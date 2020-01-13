@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package proto;
+
+import "github.com/relab/gorums/gorums.proto";
+
+service Hotstuff {
+	rpc Broadcast(Msg) returns (Msg) {
+		option (gorums.qc) = true;
+	}
+
+	rpc NewView(Msg) returns (Empty);
+}
+
+enum Type {
+	GENERIC = 0;
+	PREPARE = 1;
+	PRE_COMMIT = 2;
+	COMMIT = 3;
+	DECIDE = 4;
+	NEW_VIEW = 5;
+}
+
+message Msg {
+	Type Type = 1;
+	int32 ViewNumber = 2;
+	HSNode Node = 3;
+	QuorumCert Justify = 4;
+}
+
+message QuorumCert {
+	Type Type = 1;
+	int32 ViewNumber = 2;
+	HSNode Node = 3;
+	string Sig = 4;
+}
+
+message HSNode {
+	string ParentHash = 1;
+	string Command = 2;
+}
+
+message Empty {
+
+}
