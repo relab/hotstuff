@@ -3,13 +3,18 @@ syntax = "proto3";
 package proto;
 
 import "github.com/relab/gorums/gorums.proto";
+import "google/protobuf/empty.proto";
 
-service Hotstuff {
+service HotstuffLeader {
 	rpc Broadcast(Msg) returns (Msg) {
 		option (gorums.qc) = true;
+		option (gorums.qf_with_req) = true;
+		option (gorums.custom_return_type) = "QuorumCert";
 	}
+}
 
-	rpc NewView(Msg) returns (Empty);
+service HotstuffReplica {
+	rpc NewView(Msg) returns (google.protobuf.Empty);
 }
 
 enum Type {
@@ -38,8 +43,4 @@ message QuorumCert {
 message HSNode {
 	string ParentHash = 1;
 	string Command = 2;
-}
-
-message Empty {
-
 }

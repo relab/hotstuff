@@ -38,7 +38,7 @@ type internalMsg struct {
 
 // Broadcast is invoked as a quorum call on all nodes in configuration c,
 // using the same argument arg, and returns the result.
-func (c *Configuration) Broadcast(ctx context.Context, a *Msg) (resp *Msg, err error) {
+func (c *Configuration) Broadcast(ctx context.Context, a *Msg) (resp *QuorumCert, err error) {
 	var ti traceInfo
 	if c.mgr.opts.trace {
 		ti.Trace = trace.New("gorums."+c.tstring()+".Sent", "Broadcast")
@@ -85,7 +85,7 @@ func (c *Configuration) Broadcast(ctx context.Context, a *Msg) (resp *Msg, err e
 				ti.LazyLog(&payload{sent: false, id: r.nid, msg: r.reply}, false)
 			}
 			replyValues = append(replyValues, r.reply)
-			if resp, quorum = c.qspec.BroadcastQF(replyValues); quorum {
+			if resp, quorum = c.qspec.BroadcastQF(a, replyValues); quorum {
 				return resp, nil
 			}
 		case <-ctx.Done():
@@ -103,7 +103,7 @@ func callGRPCBroadcast(ctx context.Context, node *Node, arg *Msg, replyChan chan
 	start := time.Now()
 	err := grpc.Invoke(
 		ctx,
-		"/proto.Hotstuff/Broadcast",
+		"/proto.HotstuffLeader/Broadcast",
 		arg,
 		reply,
 		node.conn,
@@ -128,7 +128,8 @@ type Node struct {
 	conn   *grpc.ClientConn
 	logger *log.Logger
 
-	HotstuffClient HotstuffClient
+	HotstuffLeaderClient  HotstuffLeaderClient
+	HotstuffReplicaClient HotstuffReplicaClient
 
 	mu      sync.Mutex
 	lastErr error
@@ -144,7 +145,8 @@ func (n *Node) connect(opts managerOptions) error {
 		return fmt.Errorf("dialing node failed: %v", err)
 	}
 
-	n.HotstuffClient = NewHotstuffClient(n.conn)
+	n.HotstuffLeaderClient = NewHotstuffLeaderClient(n.conn)
+	n.HotstuffReplicaClient = NewHotstuffReplicaClient(n.conn)
 
 	return nil
 }
@@ -166,7 +168,7 @@ func (n *Node) close() error {
 type QuorumSpec interface {
 	// BroadcastQF is the quorum function for the Broadcast
 	// quorum call method.
-	BroadcastQF(replies []*Msg) (*Msg, bool)
+	BroadcastQF(req *Msg, replies []*Msg) (*QuorumCert, bool)
 }
 
 /* Static resources */

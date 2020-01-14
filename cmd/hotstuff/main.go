@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"strings"
+
+	"github.com/relab/hotstuff"
 )
 
 func main() {
@@ -14,7 +16,8 @@ func main() {
 	nodes := strings.Split(*addresses, ";")
 
 	if *leader {
-
+		l := &hotstuff.Leader{}
+		l.RunHotStuff()
 	} else {
 
 	}
