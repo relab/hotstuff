@@ -31,6 +31,7 @@ message Msg {
 	int32 ViewNumber = 2;
 	HSNode Node = 3;
 	QuorumCert Justify = 4;
+	string PartialSig = 5;
 }
 
 message QuorumCert {
