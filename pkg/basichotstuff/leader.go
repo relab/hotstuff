@@ -2,7 +2,9 @@ package basichotstuff
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net"
 	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
@@ -10,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+//Leader is responisble for proposing new commands to be executed.
 type Leader struct {
 	*Replica
 
@@ -17,23 +20,38 @@ type Leader struct {
 
 	leaderManager      *proto.Manager
 	leaderConfig       *proto.Configuration
-	commands           chan string
+	commands           <-chan string
 	CurrentNewViewMsgs []*proto.Msg
 	contextCancel      context.CancelFunc
 }
 
-func NewLeader(replica *Replica, majority int) *Leader {
+//NewLeader creats a new leader object.
+func NewLeader(replica *Replica, majority int, commands <-chan string) *Leader {
 	return &Leader{
 		Replica:  replica,
 		Majority: majority,
+		commands: commands,
 	}
 }
 
-func (l *Leader) creatClientConnection(reps []ReplicaInfo) bool {
+//Init sets up the required connections for communication.
+func (l *Leader) Init(addresses []string, leaderPort string, timeout time.Duration) (err error) {
+	listenPort := "42069" //ayyy lmafo
+	leaderAddr := "127.0.0.1:42070"
+	err = l.Replica.Init(listenPort, leaderAddr, timeout)
+	if err != nil {
+		return err
+	}
+	err = l.createClientConnection(addresses)
+	if err != nil {
+		return err
+	}
+	err = l.serveClients(leaderPort)
+	return err
+}
 
-	addresses := ReturnReplicaAddressesAsStingSlice(reps)
-
-	mgr, err := proto.NewManager(addresses, proto.WithGrpcDialOptions(
+func (l *Leader) createClientConnection(reps []string) error {
+	mgr, err := proto.NewManager(reps, proto.WithGrpcDialOptions(
 		grpc.WithBlock(),
 		//grpc.WithTimeout(50*time.Millisecond),
 		grpc.WithInsecure(),
@@ -41,7 +59,7 @@ func (l *Leader) creatClientConnection(reps []ReplicaInfo) bool {
 		proto.WithDialTimeout(500*time.Millisecond),
 	)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("Failed to connect to replicas: %w", err)
 	}
 
 	l.leaderManager = mgr
@@ -52,14 +70,26 @@ func (l *Leader) creatClientConnection(reps []ReplicaInfo) bool {
 	// Create a configuration including all nodes
 	conf, err := mgr.NewConfiguration(ids, l)
 	if err != nil {
-		log.Fatalln("error creating read config:", err)
+		return err
 	}
 
 	l.leaderConfig = conf
 
-	return true
+	return nil
 }
 
+func (l *Leader) serveClients(port string) error {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
+	if err != nil {
+		return fmt.Errorf("Failed to listen to port %s: %w", port, err)
+	}
+	grpcServer := grpc.NewServer()
+	proto.RegisterHotstuffReplicaServer(grpcServer, l)
+	grpcServer.Serve(lis)
+	return nil
+}
+
+//BroadcastQF creats and send the qc's.
 func (l *Leader) BroadcastQF(req *proto.Msg, replies []*proto.Msg) (*proto.QuorumCert, bool) {
 	if len(replies) < l.Majority {
 		return nil, false
@@ -103,20 +133,7 @@ func (l *Leader) BroadcastQF(req *proto.Msg, replies []*proto.Msg) (*proto.Quoru
 	return qc, true
 }
 
-// This starts the protocol.
-func (l *Leader) RunHotStuff(reps []*Replica) {
-
-	l.creatClientConnection()
-	for i, r := range l.replicas {
-		reps[i].startServer(r.Address)
-	}
-
-	for {
-
-	}
-
-}
-
+//Broadcast is a wrapper for the brodcasts that are made.
 func (l *Leader) Broadcast(msg *proto.Msg) (QC *proto.QuorumCert, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	l.contextCancel = cancel
@@ -125,6 +142,7 @@ func (l *Leader) Broadcast(msg *proto.Msg) (QC *proto.QuorumCert, err error) {
 	return
 }
 
+//NewView handels new view messages.
 func (l *Leader) NewView(ctx context.Context, msg *proto.Msg) (*empty.Empty, error) {
 	if !matchingMsg(msg, msg.GetType(), msg.GetViewNumber()) {
 		return &empty.Empty{}, nil
@@ -144,6 +162,7 @@ func (l *Leader) NewView(ctx context.Context, msg *proto.Msg) (*empty.Empty, err
 	return &empty.Empty{}, nil
 }
 
+//Prepare executs the prepare phase.
 func (l *Leader) Prepare() {
 	var maxVN *proto.Msg
 
@@ -196,6 +215,7 @@ func (l *Leader) Prepare() {
 	l.Precommit(prepareQC)
 }
 
+//Precommit executes the pre-commit phase.
 func (l *Leader) Precommit(prepareQC *proto.QuorumCert) {
 	msg := &proto.Msg{
 		Type:       proto.PRE_COMMIT,
@@ -210,6 +230,7 @@ func (l *Leader) Precommit(prepareQC *proto.QuorumCert) {
 	l.Commit(precommitQC)
 }
 
+//Commit executes the commit phase.
 func (l *Leader) Commit(precommitQC *proto.QuorumCert) {
 	msg := &proto.Msg{
 		Type:       proto.COMMIT,
@@ -224,6 +245,7 @@ func (l *Leader) Commit(precommitQC *proto.QuorumCert) {
 	l.Decide(commitQC)
 }
 
+//Decide makes the decision to give a green ligth to a command.
 func (l *Leader) Decide(commitQC *proto.QuorumCert) {
 	msg := &proto.Msg{
 		Type:       proto.DECIDE,

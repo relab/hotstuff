@@ -88,18 +88,7 @@ func comparingMsgs(m1 *proto.Msg, m2 *proto.Msg) bool {
 	return false
 }
 
-// RetrunReplicaAddressesAsStringSlice does what the name infers
-func ReturnReplicaAddressesAsStingSlice(reps []ReplicaInfo) []string {
-
-	var addresses []string
-
-	for _, ri := range reps {
-		addresses = append(addresses, ri.Address)
-	}
-
-	return addresses
-}
-
+//HashNode converts a node into a hash and retruns the hash as a string.
 func HashNode(node *proto.HSNode) string {
 	h := fnv.New64()
 	return hex.EncodeToString(h.Sum([]byte(node.GetParentHash() + node.GetCommand())))
