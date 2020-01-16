@@ -27,7 +27,7 @@ type Crypto interface {
 type NoCrypto struct{}
 
 func (c NoCrypto) Sign(msg *proto.Msg) PartialSig {
-	msg.PartialSig = "hotstuff"
+	return PartialSig("hotstuff")
 }
 
 func (c NoCrypto) Combine(t proto.Type, vn int32, n *proto.HSNode, msgs []*proto.Msg) ThresholdSig {
