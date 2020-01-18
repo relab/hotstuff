@@ -35,12 +35,22 @@ func NewReplica() *Replica {
 	genesis := &proto.HSNode{}
 	nodes := make(map[string]*proto.HSNode)
 	nodes[HashNode(genesis)] = genesis
+	childOfGenisis := &proto.HSNode{
+		ParentHash: HashNode(genesis),
+		Command:    "",
+	}
+	nodes[HashNode(childOfGenisis)] = childOfGenisis
 	return &Replica{
-		ViewNumber: 1,
+		ViewNumber: 0,
 		Crypto:     crypto.NoCrypto{},
 		genesis:    genesis,
 		Nodes:      nodes,
-		Logger:     log.New(os.Stderr, "hotstuff", log.Flags()),
+		prepareQC: &proto.QuorumCert{
+			Type:       proto.PREPARE,
+			ViewNumber: 0,
+			Node:       childOfGenisis,
+		},
+		Logger: log.New(os.Stderr, "hotstuff: ", log.Flags()),
 	}
 }
 
@@ -56,7 +66,10 @@ func (r *Replica) Init(listenPort, leaderAddr string, timeout time.Duration) (er
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	r.cancelTimeout = cancel
-	r.newViewTimeout(ctx, timeout)
+	// run NewView with timeout
+	go r.newViewTimeout(ctx, timeout)
+	// send the first new view
+	r.NewView()
 	return nil
 }
 
@@ -67,12 +80,12 @@ func (r *Replica) serveLeader(port string) error {
 	}
 	grpcServer := grpc.NewServer()
 	proto.RegisterHotstuffLeaderServer(grpcServer, r)
-	grpcServer.Serve(lis)
+	go grpcServer.Serve(lis)
 	return nil
 }
 
 func (r *Replica) dialLeader(address string) error {
-	conn, err := grpc.Dial(address)
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		return fmt.Errorf("failed to dial leader: %w", err)
 	}
@@ -176,11 +189,13 @@ func (r *Replica) HandleDecide(msg *proto.Msg) *proto.Msg {
 func (r *Replica) NewView() {
 	r.Logger.Println("NEWVIEW")
 	msg := r.Msg(proto.NEW_VIEW, nil, r.prepareQC)
-	r.ViewNumber++
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	_, err := r.client.NewView(ctx, msg)
 	if err != nil {
 		r.Logger.Println("Failed to send NewView to leader: ", err)
+	} else {
+		// dont start a new view if unable to contact leader
+		r.ViewNumber++
 	}
 	cancel()
 }

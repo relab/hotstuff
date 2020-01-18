@@ -43,9 +43,17 @@ func main() {
 			}
 		}()
 		l := basichotstuff.NewLeader(basichotstuff.NewReplica(), majority, commandsChan)
-		l.Init(replicas, *listenPort, time.Duration(*timeout)*time.Second)
+		err = l.Init(replicas, *listenPort, time.Duration(*timeout)*time.Second)
+		if err != nil {
+			log.Fatalf("Failed to init Leader: %v\n", err)
+		}
 	} else {
 		r := basichotstuff.NewReplica()
-		r.Init(*listenPort, *leaderAddr, time.Duration(*timeout)*time.Second)
+		err := r.Init(*listenPort, *leaderAddr, time.Duration(*timeout)*time.Second)
+		if err != nil {
+			log.Fatalf("Failed to init Replica: %v\n", err)
+		}
 	}
+	done := make(chan bool)
+	<-done
 }

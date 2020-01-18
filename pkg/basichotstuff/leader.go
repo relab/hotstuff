@@ -37,26 +37,27 @@ func NewLeader(replica *Replica, majority int, commands <-chan string) *Leader {
 //Init sets up the required connections for communication.
 func (l *Leader) Init(addresses []string, leaderPort string, timeout time.Duration) (err error) {
 	listenPort := "42069" //ayyy lmafo
-	leaderAddr := "127.0.0.1:42070"
+	leaderAddr := fmt.Sprintf("127.0.0.1:%s", leaderPort)
+	err = l.serveClients(leaderPort)
+	if err != nil {
+		return err
+	}
 	err = l.Replica.Init(listenPort, leaderAddr, timeout)
 	if err != nil {
 		return err
 	}
-	err = l.createClientConnection(addresses)
-	if err != nil {
-		return err
-	}
-	err = l.serveClients(leaderPort)
+	addresses = append(addresses, fmt.Sprintf("127.0.0.1:%s", listenPort))
+	err = l.createClientConnection(addresses, timeout)
 	return err
 }
 
-func (l *Leader) createClientConnection(reps []string) error {
+func (l *Leader) createClientConnection(reps []string, timeout time.Duration) error {
 	mgr, err := proto.NewManager(reps, proto.WithGrpcDialOptions(
 		grpc.WithBlock(),
 		//grpc.WithTimeout(50*time.Millisecond),
 		grpc.WithInsecure(),
 	),
-		proto.WithDialTimeout(500*time.Millisecond),
+		proto.WithDialTimeout(timeout),
 	)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to replicas: %w", err)
@@ -85,7 +86,7 @@ func (l *Leader) serveClients(port string) error {
 	}
 	grpcServer := grpc.NewServer()
 	proto.RegisterHotstuffReplicaServer(grpcServer, l)
-	grpcServer.Serve(lis)
+	go grpcServer.Serve(lis)
 	return nil
 }
 
@@ -164,8 +165,8 @@ func (l *Leader) NewView(ctx context.Context, msg *proto.Msg) (*empty.Empty, err
 
 //Prepare executs the prepare phase.
 func (l *Leader) Prepare() {
-	var maxVN *proto.Msg
-
+	l.mu.Lock()
+	maxVN := l.CurrentNewViewMsgs[0]
 	for _, msg := range l.CurrentNewViewMsgs {
 		if msg.GetViewNumber() > maxVN.GetViewNumber() && l.Crypto.Verify(msg.GetJustify()) {
 			maxVN = msg
@@ -207,6 +208,9 @@ func (l *Leader) Prepare() {
 		Justify:    highQC,
 	}
 
+	l.Logger.Printf("LEADER: Sending PREPARE: VN: %d; command: %s\n", l.ViewNumber, command)
+
+	l.mu.Unlock()
 	// TODO: figure out how to broadcast to the leader aswell
 	prepareQC, err := l.Broadcast(msg)
 	if err != nil {
