@@ -93,6 +93,11 @@ func (r *Replica) dialLeader(address string) error {
 
 // Broadcast is the function that receives a message from the leader and responds with a vote
 func (r *Replica) Broadcast(ctx context.Context, msg *proto.Msg) (*proto.Msg, error) {
+	// TODO: check if it is safe to take the leader's viewnumber at this point (its not)
+	if msg.GetViewNumber() > r.ViewNumber {
+		r.ViewNumber = msg.GetViewNumber()
+	}
+
 	if matchingMsg(msg, proto.PREPARE, r.ViewNumber) {
 		r.cancelTimeout()
 		return r.HandlePrepare(msg), nil
@@ -157,10 +162,6 @@ func (r *Replica) Msg(typ proto.Type, node *proto.HSNode, qc *proto.QuorumCert) 
 func (r *Replica) HandlePrepare(msg *proto.Msg) *proto.Msg {
 	if parent, ok := r.Nodes[msg.Node.GetParentHash()]; ok && HashNode(parent) == HashNode(msg.Justify.GetNode()) &&
 		r.SafeNode(msg.Node, msg.Justify) {
-		// TODO: check if it is safe to take the leader's viewnumber at this point
-		if msg.GetViewNumber() > r.ViewNumber {
-			r.ViewNumber = msg.GetViewNumber()
-		}
 		r.Logger.Printf("PREPARE (%d)\n", r.ViewNumber)
 		return r.voteMsg(proto.PREPARE, msg.GetNode(), nil)
 	}
@@ -201,7 +202,7 @@ func (r *Replica) NewView() {
 	if err != nil {
 		r.Logger.Println("Failed to send NewView to leader: ", err)
 		// dont start a new view if unable to contact leader
-		// r.ViewNumber--
+		r.ViewNumber--
 	}
 	cancel()
 }
