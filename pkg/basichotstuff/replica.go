@@ -35,11 +35,6 @@ func NewReplica() *Replica {
 	genesis := &proto.HSNode{}
 	nodes := make(map[string]*proto.HSNode)
 	nodes[HashNode(genesis)] = genesis
-	childOfGenisis := &proto.HSNode{
-		ParentHash: HashNode(genesis),
-		Command:    "",
-	}
-	nodes[HashNode(childOfGenisis)] = childOfGenisis
 	return &Replica{
 		ViewNumber: 0,
 		Crypto:     crypto.NoCrypto{},
@@ -48,7 +43,11 @@ func NewReplica() *Replica {
 		prepareQC: &proto.QuorumCert{
 			Type:       proto.PREPARE,
 			ViewNumber: 0,
-			Node:       childOfGenisis,
+			Node:       genesis,
+		},
+		lockedQC: &proto.QuorumCert{
+			Type:       proto.PRE_COMMIT,
+			ViewNumber: -1,
 		},
 		Logger: log.New(os.Stderr, "hotstuff: ", log.Flags()),
 	}
@@ -68,8 +67,6 @@ func (r *Replica) Init(listenPort, leaderAddr string, timeout time.Duration) (er
 	r.cancelTimeout = cancel
 	// run NewView with timeout
 	go r.newViewTimeout(ctx, timeout)
-	// send the first new view
-	r.NewView()
 	return nil
 }
 
@@ -103,41 +100,49 @@ func (r *Replica) Broadcast(ctx context.Context, msg *proto.Msg) (*proto.Msg, er
 
 	if matchingQC(msg.GetJustify(), proto.PREPARE, r.ViewNumber) {
 		r.cancelTimeout()
-		return r.HandlePrepare(msg), nil
+		return r.HandlePrecommit(msg), nil
 	}
 
 	if matchingQC(msg.GetJustify(), proto.PRE_COMMIT, r.ViewNumber) {
 		r.cancelTimeout()
-		return r.HandlePrepare(msg), nil
+		return r.HandleCommit(msg), nil
 	}
 
 	if matchingQC(msg.GetJustify(), proto.COMMIT, r.ViewNumber) {
 		r.cancelTimeout()
-		return r.HandlePrepare(msg), nil
+		return r.HandleDecide(msg), nil
 	}
 
-	return nil, nil
+	return r.Msg(proto.GENERIC, nil, nil), nil
 }
 
 //SafeNode checks if a node exstends , lockedQC's node and if highQC's view number is higher than lockedQC's. Returns true if one of the checks is ok.
 func (r *Replica) SafeNode(node *proto.HSNode, qc *proto.QuorumCert) bool {
-	return r.Nodes[node.GetParentHash()] == r.lockedQC.Node || r.lockedQC.GetViewNumber() < qc.GetViewNumber()
+	extends := false
+	if parent, ok := r.Nodes[HashNode(node)]; r.lockedQC.GetNode() != nil && ok &&
+		HashNode(r.lockedQC.GetNode()) == HashNode(parent) {
+		extends = true
+	}
+
+	return extends || r.lockedQC.GetViewNumber() < qc.GetViewNumber()
 }
 
 func (r *Replica) voteMsg(typ proto.Type, node *proto.HSNode, qc *proto.QuorumCert) (msg *proto.Msg) {
-	msg = &proto.Msg{
-		Type:       typ,
-		Node:       node,
-		ViewNumber: r.ViewNumber,
-		Justify:    qc,
-	}
-
+	msg = r.Msg(typ, node, qc)
 	msg.PartialSig = r.Crypto.Sign(msg).String()
+
 	return
 }
 
 //Msg creats a proto.Msg object.
 func (r *Replica) Msg(typ proto.Type, node *proto.HSNode, qc *proto.QuorumCert) (msg *proto.Msg) {
+	if node == nil {
+		node = &proto.HSNode{}
+	}
+	if qc == nil {
+		qc = &proto.QuorumCert{}
+	}
+
 	msg = &proto.Msg{
 		Type:       typ,
 		Node:       node,
@@ -156,23 +161,23 @@ func (r *Replica) HandlePrepare(msg *proto.Msg) *proto.Msg {
 		if msg.GetViewNumber() > r.ViewNumber {
 			r.ViewNumber = msg.GetViewNumber()
 		}
-		r.Logger.Println("PREPARE")
+		r.Logger.Printf("PREPARE (%d)\n", r.ViewNumber)
 		return r.voteMsg(proto.PREPARE, msg.GetNode(), nil)
 	}
-	return nil
+	return r.Msg(proto.GENERIC, nil, nil)
 }
 
 //HandlePrecommit handels brodcasts from the leader sendt in the pre-commit phase.
 func (r *Replica) HandlePrecommit(msg *proto.Msg) *proto.Msg {
 	r.prepareQC = msg.GetJustify()
-	r.Logger.Println("PRECOMMIT")
+	r.Logger.Printf("PRECOMMIT (%d)\n", r.ViewNumber)
 	return r.voteMsg(proto.PRE_COMMIT, msg.GetJustify().GetNode(), nil)
 }
 
 //HandleCommit handels brodcasts from the leader sendt in the commit phase.
 func (r *Replica) HandleCommit(msg *proto.Msg) *proto.Msg {
 	r.lockedQC = msg.GetJustify()
-	r.Logger.Println("COMMIT")
+	r.Logger.Printf("COMMIT (%d)\n", r.ViewNumber)
 	return r.voteMsg(proto.COMMIT, msg.GetJustify().GetNode(), nil)
 }
 
@@ -180,22 +185,23 @@ func (r *Replica) HandleCommit(msg *proto.Msg) *proto.Msg {
 func (r *Replica) HandleDecide(msg *proto.Msg) *proto.Msg {
 	// execute command
 	// proceed to next view => inc ViewCount and send NEW_VIEW
-	fmt.Print(r.lockedQC.GetNode().GetCommand())
-	r.Logger.Println("DECIDE")
-	return r.Msg(proto.NEW_VIEW, nil, r.prepareQC)
+	r.Logger.Printf("DECIDE (%d): %s", r.ViewNumber, r.lockedQC.GetNode().GetCommand())
+	nw := r.Msg(proto.NEW_VIEW, nil, r.prepareQC)
+	r.ViewNumber++
+	return nw
 }
 
 //NewView sends a grpc packet to the leader, requesting that is new view starts. This is sendt if a replica times out.
 func (r *Replica) NewView() {
-	r.Logger.Println("NEWVIEW")
+	r.Logger.Printf("NEWVIEW (%d)\n", r.ViewNumber)
 	msg := r.Msg(proto.NEW_VIEW, nil, r.prepareQC)
+	r.ViewNumber++
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	_, err := r.client.NewView(ctx, msg)
 	if err != nil {
 		r.Logger.Println("Failed to send NewView to leader: ", err)
-	} else {
 		// dont start a new view if unable to contact leader
-		r.ViewNumber++
+		// r.ViewNumber--
 	}
 	cancel()
 }

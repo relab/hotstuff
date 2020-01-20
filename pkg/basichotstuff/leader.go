@@ -157,7 +157,10 @@ func (l *Leader) NewView(ctx context.Context, msg *proto.Msg) (*empty.Empty, err
 		if l.contextCancel != nil {
 			l.contextCancel()
 		}
-		go l.Prepare()
+		// just in case this is called before the leader gets to start
+		if l.leaderConfig != nil {
+			go l.Prepare()
+		}
 	}
 
 	return &empty.Empty{}, nil
@@ -166,6 +169,10 @@ func (l *Leader) NewView(ctx context.Context, msg *proto.Msg) (*empty.Empty, err
 //Prepare executs the prepare phase.
 func (l *Leader) Prepare() {
 	l.mu.Lock()
+	if len(l.CurrentNewViewMsgs) < l.Majority {
+		l.mu.Unlock()
+		return
+	}
 	maxVN := l.CurrentNewViewMsgs[0]
 	for _, msg := range l.CurrentNewViewMsgs {
 		if msg.GetViewNumber() > maxVN.GetViewNumber() && l.Crypto.Verify(msg.GetJustify()) {
@@ -189,24 +196,12 @@ func (l *Leader) Prepare() {
 		command = ""
 	}
 
-	// Need to check that parent exists
-	parent, ok := l.Nodes[highQC.GetNode().GetParentHash()]
-	if !ok {
-		// but its just a prototype, so who cares
-		log.Fatalf("Node contained parent which does not exist!")
-	}
-
 	node := &proto.HSNode{
-		ParentHash: HashNode(parent),
+		ParentHash: HashNode(highQC.GetNode()),
 		Command:    command,
 	}
 
-	msg := &proto.Msg{
-		Type:       proto.PREPARE,
-		ViewNumber: l.ViewNumber,
-		Node:       node,
-		Justify:    highQC,
-	}
+	msg := l.Msg(proto.PREPARE, node, highQC)
 
 	l.Logger.Printf("LEADER: Sending PREPARE: VN: %d; command: %s\n", l.ViewNumber, command)
 
@@ -214,52 +209,44 @@ func (l *Leader) Prepare() {
 	// TODO: figure out how to broadcast to the leader aswell
 	prepareQC, err := l.Broadcast(msg)
 	if err != nil {
-		log.Fatalf("Error on PREPARE: %v\n", err)
+		log.Printf("Error on PREPARE: %v\n", err)
+		return
 	}
 	l.Precommit(prepareQC)
 }
 
 //Precommit executes the pre-commit phase.
 func (l *Leader) Precommit(prepareQC *proto.QuorumCert) {
-	msg := &proto.Msg{
-		Type:       proto.PRE_COMMIT,
-		ViewNumber: l.ViewNumber,
-		Node:       nil,
-		Justify:    prepareQC,
-	}
+	msg := l.Msg(proto.PRE_COMMIT, nil, prepareQC)
+	l.Logger.Printf("LEADER: Sending PRE_COMMIT: VN: %d\n", l.ViewNumber)
 	precommitQC, err := l.Broadcast(msg)
 	if err != nil {
-		log.Fatalf("Error on PRECOMMIT: %v\n", err)
+		log.Printf("Error on PRECOMMIT: %v\n", err)
+		return
 	}
 	l.Commit(precommitQC)
 }
 
 //Commit executes the commit phase.
 func (l *Leader) Commit(precommitQC *proto.QuorumCert) {
-	msg := &proto.Msg{
-		Type:       proto.COMMIT,
-		ViewNumber: l.ViewNumber,
-		Node:       nil,
-		Justify:    precommitQC,
-	}
+	msg := l.Msg(proto.COMMIT, nil, precommitQC)
+	l.Logger.Printf("LEADER: Sending COMMIT: VN: %d\n", l.ViewNumber)
 	commitQC, err := l.Broadcast(msg)
 	if err != nil {
-		log.Fatalf("Error on COMMIT: %v\n", err)
+		log.Printf("Error on COMMIT: %v\n", err)
+		return
 	}
 	l.Decide(commitQC)
 }
 
 //Decide makes the decision to give a green ligth to a command.
 func (l *Leader) Decide(commitQC *proto.QuorumCert) {
-	msg := &proto.Msg{
-		Type:       proto.DECIDE,
-		ViewNumber: l.ViewNumber,
-		Node:       nil,
-		Justify:    commitQC,
-	}
+	msg := l.Msg(proto.DECIDE, nil, commitQC)
+	l.Logger.Printf("LEADER: Sending DECIDE: VN: %d\n", l.ViewNumber)
 	_, err := l.Broadcast(msg)
 	if err != nil {
-		log.Fatalf("Error on DECIDE: %v\n", err)
+		log.Printf("Error on DECIDE: %v\n", err)
+		return
 	}
 	l.Prepare()
 }
