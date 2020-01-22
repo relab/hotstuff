@@ -5,7 +5,7 @@ package proto;
 import "github.com/relab/gorums/gorums.proto";
 import "google/protobuf/empty.proto";
 
-service HotstuffLeader {
+service Hotstuff {
 	rpc Broadcast(Msg) returns (Msg) {
 		option (gorums.qc) = true;
 		option (gorums.qf_with_req) = true;
@@ -13,17 +13,13 @@ service HotstuffLeader {
 	}
 }
 
-service HotstuffReplica {
+service Pacemaker {
 	rpc NewView(Msg) returns (google.protobuf.Empty);
 }
 
 enum Type {
 	GENERIC = 0;
-	PREPARE = 1;
-	PRE_COMMIT = 2;
-	COMMIT = 3;
-	DECIDE = 4;
-	NEW_VIEW = 5;
+	NEW_VIEW = 1;
 }
 
 message Msg {
