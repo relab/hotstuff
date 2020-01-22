@@ -1,44 +1,84 @@
 package hotstuff
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"fmt"
 	"math/big"
+	"sync"
 )
 
-type PartialSig struct {
-	ID   ReplicaID
-	R, S *big.Int
+// partialSig is a single replica's signature of a node.
+type partialSig struct {
+	id   ReplicaID
+	r, s *big.Int
 }
 
-type QuorumSig []*PartialSig
+// PartialCert is a single replica's certificate for a node.
+type PartialCert struct {
+	sig  partialSig
+	hash []byte
+}
 
-func CreatePartialSig(id ReplicaID, privKey *ecdsa.PrivateKey, hash []byte) (*PartialSig, error) {
+// QuorumCert is a certificate for a node from a quorum of replicas.
+type QuorumCert struct {
+	mut  sync.Mutex
+	sigs []partialSig
+	hash []byte
+}
+
+// AddPartial adds the partial signature to the quorum cert.
+func (qc *QuorumCert) AddPartial(cert PartialCert) error {
+	qc.mut.Lock()
+	defer qc.mut.Unlock()
+
+	if !bytes.Equal(qc.hash, cert.hash) {
+		return fmt.Errorf("Partial cert hash does not match quorum cert")
+	}
+
+	qc.sigs = append(qc.sigs, cert.sig)
+
+	return nil
+}
+
+// CreatePartialCert creates a partial cert from a node.
+func CreatePartialCert(id ReplicaID, privKey *ecdsa.PrivateKey, node *Node) (*PartialCert, error) {
+	hash := node.Hash()
 	r, s, err := ecdsa.Sign(rand.Reader, privKey, hash)
 	if err != nil {
 		return nil, err
 	}
-	return &PartialSig{ ID: id, R: r, S: s }, nil
+	sig := partialSig{id, r, s}
+	return &PartialCert{sig, hash}, nil
 }
 
-func VerifyPartialSig(conf ReplicaConfig, hash []byte, ps *PartialSig) bool {
-	info, ok := conf.Replicas[ps.ID]
+// VerifyPartialCert will verify a PartialCert from a public key stored in ReplicaConfig
+func VerifyPartialCert(conf ReplicaConfig, cert *PartialCert) bool {
+	info, ok := conf.Replicas[cert.sig.id]
 	if !ok {
-		logger.Printf("VerifyPartialSig: got signature from replica whose ID (%d) was not in config.", ps.ID)
+		logger.Printf("VerifyPartialSig: got signature from replica whose ID (%d) was not in config.", cert.sig.id)
 		return false
 	}
-	return ecdsa.Verify(info.PubKey, hash, ps.R, ps.S)
+	return ecdsa.Verify(info.PubKey, cert.hash, cert.sig.s, cert.sig.s)
 }
 
-func VerifyQuorumSig(conf ReplicaConfig, hash []byte, qs QuorumSig) bool {
+// VerifyQuorumCert will verify a QuorumCert from public keys stored in ReplicaConfig
+func VerifyQuorumCert(conf ReplicaConfig, qc QuorumCert) bool {
+	qc.mut.Lock()
+	defer qc.mut.Unlock()
+
+	if len(qc.sigs) < conf.Majority {
+		return false
+	}
 	numVerified := 0
-	for _, sig := range qs {
-		info, ok := conf.Replicas[sig.ID]
+	for _, psig := range qc.sigs {
+		info, ok := conf.Replicas[psig.id]
 		if !ok {
-			logger.Printf("VerifyQuorumSig: got signature from replica whose ID (%d) was not in config.", sig.ID)
+			logger.Printf("VerifyQuorumSig: got signature from replica whose ID (%d) was not in config.", psig.id)
 		}
 
-		if ecdsa.Verify(info.PubKey, hash, sig.R, sig.S) {
+		if ecdsa.Verify(info.PubKey, qc.hash, psig.r, psig.s) {
 			numVerified++
 		}
 	}
