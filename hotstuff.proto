@@ -6,38 +6,33 @@ import "github.com/relab/gorums/gorums.proto";
 import "google/protobuf/empty.proto";
 
 service Hotstuff {
-	rpc Broadcast(Msg) returns (Msg) {
+	rpc Propose(HSNode) returns (PartialCert) {
 		option (gorums.qc) = true;
 		option (gorums.qf_with_req) = true;
 		option (gorums.custom_return_type) = "QuorumCert";
 	}
-}
-
-service Pacemaker {
-	rpc NewView(Msg) returns (google.protobuf.Empty);
-}
-
-enum Type {
-	GENERIC = 0;
-	NEW_VIEW = 1;
-}
-
-message Msg {
-	Type Type = 1;
-	int32 ViewNumber = 2;
-	HSNode Node = 3;
-	QuorumCert Justify = 4;
-	string PartialSig = 5;
-}
-
-message QuorumCert {
-	Type Type = 1;
-	int32 ViewNumber = 2;
-	HSNode Node = 3;
-	string Sig = 4;
+	rpc NewView(QuorumCert) returns (google.protobuf.Empty);
 }
 
 message HSNode {
-	string ParentHash = 1;
-	string Command = 2;
+	bytes ParentHash = 1;
+	bytes Command = 2;
+	QuorumCert QC = 3;
+	int64 Height = 4;
+}
+
+message PartialSig {
+	int32 ReplicaID = 1;
+	bytes R = 2;
+	bytes S = 3;
+}
+
+message PartialCert {
+	PartialSig Sig = 1;
+	bytes Hash = 2;
+}
+
+message QuorumCert {
+	repeated PartialSig Sigs = 1;
+	bytes Hash = 2;
 }
