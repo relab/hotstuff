@@ -85,6 +85,7 @@ func (s *MapStorage) Get(hash NodeHash) (node *Node, ok bool) {
 	return
 }
 
+// Node returns the node associated with the quorum cert
 func (s *MapStorage) Node(qc *QuorumCert) (node *Node, ok bool) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
@@ -93,6 +94,7 @@ func (s *MapStorage) Node(qc *QuorumCert) (node *Node, ok bool) {
 	return
 }
 
+// Parent returns the parent of the given node
 func (s *MapStorage) Parent(child *Node) (parent *Node, ok bool) {
 	s.mut.Lock()
 	defer s.mut.Unlock()

@@ -75,7 +75,7 @@ type QuorumCert struct {
 	hash NodeHash
 }
 
-func (qc QuorumCert) toProto() *proto.QuorumCert {
+func (qc *QuorumCert) toProto() *proto.QuorumCert {
 	sigs := make([]*proto.PartialSig, 0, len(qc.sigs))
 	for _, psig := range qc.sigs {
 		sigs = append(sigs, psig.toProto())
@@ -233,6 +233,7 @@ func ReadPrivateKeyFile(keyFile string) (key *ecdsa.PrivateKey, err error) {
 	return
 }
 
+// ReadPublicKeyFile reads a public key from the specified file
 func ReadPublicKeyFile(keyFile string) (key *ecdsa.PublicKey, err error) {
 	d, err := ioutil.ReadFile(keyFile)
 	if err != nil {

@@ -15,12 +15,12 @@ func createLeaf(parent *Node, cmd []byte, qc *QuorumCert, height int) *Node {
 	}
 }
 
-func (r *Replica) Update(node *Node) {
+func (r *Replica) update(node *Node) {
 	node1, _ := r.nodes.Get(node.Justify.hash)
 	node2, _ := r.nodes.Get(node1.Justify.hash)
 	node3, _ := r.nodes.Get(node2.Justify.hash)
 
-	r.pm.UpdateQCHigh(*node.Justify)
+	r.pm.UpdateQCHigh(node.Justify)
 
 	if node2.Height > r.bLock.Height {
 		r.bLock = node2
@@ -40,6 +40,7 @@ func (r *Replica) commit(node *Node) {
 	if r.bLock.Height < node.Height {
 		if parent, ok := r.nodes.Parent(node); ok {
 			r.commit(parent)
+			// TODO: Implement some way to execute the command
 			// exec(node.Command) // execute the commmand in the node. this is the last step in a nodes life.
 		}
 	}

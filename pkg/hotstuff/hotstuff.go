@@ -25,19 +25,23 @@ func init() {
 	}
 }
 
+// ReplicaID is the id of a replica
 type ReplicaID int
 
+// ReplicaInfo holds information about a replica
 type ReplicaInfo struct {
 	ID     ReplicaID
 	Socket string
 	PubKey *ecdsa.PublicKey
 }
 
+// ReplicaConfig holds information needed by a replica
 type ReplicaConfig struct {
 	Replicas   map[ReplicaID]ReplicaInfo
 	QuorumSize int
 }
 
+// Replica implements the hotstuff protocol
 type Replica struct {
 	*ReplicaConfig
 
@@ -86,8 +90,7 @@ func (r *Replica) createClientConnection(addressInfo []string, timeout time.Dura
 	return nil
 }
 
-// this is in practicalety the onPropose function
-
+// ProposeQF takes replies from replica after the leader calls the Propose QC and collects them into a quorum cert
 func (r *Replica) ProposeQF(req *proto.HSNode, replies []*proto.PartialCert) (*proto.QuorumCert, bool) {
 	if len(replies) < r.ReplicaConfig.QuorumSize {
 		return nil, false
@@ -96,7 +99,7 @@ func (r *Replica) ProposeQF(req *proto.HSNode, replies []*proto.PartialCert) (*p
 	for _, pc := range replies {
 		qc.AddPartial(partialCertFromProto(pc))
 	}
-	r.pm.UpdateQCHigh(*qc)
+	r.pm.UpdateQCHigh(qc)
 	protoQC := qc.toProto()
 
 	return protoQC, true
@@ -113,12 +116,13 @@ func (r *Replica) serveBrodcast(port string) error {
 	return nil
 }
 
+// Propose handles a replica's response to the Propose QC from the leader
 func (r *Replica) Propose(ctx context.Context, node *proto.HSNode) (*proto.PartialCert, error) {
 	normalNode := nodeFromProto(node)
 
-	defer r.Update(normalNode) // update is in the consensus file
+	defer r.update(normalNode) // update is in the consensus file
 
-	if normalNode.Height > r.vHeight && safeNode(*r, *normalNode) {
+	if normalNode.Height > r.vHeight && r.safeNode(normalNode) {
 		r.vHeight = normalNode.Height
 		pc, _ := CreatePartialCert(r.id, r.privKey, normalNode)
 		return pc.toProto(), nil
@@ -127,11 +131,12 @@ func (r *Replica) Propose(ctx context.Context, node *proto.HSNode) (*proto.Parti
 	return nil, nil
 }
 
+// NewView handles the leader's response to receiving a NewView rpc from a replica
 func (r *Replica) NewView(ctx context.Context, msg *proto.QuorumCert) (*empty.Empty, error) {
 	return &empty.Empty{}, nil
 }
 
-func safeNode(r Replica, node Node) bool {
+func (r *Replica) safeNode(node *Node) bool {
 	parent, _ := r.nodes.Get(node.ParentHash)
 	qcNode, _ := r.nodes.Node(node.Justify)
 	return parent == r.bLock || qcNode.Height > r.bLock.Height

@@ -5,5 +5,5 @@ type Pacemaker interface {
 	GetLeader() int
 	Beat(cmd []byte)
 	NextSyncView()
-	UpdateQCHigh(newQC QuorumCert)
+	UpdateQCHigh(newQC *QuorumCert)
 }
