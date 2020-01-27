@@ -3,6 +3,7 @@ package hotstuff
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -26,10 +27,11 @@ func init() {
 }
 
 // ReplicaID is the id of a replica
-type ReplicaID int
+type ReplicaID uint32
 
 // ReplicaInfo holds information about a replica
 type ReplicaInfo struct {
+	*proto.Node
 	ID     ReplicaID
 	Socket string
 	PubKey *ecdsa.PublicKey
@@ -59,7 +61,6 @@ type Replica struct {
 	config  *proto.Configuration
 
 	privKey *ecdsa.PrivateKey
-	pubKey  *ecdsa.PublicKey
 }
 
 func (r *Replica) createClientConnection(addressInfo []string, timeout time.Duration) error {
@@ -133,6 +134,22 @@ func (r *Replica) Propose(ctx context.Context, node *proto.HSNode) (*proto.Parti
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica
 func (r *Replica) NewView(ctx context.Context, msg *proto.QuorumCert) (*empty.Empty, error) {
+
+	r.pm.UpdateQCHigh(quorumCertFromProto(msg))
+
+	return &empty.Empty{}, nil
+}
+
+// LeaderChange handles an incoming LeaderUpdate message for a new leader.
+func (r *Replica) LeaderChange(ctx context.Context, msg *proto.LeaderUpdate) (*empty.Empty, error) {
+	qc := quorumCertFromProto(msg.GetQC())
+	sig := partialSigFromProto(msg.GetSig())
+	hash := sha256.Sum256(qc.toBytes())
+	info, ok := r.Replicas[r.pm.GetLeader()]
+	if ok && ecdsa.Verify(info.PubKey, hash[:], sig.r, sig.s) {
+		r.pm.UpdateQCHigh(qc)
+		// TODO: start a new proposal
+	}
 	return &empty.Empty{}, nil
 }
 
@@ -140,4 +157,8 @@ func (r *Replica) safeNode(node *Node) bool {
 	parent, _ := r.nodes.Get(node.ParentHash)
 	qcNode, _ := r.nodes.Node(node.Justify)
 	return parent == r.bLock || qcNode.Height > r.bLock.Height
+}
+
+func (r *Replica) runHotStuff() {
+
 }

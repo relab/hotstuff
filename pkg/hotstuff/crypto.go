@@ -6,6 +6,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/binary"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
@@ -33,6 +34,16 @@ func (p partialSig) toProto() *proto.PartialSig {
 		R:         r,
 		S:         s,
 	}
+}
+
+func (p partialSig) toBytes() []byte {
+	var b []byte
+	i := make([]byte, 4)
+	binary.LittleEndian.PutUint32(i, uint32(p.id))
+	b = append(b, i...)
+	b = append(b, p.r.Bytes()...)
+	b = append(b, p.s.Bytes()...)
+	return b
 }
 
 func partialSigFromProto(pps *proto.PartialSig) partialSig {
@@ -76,6 +87,9 @@ type QuorumCert struct {
 }
 
 func (qc *QuorumCert) toProto() *proto.QuorumCert {
+	qc.mut.Lock()
+	defer qc.mut.Unlock()
+
 	sigs := make([]*proto.PartialSig, 0, len(qc.sigs))
 	for _, psig := range qc.sigs {
 		sigs = append(sigs, psig.toProto())
@@ -84,6 +98,18 @@ func (qc *QuorumCert) toProto() *proto.QuorumCert {
 		Sigs: sigs,
 		Hash: qc.hash[:],
 	}
+}
+
+func (qc *QuorumCert) toBytes() []byte {
+	qc.mut.Lock()
+	defer qc.mut.Unlock()
+
+	var b []byte
+	b = append(b, qc.hash[:]...)
+	for _, psig := range qc.sigs {
+		b = append(b, psig.toBytes()...)
+	}
+	return b
 }
 
 func quorumCertFromProto(pqc *proto.QuorumCert) *QuorumCert {

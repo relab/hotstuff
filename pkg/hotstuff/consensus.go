@@ -2,6 +2,10 @@ package hotstuff
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/rand"
+	"crypto/sha256"
+	"github.com/relab/hotstuff/pkg/proto"
 	"time"
 )
 
@@ -51,14 +55,37 @@ func receiveProposal() {} // this should be a quorum server function
 
 func onReciveVote() {} // this should be a function the quorum
 
-func propose(leafNode *Node, cmd []byte, highQC *QuorumCert, r *Replica) {
+func propose(leafNode *Node, cmd []byte, highQC *QuorumCert, r *Replica) *Node {
 
 	newNode := createLeaf(leafNode, cmd, highQC, leafNode.Height+1)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	r.config.Propose(ctx, newNode.toProto())
+	qc, err := r.config.Propose(ctx, newNode.toProto())
+	if err != nil {
+		logger.Println("ProposeQC finished with error: ", err)
+	} else {
+		r.doLeaderChange(quorumCertFromProto(qc))
+	}
 	cancel()
+	return newNode
 } // this is the quorum call the client(the leader) makes.
+
+func (r *Replica) doLeaderChange(qc *QuorumCert) {
+	hash := sha256.Sum256(qc.toBytes())
+	R, S, err := ecdsa.Sign(rand.Reader, r.privKey, hash[:])
+	if err != nil {
+		logger.Println("Failed to sign QC for leader change: ", err)
+		return
+	}
+	sig := &partialSig{r.id, R, S}
+	upd := &proto.LeaderUpdate{QC: qc.toProto(), Sig: sig.toProto()}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	_, err = r.Replicas[r.pm.GetLeader()].HotstuffClient.LeaderChange(ctx, upd)
+	if err != nil {
+		logger.Println("Failed to perform leader update: ", err)
+	}
+	cancel()
+}
 
 // The idea of the flow is that propose is called -> reciveProposal receives the propsal sendt by propose. recives sends the votes back to
 // propose(poropse is blocking atm). After propose stops blocking, due to geting the needed info from receiveProposal, onReciveVote is triggerd by propose.

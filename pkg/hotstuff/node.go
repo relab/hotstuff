@@ -35,8 +35,7 @@ func (n Node) Hash() NodeHash {
 	height := make([]byte, 8)
 	binary.LittleEndian.PutUint64(height, uint64(n.Height))
 	toHash = append(toHash, height...)
-
-	// TODO: Figure out if we need to include Justify in the hash
+	toHash = append(toHash, n.Justify.toBytes()...)
 	return sha256.Sum256(toHash)
 }
 

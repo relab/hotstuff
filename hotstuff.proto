@@ -12,6 +12,12 @@ service Hotstuff {
 		option (gorums.custom_return_type) = "QuorumCert";
 	}
 	rpc NewView(QuorumCert) returns (google.protobuf.Empty);
+	rpc LeaderChange(LeaderUpdate) returns (google.protobuf.Empty);
+}
+
+message LeaderUpdate {
+	QuorumCert QC = 1;
+	PartialSig Sig = 2;
 }
 
 message HSNode {
