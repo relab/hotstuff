@@ -1,57 +1,36 @@
 package hotstuff
 
-import "context"
-
-import "time"
-
 // Pacemaker is a mechanism that provides synchronization
 type Pacemaker interface {
 	GetLeader() ReplicaID
-	Beat(cmd []byte)
-	NextSyncView()
-	UpdateQCHigh(newQC *QuorumCert)
 }
 
-//StandardPacemaker is the standard implementation of the pacmaker interface.
-type StandardPacemaker struct {
-	qcHigh    *QuorumCert
-	bLeaf     *Node
-	replica   *Replica
-	GetLeader func() ReplicaID
+// FixedLeaderPacemaker uses a fixed leader.
+type FixedLeaderPacemaker struct {
+	hs     *HotStuff
+	leader ReplicaID
 }
 
-//UpdateQCHigh updates the qc held by the paceMaker, to the newest qc.
-func (p *StandardPacemaker) UpdateQCHigh(qc *QuorumCert) bool {
+// GetLeader returns the fixed ID of the leader
+func (p FixedLeaderPacemaker) GetLeader() ReplicaID {
+	return p.leader
+}
 
-	newQCHighNode, _ := p.replica.nodes.Get(qc.hash)
-
-	oldQCHighNode, _ := p.replica.nodes.Get(p.qcHigh.hash)
-
-	if newQCHighNode.Height > oldQCHighNode.Height {
-
-		p.qcHigh = qc
-		p.bLeaf, _ = p.replica.nodes.Get(p.qcHigh.hash)
-
-		return true
+// Beat make the leader brodcast a new proposal for a node to work on.
+func (p FixedLeaderPacemaker) Beat() {
+	if p.hs.id == p.GetLeader() {
+		p.hs.bLeaf = p.hs.Propose()
 	}
-	return false
 }
 
-//Beat make the leader brodcast a new proposal for a node to work on.
-func (p *StandardPacemaker) Beat(cmd []byte) {
-
-	if p.replica.id == p.GetLeader() {
-		p.bLeaf = propose(p.bLeaf, cmd, p.qcHigh, p.replica)
+// Start runs the pacemaker which will beat when the previous QC is completed
+func (p FixedLeaderPacemaker) Start() {
+	go p.Beat()
+	notify := p.hs.GetNotifier()
+	for n := range notify {
+		switch n.Event {
+		case QCFinish:
+			go p.Beat()
+		}
 	}
-
-}
-
-//NextSyncView sends a newView message to the leader replica.
-func (p *StandardPacemaker) NextSyncView() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	_, err := p.replica.Replicas[p.GetLeader()].HotstuffClient.NewView(ctx, p.qcHigh.toProto())
-	if err != nil {
-		logger.Println("Failed to send new view to leader: ", err)
-	}
-	cancel()
 }

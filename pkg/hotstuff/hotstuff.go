@@ -3,18 +3,16 @@ package hotstuff
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/hotstuff/pkg/proto"
-	"google.golang.org/grpc"
 )
 
 var logger *log.Logger
@@ -31,7 +29,7 @@ type ReplicaID uint32
 
 // ReplicaInfo holds information about a replica
 type ReplicaInfo struct {
-	*proto.Node
+	proto.HotstuffClient
 	ID     ReplicaID
 	Socket string
 	PubKey *ecdsa.PublicKey
@@ -43,122 +41,211 @@ type ReplicaConfig struct {
 	QuorumSize int
 }
 
-// Replica implements the hotstuff protocol
-type Replica struct {
-	*ReplicaConfig
+// Event is the type of notification sent to pacemaker
+type Event uint8
 
-	mu      sync.Mutex
+// These are the types of events that can be sent to pacemaker
+const (
+	QCFinish Event = iota
+	Propose
+	ReceiveProposal
+	HQCUpdate
+)
+
+// Notification sends information about a protocol state change to the pacemaker
+type Notification struct {
+	Event Event
+	Node  *Node
+	QC    *QuorumCert
+}
+
+// HotStuff is an instance of the hotstuff protocol
+type HotStuff struct {
+	*ReplicaConfig
+	mu sync.Mutex
+
+	// protocol data
 	vHeight int
 	bLock   *Node
 	bExec   *Node
+	bLeaf   *Node
+	qcHigh  *QuorumCert
 
-	id ReplicaID
-
-	nodes NodeStorage
-	pm    Pacemaker
+	id      ReplicaID
+	nodes   NodeStorage
+	privKey *ecdsa.PrivateKey
+	timeout time.Duration
 
 	manager *proto.Manager
 	config  *proto.Configuration
 
-	privKey *ecdsa.PrivateKey
+	pm Pacemaker
+	// Notifications will be sent to pacemaker on this channel
+	pmNotifyChan chan Notification
+
+	// interaction with the outside application happens through these
+	Commands <-chan []byte
+	Exec     func([]byte)
 }
 
-func (r *Replica) createClientConnection(addressInfo []string, timeout time.Duration) error {
-	mgr, err := proto.NewManager(addressInfo, proto.WithGrpcDialOptions(
-		grpc.WithBlock(),
-		//grpc.WithTimeout(50*time.Millisecond),
-		grpc.WithInsecure(),
-	),
-		proto.WithDialTimeout(timeout),
-	)
-	if err != nil {
-		return fmt.Errorf("Failed to connect to replicas: %w", err)
-	}
-
-	r.manager = mgr
-
-	// Get all all available node ids
-	ids := mgr.NodeIDs()
-
-	// Create a configuration including all nodes
-	conf, err := mgr.NewConfiguration(ids, r)
-	if err != nil {
-		return err
-	}
-
-	r.config = conf
-
-	return nil
+// GetNotifier returns a channel where the pacemaker can listen for notifications
+func (hs *HotStuff) GetNotifier() <-chan Notification {
+	return hs.pmNotifyChan
 }
 
-// ProposeQF takes replies from replica after the leader calls the Propose QC and collects them into a quorum cert
-func (r *Replica) ProposeQF(req *proto.HSNode, replies []*proto.PartialCert) (*proto.QuorumCert, bool) {
-	if len(replies) < r.ReplicaConfig.QuorumSize {
-		return nil, false
-	}
-	qc := CreateQuorumCert(nodeFromProto(req))
-	for _, pc := range replies {
-		qc.AddPartial(partialCertFromProto(pc))
-	}
-	r.pm.UpdateQCHigh(qc)
-	protoQC := qc.toProto()
-
-	return protoQC, true
+func (hs *HotStuff) pmNotify(n Notification) {
+	hs.pmNotifyChan <- n
 }
 
-func (r *Replica) serveBrodcast(port string) error {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
-	if err != nil {
-		return fmt.Errorf("Failed to listen to port %s: %w", port, err)
+// UpdateQCHigh updates the qc held by the paceMaker, to the newest qc.
+func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
+	if !VerifyQuorumCert(hs.ReplicaConfig, qc) {
+		return false
 	}
-	grpcServer := grpc.NewServer()
-	proto.RegisterHotstuffServer(grpcServer, r)
-	go grpcServer.Serve(lis)
-	return nil
+
+	newQCHighNode, ok := hs.nodes.Get(qc.hash)
+	if !ok {
+		return false
+	}
+
+	oldQCHighNode, ok := hs.nodes.Get(hs.qcHigh.hash)
+	if !ok {
+		panic(fmt.Errorf("Node from the old qcHigh missing from storage"))
+	}
+
+	if newQCHighNode.Height > oldQCHighNode.Height {
+		hs.qcHigh = qc
+		hs.bLeaf = newQCHighNode
+		go hs.pmNotify(Notification{HQCUpdate, newQCHighNode, qc})
+		return true
+	}
+	return false
 }
 
-// Propose handles a replica's response to the Propose QC from the leader
-func (r *Replica) Propose(ctx context.Context, node *proto.HSNode) (*proto.PartialCert, error) {
-	normalNode := nodeFromProto(node)
+// OnReceiveProposal handles a replica's response to the Proposal from the leader
+func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
+	defer hs.update(node)
 
-	defer r.update(normalNode) // update is in the consensus file
-
-	if normalNode.Height > r.vHeight && r.safeNode(normalNode) {
-		r.vHeight = normalNode.Height
-		pc, _ := CreatePartialCert(r.id, r.privKey, normalNode)
-		return pc.toProto(), nil
+	if node.Height > hs.vHeight && hs.safeNode(node) {
+		hs.vHeight = node.Height
+		pc, err := CreatePartialCert(hs.id, hs.privKey, node)
+		go hs.pmNotify(Notification{HQCUpdate, node, nil})
+		return pc, err
 	}
 
 	return nil, nil
 }
 
-// NewView handles the leader's response to receiving a NewView rpc from a replica
-func (r *Replica) NewView(ctx context.Context, msg *proto.QuorumCert) (*empty.Empty, error) {
-
-	r.pm.UpdateQCHigh(quorumCertFromProto(msg))
-
-	return &empty.Empty{}, nil
+// OnReceiveNewView handles the leader's response to receiving a NewView rpc from a replica
+func (hs *HotStuff) onReceiveNewView(qc *QuorumCert) {
+	hs.UpdateQCHigh(qc)
 }
 
-// LeaderChange handles an incoming LeaderUpdate message for a new leader.
-func (r *Replica) LeaderChange(ctx context.Context, msg *proto.LeaderUpdate) (*empty.Empty, error) {
-	qc := quorumCertFromProto(msg.GetQC())
-	sig := partialSigFromProto(msg.GetSig())
+// OnReceiveLeaderChange handles an incoming LeaderUpdate message for a new leader.
+func (hs *HotStuff) onReceiveLeaderChange(qc *QuorumCert, sig partialSig) {
 	hash := sha256.Sum256(qc.toBytes())
-	info, ok := r.Replicas[r.pm.GetLeader()]
+	info, ok := hs.Replicas[hs.pm.GetLeader()]
 	if ok && ecdsa.Verify(info.PubKey, hash[:], sig.r, sig.s) {
-		r.pm.UpdateQCHigh(qc)
+		hs.UpdateQCHigh(qc)
 		// TODO: start a new proposal
 	}
-	return &empty.Empty{}, nil
 }
 
-func (r *Replica) safeNode(node *Node) bool {
-	parent, _ := r.nodes.Get(node.ParentHash)
-	qcNode, _ := r.nodes.Node(node.Justify)
-	return parent == r.bLock || qcNode.Height > r.bLock.Height
+func (hs *HotStuff) safeNode(node *Node) bool {
+	parent, _ := hs.nodes.Get(node.ParentHash)
+	qcNode, _ := hs.nodes.Node(node.Justify)
+	return parent == hs.bLock || qcNode.Height > hs.bLock.Height
 }
 
-func (r *Replica) runHotStuff() {
+func (hs *HotStuff) update(node *Node) {
+	// node1 = b'', node2 = b', node3 = b
+	node1, _ := hs.nodes.Get(node.Justify.hash)
+	node2, _ := hs.nodes.Get(node1.Justify.hash)
+	node3, _ := hs.nodes.Get(node2.Justify.hash)
 
+	hs.UpdateQCHigh(node.Justify)
+
+	if node2.Height > hs.bLock.Height {
+		hs.bLock = node2
+	}
+
+	parent1, _ := hs.nodes.Get(node1.ParentHash)
+	parent2, _ := hs.nodes.Get(node2.ParentHash)
+
+	if parent1 == node2 && parent2 == node3 {
+		hs.commit(node3)
+		hs.bExec = node3
+	}
+}
+
+func (hs *HotStuff) commit(node *Node) {
+
+	if hs.bLock.Height < node.Height {
+		if parent, ok := hs.nodes.Parent(node); ok {
+			hs.commit(parent)
+			// TODO: Implement some way to execute the command
+			hs.Exec(node.Command) // execute the commmand in the node. this is the last step in a nodes life.
+		}
+	}
+
+}
+
+// Propose will fetch a command from the Commands channel and proposes it to the other replicas
+func (hs *HotStuff) Propose() *Node {
+	cmd := <-hs.Commands
+	newNode := createLeaf(hs.bLeaf, cmd, hs.qcHigh, hs.bLeaf.Height+1)
+
+	go hs.pmNotify(Notification{Propose, newNode, hs.qcHigh})
+	ctx, cancel := context.WithTimeout(context.Background(), hs.timeout)
+	qc, err := hs.config.Propose(ctx, newNode.toProto())
+
+	if err != nil {
+		logger.Println("ProposeQC finished with error: ", err)
+	} else {
+		newQC := quorumCertFromProto(qc)
+		go hs.pmNotify(Notification{QCFinish, newNode, newQC})
+		if hs.pm.GetLeader() != hs.id {
+			hs.doLeaderChange(newQC)
+		}
+	}
+
+	cancel()
+	return newNode
+} // this is the quorum call the client(the leader) makes.
+
+// doLeaderChange will sign the qc and forward it to the leader
+func (hs *HotStuff) doLeaderChange(qc *QuorumCert) {
+	hash := sha256.Sum256(qc.toBytes())
+	R, S, err := ecdsa.Sign(rand.Reader, hs.privKey, hash[:])
+	if err != nil {
+		logger.Println("Failed to sign QC for leader change: ", err)
+		return
+	}
+	sig := &partialSig{hs.id, R, S}
+	upd := &proto.LeaderUpdate{QC: qc.toProto(), Sig: sig.toProto()}
+	ctx, cancel := context.WithTimeout(context.Background(), hs.timeout)
+	_, err = hs.Replicas[hs.pm.GetLeader()].LeaderChange(ctx, upd)
+	if err != nil {
+		logger.Println("Failed to perform leader update: ", err)
+	}
+	cancel()
+}
+
+// SendNewView sends a newView message to the leader replica.
+func (hs *HotStuff) SendNewView() {
+	ctx, cancel := context.WithTimeout(context.Background(), hs.timeout)
+	_, err := hs.Replicas[hs.pm.GetLeader()].NewView(ctx, hs.qcHigh.toProto())
+	if err != nil {
+		logger.Println("Failed to send new view to leader: ", err)
+	}
+	cancel()
+}
+
+func createLeaf(parent *Node, cmd []byte, qc *QuorumCert, height int) *Node {
+	return &Node{
+		ParentHash: parent.Hash(),
+		Command:    cmd,
+		Justify:    qc,
+		Height:     height,
+	}
 }
