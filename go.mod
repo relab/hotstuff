@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.3.2
+	github.com/google/gofuzz v1.1.0
 	github.com/relab/gorums v0.0.0-20190924131222-43092ec65c74
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.6.2

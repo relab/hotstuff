@@ -1,7 +1,6 @@
 package hotstuff
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
@@ -277,13 +276,9 @@ func (hs *HotStuff) Propose() {
 	cmd := <-hs.Commands
 	logger.Printf("Propose (cmd: %s)\n", cmd)
 	newNode := createLeaf(hs.bLeaf, cmd, hs.qcHigh, hs.bLeaf.Height+1)
-
 	go hs.pmNotify(Notification{Propose, newNode, hs.qcHigh})
 
 	newQC := CreateQuorumCert(newNode)
-	if hash := newNode.Hash(); !bytes.Equal(hash[:], newQC.hash[:]) {
-		logger.Panicf("Side effects! (cmd: %s)", cmd)
-	}
 	// self vote
 	partialCert, err := hs.onReceiveProposal(newNode)
 	if err != nil {

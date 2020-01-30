@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"os"
+	"sort"
 	"sync"
 
 	"github.com/relab/hotstuff/pkg/proto"
@@ -106,8 +107,17 @@ func (qc *QuorumCert) toBytes() []byte {
 
 	var b []byte
 	b = append(b, qc.hash[:]...)
-	for _, psig := range qc.sigs {
-		b = append(b, psig.toBytes()...)
+	// sort partial signatures into a slice to ensure determinism
+	// TODO: find out if there is a faster way to ensure this
+	psigs := make([]partialSig, 0, len(qc.sigs))
+	for _, v := range qc.sigs {
+		psigs = append(psigs, v)
+	}
+	sort.SliceStable(psigs, func(i, j int) bool {
+		return psigs[i].id < psigs[j].id
+	})
+	for i := range psigs {
+		b = append(b, psigs[i].toBytes()...)
 	}
 	return b
 }
