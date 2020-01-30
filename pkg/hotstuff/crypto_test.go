@@ -10,8 +10,8 @@ import (
 var pk ecdsa.PrivateKey // must not be a pointer
 
 var simpleRc = &ReplicaConfig{
-	Replicas: map[ReplicaID]ReplicaInfo{
-		0: ReplicaInfo{
+	Replicas: map[ReplicaID]*ReplicaInfo{
+		0: {
 			ID:     0,
 			Socket: "",
 			PubKey: &pk.PublicKey, // this is why
@@ -21,23 +21,23 @@ var simpleRc = &ReplicaConfig{
 }
 
 var biggerRc = &ReplicaConfig{
-	Replicas: map[ReplicaID]ReplicaInfo{
-		0: ReplicaInfo{
+	Replicas: map[ReplicaID]*ReplicaInfo{
+		0: {
 			ID:     0,
 			Socket: "",
 			PubKey: &pk.PublicKey,
 		},
-		1: ReplicaInfo{
+		1: {
 			ID:     1,
 			Socket: "",
 			PubKey: &pk.PublicKey,
 		},
-		2: ReplicaInfo{
+		2: {
 			ID:     2,
 			Socket: "",
 			PubKey: &pk.PublicKey,
 		},
-		3: ReplicaInfo{
+		3: {
 			ID:     3,
 			Socket: "",
 			PubKey: &pk.PublicKey,

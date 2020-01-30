@@ -3,20 +3,27 @@ package hotstuff
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"github.com/relab/hotstuff/pkg/proto"
+	"encoding/hex"
+	"fmt"
 	"sync"
+
+	"github.com/relab/hotstuff/pkg/proto"
 )
 
 // NodeStorage provides a means to store a Node based on its hash
 type NodeStorage interface {
 	Put(*Node)
 	Get(NodeHash) (*Node, bool)
-	Node(*QuorumCert) (*Node, bool)
-	Parent(*Node) (*Node, bool)
+	NodeOf(*QuorumCert) (*Node, bool)
+	ParentOf(*Node) (*Node, bool)
 }
 
 // NodeHash represents a SHA256 hashsum of a Node
 type NodeHash [32]byte
+
+func (h NodeHash) String() string {
+	return hex.EncodeToString(h[:])
+}
 
 // Node represents a node in the tree of commands
 type Node struct {
@@ -24,6 +31,12 @@ type Node struct {
 	Command    []byte
 	Justify    *QuorumCert
 	Height     int
+	Committed  bool
+}
+
+func (n Node) String() string {
+	return fmt.Sprintf("Node{Parent: %s, Justify: %s, Height: %d, Committed: %v}",
+		n.ParentHash, n.Justify, n.Height, n.Committed)
 }
 
 // Hash returns a hash digest of the node.
@@ -35,7 +48,10 @@ func (n Node) Hash() NodeHash {
 	height := make([]byte, 8)
 	binary.LittleEndian.PutUint64(height, uint64(n.Height))
 	toHash = append(toHash, height...)
-	toHash = append(toHash, n.Justify.toBytes()...)
+	// TODO: Figure out if this ever occurs in practice (genesis node?)
+	if n.Justify != nil {
+		toHash = append(toHash, n.Justify.toBytes()...)
+	}
 	return sha256.Sum256(toHash)
 }
 
@@ -64,7 +80,12 @@ type MapStorage struct {
 	nodes map[NodeHash]*Node
 }
 
-// Put adds a node to the map.
+func NewMapStorage() *MapStorage {
+	return &MapStorage{
+		nodes: make(map[NodeHash]*Node),
+	}
+}
+
 func (s *MapStorage) Put(node *Node) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
@@ -84,8 +105,8 @@ func (s *MapStorage) Get(hash NodeHash) (node *Node, ok bool) {
 	return
 }
 
-// Node returns the node associated with the quorum cert
-func (s *MapStorage) Node(qc *QuorumCert) (node *Node, ok bool) {
+// NodeFor returns the node associated with the quorum cert
+func (s *MapStorage) NodeOf(qc *QuorumCert) (node *Node, ok bool) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
 
@@ -94,7 +115,7 @@ func (s *MapStorage) Node(qc *QuorumCert) (node *Node, ok bool) {
 }
 
 // Parent returns the parent of the given node
-func (s *MapStorage) Parent(child *Node) (parent *Node, ok bool) {
+func (s *MapStorage) ParentOf(child *Node) (parent *Node, ok bool) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
 

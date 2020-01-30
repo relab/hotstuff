@@ -82,7 +82,7 @@ func partialCertFromProto(ppc *proto.PartialCert) *PartialCert {
 // QuorumCert is a certificate for a node from a quorum of replicas.
 type QuorumCert struct {
 	mut  sync.Mutex
-	sigs []partialSig
+	sigs map[ReplicaID]partialSig
 	hash NodeHash
 }
 
@@ -112,13 +112,21 @@ func (qc *QuorumCert) toBytes() []byte {
 	return b
 }
 
+func (qc *QuorumCert) String() string {
+	qc.mut.Lock()
+	defer qc.mut.Unlock()
+
+	return fmt.Sprintf("QuorumCert{Sigs: %d, Hash: %s}", len(qc.sigs), qc.hash)
+}
+
 func quorumCertFromProto(pqc *proto.QuorumCert) *QuorumCert {
 	qc := &QuorumCert{
-		sigs: make([]partialSig, 0, len(pqc.GetSigs())),
+		sigs: make(map[ReplicaID]partialSig),
 	}
 	copy(qc.hash[:], pqc.GetHash())
-	for _, psig := range pqc.GetSigs() {
-		qc.sigs = append(qc.sigs, partialSigFromProto(psig))
+	for _, ppsig := range pqc.GetSigs() {
+		psig := partialSigFromProto(ppsig)
+		qc.sigs[psig.id] = psig
 	}
 	return qc
 }
@@ -128,11 +136,16 @@ func (qc *QuorumCert) AddPartial(cert *PartialCert) error {
 	qc.mut.Lock()
 	defer qc.mut.Unlock()
 
+	// dont add a cert if there is already a signature from the same replica
+	if _, exists := qc.sigs[cert.sig.id]; exists {
+		return fmt.Errorf("Attempt to add partial cert from same replica twice")
+	}
+
 	if !bytes.Equal(qc.hash[:], cert.hash[:]) {
 		return fmt.Errorf("Partial cert hash does not match quorum cert")
 	}
 
-	qc.sigs = append(qc.sigs, cert.sig)
+	qc.sigs[cert.sig.id] = cert.sig
 
 	return nil
 }
@@ -160,7 +173,7 @@ func VerifyPartialCert(conf *ReplicaConfig, cert *PartialCert) bool {
 
 // CreateQuorumCert creates an empty quorum certificate for a given node
 func CreateQuorumCert(node *Node) *QuorumCert {
-	return &QuorumCert{hash: node.Hash()}
+	return &QuorumCert{hash: node.Hash(), sigs: make(map[ReplicaID]partialSig)}
 }
 
 // VerifyQuorumCert will verify a QuorumCert from public keys stored in ReplicaConfig

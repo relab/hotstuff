@@ -41,7 +41,7 @@ type internalPartialCert struct {
 
 // Propose is invoked as a quorum call on all nodes in configuration c,
 // using the same argument arg, and returns the result.
-func (c *Configuration) Propose(ctx context.Context, a *HSNode) (resp *QuorumCert, err error) {
+func (c *Configuration) Propose(ctx context.Context, a *HSNode) (resp *Empty, err error) {
 	var ti traceInfo
 	if c.mgr.opts.trace {
 		ti.Trace = trace.New("gorums."+c.tstring()+".Sent", "Propose")
@@ -169,7 +169,7 @@ func (n *Node) close() error {
 type QuorumSpec interface {
 	// ProposeQF is the quorum function for the Propose
 	// quorum call method.
-	ProposeQF(req *HSNode, replies []*PartialCert) (*QuorumCert, bool)
+	ProposeQF(req *HSNode, replies []*PartialCert) (*Empty, bool)
 }
 
 /* Static resources */

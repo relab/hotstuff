@@ -3,16 +3,15 @@ syntax = "proto3";
 package proto;
 
 import "github.com/relab/gorums/gorums.proto";
-import "google/protobuf/empty.proto";
 
 service Hotstuff {
 	rpc Propose(HSNode) returns (PartialCert) {
 		option (gorums.qc) = true;
 		option (gorums.qf_with_req) = true;
-		option (gorums.custom_return_type) = "QuorumCert";
+		option (gorums.custom_return_type) = "Empty";
 	}
-	rpc NewView(QuorumCert) returns (google.protobuf.Empty);
-	rpc LeaderChange(LeaderUpdate) returns (google.protobuf.Empty);
+	rpc NewView(QuorumCert) returns (Empty);
+	rpc LeaderChange(LeaderUpdate) returns (Empty);
 }
 
 message LeaderUpdate {
@@ -41,4 +40,8 @@ message PartialCert {
 message QuorumCert {
 	repeated PartialSig Sigs = 1;
 	bytes Hash = 2;
+}
+
+message Empty {
+
 }

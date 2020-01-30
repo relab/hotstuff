@@ -7,30 +7,35 @@ type Pacemaker interface {
 
 // FixedLeaderPacemaker uses a fixed leader.
 type FixedLeaderPacemaker struct {
-	hs     *HotStuff
-	leader ReplicaID
+	HS     *HotStuff
+	Leader ReplicaID
 }
 
 // GetLeader returns the fixed ID of the leader
 func (p FixedLeaderPacemaker) GetLeader() ReplicaID {
-	return p.leader
+	return p.Leader
 }
 
 // Beat make the leader brodcast a new proposal for a node to work on.
 func (p FixedLeaderPacemaker) Beat() {
-	if p.hs.id == p.GetLeader() {
-		p.hs.bLeaf = p.hs.Propose()
+	logger.Println("Beat")
+	if p.HS.id == p.GetLeader() {
+		p.HS.Propose()
 	}
 }
 
 // Start runs the pacemaker which will beat when the previous QC is completed
 func (p FixedLeaderPacemaker) Start() {
-	go p.Beat()
-	notify := p.hs.GetNotifier()
+	notify := p.HS.GetNotifier()
+	if p.HS.id == p.Leader {
+		go p.Beat()
+	}
 	for n := range notify {
 		switch n.Event {
 		case QCFinish:
-			go p.Beat()
+			if p.HS.id == p.Leader {
+				go p.Beat()
+			}
 		}
 	}
 }
