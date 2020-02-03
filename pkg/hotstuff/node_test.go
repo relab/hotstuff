@@ -47,3 +47,29 @@ func TestFuzzNodeHash(t *testing.T) {
 		}
 	}
 }
+
+func TestMarshalAndUnmarshalNode(t *testing.T) {
+	testNode := &Node{Command: []byte("test")}
+
+	testQC := CreateQuorumCert(testNode)
+	numSigs, _ := rand.Int(rand.Reader, big.NewInt(10))
+	for j := int64(0); j < numSigs.Int64(); j++ {
+		var sig partialSig
+		id, _ := rand.Int(rand.Reader, big.NewInt(1000))
+		sig.id = ReplicaID(id.Int64())
+		sig.r, _ = rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
+		sig.s, _ = rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
+		testQC.sigs[sig.id] = sig
+	}
+
+	testNode.Justify = testQC
+
+	h1 := testNode.Hash()
+	protoNode := testNode.toProto()
+	testNode2 := nodeFromProto(protoNode)
+	h2 := testNode2.Hash()
+
+	if !bytes.Equal(h1[:], h2[:]) {
+		t.Fatalf("Hashes don't match after marshaling / unmarshaling!")
+	}
+}
