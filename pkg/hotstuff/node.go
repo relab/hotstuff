@@ -35,7 +35,7 @@ type Node struct {
 }
 
 func (n Node) String() string {
-	return fmt.Sprintf("Node{Parent: %s, Justify: %s, Height: %d, Committed: %v}",
+	return fmt.Sprintf("Node{Parent: %.8s, Justify: %s, Height: %d, Committed: %v}",
 		n.ParentHash, n.Justify, n.Height, n.Committed)
 }
 

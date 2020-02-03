@@ -126,7 +126,7 @@ func (qc *QuorumCert) String() string {
 	qc.mut.Lock()
 	defer qc.mut.Unlock()
 
-	return fmt.Sprintf("QuorumCert{Sigs: %d, Hash: %s}", len(qc.sigs), qc.hash)
+	return fmt.Sprintf("QuorumCert{Sigs: %d, Hash: %.8s}", len(qc.sigs), qc.hash)
 }
 
 func quorumCertFromProto(pqc *proto.QuorumCert) *QuorumCert {
