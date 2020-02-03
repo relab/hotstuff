@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
@@ -86,6 +87,8 @@ type HotStuff struct {
 	timeout time.Duration
 
 	manager *proto.Manager
+	config  *proto.Configuration
+	qspec   *hotstuffQSpec
 
 	pm Pacemaker
 	// Notifications will be sent to pacemaker on this channel
@@ -238,7 +241,13 @@ func (hs *HotStuff) update(node *Node) {
 		return
 	}
 
-	hs.UpdateQCHigh(node.Justify) // PRE-COMMIT on node1
+	if hs.UpdateQCHigh(node.Justify) { // PRE-COMMIT on node1
+		logger.Println("PRE COMMIT: ", node1)
+	} else if !bytes.Equal(node.Justify.toBytes(), hs.qcHigh.toBytes()) {
+		// it is expected that updateQCHigh will return false if qcHigh equals qc.
+		// this happens when the leader already got the qc after a proposal
+		logger.Println("UpdateQCHigh failed, but qc did not equal qcHigh")
+	}
 
 	node2, ok := hs.nodes.NodeOf(node1.Justify)
 	if !ok || node2.Committed {
@@ -247,6 +256,7 @@ func (hs *HotStuff) update(node *Node) {
 
 	if node2.Height > hs.bLock.Height {
 		hs.bLock = node2 // COMMIT on node2
+		logger.Println("COMMIT: ", node2)
 	}
 
 	node3, ok := hs.nodes.NodeOf(node2.Justify)
@@ -257,15 +267,17 @@ func (hs *HotStuff) update(node *Node) {
 	if node1.ParentHash == node2.Hash() && node2.ParentHash == node3.Hash() {
 		hs.commit(node3)
 		hs.bExec = node3 // DECIDE on node3
+		logger.Println("DECIDE ", node3)
 	}
 
 }
 
 func (hs *HotStuff) commit(node *Node) {
-	if hs.bLock.Height < node.Height {
+	if hs.bExec.Height < node.Height {
 		if parent, ok := hs.nodes.ParentOf(node); ok {
 			hs.commit(parent)
 			node.Committed = true
+			logger.Println("EXEC ", node)
 			hs.Exec(node.Command) // execute the commmand in the node. this is the last step in a nodes life.
 		}
 	}
@@ -289,17 +301,11 @@ func (hs *HotStuff) Propose() {
 		logger.Println("Failed to add own vote to QC: ", err)
 	}
 
-	qSpec := &hotstuffQSpec{
-		ReplicaConfig: hs.ReplicaConfig,
-		QC:            newQC,
-	}
-	config, err := hs.manager.NewConfiguration(hs.manager.NodeIDs(), qSpec)
-	if err != nil {
-		panic(fmt.Errorf("Failed to create configuration for propose QC"))
-	}
+	// set the QSpec's QC to our newQC
+	hs.qspec.QC = newQC
 
 	ctx, cancel := context.WithTimeout(context.Background(), hs.timeout)
-	_, err = config.Propose(ctx, newNode.toProto())
+	_, err = hs.config.Propose(ctx, newNode.toProto())
 	cancel()
 
 	if err != nil {
@@ -310,9 +316,9 @@ func (hs *HotStuff) Propose() {
 	hs.bLeaf = newNode
 
 	if hs.pm.GetLeader() == hs.id {
-		hs.UpdateQCHigh(qSpec.QC)
+		hs.UpdateQCHigh(hs.qspec.QC)
 	} else {
-		hs.doLeaderChange(qSpec.QC)
+		hs.doLeaderChange(hs.qspec.QC)
 	}
 
 	go hs.pmNotify(Notification{QCFinish, newNode, newQC})
@@ -388,6 +394,16 @@ func (hs *HotStuff) StartClient() error {
 
 	hs.QuorumSize = len(hs.Replicas) - (len(hs.Replicas)-1)/3
 	logger.Println("Majority: ", hs.QuorumSize)
+
+	hs.qspec = &hotstuffQSpec{
+		ReplicaConfig: hs.ReplicaConfig,
+	}
+
+	hs.config, err = hs.manager.NewConfiguration(hs.manager.NodeIDs(), hs.qspec)
+	if err != nil {
+		return fmt.Errorf("Failed to create configuration: %w", err)
+	}
+
 	return nil
 }
 
