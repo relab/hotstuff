@@ -316,7 +316,8 @@ func (hs *HotStuff) Propose() {
 
 	if err != nil {
 		logger.Println("ProposeQC finished with error: ", err)
-		return
+		// TODO: Figure out what to do here (maybe nothing?)
+		// return
 	}
 
 	hs.bLeaf = newNode
