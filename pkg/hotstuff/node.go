@@ -80,12 +80,14 @@ type MapStorage struct {
 	nodes map[NodeHash]*Node
 }
 
+// NewMapStorage returns a new instance of MapStorage
 func NewMapStorage() *MapStorage {
 	return &MapStorage{
 		nodes: make(map[NodeHash]*Node),
 	}
 }
 
+// Put inserts a node into the map
 func (s *MapStorage) Put(node *Node) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
@@ -105,7 +107,7 @@ func (s *MapStorage) Get(hash NodeHash) (node *Node, ok bool) {
 	return
 }
 
-// NodeFor returns the node associated with the quorum cert
+// NodeOf returns the node associated with the quorum cert
 func (s *MapStorage) NodeOf(qc *QuorumCert) (node *Node, ok bool) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
@@ -114,7 +116,7 @@ func (s *MapStorage) NodeOf(qc *QuorumCert) (node *Node, ok bool) {
 	return
 }
 
-// Parent returns the parent of the given node
+// ParentOf returns the parent of the given node
 func (s *MapStorage) ParentOf(child *Node) (parent *Node, ok bool) {
 	s.mut.Lock()
 	defer s.mut.Unlock()

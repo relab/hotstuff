@@ -44,6 +44,7 @@ type ReplicaConfig struct {
 	QuorumSize int
 }
 
+// NewConfig returns a new ReplicaConfig instance
 func NewConfig() *ReplicaConfig {
 	return &ReplicaConfig{
 		Replicas: make(map[ReplicaID]*ReplicaInfo),
@@ -99,6 +100,7 @@ type HotStuff struct {
 	Exec     func([]byte)
 }
 
+// New creates a new Hotstuff instance
 func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, pacemaker Pacemaker, timeout time.Duration,
 	commands <-chan []byte, exec func([]byte)) *HotStuff {
 	genesis := &Node{
@@ -125,6 +127,7 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, pacemak
 	}
 }
 
+// Init starts the networking components of hotstuff
 func (hs *HotStuff) Init(port string) error {
 	logger.SetPrefix(fmt.Sprintf("hotstuff(id %d):", hs.id))
 
@@ -206,8 +209,9 @@ func (hs *HotStuff) onReceiveLeaderChange(qc *QuorumCert, sig partialSig) {
 	if ok && ecdsa.Verify(info.PubKey, hash[:], sig.r, sig.s) {
 		hs.UpdateQCHigh(qc)
 		// TODO: start a new proposal
-		// A new round of proposals might already have begun? The QCFinish notification has alredy been sendt to the pacemaker in a go rutine at this point.
-		// Maby consider locking this, or sending the QCFinish notificarion here.
+		// A new round of proposals might already have begun?
+		// The QCFinish notification has already been sent to the pacemaker in a goroutine at this point.
+		// Maybe consider locking this, or sending the QCFinish notification here.
 	}
 }
 
