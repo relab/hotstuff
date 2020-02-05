@@ -87,6 +87,7 @@ type HotStuff struct {
 	privKey *ecdsa.PrivateKey
 	timeout time.Duration
 
+	server  *grpc.Server
 	manager *proto.Manager
 	config  *proto.Configuration
 	qspec   *hotstuffQSpec
@@ -131,13 +132,11 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, pacemak
 
 // Init starts the networking components of hotstuff
 func (hs *HotStuff) Init(port string) error {
-	logger.SetPrefix(fmt.Sprintf("hotstuff(id %d):", hs.id))
-
-	err := hs.StartServer(port)
+	err := hs.startServer(port)
 	if err != nil {
 		return fmt.Errorf("Failed to start GRPC Server: %w", err)
 	}
-	err = hs.StartClient()
+	err = hs.startClient()
 	if err != nil {
 		return fmt.Errorf("Failed to start GRPC Clients: %w", err)
 	}
@@ -183,11 +182,12 @@ func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
 
 // OnReceiveProposal handles a replica's response to the Proposal from the leader
 func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
+	logger.Println("OnReceiveProposal: ", node)
+	hs.nodes.Put(node)
 	defer hs.update(node)
 
 	if node.Height > hs.vHeight && hs.safeNode(node) {
 		logger.Println("OnReceiveProposal: Accepted node")
-		hs.nodes.Put(node)
 		hs.vHeight = node.Height
 		pc, err := CreatePartialCert(hs.id, hs.privKey, node)
 		go hs.pmNotify(Notification{ReceiveProposal, node, nil})
@@ -232,8 +232,7 @@ func (hs *HotStuff) safeNode(node *Node) bool {
 		}
 		if ok && b.ParentHash == hs.bLock.Hash() {
 			accept = true
-		}
-		if !accept {
+		} else {
 			logger.Println("safeNode: safety condition failed")
 		}
 	}
@@ -292,7 +291,7 @@ func (hs *HotStuff) commit(node *Node) {
 // Propose will fetch a command from the Commands channel and proposes it to the other replicas
 func (hs *HotStuff) Propose() {
 	cmd := <-hs.Commands
-	logger.Printf("Propose (cmd: %s)\n", cmd)
+	logger.Printf("Propose (cmd: %.15s)\n", cmd)
 	newNode := createLeaf(hs.bLeaf, cmd, hs.qcHigh, hs.bLeaf.Height+1)
 	go hs.pmNotify(Notification{Propose, newNode, hs.qcHigh})
 
@@ -370,7 +369,7 @@ func createLeaf(parent *Node, cmd []byte, qc *QuorumCert, height int) *Node {
 	}
 }
 
-func (hs *HotStuff) StartClient() error {
+func (hs *HotStuff) startClient() error {
 	addrs := make([]string, 0, len(hs.Replicas))
 	for _, replica := range hs.Replicas {
 		if replica.ID != hs.id {
@@ -380,7 +379,6 @@ func (hs *HotStuff) StartClient() error {
 
 	mgr, err := proto.NewManager(addrs, proto.WithGrpcDialOptions(
 		grpc.WithBlock(),
-		//grpc.WithTimeout(50*time.Millisecond),
 		grpc.WithInsecure(),
 	),
 		proto.WithDialTimeout(hs.timeout),
@@ -414,15 +412,21 @@ func (hs *HotStuff) StartClient() error {
 	return nil
 }
 
-// StartServer runs a new instance of hotstuffServer
-func (hs *HotStuff) StartServer(port string) error {
+// startServer runs a new instance of hotstuffServer
+func (hs *HotStuff) startServer(port string) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		return fmt.Errorf("Failed to listen to port %s: %w", port, err)
 	}
-	grpcServer := grpc.NewServer()
-	server := &hotstuffServer{hs}
-	proto.RegisterHotstuffServer(grpcServer, server)
-	go grpcServer.Serve(lis)
+	hs.server = grpc.NewServer()
+	hsServer := &hotstuffServer{hs}
+	proto.RegisterHotstuffServer(hs.server, hsServer)
+	go hs.server.Serve(lis)
 	return nil
+}
+
+// Close closes all connections made by the HotStuff instance
+func (hs *HotStuff) Close() {
+	hs.manager.Close()
+	hs.server.GracefulStop()
 }
