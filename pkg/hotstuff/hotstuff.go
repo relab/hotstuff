@@ -21,7 +21,7 @@ import (
 var logger *log.Logger
 
 func init() {
-	logger = log.New(os.Stderr, "hotstuff: ", log.Flags())
+	logger = log.New(os.Stderr, "hs: ", log.Lshortfile|log.Ltime|log.Lmicroseconds)
 	if os.Getenv("HOTSTUFF_LOG") != "1" {
 		logger.SetOutput(ioutil.Discard)
 	}
@@ -103,6 +103,8 @@ type HotStuff struct {
 // New creates a new Hotstuff instance
 func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, pacemaker Pacemaker, timeout time.Duration,
 	commands <-chan []byte, exec func([]byte)) *HotStuff {
+	logger.SetPrefix(fmt.Sprintf("hs(id %d): ", id))
+
 	genesis := &Node{
 		Committed: true,
 	}
