@@ -5,8 +5,8 @@ package proto;
 import "github.com/relab/gorums/gorums.proto";
 
 service Hotstuff {
-	rpc Propose(HSNode) returns (PartialCert) {
-		option (gorums.qc) = true;
+	rpc Propose(stream HSNode) returns (stream PartialCert) {
+		option (gorums.qc_strict_ordering) = "MsgID";
 		option (gorums.qf_with_req) = true;
 		option (gorums.custom_return_type) = "Empty";
 	}
@@ -24,6 +24,7 @@ message HSNode {
 	bytes Command = 2;
 	QuorumCert QC = 3;
 	int64 Height = 4;
+	uint32 MsgID = 5;
 }
 
 message PartialSig {
@@ -35,6 +36,7 @@ message PartialSig {
 message PartialCert {
 	PartialSig Sig = 1;
 	bytes Hash = 2;
+	uint32 MsgID = 3;
 }
 
 message QuorumCert {
@@ -42,6 +44,4 @@ message QuorumCert {
 	bytes Hash = 2;
 }
 
-message Empty {
-
-}
+message Empty {}
