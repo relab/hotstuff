@@ -2,7 +2,6 @@ package hotstuff
 
 import (
 	"context"
-	"io"
 
 	"github.com/relab/hotstuff/pkg/proto"
 )
@@ -14,37 +13,14 @@ type hotstuffServer struct {
 
 // Propose handles a replica's response to the Propose QC from the leader
 func (s *hotstuffServer) Propose(srv proto.Hotstuff_ProposeServer) error {
-	ctx := srv.Context()
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-		}
-
-		node, err := srv.Recv()
+	return proto.ProposeServerLoop(srv, func(node *proto.HSNode) *proto.PartialCert {
+		p, err := s.hs.onReceiveProposal(nodeFromProto(node))
 		if err != nil {
-			if err != io.EOF {
-				logger.Println("Server: stream closed with error: ", err)
-				return nil
-			}
-			return err
+			logger.Printf("onReceiveProposal returned with error: %v", err)
+			return nil
 		}
-		n := nodeFromProto(node)
-		p, err := s.hs.onReceiveProposal(n)
-		if p != nil {
-			pp := p.toProto()
-			pp.MsgID = node.MsgID
-			err := srv.Send(pp)
-			if err != nil {
-				if err != io.EOF {
-					logger.Println("Server: stream closed with error: ", err)
-					return nil
-				}
-				return err
-			}
-		}
-	}
+		return p.toProto()
+	})
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica

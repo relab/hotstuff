@@ -24,7 +24,7 @@ message HSNode {
 	bytes Command = 2;
 	QuorumCert QC = 3;
 	int64 Height = 4;
-	uint32 MsgID = 5;
+	uint64 MsgID = 5;
 }
 
 message PartialSig {
@@ -36,7 +36,7 @@ message PartialSig {
 message PartialCert {
 	PartialSig Sig = 1;
 	bytes Hash = 2;
-	uint32 MsgID = 3;
+	uint64 MsgID = 3;
 }
 
 message QuorumCert {
