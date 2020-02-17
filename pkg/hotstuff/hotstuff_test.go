@@ -254,3 +254,107 @@ func TestHotStuff(t *testing.T) {
 		}
 	}
 }
+
+func TestPacemaker(t *testing.T) {
+
+	keys := make(map[ReplicaID]*ecdsa.PrivateKey)
+	keys[1], _ = GeneratePrivateKey()
+	keys[2], _ = GeneratePrivateKey()
+	keys[3], _ = GeneratePrivateKey()
+	keys[4], _ = GeneratePrivateKey()
+
+	config := NewConfig()
+	config.Replicas[1] = &ReplicaInfo{ID: 1, Socket: "127.0.0.1:13371", PubKey: &keys[1].PublicKey}
+	config.Replicas[2] = &ReplicaInfo{ID: 2, Socket: "127.0.0.1:13372", PubKey: &keys[2].PublicKey}
+	config.Replicas[3] = &ReplicaInfo{ID: 3, Socket: "127.0.0.1:13373", PubKey: &keys[3].PublicKey}
+	config.Replicas[4] = &ReplicaInfo{ID: 4, Socket: "127.0.0.1:13374", PubKey: &keys[4].PublicKey}
+
+	out := make(map[ReplicaID]chan []byte)
+	out[1] = make(chan []byte, 1)
+	out[2] = make(chan []byte, 2)
+	out[3] = make(chan []byte, 3)
+	out[4] = make(chan []byte, 4)
+
+	commands := make(chan []byte, 1)
+	var replicaSlice []*HotStuff
+	pm := &RoundRobinPacemaker{AmountOfCommandsPerLeader: 1, Leader: 1, Commands: commands}
+
+	replicas := make(map[ReplicaID]*HotStuff)
+	replicas[1] = New(1, keys[1], config, pm, 5*time.Second, func(b []byte) { out[1] <- b })
+	replicas[2] = New(2, keys[2], config, pm, 5*time.Second, func(b []byte) { out[2] <- b })
+	replicas[3] = New(3, keys[3], config, pm, 5*time.Second, func(b []byte) { out[3] <- b })
+	replicas[4] = New(4, keys[4], config, pm, 5*time.Second, func(b []byte) { out[4] <- b })
+
+	replicaSlice = append(replicaSlice, replicas[1])
+	replicaSlice = append(replicaSlice, replicas[2])
+	replicaSlice = append(replicaSlice, replicas[3])
+	replicaSlice = append(replicaSlice, replicas[4])
+
+	pm.ReplicaSlice = replicaSlice
+	pm.HS = replicas[1]
+
+	var wg sync.WaitGroup
+	wg.Add(len(replicas))
+	for id := range replicas {
+		go func(id ReplicaID) {
+			err := replicas[id].Init(fmt.Sprintf("1337%d", id))
+			if err != nil {
+				t.Errorf("Failed to init replica %d: %v", id, err)
+			}
+			wg.Done()
+		}(id)
+	}
+
+	wg.Wait()
+
+	test := [][]byte{[]byte("0"), []byte("1"), []byte("2"), []byte("3")}
+	go func() {
+		for _, t := range test {
+			commands <- t
+		}
+		close(commands)
+	}()
+
+	pm.Run()
+
+	if pm.Leader != replicas[1].id {
+		t.Errorf("Error: Incorrect leader %d, want %d.", pm.Leader, replicas[1].id)
+	}
+
+	test2 := [][]byte{[]byte("4"), []byte("5"), []byte("6")}
+	go func() {
+		for _, t := range test2 {
+			commands <- t
+		}
+		close(commands)
+	}()
+
+	if pm.Leader != replicas[2].id {
+		t.Errorf("Error: Incorrect leader %d, want %d.", pm.Leader, replicas[2].id)
+	}
+
+	test3 := [][]byte{[]byte("7"), []byte("8"), []byte("9"), []byte("10"), []byte("11")}
+	go func() {
+		for _, t := range test3 {
+			commands <- t
+		}
+		close(commands)
+	}()
+
+	if pm.Leader != replicas[3].id {
+		t.Errorf("Error: Incorrect leader %d, want %d.", pm.Leader, replicas[3].id)
+	}
+
+	test4 := [][]byte{[]byte("12"), []byte("13"), []byte("14"), []byte("15"), []byte("16"), []byte("17"), []byte("18")}
+	go func() {
+		for _, t := range test4 {
+			commands <- t
+		}
+		close(commands)
+	}()
+
+	if pm.Leader != replicas[1].id {
+		t.Errorf("Error: Incorrect leader %d, want %d.", pm.Leader, replicas[1].id)
+	}
+
+}
