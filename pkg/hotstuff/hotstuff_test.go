@@ -11,7 +11,7 @@ import (
 
 func TestSafeNode(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), nil, time.Second, nil, nil)
+	hs := New(1, key, NewConfig(), nil, time.Second, nil)
 
 	n1 := createLeaf(hs.genesis, []byte("n1"), hs.qcHigh, hs.genesis.Height+1)
 	hs.nodes.Put(n1)
@@ -55,7 +55,7 @@ func TestSafeNode(t *testing.T) {
 
 func TestUpdateQCHigh(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), nil, time.Second, nil, nil)
+	hs := New(1, key, NewConfig(), nil, time.Second, nil)
 	node1 := createLeaf(hs.genesis, []byte("command1"), hs.qcHigh, hs.genesis.Height+1)
 	hs.nodes.Put(node1)
 	qc1 := CreateQuorumCert(node1)
@@ -85,7 +85,7 @@ func TestUpdateQCHigh(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	exec := make(chan []byte, 1)
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), nil, time.Second, nil, func(b []byte) { exec <- b })
+	hs := New(1, key, NewConfig(), nil, time.Second, func(b []byte) { exec <- b })
 	hs.QuorumSize = 0 // this accepts all QCs
 
 	n1 := createLeaf(hs.genesis, []byte("n1"), hs.qcHigh, hs.genesis.Height+1)
@@ -138,7 +138,7 @@ func TestUpdate(t *testing.T) {
 
 func TestOnReciveProposal(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), nil, time.Second, nil, nil)
+	hs := New(1, key, NewConfig(), nil, time.Second, nil)
 	node1 := createLeaf(hs.genesis, []byte("command1"), hs.qcHigh, hs.genesis.Height+1)
 	qc := CreateQuorumCert(node1)
 
@@ -157,7 +157,6 @@ func TestOnReciveProposal(t *testing.T) {
 		if hs.vHeight != node1.Height {
 			t.Error("onReciveProposal failed to update the heigt of the replica")
 		}
-
 	}
 
 	node2 := createLeaf(node1, []byte("command2"), qc, node1.Height+1)
@@ -171,7 +170,6 @@ func TestOnReciveProposal(t *testing.T) {
 	if pc != nil {
 		t.Errorf("Expected nil got: %v", pc)
 	}
-
 }
 
 // This test verifies that the entire stack works.
@@ -194,15 +192,16 @@ func TestHotStuff(t *testing.T) {
 	out[3] = make(chan []byte, 3)
 	out[4] = make(chan []byte, 4)
 
-	// wont give pm a HotStuff instance, because we only need GetLeader()
-	pm := &FixedLeaderPacemaker{Leader: 1}
 	commands := make(chan []byte, 1)
+	pm := &FixedLeaderPacemaker{Leader: 1, Commands: commands}
 
 	replicas := make(map[ReplicaID]*HotStuff)
-	replicas[1] = New(1, keys[1], config, pm, time.Second, commands, func(b []byte) { out[1] <- b })
-	replicas[2] = New(2, keys[2], config, pm, time.Second, nil, func(b []byte) { out[2] <- b })
-	replicas[3] = New(3, keys[3], config, pm, time.Second, nil, func(b []byte) { out[3] <- b })
-	replicas[4] = New(4, keys[4], config, pm, time.Second, nil, func(b []byte) { out[4] <- b })
+	replicas[1] = New(1, keys[1], config, pm, 5*time.Second, func(b []byte) { out[1] <- b })
+	replicas[2] = New(2, keys[2], config, pm, 5*time.Second, func(b []byte) { out[2] <- b })
+	replicas[3] = New(3, keys[3], config, pm, 5*time.Second, func(b []byte) { out[3] <- b })
+	replicas[4] = New(4, keys[4], config, pm, 5*time.Second, func(b []byte) { out[4] <- b })
+
+	pm.HS = replicas[1]
 
 	var wg sync.WaitGroup
 	wg.Add(len(replicas))
@@ -219,14 +218,16 @@ func TestHotStuff(t *testing.T) {
 	wg.Wait()
 
 	test := [][]byte{[]byte("DECIDE"), []byte("COMMIT"), []byte("PRECOMMIT"), []byte("PROPOSE")}
-	for _, t := range test {
-		commands <- t
-		replicas[1].Propose()
-	}
+	go func() {
+		for _, t := range test {
+			commands <- t
+		}
+		close(commands)
+	}()
+
+	pm.Run()
 
 	for id, r := range replicas {
-		r.Close()
-
 		if !bytes.Equal(r.bExec.Command, test[0]) {
 			t.Errorf("Replica %d: Incorrect bExec.Command: Got '%s', want '%s'", id, r.bExec.Command, test[0])
 		}

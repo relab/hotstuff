@@ -2,8 +2,11 @@ package main
 
 import (
 	"bufio"
+	"fmt"
+	"io"
 	"log"
 	"os"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
@@ -24,7 +27,7 @@ func mapRead(m map[string]string, key string) string {
 
 func exec(cmd []byte) {
 	s := string(cmd)
-	log.Printf("Exec: %s\n", s)
+	fmt.Print(s)
 }
 
 func main() {
@@ -33,6 +36,7 @@ func main() {
 	pflag.Int("timeout", 1000, "Timeout (in milliseconds)")
 	pflag.String("keyfile", "", "The path to the private key file")
 	pflag.String("commands", "", "The file to read commands from")
+	pflag.String("cpuprofile", "", "File to write CPU profile to")
 	pflag.Parse()
 	viper.BindPFlags(pflag.CommandLine)
 
@@ -99,20 +103,44 @@ func main() {
 			if err != nil {
 				log.Fatalf("Failed to read commands file: %v\n", err)
 			}
-			scanner := bufio.NewScanner(file)
-			for scanner.Scan() {
-				commands <- scanner.Bytes()
+			reader := bufio.NewReader(file)
+			for {
+				buf := make([]byte, 1024)
+				_, err := io.ReadFull(reader, buf)
+				if err == io.EOF || err == io.ErrUnexpectedEOF {
+					break
+				} else if err != nil {
+					log.Fatalf("Failed to read from file: %v", err)
+				}
+				commands <- buf
 			}
+			// send some extra commands such that the last part of the file will be committed successfully
+			commands <- []byte{}
+			commands <- []byte{}
+			commands <- []byte{}
+			close(commands)
 		}()
 	}
 
-	pm := &hotstuff.FixedLeaderPacemaker{Leader: leaderID}
-	hs := hotstuff.New(selfID, privKey, config, pm, timeout, commands, exec)
+	pm := &hotstuff.FixedLeaderPacemaker{Leader: leaderID, Commands: commands}
+	hs := hotstuff.New(selfID, privKey, config, pm, timeout, exec)
 	pm.HS = hs
 	err = hs.Init(selfPort)
 	if err != nil {
 		log.Fatalf("Failed to init HotStuff: %v\n", err)
 	}
-	pm.Start()
+
+	if cpuprofile := viper.GetString("cpuprofile"); cpuprofile != "" {
+		f, err := os.Create(cpuprofile)
+		if err != nil {
+			log.Fatal("Could not create CPU profile: ", err)
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal("Could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
+	pm.Run()
 	log.Printf("Replica %d EXIT\n", selfID)
 }

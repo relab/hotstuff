@@ -103,7 +103,7 @@ type HotStuff struct {
 
 // New creates a new Hotstuff instance
 func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, pacemaker Pacemaker, timeout time.Duration,
-	commands <-chan []byte, exec func([]byte)) *HotStuff {
+	exec func([]byte)) *HotStuff {
 	logger.SetPrefix(fmt.Sprintf("hs(id %d): ", id))
 
 	genesis := &Node{
@@ -124,9 +124,8 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, pacemak
 		bLeaf:         genesis,
 		qcHigh:        qcForGenesis,
 		timeout:       timeout,
-		Commands:      commands,
 		Exec:          exec,
-		pmNotifyChan:  make(chan Notification),
+		pmNotifyChan:  make(chan Notification, 10),
 	}
 }
 
@@ -174,7 +173,7 @@ func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
 	if newQCHighNode.Height > oldQCHighNode.Height {
 		hs.qcHigh = qc
 		hs.bLeaf = newQCHighNode
-		go hs.pmNotify(Notification{HQCUpdate, newQCHighNode, qc})
+		hs.pmNotify(Notification{HQCUpdate, newQCHighNode, qc})
 		return true
 	}
 	return false
@@ -190,7 +189,7 @@ func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
 		logger.Println("OnReceiveProposal: Accepted node")
 		hs.vHeight = node.Height
 		pc, err := CreatePartialCert(hs.id, hs.privKey, node)
-		go hs.pmNotify(Notification{ReceiveProposal, node, nil})
+		hs.pmNotify(Notification{ReceiveProposal, node, nil})
 		return pc, err
 	}
 	logger.Println("OnReceiveProposal: Node not accepted")
@@ -289,11 +288,10 @@ func (hs *HotStuff) commit(node *Node) {
 }
 
 // Propose will fetch a command from the Commands channel and proposes it to the other replicas
-func (hs *HotStuff) Propose() {
-	cmd := <-hs.Commands
+func (hs *HotStuff) Propose(cmd []byte) {
 	logger.Printf("Propose (cmd: %.15s)\n", cmd)
 	newNode := createLeaf(hs.bLeaf, cmd, hs.qcHigh, hs.bLeaf.Height+1)
-	go hs.pmNotify(Notification{Propose, newNode, hs.qcHigh})
+	hs.pmNotify(Notification{Propose, newNode, hs.qcHigh})
 
 	newQC := CreateQuorumCert(newNode)
 	// self vote
@@ -327,7 +325,7 @@ func (hs *HotStuff) Propose() {
 		hs.doLeaderChange(hs.qspec.QC)
 	}
 
-	go hs.pmNotify(Notification{QCFinish, newNode, newQC})
+	hs.pmNotify(Notification{QCFinish, newNode, newQC})
 } // this is the quorum call the client(the leader) makes.
 
 // doLeaderChange will sign the qc and forward it to the leader
@@ -428,5 +426,6 @@ func (hs *HotStuff) startServer(port string) error {
 // Close closes all connections made by the HotStuff instance
 func (hs *HotStuff) Close() {
 	hs.manager.Close()
-	hs.server.GracefulStop()
+	hs.server.Stop()
+	close(hs.pmNotifyChan)
 }
