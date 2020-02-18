@@ -122,7 +122,7 @@ func main() {
 		}()
 	}
 
-	pm := &hotstuff.FixedLeaderPacemaker{Leader: leaderID, Commands: commands}
+	pm := &hotstuff.RoundRobinPacemaker{Leader: leaderID, Commands: commands}
 	hs := hotstuff.New(selfID, privKey, config, pm, timeout, exec)
 	pm.HS = hs
 	err = hs.Init(selfPort)

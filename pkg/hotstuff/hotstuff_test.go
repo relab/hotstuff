@@ -275,23 +275,37 @@ func TestPacemaker(t *testing.T) {
 	out[3] = make(chan []byte, 3)
 	out[4] = make(chan []byte, 4)
 
-	commands := make(chan []byte, 1)
+	commands1 := make(chan []byte, 1)
+	commands2 := make(chan []byte, 1)
+	commands3 := make(chan []byte, 1)
+	commands4 := make(chan []byte, 1)
+
 	var replicaSlice []*HotStuff
-	pm := &RoundRobinPacemaker{AmountOfCommandsPerLeader: 1, Leader: 1, Commands: commands}
+	pm1 := &RoundRobinPacemaker{AmountOfCommandsPerLeader: 1, Leader: 1, Commands: commands1}
+	pm2 := &RoundRobinPacemaker{AmountOfCommandsPerLeader: 1, Leader: 1, Commands: commands2}
+	pm3 := &RoundRobinPacemaker{AmountOfCommandsPerLeader: 1, Leader: 1, Commands: commands3}
+	pm4 := &RoundRobinPacemaker{AmountOfCommandsPerLeader: 1, Leader: 1, Commands: commands4}
 
 	replicas := make(map[ReplicaID]*HotStuff)
-	replicas[1] = New(1, keys[1], config, pm, 5*time.Second, func(b []byte) { out[1] <- b })
-	replicas[2] = New(2, keys[2], config, pm, 5*time.Second, func(b []byte) { out[2] <- b })
-	replicas[3] = New(3, keys[3], config, pm, 5*time.Second, func(b []byte) { out[3] <- b })
-	replicas[4] = New(4, keys[4], config, pm, 5*time.Second, func(b []byte) { out[4] <- b })
+	replicas[1] = New(1, keys[1], config, pm1, 5*time.Second, func(b []byte) { out[1] <- b })
+	replicas[2] = New(2, keys[2], config, pm2, 5*time.Second, func(b []byte) { out[2] <- b })
+	replicas[3] = New(3, keys[3], config, pm3, 5*time.Second, func(b []byte) { out[3] <- b })
+	replicas[4] = New(4, keys[4], config, pm4, 5*time.Second, func(b []byte) { out[4] <- b })
 
 	replicaSlice = append(replicaSlice, replicas[1])
 	replicaSlice = append(replicaSlice, replicas[2])
 	replicaSlice = append(replicaSlice, replicas[3])
 	replicaSlice = append(replicaSlice, replicas[4])
 
-	pm.ReplicaSlice = replicaSlice
-	pm.HS = replicas[1]
+	pm1.ReplicaSlice = replicaSlice
+	pm2.ReplicaSlice = replicaSlice
+	pm3.ReplicaSlice = replicaSlice
+	pm4.ReplicaSlice = replicaSlice
+
+	pm1.HS = replicas[1]
+	pm2.HS = replicas[2]
+	pm3.HS = replicas[3]
+	pm4.HS = replicas[4]
 
 	var wg sync.WaitGroup
 	wg.Add(len(replicas))
@@ -307,54 +321,75 @@ func TestPacemaker(t *testing.T) {
 
 	wg.Wait()
 
-	test := [][]byte{[]byte("0"), []byte("1"), []byte("2"), []byte("3")}
+	test := [][]byte{[]byte("hello world")}
+
+	wg.Add(len(replicas))
 	go func() {
-		for _, t := range test {
-			commands <- t
-		}
-		close(commands)
+		pm1.Run()
+		wg.Done()
+	}()
+	go func() {
+		pm2.Run()
+		wg.Done()
+	}()
+	go func() {
+		pm3.Run()
+		wg.Done()
+	}()
+	go func() {
+		pm4.Run()
+		wg.Done()
 	}()
 
-	pm.Run()
-
-	if pm.Leader != replicas[1].id {
-		t.Errorf("Error: Incorrect leader %d, want %d.", pm.Leader, replicas[1].id)
+	for _, t := range test {
+		commands1 <- t
+		commands2 <- t
+		commands3 <- t
+		commands4 <- t
 	}
 
-	test2 := [][]byte{[]byte("4"), []byte("5"), []byte("6")}
-	go func() {
-		for _, t := range test2 {
-			commands <- t
-		}
-		close(commands)
-	}()
+	time.Sleep(time.Second)
 
-	if pm.Leader != replicas[2].id {
-		t.Errorf("Error: Incorrect leader %d, want %d.", pm.Leader, replicas[2].id)
+	if pm1.Leader != replicas[4].id {
+		t.Errorf("Error in pm1: Incorrect leader %d, want %d.", pm1.Leader, replicas[4].id)
 	}
 
-	test3 := [][]byte{[]byte("7"), []byte("8"), []byte("9"), []byte("10"), []byte("11")}
-	go func() {
-		for _, t := range test3 {
-			commands <- t
-		}
-		close(commands)
-	}()
-
-	if pm.Leader != replicas[3].id {
-		t.Errorf("Error: Incorrect leader %d, want %d.", pm.Leader, replicas[3].id)
+	if pm2.Leader != replicas[4].id {
+		t.Errorf("Error in pm2: Incorrect leader %d, want %d.", pm2.Leader, replicas[4].id)
 	}
 
-	test4 := [][]byte{[]byte("12"), []byte("13"), []byte("14"), []byte("15"), []byte("16"), []byte("17"), []byte("18")}
-	go func() {
-		for _, t := range test4 {
-			commands <- t
-		}
-		close(commands)
-	}()
-
-	if pm.Leader != replicas[1].id {
-		t.Errorf("Error: Incorrect leader %d, want %d.", pm.Leader, replicas[1].id)
+	if pm3.Leader != replicas[4].id {
+		t.Errorf("Error in pm3: Incorrect leader %d, want %d.", pm3.Leader, replicas[4].id)
 	}
 
+	if pm1.Leader != replicas[4].id {
+		t.Errorf("Error in pm4: Incorrect leader %d, want %d.", pm4.Leader, replicas[4].id)
+	}
+
+	commands1 <- test[0]
+
+	time.Sleep(time.Second)
+
+	if pm1.Leader != replicas[1].id {
+		t.Errorf("Error in pm1: Incorrect leader %d, want %d.", pm1.Leader, replicas[1].id)
+	}
+
+	if pm2.Leader != replicas[1].id {
+		t.Errorf("Error in pm2: Incorrect leader %d, want %d.", pm2.Leader, replicas[1].id)
+	}
+
+	if pm3.Leader != replicas[1].id {
+		t.Errorf("Error in pm3: Incorrect leader %d, want %d.", pm3.Leader, replicas[1].id)
+	}
+
+	if pm4.Leader != replicas[1].id {
+		t.Errorf("Error in pm4: Incorrect leader %d, want %d.", pm4.Leader, replicas[1].id)
+	}
+
+	close(commands1)
+	close(commands2)
+	close(commands3)
+	close(commands4)
+
+	wg.Wait()
 }

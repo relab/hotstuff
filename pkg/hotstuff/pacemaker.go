@@ -66,7 +66,7 @@ func (p FixedLeaderPacemaker) Run() {
 	if p.HS.id == p.Leader {
 		go p.Beat()
 	}
-
+	// Might just be the leader replica pacemaker that gets the update.
 	for n := range notify {
 		switch n.Event {
 		case QCFinish:
@@ -89,14 +89,15 @@ func (p RoundRobinPacemaker) Run() {
 	for n := range notify {
 		switch n.Event {
 		case QCFinish:
+			if p.HS.id == p.Leader {
+				go p.Beat()
+			}
+		case ReceiveProposal:
 			if p.AmountOfCommandsPerLeader <= progressNumber {
 				p.changeLeader()
 				progressNumber = 0
 			} else {
 				progressNumber++
-			}
-			if p.HS.id == p.Leader {
-				go p.Beat()
 			}
 		}
 	}
