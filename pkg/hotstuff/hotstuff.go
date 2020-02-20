@@ -206,9 +206,13 @@ func (hs *HotStuff) onReceiveNewView(qc *QuorumCert) {
 func (hs *HotStuff) onReceiveLeaderChange(qc *QuorumCert, sig partialSig) {
 	logger.Println("OnReceiveLeaderchange")
 	hash := sha256.Sum256(qc.toBytes())
-	info, ok := hs.Replicas[hs.pm.GetLeader()]
+	//The hs.pm.GetLeader should return this hs here and not the old leader.
+	//There is currently no way of knowing who  the old leader were.
+	info, ok := hs.Replicas[hs.pm.GetOldLeader()]
 	if ok && ecdsa.Verify(info.PubKey, hash[:], sig.r, sig.s) {
 		hs.UpdateQCHigh(qc)
+		node, _ := hs.nodes.Get(qc.hash)
+		hs.pmNotify(Notification{QCFinish, node, qc})
 		// TODO: start a new proposal
 		// A new round of proposals might already have begun?
 		// The QCFinish notification has already been sent to the pacemaker in a goroutine at this point.
