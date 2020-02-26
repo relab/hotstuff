@@ -235,7 +235,7 @@ func TestHotStuff(t *testing.T) {
 			t.Errorf("Replica %d: Incorrect bLock.Command: Got '%s', want '%s'", id, r.bLock.Command, test[1])
 		}
 		// leader will have progressed further due to UpdateQCHigh being called at the end of Propose()
-		if r.id == pm.GetLeader() {
+		if r.id == pm.GetLeader(pm.HS.vHeight) {
 			if !bytes.Equal(r.bLeaf.Command, test[3]) {
 				t.Errorf("Replica %d: Incorrect bLeaf.Command: Got '%s', want '%s'", id, r.bLeaf.Command, test[3])
 			}
@@ -255,7 +255,22 @@ func TestHotStuff(t *testing.T) {
 	}
 }
 
-func TestPacemaker(t *testing.T) {
+func TestRRGetLeader(t *testing.T) {
+	pm := &RoundRobinPacemaker{TermLength: 1, Schedule: []ReplicaID{1, 2, 3, 4}}
+	testCases := []struct {
+		height int
+		leader ReplicaID
+	}{
+		{1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 1},
+	}
+	for _, testCase := range testCases {
+		if leader := pm.GetLeader(testCase.height); leader != testCase.leader {
+			t.Errorf("Incorrect leader for view %d: got: %d, want: %d", testCase.height, leader, testCase.leader)
+		}
+	}
+}
+
+func TestRRPacemaker(t *testing.T) {
 
 	keys := make(map[ReplicaID]*ecdsa.PrivateKey)
 	keys[1], _ = GeneratePrivateKey()
@@ -280,27 +295,17 @@ func TestPacemaker(t *testing.T) {
 	commands3 := make(chan []byte, 1)
 	commands4 := make(chan []byte, 1)
 
-	var replicaSlice []*HotStuff
-	pm1 := &RoundRobinPacemaker{AmountOfCommandsPerLeader: 1, Leader: 1, Commands: commands1}
-	pm2 := &RoundRobinPacemaker{AmountOfCommandsPerLeader: 1, Leader: 1, Commands: commands2}
-	pm3 := &RoundRobinPacemaker{AmountOfCommandsPerLeader: 1, Leader: 1, Commands: commands3}
-	pm4 := &RoundRobinPacemaker{AmountOfCommandsPerLeader: 1, Leader: 1, Commands: commands4}
+	leaderSchedule := []ReplicaID{1, 2, 3, 4}
+	pm1 := &RoundRobinPacemaker{TermLength: 1, Schedule: leaderSchedule, Commands: commands1}
+	pm2 := &RoundRobinPacemaker{TermLength: 1, Schedule: leaderSchedule, Commands: commands2}
+	pm3 := &RoundRobinPacemaker{TermLength: 1, Schedule: leaderSchedule, Commands: commands3}
+	pm4 := &RoundRobinPacemaker{TermLength: 1, Schedule: leaderSchedule, Commands: commands4}
 
 	replicas := make(map[ReplicaID]*HotStuff)
 	replicas[1] = New(1, keys[1], config, pm1, 5*time.Second, func(b []byte) { out[1] <- b })
 	replicas[2] = New(2, keys[2], config, pm2, 5*time.Second, func(b []byte) { out[2] <- b })
 	replicas[3] = New(3, keys[3], config, pm3, 5*time.Second, func(b []byte) { out[3] <- b })
 	replicas[4] = New(4, keys[4], config, pm4, 5*time.Second, func(b []byte) { out[4] <- b })
-
-	replicaSlice = append(replicaSlice, replicas[1])
-	replicaSlice = append(replicaSlice, replicas[2])
-	replicaSlice = append(replicaSlice, replicas[3])
-	replicaSlice = append(replicaSlice, replicas[4])
-
-	pm1.ReplicaSlice = replicaSlice
-	pm2.ReplicaSlice = replicaSlice
-	pm3.ReplicaSlice = replicaSlice
-	pm4.ReplicaSlice = replicaSlice
 
 	pm1.HS = replicas[1]
 	pm2.HS = replicas[2]
@@ -340,20 +345,22 @@ func TestPacemaker(t *testing.T) {
 	go pm3.Run()
 	go pm4.Run()
 
-	if pm1.Leader != replicas[4].id {
-		t.Errorf("Error in pm1: Incorrect leader %d, want %d.", pm1.Leader, replicas[4].id)
+	time.Sleep(10 * time.Second)
+
+	if leader := pm1.GetLeader(pm1.HS.vHeight); leader != replicas[4].id {
+		t.Errorf("Error in pm1: Incorrect leader %d, want %d.", leader, replicas[4].id)
 	}
 
-	if pm2.Leader != replicas[4].id {
-		t.Errorf("Error in pm2: Incorrect leader %d, want %d.", pm2.Leader, replicas[4].id)
+	if leader := pm2.GetLeader(pm1.HS.vHeight); leader != replicas[4].id {
+		t.Errorf("Error in pm2: Incorrect leader %d, want %d.", leader, replicas[4].id)
 	}
 
-	if pm3.Leader != replicas[4].id {
-		t.Errorf("Error in pm3: Incorrect leader %d, want %d.", pm3.Leader, replicas[4].id)
+	if leader := pm3.GetLeader(pm1.HS.vHeight); leader != replicas[4].id {
+		t.Errorf("Error in pm3: Incorrect leader %d, want %d.", leader, replicas[4].id)
 	}
 
-	if pm1.Leader != replicas[4].id {
-		t.Errorf("Error in pm4: Incorrect leader %d, want %d.", pm4.Leader, replicas[4].id)
+	if leader := pm4.GetLeader(pm1.HS.vHeight); leader != replicas[4].id {
+		t.Errorf("Error in pm4: Incorrect leader %d, want %d.", leader, replicas[4].id)
 	}
 
 	/*	commands1 <- test[0]

@@ -60,6 +60,7 @@ const (
 	Propose
 	ReceiveProposal
 	HQCUpdate
+	ReceiveNewView
 )
 
 // Notification sends information about a protocol state change to the pacemaker
@@ -92,7 +93,7 @@ type HotStuff struct {
 	config  *proto.Configuration
 	qspec   *hotstuffQSpec
 
-	pm Pacemaker
+	Pacemaker
 	// Notifications will be sent to pacemaker on this channel
 	pmNotifyChan chan Notification
 
@@ -116,7 +117,7 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, pacemak
 		ReplicaConfig: config,
 		id:            id,
 		privKey:       privKey,
-		pm:            pacemaker,
+		Pacemaker:     pacemaker,
 		nodes:         nodes,
 		genesis:       genesis,
 		bLock:         genesis,
@@ -176,6 +177,8 @@ func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
 		hs.pmNotify(Notification{HQCUpdate, newQCHighNode, qc})
 		return true
 	}
+
+	logger.Println("UpdateQCHigh Failed")
 	return false
 }
 
@@ -199,16 +202,18 @@ func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
 // OnReceiveNewView handles the leader's response to receiving a NewView rpc from a replica
 func (hs *HotStuff) onReceiveNewView(qc *QuorumCert) {
 	logger.Println("OnReceiveNewView")
+	node, _ := hs.nodes.NodeOf(qc)
+	hs.pmNotify(Notification{ReceiveNewView, node, qc})
 	hs.UpdateQCHigh(qc)
 }
 
 // OnReceiveLeaderChange handles an incoming LeaderUpdate message for a new leader.
 func (hs *HotStuff) onReceiveLeaderChange(qc *QuorumCert, sig partialSig) {
-	logger.Println("OnReceiveLeaderchange")
+	logger.Println("OnReceiveLeaderChange")
 	hash := sha256.Sum256(qc.toBytes())
 	//The hs.pm.GetLeader should return this hs here and not the old leader.
-	//There is currently no way of knowing who  the old leader were.
-	info, ok := hs.Replicas[hs.pm.GetOldLeader()]
+	//There is currently no way of knowing who the old leader were.
+	info, ok := hs.Replicas[hs.GetLeader(hs.vHeight)]
 	if ok && ecdsa.Verify(info.PubKey, hash[:], sig.r, sig.s) {
 		hs.UpdateQCHigh(qc)
 		node, _ := hs.nodes.Get(qc.hash)
@@ -217,6 +222,8 @@ func (hs *HotStuff) onReceiveLeaderChange(qc *QuorumCert, sig partialSig) {
 		// A new round of proposals might already have begun?
 		// The QCFinish notification has already been sent to the pacemaker in a goroutine at this point.
 		// Maybe consider locking this, or sending the QCFinish notification here.
+	} else {
+		logger.Println("OnReceiveLeaderChange: did not accept incoming qc")
 	}
 }
 
@@ -322,44 +329,48 @@ func (hs *HotStuff) Propose(cmd []byte) {
 	}
 
 	hs.bLeaf = newNode
-
-	if hs.pm.GetLeader() == hs.id {
-		hs.UpdateQCHigh(hs.qspec.QC)
-	} else {
-		hs.doLeaderChange(hs.qspec.QC)
-	}
+	hs.UpdateQCHigh(hs.qspec.QC)
 
 	hs.pmNotify(Notification{QCFinish, newNode, newQC})
 } // this is the quorum call the client(the leader) makes.
 
-// doLeaderChange will sign the qc and forward it to the leader
+// doLeaderChange will sign the qc and forward it to the leader of vHeight+1
 func (hs *HotStuff) doLeaderChange(qc *QuorumCert) {
-	logger.Println("doLeaderChange")
 	hash := sha256.Sum256(qc.toBytes())
 	R, S, err := ecdsa.Sign(rand.Reader, hs.privKey, hash[:])
 	if err != nil {
 		logger.Println("Failed to sign QC for leader change: ", err)
 		return
 	}
+	leader := hs.GetLeader(hs.vHeight + 1)
+	logger.Println("doLeaderChange: changing to leader: ", leader)
 	sig := &partialSig{hs.id, R, S}
 	upd := &proto.LeaderUpdate{QC: qc.toProto(), Sig: sig.toProto()}
 	ctx, cancel := context.WithTimeout(context.Background(), hs.timeout)
-	_, err = hs.Replicas[hs.pm.GetLeader()].LeaderChange(ctx, upd)
+	_, err = hs.Replicas[leader].LeaderChange(ctx, upd)
 	if err != nil {
-		logger.Println("Failed to perform leader update: ", err)
+		logger.Println("Failed to perform leader change: ", err)
 	}
 	cancel()
 }
 
 // SendNewView sends a newView message to the leader replica.
-func (hs *HotStuff) SendNewView() {
+func (hs *HotStuff) SendNewView() error {
 	logger.Println("SendNewView")
 	ctx, cancel := context.WithTimeout(context.Background(), hs.timeout)
-	_, err := hs.Replicas[hs.pm.GetLeader()].NewView(ctx, hs.qcHigh.toProto())
+	defer cancel()
+	replica := hs.Replicas[hs.GetLeader(hs.vHeight+1)]
+	if replica.ID == hs.id {
+		// "send" new-view to self
+		hs.pmNotify(Notification{ReceiveNewView, hs.bLeaf, hs.qcHigh})
+		return nil
+	}
+	_, err := replica.NewView(ctx, hs.qcHigh.toProto())
 	if err != nil {
 		logger.Println("Failed to send new view to leader: ", err)
+		return err
 	}
-	cancel()
+	return nil
 }
 
 func createLeaf(parent *Node, cmd []byte, qc *QuorumCert, height int) *Node {

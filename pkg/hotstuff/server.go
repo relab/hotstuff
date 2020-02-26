@@ -17,7 +17,7 @@ func (s *hotstuffServer) Propose(srv proto.Hotstuff_ProposeServer) error {
 		p, err := s.hs.onReceiveProposal(nodeFromProto(node))
 		if err != nil {
 			logger.Printf("onReceiveProposal returned with error: %v", err)
-			return nil
+			return &proto.PartialCert{}
 		}
 		return p.toProto()
 	})
