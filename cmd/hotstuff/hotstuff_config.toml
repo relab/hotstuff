@@ -1,4 +1,8 @@
 # This is the information that each replica is given about the other replicas
+pacemaker = "RR"
+leaderSchedule = [1, 2, 3, 4]
+termLength = 1
+
 [[replicas]]
 id = "1"
 socket = "127.0.0.1:13371"

@@ -95,11 +95,11 @@ func main() {
 
 	timeout := time.Duration(viper.GetInt("timeout")) * time.Millisecond
 
+	// send commands
 	commands := make(chan []byte, 10)
-	if selfID == leaderID {
-		// send commands
+	if commandsFile := viper.GetString("commands"); commandsFile != "" {
 		go func() {
-			file, err := os.Open(viper.GetString("commands"))
+			file, err := os.Open(commandsFile)
 			if err != nil {
 				log.Fatalf("Failed to read commands file: %v\n", err)
 			}
@@ -122,9 +122,24 @@ func main() {
 		}()
 	}
 
-	pm := &hotstuff.RoundRobinPacemaker{Leader: leaderID, Commands: commands}
-	hs := hotstuff.New(selfID, privKey, config, pm, timeout, exec)
-	pm.HS = hs
+	var pm hotstuff.Pacemaker
+	hs := hotstuff.New(selfID, privKey, config, nil, timeout, exec)
+
+	pmType := viper.GetString("pacemaker")
+	switch pmType {
+	case "RR":
+		s := viper.GetIntSlice("leaderSchedule")
+		var leaderSchedule []hotstuff.ReplicaID
+		for _, id := range s {
+			leaderSchedule = append(leaderSchedule, hotstuff.ReplicaID(id))
+		}
+		termLength := viper.GetInt("termLength")
+		pm = &hotstuff.RoundRobinPacemaker{TermLength: termLength, Schedule: leaderSchedule, HS: hs, Commands: commands}
+	case "fixed":
+		pm = &hotstuff.FixedLeaderPacemaker{HS: hs, Leader: leaderID, Commands: commands}
+	}
+
+	hs.Pacemaker = pm
 	err = hs.Init(selfPort)
 	if err != nil {
 		log.Fatalf("Failed to init HotStuff: %v\n", err)
