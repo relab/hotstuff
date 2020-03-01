@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -33,9 +34,9 @@ type ReplicaID uint32
 // ReplicaInfo holds information about a replica
 type ReplicaInfo struct {
 	proto.HotstuffClient
-	ID     ReplicaID
-	Socket string
-	PubKey *ecdsa.PublicKey
+	ID      ReplicaID
+	Address string
+	PubKey  *ecdsa.PublicKey
 }
 
 // ReplicaConfig holds information needed by a replica
@@ -204,12 +205,11 @@ func (hs *HotStuff) onReceiveNewView(qc *QuorumCert) {
 	logger.Println("OnReceiveNewView")
 	node, _ := hs.nodes.NodeOf(qc)
 	hs.pmNotify(Notification{ReceiveNewView, node, qc})
-	hs.UpdateQCHigh(qc)
 }
 
 // OnReceiveLeaderChange handles an incoming LeaderUpdate message for a new leader.
 func (hs *HotStuff) onReceiveLeaderChange(qc *QuorumCert, sig partialSig) {
-	logger.Println("OnReceiveLeaderChange")
+	logger.Println("OnReceiveLeaderChange: vHeight: ", hs.vHeight)
 	hash := sha256.Sum256(qc.toBytes())
 	//The hs.pm.GetLeader should return this hs here and not the old leader.
 	//There is currently no way of knowing who the old leader were.
@@ -256,9 +256,9 @@ func (hs *HotStuff) update(node *Node) {
 		return
 	}
 
-	if hs.UpdateQCHigh(node.Justify) { // PRE-COMMIT on node1
-		logger.Println("PRE COMMIT: ", node1)
-	} else if !bytes.Equal(node.Justify.toBytes(), hs.qcHigh.toBytes()) {
+	logger.Println("PRE COMMIT: ", node1)
+	// PRE-COMMIT on node1
+	if !hs.UpdateQCHigh(node.Justify) && !bytes.Equal(node.Justify.toBytes(), hs.qcHigh.toBytes()) {
 		// it is expected that updateQCHigh will return false if qcHigh equals qc.
 		// this happens when the leader already got the qc after a proposal
 		logger.Println("UpdateQCHigh failed, but qc did not equal qcHigh")
@@ -347,7 +347,11 @@ func (hs *HotStuff) doLeaderChange(qc *QuorumCert) {
 	sig := &partialSig{hs.id, R, S}
 	upd := &proto.LeaderUpdate{QC: qc.toProto(), Sig: sig.toProto()}
 	ctx, cancel := context.WithTimeout(context.Background(), hs.timeout)
-	_, err = hs.Replicas[leader].LeaderChange(ctx, upd)
+	info, ok := hs.Replicas[leader]
+	if !ok || info.ID != leader {
+		panic(fmt.Errorf("Failed to get info for leader: %d", leader))
+	}
+	_, err = info.LeaderChange(ctx, upd)
 	if err != nil {
 		logger.Println("Failed to perform leader change: ", err)
 	}
@@ -383,10 +387,18 @@ func createLeaf(parent *Node, cmd []byte, qc *QuorumCert, height int) *Node {
 }
 
 func (hs *HotStuff) startClient() error {
-	addrs := make([]string, 0, len(hs.Replicas))
+	// sort addresses based on ID, excluding self
+	ids := make([]ReplicaID, 0, len(hs.Replicas)-1)
+	addrs := make([]string, 0, len(hs.Replicas)-1)
 	for _, replica := range hs.Replicas {
 		if replica.ID != hs.id {
-			addrs = append(addrs, replica.Socket)
+			i := sort.Search(len(ids), func(i int) bool { return ids[i] >= replica.ID })
+			ids = append(ids, 0)
+			copy(ids[i+1:], ids[i:])
+			ids[i] = replica.ID
+			addrs = append(addrs, "")
+			copy(addrs[i+1:], addrs[i:])
+			addrs[i] = replica.Address
 		}
 	}
 

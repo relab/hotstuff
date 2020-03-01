@@ -12,9 +12,9 @@ var pk ecdsa.PrivateKey // must not be a pointer
 var simpleRc = &ReplicaConfig{
 	Replicas: map[ReplicaID]*ReplicaInfo{
 		0: {
-			ID:     0,
-			Socket: "",
-			PubKey: &pk.PublicKey, // this is why
+			ID:      0,
+			Address: "",
+			PubKey:  &pk.PublicKey, // this is why
 		},
 	},
 	QuorumSize: 1,
@@ -23,24 +23,24 @@ var simpleRc = &ReplicaConfig{
 var biggerRc = &ReplicaConfig{
 	Replicas: map[ReplicaID]*ReplicaInfo{
 		0: {
-			ID:     0,
-			Socket: "",
-			PubKey: &pk.PublicKey,
+			ID:      0,
+			Address: "",
+			PubKey:  &pk.PublicKey,
 		},
 		1: {
-			ID:     1,
-			Socket: "",
-			PubKey: &pk.PublicKey,
+			ID:      1,
+			Address: "",
+			PubKey:  &pk.PublicKey,
 		},
 		2: {
-			ID:     2,
-			Socket: "",
-			PubKey: &pk.PublicKey,
+			ID:      2,
+			Address: "",
+			PubKey:  &pk.PublicKey,
 		},
 		3: {
-			ID:     3,
-			Socket: "",
-			PubKey: &pk.PublicKey,
+			ID:      3,
+			Address: "",
+			PubKey:  &pk.PublicKey,
 		},
 	},
 	QuorumSize: 3,
