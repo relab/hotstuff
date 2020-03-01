@@ -71,7 +71,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to read public key file %s: %v\n", mapRead(replica, "keyfile"), err)
 		}
-		socket := mapRead(replica, "socket")
+		address := mapRead(replica, "address")
 		_id, err := strconv.Atoi(mapRead(replica, "id"))
 		if err != nil {
 			log.Fatalf("Failed to parse id. (Id must be an integer): %v\n", err)
@@ -79,12 +79,12 @@ func main() {
 		id := hotstuff.ReplicaID(_id)
 		// dont put self in config
 		if id == selfID {
-			selfPort = socket[strings.LastIndex(socket, ":")+1:]
+			selfPort = address[strings.LastIndex(address, ":")+1:]
 		}
 		info := &hotstuff.ReplicaInfo{
-			ID:     id,
-			Socket: socket,
-			PubKey: pubKey,
+			ID:      id,
+			Address: address,
+			PubKey:  pubKey,
 		}
 		config.Replicas[id] = info
 	}

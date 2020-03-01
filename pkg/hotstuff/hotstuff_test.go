@@ -181,10 +181,10 @@ func TestHotStuff(t *testing.T) {
 	keys[4], _ = GeneratePrivateKey()
 
 	config := NewConfig()
-	config.Replicas[1] = &ReplicaInfo{ID: 1, Socket: "127.0.0.1:13371", PubKey: &keys[1].PublicKey}
-	config.Replicas[2] = &ReplicaInfo{ID: 2, Socket: "127.0.0.1:13372", PubKey: &keys[2].PublicKey}
-	config.Replicas[3] = &ReplicaInfo{ID: 3, Socket: "127.0.0.1:13373", PubKey: &keys[3].PublicKey}
-	config.Replicas[4] = &ReplicaInfo{ID: 4, Socket: "127.0.0.1:13374", PubKey: &keys[4].PublicKey}
+	config.Replicas[1] = &ReplicaInfo{ID: 1, Address: "127.0.0.1:13371", PubKey: &keys[1].PublicKey}
+	config.Replicas[2] = &ReplicaInfo{ID: 2, Address: "127.0.0.1:13372", PubKey: &keys[2].PublicKey}
+	config.Replicas[3] = &ReplicaInfo{ID: 3, Address: "127.0.0.1:13373", PubKey: &keys[3].PublicKey}
+	config.Replicas[4] = &ReplicaInfo{ID: 4, Address: "127.0.0.1:13374", PubKey: &keys[4].PublicKey}
 
 	out := make(map[ReplicaID]chan []byte)
 	out[1] = make(chan []byte, 1)
@@ -279,10 +279,10 @@ func TestRRPacemaker(t *testing.T) {
 	keys[4], _ = GeneratePrivateKey()
 
 	config := NewConfig()
-	config.Replicas[1] = &ReplicaInfo{ID: 1, Socket: "127.0.0.1:13371", PubKey: &keys[1].PublicKey}
-	config.Replicas[2] = &ReplicaInfo{ID: 2, Socket: "127.0.0.1:13372", PubKey: &keys[2].PublicKey}
-	config.Replicas[3] = &ReplicaInfo{ID: 3, Socket: "127.0.0.1:13373", PubKey: &keys[3].PublicKey}
-	config.Replicas[4] = &ReplicaInfo{ID: 4, Socket: "127.0.0.1:13374", PubKey: &keys[4].PublicKey}
+	config.Replicas[1] = &ReplicaInfo{ID: 1, Address: "127.0.0.1:13371", PubKey: &keys[1].PublicKey}
+	config.Replicas[2] = &ReplicaInfo{ID: 2, Address: "127.0.0.1:13372", PubKey: &keys[2].PublicKey}
+	config.Replicas[3] = &ReplicaInfo{ID: 3, Address: "127.0.0.1:13373", PubKey: &keys[3].PublicKey}
+	config.Replicas[4] = &ReplicaInfo{ID: 4, Address: "127.0.0.1:13374", PubKey: &keys[4].PublicKey}
 
 	out := make(map[ReplicaID]chan []byte)
 	out[1] = make(chan []byte, 1)

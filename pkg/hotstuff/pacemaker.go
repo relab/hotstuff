@@ -107,12 +107,15 @@ func (p *RoundRobinPacemaker) Run() {
 		case ReceiveNewView:
 			if n.Node != nil && n.Node.Height == p.HS.bLeaf.Height {
 				p.newViewCount++
+				p.HS.UpdateQCHigh(n.QC)
 				if p.newViewCount >= p.HS.QuorumSize {
 					p.newViewCount = 0
 					go p.Beat()
 				}
+			} else if n.Node != nil && n.QC != nil && n.Node.Height > p.HS.bLeaf.Height {
+				p.newViewCount = 1
+				p.HS.UpdateQCHigh(n.QC)
 			}
-
 		}
 	}
 }

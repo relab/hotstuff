@@ -5,20 +5,20 @@ termLength = 1
 
 [[replicas]]
 id = "1"
-socket = "127.0.0.1:13371"
+address = "127.0.0.1:13371"
 keyfile = "keys/r1.key.pub"
 
 [[replicas]]
 id = "2"
-socket = "127.0.0.1:13372"
+address = "127.0.0.1:13372"
 keyfile = "keys/r2.key.pub"
 
 [[replicas]]
 id = "3"
-socket = "127.0.0.1:13373"
+address = "127.0.0.1:13373"
 keyfile = "keys/r3.key.pub"
 
 [[replicas]]
 id = "4"
-socket = "127.0.0.1:13374"
+address = "127.0.0.1:13374"
 keyfile = "keys/r4.key.pub"
