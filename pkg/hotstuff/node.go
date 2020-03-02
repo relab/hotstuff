@@ -112,7 +112,7 @@ func (s *MapStorage) NodeOf(qc *QuorumCert) (node *Node, ok bool) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
 
-	node, ok = s.nodes[qc.hash]
+	node, ok = s.nodes[qc.NodeHash]
 	return
 }
 
