@@ -414,12 +414,8 @@ func (hs *HotStuff) startClient() error {
 	hs.manager = mgr
 
 	nodes := mgr.Nodes()
-	i := 0
-	for _, replica := range hs.Replicas {
-		if replica.ID != hs.id {
-			replica.HotstuffClient = nodes[i].HotstuffClient
-			i++
-		}
+	for i, id := range ids {
+		hs.Replicas[id].HotstuffClient = nodes[i].HotstuffClient
 	}
 
 	hs.QuorumSize = len(hs.Replicas) - (len(hs.Replicas)-1)/3
