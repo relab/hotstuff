@@ -114,9 +114,9 @@ func TestMarshalingQuorumCertToProto(t *testing.T) {
 	pqc := qc1.toProto()
 	qc2 := quorumCertFromProto(pqc)
 
-	if !bytes.Equal(qc1.hash[:], qc2.hash[:]) {
+	if !bytes.Equal(qc1.NodeHash[:], qc2.NodeHash[:]) {
 		t.Errorf("Hashes don't match! Got %v, want: %v\n",
-			hex.EncodeToString(qc2.hash[:]), hex.EncodeToString(qc1.hash[:]))
+			hex.EncodeToString(qc2.NodeHash[:]), hex.EncodeToString(qc1.NodeHash[:]))
 	}
 
 	if !VerifyQuorumCert(biggerRc, qc2) {

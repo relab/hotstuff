@@ -82,9 +82,9 @@ func partialCertFromProto(ppc *proto.PartialCert) *PartialCert {
 
 // QuorumCert is a certificate for a node from a quorum of replicas.
 type QuorumCert struct {
-	mut  sync.Mutex
-	sigs map[ReplicaID]partialSig
-	hash NodeHash
+	mut      sync.Mutex
+	sigs     map[ReplicaID]partialSig
+	NodeHash NodeHash
 }
 
 func (qc *QuorumCert) toProto() *proto.QuorumCert {
@@ -97,7 +97,7 @@ func (qc *QuorumCert) toProto() *proto.QuorumCert {
 	}
 	return &proto.QuorumCert{
 		Sigs: sigs,
-		Hash: qc.hash[:],
+		Hash: qc.NodeHash[:],
 	}
 }
 
@@ -106,7 +106,7 @@ func (qc *QuorumCert) toBytes() []byte {
 	defer qc.mut.Unlock()
 
 	var b []byte
-	b = append(b, qc.hash[:]...)
+	b = append(b, qc.NodeHash[:]...)
 	// sort partial signatures into a slice to ensure determinism
 	// TODO: find out if there is a faster way to ensure this
 	psigs := make([]partialSig, 0, len(qc.sigs))
@@ -126,14 +126,14 @@ func (qc *QuorumCert) String() string {
 	qc.mut.Lock()
 	defer qc.mut.Unlock()
 
-	return fmt.Sprintf("QuorumCert{Sigs: %d, Hash: %.8s}", len(qc.sigs), qc.hash)
+	return fmt.Sprintf("QuorumCert{Sigs: %d, Hash: %.8s}", len(qc.sigs), qc.NodeHash)
 }
 
 func quorumCertFromProto(pqc *proto.QuorumCert) *QuorumCert {
 	qc := &QuorumCert{
 		sigs: make(map[ReplicaID]partialSig),
 	}
-	copy(qc.hash[:], pqc.GetHash())
+	copy(qc.NodeHash[:], pqc.GetHash())
 	for _, ppsig := range pqc.GetSigs() {
 		psig := partialSigFromProto(ppsig)
 		qc.sigs[psig.id] = psig
@@ -151,7 +151,7 @@ func (qc *QuorumCert) AddPartial(cert *PartialCert) error {
 		return fmt.Errorf("Attempt to add partial cert from same replica twice")
 	}
 
-	if !bytes.Equal(qc.hash[:], cert.hash[:]) {
+	if !bytes.Equal(qc.NodeHash[:], cert.hash[:]) {
 		return fmt.Errorf("Partial cert hash does not match quorum cert")
 	}
 
@@ -183,7 +183,7 @@ func VerifyPartialCert(conf *ReplicaConfig, cert *PartialCert) bool {
 
 // CreateQuorumCert creates an empty quorum certificate for a given node
 func CreateQuorumCert(node *Node) *QuorumCert {
-	return &QuorumCert{hash: node.Hash(), sigs: make(map[ReplicaID]partialSig)}
+	return &QuorumCert{NodeHash: node.Hash(), sigs: make(map[ReplicaID]partialSig)}
 }
 
 // VerifyQuorumCert will verify a QuorumCert from public keys stored in ReplicaConfig
@@ -201,7 +201,7 @@ func VerifyQuorumCert(conf *ReplicaConfig, qc *QuorumCert) bool {
 			logger.Printf("VerifyQuorumSig: got signature from replica whose ID (%d) was not in config.", psig.id)
 		}
 
-		if ecdsa.Verify(info.PubKey, qc.hash[:], psig.r, psig.s) {
+		if ecdsa.Verify(info.PubKey, qc.NodeHash[:], psig.r, psig.s) {
 			numVerified++
 		}
 	}

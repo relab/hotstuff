@@ -193,7 +193,7 @@ func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
 		logger.Println("OnReceiveProposal: Accepted node")
 		hs.vHeight = node.Height
 		pc, err := CreatePartialCert(hs.id, hs.privKey, node)
-		hs.pmNotify(Notification{ReceiveProposal, node, nil})
+		hs.pmNotify(Notification{ReceiveProposal, node, hs.qcHigh})
 		return pc, err
 	}
 	logger.Println("OnReceiveProposal: Node not accepted")
@@ -211,12 +211,13 @@ func (hs *HotStuff) onReceiveNewView(qc *QuorumCert) {
 func (hs *HotStuff) onReceiveLeaderChange(qc *QuorumCert, sig partialSig) {
 	logger.Println("OnReceiveLeaderChange: vHeight: ", hs.vHeight)
 	hash := sha256.Sum256(qc.toBytes())
-	//The hs.pm.GetLeader should return this hs here and not the old leader.
-	//There is currently no way of knowing who the old leader were.
-	info, ok := hs.Replicas[hs.GetLeader(hs.vHeight)]
+	// Previously, we used GetLeader to check the hash, but this caused a race condition if this replica received the
+	// leader change before the Proposal made by the previous leader. Thus, we only check that the hash matches that of
+	// the replica that claims to be the sender.
+	info, ok := hs.Replicas[sig.id]
 	if ok && ecdsa.Verify(info.PubKey, hash[:], sig.r, sig.s) {
 		hs.UpdateQCHigh(qc)
-		node, _ := hs.nodes.Get(qc.hash)
+		node, _ := hs.nodes.NodeOf(qc)
 		hs.pmNotify(Notification{QCFinish, node, qc})
 		// TODO: start a new proposal
 		// A new round of proposals might already have begun?

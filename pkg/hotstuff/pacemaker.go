@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"bytes"
 	"context"
 	"math"
 	"time"
@@ -96,6 +97,14 @@ func (p *RoundRobinPacemaker) Run() {
 		switch n.Event {
 		case ReceiveProposal:
 			p.cancel()
+			// If we received leaderchange before propsal, then highQC could be the QC from this round.
+			// If this is the case, then this replica should beat.
+			if n.Node != nil && n.QC != nil {
+				hash := n.Node.Hash()
+				if bytes.Equal(hash[:], n.QC.NodeHash[:]) && p.HS.id == p.GetLeader(p.HS.vHeight+1) {
+					go p.Beat()
+				}
+			}
 		case QCFinish:
 			if p.HS.id == p.GetLeader(p.HS.vHeight+1) {
 				go p.Beat()
