@@ -11,7 +11,7 @@ import (
 
 func TestSafeNode(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), time.Second, nil)
+	hs := New(1, key, NewConfig(), time.Second, 10*time.Millisecond, nil)
 
 	n1 := createLeaf(hs.genesis, []byte("n1"), hs.qcHigh, hs.genesis.Height+1)
 	hs.nodes.Put(n1)
@@ -55,7 +55,7 @@ func TestSafeNode(t *testing.T) {
 
 func TestUpdateQCHigh(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), time.Second, nil)
+	hs := New(1, key, NewConfig(), time.Second, 10*time.Millisecond, nil)
 	node1 := createLeaf(hs.genesis, []byte("command1"), hs.qcHigh, hs.genesis.Height+1)
 	hs.nodes.Put(node1)
 	qc1 := CreateQuorumCert(node1)
@@ -85,7 +85,7 @@ func TestUpdateQCHigh(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	exec := make(chan []byte, 1)
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), time.Second, func(b []byte) { exec <- b })
+	hs := New(1, key, NewConfig(), time.Second, 10*time.Millisecond, func(b []byte) { exec <- b })
 	hs.QuorumSize = 0 // this accepts all QCs
 
 	n1 := createLeaf(hs.genesis, []byte("n1"), hs.qcHigh, hs.genesis.Height+1)
@@ -138,7 +138,7 @@ func TestUpdate(t *testing.T) {
 
 func TestOnReciveProposal(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), time.Second, nil)
+	hs := New(1, key, NewConfig(), time.Second, 10*time.Millisecond, nil)
 	node1 := createLeaf(hs.genesis, []byte("command1"), hs.qcHigh, hs.genesis.Height+1)
 	qc := CreateQuorumCert(node1)
 
@@ -196,10 +196,10 @@ func TestHotStuff(t *testing.T) {
 	pm := &FixedLeaderPacemaker{Leader: 1, Commands: commands}
 
 	replicas := make(map[ReplicaID]*HotStuff)
-	replicas[1] = New(1, keys[1], config, 5*time.Second, func(b []byte) { out[1] <- b })
-	replicas[2] = New(2, keys[2], config, 5*time.Second, func(b []byte) { out[2] <- b })
-	replicas[3] = New(3, keys[3], config, 5*time.Second, func(b []byte) { out[3] <- b })
-	replicas[4] = New(4, keys[4], config, 5*time.Second, func(b []byte) { out[4] <- b })
+	replicas[1] = New(1, keys[1], config, 5*time.Second, 10*time.Millisecond, func(b []byte) { out[1] <- b })
+	replicas[2] = New(2, keys[2], config, 5*time.Second, 10*time.Millisecond, func(b []byte) { out[2] <- b })
+	replicas[3] = New(3, keys[3], config, 5*time.Second, 10*time.Millisecond, func(b []byte) { out[3] <- b })
+	replicas[4] = New(4, keys[4], config, 5*time.Second, 10*time.Millisecond, func(b []byte) { out[4] <- b })
 
 	pm.HotStuff = replicas[1]
 
@@ -302,10 +302,10 @@ func TestRRPacemaker(t *testing.T) {
 	pm4 := &RoundRobinPacemaker{TermLength: 1, Schedule: leaderSchedule, Commands: commands4}
 
 	replicas := make(map[ReplicaID]*HotStuff)
-	replicas[1] = New(1, keys[1], config, 5*time.Second, func(b []byte) { out[1] <- b })
-	replicas[2] = New(2, keys[2], config, 5*time.Second, func(b []byte) { out[2] <- b })
-	replicas[3] = New(3, keys[3], config, 5*time.Second, func(b []byte) { out[3] <- b })
-	replicas[4] = New(4, keys[4], config, 5*time.Second, func(b []byte) { out[4] <- b })
+	replicas[1] = New(1, keys[1], config, 5*time.Second, 10*time.Millisecond, func(b []byte) { out[1] <- b })
+	replicas[2] = New(2, keys[2], config, 5*time.Second, 10*time.Millisecond, func(b []byte) { out[2] <- b })
+	replicas[3] = New(3, keys[3], config, 5*time.Second, 10*time.Millisecond, func(b []byte) { out[3] <- b })
+	replicas[4] = New(4, keys[4], config, 5*time.Second, 10*time.Millisecond, func(b []byte) { out[4] <- b })
 
 	pm1.HotStuff = replicas[1]
 	pm2.HotStuff = replicas[2]

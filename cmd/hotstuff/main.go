@@ -123,7 +123,7 @@ func main() {
 	}
 
 	var pm hotstuff.Pacemaker
-	hs := hotstuff.New(selfID, privKey, config, timeout, exec)
+	hs := hotstuff.New(selfID, privKey, config, timeout, 100*time.Millisecond, exec)
 
 	pmType := viper.GetString("pacemaker")
 	switch pmType {

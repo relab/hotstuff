@@ -94,6 +94,8 @@ type HotStuff struct {
 
 	closeOnce *sync.Once
 
+	// the duration that hotstuff can wait for an out-of-order message
+	waitDuration time.Duration
 	waitProposal chan struct{}
 	// Notifications will be sent to pacemaker on this channel
 	pmNotifyChan chan Notification
@@ -103,12 +105,12 @@ type HotStuff struct {
 	Exec     func([]byte)
 }
 
-// This function will expect to return the node for the qc if it is delivered within a timeout.
+// This function will expect to return the node for the qc if it is delivered within a duration.
 func (hs *HotStuff) expectNodeFor(qc *QuorumCert) (node *Node, ok bool) {
 	if node, ok = hs.nodes.NodeOf(qc); ok {
 		return
 	}
-	timeout := time.After(hs.timeout)
+	timeout := time.After(hs.waitDuration)
 loop:
 	for {
 		select {
@@ -125,7 +127,7 @@ loop:
 
 // New creates a new Hotstuff instance
 func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, timeout time.Duration,
-	exec func([]byte)) *HotStuff {
+	waitDuration time.Duration, exec func([]byte)) *HotStuff {
 	logger.SetPrefix(fmt.Sprintf("hs(id %d): ", id))
 
 	genesis := &Node{
