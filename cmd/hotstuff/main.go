@@ -123,7 +123,7 @@ func main() {
 	}
 
 	var pm hotstuff.Pacemaker
-	hs := hotstuff.New(selfID, privKey, config, nil, timeout, exec)
+	hs := hotstuff.New(selfID, privKey, config, timeout, exec)
 
 	pmType := viper.GetString("pacemaker")
 	switch pmType {
@@ -134,12 +134,11 @@ func main() {
 			leaderSchedule = append(leaderSchedule, hotstuff.ReplicaID(id))
 		}
 		termLength := viper.GetInt("termLength")
-		pm = &hotstuff.RoundRobinPacemaker{TermLength: termLength, Schedule: leaderSchedule, HS: hs, Commands: commands}
+		pm = &hotstuff.RoundRobinPacemaker{TermLength: termLength, Schedule: leaderSchedule, HotStuff: hs, Commands: commands}
 	case "fixed":
-		pm = &hotstuff.FixedLeaderPacemaker{HS: hs, Leader: leaderID, Commands: commands}
+		pm = &hotstuff.FixedLeaderPacemaker{HotStuff: hs, Leader: leaderID, Commands: commands}
 	}
 
-	hs.Pacemaker = pm
 	err = hs.Init(selfPort)
 	if err != nil {
 		log.Fatalf("Failed to init HotStuff: %v\n", err)

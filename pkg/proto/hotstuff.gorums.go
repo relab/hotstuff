@@ -124,6 +124,10 @@ func (c *Configuration) Propose(ctx context.Context, a *HSNode) (resp *Empty, er
 	}
 }
 
+// ProposeServerLoop is a helper function that will process receive
+// messages on srv, generate a response message using getResponse, and send
+// the response back on srv. The function returns when the stream ends, and
+// returns the error that caused it to end.
 func ProposeServerLoop(srv Hotstuff_ProposeServer, getResponse func(*HSNode) *PartialCert) error {
 	ctx := srv.Context()
 	for {

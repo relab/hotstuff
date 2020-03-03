@@ -29,11 +29,3 @@ func (s *hotstuffServer) NewView(ctx context.Context, msg *proto.QuorumCert) (*p
 	s.hs.onReceiveNewView(qc)
 	return &proto.Empty{}, nil
 }
-
-// LeaderChange handles an incoming LeaderUpdate message for a new leader.
-func (s *hotstuffServer) LeaderChange(ctx context.Context, msg *proto.LeaderUpdate) (*proto.Empty, error) {
-	qc := quorumCertFromProto(msg.GetQC())
-	sig := partialSigFromProto(msg.GetSig())
-	s.hs.onReceiveLeaderChange(qc, sig)
-	return &proto.Empty{}, nil
-}

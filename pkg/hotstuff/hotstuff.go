@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
-	"crypto/rand"
-	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -94,7 +92,6 @@ type HotStuff struct {
 	config  *proto.Configuration
 	qspec   *hotstuffQSpec
 
-	Pacemaker
 	// Notifications will be sent to pacemaker on this channel
 	pmNotifyChan chan Notification
 
@@ -104,7 +101,7 @@ type HotStuff struct {
 }
 
 // New creates a new Hotstuff instance
-func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, pacemaker Pacemaker, timeout time.Duration,
+func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, timeout time.Duration,
 	exec func([]byte)) *HotStuff {
 	logger.SetPrefix(fmt.Sprintf("hs(id %d): ", id))
 
@@ -118,7 +115,6 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, pacemak
 		ReplicaConfig: config,
 		id:            id,
 		privKey:       privKey,
-		Pacemaker:     pacemaker,
 		nodes:         nodes,
 		genesis:       genesis,
 		bLock:         genesis,
@@ -205,27 +201,6 @@ func (hs *HotStuff) onReceiveNewView(qc *QuorumCert) {
 	logger.Println("OnReceiveNewView")
 	node, _ := hs.nodes.NodeOf(qc)
 	hs.pmNotify(Notification{ReceiveNewView, node, qc})
-}
-
-// OnReceiveLeaderChange handles an incoming LeaderUpdate message for a new leader.
-func (hs *HotStuff) onReceiveLeaderChange(qc *QuorumCert, sig partialSig) {
-	logger.Println("OnReceiveLeaderChange: vHeight: ", hs.vHeight)
-	hash := sha256.Sum256(qc.toBytes())
-	// Previously, we used GetLeader to check the hash, but this caused a race condition if this replica received the
-	// leader change before the Proposal made by the previous leader. Thus, we only check that the hash matches that of
-	// the replica that claims to be the sender.
-	info, ok := hs.Replicas[sig.id]
-	if ok && ecdsa.Verify(info.PubKey, hash[:], sig.r, sig.s) {
-		hs.UpdateQCHigh(qc)
-		node, _ := hs.nodes.NodeOf(qc)
-		hs.pmNotify(Notification{QCFinish, node, qc})
-		// TODO: start a new proposal
-		// A new round of proposals might already have begun?
-		// The QCFinish notification has already been sent to the pacemaker in a goroutine at this point.
-		// Maybe consider locking this, or sending the QCFinish notification here.
-	} else {
-		logger.Println("OnReceiveLeaderChange: did not accept incoming qc")
-	}
 }
 
 func (hs *HotStuff) safeNode(node *Node) bool {
@@ -335,36 +310,12 @@ func (hs *HotStuff) Propose(cmd []byte) {
 	hs.pmNotify(Notification{QCFinish, newNode, newQC})
 } // this is the quorum call the client(the leader) makes.
 
-// doLeaderChange will sign the qc and forward it to the leader of vHeight+1
-func (hs *HotStuff) doLeaderChange(qc *QuorumCert) {
-	hash := sha256.Sum256(qc.toBytes())
-	R, S, err := ecdsa.Sign(rand.Reader, hs.privKey, hash[:])
-	if err != nil {
-		logger.Println("Failed to sign QC for leader change: ", err)
-		return
-	}
-	leader := hs.GetLeader(hs.vHeight + 1)
-	logger.Println("doLeaderChange: changing to leader: ", leader)
-	sig := &partialSig{hs.id, R, S}
-	upd := &proto.LeaderUpdate{QC: qc.toProto(), Sig: sig.toProto()}
-	ctx, cancel := context.WithTimeout(context.Background(), hs.timeout)
-	info, ok := hs.Replicas[leader]
-	if !ok || info.ID != leader {
-		panic(fmt.Errorf("Failed to get info for leader: %d", leader))
-	}
-	_, err = info.LeaderChange(ctx, upd)
-	if err != nil {
-		logger.Println("Failed to perform leader change: ", err)
-	}
-	cancel()
-}
-
 // SendNewView sends a newView message to the leader replica.
-func (hs *HotStuff) SendNewView() error {
+func (hs *HotStuff) SendNewView(leader ReplicaID) error {
 	logger.Println("SendNewView")
 	ctx, cancel := context.WithTimeout(context.Background(), hs.timeout)
 	defer cancel()
-	replica := hs.Replicas[hs.GetLeader(hs.vHeight+1)]
+	replica := hs.Replicas[leader]
 	if replica.ID == hs.id {
 		// "send" new-view to self
 		hs.pmNotify(Notification{ReceiveNewView, hs.bLeaf, hs.qcHigh})

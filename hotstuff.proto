@@ -11,12 +11,6 @@ service Hotstuff {
 		option (gorums.custom_return_type) = "Empty";
 	}
 	rpc NewView(QuorumCert) returns (Empty);
-	rpc LeaderChange(LeaderUpdate) returns (Empty);
-}
-
-message LeaderUpdate {
-	QuorumCert QC = 1;
-	PartialSig Sig = 2;
 }
 
 message HSNode {

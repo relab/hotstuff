@@ -29,59 +29,6 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
-type LeaderUpdate struct {
-	QC                   *QuorumCert `protobuf:"bytes,1,opt,name=QC,proto3" json:"QC,omitempty"`
-	Sig                  *PartialSig `protobuf:"bytes,2,opt,name=Sig,proto3" json:"Sig,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
-	XXX_sizecache        int32       `json:"-"`
-}
-
-func (m *LeaderUpdate) Reset()      { *m = LeaderUpdate{} }
-func (*LeaderUpdate) ProtoMessage() {}
-func (*LeaderUpdate) Descriptor() ([]byte, []int) {
-	return fileDescriptor_8517aa0e19c54851, []int{0}
-}
-func (m *LeaderUpdate) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *LeaderUpdate) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_LeaderUpdate.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *LeaderUpdate) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_LeaderUpdate.Merge(m, src)
-}
-func (m *LeaderUpdate) XXX_Size() int {
-	return m.Size()
-}
-func (m *LeaderUpdate) XXX_DiscardUnknown() {
-	xxx_messageInfo_LeaderUpdate.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_LeaderUpdate proto.InternalMessageInfo
-
-func (m *LeaderUpdate) GetQC() *QuorumCert {
-	if m != nil {
-		return m.QC
-	}
-	return nil
-}
-
-func (m *LeaderUpdate) GetSig() *PartialSig {
-	if m != nil {
-		return m.Sig
-	}
-	return nil
-}
-
 type HSNode struct {
 	ParentHash           []byte      `protobuf:"bytes,1,opt,name=ParentHash,proto3" json:"ParentHash,omitempty"`
 	Command              []byte      `protobuf:"bytes,2,opt,name=Command,proto3" json:"Command,omitempty"`
@@ -95,7 +42,7 @@ type HSNode struct {
 func (m *HSNode) Reset()      { *m = HSNode{} }
 func (*HSNode) ProtoMessage() {}
 func (*HSNode) Descriptor() ([]byte, []int) {
-	return fileDescriptor_8517aa0e19c54851, []int{1}
+	return fileDescriptor_8517aa0e19c54851, []int{0}
 }
 func (m *HSNode) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -170,7 +117,7 @@ type PartialSig struct {
 func (m *PartialSig) Reset()      { *m = PartialSig{} }
 func (*PartialSig) ProtoMessage() {}
 func (*PartialSig) Descriptor() ([]byte, []int) {
-	return fileDescriptor_8517aa0e19c54851, []int{2}
+	return fileDescriptor_8517aa0e19c54851, []int{1}
 }
 func (m *PartialSig) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -231,7 +178,7 @@ type PartialCert struct {
 func (m *PartialCert) Reset()      { *m = PartialCert{} }
 func (*PartialCert) ProtoMessage() {}
 func (*PartialCert) Descriptor() ([]byte, []int) {
-	return fileDescriptor_8517aa0e19c54851, []int{3}
+	return fileDescriptor_8517aa0e19c54851, []int{2}
 }
 func (m *PartialCert) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -291,7 +238,7 @@ type QuorumCert struct {
 func (m *QuorumCert) Reset()      { *m = QuorumCert{} }
 func (*QuorumCert) ProtoMessage() {}
 func (*QuorumCert) Descriptor() ([]byte, []int) {
-	return fileDescriptor_8517aa0e19c54851, []int{4}
+	return fileDescriptor_8517aa0e19c54851, []int{3}
 }
 func (m *QuorumCert) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -342,7 +289,7 @@ type Empty struct {
 func (m *Empty) Reset()      { *m = Empty{} }
 func (*Empty) ProtoMessage() {}
 func (*Empty) Descriptor() ([]byte, []int) {
-	return fileDescriptor_8517aa0e19c54851, []int{5}
+	return fileDescriptor_8517aa0e19c54851, []int{4}
 }
 func (m *Empty) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -372,7 +319,6 @@ func (m *Empty) XXX_DiscardUnknown() {
 var xxx_messageInfo_Empty proto.InternalMessageInfo
 
 func init() {
-	proto.RegisterType((*LeaderUpdate)(nil), "proto.LeaderUpdate")
 	proto.RegisterType((*HSNode)(nil), "proto.HSNode")
 	proto.RegisterType((*PartialSig)(nil), "proto.PartialSig")
 	proto.RegisterType((*PartialCert)(nil), "proto.PartialCert")
@@ -383,36 +329,34 @@ func init() {
 func init() { proto.RegisterFile("hotstuff.proto", fileDescriptor_8517aa0e19c54851) }
 
 var fileDescriptor_8517aa0e19c54851 = []byte{
-	// 460 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x7c, 0x92, 0xc1, 0x6e, 0xd3, 0x40,
-	0x10, 0x86, 0x33, 0x75, 0x9c, 0xc0, 0xd4, 0x20, 0x31, 0xa0, 0xca, 0x8a, 0xd0, 0x2a, 0x98, 0x22,
-	0x45, 0x1c, 0x52, 0x28, 0x6f, 0x80, 0x0b, 0xb8, 0x12, 0x54, 0xc9, 0x5a, 0xf4, 0xc4, 0x65, 0xd3,
-	0x6c, 0x6d, 0x4b, 0x71, 0x6c, 0xd9, 0x1b, 0x55, 0xdc, 0x78, 0x04, 0x24, 0x5e, 0x82, 0x3b, 0xea,
-	0x85, 0x23, 0x27, 0x8e, 0x3d, 0x72, 0xa4, 0xe6, 0xc2, 0x11, 0x89, 0x17, 0x40, 0x5e, 0x6f, 0x94,
-	0x44, 0x54, 0x3d, 0xad, 0x67, 0xe6, 0x9f, 0xdf, 0xdf, 0xce, 0x0e, 0xde, 0x8e, 0x33, 0x55, 0xaa,
-	0xc5, 0xe9, 0xe9, 0x30, 0x2f, 0x32, 0x95, 0x91, 0xad, 0x8f, 0xde, 0x6e, 0x94, 0xa8, 0x78, 0x31,
-	0x19, 0x9e, 0x64, 0xe9, 0x5e, 0x21, 0x67, 0x62, 0xb2, 0x17, 0x65, 0xc5, 0x22, 0x2d, 0xcd, 0xd1,
-	0x88, 0xbd, 0x63, 0x74, 0x5e, 0x4b, 0x31, 0x95, 0xc5, 0xdb, 0x7c, 0x2a, 0x94, 0xa4, 0x07, 0xb8,
-	0x35, 0xf6, 0x5d, 0xe8, 0xc3, 0x60, 0x7b, 0xff, 0x4e, 0xa3, 0x19, 0x8e, 0x17, 0x75, 0x87, 0x2f,
-	0x0b, 0xc5, 0xb7, 0xc6, 0x3e, 0x3d, 0x44, 0x2b, 0x4c, 0x22, 0x77, 0x6b, 0x43, 0x33, 0x12, 0x85,
-	0x4a, 0xc4, 0x2c, 0x4c, 0x22, 0x5e, 0x57, 0xbd, 0x4f, 0x80, 0x9d, 0x20, 0x3c, 0xca, 0xa6, 0x92,
-	0x18, 0xe2, 0x48, 0x14, 0x72, 0xae, 0x02, 0x51, 0xc6, 0xda, 0xda, 0xe1, 0x6b, 0x19, 0x72, 0xb1,
-	0xeb, 0x67, 0x69, 0x2a, 0xe6, 0x53, 0xed, 0xe9, 0xf0, 0x65, 0x68, 0x60, 0xac, 0xeb, 0x60, 0x76,
-	0xb0, 0x13, 0xc8, 0x24, 0x8a, 0x95, 0xdb, 0xee, 0xc3, 0xc0, 0xe2, 0x26, 0xa2, 0x7b, 0x68, 0xbf,
-	0x29, 0xa3, 0xc3, 0x03, 0xd7, 0xee, 0xc3, 0xa0, 0xcd, 0x9b, 0xc0, 0x7b, 0xa9, 0x51, 0x0c, 0x28,
-	0xdd, 0xc7, 0x9b, 0x5c, 0xe6, 0xb3, 0xe4, 0x44, 0x1c, 0x1e, 0x68, 0x2e, 0x9b, 0xaf, 0x12, 0xe4,
-	0x20, 0x70, 0x03, 0x04, 0xbc, 0x8e, 0x42, 0x4d, 0xe2, 0x70, 0x08, 0xbd, 0x77, 0xb8, 0x6d, 0x7c,
-	0x6a, 0x90, 0xe5, 0x44, 0xe0, 0xba, 0x89, 0x10, 0x61, 0x5b, 0x0f, 0xa0, 0xb1, 0xd4, 0xdf, 0x2b,
-	0x4a, 0x6b, 0x9d, 0xf2, 0x15, 0xe2, 0xea, 0x96, 0xf4, 0x08, 0xdb, 0x61, 0x12, 0x95, 0x2e, 0xf4,
-	0xad, 0xab, 0xdd, 0x75, 0xf9, 0x2a, 0x7b, 0xaf, 0x8b, 0xf6, 0x8b, 0x34, 0x57, 0xef, 0xf7, 0xbf,
-	0x00, 0xde, 0x08, 0xcc, 0x96, 0x50, 0x80, 0xdd, 0x51, 0x91, 0xe5, 0x59, 0x29, 0xe9, 0x96, 0x71,
-	0x6b, 0x5e, 0xaa, 0x47, 0x9b, 0xe6, 0xf5, 0xef, 0xbd, 0x9d, 0xcf, 0xe7, 0x2e, 0x7c, 0x3d, 0x77,
-	0x1b, 0xb6, 0x6f, 0x7f, 0xdd, 0xc6, 0x72, 0x00, 0x4f, 0x80, 0x1e, 0x63, 0xf7, 0x48, 0x9e, 0x1d,
-	0x27, 0xf2, 0x8c, 0xfe, 0x7f, 0x9e, 0x9e, 0x63, 0x52, 0x5a, 0x4f, 0x4f, 0x97, 0x8b, 0xe6, 0xc7,
-	0x62, 0x1e, 0x49, 0xba, 0x6b, 0xaa, 0xeb, 0xdb, 0xb7, 0xd9, 0xf2, 0x7c, 0xf7, 0xe2, 0x92, 0xb5,
-	0x7e, 0x5c, 0xb2, 0xd6, 0x87, 0x8a, 0xc1, 0xf7, 0x8a, 0xc1, 0x45, 0xc5, 0xe0, 0x67, 0xc5, 0xe0,
-	0x77, 0xc5, 0x5a, 0x7f, 0x2a, 0x06, 0x1f, 0x7f, 0xb1, 0xd6, 0xa4, 0xa3, 0x5b, 0x9e, 0xfd, 0x0b,
-	0x00, 0x00, 0xff, 0xff, 0xd2, 0x67, 0xfe, 0x77, 0x07, 0x03, 0x00, 0x00,
+	// 418 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x91, 0xb1, 0x6e, 0xd4, 0x40,
+	0x10, 0x86, 0x6f, 0xce, 0xe7, 0x3b, 0x98, 0x1c, 0x48, 0x8c, 0x50, 0xb4, 0x3a, 0xa1, 0x95, 0x31,
+	0x41, 0xb2, 0x28, 0x2e, 0x28, 0xbc, 0x01, 0x17, 0xc0, 0x29, 0x88, 0x72, 0x6b, 0x89, 0x8a, 0xc6,
+	0x97, 0x6c, 0xec, 0x95, 0xce, 0x59, 0xcb, 0x5e, 0x2b, 0xa2, 0xcb, 0x23, 0x20, 0xf1, 0x12, 0xbc,
+	0x40, 0x1a, 0x4a, 0x2a, 0xca, 0x94, 0x94, 0xc4, 0x34, 0x94, 0x48, 0xbc, 0x00, 0xf2, 0xda, 0xc8,
+	0x41, 0xb9, 0x6a, 0xfd, 0xcf, 0xac, 0xbf, 0xf9, 0xec, 0xc1, 0xfb, 0xa9, 0x36, 0xa5, 0xa9, 0x4e,
+	0x4f, 0xe7, 0x79, 0xa1, 0x8d, 0x26, 0xd7, 0x1e, 0xb3, 0x9d, 0x44, 0x99, 0xb4, 0x5a, 0xcd, 0x8f,
+	0x75, 0xb6, 0x5b, 0xc8, 0x75, 0xbc, 0xda, 0x4d, 0x74, 0x51, 0x65, 0x65, 0x77, 0xb4, 0x97, 0xfd,
+	0x4f, 0x80, 0xe3, 0x30, 0x3a, 0xd4, 0x27, 0x92, 0x38, 0xe2, 0x51, 0x5c, 0xc8, 0x33, 0x13, 0xc6,
+	0x65, 0xca, 0xc0, 0x83, 0x60, 0x2a, 0x6e, 0x54, 0x88, 0xe1, 0x64, 0xa1, 0xb3, 0x2c, 0x3e, 0x3b,
+	0x61, 0x43, 0xdb, 0xfc, 0x17, 0xe9, 0x31, 0x0e, 0x97, 0x0b, 0xe6, 0x78, 0x10, 0x6c, 0xed, 0x3d,
+	0x68, 0xc1, 0xf3, 0x65, 0xd5, 0x8c, 0x59, 0xc8, 0xc2, 0x88, 0xe1, 0x72, 0x41, 0xdb, 0x38, 0x0e,
+	0xa5, 0x4a, 0x52, 0xc3, 0x46, 0x1e, 0x04, 0x8e, 0xe8, 0x12, 0x3d, 0x44, 0xf7, 0x6d, 0x99, 0x1c,
+	0xec, 0x33, 0xd7, 0x83, 0x60, 0x24, 0xda, 0xe0, 0xbf, 0xb6, 0x2a, 0x46, 0xc5, 0xeb, 0x48, 0x25,
+	0xf4, 0x08, 0xef, 0x0a, 0x99, 0xaf, 0xd5, 0x71, 0x7c, 0xb0, 0x6f, 0xbd, 0x5c, 0xd1, 0x17, 0x68,
+	0x8a, 0x20, 0x3a, 0x21, 0x10, 0x4d, 0x8a, 0xac, 0xc9, 0x54, 0x40, 0xe4, 0xbf, 0xc7, 0xad, 0x8e,
+	0xd3, 0x88, 0xd0, 0x13, 0x74, 0x22, 0x95, 0x58, 0x44, 0x2f, 0xda, 0x0f, 0x12, 0x4d, 0x97, 0x08,
+	0x47, 0xf6, 0x07, 0xb4, 0x48, 0xfb, 0xdc, 0x5b, 0x3a, 0x37, 0x2d, 0xdf, 0x20, 0xf6, 0x5f, 0x49,
+	0x4f, 0x71, 0x14, 0xa9, 0xa4, 0x64, 0xe0, 0x39, 0x9b, 0xe9, 0xb6, 0xbd, 0x09, 0xef, 0x4f, 0xd0,
+	0x7d, 0x95, 0xe5, 0xe6, 0xc3, 0xde, 0x05, 0xe0, 0x9d, 0xb0, 0xdb, 0x26, 0x85, 0x38, 0x39, 0x2a,
+	0x74, 0xae, 0x4b, 0x49, 0xf7, 0x3a, 0x5a, 0xbb, 0xa9, 0x19, 0xfd, 0x0f, 0x6f, 0xc6, 0xfb, 0xdb,
+	0x9f, 0x2f, 0x19, 0x7c, 0xb9, 0x64, 0xad, 0xdb, 0xd7, 0x3f, 0xac, 0x45, 0x06, 0xf0, 0x1c, 0xe8,
+	0x19, 0x4e, 0x0e, 0xe5, 0xf9, 0x3b, 0x25, 0xcf, 0xe9, 0xf6, 0x7a, 0x66, 0xd3, 0xae, 0x64, 0xef,
+	0xbf, 0xdc, 0xb9, 0xba, 0xe6, 0x83, 0xef, 0xd7, 0x7c, 0x70, 0x51, 0x73, 0xf8, 0x56, 0x73, 0xb8,
+	0xaa, 0x39, 0xfc, 0xa8, 0x39, 0xfc, 0xaa, 0xf9, 0xe0, 0x77, 0xcd, 0xe1, 0xe3, 0x4f, 0x3e, 0x58,
+	0x8d, 0xed, 0x2b, 0x2f, 0xfe, 0x06, 0x00, 0x00, 0xff, 0xff, 0x49, 0x1d, 0xcc, 0xba, 0x7c, 0x02,
+	0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -429,7 +373,6 @@ const _ = grpc.SupportPackageIsVersion4
 type HotstuffClient interface {
 	Propose(ctx context.Context, opts ...grpc.CallOption) (Hotstuff_ProposeClient, error)
 	NewView(ctx context.Context, in *QuorumCert, opts ...grpc.CallOption) (*Empty, error)
-	LeaderChange(ctx context.Context, in *LeaderUpdate, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type hotstuffClient struct {
@@ -480,20 +423,10 @@ func (c *hotstuffClient) NewView(ctx context.Context, in *QuorumCert, opts ...gr
 	return out, nil
 }
 
-func (c *hotstuffClient) LeaderChange(ctx context.Context, in *LeaderUpdate, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
-	err := c.cc.Invoke(ctx, "/proto.Hotstuff/LeaderChange", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // HotstuffServer is the server API for Hotstuff service.
 type HotstuffServer interface {
 	Propose(Hotstuff_ProposeServer) error
 	NewView(context.Context, *QuorumCert) (*Empty, error)
-	LeaderChange(context.Context, *LeaderUpdate) (*Empty, error)
 }
 
 // UnimplementedHotstuffServer can be embedded to have forward compatible implementations.
@@ -505,9 +438,6 @@ func (*UnimplementedHotstuffServer) Propose(srv Hotstuff_ProposeServer) error {
 }
 func (*UnimplementedHotstuffServer) NewView(ctx context.Context, req *QuorumCert) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NewView not implemented")
-}
-func (*UnimplementedHotstuffServer) LeaderChange(ctx context.Context, req *LeaderUpdate) (*Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method LeaderChange not implemented")
 }
 
 func RegisterHotstuffServer(s *grpc.Server, srv HotstuffServer) {
@@ -558,24 +488,6 @@ func _Hotstuff_NewView_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Hotstuff_LeaderChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(LeaderUpdate)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(HotstuffServer).LeaderChange(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/proto.Hotstuff/LeaderChange",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(HotstuffServer).LeaderChange(ctx, req.(*LeaderUpdate))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 var _Hotstuff_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "proto.Hotstuff",
 	HandlerType: (*HotstuffServer)(nil),
@@ -583,10 +495,6 @@ var _Hotstuff_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "NewView",
 			Handler:    _Hotstuff_NewView_Handler,
-		},
-		{
-			MethodName: "LeaderChange",
-			Handler:    _Hotstuff_LeaderChange_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
@@ -598,53 +506,6 @@ var _Hotstuff_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Metadata: "hotstuff.proto",
-}
-
-func (m *LeaderUpdate) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *LeaderUpdate) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *LeaderUpdate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if m.Sig != nil {
-		{
-			size, err := m.Sig.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintHotstuff(dAtA, i, uint64(size))
-		}
-		i--
-		dAtA[i] = 0x12
-	}
-	if m.QC != nil {
-		{
-			size, err := m.QC.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintHotstuff(dAtA, i, uint64(size))
-		}
-		i--
-		dAtA[i] = 0xa
-	}
-	return len(dAtA) - i, nil
 }
 
 func (m *HSNode) Marshal() (dAtA []byte, err error) {
@@ -873,23 +734,6 @@ func encodeVarintHotstuff(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
-func (m *LeaderUpdate) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.QC != nil {
-		l = m.QC.Size()
-		n += 1 + l + sovHotstuff(uint64(l))
-	}
-	if m.Sig != nil {
-		l = m.Sig.Size()
-		n += 1 + l + sovHotstuff(uint64(l))
-	}
-	return n
-}
-
 func (m *HSNode) Size() (n int) {
 	if m == nil {
 		return 0
@@ -991,17 +835,6 @@ func sovHotstuff(x uint64) (n int) {
 func sozHotstuff(x uint64) (n int) {
 	return sovHotstuff(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (this *LeaderUpdate) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&LeaderUpdate{`,
-		`QC:` + strings.Replace(this.QC.String(), "QuorumCert", "QuorumCert", 1) + `,`,
-		`Sig:` + strings.Replace(this.Sig.String(), "PartialSig", "PartialSig", 1) + `,`,
-		`}`,
-	}, "")
-	return s
-}
 func (this *HSNode) String() string {
 	if this == nil {
 		return "nil"
@@ -1072,131 +905,6 @@ func valueToStringHotstuff(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
-}
-func (m *LeaderUpdate) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowHotstuff
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: LeaderUpdate: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: LeaderUpdate: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field QC", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowHotstuff
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthHotstuff
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthHotstuff
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.QC == nil {
-				m.QC = &QuorumCert{}
-			}
-			if err := m.QC.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Sig", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowHotstuff
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthHotstuff
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthHotstuff
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Sig == nil {
-				m.Sig = &PartialSig{}
-			}
-			if err := m.Sig.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipHotstuff(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthHotstuff
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthHotstuff
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
 }
 func (m *HSNode) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
