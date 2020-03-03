@@ -93,12 +93,34 @@ type HotStuff struct {
 	qspec   *hotstuffQSpec
 
 	closeOnce *sync.Once
+
+	waitProposal chan struct{}
 	// Notifications will be sent to pacemaker on this channel
 	pmNotifyChan chan Notification
 
 	// interaction with the outside application happens through these
 	Commands <-chan []byte
 	Exec     func([]byte)
+}
+
+// This function will expect to return the node for the qc if it is delivered within a timeout.
+func (hs *HotStuff) expectNodeFor(qc *QuorumCert) (node *Node, ok bool) {
+	if node, ok = hs.nodes.NodeOf(qc); ok {
+		return
+	}
+	timeout := time.After(hs.timeout)
+loop:
+	for {
+		select {
+		case hs.waitProposal <- struct{}{}:
+			if node, ok = hs.nodes.NodeOf(qc); ok {
+				return
+			}
+		case <-timeout:
+			break loop
+		}
+	}
+	return nil, false
 }
 
 // New creates a new Hotstuff instance
@@ -191,6 +213,16 @@ func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
 		hs.vHeight = node.Height
 		pc, err := CreatePartialCert(hs.id, hs.privKey, node)
 		hs.pmNotify(Notification{ReceiveProposal, node, hs.qcHigh})
+
+		// wake anyone waiting for a proposal
+	loop:
+		for {
+			select {
+			case <-hs.waitProposal:
+			default:
+				break loop
+			}
+		}
 		return pc, err
 	}
 	logger.Println("OnReceiveProposal: Node not accepted")
@@ -200,12 +232,12 @@ func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
 // OnReceiveNewView handles the leader's response to receiving a NewView rpc from a replica
 func (hs *HotStuff) onReceiveNewView(qc *QuorumCert) {
 	logger.Println("OnReceiveNewView")
-	node, _ := hs.nodes.NodeOf(qc)
+	node, _ := hs.expectNodeFor(qc)
 	hs.pmNotify(Notification{ReceiveNewView, node, qc})
 }
 
 func (hs *HotStuff) safeNode(node *Node) bool {
-	qcNode, nExists := hs.nodes.NodeOf(node.Justify)
+	qcNode, nExists := hs.expectNodeFor(node.Justify)
 	accept := false
 	if nExists && qcNode.Height > hs.bLock.Height {
 		accept = true
@@ -402,8 +434,8 @@ func (hs *HotStuff) startServer(port string) error {
 // Close closes all connections made by the HotStuff instance
 func (hs *HotStuff) Close() {
 	hs.closeOnce.Do(func() {
-	hs.manager.Close()
-	hs.server.Stop()
-	close(hs.pmNotifyChan)
+		hs.manager.Close()
+		hs.server.Stop()
+		close(hs.pmNotifyChan)
 	})
 }
