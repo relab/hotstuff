@@ -201,7 +201,7 @@ func TestHotStuff(t *testing.T) {
 	replicas[3] = New(3, keys[3], config, 5*time.Second, func(b []byte) { out[3] <- b })
 	replicas[4] = New(4, keys[4], config, 5*time.Second, func(b []byte) { out[4] <- b })
 
-	pm.HS = replicas[1]
+	pm.HotStuff = replicas[1]
 
 	var wg sync.WaitGroup
 	wg.Add(len(replicas))
@@ -235,7 +235,7 @@ func TestHotStuff(t *testing.T) {
 			t.Errorf("Replica %d: Incorrect bLock.Command: Got '%s', want '%s'", id, r.bLock.Command, test[1])
 		}
 		// leader will have progressed further due to UpdateQCHigh being called at the end of Propose()
-		if r.id == pm.GetLeader(pm.HS.vHeight) {
+		if r.id == pm.getLeader(pm.vHeight) {
 			if !bytes.Equal(r.bLeaf.Command, test[3]) {
 				t.Errorf("Replica %d: Incorrect bLeaf.Command: Got '%s', want '%s'", id, r.bLeaf.Command, test[3])
 			}
@@ -264,7 +264,7 @@ func TestRRGetLeader(t *testing.T) {
 		{1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 1},
 	}
 	for _, testCase := range testCases {
-		if leader := pm.GetLeader(testCase.height); leader != testCase.leader {
+		if leader := pm.getLeader(testCase.height); leader != testCase.leader {
 			t.Errorf("Incorrect leader for view %d: got: %d, want: %d", testCase.height, leader, testCase.leader)
 		}
 	}
@@ -307,10 +307,10 @@ func TestRRPacemaker(t *testing.T) {
 	replicas[3] = New(3, keys[3], config, 5*time.Second, func(b []byte) { out[3] <- b })
 	replicas[4] = New(4, keys[4], config, 5*time.Second, func(b []byte) { out[4] <- b })
 
-	pm1.HS = replicas[1]
-	pm2.HS = replicas[2]
-	pm3.HS = replicas[3]
-	pm4.HS = replicas[4]
+	pm1.HotStuff = replicas[1]
+	pm2.HotStuff = replicas[2]
+	pm3.HotStuff = replicas[3]
+	pm4.HotStuff = replicas[4]
 
 	var wg sync.WaitGroup
 	wg.Add(len(replicas))
@@ -347,19 +347,19 @@ func TestRRPacemaker(t *testing.T) {
 
 	time.Sleep(10 * time.Second)
 
-	if leader := pm1.GetLeader(pm1.HS.vHeight); leader != replicas[4].id {
+	if leader := pm1.getLeader(pm1.height()); leader != replicas[4].id {
 		t.Errorf("Error in pm1: Incorrect leader %d, want %d.", leader, replicas[4].id)
 	}
 
-	if leader := pm2.GetLeader(pm1.HS.vHeight); leader != replicas[4].id {
+	if leader := pm2.getLeader(pm1.height()); leader != replicas[4].id {
 		t.Errorf("Error in pm2: Incorrect leader %d, want %d.", leader, replicas[4].id)
 	}
 
-	if leader := pm3.GetLeader(pm1.HS.vHeight); leader != replicas[4].id {
+	if leader := pm3.getLeader(pm1.height()); leader != replicas[4].id {
 		t.Errorf("Error in pm3: Incorrect leader %d, want %d.", leader, replicas[4].id)
 	}
 
-	if leader := pm4.GetLeader(pm1.HS.vHeight); leader != replicas[4].id {
+	if leader := pm4.getLeader(pm1.height()); leader != replicas[4].id {
 		t.Errorf("Error in pm4: Incorrect leader %d, want %d.", leader, replicas[4].id)
 	}
 
