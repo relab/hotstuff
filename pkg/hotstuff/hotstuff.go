@@ -92,6 +92,7 @@ type HotStuff struct {
 	config  *proto.Configuration
 	qspec   *hotstuffQSpec
 
+	closeOnce *sync.Once
 	// Notifications will be sent to pacemaker on this channel
 	pmNotifyChan chan Notification
 
@@ -400,7 +401,9 @@ func (hs *HotStuff) startServer(port string) error {
 
 // Close closes all connections made by the HotStuff instance
 func (hs *HotStuff) Close() {
+	hs.closeOnce.Do(func() {
 	hs.manager.Close()
 	hs.server.Stop()
 	close(hs.pmNotifyChan)
+	})
 }
