@@ -33,7 +33,10 @@ func exec(cmd []byte) {
 func main() {
 	pflag.Int("self-id", 0, "The ID for this replica")
 	pflag.Int("leader-id", 0, "The ID of the fixed leader")
-	pflag.Int("timeout", 1000, "Timeout (in milliseconds)")
+	pflag.Int("newview-timeout", 1000, "Timeout for newview (in milliseconds)")
+	pflag.Int("timeout", 800, "Timeout for proposals (in milliseconds)")
+	pflag.Int("waitduration", 200, "Duration to wait for an out-of-order message (in milliseconds)")
+	pflag.Int("connect-timeout", 5000, "Timeout for establishing connections (in milliseconds)")
 	pflag.String("keyfile", "", "The path to the private key file")
 	pflag.String("commands", "", "The file to read commands from")
 	pflag.String("cpuprofile", "", "File to write CPU profile to")
@@ -93,7 +96,10 @@ func main() {
 		log.Fatalf("Found no port for self. Missing from config?\n")
 	}
 
-	timeout := time.Duration(viper.GetInt("timeout")) * time.Millisecond
+	qcTimeout := time.Duration(viper.GetInt("timeout")) * time.Millisecond
+	waitDuration := time.Duration(viper.GetInt("waitduration")) * time.Millisecond
+	connectTimeout := time.Duration(viper.GetInt("connect-timeout")) * time.Millisecond
+	newViewTimeout := time.Duration(viper.GetInt("newview-timeout")) * time.Millisecond
 
 	// send commands
 	commands := make(chan []byte, 10)
@@ -123,7 +129,7 @@ func main() {
 	}
 
 	var pm hotstuff.Pacemaker
-	hs := hotstuff.New(selfID, privKey, config, timeout, 100*time.Millisecond, exec)
+	hs := hotstuff.New(selfID, privKey, config, qcTimeout, waitDuration, exec)
 
 	pmType := viper.GetString("pacemaker")
 	switch pmType {
@@ -134,12 +140,18 @@ func main() {
 			leaderSchedule = append(leaderSchedule, hotstuff.ReplicaID(id))
 		}
 		termLength := viper.GetInt("termLength")
-		pm = &hotstuff.RoundRobinPacemaker{TermLength: termLength, Schedule: leaderSchedule, HotStuff: hs, Commands: commands}
+		pm = &hotstuff.RoundRobinPacemaker{
+			TermLength:     termLength,
+			Schedule:       leaderSchedule,
+			HotStuff:       hs,
+			Commands:       commands,
+			NewViewTimeout: newViewTimeout,
+		}
 	case "fixed":
 		pm = &hotstuff.FixedLeaderPacemaker{HotStuff: hs, Leader: leaderID, Commands: commands}
 	}
 
-	err = hs.Init(selfPort)
+	err = hs.Init(selfPort, connectTimeout)
 	if err != nil {
 		log.Fatalf("Failed to init HotStuff: %v\n", err)
 	}

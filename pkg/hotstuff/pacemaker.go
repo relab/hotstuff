@@ -61,6 +61,8 @@ type RoundRobinPacemaker struct {
 	TermLength int
 	Schedule   []ReplicaID
 
+	NewViewTimeout time.Duration
+
 	cancelTimeout func() // resets the current new-view interrupt
 	stopTimeout   func() // stops the new-view interrupts
 }
@@ -95,43 +97,46 @@ func (p *RoundRobinPacemaker) Run() {
 		go p.beat()
 	}
 
-	// set up new-view interrupt
-	stopContext, cancel := context.WithCancel(context.Background())
-	p.stopTimeout = cancel
-	cancelContext, cancel := context.WithCancel(context.Background())
-	p.cancelTimeout = cancel
-	go p.newViewTimeout(stopContext, cancelContext)
-
 	// make sure that we only beat once per view, and don't beat if bLeaf.Height < vHeight
 	// as that would cause a panic
 	lastBeat := 1
 	beat := func() {
-		if lastBeat < p.height()+1 && p.height()+1 > p.vHeight {
+		if p.getLeader(p.height()+1) == p.id && lastBeat < p.height()+1 && p.height()+1 > p.vHeight {
 			lastBeat = p.height() + 1
 			go p.beat()
 		}
 	}
 
+	// get the first notification, thus making sure that leader of view 1 has a chance to beat before timeouts happen
+	n := <-notify
+
+	// set up new-view interrupt
+	stopContext, cancel := context.WithCancel(context.Background())
+	p.stopTimeout = cancel
+	cancelContext, cancel := context.WithCancel(context.Background())
+	p.cancelTimeout = cancel
+	go p.startNewViewTimeout(stopContext, cancelContext)
+
 	// handle events from hotstuff
-	for n := range notify {
+	for {
 		switch n.Event {
 		case ReceiveProposal:
 			p.cancelTimeout()
 		case QCFinish:
-			if p.id == p.getLeader(p.height()+1) {
-				beat()
-			} else if p.id == p.getLeader(p.height()) {
+			if p.id == p.getLeader(p.height()) {
 				// was leader for previous view, but not the leader for next view
 				// do leader change
 				go p.SendNewView(p.getLeader(p.height() + 1))
 			}
+			beat()
 		case ReceiveNewView:
-			if n.QC != nil {
-				p.UpdateQCHigh(n.QC)
-				if p.id == p.getLeader(p.height()+1) {
-					beat()
-				}
-			}
+			beat()
+		}
+
+		var ok bool
+		n, ok = <-notify
+		if !ok {
+			break
 		}
 	}
 
@@ -139,15 +144,15 @@ func (p *RoundRobinPacemaker) Run() {
 	p.stopTimeout()
 }
 
-// newViewTimeout sends a NewView to the leader if triggered by a timer interrupt. Two contexts are used to control
+// startNewViewTimeout sends a NewView to the leader if triggered by a timer interrupt. Two contexts are used to control
 // this function; the stopContext is used to stop the function, and the cancelContext is used to cancel a single timer.
-func (p *RoundRobinPacemaker) newViewTimeout(stopContext, cancelContext context.Context) {
+func (p *RoundRobinPacemaker) startNewViewTimeout(stopContext, cancelContext context.Context) {
 	for {
 		select {
 		case <-stopContext.Done():
 			p.cancelTimeout()
 			return
-		case <-time.After(p.timeout):
+		case <-time.After(p.NewViewTimeout):
 			// add a dummy node to the tree representing this round which failed
 			p.bLeaf = createLeaf(p.bLeaf, nil, nil, p.height()+1)
 			p.SendNewView(p.getLeader(p.height() + 1))

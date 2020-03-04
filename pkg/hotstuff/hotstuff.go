@@ -82,10 +82,10 @@ type HotStuff struct {
 	bLeaf   *Node
 	qcHigh  *QuorumCert
 
-	id      ReplicaID
-	nodes   NodeStorage
-	privKey *ecdsa.PrivateKey
-	timeout time.Duration
+	id        ReplicaID
+	nodes     NodeStorage
+	privKey   *ecdsa.PrivateKey
+	qcTimeout time.Duration
 
 	server  *grpc.Server
 	manager *proto.Manager
@@ -126,7 +126,7 @@ loop:
 }
 
 // New creates a new Hotstuff instance
-func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, timeout time.Duration,
+func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, qcTimeout time.Duration,
 	waitDuration time.Duration, exec func([]byte)) *HotStuff {
 	logger.SetPrefix(fmt.Sprintf("hs(id %d): ", id))
 
@@ -146,19 +146,19 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, timeout
 		bExec:         genesis,
 		bLeaf:         genesis,
 		qcHigh:        qcForGenesis,
-		timeout:       timeout,
+		qcTimeout:     qcTimeout,
 		Exec:          exec,
 		pmNotifyChan:  make(chan Notification, 10),
 	}
 }
 
 // Init starts the networking components of hotstuff
-func (hs *HotStuff) Init(port string) error {
+func (hs *HotStuff) Init(port string, connectTimeout time.Duration) error {
 	err := hs.startServer(port)
 	if err != nil {
 		return fmt.Errorf("Failed to start GRPC Server: %w", err)
 	}
-	err = hs.startClient()
+	err = hs.startClient(connectTimeout)
 	if err != nil {
 		return fmt.Errorf("Failed to start GRPC Clients: %w", err)
 	}
@@ -182,7 +182,7 @@ func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
 		return false
 	}
 
-	newQCHighNode, ok := hs.nodes.NodeOf(qc)
+	newQCHighNode, ok := hs.expectNodeFor(qc)
 	if !ok {
 		logger.Println("Could not find node of new QC!")
 		return false
@@ -234,7 +234,8 @@ func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
 // OnReceiveNewView handles the leader's response to receiving a NewView rpc from a replica
 func (hs *HotStuff) onReceiveNewView(qc *QuorumCert) {
 	logger.Println("OnReceiveNewView")
-	node, _ := hs.expectNodeFor(qc)
+	hs.UpdateQCHigh(qc)
+	node, _ := hs.nodes.NodeOf(qc)
 	hs.pmNotify(Notification{ReceiveNewView, node, qc})
 }
 
@@ -329,7 +330,7 @@ func (hs *HotStuff) Propose(cmd []byte) {
 	// set the QSpec's QC to our newQC
 	hs.qspec.QC = newQC
 
-	ctx, cancel := context.WithTimeout(context.Background(), hs.timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), hs.qcTimeout)
 	_, err = hs.config.Propose(ctx, newNode.toProto())
 	cancel()
 
@@ -348,7 +349,7 @@ func (hs *HotStuff) Propose(cmd []byte) {
 // SendNewView sends a newView message to the leader replica.
 func (hs *HotStuff) SendNewView(leader ReplicaID) error {
 	logger.Println("SendNewView")
-	ctx, cancel := context.WithTimeout(context.Background(), hs.timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), hs.qcTimeout)
 	defer cancel()
 	replica := hs.Replicas[leader]
 	if replica.ID == hs.id {
@@ -373,7 +374,7 @@ func createLeaf(parent *Node, cmd []byte, qc *QuorumCert, height int) *Node {
 	}
 }
 
-func (hs *HotStuff) startClient() error {
+func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
 	// sort addresses based on ID, excluding self
 	ids := make([]ReplicaID, 0, len(hs.Replicas)-1)
 	addrs := make([]string, 0, len(hs.Replicas)-1)
@@ -393,7 +394,7 @@ func (hs *HotStuff) startClient() error {
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
 	),
-		proto.WithDialTimeout(hs.timeout),
+		proto.WithDialTimeout(connectTimeout),
 	)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to replicas: %w", err)

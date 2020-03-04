@@ -196,10 +196,10 @@ func TestHotStuff(t *testing.T) {
 	pm := &FixedLeaderPacemaker{Leader: 1, Commands: commands}
 
 	replicas := make(map[ReplicaID]*HotStuff)
-	replicas[1] = New(1, keys[1], config, 5*time.Second, 10*time.Millisecond, func(b []byte) { out[1] <- b })
-	replicas[2] = New(2, keys[2], config, 5*time.Second, 10*time.Millisecond, func(b []byte) { out[2] <- b })
-	replicas[3] = New(3, keys[3], config, 5*time.Second, 10*time.Millisecond, func(b []byte) { out[3] <- b })
-	replicas[4] = New(4, keys[4], config, 5*time.Second, 10*time.Millisecond, func(b []byte) { out[4] <- b })
+	replicas[1] = New(1, keys[1], config, 100*time.Millisecond, 50*time.Millisecond, func(b []byte) { out[1] <- b })
+	replicas[2] = New(2, keys[2], config, 100*time.Millisecond, 50*time.Millisecond, func(b []byte) { out[2] <- b })
+	replicas[3] = New(3, keys[3], config, 100*time.Millisecond, 50*time.Millisecond, func(b []byte) { out[3] <- b })
+	replicas[4] = New(4, keys[4], config, 100*time.Millisecond, 50*time.Millisecond, func(b []byte) { out[4] <- b })
 
 	pm.HotStuff = replicas[1]
 
@@ -207,7 +207,7 @@ func TestHotStuff(t *testing.T) {
 	wg.Add(len(replicas))
 	for id := range replicas {
 		go func(id ReplicaID) {
-			err := replicas[id].Init(fmt.Sprintf("1337%d", id))
+			err := replicas[id].Init(fmt.Sprintf("1337%d", id), 5*time.Second)
 			if err != nil {
 				t.Errorf("Failed to init replica %d: %v", id, err)
 			}
@@ -319,7 +319,7 @@ func TestRRPacemaker(t *testing.T) {
 	wg.Add(len(replicas))
 	for id := range replicas {
 		go func(id ReplicaID) {
-			err := replicas[id].Init(fmt.Sprintf("1337%d", id))
+			err := replicas[id].Init(fmt.Sprintf("1337%d", id), 5*time.Second)
 			if err != nil {
 				t.Errorf("Failed to init replica %d: %v", id, err)
 			}
