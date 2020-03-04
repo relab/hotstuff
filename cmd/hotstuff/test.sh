@@ -15,10 +15,10 @@ COMMANDS="big.txt"
 
 COMMON_ARGS="--leader-id 1 --commands $COMMANDS --connect-timeout 5000 --newview-timeout $NEWVIEW  --waitduration 50 --timeout $TIMEOUT"
 
-REPLICA1_ARG="--self-id 1 --keyfile keys/r1.key --leader-id 1 $COMMON_ARGS"
-REPLICA2_ARG="--self-id 2 --keyfile keys/r2.key --leader-id 1 $COMMON_ARGS"
-REPLICA3_ARG="--self-id 3 --keyfile keys/r3.key --leader-id 1 $COMMON_ARGS"
-REPLICA4_ARG="--self-id 4 --keyfile keys/r4.key --leader-id 1 $COMMON_ARGS"
+REPLICA1_ARG="--self-id 1 --keyfile keys/r1.key $COMMON_ARGS"
+REPLICA2_ARG="--self-id 2 --keyfile keys/r2.key $COMMON_ARGS"
+REPLICA3_ARG="--self-id 3 --keyfile keys/r3.key $COMMON_ARGS"
+REPLICA4_ARG="--self-id 4 --keyfile keys/r4.key $COMMON_ARGS"
 
 if [[ "$1" == "record" ]]; then
 	if [ $(cat /proc/sys/kernel/perf_event_paranoid) -gt "1" ]; then
