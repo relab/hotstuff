@@ -15,7 +15,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/relab/hotstuff/pkg/proto"
+	"github.com/relab/hotstuff/proto"
 )
 
 const privateKeyFileType = "HOTSTUFF PRIVATE KEY"

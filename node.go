@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/relab/hotstuff/pkg/proto"
+	"github.com/relab/hotstuff/proto"
 )
 
 // NodeStorage provides a means to store a Node based on its hash

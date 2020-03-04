@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/relab/hotstuff/pkg/hotstuff"
 	"os"
+
+	"github.com/relab/hotstuff"
 )
 
 func main() {

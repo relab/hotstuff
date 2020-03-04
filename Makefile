@@ -1,7 +1,7 @@
 PROTOPKG  := ./pkg/proto
 PROTOBUF  := $(PROTOPKG)/hotstuff.pb.go
 GORUMS    := $(PROTOPKG)/hotstuff.gorums.go 
-PROTOFILE := hotstuff.proto
+PROTOFILE := $(PROTOPKG)/hotstuff.proto
 
 .PHONY: all
 all: $(PROTOBUF) $(GORUMS)

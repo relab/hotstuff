@@ -11,7 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/relab/hotstuff/pkg/hotstuff"
+	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/pacemaker"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -128,7 +129,7 @@ func main() {
 		}()
 	}
 
-	var pm hotstuff.Pacemaker
+	var pm pacemaker.Pacemaker
 	hs := hotstuff.New(selfID, privKey, config, qcTimeout, waitDuration, exec)
 
 	pmType := viper.GetString("pacemaker")
@@ -140,7 +141,7 @@ func main() {
 			leaderSchedule = append(leaderSchedule, hotstuff.ReplicaID(id))
 		}
 		termLength := viper.GetInt("termLength")
-		pm = &hotstuff.RoundRobinPacemaker{
+		pm = &pacemaker.RoundRobinPacemaker{
 			TermLength:     termLength,
 			Schedule:       leaderSchedule,
 			HotStuff:       hs,
@@ -148,7 +149,7 @@ func main() {
 			NewViewTimeout: newViewTimeout,
 		}
 	case "fixed":
-		pm = &hotstuff.FixedLeaderPacemaker{HotStuff: hs, Leader: leaderID, Commands: commands}
+		pm = &pacemaker.FixedLeaderPacemaker{HotStuff: hs, Leader: leaderID, Commands: commands}
 	}
 
 	err = hs.Init(selfPort, connectTimeout)

@@ -1,9 +1,11 @@
-package hotstuff
+package pacemaker
 
 import (
 	"context"
 	"math"
 	"time"
+
+	"github.com/relab/hotstuff"
 )
 
 // Pacemaker is a mechanism that provides synchronization
@@ -13,21 +15,20 @@ type Pacemaker interface {
 
 // FixedLeaderPacemaker uses a fixed leader.
 type FixedLeaderPacemaker struct {
-	*HotStuff
-	Leader    ReplicaID
-	OldLeader ReplicaID
+	*hotstuff.HotStuff
+	Leader    hotstuff.ReplicaID
+	OldLeader hotstuff.ReplicaID
 	Commands  chan []byte
 }
 
 // getLeader returns the fixed ID of the leader
-func (p FixedLeaderPacemaker) getLeader(vHeight int) ReplicaID {
+func (p FixedLeaderPacemaker) getLeader(vHeight int) hotstuff.ReplicaID {
 	return p.Leader
 }
 
 // beat make the leader brodcast a new proposal for a node to work on.
 func (p FixedLeaderPacemaker) beat() {
 	p.OldLeader = p.Leader
-	logger.Println("beat")
 	cmd, ok := <-p.Commands
 	if !ok {
 		// no more commands. Time to quit
@@ -40,13 +41,13 @@ func (p FixedLeaderPacemaker) beat() {
 // Run runs the pacemaker which will beat when the previous QC is completed
 func (p FixedLeaderPacemaker) Run() {
 	notify := p.GetNotifier()
-	if p.id == p.Leader {
+	if p.GetID() == p.Leader {
 		go p.beat()
 	}
 	for n := range notify {
 		switch n.Event {
-		case QCFinish:
-			if p.id == p.Leader {
+		case hotstuff.QCFinish:
+			if p.GetID() == p.Leader {
 				go p.beat()
 			}
 		}
@@ -55,11 +56,11 @@ func (p FixedLeaderPacemaker) Run() {
 
 // RoundRobinPacemaker change leader in a RR fashion. The amount of commands to be executed before it changes leader can be customized.
 type RoundRobinPacemaker struct {
-	*HotStuff
+	*hotstuff.HotStuff
 
 	Commands   chan []byte
 	TermLength int
-	Schedule   []ReplicaID
+	Schedule   []hotstuff.ReplicaID
 
 	NewViewTimeout time.Duration
 
@@ -68,14 +69,13 @@ type RoundRobinPacemaker struct {
 }
 
 // getLeader returns the fixed ID of the leader for the view height vHeight
-func (p *RoundRobinPacemaker) getLeader(vHeight int) ReplicaID {
+func (p *RoundRobinPacemaker) getLeader(vHeight int) hotstuff.ReplicaID {
 	term := int(math.Ceil(float64(vHeight)/float64(p.TermLength)) - 1)
 	return p.Schedule[term%len(p.Schedule)]
 }
 
 // beat make the leader brodcast a new proposal for a node to work on.
 func (p *RoundRobinPacemaker) beat() {
-	logger.Println("beat: height ", p.height()+1)
 	cmd, ok := <-p.Commands
 	if !ok {
 		p.Close()
@@ -84,16 +84,12 @@ func (p *RoundRobinPacemaker) beat() {
 	p.Propose(cmd)
 }
 
-func (p *RoundRobinPacemaker) height() int {
-	return p.bLeaf.Height
-}
-
 // Run runs the pacemaker which will beat when the previous QC is completed
 func (p *RoundRobinPacemaker) Run() {
 	notify := p.GetNotifier()
 
 	// initial beat for view 1
-	if p.id == p.getLeader(1) {
+	if p.GetID() == p.getLeader(1) {
 		go p.beat()
 	}
 
@@ -101,8 +97,9 @@ func (p *RoundRobinPacemaker) Run() {
 	// as that would cause a panic
 	lastBeat := 1
 	beat := func() {
-		if p.getLeader(p.height()+1) == p.id && lastBeat < p.height()+1 && p.height()+1 > p.vHeight {
-			lastBeat = p.height() + 1
+		if p.getLeader(p.GetHeight()+1) == p.GetID() && lastBeat < p.GetHeight()+1 &&
+			p.GetHeight()+1 > p.GetVotedHeight() {
+			lastBeat = p.GetHeight() + 1
 			go p.beat()
 		}
 	}
@@ -120,16 +117,16 @@ func (p *RoundRobinPacemaker) Run() {
 	// handle events from hotstuff
 	for {
 		switch n.Event {
-		case ReceiveProposal:
+		case hotstuff.ReceiveProposal:
 			p.cancelTimeout()
-		case QCFinish:
-			if p.id == p.getLeader(p.height()) {
+		case hotstuff.QCFinish:
+			if p.GetID() == p.getLeader(p.GetHeight()) {
 				// was leader for previous view, but not the leader for next view
 				// do leader change
-				go p.SendNewView(p.getLeader(p.height() + 1))
+				go p.SendNewView(p.getLeader(p.GetHeight() + 1))
 			}
 			beat()
-		case ReceiveNewView:
+		case hotstuff.ReceiveNewView:
 			beat()
 		}
 
@@ -154,8 +151,8 @@ func (p *RoundRobinPacemaker) startNewViewTimeout(stopContext, cancelContext con
 			return
 		case <-time.After(p.NewViewTimeout):
 			// add a dummy node to the tree representing this round which failed
-			p.bLeaf = createLeaf(p.bLeaf, nil, nil, p.height()+1)
-			p.SendNewView(p.getLeader(p.height() + 1))
+			p.BLeaf = hotstuff.CreateLeaf(p.BLeaf, nil, nil, p.GetHeight()+1)
+			p.SendNewView(p.getLeader(p.GetHeight() + 1))
 		case <-cancelContext.Done():
 		}
 

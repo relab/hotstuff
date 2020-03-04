@@ -3,7 +3,7 @@ package hotstuff
 import (
 	"context"
 
-	"github.com/relab/hotstuff/pkg/proto"
+	"github.com/relab/hotstuff/proto"
 )
 
 // a simple struct implementing the hotstuff server API which will call back to replica methods

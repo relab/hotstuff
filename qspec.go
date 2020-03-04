@@ -1,7 +1,7 @@
 package hotstuff
 
 import (
-	"github.com/relab/hotstuff/pkg/proto"
+	"github.com/relab/hotstuff/proto"
 )
 
 type hotstuffQSpec struct {

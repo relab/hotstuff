@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/relab/hotstuff/pkg/proto"
+	"github.com/relab/hotstuff/proto"
 	"google.golang.org/grpc"
 )
 
@@ -79,8 +79,10 @@ type HotStuff struct {
 	vHeight int
 	bLock   *Node
 	bExec   *Node
-	bLeaf   *Node
-	qcHigh  *QuorumCert
+
+	// fields that pacemaker needs
+	BLeaf  *Node
+	QCHigh *QuorumCert
 
 	id        ReplicaID
 	nodes     NodeStorage
@@ -105,24 +107,16 @@ type HotStuff struct {
 	Exec     func([]byte)
 }
 
-// This function will expect to return the node for the qc if it is delivered within a duration.
-func (hs *HotStuff) expectNodeFor(qc *QuorumCert) (node *Node, ok bool) {
-	if node, ok = hs.nodes.NodeOf(qc); ok {
-		return
-	}
-	timeout := time.After(hs.waitDuration)
-loop:
-	for {
-		select {
-		case hs.waitProposal <- struct{}{}:
-			if node, ok = hs.nodes.NodeOf(qc); ok {
-				return
-			}
-		case <-timeout:
-			break loop
-		}
-	}
-	return nil, false
+func (hs *HotStuff) GetID() ReplicaID {
+	return hs.id
+}
+
+func (hs *HotStuff) GetHeight() int {
+	return hs.BLeaf.Height
+}
+
+func (hs *HotStuff) GetVotedHeight() int {
+	return hs.vHeight
 }
 
 // New creates a new Hotstuff instance
@@ -144,8 +138,8 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, qcTimeo
 		genesis:       genesis,
 		bLock:         genesis,
 		bExec:         genesis,
-		bLeaf:         genesis,
-		qcHigh:        qcForGenesis,
+		BLeaf:         genesis,
+		QCHigh:        qcForGenesis,
 		qcTimeout:     qcTimeout,
 		Exec:          exec,
 		pmNotifyChan:  make(chan Notification, 10),
@@ -174,6 +168,26 @@ func (hs *HotStuff) pmNotify(n Notification) {
 	hs.pmNotifyChan <- n
 }
 
+// This function will expect to return the node for the qc if it is delivered within a duration.
+func (hs *HotStuff) expectNodeFor(qc *QuorumCert) (node *Node, ok bool) {
+	if node, ok = hs.nodes.NodeOf(qc); ok {
+		return
+	}
+	timeout := time.After(hs.waitDuration)
+loop:
+	for {
+		select {
+		case hs.waitProposal <- struct{}{}:
+			if node, ok = hs.nodes.NodeOf(qc); ok {
+				return
+			}
+		case <-timeout:
+			break loop
+		}
+	}
+	return nil, false
+}
+
 // UpdateQCHigh updates the qc held by the paceMaker, to the newest qc.
 func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
 	logger.Println("UpdateQCHigh")
@@ -188,14 +202,14 @@ func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
 		return false
 	}
 
-	oldQCHighNode, ok := hs.nodes.NodeOf(hs.qcHigh)
+	oldQCHighNode, ok := hs.nodes.NodeOf(hs.QCHigh)
 	if !ok {
 		panic(fmt.Errorf("Node from the old qcHigh missing from storage"))
 	}
 
 	if newQCHighNode.Height > oldQCHighNode.Height {
-		hs.qcHigh = qc
-		hs.bLeaf = newQCHighNode
+		hs.QCHigh = qc
+		hs.BLeaf = newQCHighNode
 		hs.pmNotify(Notification{HQCUpdate, newQCHighNode, qc})
 		return true
 	}
@@ -214,7 +228,7 @@ func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
 		logger.Println("OnReceiveProposal: Accepted node")
 		hs.vHeight = node.Height
 		pc, err := CreatePartialCert(hs.id, hs.privKey, node)
-		hs.pmNotify(Notification{ReceiveProposal, node, hs.qcHigh})
+		hs.pmNotify(Notification{ReceiveProposal, node, hs.QCHigh})
 
 		// wake anyone waiting for a proposal
 	loop:
@@ -270,7 +284,7 @@ func (hs *HotStuff) update(node *Node) {
 
 	logger.Println("PRE COMMIT: ", node1)
 	// PRE-COMMIT on node1
-	if !hs.UpdateQCHigh(node.Justify) && !bytes.Equal(node.Justify.toBytes(), hs.qcHigh.toBytes()) {
+	if !hs.UpdateQCHigh(node.Justify) && !bytes.Equal(node.Justify.toBytes(), hs.QCHigh.toBytes()) {
 		// it is expected that updateQCHigh will return false if qcHigh equals qc.
 		// this happens when the leader already got the qc after a proposal
 		logger.Println("UpdateQCHigh failed, but qc did not equal qcHigh")
@@ -313,8 +327,8 @@ func (hs *HotStuff) commit(node *Node) {
 // Propose will fetch a command from the Commands channel and proposes it to the other replicas
 func (hs *HotStuff) Propose(cmd []byte) {
 	logger.Printf("Propose (cmd: %.15s)\n", cmd)
-	newNode := createLeaf(hs.bLeaf, cmd, hs.qcHigh, hs.bLeaf.Height+1)
-	hs.pmNotify(Notification{Propose, newNode, hs.qcHigh})
+	newNode := CreateLeaf(hs.BLeaf, cmd, hs.QCHigh, hs.BLeaf.Height+1)
+	hs.pmNotify(Notification{Propose, newNode, hs.QCHigh})
 
 	newQC := CreateQuorumCert(newNode)
 	// self vote
@@ -340,7 +354,7 @@ func (hs *HotStuff) Propose(cmd []byte) {
 		// return
 	}
 
-	hs.bLeaf = newNode
+	hs.BLeaf = newNode
 	hs.UpdateQCHigh(hs.qspec.QC)
 
 	hs.pmNotify(Notification{QCFinish, newNode, newQC})
@@ -354,10 +368,10 @@ func (hs *HotStuff) SendNewView(leader ReplicaID) error {
 	replica := hs.Replicas[leader]
 	if replica.ID == hs.id {
 		// "send" new-view to self
-		hs.pmNotify(Notification{ReceiveNewView, hs.bLeaf, hs.qcHigh})
+		hs.pmNotify(Notification{ReceiveNewView, hs.BLeaf, hs.QCHigh})
 		return nil
 	}
-	_, err := replica.NewView(ctx, hs.qcHigh.toProto())
+	_, err := replica.NewView(ctx, hs.QCHigh.toProto())
 	if err != nil {
 		logger.Println("Failed to send new view to leader: ", err)
 		return err
@@ -365,7 +379,7 @@ func (hs *HotStuff) SendNewView(leader ReplicaID) error {
 	return nil
 }
 
-func createLeaf(parent *Node, cmd []byte, qc *QuorumCert, height int) *Node {
+func CreateLeaf(parent *Node, cmd []byte, qc *QuorumCert, height int) *Node {
 	return &Node{
 		ParentHash: parent.Hash(),
 		Command:    cmd,
