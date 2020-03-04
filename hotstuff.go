@@ -174,7 +174,6 @@ func (hs *HotStuff) expectNodeFor(qc *QuorumCert) (node *Node, ok bool) {
 		return
 	}
 	timeout := time.After(hs.waitDuration)
-loop:
 	for {
 		select {
 		case hs.waitProposal <- struct{}{}:
@@ -182,10 +181,9 @@ loop:
 				return
 			}
 		case <-timeout:
-			break loop
+			return nil, false
 		}
 	}
-	return nil, false
 }
 
 // UpdateQCHigh updates the qc held by the paceMaker, to the newest qc.
