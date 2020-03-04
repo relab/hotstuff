@@ -92,7 +92,7 @@ type HotStuff struct {
 	config  *proto.Configuration
 	qspec   *hotstuffQSpec
 
-	closeOnce *sync.Once
+	closeOnce sync.Once
 
 	// the duration that hotstuff can wait for an out-of-order message
 	waitDuration time.Duration

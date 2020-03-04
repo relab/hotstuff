@@ -235,7 +235,7 @@ func TestHotStuff(t *testing.T) {
 			t.Errorf("Replica %d: Incorrect bLock.Command: Got '%s', want '%s'", id, r.bLock.Command, test[1])
 		}
 		// leader will have progressed further due to UpdateQCHigh being called at the end of Propose()
-		if r.id == pm.getLeader(pm.vHeight) {
+		if r.id == pm.getLeader(0) {
 			if !bytes.Equal(r.bLeaf.Command, test[3]) {
 				t.Errorf("Replica %d: Incorrect bLeaf.Command: Got '%s', want '%s'", id, r.bLeaf.Command, test[3])
 			}
@@ -252,6 +252,10 @@ func TestHotStuff(t *testing.T) {
 		if fail {
 			t.Errorf("Replica %d: Incorrect output!", id)
 		}
+	}
+
+	for _, replica := range replicas {
+		replica.Close()
 	}
 }
 
@@ -271,7 +275,6 @@ func TestRRGetLeader(t *testing.T) {
 }
 
 func TestRRPacemaker(t *testing.T) {
-
 	keys := make(map[ReplicaID]*ecdsa.PrivateKey)
 	keys[1], _ = GeneratePrivateKey()
 	keys[2], _ = GeneratePrivateKey()
@@ -351,16 +354,21 @@ func TestRRPacemaker(t *testing.T) {
 		t.Errorf("Error in pm1: Incorrect leader %d, want %d.", leader, replicas[4].id)
 	}
 
-	if leader := pm2.getLeader(pm1.height()); leader != replicas[4].id {
+	if leader := pm2.getLeader(pm2.height()); leader != replicas[4].id {
 		t.Errorf("Error in pm2: Incorrect leader %d, want %d.", leader, replicas[4].id)
 	}
 
-	if leader := pm3.getLeader(pm1.height()); leader != replicas[4].id {
+	if leader := pm3.getLeader(pm3.height()); leader != replicas[4].id {
 		t.Errorf("Error in pm3: Incorrect leader %d, want %d.", leader, replicas[4].id)
 	}
 
-	if leader := pm4.getLeader(pm1.height()); leader != replicas[4].id {
+	// pm4 will have progressed further
+	if leader := pm4.getLeader(pm4.height()); leader != replicas[1].id {
 		t.Errorf("Error in pm4: Incorrect leader %d, want %d.", leader, replicas[4].id)
+	}
+
+	for _, replica := range replicas {
+		replica.Close()
 	}
 
 	/*	commands1 <- test[0]
