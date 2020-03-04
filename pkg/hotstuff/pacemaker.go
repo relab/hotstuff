@@ -99,10 +99,11 @@ func (p *RoundRobinPacemaker) Run() {
 	p.cancel = cancel
 	go p.newViewTimeout(ctx, p.timeout)
 
-	// make sure that we only beat once per view
+	// make sure that we only beat once per view, and don't beat if bLeaf.Height < vHeight
+	// as that would cause a panic
 	lastBeat := 1
 	beat := func() {
-		if lastBeat < p.height()+1 {
+		if lastBeat < p.height()+1 && p.height()+1 > p.vHeight {
 			lastBeat = p.height() + 1
 			go p.beat()
 		}
