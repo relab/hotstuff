@@ -61,7 +61,8 @@ type RoundRobinPacemaker struct {
 	TermLength int
 	Schedule   []ReplicaID
 
-	cancel func() // resets the current new-view interrupt
+	cancelTimeout func() // resets the current new-view interrupt
+	stopTimeout   func() // stops the new-view interrupts
 }
 
 // getLeader returns the fixed ID of the leader for the view height vHeight
@@ -95,9 +96,11 @@ func (p *RoundRobinPacemaker) Run() {
 	}
 
 	// set up new-view interrupt
-	ctx, cancel := context.WithCancel(context.Background())
-	p.cancel = cancel
-	go p.newViewTimeout(ctx, p.timeout)
+	stopContext, cancel := context.WithCancel(context.Background())
+	p.stopTimeout = cancel
+	cancelContext, cancel := context.WithCancel(context.Background())
+	p.cancelTimeout = cancel
+	go p.newViewTimeout(stopContext, cancelContext)
 
 	// make sure that we only beat once per view, and don't beat if bLeaf.Height < vHeight
 	// as that would cause a panic
@@ -113,7 +116,7 @@ func (p *RoundRobinPacemaker) Run() {
 	for n := range notify {
 		switch n.Event {
 		case ReceiveProposal:
-			p.cancel()
+			p.cancelTimeout()
 		case QCFinish:
 			if p.id == p.getLeader(p.height()+1) {
 				beat()
@@ -131,20 +134,28 @@ func (p *RoundRobinPacemaker) Run() {
 			}
 		}
 	}
+
+	// clean up
+	p.stopTimeout()
 }
 
-func (p *RoundRobinPacemaker) newViewTimeout(ctx context.Context, timeout time.Duration) {
+// newViewTimeout sends a NewView to the leader if triggered by a timer interrupt. Two contexts are used to control
+// this function; the stopContext is used to stop the function, and the cancelContext is used to cancel a single timer.
+func (p *RoundRobinPacemaker) newViewTimeout(stopContext, cancelContext context.Context) {
 	for {
 		select {
-		case <-time.After(timeout):
+		case <-stopContext.Done():
+			p.cancelTimeout()
+			return
+		case <-time.After(p.timeout):
 			// add a dummy node to the tree representing this round which failed
 			p.bLeaf = createLeaf(p.bLeaf, nil, nil, p.height()+1)
 			p.SendNewView(p.getLeader(p.height() + 1))
-		case <-ctx.Done():
+		case <-cancelContext.Done():
 		}
 
 		var cancel func()
-		ctx, cancel = context.WithCancel(context.Background())
-		p.cancel = cancel
+		cancelContext, cancel = context.WithCancel(context.Background())
+		p.cancelTimeout = cancel
 	}
 }
