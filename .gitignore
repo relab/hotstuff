@@ -13,3 +13,14 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+# delve debug binary
+__debug_bin
+
+# binaries
+cmd/hotstuff/hotstuff
+cmd/hotstuffkeygen/hotstuffkeygen
+
+# other
+cmd/hotstuff/rr/
+cmd/hotstuff/keys/
