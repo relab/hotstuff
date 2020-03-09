@@ -15,6 +15,7 @@
 * Testing with `cmd/hotstuff`:
   * The `test.sh` script can be used to run 4 instances of hotstuff, based on `hotstuff_config.toml`
   * Make sure that the key files exist by running `generate_keys.sh`
+  * If using round-robin: Create input files by running the splitfile program, e.g. `splitfile big.txt *.in`.
   * To save a log file, you can redirect the output of the script. For example `./test.sh > test.out 2>&1`
   * To debug the leader (replica 1), run the script with `./test.sh debug leader`.
   * To debug replica 2, run the script with `./test.sh debug replica`.
