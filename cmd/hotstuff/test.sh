@@ -4,21 +4,21 @@ go build .
 
 export HOTSTUFF_LOG=1
 
-TIMEOUT="100"
+TIMEOUT="500"
 NEWVIEW="200"
 if [[ "$1" == "debug" ]]; then
 	TIMEOUT="$((1000*10))"
-	NEWVIEW="$((1000*15))"
+	NEWVIEW="$((1000*10))"
 fi
 
 COMMANDS="big.txt"
 
-COMMON_ARGS="--leader-id 1 --commands $COMMANDS --connect-timeout 5000 --newview-timeout $NEWVIEW  --waitduration 50 --timeout $TIMEOUT"
+COMMON_ARGS="--leader-id 1 --connect-timeout 5000 --newview-timeout $NEWVIEW  --waitduration 80 --timeout $TIMEOUT"
 
-REPLICA1_ARG="--self-id 1 --keyfile keys/r1.key $COMMON_ARGS"
-REPLICA2_ARG="--self-id 2 --keyfile keys/r2.key $COMMON_ARGS"
-REPLICA3_ARG="--self-id 3 --keyfile keys/r3.key $COMMON_ARGS"
-REPLICA4_ARG="--self-id 4 --keyfile keys/r4.key $COMMON_ARGS"
+REPLICA1_ARG="--self-id 1 --keyfile keys/r1.key $COMMON_ARGS --commands 1.in"
+REPLICA2_ARG="--self-id 2 --keyfile keys/r2.key $COMMON_ARGS --commands 2.in"
+REPLICA3_ARG="--self-id 3 --keyfile keys/r3.key $COMMON_ARGS --commands 3.in"
+REPLICA4_ARG="--self-id 4 --keyfile keys/r4.key $COMMON_ARGS --commands 4.in"
 
 if [[ "$1" == "record" ]]; then
 	if [ $(cat /proc/sys/kernel/perf_event_paranoid) -gt "1" ]; then
@@ -53,4 +53,4 @@ else
 	./hotstuff $REPLICA1_ARG >1.out
 fi
 
-killall hotstuff
+wait; wait; wait;
