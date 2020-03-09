@@ -111,15 +111,17 @@ func main() {
 				log.Fatalf("Failed to read commands file: %v\n", err)
 			}
 			reader := bufio.NewReader(file)
+			buf := make([]byte, 1024)
 			for {
-				buf := make([]byte, 1024)
-				_, err := io.ReadFull(reader, buf)
-				if err == io.EOF || err == io.ErrUnexpectedEOF {
+				n, err := reader.Read(buf)
+				if err == io.EOF {
 					break
 				} else if err != nil {
 					log.Fatalf("Failed to read from file: %v", err)
 				}
-				commands <- buf
+				cmd := make([]byte, n)
+				copy(cmd, buf[:n])
+				commands <- cmd
 			}
 			// send some extra commands such that the last part of the file will be committed successfully
 			commands <- []byte{}
