@@ -13,7 +13,7 @@ func TestSafeNode(t *testing.T) {
 	key, _ := GeneratePrivateKey()
 	hs := New(1, key, NewConfig(), time.Second, 10*time.Millisecond, nil)
 
-	n1 := CreateLeaf(hs.genesis, []byte("n1"), hs.QCHigh, hs.genesis.Height+1)
+	n1 := CreateLeaf(hs.genesis, []byte("n1"), hs.qcHigh, hs.genesis.Height+1)
 	hs.nodes.Put(n1)
 	n2 := CreateLeaf(n1, []byte("n2"), CreateQuorumCert(n1), n1.Height+1)
 	hs.nodes.Put(n2)
@@ -56,15 +56,15 @@ func TestSafeNode(t *testing.T) {
 func TestUpdateQCHigh(t *testing.T) {
 	key, _ := GeneratePrivateKey()
 	hs := New(1, key, NewConfig(), time.Second, 10*time.Millisecond, nil)
-	node1 := CreateLeaf(hs.genesis, []byte("command1"), hs.QCHigh, hs.genesis.Height+1)
+	node1 := CreateLeaf(hs.genesis, []byte("command1"), hs.qcHigh, hs.genesis.Height+1)
 	hs.nodes.Put(node1)
 	qc1 := CreateQuorumCert(node1)
 
 	if hs.UpdateQCHigh(qc1) {
-		if hs.BLeaf.Hash() != node1.Hash() {
+		if hs.bLeaf.Hash() != node1.Hash() {
 			t.Error("UpdateQCHigh failed to update the leaf node")
 		}
-		if !bytes.Equal(hs.QCHigh.toBytes(), qc1.toBytes()) {
+		if !bytes.Equal(hs.qcHigh.toBytes(), qc1.toBytes()) {
 			t.Error("UpdateQCHigh failed to update qcHigh")
 		}
 
@@ -88,7 +88,7 @@ func TestUpdate(t *testing.T) {
 	hs := New(1, key, NewConfig(), time.Second, 10*time.Millisecond, func(b []byte) { exec <- b })
 	hs.QuorumSize = 0 // this accepts all QCs
 
-	n1 := CreateLeaf(hs.genesis, []byte("n1"), hs.QCHigh, hs.genesis.Height+1)
+	n1 := CreateLeaf(hs.genesis, []byte("n1"), hs.qcHigh, hs.genesis.Height+1)
 	hs.nodes.Put(n1)
 	n2 := CreateLeaf(n1, []byte("n2"), CreateQuorumCert(n1), n1.Height+1)
 	hs.nodes.Put(n2)
@@ -103,7 +103,7 @@ func TestUpdate(t *testing.T) {
 	// PRECOMMIT on n1, PROPOSE on n2
 	hs.update(n2)
 	// check that QCHigh and bLeaf updated
-	if hs.BLeaf != n1 || hs.QCHigh != n2.Justify {
+	if hs.bLeaf != n1 || hs.qcHigh != n2.Justify {
 		t.Error("PRECOMMIT failed")
 	}
 
@@ -139,7 +139,7 @@ func TestUpdate(t *testing.T) {
 func TestOnReciveProposal(t *testing.T) {
 	key, _ := GeneratePrivateKey()
 	hs := New(1, key, NewConfig(), time.Second, 10*time.Millisecond, nil)
-	node1 := CreateLeaf(hs.genesis, []byte("command1"), hs.QCHigh, hs.genesis.Height+1)
+	node1 := CreateLeaf(hs.genesis, []byte("command1"), hs.qcHigh, hs.genesis.Height+1)
 	qc := CreateQuorumCert(node1)
 
 	pc, err := hs.onReceiveProposal(node1)
@@ -235,11 +235,11 @@ func TestHotStuff(t *testing.T) {
 		}
 		// leader will have progressed further due to UpdateQCHigh being called at the end of Propose()
 		if r.id == 1 {
-			if !bytes.Equal(r.BLeaf.Command, test[3]) {
-				t.Errorf("Replica %d: Incorrect bLeaf.Command: Got '%s', want '%s'", id, r.BLeaf.Command, test[3])
+			if !bytes.Equal(r.bLeaf.Command, test[3]) {
+				t.Errorf("Replica %d: Incorrect bLeaf.Command: Got '%s', want '%s'", id, r.bLeaf.Command, test[3])
 			}
-		} else if !bytes.Equal(r.BLeaf.Command, test[2]) {
-			t.Errorf("Replica %d: Incorrect bLeaf.Command: Got '%s', want '%s'", id, r.BLeaf.Command, test[2])
+		} else if !bytes.Equal(r.bLeaf.Command, test[2]) {
+			t.Errorf("Replica %d: Incorrect bLeaf.Command: Got '%s', want '%s'", id, r.bLeaf.Command, test[2])
 		}
 		fail := false
 		select {
@@ -261,7 +261,7 @@ func TestHotStuff(t *testing.T) {
 func TestExpectNodeFor(t *testing.T) {
 	key, _ := GeneratePrivateKey()
 	hs := New(1, key, NewConfig(), time.Second, time.Second, nil)
-	node := CreateLeaf(hs.genesis, []byte("test"), hs.QCHigh, 1)
+	node := CreateLeaf(hs.genesis, []byte("test"), hs.qcHigh, 1)
 	qc := CreateQuorumCert(node)
 
 	go func() {

@@ -1,7 +1,6 @@
 package hotstuff
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
@@ -82,8 +81,8 @@ type HotStuff struct {
 	bExec   *Node
 
 	// fields that pacemaker needs
-	BLeaf  *Node
-	QCHigh *QuorumCert
+	bLeaf  *Node
+	qcHigh *QuorumCert
 
 	id        ReplicaID
 	nodes     NodeStorage
@@ -108,16 +107,40 @@ type HotStuff struct {
 	Exec     func([]byte)
 }
 
+// GetID returns the ID of this hotstuff instance
 func (hs *HotStuff) GetID() ReplicaID {
 	return hs.id
 }
 
+// GetHeight returns the height of the tree
 func (hs *HotStuff) GetHeight() int {
-	return hs.BLeaf.Height
+	return hs.bLeaf.Height
 }
 
+// GetVotedHeight returns the height that was last voted at
 func (hs *HotStuff) GetVotedHeight() int {
 	return hs.vHeight
+}
+
+// GetLeafNode returns the current leaf node of the tree
+func (hs *HotStuff) GetLeafNode() *Node {
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
+	return hs.bLeaf
+}
+
+// SetLeafNode sets the leaf node of the tree
+func (hs *HotStuff) SetLeafNode(node *Node) {
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
+	hs.bLeaf = node
+}
+
+// GetQCHigh returns the highest valid Quorum Certificate known to the hotstuff instance.
+func (hs *HotStuff) GetQCHigh() *QuorumCert {
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
+	return hs.qcHigh
 }
 
 // New creates a new Hotstuff instance
@@ -139,8 +162,8 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, qcTimeo
 		genesis:       genesis,
 		bLock:         genesis,
 		bExec:         genesis,
-		BLeaf:         genesis,
-		QCHigh:        qcForGenesis,
+		bLeaf:         genesis,
+		qcHigh:        qcForGenesis,
 		qcTimeout:     qcTimeout,
 		waitDuration:  waitDuration,
 		waitProposal:  waitutil.NewWaitUtil(),
@@ -194,14 +217,17 @@ func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
 		return false
 	}
 
-	oldQCHighNode, ok := hs.nodes.NodeOf(hs.QCHigh)
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
+
+	oldQCHighNode, ok := hs.nodes.NodeOf(hs.qcHigh)
 	if !ok {
 		panic(fmt.Errorf("Node from the old qcHigh missing from storage"))
 	}
 
 	if newQCHighNode.Height > oldQCHighNode.Height {
-		hs.QCHigh = qc
-		hs.BLeaf = newQCHighNode
+		hs.qcHigh = qc
+		hs.bLeaf = newQCHighNode
 		hs.pmNotify(Notification{HQCUpdate, newQCHighNode, qc})
 		return true
 	}
@@ -216,11 +242,14 @@ func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
 	hs.nodes.Put(node)
 	defer hs.update(node)
 
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
+
 	if node.Height > hs.vHeight && hs.safeNode(node) {
 		logger.Println("OnReceiveProposal: Accepted node")
 		hs.vHeight = node.Height
 		pc, err := CreatePartialCert(hs.id, hs.privKey, node)
-		hs.pmNotify(Notification{ReceiveProposal, node, hs.QCHigh})
+		hs.pmNotify(Notification{ReceiveProposal, node, hs.qcHigh})
 
 		// wake anyone waiting for a proposal
 		hs.waitProposal.WakeAll()
@@ -239,6 +268,7 @@ func (hs *HotStuff) onReceiveNewView(qc *QuorumCert) {
 }
 
 func (hs *HotStuff) safeNode(node *Node) bool {
+	// safeNode is only called from onReceiveProposal, and is covered by its mutex lock.
 	qcNode, nExists := hs.expectNodeFor(node.Justify)
 	accept := false
 	if nExists && qcNode.Height > hs.bLock.Height {
@@ -269,16 +299,21 @@ func (hs *HotStuff) update(node *Node) {
 
 	logger.Println("PRE COMMIT: ", node1)
 	// PRE-COMMIT on node1
-	if !hs.UpdateQCHigh(node.Justify) && !bytes.Equal(node.Justify.toBytes(), hs.QCHigh.toBytes()) {
+	hs.UpdateQCHigh(node.Justify)
+
+	/* if !hs.UpdateQCHigh(node.Justify) && !bytes.Equal(node.Justify.toBytes(), hs.QCHigh.toBytes()) {
 		// it is expected that updateQCHigh will return false if qcHigh equals qc.
 		// this happens when the leader already got the qc after a proposal
 		logger.Println("UpdateQCHigh failed, but qc did not equal qcHigh")
-	}
+	} */
 
 	node2, ok := hs.nodes.NodeOf(node1.Justify)
 	if !ok || node2.Committed {
 		return
 	}
+
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
 
 	if node2.Height > hs.bLock.Height {
 		hs.bLock = node2 // COMMIT on node2
@@ -295,10 +330,10 @@ func (hs *HotStuff) update(node *Node) {
 		hs.bExec = node3 // DECIDE on node3
 		logger.Println("DECIDE ", node3)
 	}
-
 }
 
 func (hs *HotStuff) commit(node *Node) {
+	// only called from within update. Thus covered by its mutex lock.
 	if hs.bExec.Height < node.Height {
 		if parent, ok := hs.nodes.ParentOf(node); ok {
 			hs.commit(parent)
@@ -312,10 +347,15 @@ func (hs *HotStuff) commit(node *Node) {
 // Propose will fetch a command from the Commands channel and proposes it to the other replicas
 func (hs *HotStuff) Propose(cmd []byte) {
 	logger.Printf("Propose (cmd: %.15s)\n", cmd)
-	newNode := CreateLeaf(hs.BLeaf, cmd, hs.QCHigh, hs.BLeaf.Height+1)
-	hs.pmNotify(Notification{Propose, newNode, hs.QCHigh})
+	hs.mut.Lock()
+
+	newNode := CreateLeaf(hs.bLeaf, cmd, hs.qcHigh, hs.bLeaf.Height+1)
+	hs.pmNotify(Notification{Propose, newNode, hs.qcHigh})
 
 	newQC := CreateQuorumCert(newNode)
+
+	hs.mut.Unlock()
+
 	// self vote
 	partialCert, err := hs.onReceiveProposal(newNode)
 	if err != nil {
@@ -335,11 +375,12 @@ func (hs *HotStuff) Propose(cmd []byte) {
 
 	if err != nil {
 		logger.Println("ProposeQC finished with error: ", err)
-		// TODO: Figure out what to do here (maybe nothing?)
-		// return
 	}
 
-	hs.BLeaf = newNode
+	hs.mut.Lock()
+	hs.bLeaf = newNode
+	hs.mut.Unlock()
+
 	hs.UpdateQCHigh(hs.qspec.QC)
 
 	hs.pmNotify(Notification{QCFinish, newNode, newQC})
@@ -353,10 +394,10 @@ func (hs *HotStuff) SendNewView(leader ReplicaID) error {
 	replica := hs.Replicas[leader]
 	if replica.ID == hs.id {
 		// "send" new-view to self
-		hs.pmNotify(Notification{ReceiveNewView, hs.BLeaf, hs.QCHigh})
+		hs.pmNotify(Notification{ReceiveNewView, hs.bLeaf, hs.qcHigh})
 		return nil
 	}
-	_, err := replica.NewView(ctx, hs.QCHigh.toProto())
+	_, err := replica.NewView(ctx, hs.qcHigh.toProto())
 	if err != nil {
 		logger.Println("Failed to send new view to leader: ", err)
 		return err
@@ -364,6 +405,7 @@ func (hs *HotStuff) SendNewView(leader ReplicaID) error {
 	return nil
 }
 
+// CreateLeaf returns a new node that extends the parent.
 func CreateLeaf(parent *Node, cmd []byte, qc *QuorumCert, height int) *Node {
 	return &Node{
 		ParentHash: parent.Hash(),

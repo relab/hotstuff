@@ -76,6 +76,7 @@ func nodeFromProto(pn *proto.HSNode) *Node {
 
 // MapStorage is a simple implementation of NodeStorage that uses a concurrent map.
 type MapStorage struct {
+	// TODO: Experiment with RWMutex
 	mut   sync.Mutex
 	nodes map[NodeHash]*Node
 }

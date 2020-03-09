@@ -151,7 +151,7 @@ func (p *RoundRobinPacemaker) startNewViewTimeout(stopContext, cancelContext con
 			return
 		case <-time.After(p.NewViewTimeout):
 			// add a dummy node to the tree representing this round which failed
-			p.BLeaf = hotstuff.CreateLeaf(p.BLeaf, nil, nil, p.GetHeight()+1)
+			p.SetLeafNode(hotstuff.CreateLeaf(p.GetLeafNode(), nil, nil, p.GetHeight()+1))
 			p.SendNewView(p.getLeader(p.GetHeight() + 1))
 		case <-cancelContext.Done():
 		}
