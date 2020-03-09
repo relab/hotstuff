@@ -20,7 +20,9 @@ __debug_bin
 # binaries
 cmd/hotstuff/hotstuff
 cmd/hotstuffkeygen/hotstuffkeygen
+cmd/splitfile/splitfile
 
 # other
 cmd/hotstuff/rr/
 cmd/hotstuff/keys/
+*.in
