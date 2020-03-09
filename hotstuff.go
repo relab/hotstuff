@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/proto"
+	"github.com/relab/hotstuff/waitutil"
 	"google.golang.org/grpc"
 )
 
@@ -98,7 +99,7 @@ type HotStuff struct {
 
 	// the duration that hotstuff can wait for an out-of-order message
 	waitDuration time.Duration
-	waitProposal chan struct{}
+	waitProposal *waitutil.WaitUtil
 	// Notifications will be sent to pacemaker on this channel
 	pmNotifyChan chan Notification
 
@@ -141,6 +142,8 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, qcTimeo
 		BLeaf:         genesis,
 		QCHigh:        qcForGenesis,
 		qcTimeout:     qcTimeout,
+		waitDuration:  waitDuration,
+		waitProposal:  waitutil.NewWaitUtil(),
 		Exec:          exec,
 		pmNotifyChan:  make(chan Notification, 10),
 	}
@@ -170,20 +173,11 @@ func (hs *HotStuff) pmNotify(n Notification) {
 
 // This function will expect to return the node for the qc if it is delivered within a duration.
 func (hs *HotStuff) expectNodeFor(qc *QuorumCert) (node *Node, ok bool) {
-	if node, ok = hs.nodes.NodeOf(qc); ok {
-		return
-	}
-	timeout := time.After(hs.waitDuration)
-	for {
-		select {
-		case hs.waitProposal <- struct{}{}:
-			if node, ok = hs.nodes.NodeOf(qc); ok {
-				return
-			}
-		case <-timeout:
-			return nil, false
-		}
-	}
+	hs.waitProposal.WaitCondTimeout(hs.waitDuration, func() bool {
+		node, ok = hs.nodes.NodeOf(qc)
+		return ok
+	})
+	return
 }
 
 // UpdateQCHigh updates the qc held by the paceMaker, to the newest qc.
@@ -229,14 +223,7 @@ func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
 		hs.pmNotify(Notification{ReceiveProposal, node, hs.QCHigh})
 
 		// wake anyone waiting for a proposal
-	loop:
-		for {
-			select {
-			case <-hs.waitProposal:
-			default:
-				break loop
-			}
-		}
+		hs.waitProposal.WakeAll()
 		return pc, err
 	}
 	logger.Println("OnReceiveProposal: Node not accepted")

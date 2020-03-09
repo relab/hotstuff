@@ -257,3 +257,20 @@ func TestHotStuff(t *testing.T) {
 		replica.Close()
 	}
 }
+
+func TestExpectNodeFor(t *testing.T) {
+	key, _ := GeneratePrivateKey()
+	hs := New(1, key, NewConfig(), time.Second, time.Second, nil)
+	node := CreateLeaf(hs.genesis, []byte("test"), hs.QCHigh, 1)
+	qc := CreateQuorumCert(node)
+
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		hs.onReceiveProposal(node)
+	}()
+
+	n, ok := hs.expectNodeFor(qc)
+	if !ok && n == nil {
+		t.Fail()
+	}
+}
