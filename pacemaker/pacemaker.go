@@ -120,7 +120,7 @@ func (p *RoundRobinPacemaker) Run() {
 		case hotstuff.ReceiveProposal:
 			p.cancelTimeout()
 		case hotstuff.QCFinish:
-			if p.GetID() == p.getLeader(p.GetHeight()) {
+			if p.GetID() != p.getLeader(p.GetHeight()+1) {
 				// was leader for previous view, but not the leader for next view
 				// do leader change
 				go p.SendNewView(p.getLeader(p.GetHeight() + 1))
