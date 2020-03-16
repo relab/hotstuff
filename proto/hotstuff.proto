@@ -4,6 +4,8 @@ package proto;
 
 import "github.com/relab/gorums/gorums.proto";
 
+option go_package = "github.com/relab/hotstuff/proto";
+
 service Hotstuff {
 	rpc Propose(stream HSNode) returns (stream PartialCert) {
 		option (gorums.qc_strict_ordering) = "MsgID";
