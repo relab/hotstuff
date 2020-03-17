@@ -206,7 +206,7 @@ func (hs *HotStuff) expectNodeFor(qc *QuorumCert) (node *Node, ok bool) {
 // UpdateQCHigh updates the qc held by the paceMaker, to the newest qc.
 func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
 	logger.Println("UpdateQCHigh")
-	if !VerifyQuorumCert(hs.ReplicaConfig, qc) {
+	if !VerifyQuorumCert(hs.ReplicaConfig, qc) { // her må vi
 		logger.Println("QC not verified!: ", qc)
 		return false
 	}
@@ -249,8 +249,8 @@ func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
 		logger.Println("OnReceiveProposal: Accepted node")
 		hs.vHeight = node.Height
 		pc, err := CreatePartialCert(hs.id, hs.privKey, node)
-		hs.pmNotify(Notification{ReceiveProposal, node, hs.qcHigh})
-
+		hs.pmNotify(Notification{ReceiveProposal, node, hs.qcHigh}) // kan vær at de blir feil å en receiveProposal notifikasjon her. Burde kansje hatt det før man
+		// aksepeter noden, siden du har mottat en proposal før sjekken også, de eneste er at du ikke godtar den
 		// wake anyone waiting for a proposal
 		hs.waitProposal.WakeAll()
 		return pc, err
@@ -265,6 +265,11 @@ func (hs *HotStuff) onReceiveNewView(qc *QuorumCert) {
 	hs.UpdateQCHigh(qc)
 	node, _ := hs.nodes.NodeOf(qc)
 	hs.pmNotify(Notification{ReceiveNewView, node, qc})
+}
+
+func (hs *HotStuff) onReceiveResendNode() *Node {
+	logger.Println("OnReceiveResendNode")
+	return hs.GetLeafNode()
 }
 
 func (hs *HotStuff) safeNode(node *Node) bool {
@@ -403,6 +408,23 @@ func (hs *HotStuff) SendNewView(leader ReplicaID) error {
 		return err
 	}
 	return nil
+}
+
+func (hs *HotStuff) ResendNode(leader ReplicaID) (*Node, error) {
+	logger.Println("ResendNode")
+	ctx, cancel := context.WithTimeout(context.Background(), hs.qcTimeout)
+	defer cancel()
+	replica := hs.Replicas[leader]
+	if replica.ID == hs.id {
+		// Leader "resends" leaf node to self
+		return hs.GetLeafNode(), nil
+	}
+	newNodeProto, err := replica.ResendNode(ctx, &proto.Empty{})
+	if err != nil {
+		logger.Println("Leader faild to resend new node: ", err)
+		return nil, err
+	}
+	return nodeFromProto(newNodeProto), nil
 }
 
 // CreateLeaf returns a new node that extends the parent.

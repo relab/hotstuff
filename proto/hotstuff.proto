@@ -13,6 +13,7 @@ service Hotstuff {
 		option (gorums.custom_return_type) = "Empty";
 	}
 	rpc NewView(QuorumCert) returns (Empty);
+	rpc ResendNode(Empty) returns (HSNode);
 }
 
 message HSNode {

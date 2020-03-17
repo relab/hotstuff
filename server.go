@@ -29,3 +29,8 @@ func (s *hotstuffServer) NewView(ctx context.Context, msg *proto.QuorumCert) (*p
 	s.hs.onReceiveNewView(qc)
 	return &proto.Empty{}, nil
 }
+
+func (s *hotstuffServer) ResendNode(ctx context.Context, empty *proto.Empty) (*proto.HSNode, error) {
+	newNode := s.hs.onReceiveResendNode()
+	return newNode.toProto(), nil
+}

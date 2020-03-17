@@ -150,8 +150,16 @@ func (p *RoundRobinPacemaker) startNewViewTimeout(stopContext, cancelContext con
 			p.cancelTimeout()
 			return
 		case <-time.After(p.NewViewTimeout):
+			// Det ser ut til å være 2 måter å løysa dette på. Metode 1) Spør lederen om den kan sende noden igjenn, eller metode 2) Bare lag en fake QC for å få sendt noden igjennom alle sjekkene.
+
 			// add a dummy node to the tree representing this round which failed
-			p.SetLeafNode(hotstuff.CreateLeaf(p.GetLeafNode(), nil, nil, p.GetHeight()+1))
+			//p.SetLeafNode(hotstuff.CreateLeaf(p.GetLeafNode(), nil, nil, p.GetHeight()+1))
+
+			// Ask leader to resend the new node
+			newNode, _ := p.ResendNode(p.getLeader(p.GetHeight()))
+
+			p.SetLeafNode(newNode)
+
 			p.SendNewView(p.getLeader(p.GetHeight() + 1))
 		case <-cancelContext.Done():
 		}
