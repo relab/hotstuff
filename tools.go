@@ -4,4 +4,7 @@ package hotstuff
 
 import (
 	_ "github.com/relab/gorums"
+	_ "google.golang.org/protobuf/cmd/protoc-gen-go"
+	// update this to google.golang.org/grpc/cmd/protoc-gen-go-grpc when available
+	_ "google.golang.org/protobuf/cmd/protoc-gen-go-grpc"
 )
