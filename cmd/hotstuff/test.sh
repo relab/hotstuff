@@ -4,8 +4,8 @@ go build .
 
 export HOTSTUFF_LOG=1
 
-TIMEOUT="500"
-NEWVIEW="200"
+TIMEOUT="1800"
+NEWVIEW="2000"
 if [[ "$1" == "debug" ]]; then
 	TIMEOUT="$((1000*10))"
 	NEWVIEW="$((1000*10))"
@@ -13,7 +13,7 @@ fi
 
 COMMANDS="big.txt"
 
-COMMON_ARGS="--leader-id 1 --connect-timeout 5000 --newview-timeout $NEWVIEW  --waitduration 80 --timeout $TIMEOUT"
+COMMON_ARGS="--leader-id 1 --connect-timeout 5000 --newview-timeout $NEWVIEW  --waitduration 1000 --timeout $TIMEOUT"
 
 REPLICA1_ARG="--self-id 1 --keyfile keys/r1.key $COMMON_ARGS --commands 1.in"
 REPLICA2_ARG="--self-id 2 --keyfile keys/r2.key $COMMON_ARGS --commands 2.in"
@@ -48,6 +48,13 @@ if [[ "$2" == "leader" ]]; then
 elif [[ "$2" == "replica" ]]; then
 	./hotstuff $REPLICA1_ARG >1.out &
 	dlv debug --headless --listen=:2345 --api-version=2 -- $REPLICA2_ARG
+elif [[ "$1" == "fail" ]]; then
+	./hotstuff $REPLICA2_ARG >2.out &
+	./hotstuff $REPLICA1_ARG >1.out &
+	PID=$!
+	sleep 2s
+	echo "Killing replica 1..."
+	kill $PID
 else
 	./hotstuff $REPLICA2_ARG >2.out &
 	./hotstuff $REPLICA1_ARG >1.out

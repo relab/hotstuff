@@ -375,6 +375,7 @@ func (hs *HotStuff) Propose(cmd []byte) {
 
 	if err != nil {
 		logger.Println("ProposeQC finished with error: ", err)
+		return
 	}
 
 	hs.mut.Lock()

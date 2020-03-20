@@ -9,9 +9,14 @@ import (
 	fmt "fmt"
 	trace "golang.org/x/net/trace"
 	grpc "google.golang.org/grpc"
+	backoff "google.golang.org/grpc/backoff"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	fnv "hash/fnv"
 	io "io"
 	log "log"
+	math "math"
+	rand "math/rand"
 	net "net"
 	sort "sort"
 	strconv "strconv"
@@ -422,6 +427,7 @@ type Node struct {
 	id      uint32
 	addr    string
 	conn    *grpc.ClientConn
+	cancel  func()
 	mu      sync.Mutex
 	lastErr error
 	latency time.Duration
@@ -440,7 +446,9 @@ func (n *Node) connect(opts managerOptions) error {
 	if err != nil {
 		return fmt.Errorf("dialing node failed: %w", err)
 	}
-	return n.connectStream() // call generated method
+	// a context for all of the streams
+	ctx, n.cancel = context.WithCancel(context.Background())
+	return n.connectStream(ctx) // call generated method
 }
 
 // close this node for further calls and optionally stream.
@@ -448,7 +456,9 @@ func (n *Node) close() error {
 	if err := n.conn.Close(); err != nil {
 		return fmt.Errorf("%d: conn close error: %w", n.id, err)
 	}
-	return n.closeStream() // call generated method
+	err := n.closeStream() // call generated method
+	n.cancel()
+	return err
 }
 
 // ID returns the ID of n.
@@ -754,14 +764,14 @@ type nodeServices struct {
 	proposeClient Hotstuff_ProposeClient
 }
 
-func (n *Node) connectStream() (err error) {
+func (n *Node) connectStream(ctx context.Context) (err error) {
 	n.HotstuffClient = NewHotstuffClient(n.conn)
-	n.proposeClient, err = n.HotstuffClient.Propose(context.Background())
+	n.proposeClient, err = n.HotstuffClient.Propose(ctx)
 	if err != nil {
 		return fmt.Errorf("stream creation failed: %v", err)
 	}
 	go n.proposeSendMsgs()
-	go n.proposeRecvMsgs()
+	go n.proposeRecvMsgs(ctx)
 	return nil
 }
 
@@ -773,25 +783,38 @@ func (n *Node) closeStream() (err error) {
 
 func (n *Node) proposeSendMsgs() {
 	for msg := range n.proposeSend {
+		if broken := atomic.LoadUint32(&n.proposeLinkBroken); broken == 1 {
+			id := msg.MsgID
+			err := status.Errorf(codes.Unavailable, "stream is down")
+			n.proposeLock.RLock()
+			if c, ok := n.proposeRecv[id]; ok {
+				c <- &internalPartialCert{n.id, nil, err}
+			}
+			n.proposeLock.RUnlock()
+		}
 		err := n.proposeClient.SendMsg(msg)
 		if err != nil {
-			if err != io.EOF {
-				n.setLastErr(err)
+			atomic.StoreUint32(&n.proposeLinkBroken, 1)
+			// return the error
+			id := msg.MsgID
+			n.proposeLock.RLock()
+			if c, ok := n.proposeRecv[id]; ok {
+				c <- &internalPartialCert{n.id, nil, err}
 			}
-			return
+			n.proposeLock.RUnlock()
 		}
 	}
 }
 
-func (n *Node) proposeRecvMsgs() {
+func (n *Node) proposeRecvMsgs(ctx context.Context) {
 	for {
 		msg := new(PartialCert)
 		err := n.proposeClient.RecvMsg(msg)
 		if err != nil {
-			if err != io.EOF {
-				n.setLastErr(err)
-			}
-			return
+			atomic.StoreUint32(&n.proposeLinkBroken, 1)
+			n.setLastErr(err)
+			// reconnect
+			n.proposeReconnect(ctx)
 		}
 		id := msg.MsgID
 		n.proposeLock.RLock()
@@ -799,13 +822,47 @@ func (n *Node) proposeRecvMsgs() {
 			c <- &internalPartialCert{n.id, msg, nil}
 		}
 		n.proposeLock.RUnlock()
+		select {
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (n *Node) proposeReconnect(ctx context.Context) {
+	// attempt to reconnect with exponential backoff
+	// TODO: Allow using a custom config
+	bc := backoff.DefaultConfig
+	retries := 0.0
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for {
+		var err error
+		n.proposeClient, err = n.HotstuffClient.Propose(ctx)
+		if err == nil {
+			atomic.StoreUint32(&n.proposeLinkBroken, 0)
+			return
+		}
+		delay := float64(bc.BaseDelay)
+		max := float64(bc.MaxDelay)
+		if retries > 0 {
+			delay = math.Pow(delay, retries)
+			delay = math.Min(delay, max)
+		}
+		delay *= 1 + bc.Jitter*(r.Float64()*2-1)
+		time.Sleep(time.Duration(delay))
+		retries++
+		select {
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
 type nodeData struct {
-	proposeSend chan *HSNode
-	proposeRecv map[uint64]chan *internalPartialCert
-	proposeLock *sync.RWMutex
+	proposeSend       chan *HSNode
+	proposeRecv       map[uint64]chan *internalPartialCert
+	proposeLock       *sync.RWMutex
+	proposeLinkBroken uint32
 }
 
 // QuorumSpec is the interface of quorum functions for Hotstuff.
