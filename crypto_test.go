@@ -1,9 +1,7 @@
 package hotstuff
 
 import (
-	"bytes"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"testing"
 )
 
@@ -75,22 +73,6 @@ func TestVerifyPartialCert(t *testing.T) {
 	}
 }
 
-func TestMarshalingPartialCertToProto(t *testing.T) {
-	pc1 := createPartialCert(t, 0)
-
-	ppc := pc1.toProto()
-	pc2 := partialCertFromProto(ppc)
-
-	if !bytes.Equal(pc1.hash[:], pc2.hash[:]) {
-		t.Errorf("Hashes don't match! Got %v, want: %v\n",
-			hex.EncodeToString(pc2.hash[:]), hex.EncodeToString(pc1.hash[:]))
-	}
-
-	if !VerifyPartialCert(simpleRc, pc2) {
-		t.Errorf("Cert failed to verify!\n")
-	}
-}
-
 func createQuorumCert(t *testing.T) *QuorumCert {
 	qc := CreateQuorumCert(testNode)
 	for k := range biggerRc.Replicas {
@@ -106,20 +88,5 @@ func TestVerifyQuorumCert(t *testing.T) {
 	qc := createQuorumCert(t)
 	if !VerifyQuorumCert(biggerRc, qc) {
 		t.Errorf("Quorum cert failed to verify!")
-	}
-}
-
-func TestMarshalingQuorumCertToProto(t *testing.T) {
-	qc1 := createQuorumCert(t)
-	pqc := qc1.toProto()
-	qc2 := quorumCertFromProto(pqc)
-
-	if !bytes.Equal(qc1.NodeHash[:], qc2.NodeHash[:]) {
-		t.Errorf("Hashes don't match! Got %v, want: %v\n",
-			hex.EncodeToString(qc2.NodeHash[:]), hex.EncodeToString(qc1.NodeHash[:]))
-	}
-
-	if !VerifyQuorumCert(biggerRc, qc2) {
-		t.Errorf("Cert failed to verify!\n")
 	}
 }

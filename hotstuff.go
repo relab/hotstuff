@@ -1,20 +1,15 @@
 package hotstuff
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net"
 	"os"
-	"sort"
 	"sync"
 	"time"
 
-	"github.com/relab/hotstuff/proto"
 	"github.com/relab/hotstuff/waitutil"
-	"google.golang.org/grpc"
 )
 
 var logger *log.Logger
@@ -31,7 +26,6 @@ type ReplicaID uint32
 
 // ReplicaInfo holds information about a replica
 type ReplicaInfo struct {
-	proto.HotstuffClient
 	ID      ReplicaID
 	Address string
 	PubKey  *ecdsa.PublicKey
@@ -69,10 +63,21 @@ type Notification struct {
 	QC    *QuorumCert
 }
 
-// HotStuff is an instance of the hotstuff protocol
+// Backend is the networking code that serves HotStuff
+type Backend interface {
+	Init(*HotStuff)
+	DoPropose(*Node, *QuorumCert) (*QuorumCert, error)
+	DoNewView(ReplicaID, *QuorumCert) error
+	Close()
+}
+
+// HotStuff is the safety core of the HotStuff protocol
 type HotStuff struct {
 	*ReplicaConfig
 	mut sync.Mutex
+
+	// depend on a network abstraction
+	Backend
 
 	// protocol data
 	genesis *Node
@@ -84,21 +89,14 @@ type HotStuff struct {
 	bLeaf  *Node
 	qcHigh *QuorumCert
 
-	id        ReplicaID
-	nodes     NodeStorage
-	privKey   *ecdsa.PrivateKey
-	qcTimeout time.Duration
-
-	server  *grpc.Server
-	manager *proto.Manager
-	config  *proto.Configuration
-	qspec   *hotstuffQSpec
-
-	closeOnce sync.Once
+	id      ReplicaID
+	nodes   NodeStorage
+	privKey *ecdsa.PrivateKey
 
 	// the duration that hotstuff can wait for an out-of-order message
 	waitDuration time.Duration
 	waitProposal *waitutil.WaitUtil
+
 	// Notifications will be sent to pacemaker on this channel
 	pmNotifyChan chan Notification
 
@@ -144,19 +142,19 @@ func (hs *HotStuff) GetQCHigh() *QuorumCert {
 }
 
 // New creates a new Hotstuff instance
-func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, qcTimeout time.Duration,
+func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, backend Backend,
 	waitDuration time.Duration, exec func([]byte)) *HotStuff {
 	logger.SetPrefix(fmt.Sprintf("hs(id %d): ", id))
-
 	genesis := &Node{
 		Committed: true,
 	}
 	qcForGenesis := CreateQuorumCert(genesis)
 	nodes := NewMapStorage()
 	nodes.Put(genesis)
-	return &HotStuff{
+	hs := &HotStuff{
 		ReplicaConfig: config,
 		id:            id,
+		Backend:       backend,
 		privKey:       privKey,
 		nodes:         nodes,
 		genesis:       genesis,
@@ -164,25 +162,14 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, qcTimeo
 		bExec:         genesis,
 		bLeaf:         genesis,
 		qcHigh:        qcForGenesis,
-		qcTimeout:     qcTimeout,
 		waitDuration:  waitDuration,
 		waitProposal:  waitutil.NewWaitUtil(),
 		Exec:          exec,
 		pmNotifyChan:  make(chan Notification, 10),
 	}
-}
 
-// Init starts the networking components of hotstuff
-func (hs *HotStuff) Init(port string, connectTimeout time.Duration) error {
-	err := hs.startServer(port)
-	if err != nil {
-		return fmt.Errorf("Failed to start GRPC Server: %w", err)
-	}
-	err = hs.startClient(connectTimeout)
-	if err != nil {
-		return fmt.Errorf("Failed to start GRPC Clients: %w", err)
-	}
-	return nil
+	backend.Init(hs)
+	return hs
 }
 
 // GetNotifier returns a channel where the pacemaker can listen for notifications
@@ -237,7 +224,7 @@ func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
 }
 
 // OnReceiveProposal handles a replica's response to the Proposal from the leader
-func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
+func (hs *HotStuff) OnReceiveProposal(node *Node) (*PartialCert, error) {
 	logger.Println("OnReceiveProposal: ", node)
 	hs.nodes.Put(node)
 
@@ -261,7 +248,7 @@ func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
 }
 
 // OnReceiveNewView handles the leader's response to receiving a NewView rpc from a replica
-func (hs *HotStuff) onReceiveNewView(qc *QuorumCert) {
+func (hs *HotStuff) OnReceiveNewView(qc *QuorumCert) {
 	logger.Println("OnReceiveNewView")
 	hs.UpdateQCHigh(qc)
 	node, _ := hs.nodes.NodeOf(qc)
@@ -358,7 +345,7 @@ func (hs *HotStuff) Propose(cmd []byte) {
 	hs.mut.Unlock()
 
 	// self vote
-	partialCert, err := hs.onReceiveProposal(newNode)
+	partialCert, err := hs.OnReceiveProposal(newNode)
 	if err != nil {
 		panic(fmt.Errorf("Failed to vote for own proposal: %w", err))
 	}
@@ -367,12 +354,7 @@ func (hs *HotStuff) Propose(cmd []byte) {
 		logger.Println("Failed to add own vote to QC: ", err)
 	}
 
-	// set the QSpec's QC to our newQC
-	hs.qspec.QC = newQC
-
-	ctx, cancel := context.WithTimeout(context.Background(), hs.qcTimeout)
-	_, err = hs.config.Propose(ctx, newNode.toProto())
-	cancel()
+	qc, err := hs.DoPropose(newNode, newQC)
 
 	if err != nil {
 		logger.Println("ProposeQC finished with error: ", err)
@@ -383,7 +365,7 @@ func (hs *HotStuff) Propose(cmd []byte) {
 	hs.bLeaf = newNode
 	hs.mut.Unlock()
 
-	hs.UpdateQCHigh(hs.qspec.QC)
+	hs.UpdateQCHigh(qc)
 
 	hs.pmNotify(Notification{QCFinish, newNode, newQC})
 } // this is the quorum call the client(the leader) makes.
@@ -391,15 +373,16 @@ func (hs *HotStuff) Propose(cmd []byte) {
 // SendNewView sends a newView message to the leader replica.
 func (hs *HotStuff) SendNewView(leader ReplicaID) error {
 	logger.Println("SendNewView")
-	ctx, cancel := context.WithTimeout(context.Background(), hs.qcTimeout)
-	defer cancel()
 	replica := hs.Replicas[leader]
+	if replica == nil {
+		panic(fmt.Errorf("Could not find replica with id '%d'", leader))
+	}
 	if replica.ID == hs.id {
 		// "send" new-view to self
 		hs.pmNotify(Notification{ReceiveNewView, hs.bLeaf, hs.qcHigh})
 		return nil
 	}
-	_, err := replica.NewView(ctx, hs.qcHigh.toProto())
+	err := hs.DoNewView(leader, hs.GetQCHigh())
 	if err != nil {
 		logger.Println("Failed to send new view to leader: ", err)
 		return err
@@ -415,73 +398,4 @@ func CreateLeaf(parent *Node, cmd []byte, qc *QuorumCert, height int) *Node {
 		Justify:    qc,
 		Height:     height,
 	}
-}
-
-func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
-	// sort addresses based on ID, excluding self
-	ids := make([]ReplicaID, 0, len(hs.Replicas)-1)
-	addrs := make([]string, 0, len(hs.Replicas)-1)
-	for _, replica := range hs.Replicas {
-		if replica.ID != hs.id {
-			i := sort.Search(len(ids), func(i int) bool { return ids[i] >= replica.ID })
-			ids = append(ids, 0)
-			copy(ids[i+1:], ids[i:])
-			ids[i] = replica.ID
-			addrs = append(addrs, "")
-			copy(addrs[i+1:], addrs[i:])
-			addrs[i] = replica.Address
-		}
-	}
-
-	mgr, err := proto.NewManager(addrs, proto.WithGrpcDialOptions(
-		grpc.WithBlock(),
-		grpc.WithInsecure(),
-	),
-		proto.WithDialTimeout(connectTimeout),
-	)
-	if err != nil {
-		return fmt.Errorf("Failed to connect to replicas: %w", err)
-	}
-	hs.manager = mgr
-
-	nodes := mgr.Nodes()
-	for i, id := range ids {
-		hs.Replicas[id].HotstuffClient = nodes[i].HotstuffClient
-	}
-
-	hs.QuorumSize = len(hs.Replicas) - (len(hs.Replicas)-1)/3
-	logger.Println("Majority: ", hs.QuorumSize)
-
-	hs.qspec = &hotstuffQSpec{
-		ReplicaConfig: hs.ReplicaConfig,
-	}
-
-	hs.config, err = hs.manager.NewConfiguration(hs.manager.NodeIDs(), hs.qspec)
-	if err != nil {
-		return fmt.Errorf("Failed to create configuration: %w", err)
-	}
-
-	return nil
-}
-
-// startServer runs a new instance of hotstuffServer
-func (hs *HotStuff) startServer(port string) error {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
-	if err != nil {
-		return fmt.Errorf("Failed to listen to port %s: %w", port, err)
-	}
-	hs.server = grpc.NewServer()
-	hsServer := &hotstuffServer{hs}
-	proto.RegisterHotstuffServer(hs.server, hsServer)
-	go hs.server.Serve(lis)
-	return nil
-}
-
-// Close closes all connections made by the HotStuff instance
-func (hs *HotStuff) Close() {
-	hs.closeOnce.Do(func() {
-		hs.manager.Close()
-		hs.server.Stop()
-		close(hs.pmNotifyChan)
-	})
 }

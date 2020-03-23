@@ -2,16 +2,20 @@ package hotstuff
 
 import (
 	"bytes"
-	"crypto/ecdsa"
-	"fmt"
-	"sync"
 	"testing"
 	"time"
 )
 
+type stubBackend struct{}
+
+func (d *stubBackend) Init(hs *HotStuff)                                         {}
+func (d *stubBackend) DoPropose(node *Node, qc *QuorumCert) (*QuorumCert, error) { return nil, nil }
+func (d *stubBackend) DoNewView(leader ReplicaID, qc *QuorumCert) error          { return nil }
+func (d *stubBackend) Close()                                                    {}
+
 func TestSafeNode(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), time.Second, 10*time.Millisecond, nil)
+	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, nil)
 
 	n1 := CreateLeaf(hs.genesis, []byte("n1"), hs.qcHigh, hs.genesis.Height+1)
 	hs.nodes.Put(n1)
@@ -55,7 +59,7 @@ func TestSafeNode(t *testing.T) {
 
 func TestUpdateQCHigh(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), time.Second, 10*time.Millisecond, nil)
+	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, nil)
 	node1 := CreateLeaf(hs.genesis, []byte("command1"), hs.qcHigh, hs.genesis.Height+1)
 	hs.nodes.Put(node1)
 	qc1 := CreateQuorumCert(node1)
@@ -85,7 +89,7 @@ func TestUpdateQCHigh(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	exec := make(chan []byte, 1)
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), time.Second, 10*time.Millisecond, func(b []byte) { exec <- b })
+	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, func(b []byte) { exec <- b })
 	hs.QuorumSize = 0 // this accepts all QCs
 
 	n1 := CreateLeaf(hs.genesis, []byte("n1"), hs.qcHigh, hs.genesis.Height+1)
@@ -138,11 +142,11 @@ func TestUpdate(t *testing.T) {
 
 func TestOnReciveProposal(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), time.Second, 10*time.Millisecond, nil)
+	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, nil)
 	node1 := CreateLeaf(hs.genesis, []byte("command1"), hs.qcHigh, hs.genesis.Height+1)
 	qc := CreateQuorumCert(node1)
 
-	pc, err := hs.onReceiveProposal(node1)
+	pc, err := hs.OnReceiveProposal(node1)
 
 	if err != nil {
 		t.Errorf("onReciveProposal failed with error: %w", err)
@@ -161,8 +165,8 @@ func TestOnReciveProposal(t *testing.T) {
 
 	node2 := CreateLeaf(node1, []byte("command2"), qc, node1.Height+1)
 
-	hs.onReceiveProposal(node2)
-	pc, err = hs.onReceiveProposal(node1)
+	hs.OnReceiveProposal(node2)
+	pc, err = hs.OnReceiveProposal(node1)
 
 	if err == nil {
 		t.Error("Node got accepted, expected rejection.")
@@ -172,101 +176,15 @@ func TestOnReciveProposal(t *testing.T) {
 	}
 }
 
-// This test verifies that the entire stack works.
-func TestHotStuff(t *testing.T) {
-	keys := make(map[ReplicaID]*ecdsa.PrivateKey)
-	keys[1], _ = GeneratePrivateKey()
-	keys[2], _ = GeneratePrivateKey()
-	keys[3], _ = GeneratePrivateKey()
-	keys[4], _ = GeneratePrivateKey()
-
-	config := NewConfig()
-	config.Replicas[1] = &ReplicaInfo{ID: 1, Address: "127.0.0.1:13371", PubKey: &keys[1].PublicKey}
-	config.Replicas[2] = &ReplicaInfo{ID: 2, Address: "127.0.0.1:13372", PubKey: &keys[2].PublicKey}
-	config.Replicas[3] = &ReplicaInfo{ID: 3, Address: "127.0.0.1:13373", PubKey: &keys[3].PublicKey}
-	config.Replicas[4] = &ReplicaInfo{ID: 4, Address: "127.0.0.1:13374", PubKey: &keys[4].PublicKey}
-
-	out := make(map[ReplicaID]chan []byte)
-	out[1] = make(chan []byte, 1)
-	out[2] = make(chan []byte, 2)
-	out[3] = make(chan []byte, 3)
-	out[4] = make(chan []byte, 4)
-
-	replicas := make(map[ReplicaID]*HotStuff)
-	replicas[1] = New(1, keys[1], config, 100*time.Millisecond, 50*time.Millisecond, func(b []byte) { out[1] <- b })
-	replicas[2] = New(2, keys[2], config, 100*time.Millisecond, 50*time.Millisecond, func(b []byte) { out[2] <- b })
-	replicas[3] = New(3, keys[3], config, 100*time.Millisecond, 50*time.Millisecond, func(b []byte) { out[3] <- b })
-	replicas[4] = New(4, keys[4], config, 100*time.Millisecond, 50*time.Millisecond, func(b []byte) { out[4] <- b })
-
-	var wg sync.WaitGroup
-	wg.Add(len(replicas))
-	for id := range replicas {
-		go func(id ReplicaID) {
-			err := replicas[id].Init(fmt.Sprintf("1337%d", id), 5*time.Second)
-			if err != nil {
-				t.Errorf("Failed to init replica %d: %v", id, err)
-			}
-			wg.Done()
-		}(id)
-	}
-
-	wg.Wait()
-
-	test := [][]byte{[]byte("DECIDE"), []byte("COMMIT"), []byte("PRECOMMIT"), []byte("PROPOSE")}
-
-	for _, r := range replicas {
-		go func(r *HotStuff) {
-			n := r.GetNotifier()
-			for range n {
-			}
-		}(r)
-	}
-
-	for _, t := range test {
-		replicas[1].Propose(t)
-	}
-
-	for id, r := range replicas {
-		if !bytes.Equal(r.bExec.Command, test[0]) {
-			t.Errorf("Replica %d: Incorrect bExec.Command: Got '%s', want '%s'", id, r.bExec.Command, test[0])
-		}
-		if !bytes.Equal(r.bLock.Command, test[1]) {
-			t.Errorf("Replica %d: Incorrect bLock.Command: Got '%s', want '%s'", id, r.bLock.Command, test[1])
-		}
-		// leader will have progressed further due to UpdateQCHigh being called at the end of Propose()
-		if r.id == 1 {
-			if !bytes.Equal(r.bLeaf.Command, test[3]) {
-				t.Errorf("Replica %d: Incorrect bLeaf.Command: Got '%s', want '%s'", id, r.bLeaf.Command, test[3])
-			}
-		} else if !bytes.Equal(r.bLeaf.Command, test[2]) {
-			t.Errorf("Replica %d: Incorrect bLeaf.Command: Got '%s', want '%s'", id, r.bLeaf.Command, test[2])
-		}
-		fail := false
-		select {
-		case o := <-out[id]:
-			fail = !bytes.Equal(o, test[0])
-		default:
-			fail = true
-		}
-		if fail {
-			t.Errorf("Replica %d: Incorrect output!", id)
-		}
-	}
-
-	for _, replica := range replicas {
-		replica.Close()
-	}
-}
-
 func TestExpectNodeFor(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), time.Second, time.Second, nil)
+	hs := New(1, key, NewConfig(), &stubBackend{}, time.Second, nil)
 	node := CreateLeaf(hs.genesis, []byte("test"), hs.qcHigh, 1)
 	qc := CreateQuorumCert(node)
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		hs.onReceiveProposal(node)
+		hs.OnReceiveProposal(node)
 	}()
 
 	n, ok := hs.expectNodeFor(qc)

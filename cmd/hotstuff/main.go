@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/gorumshotstuff"
 	"github.com/relab/hotstuff/pacemaker"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -132,7 +133,8 @@ func main() {
 	}
 
 	var pm pacemaker.Pacemaker
-	hs := hotstuff.New(selfID, privKey, config, qcTimeout, waitDuration, exec)
+	backend := gorumshotstuff.New(connectTimeout, qcTimeout)
+	hs := hotstuff.New(selfID, privKey, config, backend, waitDuration, exec)
 
 	pmType := viper.GetString("pacemaker")
 	switch pmType {
@@ -154,7 +156,7 @@ func main() {
 		pm = &pacemaker.FixedLeaderPacemaker{HotStuff: hs, Leader: leaderID, Commands: commands}
 	}
 
-	err = hs.Init(selfPort, connectTimeout)
+	err = backend.Start()
 	if err != nil {
 		log.Fatalf("Failed to init HotStuff: %v\n", err)
 	}
