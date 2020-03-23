@@ -6,8 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sync"
-
-	"github.com/relab/hotstuff/proto"
 )
 
 // NodeStorage provides a means to store a Node based on its hash
@@ -53,25 +51,6 @@ func (n Node) Hash() NodeHash {
 		toHash = append(toHash, n.Justify.toBytes()...)
 	}
 	return sha256.Sum256(toHash)
-}
-
-func (n Node) toProto() *proto.HSNode {
-	return &proto.HSNode{
-		ParentHash: n.ParentHash[:],
-		Command:    n.Command,
-		QC:         n.Justify.toProto(),
-		Height:     int64(n.Height),
-	}
-}
-
-func nodeFromProto(pn *proto.HSNode) *Node {
-	n := &Node{
-		Command: pn.GetCommand(),
-		Justify: quorumCertFromProto(pn.GetQC()),
-		Height:  int(pn.Height),
-	}
-	copy(n.ParentHash[:], pn.GetParentHash())
-	return n
 }
 
 // MapStorage is a simple implementation of NodeStorage that uses a concurrent map.
