@@ -2,11 +2,19 @@ package pacemaker
 
 import (
 	"context"
+	"log"
 	"math"
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/logging"
 )
+
+var logger *log.Logger
+
+func init() {
+	logger = logging.GetLogger()
+}
 
 // Pacemaker is a mechanism that provides synchronization
 type Pacemaker interface {
@@ -151,6 +159,7 @@ func (p *RoundRobinPacemaker) startNewViewTimeout(stopContext, cancelContext con
 			return
 		case <-time.After(p.NewViewTimeout):
 			// add a dummy node to the tree representing this round which failed
+			logger.Println("NewViewTimeout triggered")
 			p.SetLeafNode(hotstuff.CreateLeaf(p.GetLeafNode(), nil, nil, p.GetHeight()+1))
 			p.SendNewView(p.getLeader(p.GetHeight() + 1))
 		case <-cancelContext.Done():

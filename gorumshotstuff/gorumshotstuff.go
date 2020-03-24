@@ -3,6 +3,7 @@ package gorumshotstuff
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"sort"
 	"sync"
@@ -10,8 +11,15 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/gorumshotstuff/internal/proto"
+	"github.com/relab/hotstuff/internal/logging"
 	"google.golang.org/grpc"
 )
+
+var logger *log.Logger
+
+func init() {
+	logger = logging.GetLogger()
+}
 
 type gorumsReplica struct {
 	*hotstuff.ReplicaInfo
@@ -156,6 +164,7 @@ func (hs *GorumsHotStuff) Propose(srv proto.Hotstuff_ProposeServer) error {
 	return proto.ProposeServerLoop(srv, func(node *proto.HSNode) *proto.PartialCert {
 		p, err := hs.OnReceiveProposal(node.FromProto())
 		if err != nil {
+			logger.Println("OnReceiveProposal returned with error: ", err)
 			return &proto.PartialCert{}
 		}
 		return proto.PartialCertToProto(p)
