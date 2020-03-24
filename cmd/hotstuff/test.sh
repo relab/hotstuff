@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# kill all children on exit
+trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM EXIT
+
 go build .
 
 export HOTSTUFF_LOG=1

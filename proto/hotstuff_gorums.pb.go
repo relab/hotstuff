@@ -753,9 +753,9 @@ func newManagerData() *managerData {
 
 func (m *managerData) createNodeData() *nodeData {
 	return &nodeData{
-		proposeSend: make(chan *HSNode, 1),
-		proposeRecv: m.proposeRecv,
-		proposeLock: &m.proposeLock,
+		proposeSend:    make(chan *HSNode, 1),
+		proposeRecv:    m.proposeRecv,
+		proposeMapLock: &m.proposeLock,
 	}
 }
 
@@ -776,55 +776,64 @@ func (n *Node) connectStream(ctx context.Context) (err error) {
 }
 
 func (n *Node) closeStream() (err error) {
-	err = n.proposeClient.CloseSend()
 	close(n.proposeSend)
 	return err
 }
 
 func (n *Node) proposeSendMsgs() {
 	for msg := range n.proposeSend {
-		if broken := atomic.LoadUint32(&n.proposeLinkBroken); broken == 1 {
+		if n.proposeLinkBroken {
 			id := msg.MsgID
 			err := status.Errorf(codes.Unavailable, "stream is down")
-			n.proposeLock.RLock()
+			n.proposeMapLock.RLock()
 			if c, ok := n.proposeRecv[id]; ok {
 				c <- &internalPartialCert{n.id, nil, err}
 			}
-			n.proposeLock.RUnlock()
+			n.proposeMapLock.RUnlock()
+			continue
 		}
+		n.proposeStreamLock.RLock()
 		err := n.proposeClient.SendMsg(msg)
-		if err != nil {
-			atomic.StoreUint32(&n.proposeLinkBroken, 1)
-			// return the error
-			id := msg.MsgID
-			n.proposeLock.RLock()
-			if c, ok := n.proposeRecv[id]; ok {
-				c <- &internalPartialCert{n.id, nil, err}
-			}
-			n.proposeLock.RUnlock()
+		if err == nil {
+			n.proposeStreamLock.RUnlock()
+			continue
 		}
+		n.proposeLinkBroken = true
+		n.proposeStreamLock.RUnlock()
+		// return the error
+		id := msg.MsgID
+		n.proposeMapLock.RLock()
+		if c, ok := n.proposeRecv[id]; ok {
+			c <- &internalPartialCert{n.id, nil, err}
+		}
+		n.proposeMapLock.RUnlock()
 	}
 }
 
 func (n *Node) proposeRecvMsgs(ctx context.Context) {
 	for {
 		msg := new(PartialCert)
+		n.proposeStreamLock.RLock()
 		err := n.proposeClient.RecvMsg(msg)
 		if err != nil {
-			atomic.StoreUint32(&n.proposeLinkBroken, 1)
+			n.proposeLinkBroken = true
+			n.proposeStreamLock.RUnlock()
 			n.setLastErr(err)
 			// reconnect
 			n.proposeReconnect(ctx)
+		} else {
+			n.proposeStreamLock.RUnlock()
+			id := msg.MsgID
+			n.proposeMapLock.RLock()
+			if c, ok := n.proposeRecv[id]; ok {
+				c <- &internalPartialCert{n.id, msg, nil}
+			}
+			n.proposeMapLock.RUnlock()
 		}
-		id := msg.MsgID
-		n.proposeLock.RLock()
-		if c, ok := n.proposeRecv[id]; ok {
-			c <- &internalPartialCert{n.id, msg, nil}
-		}
-		n.proposeLock.RUnlock()
 		select {
 		case <-ctx.Done():
 			return
+		default:
 		}
 	}
 }
@@ -839,7 +848,7 @@ func (n *Node) proposeReconnect(ctx context.Context) {
 		var err error
 		n.proposeClient, err = n.HotstuffClient.Propose(ctx)
 		if err == nil {
-			atomic.StoreUint32(&n.proposeLinkBroken, 0)
+			n.proposeLinkBroken = false
 			return
 		}
 		delay := float64(bc.BaseDelay)
@@ -854,6 +863,7 @@ func (n *Node) proposeReconnect(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
+		default:
 		}
 	}
 }
@@ -861,8 +871,9 @@ func (n *Node) proposeReconnect(ctx context.Context) {
 type nodeData struct {
 	proposeSend       chan *HSNode
 	proposeRecv       map[uint64]chan *internalPartialCert
-	proposeLock       *sync.RWMutex
-	proposeLinkBroken uint32
+	proposeMapLock    *sync.RWMutex
+	proposeStreamLock sync.RWMutex
+	proposeLinkBroken bool
 }
 
 // QuorumSpec is the interface of quorum functions for Hotstuff.
