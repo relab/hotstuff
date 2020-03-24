@@ -3,22 +3,18 @@ package hotstuff
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"os"
 	"sync"
 	"time"
 
+	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/waitutil"
 )
 
 var logger *log.Logger
 
 func init() {
-	logger = log.New(os.Stderr, "hs: ", log.Lshortfile|log.Ltime|log.Lmicroseconds)
-	if os.Getenv("HOTSTUFF_LOG") != "1" {
-		logger.SetOutput(ioutil.Discard)
-	}
+	logger = logging.GetLogger()
 }
 
 // ReplicaID is the id of a replica

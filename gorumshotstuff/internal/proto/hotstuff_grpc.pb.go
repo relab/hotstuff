@@ -155,5 +155,5 @@ var _Hotstuff_serviceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "proto/hotstuff.proto",
+	Metadata: "gorumshotstuff/internal/proto/hotstuff.proto",
 }

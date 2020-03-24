@@ -4,7 +4,7 @@ package proto;
 
 import "github.com/relab/gorums/gorums.proto";
 
-option go_package = "github.com/relab/hotstuff/proto";
+option go_package = "github.com/relab/hotstuff/gorumshotstuff/internal/proto";
 
 service Hotstuff {
 	rpc Propose(stream HSNode) returns (stream PartialCert) {
