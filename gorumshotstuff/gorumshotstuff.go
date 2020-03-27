@@ -23,7 +23,7 @@ func init() {
 
 type gorumsReplica struct {
 	*hotstuff.ReplicaInfo
-	proto.HotstuffClient
+	node *proto.Node
 }
 
 // GorumsHotStuff is a backend for HotStuff that uses Gorums
@@ -32,7 +32,7 @@ type GorumsHotStuff struct {
 
 	replicaInfo map[hotstuff.ReplicaID]*gorumsReplica
 
-	server  *grpc.Server
+	server  *proto.GorumsServer
 	manager *proto.Manager
 	config  *proto.Configuration
 	qspec   *hotstuffQSpec
@@ -68,7 +68,7 @@ func (hs *GorumsHotStuff) DoNewView(id hotstuff.ReplicaID, qc *hotstuff.QuorumCe
 		return fmt.Errorf("Replica with id '%d' not found", id)
 	}
 	pb := proto.QuorumCertToProto(qc)
-	_, err := info.NewView(ctx, pb)
+	_, err := info.node.NewView(ctx, pb)
 	return err
 }
 
@@ -124,7 +124,7 @@ func (hs *GorumsHotStuff) startClient(connectTimeout time.Duration) error {
 
 	nodes := mgr.Nodes()
 	for i, id := range ids {
-		hs.replicaInfo[id].HotstuffClient = nodes[i].HotstuffClient
+		hs.replicaInfo[id].node = nodes[i]
 	}
 
 	hs.qspec = &hotstuffQSpec{
@@ -145,8 +145,11 @@ func (hs *GorumsHotStuff) startServer(port string) error {
 	if err != nil {
 		return fmt.Errorf("Failed to listen to port %s: %w", port, err)
 	}
-	hs.server = grpc.NewServer()
-	proto.RegisterHotstuffServer(hs.server, hs)
+
+	hs.server = proto.NewGorumsServer()
+	hs.server.RegisterProposeHandler(hs)
+	hs.server.RegisterNewViewHandler(hs)
+
 	go hs.server.Serve(lis)
 	return nil
 }
@@ -160,20 +163,18 @@ func (hs *GorumsHotStuff) Close() {
 }
 
 // Propose handles a replica's response to the Propose QC from the leader
-func (hs *GorumsHotStuff) Propose(srv proto.Hotstuff_ProposeServer) error {
-	return proto.ProposeServerLoop(srv, func(node *proto.HSNode) *proto.PartialCert {
-		p, err := hs.OnReceiveProposal(node.FromProto())
-		if err != nil {
-			logger.Println("OnReceiveProposal returned with error: ", err)
-			return &proto.PartialCert{}
-		}
-		return proto.PartialCertToProto(p)
-	})
+func (hs *GorumsHotStuff) Propose(node *proto.HSNode) *proto.PartialCert {
+	p, err := hs.OnReceiveProposal(node.FromProto())
+	if err != nil {
+		logger.Println("OnReceiveProposal returned with error: ", err)
+		return &proto.PartialCert{}
+	}
+	return proto.PartialCertToProto(p)
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica
-func (hs *GorumsHotStuff) NewView(ctx context.Context, msg *proto.QuorumCert) (*proto.Empty, error) {
+func (hs *GorumsHotStuff) NewView(msg *proto.QuorumCert) *proto.Empty {
 	qc := msg.FromProto()
 	hs.OnReceiveNewView(qc)
-	return &proto.Empty{}, nil
+	return &proto.Empty{}
 }
