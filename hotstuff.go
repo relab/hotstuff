@@ -327,9 +327,9 @@ func (hs *HotStuff) update(node *Node) {
 	}
 
 	if node1.ParentHash == node2.Hash() && node2.ParentHash == node3.Hash() {
+		logger.Println("DECIDE ", node3)
 		hs.commit(node3)
 		hs.bExec = node3 // DECIDE on node3
-		logger.Println("DECIDE ", node3)
 	}
 }
 
@@ -338,10 +338,10 @@ func (hs *HotStuff) commit(node *Node) {
 	if hs.bExec.Height < node.Height {
 		if parent, ok := hs.nodes.ParentOf(node); ok {
 			hs.commit(parent)
-			node.Committed = true
-			logger.Println("EXEC ", node)
-			hs.Exec(node.Command) // execute the commmand in the node. this is the last step in a nodes life.
 		}
+		node.Committed = true
+		logger.Println("EXEC ", node)
+		hs.Exec(node.Command) // execute the commmand in the node. this is the last step in a nodes life.
 	}
 }
 
