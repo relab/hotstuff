@@ -240,6 +240,10 @@ func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
 func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
 	logger.Println("OnReceiveProposal: ", node)
 	hs.nodes.Put(node)
+
+	// wake anyone waiting for a proposal
+	hs.waitProposal.WakeAll()
+
 	defer hs.update(node)
 
 	hs.mut.Lock()
@@ -250,9 +254,6 @@ func (hs *HotStuff) onReceiveProposal(node *Node) (*PartialCert, error) {
 		hs.vHeight = node.Height
 		pc, err := CreatePartialCert(hs.id, hs.privKey, node)
 		hs.pmNotify(Notification{ReceiveProposal, node, hs.qcHigh})
-
-		// wake anyone waiting for a proposal
-		hs.waitProposal.WakeAll()
 		return pc, err
 	}
 	logger.Println("OnReceiveProposal: Node not accepted")
