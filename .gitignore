@@ -21,8 +21,10 @@ __debug_bin
 cmd/hotstuff/hotstuff
 cmd/hotstuffkeygen/hotstuffkeygen
 cmd/splitfile/splitfile
+cmd/hotstuffbench/hotstuffbench
 
 # other
 cmd/hotstuff/rr/
 cmd/hotstuff/keys/
+cmd/hotstuffbench/keys/
 *.in
