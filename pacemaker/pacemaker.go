@@ -18,12 +18,15 @@ func init() {
 
 // Pacemaker is a mechanism that provides synchronization
 type Pacemaker interface {
-	Run()
+	Run(context.Context)
 }
 
 // FixedLeaderPacemaker uses a fixed leader.
 type FixedLeaderPacemaker struct {
 	*hotstuff.HotStuff
+
+	ctx       context.Context
+	cancel    func()
 	Leader    hotstuff.ReplicaID
 	OldLeader hotstuff.ReplicaID
 	Commands  chan []byte
@@ -41,18 +44,30 @@ func (p FixedLeaderPacemaker) beat() {
 	if !ok {
 		// no more commands. Time to quit
 		p.Close()
+		p.cancel()
 		return
 	}
 	p.Propose(cmd)
 }
 
 // Run runs the pacemaker which will beat when the previous QC is completed
-func (p FixedLeaderPacemaker) Run() {
+func (p FixedLeaderPacemaker) Run(ctx context.Context) {
+	p.ctx, p.cancel = context.WithCancel(ctx)
 	notify := p.GetNotifier()
 	if p.GetID() == p.Leader {
 		go p.beat()
 	}
-	for n := range notify {
+	var n hotstuff.Notification
+	var ok bool
+	for {
+		select {
+		case n, ok = <-notify:
+			if !ok {
+				return
+			}
+		case <-p.ctx.Done():
+			return
+		}
 		switch n.Event {
 		case hotstuff.QCFinish:
 			if p.GetID() == p.Leader {
@@ -66,6 +81,8 @@ func (p FixedLeaderPacemaker) Run() {
 type RoundRobinPacemaker struct {
 	*hotstuff.HotStuff
 
+	ctx        context.Context
+	cancel     func()
 	Commands   chan []byte
 	TermLength int
 	Schedule   []hotstuff.ReplicaID
@@ -86,14 +103,17 @@ func (p *RoundRobinPacemaker) getLeader(vHeight int) hotstuff.ReplicaID {
 func (p *RoundRobinPacemaker) beat() {
 	cmd, ok := <-p.Commands
 	if !ok {
+		logger.Println("No more commands, exiting...")
 		p.Close()
+		p.cancel()
 		return
 	}
 	p.Propose(cmd)
 }
 
 // Run runs the pacemaker which will beat when the previous QC is completed
-func (p *RoundRobinPacemaker) Run() {
+func (p *RoundRobinPacemaker) Run(ctx context.Context) {
+	p.ctx, p.cancel = context.WithCancel(ctx)
 	notify := p.GetNotifier()
 
 	// initial beat for view 1
@@ -121,6 +141,7 @@ func (p *RoundRobinPacemaker) Run() {
 	cancelContext, cancel := context.WithCancel(context.Background())
 	p.cancelTimeout = cancel
 	go p.startNewViewTimeout(stopContext, cancelContext)
+	defer p.stopTimeout()
 
 	// handle events from hotstuff
 	for {
@@ -139,14 +160,15 @@ func (p *RoundRobinPacemaker) Run() {
 		}
 
 		var ok bool
-		n, ok = <-notify
-		if !ok {
-			break
+		select {
+		case n, ok = <-notify:
+			if !ok {
+				return
+			}
+		case <-p.ctx.Done():
+			return
 		}
 	}
-
-	// clean up
-	p.stopTimeout()
 }
 
 // startNewViewTimeout sends a NewView to the leader if triggered by a timer interrupt. Two contexts are used to control

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -172,6 +173,10 @@ func main() {
 		}
 		defer pprof.StopCPUProfile()
 	}
-	pm.Run()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	pm.Run(ctx)
+	cancel()
+
 	log.Printf("Replica %d EXIT\n", selfID)
 }
