@@ -314,6 +314,7 @@ func (hs *HotStuff) update(node *Node) {
 		logger.Println("DECIDE ", node3)
 		hs.commit(node3)
 		hs.bExec = node3 // DECIDE on node3
+		go hs.nodes.GarbageCollectNodes(hs.GetHeight())
 	}
 }
 

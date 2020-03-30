@@ -14,6 +14,7 @@ type NodeStorage interface {
 	Get(NodeHash) (*Node, bool)
 	NodeOf(*QuorumCert) (*Node, bool)
 	ParentOf(*Node) (*Node, bool)
+	GarbageCollectNodes(int)
 }
 
 // NodeHash represents a SHA256 hashsum of a Node
@@ -105,4 +106,25 @@ func (s *MapStorage) ParentOf(child *Node) (parent *Node, ok bool) {
 
 	parent, ok = s.nodes[child.ParentHash]
 	return
+}
+
+// GarbageCollectNodes dereferanec old nodes that are no longer needed
+func (s *MapStorage) GarbageCollectNodes(currentVeiwHeigth int) {
+	var deleteAncestors func(node *Node)
+
+	deleteAncestors = func(node *Node) {
+		parent, ok := s.ParentOf(node)
+		if ok {
+			deleteAncestors(parent)
+		}
+		delete(s.nodes, node.Hash())
+		return
+	}
+
+	for _, n := range s.nodes {
+		if n.Height+50 < currentVeiwHeigth {
+			deleteAncestors(n)
+			return
+		}
+	}
 }
