@@ -28,9 +28,10 @@ func mapRead(m map[string]string, key string) string {
 	return v
 }
 
-func exec(cmd []byte) {
-	s := string(cmd)
-	fmt.Print(s)
+func exec(cmd []hotstuff.Command) {
+	for i := range cmd {
+		fmt.Print(string(cmd[i]))
+	}
 }
 
 func main() {
@@ -105,7 +106,7 @@ func main() {
 	newViewTimeout := time.Duration(viper.GetInt("newview-timeout")) * time.Millisecond
 
 	// send commands
-	commands := make(chan []byte, 10)
+	commands := make(chan []hotstuff.Command, 10)
 	if commandsFile := viper.GetString("commands"); commandsFile != "" {
 		go func() {
 			file, err := os.Open(commandsFile)
@@ -121,14 +122,15 @@ func main() {
 				} else if err != nil {
 					log.Fatalf("Failed to read from file: %v", err)
 				}
-				cmd := make([]byte, n)
-				copy(cmd, buf[:n])
+				cmd := make([]hotstuff.Command, 1)
+				cmd[0] = make(hotstuff.Command, n)
+				copy(cmd[0], buf[:n])
 				commands <- cmd
 			}
 			// send some extra commands such that the last part of the file will be committed successfully
-			commands <- []byte{}
-			commands <- []byte{}
-			commands <- []byte{}
+			commands <- []hotstuff.Command{}
+			commands <- []hotstuff.Command{}
+			commands <- []hotstuff.Command{}
 			close(commands)
 		}()
 	}

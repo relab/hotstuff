@@ -67,20 +67,36 @@ func (pqc *QuorumCert) FromProto() *hotstuff.QuorumCert {
 }
 
 func NodeToProto(n *hotstuff.Node) *HSNode {
+	commands := make([]*Command, len(n.Commands))
+	for _, cmd := range n.Commands {
+		commands = append(commands, CommandToProto(cmd))
+	}
 	return &HSNode{
 		ParentHash: n.ParentHash[:],
-		Command:    n.Command,
+		Commands:   commands,
 		QC:         QuorumCertToProto(n.Justify),
 		Height:     int64(n.Height),
 	}
 }
 
 func (pn *HSNode) FromProto() *hotstuff.Node {
+	commands := make([]hotstuff.Command, len(pn.GetCommands()))
+	for _, cmd := range pn.GetCommands() {
+		commands = append(commands, cmd.FromProto())
+	}
 	n := &hotstuff.Node{
-		Command: pn.GetCommand(),
-		Justify: pn.GetQC().FromProto(),
-		Height:  int(pn.Height),
+		Justify:  pn.GetQC().FromProto(),
+		Height:   int(pn.Height),
+		Commands: commands,
 	}
 	copy(n.ParentHash[:], pn.GetParentHash())
 	return n
+}
+
+func CommandToProto(cmd hotstuff.Command) *Command {
+	return &Command{Data: cmd}
+}
+
+func (cmd *Command) FromProto() hotstuff.Command {
+	return hotstuff.Command(cmd.GetData())
 }

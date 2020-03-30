@@ -31,8 +31,8 @@ var simpleRc = hotstuff.ReplicaConfig{
 }
 
 var testNode = hotstuff.Node{
-	Command: []byte("this is a test"),
-	Height:  0,
+	Commands: []hotstuff.Command{hotstuff.Command("this is a test")},
+	Height:   0,
 }
 
 func TestMarshalingPartialCertToProto(t *testing.T) {
@@ -69,7 +69,7 @@ func TestMarshalingQuorumCertToProto(t *testing.T) {
 }
 
 func TestMarshalAndUnmarshalNode(t *testing.T) {
-	testNode := &hotstuff.Node{Command: []byte("test")}
+	testNode := &hotstuff.Node{Commands: []hotstuff.Command{hotstuff.Command("test")}}
 	testQC := hotstuff.CreateQuorumCert(testNode)
 	numSigs, _ := rand.Int(rand.Reader, big.NewInt(10))
 	for j := int64(0); j < numSigs.Int64(); j++ {

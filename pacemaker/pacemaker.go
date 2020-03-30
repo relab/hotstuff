@@ -25,11 +25,10 @@ type Pacemaker interface {
 type FixedLeaderPacemaker struct {
 	*hotstuff.HotStuff
 
-	ctx       context.Context
-	cancel    func()
-	Leader    hotstuff.ReplicaID
-	OldLeader hotstuff.ReplicaID
-	Commands  chan []byte
+	ctx      context.Context
+	cancel   func()
+	Leader   hotstuff.ReplicaID
+	Commands chan []hotstuff.Command
 }
 
 // getLeader returns the fixed ID of the leader
@@ -39,15 +38,14 @@ func (p FixedLeaderPacemaker) getLeader(vHeight int) hotstuff.ReplicaID {
 
 // beat make the leader brodcast a new proposal for a node to work on.
 func (p FixedLeaderPacemaker) beat() {
-	p.OldLeader = p.Leader
-	cmd, ok := <-p.Commands
+	cmds, ok := <-p.Commands
 	if !ok {
 		// no more commands. Time to quit
 		p.Close()
 		p.cancel()
 		return
 	}
-	p.Propose(cmd)
+	p.Propose(cmds)
 }
 
 // Run runs the pacemaker which will beat when the previous QC is completed
@@ -83,7 +81,7 @@ type RoundRobinPacemaker struct {
 
 	ctx        context.Context
 	cancel     func()
-	Commands   chan []byte
+	Commands   chan []hotstuff.Command
 	TermLength int
 	Schedule   []hotstuff.ReplicaID
 
@@ -101,14 +99,14 @@ func (p *RoundRobinPacemaker) getLeader(vHeight int) hotstuff.ReplicaID {
 
 // beat make the leader brodcast a new proposal for a node to work on.
 func (p *RoundRobinPacemaker) beat() {
-	cmd, ok := <-p.Commands
+	cmds, ok := <-p.Commands
 	if !ok {
 		logger.Println("No more commands, exiting...")
 		p.Close()
 		p.cancel()
 		return
 	}
-	p.Propose(cmd)
+	p.Propose(cmds)
 }
 
 // Run runs the pacemaker which will beat when the previous QC is completed

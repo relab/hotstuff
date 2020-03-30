@@ -45,8 +45,8 @@ var biggerRc = &ReplicaConfig{
 }
 
 var testNode = &Node{
-	Command: []byte("this is a test"),
-	Height:  0,
+	Commands: []Command{Command("this is a test")},
+	Height:   0,
 }
 
 func init() {

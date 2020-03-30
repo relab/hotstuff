@@ -17,9 +17,9 @@ func TestSafeNode(t *testing.T) {
 	key, _ := GeneratePrivateKey()
 	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, nil)
 
-	n1 := CreateLeaf(hs.genesis, []byte("n1"), hs.qcHigh, hs.genesis.Height+1)
+	n1 := CreateLeaf(hs.genesis, []Command{Command("n1")}, hs.qcHigh, hs.genesis.Height+1)
 	hs.nodes.Put(n1)
-	n2 := CreateLeaf(n1, []byte("n2"), CreateQuorumCert(n1), n1.Height+1)
+	n2 := CreateLeaf(n1, []Command{Command("n2")}, CreateQuorumCert(n1), n1.Height+1)
 	hs.nodes.Put(n2)
 
 	if !hs.safeNode(n2) {
@@ -28,28 +28,28 @@ func TestSafeNode(t *testing.T) {
 
 	hs.bLock = n2
 
-	n3 := CreateLeaf(n1, []byte("n3"), CreateQuorumCert(n1), n2.Height+1)
+	n3 := CreateLeaf(n1, []Command{Command("n3")}, CreateQuorumCert(n1), n2.Height+1)
 	hs.nodes.Put(n3)
-	n4 := CreateLeaf(n3, []byte("n4"), CreateQuorumCert(n3), n3.Height+1)
+	n4 := CreateLeaf(n3, []Command{Command("n4")}, CreateQuorumCert(n3), n3.Height+1)
 	hs.nodes.Put(n4)
 
 	if !hs.safeNode(n4) {
 		t.Error("SafeNode rejected node, but liveness rule should have passed it.")
 	}
 
-	n5 := CreateLeaf(n2, []byte("n5"), CreateQuorumCert(n2), n2.Height+1)
+	n5 := CreateLeaf(n2, []Command{Command("n5")}, CreateQuorumCert(n2), n2.Height+1)
 	hs.nodes.Put(n5)
-	n6 := CreateLeaf(n5, []byte("n6"), CreateQuorumCert(n5), n5.Height+1)
+	n6 := CreateLeaf(n5, []Command{Command("n6")}, CreateQuorumCert(n5), n5.Height+1)
 	hs.nodes.Put(n6)
 	// intentionally violates liveness rule
-	n7 := CreateLeaf(n6, []byte("n7"), CreateQuorumCert(n6), 1)
+	n7 := CreateLeaf(n6, []Command{Command("n7")}, CreateQuorumCert(n6), 1)
 	hs.nodes.Put(n7)
 
 	if !hs.safeNode(n7) {
 		t.Error("SafeNode rejected node, but safety rule should have passed it.")
 	}
 
-	bad := CreateLeaf(hs.genesis, []byte("bad"), CreateQuorumCert(hs.genesis), hs.genesis.Height+1)
+	bad := CreateLeaf(hs.genesis, []Command{Command("bad")}, CreateQuorumCert(hs.genesis), hs.genesis.Height+1)
 	hs.nodes.Put(bad)
 
 	if hs.safeNode(bad) {
@@ -60,7 +60,7 @@ func TestSafeNode(t *testing.T) {
 func TestUpdateQCHigh(t *testing.T) {
 	key, _ := GeneratePrivateKey()
 	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, nil)
-	node1 := CreateLeaf(hs.genesis, []byte("command1"), hs.qcHigh, hs.genesis.Height+1)
+	node1 := CreateLeaf(hs.genesis, []Command{Command("command1")}, hs.qcHigh, hs.genesis.Height+1)
 	hs.nodes.Put(node1)
 	qc1 := CreateQuorumCert(node1)
 
@@ -76,7 +76,7 @@ func TestUpdateQCHigh(t *testing.T) {
 		t.Error("UpdateQCHigh failed to complete")
 	}
 
-	node2 := CreateLeaf(node1, []byte("command2"), qc1, node1.Height+1)
+	node2 := CreateLeaf(node1, []Command{Command("command2")}, qc1, node1.Height+1)
 	qc2 := CreateQuorumCert(node2)
 	hs.UpdateQCHigh(qc2)
 
@@ -87,18 +87,18 @@ func TestUpdateQCHigh(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	exec := make(chan []byte, 1)
+	exec := make(chan []Command, 1)
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, func(b []byte) { exec <- b })
+	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, func(b []Command) { exec <- b })
 	hs.QuorumSize = 0 // this accepts all QCs
 
-	n1 := CreateLeaf(hs.genesis, []byte("n1"), hs.qcHigh, hs.genesis.Height+1)
+	n1 := CreateLeaf(hs.genesis, []Command{Command("n1")}, hs.qcHigh, hs.genesis.Height+1)
 	hs.nodes.Put(n1)
-	n2 := CreateLeaf(n1, []byte("n2"), CreateQuorumCert(n1), n1.Height+1)
+	n2 := CreateLeaf(n1, []Command{Command("n2")}, CreateQuorumCert(n1), n1.Height+1)
 	hs.nodes.Put(n2)
-	n3 := CreateLeaf(n2, []byte("n3"), CreateQuorumCert(n2), n2.Height+1)
+	n3 := CreateLeaf(n2, []Command{Command("n3")}, CreateQuorumCert(n2), n2.Height+1)
 	hs.nodes.Put(n3)
-	n4 := CreateLeaf(n3, []byte("n4"), CreateQuorumCert(n3), n3.Height+1)
+	n4 := CreateLeaf(n3, []Command{Command("n4")}, CreateQuorumCert(n3), n3.Height+1)
 	hs.nodes.Put(n4)
 
 	// PROPOSE on n1
@@ -128,7 +128,7 @@ func TestUpdate(t *testing.T) {
 
 	select {
 	case b := <-exec:
-		if !bytes.Equal(b, n1.Command) {
+		if !bytes.Equal(b[0], n1.Commands[0]) {
 			success = false
 		}
 	case <-time.After(time.Second):
@@ -143,7 +143,7 @@ func TestUpdate(t *testing.T) {
 func TestOnReciveProposal(t *testing.T) {
 	key, _ := GeneratePrivateKey()
 	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, nil)
-	node1 := CreateLeaf(hs.genesis, []byte("command1"), hs.qcHigh, hs.genesis.Height+1)
+	node1 := CreateLeaf(hs.genesis, []Command{Command("command1")}, hs.qcHigh, hs.genesis.Height+1)
 	qc := CreateQuorumCert(node1)
 
 	pc, err := hs.OnReceiveProposal(node1)
@@ -163,7 +163,7 @@ func TestOnReciveProposal(t *testing.T) {
 		}
 	}
 
-	node2 := CreateLeaf(node1, []byte("command2"), qc, node1.Height+1)
+	node2 := CreateLeaf(node1, []Command{Command("command2")}, qc, node1.Height+1)
 
 	hs.OnReceiveProposal(node2)
 	pc, err = hs.OnReceiveProposal(node1)
@@ -179,7 +179,7 @@ func TestOnReciveProposal(t *testing.T) {
 func TestExpectNodeFor(t *testing.T) {
 	key, _ := GeneratePrivateKey()
 	hs := New(1, key, NewConfig(), &stubBackend{}, time.Second, nil)
-	node := CreateLeaf(hs.genesis, []byte("test"), hs.qcHigh, 1)
+	node := CreateLeaf(hs.genesis, []Command{Command("test")}, hs.qcHigh, 1)
 	qc := CreateQuorumCert(node)
 
 	go func() {

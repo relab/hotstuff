@@ -20,9 +20,9 @@ service Hotstuff {
 
 message HSNode {
 	bytes ParentHash = 1;
-	bytes Command = 2;
-	QuorumCert QC = 3;
-	int64 Height = 4;
+	QuorumCert QC = 2;
+	int64 Height = 3;
+	repeated Command Commands = 4;
 }
 
 message PartialSig {
@@ -39,6 +39,10 @@ message PartialCert {
 message QuorumCert {
 	repeated PartialSig Sigs = 1;
 	bytes Hash = 2;
+}
+
+message Command {
+	bytes Data = 1;
 }
 
 message Empty {}

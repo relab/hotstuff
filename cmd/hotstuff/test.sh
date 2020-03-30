@@ -37,7 +37,14 @@ if [[ "$1" == "record" ]]; then
 	rr record ./hotstuff $REPLICA2_ARG >2.out &
 	rr record ./hotstuff $REPLICA3_ARG >3.out &
 	rr record ./hotstuff $REPLICA4_ARG >4.out &
-	wait; wait; wait; wait;
+	if [[ "$2" == "fail" ]]; then 
+		sleep 2s
+		echo "killing replica 4..."
+		kill $!
+		wait; wait; wait;
+		exit
+	fi
+	wait; wait; wait; wait; 
 	exit
 fi
 

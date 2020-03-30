@@ -17,6 +17,9 @@ func init() {
 	logger = logging.GetLogger()
 }
 
+// Command is the client data that is processed by HotStuff
+type Command []byte
+
 // ReplicaID is the id of a replica
 type ReplicaID uint32
 
@@ -96,9 +99,7 @@ type HotStuff struct {
 	// Notifications will be sent to pacemaker on this channel
 	pmNotifyChan chan Notification
 
-	// interaction with the outside application happens through these
-	Commands <-chan []byte
-	Exec     func([]byte)
+	Exec func([]Command)
 }
 
 // GetID returns the ID of this hotstuff instance
@@ -139,7 +140,7 @@ func (hs *HotStuff) GetQCHigh() *QuorumCert {
 
 // New creates a new Hotstuff instance
 func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, backend Backend,
-	waitDuration time.Duration, exec func([]byte)) *HotStuff {
+	waitDuration time.Duration, exec func([]Command)) *HotStuff {
 	logger.SetPrefix(fmt.Sprintf("hs(id %d): ", id))
 	genesis := &Node{
 		Committed: true,
@@ -324,16 +325,16 @@ func (hs *HotStuff) commit(node *Node) {
 		}
 		node.Committed = true
 		logger.Println("EXEC ", node)
-		hs.Exec(node.Command) // execute the commmand in the node. this is the last step in a nodes life.
+		hs.Exec(node.Commands)
 	}
 }
 
 // Propose will fetch a command from the Commands channel and proposes it to the other replicas
-func (hs *HotStuff) Propose(cmd []byte) {
-	logger.Printf("Propose (cmd: %.15s)\n", cmd)
+func (hs *HotStuff) Propose(cmds []Command) {
+	logger.Printf("Propose (%d commands)\n", len(cmds))
 	hs.mut.Lock()
 
-	newNode := CreateLeaf(hs.bLeaf, cmd, hs.qcHigh, hs.bLeaf.Height+1)
+	newNode := CreateLeaf(hs.bLeaf, cmds, hs.qcHigh, hs.bLeaf.Height+1)
 	hs.pmNotify(Notification{Propose, newNode, hs.qcHigh})
 
 	newQC := CreateQuorumCert(newNode)
@@ -387,10 +388,10 @@ func (hs *HotStuff) SendNewView(leader ReplicaID) error {
 }
 
 // CreateLeaf returns a new node that extends the parent.
-func CreateLeaf(parent *Node, cmd []byte, qc *QuorumCert, height int) *Node {
+func CreateLeaf(parent *Node, cmds []Command, qc *QuorumCert, height int) *Node {
 	return &Node{
 		ParentHash: parent.Hash(),
-		Command:    cmd,
+		Commands:   cmds,
 		Justify:    qc,
 		Height:     height,
 	}

@@ -26,7 +26,7 @@ func (h NodeHash) String() string {
 // Node represents a node in the tree of commands
 type Node struct {
 	ParentHash NodeHash
-	Command    []byte
+	Commands   []Command
 	Justify    *QuorumCert
 	Height     int
 	Committed  bool
@@ -42,13 +42,15 @@ func (n Node) Hash() NodeHash {
 	// add the fields that should be hashed to a single slice
 	var toHash []byte
 	toHash = append(toHash, n.ParentHash[:]...)
-	toHash = append(toHash, n.Command...)
 	height := make([]byte, 8)
 	binary.LittleEndian.PutUint64(height, uint64(n.Height))
 	toHash = append(toHash, height...)
 	// TODO: Figure out if this ever occurs in practice (genesis node?)
 	if n.Justify != nil {
 		toHash = append(toHash, n.Justify.toBytes()...)
+	}
+	for _, cmd := range n.Commands {
+		toHash = append(toHash, cmd...)
 	}
 	return sha256.Sum256(toHash)
 }
