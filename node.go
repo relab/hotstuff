@@ -108,23 +108,24 @@ func (s *MapStorage) ParentOf(child *Node) (parent *Node, ok bool) {
 	return
 }
 
-// GarbageCollectNodes dereferanec old nodes that are no longer needed
+// GarbageCollectNodes dereferences old nodes that are no longer needed
 func (s *MapStorage) GarbageCollectNodes(currentVeiwHeigth int) {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+
 	var deleteAncestors func(node *Node)
 
 	deleteAncestors = func(node *Node) {
-		parent, ok := s.ParentOf(node)
+		parent, ok := s.nodes[node.ParentHash]
 		if ok {
 			deleteAncestors(parent)
 		}
 		delete(s.nodes, node.Hash())
-		return
 	}
 
 	for _, n := range s.nodes {
 		if n.Height+50 < currentVeiwHeigth {
 			deleteAncestors(n)
-			return
 		}
 	}
 }
