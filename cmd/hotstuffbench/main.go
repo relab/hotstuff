@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/relab/hotstuff"
@@ -18,9 +20,14 @@ import (
 )
 
 var (
-	mut         sync.Mutex
-	lastExec    time.Time
-	numCommands uint64
+	backlog chan hotstuff.Command
+	done    chan uint32
+
+	lastExec     int64
+	numCommands  uint64
+	latencyTotal int64
+	sentTimes    map[uint32]int64 = make(map[uint32]int64)
+	mut          sync.Mutex
 )
 
 // helper function to ensure that we dont try to read values that dont exist
@@ -32,24 +39,64 @@ func mapRead(m map[string]string, key string) string {
 	return v
 }
 
+func createCommands() {
+	var num uint32 = 0
+	for {
+		b := make([]byte, 4)
+		binary.LittleEndian.PutUint32(b, num)
+		cmd := hotstuff.Command(b)
+		backlog <- cmd
+		time := time.Now().UnixNano()
+		mut.Lock()
+		sentTimes[num] = time
+		mut.Unlock()
+		num++
+	}
+}
+
 func sendCommands(commands chan<- []hotstuff.Command, batchSize int) {
 	for {
 		batch := make([]hotstuff.Command, batchSize)
+		for i := 0; i < batchSize; i++ {
+			var ok bool
+			batch[i], ok = <-backlog
+			if !ok {
+				return
+			}
+		}
 		commands <- batch
 	}
 }
 
 func onExec(cmds []hotstuff.Command) {
+	now := time.Now().UnixNano()
+	num := atomic.AddUint64(&numCommands, uint64(len(cmds)))
+	last := atomic.LoadInt64(&lastExec)
+	diff := now - last
+
+	// compute latencies
+	var latency int64
 	mut.Lock()
-	defer mut.Unlock()
-	now := time.Now()
-	diff := now.Sub(lastExec)
-	numCommands += uint64(len(cmds))
-	if diff.Seconds() > 1.0 {
-		lastExec = now
-		throughput := (float64(numCommands) / 1000) / diff.Seconds()
-		fmt.Printf("Throughput: %.2f Kops/sec\n", throughput)
-		numCommands = 0
+	for _, c := range cmds {
+		if len(c) == 4 {
+			id := binary.LittleEndian.Uint32(c)
+			latency += now - sentTimes[id]
+			delete(sentTimes, id)
+		}
+	}
+	mut.Unlock()
+
+	latency = atomic.AddInt64(&latencyTotal, latency)
+
+	if seconds := float64(diff) / float64(time.Second); seconds > 1.0 {
+		atomic.StoreInt64(&lastExec, now)
+		// compute throughput
+		throughput := (float64(num) / 1000) / seconds
+		// compute latency
+		latencyAvg := (float64(latency) / float64(num)) / float64(time.Millisecond)
+		fmt.Printf("Throughput: %.2f Kops/sec, Avg. Latency: %.2f ms\n", throughput, latencyAvg)
+		atomic.StoreUint64(&numCommands, 0)
+		atomic.StoreInt64(&latencyTotal, 0)
 	}
 }
 
@@ -69,6 +116,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to read config file: %v\n", err)
 	}
+
+	backlog = make(chan hotstuff.Command, 2**batchSize)
+	done = make(chan uint32, 2**batchSize)
 
 	privKey, err := hotstuff.ReadPrivateKeyFile(*keyFile)
 	if err != nil {
@@ -101,6 +151,7 @@ func main() {
 
 	commands := make(chan []hotstuff.Command, 10)
 	if *selfID == viper.GetInt("leader_id") {
+		go createCommands()
 		go sendCommands(commands, *batchSize)
 	}
 
