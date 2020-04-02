@@ -7,9 +7,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime/pprof"
 	"strconv"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/relab/hotstuff"
@@ -19,16 +18,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	backlog chan hotstuff.Command
-	done    chan uint32
-
-	lastExec     int64
-	numCommands  uint64
-	latencyTotal int64
-	sentTimes    map[uint32]int64 = make(map[uint32]int64)
-	mut          sync.Mutex
-)
+var backlog chan hotstuff.Command
 
 // helper function to ensure that we dont try to read values that dont exist
 func mapRead(m map[string]string, key string) string {
@@ -39,64 +29,50 @@ func mapRead(m map[string]string, key string) string {
 	return v
 }
 
-func createCommands() {
-	var num uint32 = 0
-	for {
-		b := make([]byte, 4)
-		binary.LittleEndian.PutUint32(b, num)
-		cmd := hotstuff.Command(b)
-		backlog <- cmd
-		time := time.Now().UnixNano()
-		mut.Lock()
-		sentTimes[num] = time
-		mut.Unlock()
-		num++
-	}
-}
-
 func sendCommands(commands chan<- []hotstuff.Command, batchSize int) {
 	for {
 		batch := make([]hotstuff.Command, batchSize)
 		for i := 0; i < batchSize; i++ {
-			var ok bool
-			batch[i], ok = <-backlog
-			if !ok {
-				return
+			now := time.Now().UnixNano()
+			b := make([]byte, binary.MaxVarintLen64)
+			len := binary.PutVarint(b, now)
+			if len > 0 {
+				batch[i] = hotstuff.Command(b[:len])
 			}
 		}
 		commands <- batch
 	}
 }
 
-func onExec(cmds []hotstuff.Command) {
-	now := time.Now().UnixNano()
-	num := atomic.AddUint64(&numCommands, uint64(len(cmds)))
-	last := atomic.LoadInt64(&lastExec)
-	diff := now - last
+func processCommands(cmdsChan <-chan []hotstuff.Command) {
+	var (
+		lastExec     int64
+		numCommands  int
+		latencyTotal int64
+	)
 
-	// compute latencies
-	var latency int64
-	mut.Lock()
-	for _, c := range cmds {
-		if len(c) == 4 {
-			id := binary.LittleEndian.Uint32(c)
-			latency += now - sentTimes[id]
-			delete(sentTimes, id)
+	for cmds := range cmdsChan {
+		// compute latencies
+		now := time.Now().UnixNano()
+		for _, c := range cmds {
+			sent, n := binary.Varint(c)
+			if n > 0 {
+				latencyTotal += now - sent
+			}
 		}
-	}
-	mut.Unlock()
 
-	latency = atomic.AddInt64(&latencyTotal, latency)
-
-	if seconds := float64(diff) / float64(time.Second); seconds > 1.0 {
-		atomic.StoreInt64(&lastExec, now)
-		// compute throughput
-		throughput := (float64(num) / 1000) / seconds
-		// compute latency
-		latencyAvg := (float64(latency) / float64(num)) / float64(time.Millisecond)
-		fmt.Printf("Throughput: %.2f Kops/sec, Avg. Latency: %.2f ms\n", throughput, latencyAvg)
-		atomic.StoreUint64(&numCommands, 0)
-		atomic.StoreInt64(&latencyTotal, 0)
+		numCommands += len(cmds)
+		diff := now - lastExec
+		if seconds := float64(diff) / float64(time.Second); seconds > 1 {
+			lastExec = now
+			// compute throughput
+			throughput := (float64(numCommands) / 1000) / seconds
+			// compute latency
+			latencyAvg := (float64(latencyTotal) / float64(numCommands)) / float64(time.Millisecond)
+			fmt.Printf("Throughput: %.2f Kops/sec, Avg. Latency: %.2f ms\n", throughput, latencyAvg)
+			numCommands = 0
+			latencyTotal = 0
+		}
 	}
 }
 
@@ -108,7 +84,20 @@ func main() {
 	keyFile := pflag.String("keyfile", "", "The path to the private key file")
 	configFile := pflag.String("config", "", "The path to the config file")
 	batchSize := pflag.Int("batch-size", 100, "The size of batches")
+	cpuprofile := pflag.String("cpuprofile", "", "The file to write a cpuprofile to")
 	pflag.Parse()
+
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal("Could not create CPU profile: ", err)
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal("Could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
 
 	viper.SetConfigFile(*configFile)
 	viper.SetConfigType("toml")
@@ -116,9 +105,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to read config file: %v\n", err)
 	}
-
-	backlog = make(chan hotstuff.Command, 2**batchSize)
-	done = make(chan uint32, 2**batchSize)
 
 	privKey, err := hotstuff.ReadPrivateKeyFile(*keyFile)
 	if err != nil {
@@ -151,12 +137,20 @@ func main() {
 
 	commands := make(chan []hotstuff.Command, 10)
 	if *selfID == viper.GetInt("leader_id") {
-		go createCommands()
 		go sendCommands(commands, *batchSize)
 	}
 
+	exec := make(chan []hotstuff.Command, 10)
+	go processCommands(exec)
+
 	backend := gorumshotstuff.New(time.Minute, time.Second)
-	hs := hotstuff.New(hotstuff.ReplicaID(*selfID), privKey, config, backend, 500*time.Millisecond, onExec)
+
+	hs := hotstuff.New(hotstuff.ReplicaID(*selfID), privKey, config, backend, 500*time.Millisecond,
+		func(cmds []hotstuff.Command) {
+			exec <- cmds
+		},
+	)
+
 	pm := &pacemaker.FixedLeaderPacemaker{
 		Leader:   hotstuff.ReplicaID(viper.GetInt("leader_id")),
 		Commands: commands,
@@ -173,4 +167,5 @@ func main() {
 
 	<-signals
 	cancel()
+	backend.Close()
 }

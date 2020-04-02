@@ -1,0 +1,23 @@
+# This is the information that each replica is given about the other replicas
+pacemaker = "fixed"
+leader_id = 1
+
+[[replicas]]
+id = "1"
+address = "10.164.0.6:13371"
+keyfile = "keys/r1.key.pub"
+
+[[replicas]]
+id = "2"
+address = "10.164.0.7:13372"
+keyfile = "keys/r2.key.pub"
+
+[[replicas]]
+id = "3"
+address = "10.164.0.8:13373"
+keyfile = "keys/r3.key.pub"
+
+[[replicas]]
+id = "4"
+address = "10.164.0.9:13374"
+keyfile = "keys/r4.key.pub"
