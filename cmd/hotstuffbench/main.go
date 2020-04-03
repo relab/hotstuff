@@ -27,7 +27,7 @@ func mapRead(m map[string]string, key string) string {
 	return v
 }
 
-func sendCommands(commands chan<- []hotstuff.Command, batchSize int) {
+func sendCommands(commands chan<- []hotstuff.Command, batchSize int, delay int) {
 	for {
 		batch := make([]hotstuff.Command, batchSize)
 		for i := 0; i < batchSize; i++ {
@@ -37,6 +37,7 @@ func sendCommands(commands chan<- []hotstuff.Command, batchSize int) {
 			if len > 0 {
 				batch[i] = hotstuff.Command(b[:len])
 			}
+			time.Sleep(time.Duration(delay))
 		}
 		commands <- batch
 	}
@@ -82,6 +83,7 @@ func main() {
 	keyFile := pflag.String("keyfile", "", "The path to the private key file")
 	configFile := pflag.String("config", "", "The path to the config file")
 	batchSize := pflag.Int("batch-size", 100, "The size of batches")
+	delay := pflag.Int("delay", 100, "The delay between each request that is sent (in nanoseconds)")
 	cpuprofile := pflag.String("cpuprofile", "", "The file to write a cpuprofile to")
 	pflag.Parse()
 
@@ -135,7 +137,7 @@ func main() {
 
 	commands := make(chan []hotstuff.Command, 10)
 	if *selfID == viper.GetInt("leader_id") {
-		go sendCommands(commands, *batchSize)
+		go sendCommands(commands, *batchSize, *delay)
 	}
 
 	exec := make(chan []hotstuff.Command, 10)
