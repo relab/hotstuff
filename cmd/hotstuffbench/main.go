@@ -18,8 +18,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-var backlog chan hotstuff.Command
-
 // helper function to ensure that we dont try to read values that dont exist
 func mapRead(m map[string]string, key string) string {
 	v, ok := m[key]

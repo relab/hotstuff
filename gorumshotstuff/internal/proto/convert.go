@@ -67,7 +67,7 @@ func (pqc *QuorumCert) FromProto() *hotstuff.QuorumCert {
 }
 
 func NodeToProto(n *hotstuff.Node) *HSNode {
-	commands := make([]*Command, len(n.Commands))
+	commands := make([]*Command, 0, len(n.Commands))
 	for _, cmd := range n.Commands {
 		commands = append(commands, CommandToProto(cmd))
 	}
@@ -80,7 +80,7 @@ func NodeToProto(n *hotstuff.Node) *HSNode {
 }
 
 func (pn *HSNode) FromProto() *hotstuff.Node {
-	commands := make([]hotstuff.Command, len(pn.GetCommands()))
+	commands := make([]hotstuff.Command, 0, len(pn.GetCommands()))
 	for _, cmd := range pn.GetCommands() {
 		commands = append(commands, cmd.FromProto())
 	}
