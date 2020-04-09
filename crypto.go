@@ -10,9 +10,6 @@ import (
 	"sort"
 )
 
-const privateKeyFileType = "HOTSTUFF PRIVATE KEY"
-const publicKeyFileType = "HOTSTUFF PUBLIC KEY"
-
 // PartialSig is a single replica's signature of a node.
 type PartialSig struct {
 	ID   ReplicaID
