@@ -1,7 +1,6 @@
 package gorumshotstuff
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"sync"
 	"testing"
@@ -66,14 +65,15 @@ func TestHotStuff(t *testing.T) {
 	}
 
 	for _, t := range test {
-		replicas[1].HotStuff.Propose([]hotstuff.Command{t})
+		replicas[1].HotStuff.AddCommand(t)
+		replicas[1].HotStuff.Propose()
 	}
 
 	for id := range replicas {
 		fail := false
 		select {
 		case o := <-out[id]:
-			fail = !bytes.Equal(o[0], test[0])
+			fail = o[0] != test[0]
 		default:
 			fail = true
 		}

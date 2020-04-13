@@ -9,6 +9,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.2
 	golang.org/x/net v0.0.0-20200301022130-244492dfa37a
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20200317113312-5766fd39f98d // indirect
 	golang.org/x/text v0.3.2 // indirect
 	google.golang.org/genproto v0.0.0-20200330113809-af700f360a68 // indirect
@@ -16,4 +17,4 @@ require (
 	google.golang.org/protobuf v1.20.1
 )
 
-replace github.com/relab/gorums => github.com/Raytar/gorums v0.0.0-20200327092422-96927d4bd728
+replace github.com/relab/gorums => github.com/Raytar/gorums v0.0.0-20200413092851-35c06a921b8c

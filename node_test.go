@@ -17,7 +17,7 @@ func TestCanStoreAndRetrieveNode(t *testing.T) {
 	nodes.Put(testNode)
 	got, ok := nodes.Get(testNode.Hash())
 
-	if !ok || !bytes.Equal(testNode.Commands[0], got.Commands[0]) {
+	if !ok || testNode.Commands[0] != got.Commands[0] {
 		t.Errorf("Failed to retrieve node from storage.")
 	}
 }

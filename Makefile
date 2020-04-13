@@ -1,18 +1,45 @@
-PROTOPKG  := ./gorumshotstuff/internal/proto
-PROTOBUF  := $(PROTOPKG)/hotstuff.pb.go
-GORUMS    := $(PROTOPKG)/hotstuff_gorums.pb.go
-PROTOFILE := $(PROTOPKG)/hotstuff.proto
+INTERNALPATH   := ./gorumshotstuff/internal/proto
+INTERNALPROTO  := $(INTERNALPATH)/hotstuff.pb.go
+INTERNALGORUMS := $(INTERNALPATH)/hotstuff_gorums.pb.go
+INTERNALFILE   := $(INTERNALPATH)/hotstuff.proto
 
-.PHONY: all
-all: $(PROTOBUF) $(GORUMS)
+PUBLICPATH   := ./clientapi
+PUBLICPROTO  := $(PUBLICPATH)/hotstuff.pb.go
+PUBLICGORUMS := $(PUBLICPATH)/hotstuff_gorums.pb.go
+PUBLICFILE   := $(PUBLICPATH)/hotstuff.proto
 
-# In the future, with GNU Make 4.3 and up, the "gorumsproto" rule will not be necessary
-# https://stackoverflow.com/a/59877127
+CLIENTPATH := ./cmd/hotstuffclient
+CLIENT     := $(CLIENTPATH)/hotstuffclient
 
-$(PROTOBUF) $(GORUMS): gorumsproto
+SERVERPATH := ./cmd/hotstuffserver
+SERVER     := $(SERVERPATH)/hotstuffserver
 
-gorumsproto: $(PROTOFILE)
+.PHONY: all $(CLIENT) $(SERVER)
+
+all: $(CLIENT) $(SERVER)
+
+$(CLIENT): $(PUBLICPROTO) $(PUBLICGORUMS)
+	@go build -o $(CLIENT) $(CLIENTPATH)
+
+$(SERVER): $(PUBLICPROTO) $(PUBLICGORUMS) $(INTERNALPROTO) $(INTERNALGORUMS)
+	@go build -o $(SERVER) $(SERVERPATH)
+
+$(INTERNALPROTO): $(INTERNALFILE)
 	@protoc -I=$(GOPATH)/src:. \
 		--go_out=paths=source_relative:. \
+		$(INTERNALFILE)
+
+$(INTERNALGORUMS): $(INTERNALFILE)
+	@protoc -I=$(GOPATH)/src:. \
 		--gorums_out=paths=source_relative:. \
-		$(PROTOFILE)
+		$(INTERNALFILE)
+
+$(PUBLICPROTO): $(PUBLICFILE)
+	@protoc -I=$(GOPATH)/src:. \
+		--go_out=paths=source_relative:. \
+		$(PUBLICFILE)
+
+$(PUBLICGORUMS): $(PUBLICFILE)
+	@protoc -I=$(GOPATH)/src:. \
+		--gorums_out=paths=source_relative:. \
+		$(PUBLICFILE)

@@ -24,11 +24,7 @@ type Pacemaker interface {
 // FixedLeaderPacemaker uses a fixed leader.
 type FixedLeaderPacemaker struct {
 	*hotstuff.HotStuff
-
-	ctx      context.Context
-	cancel   func()
-	Leader   hotstuff.ReplicaID
-	Commands chan []hotstuff.Command
+	Leader hotstuff.ReplicaID
 }
 
 // getLeader returns the fixed ID of the leader
@@ -36,24 +32,11 @@ func (p FixedLeaderPacemaker) getLeader(vHeight int) hotstuff.ReplicaID {
 	return p.Leader
 }
 
-// beat make the leader brodcast a new proposal for a node to work on.
-func (p FixedLeaderPacemaker) beat() {
-	cmds, ok := <-p.Commands
-	if !ok {
-		// no more commands. Time to quit
-		p.Close()
-		p.cancel()
-		return
-	}
-	p.Propose(cmds)
-}
-
 // Run runs the pacemaker which will beat when the previous QC is completed
 func (p FixedLeaderPacemaker) Run(ctx context.Context) {
-	p.ctx, p.cancel = context.WithCancel(ctx)
 	notify := p.GetNotifier()
 	if p.GetID() == p.Leader {
-		go p.beat()
+		go p.Propose()
 	}
 	var n hotstuff.Notification
 	var ok bool
@@ -63,13 +46,13 @@ func (p FixedLeaderPacemaker) Run(ctx context.Context) {
 			if !ok {
 				return
 			}
-		case <-p.ctx.Done():
+		case <-ctx.Done():
 			return
 		}
 		switch n.Event {
 		case hotstuff.QCFinish:
 			if p.GetID() == p.Leader {
-				go p.beat()
+				go p.Propose()
 			}
 		}
 	}
@@ -79,9 +62,6 @@ func (p FixedLeaderPacemaker) Run(ctx context.Context) {
 type RoundRobinPacemaker struct {
 	*hotstuff.HotStuff
 
-	ctx        context.Context
-	cancel     func()
-	Commands   chan []hotstuff.Command
 	TermLength int
 	Schedule   []hotstuff.ReplicaID
 
@@ -97,26 +77,13 @@ func (p *RoundRobinPacemaker) getLeader(vHeight int) hotstuff.ReplicaID {
 	return p.Schedule[term%len(p.Schedule)]
 }
 
-// beat make the leader brodcast a new proposal for a node to work on.
-func (p *RoundRobinPacemaker) beat() {
-	cmds, ok := <-p.Commands
-	if !ok {
-		logger.Println("No more commands, exiting...")
-		p.Close()
-		p.cancel()
-		return
-	}
-	p.Propose(cmds)
-}
-
 // Run runs the pacemaker which will beat when the previous QC is completed
 func (p *RoundRobinPacemaker) Run(ctx context.Context) {
-	p.ctx, p.cancel = context.WithCancel(ctx)
 	notify := p.GetNotifier()
 
 	// initial beat for view 1
 	if p.GetID() == p.getLeader(1) {
-		go p.beat()
+		go p.Propose()
 	}
 
 	// make sure that we only beat once per view, and don't beat if bLeaf.Height < vHeight
@@ -126,7 +93,7 @@ func (p *RoundRobinPacemaker) Run(ctx context.Context) {
 		if p.getLeader(p.GetHeight()+1) == p.GetID() && lastBeat < p.GetHeight()+1 &&
 			p.GetHeight()+1 > p.GetVotedHeight() {
 			lastBeat = p.GetHeight() + 1
-			go p.beat()
+			go p.Propose()
 		}
 	}
 
@@ -163,7 +130,7 @@ func (p *RoundRobinPacemaker) Run(ctx context.Context) {
 			if !ok {
 				return
 			}
-		case <-p.ctx.Done():
+		case <-ctx.Done():
 			return
 		}
 	}

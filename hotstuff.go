@@ -18,7 +18,7 @@ func init() {
 }
 
 // Command is the client data that is processed by HotStuff
-type Command []byte
+type Command string
 
 // ReplicaID is the id of a replica
 type ReplicaID uint32
@@ -34,12 +34,14 @@ type ReplicaInfo struct {
 type ReplicaConfig struct {
 	Replicas   map[ReplicaID]*ReplicaInfo
 	QuorumSize int
+	BatchSize  int
 }
 
 // NewConfig returns a new ReplicaConfig instance
 func NewConfig() *ReplicaConfig {
 	return &ReplicaConfig{
-		Replicas: make(map[ReplicaID]*ReplicaInfo),
+		Replicas:  make(map[ReplicaID]*ReplicaInfo),
+		BatchSize: 1,
 	}
 }
 
@@ -65,6 +67,7 @@ type Notification struct {
 // Backend is the networking code that serves HotStuff
 type Backend interface {
 	Init(*HotStuff)
+	Start() error
 	DoPropose(*Node, *QuorumCert) (*QuorumCert, error)
 	DoNewView(ReplicaID, *QuorumCert) error
 	Close()
@@ -72,25 +75,21 @@ type Backend interface {
 
 // HotStuff is the safety core of the HotStuff protocol
 type HotStuff struct {
-	*ReplicaConfig
-	mut sync.Mutex
-
-	// depend on a network abstraction
 	Backend
-
-	// protocol data
-	genesis *Node
-	vHeight int
-	bLock   *Node
-	bExec   *Node
-
-	// fields that pacemaker needs
-	bLeaf  *Node
-	qcHigh *QuorumCert
+	*ReplicaConfig
 
 	id      ReplicaID
-	nodes   NodeStorage
+	mut     sync.Mutex
 	privKey *ecdsa.PrivateKey
+
+	// protocol data
+	vHeight int
+	genesis *Node
+	bLock   *Node
+	bExec   *Node
+	bLeaf   *Node
+	qcHigh  *QuorumCert
+	nodes   NodeStorage
 
 	// the duration that hotstuff can wait for an out-of-order message
 	waitDuration time.Duration
@@ -98,6 +97,8 @@ type HotStuff struct {
 
 	// Notifications will be sent to pacemaker on this channel
 	pmNotifyChan chan Notification
+
+	pendingCmds *cmdSet
 
 	Exec func([]Command)
 }
@@ -149,24 +150,30 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, backend
 	nodes := NewMapStorage()
 	nodes.Put(genesis)
 	hs := &HotStuff{
+		Backend:       backend,
 		ReplicaConfig: config,
 		id:            id,
-		Backend:       backend,
 		privKey:       privKey,
-		nodes:         nodes,
 		genesis:       genesis,
 		bLock:         genesis,
 		bExec:         genesis,
 		bLeaf:         genesis,
 		qcHigh:        qcForGenesis,
+		nodes:         nodes,
 		waitDuration:  waitDuration,
 		waitProposal:  waitutil.NewWaitUtil(),
-		Exec:          exec,
 		pmNotifyChan:  make(chan Notification, 10),
+		pendingCmds:   newCmdSet(),
+		Exec:          exec,
 	}
 
 	backend.Init(hs)
 	return hs
+}
+
+// AddCommand queues a command for proposal
+func (hs *HotStuff) AddCommand(cmd Command) {
+	hs.pendingCmds.Add(cmd)
 }
 
 // GetNotifier returns a channel where the pacemaker can listen for notifications
@@ -237,6 +244,10 @@ func (hs *HotStuff) OnReceiveProposal(node *Node) (*PartialCert, error) {
 		logger.Println("OnReceiveProposal: Accepted node")
 		hs.vHeight = node.Height
 		pc, err := CreatePartialCert(hs.id, hs.privKey, node)
+		if err != nil {
+			// remove all commands associated with this node from the pending commands
+			hs.pendingCmds.Remove(node.Commands...)
+		}
 		hs.pmNotify(Notification{ReceiveProposal, node, hs.qcHigh})
 		return pc, err
 	}
@@ -332,7 +343,9 @@ func (hs *HotStuff) commit(node *Node) {
 }
 
 // Propose will fetch a command from the Commands channel and proposes it to the other replicas
-func (hs *HotStuff) Propose(cmds []Command) {
+func (hs *HotStuff) Propose() {
+	cmds := hs.pendingCmds.GetFirst(hs.BatchSize)
+
 	logger.Printf("Propose (%d commands)\n", len(cmds))
 	hs.mut.Lock()
 

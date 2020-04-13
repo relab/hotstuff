@@ -9,6 +9,7 @@ import (
 type stubBackend struct{}
 
 func (d *stubBackend) Init(hs *HotStuff)                                         {}
+func (d *stubBackend) Start() error                                              { return nil }
 func (d *stubBackend) DoPropose(node *Node, qc *QuorumCert) (*QuorumCert, error) { return nil, nil }
 func (d *stubBackend) DoNewView(leader ReplicaID, qc *QuorumCert) error          { return nil }
 func (d *stubBackend) Close()                                                    {}
@@ -128,7 +129,7 @@ func TestUpdate(t *testing.T) {
 
 	select {
 	case b := <-exec:
-		if !bytes.Equal(b[0], n1.Commands[0]) {
+		if b[0] != n1.Commands[0] {
 			success = false
 		}
 	case <-time.After(time.Second):

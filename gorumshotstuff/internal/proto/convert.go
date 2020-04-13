@@ -94,7 +94,7 @@ func (pn *HSNode) FromProto() *hotstuff.Node {
 }
 
 func CommandToProto(cmd hotstuff.Command) *Command {
-	return &Command{Data: cmd}
+	return &Command{Data: []byte(cmd)}
 }
 
 func (cmd *Command) FromProto() hotstuff.Command {

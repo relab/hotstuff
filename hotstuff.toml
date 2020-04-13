@@ -1,0 +1,29 @@
+pacemaker = "fixed"
+leader-id = 1
+view-change = 100
+leader-schedule = [1, 2, 3, 4]
+
+# This is the information that each replica is given about the other replicas
+[[replicas]]
+id = 1
+peer-address = "127.0.0.1:13371"
+client-address = "127.0.0.1:23371"
+pubkey = "keys/r1.key.pub"
+
+[[replicas]]
+id = 2
+peer-address = "127.0.0.1:13372"
+client-address = "127.0.0.1:23372"
+pubkey = "keys/r2.key.pub"
+
+[[replicas]]
+id = 3
+peer-address = "127.0.0.1:13373"
+client-address = "127.0.0.1:23373"
+pubkey = "keys/r3.key.pub"
+
+[[replicas]]
+id = 4
+peer-address = "127.0.0.1:13374"
+client-address = "127.0.0.1:23374"
+pubkey = "keys/r4.key.pub"

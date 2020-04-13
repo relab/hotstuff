@@ -22,8 +22,11 @@ cmd/hotstuff/hotstuff
 cmd/hotstuffkeygen/hotstuffkeygen
 cmd/splitfile/splitfile
 cmd/hotstuffbench/hotstuffbench
+cmd/hotstuffclient/hotstuffclient
+cmd/hotstuffserver/hotstuffserver
 
 # other
+keys/
 cmd/hotstuff/rr/
 cmd/hotstuff/keys/
 cmd/hotstuffbench/keys/
