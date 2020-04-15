@@ -14,12 +14,15 @@ import (
 	"time"
 
 	protobuf "github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes"
+	"github.com/relab/gorums/strictordering"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/clientapi"
 	"github.com/relab/hotstuff/gorumshotstuff"
 	"github.com/relab/hotstuff/pacemaker"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"google.golang.org/grpc"
 )
 
 type config struct {
@@ -148,13 +151,14 @@ type hotstuffServer struct {
 	cancel  context.CancelFunc
 	key     *ecdsa.PrivateKey
 	conf    *config
-	gorums  *clientapi.GorumsServer
+	grpcSrv *grpc.Server
 	hs      *hotstuff.HotStuff
 	pm      pacemaker.Pacemaker
 	backend hotstuff.Backend
 
-	mut             sync.Mutex
-	waitingRequests map[hotstuff.Command]chan struct{}
+	mut          sync.Mutex
+	requestIDs   map[hotstuff.Command]uint64
+	finishedCmds chan hotstuff.Command
 
 	measureMut      sync.Mutex
 	lastMeasureTime time.Time
@@ -165,12 +169,13 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *config, replicaConfig *hotst
 	waitDuration := time.Duration(conf.ViewTimeout/2) * time.Millisecond
 	ctx, cancel := context.WithCancel(context.Background())
 	srv := &hotstuffServer{
-		ctx:             ctx,
-		cancel:          cancel,
-		conf:            conf,
-		key:             key,
-		gorums:          clientapi.NewGorumsServer(),
-		waitingRequests: make(map[hotstuff.Command]chan struct{}),
+		ctx:          ctx,
+		cancel:       cancel,
+		conf:         conf,
+		key:          key,
+		grpcSrv:      grpc.NewServer(),
+		requestIDs:   make(map[hotstuff.Command]uint64),
+		finishedCmds: make(chan hotstuff.Command, conf.BatchSize*2),
 	}
 	srv.backend = gorumshotstuff.New(time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
 	srv.hs = hotstuff.New(conf.SelfID, key, replicaConfig, srv.backend, waitDuration, srv.onExec)
@@ -188,7 +193,8 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *config, replicaConfig *hotst
 		fmt.Fprintf(os.Stderr, "Invalid pacemaker type: '%s'\n", conf.PmType)
 		os.Exit(1)
 	}
-	srv.gorums.RegisterExecCommandHandler(srv)
+	// Use a custom server instead of the gorums one
+	strictordering.RegisterGorumsStrictOrderingServer(srv.grpcSrv, srv)
 	return srv
 }
 
@@ -197,7 +203,7 @@ func (srv *hotstuffServer) Start(address string) error {
 	if err != nil {
 		return err
 	}
-	go srv.gorums.Serve(lis)
+	go srv.grpcSrv.Serve(lis)
 
 	err = srv.backend.Start()
 	if err != nil {
@@ -210,49 +216,67 @@ func (srv *hotstuffServer) Start(address string) error {
 }
 
 func (srv *hotstuffServer) Stop() {
-	srv.gorums.Stop()
+	srv.grpcSrv.Stop()
 	srv.cancel()
 	srv.hs.Close()
 }
 
-func (srv *hotstuffServer) ExecCommand(ctx context.Context, cmd *clientapi.Command) *clientapi.Signature {
-	// marshal cmd into a string and send it to hotstuff
-	_c, err := protobuf.Marshal(cmd)
-	if err != nil {
-		return nil
-	}
-	c := hotstuff.Command(_c)
+// Custom server code
+func (srv *hotstuffServer) NodeStream(stream strictordering.GorumsStrictOrdering_NodeStreamServer) error {
+	go func() {
+		for cmd := range srv.finishedCmds {
+			// compute hash
+			b := []byte(cmd)
+			hash := sha256.Sum256(b)
+			r, s, err := ecdsa.Sign(rand.Reader, srv.key, hash[:])
+			if err != nil {
+				continue
+			}
 
-	signal := make(chan struct{}, 1)
-	srv.mut.Lock()
-	srv.waitingRequests[c] = signal
-	srv.mut.Unlock()
+			// create response and marshal into Any
+			sig := &clientapi.Signature{
+				ReplicaID: uint32(srv.hs.GetID()),
+				R:         r.Bytes(),
+				S:         s.Bytes(),
+			}
+			any, err := ptypes.MarshalAny(sig)
+			if err != nil {
+				continue
+			}
 
-	defer func() {
-		srv.mut.Lock()
-		delete(srv.waitingRequests, c)
-		srv.mut.Unlock()
+			// get id
+			srv.mut.Lock()
+			id, ok := srv.requestIDs[cmd]
+			if !ok {
+				srv.mut.Unlock()
+				continue
+			}
+			delete(srv.requestIDs, cmd)
+			srv.mut.Unlock()
+
+			// send response
+			resp := &strictordering.GorumsMessage{
+				ID:   id,
+				Data: any,
+			}
+			err = stream.Send(resp)
+			if err != nil {
+				return
+			}
+		}
 	}()
 
-	srv.hs.AddCommand(c)
-
-	select {
-	case <-signal:
-		hash := sha256.Sum256(_c)
-		r, s, err := ecdsa.Sign(rand.Reader, srv.key, hash[:])
+	for {
+		req, err := stream.Recv()
 		if err != nil {
-			return nil
+			return err
 		}
-		return &clientapi.Signature{
-			ReplicaID: uint32(srv.conf.SelfID),
-			R:         r.Bytes(),
-			S:         s.Bytes(),
-		}
-	case <-ctx.Done():
-		return nil
-	// probably won't need to check this one aswell
-	case <-srv.ctx.Done():
-		return nil
+		// use the serialized data as cmd
+		cmd := hotstuff.Command(req.GetData().GetValue())
+		srv.mut.Lock()
+		srv.requestIDs[cmd] = req.GetID()
+		srv.mut.Unlock()
+		srv.hs.AddCommand(cmd)
 	}
 }
 
@@ -261,25 +285,20 @@ func (srv *hotstuffServer) onExec(cmds []hotstuff.Command) {
 		now := time.Now()
 		srv.measureMut.Lock()
 		srv.numCommands += len(cmds)
-		if now.Sub(srv.lastMeasureTime) > time.Duration(srv.conf.Interval)*time.Millisecond {
-			fmt.Printf("%s, %d\n", now.Format("15:04:05.000"), srv.numCommands)
+		if diff := now.Sub(srv.lastMeasureTime); diff > time.Duration(srv.conf.Interval)*time.Millisecond {
+			fmt.Printf("%d, %d\n", diff, srv.numCommands)
 			srv.numCommands = 0
 			srv.lastMeasureTime = now
 		}
 		srv.measureMut.Unlock()
 	}
 
-	srv.mut.Lock()
 	for _, cmd := range cmds {
 		if srv.conf.PrintCommands {
 			m := new(clientapi.Command)
 			protobuf.Unmarshal([]byte(cmd), m)
 			fmt.Printf("%s", m.Data)
 		}
-
-		if c, ok := srv.waitingRequests[cmd]; ok {
-			c <- struct{}{}
-		}
+		srv.finishedCmds <- cmd
 	}
-	srv.mut.Unlock()
 }

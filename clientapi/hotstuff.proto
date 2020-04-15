@@ -10,7 +10,7 @@ option go_package = "github.com/relab/hotstuff/clientapi";
 service HotStuffSMR {
 	// ExecCommand sends a command to all replicas and waits for valid signatures from f+1 replicas
 	rpc ExecCommand(Command) returns (Signature) {
-		option (gorums.qc) = true;
+		option (gorums.qc_future) = true;
 		option (gorums.ordered) = true;
 		option (gorums.qf_with_req) = true;
 		option (gorums.custom_return_type) = "Empty";

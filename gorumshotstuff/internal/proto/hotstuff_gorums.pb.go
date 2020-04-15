@@ -10,7 +10,6 @@ import (
 	ptypes "github.com/golang/protobuf/ptypes"
 	strictordering "github.com/relab/gorums/strictordering"
 	trace "golang.org/x/net/trace"
-	errgroup "golang.org/x/sync/errgroup"
 	grpc "google.golang.org/grpc"
 	backoff "google.golang.org/grpc/backoff"
 	codes "google.golang.org/grpc/codes"
@@ -719,7 +718,7 @@ func WithBackoff(backoff backoff.Config) ManagerOption {
 // A requestHandler should receive a message from the server, unmarshal it into
 // the proper type for that Method's request type, call a user provided Handler,
 // and return a marshaled result to the server.
-type requestHandler func(context.Context, *strictordering.GorumsMessage) *strictordering.GorumsMessage
+type requestHandler func(*strictordering.GorumsMessage) *strictordering.GorumsMessage
 
 type strictOrderingServer struct {
 	handlers map[string]requestHandler
@@ -736,34 +735,21 @@ func (s *strictOrderingServer) registerHandler(method string, handler requestHan
 }
 
 func (s *strictOrderingServer) NodeStream(srv strictordering.GorumsStrictOrdering_NodeStreamServer) error {
-	g, ctx := errgroup.WithContext(srv.Context())
-
-	g.Go(func() error {
-		for {
-			req, err := srv.Recv()
+	for {
+		req, err := srv.Recv()
+		if err != nil {
+			return err
+		}
+		// handle the request if a handler is available for this rpc
+		if handler, ok := s.handlers[req.GetMethod()]; ok {
+			resp := handler(req)
+			resp.ID = req.GetID()
+			err = srv.Send(resp)
 			if err != nil {
 				return err
 			}
-
-			// handle the request if a handler is available for this rpc
-			if handler, ok := s.handlers[req.GetMethod()]; ok {
-				g.Go(func() error {
-					resp := handler(ctx, req)
-					resp.ID = req.GetID()
-					err = srv.Send(resp)
-					return err
-				})
-			}
-
-			select {
-			case <-ctx.Done():
-				return nil
-			default:
-			}
 		}
-	})
-
-	return g.Wait()
+	}
 }
 
 // GorumsServer serves all strict ordering based RPCs using registered handlers
@@ -1094,19 +1080,19 @@ func (c *Configuration) Propose(ctx context.Context, in *HSNode, opts ...grpc.Ca
 
 // ProposeHandler is the server API for the Propose rpc.
 type ProposeHandler interface {
-	Propose(context.Context, *HSNode) *PartialCert
+	Propose(*HSNode) *PartialCert
 }
 
 // RegisterProposeHandler sets the handler for Propose.
 func (s *GorumsServer) RegisterProposeHandler(handler ProposeHandler) {
-	s.srv.registerHandler("/proto.Hotstuff/Propose", func(ctx context.Context, in *strictordering.GorumsMessage) *strictordering.GorumsMessage {
+	s.srv.registerHandler("/proto.Hotstuff/Propose", func(in *strictordering.GorumsMessage) *strictordering.GorumsMessage {
 		req := new(HSNode)
 		err := ptypes.UnmarshalAny(in.GetData(), req)
 		// TODO: how to handle marshaling errors here
 		if err != nil {
 			return new(strictordering.GorumsMessage)
 		}
-		resp := handler.Propose(ctx, req)
+		resp := handler.Propose(req)
 		data, err := ptypes.MarshalAny(resp)
 		if err != nil {
 			return new(strictordering.GorumsMessage)
@@ -1156,19 +1142,19 @@ func (n *Node) NewView(ctx context.Context, in *QuorumCert, opts ...grpc.CallOpt
 
 // NewViewHandler is the server API for the NewView rpc.
 type NewViewHandler interface {
-	NewView(context.Context, *QuorumCert) *Empty
+	NewView(*QuorumCert) *Empty
 }
 
 // RegisterNewViewHandler sets the handler for NewView.
 func (s *GorumsServer) RegisterNewViewHandler(handler NewViewHandler) {
-	s.srv.registerHandler("/proto.Hotstuff/NewView", func(ctx context.Context, in *strictordering.GorumsMessage) *strictordering.GorumsMessage {
+	s.srv.registerHandler("/proto.Hotstuff/NewView", func(in *strictordering.GorumsMessage) *strictordering.GorumsMessage {
 		req := new(QuorumCert)
 		err := ptypes.UnmarshalAny(in.GetData(), req)
 		// TODO: how to handle marshaling errors here
 		if err != nil {
 			return new(strictordering.GorumsMessage)
 		}
-		resp := handler.NewView(ctx, req)
+		resp := handler.NewView(req)
 		data, err := ptypes.MarshalAny(resp)
 		if err != nil {
 			return new(strictordering.GorumsMessage)

@@ -10,7 +10,6 @@ import (
 	ptypes "github.com/golang/protobuf/ptypes"
 	strictordering "github.com/relab/gorums/strictordering"
 	trace "golang.org/x/net/trace"
-	errgroup "golang.org/x/sync/errgroup"
 	grpc "google.golang.org/grpc"
 	backoff "google.golang.org/grpc/backoff"
 	codes "google.golang.org/grpc/codes"
@@ -719,7 +718,7 @@ func WithBackoff(backoff backoff.Config) ManagerOption {
 // A requestHandler should receive a message from the server, unmarshal it into
 // the proper type for that Method's request type, call a user provided Handler,
 // and return a marshaled result to the server.
-type requestHandler func(context.Context, *strictordering.GorumsMessage) *strictordering.GorumsMessage
+type requestHandler func(*strictordering.GorumsMessage) *strictordering.GorumsMessage
 
 type strictOrderingServer struct {
 	handlers map[string]requestHandler
@@ -736,34 +735,21 @@ func (s *strictOrderingServer) registerHandler(method string, handler requestHan
 }
 
 func (s *strictOrderingServer) NodeStream(srv strictordering.GorumsStrictOrdering_NodeStreamServer) error {
-	g, ctx := errgroup.WithContext(srv.Context())
-
-	g.Go(func() error {
-		for {
-			req, err := srv.Recv()
+	for {
+		req, err := srv.Recv()
+		if err != nil {
+			return err
+		}
+		// handle the request if a handler is available for this rpc
+		if handler, ok := s.handlers[req.GetMethod()]; ok {
+			resp := handler(req)
+			resp.ID = req.GetID()
+			err = srv.Send(resp)
 			if err != nil {
 				return err
 			}
-
-			// handle the request if a handler is available for this rpc
-			if handler, ok := s.handlers[req.GetMethod()]; ok {
-				g.Go(func() error {
-					resp := handler(ctx, req)
-					resp.ID = req.GetID()
-					err = srv.Send(resp)
-					return err
-				})
-			}
-
-			select {
-			case <-ctx.Done():
-				return nil
-			default:
-			}
 		}
-	})
-
-	return g.Wait()
+	}
 }
 
 // GorumsServer serves all strict ordering based RPCs using registered handlers
@@ -1017,7 +1003,7 @@ func (n *Node) closeStream() (err error) {
 type QuorumSpec interface {
 
 	// ExecCommandQF is the quorum function for the ExecCommand
-	// ordered quorum call method.
+	// asynchronous ordered quorum call method.
 	ExecCommandQF(in *Command, replies []*Signature) (*Empty, bool)
 }
 
@@ -1029,22 +1015,59 @@ type internalSignature struct {
 	err   error
 }
 
-// ExecCommand sends a command to all replicas and waits for valid signatures from f+1 replicas
-func (c *Configuration) ExecCommand(ctx context.Context, in *Command, opts ...grpc.CallOption) (resp *Empty, err error) {
+// FutureEmpty is a future object for processing replies.
+type FutureEmpty struct {
+	// the actual reply
+	*Empty
+	NodeIDs []uint32
+	err     error
+	c       chan struct{}
+}
 
-	// get the ID which will be used to return the correct responses for a request
+// Get returns the reply and any error associated with the called method.
+// The method blocks until a reply or error is available.
+func (f *FutureEmpty) Get() (*Empty, error) {
+	<-f.c
+	return f.Empty, f.err
+}
+
+// Done reports if a reply and/or error is available for the called method.
+func (f *FutureEmpty) Done() bool {
+	select {
+	case <-f.c:
+		return true
+	default:
+		return false
+	}
+}
+
+// ExecCommand sends a command to all replicas and waits for valid signatures from f+1 replicas
+func (c *Configuration) ExecCommand(ctx context.Context, in *Command) (*FutureEmpty, error) {
+	fut := &FutureEmpty{
+		NodeIDs: make([]uint32, 0, c.n),
+		c:       make(chan struct{}, 1),
+	}
+	id, expected, replyChan, err := c.execCommandSend(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		defer close(fut.c)
+		c.execCommandRecv(ctx, in, id, expected, replyChan, fut)
+	}()
+	return fut, nil
+}
+
+func (c *Configuration) execCommandSend(ctx context.Context, in *Command) (uint64, int, chan *strictOrderingResult, error) { // get the ID which will be used to return the correct responses for a request
 	msgID := c.mgr.nextMsgID()
 
 	// set up a channel to collect replies
-	replies := make(chan *strictOrderingResult, c.n)
-	c.mgr.putChan(msgID, replies)
-
-	// remove the replies channel when we are done
-	defer c.mgr.deleteChan(msgID)
+	replyChan := make(chan *strictOrderingResult, c.n)
+	c.mgr.putChan(msgID, replyChan)
 
 	data, err := ptypes.MarshalAny(in)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal message: %w", err)
+		return 0, 0, nil, fmt.Errorf("failed to marshal message: %w", err)
 	}
 	msg := &strictordering.GorumsMessage{
 		ID:     msgID,
@@ -1057,55 +1080,65 @@ func (c *Configuration) ExecCommand(ctx context.Context, in *Command, opts ...gr
 		n.sendQ <- msg
 	}
 
+	return msgID, expected, replyChan, nil
+}
+
+func (c *Configuration) execCommandRecv(ctx context.Context, in *Command, msgID uint64, expected int, replyChan chan *strictOrderingResult, resp *FutureEmpty) {
+	defer c.mgr.deleteChan(msgID)
+
 	var (
-		replyValues = make([]*Signature, 0, expected)
+		replyValues = make([]*Signature, 0, c.n)
+		reply       *Empty
 		errs        []GRPCError
 		quorum      bool
 	)
 
 	for {
 		select {
-		case r := <-replies:
+		case r := <-replyChan:
+			resp.NodeIDs = append(resp.NodeIDs, r.nid)
 			if r.err != nil {
 				errs = append(errs, GRPCError{r.nid, r.err})
 				break
 			}
 
-			reply := new(Signature)
-			err := ptypes.UnmarshalAny(r.reply, reply)
+			data := new(Signature)
+			err := ptypes.UnmarshalAny(r.reply, data)
 			if err != nil {
 				errs = append(errs, GRPCError{r.nid, fmt.Errorf("failed to unmarshal reply: %w", err)})
 				break
 			}
-			replyValues = append(replyValues, reply)
-			if resp, quorum = c.qspec.ExecCommandQF(in, replyValues); quorum {
-				return resp, nil
+			replyValues = append(replyValues, data)
+			if reply, quorum = c.qspec.ExecCommandQF(in, replyValues); quorum {
+				resp.Empty, resp.err = reply, nil
+				return
 			}
 		case <-ctx.Done():
-			return resp, QuorumCallError{ctx.Err().Error(), len(replyValues), errs}
+			resp.Empty, resp.err = reply, QuorumCallError{ctx.Err().Error(), len(replyValues), errs}
+			return
 		}
-
 		if len(errs)+len(replyValues) == expected {
-			return resp, QuorumCallError{"incomplete call", len(replyValues), errs}
+			resp.Empty, resp.err = reply, QuorumCallError{"incomplete call", len(replyValues), errs}
+			return
 		}
 	}
 }
 
 // ExecCommandHandler is the server API for the ExecCommand rpc.
 type ExecCommandHandler interface {
-	ExecCommand(context.Context, *Command) *Signature
+	ExecCommand(*Command) *Signature
 }
 
 // RegisterExecCommandHandler sets the handler for ExecCommand.
 func (s *GorumsServer) RegisterExecCommandHandler(handler ExecCommandHandler) {
-	s.srv.registerHandler("/clientapi.HotStuffSMR/ExecCommand", func(ctx context.Context, in *strictordering.GorumsMessage) *strictordering.GorumsMessage {
+	s.srv.registerHandler("/clientapi.HotStuffSMR/ExecCommand", func(in *strictordering.GorumsMessage) *strictordering.GorumsMessage {
 		req := new(Command)
 		err := ptypes.UnmarshalAny(in.GetData(), req)
 		// TODO: how to handle marshaling errors here
 		if err != nil {
 			return new(strictordering.GorumsMessage)
 		}
-		resp := handler.ExecCommand(ctx, req)
+		resp := handler.ExecCommand(req)
 		data, err := ptypes.MarshalAny(resp)
 		if err != nil {
 			return new(strictordering.GorumsMessage)

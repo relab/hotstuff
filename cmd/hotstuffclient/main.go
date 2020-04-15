@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"math/big"
 	"os"
 	"os/signal"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -29,6 +31,7 @@ type config struct {
 	MaxInflight    uint64 `mapstructure:"max-inflight"`
 	DataSource     string `mapstructure:"input"`
 	PrintLatencies bool   `mapstructure:"print-latencies"`
+	ExitAfter      int    `mapstructure:"exit-after"`
 	Replicas       []struct {
 		ID         hotstuff.ReplicaID
 		ClientAddr string `mapstructure:"client-address"`
@@ -57,6 +60,7 @@ func main() {
 	pflag.Uint64("max-inflight", 10000, "The maximum number of messages that the client can wait for at once")
 	pflag.String("input", "", "Optional file to use for payload data")
 	pflag.Bool("print-latencies", false, "If enabled, the latency of each request will be printed to stdout")
+	pflag.Int("exit-after", 0, "Number of seconds after which the program should exit.")
 	pflag.Parse()
 
 	if *help {
@@ -104,18 +108,27 @@ func main() {
 
 	go func() {
 		err := client.SendCommands(ctx)
-		if err != io.EOF {
+		if err != nil && err != io.EOF {
 			fmt.Fprintf(os.Stderr, "Failed to send commands: %v\n", err)
+			client.Close()
+			os.Exit(1)
 		}
 		client.Close()
-		os.Exit(1)
+		os.Exit(0)
 	}()
 
-	<-signals
+	if conf.ExitAfter > 0 {
+		select {
+		case <-time.After(time.Duration(conf.ExitAfter) * time.Second):
+		case <-signals:
+		}
+	} else {
+		<-signals
+	}
+
 	fmt.Fprintf(os.Stderr, "Exiting...\n")
 
 	cancel()
-
 }
 
 type qspec struct {
@@ -156,6 +169,7 @@ type hotstuffClient struct {
 	mgr           *clientapi.Manager
 	replicaConfig *hotstuff.ReplicaConfig
 	gorumsConfig  *clientapi.Configuration
+	wg            sync.WaitGroup
 }
 
 func newHotStuffClient(conf *config, replicaConfig *hotstuff.ReplicaConfig) (*hotstuffClient, error) {
@@ -199,6 +213,7 @@ func newHotStuffClient(conf *config, replicaConfig *hotstuff.ReplicaConfig) (*ho
 }
 
 func (c *hotstuffClient) Close() {
+	c.wg.Wait()
 	c.mgr.Close()
 	c.reader.Close()
 }
@@ -217,20 +232,24 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 				Timestamp: time.Now().UnixNano(),
 				Data:      data[:n],
 			}
-			go func(ctx context.Context, cmd *clientapi.Command) {
-				_, err := c.gorumsConfig.ExecCommand(ctx, cmd)
-				now := time.Now().UnixNano()
-				atomic.AddUint64(&c.inflight, ^uint64(0))
+			promise, err := c.gorumsConfig.ExecCommand(ctx, cmd)
+			if err != nil {
+				continue
+			}
+			atomic.AddUint64(&c.inflight, ^uint64(0))
 
-				// TODO: what to do on error
+			go func(cmd *clientapi.Command, promise *clientapi.FutureEmpty) {
+				c.wg.Add(1)
+				_, err := promise.Get()
 				if err != nil {
-					return
+					log.Printf("Did not get enough signatures for command: %v\n", err)
 				}
-
+				now := time.Now().UnixNano()
 				if c.conf.PrintLatencies {
-					fmt.Println(now - cmd.Timestamp)
+					fmt.Println(now - cmd.GetTimestamp())
 				}
-			}(ctx, cmd)
+				c.wg.Done()
+			}(cmd, promise)
 		}
 
 		select {

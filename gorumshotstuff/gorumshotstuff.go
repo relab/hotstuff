@@ -163,7 +163,7 @@ func (hs *GorumsHotStuff) Close() {
 }
 
 // Propose handles a replica's response to the Propose QC from the leader
-func (hs *GorumsHotStuff) Propose(ctx context.Context, node *proto.HSNode) *proto.PartialCert {
+func (hs *GorumsHotStuff) Propose(node *proto.HSNode) *proto.PartialCert {
 	p, err := hs.OnReceiveProposal(node.FromProto())
 	if err != nil {
 		logger.Println("OnReceiveProposal returned with error: ", err)
@@ -173,7 +173,7 @@ func (hs *GorumsHotStuff) Propose(ctx context.Context, node *proto.HSNode) *prot
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica
-func (hs *GorumsHotStuff) NewView(ctx context.Context, msg *proto.QuorumCert) *proto.Empty {
+func (hs *GorumsHotStuff) NewView(msg *proto.QuorumCert) *proto.Empty {
 	qc := msg.FromProto()
 	hs.OnReceiveNewView(qc)
 	return &proto.Empty{}
