@@ -191,6 +191,9 @@ func (hs *HotStuff) expectNodeFor(qc *QuorumCert) (node *Node, ok bool) {
 		node, ok = hs.nodes.NodeOf(qc)
 		return ok
 	})
+	if !ok {
+		logger.Println("ExpectNodeFor: Node not found")
+	}
 	return
 }
 
@@ -244,7 +247,7 @@ func (hs *HotStuff) OnReceiveProposal(node *Node) (*PartialCert, error) {
 		logger.Println("OnReceiveProposal: Accepted node")
 		hs.vHeight = node.Height
 		pc, err := CreatePartialCert(hs.id, hs.privKey, node)
-		if err != nil {
+		if err == nil {
 			// remove all commands associated with this node from the pending commands
 			hs.pendingCmds.Remove(node.Commands...)
 		}

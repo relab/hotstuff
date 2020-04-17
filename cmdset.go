@@ -49,7 +49,6 @@ func (s *cmdSet) Remove(cmds ...Command) {
 			// remove e from list and set
 			delete(s.set, cmd)
 			s.order.Remove(e)
-			break
 		}
 	}
 }

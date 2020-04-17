@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -181,14 +182,11 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *config, replicaConfig *hotst
 	srv.hs = hotstuff.New(conf.SelfID, key, replicaConfig, srv.backend, waitDuration, srv.onExec)
 	switch conf.PmType {
 	case "fixed":
-		srv.pm = &pacemaker.FixedLeaderPacemaker{HotStuff: srv.hs, Leader: conf.LeaderID}
+		srv.pm = pacemaker.NewFixedLeader(srv.hs, conf.LeaderID)
 	case "round-robin":
-		srv.pm = &pacemaker.RoundRobinPacemaker{
-			HotStuff:       srv.hs,
-			Schedule:       conf.Schedule,
-			TermLength:     conf.ViewChange,
-			NewViewTimeout: time.Duration(conf.ViewTimeout) * time.Millisecond,
-		}
+		srv.pm = pacemaker.NewRoundRobin(
+			srv.hs, conf.ViewChange, conf.Schedule, time.Duration(conf.ViewTimeout)*time.Millisecond,
+		)
 	default:
 		fmt.Fprintf(os.Stderr, "Invalid pacemaker type: '%s'\n", conf.PmType)
 		os.Exit(1)
@@ -296,7 +294,10 @@ func (srv *hotstuffServer) onExec(cmds []hotstuff.Command) {
 	for _, cmd := range cmds {
 		if srv.conf.PrintCommands {
 			m := new(clientapi.Command)
-			protobuf.Unmarshal([]byte(cmd), m)
+			err := protobuf.Unmarshal([]byte(cmd), m)
+			if err != nil {
+				log.Printf("Failed to unmarshal command: %v\n", err)
+			}
 			fmt.Printf("%s", m.Data)
 		}
 		srv.finishedCmds <- cmd

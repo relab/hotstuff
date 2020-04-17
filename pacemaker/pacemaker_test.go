@@ -7,7 +7,7 @@ import (
 )
 
 func TestRRGetLeader(t *testing.T) {
-	pm := &RoundRobinPacemaker{TermLength: 1, Schedule: []hotstuff.ReplicaID{1, 2, 3, 4}}
+	pm := NewRoundRobin(nil, 1, []hotstuff.ReplicaID{1, 2, 3, 4}, 0)
 	testCases := []struct {
 		height int
 		leader hotstuff.ReplicaID

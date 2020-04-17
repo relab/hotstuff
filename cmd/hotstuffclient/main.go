@@ -107,28 +107,26 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
-		err := client.SendCommands(ctx)
-		if err != nil && err != io.EOF {
-			fmt.Fprintf(os.Stderr, "Failed to send commands: %v\n", err)
-			client.Close()
-			os.Exit(1)
+		if conf.ExitAfter > 0 {
+			select {
+			case <-time.After(time.Duration(conf.ExitAfter) * time.Second):
+			case <-signals:
+				fmt.Fprintf(os.Stderr, "Exiting...\n")
+			}
+		} else {
+			<-signals
+			fmt.Fprintf(os.Stderr, "Exiting...\n")
 		}
-		client.Close()
-		os.Exit(0)
+		cancel()
 	}()
 
-	if conf.ExitAfter > 0 {
-		select {
-		case <-time.After(time.Duration(conf.ExitAfter) * time.Second):
-		case <-signals:
-		}
-	} else {
-		<-signals
+	err = client.SendCommands(ctx)
+	if err != nil && err != io.EOF {
+		fmt.Fprintf(os.Stderr, "Failed to send commands: %v\n", err)
+		client.Close()
+		os.Exit(1)
 	}
-
-	fmt.Fprintf(os.Stderr, "Exiting...\n")
-
-	cancel()
+	client.Close()
 }
 
 type qspec struct {
@@ -236,13 +234,16 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 			if err != nil {
 				continue
 			}
-			atomic.AddUint64(&c.inflight, ^uint64(0))
 
 			go func(cmd *clientapi.Command, promise *clientapi.FutureEmpty) {
 				c.wg.Add(1)
 				_, err := promise.Get()
+				atomic.AddUint64(&c.inflight, ^uint64(0))
 				if err != nil {
-					log.Printf("Did not get enough signatures for command: %v\n", err)
+					qcError, ok := err.(clientapi.QuorumCallError)
+					if !ok || qcError.Reason != context.Canceled.Error() {
+						log.Printf("Did not get enough signatures for command: %v\n", err)
+					}
 				}
 				now := time.Now().UnixNano()
 				if c.conf.PrintLatencies {

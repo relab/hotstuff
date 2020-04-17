@@ -21,21 +21,24 @@ type Pacemaker interface {
 	Run(context.Context)
 }
 
-// FixedLeaderPacemaker uses a fixed leader.
-type FixedLeaderPacemaker struct {
+// FixedLeader uses a fixed leader.
+type FixedLeader struct {
 	*hotstuff.HotStuff
-	Leader hotstuff.ReplicaID
+	leader hotstuff.ReplicaID
 }
 
-// getLeader returns the fixed ID of the leader
-func (p FixedLeaderPacemaker) getLeader(vHeight int) hotstuff.ReplicaID {
-	return p.Leader
+// NewFixedLeader returns a new fixed leader pacemaker
+func NewFixedLeader(hs *hotstuff.HotStuff, leaderID hotstuff.ReplicaID) *FixedLeader {
+	return &FixedLeader{
+		HotStuff: hs,
+		leader:   leaderID,
+	}
 }
 
 // Run runs the pacemaker which will beat when the previous QC is completed
-func (p FixedLeaderPacemaker) Run(ctx context.Context) {
+func (p FixedLeader) Run(ctx context.Context) {
 	notify := p.GetNotifier()
-	if p.GetID() == p.Leader {
+	if p.GetID() == p.leader {
 		go p.Propose()
 	}
 	var n hotstuff.Notification
@@ -51,40 +54,53 @@ func (p FixedLeaderPacemaker) Run(ctx context.Context) {
 		}
 		switch n.Event {
 		case hotstuff.QCFinish:
-			if p.GetID() == p.Leader {
+			if p.GetID() == p.leader {
 				go p.Propose()
 			}
 		}
 	}
 }
 
-// RoundRobinPacemaker change leader in a RR fashion. The amount of commands to be executed before it changes leader can be customized.
-type RoundRobinPacemaker struct {
+// RoundRobin change leader in a RR fashion. The amount of commands to be executed before it changes leader can be customized.
+type RoundRobin struct {
 	*hotstuff.HotStuff
 
-	TermLength int
-	Schedule   []hotstuff.ReplicaID
+	termLength int
+	schedule   []hotstuff.ReplicaID
+	timeout    time.Duration
 
-	NewViewTimeout time.Duration
+	resetTimer  chan struct{} // sending on this channel will reset the timer
+	stopTimeout func()        // stops the new-view interrupts
+}
 
-	cancelTimeout func() // resets the current new-view interrupt
-	stopTimeout   func() // stops the new-view interrupts
+// NewRoundRobin returns a new round robin pacemaker
+func NewRoundRobin(hs *hotstuff.HotStuff, termLength int, schedule []hotstuff.ReplicaID, timeout time.Duration) *RoundRobin {
+	return &RoundRobin{
+		HotStuff:   hs,
+		termLength: termLength,
+		schedule:   schedule,
+		timeout:    timeout,
+		resetTimer: make(chan struct{}),
+	}
 }
 
 // getLeader returns the fixed ID of the leader for the view height vHeight
-func (p *RoundRobinPacemaker) getLeader(vHeight int) hotstuff.ReplicaID {
-	term := int(math.Ceil(float64(vHeight)/float64(p.TermLength)) - 1)
-	return p.Schedule[term%len(p.Schedule)]
+func (p *RoundRobin) getLeader(vHeight int) hotstuff.ReplicaID {
+	term := int(math.Ceil(float64(vHeight)/float64(p.termLength)) - 1)
+	return p.schedule[term%len(p.schedule)]
 }
 
 // Run runs the pacemaker which will beat when the previous QC is completed
-func (p *RoundRobinPacemaker) Run(ctx context.Context) {
+func (p *RoundRobin) Run(ctx context.Context) {
 	notify := p.GetNotifier()
 
-	// initial beat for view 1
-	if p.GetID() == p.getLeader(1) {
+	// initial beat
+	if p.getLeader(1) == p.GetID() {
 		go p.Propose()
 	}
+
+	// get initial notification
+	n := <-notify
 
 	// make sure that we only beat once per view, and don't beat if bLeaf.Height < vHeight
 	// as that would cause a panic
@@ -97,22 +113,17 @@ func (p *RoundRobinPacemaker) Run(ctx context.Context) {
 		}
 	}
 
-	// get the first notification, thus making sure that leader of view 1 has a chance to beat before timeouts happen
-	n := <-notify
-
 	// set up new-view interrupt
 	stopContext, cancel := context.WithCancel(context.Background())
 	p.stopTimeout = cancel
-	cancelContext, cancel := context.WithCancel(context.Background())
-	p.cancelTimeout = cancel
-	go p.startNewViewTimeout(stopContext, cancelContext)
+	go p.startNewViewTimeout(stopContext)
 	defer p.stopTimeout()
 
 	// handle events from hotstuff
 	for {
 		switch n.Event {
 		case hotstuff.ReceiveProposal:
-			p.cancelTimeout()
+			p.resetTimer <- struct{}{}
 		case hotstuff.QCFinish:
 			if p.GetID() != p.getLeader(p.GetHeight()+1) {
 				// was leader for previous view, but not the leader for next view
@@ -138,22 +149,17 @@ func (p *RoundRobinPacemaker) Run(ctx context.Context) {
 
 // startNewViewTimeout sends a NewView to the leader if triggered by a timer interrupt. Two contexts are used to control
 // this function; the stopContext is used to stop the function, and the cancelContext is used to cancel a single timer.
-func (p *RoundRobinPacemaker) startNewViewTimeout(stopContext, cancelContext context.Context) {
+func (p *RoundRobin) startNewViewTimeout(stopContext context.Context) {
 	for {
 		select {
+		case <-p.resetTimer:
 		case <-stopContext.Done():
-			p.cancelTimeout()
 			return
-		case <-time.After(p.NewViewTimeout):
+		case <-time.After(p.timeout):
 			// add a dummy node to the tree representing this round which failed
 			logger.Println("NewViewTimeout triggered")
 			p.SetLeafNode(hotstuff.CreateLeaf(p.GetLeafNode(), nil, nil, p.GetHeight()+1))
 			p.SendNewView(p.getLeader(p.GetHeight() + 1))
-		case <-cancelContext.Done():
 		}
-
-		var cancel func()
-		cancelContext, cancel = context.WithCancel(context.Background())
-		p.cancelTimeout = cancel
 	}
 }
