@@ -2,29 +2,30 @@ package hotstuff
 
 import (
 	"container/list"
-	"hash"
-	"hash/fnv"
 	"sync"
 )
+
+type cmdElement struct {
+	cmd      Command
+	proposed bool
+}
 
 // cmdSet is a linkedhashset for Commands
 type cmdSet struct {
 	mut   sync.Mutex
 	set   map[Command]*list.Element
 	order list.List
-	hash  hash.Hash32
 }
 
 func newCmdSet() *cmdSet {
 	c := &cmdSet{
-		set:  make(map[Command]*list.Element),
-		hash: fnv.New32a(),
+		set: make(map[Command]*list.Element),
 	}
 	c.order.Init()
 	return c
 }
 
-// Add adds cmds to the set
+// Add adds cmds to the set. Duplicate entries are ignored
 func (s *cmdSet) Add(cmds ...Command) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
@@ -34,7 +35,7 @@ func (s *cmdSet) Add(cmds ...Command) {
 		if _, ok := s.set[cmd]; ok {
 			continue
 		}
-		e := s.order.PushBack(cmd)
+		e := s.order.PushBack(&cmdElement{cmd: cmd})
 		s.set[cmd] = e
 	}
 }
@@ -53,21 +54,88 @@ func (s *cmdSet) Remove(cmds ...Command) {
 	}
 }
 
-// GetFirst returns the n first entries in the set
+// GetFirst returns the n first non-proposed commands in the set
 func (s *cmdSet) GetFirst(n int) []Command {
 	s.mut.Lock()
 	defer s.mut.Unlock()
 
+	if len(s.set) == 0 {
+		return nil
+	}
+
 	cmds := make([]Command, 0, n)
-	for i := 0; i < n; i++ {
-		e := s.order.Front()
+	i := 0
+	e := s.order.Front()
+	for i < n {
 		if e == nil {
 			break
 		}
-		s.order.Remove(e)
-		cmd := e.Value.(Command)
-		delete(s.set, cmd)
-		cmds = append(cmds, cmd)
+		if c := e.Value.(*cmdElement); !c.proposed {
+			cmds = append(cmds, c.cmd)
+			i++
+		}
+		e = e.Next()
 	}
 	return cmds
+}
+
+// Contains returns true if the set contains cmd, false otherwise
+func (s *cmdSet) Contains(cmd Command) bool {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+	_, ok := s.set[cmd]
+	return ok
+}
+
+// Len returns the length of the set
+func (s *cmdSet) Len() int {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+	return len(s.set)
+}
+
+// TrimToLen will try to remove proposed elements from the set until its length is equal to or less than 'length'
+func (s *cmdSet) TrimToLen(length int) {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+
+	e := s.order.Front()
+	for length < len(s.set) {
+		if e == nil {
+			break
+		}
+		c := e.Value.(*cmdElement)
+		if c.proposed {
+			s.order.Remove(e)
+			delete(s.set, c.cmd)
+		}
+		e = e.Next()
+	}
+}
+
+// IsProposed will return true if the given command is marked as proposed
+func (s *cmdSet) IsProposed(cmd Command) bool {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+	if e, ok := s.set[cmd]; ok {
+		return e.Value.(*cmdElement).proposed
+	}
+	return false
+}
+
+// MarkProposed will mark the given commands as proposed and move them to the back of the queue
+func (s *cmdSet) MarkProposed(cmds ...Command) {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+	for _, cmd := range cmds {
+		if e, ok := s.set[cmd]; ok {
+			e.Value.(*cmdElement).proposed = true
+			// Move to back so that it's not immediately deleted by a call to TrimToLen()
+			s.order.MoveToBack(e)
+		} else {
+			// We don't have the command locally yet, so let's store it
+			e := s.order.PushBack(&cmdElement{cmd: cmd, proposed: true})
+			s.set[cmd] = e
+		}
+	}
 }

@@ -98,7 +98,8 @@ type HotStuff struct {
 	// Notifications will be sent to pacemaker on this channel
 	pmNotifyChan chan Notification
 
-	pendingCmds *cmdSet
+	// Contains the commands that are waiting to be proposed
+	cmdCache *cmdSet
 
 	Exec func([]Command)
 }
@@ -163,7 +164,7 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, backend
 		waitDuration:  waitDuration,
 		waitProposal:  waitutil.NewWaitUtil(),
 		pmNotifyChan:  make(chan Notification, 10),
-		pendingCmds:   newCmdSet(),
+		cmdCache:      newCmdSet(),
 		Exec:          exec,
 	}
 
@@ -173,7 +174,7 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, backend
 
 // AddCommand queues a command for proposal
 func (hs *HotStuff) AddCommand(cmd Command) {
-	hs.pendingCmds.Add(cmd)
+	hs.cmdCache.Add(cmd)
 }
 
 // GetNotifier returns a channel where the pacemaker can listen for notifications
@@ -236,20 +237,20 @@ func (hs *HotStuff) OnReceiveProposal(node *Node) (*PartialCert, error) {
 	hs.nodes.Put(node)
 
 	// wake anyone waiting for a proposal
-	hs.waitProposal.WakeAll()
+	defer hs.waitProposal.WakeAll()
 
-	defer hs.update(node)
+	if hs.safeNode(node) {
+		defer hs.update(node)
 
-	hs.mut.Lock()
-	defer hs.mut.Unlock()
+		hs.mut.Lock()
+		defer hs.mut.Unlock()
 
-	if node.Height > hs.vHeight && hs.safeNode(node) {
 		logger.Println("OnReceiveProposal: Accepted node")
 		hs.vHeight = node.Height
 		pc, err := CreatePartialCert(hs.id, hs.privKey, node)
 		if err == nil {
 			// remove all commands associated with this node from the pending commands
-			hs.pendingCmds.Remove(node.Commands...)
+			hs.cmdCache.MarkProposed(node.Commands...)
 		}
 		hs.pmNotify(Notification{ReceiveProposal, node, hs.qcHigh})
 		return pc, err
@@ -267,8 +268,15 @@ func (hs *HotStuff) OnReceiveNewView(qc *QuorumCert) {
 }
 
 func (hs *HotStuff) safeNode(node *Node) bool {
-	// safeNode is only called from onReceiveProposal, and is covered by its mutex lock.
 	qcNode, nExists := hs.expectNodeFor(node.Justify)
+
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
+
+	if node.Height <= hs.vHeight {
+		return false
+	}
+
 	accept := false
 	if nExists && qcNode.Height > hs.bLock.Height {
 		accept = true
@@ -330,7 +338,9 @@ func (hs *HotStuff) update(node *Node) {
 		hs.bExec = node3 // DECIDE on node3
 	}
 
+	// Free up space by deleting old data
 	go hs.nodes.GarbageCollectNodes(hs.GetVotedHeight())
+	go hs.cmdCache.TrimToLen(hs.BatchSize * 5)
 }
 
 func (hs *HotStuff) commit(node *Node) {
@@ -347,7 +357,7 @@ func (hs *HotStuff) commit(node *Node) {
 
 // Propose will fetch a command from the Commands channel and proposes it to the other replicas
 func (hs *HotStuff) Propose() {
-	cmds := hs.pendingCmds.GetFirst(hs.BatchSize)
+	cmds := hs.cmdCache.GetFirst(hs.BatchSize)
 
 	logger.Printf("Propose (%d commands)\n", len(cmds))
 	hs.mut.Lock()
