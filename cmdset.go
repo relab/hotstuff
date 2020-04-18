@@ -104,12 +104,13 @@ func (s *cmdSet) TrimToLen(length int) {
 		if e == nil {
 			break
 		}
+		n := e.Next()
 		c := e.Value.(*cmdElement)
 		if c.proposed {
 			s.order.Remove(e)
 			delete(s.set, c.cmd)
 		}
-		e = e.Next()
+		e = n
 	}
 }
 
