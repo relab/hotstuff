@@ -12,6 +12,8 @@ import (
 	"math/big"
 	"os"
 	"os/signal"
+	"runtime"
+	"runtime/pprof"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -55,6 +57,8 @@ func main() {
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
 	help := pflag.BoolP("help", "h", false, "Prints this text.")
+	cpuprofile := pflag.String("cpuprofile", "", "File to write CPU profile to")
+	memprofile := pflag.String("memprofile", "", "File to write memory profile to")
 	pflag.Int("request-rate", 10, "The request rate in Kops/sec")
 	pflag.Int("payload-size", 0, "The size of the payload in bytes")
 	pflag.Uint64("max-inflight", 10000, "The maximum number of messages that the client can wait for at once")
@@ -66,6 +70,18 @@ func main() {
 	if *help {
 		pflag.Usage()
 		os.Exit(0)
+	}
+
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal("Could not create CPU profile: ", err)
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal("Could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
 	}
 
 	viper.BindPFlags(pflag.CommandLine)
@@ -127,6 +143,18 @@ func main() {
 		os.Exit(1)
 	}
 	client.Close()
+
+	if *memprofile != "" {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			log.Fatal("could not create memory profile: ", err)
+		}
+		defer f.Close() // error handling omitted for example
+		runtime.GC()    // get up-to-date statistics
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			log.Fatal("could not write memory profile: ", err)
+		}
+	}
 }
 
 type qspec struct {
@@ -219,6 +247,7 @@ func (c *hotstuffClient) Close() {
 func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 	sleeptime := time.Second / time.Duration(c.conf.RequestRate*1000)
 	for {
+		start := time.Now().UnixNano()
 		if atomic.LoadUint64(&c.inflight) < c.conf.MaxInflight {
 			atomic.AddUint64(&c.inflight, 1)
 			data := make([]byte, c.conf.PayloadSize)
@@ -253,8 +282,9 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 			}(cmd, promise)
 		}
 
+		timeSpent := time.Duration(time.Now().UnixNano() - start)
 		select {
-		case <-time.After(sleeptime):
+		case <-time.After(sleeptime - timeSpent):
 		case <-ctx.Done():
 			return nil
 		}
