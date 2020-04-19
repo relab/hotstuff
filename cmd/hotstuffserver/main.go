@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -189,9 +190,7 @@ type hotstuffServer struct {
 	requestIDs   map[hotstuff.Command]uint64
 	finishedCmds chan hotstuff.Command
 
-	measureMut      sync.Mutex
-	lastMeasureTime time.Time
-	numCommands     int
+	lastExecTime int64
 }
 
 func newHotStuffServer(key *ecdsa.PrivateKey, conf *config, replicaConfig *hotstuff.ReplicaConfig) *hotstuffServer {
@@ -205,6 +204,7 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *config, replicaConfig *hotst
 		grpcSrv:      grpc.NewServer(),
 		requestIDs:   make(map[hotstuff.Command]uint64),
 		finishedCmds: make(chan hotstuff.Command, conf.BatchSize*2),
+		lastExecTime: time.Now().UnixNano(),
 	}
 	srv.backend = gorumshotstuff.New(time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
 	srv.hs = hotstuff.New(conf.SelfID, key, replicaConfig, srv.backend, waitDuration, srv.onExec)
@@ -307,16 +307,10 @@ func (srv *hotstuffServer) NodeStream(stream strictordering.GorumsStrictOrdering
 }
 
 func (srv *hotstuffServer) onExec(cmds []hotstuff.Command) {
-	if srv.conf.PrintThroughput {
-		now := time.Now()
-		srv.measureMut.Lock()
-		srv.numCommands += len(cmds)
-		if diff := now.Sub(srv.lastMeasureTime); diff > time.Duration(srv.conf.Interval)*time.Millisecond {
-			fmt.Printf("%d, %d\n", diff, srv.numCommands)
-			srv.numCommands = 0
-			srv.lastMeasureTime = now
-		}
-		srv.measureMut.Unlock()
+	if len(cmds) > 0 && srv.conf.PrintThroughput {
+		now := time.Now().UnixNano()
+		prev := atomic.SwapInt64(&srv.lastExecTime, now)
+		fmt.Printf("%d, %d\n", now-prev, len(cmds))
 	}
 
 	for _, cmd := range cmds {
