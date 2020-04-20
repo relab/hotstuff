@@ -12,6 +12,7 @@ require (
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20200317113312-5766fd39f98d // indirect
 	golang.org/x/text v0.3.2 // indirect
+	gonum.org/v1/plot v0.7.0
 	google.golang.org/genproto v0.0.0-20200330113809-af700f360a68 // indirect
 	google.golang.org/grpc v1.28.0
 	google.golang.org/protobuf v1.20.1

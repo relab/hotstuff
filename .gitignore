@@ -18,12 +18,11 @@
 __debug_bin
 
 # binaries
-cmd/hotstuff/hotstuff
 cmd/hotstuffkeygen/hotstuffkeygen
 cmd/splitfile/splitfile
-cmd/hotstuffbench/hotstuffbench
 cmd/hotstuffclient/hotstuffclient
 cmd/hotstuffserver/hotstuffserver
+cmd/plot/plot
 
 # other
 keys/
@@ -33,3 +32,4 @@ cmd/hotstuffbench/keys/
 *.in
 gcp_token.json
 gcloud_test
+test.png
