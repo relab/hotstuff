@@ -1,0 +1,14 @@
+plugin: gcp_compute
+projects:
+  - hotstuff
+auth_kind: serviceaccount
+service_account_file: "gcp_token.json"
+groups:
+  clients: "'client' in name"
+  replicas: "'hotstuff' in name"
+hostnames:
+  - name
+compose:
+  # Set an inventory parameter to use the Public IP address to connect to the host
+  # For Private ip use "networkInterfaces[0].networkIP"
+  ansible_host: networkInterfaces[0].accessConfigs[0].natIP

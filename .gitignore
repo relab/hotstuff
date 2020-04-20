@@ -31,3 +31,5 @@ cmd/hotstuff/rr/
 cmd/hotstuff/keys/
 cmd/hotstuffbench/keys/
 *.in
+gcp_token.json
+gcloud_test

@@ -1,0 +1,14 @@
+---
+- hosts: clients
+  gather_facts: no
+  tasks:
+    - name: Kill clients
+      shell: killall -s INT hotstuffclient
+      ignore_errors: yes
+
+- hosts: replicas
+  gather_facts: no
+  tasks:
+    - name: Kill servers
+      shell: killall -s INT hotstuffserver
+      ignore_errors: yes
