@@ -1,24 +1,25 @@
 #!/usr/bin/env bash
 
 # default values
-prefix="hotstuff"
 pacemaker="fixed"
 ips=()
 peer_port="30000"
 client_port="40000"
-keypath="keys"
+keypath="."
+dest="."
 
 usage() {
-	echo "Usage: $0 [options]"
+	echo "Usage: $0 [options] [destination]"
 	echo
 	echo "Options:"
-	echo "	--prefix <prefix>               : Specify a prefix for the generated config files"
 	echo "	--pacemaker <fixed|round-robin> : Specify the type of pacemaker"
 	echo "	--ips <';' separated list>      : List of IP addresses to use"
 	echo "	--client-port <port>            : The port that clients should use to connect to servers"
 	echo "	--peer-port <port>              : The port that replicas should use to connect to each other"
 	echo "	--keypath <folder>              : Path to the keys relative to the working directory"
 	echo "	--keygen                        : If present, the keys will be generated in 'keypath'"
+	echo
+	echo "If no destination is given, the files are saved relative to the working directory."
 }
 
 write_replica() {
@@ -45,10 +46,6 @@ while [ $# -gt 0 ]; do
 		--help)
 			usage
 			exit
-			;;
-		--prefix)
-			prefix="$2"
-			shift 2
 			;;
 		--pacemaker)
 			if [ "$2" = "fixed" ] || [ "$2" = "round-robin" ]; then
@@ -79,25 +76,47 @@ while [ $# -gt 0 ]; do
 			keygen="1"
 			shift
 			;;
-		*)
+		--*)
 			"Unknown option '$1'."
 			exit 1
+			;;
+		*)
+			break 2
 			;;
 	esac
 done
 
+# check for destination
+if [ -n "$1" ]; then
+	dest="$1"
+	mkdir -p "$dest"
+fi
+
 # generate keys
 if [ -n "$keygen" ]; then
-	scripts/generate_keys.sh "$keypath" \*.key ${#ips[@]}
+	scripts/generate_keys.sh "$dest/$keypath" \*.key ${#ips[@]}
 fi
 
 # create main config file
-file="$prefix.toml"
+file="$dest/hotstuff.toml"
 :> "$file"
 
-echo -e -n "pacemaker = \"$pacemaker\"\n" > "$file"
+echo -e "pacemaker = \"$pacemaker\"" >> "$file"
+
+if [ "$pacemaker" = "fixed" ]; then
+	echo "leader-id = 1" >> "$file"
+elif [ "$pacemaker" = "round-robin" ]; then
+	echo "view-change = 100" >> "$file"
+	echo -n "leader-schedule = [" >> "$file"
+	for i in "${!ips[@]}"; do
+		echo -n "$((i+1))," >> "$file"
+	done
+	echo "]" >> "$file"
+fi
+
+echo >> "$file"
 
 for i in "${!ips[@]}"; do
-	write_replica "$file" "$i" "${ips[$i]}"
-	write_replica_config "${prefix}_${i}.toml" "$i"
+	write_replica "$file" "$((i+1))" "${ips[$i]}"
+	write_replica_config "$dest/hotstuff_$((i+1)).toml" "$((i+1))"
 done

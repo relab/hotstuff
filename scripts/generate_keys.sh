@@ -32,5 +32,5 @@ mkdir -p "$1" || exit_error "Failed to create target directory."
 i=1
 while [ "$i" -le "$3" ]; do
 	"$keygen_bin" "$1/${2/'*'/$i}" || exit_error "Failed to create all keys." 
-	i=$(($i + 1))
+	i=$((i + 1))
 done
