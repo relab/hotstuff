@@ -8,6 +8,7 @@ import (
 	"path"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"gonum.org/v1/plot"
@@ -27,6 +28,7 @@ type measurement struct {
 
 type benchmark struct {
 	measurements []measurement
+	name         string
 	batchSize    int
 	payloadSize  int
 }
@@ -42,26 +44,27 @@ func (b *benchmark) XY(i int) (x, y float64) {
 
 func main() {
 	if len(os.Args) < 3 {
-		fmt.Fprintf(os.Stderr, "Usage: %s [path to benchmark files] [output file]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s [paths to benchmark files] [output file]\n", os.Args[0])
 		os.Exit(1)
 	}
 
 	var plots []interface{}
 
-	benchFolder := os.Args[1]
-	dir, err := ioutil.ReadDir(benchFolder)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to open benchmark directory: %v\n", err)
-		os.Exit(1)
-	}
-	for _, f := range dir {
-		if f.IsDir() {
-			b, err := processBenchmark(path.Join(benchFolder, f.Name()))
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to read benchmark: %v\n", err)
-				os.Exit(1)
+	for _, benchFolder := range os.Args[1 : len(os.Args)-1] {
+		dir, err := ioutil.ReadDir(benchFolder)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to open benchmark directory: %v\n", err)
+			os.Exit(1)
+		}
+		for _, f := range dir {
+			if f.IsDir() {
+				b, err := processBenchmark(path.Join(benchFolder, f.Name()))
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Failed to read benchmark: %v\n", err)
+					os.Exit(1)
+				}
+				plots = append(plots, fmt.Sprintf("%s-b%d-p%d", b.name, b.batchSize, b.payloadSize), b)
 			}
-			plots = append(plots, fmt.Sprintf("hs-b%d-p%d", b.batchSize, b.payloadSize), b)
 		}
 	}
 
@@ -82,7 +85,7 @@ func main() {
 	p.X.Label.Text = "Throughput Kops/sec"
 	p.Y.Label.Text = "Latency ms"
 
-	if err := p.Save(4*vg.Inch, 4*vg.Inch, os.Args[2]); err != nil {
+	if err := p.Save(4*vg.Inch, 4*vg.Inch, os.Args[len(os.Args)-1]); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to save plot: %v\n", err)
 		os.Exit(1)
 	}
@@ -95,10 +98,15 @@ func processBenchmark(dirPath string) (*benchmark, error) {
 		return nil, err
 	}
 	b := &benchmark{}
+	if strings.HasPrefix(path.Base(dirPath), "lhs-") {
+		b.name = "libhotstuff"
+	} else {
+		b.name = "relab/hotstuff"
+	}
 	fmt.Sscanf(path.Base(dirPath), "b%d-p%d", &b.batchSize, &b.payloadSize)
 	for _, f := range dir {
 		if f.IsDir() {
-			if err := processRun(path.Join(dirPath, f.Name()), measurements); err != nil {
+			if err := processRun(path.Join(dirPath, f.Name()), measurements, b.name); err != nil {
 				return nil, err
 			}
 		}
@@ -124,14 +132,24 @@ func processBenchmark(dirPath string) (*benchmark, error) {
 	return b, nil
 }
 
-func processRun(dirPath string, measurements map[string][]measurement) error {
+func processRun(dirPath string, measurements map[string][]measurement, benchType string) error {
 	dir, err := ioutil.ReadDir(dirPath)
 	if err != nil {
 		return err
 	}
 	for _, f := range dir {
 		if f.IsDir() {
-			m, err := processMeasurement(path.Join(dirPath, f.Name()))
+			var (
+				m   measurement
+				err error
+			)
+
+			if benchType == "libhotstuff" {
+				m, err = readInLibHotStuffMeasurement(path.Join(dirPath, f.Name(), "client-1.out"))
+			} else {
+				m, err = processMeasurement(path.Join(dirPath, f.Name()))
+			}
+
 			if err != nil {
 				return err
 			}
@@ -198,8 +216,7 @@ func readInLatencies(file string, latencies *[]float64) error {
 		var m float64
 		n, err := fmt.Sscanf(l, "%f", &m)
 		if n != 1 {
-			fmt.Fprintf(os.Stderr, "Failed to read latency measurement: %v\n", err)
-			continue
+			return fmt.Errorf("Failed to read latency measurement: %w", err)
 		}
 		*latencies = append(*latencies, float64(m))
 	}
@@ -217,12 +234,53 @@ func readInThroughput(file string, throughput *[]rawThroughput) error {
 		var d, t float64
 		n, err := fmt.Sscanf(l, "%f,%f", &d, &t)
 		if n != 2 {
-			fmt.Fprintf(os.Stderr, "Failed to read throughput measurement: %v\n", err)
-			continue
+			return fmt.Errorf("Failed to read throughput measurement: %w", err)
 		}
 		if t > 0 {
 			*throughput = append(*throughput, rawThroughput{deltaTime: d, numCommands: t})
 		}
 	}
 	return nil
+}
+
+func readInLibHotStuffMeasurement(file string) (measurement, error) {
+	re := regexp.MustCompile(`^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{6}) \[hotstuff info\] (\d+?.\d+?)$`)
+	numCommands := 0
+	var totalLatency time.Duration
+	var totalTime time.Duration
+	var prevTime *time.Time
+
+	f, err := os.Open(file)
+	if err != nil {
+		return measurement{}, fmt.Errorf("Failed to read libhotstuff measurement: %w", err)
+	}
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		l := scanner.Text()
+		matches := re.FindStringSubmatch(l)
+		if len(matches) < 3 {
+			continue
+		}
+		t, err := time.Parse("2006-01-02 15:04:05.999999", matches[1])
+		if err != nil {
+			return measurement{}, fmt.Errorf("Failed to read libhotstuff measurement: %w", err)
+		}
+		lat := matches[2]
+		d, err := time.ParseDuration(fmt.Sprintf("%ss", lat))
+		if err != nil {
+			return measurement{}, fmt.Errorf("Failed to read libhotstuff measurement: %w", err)
+		}
+		numCommands++
+		totalLatency += d
+		if prevTime != nil {
+			totalTime += t.Sub(*prevTime)
+		}
+		prevTime = &t
+	}
+
+	return measurement{
+		latency:    (float64(totalLatency) / float64(numCommands)) / float64(time.Millisecond),
+		throughput: (float64(numCommands) / 1000) / totalTime.Seconds(),
+	}, nil
 }
