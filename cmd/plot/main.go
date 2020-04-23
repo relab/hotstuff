@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"image/color"
 	"io/ioutil"
 	"math"
 	"os"
@@ -67,6 +68,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	grid := plotter.NewGrid()
+	grid.Horizontal.Color = color.Gray{Y: 200}
+	grid.Horizontal.Dashes = plotutil.Dashes(2)
+	grid.Vertical.Color = color.Gray{Y: 200}
+	grid.Vertical.Dashes = plotutil.Dashes(2)
+	p.Add(grid)
+
 	var plots []interface{}
 	benchmarks := make(chan *benchmark, 1)
 	errors := make(chan error, 1)
@@ -129,7 +137,6 @@ func main() {
 	p.X.Tick.Marker = hplot.Ticks{N: 8}
 	p.Y.Label.Text = "Latency ms"
 	p.Y.Tick.Marker = hplot.Ticks{N: 5}
-	p.Add(plotter.NewGrid())
 
 	if err := p.Save(4*vg.Inch, 4*vg.Inch, os.Args[len(os.Args)-1]); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to save plot: %v\n", err)
