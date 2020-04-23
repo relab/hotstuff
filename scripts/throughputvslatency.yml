@@ -5,13 +5,16 @@
     rate: 10
     time: 60
     payload: 0
+    client_id: "{{ inventory_hostname | regex_replace('[^0-9]', '') }}"
   tasks:
     - name: Start clients
       shell: >
         ./hotstuffclient
+        --self-id {{ client_id }}
         --exit-after {{ time }}
         --request-rate {{ rate }}
         --payload-size {{ payload }}
+        --max-inflight 3200
         --print-latencies
         > "$HOME/{{ inventory_hostname }}.out"
         2> "$HOME/{{ inventory_hostname }}.stderr.out"

@@ -2,14 +2,11 @@ package main
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"crypto/rand"
-	"crypto/sha256"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
-	"math/big"
 	"os"
 	"os/signal"
 	"runtime"
@@ -19,7 +16,6 @@ import (
 	"syscall"
 	"time"
 
-	protobuf "github.com/golang/protobuf/proto"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/clientapi"
 	"github.com/spf13/pflag"
@@ -28,12 +24,13 @@ import (
 )
 
 type config struct {
-	RequestRate    int    `mapstructure:"request-rate"`
-	PayloadSize    int    `mapstructure:"payload-size"`
-	MaxInflight    uint64 `mapstructure:"max-inflight"`
-	DataSource     string `mapstructure:"input"`
-	PrintLatencies bool   `mapstructure:"print-latencies"`
-	ExitAfter      int    `mapstructure:"exit-after"`
+	SelfID         hotstuff.ReplicaID `mapstructure:"self-id"`
+	RequestRate    int                `mapstructure:"request-rate"`
+	PayloadSize    int                `mapstructure:"payload-size"`
+	MaxInflight    uint64             `mapstructure:"max-inflight"`
+	DataSource     string             `mapstructure:"input"`
+	PrintLatencies bool               `mapstructure:"print-latencies"`
+	ExitAfter      int                `mapstructure:"exit-after"`
 	Replicas       []struct {
 		ID         hotstuff.ReplicaID
 		ClientAddr string `mapstructure:"client-address"`
@@ -59,6 +56,7 @@ func main() {
 	help := pflag.BoolP("help", "h", false, "Prints this text.")
 	cpuprofile := pflag.String("cpuprofile", "", "File to write CPU profile to")
 	memprofile := pflag.String("memprofile", "", "File to write memory profile to")
+	pflag.Uint32("self-id", 0, "The id for this replica.")
 	pflag.Int("request-rate", 10, "The request rate in Kops/sec")
 	pflag.Int("payload-size", 0, "The size of the payload in bytes")
 	pflag.Uint64("max-inflight", 10000, "The maximum number of messages that the client can wait for at once")
@@ -162,27 +160,8 @@ type qspec struct {
 	faulty int
 }
 
-func (q *qspec) ExecCommandQF(cmd *clientapi.Command, signatures []*clientapi.Signature) (*clientapi.Empty, bool) {
+func (q *qspec) ExecCommandQF(cmd *clientapi.Command, signatures []*clientapi.Empty) (*clientapi.Empty, bool) {
 	if len(signatures) < q.faulty+1 {
-		return nil, false
-	}
-	b, err := protobuf.Marshal(cmd)
-	if err != nil {
-		return nil, false
-	}
-	hash := sha256.Sum256(b)
-	verified := 0
-	for _, signature := range signatures {
-		r := new(big.Int)
-		r.SetBytes(signature.R)
-		s := new(big.Int)
-		s.SetBytes(signature.S)
-		pkey := q.conf.Replicas[hotstuff.ReplicaID(signature.ReplicaID)].PubKey
-		if ecdsa.Verify(pkey, hash[:], r, s) {
-			verified++
-		}
-	}
-	if verified < q.faulty+1 {
 		return nil, false
 	}
 	return &clientapi.Empty{}, true
@@ -245,6 +224,7 @@ func (c *hotstuffClient) Close() {
 }
 
 func (c *hotstuffClient) SendCommands(ctx context.Context) error {
+	var num uint64
 	sleeptime := time.Second / time.Duration(c.conf.RequestRate*1000)
 	for {
 		start := time.Now().UnixNano()
@@ -256,15 +236,18 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 				return err
 			}
 			cmd := &clientapi.Command{
-				Timestamp: time.Now().UnixNano(),
-				Data:      data[:n],
+				ClientID:       uint32(c.conf.SelfID),
+				SequenceNumber: num,
+				Data:           data[:n],
 			}
+			now := time.Now().UnixNano()
 			promise, err := c.gorumsConfig.ExecCommand(ctx, cmd)
 			if err != nil {
 				continue
 			}
+			num++
 
-			go func(cmd *clientapi.Command, promise *clientapi.FutureEmpty) {
+			go func(promise *clientapi.FutureEmpty, then int64) {
 				c.wg.Add(1)
 				_, err := promise.Get()
 				atomic.AddUint64(&c.inflight, ^uint64(0))
@@ -276,10 +259,10 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 				}
 				now := time.Now().UnixNano()
 				if c.conf.PrintLatencies {
-					fmt.Println(now - cmd.GetTimestamp())
+					fmt.Println(now - then)
 				}
 				c.wg.Done()
-			}(cmd, promise)
+			}(promise, now)
 		}
 
 		timeSpent := time.Duration(time.Now().UnixNano() - start)

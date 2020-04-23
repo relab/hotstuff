@@ -1004,14 +1004,14 @@ type QuorumSpec interface {
 
 	// ExecCommandQF is the quorum function for the ExecCommand
 	// asynchronous ordered quorum call method.
-	ExecCommandQF(in *Command, replies []*Signature) (*Empty, bool)
+	ExecCommandQF(in *Command, replies []*Empty) (*Empty, bool)
 }
 
 const hasStrictOrderingMethods = true
 
-type internalSignature struct {
+type internalEmpty struct {
 	nid   uint32
-	reply *Signature
+	reply *Empty
 	err   error
 }
 
@@ -1087,7 +1087,7 @@ func (c *Configuration) execCommandRecv(ctx context.Context, in *Command, msgID 
 	defer c.mgr.deleteChan(msgID)
 
 	var (
-		replyValues = make([]*Signature, 0, c.n)
+		replyValues = make([]*Empty, 0, c.n)
 		reply       *Empty
 		errs        []GRPCError
 		quorum      bool
@@ -1102,7 +1102,7 @@ func (c *Configuration) execCommandRecv(ctx context.Context, in *Command, msgID 
 				break
 			}
 
-			data := new(Signature)
+			data := new(Empty)
 			err := ptypes.UnmarshalAny(r.reply, data)
 			if err != nil {
 				errs = append(errs, GRPCError{r.nid, fmt.Errorf("failed to unmarshal reply: %w", err)})
@@ -1126,7 +1126,7 @@ func (c *Configuration) execCommandRecv(ctx context.Context, in *Command, msgID 
 
 // ExecCommandHandler is the server API for the ExecCommand rpc.
 type ExecCommandHandler interface {
-	ExecCommand(*Command) *Signature
+	ExecCommand(*Command) *Empty
 }
 
 // RegisterExecCommandHandler sets the handler for ExecCommand.

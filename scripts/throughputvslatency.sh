@@ -6,14 +6,14 @@ set -e
 basedir="$1/throughputvslatency-$(date +%Y%m%d%H%M%S)"
 
 run_benchmark_series() {
-	for n in {1..2}; do
+	for n in {1..1}; do
 		rundir="$basedir/b$1-p$2/$n"
 		mkdir -p "$rundir"
-		for t in {5,10,25,40,60,80,100,120,150}; do
+		for t in {1,2,5,7,10,15,20,25,40}; do
 			testdir="$rundir/t$t"
 			mkdir -p "$testdir"
 			ansible-playbook -i scripts/hotstuff.gcp.yml scripts/throughputvslatency.yml \
-				-e "destdir='$testdir' rate='$t' batch_size='$1' payload='$2' time='20'"
+				-e "destdir='$testdir' rate='$t' batch_size='$1' payload='$2' time='10'"
 		done
 	done
 }

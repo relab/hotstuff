@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/rand"
-	"crypto/sha256"
 	"fmt"
 	"log"
 	"net"
@@ -187,8 +185,7 @@ type hotstuffServer struct {
 	backend hotstuff.Backend
 
 	mut          sync.Mutex
-	requestIDs   map[hotstuff.Command]uint64
-	finishedCmds chan hotstuff.Command
+	finishedCmds map[hotstuff.Command]chan struct{}
 
 	lastExecTime int64
 }
@@ -202,8 +199,7 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *config, replicaConfig *hotst
 		conf:         conf,
 		key:          key,
 		grpcSrv:      grpc.NewServer(),
-		requestIDs:   make(map[hotstuff.Command]uint64),
-		finishedCmds: make(chan hotstuff.Command, conf.BatchSize*2),
+		finishedCmds: make(map[hotstuff.Command]chan struct{}),
 		lastExecTime: time.Now().UnixNano(),
 	}
 	srv.backend = gorumshotstuff.New(time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
@@ -229,12 +225,13 @@ func (srv *hotstuffServer) Start(address string) error {
 	if err != nil {
 		return err
 	}
-	go srv.grpcSrv.Serve(lis)
 
 	err = srv.backend.Start()
 	if err != nil {
 		return err
 	}
+
+	go srv.grpcSrv.Serve(lis)
 
 	go srv.pm.Run(srv.ctx)
 
@@ -249,49 +246,6 @@ func (srv *hotstuffServer) Stop() {
 
 // Custom server code
 func (srv *hotstuffServer) NodeStream(stream strictordering.GorumsStrictOrdering_NodeStreamServer) error {
-	go func() {
-		for cmd := range srv.finishedCmds {
-			// compute hash
-			b := []byte(cmd)
-			hash := sha256.Sum256(b)
-			r, s, err := ecdsa.Sign(rand.Reader, srv.key, hash[:])
-			if err != nil {
-				continue
-			}
-
-			// create response and marshal into Any
-			sig := &clientapi.Signature{
-				ReplicaID: uint32(srv.hs.GetID()),
-				R:         r.Bytes(),
-				S:         s.Bytes(),
-			}
-			any, err := ptypes.MarshalAny(sig)
-			if err != nil {
-				continue
-			}
-
-			// get id
-			srv.mut.Lock()
-			id, ok := srv.requestIDs[cmd]
-			if !ok {
-				srv.mut.Unlock()
-				continue
-			}
-			delete(srv.requestIDs, cmd)
-			srv.mut.Unlock()
-
-			// send response
-			resp := &strictordering.GorumsMessage{
-				ID:   id,
-				Data: any,
-			}
-			err = stream.Send(resp)
-			if err != nil {
-				return
-			}
-		}
-	}()
-
 	for {
 		req, err := stream.Recv()
 		if err != nil {
@@ -300,9 +254,34 @@ func (srv *hotstuffServer) NodeStream(stream strictordering.GorumsStrictOrdering
 		// use the serialized data as cmd
 		cmd := hotstuff.Command(req.GetData().GetValue())
 		srv.mut.Lock()
-		srv.requestIDs[cmd] = req.GetID()
+		id := req.GetID()
+		finished := make(chan struct{}, 1)
+		srv.finishedCmds[cmd] = finished
 		srv.mut.Unlock()
 		srv.hs.AddCommand(cmd)
+
+		go func(id uint64, finished chan struct{}) {
+			<-finished
+
+			srv.mut.Lock()
+			delete(srv.finishedCmds, cmd)
+			srv.mut.Unlock()
+
+			// send response
+			any, err := ptypes.MarshalAny(&clientapi.Empty{})
+			if err != nil {
+				return
+			}
+			resp := &strictordering.GorumsMessage{
+				ID:   id,
+				Data: any,
+			}
+			err = stream.Send(resp)
+			if err != nil {
+				return
+			}
+
+		}(id, finished)
 	}
 }
 
@@ -322,6 +301,10 @@ func (srv *hotstuffServer) onExec(cmds []hotstuff.Command) {
 			}
 			fmt.Printf("%s", m.Data)
 		}
-		srv.finishedCmds <- cmd
+		srv.mut.Lock()
+		if c, ok := srv.finishedCmds[cmd]; ok {
+			c <- struct{}{}
+		}
+		srv.mut.Unlock()
 	}
 }
