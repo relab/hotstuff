@@ -8,7 +8,6 @@ import (
 	"math"
 	"os"
 	"path"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -209,9 +208,9 @@ func processRun(dirPath string, measurements map[int][]measurement, benchType st
 				)
 
 				if benchType == "libhotstuff" {
-					m, err = readInLibHotStuffMeasurement(dirPath)
+					m, err = readInMeasurement(dirPath, false)
 				} else {
-					m, err = processMeasurement(dirPath)
+					m, err = readInMeasurement(dirPath, true)
 				}
 
 				fmt.Sscanf(path.Base(dirPath), "t%d", &m.rate)
@@ -238,94 +237,13 @@ func processRun(dirPath string, measurements map[int][]measurement, benchType st
 	return nil
 }
 
-func processMeasurement(dirPath string) (measurement, error) {
-	dir, err := ioutil.ReadDir(dirPath)
-	if err != nil {
-		return measurement{}, err
+func readInMeasurement(dirPath string, nanoseconds bool) (measurement, error) {
+	var numberFormat string
+	if nanoseconds {
+		numberFormat = "%sns"
+	} else {
+		numberFormat = "%sus"
 	}
-	var latencies []float64
-	var throughput []rawThroughput
-	for _, f := range dir {
-		if f.IsDir() {
-			continue
-		}
-		latenciesReg := regexp.MustCompile(`client-\d+\.out`)
-		throughputReg := regexp.MustCompile(`hotstuff-\d+\.out`)
-		switch {
-		case latenciesReg.MatchString(f.Name()):
-			err := readInLatencies(path.Join(dirPath, f.Name()), &latencies)
-			if err != nil {
-				return measurement{}, err
-			}
-		case throughputReg.MatchString(f.Name()):
-			err := readInThroughput(path.Join(dirPath, f.Name()), &throughput)
-			if err != nil {
-				return measurement{}, err
-			}
-		}
-	}
-
-	latencySum := 0.0
-	for _, l := range latencies {
-		latencySum += l
-	}
-	latencyAvg := (latencySum / float64(len(latencies))) / float64(time.Millisecond)
-
-	totalTime, totalCommands := 0.0, 0.0
-	for _, t := range throughput {
-		totalTime += t.deltaTime
-		totalCommands += t.numCommands
-	}
-
-	throughputAvg := (totalCommands / 1000) / (totalTime / float64(time.Second))
-
-	if math.IsNaN(throughputAvg) || math.IsNaN(latencyAvg) {
-		return measurement{}, fmt.Errorf("NaN measurement in '%s'", dirPath)
-	}
-
-	return measurement{latency: latencyAvg, throughput: throughputAvg}, nil
-}
-
-func readInLatencies(file string, latencies *[]float64) error {
-	f, err := os.Open(file)
-	if err != nil {
-		return err
-	}
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		l := scanner.Text()
-		var m float64
-		n, err := fmt.Sscanf(l, "%f", &m)
-		if n != 1 {
-			return fmt.Errorf("Failed to read latency measurement: %w", err)
-		}
-		*latencies = append(*latencies, float64(m))
-	}
-	return nil
-}
-
-func readInThroughput(file string, throughput *[]rawThroughput) error {
-	f, err := os.Open(file)
-	if err != nil {
-		return err
-	}
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		l := scanner.Text()
-		var d, t float64
-		n, err := fmt.Sscanf(l, "%f,%f", &d, &t)
-		if n != 2 {
-			return fmt.Errorf("Failed to read throughput measurement: %w", err)
-		}
-		if t > 0 {
-			*throughput = append(*throughput, rawThroughput{deltaTime: d, numCommands: t})
-		}
-	}
-	return nil
-}
-
-func readInLibHotStuffMeasurement(dirPath string) (measurement, error) {
-	re := regexp.MustCompile(`^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{6}) \[hotstuff info\] (\d+?.\d+?)$`)
 
 	dir, err := ioutil.ReadDir(dirPath)
 	if err != nil {
@@ -335,7 +253,7 @@ func readInLibHotStuffMeasurement(dirPath string) (measurement, error) {
 	var measurements []measurement
 	for _, file := range dir {
 		if file.IsDir() {
-			m, err := readInLibHotStuffMeasurement(path.Join(dirPath, file.Name()))
+			m, err := readInMeasurement(path.Join(dirPath, file.Name()), nanoseconds)
 			if err != nil {
 				return measurement{}, err
 			}
@@ -349,31 +267,27 @@ func readInLibHotStuffMeasurement(dirPath string) (measurement, error) {
 		}
 
 		var totalLatency time.Duration
-		var prevTime *time.Time
 		var totalTime time.Duration
 		numCommands := 0
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
 			l := scanner.Text()
-			matches := re.FindStringSubmatch(l)
-			if len(matches) < 3 {
+			matches := strings.Split(l, " ")
+			if len(matches) < 2 {
 				continue
 			}
-			t, err := time.Parse("2006-01-02 15:04:05.999999", matches[1])
+
+			t, err := time.ParseDuration(fmt.Sprintf(numberFormat, matches[0]))
 			if err != nil {
 				return measurement{}, fmt.Errorf("Failed to read libhotstuff measurement: %w", err)
 			}
-			lat := matches[2]
-			d, err := time.ParseDuration(fmt.Sprintf("%ss", lat))
+			lat, err := time.ParseDuration(fmt.Sprintf(numberFormat, matches[1]))
 			if err != nil {
 				return measurement{}, fmt.Errorf("Failed to read libhotstuff measurement: %w", err)
 			}
 			numCommands++
-			totalLatency += d
-			if prevTime != nil {
-				totalTime += t.Sub(*prevTime)
-			}
-			prevTime = &t
+			totalLatency += lat
+			totalTime += t
 		}
 		latency := (float64(totalLatency) / float64(numCommands)) / float64(time.Millisecond)
 		throughput := (float64(numCommands) / 1000) / totalTime.Seconds()
