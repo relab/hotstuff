@@ -2,7 +2,7 @@
 - hosts: clients
   gather_facts: no
   vars:
-    rate: 10
+    rate: 10000
     time: 60
     payload: 0
     client_id: "{{ inventory_hostname | regex_replace('[^0-9]', '') }}"
@@ -15,7 +15,7 @@
         --request-rate {{ rate }}
         --payload-size {{ payload }}
         --max-inflight 3200
-        --print-latencies
+        --benchmark
         > "$HOME/{{ inventory_hostname }}.out"
         2> "$HOME/{{ inventory_hostname }}.stderr.out"
 
@@ -35,9 +35,6 @@
         --config "$HOME/self_config.toml"
         --batch-size {{ batch_size }}
         --view-change {{ view_change }}
-        --print-throughput
-        > "$HOME/{{ inventory_hostname }}.out"
-        2> "$HOME/{{ inventory_hostname }}.stderr.out"
 
       async: 1000
       poll: 0
@@ -58,11 +55,6 @@
     - name: Kill servers
       shell: killall -s INT hotstuffserver
       ignore_errors: yes
-    - name: Fetch throughput data
-      fetch:
-        src: "$HOME/{{ inventory_hostname }}.out"
-        dest: "{{ destdir }}/{{ inventory_hostname }}.out"
-        flat: yes
 
 - hosts: clients
   gather_facts: no

@@ -17,19 +17,19 @@ for n in {1..1}; do
 
 	batch=100
 	payload=0
-	for t in {1,2,3,5,7,10,11}; do
+	for t in {1000,2000,3000,5000,7000,10000,11000}; do
 		run_benchmark "$basedir/b$batch-p$payload/$n/t$t" "$t" "$batch" "$payload" 10
 	done
 
 	batch=400
 	payload=0
-	for t in {17,20,21,23,26,28}; do
+	for t in {17000,20000,21000,23000,26000,28000}; do
 		run_benchmark "$basedir/b$batch-p$payload/$n/t$t" "$t" "$batch" "$payload" 10
 	done
 
 	batch=800
 	payload=0
-	for t in {23,25,27,30,32,35}; do
+	for t in {23000,25000,27000,30000,32000,35000}; do
 		run_benchmark "$basedir/b$batch-p$payload/$n/t$t" "$t" "$batch" "$payload" 10
 	done
 
