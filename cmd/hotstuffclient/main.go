@@ -24,14 +24,14 @@ import (
 )
 
 type config struct {
-	SelfID         hotstuff.ReplicaID `mapstructure:"self-id"`
-	RequestRate    int                `mapstructure:"request-rate"`
-	PayloadSize    int                `mapstructure:"payload-size"`
-	MaxInflight    uint64             `mapstructure:"max-inflight"`
-	DataSource     string             `mapstructure:"input"`
-	PrintLatencies bool               `mapstructure:"print-latencies"`
-	ExitAfter      int                `mapstructure:"exit-after"`
-	Replicas       []struct {
+	SelfID      hotstuff.ReplicaID `mapstructure:"self-id"`
+	RequestRate int                `mapstructure:"request-rate"`
+	PayloadSize int                `mapstructure:"payload-size"`
+	MaxInflight uint64             `mapstructure:"max-inflight"`
+	DataSource  string             `mapstructure:"input"`
+	Benchmark   bool               `mapstructure:"benchmark"`
+	ExitAfter   int                `mapstructure:"exit-after"`
+	Replicas    []struct {
 		ID         hotstuff.ReplicaID
 		ClientAddr string `mapstructure:"client-address"`
 		Pubkey     string
@@ -61,7 +61,7 @@ func main() {
 	pflag.Int("payload-size", 0, "The size of the payload in bytes")
 	pflag.Uint64("max-inflight", 10000, "The maximum number of messages that the client can wait for at once")
 	pflag.String("input", "", "Optional file to use for payload data")
-	pflag.Bool("print-latencies", false, "If enabled, the latency of each request will be printed to stdout")
+	pflag.Bool("benchmark", false, "If enabled, the latency of each request will be printed to stdout")
 	pflag.Int("exit-after", 0, "Number of seconds after which the program should exit.")
 	pflag.Parse()
 
@@ -225,7 +225,8 @@ func (c *hotstuffClient) Close() {
 
 func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 	var num uint64
-	sleeptime := time.Second / time.Duration(c.conf.RequestRate*1000)
+	prevExecTime := time.Now().UnixNano()
+	sleeptime := time.Second / time.Duration(c.conf.RequestRate)
 	for {
 		start := time.Now().UnixNano()
 		if atomic.LoadUint64(&c.inflight) < c.conf.MaxInflight {
@@ -247,7 +248,7 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 			}
 			num++
 
-			go func(promise *clientapi.FutureEmpty, then int64) {
+			go func(promise *clientapi.FutureEmpty, sendTime int64) {
 				c.wg.Add(1)
 				_, err := promise.Get()
 				atomic.AddUint64(&c.inflight, ^uint64(0))
@@ -257,9 +258,10 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 						log.Printf("Did not get enough signatures for command: %v\n", err)
 					}
 				}
-				now := time.Now().UnixNano()
-				if c.conf.PrintLatencies {
-					fmt.Println(now - then)
+				if c.conf.Benchmark {
+					now := time.Now().UnixNano()
+					prevExec := atomic.SwapInt64(&prevExecTime, now)
+					fmt.Printf("%d %d\n", now-prevExec, now-sendTime)
 				}
 				c.wg.Done()
 			}(promise, now)
