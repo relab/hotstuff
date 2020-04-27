@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"sync"
+	"sync/atomic"
 )
 
 // PartialSig is a single replica's signature of a node.
@@ -107,16 +109,21 @@ func VerifyQuorumCert(conf *ReplicaConfig, qc *QuorumCert) bool {
 	if len(qc.Sigs) < conf.QuorumSize {
 		return false
 	}
-	numVerified := 0
+	var wg sync.WaitGroup
+	var numVerified uint64 = 0
 	for _, psig := range qc.Sigs {
 		info, ok := conf.Replicas[psig.ID]
 		if !ok {
 			logger.Printf("VerifyQuorumSig: got signature from replica whose ID (%d) was not in config.", psig.ID)
 		}
-
-		if ecdsa.Verify(info.PubKey, qc.NodeHash[:], psig.R, psig.S) {
-			numVerified++
-		}
+		wg.Add(1)
+		go func(psig PartialSig) {
+			if ecdsa.Verify(info.PubKey, qc.NodeHash[:], psig.R, psig.S) {
+				atomic.AddUint64(&numVerified, 1)
+			}
+			wg.Done()
+		}(psig)
 	}
-	return numVerified >= conf.QuorumSize
+	wg.Wait()
+	return numVerified >= uint64(conf.QuorumSize)
 }
