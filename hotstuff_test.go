@@ -14,7 +14,7 @@ func (d *stubBackend) DoPropose(node *Node, qc *QuorumCert) (*QuorumCert, error)
 func (d *stubBackend) DoNewView(leader ReplicaID, qc *QuorumCert) error          { return nil }
 func (d *stubBackend) Close()                                                    {}
 
-func TestSafeNode(t *testing.T) {
+/* func TestSafeNode(t *testing.T) {
 	key, _ := GeneratePrivateKey()
 	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, nil)
 
@@ -56,7 +56,7 @@ func TestSafeNode(t *testing.T) {
 	if hs.safeNode(bad) {
 		t.Error("SafeNode accepted node, but none of the rules should have passed it.")
 	}
-}
+} */
 
 func TestUpdateQCHigh(t *testing.T) {
 	key, _ := GeneratePrivateKey()

@@ -252,28 +252,58 @@ func (hs *HotStuff) OnReceiveProposal(node *Node) (*PartialCert, error) {
 	// wake anyone waiting for a proposal
 	defer hs.waitProposal.WakeAll()
 
-	if hs.safeNode(node) {
-		logger.Println("OnReceiveProposal: Accepted node")
-		hs.mut.Lock()
-		hs.vHeight = node.Height
+	qcNode, nExists := hs.expectNodeFor(node.Justify)
+
+	hs.mut.Lock()
+
+	if node.Height <= hs.vHeight {
 		hs.mut.Unlock()
-
-		// queue node for update
-		hs.pendingUpdates <- node
-
-		pc, err := CreatePartialCert(hs.id, hs.privKey, node)
-		if err != nil {
-			return nil, err
-		}
-
-		// remove all commands associated with this node from the pending commands
-		hs.cmdCache.MarkProposed(node.Commands...)
-
-		hs.pmNotify(Notification{ReceiveProposal, node, hs.qcHigh})
-		return pc, nil
+		logger.Println("OnReceiveProposal: Node height less than vHeight")
+		return nil, fmt.Errorf("Node was not accepted")
 	}
-	logger.Println("OnReceiveProposal: Node not accepted")
-	return nil, fmt.Errorf("Node was not accepted")
+
+	safe := false
+	if nExists && qcNode.Height > hs.bLock.Height {
+		safe = true
+	} else {
+		logger.Println("OnReceiveProposal: liveness condition failed")
+		// check if node extends bLock
+		b := node
+		ok := true
+		for ok && b.Height > hs.bLock.Height+1 {
+			b, ok = hs.nodes.Get(b.ParentHash)
+		}
+		if ok && b.ParentHash == hs.bLock.Hash() {
+			safe = true
+		} else {
+			logger.Println("OnReceiveProposal: safety condition failed")
+		}
+	}
+
+	if !safe {
+		hs.mut.Unlock()
+		logger.Println("OnReceiveProposal: Node not safe")
+		return nil, fmt.Errorf("Node was not accepted")
+	}
+
+	logger.Println("OnReceiveProposal: Accepted node")
+	hs.vHeight = node.Height
+
+	hs.mut.Unlock()
+
+	// queue node for update
+	hs.pendingUpdates <- node
+
+	pc, err := CreatePartialCert(hs.id, hs.privKey, node)
+	if err != nil {
+		return nil, err
+	}
+
+	// remove all commands associated with this node from the pending commands
+	hs.cmdCache.MarkProposed(node.Commands...)
+
+	hs.pmNotify(Notification{ReceiveProposal, node, hs.qcHigh})
+	return pc, nil
 }
 
 // OnReceiveNewView handles the leader's response to receiving a NewView rpc from a replica
@@ -282,36 +312,6 @@ func (hs *HotStuff) OnReceiveNewView(qc *QuorumCert) {
 	hs.UpdateQCHigh(qc)
 	node, _ := hs.nodes.NodeOf(qc)
 	hs.pmNotify(Notification{ReceiveNewView, node, qc})
-}
-
-func (hs *HotStuff) safeNode(node *Node) bool {
-	qcNode, nExists := hs.expectNodeFor(node.Justify)
-
-	hs.mut.Lock()
-	defer hs.mut.Unlock()
-
-	if node.Height <= hs.vHeight {
-		return false
-	}
-
-	accept := false
-	if nExists && qcNode.Height > hs.bLock.Height {
-		accept = true
-	} else {
-		logger.Println("safeNode: liveness condition failed")
-		// check if node extends bLock
-		b := node
-		ok := true
-		for ok && b.Height > hs.bLock.Height+1 {
-			b, ok = hs.nodes.Get(b.ParentHash)
-		}
-		if ok && b.ParentHash == hs.bLock.Hash() {
-			accept = true
-		} else {
-			logger.Println("safeNode: safety condition failed")
-		}
-	}
-	return accept
 }
 
 func (hs *HotStuff) updateAsync(ctx context.Context) {
