@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"log"
@@ -101,6 +102,11 @@ type HotStuff struct {
 	// Contains the commands that are waiting to be proposed
 	cmdCache *cmdSet
 
+	pendingUpdates chan *Node
+
+	// stops any goroutines started by HotStuff
+	cancel context.CancelFunc
+
 	Exec func([]Command)
 }
 
@@ -150,23 +156,30 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, backend
 	qcForGenesis := CreateQuorumCert(genesis)
 	nodes := NewMapStorage()
 	nodes.Put(genesis)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
 	hs := &HotStuff{
-		Backend:       backend,
-		ReplicaConfig: config,
-		id:            id,
-		privKey:       privKey,
-		genesis:       genesis,
-		bLock:         genesis,
-		bExec:         genesis,
-		bLeaf:         genesis,
-		qcHigh:        qcForGenesis,
-		nodes:         nodes,
-		waitDuration:  waitDuration,
-		waitProposal:  waitutil.NewWaitUtil(),
-		pmNotifyChan:  make(chan Notification, 10),
-		cmdCache:      newCmdSet(),
-		Exec:          exec,
+		Backend:        backend,
+		ReplicaConfig:  config,
+		id:             id,
+		privKey:        privKey,
+		genesis:        genesis,
+		bLock:          genesis,
+		bExec:          genesis,
+		bLeaf:          genesis,
+		qcHigh:         qcForGenesis,
+		nodes:          nodes,
+		waitDuration:   waitDuration,
+		waitProposal:   waitutil.NewWaitUtil(),
+		pmNotifyChan:   make(chan Notification, 10),
+		cmdCache:       newCmdSet(),
+		cancel:         cancel,
+		pendingUpdates: make(chan *Node, 1),
+		Exec:           exec,
 	}
+
+	go hs.updateAsync(ctx)
 
 	backend.Init(hs)
 	return hs
@@ -240,20 +253,24 @@ func (hs *HotStuff) OnReceiveProposal(node *Node) (*PartialCert, error) {
 	defer hs.waitProposal.WakeAll()
 
 	if hs.safeNode(node) {
-		defer hs.update(node)
-
-		hs.mut.Lock()
-		defer hs.mut.Unlock()
-
 		logger.Println("OnReceiveProposal: Accepted node")
+		hs.mut.Lock()
 		hs.vHeight = node.Height
+		hs.mut.Unlock()
+
+		// queue node for update
+		hs.pendingUpdates <- node
+
 		pc, err := CreatePartialCert(hs.id, hs.privKey, node)
-		if err == nil {
-			// remove all commands associated with this node from the pending commands
-			hs.cmdCache.MarkProposed(node.Commands...)
+		if err != nil {
+			return nil, err
 		}
+
+		// remove all commands associated with this node from the pending commands
+		hs.cmdCache.MarkProposed(node.Commands...)
+
 		hs.pmNotify(Notification{ReceiveProposal, node, hs.qcHigh})
-		return pc, err
+		return pc, nil
 	}
 	logger.Println("OnReceiveProposal: Node not accepted")
 	return nil, fmt.Errorf("Node was not accepted")
@@ -295,6 +312,17 @@ func (hs *HotStuff) safeNode(node *Node) bool {
 		}
 	}
 	return accept
+}
+
+func (hs *HotStuff) updateAsync(ctx context.Context) {
+	for {
+		select {
+		case n := <-hs.pendingUpdates:
+			hs.update(n)
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func (hs *HotStuff) update(node *Node) {
@@ -339,8 +367,8 @@ func (hs *HotStuff) update(node *Node) {
 	}
 
 	// Free up space by deleting old data
-	go hs.nodes.GarbageCollectNodes(hs.GetVotedHeight())
-	go hs.cmdCache.TrimToLen(hs.BatchSize * 5)
+	hs.nodes.GarbageCollectNodes(hs.GetVotedHeight())
+	hs.cmdCache.TrimToLen(hs.BatchSize * 5)
 }
 
 func (hs *HotStuff) commit(node *Node) {
@@ -413,6 +441,12 @@ func (hs *HotStuff) SendNewView(leader ReplicaID) error {
 		return err
 	}
 	return nil
+}
+
+// Close frees resources held by HotStuff and closes backend connections
+func (hs *HotStuff) Close() {
+	hs.cancel()
+	hs.Backend.Close()
 }
 
 // CreateLeaf returns a new node that extends the parent.
