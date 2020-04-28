@@ -133,11 +133,11 @@ func main() {
 	/* p.Legend.Left = true */
 	p.Legend.Top = true
 	p.X.Label.Text = "Throughput Kops/sec"
-	p.X.Tick.Marker = hplot.Ticks{N: 8}
+	p.X.Tick.Marker = hplot.Ticks{N: 10}
 	p.Y.Label.Text = "Latency ms"
-	p.Y.Tick.Marker = hplot.Ticks{N: 5}
+	p.Y.Tick.Marker = hplot.Ticks{N: 10}
 
-	if err := p.Save(4*vg.Inch, 4*vg.Inch, os.Args[len(os.Args)-1]); err != nil {
+	if err := p.Save(6*vg.Inch, 6*vg.Inch, os.Args[len(os.Args)-1]); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to save plot: %v\n", err)
 		os.Exit(1)
 	}
@@ -226,7 +226,9 @@ func processRun(dirPath string, measurements map[int][]measurement, benchType st
 	for i := 0; i < n; i++ {
 		err := <-errs
 		if err != nil {
-			return err
+			fmt.Fprintf(os.Stderr, "WARNING: error while processing measurement (ignoring): %v\n", err)
+			<-ms
+			continue
 		}
 		m := <-ms
 		s, _ := measurements[m.rate]
@@ -277,7 +279,7 @@ func readInMeasurement(dirPath string, nanoseconds bool) (measurement, error) {
 				continue
 			}
 
-			t, err := time.ParseDuration(fmt.Sprintf(numberFormat, matches[0]))
+			t, err := time.ParseDuration(fmt.Sprintf("%sns", matches[0]))
 			if err != nil {
 				return measurement{}, fmt.Errorf("Failed to read libhotstuff measurement: %w", err)
 			}
