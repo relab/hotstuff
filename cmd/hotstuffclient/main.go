@@ -57,7 +57,7 @@ func main() {
 	cpuprofile := pflag.String("cpuprofile", "", "File to write CPU profile to")
 	memprofile := pflag.String("memprofile", "", "File to write memory profile to")
 	pflag.Uint32("self-id", 0, "The id for this replica.")
-	pflag.Int("request-rate", 10, "The request rate in Kops/sec")
+	pflag.Int("request-rate", 10000, "The request rate in requests/sec")
 	pflag.Int("payload-size", 0, "The size of the payload in bytes")
 	pflag.Uint64("max-inflight", 10000, "The maximum number of messages that the client can wait for at once")
 	pflag.String("input", "", "Optional file to use for payload data")
@@ -248,8 +248,8 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 			}
 			num++
 
+			c.wg.Add(1)
 			go func(promise *clientapi.FutureEmpty, sendTime int64) {
-				c.wg.Add(1)
 				_, err := promise.Get()
 				atomic.AddUint64(&c.inflight, ^uint64(0))
 				if err != nil {
