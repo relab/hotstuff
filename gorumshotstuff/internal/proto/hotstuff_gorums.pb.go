@@ -1004,7 +1004,7 @@ type QuorumSpec interface {
 
 	// ProposeQF is the quorum function for the Propose
 	// ordered quorum call method.
-	ProposeQF(in *HSNode, replies []*PartialCert) (*Empty, bool)
+	ProposeQF(in *HSNode, replies []*PartialCert) (*QuorumCert, bool)
 }
 
 const hasStrictOrderingMethods = true
@@ -1017,7 +1017,7 @@ type internalPartialCert struct {
 
 // Propose is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (c *Configuration) Propose(ctx context.Context, in *HSNode, opts ...grpc.CallOption) (resp *Empty, err error) {
+func (c *Configuration) Propose(ctx context.Context, in *HSNode, opts ...grpc.CallOption) (resp *QuorumCert, err error) {
 
 	// get the ID which will be used to return the correct responses for a request
 	msgID := c.mgr.nextMsgID()

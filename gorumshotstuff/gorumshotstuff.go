@@ -51,13 +51,12 @@ func New(connectTimeout, qcTimeout time.Duration) *GorumsHotStuff {
 	}
 }
 
-func (hs *GorumsHotStuff) DoPropose(node *hotstuff.Node, qc *hotstuff.QuorumCert) (*hotstuff.QuorumCert, error) {
-	hs.qspec.QC = qc
+func (hs *GorumsHotStuff) DoPropose(node *hotstuff.Node) (*hotstuff.QuorumCert, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), hs.qcTimeout)
 	defer cancel()
 	pb := proto.NodeToProto(node)
-	_, err := hs.config.Propose(ctx, pb)
-	return hs.qspec.QC, err
+	pqc, err := hs.config.Propose(ctx, pb)
+	return pqc.FromProto(), err
 }
 
 func (hs *GorumsHotStuff) DoNewView(id hotstuff.ReplicaID, qc *hotstuff.QuorumCert) error {

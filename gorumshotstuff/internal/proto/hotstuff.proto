@@ -11,7 +11,7 @@ service Hotstuff {
 		option (gorums.qc) = true;
 		option (gorums.ordered) = true;
 		option (gorums.qf_with_req) = true;
-		option (gorums.custom_return_type) = "Empty";
+		option (gorums.custom_return_type) = "QuorumCert";
 	}
 	rpc NewView(QuorumCert) returns (Empty) {
 		option (gorums.ordered) = true;

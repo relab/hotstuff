@@ -7,25 +7,44 @@ import (
 
 type hotstuffQSpec struct {
 	*hotstuff.ReplicaConfig
-	QC *hotstuff.QuorumCert
+	verified map[*proto.PartialCert]bool
 }
 
 // ProposeQF takes replies from replica after the leader calls the Propose QC and collects them into a quorum cert
-func (spec hotstuffQSpec) ProposeQF(req *proto.HSNode, replies []*proto.PartialCert) (*proto.Empty, bool) {
+func (spec hotstuffQSpec) ProposeQF(req *proto.HSNode, replies []*proto.PartialCert) (*proto.QuorumCert, bool) {
+	if spec.verified == nil {
+		spec.verified = make(map[*proto.PartialCert]bool)
+	}
+
 	// -1 because we self voted earlier
 	if len(replies) < spec.QuorumSize-1 {
-		return &proto.Empty{}, false
+		return nil, false
 	}
 
+	numVerified := 0
 	for _, pc := range replies {
-		// AddPartial does deduplication, but not verification
-		spec.QC.AddPartial(pc.FromProto())
+		if ok, verifiedBefore := spec.verified[pc]; !verifiedBefore {
+			cert := pc.FromProto()
+			ok := hotstuff.VerifyPartialCert(spec.ReplicaConfig, cert)
+			if ok {
+				numVerified++
+			}
+			spec.verified[pc] = ok
+		} else if ok {
+			numVerified++
+		}
 	}
 
-	// TODO: find a way to avoid checking a signature more than once
-	if hotstuff.VerifyQuorumCert(spec.ReplicaConfig, spec.QC) {
-		return &proto.Empty{}, true
+	if numVerified >= spec.QuorumSize-1 {
+		qc := hotstuff.CreateQuorumCert(req.FromProto())
+		for c, ok := range spec.verified {
+			if ok {
+				qc.AddPartial(c.FromProto())
+			}
+		}
+		spec.verified = nil
+		return proto.QuorumCertToProto(qc), true
 	}
 
-	return &proto.Empty{}, false
+	return nil, false
 }

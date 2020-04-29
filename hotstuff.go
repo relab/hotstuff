@@ -69,7 +69,7 @@ type Notification struct {
 type Backend interface {
 	Init(*HotStuff)
 	Start() error
-	DoPropose(*Node, *QuorumCert) (*QuorumCert, error)
+	DoPropose(*Node) (*QuorumCert, error)
 	DoNewView(ReplicaID, *QuorumCert) error
 	Close()
 }
@@ -393,25 +393,28 @@ func (hs *HotStuff) Propose() {
 	newNode := CreateLeaf(hs.bLeaf, cmds, hs.qcHigh, hs.bLeaf.Height+1)
 	hs.pmNotify(Notification{Propose, newNode, hs.qcHigh})
 
-	newQC := CreateQuorumCert(newNode)
-
 	hs.mut.Unlock()
 
-	// self vote
-	partialCert, err := hs.OnReceiveProposal(newNode)
-	if err != nil {
-		panic(fmt.Errorf("Failed to vote for own proposal: %w", err))
-	}
-	err = newQC.AddPartial(partialCert)
-	if err != nil {
-		logger.Println("Failed to add own vote to QC: ", err)
-	}
+	// async self vote
+	selfVote := make(chan *PartialCert)
+	go func() {
+		partialCert, err := hs.OnReceiveProposal(newNode)
+		if err != nil {
+			panic(fmt.Errorf("Failed to vote for own proposal: %w", err))
+		}
+		selfVote <- partialCert
+	}()
 
-	qc, err := hs.DoPropose(newNode, newQC)
+	qc, err := hs.DoPropose(newNode)
 
 	if err != nil {
 		logger.Println("ProposeQC finished with error: ", err)
 		return
+	}
+
+	err = qc.AddPartial(<-selfVote)
+	if err != nil {
+		logger.Println("Failed to add own vote to QC: ", err)
 	}
 
 	hs.mut.Lock()
@@ -420,7 +423,7 @@ func (hs *HotStuff) Propose() {
 
 	hs.UpdateQCHigh(qc)
 
-	hs.pmNotify(Notification{QCFinish, newNode, newQC})
+	hs.pmNotify(Notification{QCFinish, newNode, qc})
 } // this is the quorum call the client(the leader) makes.
 
 // SendNewView sends a newView message to the leader replica.
