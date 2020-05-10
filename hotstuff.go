@@ -336,12 +336,6 @@ func (hs *HotStuff) update(node *Node) {
 	// PRE-COMMIT on node1
 	hs.UpdateQCHigh(node.Justify)
 
-	/* if !hs.UpdateQCHigh(node.Justify) && !bytes.Equal(node.Justify.toBytes(), hs.QCHigh.toBytes()) {
-		// it is expected that updateQCHigh will return false if qcHigh equals qc.
-		// this happens when the leader already got the qc after a proposal
-		logger.Println("UpdateQCHigh failed, but qc did not equal qcHigh")
-	} */
-
 	node2, ok := hs.nodes.NodeOf(node1.Justify)
 	if !ok || node2.Committed {
 		return
@@ -424,7 +418,7 @@ func (hs *HotStuff) Propose() {
 	hs.UpdateQCHigh(qc)
 
 	hs.pmNotify(Notification{QCFinish, newNode, qc})
-} // this is the quorum call the client(the leader) makes.
+}
 
 // SendNewView sends a newView message to the leader replica.
 func (hs *HotStuff) SendNewView(leader ReplicaID) error {
