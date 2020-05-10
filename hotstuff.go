@@ -411,10 +411,6 @@ func (hs *HotStuff) Propose() {
 		logger.Println("Failed to add own vote to QC: ", err)
 	}
 
-	hs.mut.Lock()
-	hs.bLeaf = newNode
-	hs.mut.Unlock()
-
 	hs.UpdateQCHigh(qc)
 
 	hs.pmNotify(Notification{QCFinish, newNode, qc})
