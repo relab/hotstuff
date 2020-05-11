@@ -91,6 +91,7 @@ func (b *benchmark) YError(i int) (lower, upper float64) {
 
 func main() {
 	plotFile := flag.String("plot", "", "Destination to save plot in")
+	conf95 := flag.Bool("conf95", false, "Draw a 95% confidence interval to each measurement")
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
@@ -175,10 +176,12 @@ func main() {
 			os.Exit(1)
 		}
 
-		err = plotutil.AddErrorBars(p, errorBars...)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to add error bars: %v\n", err)
-			os.Exit(1)
+		if *conf95 {
+			err = plotutil.AddErrorBars(p, errorBars...)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to add error bars: %v\n", err)
+				os.Exit(1)
+			}
 		}
 
 		/* p.Legend.Left = true */
