@@ -326,6 +326,9 @@ func readInMeasurement(dirPath string, nanoseconds bool) (measurement, error) {
 	var throughput float64
 	numCommands := 0
 	for _, d := range data {
+		if len(d) == 0 {
+			continue
+		}
 		var totalTime time.Duration
 		numCommands += len(d)
 		for _, p := range d {
