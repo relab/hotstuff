@@ -2,23 +2,23 @@
 - hosts: clients
   gather_facts: no
   vars:
+    num_clients: 1
     rate: 10000
     time: 60
     payload: 0
+    maxinflight: 2500
     client_id: "{{ inventory_hostname | regex_replace('[^0-9]', '') }}"
   tasks:
+    - name: Clean results dir
+      file:
+        path: /tmp/results
+        state: absent
+    - name: Create results dir
+      file:
+        path: /tmp/results
+        state: directory
     - name: Start clients
-      shell: >
-        ./hotstuffclient
-        --self-id {{ client_id }}
-        --exit-after {{ time }}
-        --request-rate {{ rate }}
-        --payload-size {{ payload }}
-        --max-inflight 3200
-        --benchmark
-        > "$HOME/{{ inventory_hostname }}.out"
-        2> "$HOME/{{ inventory_hostname }}.stderr.out"
-
+      shell: ./run_clients.sh "{{ num_clients }}" "{{ inventory_hostname }}" "{{ client_id }}" "{{ rate }}" "{{ payload }}" "{{ maxinflight }}" "{{ time }}" 
       async: 1000
       poll: 0
       register: hotstuff_clients
@@ -59,8 +59,8 @@
 - hosts: clients
   gather_facts: no
   tasks:
-    - name: Fetch latency data
-      fetch:
-        src: "$HOME/{{ inventory_hostname }}.out"
-        dest: "{{ destdir }}/{{ inventory_hostname }}.out"
-        flat: yes
+    - name: Fetch data
+      synchronize:
+        src: "/tmp/results/"
+        dest: "{{ destdir }}"
+        mode: pull

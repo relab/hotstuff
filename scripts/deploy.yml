@@ -26,6 +26,11 @@
         src: ../cmd/hotstuffclient/hotstuffclient
         dest: $HOME/hotstuffclient
         mode: 0755
+    - name: Upload run_clients script
+      copy:
+        src: ./run_multiple_clients.sh
+        dest: $HOME/run_clients.sh
+        mode: 0755
 
 - hosts: clients:replicas
   tasks:
