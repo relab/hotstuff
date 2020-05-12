@@ -156,7 +156,6 @@ func main() {
 }
 
 type qspec struct {
-	conf   *hotstuff.ReplicaConfig
 	faulty int
 }
 
@@ -192,7 +191,7 @@ func newHotStuffClient(conf *config, replicaConfig *hotstuff.ReplicaConfig) (*ho
 		return nil, err
 	}
 	faulty := (len(replicaConfig.Replicas) - 1) / 3
-	gorumsConf, err := mgr.NewConfiguration(mgr.NodeIDs(), &qspec{conf: replicaConfig, faulty: faulty})
+	gorumsConf, err := mgr.NewConfiguration(mgr.NodeIDs(), &qspec{faulty: faulty})
 	if err != nil {
 		mgr.Close()
 		return nil, err
