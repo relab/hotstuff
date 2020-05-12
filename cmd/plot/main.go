@@ -184,11 +184,11 @@ func main() {
 			}
 		}
 
-		/* p.Legend.Left = true */
+		p.Legend.Left = true
 		p.Legend.Top = true
-		p.X.Label.Text = "Throughput Kops/sec"
+		p.X.Label.Text = "Throughput (Kops/sec)"
 		p.X.Tick.Marker = hplot.Ticks{N: 10}
-		p.Y.Label.Text = "Latency ms"
+		p.Y.Label.Text = "Latency (ms)"
 		p.Y.Tick.Marker = hplot.Ticks{N: 10}
 
 		if err := p.Save(6*vg.Inch, 6*vg.Inch, *plotFile); err != nil {
