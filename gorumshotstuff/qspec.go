@@ -17,31 +17,29 @@ type hotstuffQSpec struct {
 	wg sync.WaitGroup
 }
 
-// ProposeQF takes replies from replica after the leader calls the Propose QC and collects them into a quorum cert
-func (spec *hotstuffQSpec) ProposeQF(req *proto.HSNode, replies []*proto.PartialCert) (*proto.QuorumCert, bool) {
-	if spec.verified == nil {
-		spec.verified = make(map[*proto.PartialCert]bool)
-	}
-	if spec.jobs == nil {
-		spec.jobs = make(chan struct {
-			pc *proto.PartialCert
-			ok bool
-		}, len(spec.Replicas))
-	}
+func (qspec *hotstuffQSpec) Reset() {
+	qspec.verified = make(map[*proto.PartialCert]bool)
+	qspec.jobs = make(chan struct {
+		pc *proto.PartialCert
+		ok bool
+	}, len(qspec.Replicas))
+}
 
+// ProposeQF takes replies from replica after the leader calls the Propose QC and collects them into a quorum cert
+func (qspec *hotstuffQSpec) ProposeQF(req *proto.HSNode, replies []*proto.PartialCert) (*proto.QuorumCert, bool) {
 	numVerified := 0
 	for _, pc := range replies {
-		if ok, verifiedBefore := spec.verified[pc]; !verifiedBefore {
-			spec.verified[pc] = false
-			spec.wg.Add(1)
+		if ok, verifiedBefore := qspec.verified[pc]; !verifiedBefore {
+			qspec.verified[pc] = false
+			qspec.wg.Add(1)
 			go func(pc *proto.PartialCert) {
 				cert := pc.FromProto()
-				ok := hotstuff.VerifyPartialCert(spec.ReplicaConfig, cert)
-				spec.jobs <- struct {
+				ok := hotstuff.VerifyPartialCert(qspec.ReplicaConfig, cert)
+				qspec.jobs <- struct {
 					pc *proto.PartialCert
 					ok bool
 				}{pc, ok}
-				spec.wg.Done()
+				qspec.wg.Done()
 			}(pc)
 		} else if ok {
 			numVerified++
@@ -49,28 +47,27 @@ func (spec *hotstuffQSpec) ProposeQF(req *proto.HSNode, replies []*proto.Partial
 	}
 
 	// -1 because we self voted earlier
-	if len(replies) < spec.QuorumSize-1 {
+	if len(replies) < qspec.QuorumSize-1 {
 		return nil, false
 	}
 
-	spec.wg.Wait()
-	numFinished := len(spec.jobs)
+	qspec.wg.Wait()
+	numFinished := len(qspec.jobs)
 	for i := 0; i < numFinished; i++ {
-		v := <-spec.jobs
+		v := <-qspec.jobs
 		if v.ok {
-			spec.verified[v.pc] = true
+			qspec.verified[v.pc] = true
 			numVerified++
 		}
 	}
 
-	if numVerified >= spec.QuorumSize-1 {
+	if numVerified >= qspec.QuorumSize-1 {
 		qc := hotstuff.CreateQuorumCert(req.FromProto())
-		for c, ok := range spec.verified {
+		for c, ok := range qspec.verified {
 			if ok {
 				qc.AddPartial(c.FromProto())
 			}
 		}
-		spec.verified = nil
 		return proto.QuorumCertToProto(qc), true
 	}
 

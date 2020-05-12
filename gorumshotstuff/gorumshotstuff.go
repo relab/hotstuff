@@ -55,6 +55,7 @@ func (hs *GorumsHotStuff) DoPropose(node *hotstuff.Node) (*hotstuff.QuorumCert, 
 	ctx, cancel := context.WithTimeout(context.Background(), hs.qcTimeout)
 	defer cancel()
 	pb := proto.NodeToProto(node)
+	hs.qspec.Reset()
 	pqc, err := hs.config.Propose(ctx, pb)
 	return pqc.FromProto(), err
 }
