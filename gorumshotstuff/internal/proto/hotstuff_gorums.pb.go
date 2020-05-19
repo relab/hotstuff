@@ -7,14 +7,13 @@ import (
 	context "context"
 	binary "encoding/binary"
 	fmt "fmt"
-	ptypes "github.com/golang/protobuf/ptypes"
-	strictordering "github.com/relab/gorums/strictordering"
+	ordering "github.com/relab/gorums/ordering"
 	trace "golang.org/x/net/trace"
 	grpc "google.golang.org/grpc"
 	backoff "google.golang.org/grpc/backoff"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	anypb "google.golang.org/protobuf/types/known/anypb"
+	proto "google.golang.org/protobuf/proto"
 	fnv "hash/fnv"
 	io "io"
 	log "log"
@@ -377,29 +376,29 @@ func (m *Manager) NewConfiguration(ids []uint32, qspec QuorumSpec) (*Configurati
 		return nil, IllegalConfigError("need at least one node")
 	}
 
-	var cnodes []*Node
+	var nodes []*Node
 	unique := make(map[uint32]struct{})
-	var deduped []uint32
+	var uniqueIDs []uint32
 	for _, nid := range ids {
-		// Ensure that identical ids are only counted once.
+		// ensure that identical IDs are only counted once
 		if _, duplicate := unique[nid]; duplicate {
 			continue
 		}
 		unique[nid] = struct{}{}
-		deduped = append(deduped, nid)
+		uniqueIDs = append(uniqueIDs, nid)
 
 		node, found := m.lookup[nid]
 		if !found {
 			return nil, NodeNotFoundError(nid)
 		}
-		cnodes = append(cnodes, node)
+		nodes = append(nodes, node)
 	}
 
-	// Node ids are sorted ensure a globally consistent configuration id.
-	sort.Sort(idSlice(deduped))
+	// node IDs are sorted to ensure a globally consistent configuration ID
+	sort.Sort(idSlice(uniqueIDs))
 
 	h := fnv.New32a()
-	for _, id := range deduped {
+	for _, id := range uniqueIDs {
 		binary.Write(h, binary.LittleEndian, id)
 	}
 	cid := h.Sum32()
@@ -411,8 +410,8 @@ func (m *Manager) NewConfiguration(ids []uint32, qspec QuorumSpec) (*Configurati
 
 	c := &Configuration{
 		id:    cid,
-		nodes: cnodes,
-		n:     len(cnodes),
+		nodes: nodes,
+		n:     len(nodes),
 		mgr:   m,
 		qspec: qspec,
 	}
@@ -452,7 +451,7 @@ type Node struct {
 func (n *Node) createOrderedStream(rq *receiveQueue, backoff backoff.Config) {
 	n.orderedNodeStream = &orderedNodeStream{
 		receiveQueue: rq,
-		sendQ:        make(chan *strictordering.GorumsMessage),
+		sendQ:        make(chan *ordering.Message),
 		node:         n,
 		backoff:      backoff,
 		rand:         rand.New(rand.NewSource(time.Now().UnixNano())),
@@ -470,8 +469,8 @@ func (n *Node) connect(opts managerOptions) error {
 	}
 	// a context for all of the streams
 	ctx, n.cancel = context.WithCancel(context.Background())
-	// only start strictOrdering RPCs when needed
-	if hasStrictOrderingMethods {
+	// only start ordering RPCs when needed
+	if hasOrderingMethods {
 		err = n.connectOrderedStream(ctx, n.conn)
 		if err != nil {
 			return fmt.Errorf("starting stream failed: %w", err)
@@ -698,7 +697,7 @@ func WithNoConnect() ManagerOption {
 	}
 }
 
-// WithTracing controls whether to trace qourum calls for this Manager instance
+// WithTracing controls whether to trace quorum calls for this Manager instance
 // using the golang.org/x/net/trace package. Tracing is currently only supported
 // for regular quorum calls.
 func WithTracing() ManagerOption {
@@ -714,90 +713,21 @@ func WithBackoff(backoff backoff.Config) ManagerOption {
 	}
 }
 
-// requestHandler is used to fetch a response message based on the request.
-// A requestHandler should receive a message from the server, unmarshal it into
-// the proper type for that Method's request type, call a user provided Handler,
-// and return a marshaled result to the server.
-type requestHandler func(*strictordering.GorumsMessage) *strictordering.GorumsMessage
-
-type strictOrderingServer struct {
-	handlers map[string]requestHandler
-}
-
-func newStrictOrderingServer() *strictOrderingServer {
-	return &strictOrderingServer{
-		handlers: make(map[string]requestHandler),
-	}
-}
-
-func (s *strictOrderingServer) registerHandler(method string, handler requestHandler) {
-	s.handlers[method] = handler
-}
-
-func (s *strictOrderingServer) NodeStream(srv strictordering.GorumsStrictOrdering_NodeStreamServer) error {
-	for {
-		req, err := srv.Recv()
-		if err != nil {
-			return err
-		}
-		// handle the request if a handler is available for this rpc
-		if handler, ok := s.handlers[req.GetMethod()]; ok {
-			resp := handler(req)
-			resp.ID = req.GetID()
-			err = srv.Send(resp)
-			if err != nil {
-				return err
-			}
-		}
-	}
-}
-
-// GorumsServer serves all strict ordering based RPCs using registered handlers
-type GorumsServer struct {
-	srv        *strictOrderingServer
-	grpcServer *grpc.Server
-}
-
-// NewGorumsServer returns a new instance of GorumsServer
-func NewGorumsServer() *GorumsServer {
-	s := &GorumsServer{
-		srv:        newStrictOrderingServer(),
-		grpcServer: grpc.NewServer(),
-	}
-	strictordering.RegisterGorumsStrictOrderingServer(s.grpcServer, s.srv)
-	return s
-}
-
-// Serve starts serving on the listener
-func (s *GorumsServer) Serve(listener net.Listener) {
-	s.grpcServer.Serve(listener)
-}
-
-// GracefulStop waits for all RPCs to finish before stopping.
-func (s *GorumsServer) GracefulStop() {
-	s.grpcServer.GracefulStop()
-}
-
-// Stop stops the server immediately
-func (s *GorumsServer) Stop() {
-	s.grpcServer.Stop()
-}
-
-type strictOrderingResult struct {
+type orderingResult struct {
 	nid   uint32
-	reply *anypb.Any
+	reply []byte
 	err   error
 }
 
 type receiveQueue struct {
 	msgID    uint64
-	recvQ    map[uint64]chan *strictOrderingResult
+	recvQ    map[uint64]chan *orderingResult
 	recvQMut sync.RWMutex
 }
 
 func newReceiveQueue() *receiveQueue {
 	return &receiveQueue{
-		recvQ: make(map[uint64]chan *strictOrderingResult),
+		recvQ: make(map[uint64]chan *orderingResult),
 	}
 }
 
@@ -805,7 +735,7 @@ func (m *receiveQueue) nextMsgID() uint64 {
 	return atomic.AddUint64(&m.msgID, 1)
 }
 
-func (m *receiveQueue) putChan(id uint64, c chan *strictOrderingResult) {
+func (m *receiveQueue) putChan(id uint64, c chan *orderingResult) {
 	m.recvQMut.Lock()
 	m.recvQ[id] = c
 	m.recvQMut.Unlock()
@@ -817,7 +747,7 @@ func (m *receiveQueue) deleteChan(id uint64) {
 	m.recvQMut.Unlock()
 }
 
-func (m *receiveQueue) putResult(id uint64, result *strictOrderingResult) {
+func (m *receiveQueue) putResult(id uint64, result *orderingResult) {
 	m.recvQMut.RLock()
 	c, ok := m.recvQ[id]
 	m.recvQMut.RUnlock()
@@ -828,19 +758,19 @@ func (m *receiveQueue) putResult(id uint64, result *strictOrderingResult) {
 
 type orderedNodeStream struct {
 	*receiveQueue
-	sendQ        chan *strictordering.GorumsMessage
+	sendQ        chan *ordering.Message
 	node         *Node // needed for ID and setLastError
 	backoff      backoff.Config
 	rand         *rand.Rand
-	gorumsClient strictordering.GorumsStrictOrderingClient
-	gorumsStream strictordering.GorumsStrictOrdering_NodeStreamClient
+	gorumsClient ordering.GorumsClient
+	gorumsStream ordering.Gorums_NodeStreamClient
 	streamMut    sync.RWMutex
 	streamBroken bool
 }
 
 func (s *orderedNodeStream) connectOrderedStream(ctx context.Context, conn *grpc.ClientConn) error {
 	var err error
-	s.gorumsClient = strictordering.NewGorumsStrictOrderingClient(conn)
+	s.gorumsClient = ordering.NewGorumsClient(conn)
 	s.gorumsStream, err = s.gorumsClient.NodeStream(ctx)
 	if err != nil {
 		return err
@@ -855,7 +785,7 @@ func (s *orderedNodeStream) sendMsgs() {
 		// return error if stream is broken
 		if s.streamBroken {
 			err := status.Errorf(codes.Unavailable, "stream is down")
-			s.putResult(req.GetID(), &strictOrderingResult{nid: s.node.ID(), reply: nil, err: err})
+			s.putResult(req.GetID(), &orderingResult{nid: s.node.ID(), reply: nil, err: err})
 			continue
 		}
 		// else try to send message
@@ -869,13 +799,13 @@ func (s *orderedNodeStream) sendMsgs() {
 		s.streamMut.RUnlock()
 		s.node.setLastErr(err)
 		// return the error
-		s.putResult(req.GetID(), &strictOrderingResult{nid: s.node.ID(), reply: nil, err: err})
+		s.putResult(req.GetID(), &orderingResult{nid: s.node.ID(), reply: nil, err: err})
 	}
 }
 
 func (s *orderedNodeStream) recvMsgs(ctx context.Context) {
 	for {
-		resp := new(strictordering.GorumsMessage)
+		resp := new(ordering.Message)
 		s.streamMut.RLock()
 		err := s.gorumsStream.RecvMsg(resp)
 		if err != nil {
@@ -886,7 +816,7 @@ func (s *orderedNodeStream) recvMsgs(ctx context.Context) {
 			s.reconnectStream(ctx)
 		} else {
 			s.streamMut.RUnlock()
-			s.putResult(resp.GetID(), &strictOrderingResult{nid: s.node.ID(), reply: resp.GetData(), err: nil})
+			s.putResult(resp.GetID(), &orderingResult{nid: s.node.ID(), reply: resp.GetData(), err: nil})
 		}
 
 		select {
@@ -924,6 +854,75 @@ func (s *orderedNodeStream) reconnectStream(ctx context.Context) {
 			return
 		}
 	}
+}
+
+// requestHandler is used to fetch a response message based on the request.
+// A requestHandler should receive a message from the server, unmarshal it into
+// the proper type for that Method's request type, call a user provided Handler,
+// and return a marshaled result to the server.
+type requestHandler func(*ordering.Message) *ordering.Message
+
+type orderingServer struct {
+	handlers map[int32]requestHandler
+}
+
+func newOrderingServer() *orderingServer {
+	return &orderingServer{
+		handlers: make(map[int32]requestHandler),
+	}
+}
+
+func (s *orderingServer) registerHandler(methodID int32, handler requestHandler) {
+	s.handlers[methodID] = handler
+}
+
+func (s *orderingServer) NodeStream(srv ordering.Gorums_NodeStreamServer) error {
+	for {
+		req, err := srv.Recv()
+		if err != nil {
+			return err
+		}
+		// handle the request if a handler is available for this rpc
+		if handler, ok := s.handlers[req.GetMethodID()]; ok {
+			resp := handler(req)
+			resp.ID = req.GetID()
+			err = srv.Send(resp)
+			if err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// GorumsServer serves all ordering based RPCs using registered handlers.
+type GorumsServer struct {
+	srv        *orderingServer
+	grpcServer *grpc.Server
+}
+
+// NewGorumsServer returns a new instance of GorumsServer.
+func NewGorumsServer() *GorumsServer {
+	s := &GorumsServer{
+		srv:        newOrderingServer(),
+		grpcServer: grpc.NewServer(),
+	}
+	ordering.RegisterGorumsServer(s.grpcServer, s.srv)
+	return s
+}
+
+// Serve starts serving on the listener.
+func (s *GorumsServer) Serve(listener net.Listener) {
+	s.grpcServer.Serve(listener)
+}
+
+// GracefulStop waits for all RPCs to finish before stopping.
+func (s *GorumsServer) GracefulStop() {
+	s.grpcServer.GracefulStop()
+}
+
+// Stop stops the server immediately.
+func (s *GorumsServer) Stop() {
+	s.grpcServer.Stop()
 }
 
 type traceInfo struct {
@@ -999,22 +998,6 @@ func (n *Node) closeStream() (err error) {
 	return err
 }
 
-// QuorumSpec is the interface of quorum functions for Hotstuff.
-type QuorumSpec interface {
-
-	// ProposeQF is the quorum function for the Propose
-	// ordered quorum call method.
-	ProposeQF(in *HSNode, replies []*PartialCert) (*QuorumCert, bool)
-}
-
-const hasStrictOrderingMethods = true
-
-type internalPartialCert struct {
-	nid   uint32
-	reply *PartialCert
-	err   error
-}
-
 // Propose is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
 func (c *Configuration) Propose(ctx context.Context, in *HSNode, opts ...grpc.CallOption) (resp *QuorumCert, err error) {
@@ -1023,20 +1006,20 @@ func (c *Configuration) Propose(ctx context.Context, in *HSNode, opts ...grpc.Ca
 	msgID := c.mgr.nextMsgID()
 
 	// set up a channel to collect replies
-	replies := make(chan *strictOrderingResult, c.n)
+	replies := make(chan *orderingResult, c.n)
 	c.mgr.putChan(msgID, replies)
 
 	// remove the replies channel when we are done
 	defer c.mgr.deleteChan(msgID)
 
-	data, err := ptypes.MarshalAny(in)
+	data, err := proto.MarshalOptions{AllowPartial: true, Deterministic: true}.Marshal(in)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal message: %w", err)
 	}
-	msg := &strictordering.GorumsMessage{
-		ID:     msgID,
-		Method: "/proto.Hotstuff/Propose",
-		Data:   data,
+	msg := &ordering.Message{
+		ID:       msgID,
+		MethodID: proposeMethodID,
+		Data:     data,
 	}
 	// push the message to the nodes
 	expected := c.n
@@ -1059,7 +1042,7 @@ func (c *Configuration) Propose(ctx context.Context, in *HSNode, opts ...grpc.Ca
 			}
 
 			reply := new(PartialCert)
-			err := ptypes.UnmarshalAny(r.reply, reply)
+			err := proto.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}.Unmarshal(r.reply, reply)
 			if err != nil {
 				errs = append(errs, GRPCError{r.nid, fmt.Errorf("failed to unmarshal reply: %w", err)})
 				break
@@ -1085,19 +1068,19 @@ type ProposeHandler interface {
 
 // RegisterProposeHandler sets the handler for Propose.
 func (s *GorumsServer) RegisterProposeHandler(handler ProposeHandler) {
-	s.srv.registerHandler("/proto.Hotstuff/Propose", func(in *strictordering.GorumsMessage) *strictordering.GorumsMessage {
+	s.srv.registerHandler(proposeMethodID, func(in *ordering.Message) *ordering.Message {
 		req := new(HSNode)
-		err := ptypes.UnmarshalAny(in.GetData(), req)
+		err := proto.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}.Unmarshal(in.GetData(), req)
 		// TODO: how to handle marshaling errors here
 		if err != nil {
-			return new(strictordering.GorumsMessage)
+			return new(ordering.Message)
 		}
 		resp := handler.Propose(req)
-		data, err := ptypes.MarshalAny(resp)
+		data, err := proto.MarshalOptions{AllowPartial: true, Deterministic: true}.Marshal(resp)
 		if err != nil {
-			return new(strictordering.GorumsMessage)
+			return new(ordering.Message)
 		}
-		return &strictordering.GorumsMessage{Data: data, Method: in.GetMethod()}
+		return &ordering.Message{Data: data, MethodID: proposeMethodID}
 	})
 }
 
@@ -1107,20 +1090,20 @@ func (n *Node) NewView(ctx context.Context, in *QuorumCert, opts ...grpc.CallOpt
 	msgID := n.nextMsgID()
 
 	// set up a channel to collect replies
-	replies := make(chan *strictOrderingResult, 1)
+	replies := make(chan *orderingResult, 1)
 	n.putChan(msgID, replies)
 
 	// remove the replies channel when we are done
 	defer n.deleteChan(msgID)
 
-	data, err := ptypes.MarshalAny(in)
+	data, err := proto.MarshalOptions{AllowPartial: true, Deterministic: true}.Marshal(in)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal message: %w", err)
 	}
-	msg := &strictordering.GorumsMessage{
-		ID:     msgID,
-		Method: "/proto.Hotstuff/NewView",
-		Data:   data,
+	msg := &ordering.Message{
+		ID:       msgID,
+		MethodID: newViewMethodID,
+		Data:     data,
 	}
 	n.sendQ <- msg
 
@@ -1130,7 +1113,7 @@ func (n *Node) NewView(ctx context.Context, in *QuorumCert, opts ...grpc.CallOpt
 			return nil, r.err
 		}
 		reply := new(Empty)
-		err := ptypes.UnmarshalAny(r.reply, reply)
+		err := proto.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}.Unmarshal(r.reply, reply)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal reply: %w", err)
 		}
@@ -1147,18 +1130,40 @@ type NewViewHandler interface {
 
 // RegisterNewViewHandler sets the handler for NewView.
 func (s *GorumsServer) RegisterNewViewHandler(handler NewViewHandler) {
-	s.srv.registerHandler("/proto.Hotstuff/NewView", func(in *strictordering.GorumsMessage) *strictordering.GorumsMessage {
+	s.srv.registerHandler(newViewMethodID, func(in *ordering.Message) *ordering.Message {
 		req := new(QuorumCert)
-		err := ptypes.UnmarshalAny(in.GetData(), req)
+		err := proto.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}.Unmarshal(in.GetData(), req)
 		// TODO: how to handle marshaling errors here
 		if err != nil {
-			return new(strictordering.GorumsMessage)
+			return new(ordering.Message)
 		}
 		resp := handler.NewView(req)
-		data, err := ptypes.MarshalAny(resp)
+		data, err := proto.MarshalOptions{AllowPartial: true, Deterministic: true}.Marshal(resp)
 		if err != nil {
-			return new(strictordering.GorumsMessage)
+			return new(ordering.Message)
 		}
-		return &strictordering.GorumsMessage{Data: data, Method: in.GetMethod()}
+		return &ordering.Message{Data: data, MethodID: newViewMethodID}
 	})
+}
+
+// QuorumSpec is the interface of quorum functions for Hotstuff.
+type QuorumSpec interface {
+
+	// ProposeQF is the quorum function for the Propose
+	// ordered quorum call method. The in parameter is the request object
+	// supplied to the Propose method at call time, and may or may not
+	// be used by the quorum function. If the in parameter is not needed
+	// you should implement your quorum function with '_ *HSNode'.
+	ProposeQF(in *HSNode, replies []*PartialCert) (*QuorumCert, bool)
+}
+
+const hasOrderingMethods = true
+
+const proposeMethodID int32 = 0
+const newViewMethodID int32 = 1
+
+type internalPartialCert struct {
+	nid   uint32
+	reply *PartialCert
+	err   error
 }

@@ -16,8 +16,7 @@ import (
 	"time"
 
 	protobuf "github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
-	"github.com/relab/gorums/strictordering"
+	"github.com/relab/gorums/ordering"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/clientapi"
 	"github.com/relab/hotstuff/gorumshotstuff"
@@ -216,7 +215,7 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *config, replicaConfig *hotst
 		os.Exit(1)
 	}
 	// Use a custom server instead of the gorums one
-	strictordering.RegisterGorumsStrictOrderingServer(srv.grpcSrv, srv)
+	ordering.RegisterGorumsServer(srv.grpcSrv, srv)
 	return srv
 }
 
@@ -245,14 +244,14 @@ func (srv *hotstuffServer) Stop() {
 }
 
 // Custom server code
-func (srv *hotstuffServer) NodeStream(stream strictordering.GorumsStrictOrdering_NodeStreamServer) error {
+func (srv *hotstuffServer) NodeStream(stream ordering.Gorums_NodeStreamServer) error {
 	for {
 		req, err := stream.Recv()
 		if err != nil {
 			return err
 		}
 		// use the serialized data as cmd
-		cmd := hotstuff.Command(req.GetData().GetValue())
+		cmd := hotstuff.Command(req.GetData())
 		srv.mut.Lock()
 		id := req.GetID()
 		finished := make(chan struct{}, 1)
@@ -268,14 +267,7 @@ func (srv *hotstuffServer) NodeStream(stream strictordering.GorumsStrictOrdering
 			srv.mut.Unlock()
 
 			// send response
-			any, err := ptypes.MarshalAny(&clientapi.Empty{})
-			if err != nil {
-				return
-			}
-			resp := &strictordering.GorumsMessage{
-				ID:   id,
-				Data: any,
-			}
+			resp := &ordering.Message{ID: id}
 			err = stream.Send(resp)
 			if err != nil {
 				return

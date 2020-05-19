@@ -8,9 +8,8 @@ option go_package = "github.com/relab/hotstuff/gorumshotstuff/internal/proto";
 
 service Hotstuff {
 	rpc Propose(HSNode) returns (PartialCert) {
-		option (gorums.qc) = true;
+		option (gorums.quorumcall) = true;
 		option (gorums.ordered) = true;
-		option (gorums.qf_with_req) = true;
 		option (gorums.custom_return_type) = "QuorumCert";
 	}
 	rpc NewView(QuorumCert) returns (Empty) {

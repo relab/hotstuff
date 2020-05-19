@@ -12,7 +12,6 @@ service HotStuffSMR {
 	rpc ExecCommand(Command) returns (Empty) {
 		option (gorums.qc_future) = true;
 		option (gorums.ordered) = true;
-		option (gorums.qf_with_req) = true;
 	}
 }
 
