@@ -2,6 +2,7 @@ package hotstuff
 
 import (
 	"bytes"
+	"container/list"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/binary"
@@ -11,6 +12,78 @@ import (
 	"sync"
 	"sync/atomic"
 )
+
+// SignatureVerifier keeps a cache of verified signatures in order to speed up verification
+type SignatureVerifier struct {
+	conf               *ReplicaConfig
+	verifiedSignatures map[string]bool
+	cache              list.List
+	mut                sync.Mutex
+}
+
+// NewSignatureVerifier returns a new instance of SignatureVerifier
+func NewSignatureVerifier(conf *ReplicaConfig) *SignatureVerifier {
+	return &SignatureVerifier{
+		conf:               conf,
+		verifiedSignatures: make(map[string]bool),
+	}
+}
+
+// VerifySignature verifies a partial signature
+func (s *SignatureVerifier) VerifySignature(sig PartialSig, hash NodeHash) bool {
+	k := string(sig.toBytes())
+
+	s.mut.Lock()
+	if valid, ok := s.verifiedSignatures[k]; ok {
+		s.mut.Unlock()
+		return valid
+	}
+	s.mut.Unlock()
+
+	info, ok := s.conf.Replicas[sig.ID]
+	if !ok {
+		return false
+	}
+	valid := ecdsa.Verify(info.PubKey, hash[:], sig.R, sig.S)
+
+	s.mut.Lock()
+	s.cache.PushBack(k)
+	s.verifiedSignatures[k] = valid
+	s.mut.Unlock()
+
+	return valid
+}
+
+// VerifyQuorumCert verifies a quorum certificate
+func (s *SignatureVerifier) VerifyQuorumCert(qc *QuorumCert) bool {
+	if len(qc.Sigs) < s.conf.QuorumSize {
+		return false
+	}
+	var wg sync.WaitGroup
+	var numVerified uint64 = 0
+	for _, psig := range qc.Sigs {
+		wg.Add(1)
+		go func(psig PartialSig) {
+			if s.VerifySignature(psig, qc.NodeHash) {
+				atomic.AddUint64(&numVerified, 1)
+			}
+			wg.Done()
+		}(psig)
+	}
+	wg.Wait()
+	return numVerified >= uint64(s.conf.QuorumSize)
+}
+
+// EvictOld reduces the size of the cache by removing the oldest cached results
+func (s *SignatureVerifier) EvictOld(size int) {
+	s.mut.Lock()
+	for length := s.cache.Len(); length >= size; length-- {
+		el := s.cache.Front()
+		k := s.cache.Remove(el).(string)
+		delete(s.verifiedSignatures, k)
+	}
+	s.mut.Unlock()
+}
 
 // PartialSig is a single replica's signature of a node.
 type PartialSig struct {
