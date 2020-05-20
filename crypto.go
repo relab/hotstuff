@@ -19,12 +19,12 @@ type PartialSig struct {
 }
 
 func (psig PartialSig) toBytes() []byte {
-	var b []byte
-	i := make([]byte, 4)
-	binary.LittleEndian.PutUint32(i, uint32(psig.ID))
-	b = append(b, i...)
-	b = append(b, psig.R.Bytes()...)
-	b = append(b, psig.S.Bytes()...)
+	r := psig.R.Bytes()
+	s := psig.S.Bytes()
+	b := make([]byte, 4, 4+len(r)+len(s))
+	binary.LittleEndian.PutUint32(b, uint32(psig.ID))
+	b = append(b, r...)
+	b = append(b, s...)
 	return b
 }
 
@@ -41,17 +41,17 @@ type QuorumCert struct {
 }
 
 func (qc *QuorumCert) toBytes() []byte {
-	var b []byte
+	b := make([]byte, 0, 32)
 	b = append(b, qc.NodeHash[:]...)
-	// sort partial signatures into a slice to ensure determinism
-	// TODO: find out if there is a faster way to ensure this
 	psigs := make([]PartialSig, 0, len(qc.Sigs))
 	for _, v := range qc.Sigs {
-		psigs = append(psigs, v)
+		i := sort.Search(len(psigs), func(j int) bool {
+			return v.ID < psigs[j].ID
+		})
+		psigs = append(psigs, PartialSig{})
+		copy(psigs[i+1:], psigs[i:])
+		psigs[i] = v
 	}
-	sort.SliceStable(psigs, func(i, j int) bool {
-		return psigs[i].ID < psigs[j].ID
-	})
 	for i := range psigs {
 		b = append(b, psigs[i].toBytes()...)
 	}
