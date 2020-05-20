@@ -90,3 +90,21 @@ func TestVerifyQuorumCert(t *testing.T) {
 		t.Errorf("Quorum cert failed to verify!")
 	}
 }
+
+func BenchmarkQuroumCertToBytes(b *testing.B) {
+	qc := CreateQuorumCert(testNode)
+	for _, r := range biggerRc.Replicas {
+		pc, _ := CreatePartialCert(r.ID, &pk, testNode)
+		qc.AddPartial(pc)
+	}
+	for n := 0; n < b.N; n++ {
+		qc.toBytes()
+	}
+}
+
+func BenchmarkPartialSigToBytes(b *testing.B) {
+	pc, _ := CreatePartialCert(0, &pk, testNode)
+	for n := 0; n < b.N; n++ {
+		pc.Sig.toBytes()
+	}
+}
