@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"runtime"
 	"runtime/pprof"
+	"runtime/trace"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -76,6 +77,7 @@ func main() {
 	cpuprofile := pflag.String("cpuprofile", "", "File to write CPU profile to")
 	memprofile := pflag.String("memprofile", "", "File to write memory profile to")
 	fullprofile := pflag.String("fullprofile", "", "File to write fgprof profile to")
+	traceFile := pflag.String("trace", "", "File to write execution trace to")
 	pflag.Uint32("self-id", 0, "The id for this replica.")
 	pflag.Int("view-change", 100, "How many views before leader change with round-robin pacemaker")
 	pflag.Int("batch-size", 100, "How many commands are batched together for each proposal")
@@ -119,6 +121,18 @@ func main() {
 				log.Fatal("Could not write fgprof profile: ", err)
 			}
 		}()
+	}
+
+	if *traceFile != "" {
+		f, err := os.Create(*traceFile)
+		if err != nil {
+			log.Fatal("Could not create trace file: ", err)
+		}
+		defer f.Close()
+		if err := trace.Start(f); err != nil {
+			log.Fatal("Failed to start trace: ", err)
+		}
+		defer trace.Stop()
 	}
 
 	viper.BindPFlags(pflag.CommandLine)

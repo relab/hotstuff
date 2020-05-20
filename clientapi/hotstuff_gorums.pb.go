@@ -327,7 +327,7 @@ func NewManager(opts ...ManagerOption) (*Manager, error) {
 	if m.opts.idMapping != nil {
 		for naddr, id := range m.opts.idMapping {
 			if m.lookup[id] != nil {
-				err := fmt.Errorf("two node ids are identical(id %d). Node ids has to be unique!", id)
+				err := fmt.Errorf("Two node ids are identical(id %d). Node ids have to be unique", id)
 				return nil, ManagerCreationError(err)
 			}
 			nodeAddrs = append(nodeAddrs, naddr)
@@ -981,7 +981,7 @@ type orderedNodeStream struct {
 	gorumsClient ordering.GorumsClient
 	gorumsStream ordering.Gorums_NodeStreamClient
 	streamMut    sync.RWMutex
-	streamBroken bool
+	streamBroken uint32
 }
 
 func (s *orderedNodeStream) connectOrderedStream(ctx context.Context, conn *grpc.ClientConn) error {
@@ -1005,7 +1005,7 @@ func (s *orderedNodeStream) sendMsgs(ctx context.Context) {
 		case req = <-s.sendQ:
 		}
 		// return error if stream is broken
-		if s.streamBroken {
+		if atomic.LoadUint32(&s.streamBroken) == 1 {
 			err := status.Errorf(codes.Unavailable, "stream is down")
 			s.putResult(req.metadata.MessageID, &orderingResult{nid: s.node.ID(), reply: nil, err: err})
 			continue
@@ -1017,7 +1017,7 @@ func (s *orderedNodeStream) sendMsgs(ctx context.Context) {
 			s.streamMut.RUnlock()
 			continue
 		}
-		s.streamBroken = true
+		atomic.StoreUint32(&s.streamBroken, 1)
 		s.streamMut.RUnlock()
 		s.node.setLastErr(err)
 		// return the error
@@ -1031,7 +1031,7 @@ func (s *orderedNodeStream) recvMsgs(ctx context.Context) {
 		s.streamMut.RLock()
 		err := s.gorumsStream.RecvMsg(resp)
 		if err != nil {
-			s.streamBroken = true
+			atomic.StoreUint32(&s.streamBroken, 1)
 			s.streamMut.RUnlock()
 			s.node.setLastErr(err)
 			// attempt to reconnect
@@ -1059,7 +1059,7 @@ func (s *orderedNodeStream) reconnectStream(ctx context.Context) {
 		var err error
 		s.gorumsStream, err = s.gorumsClient.NodeStream(ctx)
 		if err == nil {
-			s.streamBroken = false
+			atomic.StoreUint32(&s.streamBroken, 0)
 			return
 		}
 		s.node.setLastErr(err)
@@ -1157,6 +1157,7 @@ func WithServerBufferSize(size uint) ServerOption {
 	}
 }
 
+// WithGRPCServerOptions allows to set gRPC options for the server.
 func WithGRPCServerOptions(opts ...grpc.ServerOption) ServerOption {
 	return func(o *serverOptions) {
 		o.grpcOpts = append(o.grpcOpts, opts...)
