@@ -92,6 +92,8 @@ type HotStuff struct {
 	qcHigh  *QuorumCert
 	nodes   NodeStorage
 
+	Sigs *SignatureVerifier
+
 	// the duration that hotstuff can wait for an out-of-order message
 	waitDuration time.Duration
 	waitProposal *waitutil.WaitUtil
@@ -170,6 +172,7 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, backend
 		bLeaf:          genesis,
 		qcHigh:         qcForGenesis,
 		nodes:          nodes,
+		Sigs:           NewSignatureVerifier(config),
 		waitDuration:   waitDuration,
 		waitProposal:   waitutil.NewWaitUtil(),
 		pmNotifyChan:   make(chan Notification, 10),
@@ -214,7 +217,7 @@ func (hs *HotStuff) expectNodeFor(qc *QuorumCert) (node *Node, ok bool) {
 // UpdateQCHigh updates the qc held by the paceMaker, to the newest qc.
 func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
 	logger.Println("UpdateQCHigh")
-	if !VerifyQuorumCert(hs.ReplicaConfig, qc) {
+	if !hs.Sigs.VerifyQuorumCert(qc) {
 		logger.Println("QC not verified!: ", qc)
 		return false
 	}
@@ -363,6 +366,7 @@ func (hs *HotStuff) update(node *Node) {
 	// Free up space by deleting old data
 	hs.nodes.GarbageCollectNodes(hs.GetVotedHeight())
 	hs.cmdCache.TrimToLen(hs.BatchSize * 5)
+	hs.Sigs.EvictOld(hs.QuorumSize * 5)
 }
 
 func (hs *HotStuff) commit(node *Node) {

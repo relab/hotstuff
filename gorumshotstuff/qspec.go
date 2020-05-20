@@ -8,6 +8,7 @@ import (
 )
 
 type hotstuffQSpec struct {
+	*hotstuff.SignatureVerifier
 	*hotstuff.ReplicaConfig
 	verified map[*proto.PartialCert]bool
 	jobs     chan struct {
@@ -34,7 +35,7 @@ func (qspec *hotstuffQSpec) ProposeQF(req *proto.HSNode, replies []*proto.Partia
 			qspec.wg.Add(1)
 			go func(pc *proto.PartialCert) {
 				cert := pc.FromProto()
-				ok := hotstuff.VerifyPartialCert(qspec.ReplicaConfig, cert)
+				ok := qspec.VerifySignature(cert.Sig, cert.NodeHash)
 				qspec.jobs <- struct {
 					pc *proto.PartialCert
 					ok bool
