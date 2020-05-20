@@ -26,6 +26,7 @@ func (h NodeHash) String() string {
 
 // Node represents a node in the tree of commands
 type Node struct {
+	hash       *NodeHash
 	ParentHash NodeHash
 	Commands   []Command
 	Justify    *QuorumCert
@@ -40,20 +41,32 @@ func (n Node) String() string {
 
 // Hash returns a hash digest of the node.
 func (n Node) Hash() NodeHash {
-	// add the fields that should be hashed to a single slice
-	var toHash []byte
-	toHash = append(toHash, n.ParentHash[:]...)
+	// return cached hash if available
+	if n.hash != nil {
+		return *n.hash
+	}
+
+	s256 := sha256.New()
+
+	s256.Write(n.ParentHash[:])
+
 	height := make([]byte, 8)
 	binary.LittleEndian.PutUint64(height, uint64(n.Height))
-	toHash = append(toHash, height...)
-	// TODO: Figure out if this ever occurs in practice (genesis node?)
+	s256.Write(height[:])
+
 	if n.Justify != nil {
-		toHash = append(toHash, n.Justify.toBytes()...)
+		s256.Write(n.Justify.toBytes())
 	}
+
 	for _, cmd := range n.Commands {
-		toHash = append(toHash, cmd...)
+		s256.Write([]byte(cmd))
 	}
-	return sha256.Sum256(toHash)
+
+	n.hash = new(NodeHash)
+	sum := s256.Sum(nil)
+	copy(n.hash[:], sum)
+
+	return *n.hash
 }
 
 // MapStorage is a simple implementation of NodeStorage that uses a concurrent map.
