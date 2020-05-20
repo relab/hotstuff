@@ -48,3 +48,28 @@ func TestFuzzNodeHash(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkNodeHash(b *testing.B) {
+	pk1, _ := GeneratePrivateKey()
+	pk2, _ := GeneratePrivateKey()
+	pk3, _ := GeneratePrivateKey()
+
+	parent := &Node{Commands: []Command{"Test"}}
+
+	node := &Node{Commands: []Command{"Hello world"}, ParentHash: parent.Hash()}
+
+	node.Justify = CreateQuorumCert(parent)
+	pc1, _ := CreatePartialCert(1, pk1, parent)
+	node.Justify.AddPartial(pc1)
+	pc2, _ := CreatePartialCert(2, pk2, parent)
+	node.Justify.AddPartial(pc2)
+	pc3, _ := CreatePartialCert(3, pk3, parent)
+	node.Justify.AddPartial(pc3)
+
+	for n := 0; n < b.N; n++ {
+		b.StopTimer()
+		node.hash = nil
+		b.StartTimer()
+		node.Hash()
+	}
+}
