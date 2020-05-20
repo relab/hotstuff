@@ -297,7 +297,7 @@ func (hs *HotStuff) OnReceiveProposal(node *Node) (*PartialCert, error) {
 	// queue node for update
 	hs.pendingUpdates <- node
 
-	pc, err := CreatePartialCert(hs.id, hs.privKey, node)
+	pc, err := hs.Sigs.CreatePartialCert(hs.id, hs.privKey, node)
 	if err != nil {
 		return nil, err
 	}

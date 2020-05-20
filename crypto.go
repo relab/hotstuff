@@ -29,6 +29,22 @@ func NewSignatureVerifier(conf *ReplicaConfig) *SignatureVerifier {
 	}
 }
 
+// CreatePartialCert creates a partial cert from a node.
+func (s *SignatureVerifier) CreatePartialCert(id ReplicaID, privKey *ecdsa.PrivateKey, node *Node) (*PartialCert, error) {
+	hash := node.Hash()
+	R, S, err := ecdsa.Sign(rand.Reader, privKey, hash[:])
+	if err != nil {
+		return nil, err
+	}
+	sig := PartialSig{id, R, S}
+	k := string(sig.toBytes())
+	s.mut.Lock()
+	s.verifiedSignatures[k] = true
+	s.cache.PushBack(k)
+	s.mut.Unlock()
+	return &PartialCert{sig, hash}, nil
+}
+
 // VerifySignature verifies a partial signature
 func (s *SignatureVerifier) VerifySignature(sig PartialSig, hash NodeHash) bool {
 	k := string(sig.toBytes())
