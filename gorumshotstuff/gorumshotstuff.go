@@ -43,6 +43,7 @@ type GorumsHotStuff struct {
 	connectTimeout time.Duration
 }
 
+//New creates a new GorumsHotStuff backend object.
 func New(connectTimeout, qcTimeout time.Duration) *GorumsHotStuff {
 	return &GorumsHotStuff{
 		replicaInfo:    make(map[hotstuff.ReplicaID]*gorumsReplica),
@@ -51,15 +52,17 @@ func New(connectTimeout, qcTimeout time.Duration) *GorumsHotStuff {
 	}
 }
 
-func (hs *GorumsHotStuff) DoPropose(node *hotstuff.Node) (*hotstuff.QuorumCert, error) {
+//DoPropose is the interface between backend and consensus logic when sending a propoasl.
+func (hs *GorumsHotStuff) DoPropose(block *hotstuff.Block) (*hotstuff.QuorumCert, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), hs.qcTimeout)
 	defer cancel()
-	pb := proto.NodeToProto(node)
+	pb := proto.BlockToProto(block)
 	hs.qspec.Reset()
 	pqc, err := hs.config.Propose(ctx, pb)
 	return pqc.FromProto(), err
 }
 
+//DoNewView is the interface between backend and consensus lgoic  when sending a new view message.
 func (hs *GorumsHotStuff) DoNewView(id hotstuff.ReplicaID, qc *hotstuff.QuorumCert) error {
 	ctx, cancel := context.WithTimeout(context.Background(), hs.qcTimeout)
 	defer cancel()
@@ -82,6 +85,7 @@ func (hs *GorumsHotStuff) Init(hsc *hotstuff.HotStuff) {
 	}
 }
 
+//Start starts the server and client
 func (hs *GorumsHotStuff) Start() error {
 	addr := hs.replicaInfo[hs.GetID()].Address
 	err := hs.startServer(addr)
@@ -164,8 +168,8 @@ func (hs *GorumsHotStuff) Close() {
 }
 
 // Propose handles a replica's response to the Propose QC from the leader
-func (hs *GorumsHotStuff) Propose(node *proto.HSNode) *proto.PartialCert {
-	p, err := hs.OnReceiveProposal(node.FromProto())
+func (hs *GorumsHotStuff) Propose(block *proto.Block) *proto.PartialCert {
+	p, err := hs.OnReceiveProposal(block.FromProto())
 	if err != nil {
 		logger.Println("OnReceiveProposal returned with error: ", err)
 		return &proto.PartialCert{}

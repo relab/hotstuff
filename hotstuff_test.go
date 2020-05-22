@@ -10,7 +10,7 @@ type stubBackend struct{}
 
 func (d *stubBackend) Init(hs *HotStuff)                                {}
 func (d *stubBackend) Start() error                                     { return nil }
-func (d *stubBackend) DoPropose(node *Node) (*QuorumCert, error)        { return nil, nil }
+func (d *stubBackend) DoPropose(block *Block) (*QuorumCert, error)      { return nil, nil }
 func (d *stubBackend) DoNewView(leader ReplicaID, qc *QuorumCert) error { return nil }
 func (d *stubBackend) Close()                                           {}
 
@@ -61,13 +61,13 @@ func (d *stubBackend) Close()                                           {}
 func TestUpdateQCHigh(t *testing.T) {
 	key, _ := GeneratePrivateKey()
 	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, nil)
-	node1 := CreateLeaf(hs.genesis, []Command{Command("command1")}, hs.qcHigh, hs.genesis.Height+1)
-	hs.nodes.Put(node1)
-	qc1 := CreateQuorumCert(node1)
+	block1 := CreateLeaf(hs.genesis, []Command{Command("command1")}, hs.qcHigh, hs.genesis.Height+1)
+	hs.blocks.Put(block1)
+	qc1 := CreateQuorumCert(block1)
 
 	if hs.UpdateQCHigh(qc1) {
-		if hs.bLeaf.Hash() != node1.Hash() {
-			t.Error("UpdateQCHigh failed to update the leaf node")
+		if hs.bLeaf.Hash() != block1.Hash() {
+			t.Error("UpdateQCHigh failed to update the leaf block")
 		}
 		if !bytes.Equal(hs.qcHigh.toBytes(), qc1.toBytes()) {
 			t.Error("UpdateQCHigh failed to update qcHigh")
@@ -77,8 +77,8 @@ func TestUpdateQCHigh(t *testing.T) {
 		t.Error("UpdateQCHigh failed to complete")
 	}
 
-	node2 := CreateLeaf(node1, []Command{Command("command2")}, qc1, node1.Height+1)
-	qc2 := CreateQuorumCert(node2)
+	block2 := CreateLeaf(block1, []Command{Command("command2")}, qc1, block1.Height+1)
+	qc2 := CreateQuorumCert(block2)
 	hs.UpdateQCHigh(qc2)
 
 	if hs.UpdateQCHigh(qc1) {
@@ -94,13 +94,13 @@ func TestUpdate(t *testing.T) {
 	hs.QuorumSize = 0 // this accepts all QCs
 
 	n1 := CreateLeaf(hs.genesis, []Command{Command("n1")}, hs.qcHigh, hs.genesis.Height+1)
-	hs.nodes.Put(n1)
+	hs.blocks.Put(n1)
 	n2 := CreateLeaf(n1, []Command{Command("n2")}, CreateQuorumCert(n1), n1.Height+1)
-	hs.nodes.Put(n2)
+	hs.blocks.Put(n2)
 	n3 := CreateLeaf(n2, []Command{Command("n3")}, CreateQuorumCert(n2), n2.Height+1)
-	hs.nodes.Put(n3)
+	hs.blocks.Put(n3)
 	n4 := CreateLeaf(n3, []Command{Command("n4")}, CreateQuorumCert(n3), n3.Height+1)
-	hs.nodes.Put(n4)
+	hs.blocks.Put(n4)
 
 	// PROPOSE on n1
 	hs.update(n1)
@@ -144,10 +144,10 @@ func TestUpdate(t *testing.T) {
 func TestOnReciveProposal(t *testing.T) {
 	key, _ := GeneratePrivateKey()
 	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, nil)
-	node1 := CreateLeaf(hs.genesis, []Command{Command("command1")}, hs.qcHigh, hs.genesis.Height+1)
-	qc := CreateQuorumCert(node1)
+	block1 := CreateLeaf(hs.genesis, []Command{Command("command1")}, hs.qcHigh, hs.genesis.Height+1)
+	qc := CreateQuorumCert(block1)
 
-	pc, err := hs.OnReceiveProposal(node1)
+	pc, err := hs.OnReceiveProposal(block1)
 
 	if err != nil {
 		t.Errorf("onReciveProposal failed with error: %w", err)
@@ -156,39 +156,39 @@ func TestOnReciveProposal(t *testing.T) {
 	if pc == nil {
 		t.Error("onReciveProposal failed to complete")
 	} else {
-		if _, ok := hs.nodes.Get(node1.Hash()); !ok {
+		if _, ok := hs.blocks.Get(block1.Hash()); !ok {
 			t.Error("onReciveProposal failed to place the new node in NodeStorage")
 		}
-		if hs.vHeight != node1.Height {
+		if hs.vHeight != block1.Height {
 			t.Error("onReciveProposal failed to update the heigt of the replica")
 		}
 	}
 
-	node2 := CreateLeaf(node1, []Command{Command("command2")}, qc, node1.Height+1)
+	block2 := CreateLeaf(block1, []Command{Command("command2")}, qc, block1.Height+1)
 
-	hs.OnReceiveProposal(node2)
-	pc, err = hs.OnReceiveProposal(node1)
+	hs.OnReceiveProposal(block2)
+	pc, err = hs.OnReceiveProposal(block1)
 
 	if err == nil {
-		t.Error("Node got accepted, expected rejection.")
+		t.Error("Block got accepted, expected rejection.")
 	}
 	if pc != nil {
 		t.Errorf("Expected nil got: %v", pc)
 	}
 }
 
-func TestExpectNodeFor(t *testing.T) {
+func TestExpectBlockFor(t *testing.T) {
 	key, _ := GeneratePrivateKey()
 	hs := New(1, key, NewConfig(), &stubBackend{}, time.Second, nil)
-	node := CreateLeaf(hs.genesis, []Command{Command("test")}, hs.qcHigh, 1)
-	qc := CreateQuorumCert(node)
+	block := CreateLeaf(hs.genesis, []Command{Command("test")}, hs.qcHigh, 1)
+	qc := CreateQuorumCert(block)
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		hs.OnReceiveProposal(node)
+		hs.OnReceiveProposal(block)
 	}()
 
-	n, ok := hs.expectNodeFor(qc)
+	n, ok := hs.expectBlockFor(qc)
 	if !ok && n == nil {
 		t.Fail()
 	}

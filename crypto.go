@@ -30,8 +30,8 @@ func NewSignatureCache(conf *ReplicaConfig) *SignatureCache {
 }
 
 // CreatePartialCert creates a partial cert from a node.
-func (s *SignatureCache) CreatePartialCert(id ReplicaID, privKey *ecdsa.PrivateKey, node *Node) (*PartialCert, error) {
-	hash := node.Hash()
+func (s *SignatureCache) CreatePartialCert(id ReplicaID, privKey *ecdsa.PrivateKey, block *Block) (*PartialCert, error) {
+	hash := block.Hash()
 	R, S, err := ecdsa.Sign(rand.Reader, privKey, hash[:])
 	if err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (s *SignatureCache) CreatePartialCert(id ReplicaID, privKey *ecdsa.PrivateK
 }
 
 // VerifySignature verifies a partial signature
-func (s *SignatureCache) VerifySignature(sig PartialSig, hash NodeHash) bool {
+func (s *SignatureCache) VerifySignature(sig PartialSig, hash BlockHash) bool {
 	k := string(sig.toBytes())
 
 	s.mut.Lock()
@@ -80,7 +80,7 @@ func (s *SignatureCache) VerifyQuorumCert(qc *QuorumCert) bool {
 	for _, psig := range qc.Sigs {
 		wg.Add(1)
 		go func(psig PartialSig) {
-			if s.VerifySignature(psig, qc.NodeHash) {
+			if s.VerifySignature(psig, qc.BlockHash) {
 				atomic.AddUint64(&numVerified, 1)
 			}
 			wg.Done()
@@ -119,19 +119,19 @@ func (psig PartialSig) toBytes() []byte {
 
 // PartialCert is a single replica's certificate for a node.
 type PartialCert struct {
-	Sig      PartialSig
-	NodeHash NodeHash
+	Sig       PartialSig
+	BlockHash BlockHash
 }
 
-// QuorumCert is a certificate for a node from a quorum of replicas.
+// QuorumCert is a certificate for a block from a quorum of replicas.
 type QuorumCert struct {
-	Sigs     map[ReplicaID]PartialSig
-	NodeHash NodeHash
+	Sigs      map[ReplicaID]PartialSig
+	BlockHash BlockHash
 }
 
 func (qc *QuorumCert) toBytes() []byte {
 	b := make([]byte, 0, 32)
-	b = append(b, qc.NodeHash[:]...)
+	b = append(b, qc.BlockHash[:]...)
 	psigs := make([]PartialSig, 0, len(qc.Sigs))
 	for _, v := range qc.Sigs {
 		i := sort.Search(len(psigs), func(j int) bool {
@@ -148,7 +148,7 @@ func (qc *QuorumCert) toBytes() []byte {
 }
 
 func (qc *QuorumCert) String() string {
-	return fmt.Sprintf("QuorumCert{Sigs: %d, Hash: %.8s}", len(qc.Sigs), qc.NodeHash)
+	return fmt.Sprintf("QuorumCert{Sigs: %d, Hash: %.8s}", len(qc.Sigs), qc.BlockHash)
 }
 
 // AddPartial adds the partial signature to the quorum cert.
@@ -158,7 +158,7 @@ func (qc *QuorumCert) AddPartial(cert *PartialCert) error {
 		return fmt.Errorf("Attempt to add partial cert from same replica twice")
 	}
 
-	if !bytes.Equal(qc.NodeHash[:], cert.NodeHash[:]) {
+	if !bytes.Equal(qc.BlockHash[:], cert.BlockHash[:]) {
 		return fmt.Errorf("Partial cert hash does not match quorum cert")
 	}
 
@@ -167,9 +167,9 @@ func (qc *QuorumCert) AddPartial(cert *PartialCert) error {
 	return nil
 }
 
-// CreatePartialCert creates a partial cert from a node.
-func CreatePartialCert(id ReplicaID, privKey *ecdsa.PrivateKey, node *Node) (*PartialCert, error) {
-	hash := node.Hash()
+// CreatePartialCert creates a partial cert from a block.
+func CreatePartialCert(id ReplicaID, privKey *ecdsa.PrivateKey, block *Block) (*PartialCert, error) {
+	hash := block.Hash()
 	r, s, err := ecdsa.Sign(rand.Reader, privKey, hash[:])
 	if err != nil {
 		return nil, err
@@ -185,12 +185,12 @@ func VerifyPartialCert(conf *ReplicaConfig, cert *PartialCert) bool {
 		logger.Printf("VerifyPartialSig: got signature from replica whose ID (%d) was not in config.", cert.Sig.ID)
 		return false
 	}
-	return ecdsa.Verify(info.PubKey, cert.NodeHash[:], cert.Sig.R, cert.Sig.S)
+	return ecdsa.Verify(info.PubKey, cert.BlockHash[:], cert.Sig.R, cert.Sig.S)
 }
 
 // CreateQuorumCert creates an empty quorum certificate for a given node
-func CreateQuorumCert(node *Node) *QuorumCert {
-	return &QuorumCert{NodeHash: node.Hash(), Sigs: make(map[ReplicaID]PartialSig)}
+func CreateQuorumCert(block *Block) *QuorumCert {
+	return &QuorumCert{BlockHash: block.Hash(), Sigs: make(map[ReplicaID]PartialSig)}
 }
 
 // VerifyQuorumCert will verify a QuorumCert from public keys stored in ReplicaConfig
@@ -207,7 +207,7 @@ func VerifyQuorumCert(conf *ReplicaConfig, qc *QuorumCert) bool {
 		}
 		wg.Add(1)
 		go func(psig PartialSig) {
-			if ecdsa.Verify(info.PubKey, qc.NodeHash[:], psig.R, psig.S) {
+			if ecdsa.Verify(info.PubKey, qc.BlockHash[:], psig.R, psig.S) {
 				atomic.AddUint64(&numVerified, 1)
 			}
 			wg.Done()

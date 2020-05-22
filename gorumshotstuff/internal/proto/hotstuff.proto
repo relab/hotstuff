@@ -7,7 +7,7 @@ import "github.com/relab/gorums/gorums.proto";
 option go_package = "github.com/relab/hotstuff/gorumshotstuff/internal/proto";
 
 service Hotstuff {
-	rpc Propose(HSNode) returns (PartialCert) {
+	rpc Propose(Block) returns (PartialCert) {
 		option (gorums.quorumcall) = true;
 		option (gorums.ordered) = true;
 		option (gorums.custom_return_type) = "QuorumCert";
@@ -17,7 +17,7 @@ service Hotstuff {
 	}
 }
 
-message HSNode {
+message Block {
 	bytes ParentHash = 1;
 	QuorumCert QC = 2;
 	int64 Height = 3;
