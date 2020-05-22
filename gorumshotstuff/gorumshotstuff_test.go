@@ -70,15 +70,13 @@ func TestHotStuff(t *testing.T) {
 	}
 
 	for id := range replicas {
-		fail := false
 		select {
 		case o := <-out[id]:
-			fail = o[0] != test[0]
-		default:
-			fail = true
-		}
-		if fail {
-			t.Errorf("Replica %d: Incorrect output!", id)
+			if o[0] != test[0] {
+				t.Errorf("Replica %d: Incorrect output! (Want: DECIDE, got %s)", id, o[0])
+			}
+		case <-time.After(10 * time.Second):
+			t.Errorf("Replica %d: No output!", id)
 		}
 	}
 
