@@ -93,7 +93,7 @@ func (s *SignatureCache) VerifyQuorumCert(qc *QuorumCert) bool {
 // EvictOld reduces the size of the cache by removing the oldest cached results
 func (s *SignatureCache) EvictOld(size int) {
 	s.mut.Lock()
-	for length := s.cache.Len(); length >= size; length-- {
+	for length := s.cache.Len(); length > size; length-- {
 		el := s.cache.Front()
 		k := s.cache.Remove(el).(string)
 		delete(s.verifiedSignatures, k)
