@@ -13,24 +13,24 @@ import (
 	"sync/atomic"
 )
 
-// SignatureVerifier keeps a cache of verified signatures in order to speed up verification
-type SignatureVerifier struct {
+// SignatureCache keeps a cache of verified signatures in order to speed up verification
+type SignatureCache struct {
 	conf               *ReplicaConfig
 	verifiedSignatures map[string]bool
 	cache              list.List
 	mut                sync.Mutex
 }
 
-// NewSignatureVerifier returns a new instance of SignatureVerifier
-func NewSignatureVerifier(conf *ReplicaConfig) *SignatureVerifier {
-	return &SignatureVerifier{
+// NewSignatureCache returns a new instance of SignatureVerifier
+func NewSignatureCache(conf *ReplicaConfig) *SignatureCache {
+	return &SignatureCache{
 		conf:               conf,
 		verifiedSignatures: make(map[string]bool),
 	}
 }
 
 // CreatePartialCert creates a partial cert from a node.
-func (s *SignatureVerifier) CreatePartialCert(id ReplicaID, privKey *ecdsa.PrivateKey, node *Node) (*PartialCert, error) {
+func (s *SignatureCache) CreatePartialCert(id ReplicaID, privKey *ecdsa.PrivateKey, node *Node) (*PartialCert, error) {
 	hash := node.Hash()
 	R, S, err := ecdsa.Sign(rand.Reader, privKey, hash[:])
 	if err != nil {
@@ -46,7 +46,7 @@ func (s *SignatureVerifier) CreatePartialCert(id ReplicaID, privKey *ecdsa.Priva
 }
 
 // VerifySignature verifies a partial signature
-func (s *SignatureVerifier) VerifySignature(sig PartialSig, hash NodeHash) bool {
+func (s *SignatureCache) VerifySignature(sig PartialSig, hash NodeHash) bool {
 	k := string(sig.toBytes())
 
 	s.mut.Lock()
@@ -71,7 +71,7 @@ func (s *SignatureVerifier) VerifySignature(sig PartialSig, hash NodeHash) bool 
 }
 
 // VerifyQuorumCert verifies a quorum certificate
-func (s *SignatureVerifier) VerifyQuorumCert(qc *QuorumCert) bool {
+func (s *SignatureCache) VerifyQuorumCert(qc *QuorumCert) bool {
 	if len(qc.Sigs) < s.conf.QuorumSize {
 		return false
 	}
@@ -91,7 +91,7 @@ func (s *SignatureVerifier) VerifyQuorumCert(qc *QuorumCert) bool {
 }
 
 // EvictOld reduces the size of the cache by removing the oldest cached results
-func (s *SignatureVerifier) EvictOld(size int) {
+func (s *SignatureCache) EvictOld(size int) {
 	s.mut.Lock()
 	for length := s.cache.Len(); length >= size; length-- {
 		el := s.cache.Front()

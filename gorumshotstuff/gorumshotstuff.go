@@ -128,8 +128,8 @@ func (hs *GorumsHotStuff) startClient(connectTimeout time.Duration) error {
 	}
 
 	hs.qspec = &hotstuffQSpec{
-		SignatureVerifier: hs.Sigs,
-		ReplicaConfig:     hs.ReplicaConfig,
+		SignatureCache: hs.SigCache,
+		ReplicaConfig:  hs.ReplicaConfig,
 	}
 
 	hs.config, err = hs.manager.NewConfiguration(hs.manager.NodeIDs(), hs.qspec)

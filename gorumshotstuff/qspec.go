@@ -8,7 +8,7 @@ import (
 )
 
 type hotstuffQSpec struct {
-	*hotstuff.SignatureVerifier
+	*hotstuff.SignatureCache
 	*hotstuff.ReplicaConfig
 	verified map[*proto.PartialCert]bool
 	jobs     chan struct {

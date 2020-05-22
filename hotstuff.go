@@ -92,7 +92,7 @@ type HotStuff struct {
 	qcHigh  *QuorumCert
 	nodes   NodeStorage
 
-	Sigs *SignatureVerifier
+	SigCache *SignatureCache
 
 	// the duration that hotstuff can wait for an out-of-order message
 	waitDuration time.Duration
@@ -172,7 +172,7 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, backend
 		bLeaf:          genesis,
 		qcHigh:         qcForGenesis,
 		nodes:          nodes,
-		Sigs:           NewSignatureVerifier(config),
+		SigCache:       NewSignatureCache(config),
 		waitDuration:   waitDuration,
 		waitProposal:   waitutil.NewWaitUtil(),
 		pmNotifyChan:   make(chan Notification, 10),
@@ -217,7 +217,7 @@ func (hs *HotStuff) expectNodeFor(qc *QuorumCert) (node *Node, ok bool) {
 // UpdateQCHigh updates the qc held by the paceMaker, to the newest qc.
 func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
 	logger.Println("UpdateQCHigh")
-	if !hs.Sigs.VerifyQuorumCert(qc) {
+	if !hs.SigCache.VerifyQuorumCert(qc) {
 		logger.Println("QC not verified!: ", qc)
 		return false
 	}
@@ -297,7 +297,7 @@ func (hs *HotStuff) OnReceiveProposal(node *Node) (*PartialCert, error) {
 	// queue node for update
 	hs.pendingUpdates <- node
 
-	pc, err := hs.Sigs.CreatePartialCert(hs.id, hs.privKey, node)
+	pc, err := hs.SigCache.CreatePartialCert(hs.id, hs.privKey, node)
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +366,7 @@ func (hs *HotStuff) update(node *Node) {
 	// Free up space by deleting old data
 	hs.nodes.GarbageCollectNodes(hs.GetVotedHeight())
 	hs.cmdCache.TrimToLen(hs.BatchSize * 5)
-	hs.Sigs.EvictOld(hs.QuorumSize * 5)
+	hs.SigCache.EvictOld(hs.QuorumSize * 5)
 }
 
 func (hs *HotStuff) commit(node *Node) {
