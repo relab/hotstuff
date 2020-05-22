@@ -27,7 +27,7 @@ func (qspec *hotstuffQSpec) Reset() {
 }
 
 // ProposeQF takes replies from replica after the leader calls the Propose QC and collects them into a quorum cert
-func (qspec *hotstuffQSpec) ProposeQF(req *proto.HSNode, replies []*proto.PartialCert) (*proto.QuorumCert, bool) {
+func (qspec *hotstuffQSpec) ProposeQF(req *proto.Block, replies []*proto.PartialCert) (*proto.QuorumCert, bool) {
 	numVerified := 0
 	for _, pc := range replies {
 		if ok, verifiedBefore := qspec.verified[pc]; !verifiedBefore {
@@ -35,7 +35,7 @@ func (qspec *hotstuffQSpec) ProposeQF(req *proto.HSNode, replies []*proto.Partia
 			qspec.wg.Add(1)
 			go func(pc *proto.PartialCert) {
 				cert := pc.FromProto()
-				ok := qspec.VerifySignature(cert.Sig, cert.NodeHash)
+				ok := qspec.VerifySignature(cert.Sig, cert.BlockHash)
 				qspec.jobs <- struct {
 					pc *proto.PartialCert
 					ok bool

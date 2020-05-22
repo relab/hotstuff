@@ -44,7 +44,7 @@ var biggerRc = &ReplicaConfig{
 	QuorumSize: 3,
 }
 
-var testNode = &Node{
+var testBlock = &Block{
 	Commands: []Command{Command("this is a test")},
 	Height:   0,
 }
@@ -58,7 +58,7 @@ func init() {
 }
 
 func createPartialCert(t *testing.T, id ReplicaID) *PartialCert {
-	pc, err := CreatePartialCert(id, &pk, testNode)
+	pc, err := CreatePartialCert(id, &pk, testBlock)
 	if err != nil {
 		t.Errorf("Failed to create partial certificate: %v\n", err)
 	}
@@ -74,7 +74,7 @@ func TestVerifyPartialCert(t *testing.T) {
 }
 
 func createQuorumCert(t *testing.T) *QuorumCert {
-	qc := CreateQuorumCert(testNode)
+	qc := CreateQuorumCert(testBlock)
 	for k := range biggerRc.Replicas {
 		err := qc.AddPartial(createPartialCert(t, k))
 		if err != nil {
@@ -92,9 +92,9 @@ func TestVerifyQuorumCert(t *testing.T) {
 }
 
 func BenchmarkQuroumCertToBytes(b *testing.B) {
-	qc := CreateQuorumCert(testNode)
+	qc := CreateQuorumCert(testBlock)
 	for _, r := range biggerRc.Replicas {
-		pc, _ := CreatePartialCert(r.ID, &pk, testNode)
+		pc, _ := CreatePartialCert(r.ID, &pk, testBlock)
 		qc.AddPartial(pc)
 	}
 	for n := 0; n < b.N; n++ {
@@ -103,7 +103,7 @@ func BenchmarkQuroumCertToBytes(b *testing.B) {
 }
 
 func BenchmarkPartialSigToBytes(b *testing.B) {
-	pc, _ := CreatePartialCert(0, &pk, testNode)
+	pc, _ := CreatePartialCert(0, &pk, testBlock)
 	for n := 0; n < b.N; n++ {
 		pc.Sig.toBytes()
 	}

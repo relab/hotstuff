@@ -31,7 +31,7 @@ func (pps *PartialSig) FromProto() *hotstuff.PartialSig {
 func PartialCertToProto(p *hotstuff.PartialCert) *PartialCert {
 	return &PartialCert{
 		Sig:  PartialSigToProto(&p.Sig),
-		Hash: p.NodeHash[:],
+		Hash: p.BlockHash[:],
 	}
 }
 
@@ -39,7 +39,7 @@ func (ppc *PartialCert) FromProto() *hotstuff.PartialCert {
 	pc := &hotstuff.PartialCert{
 		Sig: *ppc.GetSig().FromProto(),
 	}
-	copy(pc.NodeHash[:], ppc.GetHash())
+	copy(pc.BlockHash[:], ppc.GetHash())
 	return pc
 }
 
@@ -50,7 +50,7 @@ func QuorumCertToProto(qc *hotstuff.QuorumCert) *QuorumCert {
 	}
 	return &QuorumCert{
 		Sigs: sigs,
-		Hash: qc.NodeHash[:],
+		Hash: qc.BlockHash[:],
 	}
 }
 
@@ -58,7 +58,7 @@ func (pqc *QuorumCert) FromProto() *hotstuff.QuorumCert {
 	qc := &hotstuff.QuorumCert{
 		Sigs: make(map[hotstuff.ReplicaID]hotstuff.PartialSig),
 	}
-	copy(qc.NodeHash[:], pqc.GetHash())
+	copy(qc.BlockHash[:], pqc.GetHash())
 	for _, ppsig := range pqc.GetSigs() {
 		psig := ppsig.FromProto()
 		qc.Sigs[psig.ID] = *psig
@@ -66,12 +66,12 @@ func (pqc *QuorumCert) FromProto() *hotstuff.QuorumCert {
 	return qc
 }
 
-func NodeToProto(n *hotstuff.Node) *HSNode {
+func BlockToProto(n *hotstuff.Block) *Block {
 	commands := make([]*Command, 0, len(n.Commands))
 	for _, cmd := range n.Commands {
 		commands = append(commands, CommandToProto(cmd))
 	}
-	return &HSNode{
+	return &Block{
 		ParentHash: n.ParentHash[:],
 		Commands:   commands,
 		QC:         QuorumCertToProto(n.Justify),
@@ -79,12 +79,12 @@ func NodeToProto(n *hotstuff.Node) *HSNode {
 	}
 }
 
-func (pn *HSNode) FromProto() *hotstuff.Node {
+func (pn *Block) FromProto() *hotstuff.Block {
 	commands := make([]hotstuff.Command, 0, len(pn.GetCommands()))
 	for _, cmd := range pn.GetCommands() {
 		commands = append(commands, cmd.FromProto())
 	}
-	n := &hotstuff.Node{
+	n := &hotstuff.Block{
 		Justify:  pn.GetQC().FromProto(),
 		Height:   int(pn.Height),
 		Commands: commands,

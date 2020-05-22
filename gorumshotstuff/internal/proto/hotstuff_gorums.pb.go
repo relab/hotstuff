@@ -7,13 +7,6 @@ import (
 	context "context"
 	binary "encoding/binary"
 	fmt "fmt"
-	ordering "github.com/relab/gorums/ordering"
-	trace "golang.org/x/net/trace"
-	grpc "google.golang.org/grpc"
-	backoff "google.golang.org/grpc/backoff"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
-	proto "google.golang.org/protobuf/proto"
 	fnv "hash/fnv"
 	io "io"
 	log "log"
@@ -26,6 +19,14 @@ import (
 	sync "sync"
 	atomic "sync/atomic"
 	time "time"
+
+	ordering "github.com/relab/gorums/ordering"
+	trace "golang.org/x/net/trace"
+	grpc "google.golang.org/grpc"
+	backoff "google.golang.org/grpc/backoff"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
+	proto "google.golang.org/protobuf/proto"
 )
 
 // A Configuration represents a static set of nodes on which quorum remote
@@ -775,13 +776,19 @@ func (s *orderedNodeStream) connectOrderedStream(ctx context.Context, conn *grpc
 	if err != nil {
 		return err
 	}
-	go s.sendMsgs()
+	go s.sendMsgs(ctx)
 	go s.recvMsgs(ctx)
 	return nil
 }
 
-func (s *orderedNodeStream) sendMsgs() {
-	for req := range s.sendQ {
+func (s *orderedNodeStream) sendMsgs(ctx context.Context) {
+	var req *ordering.Message
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case req = <-s.sendQ:
+		}
 		// return error if stream is broken
 		if s.streamBroken {
 			err := status.Errorf(codes.Unavailable, "stream is down")
@@ -1000,7 +1007,7 @@ func (n *Node) closeStream() (err error) {
 
 // Propose is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (c *Configuration) Propose(ctx context.Context, in *HSNode, opts ...grpc.CallOption) (resp *QuorumCert, err error) {
+func (c *Configuration) Propose(ctx context.Context, in *Block, opts ...grpc.CallOption) (resp *QuorumCert, err error) {
 
 	// get the ID which will be used to return the correct responses for a request
 	msgID := c.mgr.nextMsgID()
@@ -1063,13 +1070,13 @@ func (c *Configuration) Propose(ctx context.Context, in *HSNode, opts ...grpc.Ca
 
 // ProposeHandler is the server API for the Propose rpc.
 type ProposeHandler interface {
-	Propose(*HSNode) *PartialCert
+	Propose(*Block) *PartialCert
 }
 
 // RegisterProposeHandler sets the handler for Propose.
 func (s *GorumsServer) RegisterProposeHandler(handler ProposeHandler) {
 	s.srv.registerHandler(proposeMethodID, func(in *ordering.Message) *ordering.Message {
-		req := new(HSNode)
+		req := new(Block)
 		err := proto.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}.Unmarshal(in.GetData(), req)
 		// TODO: how to handle marshaling errors here
 		if err != nil {
@@ -1153,8 +1160,8 @@ type QuorumSpec interface {
 	// ordered quorum call method. The in parameter is the request object
 	// supplied to the Propose method at call time, and may or may not
 	// be used by the quorum function. If the in parameter is not needed
-	// you should implement your quorum function with '_ *HSNode'.
-	ProposeQF(in *HSNode, replies []*PartialCert) (*QuorumCert, bool)
+	// you should implement your quorum function with '_ *Block'.
+	ProposeQF(in *Block, replies []*PartialCert) (*QuorumCert, bool)
 }
 
 const hasOrderingMethods = true
