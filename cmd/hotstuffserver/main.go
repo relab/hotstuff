@@ -201,7 +201,7 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *config, replicaConfig *hotst
 		finishedCmds: make(map[hotstuff.Command]chan struct{}),
 		lastExecTime: time.Now().UnixNano(),
 	}
-	srv.backend = gorumshotstuff.New(time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
+	srv.backend = gorumshotstuff.New(time.Minute)
 	srv.hs = hotstuff.New(conf.SelfID, key, replicaConfig, srv.backend, waitDuration, srv.onExec)
 	switch conf.PmType {
 	case "fixed":

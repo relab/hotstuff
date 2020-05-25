@@ -1,6 +1,7 @@
 package gorumshotstuff
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"sync"
 	"testing"
@@ -30,10 +31,10 @@ func TestHotStuff(t *testing.T) {
 	out[4] = make(chan []hotstuff.Command, 4)
 
 	replicas := make(map[hotstuff.ReplicaID]*GorumsHotStuff)
-	replicas[2] = New(10*time.Second, time.Second)
-	replicas[1] = New(10*time.Second, time.Second)
-	replicas[3] = New(10*time.Second, time.Second)
-	replicas[4] = New(10*time.Second, time.Second)
+	replicas[2] = New(10 * time.Second)
+	replicas[1] = New(10 * time.Second)
+	replicas[3] = New(10 * time.Second)
+	replicas[4] = New(10 * time.Second)
 
 	hotstuff.New(1, keys[1], config, replicas[1], 50*time.Millisecond, func(b []hotstuff.Command) { out[1] <- b })
 	hotstuff.New(2, keys[2], config, replicas[2], 50*time.Millisecond, func(b []hotstuff.Command) { out[2] <- b })
@@ -66,7 +67,7 @@ func TestHotStuff(t *testing.T) {
 
 	for _, t := range test {
 		replicas[1].HotStuff.AddCommand(t)
-		replicas[1].HotStuff.Propose()
+		replicas[1].HotStuff.Propose(context.Background())
 	}
 
 	for id := range replicas {

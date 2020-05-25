@@ -2,15 +2,18 @@ package hotstuff
 
 import (
 	"bytes"
+	"context"
 	"testing"
 	"time"
 )
 
 type stubBackend struct{}
 
-func (d *stubBackend) Init(hs *HotStuff)                                {}
-func (d *stubBackend) Start() error                                     { return nil }
-func (d *stubBackend) DoPropose(block *Block) (*QuorumCert, error)      { return nil, nil }
+func (d *stubBackend) Init(hs *HotStuff) {}
+func (d *stubBackend) Start() error      { return nil }
+func (d *stubBackend) DoPropose(ctx context.Context, block *Block) (*QuorumCert, error) {
+	return nil, nil
+}
 func (d *stubBackend) DoNewView(leader ReplicaID, qc *QuorumCert) error { return nil }
 func (d *stubBackend) Close()                                           {}
 

@@ -39,23 +39,19 @@ type GorumsHotStuff struct {
 
 	closeOnce sync.Once
 
-	qcTimeout      time.Duration
 	connectTimeout time.Duration
 }
 
 //New creates a new GorumsHotStuff backend object.
-func New(connectTimeout, qcTimeout time.Duration) *GorumsHotStuff {
+func New(connectTimeout time.Duration) *GorumsHotStuff {
 	return &GorumsHotStuff{
 		replicaInfo:    make(map[hotstuff.ReplicaID]*gorumsReplica),
 		connectTimeout: connectTimeout,
-		qcTimeout:      qcTimeout,
 	}
 }
 
 //DoPropose is the interface between backend and consensus logic when sending a propoasl.
-func (hs *GorumsHotStuff) DoPropose(block *hotstuff.Block) (*hotstuff.QuorumCert, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), hs.qcTimeout)
-	defer cancel()
+func (hs *GorumsHotStuff) DoPropose(ctx context.Context, block *hotstuff.Block) (*hotstuff.QuorumCert, error) {
 	pb := proto.BlockToProto(block)
 	hs.qspec.Reset()
 	pqc, err := hs.config.Propose(ctx, pb)
@@ -63,9 +59,7 @@ func (hs *GorumsHotStuff) DoPropose(block *hotstuff.Block) (*hotstuff.QuorumCert
 }
 
 //DoNewView is the interface between backend and consensus lgoic  when sending a new view message.
-func (hs *GorumsHotStuff) DoNewView(id hotstuff.ReplicaID, qc *hotstuff.QuorumCert) error {
-	ctx, cancel := context.WithTimeout(context.Background(), hs.qcTimeout)
-	defer cancel()
+func (hs *GorumsHotStuff) DoNewView(ctx context.Context, id hotstuff.ReplicaID, qc *hotstuff.QuorumCert) error {
 	info, ok := hs.replicaInfo[id]
 	if !ok {
 		return fmt.Errorf("Replica with id '%d' not found", id)

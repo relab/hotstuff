@@ -69,8 +69,8 @@ type Notification struct {
 type Backend interface {
 	Init(*HotStuff)
 	Start() error
-	DoPropose(*Block) (*QuorumCert, error)
-	DoNewView(ReplicaID, *QuorumCert) error
+	DoPropose(context.Context, *Block) (*QuorumCert, error)
+	DoNewView(context.Context, ReplicaID, *QuorumCert) error
 	Close()
 }
 
@@ -382,7 +382,7 @@ func (hs *HotStuff) commit(block *Block) {
 }
 
 // Propose will fetch a command from the Commands channel and proposes it to the other replicas
-func (hs *HotStuff) Propose() {
+func (hs *HotStuff) Propose(ctx context.Context) {
 	cmds := hs.cmdCache.GetFirst(hs.BatchSize)
 
 	logger.Printf("Propose (%d commands)\n", len(cmds))
@@ -403,7 +403,7 @@ func (hs *HotStuff) Propose() {
 		selfVote <- partialCert
 	}()
 
-	qc, err := hs.DoPropose(newBlock)
+	qc, err := hs.DoPropose(ctx, newBlock)
 
 	if err != nil {
 		logger.Println("ProposeQC finished with error: ", err)
@@ -421,7 +421,7 @@ func (hs *HotStuff) Propose() {
 }
 
 // SendNewView sends a newView message to the leader replica.
-func (hs *HotStuff) SendNewView(leader ReplicaID) error {
+func (hs *HotStuff) SendNewView(ctx context.Context, leader ReplicaID) error {
 	logger.Println("SendNewView")
 	replica := hs.Replicas[leader]
 	if replica == nil {
@@ -432,7 +432,7 @@ func (hs *HotStuff) SendNewView(leader ReplicaID) error {
 		hs.pmNotify(Notification{ReceiveNewView, hs.bLeaf, hs.qcHigh})
 		return nil
 	}
-	err := hs.DoNewView(leader, hs.GetQCHigh())
+	err := hs.DoNewView(ctx, leader, hs.GetQCHigh())
 	if err != nil {
 		logger.Println("Failed to send new view to leader: ", err)
 		return err
