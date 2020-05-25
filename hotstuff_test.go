@@ -157,7 +157,7 @@ func TestOnReciveProposal(t *testing.T) {
 		t.Error("onReciveProposal failed to complete")
 	} else {
 		if _, ok := hs.blocks.Get(block1.Hash()); !ok {
-			t.Error("onReciveProposal failed to place the new node in NodeStorage")
+			t.Error("onReciveProposal failed to place the new block in BlockStorage")
 		}
 		if hs.vHeight != block1.Height {
 			t.Error("onReciveProposal failed to update the heigt of the replica")

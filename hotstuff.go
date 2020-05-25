@@ -233,7 +233,7 @@ func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
 
 	oldQCHighBlock, ok := hs.blocks.BlockOf(hs.qcHigh)
 	if !ok {
-		panic(fmt.Errorf("Node from the old qcHigh missing from storage"))
+		panic(fmt.Errorf("Block from the old qcHigh missing from storage"))
 	}
 
 	if newQCHighBlock.Height > oldQCHighBlock.Height {
@@ -294,7 +294,7 @@ func (hs *HotStuff) OnReceiveProposal(block *Block) (*PartialCert, error) {
 
 	hs.mut.Unlock()
 
-	// queue node for update
+	// queue block for update
 	hs.pendingUpdates <- block
 
 	pc, err := hs.SigCache.CreatePartialCert(hs.id, hs.privKey, block)

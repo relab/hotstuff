@@ -44,7 +44,7 @@ func TestFuzzBlockHash(t *testing.T) {
 		hash1 := testBlock.Hash()
 		hash2 := testBlock.Hash()
 		if !bytes.Equal(hash1[:], hash2[:]) {
-			t.Fatalf("Non-determinism in hash function detected:\nNode: %s\nHash1: %s\nHash2: %s", testBlock, hash1, hash2)
+			t.Fatalf("Non-determinism in hash function detected:\nBlock: %s\nHash1: %s\nHash2: %s", testBlock, hash1, hash2)
 		}
 	}
 }
@@ -56,20 +56,20 @@ func BenchmarkBlockHash(b *testing.B) {
 
 	parent := &Block{Commands: []Command{"Test"}}
 
-	node := &Block{Commands: []Command{"Hello world"}, ParentHash: parent.Hash()}
+	block := &Block{Commands: []Command{"Hello world"}, ParentHash: parent.Hash()}
 
-	node.Justify = CreateQuorumCert(parent)
+	block.Justify = CreateQuorumCert(parent)
 	pc1, _ := CreatePartialCert(1, pk1, parent)
-	node.Justify.AddPartial(pc1)
+	block.Justify.AddPartial(pc1)
 	pc2, _ := CreatePartialCert(2, pk2, parent)
-	node.Justify.AddPartial(pc2)
+	block.Justify.AddPartial(pc2)
 	pc3, _ := CreatePartialCert(3, pk3, parent)
-	node.Justify.AddPartial(pc3)
+	block.Justify.AddPartial(pc3)
 
 	for n := 0; n < b.N; n++ {
 		b.StopTimer()
-		node.hash = nil
+		block.hash = nil
 		b.StartTimer()
-		node.Hash()
+		block.Hash()
 	}
 }

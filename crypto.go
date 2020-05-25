@@ -29,7 +29,7 @@ func NewSignatureCache(conf *ReplicaConfig) *SignatureCache {
 	}
 }
 
-// CreatePartialCert creates a partial cert from a node.
+// CreatePartialCert creates a partial cert from a block.
 func (s *SignatureCache) CreatePartialCert(id ReplicaID, privKey *ecdsa.PrivateKey, block *Block) (*PartialCert, error) {
 	hash := block.Hash()
 	R, S, err := ecdsa.Sign(rand.Reader, privKey, hash[:])
@@ -101,7 +101,7 @@ func (s *SignatureCache) EvictOld(size int) {
 	s.mut.Unlock()
 }
 
-// PartialSig is a single replica's signature of a node.
+// PartialSig is a single replica's signature of a block.
 type PartialSig struct {
 	ID   ReplicaID
 	R, S *big.Int
@@ -117,7 +117,7 @@ func (psig PartialSig) toBytes() []byte {
 	return b
 }
 
-// PartialCert is a single replica's certificate for a node.
+// PartialCert is a single replica's certificate for a block.
 type PartialCert struct {
 	Sig       PartialSig
 	BlockHash BlockHash
@@ -188,7 +188,7 @@ func VerifyPartialCert(conf *ReplicaConfig, cert *PartialCert) bool {
 	return ecdsa.Verify(info.PubKey, cert.BlockHash[:], cert.Sig.R, cert.Sig.S)
 }
 
-// CreateQuorumCert creates an empty quorum certificate for a given node
+// CreateQuorumCert creates an empty quorum certificate for a given block
 func CreateQuorumCert(block *Block) *QuorumCert {
 	return &QuorumCert{BlockHash: block.Hash(), Sigs: make(map[ReplicaID]PartialSig)}
 }
