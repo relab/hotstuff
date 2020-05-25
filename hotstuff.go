@@ -127,15 +127,15 @@ func (hs *HotStuff) GetVotedHeight() int {
 	return hs.vHeight
 }
 
-// GetLeafBlock returns the current leaf node of the tree
-func (hs *HotStuff) GetLeafBlock() *Block {
+// GetLeaf returns the current leaf node of the tree
+func (hs *HotStuff) GetLeaf() *Block {
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
 	return hs.bLeaf
 }
 
-// SetLeafBlock sets the leaf node of the tree
-func (hs *HotStuff) SetLeafBlock(block *Block) {
+// SetLeaf sets the leaf node of the tree
+func (hs *HotStuff) SetLeaf(block *Block) {
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
 	hs.bLeaf = block
