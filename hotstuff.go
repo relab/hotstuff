@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/internal/logging"
-	"github.com/relab/hotstuff/waitutil"
 )
 
 var logger *log.Logger
@@ -94,9 +93,7 @@ type HotStuff struct {
 
 	SigCache *SignatureCache
 
-	// the duration that hotstuff can wait for an out-of-order message
-	waitDuration time.Duration
-	waitProposal *waitutil.WaitUtil
+	waitProposal *sync.Cond
 
 	// Notifications will be sent to pacemaker on this channel
 	pmNotifyChan chan Notification
@@ -173,14 +170,14 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, backend
 		qcHigh:         qcForGenesis,
 		blocks:         blocks,
 		SigCache:       NewSignatureCache(config),
-		waitDuration:   waitDuration,
-		waitProposal:   waitutil.NewWaitUtil(),
 		pmNotifyChan:   make(chan Notification, 10),
 		cmdCache:       newCmdSet(),
 		cancel:         cancel,
 		pendingUpdates: make(chan *Block, 1),
 		Exec:           exec,
 	}
+
+	hs.waitProposal = sync.NewCond(&hs.mut)
 
 	go hs.updateAsync(ctx)
 
@@ -204,13 +201,21 @@ func (hs *HotStuff) pmNotify(n Notification) {
 
 // This function will expect to return the block for the qc if it is delivered within a duration.
 func (hs *HotStuff) expectBlockFor(qc *QuorumCert) (block *Block, ok bool) {
-	hs.waitProposal.WaitCondTimeout(hs.waitDuration, func() bool {
-		block, ok = hs.blocks.BlockOf(qc)
-		return ok
-	})
-	if !ok {
-		logger.Println("ExpectBlockFor: Block not found")
+
+	block, ok = hs.blocks.BlockOf(qc)
+	if ok {
+		return block, ok
 	}
+
+	hs.waitProposal.Wait()
+
+	block, ok = hs.blocks.BlockOf(qc)
+
+	if ok {
+		return block, ok
+	}
+
+	logger.Println("ExpectBlockFor: Block not found")
 	return
 }
 
@@ -253,7 +258,7 @@ func (hs *HotStuff) OnReceiveProposal(block *Block) (*PartialCert, error) {
 	hs.blocks.Put(block)
 
 	// wake anyone waiting for a proposal
-	defer hs.waitProposal.WakeAll()
+	defer hs.waitProposal.Signal()
 
 	qcBlock, nExists := hs.expectBlockFor(block.Justify)
 

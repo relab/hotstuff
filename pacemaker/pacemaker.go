@@ -160,7 +160,6 @@ func (p *RoundRobin) startNewViewTimeout(stopContext context.Context) {
 	for {
 		select {
 		case <-p.resetTimer:
-		case <-p.timeoutContext.Done():
 			p.timeoutContextCancle()
 		case <-stopContext.Done():
 			p.timeoutContextCancle()
