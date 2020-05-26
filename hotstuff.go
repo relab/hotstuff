@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
 	"github.com/relab/hotstuff/internal/logging"
 )
@@ -146,8 +145,7 @@ func (hs *HotStuff) GetQCHigh() *QuorumCert {
 }
 
 // New creates a new Hotstuff instance
-func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, backend Backend,
-	waitDuration time.Duration, exec func([]Command)) *HotStuff {
+func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, backend Backend, exec func([]Command)) *HotStuff {
 	logger.SetPrefix(fmt.Sprintf("hs(id %d): ", id))
 	genesis := &Block{
 		Committed: true,

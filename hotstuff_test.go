@@ -65,7 +65,7 @@ func (d *stubBackend) Close() {}
 
 func TestUpdateQCHigh(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, nil)
+	hs := New(1, key, NewConfig(), &stubBackend{}, nil)
 	block1 := CreateLeaf(hs.genesis, []Command{Command("command1")}, hs.qcHigh, hs.genesis.Height+1)
 	hs.blocks.Put(block1)
 	qc1 := CreateQuorumCert(block1)
@@ -95,7 +95,7 @@ func TestUpdateQCHigh(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	exec := make(chan []Command, 1)
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, func(b []Command) { exec <- b })
+	hs := New(1, key, NewConfig(), &stubBackend{}, func(b []Command) { exec <- b })
 	hs.QuorumSize = 0 // this accepts all QCs
 
 	n1 := CreateLeaf(hs.genesis, []Command{Command("n1")}, hs.qcHigh, hs.genesis.Height+1)
@@ -148,7 +148,7 @@ func TestUpdate(t *testing.T) {
 
 func TestOnReciveProposal(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, nil)
+	hs := New(1, key, NewConfig(), &stubBackend{}, nil)
 	block1 := CreateLeaf(hs.genesis, []Command{Command("command1")}, hs.qcHigh, hs.genesis.Height+1)
 	qc := CreateQuorumCert(block1)
 
@@ -184,7 +184,7 @@ func TestOnReciveProposal(t *testing.T) {
 
 func TestExpectBlockFor(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), &stubBackend{}, time.Second, nil)
+	hs := New(1, key, NewConfig(), &stubBackend{}, nil)
 	block := CreateLeaf(hs.genesis, []Command{Command("test")}, hs.qcHigh, 1)
 	qc := CreateQuorumCert(block)
 
