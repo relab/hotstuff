@@ -190,7 +190,6 @@ type hotstuffServer struct {
 }
 
 func newHotStuffServer(key *ecdsa.PrivateKey, conf *config, replicaConfig *hotstuff.ReplicaConfig) *hotstuffServer {
-	waitDuration := time.Duration(conf.ViewTimeout/2) * time.Millisecond
 	ctx, cancel := context.WithCancel(context.Background())
 	srv := &hotstuffServer{
 		ctx:          ctx,
@@ -202,7 +201,7 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *config, replicaConfig *hotst
 		lastExecTime: time.Now().UnixNano(),
 	}
 	srv.backend = gorumshotstuff.New(time.Minute)
-	srv.hs = hotstuff.New(conf.SelfID, key, replicaConfig, srv.backend, waitDuration, srv.onExec)
+	srv.hs = hotstuff.New(conf.SelfID, key, replicaConfig, srv.backend, srv.onExec)
 	switch conf.PmType {
 	case "fixed":
 		srv.pm = pacemaker.NewFixedLeader(srv.hs, conf.LeaderID)

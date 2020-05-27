@@ -64,6 +64,7 @@ func (d *stubBackend) Close() {}
 } */
 
 func TestUpdateQCHigh(t *testing.T) {
+
 	key, _ := GeneratePrivateKey()
 	hs := New(1, key, NewConfig(), &stubBackend{}, nil)
 	block1 := CreateLeaf(hs.genesis, []Command{Command("command1")}, hs.qcHigh, hs.genesis.Height+1)
@@ -83,7 +84,9 @@ func TestUpdateQCHigh(t *testing.T) {
 	}
 
 	block2 := CreateLeaf(block1, []Command{Command("command2")}, qc1, block1.Height+1)
+	hs.blocks.Put(block2)
 	qc2 := CreateQuorumCert(block2)
+
 	hs.UpdateQCHigh(qc2)
 
 	if hs.UpdateQCHigh(qc1) {

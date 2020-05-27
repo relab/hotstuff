@@ -92,7 +92,7 @@ type HotStuff struct {
 
 	SigCache *SignatureCache
 
-	waitProposal *sync.Cond
+	waitProposal chan struct{}
 
 	// Notifications will be sent to pacemaker on this channel
 	pmNotifyChan chan Notification
@@ -168,6 +168,7 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, backend
 		qcHigh:         qcForGenesis,
 		blocks:         blocks,
 		SigCache:       NewSignatureCache(config),
+		waitProposal:   make(chan struct{}),
 		pmNotifyChan:   make(chan Notification, 10),
 		cmdCache:       newCmdSet(),
 		cancel:         cancel,
@@ -175,12 +176,25 @@ func New(id ReplicaID, privKey *ecdsa.PrivateKey, config *ReplicaConfig, backend
 		Exec:           exec,
 	}
 
-	hs.waitProposal = sync.NewCond(&hs.mut)
-
 	go hs.updateAsync(ctx)
 
 	backend.Init(hs)
 	return hs
+}
+
+// Wait waits for a signal on the waitProposal channel.
+func (hs *HotStuff) Wait() {
+	select {
+	case <-hs.waitProposal:
+	}
+}
+
+// Signal wakes gorutines that has called Wait(). A signal is sent on the waitProposal channel. Signal does not block when called.
+func (hs *HotStuff) Signal() {
+	select {
+	case hs.waitProposal <- struct{}{}:
+	default:
+	}
 }
 
 // AddCommand queues a command for proposal
@@ -205,7 +219,8 @@ func (hs *HotStuff) expectBlockFor(qc *QuorumCert) (block *Block, ok bool) {
 		return block, ok
 	}
 
-	hs.waitProposal.Wait()
+	// Waits for a new proposal to be recived.
+	hs.Wait()
 
 	block, ok = hs.blocks.BlockOf(qc)
 
@@ -256,7 +271,7 @@ func (hs *HotStuff) OnReceiveProposal(block *Block) (*PartialCert, error) {
 	hs.blocks.Put(block)
 
 	// wake anyone waiting for a proposal
-	defer hs.waitProposal.Signal()
+	defer hs.Signal()
 
 	qcBlock, nExists := hs.expectBlockFor(block.Justify)
 

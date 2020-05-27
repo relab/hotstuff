@@ -36,10 +36,10 @@ func TestHotStuff(t *testing.T) {
 	replicas[3] = New(10 * time.Second)
 	replicas[4] = New(10 * time.Second)
 
-	hotstuff.New(1, keys[1], config, replicas[1], 50*time.Millisecond, func(b []hotstuff.Command) { out[1] <- b })
-	hotstuff.New(2, keys[2], config, replicas[2], 50*time.Millisecond, func(b []hotstuff.Command) { out[2] <- b })
-	hotstuff.New(3, keys[3], config, replicas[3], 50*time.Millisecond, func(b []hotstuff.Command) { out[3] <- b })
-	hotstuff.New(4, keys[4], config, replicas[4], 50*time.Millisecond, func(b []hotstuff.Command) { out[4] <- b })
+	hotstuff.New(1, keys[1], config, replicas[1], func(b []hotstuff.Command) { out[1] <- b })
+	hotstuff.New(2, keys[2], config, replicas[2], func(b []hotstuff.Command) { out[2] <- b })
+	hotstuff.New(3, keys[3], config, replicas[3], func(b []hotstuff.Command) { out[3] <- b })
+	hotstuff.New(4, keys[4], config, replicas[4], func(b []hotstuff.Command) { out[4] <- b })
 
 	var wg sync.WaitGroup
 	wg.Add(len(replicas))
