@@ -38,9 +38,8 @@ func NewFixedLeader(hs *hotstuff.HotStuff, leaderID hotstuff.ReplicaID) *FixedLe
 // Run runs the pacemaker which will beat when the previous QC is completed
 func (p FixedLeader) Run(ctx context.Context) {
 	notify := p.GetNotifier()
-	dummyCtx := context.Background()
 	if p.GetID() == p.leader {
-		go p.Propose(dummyCtx)
+		go p.Propose(context.Background())
 	}
 	var n hotstuff.Notification
 	var ok bool
@@ -56,7 +55,7 @@ func (p FixedLeader) Run(ctx context.Context) {
 		switch n.Event {
 		case hotstuff.QCFinish:
 			if p.GetID() == p.leader {
-				go p.Propose(dummyCtx)
+				go p.Propose(context.Background())
 			}
 		}
 	}
@@ -70,10 +69,8 @@ type RoundRobin struct {
 	schedule   []hotstuff.ReplicaID
 	timeout    time.Duration
 
-	resetTimer           chan struct{}   // sending on this channel will reset the timer
-	stopTimeout          func()          // stops the new-view interrupts
-	timeoutContext       context.Context // timeoutContext is passed down to the RPC's. A new context is created for every transmission.
-	timeoutContextCancle func()          // timeoutContext times out after the timeout time in the pacemaker timeout variable.
+	resetTimer  chan struct{} // sending on this channel will reset the timer
+	stopTimeout func()        // stops the new-view interrupts
 }
 
 // NewRoundRobin returns a new round robin pacemaker
@@ -98,15 +95,15 @@ func (p *RoundRobin) Run(ctx context.Context) {
 	notify := p.GetNotifier()
 
 	// set up new-view interrupt
-	p.timeoutContext, p.timeoutContextCancle = context.WithCancel(ctx)
+	timeoutContext, timeoutContextCancle := context.WithCancel(ctx)
 	stopContext, cancel := context.WithCancel(ctx)
 	p.stopTimeout = cancel
-	go p.startNewViewTimeout(stopContext)
+	go p.startNewViewTimeout(stopContext, timeoutContext, timeoutContextCancle)
 	defer p.stopTimeout()
 
 	// initial beat
 	if p.getLeader(1) == p.GetID() {
-		go p.Propose(p.timeoutContext)
+		go p.Propose(timeoutContext)
 	}
 
 	// get initial notification
@@ -129,26 +126,30 @@ func (p *RoundRobin) Run(ctx context.Context) {
 		case hotstuff.ReceiveProposal:
 			p.resetTimer <- struct{}{}
 		case hotstuff.QCFinish:
-			p.timeoutContext, p.timeoutContextCancle = context.WithCancel(ctx)
+			timeoutContextCancle()
+			timeoutContext, timeoutContextCancle = context.WithCancel(ctx)
 			if p.GetID() != p.getLeader(p.GetHeight()+1) {
 				// was leader for previous view, but not the leader for next view
 				// do leader change
-				go p.SendNewView(p.timeoutContext, p.getLeader(p.GetHeight()+1))
+				go p.SendNewView(timeoutContext, p.getLeader(p.GetHeight()+1))
 			}
-			beat(p.timeoutContext)
+			beat(timeoutContext)
 		case hotstuff.ReceiveNewView:
 			p.resetTimer <- struct{}{} // the same timeout mechanisme is used for proposal and new-view messages.
-			p.timeoutContext, p.timeoutContextCancle = context.WithCancel(ctx)
-			beat(p.timeoutContext)
+			timeoutContextCancle()
+			timeoutContext, timeoutContextCancle = context.WithCancel(ctx)
+			beat(timeoutContext)
 		}
 
 		var ok bool
 		select {
 		case n, ok = <-notify:
 			if !ok {
+				timeoutContextCancle()
 				return
 			}
 		case <-ctx.Done():
+			timeoutContextCancle()
 			return
 		}
 	}
@@ -156,21 +157,23 @@ func (p *RoundRobin) Run(ctx context.Context) {
 
 // startNewViewTimeout sends a NewView to the leader if triggered by a timer interrupt. Two contexts are used to control
 // this function; the stopContext is used to stop the function, and the cancelContext is used to cancel a single timer.
-func (p *RoundRobin) startNewViewTimeout(stopContext context.Context) {
+func (p *RoundRobin) startNewViewTimeout(stopContext, timeoutContext context.Context, timeoutContextCancle func()) {
 	for {
 		select {
 		case <-p.resetTimer:
-			p.timeoutContextCancle()
+			if p.HotStuff.GetID() != p.getLeader(p.GetHeight()) {
+				timeoutContextCancle()
+			}
 		case <-stopContext.Done():
-			p.timeoutContextCancle()
+			timeoutContextCancle()
 			return
 		case <-time.After(p.timeout):
-			p.timeoutContextCancle()
-			p.timeoutContext, p.timeoutContextCancle = context.WithCancel(context.Background()) // Would maybe be better to pass in the run context here, but whatever for now.
+			timeoutContextCancle()
+			timeoutContext, timeoutContextCancle = context.WithCancel(context.Background()) // Would maybe be better to pass in the run context here, but whatever for now.
 			// add a dummy block to the tree representing this round which failed
 			logger.Println("NewViewTimeout triggered")
 			p.SetLeaf(hotstuff.CreateLeaf(p.GetLeaf(), nil, nil, p.GetHeight()+1))
-			p.SendNewView(p.timeoutContext, p.getLeader(p.GetHeight()+1))
+			p.SendNewView(timeoutContext, p.getLeader(p.GetHeight()+1))
 		}
 	}
 }
