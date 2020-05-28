@@ -95,15 +95,16 @@ func (p *RoundRobin) Run(ctx context.Context) {
 	notify := p.GetNotifier()
 
 	// set up new-view interrupt
-	timeoutContext, timeoutContextCancle := context.WithCancel(ctx)
+	newViewContext, newViewContextCancle := context.WithCancel(ctx)   // newViewContextCancle cancle the context used in new-view transmissions.
+	proposalContext, proposalContextCancle := context.WithCancel(ctx) // proposalContextCancle cancle the context used when proposing.
 	stopContext, cancel := context.WithCancel(ctx)
 	p.stopTimeout = cancel
-	go p.startNewViewTimeout(stopContext, timeoutContext, timeoutContextCancle)
+	go p.startNewViewTimeout(ctx, stopContext, newViewContext, proposalContextCancle, newViewContextCancle)
 	defer p.stopTimeout()
 
 	// initial beat
 	if p.getLeader(1) == p.GetID() {
-		go p.Propose(timeoutContext)
+		go p.Propose(proposalContext)
 	}
 
 	// get initial notification
@@ -112,11 +113,13 @@ func (p *RoundRobin) Run(ctx context.Context) {
 	// make sure that we only beat once per view, and don't beat if bLeaf.Height < vHeight
 	// as that would cause a panic
 	lastBeat := 1
-	beat := func(ctx context.Context) {
+	beat := func() {
 		if p.getLeader(p.GetHeight()+1) == p.GetID() && lastBeat < p.GetHeight()+1 &&
 			p.GetHeight()+1 > p.GetVotedHeight() {
+			proposalContextCancle()
+			proposalContext, proposalContextCancle = context.WithCancel(ctx)
 			lastBeat = p.GetHeight() + 1
-			go p.Propose(ctx)
+			go p.Propose(proposalContext)
 		}
 	}
 
@@ -124,32 +127,32 @@ func (p *RoundRobin) Run(ctx context.Context) {
 	for {
 		switch n.Event {
 		case hotstuff.ReceiveProposal:
+			newViewContextCancle()
 			p.resetTimer <- struct{}{}
 		case hotstuff.QCFinish:
-			timeoutContextCancle()
-			timeoutContext, timeoutContextCancle = context.WithCancel(ctx)
 			if p.GetID() != p.getLeader(p.GetHeight()+1) {
 				// was leader for previous view, but not the leader for next view
 				// do leader change
-				go p.SendNewView(timeoutContext, p.getLeader(p.GetHeight()+1))
+				proposalContextCancle()
+				newViewContext, newViewContextCancle = context.WithCancel(ctx)
+				go p.SendNewView(newViewContext, p.getLeader(p.GetHeight()+1))
 			}
-			beat(timeoutContext)
+			beat()
 		case hotstuff.ReceiveNewView:
 			p.resetTimer <- struct{}{} // the same timeout mechanisme is used for proposal and new-view messages.
-			timeoutContextCancle()
-			timeoutContext, timeoutContextCancle = context.WithCancel(ctx)
-			beat(timeoutContext)
+			beat()
 		}
+
+		defer proposalContextCancle()
+		defer newViewContextCancle()
 
 		var ok bool
 		select {
 		case n, ok = <-notify:
 			if !ok {
-				timeoutContextCancle()
 				return
 			}
 		case <-ctx.Done():
-			timeoutContextCancle()
 			return
 		}
 	}
@@ -157,19 +160,18 @@ func (p *RoundRobin) Run(ctx context.Context) {
 
 // startNewViewTimeout sends a NewView to the leader if triggered by a timer interrupt. Two contexts are used to control
 // this function; the stopContext is used to stop the function, and the cancelContext is used to cancel a single timer.
-func (p *RoundRobin) startNewViewTimeout(stopContext, timeoutContext context.Context, timeoutContextCancle func()) {
+func (p *RoundRobin) startNewViewTimeout(ctx, stopContext, timeoutContext context.Context, proposalContextCancle, newViewContextCancle func()) {
 	for {
 		select {
 		case <-p.resetTimer:
-			if p.HotStuff.GetID() != p.getLeader(p.GetHeight()) {
-				timeoutContextCancle()
-			}
 		case <-stopContext.Done():
-			timeoutContextCancle()
+			proposalContextCancle()
+			newViewContextCancle()
 			return
 		case <-time.After(p.timeout):
-			timeoutContextCancle()
-			timeoutContext, timeoutContextCancle = context.WithCancel(context.Background()) // Would maybe be better to pass in the run context here, but whatever for now.
+			proposalContextCancle()
+			newViewContextCancle()
+			timeoutContext, newViewContextCancle = context.WithCancel(ctx)
 			// add a dummy block to the tree representing this round which failed
 			logger.Println("NewViewTimeout triggered")
 			p.SetLeaf(hotstuff.CreateLeaf(p.GetLeaf(), nil, nil, p.GetHeight()+1))
