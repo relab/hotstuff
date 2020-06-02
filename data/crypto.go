@@ -1,4 +1,4 @@
-package hotstuff
+package data
 
 import (
 	"bytes"
@@ -7,22 +7,32 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"math/big"
 	"sort"
 	"sync"
 	"sync/atomic"
+
+	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/internal/logging"
 )
+
+var logger *log.Logger
+
+func init() {
+	logger = logging.GetLogger()
+}
 
 // SignatureCache keeps a cache of verified signatures in order to speed up verification
 type SignatureCache struct {
-	conf               *ReplicaConfig
+	conf               *config.ReplicaConfig
 	verifiedSignatures map[string]bool
 	cache              list.List
 	mut                sync.Mutex
 }
 
 // NewSignatureCache returns a new instance of SignatureVerifier
-func NewSignatureCache(conf *ReplicaConfig) *SignatureCache {
+func NewSignatureCache(conf *config.ReplicaConfig) *SignatureCache {
 	return &SignatureCache{
 		conf:               conf,
 		verifiedSignatures: make(map[string]bool),
@@ -30,14 +40,14 @@ func NewSignatureCache(conf *ReplicaConfig) *SignatureCache {
 }
 
 // CreatePartialCert creates a partial cert from a block.
-func (s *SignatureCache) CreatePartialCert(id ReplicaID, privKey *ecdsa.PrivateKey, block *Block) (*PartialCert, error) {
+func (s *SignatureCache) CreatePartialCert(id config.ReplicaID, privKey *ecdsa.PrivateKey, block *Block) (*PartialCert, error) {
 	hash := block.Hash()
 	R, S, err := ecdsa.Sign(rand.Reader, privKey, hash[:])
 	if err != nil {
 		return nil, err
 	}
 	sig := PartialSig{id, R, S}
-	k := string(sig.toBytes())
+	k := string(sig.ToBytes())
 	s.mut.Lock()
 	s.verifiedSignatures[k] = true
 	s.cache.PushBack(k)
@@ -47,7 +57,7 @@ func (s *SignatureCache) CreatePartialCert(id ReplicaID, privKey *ecdsa.PrivateK
 
 // VerifySignature verifies a partial signature
 func (s *SignatureCache) VerifySignature(sig PartialSig, hash BlockHash) bool {
-	k := string(sig.toBytes())
+	k := string(sig.ToBytes())
 
 	s.mut.Lock()
 	if valid, ok := s.verifiedSignatures[k]; ok {
@@ -103,11 +113,11 @@ func (s *SignatureCache) EvictOld(size int) {
 
 // PartialSig is a single replica's signature of a block.
 type PartialSig struct {
-	ID   ReplicaID
+	ID   config.ReplicaID
 	R, S *big.Int
 }
 
-func (psig PartialSig) toBytes() []byte {
+func (psig PartialSig) ToBytes() []byte {
 	r := psig.R.Bytes()
 	s := psig.S.Bytes()
 	b := make([]byte, 4, 4+len(r)+len(s))
@@ -125,11 +135,11 @@ type PartialCert struct {
 
 // QuorumCert is a certificate for a block from a quorum of replicas.
 type QuorumCert struct {
-	Sigs      map[ReplicaID]PartialSig
+	Sigs      map[config.ReplicaID]PartialSig
 	BlockHash BlockHash
 }
 
-func (qc *QuorumCert) toBytes() []byte {
+func (qc *QuorumCert) ToBytes() []byte {
 	b := make([]byte, 0, 32)
 	b = append(b, qc.BlockHash[:]...)
 	psigs := make([]PartialSig, 0, len(qc.Sigs))
@@ -142,7 +152,7 @@ func (qc *QuorumCert) toBytes() []byte {
 		psigs[i] = v
 	}
 	for i := range psigs {
-		b = append(b, psigs[i].toBytes()...)
+		b = append(b, psigs[i].ToBytes()...)
 	}
 	return b
 }
@@ -168,7 +178,7 @@ func (qc *QuorumCert) AddPartial(cert *PartialCert) error {
 }
 
 // CreatePartialCert creates a partial cert from a block.
-func CreatePartialCert(id ReplicaID, privKey *ecdsa.PrivateKey, block *Block) (*PartialCert, error) {
+func CreatePartialCert(id config.ReplicaID, privKey *ecdsa.PrivateKey, block *Block) (*PartialCert, error) {
 	hash := block.Hash()
 	r, s, err := ecdsa.Sign(rand.Reader, privKey, hash[:])
 	if err != nil {
@@ -179,7 +189,7 @@ func CreatePartialCert(id ReplicaID, privKey *ecdsa.PrivateKey, block *Block) (*
 }
 
 // VerifyPartialCert will verify a PartialCert from a public key stored in ReplicaConfig
-func VerifyPartialCert(conf *ReplicaConfig, cert *PartialCert) bool {
+func VerifyPartialCert(conf *config.ReplicaConfig, cert *PartialCert) bool {
 	info, ok := conf.Replicas[cert.Sig.ID]
 	if !ok {
 		logger.Printf("VerifyPartialSig: got signature from replica whose ID (%d) was not in config.", cert.Sig.ID)
@@ -190,11 +200,11 @@ func VerifyPartialCert(conf *ReplicaConfig, cert *PartialCert) bool {
 
 // CreateQuorumCert creates an empty quorum certificate for a given block
 func CreateQuorumCert(block *Block) *QuorumCert {
-	return &QuorumCert{BlockHash: block.Hash(), Sigs: make(map[ReplicaID]PartialSig)}
+	return &QuorumCert{BlockHash: block.Hash(), Sigs: make(map[config.ReplicaID]PartialSig)}
 }
 
 // VerifyQuorumCert will verify a QuorumCert from public keys stored in ReplicaConfig
-func VerifyQuorumCert(conf *ReplicaConfig, qc *QuorumCert) bool {
+func VerifyQuorumCert(conf *config.ReplicaConfig, qc *QuorumCert) bool {
 	if len(qc.Sigs) < conf.QuorumSize {
 		return false
 	}

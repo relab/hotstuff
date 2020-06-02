@@ -4,16 +4,21 @@ package proto;
 
 import "github.com/relab/gorums/gorums.proto";
 
-option go_package = "github.com/relab/hotstuff/gorumshotstuff/internal/proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/relab/hotstuff/internal/proto";
 
 service Hotstuff {
-	rpc Propose(Block) returns (PartialCert) {
-		option (gorums.quorumcall) = true;
-		option (gorums.ordered) = true;
-		option (gorums.custom_return_type) = "QuorumCert";
+	rpc Propose(Block) returns (google.protobuf.Empty) {
+		option (gorums.multicast) = true;
 	}
-	rpc NewView(QuorumCert) returns (Empty) {
-		option (gorums.ordered) = true;
+
+	rpc Vote(PartialCert) returns (google.protobuf.Empty) {
+		option (gorums.unicast) = true;
+	}
+
+	rpc NewView(QuorumCert) returns (google.protobuf.Empty) {
+		option (gorums.unicast) = true;
 	}
 }
 
@@ -43,5 +48,3 @@ message QuorumCert {
 message Command {
 	bytes Data = 1;
 }
-
-message Empty {}

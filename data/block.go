@@ -1,4 +1,4 @@
-package hotstuff
+package data
 
 import (
 	"crypto/sha256"
@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"sync"
 )
+
+// Command is the client data that is processed by HotStuff
+type Command string
 
 // BlockStorage provides a means to store a block based on its hash
 type BlockStorage interface {
@@ -55,7 +58,7 @@ func (n Block) Hash() BlockHash {
 	s256.Write(height[:])
 
 	if n.Justify != nil {
-		s256.Write(n.Justify.toBytes())
+		s256.Write(n.Justify.ToBytes())
 	}
 
 	for _, cmd := range n.Commands {

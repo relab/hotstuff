@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/data"
 )
 
 func main() {
@@ -16,19 +16,19 @@ func main() {
 	privKeyPath := os.Args[1]
 	pubKeyPath := privKeyPath + ".pub"
 
-	pk, err := hotstuff.GeneratePrivateKey()
+	pk, err := data.GeneratePrivateKey()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to generate key: %v\n", err)
 		os.Exit(1)
 	}
 
-	err = hotstuff.WritePrivateKeyFile(pk, privKeyPath)
+	err = data.WritePrivateKeyFile(pk, privKeyPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to write private key file: %v\n", err)
 		os.Exit(1)
 	}
 
-	err = hotstuff.WritePublicKeyFile(&pk.PublicKey, pubKeyPath)
+	err = data.WritePublicKeyFile(&pk.PublicKey, pubKeyPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to write public key file: %v\n", err)
 		os.Exit(1)

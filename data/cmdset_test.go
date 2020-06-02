@@ -1,11 +1,11 @@
-package hotstuff
+package data
 
 import (
 	"testing"
 )
 
 func TestCmdSetAdd(t *testing.T) {
-	s := newCmdSet()
+	s := NewCommandSet()
 	c1 := Command("Hello")
 	c2 := Command("World")
 
@@ -21,7 +21,7 @@ func TestCmdSetAdd(t *testing.T) {
 }
 
 func TestCmdSetGet(t *testing.T) {
-	s := newCmdSet()
+	s := NewCommandSet()
 	c1 := Command("Hello")
 	c2 := Command("World")
 
@@ -34,7 +34,7 @@ func TestCmdSetGet(t *testing.T) {
 }
 
 func TestCmdSetAvoidsDuplicates(t *testing.T) {
-	s := newCmdSet()
+	s := NewCommandSet()
 	c1 := Command("Hello")
 	c2 := Command("World")
 	c3 := c1
@@ -51,7 +51,7 @@ func TestCmdSetAvoidsDuplicates(t *testing.T) {
 }
 
 func TestCmdSetRemove(t *testing.T) {
-	s := newCmdSet()
+	s := NewCommandSet()
 	c1 := Command("Hello")
 	c2 := Command("World")
 	s.Add(c1, c2)
@@ -65,7 +65,7 @@ func TestCmdSetRemove(t *testing.T) {
 }
 
 func TestCmdSetMarkProposed(t *testing.T) {
-	s := newCmdSet()
+	s := NewCommandSet()
 	c1 := Command("Hello")
 	c2 := Command("World")
 	s.Add(c1, c2)
@@ -79,7 +79,7 @@ func TestCmdSetMarkProposed(t *testing.T) {
 }
 
 func TestCmdSetTrimToLen(t *testing.T) {
-	s := newCmdSet()
+	s := NewCommandSet()
 	c1 := Command("Hello")
 	c2 := Command("World")
 	s.Add(c1, c2)

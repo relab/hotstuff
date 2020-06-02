@@ -1,0 +1,15 @@
+panic: runtime error: invalid memory address or nil pointer dereference
+[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x8b03a2]
+
+goroutine 82 [running]:
+github.com/relab/hotstuff/data.(*CommandSet).GetFirst(0x0, 0xc8, 0x0, 0x0, 0x0)
+	/home/john/go/src/github.com/relab/hotstuff/data/cmdset.go:59 +0x62
+github.com/relab/hotstuff/consensus.(*HotStuffCore).CreateProposal(0xc0000b4090, 0x0)
+	/home/john/go/src/github.com/relab/hotstuff/consensus/consensus.go:331 +0x70
+github.com/relab/hotstuff.(*HotStuff).Propose(0xc00009aa20)
+	/home/john/go/src/github.com/relab/hotstuff/hotstuff.go:137 +0x33
+created by github.com/relab/hotstuff/pacemaker.FixedLeader.Run
+	/home/john/go/src/github.com/relab/hotstuff/pacemaker/pacemaker.go:39 +0x1b3
+Exiting...
+Exiting...
+Exiting...

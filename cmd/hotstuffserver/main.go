@@ -19,28 +19,29 @@ import (
 	"github.com/relab/gorums/ordering"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/clientapi"
-	"github.com/relab/hotstuff/gorumshotstuff"
+	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/data"
 	"github.com/relab/hotstuff/pacemaker"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 )
 
-type config struct {
+type options struct {
 	Privkey         string
-	SelfID          hotstuff.ReplicaID   `mapstructure:"self-id"`
-	PmType          string               `mapstructure:"pacemaker"`
-	LeaderID        hotstuff.ReplicaID   `mapstructure:"leader-id"`
-	Schedule        []hotstuff.ReplicaID `mapstructure:"leader-schedule"`
-	ViewChange      int                  `mapstructure:"view-change"`
-	ViewTimeout     int                  `mapstructure:"view-timeout"`
-	BatchSize       int                  `mapstructure:"batch-size"`
-	PrintThroughput bool                 `mapstructure:"print-throughput"`
-	PrintCommands   bool                 `mapstructure:"print-commands"`
+	SelfID          config.ReplicaID   `mapstructure:"self-id"`
+	PmType          string             `mapstructure:"pacemaker"`
+	LeaderID        config.ReplicaID   `mapstructure:"leader-id"`
+	Schedule        []config.ReplicaID `mapstructure:"leader-schedule"`
+	ViewChange      int                `mapstructure:"view-change"`
+	ViewTimeout     int                `mapstructure:"view-timeout"`
+	BatchSize       int                `mapstructure:"batch-size"`
+	PrintThroughput bool               `mapstructure:"print-throughput"`
+	PrintCommands   bool               `mapstructure:"print-commands"`
 	Interval        int
 	Output          string
 	Replicas        []struct {
-		ID         hotstuff.ReplicaID
+		ID         config.ReplicaID
 		PeerAddr   string `mapstructure:"peer-address"`
 		ClientAddr string `mapstructure:"client-address"`
 		Pubkey     string
@@ -115,14 +116,14 @@ func main() {
 		}
 	}
 
-	var conf config
+	var conf options
 	err = viper.Unmarshal(&conf)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to unmarshal config: %v\n", err)
 		os.Exit(1)
 	}
 
-	privkey, err := hotstuff.ReadPrivateKeyFile(conf.Privkey)
+	privkey, err := data.ReadPrivateKeyFile(conf.Privkey)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to read private key file: %v\n", err)
 		os.Exit(1)
@@ -130,15 +131,15 @@ func main() {
 
 	var clientAddress string
 
-	replicaConfig := hotstuff.NewConfig()
+	replicaConfig := config.NewConfig(conf.SelfID, privkey)
 	replicaConfig.BatchSize = conf.BatchSize
 	for _, r := range conf.Replicas {
-		key, err := hotstuff.ReadPublicKeyFile(r.Pubkey)
+		key, err := data.ReadPublicKeyFile(r.Pubkey)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to read public key file '%s': %v\n", r.Pubkey, err)
 			os.Exit(1)
 		}
-		replicaConfig.Replicas[r.ID] = &hotstuff.ReplicaInfo{
+		replicaConfig.Replicas[r.ID] = &config.ReplicaInfo{
 			ID:      r.ID,
 			Address: r.PeerAddr,
 			PubKey:  key,
@@ -177,20 +178,20 @@ type hotstuffServer struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	key     *ecdsa.PrivateKey
-	conf    *config
+	conf    *options
 	grpcSrv *grpc.Server
 	hs      *hotstuff.HotStuff
-	pm      pacemaker.Pacemaker
-	backend hotstuff.Backend
+	pm      interface {
+		Run(context.Context)
+	}
 
 	mut          sync.Mutex
-	finishedCmds map[hotstuff.Command]chan struct{}
+	finishedCmds map[data.Command]chan struct{}
 
 	lastExecTime int64
 }
 
-func newHotStuffServer(key *ecdsa.PrivateKey, conf *config, replicaConfig *hotstuff.ReplicaConfig) *hotstuffServer {
-	waitDuration := time.Duration(conf.ViewTimeout/2) * time.Millisecond
+func newHotStuffServer(key *ecdsa.PrivateKey, conf *options, replicaConfig *config.ReplicaConfig) *hotstuffServer {
 	ctx, cancel := context.WithCancel(context.Background())
 	srv := &hotstuffServer{
 		ctx:          ctx,
@@ -198,11 +199,10 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *config, replicaConfig *hotst
 		conf:         conf,
 		key:          key,
 		grpcSrv:      grpc.NewServer(),
-		finishedCmds: make(map[hotstuff.Command]chan struct{}),
+		finishedCmds: make(map[data.Command]chan struct{}),
 		lastExecTime: time.Now().UnixNano(),
 	}
-	srv.backend = gorumshotstuff.New(time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
-	srv.hs = hotstuff.New(conf.SelfID, key, replicaConfig, srv.backend, waitDuration, srv.onExec)
+	srv.hs = hotstuff.New(replicaConfig, time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
 	switch conf.PmType {
 	case "fixed":
 		srv.pm = pacemaker.NewFixedLeader(srv.hs, conf.LeaderID)
@@ -225,14 +225,14 @@ func (srv *hotstuffServer) Start(address string) error {
 		return err
 	}
 
-	err = srv.backend.Start()
+	err = srv.hs.Start()
 	if err != nil {
 		return err
 	}
 
 	go srv.grpcSrv.Serve(lis)
-
 	go srv.pm.Run(srv.ctx)
+	go srv.onExec()
 
 	return nil
 }
@@ -251,7 +251,7 @@ func (srv *hotstuffServer) NodeStream(stream ordering.Gorums_NodeStreamServer) e
 			return err
 		}
 		// use the serialized data as cmd
-		cmd := hotstuff.Command(req.GetData())
+		cmd := data.Command(req.GetData())
 		srv.mut.Lock()
 		id := req.GetID()
 		finished := make(chan struct{}, 1)
@@ -277,26 +277,28 @@ func (srv *hotstuffServer) NodeStream(stream ordering.Gorums_NodeStreamServer) e
 	}
 }
 
-func (srv *hotstuffServer) onExec(cmds []hotstuff.Command) {
-	if len(cmds) > 0 && srv.conf.PrintThroughput {
-		now := time.Now().UnixNano()
-		prev := atomic.SwapInt64(&srv.lastExecTime, now)
-		fmt.Printf("%d, %d\n", now-prev, len(cmds))
-	}
+func (srv *hotstuffServer) onExec() {
+	for cmds := range srv.hs.GetExec() {
+		if len(cmds) > 0 && srv.conf.PrintThroughput {
+			now := time.Now().UnixNano()
+			prev := atomic.SwapInt64(&srv.lastExecTime, now)
+			fmt.Printf("%d, %d\n", now-prev, len(cmds))
+		}
 
-	for _, cmd := range cmds {
-		if srv.conf.PrintCommands {
-			m := new(clientapi.Command)
-			err := protobuf.Unmarshal([]byte(cmd), m)
-			if err != nil {
-				log.Printf("Failed to unmarshal command: %v\n", err)
+		for _, cmd := range cmds {
+			if srv.conf.PrintCommands {
+				m := new(clientapi.Command)
+				err := protobuf.Unmarshal([]byte(cmd), m)
+				if err != nil {
+					log.Printf("Failed to unmarshal command: %v\n", err)
+				}
+				fmt.Printf("%s", m.Data)
 			}
-			fmt.Printf("%s", m.Data)
+			srv.mut.Lock()
+			if c, ok := srv.finishedCmds[cmd]; ok {
+				c <- struct{}{}
+			}
+			srv.mut.Unlock()
 		}
-		srv.mut.Lock()
-		if c, ok := srv.finishedCmds[cmd]; ok {
-			c <- struct{}{}
-		}
-		srv.mut.Unlock()
 	}
 }

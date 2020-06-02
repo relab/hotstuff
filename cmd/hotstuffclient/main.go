@@ -16,23 +16,24 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/clientapi"
+	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/data"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 )
 
-type config struct {
-	SelfID      hotstuff.ReplicaID `mapstructure:"self-id"`
-	RequestRate int                `mapstructure:"request-rate"`
-	PayloadSize int                `mapstructure:"payload-size"`
-	MaxInflight uint64             `mapstructure:"max-inflight"`
-	DataSource  string             `mapstructure:"input"`
-	Benchmark   bool               `mapstructure:"benchmark"`
-	ExitAfter   int                `mapstructure:"exit-after"`
+type options struct {
+	SelfID      config.ReplicaID `mapstructure:"self-id"`
+	RequestRate int              `mapstructure:"request-rate"`
+	PayloadSize int              `mapstructure:"payload-size"`
+	MaxInflight uint64           `mapstructure:"max-inflight"`
+	DataSource  string           `mapstructure:"input"`
+	Benchmark   bool             `mapstructure:"benchmark"`
+	ExitAfter   int              `mapstructure:"exit-after"`
 	Replicas    []struct {
-		ID         hotstuff.ReplicaID
+		ID         config.ReplicaID
 		ClientAddr string `mapstructure:"client-address"`
 		Pubkey     string
 	}
@@ -93,21 +94,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	var conf config
+	var conf options
 	err = viper.Unmarshal(&conf)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to unmarshal config: %v\n", err)
 		os.Exit(1)
 	}
 
-	replicaConfig := hotstuff.NewConfig()
+	replicaConfig := config.NewConfig(0, nil)
 	for _, r := range conf.Replicas {
-		key, err := hotstuff.ReadPublicKeyFile(r.Pubkey)
+		key, err := data.ReadPublicKeyFile(r.Pubkey)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to read public key file '%s': %v\n", r.Pubkey, err)
 			os.Exit(1)
 		}
-		replicaConfig.Replicas[r.ID] = &hotstuff.ReplicaInfo{
+		replicaConfig.Replicas[r.ID] = &config.ReplicaInfo{
 			ID:      r.ID,
 			Address: r.ClientAddr,
 			PubKey:  key,
@@ -169,14 +170,14 @@ func (q *qspec) ExecCommandQF(cmd *clientapi.Command, signatures []*clientapi.Em
 type hotstuffClient struct {
 	inflight      uint64
 	reader        io.ReadCloser
-	conf          *config
+	conf          *options
 	mgr           *clientapi.Manager
-	replicaConfig *hotstuff.ReplicaConfig
+	replicaConfig *config.ReplicaConfig
 	gorumsConfig  *clientapi.Configuration
 	wg            sync.WaitGroup
 }
 
-func newHotStuffClient(conf *config, replicaConfig *hotstuff.ReplicaConfig) (*hotstuffClient, error) {
+func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hotstuffClient, error) {
 	var addrs []string
 	for _, r := range replicaConfig.Replicas {
 		addrs = append(addrs, r.Address)

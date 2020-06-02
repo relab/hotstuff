@@ -1,4 +1,4 @@
-package hotstuff
+package consensus
 
 import (
 	"bytes"

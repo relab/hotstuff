@@ -1,4 +1,4 @@
-INTERNALPATH   := ./gorumshotstuff/internal/proto
+INTERNALPATH   := ./internal/proto
 INTERNALPROTO  := $(INTERNALPATH)/hotstuff.pb.go
 INTERNALGORUMS := $(INTERNALPATH)/hotstuff_gorums.pb.go
 INTERNALFILE   := $(INTERNALPATH)/hotstuff.proto

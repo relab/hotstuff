@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/logging"
 )
 
@@ -16,19 +18,14 @@ func init() {
 	logger = logging.GetLogger()
 }
 
-// Pacemaker is a mechanism that provides synchronization
-type Pacemaker interface {
-	Run(context.Context)
-}
-
 // FixedLeader uses a fixed leader.
 type FixedLeader struct {
 	*hotstuff.HotStuff
-	leader hotstuff.ReplicaID
+	leader config.ReplicaID
 }
 
 // NewFixedLeader returns a new fixed leader pacemaker
-func NewFixedLeader(hs *hotstuff.HotStuff, leaderID hotstuff.ReplicaID) *FixedLeader {
+func NewFixedLeader(hs *hotstuff.HotStuff, leaderID config.ReplicaID) *FixedLeader {
 	return &FixedLeader{
 		HotStuff: hs,
 		leader:   leaderID,
@@ -37,11 +34,11 @@ func NewFixedLeader(hs *hotstuff.HotStuff, leaderID hotstuff.ReplicaID) *FixedLe
 
 // Run runs the pacemaker which will beat when the previous QC is completed
 func (p FixedLeader) Run(ctx context.Context) {
-	notify := p.GetNotifier()
-	if p.GetID() == p.leader {
+	notify := p.GetEvents()
+	if p.Config.ID == p.leader {
 		go p.Propose()
 	}
-	var n hotstuff.Notification
+	var n consensus.Event
 	var ok bool
 	for {
 		select {
@@ -52,9 +49,9 @@ func (p FixedLeader) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		}
-		switch n.Event {
-		case hotstuff.QCFinish:
-			if p.GetID() == p.leader {
+		switch n {
+		case consensus.QCFinish:
+			if p.Config.ID == p.leader {
 				go p.Propose()
 			}
 		}
@@ -66,7 +63,7 @@ type RoundRobin struct {
 	*hotstuff.HotStuff
 
 	termLength int
-	schedule   []hotstuff.ReplicaID
+	schedule   []config.ReplicaID
 	timeout    time.Duration
 
 	resetTimer  chan struct{} // sending on this channel will reset the timer
@@ -74,7 +71,7 @@ type RoundRobin struct {
 }
 
 // NewRoundRobin returns a new round robin pacemaker
-func NewRoundRobin(hs *hotstuff.HotStuff, termLength int, schedule []hotstuff.ReplicaID, timeout time.Duration) *RoundRobin {
+func NewRoundRobin(hs *hotstuff.HotStuff, termLength int, schedule []config.ReplicaID, timeout time.Duration) *RoundRobin {
 	return &RoundRobin{
 		HotStuff:   hs,
 		termLength: termLength,
@@ -85,17 +82,17 @@ func NewRoundRobin(hs *hotstuff.HotStuff, termLength int, schedule []hotstuff.Re
 }
 
 // getLeader returns the fixed ID of the leader for the view height vHeight
-func (p *RoundRobin) getLeader(vHeight int) hotstuff.ReplicaID {
+func (p *RoundRobin) getLeader(vHeight int) config.ReplicaID {
 	term := int(math.Ceil(float64(vHeight)/float64(p.termLength)) - 1)
 	return p.schedule[term%len(p.schedule)]
 }
 
 // Run runs the pacemaker which will beat when the previous QC is completed
 func (p *RoundRobin) Run(ctx context.Context) {
-	notify := p.GetNotifier()
+	notify := p.GetEvents()
 
 	// initial beat
-	if p.getLeader(1) == p.GetID() {
+	if p.getLeader(1) == p.Config.ID {
 		go p.Propose()
 	}
 
@@ -106,7 +103,7 @@ func (p *RoundRobin) Run(ctx context.Context) {
 	// as that would cause a panic
 	lastBeat := 1
 	beat := func() {
-		if p.getLeader(p.GetHeight()+1) == p.GetID() && lastBeat < p.GetHeight()+1 &&
+		if p.getLeader(p.GetHeight()+1) == p.Config.ID && lastBeat < p.GetHeight()+1 &&
 			p.GetHeight()+1 > p.GetVotedHeight() {
 			lastBeat = p.GetHeight() + 1
 			go p.Propose()
@@ -121,17 +118,17 @@ func (p *RoundRobin) Run(ctx context.Context) {
 
 	// handle events from hotstuff
 	for {
-		switch n.Event {
-		case hotstuff.ReceiveProposal:
+		switch n {
+		case consensus.ReceiveProposal:
 			p.resetTimer <- struct{}{}
-		case hotstuff.QCFinish:
-			if p.GetID() != p.getLeader(p.GetHeight()+1) {
+		case consensus.QCFinish:
+			if p.Config.ID != p.getLeader(p.GetHeight()+1) {
 				// was leader for previous view, but not the leader for next view
 				// do leader change
 				go p.SendNewView(p.getLeader(p.GetHeight() + 1))
 			}
 			beat()
-		case hotstuff.ReceiveNewView:
+		case consensus.ReceiveNewView:
 			beat()
 		}
 
@@ -158,7 +155,7 @@ func (p *RoundRobin) startNewViewTimeout(stopContext context.Context) {
 		case <-time.After(p.timeout):
 			// add a dummy block to the tree representing this round which failed
 			logger.Println("NewViewTimeout triggered")
-			p.SetLeaf(hotstuff.CreateLeaf(p.GetLeaf(), nil, nil, p.GetHeight()+1))
+			p.SetLeaf(consensus.CreateLeaf(p.GetLeaf(), nil, nil, p.GetHeight()+1))
 			p.SendNewView(p.getLeader(p.GetHeight() + 1))
 		}
 	}

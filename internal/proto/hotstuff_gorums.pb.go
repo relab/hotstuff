@@ -7,6 +7,14 @@ import (
 	context "context"
 	binary "encoding/binary"
 	fmt "fmt"
+	empty "github.com/golang/protobuf/ptypes/empty"
+	ordering "github.com/relab/gorums/ordering"
+	trace "golang.org/x/net/trace"
+	grpc "google.golang.org/grpc"
+	backoff "google.golang.org/grpc/backoff"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
+	proto "google.golang.org/protobuf/proto"
 	fnv "hash/fnv"
 	io "io"
 	log "log"
@@ -19,14 +27,6 @@ import (
 	sync "sync"
 	atomic "sync/atomic"
 	time "time"
-
-	ordering "github.com/relab/gorums/ordering"
-	trace "golang.org/x/net/trace"
-	grpc "google.golang.org/grpc"
-	backoff "google.golang.org/grpc/backoff"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
-	proto "google.golang.org/protobuf/proto"
 )
 
 // A Configuration represents a static set of nodes on which quorum remote
@@ -714,6 +714,10 @@ func WithBackoff(backoff backoff.Config) ManagerOption {
 	}
 }
 
+type methodInfo struct {
+	oneway bool
+}
+
 type orderingResult struct {
 	nid   uint32
 	reply []byte
@@ -889,8 +893,17 @@ func (s *orderingServer) NodeStream(srv ordering.Gorums_NodeStreamServer) error 
 		if err != nil {
 			return err
 		}
+
 		// handle the request if a handler is available for this rpc
 		if handler, ok := s.handlers[req.GetMethodID()]; ok {
+			info, ok := orderingMethods[req.MethodID]
+			if !ok {
+				continue
+			}
+			if info.oneway {
+				handler(req)
+				continue
+			}
 			resp := handler(req)
 			resp.ID = req.GetID()
 			err = srv.Send(resp)
@@ -993,6 +1006,47 @@ func appendIfNotPresent(set []uint32, x uint32) []uint32 {
 	return append(set, x)
 }
 
+// Reference imports to suppress errors if they are not otherwise used.
+var _ empty.Empty
+
+// Propose is a one-way multicast call on all nodes in configuration c,
+// with the same in argument. The call is asynchronous and has no return value.
+func (c *Configuration) Propose(in *Block) error {
+	msgID := c.mgr.nextMsgID()
+	data, err := proto.MarshalOptions{AllowPartial: true, Deterministic: true}.Marshal(in)
+	if err != nil {
+		return fmt.Errorf("failed to marshal message: %w", err)
+	}
+	msg := &ordering.Message{
+		ID:       msgID,
+		MethodID: proposeMethodID,
+		Data:     data,
+	}
+	for _, n := range c.nodes {
+		n.sendQ <- msg
+	}
+	return nil
+}
+
+// ProposeHandler is the server API for the Propose rpc.
+type ProposeHandler interface {
+	Propose(*Block)
+}
+
+// RegisterProposeHandler sets the handler for Propose.
+func (s *GorumsServer) RegisterProposeHandler(handler ProposeHandler) {
+	s.srv.registerHandler(proposeMethodID, func(in *ordering.Message) *ordering.Message {
+		req := new(Block)
+		err := proto.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}.Unmarshal(in.GetData(), req)
+		// TODO: how to handle marshaling errors here
+		if err != nil {
+			return new(ordering.Message)
+		}
+		handler.Propose(req)
+		return nil
+	})
+}
+
 type nodeServices struct {
 }
 
@@ -1005,107 +1059,67 @@ func (n *Node) closeStream() (err error) {
 	return err
 }
 
-// Propose is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (c *Configuration) Propose(ctx context.Context, in *Block, opts ...grpc.CallOption) (resp *QuorumCert, err error) {
+// QuorumSpec is the interface of quorum functions for Hotstuff.
+type QuorumSpec interface {
+}
 
-	// get the ID which will be used to return the correct responses for a request
-	msgID := c.mgr.nextMsgID()
+const hasOrderingMethods = true
 
-	// set up a channel to collect replies
-	replies := make(chan *orderingResult, c.n)
-	c.mgr.putChan(msgID, replies)
+const proposeMethodID int32 = 0
+const voteMethodID int32 = 1
+const newViewMethodID int32 = 2
 
-	// remove the replies channel when we are done
-	defer c.mgr.deleteChan(msgID)
+var orderingMethods = map[int32]methodInfo{
+	0: {oneway: true},
+	1: {oneway: true},
+	2: {oneway: true},
+}
 
+// Reference imports to suppress errors if they are not otherwise used.
+var _ empty.Empty
+
+func (n *Node) Vote(in *PartialCert) error {
+	msgID := n.nextMsgID()
 	data, err := proto.MarshalOptions{AllowPartial: true, Deterministic: true}.Marshal(in)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal message: %w", err)
+		return fmt.Errorf("failed to marshal message: %w", err)
 	}
 	msg := &ordering.Message{
 		ID:       msgID,
-		MethodID: proposeMethodID,
+		MethodID: voteMethodID,
 		Data:     data,
 	}
-	// push the message to the nodes
-	expected := c.n
-	for _, n := range c.nodes {
-		n.sendQ <- msg
-	}
-
-	var (
-		replyValues = make([]*PartialCert, 0, expected)
-		errs        []GRPCError
-		quorum      bool
-	)
-
-	for {
-		select {
-		case r := <-replies:
-			if r.err != nil {
-				errs = append(errs, GRPCError{r.nid, r.err})
-				break
-			}
-
-			reply := new(PartialCert)
-			err := proto.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}.Unmarshal(r.reply, reply)
-			if err != nil {
-				errs = append(errs, GRPCError{r.nid, fmt.Errorf("failed to unmarshal reply: %w", err)})
-				break
-			}
-			replyValues = append(replyValues, reply)
-			if resp, quorum = c.qspec.ProposeQF(in, replyValues); quorum {
-				return resp, nil
-			}
-		case <-ctx.Done():
-			return resp, QuorumCallError{ctx.Err().Error(), len(replyValues), errs}
-		}
-
-		if len(errs)+len(replyValues) == expected {
-			return resp, QuorumCallError{"incomplete call", len(replyValues), errs}
-		}
-	}
+	n.sendQ <- msg
+	return nil
 }
 
-// ProposeHandler is the server API for the Propose rpc.
-type ProposeHandler interface {
-	Propose(*Block) *PartialCert
+// VoteHandler is the server API for the Vote rpc.
+type VoteHandler interface {
+	Vote(*PartialCert)
 }
 
-// RegisterProposeHandler sets the handler for Propose.
-func (s *GorumsServer) RegisterProposeHandler(handler ProposeHandler) {
-	s.srv.registerHandler(proposeMethodID, func(in *ordering.Message) *ordering.Message {
-		req := new(Block)
+// RegisterVoteHandler sets the handler for Vote.
+func (s *GorumsServer) RegisterVoteHandler(handler VoteHandler) {
+	s.srv.registerHandler(voteMethodID, func(in *ordering.Message) *ordering.Message {
+		req := new(PartialCert)
 		err := proto.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}.Unmarshal(in.GetData(), req)
 		// TODO: how to handle marshaling errors here
 		if err != nil {
 			return new(ordering.Message)
 		}
-		resp := handler.Propose(req)
-		data, err := proto.MarshalOptions{AllowPartial: true, Deterministic: true}.Marshal(resp)
-		if err != nil {
-			return new(ordering.Message)
-		}
-		return &ordering.Message{Data: data, MethodID: proposeMethodID}
+		handler.Vote(req)
+		return nil
 	})
 }
 
-func (n *Node) NewView(ctx context.Context, in *QuorumCert, opts ...grpc.CallOption) (resp *Empty, err error) {
+// Reference imports to suppress errors if they are not otherwise used.
+var _ empty.Empty
 
-	// get the ID which will be used to return the correct responses for a request
+func (n *Node) NewView(in *QuorumCert) error {
 	msgID := n.nextMsgID()
-
-	// set up a channel to collect replies
-	replies := make(chan *orderingResult, 1)
-	n.putChan(msgID, replies)
-
-	// remove the replies channel when we are done
-	defer n.deleteChan(msgID)
-
 	data, err := proto.MarshalOptions{AllowPartial: true, Deterministic: true}.Marshal(in)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal message: %w", err)
+		return fmt.Errorf("failed to marshal message: %w", err)
 	}
 	msg := &ordering.Message{
 		ID:       msgID,
@@ -1113,26 +1127,12 @@ func (n *Node) NewView(ctx context.Context, in *QuorumCert, opts ...grpc.CallOpt
 		Data:     data,
 	}
 	n.sendQ <- msg
-
-	select {
-	case r := <-replies:
-		if r.err != nil {
-			return nil, r.err
-		}
-		reply := new(Empty)
-		err := proto.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}.Unmarshal(r.reply, reply)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal reply: %w", err)
-		}
-		return reply, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
+	return nil
 }
 
 // NewViewHandler is the server API for the NewView rpc.
 type NewViewHandler interface {
-	NewView(*QuorumCert) *Empty
+	NewView(*QuorumCert)
 }
 
 // RegisterNewViewHandler sets the handler for NewView.
@@ -1144,33 +1144,7 @@ func (s *GorumsServer) RegisterNewViewHandler(handler NewViewHandler) {
 		if err != nil {
 			return new(ordering.Message)
 		}
-		resp := handler.NewView(req)
-		data, err := proto.MarshalOptions{AllowPartial: true, Deterministic: true}.Marshal(resp)
-		if err != nil {
-			return new(ordering.Message)
-		}
-		return &ordering.Message{Data: data, MethodID: newViewMethodID}
+		handler.NewView(req)
+		return nil
 	})
-}
-
-// QuorumSpec is the interface of quorum functions for Hotstuff.
-type QuorumSpec interface {
-
-	// ProposeQF is the quorum function for the Propose
-	// ordered quorum call method. The in parameter is the request object
-	// supplied to the Propose method at call time, and may or may not
-	// be used by the quorum function. If the in parameter is not needed
-	// you should implement your quorum function with '_ *Block'.
-	ProposeQF(in *Block, replies []*PartialCert) (*QuorumCert, bool)
-}
-
-const hasOrderingMethods = true
-
-const proposeMethodID int32 = 0
-const newViewMethodID int32 = 1
-
-type internalPartialCert struct {
-	nid   uint32
-	reply *PartialCert
-	err   error
 }

@@ -1,4 +1,4 @@
-package hotstuff
+package data
 
 import (
 	"container/list"
@@ -10,15 +10,15 @@ type cmdElement struct {
 	proposed bool
 }
 
-// cmdSet is a linkedhashset for Commands
-type cmdSet struct {
+// CommandSet is a linkedhashset for Commands
+type CommandSet struct {
 	mut   sync.Mutex
 	set   map[Command]*list.Element
 	order list.List
 }
 
-func newCmdSet() *cmdSet {
-	c := &cmdSet{
+func NewCommandSet() *CommandSet {
+	c := &CommandSet{
 		set: make(map[Command]*list.Element),
 	}
 	c.order.Init()
@@ -26,7 +26,7 @@ func newCmdSet() *cmdSet {
 }
 
 // Add adds cmds to the set. Duplicate entries are ignored
-func (s *cmdSet) Add(cmds ...Command) {
+func (s *CommandSet) Add(cmds ...Command) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
 
@@ -41,7 +41,7 @@ func (s *cmdSet) Add(cmds ...Command) {
 }
 
 // Remove removes cmds from the set
-func (s *cmdSet) Remove(cmds ...Command) {
+func (s *CommandSet) Remove(cmds ...Command) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
 
@@ -55,7 +55,7 @@ func (s *cmdSet) Remove(cmds ...Command) {
 }
 
 // GetFirst returns the n first non-proposed commands in the set
-func (s *cmdSet) GetFirst(n int) []Command {
+func (s *CommandSet) GetFirst(n int) []Command {
 	s.mut.Lock()
 	defer s.mut.Unlock()
 
@@ -80,7 +80,7 @@ func (s *cmdSet) GetFirst(n int) []Command {
 }
 
 // Contains returns true if the set contains cmd, false otherwise
-func (s *cmdSet) Contains(cmd Command) bool {
+func (s *CommandSet) Contains(cmd Command) bool {
 	s.mut.Lock()
 	defer s.mut.Unlock()
 	_, ok := s.set[cmd]
@@ -88,14 +88,14 @@ func (s *cmdSet) Contains(cmd Command) bool {
 }
 
 // Len returns the length of the set
-func (s *cmdSet) Len() int {
+func (s *CommandSet) Len() int {
 	s.mut.Lock()
 	defer s.mut.Unlock()
 	return len(s.set)
 }
 
 // TrimToLen will try to remove proposed elements from the set until its length is equal to or less than 'length'
-func (s *cmdSet) TrimToLen(length int) {
+func (s *CommandSet) TrimToLen(length int) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
 
@@ -115,7 +115,7 @@ func (s *cmdSet) TrimToLen(length int) {
 }
 
 // IsProposed will return true if the given command is marked as proposed
-func (s *cmdSet) IsProposed(cmd Command) bool {
+func (s *CommandSet) IsProposed(cmd Command) bool {
 	s.mut.Lock()
 	defer s.mut.Unlock()
 	if e, ok := s.set[cmd]; ok {
@@ -125,7 +125,7 @@ func (s *cmdSet) IsProposed(cmd Command) bool {
 }
 
 // MarkProposed will mark the given commands as proposed and move them to the back of the queue
-func (s *cmdSet) MarkProposed(cmds ...Command) {
+func (s *CommandSet) MarkProposed(cmds ...Command) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
 	for _, cmd := range cmds {
