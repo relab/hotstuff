@@ -48,6 +48,8 @@ type HotStuffCore struct {
 	qcHigh     *data.QuorumCert
 	pendingQCs map[data.BlockHash]*data.QuorumCert
 
+	waitProposal *sync.Cond
+
 	pendingUpdates chan *data.Block
 
 	pacemakerEvents chan Event
@@ -130,9 +132,21 @@ func New(conf *config.ReplicaConfig) *HotStuffCore {
 		exec:            make(chan []data.Command, 1),
 	}
 
+	hs.waitProposal = sync.NewCond(&hs.mut)
+
 	go hs.updateAsync(ctx)
 
 	return hs
+}
+
+// expectBlock looks for a block with the given Hash, or waits for the next proposal to arrive
+// hs.mut must be locked when calling this function
+func (hs *HotStuffCore) expectBlock(hash data.BlockHash) (*data.Block, bool) {
+	if block, ok := hs.Blocks.Get(hash); ok {
+		return block, true
+	}
+	hs.waitProposal.Wait()
+	return hs.Blocks.Get(hash)
 }
 
 // UpdateQCHigh updates the qc held by the paceMaker, to the newest qc.
@@ -143,14 +157,14 @@ func (hs *HotStuffCore) UpdateQCHigh(qc *data.QuorumCert) bool {
 		return false
 	}
 
-	newQCHighBlock, ok := hs.Blocks.BlockOf(qc)
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
+
+	newQCHighBlock, ok := hs.expectBlock(qc.BlockHash)
 	if !ok {
 		logger.Println("Could not find block of new QC!")
 		return false
 	}
-
-	hs.mut.Lock()
-	defer hs.mut.Unlock()
 
 	oldQCHighBlock, ok := hs.Blocks.BlockOf(hs.qcHigh)
 	if !ok {
@@ -173,9 +187,9 @@ func (hs *HotStuffCore) OnReceiveProposal(block *data.Block) (*data.PartialCert,
 	logger.Println("OnReceiveProposal: ", block)
 	hs.Blocks.Put(block)
 
-	qcBlock, nExists := hs.Blocks.BlockOf(block.Justify)
-
 	hs.mut.Lock()
+	qcBlock, nExists := hs.expectBlock(block.Justify.BlockHash)
+
 	if block.Height <= hs.vHeight {
 		hs.mut.Unlock()
 		logger.Println("OnReceiveProposal: Block height less than vHeight")
@@ -209,6 +223,7 @@ func (hs *HotStuffCore) OnReceiveProposal(block *data.Block) (*data.PartialCert,
 	logger.Println("OnReceiveProposal: Accepted block")
 	hs.vHeight = block.Height
 	hs.cmdCache.MarkProposed(block.Commands...)
+	hs.waitProposal.Broadcast()
 	hs.mut.Unlock()
 
 	hs.pacemakerEvents <- ReceiveProposal
@@ -230,6 +245,7 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 		return
 	}
 
+	logger.Printf("OnReceiveVote: %.8s\n", cert.BlockHash)
 	hs.pacemakerEvents <- ReceiveVote
 
 	hs.mut.Lock()
@@ -237,12 +253,13 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 
 	qc, ok := hs.pendingQCs[cert.BlockHash]
 	if !ok {
-		b, ok := hs.Blocks.Get(cert.BlockHash)
+		b, ok := hs.expectBlock(cert.BlockHash)
 		if !ok {
 			logger.Println("OnReceiveVote: could not find block for certificate.")
 			return
 		}
 		qc = data.CreateQuorumCert(b)
+		hs.pendingQCs[cert.BlockHash] = qc
 	}
 
 	err := qc.AddPartial(cert)
@@ -250,9 +267,11 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 		logger.Println("OnReceiveVote: could not add partial signature to QC:", err)
 	}
 
-	if len(qc.Sigs) > hs.Config.QuorumSize {
+	if len(qc.Sigs) >= hs.Config.QuorumSize {
+		delete(hs.pendingQCs, cert.BlockHash)
+		logger.Println("OnReceiveVote: Created QC")
 		hs.pacemakerEvents <- QCFinish
-		hs.UpdateQCHigh(qc)
+		defer hs.UpdateQCHigh(qc)
 	}
 }
 

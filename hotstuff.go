@@ -24,16 +24,18 @@ func init() {
 // Pacemaker is a mechanism that provides synchronization
 type Pacemaker interface {
 	GetLeader() config.ReplicaID
+	Init(*HotStuff)
 }
 
 // HotStuff is a thing
 type HotStuff struct {
-	Pacemaker
 	*consensus.HotStuffCore
+
+	pacemaker Pacemaker
 
 	nodes map[config.ReplicaID]*proto.Node
 
-	server  *proto.GorumsServer
+	server  *hotstuffServer
 	manager *proto.Manager
 	cfg     *proto.Configuration
 
@@ -44,13 +46,16 @@ type HotStuff struct {
 }
 
 //New creates a new GorumsHotStuff backend object.
-func New(conf *config.ReplicaConfig, connectTimeout, qcTimeout time.Duration) *HotStuff {
-	return &HotStuff{
+func New(conf *config.ReplicaConfig, pacemaker Pacemaker, connectTimeout, qcTimeout time.Duration) *HotStuff {
+	hs := &HotStuff{
+		pacemaker:      pacemaker,
 		HotStuffCore:   consensus.New(conf),
 		nodes:          make(map[config.ReplicaID]*proto.Node),
 		connectTimeout: connectTimeout,
 		qcTimeout:      qcTimeout,
 	}
+	pacemaker.Init(hs)
+	return hs
 }
 
 //Start starts the server and client
@@ -114,11 +119,10 @@ func (hs *HotStuff) startServer(port string) error {
 		return fmt.Errorf("Failed to listen to port %s: %w", port, err)
 	}
 
-	hs.server = proto.NewGorumsServer()
-	hsSrv := &hotstuffServer{hs}
-	hs.server.RegisterProposeHandler(hsSrv)
-	hs.server.RegisterVoteHandler(hsSrv)
-	hs.server.RegisterNewViewHandler(hsSrv)
+	hs.server = &hotstuffServer{hs, proto.NewGorumsServer()}
+	hs.server.RegisterProposeHandler(hs.server)
+	hs.server.RegisterVoteHandler(hs.server)
+	hs.server.RegisterNewViewHandler(hs.server)
 
 	go hs.server.Serve(lis)
 	return nil
@@ -135,14 +139,11 @@ func (hs *HotStuff) Close() {
 
 func (hs *HotStuff) Propose() {
 	proposal := hs.CreateProposal()
-	hs.cfg.Propose(proto.BlockToProto(proposal))
+	logger.Println("Propose: ", proposal)
+	protobuf := proto.BlockToProto(proposal)
+	hs.cfg.Propose(protobuf)
 	// self-vote
-	pc, err := hs.OnReceiveProposal(proposal)
-	if err != nil {
-		logger.Println("Propose: OnReceiveProposal returned with error: ", err)
-		return
-	}
-	hs.OnReceiveVote(pc)
+	hs.server.Propose(protobuf)
 }
 
 func (hs *HotStuff) SendNewView(id config.ReplicaID) {
@@ -154,6 +155,7 @@ func (hs *HotStuff) SendNewView(id config.ReplicaID) {
 
 type hotstuffServer struct {
 	*HotStuff
+	*proto.GorumsServer
 }
 
 // Propose handles a replica's response to the Propose QC from the leader
@@ -162,7 +164,10 @@ func (hs *hotstuffServer) Propose(block *proto.Block) {
 	if err != nil {
 		logger.Println("OnReceiveProposal returned with error: ", err)
 	}
-	if leader, ok := hs.nodes[hs.GetLeader()]; ok {
+	leaderID := hs.pacemaker.GetLeader()
+	if hs.Config.ID == leaderID {
+		hs.OnReceiveVote(p)
+	} else if leader, ok := hs.nodes[leaderID]; ok {
 		leader.Vote(proto.PartialCertToProto(p))
 	}
 }

@@ -202,18 +202,20 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *options, replicaConfig *conf
 		finishedCmds: make(map[data.Command]chan struct{}),
 		lastExecTime: time.Now().UnixNano(),
 	}
-	srv.hs = hotstuff.New(replicaConfig, time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
+	var pm hotstuff.Pacemaker
 	switch conf.PmType {
 	case "fixed":
-		srv.pm = pacemaker.NewFixedLeader(srv.hs, conf.LeaderID)
+		pm = pacemaker.NewFixedLeader(conf.LeaderID)
 	case "round-robin":
-		srv.pm = pacemaker.NewRoundRobin(
-			srv.hs, conf.ViewChange, conf.Schedule, time.Duration(conf.ViewTimeout)*time.Millisecond,
+		pm = pacemaker.NewRoundRobin(
+			conf.ViewChange, conf.Schedule, time.Duration(conf.ViewTimeout)*time.Millisecond,
 		)
 	default:
 		fmt.Fprintf(os.Stderr, "Invalid pacemaker type: '%s'\n", conf.PmType)
 		os.Exit(1)
 	}
+	srv.hs = hotstuff.New(replicaConfig, pm, time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
+	srv.pm = pm.(interface{ Run(context.Context) })
 	// Use a custom server instead of the gorums one
 	ordering.RegisterGorumsServer(srv.grpcSrv, srv)
 	return srv

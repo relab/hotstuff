@@ -1,6 +1,6 @@
 pacemaker = "fixed"
 leader-id = 1
-view-change = 100
+view-change = 1
 leader-schedule = [1, 2, 3, 4]
 
 # This is the information that each replica is given about the other replicas

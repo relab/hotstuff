@@ -25,17 +25,25 @@ type FixedLeader struct {
 }
 
 // NewFixedLeader returns a new fixed leader pacemaker
-func NewFixedLeader(hs *hotstuff.HotStuff, leaderID config.ReplicaID) *FixedLeader {
+func NewFixedLeader(leaderID config.ReplicaID) *FixedLeader {
 	return &FixedLeader{
-		HotStuff: hs,
-		leader:   leaderID,
+		leader: leaderID,
 	}
 }
 
+func (p *FixedLeader) Init(hs *hotstuff.HotStuff) {
+	p.HotStuff = hs
+}
+
+func (p *FixedLeader) GetLeader() config.ReplicaID {
+	return p.leader
+}
+
 // Run runs the pacemaker which will beat when the previous QC is completed
-func (p FixedLeader) Run(ctx context.Context) {
+func (p *FixedLeader) Run(ctx context.Context) {
 	notify := p.GetEvents()
 	if p.Config.ID == p.leader {
+		logger.Println("Beat")
 		go p.Propose()
 	}
 	var n consensus.Event
@@ -52,6 +60,7 @@ func (p FixedLeader) Run(ctx context.Context) {
 		switch n {
 		case consensus.QCFinish:
 			if p.Config.ID == p.leader {
+				logger.Println("Beat")
 				go p.Propose()
 			}
 		}
@@ -71,9 +80,8 @@ type RoundRobin struct {
 }
 
 // NewRoundRobin returns a new round robin pacemaker
-func NewRoundRobin(hs *hotstuff.HotStuff, termLength int, schedule []config.ReplicaID, timeout time.Duration) *RoundRobin {
+func NewRoundRobin(termLength int, schedule []config.ReplicaID, timeout time.Duration) *RoundRobin {
 	return &RoundRobin{
-		HotStuff:   hs,
 		termLength: termLength,
 		schedule:   schedule,
 		timeout:    timeout,
@@ -81,9 +89,17 @@ func NewRoundRobin(hs *hotstuff.HotStuff, termLength int, schedule []config.Repl
 	}
 }
 
+func (p *RoundRobin) Init(hs *hotstuff.HotStuff) {
+	p.HotStuff = hs
+}
+
+func (p *RoundRobin) GetLeader() config.ReplicaID {
+	return p.getLeader(p.GetHeight())
+}
+
 // getLeader returns the fixed ID of the leader for the view height vHeight
 func (p *RoundRobin) getLeader(vHeight int) config.ReplicaID {
-	term := int(math.Ceil(float64(vHeight)/float64(p.termLength)) - 1)
+	term := int(math.Ceil(float64(vHeight) / float64(p.termLength)))
 	return p.schedule[term%len(p.schedule)]
 }
 
@@ -92,7 +108,7 @@ func (p *RoundRobin) Run(ctx context.Context) {
 	notify := p.GetEvents()
 
 	// initial beat
-	if p.getLeader(1) == p.Config.ID {
+	if p.getLeader(0) == p.Config.ID {
 		go p.Propose()
 	}
 
@@ -103,9 +119,9 @@ func (p *RoundRobin) Run(ctx context.Context) {
 	// as that would cause a panic
 	lastBeat := 1
 	beat := func() {
-		if p.getLeader(p.GetHeight()+1) == p.Config.ID && lastBeat < p.GetHeight()+1 &&
-			p.GetHeight()+1 > p.GetVotedHeight() {
-			lastBeat = p.GetHeight() + 1
+		if p.GetLeader() == p.Config.ID && lastBeat < p.GetHeight() &&
+			p.GetHeight() >= p.GetVotedHeight() {
+			lastBeat = p.GetHeight()
 			go p.Propose()
 		}
 	}
@@ -122,11 +138,6 @@ func (p *RoundRobin) Run(ctx context.Context) {
 		case consensus.ReceiveProposal:
 			p.resetTimer <- struct{}{}
 		case consensus.QCFinish:
-			if p.Config.ID != p.getLeader(p.GetHeight()+1) {
-				// was leader for previous view, but not the leader for next view
-				// do leader change
-				go p.SendNewView(p.getLeader(p.GetHeight() + 1))
-			}
 			beat()
 		case consensus.ReceiveNewView:
 			beat()
