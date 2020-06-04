@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	fuzz "github.com/google/gofuzz"
+	"github.com/relab/hotstuff/config"
 )
 
 func TestCanStoreAndRetrieveBlock(t *testing.T) {
@@ -35,7 +36,7 @@ func TestFuzzBlockHash(t *testing.T) {
 			var sig PartialSig
 			f.Fuzz(&sig)
 			id, _ := rand.Int(rand.Reader, big.NewInt(1000))
-			rID := ReplicaID(id.Int64())
+			rID := config.ReplicaID(id.Int64())
 			sig.ID = rID
 			sig.R, _ = rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
 			sig.S, _ = rand.Int(rand.Reader, big.NewInt(math.MaxInt64))

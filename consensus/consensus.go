@@ -149,6 +149,13 @@ func (hs *HotStuffCore) expectBlock(hash data.BlockHash) (*data.Block, bool) {
 	return hs.Blocks.Get(hash)
 }
 
+func (hs *HotStuffCore) emitEvent(event Event) {
+	select {
+	case hs.pacemakerEvents <- event:
+	default:
+	}
+}
+
 // UpdateQCHigh updates the qc held by the paceMaker, to the newest qc.
 func (hs *HotStuffCore) UpdateQCHigh(qc *data.QuorumCert) bool {
 	if !hs.SigCache.VerifyQuorumCert(qc) {
@@ -172,7 +179,7 @@ func (hs *HotStuffCore) UpdateQCHigh(qc *data.QuorumCert) bool {
 	if newQCHighBlock.Height > oldQCHighBlock.Height {
 		hs.qcHigh = qc
 		hs.bLeaf = newQCHighBlock
-		hs.pacemakerEvents <- HQCUpdate
+		hs.emitEvent(HQCUpdate)
 		return true
 	}
 
@@ -224,7 +231,7 @@ func (hs *HotStuffCore) OnReceiveProposal(block *data.Block) (*data.PartialCert,
 	hs.waitProposal.Broadcast()
 	hs.mut.Unlock()
 
-	hs.pacemakerEvents <- ReceiveProposal
+	hs.emitEvent(ReceiveProposal)
 
 	// queue block for update
 	hs.pendingUpdates <- block
@@ -244,7 +251,7 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 	}
 
 	logger.Printf("OnReceiveVote: %.8s\n", cert.BlockHash)
-	hs.pacemakerEvents <- ReceiveVote
+	hs.emitEvent(ReceiveVote)
 
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
@@ -272,7 +279,7 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 	if len(qc.Sigs) >= hs.Config.QuorumSize {
 		delete(hs.pendingQCs, cert.BlockHash)
 		logger.Println("OnReceiveVote: Created QC")
-		hs.pacemakerEvents <- QCFinish
+		hs.emitEvent(QCFinish)
 		hs.UpdateQCHigh(qc)
 	}
 }
@@ -282,7 +289,7 @@ func (hs *HotStuffCore) OnReceiveNewView(qc *data.QuorumCert) {
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
 	logger.Println("OnReceiveNewView")
-	hs.pacemakerEvents <- ReceiveNewView
+	hs.emitEvent(ReceiveNewView)
 	hs.UpdateQCHigh(qc)
 }
 

@@ -9,6 +9,7 @@ if [[ "$1" == "record" ]]; then
 		sudo sysctl kernel.perf_event_paranoid=1 || (echo "Failed to apply kernel parameter"; exit 1)
 	fi
 
+	mkdir -p rr
 	export _RR_TRACE_DIR=rr
 
 	rr record $bin --self-id 1 --privkey keys/r1.key "$@" > 1.out &

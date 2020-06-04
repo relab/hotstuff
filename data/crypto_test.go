@@ -3,12 +3,14 @@ package data
 import (
 	"crypto/ecdsa"
 	"testing"
+
+	"github.com/relab/hotstuff/config"
 )
 
 var pk ecdsa.PrivateKey // must not be a pointer
 
-var simpleRc = &ReplicaConfig{
-	Replicas: map[ReplicaID]*ReplicaInfo{
+var simpleRc = &config.ReplicaConfig{
+	Replicas: map[config.ReplicaID]*config.ReplicaInfo{
 		0: {
 			ID:      0,
 			Address: "",
@@ -18,8 +20,8 @@ var simpleRc = &ReplicaConfig{
 	QuorumSize: 1,
 }
 
-var biggerRc = &ReplicaConfig{
-	Replicas: map[ReplicaID]*ReplicaInfo{
+var biggerRc = &config.ReplicaConfig{
+	Replicas: map[config.ReplicaID]*config.ReplicaInfo{
 		0: {
 			ID:      0,
 			Address: "",
@@ -57,7 +59,7 @@ func init() {
 	pk = *k
 }
 
-func createPartialCert(t *testing.T, id ReplicaID) *PartialCert {
+func createPartialCert(t *testing.T, id config.ReplicaID) *PartialCert {
 	pc, err := CreatePartialCert(id, &pk, testBlock)
 	if err != nil {
 		t.Errorf("Failed to create partial certificate: %v\n", err)
@@ -98,13 +100,13 @@ func BenchmarkQuroumCertToBytes(b *testing.B) {
 		qc.AddPartial(pc)
 	}
 	for n := 0; n < b.N; n++ {
-		qc.toBytes()
+		qc.ToBytes()
 	}
 }
 
 func BenchmarkPartialSigToBytes(b *testing.B) {
 	pc, _ := CreatePartialCert(0, &pk, testBlock)
 	for n := 0; n < b.N; n++ {
-		pc.Sig.toBytes()
+		pc.Sig.ToBytes()
 	}
 }

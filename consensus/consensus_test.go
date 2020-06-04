@@ -4,15 +4,10 @@ import (
 	"bytes"
 	"testing"
 	"time"
+
+	. "github.com/relab/hotstuff/config"
+	. "github.com/relab/hotstuff/data"
 )
-
-type stubBackend struct{}
-
-func (d *stubBackend) Init(hs *HotStuff)                                {}
-func (d *stubBackend) Start() error                                     { return nil }
-func (d *stubBackend) DoPropose(block *Block) (*QuorumCert, error)      { return nil, nil }
-func (d *stubBackend) DoNewView(leader ReplicaID, qc *QuorumCert) error { return nil }
-func (d *stubBackend) Close()                                           {}
 
 /* func TestSafeNode(t *testing.T) {
 	key, _ := GeneratePrivateKey()
@@ -60,16 +55,16 @@ func (d *stubBackend) Close()                                           {}
 
 func TestUpdateQCHigh(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, nil)
+	hs := New(NewConfig(1, key))
 	block1 := CreateLeaf(hs.genesis, []Command{Command("command1")}, hs.qcHigh, hs.genesis.Height+1)
-	hs.blocks.Put(block1)
+	hs.Blocks.Put(block1)
 	qc1 := CreateQuorumCert(block1)
 
 	if hs.UpdateQCHigh(qc1) {
 		if hs.bLeaf.Hash() != block1.Hash() {
 			t.Error("UpdateQCHigh failed to update the leaf block")
 		}
-		if !bytes.Equal(hs.qcHigh.toBytes(), qc1.toBytes()) {
+		if !bytes.Equal(hs.qcHigh.ToBytes(), qc1.ToBytes()) {
 			t.Error("UpdateQCHigh failed to update qcHigh")
 		}
 
@@ -78,29 +73,28 @@ func TestUpdateQCHigh(t *testing.T) {
 	}
 
 	block2 := CreateLeaf(block1, []Command{Command("command2")}, qc1, block1.Height+1)
+	hs.Blocks.Put(block2)
 	qc2 := CreateQuorumCert(block2)
 	hs.UpdateQCHigh(qc2)
 
 	if hs.UpdateQCHigh(qc1) {
 		t.Error("UpdateQCHigh updated with outdated state given as input.")
 	}
-
 }
 
 func TestUpdate(t *testing.T) {
-	exec := make(chan []Command, 1)
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, func(b []Command) { exec <- b })
-	hs.QuorumSize = 0 // this accepts all QCs
+	hs := New(NewConfig(1, key))
+	hs.Config.QuorumSize = 0 // this accepts all QCs
 
 	n1 := CreateLeaf(hs.genesis, []Command{Command("n1")}, hs.qcHigh, hs.genesis.Height+1)
-	hs.blocks.Put(n1)
+	hs.Blocks.Put(n1)
 	n2 := CreateLeaf(n1, []Command{Command("n2")}, CreateQuorumCert(n1), n1.Height+1)
-	hs.blocks.Put(n2)
+	hs.Blocks.Put(n2)
 	n3 := CreateLeaf(n2, []Command{Command("n3")}, CreateQuorumCert(n2), n2.Height+1)
-	hs.blocks.Put(n3)
+	hs.Blocks.Put(n3)
 	n4 := CreateLeaf(n3, []Command{Command("n4")}, CreateQuorumCert(n3), n3.Height+1)
-	hs.blocks.Put(n4)
+	hs.Blocks.Put(n4)
 
 	// PROPOSE on n1
 	hs.update(n1)
@@ -128,7 +122,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	select {
-	case b := <-exec:
+	case b := <-hs.GetExec():
 		if b[0] != n1.Commands[0] {
 			success = false
 		}
@@ -143,7 +137,7 @@ func TestUpdate(t *testing.T) {
 
 func TestOnReciveProposal(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), &stubBackend{}, 10*time.Millisecond, nil)
+	hs := New(NewConfig(1, key))
 	block1 := CreateLeaf(hs.genesis, []Command{Command("command1")}, hs.qcHigh, hs.genesis.Height+1)
 	qc := CreateQuorumCert(block1)
 
@@ -156,7 +150,7 @@ func TestOnReciveProposal(t *testing.T) {
 	if pc == nil {
 		t.Error("onReciveProposal failed to complete")
 	} else {
-		if _, ok := hs.blocks.Get(block1.Hash()); !ok {
+		if _, ok := hs.Blocks.Get(block1.Hash()); !ok {
 			t.Error("onReciveProposal failed to place the new block in BlockStorage")
 		}
 		if hs.vHeight != block1.Height {
@@ -177,9 +171,9 @@ func TestOnReciveProposal(t *testing.T) {
 	}
 }
 
-func TestExpectBlockFor(t *testing.T) {
+func TestExpectBlock(t *testing.T) {
 	key, _ := GeneratePrivateKey()
-	hs := New(1, key, NewConfig(), &stubBackend{}, time.Second, nil)
+	hs := New(NewConfig(1, key))
 	block := CreateLeaf(hs.genesis, []Command{Command("test")}, hs.qcHigh, 1)
 	qc := CreateQuorumCert(block)
 
@@ -188,7 +182,10 @@ func TestExpectBlockFor(t *testing.T) {
 		hs.OnReceiveProposal(block)
 	}()
 
-	n, ok := hs.expectBlockFor(qc)
+	hs.mut.Lock()
+	n, ok := hs.expectBlock(qc.BlockHash)
+	hs.mut.Unlock()
+
 	if !ok && n == nil {
 		t.Fail()
 	}
