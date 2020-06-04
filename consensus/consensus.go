@@ -151,14 +151,12 @@ func (hs *HotStuffCore) expectBlock(hash data.BlockHash) (*data.Block, bool) {
 
 // UpdateQCHigh updates the qc held by the paceMaker, to the newest qc.
 func (hs *HotStuffCore) UpdateQCHigh(qc *data.QuorumCert) bool {
-	logger.Println("UpdateQCHigh")
 	if !hs.SigCache.VerifyQuorumCert(qc) {
-		logger.Println("QC not verified!: ", qc)
+		logger.Println("QC not verified!:", qc)
 		return false
 	}
 
-	hs.mut.Lock()
-	defer hs.mut.Unlock()
+	logger.Println("UpdateQCHigh")
 
 	newQCHighBlock, ok := hs.expectBlock(qc.BlockHash)
 	if !ok {
@@ -184,7 +182,7 @@ func (hs *HotStuffCore) UpdateQCHigh(qc *data.QuorumCert) bool {
 
 // OnReceiveProposal handles a replica's response to the Proposal from the leader
 func (hs *HotStuffCore) OnReceiveProposal(block *data.Block) (*data.PartialCert, error) {
-	logger.Println("OnReceiveProposal: ", block)
+	logger.Println("OnReceiveProposal:", block)
 	hs.Blocks.Put(block)
 
 	hs.mut.Lock()
@@ -258,6 +256,10 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 			logger.Println("OnReceiveVote: could not find block for certificate.")
 			return
 		}
+		if b.Height < hs.vHeight {
+			// too old, don't care
+			return
+		}
 		qc = data.CreateQuorumCert(b)
 		hs.pendingQCs[cert.BlockHash] = qc
 	}
@@ -271,12 +273,14 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 		delete(hs.pendingQCs, cert.BlockHash)
 		logger.Println("OnReceiveVote: Created QC")
 		hs.pacemakerEvents <- QCFinish
-		defer hs.UpdateQCHigh(qc)
+		hs.UpdateQCHigh(qc)
 	}
 }
 
 // OnReceiveNewView handles the leader's response to receiving a NewView rpc from a replica
 func (hs *HotStuffCore) OnReceiveNewView(qc *data.QuorumCert) {
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
 	logger.Println("OnReceiveNewView")
 	hs.pacemakerEvents <- ReceiveNewView
 	hs.UpdateQCHigh(qc)
@@ -300,7 +304,10 @@ func (hs *HotStuffCore) update(block *data.Block) {
 		return
 	}
 
-	logger.Println("PRE COMMIT: ", block1)
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
+
+	logger.Println("PRE COMMIT:", block1)
 	// PRE-COMMIT on block1
 	hs.UpdateQCHigh(block.Justify)
 
@@ -309,12 +316,9 @@ func (hs *HotStuffCore) update(block *data.Block) {
 		return
 	}
 
-	hs.mut.Lock()
-	defer hs.mut.Unlock()
-
 	if block2.Height > hs.bLock.Height {
 		hs.bLock = block2 // COMMIT on block2
-		logger.Println("COMMIT: ", block2)
+		logger.Println("COMMIT:", block2)
 	}
 
 	block3, ok := hs.Blocks.BlockOf(block2.Justify)
@@ -323,7 +327,7 @@ func (hs *HotStuffCore) update(block *data.Block) {
 	}
 
 	if block1.ParentHash == block2.Hash() && block2.ParentHash == block3.Hash() {
-		logger.Println("DECIDE ", block3)
+		logger.Println("DECIDE", block3)
 		hs.commit(block3)
 		hs.bExec = block3 // DECIDE on block3
 	}
@@ -341,7 +345,7 @@ func (hs *HotStuffCore) commit(block *data.Block) {
 			hs.commit(parent)
 		}
 		block.Committed = true
-		logger.Println("EXEC ", block)
+		logger.Println("EXEC", block)
 		hs.exec <- block.Commands
 	}
 }
@@ -350,8 +354,10 @@ func (hs *HotStuffCore) commit(block *data.Block) {
 func (hs *HotStuffCore) CreateProposal() *data.Block {
 	batch := hs.cmdCache.GetFirst(hs.Config.BatchSize)
 	hs.mut.Lock()
-	defer hs.mut.Unlock()
-	return CreateLeaf(hs.bLeaf, batch, hs.qcHigh, hs.bLeaf.Height+1)
+	b := CreateLeaf(hs.bLeaf, batch, hs.qcHigh, hs.bLeaf.Height+1)
+	hs.mut.Unlock()
+	hs.Blocks.Put(b)
+	return b
 }
 
 // Close frees resources held by HotStuff and closes backend connections

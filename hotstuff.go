@@ -139,7 +139,7 @@ func (hs *HotStuff) Close() {
 
 func (hs *HotStuff) Propose() {
 	proposal := hs.CreateProposal()
-	logger.Println("Propose: ", proposal)
+	logger.Println("Propose:", proposal)
 	protobuf := proto.BlockToProto(proposal)
 	hs.cfg.Propose(protobuf)
 	// self-vote
@@ -162,7 +162,7 @@ type hotstuffServer struct {
 func (hs *hotstuffServer) Propose(block *proto.Block) {
 	p, err := hs.OnReceiveProposal(block.FromProto())
 	if err != nil {
-		logger.Println("OnReceiveProposal returned with error: ", err)
+		logger.Println("OnReceiveProposal returned with error:", err)
 	}
 	leaderID := hs.pacemaker.GetLeader()
 	if hs.Config.ID == leaderID {
