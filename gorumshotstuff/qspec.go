@@ -27,7 +27,7 @@ func (qspec *hotstuffQSpec) Reset() {
 }
 
 // ProposeQF takes replies from replica after the leader calls the Propose QC and collects them into a quorum cert
-func (qspec *hotstuffQSpec) ProposeQF(req *proto.Block, replies []*proto.PartialCert) (*proto.QuorumCert, bool) {
+func (qspec *hotstuffQSpec) ProposeQF(req *proto.Block, replies map[uint32]*proto.PartialCert) (*proto.QuorumCert, bool) {
 	numVerified := 0
 	for _, pc := range replies {
 		if ok, verifiedBefore := qspec.verified[pc]; !verifiedBefore {

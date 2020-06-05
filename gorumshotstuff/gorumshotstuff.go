@@ -102,24 +102,36 @@ func (hs *GorumsHotStuff) Start() error {
 func (hs *GorumsHotStuff) startClient(connectTimeout time.Duration) error {
 	// sort addresses based on ID, excluding self
 	ids := make([]hotstuff.ReplicaID, 0, len(hs.Replicas)-1)
-	addrs := make([]string, 0, len(hs.Replicas)-1)
+	/*	addrs := make([]string, 0, len(hs.Replicas)-1)
+		for _, replica := range hs.Replicas {
+			if replica.ID != hs.GetID() {
+				i := sort.Search(len(ids), func(i int) bool { return ids[i] >= replica.ID })
+				ids = append(ids, 0)
+				copy(ids[i+1:], ids[i:])
+				ids[i] = replica.ID
+				addrs = append(addrs, "")
+				copy(addrs[i+1:], addrs[i:])
+				addrs[i] = replica.Address
+			}
+		}
+	*/
+	addrs := make(map[string]uint32)
 	for _, replica := range hs.Replicas {
 		if replica.ID != hs.GetID() {
 			i := sort.Search(len(ids), func(i int) bool { return ids[i] >= replica.ID })
 			ids = append(ids, 0)
 			copy(ids[i+1:], ids[i:])
 			ids[i] = replica.ID
-			addrs = append(addrs, "")
-			copy(addrs[i+1:], addrs[i:])
-			addrs[i] = replica.Address
+			addrs[replica.Address] = uint32(replica.ID)
 		}
 	}
 
-	mgr, err := proto.NewManager(addrs, proto.WithGrpcDialOptions(
+	mgr, err := proto.NewManager(proto.WithGrpcDialOptions(
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
 	),
 		proto.WithDialTimeout(connectTimeout),
+		proto.WithSpesifiedNodeID(addrs),
 	)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to replicas: %w", err)

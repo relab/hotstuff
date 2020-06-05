@@ -7,6 +7,13 @@ import (
 	context "context"
 	binary "encoding/binary"
 	fmt "fmt"
+	ordering "github.com/relab/gorums/ordering"
+	trace "golang.org/x/net/trace"
+	grpc "google.golang.org/grpc"
+	backoff "google.golang.org/grpc/backoff"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
+	proto "google.golang.org/protobuf/proto"
 	fnv "hash/fnv"
 	io "io"
 	log "log"
@@ -19,14 +26,6 @@ import (
 	sync "sync"
 	atomic "sync/atomic"
 	time "time"
-
-	ordering "github.com/relab/gorums/ordering"
-	trace "golang.org/x/net/trace"
-	grpc "google.golang.org/grpc"
-	backoff "google.golang.org/grpc/backoff"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
-	proto "google.golang.org/protobuf/proto"
 )
 
 // A Configuration represents a static set of nodes on which quorum remote
@@ -38,6 +37,21 @@ type Configuration struct {
 	mgr   *Manager
 	qspec QuorumSpec
 	errs  chan GRPCError
+}
+
+// NewConfig returns a configuration for the given node addresses and quorum spec.
+// The returned func() must be called to close the underlying connections.
+// This is an experimental API.
+func NewConfig(qspec QuorumSpec, opts ...ManagerOption) (*Configuration, func(), error) {
+	man, err := NewManager(opts...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create manager: %v", err)
+	}
+	c, err := man.NewConfiguration(man.NodeIDs(), qspec)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create configuration: %v", err)
+	}
+	return c, func() { man.Close() }, nil
 }
 
 // ID reports the identifier for the configuration.
@@ -170,10 +184,7 @@ type Manager struct {
 
 // NewManager attempts to connect to the given set of node addresses and if
 // successful returns a new Manager containing connections to those nodes.
-func NewManager(nodeAddrs []string, opts ...ManagerOption) (*Manager, error) {
-	if len(nodeAddrs) == 0 {
-		return nil, fmt.Errorf("could not create manager: no nodes provided")
-	}
+func NewManager(opts ...ManagerOption) (*Manager, error) {
 
 	m := &Manager{
 		lookup:       make(map[uint32]*Node),
@@ -188,19 +199,45 @@ func NewManager(nodeAddrs []string, opts ...ManagerOption) (*Manager, error) {
 		opt(&m.opts)
 	}
 
+	if len(m.opts.addrsList) == 0 && len(m.opts.IDMapping) == 0 {
+		return nil, fmt.Errorf("could not create manager: no nodes provided")
+	}
+
 	if m.opts.backoff != backoff.DefaultConfig {
 		m.opts.grpcDialOpts = append(m.opts.grpcDialOpts, grpc.WithConnectParams(
 			grpc.ConnectParams{Backoff: m.opts.backoff},
 		))
 	}
 
-	for _, naddr := range nodeAddrs {
-		node, err2 := m.createNode(naddr)
-		if err2 != nil {
-			return nil, ManagerCreationError(err2)
+	var nodeAddrs []string
+	if m.opts.IDMapping != nil {
+		for naddr, id := range m.opts.IDMapping {
+
+			nodeAddrs = append(nodeAddrs, naddr)
+			node, err2 := m.createNode(naddr, id)
+
+			if err2 != nil {
+				return nil, ManagerCreationError(err2)
+			}
+			m.lookup[node.id] = node
+			m.nodes = append(m.nodes, node)
 		}
-		m.lookup[node.id] = node
-		m.nodes = append(m.nodes, node)
+
+	} else if m.opts.addrsList != nil {
+
+		nodeAddrs = m.opts.addrsList
+
+		for _, naddr := range m.opts.addrsList {
+
+			node, err2 := m.createNode(naddr, 0)
+
+			if err2 != nil {
+				return nil, ManagerCreationError(err2)
+			}
+			m.lookup[node.id] = node
+			m.nodes = append(m.nodes, node)
+		}
+
 	}
 
 	if m.opts.trace {
@@ -224,7 +261,7 @@ func NewManager(nodeAddrs []string, opts ...ManagerOption) (*Manager, error) {
 	return m, nil
 }
 
-func (m *Manager) createNode(addr string) (*Node, error) {
+func (m *Manager) createNode(addr string, id uint32) (*Node, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -233,9 +270,11 @@ func (m *Manager) createNode(addr string) (*Node, error) {
 		return nil, fmt.Errorf("create node %s error: %v", addr, err)
 	}
 
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(tcpAddr.String()))
-	id := h.Sum32()
+	if id == 0 {
+		h := fnv.New32a()
+		_, _ = h.Write([]byte(tcpAddr.String()))
+		id = h.Sum32()
+	}
 
 	if _, found := m.lookup[id]; found {
 		return nil, fmt.Errorf("create node %s error: node already exists", addr)
@@ -661,6 +700,8 @@ type managerOptions struct {
 	noConnect       bool
 	trace           bool
 	backoff         backoff.Config
+	IDMapping       map[string]uint32
+	addrsList       []string
 }
 
 // ManagerOption provides a way to set different options on a new Manager.
@@ -714,8 +755,22 @@ func WithBackoff(backoff backoff.Config) ManagerOption {
 	}
 }
 
+// WithSpesifiedNodeID allows users to manualy create an ID shceam for the nodes. idMap maps an address to an id.
+func WithSpesifiedNodeID(idMap map[string]uint32) ManagerOption {
+	return func(o *managerOptions) {
+		o.IDMapping = idMap
+	}
+}
+
+// WithoutSpesifedNodeID automaticaly creates a node shceam for the nodes. There still has to be given a list of addresses that is to be used.
+func WithoutSpesifedNodeID(addrsList []string) ManagerOption {
+	return func(o *managerOptions) {
+		o.addrsList = addrsList
+	}
+}
+
 type orderingResult struct {
-	nid   uint32
+	nid   uint32 // Give the qspec this id when sending it a result from a request
 	reply []byte
 	err   error
 }
@@ -1007,7 +1062,7 @@ func (n *Node) closeStream() (err error) {
 
 // Propose is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (c *Configuration) Propose(ctx context.Context, in *Block, opts ...grpc.CallOption) (resp *QuorumCert, err error) {
+func (c *Configuration) Propose(ctx context.Context, in *Block) (resp *QuorumCert, err error) {
 
 	// get the ID which will be used to return the correct responses for a request
 	msgID := c.mgr.nextMsgID()
@@ -1035,9 +1090,10 @@ func (c *Configuration) Propose(ctx context.Context, in *Block, opts ...grpc.Cal
 	}
 
 	var (
-		replyValues = make([]*PartialCert, 0, expected)
-		errs        []GRPCError
-		quorum      bool
+		//replyValues = make([]*PartialCert, 0, expected)
+		errs   []GRPCError
+		quorum bool
+		replys = make(map[uint32]*PartialCert)
 	)
 
 	for {
@@ -1050,20 +1106,21 @@ func (c *Configuration) Propose(ctx context.Context, in *Block, opts ...grpc.Cal
 
 			reply := new(PartialCert)
 			err := proto.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}.Unmarshal(r.reply, reply)
+			replys[r.nid] = reply
 			if err != nil {
 				errs = append(errs, GRPCError{r.nid, fmt.Errorf("failed to unmarshal reply: %w", err)})
 				break
 			}
-			replyValues = append(replyValues, reply)
-			if resp, quorum = c.qspec.ProposeQF(in, replyValues); quorum {
+			//replyValues = append(replyValues, reply)
+			if resp, quorum = c.qspec.ProposeQF(in, replys); quorum {
 				return resp, nil
 			}
 		case <-ctx.Done():
-			return resp, QuorumCallError{ctx.Err().Error(), len(replyValues), errs}
+			return resp, QuorumCallError{ctx.Err().Error(), len(replys), errs}
 		}
 
-		if len(errs)+len(replyValues) == expected {
-			return resp, QuorumCallError{"incomplete call", len(replyValues), errs}
+		if len(errs)+len(replys) == expected {
+			return resp, QuorumCallError{"incomplete call", len(replys), errs}
 		}
 	}
 }
@@ -1161,7 +1218,7 @@ type QuorumSpec interface {
 	// supplied to the Propose method at call time, and may or may not
 	// be used by the quorum function. If the in parameter is not needed
 	// you should implement your quorum function with '_ *Block'.
-	ProposeQF(in *Block, replies []*PartialCert) (*QuorumCert, bool)
+	ProposeQF(in *Block, replies map[uint32]*PartialCert) (*QuorumCert, bool)
 }
 
 const hasOrderingMethods = true
