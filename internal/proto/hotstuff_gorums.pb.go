@@ -44,9 +44,9 @@ type Configuration struct {
 
 // NewConfig returns a configuration for the given node addresses and quorum spec.
 // The returned func() must be called to close the underlying connections.
-// This is experimental API.
-func NewConfig(addrs []string, qspec QuorumSpec, opts ...ManagerOption) (*Configuration, func(), error) {
-	man, err := NewManager(addrs, opts...)
+// This is an experimental API.
+func NewConfig(qspec QuorumSpec, opts ...ManagerOption) (*Configuration, func(), error) {
+	man, err := NewManager(opts...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create manager: %v", err)
 	}
@@ -299,10 +299,7 @@ type Manager struct {
 
 // NewManager attempts to connect to the given set of node addresses and if
 // successful returns a new Manager containing connections to those nodes.
-func NewManager(nodeAddrs []string, opts ...ManagerOption) (*Manager, error) {
-	if len(nodeAddrs) == 0 {
-		return nil, fmt.Errorf("could not create manager: no nodes provided")
-	}
+func NewManager(opts ...ManagerOption) (*Manager, error) {
 
 	m := &Manager{
 		lookup:       make(map[uint32]*Node),
@@ -320,19 +317,77 @@ func NewManager(nodeAddrs []string, opts ...ManagerOption) (*Manager, error) {
 		grpc.ForceCodec(newGorumsCodec()),
 	))
 
+	if len(m.opts.addrsList) == 0 && len(m.opts.IDMapping) == 0 {
+		return nil, fmt.Errorf("could not create manager: no nodes provided")
+	}
+
 	if m.opts.backoff != backoff.DefaultConfig {
 		m.opts.grpcDialOpts = append(m.opts.grpcDialOpts, grpc.WithConnectParams(
 			grpc.ConnectParams{Backoff: m.opts.backoff},
 		))
 	}
 
-	for _, naddr := range nodeAddrs {
-		node, err2 := m.createNode(naddr)
-		if err2 != nil {
-			return nil, ManagerCreationError(err2)
+	var nodeAddrs []string
+	if m.opts.IDMapping != nil {
+		for naddr, id := range m.opts.IDMapping {
+
+			nodeAddrs = append(nodeAddrs, naddr)
+			node, err2 := m.createNode(naddr, id)
+
+			if err2 != nil {
+				return nil, ManagerCreationError(err2)
+			}
+			m.lookup[node.id] = node
+			m.nodes = append(m.nodes, node)
+			// Sorting the nodes when puting them in the node list from lowest to highest id value. This has to be done in order for there to be some system when
+			// returning node IDs. Looping over a map is none-deterministic and therefor the nodes can't simpely be put in a list.
+			/*if len(m.nodes) == 0 || len(m.nodes)+1 == len(m.opts.IDMapping) {
+				m.nodes = append(m.nodes, node)
+			}
+
+			for i, node := range m.nodes {
+				if id < node.id {
+					var temp []*Node
+					if i == 0 {
+						temp = append(temp, node)
+						m.nodes = append(temp, m.nodes...)
+						break
+					}
+					temp = m.nodes[i:]
+					m.nodes = append(append(m.nodes[:i], node), temp...)
+					break
+				}
+			}*/
 		}
-		m.lookup[node.id] = node
-		m.nodes = append(m.nodes, node)
+
+		temp := make([]*Node, len(m.nodes))
+		index := 0
+		for _, node1 := range m.nodes {
+			for _, node2 := range m.nodes {
+				if node2.id < node1.id {
+					index++
+				}
+			}
+			temp[index] = node1
+			index = 0
+		}
+		m.nodes = temp
+
+	} else if m.opts.addrsList != nil {
+
+		nodeAddrs = m.opts.addrsList
+
+		for _, naddr := range m.opts.addrsList {
+
+			node, err2 := m.createNode(naddr, 0)
+
+			if err2 != nil {
+				return nil, ManagerCreationError(err2)
+			}
+			m.lookup[node.id] = node
+			m.nodes = append(m.nodes, node)
+		}
+
 	}
 
 	if m.opts.trace {
@@ -356,7 +411,7 @@ func NewManager(nodeAddrs []string, opts ...ManagerOption) (*Manager, error) {
 	return m, nil
 }
 
-func (m *Manager) createNode(addr string) (*Node, error) {
+func (m *Manager) createNode(addr string, id uint32) (*Node, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -365,9 +420,11 @@ func (m *Manager) createNode(addr string) (*Node, error) {
 		return nil, fmt.Errorf("create node %s error: %v", addr, err)
 	}
 
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(tcpAddr.String()))
-	id := h.Sum32()
+	if id == 0 {
+		h := fnv.New32a()
+		_, _ = h.Write([]byte(tcpAddr.String()))
+		id = h.Sum32()
+	}
 
 	if _, found := m.lookup[id]; found {
 		return nil, fmt.Errorf("create node %s error: node already exists", addr)
@@ -794,6 +851,8 @@ type managerOptions struct {
 	trace           bool
 	backoff         backoff.Config
 	sendBuffer      uint
+	IDMapping       map[string]uint32
+	addrsList       []string
 }
 
 func newManagerOptions() managerOptions {
@@ -860,6 +919,20 @@ func WithBackoff(backoff backoff.Config) ManagerOption {
 func WithSendBufferSize(size uint) ManagerOption {
 	return func(o *managerOptions) {
 		o.sendBuffer = size
+	}
+}
+
+// WithSpesifiedNodeID allows users to manualy create an ID shceam for the nodes. idMap maps an address to an id.
+func WithSpesifiedNodeID(idMap map[string]uint32) ManagerOption {
+	return func(o *managerOptions) {
+		o.IDMapping = idMap
+	}
+}
+
+// WithoutSpesifedNodeID automaticaly creates a node shceam for the nodes. There still has to be given a list of addresses that is to be used.
+func WithoutSpesifedNodeID(addrsList []string) ManagerOption {
+	return func(o *managerOptions) {
+		o.addrsList = addrsList
 	}
 }
 

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"sort"
 	"sync"
 	"time"
 
@@ -73,26 +72,19 @@ func (hs *HotStuff) Start() error {
 }
 
 func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
-	// sort addresses based on ID, excluding self
-	ids := make([]config.ReplicaID, 0, len(hs.Config.Replicas)-1)
-	addrs := make([]string, 0, len(hs.Config.Replicas)-1)
+	idMapping := make(map[string]uint32)
 	for _, replica := range hs.Config.Replicas {
 		if replica.ID != hs.Config.ID {
-			i := sort.Search(len(ids), func(i int) bool { return ids[i] >= replica.ID })
-			ids = append(ids, 0)
-			copy(ids[i+1:], ids[i:])
-			ids[i] = replica.ID
-			addrs = append(addrs, "")
-			copy(addrs[i+1:], addrs[i:])
-			addrs[i] = replica.Address
+			idMapping[replica.Address] = uint32(replica.ID)
 		}
 	}
 
-	mgr, err := proto.NewManager(addrs, proto.WithGrpcDialOptions(
+	mgr, err := proto.NewManager(proto.WithGrpcDialOptions(
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
 	),
 		proto.WithDialTimeout(connectTimeout),
+		proto.WithSpesifiedNodeID(idMapping),
 	)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to replicas: %w", err)
@@ -100,8 +92,8 @@ func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
 	hs.manager = mgr
 
 	nodes := mgr.Nodes()
-	for i, id := range ids {
-		hs.nodes[id] = nodes[i]
+	for _, node := range nodes {
+		hs.nodes[config.ReplicaID(node.ID())] = node
 	}
 
 	hs.cfg, err = hs.manager.NewConfiguration(hs.manager.NodeIDs(), &struct{}{})
