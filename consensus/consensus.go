@@ -52,7 +52,7 @@ type HotStuffCore struct {
 
 	pendingUpdates chan *data.Block
 
-	pacemakerEvents chan Event
+	eventChannels []chan Event
 
 	// stops any goroutines started by HotStuff
 	cancel context.CancelFunc
@@ -96,7 +96,9 @@ func (hs *HotStuffCore) GetQCHigh() *data.QuorumCert {
 }
 
 func (hs *HotStuffCore) GetEvents() chan Event {
-	return hs.pacemakerEvents
+	c := make(chan Event)
+	hs.eventChannels = append(hs.eventChannels, c)
+	return c
 }
 
 func (hs *HotStuffCore) GetExec() chan []data.Command {
@@ -116,20 +118,19 @@ func New(conf *config.ReplicaConfig) *HotStuffCore {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	hs := &HotStuffCore{
-		Config:          conf,
-		genesis:         genesis,
-		bLock:           genesis,
-		bExec:           genesis,
-		bLeaf:           genesis,
-		qcHigh:          qcForGenesis,
-		Blocks:          blocks,
-		pendingQCs:      make(map[data.BlockHash]*data.QuorumCert),
-		cancel:          cancel,
-		SigCache:        data.NewSignatureCache(conf),
-		cmdCache:        data.NewCommandSet(),
-		pendingUpdates:  make(chan *data.Block, 1),
-		pacemakerEvents: make(chan Event, 1),
-		exec:            make(chan []data.Command, 1),
+		Config:         conf,
+		genesis:        genesis,
+		bLock:          genesis,
+		bExec:          genesis,
+		bLeaf:          genesis,
+		qcHigh:         qcForGenesis,
+		Blocks:         blocks,
+		pendingQCs:     make(map[data.BlockHash]*data.QuorumCert),
+		cancel:         cancel,
+		SigCache:       data.NewSignatureCache(conf),
+		cmdCache:       data.NewCommandSet(),
+		pendingUpdates: make(chan *data.Block, 1),
+		exec:           make(chan []data.Command, 1),
 	}
 
 	hs.waitProposal = sync.NewCond(&hs.mut)
@@ -150,9 +151,8 @@ func (hs *HotStuffCore) expectBlock(hash data.BlockHash) (*data.Block, bool) {
 }
 
 func (hs *HotStuffCore) emitEvent(event Event) {
-	select {
-	case hs.pacemakerEvents <- event:
-	default:
+	for _, c := range hs.eventChannels {
+		c <- event
 	}
 }
 
