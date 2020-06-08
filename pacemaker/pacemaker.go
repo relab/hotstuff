@@ -94,7 +94,7 @@ func (p *RoundRobin) Init(hs *hotstuff.HotStuff) {
 }
 
 func (p *RoundRobin) GetLeader() config.ReplicaID {
-	return p.getLeader(p.GetHeight())
+	return p.getLeader(p.GetHeight() + 1)
 }
 
 // getLeader returns the fixed ID of the leader for the view height vHeight
@@ -117,11 +117,12 @@ func (p *RoundRobin) Run(ctx context.Context) {
 
 	// make sure that we only beat once per view, and don't beat if bLeaf.Height < vHeight
 	// as that would cause a panic
-	lastBeat := 1
+	lastBeat := 0
 	beat := func() {
-		if p.GetLeader() == p.Config.ID && lastBeat < p.GetHeight() &&
-			p.GetHeight() >= p.GetVotedHeight() {
-			lastBeat = p.GetHeight()
+		nextView := p.GetHeight() + 1
+		if p.getLeader(nextView) == p.Config.ID && lastBeat < nextView &&
+			nextView >= p.GetVotedHeight() {
+			lastBeat = nextView
 			go p.Propose()
 		}
 	}
