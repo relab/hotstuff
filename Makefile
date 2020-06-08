@@ -1,45 +1,19 @@
-INTERNALPATH   := ./internal/proto
-INTERNALPROTO  := $(INTERNALPATH)/hotstuff.pb.go
-INTERNALGORUMS := $(INTERNALPATH)/hotstuff_gorums.pb.go
-INTERNALFILE   := $(INTERNALPATH)/hotstuff.proto
 
-PUBLICPATH   := ./clientapi
-PUBLICPROTO  := $(PUBLICPATH)/hotstuff.pb.go
-PUBLICGORUMS := $(PUBLICPATH)/hotstuff_gorums.pb.go
-PUBLICFILE   := $(PUBLICPATH)/hotstuff.proto
+proto_src := clientapi/hotstuff.proto internal/proto/hotstuff.proto
+proto_go := $(proto_src:%.proto=%.pb.go)
+gorums_go := $(proto_src:%.proto=%_gorums.pb.go)
 
-CLIENTPATH := ./cmd/hotstuffclient
-CLIENT     := $(CLIENTPATH)/hotstuffclient
+binaries := cmd/hotstuffclient/hotstuffclient cmd/hotstuffserver/hotstuffserver cmd/hotstuffkeygen/hotstuffkeygen
 
-SERVERPATH := ./cmd/hotstuffserver
-SERVER     := $(SERVERPATH)/hotstuffserver
+.PHONY: all $(binaries)
 
-.PHONY: all $(CLIENT) $(SERVER)
+all: $(binaries)
 
-all: $(CLIENT) $(SERVER)
+$(proto_go): %.pb.go : %.proto
+	@protoc --go_out=paths=source_relative:. -I=$(GOPATH)/src:. $^
 
-$(CLIENT): $(PUBLICPROTO) $(PUBLICGORUMS)
-	@go build -o $(CLIENT) $(CLIENTPATH)
+$(gorums_go): %_gorums.pb.go : %.proto
+	@protoc --gorums_out=paths=source_relative:. -I=$(GOPATH)/src:. $^
 
-$(SERVER): $(PUBLICPROTO) $(PUBLICGORUMS) $(INTERNALPROTO) $(INTERNALGORUMS)
-	@go build -o $(SERVER) $(SERVERPATH)
-
-$(INTERNALPROTO): $(INTERNALFILE)
-	@protoc -I=$(GOPATH)/src:. \
-		--go_out=paths=source_relative:. \
-		$(INTERNALFILE)
-
-$(INTERNALGORUMS): $(INTERNALFILE)
-	@protoc -I=$(GOPATH)/src:. \
-		--gorums_out=paths=source_relative:. \
-		$(INTERNALFILE)
-
-$(PUBLICPROTO): $(PUBLICFILE)
-	@protoc -I=$(GOPATH)/src:. \
-		--go_out=paths=source_relative:. \
-		$(PUBLICFILE)
-
-$(PUBLICGORUMS): $(PUBLICFILE)
-	@protoc -I=$(GOPATH)/src:. \
-		--gorums_out=paths=source_relative:. \
-		$(PUBLICFILE)
+$(binaries): $(proto_go) $(gorums_go)
+	@go build -o ./$@ ./$(dir $@)
