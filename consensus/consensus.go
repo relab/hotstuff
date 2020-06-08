@@ -115,18 +115,18 @@ func New(conf *config.ReplicaConfig) *HotStuffCore {
 	blocks := data.NewMapStorage()
 	blocks.Put(genesis)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	/* ctx, cancel := context.WithCancel(context.Background()) */
 
 	hs := &HotStuffCore{
-		Config:         conf,
-		genesis:        genesis,
-		bLock:          genesis,
-		bExec:          genesis,
-		bLeaf:          genesis,
-		qcHigh:         qcForGenesis,
-		Blocks:         blocks,
-		pendingQCs:     make(map[data.BlockHash]*data.QuorumCert),
-		cancel:         cancel,
+		Config:     conf,
+		genesis:    genesis,
+		bLock:      genesis,
+		bExec:      genesis,
+		bLeaf:      genesis,
+		qcHigh:     qcForGenesis,
+		Blocks:     blocks,
+		pendingQCs: make(map[data.BlockHash]*data.QuorumCert),
+		/* cancel:         cancel, */
 		SigCache:       data.NewSignatureCache(conf),
 		cmdCache:       data.NewCommandSet(),
 		pendingUpdates: make(chan *data.Block, 1),
@@ -135,7 +135,7 @@ func New(conf *config.ReplicaConfig) *HotStuffCore {
 
 	hs.waitProposal = sync.NewCond(&hs.mut)
 
-	go hs.updateAsync(ctx)
+	/* go hs.updateAsync(ctx) */
 
 	return hs
 }
@@ -228,13 +228,12 @@ func (hs *HotStuffCore) OnReceiveProposal(block *data.Block) (*data.PartialCert,
 	logger.Println("OnReceiveProposal: Accepted block")
 	hs.vHeight = block.Height
 	hs.cmdCache.MarkProposed(block.Commands...)
-	hs.waitProposal.Broadcast()
-	hs.mut.Unlock()
 
+	hs.waitProposal.Broadcast()
 	hs.emitEvent(ReceiveProposal)
 
-	// queue block for update
-	hs.pendingUpdates <- block
+	hs.update(block)
+	hs.mut.Unlock()
 
 	pc, err := hs.SigCache.CreatePartialCert(hs.Config.ID, hs.Config.PrivateKey, block)
 	if err != nil {
@@ -267,8 +266,12 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 			// too old, don't care
 			return
 		}
-		qc = data.CreateQuorumCert(b)
-		hs.pendingQCs[cert.BlockHash] = qc
+		// need to check again in case a qc was created while we waited for the block
+		qc, ok = hs.pendingQCs[cert.BlockHash]
+		if !ok {
+			qc = data.CreateQuorumCert(b)
+			hs.pendingQCs[cert.BlockHash] = qc
+		}
 	}
 
 	err := qc.AddPartial(cert)
@@ -311,8 +314,8 @@ func (hs *HotStuffCore) update(block *data.Block) {
 		return
 	}
 
-	hs.mut.Lock()
-	defer hs.mut.Unlock()
+	/* hs.mut.Lock()
+	defer hs.mut.Unlock() */
 
 	logger.Println("PRE COMMIT:", block1)
 	// PRE-COMMIT on block1
@@ -369,7 +372,7 @@ func (hs *HotStuffCore) CreateProposal() *data.Block {
 
 // Close frees resources held by HotStuff and closes backend connections
 func (hs *HotStuffCore) Close() {
-	hs.cancel()
+	/* hs.cancel() */
 }
 
 // CreateLeaf returns a new block that extends the parent.
