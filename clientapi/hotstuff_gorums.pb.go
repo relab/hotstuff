@@ -39,6 +39,21 @@ type Configuration struct {
 	errs  chan GRPCError
 }
 
+// NewConfig returns a configuration for the given node addresses and quorum spec.
+// The returned func() must be called to close the underlying connections.
+// This is experimental API.
+func NewConfig(addrs []string, qspec QuorumSpec, opts ...ManagerOption) (*Configuration, func(), error) {
+	man, err := NewManager(addrs, opts...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create manager: %v", err)
+	}
+	c, err := man.NewConfiguration(man.NodeIDs(), qspec)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create configuration: %v", err)
+	}
+	return c, func() { man.Close() }, nil
+}
+
 // ID reports the identifier for the configuration.
 func (c *Configuration) ID() uint32 {
 	return c.id
@@ -713,6 +728,10 @@ func WithBackoff(backoff backoff.Config) ManagerOption {
 	}
 }
 
+type methodInfo struct {
+	oneway bool
+}
+
 type orderingResult struct {
 	nid   uint32
 	reply []byte
@@ -775,13 +794,19 @@ func (s *orderedNodeStream) connectOrderedStream(ctx context.Context, conn *grpc
 	if err != nil {
 		return err
 	}
-	go s.sendMsgs()
+	go s.sendMsgs(ctx)
 	go s.recvMsgs(ctx)
 	return nil
 }
 
-func (s *orderedNodeStream) sendMsgs() {
-	for req := range s.sendQ {
+func (s *orderedNodeStream) sendMsgs(ctx context.Context) {
+	var req *ordering.Message
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case req = <-s.sendQ:
+		}
 		// return error if stream is broken
 		if s.streamBroken {
 			err := status.Errorf(codes.Unavailable, "stream is down")
@@ -882,8 +907,17 @@ func (s *orderingServer) NodeStream(srv ordering.Gorums_NodeStreamServer) error 
 		if err != nil {
 			return err
 		}
+
 		// handle the request if a handler is available for this rpc
 		if handler, ok := s.handlers[req.GetMethodID()]; ok {
+			info, ok := orderingMethods[req.MethodID]
+			if !ok {
+				continue
+			}
+			if info.oneway {
+				handler(req)
+				continue
+			}
 			resp := handler(req)
 			resp.ID = req.GetID()
 			err = srv.Send(resp)
@@ -999,48 +1033,51 @@ func (n *Node) closeStream() (err error) {
 }
 
 // ExecCommand sends a command to all replicas and waits for valid signatures from f+1 replicas
-func (c *Configuration) ExecCommand(ctx context.Context, in *Command) (*FutureEmpty, error) {
+func (c *Configuration) ExecCommand(ctx context.Context, in *Command) *FutureEmpty {
 	fut := &FutureEmpty{
 		NodeIDs: make([]uint32, 0, c.n),
 		c:       make(chan struct{}, 1),
 	}
-	id, expected, replyChan, err := c.execCommandSend(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	go func() {
-		defer close(fut.c)
-		c.execCommandRecv(ctx, in, id, expected, replyChan, fut)
-	}()
-	return fut, nil
-}
-
-func (c *Configuration) execCommandSend(ctx context.Context, in *Command) (uint64, int, chan *orderingResult, error) { // get the ID which will be used to return the correct responses for a request
+	// get the ID which will be used to return the correct responses for a request
 	msgID := c.mgr.nextMsgID()
 
 	// set up a channel to collect replies
 	replyChan := make(chan *orderingResult, c.n)
 	c.mgr.putChan(msgID, replyChan)
 
+	expected := c.n
+
+	var msg *ordering.Message
 	data, err := proto.MarshalOptions{AllowPartial: true, Deterministic: true}.Marshal(in)
 	if err != nil {
-		return 0, 0, nil, fmt.Errorf("failed to marshal message: %w", err)
+		// In case of a marshalling error, we should skip sending any messages
+		fut.err = fmt.Errorf("failed to marshal message: %w", err)
+		close(fut.c)
+		return fut
 	}
-	msg := &ordering.Message{
+	msg = &ordering.Message{
 		ID:       msgID,
 		MethodID: execCommandMethodID,
 		Data:     data,
 	}
+
 	// push the message to the nodes
-	expected := c.n
 	for _, n := range c.nodes {
 		n.sendQ <- msg
 	}
 
-	return msgID, expected, replyChan, nil
+	go c.execCommandRecv(ctx, in, msgID, expected, replyChan, fut)
+
+	return fut
 }
 
-func (c *Configuration) execCommandRecv(ctx context.Context, in *Command, msgID uint64, expected int, replyChan chan *orderingResult, resp *FutureEmpty) {
+func (c *Configuration) execCommandRecv(ctx context.Context, in *Command, msgID uint64, expected int, replyChan chan *orderingResult, fut *FutureEmpty) {
+	defer close(fut.c)
+
+	if fut.err != nil {
+		return
+	}
+
 	defer c.mgr.deleteChan(msgID)
 
 	var (
@@ -1053,12 +1090,11 @@ func (c *Configuration) execCommandRecv(ctx context.Context, in *Command, msgID 
 	for {
 		select {
 		case r := <-replyChan:
-			resp.NodeIDs = append(resp.NodeIDs, r.nid)
+			fut.NodeIDs = append(fut.NodeIDs, r.nid)
 			if r.err != nil {
 				errs = append(errs, GRPCError{r.nid, r.err})
 				break
 			}
-
 			data := new(Empty)
 			err := proto.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}.Unmarshal(r.reply, data)
 			if err != nil {
@@ -1067,15 +1103,15 @@ func (c *Configuration) execCommandRecv(ctx context.Context, in *Command, msgID 
 			}
 			replyValues = append(replyValues, data)
 			if reply, quorum = c.qspec.ExecCommandQF(in, replyValues); quorum {
-				resp.Empty, resp.err = reply, nil
+				fut.Empty, fut.err = reply, nil
 				return
 			}
 		case <-ctx.Done():
-			resp.Empty, resp.err = reply, QuorumCallError{ctx.Err().Error(), len(replyValues), errs}
+			fut.Empty, fut.err = reply, QuorumCallError{ctx.Err().Error(), len(replyValues), errs}
 			return
 		}
 		if len(errs)+len(replyValues) == expected {
-			resp.Empty, resp.err = reply, QuorumCallError{"incomplete call", len(replyValues), errs}
+			fut.Empty, fut.err = reply, QuorumCallError{"incomplete call", len(replyValues), errs}
 			return
 		}
 	}
@@ -1118,6 +1154,10 @@ type QuorumSpec interface {
 const hasOrderingMethods = true
 
 const execCommandMethodID int32 = 0
+
+var orderingMethods = map[int32]methodInfo{
+	0: {oneway: false},
+}
 
 type internalEmpty struct {
 	nid   uint32

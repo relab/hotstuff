@@ -242,10 +242,7 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 				Data:           data[:n],
 			}
 			now := time.Now().UnixNano()
-			promise, err := c.gorumsConfig.ExecCommand(ctx, cmd)
-			if err != nil {
-				continue
-			}
+			promise := c.gorumsConfig.ExecCommand(ctx, cmd)
 			num++
 
 			c.wg.Add(1)
