@@ -74,6 +74,7 @@ type RoundRobin struct {
 	termLength int
 	schedule   []config.ReplicaID
 	timeout    time.Duration
+	notify     chan consensus.Event
 
 	resetTimer  chan struct{} // sending on this channel will reset the timer
 	stopTimeout func()        // stops the new-view interrupts
@@ -91,6 +92,11 @@ func NewRoundRobin(termLength int, schedule []config.ReplicaID, timeout time.Dur
 
 func (p *RoundRobin) Init(hs *hotstuff.HotStuff) {
 	p.HotStuff = hs
+	// Hack: We receive a channel to HotStuff at this point instead of in Run(),
+	// which forces processing of proposals to wait until the pacemaker has started.
+	// This avoids the problem of the server handling messages before the Manager
+	// has started.
+	p.notify = hs.GetEvents()
 }
 
 // GetLeader returns the fixed ID of the leader for the view height
@@ -101,15 +107,13 @@ func (p *RoundRobin) GetLeader(view int) config.ReplicaID {
 
 // Run runs the pacemaker which will beat when the previous QC is completed
 func (p *RoundRobin) Run(ctx context.Context) {
-	notify := p.GetEvents()
-
 	// initial beat
 	if p.GetLeader(0) == p.Config.ID {
 		go p.Propose()
 	}
 
 	// get initial notification
-	n := <-notify
+	n := <-p.notify
 
 	// make sure that we only beat once per view, and don't beat if bLeaf.Height < vHeight
 	// as that would cause a panic
@@ -142,7 +146,7 @@ func (p *RoundRobin) Run(ctx context.Context) {
 
 		var ok bool
 		select {
-		case n, ok = <-notify:
+		case n, ok = <-p.notify:
 			if !ok {
 				return
 			}
