@@ -15,7 +15,7 @@ func TestRRGetLeader(t *testing.T) {
 		{0, 1}, {1, 2}, {2, 3}, {3, 4}, {4, 1},
 	}
 	for _, testCase := range testCases {
-		if leader := pm.getLeader(testCase.height); leader != testCase.leader {
+		if leader := pm.GetLeader(testCase.height); leader != testCase.leader {
 			t.Errorf("Incorrect leader for view %d: got: %d, want: %d", testCase.height, leader, testCase.leader)
 		}
 	}

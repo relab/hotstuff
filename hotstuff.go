@@ -23,7 +23,7 @@ func init() {
 
 // Pacemaker is a mechanism that provides synchronization
 type Pacemaker interface {
-	GetLeader() config.ReplicaID
+	GetLeader(view int) config.ReplicaID
 	Init(*HotStuff)
 }
 
@@ -137,6 +137,7 @@ func (hs *HotStuff) Close() {
 	})
 }
 
+// Propose broadcasts a new proposal to all replicas
 func (hs *HotStuff) Propose() {
 	proposal := hs.CreateProposal()
 	logger.Println("Propose:", proposal)
@@ -146,6 +147,7 @@ func (hs *HotStuff) Propose() {
 	hs.server.Propose(protobuf)
 }
 
+// SendNewView sends a NEW-VIEW message to a specific replica
 func (hs *HotStuff) SendNewView(id config.ReplicaID) {
 	qc := hs.GetQCHigh()
 	if node, ok := hs.nodes[id]; ok {
@@ -159,12 +161,14 @@ type hotstuffServer struct {
 }
 
 // Propose handles a replica's response to the Propose QC from the leader
-func (hs *hotstuffServer) Propose(block *proto.Block) {
-	p, err := hs.OnReceiveProposal(block.FromProto())
+func (hs *hotstuffServer) Propose(protoB *proto.Block) {
+	block := protoB.FromProto()
+	p, err := hs.OnReceiveProposal(block)
 	if err != nil {
 		logger.Println("OnReceiveProposal returned with error:", err)
+		return
 	}
-	leaderID := hs.pacemaker.GetLeader()
+	leaderID := hs.pacemaker.GetLeader(block.Height)
 	if hs.Config.ID == leaderID {
 		hs.OnReceiveVote(p)
 	} else if leader, ok := hs.nodes[leaderID]; ok {

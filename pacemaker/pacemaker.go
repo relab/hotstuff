@@ -35,7 +35,7 @@ func (p *FixedLeader) Init(hs *hotstuff.HotStuff) {
 	p.HotStuff = hs
 }
 
-func (p *FixedLeader) GetLeader() config.ReplicaID {
+func (p *FixedLeader) GetLeader(_ int) config.ReplicaID {
 	return p.leader
 }
 
@@ -93,13 +93,9 @@ func (p *RoundRobin) Init(hs *hotstuff.HotStuff) {
 	p.HotStuff = hs
 }
 
-func (p *RoundRobin) GetLeader() config.ReplicaID {
-	return p.getLeader(p.GetHeight() + 1)
-}
-
-// getLeader returns the fixed ID of the leader for the view height vHeight
-func (p *RoundRobin) getLeader(vHeight int) config.ReplicaID {
-	term := int(math.Ceil(float64(vHeight) / float64(p.termLength)))
+// GetLeader returns the fixed ID of the leader for the view height
+func (p *RoundRobin) GetLeader(view int) config.ReplicaID {
+	term := int(math.Ceil(float64(view) / float64(p.termLength)))
 	return p.schedule[term%len(p.schedule)]
 }
 
@@ -108,7 +104,7 @@ func (p *RoundRobin) Run(ctx context.Context) {
 	notify := p.GetEvents()
 
 	// initial beat
-	if p.getLeader(0) == p.Config.ID {
+	if p.GetLeader(0) == p.Config.ID {
 		go p.Propose()
 	}
 
@@ -120,7 +116,7 @@ func (p *RoundRobin) Run(ctx context.Context) {
 	lastBeat := 0
 	beat := func() {
 		nextView := p.GetHeight() + 1
-		if p.getLeader(nextView) == p.Config.ID && lastBeat < nextView &&
+		if p.GetLeader(nextView) == p.Config.ID && lastBeat < nextView &&
 			nextView >= p.GetVotedHeight() {
 			lastBeat = nextView
 			go p.Propose()
@@ -168,7 +164,7 @@ func (p *RoundRobin) startNewViewTimeout(stopContext context.Context) {
 			// add a dummy block to the tree representing this round which failed
 			logger.Println("NewViewTimeout triggered")
 			p.SetLeaf(consensus.CreateLeaf(p.GetLeaf(), nil, nil, p.GetHeight()+1))
-			p.SendNewView(p.getLeader(p.GetHeight() + 1))
+			p.SendNewView(p.GetLeader(p.GetHeight() + 1))
 		}
 	}
 }
