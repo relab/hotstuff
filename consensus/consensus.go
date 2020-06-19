@@ -263,7 +263,7 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 			logger.Println("OnReceiveVote: could not find block for certificate.")
 			return
 		}
-		if b.Height < hs.vHeight {
+		if b.Height <= hs.bLeaf.Height {
 			// too old, don't care
 			return
 		}
