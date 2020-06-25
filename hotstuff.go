@@ -120,9 +120,7 @@ func (hs *HotStuff) startServer(port string) error {
 	}
 
 	hs.server = &hotstuffServer{hs, proto.NewGorumsServer()}
-	hs.server.RegisterProposeHandler(hs.server)
-	hs.server.RegisterVoteHandler(hs.server)
-	hs.server.RegisterNewViewHandler(hs.server)
+	hs.server.RegisterHotstuffServer(hs.server)
 
 	go hs.server.Serve(lis)
 	return nil
@@ -140,7 +138,7 @@ func (hs *HotStuff) Close() {
 // Propose broadcasts a new proposal to all replicas
 func (hs *HotStuff) Propose() {
 	proposal := hs.CreateProposal()
-	logger.Println("Propose:", proposal)
+	logger.Printf("Propose (%d commands):%s\n", len(proposal.Commands), proposal)
 	protobuf := proto.BlockToProto(proposal)
 	hs.cfg.Propose(protobuf)
 	// self-vote

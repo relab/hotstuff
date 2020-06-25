@@ -16,7 +16,6 @@ import (
 	"time"
 
 	protobuf "github.com/golang/protobuf/proto"
-	"github.com/relab/gorums/ordering"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/clientapi"
 	"github.com/relab/hotstuff/config"
@@ -24,7 +23,7 @@ import (
 	"github.com/relab/hotstuff/pacemaker"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 )
 
 type options struct {
@@ -174,19 +173,25 @@ func main() {
 	}
 }
 
+// cmdID is a unique identifier for a command
+type cmdID struct {
+	clientID    uint32
+	sequenceNum uint64
+}
+
 type hotstuffServer struct {
-	ctx     context.Context
-	cancel  context.CancelFunc
-	key     *ecdsa.PrivateKey
-	conf    *options
-	grpcSrv *grpc.Server
-	hs      *hotstuff.HotStuff
-	pm      interface {
+	ctx       context.Context
+	cancel    context.CancelFunc
+	key       *ecdsa.PrivateKey
+	conf      *options
+	gorumsSrv *clientapi.GorumsServer
+	hs        *hotstuff.HotStuff
+	pm        interface {
 		Run(context.Context)
 	}
 
 	mut          sync.Mutex
-	finishedCmds map[data.Command]chan struct{}
+	finishedCmds map[cmdID]chan struct{}
 
 	lastExecTime int64
 }
@@ -198,8 +203,8 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *options, replicaConfig *conf
 		cancel:       cancel,
 		conf:         conf,
 		key:          key,
-		grpcSrv:      grpc.NewServer(),
-		finishedCmds: make(map[data.Command]chan struct{}),
+		gorumsSrv:    clientapi.NewGorumsServer(),
+		finishedCmds: make(map[cmdID]chan struct{}),
 		lastExecTime: time.Now().UnixNano(),
 	}
 	var pm hotstuff.Pacemaker
@@ -217,7 +222,7 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *options, replicaConfig *conf
 	srv.hs = hotstuff.New(replicaConfig, pm, time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
 	srv.pm = pm.(interface{ Run(context.Context) })
 	// Use a custom server instead of the gorums one
-	ordering.RegisterGorumsServer(srv.grpcSrv, srv)
+	srv.gorumsSrv.RegisterHotStuffSMRServer(srv)
 	return srv
 }
 
@@ -232,7 +237,7 @@ func (srv *hotstuffServer) Start(address string) error {
 		return err
 	}
 
-	go srv.grpcSrv.Serve(lis)
+	go srv.gorumsSrv.Serve(lis)
 	go srv.pm.Run(srv.ctx)
 	go srv.onExec()
 
@@ -240,43 +245,35 @@ func (srv *hotstuffServer) Start(address string) error {
 }
 
 func (srv *hotstuffServer) Stop() {
-	srv.grpcSrv.Stop()
+	srv.gorumsSrv.Stop()
 	srv.cancel()
 	srv.hs.Close()
 }
 
-// Custom server code
-func (srv *hotstuffServer) NodeStream(stream ordering.Gorums_NodeStreamServer) error {
-	for {
-		req, err := stream.Recv()
-		if err != nil {
-			return err
-		}
-		// use the serialized data as cmd
-		cmd := data.Command(req.GetData())
-		srv.mut.Lock()
-		id := req.GetID()
-		finished := make(chan struct{}, 1)
-		srv.finishedCmds[cmd] = finished
-		srv.mut.Unlock()
-		srv.hs.AddCommand(cmd)
-
-		go func(id uint64, finished chan struct{}) {
-			<-finished
-
-			srv.mut.Lock()
-			delete(srv.finishedCmds, cmd)
-			srv.mut.Unlock()
-
-			// send response
-			resp := &ordering.Message{ID: id}
-			err = stream.Send(resp)
-			if err != nil {
-				return
-			}
-
-		}(id, finished)
+func (srv *hotstuffServer) ExecCommand(cmd *clientapi.Command, out chan<- *clientapi.Empty) {
+	finished := make(chan struct{})
+	id := cmdID{cmd.ClientID, cmd.SequenceNumber}
+	srv.mut.Lock()
+	srv.finishedCmds[id] = finished
+	srv.mut.Unlock()
+	// marshal the message back to a byte so that HotStuff can process it.
+	// TODO: think of a better way to do this.
+	b, err := proto.MarshalOptions{Deterministic: true}.Marshal(cmd)
+	if err != nil {
+		log.Fatalf("Failed to marshal command: %v", err)
 	}
+	srv.hs.AddCommand(data.Command(b))
+
+	go func(id cmdID, finished chan struct{}) {
+		<-finished
+
+		srv.mut.Lock()
+		delete(srv.finishedCmds, id)
+		srv.mut.Unlock()
+
+		// send response
+		out <- &clientapi.Empty{}
+	}(id, finished)
 }
 
 func (srv *hotstuffServer) onExec() {
@@ -288,16 +285,16 @@ func (srv *hotstuffServer) onExec() {
 		}
 
 		for _, cmd := range cmds {
+			m := new(clientapi.Command)
+			err := protobuf.Unmarshal([]byte(cmd), m)
+			if err != nil {
+				log.Printf("Failed to unmarshal command: %v\n", err)
+			}
 			if srv.conf.PrintCommands {
-				m := new(clientapi.Command)
-				err := protobuf.Unmarshal([]byte(cmd), m)
-				if err != nil {
-					log.Printf("Failed to unmarshal command: %v\n", err)
-				}
 				fmt.Printf("%s", m.Data)
 			}
 			srv.mut.Lock()
-			if c, ok := srv.finishedCmds[cmd]; ok {
+			if c, ok := srv.finishedCmds[cmdID{m.ClientID, m.SequenceNumber}]; ok {
 				c <- struct{}{}
 			}
 			srv.mut.Unlock()
