@@ -1179,83 +1179,10 @@ func appendIfNotPresent(set []uint32, x uint32) []uint32 {
 	return append(set, x)
 }
 
-// ExecCommand sends a command to all replicas and waits for valid signatures from f+1 replicas
-func (c *Configuration) ExecCommand(ctx context.Context, in *Command, opts ...grpc.CallOption) *CorrectableEmpty {
-	corr := &CorrectableEmpty{
-		level:   LevelNotSet,
-		NodeIDs: make([]uint32, 0, c.n),
-		donech:  make(chan struct{}),
-	}
-	go c.execCommand(ctx, in, corr, opts...)
-	return corr
-}
-
-func (c *Configuration) execCommand(ctx context.Context, in *Command, resp *CorrectableEmpty, opts ...grpc.CallOption) {
-	expected := c.n
-	replyChan := make(chan internalEmpty, expected)
-	for _, n := range c.nodes {
-		go n.ExecCommand(ctx, in, replyChan)
-	}
-
-	var (
-		replyValues = make([]*Empty, 0, c.n)
-		clevel      = LevelNotSet
-		reply       *Empty
-		rlevel      int
-		errs        []GRPCError
-		quorum      bool
-	)
-
-	for {
-		select {
-		case r := <-replyChan:
-			resp.NodeIDs = append(resp.NodeIDs, r.nid)
-			if r.err != nil {
-				errs = append(errs, GRPCError{r.nid, r.err})
-				break
-			}
-
-			replyValues = append(replyValues, r.reply)
-			reply, rlevel, quorum = c.qspec.ExecCommandQF(in, replyValues)
-			if quorum {
-				resp.set(reply, rlevel, nil, true)
-				return
-			}
-			if rlevel > clevel {
-				clevel = rlevel
-				resp.set(reply, rlevel, nil, false)
-			}
-		case <-ctx.Done():
-			resp.set(reply, clevel, QuorumCallError{ctx.Err().Error(), len(replyValues), errs}, true)
-			return
-		}
-		if len(errs)+len(replyValues) == expected {
-			resp.set(reply, clevel, QuorumCallError{"incomplete call", len(replyValues), errs}, true)
-			return
-		}
-	}
-}
-
-func (n *Node) ExecCommand(ctx context.Context, in *Command, replyChan chan<- internalEmpty) {
-	reply := new(Empty)
-	start := time.Now()
-	err := n.conn.Invoke(ctx, "/clientapi.HotStuffSMR/ExecCommand", in, reply)
-	s, ok := status.FromError(err)
-	if ok && (s.Code() == codes.OK || s.Code() == codes.Canceled) {
-		n.setLatency(time.Since(start))
-	} else {
-		n.setLastErr(err)
-	}
-	replyChan <- internalEmpty{n.id, reply, err}
-}
-
 type nodeServices struct {
-	HotStuffSMRClient
 }
 
 func (n *Node) connectStream(ctx context.Context) (err error) {
-
-	n.HotStuffSMRClient = NewHotStuffSMRClient(n.conn)
 
 	return nil
 }
@@ -1264,27 +1191,115 @@ func (n *Node) closeStream() (err error) {
 	return err
 }
 
+// ExecCommand sends a command to all replicas and waits for valid signatures
+// from f+1 replicas
+func (c *Configuration) ExecCommand(ctx context.Context, in *Command) *FutureEmpty {
+	fut := &FutureEmpty{
+		NodeIDs: make([]uint32, 0, c.n),
+		c:       make(chan struct{}, 1),
+	}
+	// get the ID which will be used to return the correct responses for a request
+	msgID := c.mgr.nextMsgID()
+
+	// set up a channel to collect replies
+	replyChan := make(chan *orderingResult, c.n)
+	c.mgr.putChan(msgID, replyChan)
+
+	expected := c.n
+
+	metadata := &ordering.Metadata{
+		MessageID: msgID,
+		MethodID:  execCommandMethodID,
+	}
+	msg := &gorumsMessage{metadata: metadata, message: in}
+
+	// push the message to the nodes
+	for _, n := range c.nodes {
+		n.sendQ <- msg
+	}
+
+	go c.execCommandRecv(ctx, in, msgID, expected, replyChan, fut)
+
+	return fut
+}
+
+func (c *Configuration) execCommandRecv(ctx context.Context, in *Command, msgID uint64, expected int, replyChan chan *orderingResult, fut *FutureEmpty) {
+	defer close(fut.c)
+
+	if fut.err != nil {
+		return
+	}
+
+	defer c.mgr.deleteChan(msgID)
+
+	var (
+		replyValues = make([]*Empty, 0, c.n)
+		reply       *Empty
+		errs        []GRPCError
+		quorum      bool
+	)
+
+	for {
+		select {
+		case r := <-replyChan:
+			fut.NodeIDs = append(fut.NodeIDs, r.nid)
+			if r.err != nil {
+				errs = append(errs, GRPCError{r.nid, r.err})
+				break
+			}
+			data := r.reply.(*Empty)
+			replyValues = append(replyValues, data)
+			if reply, quorum = c.qspec.ExecCommandQF(in, replyValues); quorum {
+				fut.Empty, fut.err = reply, nil
+				return
+			}
+		case <-ctx.Done():
+			fut.Empty, fut.err = reply, QuorumCallError{ctx.Err().Error(), len(replyValues), errs}
+			return
+		}
+		if len(errs)+len(replyValues) == expected {
+			fut.Empty, fut.err = reply, QuorumCallError{"incomplete call", len(replyValues), errs}
+			return
+		}
+	}
+}
+
 // QuorumSpec is the interface of quorum functions for HotStuffSMR.
 type QuorumSpec interface {
 
 	// ExecCommandQF is the quorum function for the ExecCommand
-	// correctable quorum call method. The in parameter is the request object
+	// asynchronous ordered quorum call method. The in parameter is the request object
 	// supplied to the ExecCommand method at call time, and may or may not
 	// be used by the quorum function. If the in parameter is not needed
 	// you should implement your quorum function with '_ *Command'.
-	ExecCommandQF(in *Command, replies []*Empty) (*Empty, int, bool)
+	ExecCommandQF(in *Command, replies []*Empty) (*Empty, bool)
 }
 
 // HotStuffSMR is the server-side API for the HotStuffSMR Service
 type HotStuffSMR interface {
+	ExecCommand(*Command, chan<- *Empty)
 }
 
 func (s *GorumsServer) RegisterHotStuffSMRServer(srv HotStuffSMR) {
+	s.srv.handlers[execCommandMethodID] = func(in *gorumsMessage, finished chan<- *gorumsMessage) {
+		req := in.message.(*Command)
+		c := make(chan *Empty)
+		go func() {
+			resp := <-c
+			finished <- &gorumsMessage{metadata: in.metadata, message: resp}
+		}()
+		srv.ExecCommand(req, c)
+	}
 }
 
-const hasOrderingMethods = false
+const hasOrderingMethods = true
 
-var orderingMethods = map[int32]methodInfo{}
+const execCommandMethodID int32 = 0
+
+var orderingMethods = map[int32]methodInfo{
+
+	0: {requestType: new(Command).ProtoReflect(), responseType: new(Empty).ProtoReflect()},
+}
 
 type internalEmpty struct {
 	nid   uint32
@@ -1292,78 +1307,28 @@ type internalEmpty struct {
 	err   error
 }
 
-// CorrectableEmpty is a correctable object for processing replies.
-type CorrectableEmpty struct {
-	mu sync.Mutex
+// FutureEmpty is a future object for processing replies.
+type FutureEmpty struct {
 	// the actual reply
 	*Empty
-	NodeIDs  []uint32
-	level    int
-	err      error
-	done     bool
-	watchers []*struct {
-		level int
-		ch    chan struct{}
-	}
-	donech chan struct{}
+	NodeIDs []uint32
+	err     error
+	c       chan struct{}
 }
 
-// Get returns the reply, level and any error associated with the
-// called method. The method does not block until a (possibly
-// intermediate) reply or error is available. Level is set to LevelNotSet if no
-// reply has yet been received. The Done or Watch methods should be used to
-// ensure that a reply is available.
-func (c *CorrectableEmpty) Get() (*Empty, int, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.Empty, c.level, c.err
+// Get returns the reply and any error associated with the called method.
+// The method blocks until a reply or error is available.
+func (f *FutureEmpty) Get() (*Empty, error) {
+	<-f.c
+	return f.Empty, f.err
 }
 
-// Done returns a channel that will be closed when the correctable
-// quorum call is done. A call is considered done when the quorum function has
-// signaled that a quorum of replies was received or the call returned an error.
-func (c *CorrectableEmpty) Done() <-chan struct{} {
-	return c.donech
-}
-
-// Watch returns a channel that will be closed when a reply or error at or above the
-// specified level is available. If the call is done, the channel is closed
-// regardless of the specified level.
-func (c *CorrectableEmpty) Watch(level int) <-chan struct{} {
-	ch := make(chan struct{})
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if level < c.level {
-		close(ch)
-		return ch
-	}
-	c.watchers = append(c.watchers, &struct {
-		level int
-		ch    chan struct{}
-	}{level, ch})
-	return ch
-}
-
-func (c *CorrectableEmpty) set(reply *Empty, level int, err error, done bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.done {
-		panic("set(...) called on a done correctable")
-	}
-	c.Empty, c.level, c.err, c.done = reply, level, err, done
-	if done {
-		close(c.donech)
-		for _, watcher := range c.watchers {
-			if watcher != nil {
-				close(watcher.ch)
-			}
-		}
-		return
-	}
-	for i := range c.watchers {
-		if c.watchers[i] != nil && c.watchers[i].level <= level {
-			close(c.watchers[i].ch)
-			c.watchers[i] = nil
-		}
+// Done reports if a reply and/or error is available for the called method.
+func (f *FutureEmpty) Done() bool {
+	select {
+	case <-f.c:
+		return true
+	default:
+		return false
 	}
 }

@@ -18,3 +18,5 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v0.0.0-20200630190442-3de8449f8555 // indirect
 	google.golang.org/protobuf v1.25.0
 )
+
+replace github.com/relab/gorums => github.com/Raytar/gorums v0.0.0-20200624082724-3ddcc53064eb
