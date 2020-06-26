@@ -10,9 +10,7 @@ require (
 	github.com/spf13/viper v1.6.2
 	go-hep.org/x/hep v0.26.0
 	golang.org/x/net v0.0.0-20200301022130-244492dfa37a
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
 	golang.org/x/sys v0.0.0-20200317113312-5766fd39f98d // indirect
-	golang.org/x/text v0.3.2 // indirect
 	gonum.org/v1/plot v0.7.1-0.20200414075901-f4e1939a9e7a
 	google.golang.org/grpc v1.30.0
 	google.golang.org/protobuf v1.25.0

@@ -46,7 +46,7 @@ func (b benchmark) String() string {
 	var ret strings.Builder
 	ret.WriteString("------------------------------------------------------------\n")
 	ret.WriteString(fmt.Sprintf("%s: batch size b%d, payload size p%d\n", b.name, b.batchSize, b.payloadSize))
-	ret.WriteString(fmt.Sprintf("Throughput mean, Throughput Stdev, Latency mean, Latency Stdev\n"))
+	ret.WriteString("Throughput mean, Throughput Stdev, Latency mean, Latency Stdev\n")
 	for _, m := range b.measurements {
 		ret.WriteString(fmt.Sprintf("%.2f, %.2f, %.2f, %.2f\n",
 			m.throughput, math.Sqrt(m.throughputVariance), m.latency, math.Sqrt(m.latencyVariance)))
@@ -280,7 +280,7 @@ func processRun(dirPath string, measurements map[int][]measurement, benchType st
 			continue
 		}
 		m := <-ms
-		s, _ := measurements[m.rate]
+		s := measurements[m.rate]
 		s = append(s, m)
 		measurements[m.rate] = s
 	}

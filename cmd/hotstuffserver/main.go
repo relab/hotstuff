@@ -15,7 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	protobuf "github.com/golang/protobuf/proto"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/clientapi"
 	"github.com/relab/hotstuff/config"
@@ -286,7 +285,7 @@ func (srv *hotstuffServer) onExec() {
 
 		for _, cmd := range cmds {
 			m := new(clientapi.Command)
-			err := protobuf.Unmarshal([]byte(cmd), m)
+			err := proto.Unmarshal([]byte(cmd), m)
 			if err != nil {
 				log.Printf("Failed to unmarshal command: %v\n", err)
 			}
