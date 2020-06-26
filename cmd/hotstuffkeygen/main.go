@@ -37,8 +37,7 @@ func main() {
 	for i := 1; i <= *numKeys; i++ {
 		pk, err := data.GeneratePrivateKey()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to generate key: %v\n", err)
-			os.Exit(1)
+			logger.Fatalf("Failed to generate key: %v\n", err)
 		}
 
 		privKeyPath := filepath.Join(dest, strings.ReplaceAll(*keyPattern, "*", fmt.Sprintf("%d", i)))
@@ -46,14 +45,12 @@ func main() {
 
 		err = data.WritePrivateKeyFile(pk, privKeyPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to write private key file: %v\n", err)
-			os.Exit(1)
+			logger.Fatalf("Failed to write private key file: %v\n", err)
 		}
 
 		err = data.WritePublicKeyFile(&pk.PublicKey, pubKeyPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to write public key file: %v\n", err)
-			os.Exit(1)
+			logger.Fatalf("Failed to write public key file: %v\n", err)
 		}
 	}
 }
