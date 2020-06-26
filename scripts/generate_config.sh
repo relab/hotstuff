@@ -60,7 +60,7 @@ while [ $# -gt 0 ]; do
 			IFS=";" read -ra ips <<< "$2"
 			shift 2
 			;;
-		--peer_port)
+		--peer-port)
 			peer_port="$2"
 			shift 2
 			;;
@@ -77,7 +77,7 @@ while [ $# -gt 0 ]; do
 			shift
 			;;
 		--*)
-			"Unknown option '$1'."
+			echo "Unknown option '$1'."
 			exit 1
 			;;
 		*)
@@ -94,7 +94,15 @@ fi
 
 # generate keys
 if [ -n "$keygen" ]; then
-	scripts/generate_keys.sh "$dest/$keypath" \*.key ${#ips[@]}
+	if [ -z "$keypath" ]; then
+		keypath="$dest"
+	fi
+	if [ ! -f cmd/hotstuffkeygen/hotstuffkeygen ]; then
+		echo "hotstuffkeygen binary not built. Running make..."
+		make
+	fi
+	mkdir -p "$keypath"
+	cmd/hotstuffkeygen/hotstuffkeygen -p \*.key -n ${#ips[@]} "$keypath"
 fi
 
 # create main config file
