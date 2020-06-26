@@ -286,6 +286,17 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 		hs.emitEvent(QCFinish)
 		hs.UpdateQCHigh(qc)
 	}
+
+	// delete any pending QCs with lower height than bLeaf
+	for k := range hs.pendingQCs {
+		if b, ok := hs.Blocks.Get(k); ok {
+			if b.Height <= hs.bLeaf.Height {
+				delete(hs.pendingQCs, k)
+			}
+		} else {
+			delete(hs.pendingQCs, k)
+		}
+	}
 }
 
 // OnReceiveNewView handles the leader's response to receiving a NewView rpc from a replica
