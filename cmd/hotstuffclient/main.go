@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -25,9 +26,9 @@ import (
 	"google.golang.org/grpc"
 )
 
-type config struct {
+type options struct {
 	SelfID      hotstuff.ReplicaID `mapstructure:"self-id"`
-	RequestRate int                `mapstructure:"request-rate"`
+	RateLimit   int                `mapstructure:"rate-limit"`
 	PayloadSize int                `mapstructure:"payload-size"`
 	MaxInflight uint64             `mapstructure:"max-inflight"`
 	DataSource  string             `mapstructure:"input"`
@@ -59,7 +60,7 @@ func main() {
 	cpuprofile := pflag.String("cpuprofile", "", "File to write CPU profile to")
 	memprofile := pflag.String("memprofile", "", "File to write memory profile to")
 	pflag.Uint32("self-id", 0, "The id for this replica.")
-	pflag.Int("request-rate", 10000, "The request rate in requests/sec")
+	pflag.Int("rate-limit", 0, "Limit the request-rate to approximately (in requests per second).")
 	pflag.Int("payload-size", 0, "The size of the payload in bytes")
 	pflag.Uint64("max-inflight", 10000, "The maximum number of messages that the client can wait for at once")
 	pflag.String("input", "", "Optional file to use for payload data")
@@ -95,7 +96,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var conf config
+	var conf options
 	err = viper.Unmarshal(&conf)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to unmarshal config: %v\n", err)
@@ -137,7 +138,7 @@ func main() {
 	}()
 
 	err = client.SendCommands(ctx)
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		fmt.Fprintf(os.Stderr, "Failed to send commands: %v\n", err)
 		client.Close()
 		os.Exit(1)
@@ -183,7 +184,7 @@ func (q *qspec) ExecCommandQF(cmd *clientapi.Command, signatures []*clientapi.Em
 type hotstuffClient struct {
 	inflight      uint64
 	reader        io.ReadCloser
-	conf          *config
+	conf          *options
 	mgr           *clientapi.Manager
 	replicaConfig *hotstuff.ReplicaConfig
 	gorumsConfig  *clientapi.Configuration
@@ -191,7 +192,7 @@ type hotstuffClient struct {
 	stats         benchmark.Stats
 }
 
-func newHotStuffClient(conf *config, replicaConfig *hotstuff.ReplicaConfig) (*hotstuffClient, error) {
+func newHotStuffClient(conf *options, replicaConfig *hotstuff.ReplicaConfig) (*hotstuffClient, error) {
 	var addrs []string
 	for _, r := range replicaConfig.Replicas {
 		addrs = append(addrs, r.Address)
@@ -242,14 +243,16 @@ func (c *hotstuffClient) GetStats() *benchmark.Result {
 
 func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 	var num uint64
-	sleeptime := time.Second / time.Duration(c.conf.RequestRate)
+	var sleeptime time.Duration
+	if c.conf.RateLimit > 0 {
+		sleeptime = time.Second / time.Duration(c.conf.RateLimit)
+	}
 
 	defer c.stats.End()
 	defer c.wg.Wait()
 	c.stats.Start()
 
 	for {
-		start := time.Now().UnixNano()
 		if atomic.LoadUint64(&c.inflight) < c.conf.MaxInflight {
 			atomic.AddUint64(&c.inflight, 1)
 			data := make([]byte, c.conf.PayloadSize)
@@ -283,11 +286,16 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 			}(promise, now)
 		}
 
-		timeSpent := time.Duration(time.Now().UnixNano() - start)
-		select {
-		case <-time.After(sleeptime - timeSpent):
-		case <-ctx.Done():
+		if c.conf.RateLimit > 0 {
+			time.Sleep(sleeptime)
+		}
+
+		err := ctx.Err()
+		if errors.Is(err, context.Canceled) {
 			return nil
+		}
+		if err != nil {
+			return err
 		}
 	}
 }
