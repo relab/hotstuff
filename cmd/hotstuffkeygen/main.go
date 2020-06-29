@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -34,6 +35,18 @@ func main() {
 	}
 
 	dest := pflag.Arg(0)
+	info, err := os.Stat(dest)
+	if errors.Is(err, os.ErrNotExist) {
+		err = os.MkdirAll(dest, 0755)
+		if err != nil {
+			logger.Fatalf("Cannot create '%s' directory: %v\n", dest, err)
+		}
+	} else if err != nil {
+		logger.Fatalf("Cannot Stat '%s': %v\n", dest, err)
+	} else if !info.IsDir() {
+		logger.Fatalf("Destination '%s' is not a directory!\n", dest)
+	}
+
 	for i := 1; i <= *numKeys; i++ {
 		pk, err := data.GeneratePrivateKey()
 		if err != nil {
