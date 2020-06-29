@@ -201,7 +201,8 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *config, replicaConfig *hotst
 		finishedCmds: make(map[hotstuff.Command]chan struct{}),
 		lastExecTime: time.Now().UnixNano(),
 	}
-	srv.backend = gorumshotstuff.New(time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
+	backend := gorumshotstuff.New(time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
+	srv.backend = backend
 	srv.hs = hotstuff.New(conf.SelfID, key, replicaConfig, srv.backend, waitDuration, srv.onExec)
 	switch conf.PmType {
 	case "fixed":
@@ -209,6 +210,14 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *config, replicaConfig *hotst
 	case "round-robin":
 		srv.pm = pacemaker.NewRoundRobin(
 			srv.hs, conf.ViewChange, conf.Schedule, time.Duration(conf.ViewTimeout)*time.Millisecond,
+		)
+	case "change-faulty":
+		srv.pm = pacemaker.NewChangeFaulty(
+			srv.hs, backend.GetQSpec(), conf.Schedule, time.Duration(conf.ViewTimeout)*time.Millisecond,
+		)
+	case "good-leader":
+		srv.pm = pacemaker.NewGoodLeader(
+			srv.hs, backend.GetQSpec(), conf.Schedule, time.Duration(conf.ViewTimeout)*time.Millisecond,
 		)
 	default:
 		fmt.Fprintf(os.Stderr, "Invalid pacemaker type: '%s'\n", conf.PmType)

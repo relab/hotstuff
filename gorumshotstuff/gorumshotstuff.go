@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"sort"
 	"sync"
 	"time"
 
@@ -35,7 +34,7 @@ type GorumsHotStuff struct {
 	server  *proto.GorumsServer
 	manager *proto.Manager
 	config  *proto.Configuration
-	qspec   *hotstuffQSpec
+	qspec   *HotstuffQSpec
 
 	closeOnce sync.Once
 
@@ -52,13 +51,22 @@ func New(connectTimeout, qcTimeout time.Duration) *GorumsHotStuff {
 	}
 }
 
+//GetQSpec returns the qspec used by the backend.
+func (hs *GorumsHotStuff) GetQSpec() *HotstuffQSpec {
+	return hs.qspec
+}
+
 //DoPropose is the interface between backend and consensus logic when sending a propoasl.
 func (hs *GorumsHotStuff) DoPropose(block *hotstuff.Block) (*hotstuff.QuorumCert, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), hs.qcTimeout)
 	defer cancel()
 	pb := proto.BlockToProto(block)
 	hs.qspec.Reset()
-	pqc, err := hs.config.Propose(ctx, pb)
+	pbAndID := &proto.BlockAndLeaderID{
+		Block:    pb,
+		LeaderID: uint32(hs.HotStuff.GetID()),
+	}
+	pqc, err := hs.config.Propose(ctx, pbAndID)
 	return pqc.FromProto(), err
 }
 
@@ -71,7 +79,11 @@ func (hs *GorumsHotStuff) DoNewView(id hotstuff.ReplicaID, qc *hotstuff.QuorumCe
 		return fmt.Errorf("Replica with id '%d' not found", id)
 	}
 	pb := proto.QuorumCertToProto(qc)
-	_, err := info.node.NewView(ctx, pb)
+	QCandID := &proto.QCAndID{
+		QC: pb,
+		Id: uint32(hs.GetID()),
+	}
+	_, err := info.node.NewView(ctx, QCandID)
 	return err
 }
 
@@ -115,13 +127,10 @@ func (hs *GorumsHotStuff) startClient(connectTimeout time.Duration) error {
 			}
 		}
 	*/
-	addrs := make(map[string]uint32)
+	addrs := make(map[string]uint32) // kan være at det er noe problemer her. Noen addresse-id par blir ikke laget i rett rekkefølge.
 	for _, replica := range hs.Replicas {
 		if replica.ID != hs.GetID() {
-			i := sort.Search(len(ids), func(i int) bool { return ids[i] >= replica.ID })
-			ids = append(ids, 0)
-			copy(ids[i+1:], ids[i:])
-			ids[i] = replica.ID
+			ids = append(ids, replica.ID)
 			addrs[replica.Address] = uint32(replica.ID)
 		}
 	}
@@ -137,13 +146,13 @@ func (hs *GorumsHotStuff) startClient(connectTimeout time.Duration) error {
 		return fmt.Errorf("Failed to connect to replicas: %w", err)
 	}
 	hs.manager = mgr
-
+	// Det er en bug her med at id og node.id ikke er den samme. Dette skyldes sansynligvis av at inputen til manageren ikke er sortert.
 	nodes := mgr.Nodes()
 	for i, id := range ids {
 		hs.replicaInfo[id].node = nodes[i]
 	}
 
-	hs.qspec = &hotstuffQSpec{
+	hs.qspec = &HotstuffQSpec{
 		SignatureCache: hs.SigCache,
 		ReplicaConfig:  hs.ReplicaConfig,
 	}
@@ -180,8 +189,8 @@ func (hs *GorumsHotStuff) Close() {
 }
 
 // Propose handles a replica's response to the Propose QC from the leader
-func (hs *GorumsHotStuff) Propose(block *proto.Block) *proto.PartialCert {
-	p, err := hs.OnReceiveProposal(block.FromProto())
+func (hs *GorumsHotStuff) Propose(blockAndLeaderID *proto.BlockAndLeaderID) *proto.PartialCert {
+	p, err := hs.OnReceiveProposal(blockAndLeaderID.Block.FromProto(), blockAndLeaderID.LeaderID)
 	if err != nil {
 		logger.Println("OnReceiveProposal returned with error: ", err)
 		return &proto.PartialCert{}
@@ -190,8 +199,8 @@ func (hs *GorumsHotStuff) Propose(block *proto.Block) *proto.PartialCert {
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica
-func (hs *GorumsHotStuff) NewView(msg *proto.QuorumCert) *proto.Empty {
-	qc := msg.FromProto()
-	hs.OnReceiveNewView(qc)
+func (hs *GorumsHotStuff) NewView(msg *proto.QCAndID) *proto.Empty {
+	qc := msg.QC.FromProto()
+	hs.OnReceiveNewView(qc, hotstuff.ReplicaID(msg.Id))
 	return &proto.Empty{}
 }

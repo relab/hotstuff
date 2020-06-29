@@ -147,7 +147,7 @@ func TestOnReciveProposal(t *testing.T) {
 	block1 := CreateLeaf(hs.genesis, []Command{Command("command1")}, hs.qcHigh, hs.genesis.Height+1)
 	qc := CreateQuorumCert(block1)
 
-	pc, err := hs.OnReceiveProposal(block1)
+	pc, err := hs.OnReceiveProposal(block1, 0)
 
 	if err != nil {
 		t.Errorf("onReciveProposal failed with error: %w", err)
@@ -166,8 +166,8 @@ func TestOnReciveProposal(t *testing.T) {
 
 	block2 := CreateLeaf(block1, []Command{Command("command2")}, qc, block1.Height+1)
 
-	hs.OnReceiveProposal(block2)
-	pc, err = hs.OnReceiveProposal(block1)
+	hs.OnReceiveProposal(block2, 0)
+	pc, err = hs.OnReceiveProposal(block1, 0)
 
 	if err == nil {
 		t.Error("Block got accepted, expected rejection.")
@@ -185,7 +185,7 @@ func TestExpectBlockFor(t *testing.T) {
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		hs.OnReceiveProposal(block)
+		hs.OnReceiveProposal(block, 0)
 	}()
 
 	n, ok := hs.expectBlockFor(qc)

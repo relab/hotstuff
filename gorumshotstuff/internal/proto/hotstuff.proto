@@ -7,12 +7,12 @@ import "github.com/relab/gorums/gorums.proto";
 option go_package = "github.com/relab/hotstuff/gorumshotstuff/internal/proto";
 
 service Hotstuff {
-	rpc Propose(Block) returns (PartialCert) {
+	rpc Propose(BlockAndLeaderID) returns (PartialCert) {
 		option (gorums.quorumcall) = true;
 		option (gorums.ordered) = true;
 		option (gorums.custom_return_type) = "QuorumCert";
 	}
-	rpc NewView(QuorumCert) returns (Empty) {
+	rpc NewView(QCAndID) returns (Empty) {
 		option (gorums.ordered) = true;
 	}
 }
@@ -22,6 +22,11 @@ message Block {
 	QuorumCert QC = 2;
 	int64 Height = 3;
 	repeated Command Commands = 4;
+}
+
+message BlockAndLeaderID {
+	Block block = 1;
+	uint32 leaderID = 2;
 }
 
 message PartialSig {
@@ -38,6 +43,11 @@ message PartialCert {
 message QuorumCert {
 	repeated PartialSig Sigs = 1;
 	bytes Hash = 2;
+}
+
+message QCAndID{
+	QuorumCert QC = 1;
+	uint32 id = 2; 
 }
 
 message Command {

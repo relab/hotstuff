@@ -48,7 +48,7 @@ while [ $# -gt 0 ]; do
 			exit
 			;;
 		--pacemaker)
-			if [ "$2" = "fixed" ] || [ "$2" = "round-robin" ]; then
+			if [ "$2" = "fixed" ] || [ "$2" = "round-robin" ] || [ "$2" = "change-faulty" ] || [ "$2" = "good-leader" ]; then
 				pacemaker="$2"
 			else
 				echo "Unknown pacemaker type '$2'. Use either 'fixed' or 'round-robin'." 1>&2
@@ -107,6 +107,12 @@ if [ "$pacemaker" = "fixed" ]; then
 	echo "leader-id = 1" >> "$file"
 elif [ "$pacemaker" = "round-robin" ]; then
 	echo "view-change = 100" >> "$file"
+	echo -n "leader-schedule = [" >> "$file"
+	for i in "${!ips[@]}"; do
+		echo -n "$((i+1))," >> "$file"
+	done
+	echo "]" >> "$file"
+elif [ "$pacemaker" = "good-leader" ]; then 
 	echo -n "leader-schedule = [" >> "$file"
 	for i in "${!ips[@]}"; do
 		echo -n "$((i+1))," >> "$file"

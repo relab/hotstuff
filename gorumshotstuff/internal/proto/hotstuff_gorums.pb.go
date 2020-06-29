@@ -1062,7 +1062,7 @@ func (n *Node) closeStream() (err error) {
 
 // Propose is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (c *Configuration) Propose(ctx context.Context, in *Block) (resp *QuorumCert, err error) {
+func (c *Configuration) Propose(ctx context.Context, in *BlockAndLeaderID) (resp *QuorumCert, err error) {
 
 	// get the ID which will be used to return the correct responses for a request
 	msgID := c.mgr.nextMsgID()
@@ -1127,13 +1127,13 @@ func (c *Configuration) Propose(ctx context.Context, in *Block) (resp *QuorumCer
 
 // ProposeHandler is the server API for the Propose rpc.
 type ProposeHandler interface {
-	Propose(*Block) *PartialCert
+	Propose(*BlockAndLeaderID) *PartialCert
 }
 
 // RegisterProposeHandler sets the handler for Propose.
 func (s *GorumsServer) RegisterProposeHandler(handler ProposeHandler) {
 	s.srv.registerHandler(proposeMethodID, func(in *ordering.Message) *ordering.Message {
-		req := new(Block)
+		req := new(BlockAndLeaderID)
 		err := proto.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}.Unmarshal(in.GetData(), req)
 		// TODO: how to handle marshaling errors here
 		if err != nil {
@@ -1148,7 +1148,7 @@ func (s *GorumsServer) RegisterProposeHandler(handler ProposeHandler) {
 	})
 }
 
-func (n *Node) NewView(ctx context.Context, in *QuorumCert, opts ...grpc.CallOption) (resp *Empty, err error) {
+func (n *Node) NewView(ctx context.Context, in *QCAndID, opts ...grpc.CallOption) (resp *Empty, err error) {
 
 	// get the ID which will be used to return the correct responses for a request
 	msgID := n.nextMsgID()
@@ -1189,13 +1189,13 @@ func (n *Node) NewView(ctx context.Context, in *QuorumCert, opts ...grpc.CallOpt
 
 // NewViewHandler is the server API for the NewView rpc.
 type NewViewHandler interface {
-	NewView(*QuorumCert) *Empty
+	NewView(*QCAndID) *Empty
 }
 
 // RegisterNewViewHandler sets the handler for NewView.
 func (s *GorumsServer) RegisterNewViewHandler(handler NewViewHandler) {
 	s.srv.registerHandler(newViewMethodID, func(in *ordering.Message) *ordering.Message {
-		req := new(QuorumCert)
+		req := new(QCAndID)
 		err := proto.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}.Unmarshal(in.GetData(), req)
 		// TODO: how to handle marshaling errors here
 		if err != nil {
@@ -1217,8 +1217,8 @@ type QuorumSpec interface {
 	// ordered quorum call method. The in parameter is the request object
 	// supplied to the Propose method at call time, and may or may not
 	// be used by the quorum function. If the in parameter is not needed
-	// you should implement your quorum function with '_ *Block'.
-	ProposeQF(in *Block, replies map[uint32]*PartialCert) (*QuorumCert, bool)
+	// you should implement your quorum function with '_ *BlockAndLeaderID'.
+	ProposeQF(in *BlockAndLeaderID, replies map[uint32]*PartialCert) (*QuorumCert, bool)
 }
 
 const hasOrderingMethods = true

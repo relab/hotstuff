@@ -60,9 +60,10 @@ const (
 
 // Notification sends information about a protocol state change to the pacemaker
 type Notification struct {
-	Event Event
-	Block *Block
-	QC    *QuorumCert
+	Event    Event
+	Block    *Block
+	QC       *QuorumCert
+	SenderID ReplicaID
 }
 
 // Backend is the networking code that serves HotStuff
@@ -239,7 +240,7 @@ func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
 	if newQCHighBlock.Height > oldQCHighBlock.Height {
 		hs.qcHigh = qc
 		hs.bLeaf = newQCHighBlock
-		hs.pmNotify(Notification{HQCUpdate, newQCHighBlock, qc})
+		hs.pmNotify(Notification{HQCUpdate, newQCHighBlock, qc, 0})
 		return true
 	}
 
@@ -248,9 +249,11 @@ func (hs *HotStuff) UpdateQCHigh(qc *QuorumCert) bool {
 }
 
 // OnReceiveProposal handles a replica's response to the Proposal from the leader
-func (hs *HotStuff) OnReceiveProposal(block *Block) (*PartialCert, error) {
+func (hs *HotStuff) OnReceiveProposal(block *Block, senderID uint32) (*PartialCert, error) {
 	logger.Println("OnReceiveProposal: ", block)
 	hs.blocks.Put(block)
+
+	leaderID := ReplicaID(senderID)
 
 	// wake anyone waiting for a proposal
 	defer hs.waitProposal.WakeAll()
@@ -305,16 +308,16 @@ func (hs *HotStuff) OnReceiveProposal(block *Block) (*PartialCert, error) {
 	// remove all commands associated with this block from the pending commands
 	hs.cmdCache.MarkProposed(block.Commands...)
 
-	hs.pmNotify(Notification{ReceiveProposal, block, hs.qcHigh})
+	hs.pmNotify(Notification{ReceiveProposal, block, hs.qcHigh, leaderID})
 	return pc, nil
 }
 
 // OnReceiveNewView handles the leader's response to receiving a NewView rpc from a replica
-func (hs *HotStuff) OnReceiveNewView(qc *QuorumCert) {
+func (hs *HotStuff) OnReceiveNewView(qc *QuorumCert, senderID ReplicaID) {
 	logger.Println("OnReceiveNewView")
 	hs.UpdateQCHigh(qc)
 	block, _ := hs.blocks.BlockOf(qc)
-	hs.pmNotify(Notification{ReceiveNewView, block, qc})
+	hs.pmNotify(Notification{ReceiveNewView, block, qc, senderID})
 }
 
 func (hs *HotStuff) updateAsync(ctx context.Context) {
@@ -389,14 +392,14 @@ func (hs *HotStuff) Propose() {
 	hs.mut.Lock()
 
 	newBlock := CreateLeaf(hs.bLeaf, cmds, hs.qcHigh, hs.bLeaf.Height+1)
-	hs.pmNotify(Notification{Propose, newBlock, hs.qcHigh})
+	hs.pmNotify(Notification{Propose, newBlock, hs.qcHigh, 0})
 
 	hs.mut.Unlock()
 
 	// async self vote
 	selfVote := make(chan *PartialCert)
 	go func() {
-		partialCert, err := hs.OnReceiveProposal(newBlock)
+		partialCert, err := hs.OnReceiveProposal(newBlock, uint32(hs.GetID()))
 		if err != nil {
 			panic(fmt.Errorf("Failed to vote for own proposal: %w", err))
 		}
@@ -417,7 +420,7 @@ func (hs *HotStuff) Propose() {
 
 	hs.UpdateQCHigh(qc)
 
-	hs.pmNotify(Notification{QCFinish, newBlock, qc})
+	hs.pmNotify(Notification{QCFinish, newBlock, qc, 0})
 }
 
 // SendNewView sends a newView message to the leader replica.
@@ -429,7 +432,7 @@ func (hs *HotStuff) SendNewView(leader ReplicaID) error {
 	}
 	if replica.ID == hs.id {
 		// "send" new-view to self
-		hs.pmNotify(Notification{ReceiveNewView, hs.bLeaf, hs.qcHigh})
+		hs.pmNotify(Notification{ReceiveNewView, hs.bLeaf, hs.qcHigh, hs.GetID()})
 		return nil
 	}
 	err := hs.DoNewView(leader, hs.GetQCHigh())
