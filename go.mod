@@ -5,15 +5,15 @@ go 1.13
 require (
 	github.com/golang/protobuf v1.4.2
 	github.com/google/gofuzz v1.1.0
-	github.com/relab/gorums v0.0.0-20200519094905-69d3b0f17b89
+	github.com/relab/gorums v0.1.0-gogo.0.20200629133017-f16d7efc3014
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.2
 	github.com/stretchr/testify v1.4.0 // indirect
-	golang.org/x/net v0.0.0-20200301022130-244492dfa37a
-	golang.org/x/sys v0.0.0-20200317113312-5766fd39f98d // indirect
-	golang.org/x/text v0.3.2 // indirect
+	golang.org/x/net v0.0.0-20200625001655-4c5254603344
+	golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae // indirect
+	golang.org/x/text v0.3.3 // indirect
+	google.golang.org/genproto v0.0.0-20200626011028-ee7919e894b5 // indirect
 	google.golang.org/grpc v1.30.0
+	google.golang.org/grpc/cmd/protoc-gen-go-grpc v0.0.0-20200627230533-68098483a7af // indirect
 	google.golang.org/protobuf v1.25.0
 )
-
-replace github.com/relab/gorums => github.com/Raytar/gorums v0.0.0-20200629103911-ebd0464a1930
