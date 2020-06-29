@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
 	"os/signal"
 	"runtime"
@@ -16,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/relab/gorums/benchmark"
 	"github.com/relab/hotstuff/clientapi"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/data"
@@ -143,6 +145,18 @@ func main() {
 	}
 	client.Close()
 
+	if conf.Benchmark {
+		stats := client.GetStats()
+		throughput := stats.Throughput / 1000
+		latency := stats.LatencyAvg / float64(time.Millisecond)
+		latencySD := math.Sqrt(stats.LatencyVar) / float64(time.Millisecond)
+		fmt.Printf("Throughput (Kops/sec): %.2f, Latency (ms): %.2f, Latency Std.dev (ms): %.2f\n",
+			throughput,
+			latency,
+			latencySD,
+		)
+	}
+
 	if *memprofile != "" {
 		f, err := os.Create(*memprofile)
 		if err != nil {
@@ -175,6 +189,7 @@ type hotstuffClient struct {
 	replicaConfig *config.ReplicaConfig
 	gorumsConfig  *clientapi.Configuration
 	wg            sync.WaitGroup
+	stats         benchmark.Stats
 }
 
 func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hotstuffClient, error) {
@@ -218,15 +233,22 @@ func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hot
 }
 
 func (c *hotstuffClient) Close() {
-	c.wg.Wait()
 	c.mgr.Close()
 	c.reader.Close()
 }
 
+func (c *hotstuffClient) GetStats() *benchmark.Result {
+	return c.stats.GetResult()
+}
+
 func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 	var num uint64
-	prevExecTime := time.Now().UnixNano()
 	sleeptime := time.Second / time.Duration(c.conf.RequestRate)
+
+	defer c.stats.End()
+	defer c.wg.Wait()
+	c.stats.Start()
+
 	for {
 		start := time.Now().UnixNano()
 		if atomic.LoadUint64(&c.inflight) < c.conf.MaxInflight {
@@ -241,12 +263,12 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 				SequenceNumber: num,
 				Data:           data[:n],
 			}
-			now := time.Now().UnixNano()
+			now := time.Now()
 			promise := c.gorumsConfig.ExecCommand(ctx, cmd)
 			num++
 
 			c.wg.Add(1)
-			go func(promise *clientapi.FutureEmpty, sendTime int64) {
+			go func(promise *clientapi.FutureEmpty, sendTime time.Time) {
 				_, err := promise.Get()
 				atomic.AddUint64(&c.inflight, ^uint64(0))
 				if err != nil {
@@ -256,9 +278,7 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 					}
 				}
 				if c.conf.Benchmark {
-					now := time.Now().UnixNano()
-					prevExec := atomic.SwapInt64(&prevExecTime, now)
-					fmt.Printf("%d %d\n", now-prevExec, now-sendTime)
+					c.stats.AddLatency(time.Since(sendTime))
 				}
 				c.wg.Done()
 			}(promise, now)

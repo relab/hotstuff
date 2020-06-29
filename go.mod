@@ -16,4 +16,4 @@ require (
 	google.golang.org/protobuf v1.25.0
 )
 
-replace github.com/relab/gorums => github.com/Raytar/gorums v0.0.0-20200624082724-3ddcc53064eb
+replace github.com/relab/gorums => github.com/Raytar/gorums v0.0.0-20200629103911-ebd0464a1930
