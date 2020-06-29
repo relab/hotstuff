@@ -119,7 +119,7 @@ func (p *RoundRobin) Run(ctx context.Context) {
 	// as that would cause a panic
 	lastBeat := 0
 	beat := func() {
-		nextView := p.GetHeight() + 1
+		nextView := p.GetHeight()
 		if p.GetLeader(nextView) == p.Config.ID && lastBeat < nextView &&
 			nextView >= p.GetVotedHeight() {
 			lastBeat = nextView

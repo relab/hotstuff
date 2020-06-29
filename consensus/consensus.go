@@ -283,8 +283,8 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 	if len(qc.Sigs) >= hs.Config.QuorumSize {
 		delete(hs.pendingQCs, cert.BlockHash)
 		logger.Println("OnReceiveVote: Created QC")
-		hs.emitEvent(QCFinish)
 		hs.UpdateQCHigh(qc)
+		hs.emitEvent(QCFinish)
 	}
 
 	// delete any pending QCs with lower height than bLeaf
