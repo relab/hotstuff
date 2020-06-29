@@ -8,7 +8,7 @@ We have written an example client located in `cmd/hotstuffclient` and an example
 These can be compiled by running `make`.
 They read a configuration file named `hotstuff.toml` from the working directory.
 An example configuration that runs on localhost is included in the root of the project.
-To generate public and private keys for the servers, run `scripts/generate_keys.sh keys 'r*.key' 4`.
+To generate public and private keys for the servers, run `cmd/hotstuffkeygen/hotstuffkeygen -p 'r*.key' -n 4 keys`.
 To start four servers, run `scripts/run_servers.sh` with any desired options.
 To start the client, run `cmd/hotstuffclient/hotstuffclient`.
 
