@@ -167,8 +167,9 @@ func (p *RoundRobin) startNewViewTimeout(stopContext context.Context) {
 		case <-time.After(p.timeout):
 			// add a dummy block to the tree representing this round which failed
 			logger.Println("NewViewTimeout triggered")
-			p.SetLeaf(consensus.CreateLeaf(p.GetLeaf(), nil, nil, p.GetHeight()+1))
-			p.SendNewView(p.GetLeader(p.GetHeight() + 1))
+			newHeight := p.GetHeight() + 1
+			p.SetLeaf(consensus.CreateLeaf(p.GetLeaf(), nil, nil, newHeight))
+			p.SendNewView(p.GetLeader(newHeight))
 		}
 	}
 }
