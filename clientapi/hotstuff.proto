@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package clientapi;
 
-import "github.com/relab/gorums/gorums.proto";
+import "gorums.proto";
 
 option go_package = "github.com/relab/hotstuff/clientapi";
 
