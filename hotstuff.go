@@ -138,7 +138,7 @@ func (hs *HotStuff) Close() {
 // Propose broadcasts a new proposal to all replicas
 func (hs *HotStuff) Propose() {
 	proposal := hs.CreateProposal()
-	logger.Printf("Propose (%d commands):%s\n", len(proposal.Commands), proposal)
+	logger.Printf("Propose (%d commands): %s\n", len(proposal.Commands), proposal)
 	protobuf := proto.BlockToProto(proposal)
 	hs.cfg.Propose(protobuf)
 	// self-vote
