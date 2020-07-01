@@ -5,7 +5,7 @@ gorums_go := $(proto_src:%.proto=%_gorums.pb.go)
 
 binaries := cmd/hotstuffclient/hotstuffclient cmd/hotstuffserver/hotstuffserver cmd/hotstuffkeygen/hotstuffkeygen
 
-.PHONY: all debug tools download $(binaries)
+.PHONY: all debug protos download tools $(binaries)
 
 all: $(binaries)
 
