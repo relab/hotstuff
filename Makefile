@@ -12,19 +12,19 @@ all: $(binaries)
 debug: GCFLAGS += -gcflags='all=-N -l'
 debug: $(binaries)
 
+$(binaries): protos
+	@go build -o ./$@ $(GCFLAGS) ./$(dir $@)
+
+protos: tools download $(proto_go) $(gorums_go)
+
 download:
 	@go mod download
 
 tools: download
 	@cat tools.go | grep _ | awk -F'"' '{print $$2}' | xargs -I % go install %
 
-protos: tools download $(proto_go) $(gorums_go)
-
 %.pb.go %_gorums.pb.go : %.proto
 	@protoc -I=$(proto_include):. \
 		--go_out=paths=source_relative:. \
 		--gorums_out=paths=source_relative:. \
 		$<
-
-$(binaries): protos
-	@go build -o ./$@ $(GCFLAGS) ./$(dir $@)
