@@ -159,7 +159,7 @@ type qspec struct {
 	faulty int
 }
 
-func (q *qspec) ExecCommandQF(cmd *clientapi.Command, signatures []*clientapi.Empty) (*clientapi.Empty, bool) {
+func (q *qspec) ExecCommandQF(cmd *clientapi.Command, signatures map[uint32]*clientapi.Empty) (*clientapi.Empty, bool) {
 	if len(signatures) < q.faulty+1 {
 		return nil, false
 	}
@@ -181,15 +181,17 @@ func newHotStuffClient(conf *config, replicaConfig *hotstuff.ReplicaConfig) (*ho
 	for _, r := range replicaConfig.Replicas {
 		addrs = append(addrs, r.Address)
 	}
-	mgr, err := clientapi.NewManager(addrs, clientapi.WithGrpcDialOptions(
+	mgr, err := clientapi.NewManager(clientapi.WithGrpcDialOptions(
 		grpc.WithInsecure(),
 		grpc.WithBlock(),
 	),
+		clientapi.WithoutSpesifedNodeID(addrs),
 		clientapi.WithDialTimeout(time.Minute),
 	)
 	if err != nil {
 		return nil, err
 	}
+
 	faulty := (len(replicaConfig.Replicas) - 1) / 3
 	gorumsConf, err := mgr.NewConfiguration(mgr.NodeIDs(), &qspec{faulty: faulty})
 	if err != nil {
@@ -241,10 +243,8 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 				Data:           data[:n],
 			}
 			now := time.Now().UnixNano()
-			promise, err := c.gorumsConfig.ExecCommand(ctx, cmd)
-			if err != nil {
-				continue
-			}
+			promise := c.gorumsConfig.ExecCommand(ctx, cmd)
+
 			num++
 
 			c.wg.Add(1)

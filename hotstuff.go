@@ -315,6 +315,7 @@ func (hs *HotStuff) OnReceiveProposal(block *Block, senderID uint32) (*PartialCe
 // OnReceiveNewView handles the leader's response to receiving a NewView rpc from a replica
 func (hs *HotStuff) OnReceiveNewView(qc *QuorumCert, senderID ReplicaID) {
 	logger.Println("OnReceiveNewView")
+	logger.Println(senderID)
 	hs.UpdateQCHigh(qc)
 	block, _ := hs.blocks.BlockOf(qc)
 	hs.pmNotify(Notification{ReceiveNewView, block, qc, senderID})
@@ -426,6 +427,7 @@ func (hs *HotStuff) Propose() {
 // SendNewView sends a newView message to the leader replica.
 func (hs *HotStuff) SendNewView(leader ReplicaID) error {
 	logger.Println("SendNewView")
+	logger.Println(leader)
 	replica := hs.Replicas[leader]
 	if replica == nil {
 		panic(fmt.Errorf("Could not find replica with id '%d'", leader))

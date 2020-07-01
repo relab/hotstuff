@@ -70,7 +70,7 @@ func main() {
 	pflag.Uint32("self-id", 0, "The id for this replica.")
 	pflag.Int("view-change", 100, "How many views before leader change with round-robin pacemaker")
 	pflag.Int("batch-size", 100, "How many commands are batched together for each proposal")
-	pflag.Int("view-timeout", 1000, "How many milliseconds before a view is timed out")
+	pflag.Int("view-timeout", 2000, "How many milliseconds before a view is timed out")
 	pflag.String("privkey", "", "The path to the private key file")
 	pflag.Bool("print-commands", false, "Commands will be printed to stdout")
 	pflag.Bool("print-throughput", false, "Throughput measurements will be printed stdout")

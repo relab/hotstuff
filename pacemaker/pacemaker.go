@@ -186,6 +186,7 @@ func NewChangeFaulty(hs *hotstuff.HotStuff, qs *gorumshotstuff.HotstuffQSpec, no
 		HotStuff:               hs,
 		HotstuffQSpec:          qs,
 		timeout:                timeout,
+		resetTimer:             make(chan struct{}),
 		noneFaultyReplicas:     noneFaultyReplicas,
 		isNoneFaultyReplicaMap: make(map[hotstuff.ReplicaID]bool),
 	}
@@ -193,6 +194,8 @@ func NewChangeFaulty(hs *hotstuff.HotStuff, qs *gorumshotstuff.HotstuffQSpec, no
 	for _, id := range p.noneFaultyReplicas {
 		p.isNoneFaultyReplicaMap[id] = true
 	}
+
+	logger.Println(noneFaultyReplicas)
 
 	return p
 }
@@ -228,6 +231,7 @@ func (p *ChangeFaulty) setFaulty(id hotstuff.ReplicaID) {
 			p.noneFaultyReplicas = p.noneFaultyReplicas[1:]
 		}
 	}
+	logger.Println(p.noneFaultyReplicas)
 }
 
 // A problem with this sort of pacemaker is that there is no guarantee for new leader to be none-fualty. Only the leader can obtain new information form the qspec,
@@ -244,7 +248,7 @@ func (p *ChangeFaulty) Run(ctx context.Context) {
 	if p.getLeader() == p.GetID() {
 		go p.Propose()
 	}
-	n := <-p.GetNotifier()
+	n := <-notify
 
 	lastBeat := 1
 	beat := func() {

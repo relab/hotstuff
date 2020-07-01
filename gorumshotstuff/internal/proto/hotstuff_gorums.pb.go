@@ -221,7 +221,39 @@ func NewManager(opts ...ManagerOption) (*Manager, error) {
 			}
 			m.lookup[node.id] = node
 			m.nodes = append(m.nodes, node)
+			// Sorting the nodes when puting them in the node list from lowest to highest id value. This has to be done in order for there to be some system when
+			// returning node IDs. Looping over a map is none-deterministic and therefor the nodes can't simpely be put in a list.
+			/*if len(m.nodes) == 0 || len(m.nodes)+1 == len(m.opts.IDMapping) {
+				m.nodes = append(m.nodes, node)
+			}
+
+			for i, node := range m.nodes {
+				if id < node.id {
+					var temp []*Node
+					if i == 0 {
+						temp = append(temp, node)
+						m.nodes = append(temp, m.nodes...)
+						break
+					}
+					temp = m.nodes[i:]
+					m.nodes = append(append(m.nodes[:i], node), temp...)
+					break
+				}
+			}*/
 		}
+
+		temp := make([]*Node, len(m.nodes))
+		index := 0
+		for _, node1 := range m.nodes {
+			for _, node2 := range m.nodes {
+				if node2.id < node1.id {
+					index++
+				}
+			}
+			temp[index] = node1
+			index = 0
+		}
+		m.nodes = temp
 
 	} else if m.opts.addrsList != nil {
 

@@ -127,13 +127,27 @@ func (hs *GorumsHotStuff) startClient(connectTimeout time.Duration) error {
 			}
 		}
 	*/
-	addrs := make(map[string]uint32) // kan være at det er noe problemer her. Noen addresse-id par blir ikke laget i rett rekkefølge.
-	for _, replica := range hs.Replicas {
+	addrs := make(map[string]uint32)
+	for _, replica := range hs.Replicas { //Looping over a map here. The address map is not being generated in a determinisktic manner. Wired stuff sometimes happens.
 		if replica.ID != hs.GetID() {
 			ids = append(ids, replica.ID)
 			addrs[replica.Address] = uint32(replica.ID)
+			logger.Println(replica.ID)
 		}
 	}
+
+	temp := make([]hotstuff.ReplicaID, len(ids))
+	index := 0
+	for _, node1 := range ids {
+		for _, node2 := range ids {
+			if node2 < node1 {
+				index++
+			}
+		}
+		temp[index] = node1
+		index = 0
+	}
+	ids = temp
 
 	mgr, err := proto.NewManager(proto.WithGrpcDialOptions(
 		grpc.WithBlock(),
@@ -148,10 +162,16 @@ func (hs *GorumsHotStuff) startClient(connectTimeout time.Duration) error {
 	hs.manager = mgr
 	// Det er en bug her med at id og node.id ikke er den samme. Dette skyldes sansynligvis av at inputen til manageren ikke er sortert.
 	nodes := mgr.Nodes()
+	logger.Println(nodes)
 	for i, id := range ids {
 		hs.replicaInfo[id].node = nodes[i]
+		logger.Println("-----")
+		logger.Println(id)
+		logger.Println(nodes[i].ID())
+		logger.Println("======")
 	}
 
+	logger.Println(addrs)
 	hs.qspec = &HotstuffQSpec{
 		SignatureCache: hs.SigCache,
 		ReplicaConfig:  hs.ReplicaConfig,
