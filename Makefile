@@ -9,11 +9,19 @@ binaries := cmd/hotstuffclient/hotstuffclient cmd/hotstuffserver/hotstuffserver 
 
 all: $(binaries)
 
-$(proto_go): %.pb.go : %.proto
-	protoc --go_out=paths=source_relative:. -I=$(proto_include):. $^
+debug: GCFLAGS += -gcflags='all=-N -l'
+debug: $(binaries)
 
-$(gorums_go): %_gorums.pb.go : %.proto
-	protoc --gorums_out=paths=source_relative:. -I=$(proto_include):. $^
+download:
+	@go mod download
+
+$(gorums_go) $(proto_go): download
+
+%.pb.go %_gorums.pb.go : %.proto
+	@protoc -I=$(proto_include):. \
+		--go_out=paths=source_relative:. \
+		--gorums_out=paths=source_relative:. \
+		$<
 
 $(binaries): $(proto_go) $(gorums_go)
 	@go build -o ./$@ ./$(dir $@)
