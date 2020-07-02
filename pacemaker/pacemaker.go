@@ -349,11 +349,13 @@ type GoodLeader struct {
 
 func NewGoodLeader(hs *hotstuff.HotStuff, qs *gorumshotstuff.HotstuffQSpec, schedule []hotstuff.ReplicaID, timeout time.Duration) *GoodLeader {
 	p := &GoodLeader{
-		HotStuff:      hs,
-		HotstuffQSpec: qs,
-		timeout:       timeout,
-		schedule:      schedule,
-		termLength:    1,
+		HotStuff:               hs,
+		HotstuffQSpec:          qs,
+		timeout:                timeout,
+		resetTimer:             make(chan struct{}),
+		schedule:               schedule,
+		termLength:             1,
+		isNoneFaultyReplicaMap: make(map[hotstuff.ReplicaID]bool),
 	}
 
 	p.lastTwoLeaders = [2]hotstuff.ReplicaID{0, 0}
@@ -394,8 +396,7 @@ func (p *GoodLeader) Run(ctx context.Context) {
 
 	lastBeat := 1
 	beat := func() {
-		if p.getLeader(p.GetHeight()+1) == p.GetID() && lastBeat < p.GetHeight()+1 &&
-			p.GetHeight()+1 > p.GetVotedHeight() {
+		if lastBeat < p.GetHeight()+1 && p.GetHeight()+1 > p.GetVotedHeight() {
 			lastBeat = p.GetHeight() + 1
 			go p.Propose()
 		}
@@ -415,7 +416,9 @@ func (p *GoodLeader) Run(ctx context.Context) {
 			p.updateOldLeader(n.SenderID)
 			qCounter = 0
 		case hotstuff.QCFinish:
+			logger.Println(p.HotstuffQSpec)
 			go p.SendNewView(p.HotstuffQSpec.GetBestReplica())
+			p.HotstuffQSpec.FlushBestReplica()
 		case hotstuff.ReceiveNewView:
 			qCounter++
 			if n.SenderID == p.lastTwoLeaders[0] {

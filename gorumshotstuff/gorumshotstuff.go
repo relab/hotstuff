@@ -47,7 +47,12 @@ func New(connectTimeout, qcTimeout time.Duration) *GorumsHotStuff {
 	return &GorumsHotStuff{
 		replicaInfo:    make(map[hotstuff.ReplicaID]*gorumsReplica),
 		connectTimeout: connectTimeout,
-		qcTimeout:      qcTimeout,
+		qspec: &HotstuffQSpec{
+			SignatureCache: nil,
+			ReplicaConfig:  nil,
+			bestReplicaID:  0,
+		},
+		qcTimeout: qcTimeout,
 	}
 }
 
@@ -169,13 +174,12 @@ func (hs *GorumsHotStuff) startClient(connectTimeout time.Duration) error {
 		logger.Println(id)
 		logger.Println(nodes[i].ID())
 		logger.Println("======")
+
 	}
 
 	logger.Println(addrs)
-	hs.qspec = &HotstuffQSpec{
-		SignatureCache: hs.SigCache,
-		ReplicaConfig:  hs.ReplicaConfig,
-	}
+	hs.qspec.SignatureCache = hs.SigCache
+	hs.qspec.ReplicaConfig = hs.ReplicaConfig
 
 	hs.config, err = hs.manager.NewConfiguration(hs.manager.NodeIDs(), hs.qspec)
 	if err != nil {

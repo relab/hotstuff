@@ -25,7 +25,6 @@ type HotstuffQSpec struct {
 
 // Reset resets qspec state.
 func (qspec *HotstuffQSpec) Reset() {
-	qspec.bestReplicaID = 0
 	qspec.verified = make(map[*proto.PartialCert]bool)
 	qspec.jobs = make(chan struct {
 		pc *proto.PartialCert
@@ -39,8 +38,15 @@ func (qspec *HotstuffQSpec) GetLatestReplies() (int, map[uint32]*proto.PartialCe
 	return qspec.vHeight, qspec.latestReplies
 }
 
+// FlushBestReplica set the bestReplica veriable to 0. This should be call at the end of every round of proposals by the leader.
+func (qspec *HotstuffQSpec) FlushBestReplica() {
+	qspec.bestReplicaID = 0
+}
+
 // GetBestReplica returns the ID of the replica which replied first with a valid partial certificate.
 func (qspec *HotstuffQSpec) GetBestReplica() hotstuff.ReplicaID {
+	logger.Println("hi")
+	logger.Println(qspec)
 	return qspec.bestReplicaID
 }
 
@@ -77,7 +83,11 @@ func (qspec *HotstuffQSpec) ProposeQF(req *proto.BlockAndLeaderID, replies map[u
 		v := <-qspec.jobs
 		if v.ok {
 			if i == 0 {
+				logger.Println("hello")
+				logger.Println(v.id)
 				qspec.bestReplicaID = v.id
+				logger.Println(qspec.bestReplicaID)
+				logger.Println(qspec.GetBestReplica())
 			}
 			qspec.verified[v.pc] = true
 			numVerified++
