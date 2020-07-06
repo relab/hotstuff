@@ -295,6 +295,7 @@ func (srv *hotstuffServer) onExec(cmds []hotstuff.Command) {
 		if c, ok := srv.finishedCmds[cmdID{m.ClientID, m.SequenceNumber}]; ok {
 			c <- struct{}{}
 		}
+		srv.mut.Unlock()
 		fmt.Printf("%s", m.Data)
 	}
 }
