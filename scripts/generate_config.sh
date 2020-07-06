@@ -95,14 +95,14 @@ fi
 # generate keys
 if [ -n "$keygen" ]; then
 	if [ -z "$keypath" ]; then
-		keypath="$dest"
+		keypath="."
 	fi
 	if [ ! -f cmd/hotstuffkeygen/hotstuffkeygen ]; then
 		echo "hotstuffkeygen binary not built. Running make..."
 		make
 	fi
 	mkdir -p "$keypath"
-	cmd/hotstuffkeygen/hotstuffkeygen -p \*.key -n ${#ips[@]} "$keypath"
+	cmd/hotstuffkeygen/hotstuffkeygen -p \*.key -n ${#ips[@]} "$dest/$keypath"
 fi
 
 # create main config file

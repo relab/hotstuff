@@ -19,7 +19,7 @@ for (( i = 0 ; i < $num_clients ; i++ )); do
 	--benchmark \
 	--self-id "$id" \
 	--max-inflight "$maxinflight" \
-	--request-rate "$request_rate" \
+	--rate-limit "$request_rate" \
 	--payload-size "$payload_size" \
 	--exit-after "$exit_after" \
 	> "/tmp/results/$hostname-c$id.out" &
