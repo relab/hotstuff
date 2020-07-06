@@ -17,17 +17,25 @@ func init() {
 	logger = logging.GetLogger()
 }
 
-// Event is the type of notification sent to pacemaker
-type Event uint8
+// EventType is the type of notification sent to pacemaker
+type EventType uint8
 
 // These are the types of events that can be sent to pacemaker
 const (
-	QCFinish Event = iota
+	QCFinish EventType = iota
 	ReceiveProposal
 	ReceiveVote
 	HQCUpdate
 	ReceiveNewView
 )
+
+// Event is sent to the pacemaker to allow it to observe the protocol.
+type Event struct {
+	Type    EventType
+	QC      *data.QuorumCert
+	Block   *data.Block
+	Replica config.ReplicaID
+}
 
 // HotStuffCore is the safety core of the HotStuffCore protocol
 type HotStuffCore struct {
@@ -179,7 +187,7 @@ func (hs *HotStuffCore) UpdateQCHigh(qc *data.QuorumCert) bool {
 	if newQCHighBlock.Height > oldQCHighBlock.Height {
 		hs.qcHigh = qc
 		hs.bLeaf = newQCHighBlock
-		hs.emitEvent(HQCUpdate)
+		hs.emitEvent(Event{Type: HQCUpdate, QC: hs.qcHigh, Block: hs.bLeaf})
 		return true
 	}
 
@@ -231,7 +239,7 @@ func (hs *HotStuffCore) OnReceiveProposal(block *data.Block) (*data.PartialCert,
 	hs.mut.Unlock()
 
 	hs.waitProposal.Broadcast()
-	hs.emitEvent(ReceiveProposal)
+	hs.emitEvent(Event{Type: ReceiveProposal, Block: block})
 
 	// queue block for update
 	hs.pendingUpdates <- block
@@ -251,7 +259,7 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 	}
 
 	logger.Printf("OnReceiveVote: %.8s\n", cert.BlockHash)
-	hs.emitEvent(ReceiveVote)
+	hs.emitEvent(Event{Type: ReceiveVote, Replica: cert.Sig.ID})
 
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
@@ -284,7 +292,7 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 		delete(hs.pendingQCs, cert.BlockHash)
 		logger.Println("OnReceiveVote: Created QC")
 		hs.UpdateQCHigh(qc)
-		hs.emitEvent(QCFinish)
+		hs.emitEvent(Event{Type: QCFinish, QC: qc})
 	}
 
 	// delete any pending QCs with lower height than bLeaf
@@ -304,7 +312,7 @@ func (hs *HotStuffCore) OnReceiveNewView(qc *data.QuorumCert) {
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
 	logger.Println("OnReceiveNewView")
-	hs.emitEvent(ReceiveNewView)
+	hs.emitEvent(Event{Type: ReceiveNewView, QC: qc})
 	hs.UpdateQCHigh(qc)
 }
 

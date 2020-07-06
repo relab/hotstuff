@@ -62,7 +62,7 @@ func (p *FixedLeader) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		}
-		switch n {
+		switch n.Type {
 		case consensus.QCFinish:
 			if p.Config.ID == p.leader {
 				logger.Println("Beat")
@@ -140,7 +140,7 @@ func (p *RoundRobin) Run(ctx context.Context) {
 
 	// handle events from hotstuff
 	for {
-		switch n {
+		switch n.Type {
 		case consensus.ReceiveProposal:
 			p.resetTimer <- struct{}{}
 		case consensus.QCFinish:
