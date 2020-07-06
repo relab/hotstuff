@@ -1180,12 +1180,9 @@ func appendIfNotPresent(set []uint32, x uint32) []uint32 {
 }
 
 type nodeServices struct {
-	HotstuffClient
 }
 
 func (n *Node) connectStream(ctx context.Context) (err error) {
-
-	n.HotstuffClient = NewHotstuffClient(n.conn)
 
 	return nil
 }
@@ -1194,24 +1191,29 @@ func (n *Node) closeStream() (err error) {
 	return err
 }
 
-// QuorumSpec is the interface of quorum functions for Hotstuff.
-type QuorumSpec interface {
-
-	// ProposeQF is the quorum function for the Propose
-	// quorum call method. The in parameter is the request object
-	// supplied to the Propose method at call time, and may or may not
-	// be used by the quorum function. If the in parameter is not needed
-	// you should implement your quorum function with '_ *Block'.
-	ProposeQF(in *Block, replies []*PartialCert) (*QuorumCert, bool)
-}
-
 // Propose is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (c *Configuration) Propose(ctx context.Context, in *Block, opts ...grpc.CallOption) (resp *QuorumCert, err error) {
+func (c *Configuration) Propose(ctx context.Context, in *Block) (resp *QuorumCert, err error) {
+
+	// get the ID which will be used to return the correct responses for a request
+	msgID := c.mgr.nextMsgID()
+
+	// set up a channel to collect replies
+	replies := make(chan *orderingResult, c.n)
+	c.mgr.putChan(msgID, replies)
+
+	// remove the replies channel when we are done
+	defer c.mgr.deleteChan(msgID)
+
+	metadata := &ordering.Metadata{
+		MessageID: msgID,
+		MethodID:  proposeMethodID,
+	}
+	msg := &gorumsMessage{metadata: metadata, message: in}
+	// push the message to the nodes
 	expected := c.n
-	replyChan := make(chan internalPartialCert, expected)
 	for _, n := range c.nodes {
-		go n.Propose(ctx, in, replyChan)
+		n.sendQ <- msg
 	}
 
 	var (
@@ -1222,48 +1224,106 @@ func (c *Configuration) Propose(ctx context.Context, in *Block, opts ...grpc.Cal
 
 	for {
 		select {
-		case r := <-replyChan:
+		case r := <-replies:
 			if r.err != nil {
 				errs = append(errs, GRPCError{r.nid, r.err})
 				break
 			}
 
-			replyValues = append(replyValues, r.reply)
+			reply := r.reply.(*PartialCert)
+			replyValues = append(replyValues, reply)
 			if resp, quorum = c.qspec.ProposeQF(in, replyValues); quorum {
 				return resp, nil
 			}
 		case <-ctx.Done():
 			return resp, QuorumCallError{ctx.Err().Error(), len(replyValues), errs}
 		}
+
 		if len(errs)+len(replyValues) == expected {
 			return resp, QuorumCallError{"incomplete call", len(replyValues), errs}
 		}
 	}
 }
 
-func (n *Node) Propose(ctx context.Context, in *Block, replyChan chan<- internalPartialCert) {
-	reply := new(PartialCert)
-	start := time.Now()
-	err := n.conn.Invoke(ctx, "/proto.Hotstuff/Propose", in, reply)
-	s, ok := status.FromError(err)
-	if ok && (s.Code() == codes.OK || s.Code() == codes.Canceled) {
-		n.setLatency(time.Since(start))
-	} else {
-		n.setLastErr(err)
+func (n *Node) NewView(ctx context.Context, in *QuorumCert, opts ...grpc.CallOption) (resp *Empty, err error) {
+
+	// get the ID which will be used to return the correct responses for a request
+	msgID := n.nextMsgID()
+
+	// set up a channel to collect replies
+	replies := make(chan *orderingResult, 1)
+	n.putChan(msgID, replies)
+
+	// remove the replies channel when we are done
+	defer n.deleteChan(msgID)
+
+	metadata := &ordering.Metadata{
+		MessageID: msgID,
+		MethodID:  newViewMethodID,
 	}
-	replyChan <- internalPartialCert{n.id, reply, err}
+	msg := &gorumsMessage{metadata: metadata, message: in}
+	n.sendQ <- msg
+
+	select {
+	case r := <-replies:
+		if r.err != nil {
+			return nil, r.err
+		}
+		reply := r.reply.(*Empty)
+		return reply, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// QuorumSpec is the interface of quorum functions for Hotstuff.
+type QuorumSpec interface {
+
+	// ProposeQF is the quorum function for the Propose
+	// ordered quorum call method. The in parameter is the request object
+	// supplied to the Propose method at call time, and may or may not
+	// be used by the quorum function. If the in parameter is not needed
+	// you should implement your quorum function with '_ *Block'.
+	ProposeQF(in *Block, replies []*PartialCert) (*QuorumCert, bool)
 }
 
 // Hotstuff is the server-side API for the Hotstuff Service
 type Hotstuff interface {
+	Propose(*Block, chan<- *PartialCert)
+	NewView(*QuorumCert, chan<- *Empty)
 }
 
 func (s *GorumsServer) RegisterHotstuffServer(srv Hotstuff) {
+	s.srv.handlers[proposeMethodID] = func(in *gorumsMessage, finished chan<- *gorumsMessage) {
+		req := in.message.(*Block)
+		c := make(chan *PartialCert)
+		go func() {
+			resp := <-c
+			finished <- &gorumsMessage{metadata: in.metadata, message: resp}
+		}()
+		srv.Propose(req, c)
+	}
+	s.srv.handlers[newViewMethodID] = func(in *gorumsMessage, finished chan<- *gorumsMessage) {
+		req := in.message.(*QuorumCert)
+		c := make(chan *Empty)
+		go func() {
+			resp := <-c
+			finished <- &gorumsMessage{metadata: in.metadata, message: resp}
+		}()
+		srv.NewView(req, c)
+	}
 }
 
-const hasOrderingMethods = false
+const hasOrderingMethods = true
 
-var orderingMethods = map[int32]methodInfo{}
+const proposeMethodID int32 = 0
+const newViewMethodID int32 = 1
+
+var orderingMethods = map[int32]methodInfo{
+
+	0: {requestType: new(Block).ProtoReflect(), responseType: new(PartialCert).ProtoReflect()},
+	1: {requestType: new(QuorumCert).ProtoReflect(), responseType: new(Empty).ProtoReflect()},
+}
 
 type internalPartialCert struct {
 	nid   uint32

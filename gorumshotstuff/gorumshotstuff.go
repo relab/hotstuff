@@ -152,8 +152,7 @@ func (hs *GorumsHotStuff) startServer(port string) error {
 	}
 
 	hs.server = proto.NewGorumsServer()
-	hs.server.RegisterProposeHandler(hs)
-	hs.server.RegisterNewViewHandler(hs)
+	hs.server.RegisterHotstuffServer(hs)
 
 	go hs.server.Serve(lis)
 	return nil
@@ -168,18 +167,19 @@ func (hs *GorumsHotStuff) Close() {
 }
 
 // Propose handles a replica's response to the Propose QC from the leader
-func (hs *GorumsHotStuff) Propose(block *proto.Block) *proto.PartialCert {
+func (hs *GorumsHotStuff) Propose(block *proto.Block, out chan<- *proto.PartialCert) {
 	p, err := hs.OnReceiveProposal(block.FromProto())
 	if err != nil {
 		logger.Println("OnReceiveProposal returned with error: ", err)
-		return &proto.PartialCert{}
+		out <- &proto.PartialCert{}
+		return
 	}
-	return proto.PartialCertToProto(p)
+	out <- proto.PartialCertToProto(p)
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica
-func (hs *GorumsHotStuff) NewView(msg *proto.QuorumCert) *proto.Empty {
+func (hs *GorumsHotStuff) NewView(msg *proto.QuorumCert, out chan<- *proto.Empty) {
 	qc := msg.FromProto()
 	hs.OnReceiveNewView(qc)
-	return &proto.Empty{}
+	out <- &proto.Empty{}
 }
