@@ -22,6 +22,7 @@ func init() {
 type FixedLeader struct {
 	*hotstuff.HotStuff
 	leader config.ReplicaID
+	notify chan consensus.Event
 }
 
 // NewFixedLeader returns a new fixed leader pacemaker
@@ -33,6 +34,11 @@ func NewFixedLeader(leaderID config.ReplicaID) *FixedLeader {
 
 func (p *FixedLeader) Init(hs *hotstuff.HotStuff) {
 	p.HotStuff = hs
+	// Hack: We receive a channel to HotStuff at this point instead of in Run(),
+	// which forces processing of proposals to wait until the pacemaker has started.
+	// This avoids the problem of the server handling messages before the Manager
+	// has started.
+	p.notify = hs.GetEvents()
 }
 
 func (p *FixedLeader) GetLeader(_ int) config.ReplicaID {
@@ -41,7 +47,6 @@ func (p *FixedLeader) GetLeader(_ int) config.ReplicaID {
 
 // Run runs the pacemaker which will beat when the previous QC is completed
 func (p *FixedLeader) Run(ctx context.Context) {
-	notify := p.GetEvents()
 	if p.Config.ID == p.leader {
 		logger.Println("Beat")
 		go p.Propose()
@@ -50,7 +55,7 @@ func (p *FixedLeader) Run(ctx context.Context) {
 	var ok bool
 	for {
 		select {
-		case n, ok = <-notify:
+		case n, ok = <-p.notify:
 			if !ok {
 				return
 			}
