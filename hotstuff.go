@@ -2,8 +2,13 @@ package hotstuff
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"log"
+	"math/big"
 	"net"
 	"strconv"
 	"sync"
@@ -83,11 +88,22 @@ func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
 	}
 
 	// embed own ID to allow other replicas to identify messages from this replica
-	// TODO: also embed some proof that the id is not spoofed.
-	// I think that signing the other replica's id using this replicas keys will be enough
 	md := metadata.New(map[string]string{
 		"id": fmt.Sprintf("%d", hs.Config.ID),
 	})
+
+	perNodeMD := func(nid uint32) metadata.MD {
+		var b [4]byte
+		binary.LittleEndian.PutUint32(b[:], nid)
+		hash := sha256.Sum256(b[:])
+		R, S, err := ecdsa.Sign(rand.Reader, hs.Config.PrivateKey, hash[:])
+		if err != nil {
+			panic(fmt.Errorf("Could not sign proof for replica %d: %w", nid, err))
+		}
+		md := metadata.MD{}
+		md.Append("proof", string(R.Bytes()), string(S.Bytes()))
+		return md
+	}
 
 	mgr, err := proto.NewManager(proto.WithGrpcDialOptions(
 		grpc.WithBlock(),
@@ -96,6 +112,7 @@ func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
 		proto.WithDialTimeout(connectTimeout),
 		proto.WithNodeMap(idMapping),
 		proto.WithMetadata(md),
+		proto.WithPerNodeMetadata(perNodeMD),
 	)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to replicas: %w", err)
@@ -121,7 +138,7 @@ func (hs *HotStuff) startServer(port string) error {
 		return fmt.Errorf("Failed to listen to port %s: %w", port, err)
 	}
 
-	hs.server = &hotstuffServer{hs, proto.NewGorumsServer()}
+	hs.server = &hotstuffServer{HotStuff: hs, GorumsServer: proto.NewGorumsServer()}
 	hs.server.RegisterHotstuffServer(hs.server)
 
 	go hs.server.Serve(lis)
@@ -158,29 +175,78 @@ func (hs *HotStuff) SendNewView(id config.ReplicaID) {
 type hotstuffServer struct {
 	*HotStuff
 	*proto.GorumsServer
+	// maps a stream context to client info
+	mut     sync.RWMutex
+	clients map[context.Context]config.ReplicaID
 }
 
-func getPeerID(ctx context.Context) (config.ReplicaID, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if ok {
-		v := md.Get("id")
-		if len(v) > 0 {
-			id, err := strconv.Atoi(v[0])
-			if err != nil {
-				return 0, err
-			}
-			return config.ReplicaID(id), nil
+func (hs *hotstuffServer) getClientID(ctx context.Context) (config.ReplicaID, error) {
+	hs.mut.RLock()
+	// fast path for known stream
+	if id, ok := hs.clients[ctx]; ok {
+		hs.mut.RUnlock()
+		return id, nil
+	}
+
+	hs.mut.RUnlock()
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
+
+	// cleanup finished streams
+	for ctx := range hs.clients {
+		if ctx.Err() != nil {
+			delete(hs.clients, ctx)
 		}
 	}
-	return 0, fmt.Errorf("Peer ID could not be found")
+
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return 0, fmt.Errorf("getClientID: metadata not available")
+	}
+
+	v := md.Get("id")
+	if len(v) < 1 {
+		return 0, fmt.Errorf("getClientID: id field not present")
+	}
+
+	id, err := strconv.Atoi(v[0])
+	if err != nil {
+		return 0, fmt.Errorf("getClientID: cannot parse ID field: %w", err)
+	}
+
+	info, ok := hs.Config.Replicas[config.ReplicaID(id)]
+	if !ok {
+		return 0, fmt.Errorf("getClientID: could not find info about id '%d'", id)
+	}
+
+	v = md.Get("proof")
+	if len(v) < 2 {
+		return 0, fmt.Errorf("No proof found")
+	}
+
+	var R, S big.Int
+	R.SetBytes([]byte(v[0]))
+	S.SetBytes([]byte(v[1]))
+
+	var b [4]byte
+	binary.LittleEndian.PutUint32(b[:], uint32(hs.Config.ID))
+	hash := sha256.Sum256(b[:])
+
+	if !ecdsa.Verify(info.PubKey, hash[:], &R, &S) {
+		return 0, fmt.Errorf("Invalid proof")
+	}
+
+	hs.clients[ctx] = config.ReplicaID(id)
+	return config.ReplicaID(id), nil
 }
 
 // Propose handles a replica's response to the Propose QC from the leader
 func (hs *hotstuffServer) Propose(ctx context.Context, protoB *proto.Block) {
 	block := protoB.FromProto()
-	id, err := getPeerID(ctx)
+	id, err := hs.getClientID(ctx)
 	if err != nil {
-		logger.Printf("Failed to get peer ID: %v", err)
+		logger.Printf("Failed to get client ID: %v", err)
+		return
 	}
 	// defaults to 0 if error
 	block.Proposer = id
