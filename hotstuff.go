@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 var logger *log.Logger
@@ -80,12 +82,20 @@ func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
 		}
 	}
 
+	// embed own ID to allow other replicas to identify messages from this replica
+	// TODO: also embed some proof that the id is not spoofed.
+	// I think that signing the other replica's id using this replicas keys will be enough
+	md := metadata.New(map[string]string{
+		"id": fmt.Sprintf("%d", hs.Config.ID),
+	})
+
 	mgr, err := proto.NewManager(proto.WithGrpcDialOptions(
 		grpc.WithBlock(),
-		grpc.WithInsecure(),
+		grpc.WithInsecure(), // TODO: enable TLS
 	),
 		proto.WithDialTimeout(connectTimeout),
 		proto.WithNodeMap(idMapping),
+		proto.WithMetadata(md),
 	)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to replicas: %w", err)
@@ -150,9 +160,30 @@ type hotstuffServer struct {
 	*proto.GorumsServer
 }
 
+func getPeerID(ctx context.Context) (config.ReplicaID, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if ok {
+		v := md.Get("id")
+		if len(v) > 0 {
+			id, err := strconv.Atoi(v[0])
+			if err != nil {
+				return 0, err
+			}
+			return config.ReplicaID(id), nil
+		}
+	}
+	return 0, fmt.Errorf("Peer ID could not be found")
+}
+
 // Propose handles a replica's response to the Propose QC from the leader
 func (hs *hotstuffServer) Propose(ctx context.Context, protoB *proto.Block) {
 	block := protoB.FromProto()
+	id, err := getPeerID(ctx)
+	if err != nil {
+		logger.Printf("Failed to get peer ID: %v", err)
+	}
+	// defaults to 0 if error
+	block.Proposer = id
 	p, err := hs.OnReceiveProposal(block)
 	if err != nil {
 		logger.Println("OnReceiveProposal returned with error:", err)

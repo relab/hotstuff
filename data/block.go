@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sync"
+
+	"github.com/relab/hotstuff/config"
 )
 
 // Command is the client data that is processed by HotStuff
@@ -30,6 +32,7 @@ func (h BlockHash) String() string {
 // Block represents a block in the tree of commands
 type Block struct {
 	hash       *BlockHash
+	Proposer   config.ReplicaID
 	ParentHash BlockHash
 	Commands   []Command
 	Justify    *QuorumCert
