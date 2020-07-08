@@ -249,7 +249,7 @@ func (srv *hotstuffServer) Stop() {
 	srv.hs.Close()
 }
 
-func (srv *hotstuffServer) ExecCommand(cmd *clientapi.Command, out chan<- *clientapi.Empty) {
+func (srv *hotstuffServer) ExecCommand(_ context.Context, cmd *clientapi.Command, out func(*clientapi.Empty)) {
 	finished := make(chan struct{})
 	id := cmdID{cmd.ClientID, cmd.SequenceNumber}
 	srv.mut.Lock()
@@ -271,7 +271,7 @@ func (srv *hotstuffServer) ExecCommand(cmd *clientapi.Command, out chan<- *clien
 		srv.mut.Unlock()
 
 		// send response
-		out <- &clientapi.Empty{}
+		out(&clientapi.Empty{})
 	}(id, finished)
 }
 

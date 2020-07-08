@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -72,7 +73,7 @@ func (hs *HotStuff) Start() error {
 }
 
 func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
-	idMapping := make(map[string]uint32)
+	idMapping := make(map[string]uint32, len(hs.Config.Replicas)-1)
 	for _, replica := range hs.Config.Replicas {
 		if replica.ID != hs.Config.ID {
 			idMapping[replica.Address] = uint32(replica.ID)
@@ -84,15 +85,14 @@ func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
 		grpc.WithInsecure(),
 	),
 		proto.WithDialTimeout(connectTimeout),
-		proto.WithSpesifiedNodeID(idMapping),
+		proto.WithNodeMap(idMapping),
 	)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to replicas: %w", err)
 	}
 	hs.manager = mgr
 
-	nodes := mgr.Nodes()
-	for _, node := range nodes {
+	for _, node := range mgr.Nodes() {
 		hs.nodes[config.ReplicaID(node.ID())] = node
 	}
 
@@ -134,7 +134,7 @@ func (hs *HotStuff) Propose() {
 	protobuf := proto.BlockToProto(proposal)
 	hs.cfg.Propose(protobuf)
 	// self-vote
-	hs.server.Propose(protobuf)
+	hs.server.Propose(nil, protobuf)
 }
 
 // SendNewView sends a NEW-VIEW message to a specific replica
@@ -151,7 +151,7 @@ type hotstuffServer struct {
 }
 
 // Propose handles a replica's response to the Propose QC from the leader
-func (hs *hotstuffServer) Propose(protoB *proto.Block) {
+func (hs *hotstuffServer) Propose(ctx context.Context, protoB *proto.Block) {
 	block := protoB.FromProto()
 	p, err := hs.OnReceiveProposal(block)
 	if err != nil {
@@ -166,12 +166,12 @@ func (hs *hotstuffServer) Propose(protoB *proto.Block) {
 	}
 }
 
-func (hs *hotstuffServer) Vote(cert *proto.PartialCert) {
+func (hs *hotstuffServer) Vote(ctx context.Context, cert *proto.PartialCert) {
 	hs.OnReceiveVote(cert.FromProto())
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica
-func (hs *hotstuffServer) NewView(msg *proto.QuorumCert) {
+func (hs *hotstuffServer) NewView(ctx context.Context, msg *proto.QuorumCert) {
 	qc := msg.FromProto()
 	hs.OnReceiveNewView(qc)
 }

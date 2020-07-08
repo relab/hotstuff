@@ -14,6 +14,7 @@ import (
 	backoff "google.golang.org/grpc/backoff"
 	codes "google.golang.org/grpc/codes"
 	encoding "google.golang.org/grpc/encoding"
+	metadata "google.golang.org/grpc/metadata"
 	status "google.golang.org/grpc/status"
 	protowire "google.golang.org/protobuf/encoding/protowire"
 	proto "google.golang.org/protobuf/proto"
@@ -85,10 +86,6 @@ func (c *Configuration) Size() int {
 }
 
 func (c *Configuration) String() string {
-	return fmt.Sprintf("configuration %d", c.id)
-}
-
-func (c *Configuration) tstring() string {
 	return fmt.Sprintf("config-%d", c.id)
 }
 
@@ -317,7 +314,7 @@ func NewManager(opts ...ManagerOption) (*Manager, error) {
 		grpc.ForceCodec(newGorumsCodec()),
 	))
 
-	if len(m.opts.addrsList) == 0 && len(m.opts.IDMapping) == 0 {
+	if len(m.opts.addrsList) == 0 && len(m.opts.idMapping) == 0 {
 		return nil, fmt.Errorf("could not create manager: no nodes provided")
 	}
 
@@ -328,66 +325,34 @@ func NewManager(opts ...ManagerOption) (*Manager, error) {
 	}
 
 	var nodeAddrs []string
-	if m.opts.IDMapping != nil {
-		for naddr, id := range m.opts.IDMapping {
-
+	if m.opts.idMapping != nil {
+		for naddr, id := range m.opts.idMapping {
+			if m.lookup[id] != nil {
+				err := fmt.Errorf("two node ids are identical(id %d). Node ids has to be unique!", id)
+				return nil, ManagerCreationError(err)
+			}
 			nodeAddrs = append(nodeAddrs, naddr)
-			node, err2 := m.createNode(naddr, id)
-
-			if err2 != nil {
-				return nil, ManagerCreationError(err2)
+			node, err := m.createNode(naddr, id)
+			if err != nil {
+				return nil, ManagerCreationError(err)
 			}
 			m.lookup[node.id] = node
 			m.nodes = append(m.nodes, node)
-			// Sorting the nodes when puting them in the node list from lowest to highest id value. This has to be done in order for there to be some system when
-			// returning node IDs. Looping over a map is none-deterministic and therefor the nodes can't simpely be put in a list.
-			/*if len(m.nodes) == 0 || len(m.nodes)+1 == len(m.opts.IDMapping) {
-				m.nodes = append(m.nodes, node)
-			}
-
-			for i, node := range m.nodes {
-				if id < node.id {
-					var temp []*Node
-					if i == 0 {
-						temp = append(temp, node)
-						m.nodes = append(temp, m.nodes...)
-						break
-					}
-					temp = m.nodes[i:]
-					m.nodes = append(append(m.nodes[:i], node), temp...)
-					break
-				}
-			}*/
 		}
 
-		temp := make([]*Node, len(m.nodes))
-		index := 0
-		for _, node1 := range m.nodes {
-			for _, node2 := range m.nodes {
-				if node2.id < node1.id {
-					index++
-				}
-			}
-			temp[index] = node1
-			index = 0
-		}
-		m.nodes = temp
+		// Sort nodes since map iteration is non-deterministic.
+		OrderedBy(ID).Sort(m.nodes)
 
 	} else if m.opts.addrsList != nil {
-
 		nodeAddrs = m.opts.addrsList
-
 		for _, naddr := range m.opts.addrsList {
-
-			node, err2 := m.createNode(naddr, 0)
-
-			if err2 != nil {
-				return nil, ManagerCreationError(err2)
+			node, err := m.createNode(naddr, 0)
+			if err != nil {
+				return nil, ManagerCreationError(err)
 			}
 			m.lookup[node.id] = node
 			m.nodes = append(m.nodes, node)
 		}
-
 	}
 
 	if m.opts.trace {
@@ -395,8 +360,7 @@ func NewManager(opts ...ManagerOption) (*Manager, error) {
 		m.eventLog = trace.NewEventLog("gorums.Manager", title)
 	}
 
-	err := m.connectAll()
-	if err != nil {
+	if err := m.connectAll(); err != nil {
 		return nil, ManagerCreationError(err)
 	}
 
@@ -657,8 +621,13 @@ func (n *Node) connect(opts managerOptions) error {
 	if err != nil {
 		return fmt.Errorf("dialing node failed: %w", err)
 	}
+	md := opts.metadata.Copy()
+	if opts.perNodeMD != nil {
+		md = metadata.Join(md, opts.perNodeMD(n.id))
+	}
 	// a context for all of the streams
 	ctx, n.cancel = context.WithCancel(context.Background())
+	ctx = metadata.NewOutgoingContext(ctx, md)
 	// only start ordering RPCs when needed
 	if hasOrderingMethods {
 		err = n.connectOrderedStream(ctx, n.conn)
@@ -851,8 +820,10 @@ type managerOptions struct {
 	trace           bool
 	backoff         backoff.Config
 	sendBuffer      uint
-	IDMapping       map[string]uint32
+	idMapping       map[string]uint32
 	addrsList       []string
+	metadata        metadata.MD
+	perNodeMD       func(uint32) metadata.MD
 }
 
 func newManagerOptions() managerOptions {
@@ -922,17 +893,35 @@ func WithSendBufferSize(size uint) ManagerOption {
 	}
 }
 
-// WithSpesifiedNodeID allows users to manualy create an ID shceam for the nodes. idMap maps an address to an id.
-func WithSpesifiedNodeID(idMap map[string]uint32) ManagerOption {
+// WithNodeMap returns a ManagerOption containing the provided mapping from node addresses to application-specific IDs.
+func WithNodeMap(idMap map[string]uint32) ManagerOption {
 	return func(o *managerOptions) {
-		o.IDMapping = idMap
+		o.idMapping = idMap
 	}
 }
 
-// WithoutSpesifedNodeID automaticaly creates a node shceam for the nodes. There still has to be given a list of addresses that is to be used.
-func WithoutSpesifedNodeID(addrsList []string) ManagerOption {
+// WithNodeList returns a ManagerOption containing the provided list of node addresses.
+// With this option, NodeIDs are generated by the Manager.
+func WithNodeList(addrsList []string) ManagerOption {
 	return func(o *managerOptions) {
 		o.addrsList = addrsList
+	}
+}
+
+// WithMetadata returns a ManagerOption that sets the metadata that is sent to each node
+// when the connection is initially established. This metadata can be retrieved from the
+// server-side method handlers.
+func WithMetadata(md metadata.MD) ManagerOption {
+	return func(o *managerOptions) {
+		o.metadata = md
+	}
+}
+
+// WithPerNodeMetadata returns a ManagerOption that allows you to set metadata for each
+// node individually.
+func WithPerNodeMetadata(f func(uint32) metadata.MD) ManagerOption {
+	return func(o *managerOptions) {
+		o.perNodeMD = f
 	}
 }
 
@@ -1094,7 +1083,7 @@ func (s *orderedNodeStream) reconnectStream(ctx context.Context) {
 // A requestHandler should receive a message from the server, unmarshal it into
 // the proper type for that Method's request type, call a user provided Handler,
 // and return a marshaled result to the server.
-type requestHandler func(*gorumsMessage, chan<- *gorumsMessage)
+type requestHandler func(context.Context, *gorumsMessage, chan<- *gorumsMessage)
 
 type orderingServer struct {
 	handlers map[int32]requestHandler
@@ -1114,8 +1103,7 @@ func newOrderingServer(opts *serverOptions) *orderingServer {
 // is any error with sending or receiving.
 func (s *orderingServer) NodeStream(srv ordering.Gorums_NodeStreamServer) error {
 	finished := make(chan *gorumsMessage, s.opts.buffer)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := srv.Context()
 
 	go func() {
 		for {
@@ -1138,7 +1126,7 @@ func (s *orderingServer) NodeStream(srv ordering.Gorums_NodeStreamServer) error 
 			return err
 		}
 		if handler, ok := s.handlers[req.metadata.MethodID]; ok {
-			handler(req, finished)
+			handler(ctx, req, finished)
 		}
 	}
 }
@@ -1289,23 +1277,23 @@ type QuorumSpec interface {
 
 // Hotstuff is the server-side API for the Hotstuff Service
 type Hotstuff interface {
-	Propose(*Block)
-	Vote(*PartialCert)
-	NewView(*QuorumCert)
+	Propose(context.Context, *Block)
+	Vote(context.Context, *PartialCert)
+	NewView(context.Context, *QuorumCert)
 }
 
 func (s *GorumsServer) RegisterHotstuffServer(srv Hotstuff) {
-	s.srv.handlers[proposeMethodID] = func(in *gorumsMessage, _ chan<- *gorumsMessage) {
+	s.srv.handlers[proposeMethodID] = func(ctx context.Context, in *gorumsMessage, _ chan<- *gorumsMessage) {
 		req := in.message.(*Block)
-		srv.Propose(req)
+		srv.Propose(ctx, req)
 	}
-	s.srv.handlers[voteMethodID] = func(in *gorumsMessage, _ chan<- *gorumsMessage) {
+	s.srv.handlers[voteMethodID] = func(ctx context.Context, in *gorumsMessage, _ chan<- *gorumsMessage) {
 		req := in.message.(*PartialCert)
-		srv.Vote(req)
+		srv.Vote(ctx, req)
 	}
-	s.srv.handlers[newViewMethodID] = func(in *gorumsMessage, _ chan<- *gorumsMessage) {
+	s.srv.handlers[newViewMethodID] = func(ctx context.Context, in *gorumsMessage, _ chan<- *gorumsMessage) {
 		req := in.message.(*QuorumCert)
-		srv.NewView(req)
+		srv.NewView(ctx, req)
 	}
 }
 

@@ -175,7 +175,7 @@ type qspec struct {
 	faulty int
 }
 
-func (q *qspec) ExecCommandQF(cmd *clientapi.Command, signatures []*clientapi.Empty) (*clientapi.Empty, bool) {
+func (q *qspec) ExecCommandQF(_ *clientapi.Command, signatures map[uint32]*clientapi.Empty) (*clientapi.Empty, bool) {
 	if len(signatures) < q.faulty+1 {
 		return nil, false
 	}
@@ -194,11 +194,11 @@ type hotstuffClient struct {
 }
 
 func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hotstuffClient, error) {
-	var addrs []string
+	nodes := make(map[string]uint32, len(replicaConfig.Replicas))
 	for _, r := range replicaConfig.Replicas {
-		addrs = append(addrs, r.Address)
+		nodes[r.Address] = uint32(r.ID)
 	}
-	mgr, err := clientapi.NewManager(addrs, clientapi.WithGrpcDialOptions(
+	mgr, err := clientapi.NewManager(clientapi.WithNodeMap(nodes), clientapi.WithGrpcDialOptions(
 		grpc.WithInsecure(),
 		grpc.WithBlock(),
 	),
