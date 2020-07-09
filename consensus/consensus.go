@@ -291,7 +291,6 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 	}
 
 	if len(qc.Sigs) >= hs.Config.QuorumSize {
-		// here
 		delete(hs.pendingQCs, cert.BlockHash)
 		logger.Println("OnReceiveVote: Created QC")
 		hs.UpdateQCHigh(qc)

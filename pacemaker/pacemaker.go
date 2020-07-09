@@ -365,6 +365,8 @@ type GoodLeader struct {
 	termLength             int
 	isNoneFaultyReplicaMap map[config.ReplicaID]bool
 	lastTwoLeaders         [2]config.ReplicaID
+	latestReplies          []*data.PartialCert
+	latestNilReplies       []config.ReplicaID
 }
 
 func NewGoodLeader(hs *hotstuff.HotStuff, schedule []config.ReplicaID, timeout time.Duration) *GoodLeader {
@@ -397,12 +399,20 @@ func (p *GoodLeader) evictLeader() {
 	p.lastTwoLeaders[0] = p.lastTwoLeaders[1]
 }
 
+func (p *GoodLeader) GetLeader(vHeight int) config.ReplicaID {
+	return p.lastTwoLeaders[0]
+}
+
 // getLeader is in this pm only suposed to be called as a last resort in order to decide on a new leader.
 // the backend calls getLeader when handeling proposals, so there has to be done something about that.
 // The current leader is tracked so could just return that.
 func (p *GoodLeader) getLeader(vHeight int) config.ReplicaID {
 	term := int(math.Ceil(float64(vHeight)/float64(p.termLength)) - 1)
 	return p.schedule[term%len(p.schedule)]
+}
+
+func (p *GoodLeader) getBestReplica() config.ReplicaID {
+	return 0
 }
 
 func (p *GoodLeader) Run(ctx context.Context) {
@@ -437,15 +447,27 @@ func (p *GoodLeader) Run(ctx context.Context) {
 			p.updateOldLeader(n.Replica)
 			qCounter = 0
 		case consensus.QCFinish:
-			go p.SendNewView(p.HotstuffQSpec.GetBestReplica())
+			if n.QC != nil {
+				p.HotStuff.SetSugestedLeader(p.latestReplies[0].Sig.ID)
+			} else {
+				p.HotStuff.SetSugestedLeader(p.latestNilReplies[0])
+			}
+			go p.Propose()
+			p.latestReplies = p.latestReplies[:0]
+			p.latestNilReplies = p.latestNilReplies[:0]
 		case consensus.ReceiveNewView:
 			qCounter++
-			if n.Replica == p.lastTwoLeaders[0] {
+			if p.Config.QuorumSize <= qCounter {
 				qCounter = 0
+				p.latestReplies = p.latestReplies[:0]
+				p.latestNilReplies = p.latestNilReplies[:0]
 				beat()
-			} else if p.Config.QuorumSize <= qCounter {
-				qCounter = 0
-				beat()
+			}
+		case consensus.ReceiveVote:
+			if n.PC != nil {
+				p.latestReplies = append(p.latestReplies, n.PC)
+			} else {
+				p.latestNilReplies = append(p.latestNilReplies, n.Replica)
 			}
 		}
 

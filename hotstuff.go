@@ -54,6 +54,13 @@ type HotStuff struct {
 
 	qcTimeout      time.Duration
 	connectTimeout time.Duration
+
+	sugestedLeader config.ReplicaID
+}
+
+// SetSugestedLeader sets the sugested leader id to the id given as input.
+func (hs *HotStuff) SetSugestedLeader(id config.ReplicaID) {
+	hs.sugestedLeader = id
 }
 
 //New creates a new GorumsHotStuff backend object.
@@ -64,6 +71,7 @@ func New(conf *config.ReplicaConfig, pacemaker Pacemaker, tls bool, connectTimeo
 		nodes:          make(map[config.ReplicaID]*proto.Node),
 		connectTimeout: connectTimeout,
 		qcTimeout:      qcTimeout,
+		sugestedLeader: 0,
 	}
 	pacemaker.Init(hs)
 	return hs
@@ -182,7 +190,7 @@ func (hs *HotStuff) Close() {
 func (hs *HotStuff) Propose() {
 	proposal := hs.CreateProposal()
 	logger.Printf("Propose (%d commands): %s\n", len(proposal.Commands), proposal)
-	protobuf := proto.BlockToProto(proposal)
+	protobuf := &proto.BlockAndNewLeader{Block: proto.BlockToProto(proposal), SugestedNewLeaderID: uint32(hs.sugestedLeader)}
 	hs.cfg.Propose(protobuf)
 	// self-vote
 	hs.handlePropose(proposal)
@@ -296,8 +304,8 @@ func (hs *hotstuffServer) getClientID(ctx context.Context) (config.ReplicaID, er
 }
 
 // Propose handles a replica's response to the Propose QC from the leader
-func (hs *hotstuffServer) Propose(ctx context.Context, protoB *proto.Block) {
-	block := protoB.FromProto()
+func (hs *hotstuffServer) Propose(ctx context.Context, protoB *proto.BlockAndNewLeader) {
+	block := protoB.Block.FromProto()
 	id, err := hs.getClientID(ctx)
 	if err != nil {
 		logger.Printf("Failed to get client ID: %v", err)
@@ -305,7 +313,21 @@ func (hs *hotstuffServer) Propose(ctx context.Context, protoB *proto.Block) {
 	}
 	// defaults to 0 if error
 	block.Proposer = id
-	hs.handlePropose(block)
+	// TODO: replace the following with handlePropose
+	p, err := hs.OnReceiveProposal(block)
+	if err != nil {
+		logger.Println("OnReceiveProposal returned with error:", err)
+		return
+	}
+	leaderID := hs.pacemaker.GetLeader(block.Height)
+	if p != nil && protoB.SugestedNewLeaderID != 0 {
+		leaderID = config.ReplicaID(protoB.SugestedNewLeaderID)
+	}
+	if hs.Config.ID == leaderID {
+		hs.OnReceiveVote(p)
+	} else if leader, ok := hs.nodes[leaderID]; ok {
+		leader.Vote(proto.PartialCertToProto(p))
+	}
 }
 
 func (hs *hotstuffServer) Vote(ctx context.Context, cert *proto.PartialCert) {

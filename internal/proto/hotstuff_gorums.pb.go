@@ -1258,7 +1258,7 @@ var _ empty.Empty
 
 // Propose is a one-way multicast call on all nodes in configuration c,
 // with the same in argument. The call is asynchronous and has no return value.
-func (c *Configuration) Propose(in *Block) error {
+func (c *Configuration) Propose(in *BlockAndNewLeader) error {
 	msgID := c.mgr.nextMsgID()
 	metadata := &ordering.Metadata{
 		MessageID: msgID,
@@ -1289,14 +1289,14 @@ type QuorumSpec interface {
 
 // Hotstuff is the server-side API for the Hotstuff Service
 type Hotstuff interface {
-	Propose(context.Context, *Block)
+	Propose(context.Context, *BlockAndNewLeader)
 	Vote(context.Context, *PartialCert)
 	NewView(context.Context, *QuorumCert)
 }
 
 func (s *GorumsServer) RegisterHotstuffServer(srv Hotstuff) {
 	s.srv.handlers[proposeMethodID] = func(ctx context.Context, in *gorumsMessage, _ chan<- *gorumsMessage) {
-		req := in.message.(*Block)
+		req := in.message.(*BlockAndNewLeader)
 		srv.Propose(ctx, req)
 	}
 	s.srv.handlers[voteMethodID] = func(ctx context.Context, in *gorumsMessage, _ chan<- *gorumsMessage) {
@@ -1317,7 +1317,7 @@ const newViewMethodID int32 = 2
 
 var orderingMethods = map[int32]methodInfo{
 
-	0: {requestType: new(Block).ProtoReflect(), responseType: new(empty.Empty).ProtoReflect()},
+	0: {requestType: new(BlockAndNewLeader).ProtoReflect(), responseType: new(empty.Empty).ProtoReflect()},
 	1: {requestType: new(PartialCert).ProtoReflect(), responseType: new(empty.Empty).ProtoReflect()},
 	2: {requestType: new(QuorumCert).ProtoReflect(), responseType: new(empty.Empty).ProtoReflect()},
 }

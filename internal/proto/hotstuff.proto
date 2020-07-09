@@ -9,7 +9,7 @@ import "google/protobuf/empty.proto";
 option go_package = "github.com/relab/hotstuff/internal/proto";
 
 service Hotstuff {
-  rpc Propose(Block) returns (google.protobuf.Empty) {
+  rpc Propose(BlockAndNewLeader) returns (google.protobuf.Empty) {
     option (gorums.multicast) = true;
   }
 
@@ -27,6 +27,11 @@ message Block {
   QuorumCert QC = 2;
   int64 Height = 3;
   repeated Command Commands = 4;
+}
+
+message BlockAndNewLeader{
+  Block block = 1;
+  uint32 sugestedNewLeaderID = 2;
 }
 
 message PartialSig {
