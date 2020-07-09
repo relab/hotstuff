@@ -7,17 +7,20 @@ peer_port="30000"
 client_port="40000"
 keypath="."
 dest="."
+keygen=""
+tls="false"
 
 usage() {
 	echo "Usage: $0 [options] [destination]"
 	echo
 	echo "Options:"
 	echo "	--pacemaker <fixed|round-robin> : Specify the type of pacemaker"
-	echo "	--ips <';' separated list>      : List of IP addresses to use"
+	echo "	--ips                           : Comma separated list of IP addresses to use"
 	echo "	--client-port <port>            : The port that clients should use to connect to servers"
 	echo "	--peer-port <port>              : The port that replicas should use to connect to each other"
 	echo "	--keypath <folder>              : Path to the keys relative to the working directory"
 	echo "	--keygen                        : If present, the keys will be generated in 'keypath'"
+	echo "	--tls                           : If present, self-signed TLS certificates will be generated."
 	echo
 	echo "If no destination is given, the files are saved relative to the working directory."
 }
@@ -57,7 +60,8 @@ while [ $# -gt 0 ]; do
 			shift 2
 			;;
 		--ips)
-			IFS=";" read -ra ips <<< "$2"
+			hosts="$2"
+			IFS="," read -ra ips <<< "$2"
 			shift 2
 			;;
 		--peer-port)
@@ -73,7 +77,11 @@ while [ $# -gt 0 ]; do
 			shift 2
 			;;
 		--keygen)
-			keygen="1"
+			keygen="true"
+			shift
+			;;
+		--tls)
+			tls="true"
 			shift
 			;;
 		--*)
@@ -102,7 +110,7 @@ if [ -n "$keygen" ]; then
 		make
 	fi
 	mkdir -p "$keypath"
-	cmd/hotstuffkeygen/hotstuffkeygen -p \*.key -n ${#ips[@]} "$dest/$keypath"
+	cmd/hotstuffkeygen/hotstuffkeygen -p \*.key -n ${#ips[@]} -h "$hosts" --tls="$tls" "$dest/$keypath"
 fi
 
 # create main config file
