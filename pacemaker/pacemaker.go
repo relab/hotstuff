@@ -9,6 +9,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/data"
 	"github.com/relab/hotstuff/internal/logging"
 )
 
@@ -192,6 +193,8 @@ type ChangeFaulty struct {
 	stopTimeout            func()
 	noneFaultyReplicas     []config.ReplicaID
 	isNoneFaultyReplicaMap map[config.ReplicaID]bool
+	notify                 chan consensus.Event
+	latestVotes            []*data.PartialCert
 }
 
 func NewChangeFaulty(hs *hotstuff.HotStuff, noneFaultyReplicas []config.ReplicaID, timeout time.Duration) *ChangeFaulty {
@@ -199,6 +202,7 @@ func NewChangeFaulty(hs *hotstuff.HotStuff, noneFaultyReplicas []config.ReplicaI
 		HotStuff:               hs,
 		timeout:                timeout,
 		isNoneFaultyReplicaMap: make(map[config.ReplicaID]bool),
+		notify:                 make(chan consensus.Event),
 	}
 
 	for _, id := range p.noneFaultyReplicas {
@@ -206,6 +210,15 @@ func NewChangeFaulty(hs *hotstuff.HotStuff, noneFaultyReplicas []config.ReplicaI
 	}
 
 	return p
+}
+
+func (p *ChangeFaulty) Init(hs *hotstuff.HotStuff) {
+	p.HotStuff = hs
+	// Hack: We receive a channel to HotStuff at this point instead of in Run(),
+	// which forces processing of proposals to wait until the pacemaker has started.
+	// This avoids the problem of the server handling messages before the Manager
+	// has started.
+	p.notify = hs.GetEvents()
 }
 
 func (p *ChangeFaulty) isNoneFaulty(id config.ReplicaID) bool {
@@ -221,11 +234,10 @@ func (p *ChangeFaulty) getLeader() config.ReplicaID {
 // Updating the the schdual should probably not be done unless there are some form of reconfiguration or chatch up mechanism. As of now, a new replica can't
 // be added. If a replica is faulty and stop being faulty, we don't have code for handeling it anyway.
 func (p *ChangeFaulty) upadteNoneFaultySlice() {
-	_, replies := p.HotstuffQSpec.GetLatestReplies()
-	for id, pc := range replies {
-		if pc != nil && !p.isNoneFaulty(config.ReplicaID(id)) {
-			p.isNoneFaultyReplicaMap[config.ReplicaID(id)] = true
-			p.noneFaultyReplicas = append(p.noneFaultyReplicas, config.ReplicaID(id)) // There could potentialy be a double check of the contetns of this list. There should be no duplicat IDs.
+	for _, pc := range p.latestVotes {
+		if pc != nil && !p.isNoneFaulty(pc.Sig.ID) {
+			p.isNoneFaultyReplicaMap[pc.Sig.ID] = true
+			p.noneFaultyReplicas = append(p.noneFaultyReplicas, pc.Sig.ID) // There could potentialy be a double check of the contetns of this list. There should be no duplicat IDs.
 		}
 	}
 }
@@ -278,6 +290,7 @@ func (p *ChangeFaulty) Run(ctx context.Context) {
 		case consensus.ReceiveProposal: // it would have been nice if some where given regarding who sent the proposal.
 			p.resetTimer <- struct{}{}
 		case consensus.QCFinish:
+			p.latestVotes = p.latestVotes[:0]
 			if n.QC == nil {
 				p.setFaulty(p.getLeader())
 				go p.SendNewView(p.getLeader())
@@ -293,7 +306,8 @@ func (p *ChangeFaulty) Run(ctx context.Context) {
 				p.setFaulty(p.getLeader())
 				beat()
 			}
-
+		case consensus.ReceiveVote:
+			p.latestVotes = append(p.latestVotes, n.PC)
 		}
 
 		var ok bool
@@ -383,6 +397,9 @@ func (p *GoodLeader) evictLeader() {
 	p.lastTwoLeaders[0] = p.lastTwoLeaders[1]
 }
 
+// getLeader is in this pm only suposed to be called as a last resort in order to decide on a new leader.
+// the backend calls getLeader when handeling proposals, so there has to be done something about that.
+// The current leader is tracked so could just return that.
 func (p *GoodLeader) getLeader(vHeight int) config.ReplicaID {
 	term := int(math.Ceil(float64(vHeight)/float64(p.termLength)) - 1)
 	return p.schedule[term%len(p.schedule)]

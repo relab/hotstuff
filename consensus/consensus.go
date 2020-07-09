@@ -35,6 +35,7 @@ type Event struct {
 	QC      *data.QuorumCert
 	Block   *data.Block
 	Replica config.ReplicaID
+	PC      *data.PartialCert
 }
 
 // HotStuffCore is the safety core of the HotStuffCore protocol
@@ -68,6 +69,7 @@ type HotStuffCore struct {
 	exec chan []data.Command
 }
 
+// AddCommand caches the command given as input.
 func (hs *HotStuffCore) AddCommand(command data.Command) {
 	hs.cmdCache.Add(command)
 }
@@ -259,7 +261,7 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 	}
 
 	logger.Printf("OnReceiveVote: %.8s\n", cert.BlockHash)
-	hs.emitEvent(Event{Type: ReceiveVote, Replica: cert.Sig.ID})
+	hs.emitEvent(Event{Type: ReceiveVote, Replica: cert.Sig.ID, PC: cert})
 
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
@@ -289,6 +291,7 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 	}
 
 	if len(qc.Sigs) >= hs.Config.QuorumSize {
+		// here
 		delete(hs.pendingQCs, cert.BlockHash)
 		logger.Println("OnReceiveVote: Created QC")
 		hs.UpdateQCHigh(qc)
