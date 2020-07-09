@@ -14,14 +14,14 @@ type ReplicaInfo struct {
 	ID      ReplicaID
 	Address string
 	PubKey  *ecdsa.PublicKey
-	Cert    *x509.Certificate
 }
 
 // ReplicaConfig holds information needed by a replica
 type ReplicaConfig struct {
 	ID         ReplicaID
 	PrivateKey *ecdsa.PrivateKey
-	Cert       *tls.Certificate
+	Cert       *tls.Certificate // Own certificate
+	CertPool   *x509.CertPool   // Other replicas's certificates
 	Replicas   map[ReplicaID]*ReplicaInfo
 	QuorumSize int
 	BatchSize  int
@@ -33,6 +33,7 @@ func NewConfig(id ReplicaID, privateKey *ecdsa.PrivateKey, cert *tls.Certificate
 		ID:         id,
 		PrivateKey: privateKey,
 		Cert:       cert,
+		CertPool:   x509.NewCertPool(),
 		Replicas:   make(map[ReplicaID]*ReplicaInfo),
 		BatchSize:  1,
 	}

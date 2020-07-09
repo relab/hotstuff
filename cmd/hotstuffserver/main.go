@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -27,6 +29,7 @@ import (
 
 type options struct {
 	Privkey         string
+	Cert            string
 	SelfID          config.ReplicaID   `mapstructure:"self-id"`
 	PmType          string             `mapstructure:"pacemaker"`
 	LeaderID        config.ReplicaID   `mapstructure:"leader-id"`
@@ -36,6 +39,7 @@ type options struct {
 	BatchSize       int                `mapstructure:"batch-size"`
 	PrintThroughput bool               `mapstructure:"print-throughput"`
 	PrintCommands   bool               `mapstructure:"print-commands"`
+	TLS             bool
 	Interval        int
 	Output          string
 	Replicas        []struct {
@@ -43,6 +47,7 @@ type options struct {
 		PeerAddr   string `mapstructure:"peer-address"`
 		ClientAddr string `mapstructure:"client-address"`
 		Pubkey     string
+		Cert       string
 	}
 }
 
@@ -71,9 +76,11 @@ func main() {
 	pflag.Int("batch-size", 100, "How many commands are batched together for each proposal")
 	pflag.Int("view-timeout", 1000, "How many milliseconds before a view is timed out")
 	pflag.String("privkey", "", "The path to the private key file")
+	pflag.String("cert", "", "Path to the certificate")
 	pflag.Bool("print-commands", false, "Commands will be printed to stdout")
 	pflag.Bool("print-throughput", false, "Throughput measurements will be printed stdout")
 	pflag.Int("interval", 1000, "Throughput measurement interval in milliseconds")
+	pflag.Bool("tls", false, "Enable TLS")
 	pflag.Parse()
 
 	if *help {
@@ -127,9 +134,31 @@ func main() {
 		os.Exit(1)
 	}
 
+	var cert *tls.Certificate
+	if conf.TLS {
+		certB, err := data.ReadCertFile(conf.Cert)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to read certificate: %v\n", err)
+			os.Exit(1)
+		}
+		// read in the private key again, but in PEM format
+		pkPEM, err := ioutil.ReadFile(conf.Privkey)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to read private key: %v\n", err)
+			os.Exit(1)
+		}
+
+		tlsCert, err := tls.X509KeyPair(certB, pkPEM)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to parse certificate: %v\n", err)
+			os.Exit(1)
+		}
+		cert = &tlsCert
+	}
+
 	var clientAddress string
 
-	replicaConfig := config.NewConfig(conf.SelfID, privkey, nil)
+	replicaConfig := config.NewConfig(conf.SelfID, privkey, cert)
 	replicaConfig.BatchSize = conf.BatchSize
 	for _, r := range conf.Replicas {
 		key, err := data.ReadPublicKeyFile(r.Pubkey)
@@ -137,6 +166,18 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Failed to read public key file '%s': %v\n", r.Pubkey, err)
 			os.Exit(1)
 		}
+
+		if conf.TLS {
+			certB, err := data.ReadCertFile(r.Cert)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to read certificate: %v\n", err)
+				os.Exit(1)
+			}
+			if !replicaConfig.CertPool.AppendCertsFromPEM(certB) {
+				fmt.Fprintf(os.Stderr, "Failed to parse certificate\n")
+			}
+		}
+
 		replicaConfig.Replicas[r.ID] = &config.ReplicaInfo{
 			ID:      r.ID,
 			Address: r.PeerAddr,
@@ -218,7 +259,7 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *options, replicaConfig *conf
 		fmt.Fprintf(os.Stderr, "Invalid pacemaker type: '%s'\n", conf.PmType)
 		os.Exit(1)
 	}
-	srv.hs = hotstuff.New(replicaConfig, pm, false, time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
+	srv.hs = hotstuff.New(replicaConfig, pm, conf.TLS, time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
 	srv.pm = pm.(interface{ Run(context.Context) })
 	// Use a custom server instead of the gorums one
 	srv.gorumsSrv.RegisterHotStuffSMRServer(srv)

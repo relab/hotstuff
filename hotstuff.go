@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/x509"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -120,13 +119,7 @@ func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
 	}
 
 	if hs.tls {
-		cp := x509.NewCertPool()
-		for _, r := range hs.Config.Replicas {
-			if r.Cert != nil {
-				cp.AddCert(r.Cert)
-			}
-		}
-		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(cp, "")))
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(hs.Config.CertPool, "")))
 	} else {
 		grpcOpts = append(grpcOpts, grpc.WithInsecure())
 	}
