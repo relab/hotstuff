@@ -1,14 +1,19 @@
 package data
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
+	"math/big"
+	"net"
 	"os"
+	"time"
 )
 
 const privateKeyFileType = "HOTSTUFF PRIVATE KEY"
@@ -21,17 +26,67 @@ func GeneratePrivateKey() (pk *ecdsa.PrivateKey, err error) {
 	return
 }
 
+// GenerateTLSCert generates a self-signed TLS certificate for the server that is valid for the given hosts.
+// These keys should be used for testing purposes only.
+func GenerateTLSCert(hosts []string, privateKey *ecdsa.PrivateKey) (cert []byte, err error) {
+	sn, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return nil, err
+	}
+
+	caTmpl := &x509.Certificate{
+		SerialNumber: sn,
+		Subject: pkix.Name{
+			CommonName: "HotStuff Self-Signed Certificate",
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(10, 0, 0),
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		BasicConstraintsValid: true,
+	}
+
+	for _, h := range hosts {
+		if ip := net.ParseIP(h); ip != nil {
+			caTmpl.IPAddresses = append(caTmpl.IPAddresses, ip)
+		} else {
+			caTmpl.DNSNames = append(caTmpl.DNSNames, h)
+		}
+	}
+
+	caBytes, err := x509.CreateCertificate(rand.Reader, caTmpl, caTmpl, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	caPEM := new(bytes.Buffer)
+	err = pem.Encode(caPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: caBytes,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return caPEM.Bytes(), nil
+}
+
 // WritePrivateKeyFile writes a private key to the specified file
-func WritePrivateKeyFile(key *ecdsa.PrivateKey, filePath string) error {
+func WritePrivateKeyFile(key *ecdsa.PrivateKey, filePath string) (err error) {
 	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		return err
+		return
 	}
-	defer f.Close()
+
+	defer func() {
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+	}()
 
 	marshalled, err := x509.MarshalECPrivateKey(key)
 	if err != nil {
-		return err
+		return
 	}
 
 	b := &pem.Block{
@@ -39,21 +94,26 @@ func WritePrivateKeyFile(key *ecdsa.PrivateKey, filePath string) error {
 		Bytes: marshalled,
 	}
 
-	pem.Encode(f, b)
-	return nil
+	err = pem.Encode(f, b)
+	return
 }
 
 // WritePublicKeyFile writes a public key to the specified file
-func WritePublicKeyFile(key *ecdsa.PublicKey, filePath string) error {
+func WritePublicKeyFile(key *ecdsa.PublicKey, filePath string) (err error) {
 	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
-		return err
+		return
 	}
-	defer f.Close()
+
+	defer func() {
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+	}()
 
 	marshalled, err := x509.MarshalPKIXPublicKey(key)
 	if err != nil {
-		return err
+		return
 	}
 
 	b := &pem.Block{
@@ -61,8 +121,24 @@ func WritePublicKeyFile(key *ecdsa.PublicKey, filePath string) error {
 		Bytes: marshalled,
 	}
 
-	pem.Encode(f, b)
-	return nil
+	err = pem.Encode(f, b)
+	return
+}
+
+func WriteCertFile(cert []byte, file string) (err error) {
+	f, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return
+	}
+
+	defer func() {
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+	}()
+
+	_, err = f.Write(cert)
+	return
 }
 
 // ReadPrivateKeyFile reads a private key from the specified file
@@ -115,4 +191,8 @@ func ReadPublicKeyFile(keyFile string) (key *ecdsa.PublicKey, err error) {
 	}
 
 	return
+}
+
+func ReadCertFile(certFile string) (cert []byte, err error) {
+	return ioutil.ReadFile(certFile)
 }
