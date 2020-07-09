@@ -129,7 +129,7 @@ func main() {
 
 	var clientAddress string
 
-	replicaConfig := config.NewConfig(conf.SelfID, privkey)
+	replicaConfig := config.NewConfig(conf.SelfID, privkey, nil)
 	replicaConfig.BatchSize = conf.BatchSize
 	for _, r := range conf.Replicas {
 		key, err := data.ReadPublicKeyFile(r.Pubkey)
@@ -218,7 +218,7 @@ func newHotStuffServer(key *ecdsa.PrivateKey, conf *options, replicaConfig *conf
 		fmt.Fprintf(os.Stderr, "Invalid pacemaker type: '%s'\n", conf.PmType)
 		os.Exit(1)
 	}
-	srv.hs = hotstuff.New(replicaConfig, pm, time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
+	srv.hs = hotstuff.New(replicaConfig, pm, false, time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
 	srv.pm = pm.(interface{ Run(context.Context) })
 	// Use a custom server instead of the gorums one
 	srv.gorumsSrv.RegisterHotStuffSMRServer(srv)

@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -19,6 +20,7 @@ import (
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -37,6 +39,7 @@ type Pacemaker interface {
 // HotStuff is a thing
 type HotStuff struct {
 	*consensus.HotStuffCore
+	tls bool
 
 	pacemaker Pacemaker
 
@@ -53,7 +56,7 @@ type HotStuff struct {
 }
 
 //New creates a new GorumsHotStuff backend object.
-func New(conf *config.ReplicaConfig, pacemaker Pacemaker, connectTimeout, qcTimeout time.Duration) *HotStuff {
+func New(conf *config.ReplicaConfig, pacemaker Pacemaker, tls bool, connectTimeout, qcTimeout time.Duration) *HotStuff {
 	hs := &HotStuff{
 		pacemaker:      pacemaker,
 		HotStuffCore:   consensus.New(conf),
@@ -105,15 +108,32 @@ func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
 		return md
 	}
 
-	mgr, err := proto.NewManager(proto.WithGrpcDialOptions(
-		grpc.WithBlock(),
-		grpc.WithInsecure(), // TODO: enable TLS
-	),
+	mgrOpts := []proto.ManagerOption{
 		proto.WithDialTimeout(connectTimeout),
 		proto.WithNodeMap(idMapping),
 		proto.WithMetadata(md),
 		proto.WithPerNodeMetadata(perNodeMD),
-	)
+	}
+	grpcOpts := []grpc.DialOption{
+		grpc.WithBlock(),
+		grpc.WithReturnConnectionError(),
+	}
+
+	if hs.tls {
+		cp := x509.NewCertPool()
+		for _, r := range hs.Config.Replicas {
+			if r.Cert != nil {
+				cp.AddCert(r.Cert)
+			}
+		}
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(cp, "")))
+	} else {
+		grpcOpts = append(grpcOpts, grpc.WithInsecure())
+	}
+
+	mgrOpts = append(mgrOpts, proto.WithGrpcDialOptions(grpcOpts...))
+
+	mgr, err := proto.NewManager(mgrOpts...)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to replicas: %w", err)
 	}
@@ -138,7 +158,16 @@ func (hs *HotStuff) startServer(port string) error {
 		return fmt.Errorf("Failed to listen to port %s: %w", port, err)
 	}
 
-	hs.server = &hotstuffServer{HotStuff: hs, GorumsServer: proto.NewGorumsServer()}
+	serverOpts := []proto.ServerOption{}
+	grpcServerOpts := []grpc.ServerOption{}
+
+	if hs.tls {
+		grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(hs.Config.Cert)))
+	}
+
+	serverOpts = append(serverOpts, proto.WithGRPCServerOptions(grpcServerOpts...))
+
+	hs.server = &hotstuffServer{HotStuff: hs, GorumsServer: proto.NewGorumsServer(serverOpts...)}
 	hs.server.RegisterHotstuffServer(hs.server)
 
 	go hs.server.Serve(lis)

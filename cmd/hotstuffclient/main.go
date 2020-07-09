@@ -104,7 +104,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	replicaConfig := config.NewConfig(0, nil)
+	replicaConfig := config.NewConfig(0, nil, nil)
 	for _, r := range conf.Replicas {
 		key, err := data.ReadPublicKeyFile(r.Pubkey)
 		if err != nil {
