@@ -239,7 +239,7 @@ func (hs *HotStuffCore) OnReceiveProposal(block *data.Block) (*data.PartialCert,
 	hs.mut.Unlock()
 
 	hs.waitProposal.Broadcast()
-	hs.emitEvent(Event{Type: ReceiveProposal, Block: block})
+	hs.emitEvent(Event{Type: ReceiveProposal, Block: block, Replica: block.Proposer})
 
 	// queue block for update
 	hs.pendingUpdates <- block
@@ -386,6 +386,7 @@ func (hs *HotStuffCore) CreateProposal() *data.Block {
 	hs.mut.Lock()
 	b := CreateLeaf(hs.bLeaf, batch, hs.qcHigh, hs.bLeaf.Height+1)
 	hs.mut.Unlock()
+	b.Proposer = hs.Config.ID
 	hs.Blocks.Put(b)
 	return b
 }

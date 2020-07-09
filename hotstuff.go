@@ -16,6 +16,7 @@ import (
 
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/data"
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto"
 	"google.golang.org/grpc"
@@ -183,7 +184,7 @@ func (hs *HotStuff) Propose() {
 	protobuf := proto.BlockToProto(proposal)
 	hs.cfg.Propose(protobuf)
 	// self-vote
-	hs.server.Propose(nil, protobuf)
+	hs.handlePropose(proposal)
 }
 
 // SendNewView sends a NEW-VIEW message to a specific replica
@@ -191,6 +192,20 @@ func (hs *HotStuff) SendNewView(id config.ReplicaID) {
 	qc := hs.GetQCHigh()
 	if node, ok := hs.nodes[id]; ok {
 		node.NewView(proto.QuorumCertToProto(qc))
+	}
+}
+
+func (hs *HotStuff) handlePropose(block *data.Block) {
+	p, err := hs.OnReceiveProposal(block)
+	if err != nil {
+		logger.Println("OnReceiveProposal returned with error:", err)
+		return
+	}
+	leaderID := hs.pacemaker.GetLeader(block.Height)
+	if hs.Config.ID == leaderID {
+		hs.OnReceiveVote(p)
+	} else if leader, ok := hs.nodes[leaderID]; ok {
+		leader.Vote(proto.PartialCertToProto(p))
 	}
 }
 
@@ -272,17 +287,7 @@ func (hs *hotstuffServer) Propose(ctx context.Context, protoB *proto.Block) {
 	}
 	// defaults to 0 if error
 	block.Proposer = id
-	p, err := hs.OnReceiveProposal(block)
-	if err != nil {
-		logger.Println("OnReceiveProposal returned with error:", err)
-		return
-	}
-	leaderID := hs.pacemaker.GetLeader(block.Height)
-	if hs.Config.ID == leaderID {
-		hs.OnReceiveVote(p)
-	} else if leader, ok := hs.nodes[leaderID]; ok {
-		leader.Vote(proto.PartialCertToProto(p))
-	}
+	hs.handlePropose(block)
 }
 
 func (hs *hotstuffServer) Vote(ctx context.Context, cert *proto.PartialCert) {
