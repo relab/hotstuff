@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
@@ -24,7 +23,9 @@ import (
 	"github.com/relab/hotstuff/pacemaker"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
@@ -191,7 +192,7 @@ func main() {
 	}
 	replicaConfig.QuorumSize = len(replicaConfig.Replicas) - (len(replicaConfig.Replicas)-1)/3
 
-	srv := newHotStuffServer(privkey, &conf, replicaConfig)
+	srv := newHotStuffServer(&conf, replicaConfig)
 	err = srv.Start(clientAddress)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to start HotStuff: %v\n", err)
@@ -224,7 +225,6 @@ type cmdID struct {
 type hotstuffServer struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
-	key       *ecdsa.PrivateKey
 	conf      *options
 	gorumsSrv *clientapi.GorumsServer
 	hs        *hotstuff.HotStuff
@@ -238,14 +238,23 @@ type hotstuffServer struct {
 	lastExecTime int64
 }
 
-func newHotStuffServer(key *ecdsa.PrivateKey, conf *options, replicaConfig *config.ReplicaConfig) *hotstuffServer {
+func newHotStuffServer(conf *options, replicaConfig *config.ReplicaConfig) *hotstuffServer {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	serverOpts := []clientapi.ServerOption{}
+	grpcServerOpts := []grpc.ServerOption{}
+
+	if conf.TLS {
+		grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(replicaConfig.Cert)))
+	}
+
+	serverOpts = append(serverOpts, clientapi.WithGRPCServerOptions(grpcServerOpts...))
+
 	srv := &hotstuffServer{
 		ctx:          ctx,
 		cancel:       cancel,
 		conf:         conf,
-		key:          key,
-		gorumsSrv:    clientapi.NewGorumsServer(),
+		gorumsSrv:    clientapi.NewGorumsServer(serverOpts...),
 		finishedCmds: make(map[cmdID]chan struct{}),
 		lastExecTime: time.Now().UnixNano(),
 	}

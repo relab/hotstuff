@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 type options struct {
@@ -35,10 +36,12 @@ type options struct {
 	DataSource  string           `mapstructure:"input"`
 	Benchmark   bool             `mapstructure:"benchmark"`
 	ExitAfter   int              `mapstructure:"exit-after"`
+	TLS         bool
 	Replicas    []struct {
 		ID         config.ReplicaID
 		ClientAddr string `mapstructure:"client-address"`
 		Pubkey     string
+		Cert       string
 	}
 }
 
@@ -67,6 +70,7 @@ func main() {
 	pflag.String("input", "", "Optional file to use for payload data")
 	pflag.Bool("benchmark", false, "If enabled, the latency of each request will be printed to stdout")
 	pflag.Int("exit-after", 0, "Number of seconds after which the program should exit.")
+	pflag.Bool("tls", false, "Enable TLS")
 	pflag.Parse()
 
 	if *help {
@@ -110,6 +114,14 @@ func main() {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to read public key file '%s': %v\n", r.Pubkey, err)
 			os.Exit(1)
+		}
+		if conf.TLS {
+			cert, err := data.ReadCertFile(r.Cert)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to read certificate '%s': %v\n", r.Cert, err)
+				os.Exit(1)
+			}
+			replicaConfig.CertPool.AppendCertsFromPEM(cert)
 		}
 		replicaConfig.Replicas[r.ID] = &config.ReplicaInfo{
 			ID:      r.ID,
@@ -198,10 +210,16 @@ func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hot
 	for _, r := range replicaConfig.Replicas {
 		nodes[r.Address] = uint32(r.ID)
 	}
-	mgr, err := clientapi.NewManager(clientapi.WithNodeMap(nodes), clientapi.WithGrpcDialOptions(
-		grpc.WithInsecure(),
-		grpc.WithBlock(),
-	),
+
+	grpcOpts := []grpc.DialOption{grpc.WithBlock()}
+
+	if conf.TLS {
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(replicaConfig.CertPool, "")))
+	} else {
+		grpcOpts = append(grpcOpts, grpc.WithInsecure())
+	}
+
+	mgr, err := clientapi.NewManager(clientapi.WithNodeMap(nodes), clientapi.WithGrpcDialOptions(grpcOpts...),
 		clientapi.WithDialTimeout(time.Minute),
 	)
 	if err != nil {
