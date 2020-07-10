@@ -24,6 +24,8 @@ import (
 	"github.com/relab/hotstuff/pacemaker"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -290,7 +292,7 @@ func (srv *hotstuffServer) Stop() {
 	srv.hs.Close()
 }
 
-func (srv *hotstuffServer) ExecCommand(_ context.Context, cmd *clientapi.Command, out func(*clientapi.Empty)) {
+func (srv *hotstuffServer) ExecCommand(_ context.Context, cmd *clientapi.Command, out func(*clientapi.Empty, error)) {
 	finished := make(chan struct{})
 	id := cmdID{cmd.ClientID, cmd.SequenceNumber}
 	srv.mut.Lock()
@@ -301,6 +303,7 @@ func (srv *hotstuffServer) ExecCommand(_ context.Context, cmd *clientapi.Command
 	b, err := proto.MarshalOptions{Deterministic: true}.Marshal(cmd)
 	if err != nil {
 		log.Fatalf("Failed to marshal command: %v", err)
+		out(nil, status.Errorf(codes.InvalidArgument, "Failed to marshal command: %v", err))
 	}
 	srv.hs.AddCommand(data.Command(b))
 
@@ -312,7 +315,7 @@ func (srv *hotstuffServer) ExecCommand(_ context.Context, cmd *clientapi.Command
 		srv.mut.Unlock()
 
 		// send response
-		out(&clientapi.Empty{})
+		out(&clientapi.Empty{}, nil)
 	}(id, finished)
 }
 

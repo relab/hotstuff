@@ -1038,7 +1038,8 @@ func (s *orderedNodeStream) recvMsgs(ctx context.Context) {
 			s.reconnectStream(ctx)
 		} else {
 			s.streamMut.RUnlock()
-			s.putResult(resp.metadata.MessageID, &orderingResult{nid: s.node.ID(), reply: resp.message, err: nil})
+			err := status.FromProto(resp.metadata.GetStatus()).Err()
+			s.putResult(resp.metadata.MessageID, &orderingResult{nid: s.node.ID(), reply: resp.message, err: err})
 		}
 
 		select {
@@ -1096,6 +1097,16 @@ func newOrderingServer(opts *serverOptions) *orderingServer {
 		opts:     opts,
 	}
 	return s
+}
+
+// wrapMessage wraps the metadata, response and error status in a gorumsMessage
+func wrapMessage(md *ordering.Metadata, resp protoreflect.ProtoMessage, err error) *gorumsMessage {
+	errStatus, ok := status.FromError(err)
+	if !ok {
+		errStatus = status.New(codes.Unknown, err.Error())
+	}
+	md.Status = errStatus.Proto()
+	return &gorumsMessage{metadata: md, message: resp}
 }
 
 // NodeStream handles a connection to a single client. The stream is aborted if there
@@ -1338,16 +1349,16 @@ type QuorumSpec interface {
 
 // HotStuffSMR is the server-side API for the HotStuffSMR Service
 type HotStuffSMR interface {
-	ExecCommand(context.Context, *Command, func(*Empty))
+	ExecCommand(context.Context, *Command, func(*Empty, error))
 }
 
 func (s *GorumsServer) RegisterHotStuffSMRServer(srv HotStuffSMR) {
 	s.srv.handlers[execCommandMethodID] = func(ctx context.Context, in *gorumsMessage, finished chan<- *gorumsMessage) {
 		req := in.message.(*Command)
 		once := new(sync.Once)
-		f := func(resp *Empty) {
+		f := func(resp *Empty, err error) {
 			once.Do(func() {
-				finished <- &gorumsMessage{metadata: in.metadata, message: resp}
+				finished <- wrapMessage(in.metadata, resp, err)
 			})
 		}
 		srv.ExecCommand(ctx, req, f)

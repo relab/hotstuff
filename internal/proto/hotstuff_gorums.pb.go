@@ -1039,7 +1039,8 @@ func (s *orderedNodeStream) recvMsgs(ctx context.Context) {
 			s.reconnectStream(ctx)
 		} else {
 			s.streamMut.RUnlock()
-			s.putResult(resp.metadata.MessageID, &orderingResult{nid: s.node.ID(), reply: resp.message, err: nil})
+			err := status.FromProto(resp.metadata.GetStatus()).Err()
+			s.putResult(resp.metadata.MessageID, &orderingResult{nid: s.node.ID(), reply: resp.message, err: err})
 		}
 
 		select {
@@ -1097,6 +1098,16 @@ func newOrderingServer(opts *serverOptions) *orderingServer {
 		opts:     opts,
 	}
 	return s
+}
+
+// wrapMessage wraps the metadata, response and error status in a gorumsMessage
+func wrapMessage(md *ordering.Metadata, resp protoreflect.ProtoMessage, err error) *gorumsMessage {
+	errStatus, ok := status.FromError(err)
+	if !ok {
+		errStatus = status.New(codes.Unknown, err.Error())
+	}
+	md.Status = errStatus.Proto()
+	return &gorumsMessage{metadata: md, message: resp}
 }
 
 // NodeStream handles a connection to a single client. The stream is aborted if there
