@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -104,7 +105,7 @@ func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
 			panic(fmt.Errorf("Could not sign proof for replica %d: %w", nid, err))
 		}
 		md := metadata.MD{}
-		md.Append("proof", string(R.Bytes()), string(S.Bytes()))
+		md.Append("proof", base64.StdEncoding.EncodeToString(R.Bytes()), base64.StdEncoding.EncodeToString(S.Bytes()))
 		return md
 	}
 
@@ -161,7 +162,7 @@ func (hs *HotStuff) startServer(port string) error {
 
 	serverOpts = append(serverOpts, proto.WithGRPCServerOptions(grpcServerOpts...))
 
-	hs.server = &hotstuffServer{HotStuff: hs, GorumsServer: proto.NewGorumsServer(serverOpts...)}
+	hs.server = newHotStuffServer(hs, proto.NewGorumsServer(serverOpts...))
 	hs.server.RegisterHotstuffServer(hs.server)
 
 	go hs.server.Serve(lis)
@@ -217,6 +218,15 @@ type hotstuffServer struct {
 	clients map[context.Context]config.ReplicaID
 }
 
+func newHotStuffServer(hs *HotStuff, srv *proto.GorumsServer) *hotstuffServer {
+	hsSrv := &hotstuffServer{
+		HotStuff:     hs,
+		GorumsServer: srv,
+		clients:      make(map[context.Context]config.ReplicaID),
+	}
+	return hsSrv
+}
+
 func (hs *hotstuffServer) getClientID(ctx context.Context) (config.ReplicaID, error) {
 	hs.mut.RLock()
 	// fast path for known stream
@@ -258,12 +268,20 @@ func (hs *hotstuffServer) getClientID(ctx context.Context) (config.ReplicaID, er
 
 	v = md.Get("proof")
 	if len(v) < 2 {
-		return 0, fmt.Errorf("No proof found")
+		return 0, fmt.Errorf("getClientID: No proof found")
 	}
 
 	var R, S big.Int
-	R.SetBytes([]byte(v[0]))
-	S.SetBytes([]byte(v[1]))
+	v0, err := base64.StdEncoding.DecodeString(v[0])
+	if err != nil {
+		return 0, fmt.Errorf("getClientID: could not decode proof: %v", err)
+	}
+	v1, err := base64.StdEncoding.DecodeString(v[1])
+	if err != nil {
+		return 0, fmt.Errorf("getClientID: could not decode proof: %v", err)
+	}
+	R.SetBytes(v0)
+	S.SetBytes(v1)
 
 	var b [4]byte
 	binary.LittleEndian.PutUint32(b[:], uint32(hs.Config.ID))

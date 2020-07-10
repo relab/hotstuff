@@ -1,4 +1,4 @@
-pacemaker = "round-robin"
+pacemaker = "fixed"
 leader-id = 1
 view-change = 1
 leader-schedule = [1, 2, 3, 4]
