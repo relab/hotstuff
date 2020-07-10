@@ -3,6 +3,7 @@ module github.com/relab/hotstuff
 go 1.13
 
 require (
+	github.com/felixge/fgprof v0.9.0
 	github.com/golang/protobuf v1.4.2
 	github.com/google/gofuzz v1.1.0
 	github.com/relab/gorums v0.2.0

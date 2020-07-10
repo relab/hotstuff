@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/felixge/fgprof"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/clientapi"
 	"github.com/relab/hotstuff/config"
@@ -74,6 +75,7 @@ func main() {
 	configFile := pflag.String("config", "", "The path to the config file")
 	cpuprofile := pflag.String("cpuprofile", "", "File to write CPU profile to")
 	memprofile := pflag.String("memprofile", "", "File to write memory profile to")
+	fullprofile := pflag.String("fullprofile", "", "File to write fgprof profile to")
 	pflag.Uint32("self-id", 0, "The id for this replica.")
 	pflag.Int("view-change", 100, "How many views before leader change with round-robin pacemaker")
 	pflag.Int("batch-size", 100, "How many commands are batched together for each proposal")
@@ -101,6 +103,22 @@ func main() {
 			log.Fatal("Could not start CPU profile: ", err)
 		}
 		defer pprof.StopCPUProfile()
+	}
+
+	if *fullprofile != "" {
+		f, err := os.Create(*fullprofile)
+		if err != nil {
+			log.Fatal("Could not create fgprof profile: ", err)
+		}
+		defer f.Close()
+		stop := fgprof.Start(f, fgprof.FormatPprof)
+
+		defer func() {
+			err := stop()
+			if err != nil {
+				log.Fatal("Could not write fgprof profile: ", err)
+			}
+		}()
 	}
 
 	viper.BindPFlags(pflag.CommandLine)
