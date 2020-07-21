@@ -26,6 +26,9 @@ import (
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type options struct {
@@ -68,7 +71,7 @@ func main() {
 	pflag.Int("payload-size", 0, "The size of the payload in bytes")
 	pflag.Uint64("max-inflight", 10000, "The maximum number of messages that the client can wait for at once")
 	pflag.String("input", "", "Optional file to use for payload data")
-	pflag.Bool("benchmark", false, "If enabled, the latency of each request will be printed to stdout")
+	pflag.Bool("benchmark", false, "If enabled, a BenchmarkData protobuf will be written to stdout.")
 	pflag.Int("exit-after", 0, "Number of seconds after which the program should exit.")
 	pflag.Bool("tls", false, "Enable TLS")
 	pflag.Parse()
@@ -158,16 +161,29 @@ func main() {
 	}
 	client.Close()
 
-	if conf.Benchmark {
-		stats := client.GetStats()
-		throughput := stats.Throughput / 1000
-		latency := stats.LatencyAvg / float64(time.Millisecond)
-		latencySD := math.Sqrt(stats.LatencyVar) / float64(time.Millisecond)
-		fmt.Printf("Throughput (Kops/sec): %.2f, Latency (ms): %.2f, Latency Std.dev (ms): %.2f\n",
+	stats := client.GetStats()
+	throughput := stats.Throughput
+	latency := stats.LatencyAvg / float64(time.Millisecond)
+	latencySD := math.Sqrt(stats.LatencyVar) / float64(time.Millisecond)
+
+	if !conf.Benchmark {
+		fmt.Printf("Throughput (ops/sec): %.2f, Latency (ms): %.2f, Latency Std.dev (ms): %.2f\n",
 			throughput,
 			latency,
 			latencySD,
 		)
+	} else {
+		client.data.MeasuredThroughput = throughput
+		client.data.MeasuredLatency = latency
+		client.data.LatencyVariance = math.Pow(latencySD, 2) // variance in ms^2
+		b, err := proto.Marshal(client.data)
+		if err != nil {
+			log.Fatalf("Could not marshal benchmarkdata: %v\n", err)
+		}
+		_, err = os.Stdout.Write(b)
+		if err != nil {
+			log.Fatalf("Could not write data: %v\n", err)
+		}
 	}
 
 	if *memprofile != "" {
@@ -202,7 +218,8 @@ type hotstuffClient struct {
 	replicaConfig *config.ReplicaConfig
 	gorumsConfig  *client.Configuration
 	wg            sync.WaitGroup
-	stats         benchmark.Stats
+	stats         benchmark.Stats       // records latency and throughput
+	data          *client.BenchmarkData // stores time and duration for each command
 }
 
 func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hotstuffClient, error) {
@@ -248,6 +265,7 @@ func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hot
 		mgr:           mgr,
 		replicaConfig: replicaConfig,
 		gorumsConfig:  gorumsConf,
+		data:          &client.BenchmarkData{},
 	}, nil
 }
 
@@ -298,8 +316,13 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 						log.Printf("Did not get enough signatures for command: %v\n", err)
 					}
 				}
+				duration := time.Since(sendTime)
+				c.stats.AddLatency(duration)
 				if c.conf.Benchmark {
-					c.stats.AddLatency(time.Since(sendTime))
+					c.data.Stats = append(c.data.Stats, &client.CommandStats{
+						StartTime: timestamppb.New(sendTime),
+						Duration:  durationpb.New(duration),
+					})
 				}
 				c.wg.Done()
 			}(promise, now)

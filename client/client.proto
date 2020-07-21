@@ -3,6 +3,8 @@ syntax = "proto3";
 package client;
 
 import "gorums.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
 
 option go_package = "github.com/relab/hotstuff/client";
 
@@ -17,6 +19,8 @@ service Client {
   }
 }
 
+// Command is the request that is sent to the HotStuff replicas with the data to
+// be executed.
 message Command {
   uint32 ClientID = 1;
   uint64 SequenceNumber = 2;
@@ -24,3 +28,20 @@ message Command {
 }
 
 message Empty {}
+
+// CommandStats contains the start time and duration that elapsed before a
+// command was executed.
+message CommandStats {
+  google.protobuf.Timestamp StartTime = 1;
+  google.protobuf.Duration Duration = 2;
+}
+
+// BenchmarkData contains the throughput (in ops/sec) and latency (in ms) as
+// measured by the client, as well as the time and duration information for each
+// command.
+message BenchmarkData {
+  double MeasuredThroughput = 1; // ops/sec
+  double MeasuredLatency = 2;    // ms
+  double LatencyVariance = 3;    // ms^2
+  repeated CommandStats Stats = 4;
+}
