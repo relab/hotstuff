@@ -19,7 +19,7 @@ import (
 
 	"github.com/felixge/fgprof"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/clientapi"
+	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/data"
 	"github.com/relab/hotstuff/pacemaker"
@@ -258,7 +258,7 @@ type hotstuffServer struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	conf      *options
-	gorumsSrv *clientapi.GorumsServer
+	gorumsSrv *client.GorumsServer
 	hs        *hotstuff.HotStuff
 	pm        interface {
 		Run(context.Context)
@@ -273,20 +273,20 @@ type hotstuffServer struct {
 func newHotStuffServer(conf *options, replicaConfig *config.ReplicaConfig) *hotstuffServer {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	serverOpts := []clientapi.ServerOption{}
+	serverOpts := []client.ServerOption{}
 	grpcServerOpts := []grpc.ServerOption{}
 
 	if conf.TLS {
 		grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(replicaConfig.Cert)))
 	}
 
-	serverOpts = append(serverOpts, clientapi.WithGRPCServerOptions(grpcServerOpts...))
+	serverOpts = append(serverOpts, client.WithGRPCServerOptions(grpcServerOpts...))
 
 	srv := &hotstuffServer{
 		ctx:          ctx,
 		cancel:       cancel,
 		conf:         conf,
-		gorumsSrv:    clientapi.NewGorumsServer(serverOpts...),
+		gorumsSrv:    client.NewGorumsServer(serverOpts...),
 		finishedCmds: make(map[cmdID]chan struct{}),
 		lastExecTime: time.Now().UnixNano(),
 	}
@@ -305,7 +305,7 @@ func newHotStuffServer(conf *options, replicaConfig *config.ReplicaConfig) *hots
 	srv.hs = hotstuff.New(replicaConfig, pm, conf.TLS, time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
 	srv.pm = pm.(interface{ Run(context.Context) })
 	// Use a custom server instead of the gorums one
-	srv.gorumsSrv.RegisterHotStuffSMRServer(srv)
+	srv.gorumsSrv.RegisterClientServer(srv)
 	return srv
 }
 
@@ -333,7 +333,7 @@ func (srv *hotstuffServer) Stop() {
 	srv.hs.Close()
 }
 
-func (srv *hotstuffServer) ExecCommand(_ context.Context, cmd *clientapi.Command, out func(*clientapi.Empty, error)) {
+func (srv *hotstuffServer) ExecCommand(_ context.Context, cmd *client.Command, out func(*client.Empty, error)) {
 	finished := make(chan struct{})
 	id := cmdID{cmd.ClientID, cmd.SequenceNumber}
 	srv.mut.Lock()
@@ -356,7 +356,7 @@ func (srv *hotstuffServer) ExecCommand(_ context.Context, cmd *clientapi.Command
 		srv.mut.Unlock()
 
 		// send response
-		out(&clientapi.Empty{}, nil)
+		out(&client.Empty{}, nil)
 	}(id, finished)
 }
 
@@ -369,7 +369,7 @@ func (srv *hotstuffServer) onExec() {
 		}
 
 		for _, cmd := range cmds {
-			m := new(clientapi.Command)
+			m := new(client.Command)
 			err := proto.Unmarshal([]byte(cmd), m)
 			if err != nil {
 				log.Printf("Failed to unmarshal command: %v\n", err)

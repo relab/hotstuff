@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/relab/gorums/benchmark"
-	"github.com/relab/hotstuff/clientapi"
+	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/data"
 	"github.com/spf13/pflag"
@@ -187,20 +187,20 @@ type qspec struct {
 	faulty int
 }
 
-func (q *qspec) ExecCommandQF(_ *clientapi.Command, signatures map[uint32]*clientapi.Empty) (*clientapi.Empty, bool) {
+func (q *qspec) ExecCommandQF(_ *client.Command, signatures map[uint32]*client.Empty) (*client.Empty, bool) {
 	if len(signatures) < q.faulty+1 {
 		return nil, false
 	}
-	return &clientapi.Empty{}, true
+	return &client.Empty{}, true
 }
 
 type hotstuffClient struct {
 	inflight      uint64
 	reader        io.ReadCloser
 	conf          *options
-	mgr           *clientapi.Manager
+	mgr           *client.Manager
 	replicaConfig *config.ReplicaConfig
-	gorumsConfig  *clientapi.Configuration
+	gorumsConfig  *client.Configuration
 	wg            sync.WaitGroup
 	stats         benchmark.Stats
 }
@@ -219,8 +219,8 @@ func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hot
 		grpcOpts = append(grpcOpts, grpc.WithInsecure())
 	}
 
-	mgr, err := clientapi.NewManager(clientapi.WithNodeMap(nodes), clientapi.WithGrpcDialOptions(grpcOpts...),
-		clientapi.WithDialTimeout(time.Minute),
+	mgr, err := client.NewManager(client.WithNodeMap(nodes), client.WithGrpcDialOptions(grpcOpts...),
+		client.WithDialTimeout(time.Minute),
 	)
 	if err != nil {
 		return nil, err
@@ -279,7 +279,7 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			cmd := &clientapi.Command{
+			cmd := &client.Command{
 				ClientID:       uint32(c.conf.SelfID),
 				SequenceNumber: num,
 				Data:           data[:n],
@@ -289,11 +289,11 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 			num++
 
 			c.wg.Add(1)
-			go func(promise *clientapi.FutureEmpty, sendTime time.Time) {
+			go func(promise *client.FutureEmpty, sendTime time.Time) {
 				_, err := promise.Get()
 				atomic.AddUint64(&c.inflight, ^uint64(0))
 				if err != nil {
-					qcError, ok := err.(clientapi.QuorumCallError)
+					qcError, ok := err.(client.QuorumCallError)
 					if !ok || qcError.Reason != context.Canceled.Error() {
 						log.Printf("Did not get enough signatures for command: %v\n", err)
 					}

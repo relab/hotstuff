@@ -1,13 +1,13 @@
 syntax = "proto3";
 
-package clientapi;
+package client;
 
 import "gorums.proto";
 
-option go_package = "github.com/relab/hotstuff/clientapi";
+option go_package = "github.com/relab/hotstuff/client";
 
-// HotStuffSMR is the client-facing API to hotstuff
-service HotStuffSMR {
+// Client is the client-facing API to HotStuff
+service Client {
   // ExecCommand sends a command to all replicas and waits for valid signatures
   // from f+1 replicas
   rpc ExecCommand(Command) returns (Empty) {
