@@ -110,7 +110,7 @@ if [ -n "$keygen" ]; then
 		make
 	fi
 	mkdir -p "$keypath"
-	cmd/hotstuffkeygen/hotstuffkeygen -p \*.key -n ${#ips[@]} -h "$hosts" --tls="$tls" "$dest/$keypath"
+	cmd/hotstuffkeygen/hotstuffkeygen -p \* -n ${#ips[@]} -h "$hosts" --tls="$tls" "$dest/$keypath"
 fi
 
 # create main config file

@@ -1,0 +1,42 @@
+---
+- hosts: clients:replicas
+  tasks:
+    - name: "Pull docker image"
+      docker_image:
+        name: raytar/hotstuff
+        source: pull
+    - name: "Create data volume"
+      docker_volume:
+        name: "{{inventory_hostname}}_hotstuff-data"
+        state: present
+        recreate: never
+    - name: "Create tmp dir for data"
+      file:
+        path: /tmp/hotstuff-config/
+        state: directory
+    - name: "Upload main config"
+      copy:
+        src: "{{ config_path }}/hotstuff.toml"
+        dest: /tmp/hotstuff-config/
+    - name: "Upload public keys"
+      copy:
+        src: "{{item}}"
+        dest: /tmp/hotstuff-config/
+        mode: 0644
+      with_fileglob:
+        - "{{config_path}}/*.{key.pub,crt}"
+
+- hosts: replicas
+  vars:
+    replica_id: "{{ inventory_hostname | regex_replace('[^0-9]', '') }}"
+  tasks:
+    - name: "Upload private key"
+      copy:
+        src: "{{config_path}}/{{replica_id}}.key"
+        dest: /tmp/hotstuff-config/
+        mode: 0600
+
+- hosts: clients:replicas
+  tasks:
+    - name: "Copy into volume"
+      shell: docker cp /tmp/hotstuff-config/ {{inventory_hostname}}_hotstuff-data:/

@@ -1,0 +1,72 @@
+---
+- hosts: clients
+  gather_facts: no
+  vars:
+    rate: 10000
+    time: 60
+    payload: 0
+    maxinflight: 2500
+    client_id: "{{ inventory_hostname | regex_replace('[^0-9]', '') }}"
+  tasks:
+    - name: "Start clients"
+      shell: >
+        docker exec
+        --rm
+        --mount source={{inventory_hostname}}_hotstuff-data,target=/data
+        -w /data
+        -it raytar/hotstuff
+        hotstuffclient 
+        --tls
+        --self-id {{client_id}}
+        --rate-limit {{rate}}
+        --exit-after {{time}}
+        --payload-size {{payload}}
+        --max-inflight {{maxinflight}}
+      async: 10000
+      poll: 0
+      register: clients
+
+- hosts: replicas
+  gather_facts: no
+  vars:
+    batch_size: 100
+    view_change: 100
+  tasks:
+    - name: Start servers
+      shell: >
+        docker exec
+        --name {{inventory_hostname}}_hotstuff-server
+        --rm
+        --mount source={{inventory_hostname}}_hotstuff-data,target=/data
+        -w /data
+        -it raytar/hotstuff
+        hotstuffserver
+        --tls
+        --config self-config.toml
+        --batch-size {{batch_size}}
+        --view-change {{view_change}}
+      async: 10000
+      poll: 0
+      register: replicas
+
+- hosts: clients
+  gather_facts: no
+  tasks:
+    - name: "Wait for clients to exit"
+      async_status:
+        jid: "{{clients.ansible_job_id}}"
+      register: clients_result
+      until: clients_result.finished
+      retries: 30
+
+- hosts: replicas
+  gather_facts: no
+  tasks:
+    - name: "Stop servers"
+      shell: docker stop -t 3 {{inventory_hostname}}_hotstuff-server
+
+- hosts: clients
+  gather_facts: no
+  tasks:
+    - name: "Print results"
+      debug: msg={{ clients.stdout_lines | join('\n') }}
