@@ -24,7 +24,14 @@
         dest: /tmp/hotstuff-config/
         mode: 0644
       with_fileglob:
-        - "{{config_path}}/*.{key.pub,crt}"
+        - "{{config_path}}/*.key.pub"
+    - name: "Upload TLS certificates"
+      copy:
+        src: "{{item}}"
+        dest: /tmp/hotstuff-config/
+        mode: 0644
+      with_fileglob:
+        - "{{config_path}}/*.crt"
 
 - hosts: replicas
   vars:
@@ -39,4 +46,7 @@
 - hosts: clients:replicas
   tasks:
     - name: "Copy into volume"
-      shell: docker run --rm -v /tmp/hotstuff-config:/src -v {{inventory_hostname}}_hotstuff-data:/data busybox cp -r /src/ /data/
+      shell: |
+        docker container create --name {{inventory_hostname}}_hotstuff-temp -v {{inventory_hostname}}_hotstuff-data:/data hello-world
+        docker cp /tmp/hotstuff-config/. {{inventory_hostname}}_hotstuff-temp:/data
+        docker rm {{inventory_hostname}}_hotstuff-temp
