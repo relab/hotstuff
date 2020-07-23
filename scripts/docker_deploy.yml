@@ -39,4 +39,4 @@
 - hosts: clients:replicas
   tasks:
     - name: "Copy into volume"
-      shell: docker cp /tmp/hotstuff-config/ {{inventory_hostname}}_hotstuff-data:/
+      shell: docker run --rm -v /tmp/hotstuff-config:/src -v {{inventory_hostname}}_hotstuff-data:/data busybox cp -r /src/ /data/
