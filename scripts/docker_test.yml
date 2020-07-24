@@ -10,11 +10,12 @@
   tasks:
     - name: "Start clients"
       shell: >
-        docker exec
+        docker run 
         --rm
-        --mount source={{inventory_hostname}}_hotstuff-data,target=/data
+        --network hotstuff_network
+        -v {{inventory_hostname}}_hotstuff-data:/data
         -w /data
-        -it raytar/hotstuff
+        raytar/hotstuff
         hotstuffclient 
         --tls
         --self-id {{client_id}}
@@ -31,15 +32,19 @@
   vars:
     batch_size: 100
     view_change: 100
+    client_port: 20000
+    peer_port: 10000
   tasks:
     - name: Start servers
       shell: >
-        docker exec
+        docker run
         --name {{inventory_hostname}}_hotstuff-server
         --rm
-        --mount source={{inventory_hostname}}_hotstuff-data,target=/data
+        -p {{client_port}}:{{client_port}}
+        -p {{peer_port}}:{{peer_port}}
+        -v {{inventory_hostname}}_hotstuff-data:/data
         -w /data
-        -it raytar/hotstuff
+        raytar/hotstuff
         hotstuffserver
         --tls
         --config self-config.toml
