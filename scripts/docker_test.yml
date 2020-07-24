@@ -12,7 +12,6 @@
       shell: >
         docker run 
         --rm
-        --network hotstuff_network
         -v {{inventory_hostname}}_hotstuff-data:/data
         -w /data
         raytar/hotstuff
