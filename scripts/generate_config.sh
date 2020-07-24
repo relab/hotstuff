@@ -32,6 +32,7 @@ id = $2
 peer-address = "$3:$peer_port"
 client-address = "$3:$client_port"
 pubkey = "$keypath/$2.key.pub"
+cert = "$keypath/$2.crt"
 
 EOF
 }
