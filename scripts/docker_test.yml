@@ -14,6 +14,7 @@
         --rm
         -v {{inventory_hostname}}_hotstuff-data:/data
         -w /data
+        --network host
         raytar/hotstuff
         hotstuffclient 
         --tls
@@ -43,10 +44,11 @@
         -p {{peer_port}}:{{peer_port}}
         -v {{inventory_hostname}}_hotstuff-data:/data
         -w /data
+        --network host
         raytar/hotstuff
         hotstuffserver
         --tls
-        --config self-config.toml
+        --config self_config.toml
         --batch-size {{batch_size}}
         --view-change {{view_change}}
       async: 10000
@@ -73,4 +75,4 @@
   gather_facts: no
   tasks:
     - name: "Print results"
-      debug: msg={{ clients.stdout_lines | join('\n') }}
+      debug: msg={{ clients_result.stdout_lines | join('\n') }}

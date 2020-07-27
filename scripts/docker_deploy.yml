@@ -5,6 +5,7 @@
       docker_image:
         name: raytar/hotstuff
         source: pull
+        force_source: yes
     - name: "Create data volume"
       docker_volume:
         name: "{{inventory_hostname}}_hotstuff-data"
@@ -42,6 +43,11 @@
         src: "{{config_path}}/{{replica_id}}.key"
         dest: /tmp/hotstuff-config/
         mode: 0600
+    - name: "Upload self config"
+      copy:
+        src: "{{config_path}}/hotstuff_{{replica_id}}.toml"
+        dest: "/tmp/hotstuff-config/self_config.toml"
+        mode: 0644
 
 - hosts: clients:replicas
   tasks:
