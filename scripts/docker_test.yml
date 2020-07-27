@@ -15,6 +15,7 @@
         -v {{inventory_hostname}}_hotstuff-data:/data
         -w /data
         --network host
+        --cap-add NET_ADMIN
         raytar/hotstuff
         hotstuffclient 
         --tls
@@ -45,6 +46,7 @@
         -v {{inventory_hostname}}_hotstuff-data:/data
         -w /data
         --network host
+        --cap-add NET_ADMIN
         raytar/hotstuff
         hotstuffserver
         --tls
