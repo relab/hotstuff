@@ -171,6 +171,13 @@ func main() {
 
 	var cert *tls.Certificate
 	if conf.TLS {
+		if conf.Cert == "" {
+			for _, replica := range conf.Replicas {
+				if replica.ID == conf.SelfID {
+					conf.Cert = replica.Cert
+				}
+			}
+		}
 		certB, err := data.ReadCertFile(conf.Cert)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to read certificate: %v\n", err)

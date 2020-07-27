@@ -29,10 +29,10 @@ if [[ "$1" == "record" ]]; then
 	exit 0
 fi
 
-$bin --self-id 1 --privkey keys/r1.key --cert keys/r1.crt --cpuprofile cpuprofile.out --memprofile memprofile.out "$@" > 1.out &
-$bin --self-id 2 --privkey keys/r2.key --cert keys/r2.crt "$@" > 2.out &
-$bin --self-id 3 --privkey keys/r3.key --cert keys/r3.crt "$@" > 3.out &
-$bin --self-id 4 --privkey keys/r4.key --cert keys/r4.crt "$@" > 4.out &
+$bin --self-id 1 --privkey keys/r1.key --cpuprofile cpuprofile.out --memprofile memprofile.out "$@" > 1.out &
+$bin --self-id 2 --privkey keys/r2.key "$@" > 2.out &
+$bin --self-id 3 --privkey keys/r3.key "$@" > 3.out &
+$bin --self-id 4 --privkey keys/r4.key "$@" > 4.out &
 
 if [ "$1" = "kill" ]; then
 	sleep 5s
