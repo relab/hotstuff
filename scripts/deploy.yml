@@ -2,15 +2,9 @@
 - hosts: clients:replicas
   tasks:
     - name: "Pull docker image"
-      docker_image:
-        name: raytar/hotstuff
-        source: pull
-        force_source: yes
+      shell: docker pull raytar/hotstuff:latest
     - name: "Create data volume"
-      docker_volume:
-        name: "{{inventory_hostname}}_hotstuff-data"
-        state: present
-        recreate: never
+      shell: docker volume create "{{inventory_hostname}}_hotstuff-data"
     - name: "Create tmp dir for data"
       tempfile:
         state: directory
