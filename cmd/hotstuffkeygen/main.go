@@ -24,6 +24,7 @@ func usage() {
 func main() {
 	pflag.Usage = usage
 	var (
+		startID    = pflag.IntP("start-id", "i", 1, "The ID of the first replica.")
 		tls        = pflag.Bool("tls", false, "Generate self-signed TLS certificates. (Must also specify hosts)")
 		keyPattern = pflag.StringP("pattern", "p", defaultPattern, "Pattern for key file naming. '*' will be replaced by a number.")
 		numKeys    = pflag.IntP("num", "n", 1, "Number of keys to generate")
@@ -53,13 +54,13 @@ func main() {
 		logger.Fatalf("You must specify one host or IP for each certificate to generate.")
 	}
 
-	for i := 1; i <= *numKeys; i++ {
+	for i := 0; i < *numKeys; i++ {
 		pk, err := data.GeneratePrivateKey()
 		if err != nil {
 			logger.Fatalf("Failed to generate key: %v\n", err)
 		}
 
-		basePath := filepath.Join(dest, strings.ReplaceAll(*keyPattern, "*", fmt.Sprintf("%d", i)))
+		basePath := filepath.Join(dest, strings.ReplaceAll(*keyPattern, "*", fmt.Sprintf("%d", *startID+i)))
 		certPath := basePath + ".crt"
 		privKeyPath := basePath + ".key"
 		pubKeyPath := privKeyPath + ".pub"
@@ -69,7 +70,7 @@ func main() {
 			if len(*hosts) == 1 {
 				host = (*hosts)[0]
 			} else {
-				host = (*hosts)[i-1]
+				host = (*hosts)[i]
 			}
 			cert, err := data.GenerateTLSCert([]string{host}, pk)
 			if err != nil {

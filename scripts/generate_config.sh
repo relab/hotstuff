@@ -9,11 +9,13 @@ keypath="."
 dest="."
 keygen=""
 tls="false"
+start_id="1"
 
 usage() {
 	echo "Usage: $0 [options] [destination]"
 	echo
 	echo "Options:"
+	echo "	--start-id <number>             : The id of the first replica"
 	echo "	--pacemaker <fixed|round-robin> : Specify the type of pacemaker"
 	echo "	--ips                           : Comma separated list of IP addresses to use"
 	echo "	--client-port <port>            : The port that clients should use to connect to servers"
@@ -87,6 +89,10 @@ while [ $# -gt 0 ]; do
 			tls="true"
 			shift
 			;;
+		--start-id)
+			start_id="$2"
+			shift 2
+			;;
 		--*)
 			echo "Unknown option '$1'."
 			exit 1
@@ -113,7 +119,7 @@ if [ -n "$keygen" ]; then
 		make
 	fi
 	mkdir -p "$keypath"
-	cmd/hotstuffkeygen/hotstuffkeygen -p \* -n ${#ips[@]} -h "$hosts" --tls="$tls" "$dest/$keypath"
+	cmd/hotstuffkeygen/hotstuffkeygen -i "$start_id" -p \* -n ${#ips[@]} -h "$hosts" --tls="$tls" "$dest/$keypath"
 fi
 
 # create main config file
@@ -123,7 +129,7 @@ file="$dest/hotstuff.toml"
 echo -e "pacemaker = \"$pacemaker\"" >> "$file"
 
 if [ "$pacemaker" = "fixed" ]; then
-	echo "leader-id = 1" >> "$file"
+	echo "leader-id = $start_id" >> "$file"
 elif [ "$pacemaker" = "round-robin" ]; then
 	echo "view-change = 100" >> "$file"
 	echo -n "leader-schedule = [" >> "$file"
@@ -136,6 +142,7 @@ fi
 echo >> "$file"
 
 for i in "${!ips[@]}"; do
-	write_replica "$file" "$((i+1))" "${ips[$i]}"
-	write_replica_config "$dest/hotstuff_$((i+1)).toml" "$((i+1))" "$client_port" "$peer_port"
+	id="$((i+start_id))"
+	write_replica "$file" "$id" "${ips[$i]}"
+	write_replica_config "$dest/hotstuff_$id.toml" "$id" "$client_port" "$peer_port"
 done
