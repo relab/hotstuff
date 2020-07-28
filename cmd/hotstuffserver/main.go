@@ -44,6 +44,8 @@ type options struct {
 	BatchSize       int                `mapstructure:"batch-size"`
 	PrintThroughput bool               `mapstructure:"print-throughput"`
 	PrintCommands   bool               `mapstructure:"print-commands"`
+	ClientAddr      string             `mapstructure:"client-listen"`
+	PeerAddr        string             `mapstructure:"peer-listen"`
 	TLS             bool
 	Interval        int
 	Output          string
@@ -88,6 +90,8 @@ func main() {
 	pflag.Bool("print-throughput", false, "Throughput measurements will be printed stdout")
 	pflag.Int("interval", 1000, "Throughput measurement interval in milliseconds")
 	pflag.Bool("tls", false, "Enable TLS")
+	pflag.String("client-listen", "", "Override the listen address for the client server")
+	pflag.String("peer-listen", "", "Override the listen address for the replica (peer) server")
 	pflag.Parse()
 
 	if *help {
@@ -220,14 +224,25 @@ func main() {
 			}
 		}
 
-		replicaConfig.Replicas[r.ID] = &config.ReplicaInfo{
+		info := &config.ReplicaInfo{
 			ID:      r.ID,
 			Address: r.PeerAddr,
 			PubKey:  key,
 		}
+
 		if r.ID == conf.SelfID {
-			clientAddress = r.ClientAddr
+			// override own addresses if set
+			if conf.ClientAddr != "" {
+				clientAddress = conf.ClientAddr
+			} else {
+				clientAddress = r.ClientAddr
+			}
+			if conf.PeerAddr != "" {
+				info.Address = conf.PeerAddr
+			}
 		}
+
+		replicaConfig.Replicas[r.ID] = info
 	}
 	replicaConfig.QuorumSize = len(replicaConfig.Replicas) - (len(replicaConfig.Replicas)-1)/3
 

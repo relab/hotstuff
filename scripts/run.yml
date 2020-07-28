@@ -15,7 +15,6 @@
         --rm
         -v {{inventory_hostname}}_hotstuff-data:/data
         -w /data
-        --network host
         --cap-add NET_ADMIN
         raytar/hotstuff
         /bin/sh -c
@@ -52,7 +51,6 @@
         -p {{peer_port}}:{{peer_port}}
         -v {{inventory_hostname}}_hotstuff-data:/data
         -w /data
-        --network host
         --cap-add NET_ADMIN
         raytar/hotstuff
         /bin/sh -c

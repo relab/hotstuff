@@ -41,6 +41,8 @@ write_replica_config() {
 	cat <<EOF > "$1"
 self-id = $2
 privkey = "$keypath/$2.key"
+client-listen = ":$3"
+peer-listen = ":$4"
 
 EOF
 }
@@ -135,5 +137,5 @@ echo >> "$file"
 
 for i in "${!ips[@]}"; do
 	write_replica "$file" "$((i+1))" "${ips[$i]}"
-	write_replica_config "$dest/hotstuff_$((i+1)).toml" "$((i+1))"
+	write_replica_config "$dest/hotstuff_$((i+1)).toml" "$((i+1))" "$client_port" "$peer_port"
 done
