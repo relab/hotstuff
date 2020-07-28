@@ -262,7 +262,6 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 
 	logger.Printf("OnReceiveVote: %.8s\n", cert.BlockHash)
 	hs.emitEvent(Event{Type: ReceiveVote, Replica: cert.Sig.ID, PC: cert})
-
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
 

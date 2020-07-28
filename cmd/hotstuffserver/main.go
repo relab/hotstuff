@@ -299,12 +299,12 @@ func newHotStuffServer(conf *options, replicaConfig *config.ReplicaConfig) *hots
 			conf.ViewChange, conf.Schedule, time.Duration(conf.ViewTimeout)*time.Millisecond,
 		)
 	case "change-faulty":
-		srv.pm = pacemaker.NewChangeFaulty(
-			srv.hs, conf.Schedule, time.Duration(conf.ViewTimeout)*time.Millisecond,
+		pm = pacemaker.NewChangeFaulty(
+			conf.Schedule, time.Duration(conf.ViewTimeout)*time.Millisecond,
 		)
 	case "good-leader":
-		srv.pm = pacemaker.NewGoodLeader(
-			srv.hs, conf.Schedule, time.Duration(conf.ViewTimeout)*time.Millisecond,
+		pm = pacemaker.NewGoodLeader(
+			conf.Schedule, time.Duration(conf.ViewTimeout)*time.Millisecond,
 		)
 	default:
 		fmt.Fprintf(os.Stderr, "Invalid pacemaker type: '%s'\n", conf.PmType)

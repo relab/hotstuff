@@ -201,6 +201,8 @@ func (hs *HotStuff) SendNewView(id config.ReplicaID) {
 	qc := hs.GetQCHigh()
 	if node, ok := hs.nodes[id]; ok {
 		node.NewView(proto.QuorumCertToProto(qc))
+	} else if id == hs.Config.ID { // Send NEW-VIEW message to self.
+		hs.OnReceiveNewView(qc)
 	}
 }
 

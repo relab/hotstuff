@@ -197,12 +197,12 @@ type ChangeFaulty struct {
 	latestVotes            []*data.PartialCert
 }
 
-func NewChangeFaulty(hs *hotstuff.HotStuff, noneFaultyReplicas []config.ReplicaID, timeout time.Duration) *ChangeFaulty {
+func NewChangeFaulty(noneFaultyReplicas []config.ReplicaID, timeout time.Duration) *ChangeFaulty {
 	p := &ChangeFaulty{
-		HotStuff:               hs,
 		timeout:                timeout,
+		resetTimer:             make(chan struct{}),
+		noneFaultyReplicas:     noneFaultyReplicas,
 		isNoneFaultyReplicaMap: make(map[config.ReplicaID]bool),
-		notify:                 make(chan consensus.Event),
 	}
 
 	for _, id := range p.noneFaultyReplicas {
@@ -223,6 +223,10 @@ func (p *ChangeFaulty) Init(hs *hotstuff.HotStuff) {
 
 func (p *ChangeFaulty) isNoneFaulty(id config.ReplicaID) bool {
 	return p.isNoneFaultyReplicaMap[id]
+}
+
+func (p *ChangeFaulty) GetLeader(_ int) config.ReplicaID {
+	return p.noneFaultyReplicas[0]
 }
 
 func (p *ChangeFaulty) getLeader() config.ReplicaID {
@@ -263,12 +267,11 @@ func (p *ChangeFaulty) setFaulty(id config.ReplicaID) {
 
 // Run starts the pacemaker.
 func (p *ChangeFaulty) Run(ctx context.Context) {
-	notify := p.GetEvents()
 	if p.getLeader() == p.Config.ID {
 		go p.Propose()
 	}
-	n := <-notify
 
+	n := <-p.notify
 	lastBeat := 1
 	beat := func() {
 		if p.getLeader() == p.Config.ID && lastBeat < p.GetHeight()+1 &&
@@ -290,6 +293,9 @@ func (p *ChangeFaulty) Run(ctx context.Context) {
 		case consensus.ReceiveProposal: // it would have been nice if some where given regarding who sent the proposal.
 			p.resetTimer <- struct{}{}
 		case consensus.QCFinish:
+			if p.GetVotedHeight() == 100 {
+				return
+			}
 			p.latestVotes = p.latestVotes[:0]
 			if n.QC == nil {
 				p.setFaulty(p.getLeader())
@@ -298,12 +304,10 @@ func (p *ChangeFaulty) Run(ctx context.Context) {
 			beat()
 		case consensus.ReceiveNewView:
 			newViewQuorum++
+			logger.Println(n.Replica)
+			logger.Println(newViewQuorum)
 			if p.getLeader() == p.Config.ID && p.Config.QuorumSize <= newViewQuorum {
 				newViewQuorum = 0
-				beat()
-			} else if p.Config.QuorumSize <= newViewQuorum {
-				newViewQuorum = 0
-				p.setFaulty(p.getLeader())
 				beat()
 			}
 		case consensus.ReceiveVote:
@@ -312,7 +316,7 @@ func (p *ChangeFaulty) Run(ctx context.Context) {
 
 		var ok bool
 		select {
-		case n, ok = <-notify:
+		case n, ok = <-p.notify:
 			if !ok {
 				return
 			}
@@ -367,14 +371,16 @@ type GoodLeader struct {
 	lastTwoLeaders         [2]config.ReplicaID
 	latestReplies          []*data.PartialCert
 	latestNilReplies       []config.ReplicaID
+	notify                 chan consensus.Event
 }
 
-func NewGoodLeader(hs *hotstuff.HotStuff, schedule []config.ReplicaID, timeout time.Duration) *GoodLeader {
+func NewGoodLeader(schedule []config.ReplicaID, timeout time.Duration) *GoodLeader {
 	p := &GoodLeader{
-		HotStuff:   hs,
-		timeout:    timeout,
-		schedule:   schedule,
-		termLength: 1,
+		resetTimer:             make(chan struct{}),
+		timeout:                timeout,
+		schedule:               schedule,
+		termLength:             1,
+		isNoneFaultyReplicaMap: make(map[config.ReplicaID]bool),
 	}
 
 	p.lastTwoLeaders = [2]config.ReplicaID{0, 0}
@@ -384,6 +390,15 @@ func NewGoodLeader(hs *hotstuff.HotStuff, schedule []config.ReplicaID, timeout t
 	}
 
 	return p
+}
+
+func (p *GoodLeader) Init(hs *hotstuff.HotStuff) {
+	p.HotStuff = hs
+	// Hack: We receive a channel to HotStuff at this point instead of in Run(),
+	// which forces processing of proposals to wait until the pacemaker has started.
+	// This avoids the problem of the server handling messages before the Manager
+	// has started.
+	p.notify = hs.GetEvents()
 }
 
 func (p *GoodLeader) getOldLeader() config.ReplicaID {
@@ -416,13 +431,12 @@ func (p *GoodLeader) getBestReplica() config.ReplicaID {
 }
 
 func (p *GoodLeader) Run(ctx context.Context) {
-	notify := p.GetEvents()
 
 	if p.getLeader(1) == p.Config.ID {
 		go p.Propose()
 	}
 
-	n := <-notify
+	n := <-p.notify
 
 	lastBeat := 1
 	beat := func() {
@@ -473,7 +487,7 @@ func (p *GoodLeader) Run(ctx context.Context) {
 
 		var ok bool
 		select {
-		case n, ok = <-notify:
+		case n, ok = <-p.notify:
 			if !ok {
 				return
 			}
