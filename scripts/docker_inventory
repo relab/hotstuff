@@ -1,8 +1,0 @@
-[clients]
-hotstuff_node_5 ansible_connection=docker
-
-[replicas]
-hotstuff_node_1 ansible_connection=docker
-hotstuff_node_2 ansible_connection=docker
-hotstuff_node_3 ansible_connection=docker
-hotstuff_node_4 ansible_connection=docker

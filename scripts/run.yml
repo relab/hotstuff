@@ -7,6 +7,7 @@
     payload: 0
     maxinflight: 2500
     client_id: "{{ inventory_hostname | regex_replace('[^0-9]', '') }}"
+    netem_commands: ''
   tasks:
     - name: "Start clients"
       shell: >
@@ -17,6 +18,10 @@
         --network host
         --cap-add NET_ADMIN
         raytar/hotstuff
+        /bin/sh -c
+        '
+        {{netem_commands}}
+        ;
         hotstuffclient 
         --tls
         --self-id {{client_id}}
@@ -24,6 +29,7 @@
         --exit-after {{time}}
         --payload-size {{payload}}
         --max-inflight {{maxinflight}}
+        '
       async: 10000
       poll: 0
       register: clients
@@ -35,6 +41,7 @@
     view_change: 100
     client_port: 20000
     peer_port: 10000
+    netem_commands: ''
   tasks:
     - name: Start servers
       shell: >
@@ -48,11 +55,16 @@
         --network host
         --cap-add NET_ADMIN
         raytar/hotstuff
+        /bin/sh -c
+        '
+        {{netem_commands}}
+        ;
         hotstuffserver
         --tls
         --config self_config.toml
         --batch-size {{batch_size}}
         --view-change {{view_change}}
+        '
       async: 10000
       poll: 0
       register: replicas

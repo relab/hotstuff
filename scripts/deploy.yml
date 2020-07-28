@@ -1,48 +1,58 @@
 ---
+- hosts: clients:replicas
+  tasks:
+    - name: "Pull docker image"
+      docker_image:
+        name: raytar/hotstuff
+        source: pull
+        force_source: yes
+    - name: "Create data volume"
+      docker_volume:
+        name: "{{inventory_hostname}}_hotstuff-data"
+        state: present
+        recreate: never
+    - name: "Create tmp dir for data"
+      file:
+        path: /tmp/hotstuff-config/
+        state: directory
+    - name: "Upload main config"
+      copy:
+        src: "{{ config_path }}/hotstuff.toml"
+        dest: /tmp/hotstuff-config/
+    - name: "Upload public keys"
+      copy:
+        src: "{{item}}"
+        dest: /tmp/hotstuff-config/
+        mode: 0644
+      with_fileglob:
+        - "{{config_path}}/*.key.pub"
+    - name: "Upload TLS certificates"
+      copy:
+        src: "{{item}}"
+        dest: /tmp/hotstuff-config/
+        mode: 0644
+      with_fileglob:
+        - "{{config_path}}/*.crt"
+
 - hosts: replicas
   vars:
     replica_id: "{{ inventory_hostname | regex_replace('[^0-9]', '') }}"
   tasks:
-    - name: Upload hotstuffserver binary
+    - name: "Upload private key"
       copy:
-        src: ../cmd/hotstuffserver/hotstuffserver
-        dest: $HOME/hotstuffserver
-        mode: 0755
-    - name: Upload config file
+        src: "{{config_path}}/{{replica_id}}.key"
+        dest: /tmp/hotstuff-config/
+        mode: 0600
+    - name: "Upload self config"
       copy:
-        src: "{{ config_path }}/hotstuff_{{ replica_id }}.toml"
-        dest: $HOME/self_config.toml
+        src: "{{config_path}}/hotstuff_{{replica_id}}.toml"
+        dest: "/tmp/hotstuff-config/self_config.toml"
         mode: 0644
-    - name: Upload private key
-      copy:
-        src: "{{ config_path }}/{{ replica_id }}.key"
-        dest: $HOME
-        mode: 0644
-
-- hosts: clients
-  tasks:
-    - name: Upload hotstuffclient binary
-      copy:
-        src: ../cmd/hotstuffclient/hotstuffclient
-        dest: $HOME/hotstuffclient
-        mode: 0755
-    - name: Upload run_clients script
-      copy:
-        src: ./run_multiple_clients.sh
-        dest: $HOME/run_clients.sh
-        mode: 0755
 
 - hosts: clients:replicas
   tasks:
-    - name: Upload hotstuff.toml
-      copy:
-        src: "{{ config_path }}/hotstuff.toml"
-        dest: $HOME/hotstuff.toml
-        mode: 0644
-    - name: Upload public keys
-      copy:
-        src: "{{ item }}"
-        dest: $HOME
-        mode: 0644
-      with_fileglob:
-        - "{{ config_path }}/*.key.pub"
+    - name: "Copy into volume"
+      shell: |
+        docker container create --name {{inventory_hostname}}_hotstuff-temp -v {{inventory_hostname}}_hotstuff-data:/data hello-world
+        docker cp /tmp/hotstuff-config/. {{inventory_hostname}}_hotstuff-temp:/data
+        docker rm {{inventory_hostname}}_hotstuff-temp
