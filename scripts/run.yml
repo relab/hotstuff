@@ -7,11 +7,11 @@
     payload: 0
     maxinflight: 2500
     client_id: "{{ inventory_hostname | regex_replace('[^0-9]', '') }}"
-    netem_commands: ''
+    netem_commands: 'true'
   tasks:
     - name: "Start clients"
       shell: >
-        docker run 
+        docker run
         --rm
         -v {{inventory_hostname}}_hotstuff-data:/data
         -w /data
@@ -21,7 +21,7 @@
         '
         {{netem_commands}}
         ;
-        hotstuffclient 
+        hotstuffclient
         --tls
         --self-id {{client_id}}
         --rate-limit {{rate}}
@@ -40,7 +40,7 @@
     view_change: 100
     client_port: 20000
     peer_port: 10000
-    netem_commands: ''
+    netem_commands: 'true'
   tasks:
     - name: Start servers
       shell: >
@@ -76,15 +76,29 @@
       register: clients_result
       until: clients_result.finished
       retries: 30
+      ignore_errors: yes
 
 - hosts: replicas
   gather_facts: no
   tasks:
     - name: "Stop servers"
       shell: docker stop -t 3 {{inventory_hostname}}_hotstuff-server
+      ignore_errors: yes
 
 - hosts: clients
   gather_facts: no
   tasks:
     - name: "Print results"
       debug: msg={{ clients_result.stdout_lines | join('\n') }}
+
+- hosts: replicas
+  gather_facts: no
+  tasks:
+    - name: Wait for servers to exit"
+      async_status:
+        jid: "{{replicas.ansible_job_id}}"
+      register: replicas_result
+      until: replicas_result.finished
+      retries: 30
+    - name: "Print results"
+      debug: msg={{ replicas_result.stdout_lines | join('\n') }}
