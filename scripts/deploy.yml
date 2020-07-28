@@ -12,24 +12,25 @@
         state: present
         recreate: never
     - name: "Create tmp dir for data"
-      file:
-        path: /tmp/hotstuff-config/
+      tempfile:
         state: directory
+        suffix: hotstuff
+      register: tempdir
     - name: "Upload main config"
       copy:
         src: "{{ config_path }}/hotstuff.toml"
-        dest: /tmp/hotstuff-config/
+        dest: "{{tempdir.path}}/"
     - name: "Upload public keys"
       copy:
         src: "{{item}}"
-        dest: /tmp/hotstuff-config/
+        dest: "{{tempdir.path}}/"
         mode: 0644
       with_fileglob:
         - "{{config_path}}/*.key.pub"
     - name: "Upload TLS certificates"
       copy:
         src: "{{item}}"
-        dest: /tmp/hotstuff-config/
+        dest: "{{tempdir.path}}/"
         mode: 0644
       with_fileglob:
         - "{{config_path}}/*.crt"
@@ -41,12 +42,12 @@
     - name: "Upload private key"
       copy:
         src: "{{config_path}}/{{replica_id}}.key"
-        dest: /tmp/hotstuff-config/
+        dest: "{{tempdir.path}}/"
         mode: 0600
     - name: "Upload self config"
       copy:
         src: "{{config_path}}/hotstuff_{{replica_id}}.toml"
-        dest: "/tmp/hotstuff-config/self_config.toml"
+        dest: "{{tempdir.path}}/self_config.toml"
         mode: 0644
 
 - hosts: clients:replicas
@@ -54,5 +55,9 @@
     - name: "Copy into volume"
       shell: |
         docker container create --name {{inventory_hostname}}_hotstuff-temp -v {{inventory_hostname}}_hotstuff-data:/data hello-world
-        docker cp /tmp/hotstuff-config/. {{inventory_hostname}}_hotstuff-temp:/data
+        docker cp {{tempdir.path}}/. {{inventory_hostname}}_hotstuff-temp:/data
         docker rm {{inventory_hostname}}_hotstuff-temp
+    - name: "Remove temp dir"
+      file:
+        state: absent
+        path: "{{tempdir.path}}"
