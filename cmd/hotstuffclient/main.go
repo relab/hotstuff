@@ -136,6 +136,7 @@ func main() {
 	client, err := newHotStuffClient(&conf, replicaConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to start client: %v\n", err)
+		os.Exit(1)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 
