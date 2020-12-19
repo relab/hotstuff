@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/data"
@@ -109,11 +110,12 @@ func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
 		return md
 	}
 
-	mgrOpts := []proto.ManagerOption{
-		proto.WithDialTimeout(connectTimeout),
-		proto.WithNodeMap(idMapping),
-		proto.WithMetadata(md),
-		proto.WithPerNodeMetadata(perNodeMD),
+	mgrOpts := []gorums.ManagerOption{
+		gorums.WithDialTimeout(connectTimeout),
+		gorums.WithNodeMap(idMapping),
+		gorums.WithMetadata(md),
+		gorums.WithPerNodeMetadata(perNodeMD),
+		gorums.WithSendTimeout(hs.qcTimeout),
 	}
 	grpcOpts := []grpc.DialOption{
 		grpc.WithBlock(),
@@ -126,7 +128,7 @@ func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
 		grpcOpts = append(grpcOpts, grpc.WithInsecure())
 	}
 
-	mgrOpts = append(mgrOpts, proto.WithGrpcDialOptions(grpcOpts...))
+	mgrOpts = append(mgrOpts, gorums.WithGrpcDialOptions(grpcOpts...))
 
 	mgr, err := proto.NewManager(mgrOpts...)
 	if err != nil {
@@ -153,17 +155,17 @@ func (hs *HotStuff) startServer(port string) error {
 		return fmt.Errorf("Failed to listen to port %s: %w", port, err)
 	}
 
-	serverOpts := []proto.ServerOption{}
+	serverOpts := []gorums.ServerOption{}
 	grpcServerOpts := []grpc.ServerOption{}
 
 	if hs.tls {
 		grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(hs.Config.Cert)))
 	}
 
-	serverOpts = append(serverOpts, proto.WithGRPCServerOptions(grpcServerOpts...))
+	serverOpts = append(serverOpts, gorums.WithGRPCServerOptions(grpcServerOpts...))
 
-	hs.server = newHotStuffServer(hs, proto.NewGorumsServer(serverOpts...))
-	hs.server.RegisterHotstuffServer(hs.server)
+	hs.server = newHotStuffServer(hs, gorums.NewServer(serverOpts...))
+	proto.RegisterHotstuffServer(hs.server.Server, hs.server)
 
 	go hs.server.Serve(lis)
 	return nil
@@ -174,7 +176,7 @@ func (hs *HotStuff) Close() {
 	hs.closeOnce.Do(func() {
 		hs.HotStuffCore.Close()
 		hs.manager.Close()
-		hs.server.Stop()
+		hs.server.Server.Stop()
 	})
 }
 
@@ -212,17 +214,17 @@ func (hs *HotStuff) handlePropose(block *data.Block) {
 
 type hotstuffServer struct {
 	*HotStuff
-	*proto.GorumsServer
+	*gorums.Server
 	// maps a stream context to client info
 	mut     sync.RWMutex
 	clients map[context.Context]config.ReplicaID
 }
 
-func newHotStuffServer(hs *HotStuff, srv *proto.GorumsServer) *hotstuffServer {
+func newHotStuffServer(hs *HotStuff, srv *gorums.Server) *hotstuffServer {
 	hsSrv := &hotstuffServer{
-		HotStuff:     hs,
-		GorumsServer: srv,
-		clients:      make(map[context.Context]config.ReplicaID),
+		HotStuff: hs,
+		Server:   srv,
+		clients:  make(map[context.Context]config.ReplicaID),
 	}
 	return hsSrv
 }
