@@ -65,6 +65,7 @@ func New(conf *config.ReplicaConfig, pacemaker Pacemaker, tls bool, connectTimeo
 		nodes:          make(map[config.ReplicaID]*proto.Node),
 		connectTimeout: connectTimeout,
 		qcTimeout:      qcTimeout,
+		tls:            tls,
 	}
 	pacemaker.Init(hs)
 	return hs
