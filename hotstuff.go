@@ -214,7 +214,10 @@ func (hs *hotstuffServer) getClientID(ctx context.Context) (config.ReplicaID, er
 	}
 
 	if peerInfo.AuthInfo.AuthType() == "tls" {
-		tlsInfo := peerInfo.AuthInfo.(credentials.TLSInfo)
+		tlsInfo, ok := peerInfo.AuthInfo.(credentials.TLSInfo)
+		if !ok {
+			return 0, fmt.Errorf("getClientID: authInfo of wrong type: %T", peerInfo.AuthInfo)
+		}
 		if len(tlsInfo.State.PeerCertificates) > 0 {
 			cert := tlsInfo.State.PeerCertificates[0]
 			for _, replicaInfo := range hs.Config.Replicas {
@@ -224,6 +227,8 @@ func (hs *hotstuffServer) getClientID(ctx context.Context) (config.ReplicaID, er
 			}
 		}
 		return 0, fmt.Errorf("getClientID: could not find matching certificate")
+	} else if hs.tls {
+		return 0, fmt.Errorf("getClientID: tls enabled, but client was not connected using TLS")
 	}
 
 	// If we're not using TLS, we'll fallback to checking the metadata
