@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -118,18 +119,19 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Failed to read public key file '%s': %v\n", r.Pubkey, err)
 			os.Exit(1)
 		}
+		var cert *x509.Certificate
 		if conf.TLS {
-			cert, err := data.ReadCertFile(r.Cert)
+			cert, err = data.ReadCertFile(r.Cert)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Failed to read certificate '%s': %v\n", r.Cert, err)
 				os.Exit(1)
 			}
-			replicaConfig.CertPool.AppendCertsFromPEM(cert)
 		}
 		replicaConfig.Replicas[r.ID] = &config.ReplicaInfo{
 			ID:      r.ID,
 			Address: r.ClientAddr,
 			PubKey:  key,
+			Cert:    cert,
 		}
 	}
 
@@ -232,7 +234,7 @@ func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hot
 	grpcOpts := []grpc.DialOption{grpc.WithBlock()}
 
 	if conf.TLS {
-		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(replicaConfig.CertPool, "")))
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(replicaConfig.CertPool(), "")))
 	} else {
 		grpcOpts = append(grpcOpts, grpc.WithInsecure())
 	}

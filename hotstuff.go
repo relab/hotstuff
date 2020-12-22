@@ -2,14 +2,8 @@ package hotstuff
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/binary"
 	"fmt"
 	"log"
-	"math/big"
 	"net"
 	"strconv"
 	"sync"
@@ -24,6 +18,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 )
 
 var logger *log.Logger
@@ -98,24 +93,10 @@ func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
 		"id": fmt.Sprintf("%d", hs.Config.ID),
 	})
 
-	perNodeMD := func(nid uint32) metadata.MD {
-		var b [4]byte
-		binary.LittleEndian.PutUint32(b[:], nid)
-		hash := sha256.Sum256(b[:])
-		R, S, err := ecdsa.Sign(rand.Reader, hs.Config.PrivateKey, hash[:])
-		if err != nil {
-			panic(fmt.Errorf("Could not sign proof for replica %d: %w", nid, err))
-		}
-		md := metadata.MD{}
-		md.Append("proof", base64.StdEncoding.EncodeToString(R.Bytes()), base64.StdEncoding.EncodeToString(S.Bytes()))
-		return md
-	}
-
 	mgrOpts := []gorums.ManagerOption{
 		gorums.WithDialTimeout(connectTimeout),
 		gorums.WithNodeMap(idMapping),
 		gorums.WithMetadata(md),
-		gorums.WithPerNodeMetadata(perNodeMD),
 		gorums.WithSendTimeout(hs.qcTimeout),
 	}
 	grpcOpts := []grpc.DialOption{
@@ -124,7 +105,7 @@ func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
 	}
 
 	if hs.tls {
-		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(hs.Config.CertPool, "")))
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(hs.Config.CertPool(), "")))
 	} else {
 		grpcOpts = append(grpcOpts, grpc.WithInsecure())
 	}
@@ -216,39 +197,36 @@ func (hs *HotStuff) handlePropose(block *data.Block) {
 type hotstuffServer struct {
 	*HotStuff
 	*gorums.Server
-	// maps a stream context to client info
-	mut     sync.RWMutex
-	clients map[context.Context]config.ReplicaID
 }
 
 func newHotStuffServer(hs *HotStuff, srv *gorums.Server) *hotstuffServer {
 	hsSrv := &hotstuffServer{
 		HotStuff: hs,
 		Server:   srv,
-		clients:  make(map[context.Context]config.ReplicaID),
 	}
 	return hsSrv
 }
 
 func (hs *hotstuffServer) getClientID(ctx context.Context) (config.ReplicaID, error) {
-	hs.mut.RLock()
-	// fast path for known stream
-	if id, ok := hs.clients[ctx]; ok {
-		hs.mut.RUnlock()
-		return id, nil
+	peerInfo, ok := peer.FromContext(ctx)
+	if !ok {
+		return 0, fmt.Errorf("getClientID: peerInfo not available")
 	}
 
-	hs.mut.RUnlock()
-	hs.mut.Lock()
-	defer hs.mut.Unlock()
-
-	// cleanup finished streams
-	for ctx := range hs.clients {
-		if ctx.Err() != nil {
-			delete(hs.clients, ctx)
+	if peerInfo.AuthInfo.AuthType() == "tls" {
+		tlsInfo := peerInfo.AuthInfo.(credentials.TLSInfo)
+		if len(tlsInfo.State.PeerCertificates) > 0 {
+			cert := tlsInfo.State.PeerCertificates[0]
+			for _, replicaInfo := range hs.Config.Replicas {
+				if replicaInfo.Cert.Equal(cert) {
+					return replicaInfo.ID, nil
+				}
+			}
 		}
+		return 0, fmt.Errorf("getClientID: could not find matching certificate")
 	}
 
+	// If we're not using TLS, we'll fallback to checking the metadata
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return 0, fmt.Errorf("getClientID: metadata not available")
@@ -264,37 +242,6 @@ func (hs *hotstuffServer) getClientID(ctx context.Context) (config.ReplicaID, er
 		return 0, fmt.Errorf("getClientID: cannot parse ID field: %w", err)
 	}
 
-	info, ok := hs.Config.Replicas[config.ReplicaID(id)]
-	if !ok {
-		return 0, fmt.Errorf("getClientID: could not find info about id '%d'", id)
-	}
-
-	v = md.Get("proof")
-	if len(v) < 2 {
-		return 0, fmt.Errorf("getClientID: No proof found")
-	}
-
-	var R, S big.Int
-	v0, err := base64.StdEncoding.DecodeString(v[0])
-	if err != nil {
-		return 0, fmt.Errorf("getClientID: could not decode proof: %v", err)
-	}
-	v1, err := base64.StdEncoding.DecodeString(v[1])
-	if err != nil {
-		return 0, fmt.Errorf("getClientID: could not decode proof: %v", err)
-	}
-	R.SetBytes(v0)
-	S.SetBytes(v1)
-
-	var b [4]byte
-	binary.LittleEndian.PutUint32(b[:], uint32(hs.Config.ID))
-	hash := sha256.Sum256(b[:])
-
-	if !ecdsa.Verify(info.PubKey, hash[:], &R, &S) {
-		return 0, fmt.Errorf("Invalid proof")
-	}
-
-	hs.clients[ctx] = config.ReplicaID(id)
 	return config.ReplicaID(id), nil
 }
 

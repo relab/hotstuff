@@ -141,16 +141,24 @@ func WriteCertFile(cert []byte, file string) (err error) {
 	return
 }
 
-// ReadPrivateKeyFile reads a private key from the specified file
-func ReadPrivateKeyFile(keyFile string) (key *ecdsa.PrivateKey, err error) {
-	d, err := ioutil.ReadFile(keyFile)
+func readPemFile(file string) (b *pem.Block, err error) {
+	d, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
 
-	b, _ := pem.Decode(d)
+	b, _ = pem.Decode(d)
 	if b == nil {
-		return nil, fmt.Errorf("Failed to decode key")
+		return nil, fmt.Errorf("Failed to decode PEM")
+	}
+	return b, nil
+}
+
+// ReadPrivateKeyFile reads a private key from the specified file
+func ReadPrivateKeyFile(keyFile string) (key *ecdsa.PrivateKey, err error) {
+	b, err := readPemFile(keyFile)
+	if err != nil {
+		return nil, err
 	}
 
 	if b.Type != privateKeyFileType {
@@ -166,14 +174,9 @@ func ReadPrivateKeyFile(keyFile string) (key *ecdsa.PrivateKey, err error) {
 
 // ReadPublicKeyFile reads a public key from the specified file
 func ReadPublicKeyFile(keyFile string) (key *ecdsa.PublicKey, err error) {
-	d, err := ioutil.ReadFile(keyFile)
+	b, err := readPemFile(keyFile)
 	if err != nil {
 		return nil, err
-	}
-
-	b, _ := pem.Decode(d)
-	if b == nil {
-		return nil, fmt.Errorf("Failed to decode key")
 	}
 
 	if b.Type != publicKeyFileType {
@@ -193,6 +196,25 @@ func ReadPublicKeyFile(keyFile string) (key *ecdsa.PublicKey, err error) {
 	return
 }
 
-func ReadCertFile(certFile string) (cert []byte, err error) {
-	return ioutil.ReadFile(certFile)
+func ReadCertFile(certFile string) (cert *x509.Certificate, err error) {
+	d, err := ioutil.ReadFile(certFile)
+	if err != nil {
+		return nil, err
+	}
+
+	b, _ := pem.Decode(d)
+	if b == nil {
+		return nil, fmt.Errorf("Failed to decode key")
+	}
+
+	if b.Type != "CERTIFICATE" {
+		return nil, fmt.Errorf("File type did not match")
+	}
+
+	cert, err = x509.ParseCertificate(b.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return cert, nil
 }

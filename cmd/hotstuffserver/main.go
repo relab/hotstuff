@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -182,7 +183,7 @@ func main() {
 				}
 			}
 		}
-		certB, err := data.ReadCertFile(conf.Cert)
+		certB, err := ioutil.ReadFile(conf.Cert)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to read certificate: %v\n", err)
 			os.Exit(1)
@@ -213,14 +214,12 @@ func main() {
 			os.Exit(1)
 		}
 
+		var cert *x509.Certificate
 		if conf.TLS {
-			certB, err := data.ReadCertFile(r.Cert)
+			cert, err = data.ReadCertFile(r.Cert)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Failed to read certificate: %v\n", err)
 				os.Exit(1)
-			}
-			if !replicaConfig.CertPool.AppendCertsFromPEM(certB) {
-				fmt.Fprintf(os.Stderr, "Failed to parse certificate\n")
 			}
 		}
 
@@ -228,6 +227,7 @@ func main() {
 			ID:      r.ID,
 			Address: r.PeerAddr,
 			PubKey:  key,
+			Cert:    cert,
 		}
 
 		if r.ID == conf.SelfID {
