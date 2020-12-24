@@ -48,8 +48,11 @@ type HotStuff struct {
 
 	closeOnce sync.Once
 
-	qcTimeout      time.Duration
 	connectTimeout time.Duration
+
+	proposeCancel context.CancelFunc
+	voteCancel    context.CancelFunc
+	newviewCancel context.CancelFunc
 }
 
 //New creates a new GorumsHotStuff backend object.
@@ -59,8 +62,10 @@ func New(conf *config.ReplicaConfig, pacemaker Pacemaker, tls bool, connectTimeo
 		HotStuffCore:   consensus.New(conf),
 		nodes:          make(map[config.ReplicaID]*proto.Node),
 		connectTimeout: connectTimeout,
-		qcTimeout:      qcTimeout,
 		tls:            tls,
+		proposeCancel:  func() {},
+		voteCancel:     func() {},
+		newviewCancel:  func() {},
 	}
 	pacemaker.Init(hs)
 	return hs
@@ -97,7 +102,6 @@ func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
 		gorums.WithDialTimeout(connectTimeout),
 		gorums.WithNodeMap(idMapping),
 		gorums.WithMetadata(md),
-		gorums.WithSendTimeout(hs.qcTimeout),
 	}
 	grpcOpts := []grpc.DialOption{
 		grpc.WithBlock(),
@@ -167,7 +171,11 @@ func (hs *HotStuff) Propose() {
 	proposal := hs.CreateProposal()
 	logger.Printf("Propose (%d commands): %s\n", len(proposal.Commands), proposal)
 	protobuf := proto.BlockToProto(proposal)
-	hs.cfg.Propose(protobuf)
+
+	var ctx context.Context
+	hs.proposeCancel()
+	ctx, hs.proposeCancel = context.WithCancel(context.Background())
+	hs.cfg.Propose(ctx, protobuf)
 	// self-vote
 	hs.handlePropose(proposal)
 }
@@ -176,7 +184,10 @@ func (hs *HotStuff) Propose() {
 func (hs *HotStuff) SendNewView(id config.ReplicaID) {
 	qc := hs.GetQCHigh()
 	if node, ok := hs.nodes[id]; ok {
-		node.NewView(proto.QuorumCertToProto(qc))
+		var ctx context.Context
+		hs.newviewCancel()
+		ctx, hs.newviewCancel = context.WithCancel(context.Background())
+		node.NewView(ctx, proto.QuorumCertToProto(qc))
 	}
 }
 
@@ -190,7 +201,10 @@ func (hs *HotStuff) handlePropose(block *data.Block) {
 	if hs.Config.ID == leaderID {
 		hs.OnReceiveVote(p)
 	} else if leader, ok := hs.nodes[leaderID]; ok {
-		leader.Vote(proto.PartialCertToProto(p))
+		var ctx context.Context
+		hs.voteCancel()
+		ctx, hs.voteCancel = context.WithCancel(context.Background())
+		leader.Vote(ctx, proto.PartialCertToProto(p))
 	}
 }
 

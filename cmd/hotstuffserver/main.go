@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/felixge/fgprof"
+	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
@@ -280,7 +281,7 @@ type hotstuffServer struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	conf      *options
-	gorumsSrv *client.GorumsServer
+	gorumsSrv *gorums.Server
 	hs        *hotstuff.HotStuff
 	pm        interface {
 		Run(context.Context)
@@ -295,20 +296,20 @@ type hotstuffServer struct {
 func newHotStuffServer(conf *options, replicaConfig *config.ReplicaConfig) *hotstuffServer {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	serverOpts := []client.ServerOption{}
+	serverOpts := []gorums.ServerOption{}
 	grpcServerOpts := []grpc.ServerOption{}
 
 	if conf.TLS {
 		grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(replicaConfig.Cert)))
 	}
 
-	serverOpts = append(serverOpts, client.WithGRPCServerOptions(grpcServerOpts...))
+	serverOpts = append(serverOpts, gorums.WithGRPCServerOptions(grpcServerOpts...))
 
 	srv := &hotstuffServer{
 		ctx:          ctx,
 		cancel:       cancel,
 		conf:         conf,
-		gorumsSrv:    client.NewGorumsServer(serverOpts...),
+		gorumsSrv:    gorums.NewServer(serverOpts...),
 		finishedCmds: make(map[cmdID]chan struct{}),
 		lastExecTime: time.Now().UnixNano(),
 	}
@@ -327,7 +328,7 @@ func newHotStuffServer(conf *options, replicaConfig *config.ReplicaConfig) *hots
 	srv.hs = hotstuff.New(replicaConfig, pm, conf.TLS, time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
 	srv.pm = pm.(interface{ Run(context.Context) })
 	// Use a custom server instead of the gorums one
-	srv.gorumsSrv.RegisterClientServer(srv)
+	client.RegisterClientServer(srv.gorumsSrv, srv)
 	return srv
 }
 

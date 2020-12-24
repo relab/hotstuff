@@ -156,7 +156,7 @@ var _ empty.Empty
 
 // Propose is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (c *Configuration) Propose(in *Block) {
+func (c *Configuration) Propose(ctx context.Context, in *Block, opts ...gorums.CallOption) {
 
 	cd := gorums.QuorumCallData{
 		Manager:  c.mgr.Manager,
@@ -165,7 +165,7 @@ func (c *Configuration) Propose(in *Block) {
 		MethodID: proposeMethodID,
 	}
 
-	gorums.Multicast(cd)
+	gorums.Multicast(ctx, cd, opts...)
 }
 
 // QuorumSpec is the interface of quorum functions for Hotstuff.
@@ -210,7 +210,7 @@ var _ empty.Empty
 
 // Vote is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (n *Node) Vote(in *PartialCert) {
+func (n *Node) Vote(ctx context.Context, in *PartialCert, opts ...gorums.CallOption) {
 
 	cd := gorums.CallData{
 		Manager:  n.mgr.Manager,
@@ -219,7 +219,7 @@ func (n *Node) Vote(in *PartialCert) {
 		MethodID: voteMethodID,
 	}
 
-	gorums.Unicast(cd)
+	gorums.Unicast(ctx, cd, opts...)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -227,7 +227,7 @@ var _ empty.Empty
 
 // NewView is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (n *Node) NewView(in *QuorumCert) {
+func (n *Node) NewView(ctx context.Context, in *QuorumCert, opts ...gorums.CallOption) {
 
 	cd := gorums.CallData{
 		Manager:  n.mgr.Manager,
@@ -236,5 +236,5 @@ func (n *Node) NewView(in *QuorumCert) {
 		MethodID: newViewMethodID,
 	}
 
-	gorums.Unicast(cd)
+	gorums.Unicast(ctx, cd, opts...)
 }

@@ -19,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/relab/gorums"
 	"github.com/relab/gorums/benchmark"
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
@@ -239,8 +240,8 @@ func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hot
 		grpcOpts = append(grpcOpts, grpc.WithInsecure())
 	}
 
-	mgr, err := client.NewManager(client.WithNodeMap(nodes), client.WithGrpcDialOptions(grpcOpts...),
-		client.WithDialTimeout(time.Minute),
+	mgr, err := client.NewManager(gorums.WithNodeMap(nodes), gorums.WithGrpcDialOptions(grpcOpts...),
+		gorums.WithDialTimeout(time.Minute),
 	)
 	if err != nil {
 		return nil, err
@@ -314,7 +315,7 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 				_, err := promise.Get()
 				atomic.AddUint64(&c.inflight, ^uint64(0))
 				if err != nil {
-					qcError, ok := err.(client.QuorumCallError)
+					qcError, ok := err.(gorums.QuorumCallError)
 					if !ok || qcError.Reason != context.Canceled.Error() {
 						log.Printf("Did not get enough signatures for command: %v\n", err)
 					}

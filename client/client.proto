@@ -14,7 +14,6 @@ service Client {
   // from f+1 replicas
   rpc ExecCommand(Command) returns (Empty) {
     option (gorums.quorumcall) = true;
-    option (gorums.ordered) = true;
     option (gorums.async) = true;
   }
 }

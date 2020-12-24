@@ -24,7 +24,7 @@ tools: download
 	@cat tools.go | grep _ | awk -F'"' '{print $$2}' | xargs -I % go install %
 
 %.pb.go %_gorums.pb.go : %.proto
-	@protoc -I=$(proto_include):. \
+	protoc -I=$(proto_include):. \
 		--go_out=paths=source_relative:. \
 		--gorums_out=paths=source_relative:. \
 		$<
