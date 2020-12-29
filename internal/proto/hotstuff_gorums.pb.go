@@ -83,7 +83,9 @@ func (c *Configuration) SubError() <-chan gorums.Error {
 }
 
 func init() {
-	encoding.RegisterCodec(gorums.NewGorumsCodec(orderingMethods))
+	if encoding.GetCodec(gorums.ContentSubtype) == nil {
+		encoding.RegisterCodec(gorums.NewCodec())
+	}
 }
 
 func NewManager(opts ...gorums.ManagerOption) (mgr *Manager, err error) {
@@ -159,10 +161,10 @@ var _ empty.Empty
 func (c *Configuration) Propose(ctx context.Context, in *Block, opts ...gorums.CallOption) {
 
 	cd := gorums.QuorumCallData{
-		Manager:  c.mgr.Manager,
-		Nodes:    c.nodes,
-		Message:  in,
-		MethodID: proposeMethodID,
+		Manager: c.mgr.Manager,
+		Nodes:   c.nodes,
+		Message: in,
+		Method:  "proto.Hotstuff.Propose",
 	}
 
 	gorums.Multicast(ctx, cd, opts...)
@@ -180,29 +182,18 @@ type Hotstuff interface {
 }
 
 func RegisterHotstuffServer(srv *gorums.Server, impl Hotstuff) {
-	srv.RegisterHandler(proposeMethodID, func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
+	srv.RegisterHandler("proto.Hotstuff.Propose", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
 		req := in.Message.(*Block)
 		impl.Propose(ctx, req)
 	})
-	srv.RegisterHandler(voteMethodID, func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
+	srv.RegisterHandler("proto.Hotstuff.Vote", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
 		req := in.Message.(*PartialCert)
 		impl.Vote(ctx, req)
 	})
-	srv.RegisterHandler(newViewMethodID, func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
+	srv.RegisterHandler("proto.Hotstuff.NewView", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
 		req := in.Message.(*QuorumCert)
 		impl.NewView(ctx, req)
 	})
-}
-
-const proposeMethodID int32 = 0
-const voteMethodID int32 = 1
-const newViewMethodID int32 = 2
-
-var orderingMethods = map[int32]gorums.MethodInfo{
-
-	0: {RequestType: new(Block).ProtoReflect(), ResponseType: new(empty.Empty).ProtoReflect()},
-	1: {RequestType: new(PartialCert).ProtoReflect(), ResponseType: new(empty.Empty).ProtoReflect()},
-	2: {RequestType: new(QuorumCert).ProtoReflect(), ResponseType: new(empty.Empty).ProtoReflect()},
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -213,10 +204,10 @@ var _ empty.Empty
 func (n *Node) Vote(ctx context.Context, in *PartialCert, opts ...gorums.CallOption) {
 
 	cd := gorums.CallData{
-		Manager:  n.mgr.Manager,
-		Node:     n.Node,
-		Message:  in,
-		MethodID: voteMethodID,
+		Manager: n.mgr.Manager,
+		Node:    n.Node,
+		Message: in,
+		Method:  "proto.Hotstuff.Vote",
 	}
 
 	gorums.Unicast(ctx, cd, opts...)
@@ -230,10 +221,10 @@ var _ empty.Empty
 func (n *Node) NewView(ctx context.Context, in *QuorumCert, opts ...gorums.CallOption) {
 
 	cd := gorums.CallData{
-		Manager:  n.mgr.Manager,
-		Node:     n.Node,
-		Message:  in,
-		MethodID: newViewMethodID,
+		Manager: n.mgr.Manager,
+		Node:    n.Node,
+		Message: in,
+		Method:  "proto.Hotstuff.NewView",
 	}
 
 	gorums.Unicast(ctx, cd, opts...)

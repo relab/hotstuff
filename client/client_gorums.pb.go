@@ -84,7 +84,9 @@ func (c *Configuration) SubError() <-chan gorums.Error {
 }
 
 func init() {
-	encoding.RegisterCodec(gorums.NewGorumsCodec(orderingMethods))
+	if encoding.GetCodec(gorums.ContentSubtype) == nil {
+		encoding.RegisterCodec(gorums.NewCodec())
+	}
 }
 
 func NewManager(opts ...gorums.ManagerOption) (mgr *Manager, err error) {
@@ -156,10 +158,10 @@ type Node struct {
 // from f+1 replicas
 func (c *Configuration) ExecCommand(ctx context.Context, in *Command) *FutureEmpty {
 	cd := gorums.QuorumCallData{
-		Manager:  c.mgr.Manager,
-		Nodes:    c.nodes,
-		Message:  in,
-		MethodID: execCommandMethodID,
+		Manager: c.mgr.Manager,
+		Nodes:   c.nodes,
+		Message: in,
+		Method:  "client.Client.ExecCommand",
 	}
 	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
 		r := make(map[uint32]*Empty, len(replies))
@@ -190,7 +192,7 @@ type Client interface {
 }
 
 func RegisterClientServer(srv *gorums.Server, impl Client) {
-	srv.RegisterHandler(execCommandMethodID, func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
+	srv.RegisterHandler("client.Client.ExecCommand", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*Command)
 		once := new(sync.Once)
 		f := func(resp *Empty, err error) {
@@ -200,13 +202,6 @@ func RegisterClientServer(srv *gorums.Server, impl Client) {
 		}
 		impl.ExecCommand(ctx, req, f)
 	})
-}
-
-const execCommandMethodID int32 = 0
-
-var orderingMethods = map[int32]gorums.MethodInfo{
-
-	0: {RequestType: new(Command).ProtoReflect(), ResponseType: new(Empty).ProtoReflect()},
 }
 
 type internalEmpty struct {

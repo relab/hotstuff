@@ -227,7 +227,7 @@ func (hs *hotstuffServer) getClientID(ctx context.Context) (config.ReplicaID, er
 		return 0, fmt.Errorf("getClientID: peerInfo not available")
 	}
 
-	if peerInfo.AuthInfo.AuthType() == "tls" {
+	if peerInfo.AuthInfo != nil && peerInfo.AuthInfo.AuthType() == "tls" {
 		tlsInfo, ok := peerInfo.AuthInfo.(credentials.TLSInfo)
 		if !ok {
 			return 0, fmt.Errorf("getClientID: authInfo of wrong type: %T", peerInfo.AuthInfo)
