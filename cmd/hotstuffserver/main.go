@@ -10,20 +10,17 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"runtime"
-	"runtime/pprof"
-	"runtime/trace"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
 
-	"github.com/felixge/fgprof"
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/data"
+	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/pacemaker"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -102,52 +99,26 @@ func main() {
 		os.Exit(0)
 	}
 
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
-		if err != nil {
-			log.Fatal("Could not create CPU profile: ", err)
-		}
-		defer f.Close()
-		if err := pprof.StartCPUProfile(f); err != nil {
-			log.Fatal("Could not start CPU profile: ", err)
-		}
-		defer pprof.StopCPUProfile()
+	profileStop, err := profiling.StartProfilers(*cpuprofile, *memprofile, *traceFile, *fullprofile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to start profilers: %v\n", err)
+		os.Exit(1)
 	}
 
-	if *fullprofile != "" {
-		f, err := os.Create(*fullprofile)
+	defer func() {
+		err := profileStop()
 		if err != nil {
-			log.Fatal("Could not create fgprof profile: ", err)
+			fmt.Fprintf(os.Stderr, "Failed to stop profilers: %v\n", err)
+			os.Exit(1)
 		}
-		defer f.Close()
-		stop := fgprof.Start(f, fgprof.FormatPprof)
-
-		defer func() {
-			err := stop()
-			if err != nil {
-				log.Fatal("Could not write fgprof profile: ", err)
-			}
-		}()
-	}
-
-	if *traceFile != "" {
-		f, err := os.Create(*traceFile)
-		if err != nil {
-			log.Fatal("Could not create trace file: ", err)
-		}
-		defer f.Close()
-		if err := trace.Start(f); err != nil {
-			log.Fatal("Failed to start trace: ", err)
-		}
-		defer trace.Stop()
-	}
+	}()
 
 	viper.BindPFlags(pflag.CommandLine)
 
 	// read main config file in working dir
 	viper.SetConfigName("hotstuff")
 	viper.AddConfigPath(".")
-	err := viper.ReadInConfig()
+	err = viper.ReadInConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to read config: %v\n", err)
 		os.Exit(1)
@@ -260,18 +231,6 @@ func main() {
 	<-signals
 	fmt.Fprintf(os.Stderr, "Exiting...\n")
 	srv.Stop()
-
-	if *memprofile != "" {
-		f, err := os.Create(*memprofile)
-		if err != nil {
-			log.Fatal("could not create memory profile: ", err)
-		}
-		defer f.Close() // error handling omitted for example
-		runtime.GC()    // get up-to-date statistics
-		if err := pprof.WriteHeapProfile(f); err != nil {
-			log.Fatal("could not write memory profile: ", err)
-		}
-	}
 }
 
 // cmdID is a unique identifier for a command

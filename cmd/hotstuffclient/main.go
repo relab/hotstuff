@@ -12,8 +12,6 @@ import (
 	"math"
 	"os"
 	"os/signal"
-	"runtime"
-	"runtime/pprof"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -24,6 +22,7 @@ import (
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/data"
+	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
@@ -42,6 +41,7 @@ type options struct {
 	Benchmark   bool             `mapstructure:"benchmark"`
 	ExitAfter   int              `mapstructure:"exit-after"`
 	TLS         bool
+	RootCAs     []string `mapstructure:"root-cas"`
 	Replicas    []struct {
 		ID         config.ReplicaID
 		ClientAddr string `mapstructure:"client-address"`
@@ -83,24 +83,25 @@ func main() {
 		os.Exit(0)
 	}
 
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
-		if err != nil {
-			log.Fatal("Could not create CPU profile: ", err)
-		}
-		defer f.Close()
-		if err := pprof.StartCPUProfile(f); err != nil {
-			log.Fatal("Could not start CPU profile: ", err)
-		}
-		defer pprof.StopCPUProfile()
+	profileStop, err := profiling.StartProfilers(*cpuprofile, *memprofile, "", "")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to start profilers: %v\n", err)
+		os.Exit(1)
 	}
+	defer func() {
+		err := profileStop()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to stop profilers: %v\n", err)
+			os.Exit(1)
+		}
+	}()
 
 	viper.BindPFlags(pflag.CommandLine)
 
 	// read main config file in working dir
 	viper.SetConfigName("hotstuff")
 	viper.AddConfigPath(".")
-	err := viper.ReadInConfig()
+	err = viper.ReadInConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to read config: %v\n", err)
 		os.Exit(1)
@@ -199,18 +200,6 @@ func main() {
 		_, err = os.Stdout.Write(b)
 		if err != nil {
 			log.Fatalf("Could not write data: %v\n", err)
-		}
-	}
-
-	if *memprofile != "" {
-		f, err := os.Create(*memprofile)
-		if err != nil {
-			log.Fatal("could not create memory profile: ", err)
-		}
-		defer f.Close() // error handling omitted for example
-		runtime.GC()    // get up-to-date statistics
-		if err := pprof.WriteHeapProfile(f); err != nil {
-			log.Fatal("could not write memory profile: ", err)
 		}
 	}
 }
