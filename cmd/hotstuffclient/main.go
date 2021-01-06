@@ -113,26 +113,38 @@ func main() {
 		os.Exit(1)
 	}
 
-	replicaConfig := config.NewConfig(0, nil, nil)
+	var creds credentials.TransportCredentials
+	if conf.TLS {
+		rootCAs, err := x509.SystemCertPool()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to get system cert pool: %v\n", err)
+			os.Exit(1)
+		}
+		for _, ca := range conf.RootCAs {
+			cert, err := ioutil.ReadFile(ca)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to read CA: %v\n", err)
+				os.Exit(1)
+			}
+			if !rootCAs.AppendCertsFromPEM(cert) {
+				fmt.Fprintf(os.Stderr, "Failed to decode CA\n")
+				os.Exit(1)
+			}
+		}
+		creds = credentials.NewClientTLSFromCert(rootCAs, "")
+	}
+
+	replicaConfig := config.NewConfig(0, nil, creds)
 	for _, r := range conf.Replicas {
 		key, err := data.ReadPublicKeyFile(r.Pubkey)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to read public key file '%s': %v\n", r.Pubkey, err)
 			os.Exit(1)
 		}
-		var cert *x509.Certificate
-		if conf.TLS {
-			cert, err = data.ReadCertFile(r.Cert)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to read certificate '%s': %v\n", r.Cert, err)
-				os.Exit(1)
-			}
-		}
 		replicaConfig.Replicas[r.ID] = &config.ReplicaInfo{
 			ID:      r.ID,
 			Address: r.ClientAddr,
 			PubKey:  key,
-			Cert:    cert,
 		}
 	}
 
@@ -235,7 +247,7 @@ func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hot
 	grpcOpts := []grpc.DialOption{grpc.WithBlock()}
 
 	if conf.TLS {
-		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(replicaConfig.CertPool(), "")))
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(replicaConfig.Creds))
 	} else {
 		grpcOpts = append(grpcOpts, grpc.WithInsecure())
 	}

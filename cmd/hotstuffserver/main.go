@@ -35,6 +35,7 @@ import (
 )
 
 type options struct {
+	RootCAs         []string `mapstructure:"root-cas"`
 	Privkey         string
 	Cert            string
 	SelfID          config.ReplicaID   `mapstructure:"self-id"`
@@ -175,7 +176,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	var cert *tls.Certificate
+	var creds credentials.TransportCredentials
+	var tlsCert tls.Certificate
 	if conf.TLS {
 		if conf.Cert == "" {
 			for _, replica := range conf.Replicas {
@@ -184,29 +186,40 @@ func main() {
 				}
 			}
 		}
-		certB, err := ioutil.ReadFile(conf.Cert)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to read certificate: %v\n", err)
-			os.Exit(1)
-		}
-		// read in the private key again, but in PEM format
-		pkPEM, err := ioutil.ReadFile(conf.Privkey)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to read private key: %v\n", err)
-			os.Exit(1)
-		}
 
-		tlsCert, err := tls.X509KeyPair(certB, pkPEM)
+		tlsCert, err = tls.LoadX509KeyPair(conf.Cert, conf.Privkey)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to parse certificate: %v\n", err)
 			os.Exit(1)
 		}
-		cert = &tlsCert
+
+		rootCAs, err := x509.SystemCertPool()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to get system cert pool: %v\n", err)
+			os.Exit(1)
+		}
+
+		for _, ca := range conf.RootCAs {
+			cert, err := ioutil.ReadFile(ca)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to read CA file: %v\n", err)
+				os.Exit(1)
+			}
+			if !rootCAs.AppendCertsFromPEM(cert) {
+				fmt.Fprintf(os.Stderr, "Failed to add CA to cert pool.\n")
+				os.Exit(1)
+			}
+		}
+		creds = credentials.NewTLS(&tls.Config{
+			Certificates: []tls.Certificate{tlsCert},
+			RootCAs:      rootCAs,
+			ClientCAs:    rootCAs,
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+		})
 	}
 
 	var clientAddress string
-
-	replicaConfig := config.NewConfig(conf.SelfID, privkey, cert)
+	replicaConfig := config.NewConfig(conf.SelfID, privkey, creds)
 	replicaConfig.BatchSize = conf.BatchSize
 	for _, r := range conf.Replicas {
 		key, err := data.ReadPublicKeyFile(r.Pubkey)
@@ -215,20 +228,10 @@ func main() {
 			os.Exit(1)
 		}
 
-		var cert *x509.Certificate
-		if conf.TLS {
-			cert, err = data.ReadCertFile(r.Cert)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to read certificate: %v\n", err)
-				os.Exit(1)
-			}
-		}
-
 		info := &config.ReplicaInfo{
 			ID:      r.ID,
 			Address: r.PeerAddr,
 			PubKey:  key,
-			Cert:    cert,
 		}
 
 		if r.ID == conf.SelfID {
@@ -247,7 +250,7 @@ func main() {
 	}
 	replicaConfig.QuorumSize = len(replicaConfig.Replicas) - (len(replicaConfig.Replicas)-1)/3
 
-	srv := newHotStuffServer(&conf, replicaConfig)
+	srv := newHotStuffServer(&conf, replicaConfig, &tlsCert)
 	err = srv.Start(clientAddress)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to start HotStuff: %v\n", err)
@@ -293,14 +296,14 @@ type hotstuffServer struct {
 	lastExecTime int64
 }
 
-func newHotStuffServer(conf *options, replicaConfig *config.ReplicaConfig) *hotstuffServer {
+func newHotStuffServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert *tls.Certificate) *hotstuffServer {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	serverOpts := []gorums.ServerOption{}
 	grpcServerOpts := []grpc.ServerOption{}
 
 	if conf.TLS {
-		grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(replicaConfig.Cert)))
+		grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(tlsCert)))
 	}
 
 	serverOpts = append(serverOpts, gorums.WithGRPCServerOptions(grpcServerOpts...))
@@ -325,7 +328,7 @@ func newHotStuffServer(conf *options, replicaConfig *config.ReplicaConfig) *hots
 		fmt.Fprintf(os.Stderr, "Invalid pacemaker type: '%s'\n", conf.PmType)
 		os.Exit(1)
 	}
-	srv.hs = hotstuff.New(replicaConfig, pm, conf.TLS, time.Minute, time.Duration(conf.ViewTimeout)*time.Millisecond)
+	srv.hs = hotstuff.New(replicaConfig, pm, time.Minute)
 	srv.pm = pm.(interface{ Run(context.Context) })
 	// Use a custom server instead of the gorums one
 	client.RegisterClientServer(srv.gorumsSrv, srv)
