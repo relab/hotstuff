@@ -56,13 +56,12 @@ type HotStuff struct {
 }
 
 //New creates a new GorumsHotStuff backend object.
-func New(conf *config.ReplicaConfig, pacemaker Pacemaker, tls bool, connectTimeout, qcTimeout time.Duration) *HotStuff {
+func New(conf *config.ReplicaConfig, pacemaker Pacemaker, connectTimeout time.Duration) *HotStuff {
 	hs := &HotStuff{
 		pacemaker:      pacemaker,
 		HotStuffCore:   consensus.New(conf),
 		nodes:          make(map[config.ReplicaID]*proto.Node),
 		connectTimeout: connectTimeout,
-		tls:            tls,
 		proposeCancel:  func() {},
 		voteCancel:     func() {},
 		newviewCancel:  func() {},
@@ -108,8 +107,8 @@ func (hs *HotStuff) startClient(connectTimeout time.Duration) error {
 		grpc.WithReturnConnectionError(),
 	}
 
-	if hs.tls {
-		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(hs.Config.CertPool(), "")))
+	if hs.Config.Creds != nil {
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(hs.Config.Creds))
 	} else {
 		grpcOpts = append(grpcOpts, grpc.WithInsecure())
 	}
@@ -144,8 +143,8 @@ func (hs *HotStuff) startServer(port string) error {
 	serverOpts := []gorums.ServerOption{}
 	grpcServerOpts := []grpc.ServerOption{}
 
-	if hs.tls {
-		grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(hs.Config.Cert)))
+	if hs.Config.Creds != nil {
+		grpcServerOpts = append(grpcServerOpts, grpc.Creds(hs.Config.Creds.Clone()))
 	}
 
 	serverOpts = append(serverOpts, gorums.WithGRPCServerOptions(grpcServerOpts...))
@@ -234,9 +233,9 @@ func (hs *hotstuffServer) getClientID(ctx context.Context) (config.ReplicaID, er
 		}
 		if len(tlsInfo.State.PeerCertificates) > 0 {
 			cert := tlsInfo.State.PeerCertificates[0]
-			for _, replicaInfo := range hs.Config.Replicas {
-				if replicaInfo.Cert.Equal(cert) {
-					return replicaInfo.ID, nil
+			for replicaID := range hs.Config.Replicas {
+				if subject, err := strconv.Atoi(cert.Subject.CommonName); err == nil && config.ReplicaID(subject) == replicaID {
+					return replicaID, nil
 				}
 			}
 		}

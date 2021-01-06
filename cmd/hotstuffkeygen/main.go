@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/ecdsa"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"log"
@@ -8,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/data"
 	"github.com/spf13/pflag"
 )
@@ -54,6 +57,23 @@ func main() {
 		logger.Fatalf("You must specify one host or IP for each certificate to generate.")
 	}
 
+	var caKey *ecdsa.PrivateKey
+	var ca *x509.Certificate
+	if *tls {
+		caKey, err = data.GeneratePrivateKey()
+		if err != nil {
+			logger.Fatalln("Failed to generate signing key: ", err)
+		}
+		ca, err = data.GenerateRootCert(caKey)
+		if err != nil {
+			logger.Fatalln("Failed to generate root certificate: ", err)
+		}
+		err = data.WriteCertFile(ca, filepath.Join(dest, "ca.crt"))
+		if err != nil {
+			logger.Fatalln("Failed to write root certificate: ", err)
+		}
+	}
+
 	for i := 0; i < *numKeys; i++ {
 		pk, err := data.GeneratePrivateKey()
 		if err != nil {
@@ -72,7 +92,7 @@ func main() {
 			} else {
 				host = (*hosts)[i]
 			}
-			cert, err := data.GenerateTLSCert([]string{host}, pk)
+			cert, err := data.GenerateTLSCert(config.ReplicaID(*startID+i), []string{host}, ca, &pk.PublicKey, caKey)
 			if err != nil {
 				logger.Printf("Failed to generate TLS certificate: %v\n", err)
 			}

@@ -2,8 +2,8 @@ package config
 
 import (
 	"crypto/ecdsa"
-	"crypto/tls"
-	"crypto/x509"
+
+	"google.golang.org/grpc/credentials"
 )
 
 // ReplicaID is the id of a replica
@@ -14,34 +14,25 @@ type ReplicaInfo struct {
 	ID      ReplicaID
 	Address string
 	PubKey  *ecdsa.PublicKey
-	Cert    *x509.Certificate
 }
 
 // ReplicaConfig holds information needed by a replica
 type ReplicaConfig struct {
 	ID         ReplicaID
 	PrivateKey *ecdsa.PrivateKey
-	Cert       *tls.Certificate // Own certificate
+	Creds      credentials.TransportCredentials
 	Replicas   map[ReplicaID]*ReplicaInfo
 	QuorumSize int
 	BatchSize  int
 }
 
 // NewConfig returns a new ReplicaConfig instance
-func NewConfig(id ReplicaID, privateKey *ecdsa.PrivateKey, cert *tls.Certificate) *ReplicaConfig {
+func NewConfig(id ReplicaID, privateKey *ecdsa.PrivateKey, creds credentials.TransportCredentials) *ReplicaConfig {
 	return &ReplicaConfig{
 		ID:         id,
 		PrivateKey: privateKey,
-		Cert:       cert,
+		Creds:      creds,
 		Replicas:   make(map[ReplicaID]*ReplicaInfo),
 		BatchSize:  1,
 	}
-}
-
-func (cfg *ReplicaConfig) CertPool() *x509.CertPool {
-	pool := x509.NewCertPool()
-	for _, replica := range cfg.Replicas {
-		pool.AddCert(replica.Cert)
-	}
-	return pool
 }
