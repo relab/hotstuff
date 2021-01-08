@@ -2,7 +2,6 @@ package pacemaker
 
 import (
 	"context"
-	"log"
 	"math"
 	"time"
 
@@ -10,9 +9,10 @@ import (
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/logging"
+	"go.uber.org/zap"
 )
 
-var logger *log.Logger
+var logger *zap.SugaredLogger
 
 func init() {
 	logger = logging.GetLogger()
@@ -48,7 +48,7 @@ func (p *FixedLeader) GetLeader(_ int) config.ReplicaID {
 // Run runs the pacemaker which will beat when the previous QC is completed
 func (p *FixedLeader) Run(ctx context.Context) {
 	if p.Config.ID == p.leader {
-		logger.Println("Beat")
+		logger.Debug("Beat")
 		go p.Propose()
 	}
 	var n consensus.Event
@@ -65,7 +65,7 @@ func (p *FixedLeader) Run(ctx context.Context) {
 		switch n.Type {
 		case consensus.QCFinish:
 			if p.Config.ID == p.leader {
-				logger.Println("Beat")
+				logger.Debug("Beat")
 				go p.Propose()
 			}
 		}
@@ -171,7 +171,7 @@ func (p *RoundRobin) startNewViewTimeout(stopContext context.Context) {
 			return
 		case <-time.After(p.timeout):
 			// add a dummy block to the tree representing this round which failed
-			logger.Println("NewViewTimeout triggered")
+			logger.Warn("NewViewTimeout triggered")
 			newHeight := p.GetHeight() + 1
 			p.SetLeaf(consensus.CreateLeaf(p.GetLeaf(), nil, nil, newHeight))
 			p.SendNewView(p.GetLeader(newHeight))

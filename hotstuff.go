@@ -3,7 +3,6 @@ package hotstuff
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"strconv"
 	"sync"
@@ -15,13 +14,14 @@ import (
 	"github.com/relab/hotstuff/data"
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 )
 
-var logger *log.Logger
+var logger *zap.SugaredLogger
 
 func init() {
 	logger = logging.GetLogger()
@@ -167,7 +167,7 @@ func (hs *HotStuff) Close() {
 // Propose broadcasts a new proposal to all replicas
 func (hs *HotStuff) Propose() {
 	proposal := hs.CreateProposal()
-	logger.Printf("Propose (%d commands): %s\n", len(proposal.Commands), proposal)
+	logger.Debugf("Propose (%d commands): %s\n", len(proposal.Commands), proposal)
 	protobuf := proto.BlockToProto(proposal)
 
 	var ctx context.Context
@@ -192,7 +192,7 @@ func (hs *HotStuff) SendNewView(id config.ReplicaID) {
 func (hs *HotStuff) handlePropose(block *data.Block) {
 	p, err := hs.OnReceiveProposal(block)
 	if err != nil {
-		logger.Println("OnReceiveProposal returned with error:", err)
+		logger.Info("OnReceiveProposal returned with error:", err)
 		return
 	}
 	leaderID := hs.pacemaker.GetLeader(block.Height)
@@ -265,7 +265,7 @@ func (hs *hotstuffServer) Propose(ctx context.Context, protoB *proto.Block) {
 	block := protoB.FromProto()
 	id, err := hs.getClientID(ctx)
 	if err != nil {
-		logger.Printf("Failed to get client ID: %v", err)
+		logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
 	// defaults to 0 if error

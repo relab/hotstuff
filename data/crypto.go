@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"math/big"
 	"sort"
 	"sync"
@@ -15,9 +14,10 @@ import (
 
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/internal/logging"
+	"go.uber.org/zap"
 )
 
-var logger *log.Logger
+var logger *zap.SugaredLogger
 
 func init() {
 	logger = logging.GetLogger()
@@ -192,7 +192,7 @@ func CreatePartialCert(id config.ReplicaID, privKey *ecdsa.PrivateKey, block *Bl
 func VerifyPartialCert(conf *config.ReplicaConfig, cert *PartialCert) bool {
 	info, ok := conf.Replicas[cert.Sig.ID]
 	if !ok {
-		logger.Printf("VerifyPartialSig: got signature from replica whose ID (%d) was not in config.", cert.Sig.ID)
+		logger.Error("VerifyPartialSig: got signature from replica whose ID (%d) was not in config.", cert.Sig.ID)
 		return false
 	}
 	return ecdsa.Verify(info.PubKey, cert.BlockHash[:], cert.Sig.R, cert.Sig.S)
@@ -213,7 +213,7 @@ func VerifyQuorumCert(conf *config.ReplicaConfig, qc *QuorumCert) bool {
 	for _, psig := range qc.Sigs {
 		info, ok := conf.Replicas[psig.ID]
 		if !ok {
-			logger.Printf("VerifyQuorumSig: got signature from replica whose ID (%d) was not in config.", psig.ID)
+			logger.Error("VerifyQuorumSig: got signature from replica whose ID (%d) was not in config.", psig.ID)
 		}
 		wg.Add(1)
 		go func(psig PartialSig) {

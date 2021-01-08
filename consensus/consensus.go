@@ -3,15 +3,15 @@ package consensus
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/data"
 	"github.com/relab/hotstuff/internal/logging"
+	"go.uber.org/zap"
 )
 
-var logger *log.Logger
+var logger *zap.SugaredLogger
 
 func init() {
 	logger = logging.GetLogger()
@@ -115,7 +115,7 @@ func (hs *HotStuffCore) GetExec() chan []data.Command {
 
 // New creates a new Hotstuff instance
 func New(conf *config.ReplicaConfig) *HotStuffCore {
-	logger.SetPrefix(fmt.Sprintf("hs(id %d): ", conf.ID))
+	*logger = *logger.Named(fmt.Sprintf("hs.%d", conf.ID))
 	genesis := &data.Block{
 		Committed: true,
 	}
@@ -167,21 +167,21 @@ func (hs *HotStuffCore) emitEvent(event Event) {
 // UpdateQCHigh updates the qc held by the paceMaker, to the newest qc.
 func (hs *HotStuffCore) UpdateQCHigh(qc *data.QuorumCert) bool {
 	if !hs.SigCache.VerifyQuorumCert(qc) {
-		logger.Println("QC not verified!:", qc)
+		logger.Info("QC not verified!:", qc)
 		return false
 	}
 
-	logger.Println("UpdateQCHigh")
+	logger.Debug("UpdateQCHigh")
 
 	newQCHighBlock, ok := hs.expectBlock(qc.BlockHash)
 	if !ok {
-		logger.Println("Could not find block of new QC!")
+		logger.Info("Could not find block of new QC!")
 		return false
 	}
 
 	oldQCHighBlock, ok := hs.Blocks.BlockOf(hs.qcHigh)
 	if !ok {
-		panic(fmt.Errorf("Block from the old qcHigh missing from storage"))
+		logger.Panic("Block from the old qcHigh missing from storage")
 	}
 
 	if newQCHighBlock.Height > oldQCHighBlock.Height {
@@ -191,13 +191,13 @@ func (hs *HotStuffCore) UpdateQCHigh(qc *data.QuorumCert) bool {
 		return true
 	}
 
-	logger.Println("UpdateQCHigh Failed")
+	logger.Debug("UpdateQCHigh Failed")
 	return false
 }
 
 // OnReceiveProposal handles a replica's response to the Proposal from the leader
 func (hs *HotStuffCore) OnReceiveProposal(block *data.Block) (*data.PartialCert, error) {
-	logger.Println("OnReceiveProposal:", block)
+	logger.Debug("OnReceiveProposal:", block)
 	hs.Blocks.Put(block)
 
 	hs.mut.Lock()
@@ -205,7 +205,7 @@ func (hs *HotStuffCore) OnReceiveProposal(block *data.Block) (*data.PartialCert,
 
 	if block.Height <= hs.vHeight {
 		hs.mut.Unlock()
-		logger.Println("OnReceiveProposal: Block height less than vHeight")
+		logger.Info("OnReceiveProposal: Block height less than vHeight")
 		return nil, fmt.Errorf("Block was not accepted")
 	}
 
@@ -213,7 +213,7 @@ func (hs *HotStuffCore) OnReceiveProposal(block *data.Block) (*data.PartialCert,
 	if nExists && qcBlock.Height > hs.bLock.Height {
 		safe = true
 	} else {
-		logger.Println("OnReceiveProposal: liveness condition failed")
+		logger.Info("OnReceiveProposal: liveness condition failed")
 		// check if block extends bLock
 		b := block
 		ok := true
@@ -223,17 +223,17 @@ func (hs *HotStuffCore) OnReceiveProposal(block *data.Block) (*data.PartialCert,
 		if ok && b.ParentHash == hs.bLock.Hash() {
 			safe = true
 		} else {
-			logger.Println("OnReceiveProposal: safety condition failed")
+			logger.Info("OnReceiveProposal: safety condition failed")
 		}
 	}
 
 	if !safe {
 		hs.mut.Unlock()
-		logger.Println("OnReceiveProposal: Block not safe")
+		logger.Info("OnReceiveProposal: Block not safe")
 		return nil, fmt.Errorf("Block was not accepted")
 	}
 
-	logger.Println("OnReceiveProposal: Accepted block")
+	logger.Debug("OnReceiveProposal: Accepted block")
 	hs.vHeight = block.Height
 	hs.cmdCache.MarkProposed(block.Commands...)
 	hs.mut.Unlock()
@@ -254,11 +254,11 @@ func (hs *HotStuffCore) OnReceiveProposal(block *data.Block) (*data.PartialCert,
 // OnReceiveVote handles an incoming vote from a replica
 func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 	if !hs.SigCache.VerifySignature(cert.Sig, cert.BlockHash) {
-		logger.Println("OnReceiveVote: signature not verified!")
+		logger.Info("OnReceiveVote: signature not verified!")
 		return
 	}
 
-	logger.Printf("OnReceiveVote: %.8s\n", cert.BlockHash)
+	logger.Debugf("OnReceiveVote: %.8s\n", cert.BlockHash)
 	hs.emitEvent(Event{Type: ReceiveVote, Replica: cert.Sig.ID})
 
 	hs.mut.Lock()
@@ -268,7 +268,7 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 	if !ok {
 		b, ok := hs.expectBlock(cert.BlockHash)
 		if !ok {
-			logger.Println("OnReceiveVote: could not find block for certificate.")
+			logger.Info("OnReceiveVote: could not find block for certificate.")
 			return
 		}
 		if b.Height <= hs.bLeaf.Height {
@@ -285,12 +285,12 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 
 	err := qc.AddPartial(cert)
 	if err != nil {
-		logger.Println("OnReceiveVote: could not add partial signature to QC:", err)
+		logger.Info("OnReceiveVote: could not add partial signature to QC: ", err)
 	}
 
 	if len(qc.Sigs) >= hs.Config.QuorumSize {
 		delete(hs.pendingQCs, cert.BlockHash)
-		logger.Println("OnReceiveVote: Created QC")
+		logger.Debug("OnReceiveVote: Created QC")
 		hs.UpdateQCHigh(qc)
 		hs.emitEvent(Event{Type: QCFinish, QC: qc})
 	}
@@ -311,7 +311,7 @@ func (hs *HotStuffCore) OnReceiveVote(cert *data.PartialCert) {
 func (hs *HotStuffCore) OnReceiveNewView(qc *data.QuorumCert) {
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
-	logger.Println("OnReceiveNewView")
+	logger.Debug("OnReceiveNewView")
 	hs.emitEvent(Event{Type: ReceiveNewView, QC: qc})
 	hs.UpdateQCHigh(qc)
 }
@@ -337,7 +337,7 @@ func (hs *HotStuffCore) update(block *data.Block) {
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
 
-	logger.Println("PRE COMMIT:", block1)
+	logger.Debug("PRE COMMIT: ", block1)
 	// PRE-COMMIT on block1
 	hs.UpdateQCHigh(block.Justify)
 
@@ -348,7 +348,7 @@ func (hs *HotStuffCore) update(block *data.Block) {
 
 	if block2.Height > hs.bLock.Height {
 		hs.bLock = block2 // COMMIT on block2
-		logger.Println("COMMIT:", block2)
+		logger.Debug("COMMIT: ", block2)
 	}
 
 	block3, ok := hs.Blocks.BlockOf(block2.Justify)
@@ -357,7 +357,7 @@ func (hs *HotStuffCore) update(block *data.Block) {
 	}
 
 	if block1.ParentHash == block2.Hash() && block2.ParentHash == block3.Hash() {
-		logger.Println("DECIDE", block3)
+		logger.Debug("DECIDE: ", block3)
 		hs.commit(block3)
 		hs.bExec = block3 // DECIDE on block3
 	}
@@ -375,7 +375,7 @@ func (hs *HotStuffCore) commit(block *data.Block) {
 			hs.commit(parent)
 		}
 		block.Committed = true
-		logger.Println("EXEC", block)
+		logger.Debug("EXEC: ", block)
 		hs.exec <- block.Commands
 	}
 }
