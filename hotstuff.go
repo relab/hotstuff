@@ -36,7 +36,6 @@ type Pacemaker interface {
 // HotStuff is a thing
 type HotStuff struct {
 	*consensus.HotStuffCore
-	tls bool
 
 	pacemaker Pacemaker
 
@@ -240,8 +239,6 @@ func (hs *hotstuffServer) getClientID(ctx context.Context) (config.ReplicaID, er
 			}
 		}
 		return 0, fmt.Errorf("getClientID: could not find matching certificate")
-	} else if hs.tls {
-		return 0, fmt.Errorf("getClientID: tls enabled, but client was not connected using TLS")
 	}
 
 	// If we're not using TLS, we'll fallback to checking the metadata
