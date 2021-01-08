@@ -2,7 +2,9 @@ package logging
 
 import (
 	"os"
+	"strings"
 
+	"github.com/mattn/go-isatty"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -10,16 +12,32 @@ import (
 var logger *zap.SugaredLogger
 
 func init() {
-	atom := zap.NewAtomicLevelAt(zap.DebugLevel)
-	config := zap.NewDevelopmentConfig()
-	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	config.Level = atom
+	var config zap.Config
+	if strings.ToLower(os.Getenv("HOTSTUFF_LOG_TYPE")) == "json" {
+		config = zap.NewProductionConfig()
+	} else {
+		config = zap.NewDevelopmentConfig()
+		if isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd()) {
+			config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		}
+	}
 	l, err := config.Build()
 	if err != nil {
 		panic(err)
 	}
-	if os.Getenv("HOTSTUFF_LOG") != "1" {
-		atom.SetLevel(zap.ErrorLevel)
+	switch strings.ToLower(os.Getenv("HOTSTUFF_LOG")) {
+	case "1":
+		fallthrough
+	case "debug":
+		config.Level.SetLevel(zap.DebugLevel)
+	case "info":
+		config.Level.SetLevel(zap.InfoLevel)
+	case "warn":
+		config.Level.SetLevel(zap.WarnLevel)
+	case "error":
+		fallthrough
+	default:
+		config.Level.SetLevel(zap.ErrorLevel)
 	}
 	logger = l.Sugar()
 }
