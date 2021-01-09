@@ -21,6 +21,120 @@ import (
 	"google.golang.org/grpc/peer"
 )
 
+// ID uniquely identifies a replica
+type ID uint32
+
+// View uniquely identifies a view
+type View uint64
+
+// Hash is a SHA256 hash
+type Hash [32]byte
+
+// Command is a client request to be executed by the consensus protocol
+type Command []byte
+
+// Signature is a signature of a block
+type Signature interface {
+	// Signer returns the ID of the replica that generated the signature.
+	Signer() ID
+}
+
+// PartialCert is a certificate for a block created by a single replica
+type PartialCert interface {
+	// Signature returns the signature
+	Signature() Signature
+	// BlockHash returns the hash of the block that was signed
+	BlockHash() *Hash
+}
+
+// QuorumCert is a certificate for a Block created by a quorum of replicas
+type QuorumCert interface {
+	// BlockHash returns the hash of the block for which the certificate was created
+	BlockHash() *Hash
+}
+
+// Signer implements the methods requried to create signatures and certificates
+type Signer interface {
+	// Sign signs a single block and returns the signature
+	Sign(Block) Signature
+	// CreateQuourmCert creates a from a list of partial certificates
+	CreateQuorumCert(signatures []PartialCert, k int) (QuorumCert, bool)
+}
+
+// Verifier implements the methods required to verify partial and quorum certificates
+type Verifier interface {
+	// VerifyPartialCert verifies a single partial certificate
+	VerifyPartialCert(PartialCert) bool
+	// VerifyQuorumCert verifies a quorum certificate
+	VerifyQuorumCert(qc QuorumCert, k int) bool
+}
+
+// Replica implements the methods that communicate with another replica
+type Replica interface {
+	// ID returns the replica's id
+	ID() ID
+	// Propose sends the block to the other replica
+	Propose(Block)
+	// Vote sends the partial certificate to the other replica
+	Vote(PartialCert)
+	// NewView sends the quorum certificate to the other replica
+	NewView(QuorumCert)
+}
+
+// Block is a proposal that is made during the consensus protocol
+type Block interface {
+	// Hash returns the hash of the block
+	Hash() *Hash
+	// Proposer returns the id of the proposer
+	Proposer() ID
+	// Parent returns the hash of the parent block
+	Parent() *Hash
+	// Command returns the command
+	Command() Command
+	// Certificate returns the certificate that this block references
+	Certificate() QuorumCert
+	// View returns the view in which the block was proposed
+	View() View
+}
+
+// BlockChain is a datastructure that stores a chain of blocks
+type BlockChain interface {
+	// Store stores a block in the blockchain
+	Store(Block)
+	// Get retrieves a block given its hash
+	Get(*Hash) (Block, bool)
+}
+
+// Consensus implements a consensus protocol
+type Consensus interface {
+	// ID returns the id of the replica
+	ID() ID
+	// View returns the current view
+	View() View
+	// HighQC returns the highest QC known to the replica
+	HighQC() QuorumCert
+	// Leaf returns the last proposed block
+	Leaf() Block
+	// Propose proposes the given command
+	Propose(Command)
+	// OnPropose handles an incoming proposal
+	OnPropose(Command)
+	// OnVote handles an incoming vote
+	OnVote(PartialCert)
+	// OnVote handles an incoming NewView
+	OnNewView(QuorumCert)
+}
+
+// LeaderRotation implements a leader rotation scheme
+type LeaderRotation interface {
+	// GetLeader returns the id of the leader in the given view
+	GetLeader(View) ID
+}
+
+// ViewSynchronizer TODO
+type ViewSynchronizer interface {
+}
+
 var logger *zap.SugaredLogger
 
 func init() {
