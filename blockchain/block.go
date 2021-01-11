@@ -56,7 +56,7 @@ func (b *block) Command() hotstuff.Command {
 }
 
 // Certificate returns the certificate that this block references
-func (b *block) Certificate() hotstuff.QuorumCert {
+func (b *block) QuorumCert() hotstuff.QuorumCert {
 	return b.cert
 }
 

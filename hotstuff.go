@@ -117,7 +117,7 @@ type Block interface {
 	// Command returns the command
 	Command() Command
 	// Certificate returns the certificate that this block references
-	Certificate() QuorumCert
+	QuorumCert() QuorumCert
 	// View returns the view in which the block was proposed
 	View() View
 }
@@ -143,7 +143,7 @@ type Consensus interface {
 	// Propose proposes the given command
 	Propose(cmd Command)
 	// OnPropose handles an incoming proposal
-	OnPropose(block Block)
+	OnPropose(block Block) PartialCert
 	// OnVote handles an incoming vote
 	OnVote(cert PartialCert)
 	// OnVote handles an incoming NewView
@@ -165,6 +165,12 @@ type Config interface {
 type LeaderRotation interface {
 	// GetLeader returns the id of the leader in the given view
 	GetLeader(View) ID
+}
+
+// Executor executes a command
+type Executor interface {
+	// Exec executes the given command
+	Exec(Command)
 }
 
 // ViewSynchronizer TODO
