@@ -74,8 +74,8 @@ func (cert ecdsaPartialCert) Signature() hotstuff.Signature {
 }
 
 // BlockHash returns the hash of the block that was signed
-func (cert ecdsaPartialCert) BlockHash() *hotstuff.Hash {
-	return &cert.hash
+func (cert ecdsaPartialCert) BlockHash() hotstuff.Hash {
+	return cert.hash
 }
 
 func (cert ecdsaPartialCert) ToBytes() []byte {
@@ -90,8 +90,8 @@ type ecdsaQuorumCert struct {
 }
 
 // BlockHash returns the hash of the block for which the certificate was created
-func (qc ecdsaQuorumCert) BlockHash() *hotstuff.Hash {
-	return &qc.hash
+func (qc ecdsaQuorumCert) BlockHash() hotstuff.Hash {
+	return qc.hash
 }
 
 func (qc ecdsaQuorumCert) ToBytes() []byte {
@@ -129,7 +129,7 @@ func (ec *ecdsaCrypto) Sign(block hotstuff.Block) (cert hotstuff.PartialCert, er
 	}
 	return &ecdsaPartialCert{
 		&ecdsaSignature{r, s, ec.cfg.ID()},
-		*hash,
+		hash,
 	}, nil
 }
 
@@ -138,10 +138,11 @@ func (ec *ecdsaCrypto) CreateQuorumCert(block hotstuff.Block, signatures []hotst
 	hash := block.Hash()
 	qc := &ecdsaQuorumCert{
 		sigs: make(map[hotstuff.ID]ECDSASignature),
-		hash: *hash,
+		hash: hash,
 	}
 	for _, s := range signatures {
-		if !bytes.Equal(hash[:], s.BlockHash()[:]) {
+		blockHash := s.BlockHash()
+		if !bytes.Equal(hash[:], blockHash[:]) {
 			return nil, ErrHashMismatch
 		}
 		if _, ok := qc.sigs[s.Signature().Signer()]; ok {
@@ -162,7 +163,8 @@ func (ec *ecdsaCrypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 		return false
 	}
 	pk := replica.PublicKey().(*ecdsa.PublicKey)
-	return ecdsa.Verify(pk, (*cert.BlockHash())[:], sig.R(), sig.S())
+	hash := cert.BlockHash()
+	return ecdsa.Verify(pk, hash[:], sig.R(), sig.S())
 }
 
 // VerifyQuorumCert verifies a quorum certificate
@@ -171,7 +173,7 @@ func (ec *ecdsaCrypto) VerifyQuorumCert(cert hotstuff.QuorumCert) bool {
 	if len(qc.sigs) < ec.cfg.QuorumSize() {
 		return false
 	}
-
+	hash := qc.BlockHash()
 	var wg sync.WaitGroup
 	var numVerified uint64 = 0
 	for id, psig := range qc.sigs {
@@ -182,7 +184,7 @@ func (ec *ecdsaCrypto) VerifyQuorumCert(cert hotstuff.QuorumCert) bool {
 		pubKey := info.PublicKey().(*ecdsa.PublicKey)
 		wg.Add(1)
 		go func(psig ECDSASignature) {
-			if ecdsa.Verify(pubKey, qc.BlockHash()[:], psig.R(), psig.S()) {
+			if ecdsa.Verify(pubKey, hash[:], psig.R(), psig.S()) {
 				atomic.AddUint64(&numVerified, 1)
 			}
 			wg.Done()

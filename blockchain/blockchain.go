@@ -27,7 +27,7 @@ func New(maxSize int) hotstuff.BlockChain {
 func (chain *blockChain) dropOldest() {
 	elem := chain.accessOrder.Back()
 	block := elem.Value.(hotstuff.Block)
-	delete(chain.blocks, *block.Hash())
+	delete(chain.blocks, block.Hash())
 	chain.accessOrder.Remove(elem)
 }
 
@@ -41,15 +41,15 @@ func (chain *blockChain) Store(block hotstuff.Block) {
 	}
 
 	elem := chain.accessOrder.PushFront(block)
-	chain.blocks[*block.Hash()] = elem
+	chain.blocks[block.Hash()] = elem
 }
 
 // Get retrieves a block given its hash
-func (chain *blockChain) Get(hash *hotstuff.Hash) (hotstuff.Block, bool) {
+func (chain *blockChain) Get(hash hotstuff.Hash) (hotstuff.Block, bool) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
-	elem, ok := chain.blocks[*hash]
+	elem, ok := chain.blocks[hash]
 	if !ok {
 		return nil, false
 	}

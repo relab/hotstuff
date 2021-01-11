@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/internal/logging"
 )
 
@@ -22,16 +23,20 @@ type chainedhotstuff struct {
 
 	// protocol variables
 
-	view    hotstuff.View       // the last view that the replica voted in
-	genesis hotstuff.Block      // the genesis block
-	bLock   hotstuff.Block      // the currently locked block
-	bExec   hotstuff.Block      // the last committed block
-	bLeaf   hotstuff.Block      // the last proposed block
-	highQC  hotstuff.QuorumCert // the highest qc known to this replica
+	view   hotstuff.View       // the last view that the replica voted in
+	bLock  hotstuff.Block      // the currently locked block
+	bExec  hotstuff.Block      // the last committed block
+	bLeaf  hotstuff.Block      // the last proposed block
+	highQC hotstuff.QuorumCert // the highest qc known to this replica
+
+	pendingQCs map[hotstuff.Hash][]hotstuff.PartialCert
 }
 
 func (hs *chainedhotstuff) init() {
-
+	hs.bLock = blockchain.GetGenesis()
+	hs.bExec = blockchain.GetGenesis()
+	hs.bLeaf = blockchain.GetGenesis()
+	hs.highQC = blockchain.GetGenesis().QuorumCert()
 }
 
 // Config returns the configuration of this replica
@@ -96,6 +101,9 @@ func (hs *chainedhotstuff) commit(block hotstuff.Block) {
 }
 
 func (hs *chainedhotstuff) update(block hotstuff.Block) {
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
+
 	block1, ok := hs.blocks.Get(block.QuorumCert().BlockHash())
 	if !ok {
 		return
@@ -119,7 +127,7 @@ func (hs *chainedhotstuff) update(block hotstuff.Block) {
 		return
 	}
 
-	if *block1.Parent() == *block2.Hash() && *block2.Parent() == *block3.Hash() {
+	if block1.Parent() == block2.Hash() && block2.Parent() == block3.Hash() {
 		logger.Debug("DECIDE: ", block3)
 		hs.commit(block3)
 		hs.bExec = block3
@@ -128,7 +136,13 @@ func (hs *chainedhotstuff) update(block hotstuff.Block) {
 
 // Propose proposes the given command
 func (hs *chainedhotstuff) Propose(cmd hotstuff.Command) {
-	panic("not implemented") // TODO: Implement
+	hs.mut.Lock()
+	block := blockchain.NewBlock(hs.bLeaf.Hash(), hs.highQC, cmd, hs.bLeaf.View()+1, hs.cfg.ID())
+	hs.mut.Unlock()
+
+	hs.cfg.Propose(block)
+	// self vote
+	hs.OnPropose(block)
 }
 
 // OnPropose handles an incoming proposal
@@ -168,18 +182,93 @@ func (hs *chainedhotstuff) OnPropose(block hotstuff.Block) {
 		return
 	}
 
+	hs.blocks.Store(block)
 	hs.view = block.View()
 
+	pc, err := hs.signer.Sign(block)
+	if err != nil {
+		logger.Error("OnPropose: failed to sign vote: ", err)
+		return
+	}
+
+	leaderID := hs.leaderRotation.GetLeader(hs.view)
+	if leaderID == hs.cfg.ID() {
+		hs.mut.Unlock()
+		hs.update(block)
+		hs.OnVote(pc)
+		return
+	}
+
+	// will do the update after the vote is sent
+	defer hs.update(block)
+
+	leader, ok := hs.cfg.Replicas()[leaderID]
+	if !ok {
+		logger.Panicf("Replica with ID %d was not found!", leaderID)
+	}
+
+	hs.mut.Unlock()
+	leader.Vote(pc)
 }
 
 // OnVote handles an incoming vote
 func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
-	panic("not implemented") // TODO: Implement
+	defer func() {
+		hs.mut.Lock()
+		// delete any pending QCs with lower height than bLeaf
+		for k := range hs.pendingQCs {
+			if block, ok := hs.blocks.Get(k); ok {
+				if block.View() <= hs.bLeaf.View() {
+					delete(hs.pendingQCs, k)
+				}
+			} else {
+				delete(hs.pendingQCs, k)
+			}
+		}
+		hs.mut.Unlock()
+	}()
+
+	if !hs.verifier.VerifyPartialCert(cert) {
+		logger.Info("OnVote: Vote could not be verified!")
+		return
+	}
+
+	logger.Debugf("OnVote: %.8s", cert.BlockHash())
+
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
+
+	block, ok := hs.blocks.Get(cert.BlockHash())
+	if !ok {
+		logger.Info("OnVote: could not find block for certificate.")
+		return
+	}
+
+	votes, ok := hs.pendingQCs[cert.BlockHash()]
+	if !ok {
+		if block.View() <= hs.bLeaf.View() {
+			return
+		}
+		hs.pendingQCs[cert.BlockHash()] = []hotstuff.PartialCert{cert}
+	}
+
+	if len(votes) >= hs.cfg.QuorumSize() {
+		qc, err := hs.signer.CreateQuorumCert(block, votes)
+		if err != nil {
+			logger.Info("OnVote: could not create QC for block: ", err)
+		}
+		delete(hs.pendingQCs, cert.BlockHash())
+		hs.updateHighQC(qc)
+	}
 }
 
-// OnVote handles an incoming NewView
+// OnNewView handles an incoming NewView
 func (hs *chainedhotstuff) OnNewView(qc hotstuff.QuorumCert) {
-	panic("not implemented") // TODO: Implement
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
+
+	logger.Debug("OnNewView: ", qc)
+	hs.updateHighQC(qc)
 }
 
 var _ hotstuff.Consensus = (*chainedhotstuff)(nil)

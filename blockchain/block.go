@@ -32,12 +32,12 @@ func (b *block) hashSlow() hotstuff.Hash {
 }
 
 // Hash returns the hash of the block
-func (b *block) Hash() *hotstuff.Hash {
+func (b *block) Hash() hotstuff.Hash {
 	if b.hash == nil {
 		b.hash = new(hotstuff.Hash)
 		*b.hash = b.hashSlow()
 	}
-	return b.hash
+	return *b.hash
 }
 
 // Proposer returns the id of the proposer
@@ -46,8 +46,8 @@ func (b *block) Proposer() hotstuff.ID {
 }
 
 // Parent returns the hash of the parent block
-func (b *block) Parent() *hotstuff.Hash {
-	return &b.parent
+func (b *block) Parent() hotstuff.Hash {
+	return b.parent
 }
 
 // Command returns the command
