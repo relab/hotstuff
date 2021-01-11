@@ -4,6 +4,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/crypto/ecdsa"
+	"github.com/relab/hotstuff/leaderrotation"
 )
 
 // Builder is used to set up a HotStuff instance
@@ -25,7 +26,7 @@ func NewBuilder(cfg hotstuff.Config, executor hotstuff.Executor) *Builder {
 		Signer:         signer,
 		Verifier:       verifier,
 		Executor:       executor,
-		LeaderRotation: nil, // TODO
+		LeaderRotation: leaderrotation.NewRoundRobin(cfg),
 	}
 }
 
