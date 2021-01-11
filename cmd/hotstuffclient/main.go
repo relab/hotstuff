@@ -21,7 +21,7 @@ import (
 	"github.com/relab/gorums/benchmark"
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
-	"github.com/relab/hotstuff/data"
+	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -137,7 +137,7 @@ func main() {
 
 	replicaConfig := config.NewConfig(0, nil, creds)
 	for _, r := range conf.Replicas {
-		key, err := data.ReadPublicKeyFile(r.Pubkey)
+		key, err := crypto.ReadPublicKeyFile(r.Pubkey)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to read public key file '%s': %v\n", r.Pubkey, err)
 			os.Exit(1)

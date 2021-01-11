@@ -6,6 +6,7 @@ import (
 	"time"
 
 	. "github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/crypto"
 	. "github.com/relab/hotstuff/data"
 )
 
@@ -54,7 +55,7 @@ import (
 } */
 
 func TestUpdateQCHigh(t *testing.T) {
-	key, _ := GeneratePrivateKey()
+	key, _ := crypto.GeneratePrivateKey()
 	hs := New(NewConfig(1, key, nil))
 	block1 := CreateLeaf(hs.genesis, []Command{Command("command1")}, hs.qcHigh, hs.genesis.Height+1)
 	hs.Blocks.Put(block1)
@@ -83,7 +84,7 @@ func TestUpdateQCHigh(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	key, _ := GeneratePrivateKey()
+	key, _ := crypto.GeneratePrivateKey()
 	hs := New(NewConfig(1, key, nil))
 	hs.Config.QuorumSize = 0 // this accepts all QCs
 
@@ -136,7 +137,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestOnReciveProposal(t *testing.T) {
-	key, _ := GeneratePrivateKey()
+	key, _ := crypto.GeneratePrivateKey()
 	hs := New(NewConfig(1, key, nil))
 	block1 := CreateLeaf(hs.genesis, []Command{Command("command1")}, hs.qcHigh, hs.genesis.Height+1)
 	qc := CreateQuorumCert(block1)
@@ -172,7 +173,7 @@ func TestOnReciveProposal(t *testing.T) {
 }
 
 func TestExpectBlock(t *testing.T) {
-	key, _ := GeneratePrivateKey()
+	key, _ := crypto.GeneratePrivateKey()
 	hs := New(NewConfig(1, key, nil))
 	block := CreateLeaf(hs.genesis, []Command{Command("test")}, hs.qcHigh, 1)
 	qc := CreateQuorumCert(block)

@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/relab/hotstuff/config"
-	"github.com/relab/hotstuff/data"
+	"github.com/relab/hotstuff/crypto"
 	"github.com/spf13/pflag"
 )
 
@@ -60,22 +60,22 @@ func main() {
 	var caKey *ecdsa.PrivateKey
 	var ca *x509.Certificate
 	if *tls {
-		caKey, err = data.GeneratePrivateKey()
+		caKey, err = crypto.GeneratePrivateKey()
 		if err != nil {
 			logger.Fatalln("Failed to generate signing key: ", err)
 		}
-		ca, err = data.GenerateRootCert(caKey)
+		ca, err = crypto.GenerateRootCert(caKey)
 		if err != nil {
 			logger.Fatalln("Failed to generate root certificate: ", err)
 		}
-		err = data.WriteCertFile(ca, filepath.Join(dest, "ca.crt"))
+		err = crypto.WriteCertFile(ca, filepath.Join(dest, "ca.crt"))
 		if err != nil {
 			logger.Fatalln("Failed to write root certificate: ", err)
 		}
 	}
 
 	for i := 0; i < *numKeys; i++ {
-		pk, err := data.GeneratePrivateKey()
+		pk, err := crypto.GeneratePrivateKey()
 		if err != nil {
 			logger.Fatalf("Failed to generate key: %v\n", err)
 		}
@@ -92,22 +92,22 @@ func main() {
 			} else {
 				host = (*hosts)[i]
 			}
-			cert, err := data.GenerateTLSCert(config.ReplicaID(*startID+i), []string{host}, ca, &pk.PublicKey, caKey)
+			cert, err := crypto.GenerateTLSCert(config.ReplicaID(*startID+i), []string{host}, ca, &pk.PublicKey, caKey)
 			if err != nil {
 				logger.Printf("Failed to generate TLS certificate: %v\n", err)
 			}
-			err = data.WriteCertFile(cert, certPath)
+			err = crypto.WriteCertFile(cert, certPath)
 			if err != nil {
 				logger.Printf("Failed to write certificate to file: %v\n", err)
 			}
 		}
 
-		err = data.WritePrivateKeyFile(pk, privKeyPath)
+		err = crypto.WritePrivateKeyFile(pk, privKeyPath)
 		if err != nil {
 			logger.Fatalf("Failed to write private key file: %v\n", err)
 		}
 
-		err = data.WritePublicKeyFile(&pk.PublicKey, pubKeyPath)
+		err = crypto.WritePublicKeyFile(&pk.PublicKey, pubKeyPath)
 		if err != nil {
 			logger.Fatalf("Failed to write public key file: %v\n", err)
 		}

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/crypto"
 )
 
 var pk ecdsa.PrivateKey // must not be a pointer
@@ -52,7 +53,7 @@ var testBlock = &Block{
 }
 
 func init() {
-	k, err := GeneratePrivateKey()
+	k, err := crypto.GeneratePrivateKey()
 	if err != nil {
 		panic(err)
 	}

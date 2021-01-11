@@ -10,13 +10,14 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/data"
 )
 
 var pk ecdsa.PrivateKey
 
 func init() {
-	_pk, _ := data.GeneratePrivateKey()
+	_pk, _ := crypto.GeneratePrivateKey()
 	pk = *_pk
 }
 

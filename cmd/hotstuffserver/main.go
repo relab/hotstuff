@@ -19,6 +19,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/data"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/pacemaker"
@@ -141,7 +142,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	privkey, err := data.ReadPrivateKeyFile(conf.Privkey)
+	privkey, err := crypto.ReadPrivateKeyFile(conf.Privkey)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to read private key file: %v\n", err)
 		os.Exit(1)
@@ -193,7 +194,7 @@ func main() {
 	replicaConfig := config.NewConfig(conf.SelfID, privkey, creds)
 	replicaConfig.BatchSize = conf.BatchSize
 	for _, r := range conf.Replicas {
-		key, err := data.ReadPublicKeyFile(r.Pubkey)
+		key, err := crypto.ReadPublicKeyFile(r.Pubkey)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to read public key file '%s': %v\n", r.Pubkey, err)
 			os.Exit(1)

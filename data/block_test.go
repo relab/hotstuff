@@ -9,6 +9,7 @@ import (
 
 	fuzz "github.com/google/gofuzz"
 	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/crypto"
 )
 
 func TestCanStoreAndRetrieveBlock(t *testing.T) {
@@ -51,9 +52,9 @@ func TestFuzzBlockHash(t *testing.T) {
 }
 
 func BenchmarkBlockHash(b *testing.B) {
-	pk1, _ := GeneratePrivateKey()
-	pk2, _ := GeneratePrivateKey()
-	pk3, _ := GeneratePrivateKey()
+	pk1, _ := crypto.GeneratePrivateKey()
+	pk2, _ := crypto.GeneratePrivateKey()
+	pk3, _ := crypto.GeneratePrivateKey()
 
 	parent := &Block{Commands: []Command{"Test"}}
 
