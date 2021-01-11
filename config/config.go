@@ -3,36 +3,31 @@ package config
 import (
 	"crypto/ecdsa"
 
+	"github.com/relab/hotstuff"
 	"google.golang.org/grpc/credentials"
 )
 
-// ReplicaID is the id of a replica
-type ReplicaID uint32
-
 // ReplicaInfo holds information about a replica
 type ReplicaInfo struct {
-	ID      ReplicaID
+	ID      hotstuff.ID
 	Address string
 	PubKey  *ecdsa.PublicKey
 }
 
 // ReplicaConfig holds information needed by a replica
 type ReplicaConfig struct {
-	ID         ReplicaID
+	ID         hotstuff.ID
 	PrivateKey *ecdsa.PrivateKey
 	Creds      credentials.TransportCredentials
-	Replicas   map[ReplicaID]*ReplicaInfo
-	QuorumSize int
-	BatchSize  int
+	Replicas   map[hotstuff.ID]*ReplicaInfo
 }
 
 // NewConfig returns a new ReplicaConfig instance
-func NewConfig(id ReplicaID, privateKey *ecdsa.PrivateKey, creds credentials.TransportCredentials) *ReplicaConfig {
+func NewConfig(id hotstuff.ID, privateKey *ecdsa.PrivateKey, creds credentials.TransportCredentials) *ReplicaConfig {
 	return &ReplicaConfig{
 		ID:         id,
 		PrivateKey: privateKey,
 		Creds:      creds,
-		Replicas:   make(map[ReplicaID]*ReplicaInfo),
-		BatchSize:  1,
+		Replicas:   make(map[hotstuff.ID]*ReplicaInfo),
 	}
 }
