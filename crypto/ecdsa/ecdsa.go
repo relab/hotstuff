@@ -28,7 +28,7 @@ func (pk PrivateKey) PublicKey() hotstuff.PublicKey {
 
 var _ hotstuff.PrivateKey = (*PrivateKey)(nil)
 
-type ECDSASignature interface {
+type Signature interface {
 	hotstuff.Signature
 
 	R() *big.Int
@@ -61,10 +61,10 @@ func (sig *ecdsaSignature) ToBytes() []byte {
 	return b
 }
 
-var _ ECDSASignature = (*ecdsaSignature)(nil)
+var _ Signature = (*ecdsaSignature)(nil)
 
 type ecdsaPartialCert struct {
-	sig  ECDSASignature
+	sig  Signature
 	hash hotstuff.Hash
 }
 
@@ -84,9 +84,19 @@ func (cert ecdsaPartialCert) ToBytes() []byte {
 
 var _ hotstuff.PartialCert = (*ecdsaPartialCert)(nil)
 
+type QuorumCert interface {
+	hotstuff.QuorumCert
+
+	Signatures() map[hotstuff.ID]Signature
+}
+
 type ecdsaQuorumCert struct {
-	sigs map[hotstuff.ID]ECDSASignature
+	sigs map[hotstuff.ID]Signature
 	hash hotstuff.Hash
+}
+
+func (qc ecdsaQuorumCert) Signatures() map[hotstuff.ID]Signature {
+	return qc.sigs
 }
 
 // BlockHash returns the hash of the block for which the certificate was created
@@ -102,7 +112,7 @@ func (qc ecdsaQuorumCert) ToBytes() []byte {
 	return b
 }
 
-var _ hotstuff.QuorumCert = (*ecdsaQuorumCert)(nil)
+var _ QuorumCert = (*ecdsaQuorumCert)(nil)
 
 // TODO: consider adding caching back
 
@@ -137,7 +147,7 @@ func (ec *ecdsaCrypto) Sign(block hotstuff.Block) (cert hotstuff.PartialCert, er
 func (ec *ecdsaCrypto) CreateQuorumCert(block hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
 	hash := block.Hash()
 	qc := &ecdsaQuorumCert{
-		sigs: make(map[hotstuff.ID]ECDSASignature),
+		sigs: make(map[hotstuff.ID]Signature),
 		hash: hash,
 	}
 	for _, s := range signatures {
@@ -148,7 +158,7 @@ func (ec *ecdsaCrypto) CreateQuorumCert(block hotstuff.Block, signatures []hotst
 		if _, ok := qc.sigs[s.Signature().Signer()]; ok {
 			return nil, ErrPartialDuplicate
 		}
-		qc.sigs[s.Signature().Signer()] = s.(ECDSASignature)
+		qc.sigs[s.Signature().Signer()] = s.(Signature)
 	}
 	return qc, nil
 }
@@ -156,7 +166,7 @@ func (ec *ecdsaCrypto) CreateQuorumCert(block hotstuff.Block, signatures []hotst
 // VerifyPartialCert verifies a single partial certificate
 func (ec *ecdsaCrypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 	// TODO: decide how to handle incompatible types. For now we'll simply panic
-	sig := cert.Signature().(ECDSASignature)
+	sig := cert.Signature().(Signature)
 	replica, ok := ec.cfg.Replicas()[sig.Signer()]
 	if !ok {
 		logger.Info("ecdsaCrypto: got signature from replica whose ID (%d) was not in the config.")
@@ -183,7 +193,7 @@ func (ec *ecdsaCrypto) VerifyQuorumCert(cert hotstuff.QuorumCert) bool {
 		}
 		pubKey := info.PublicKey().(*ecdsa.PublicKey)
 		wg.Add(1)
-		go func(psig ECDSASignature) {
+		go func(psig Signature) {
 			if ecdsa.Verify(pubKey, hash[:], psig.R(), psig.S()) {
 				atomic.AddUint64(&numVerified, 1)
 			}

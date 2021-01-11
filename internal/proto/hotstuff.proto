@@ -23,26 +23,25 @@ service Hotstuff {
 }
 
 message Block {
-  bytes ParentHash = 1;
+  bytes XParent = 1;
   QuorumCert QC = 2;
-  int64 Height = 3;
-  repeated Command Commands = 4;
+  uint64 XView = 3;
+  bytes XCommand = 4;
+  uint32 xProposer = 5;
 }
 
-message PartialSig {
-  int32 ReplicaID = 1;
-  bytes R = 2;
-  bytes S = 3;
+message Signature {
+  uint32 ReplicaID = 1;
+  bytes XR = 2;
+  bytes XS = 3;
 }
 
 message PartialCert {
-  PartialSig Sig = 1;
+  Signature Sig = 1;
   bytes Hash = 2;
 }
 
 message QuorumCert {
-  repeated PartialSig Sigs = 1;
+  map<uint32, Signature> Sigs = 1;
   bytes Hash = 2;
 }
-
-message Command { bytes Data = 1; }
