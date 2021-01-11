@@ -33,8 +33,6 @@ type ECDSASignature interface {
 
 	R() *big.Int
 	S() *big.Int
-	// RawBytes returns a raw byte string representation of the signature
-	RawBytes() string
 }
 
 type ecdsaSignature struct {
@@ -56,11 +54,11 @@ func (sig *ecdsaSignature) S() *big.Int {
 }
 
 // RawBytes returns a raw byte string representation of the signature
-func (sig *ecdsaSignature) RawBytes() string {
+func (sig *ecdsaSignature) ToBytes() []byte {
 	var b []byte
 	b = append(b, sig.r.Bytes()...)
 	b = append(b, sig.s.Bytes()...)
-	return string(b)
+	return b
 }
 
 var _ ECDSASignature = (*ecdsaSignature)(nil)
@@ -77,7 +75,11 @@ func (cert ecdsaPartialCert) Signature() hotstuff.Signature {
 
 // BlockHash returns the hash of the block that was signed
 func (cert ecdsaPartialCert) BlockHash() *hotstuff.Hash {
-	panic("not implemented") // TODO: Implement
+	return &cert.hash
+}
+
+func (cert ecdsaPartialCert) ToBytes() []byte {
+	return append(cert.hash[:], cert.sig.ToBytes()...)
 }
 
 var _ hotstuff.PartialCert = (*ecdsaPartialCert)(nil)
@@ -90,6 +92,14 @@ type ecdsaQuorumCert struct {
 // BlockHash returns the hash of the block for which the certificate was created
 func (qc ecdsaQuorumCert) BlockHash() *hotstuff.Hash {
 	return &qc.hash
+}
+
+func (qc ecdsaQuorumCert) ToBytes() []byte {
+	b := qc.hash[:]
+	for _, sig := range qc.sigs {
+		b = append(b, sig.ToBytes()...)
+	}
+	return b
 }
 
 var _ hotstuff.QuorumCert = (*ecdsaQuorumCert)(nil)

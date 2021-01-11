@@ -33,6 +33,10 @@ type Hash [32]byte
 // Command is a client request to be executed by the consensus protocol
 type Command string
 
+type ToBytes interface {
+	ToBytes() []byte
+}
+
 // PublicKey is the public part of a replica's key pair
 type PublicKey interface{}
 
@@ -46,12 +50,14 @@ type PrivateKey interface {
 
 // Signature is a signature of a block
 type Signature interface {
+	ToBytes
 	// Signer returns the ID of the replica that generated the signature.
 	Signer() ID
 }
 
 // PartialCert is a certificate for a block created by a single replica
 type PartialCert interface {
+	ToBytes
 	// Signature returns the signature
 	Signature() Signature
 	// BlockHash returns the hash of the block that was signed
@@ -60,6 +66,7 @@ type PartialCert interface {
 
 // QuorumCert is a certificate for a Block created by a quorum of replicas
 type QuorumCert interface {
+	ToBytes
 	// BlockHash returns the hash of the block for which the certificate was created
 	BlockHash() *Hash
 }
@@ -100,6 +107,7 @@ type Replica interface {
 
 // Block is a proposal that is made during the consensus protocol
 type Block interface {
+	ToBytes
 	// Hash returns the hash of the block
 	Hash() *Hash
 	// Proposer returns the id of the proposer
