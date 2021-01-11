@@ -1,12 +1,8 @@
 package proto
 
 import (
-	"math/big"
-
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/crypto/ecdsa"
-	"github.com/relab/hotstuff/data"
 )
 
 func SignatureToProto(sig hotstuff.Signature) *Signature {
@@ -15,18 +11,6 @@ func SignatureToProto(sig hotstuff.Signature) *Signature {
 		ReplicaID: uint32(s.Signer()),
 		XR:        s.R().Bytes(),
 		XS:        s.S().Bytes(),
-	}
-}
-
-func (pps *Signature) FromProto() *data.PartialSig {
-	r := big.NewInt(0)
-	s := big.NewInt(0)
-	r.SetBytes(pps.GetXR())
-	s.SetBytes(pps.GetXS())
-	return &data.PartialSig{
-		ID: config.ReplicaID(pps.GetReplicaID()),
-		R:  r,
-		S:  s,
 	}
 }
 
