@@ -11,7 +11,7 @@ import (
 
 var logger *zap.SugaredLogger
 
-func init() {
+func initLogger() {
 	var config zap.Config
 	if strings.ToLower(os.Getenv("HOTSTUFF_LOG_TYPE")) == "json" {
 		config = zap.NewProductionConfig()
@@ -44,5 +44,8 @@ func init() {
 
 // GetLogger returns a pointer to the global logger for HotStuff
 func GetLogger() *zap.SugaredLogger {
+	if logger == nil {
+		initLogger()
+	}
 	return logger
 }
