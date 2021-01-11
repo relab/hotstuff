@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/spf13/pflag"
 )
@@ -92,7 +92,7 @@ func main() {
 			} else {
 				host = (*hosts)[i]
 			}
-			cert, err := crypto.GenerateTLSCert(config.ReplicaID(*startID+i), []string{host}, ca, &pk.PublicKey, caKey)
+			cert, err := crypto.GenerateTLSCert(hotstuff.ID(*startID+i), []string{host}, ca, &pk.PublicKey, caKey)
 			if err != nil {
 				logger.Printf("Failed to generate TLS certificate: %v\n", err)
 			}
