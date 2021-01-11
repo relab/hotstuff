@@ -19,17 +19,15 @@ import (
 
 var logger = logging.GetLogger()
 
-type gorumsServer struct {
+type Server struct {
+	addr      string
 	hs        hotstuff.Consensus
 	gorumsSrv *gorums.Server
 }
 
-func (srv *gorumsServer) startServer(replicaConfig config.ReplicaConfig) error {
-	addr := replicaConfig.Replicas[replicaConfig.ID].Address
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("Failed to listen on %s: %w", addr, err)
-	}
+func NewServer(replicaConfig config.ReplicaConfig) *Server {
+	srv := &Server{}
+	srv.addr = replicaConfig.Replicas[replicaConfig.ID].Address
 
 	serverOpts := []gorums.ServerOption{}
 	grpcServerOpts := []grpc.ServerOption{}
@@ -41,13 +39,22 @@ func (srv *gorumsServer) startServer(replicaConfig config.ReplicaConfig) error {
 	serverOpts = append(serverOpts, gorums.WithGRPCServerOptions(grpcServerOpts...))
 
 	srv.gorumsSrv = gorums.NewServer(serverOpts...)
-	proto.RegisterHotstuffServer(srv.gorumsSrv, srv)
 
+	proto.RegisterHotstuffServer(srv.gorumsSrv, srv)
+	return srv
+}
+
+func (srv *Server) StartServer(hs hotstuff.Consensus) error {
+	srv.hs = hs
+	lis, err := net.Listen("tcp", srv.addr)
+	if err != nil {
+		return fmt.Errorf("Failed to listen on %s: %w", srv.addr, err)
+	}
 	go srv.gorumsSrv.Serve(lis)
 	return nil
 }
 
-func (srv *gorumsServer) getClientID(ctx context.Context) (hotstuff.ID, error) {
+func (srv *Server) getClientID(ctx context.Context) (hotstuff.ID, error) {
 	peerInfo, ok := peer.FromContext(ctx)
 	if !ok {
 		return 0, fmt.Errorf("getClientID: peerInfo not available")
@@ -89,7 +96,7 @@ func (srv *gorumsServer) getClientID(ctx context.Context) (hotstuff.ID, error) {
 }
 
 // Propose handles a replica's response to the Propose QC from the leader
-func (srv *gorumsServer) Propose(ctx context.Context, block *proto.Block) {
+func (srv *Server) Propose(ctx context.Context, block *proto.Block) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
 		logger.Infof("Failed to get client ID: %v", err)
@@ -100,11 +107,11 @@ func (srv *gorumsServer) Propose(ctx context.Context, block *proto.Block) {
 	srv.hs.OnPropose(block)
 }
 
-func (srv *gorumsServer) Vote(ctx context.Context, cert *proto.PartialCert) {
+func (srv *Server) Vote(ctx context.Context, cert *proto.PartialCert) {
 	srv.hs.OnVote(cert)
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica
-func (srv *gorumsServer) NewView(ctx context.Context, msg *proto.QuorumCert) {
+func (srv *Server) NewView(ctx context.Context, msg *proto.QuorumCert) {
 	srv.hs.OnNewView(msg)
 }
