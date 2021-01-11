@@ -19,6 +19,7 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/gorums/benchmark"
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/crypto"
@@ -33,17 +34,17 @@ import (
 )
 
 type options struct {
-	SelfID      config.ReplicaID `mapstructure:"self-id"`
-	RateLimit   int              `mapstructure:"rate-limit"`
-	PayloadSize int              `mapstructure:"payload-size"`
-	MaxInflight uint64           `mapstructure:"max-inflight"`
-	DataSource  string           `mapstructure:"input"`
-	Benchmark   bool             `mapstructure:"benchmark"`
-	ExitAfter   int              `mapstructure:"exit-after"`
+	SelfID      hotstuff.ID `mapstructure:"self-id"`
+	RateLimit   int         `mapstructure:"rate-limit"`
+	PayloadSize int         `mapstructure:"payload-size"`
+	MaxInflight uint64      `mapstructure:"max-inflight"`
+	DataSource  string      `mapstructure:"input"`
+	Benchmark   bool        `mapstructure:"benchmark"`
+	ExitAfter   int         `mapstructure:"exit-after"`
 	TLS         bool
 	RootCAs     []string `mapstructure:"root-cas"`
 	Replicas    []struct {
-		ID         config.ReplicaID
+		ID         hotstuff.ID
 		ClientAddr string `mapstructure:"client-address"`
 		Pubkey     string
 		Cert       string
