@@ -55,7 +55,7 @@ type gorumsConfig struct {
 	cfg           *proto.Configuration
 	id            hotstuff.ID
 	privKey       hotstuff.PrivateKey
-	replicas      map[hotstuff.ID]gorumsReplica
+	replicas      map[hotstuff.ID]hotstuff.Replica
 	proposeCancel context.CancelFunc
 }
 
@@ -63,7 +63,7 @@ func NewGorumsConfig(replicaCfg config.ReplicaConfig, connectTimeout time.Durati
 	cfg := &gorumsConfig{
 		id:            replicaCfg.ID,
 		privKey:       &ecdsa.PrivateKey{PrivateKey: replicaCfg.PrivateKey},
-		replicas:      make(map[hotstuff.ID]gorumsReplica),
+		replicas:      make(map[hotstuff.ID]hotstuff.Replica),
 		proposeCancel: func() {},
 	}
 
@@ -104,7 +104,7 @@ func NewGorumsConfig(replicaCfg config.ReplicaConfig, connectTimeout time.Durati
 
 	for _, node := range cfg.mgr.Nodes() {
 		id := hotstuff.ID(node.ID())
-		cfg.replicas[id] = gorumsReplica{
+		cfg.replicas[id] = &gorumsReplica{
 			node:          node,
 			id:            id,
 			pubKey:        replicaCfg.Replicas[id].PubKey,
@@ -133,7 +133,7 @@ func (cfg *gorumsConfig) PrivateKey() hotstuff.PrivateKey {
 
 // Replicas returns all of the replicas in the configuration
 func (cfg *gorumsConfig) Replicas() map[hotstuff.ID]hotstuff.Replica {
-	return cfg.Replicas()
+	return cfg.replicas
 }
 
 // QuorumSize returns the size of a quorum
