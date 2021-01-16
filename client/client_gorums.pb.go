@@ -5,6 +5,7 @@ package client
 import (
 	context "context"
 	fmt "fmt"
+	empty "github.com/golang/protobuf/ptypes/empty"
 	gorums "github.com/relab/gorums"
 	encoding "google.golang.org/grpc/encoding"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -164,9 +165,9 @@ func (c *Configuration) ExecCommand(ctx context.Context, in *Command) *FutureEmp
 		Method:  "client.Client.ExecCommand",
 	}
 	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
-		r := make(map[uint32]*Empty, len(replies))
+		r := make(map[uint32]*empty.Empty, len(replies))
 		for k, v := range replies {
-			r[k] = v.(*Empty)
+			r[k] = v.(*empty.Empty)
 		}
 		return c.qspec.ExecCommandQF(req.(*Command), r)
 	}
@@ -183,19 +184,19 @@ type QuorumSpec interface {
 	// supplied to the ExecCommand method at call time, and may or may not
 	// be used by the quorum function. If the in parameter is not needed
 	// you should implement your quorum function with '_ *Command'.
-	ExecCommandQF(in *Command, replies map[uint32]*Empty) (*Empty, bool)
+	ExecCommandQF(in *Command, replies map[uint32]*empty.Empty) (*empty.Empty, bool)
 }
 
 // Client is the server-side API for the Client Service
 type Client interface {
-	ExecCommand(context.Context, *Command, func(*Empty, error))
+	ExecCommand(context.Context, *Command, func(*empty.Empty, error))
 }
 
 func RegisterClientServer(srv *gorums.Server, impl Client) {
 	srv.RegisterHandler("client.Client.ExecCommand", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*Command)
 		once := new(sync.Once)
-		f := func(resp *Empty, err error) {
+		f := func(resp *empty.Empty, err error) {
 			once.Do(func() {
 				finished <- gorums.WrapMessage(in.Metadata, resp, err)
 			})
@@ -206,7 +207,7 @@ func RegisterClientServer(srv *gorums.Server, impl Client) {
 
 type internalEmpty struct {
 	nid   uint32
-	reply *Empty
+	reply *empty.Empty
 	err   error
 }
 
@@ -217,10 +218,10 @@ type FutureEmpty struct {
 
 // Get returns the reply and any error associated with the called method.
 // The method blocks until a reply or error is available.
-func (f *FutureEmpty) Get() (*Empty, error) {
+func (f *FutureEmpty) Get() (*empty.Empty, error) {
 	resp, err := f.Future.Get()
 	if err != nil {
 		return nil, err
 	}
-	return resp.(*Empty), err
+	return resp.(*empty.Empty), err
 }

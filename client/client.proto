@@ -5,6 +5,7 @@ package client;
 import "gorums.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
 
 option go_package = "github.com/relab/hotstuff/client";
 
@@ -12,7 +13,7 @@ option go_package = "github.com/relab/hotstuff/client";
 service Client {
   // ExecCommand sends a command to all replicas and waits for valid signatures
   // from f+1 replicas
-  rpc ExecCommand(Command) returns (Empty) {
+  rpc ExecCommand(Command) returns (google.protobuf.Empty) {
     option (gorums.quorumcall) = true;
     option (gorums.async) = true;
   }
@@ -26,7 +27,8 @@ message Command {
   bytes Data = 3;
 }
 
-message Empty {}
+// Batch is a list of commands to be executed
+message Batch { repeated Command Commands = 1; }
 
 // CommandStats contains the start time and duration that elapsed before a
 // command was executed.

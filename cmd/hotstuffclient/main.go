@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
 	"github.com/relab/gorums/benchmark"
 	"github.com/relab/hotstuff"
@@ -209,11 +210,11 @@ type qspec struct {
 	faulty int
 }
 
-func (q *qspec) ExecCommandQF(_ *client.Command, signatures map[uint32]*client.Empty) (*client.Empty, bool) {
+func (q *qspec) ExecCommandQF(_ *client.Command, signatures map[uint32]*empty.Empty) (*empty.Empty, bool) {
 	if len(signatures) < q.faulty+1 {
 		return nil, false
 	}
-	return &client.Empty{}, true
+	return &empty.Empty{}, true
 }
 
 type hotstuffClient struct {
