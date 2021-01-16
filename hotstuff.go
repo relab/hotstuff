@@ -119,8 +119,10 @@ type Consensus interface {
 	HighQC() QuorumCert
 	// Leaf returns the last proposed block
 	Leaf() Block
-	// Propose proposes the given command
-	Propose(cmd Command)
+	// Propose starts a new proposal
+	Propose()
+	// NewView sends a NewView message to the next leader
+	NewView()
 	// OnPropose handles an incoming proposal
 	OnPropose(block Block)
 	// OnVote handles an incoming vote
@@ -140,12 +142,20 @@ type Config interface {
 	QuorumSize() int
 	// Propose sends the block to all replicas in the configuration
 	Propose(block Block)
+	// Close closes connections opened by the configuration
+	Close()
 }
 
 // LeaderRotation implements a leader rotation scheme
 type LeaderRotation interface {
 	// GetLeader returns the id of the leader in the given view
 	GetLeader(View) ID
+}
+
+// Acceptor is the mechanism that decides wether a command should be accepted by the replica
+type Acceptor interface {
+	// Accept returns true if the replica should accept the command, false otherwise
+	Accept(Command) bool
 }
 
 // Executor executes a command

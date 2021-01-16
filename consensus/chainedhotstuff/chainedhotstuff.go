@@ -20,15 +20,16 @@ type chainedhotstuff struct {
 	signer       hotstuff.Signer
 	verifier     hotstuff.Verifier
 	executor     hotstuff.Executor
+	acceptor     hotstuff.Acceptor
 	synchronizer hotstuff.ViewSynchronizer
 
 	// protocol variables
 
-	view   hotstuff.View       // the last view that the replica voted in
-	bLock  hotstuff.Block      // the currently locked block
-	bExec  hotstuff.Block      // the last committed block
-	bLeaf  hotstuff.Block      // the last proposed block
-	highQC hotstuff.QuorumCert // the highest qc known to this replica
+	lastVote hotstuff.View       // the last view that the replica voted in
+	bLock    hotstuff.Block      // the currently locked block
+	bExec    hotstuff.Block      // the last committed block
+	bLeaf    hotstuff.Block      // the last proposed block
+	highQC   hotstuff.QuorumCert // the highest qc known to this replica
 
 	pendingQCs map[hotstuff.Hash][]hotstuff.PartialCert
 }
@@ -38,6 +39,7 @@ func (hs *chainedhotstuff) init() {
 	hs.bExec = blockchain.GetGenesis()
 	hs.bLeaf = blockchain.GetGenesis()
 	hs.highQC = blockchain.GetGenesis().QuorumCert()
+	hs.synchronizer.Init(hs)
 }
 
 // Config returns the configuration of this replica
@@ -50,7 +52,7 @@ func (hs *chainedhotstuff) View() hotstuff.View {
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
 
-	return hs.view
+	return hs.bLeaf.View()
 }
 
 // HighQC returns the highest QC known to the replica
@@ -155,12 +157,29 @@ func (hs *chainedhotstuff) Propose() {
 	hs.OnPropose(block)
 }
 
+func (hs *chainedhotstuff) NewView() {
+	hs.mut.Lock()
+	leaderID := hs.synchronizer.GetLeader(hs.bLeaf.View() + 1)
+	if leaderID == hs.cfg.ID() {
+		hs.mut.Unlock()
+		// TODO: Is this necessary
+		hs.OnNewView(hs.highQC)
+		return
+	}
+	leader, ok := hs.cfg.Replicas()[leaderID]
+	if !ok {
+		logger.Panicf("Replica with ID %d was not found!", leaderID)
+	}
+	leader.NewView(hs.highQC)
+	hs.mut.Unlock()
+}
+
 // OnPropose handles an incoming proposal
 func (hs *chainedhotstuff) OnPropose(block hotstuff.Block) {
 	logger.Debug("OnPropose: ", block)
 	hs.mut.Lock()
 
-	if block.View() <= hs.view {
+	if block.View() <= hs.lastVote {
 		hs.mut.Unlock()
 		logger.Info("OnPropose: block view was less than our view")
 		return
@@ -192,8 +211,13 @@ func (hs *chainedhotstuff) OnPropose(block hotstuff.Block) {
 		return
 	}
 
-	hs.blocks.Store(block)
-	hs.view = block.View()
+	if !hs.acceptor.Accept(block.Command()) {
+		logger.Info("OnPropose: command not accepted")
+		return
+	}
+
+	// Signal the synchronizer
+	hs.synchronizer.OnPropose()
 
 	pc, err := hs.signer.Sign(block)
 	if err != nil {
@@ -201,7 +225,10 @@ func (hs *chainedhotstuff) OnPropose(block hotstuff.Block) {
 		return
 	}
 
-	leaderID := hs.leaderRotation.GetLeader(hs.view)
+	hs.blocks.Store(block)
+	hs.lastVote = block.View()
+
+	leaderID := hs.synchronizer.GetLeader(hs.lastVote)
 	if leaderID == hs.cfg.ID() {
 		hs.mut.Unlock()
 		hs.update(block)
@@ -262,14 +289,18 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 		hs.pendingQCs[cert.BlockHash()] = []hotstuff.PartialCert{cert}
 	}
 
-	if len(votes) >= hs.cfg.QuorumSize() {
-		qc, err := hs.signer.CreateQuorumCert(block, votes)
-		if err != nil {
-			logger.Info("OnVote: could not create QC for block: ", err)
-		}
-		delete(hs.pendingQCs, cert.BlockHash())
-		hs.updateHighQC(qc)
+	if len(votes) < hs.cfg.QuorumSize() {
+		return
 	}
+
+	qc, err := hs.signer.CreateQuorumCert(block, votes)
+	if err != nil {
+		logger.Info("OnVote: could not create QC for block: ", err)
+	}
+	delete(hs.pendingQCs, cert.BlockHash())
+	hs.updateHighQC(qc)
+	// signal the synchronizer
+	hs.synchronizer.OnFinishQC()
 }
 
 // OnNewView handles an incoming NewView
@@ -279,6 +310,8 @@ func (hs *chainedhotstuff) OnNewView(qc hotstuff.QuorumCert) {
 
 	logger.Debug("OnNewView: ", qc)
 	hs.updateHighQC(qc)
+	// signal the synchronizer
+	hs.synchronizer.OnNewView()
 }
 
 var _ hotstuff.Consensus = (*chainedhotstuff)(nil)
