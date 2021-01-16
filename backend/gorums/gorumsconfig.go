@@ -62,7 +62,7 @@ type gorumsConfig struct {
 func NewGorumsConfig(replicaCfg config.ReplicaConfig, connectTimeout time.Duration) (hotstuff.Config, error) {
 	cfg := &gorumsConfig{
 		id:            replicaCfg.ID,
-		privKey:       &ecdsa.PrivateKey{replicaCfg.PrivateKey},
+		privKey:       &ecdsa.PrivateKey{PrivateKey: replicaCfg.PrivateKey},
 		replicas:      make(map[hotstuff.ID]gorumsReplica),
 		proposeCancel: func() {},
 	}
@@ -85,7 +85,6 @@ func NewGorumsConfig(replicaCfg config.ReplicaConfig, connectTimeout time.Durati
 		gorums.WithMetadata(md),
 	}
 	grpcOpts := []grpc.DialOption{
-		grpc.WithBlock(),
 		grpc.WithReturnConnectionError(),
 	}
 
@@ -149,4 +148,8 @@ func (cfg *gorumsConfig) Propose(block hotstuff.Block) {
 	ctx, cfg.proposeCancel = context.WithCancel(context.Background())
 	pblock := proto.BlockToProto(block)
 	cfg.cfg.Propose(ctx, pblock, gorums.WithAsyncSend())
+}
+
+func (cfg *gorumsConfig) Close() {
+	cfg.mgr.Close()
 }

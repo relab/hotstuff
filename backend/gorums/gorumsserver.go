@@ -115,3 +115,7 @@ func (srv *Server) Vote(ctx context.Context, cert *proto.PartialCert) {
 func (srv *Server) NewView(ctx context.Context, msg *proto.QuorumCert) {
 	srv.hs.OnNewView(msg)
 }
+
+func (srv *Server) Stop() {
+	srv.gorumsSrv.Stop()
+}
