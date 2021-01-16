@@ -14,12 +14,13 @@ type chainedhotstuff struct {
 	mut sync.Mutex
 
 	// modular components
-	cfg            hotstuff.Config
-	blocks         hotstuff.BlockChain
-	signer         hotstuff.Signer
-	verifier       hotstuff.Verifier
-	executor       hotstuff.Executor
-	leaderRotation hotstuff.LeaderRotation
+	cfg          hotstuff.Config
+	commands     hotstuff.CommandQueue
+	blocks       hotstuff.BlockChain
+	signer       hotstuff.Signer
+	verifier     hotstuff.Verifier
+	executor     hotstuff.Executor
+	synchronizer hotstuff.ViewSynchronizer
 
 	// protocol variables
 
@@ -135,9 +136,18 @@ func (hs *chainedhotstuff) update(block hotstuff.Block) {
 }
 
 // Propose proposes the given command
-func (hs *chainedhotstuff) Propose(cmd hotstuff.Command) {
+func (hs *chainedhotstuff) Propose() {
 	hs.mut.Lock()
-	block := blockchain.NewBlock(hs.bLeaf.Hash(), hs.highQC, cmd, hs.bLeaf.View()+1, hs.cfg.ID())
+	cmd := hs.commands.GetCommand()
+	// TODO: Should probably use channels/contexts here instead such that
+	// a proposal can be made a little later if a new command is added to the queue.
+	// Alternatively, we could let the pacemaker know when commands arrive, so that it
+	// can rall Propose() again.
+	if cmd == nil {
+		hs.mut.Unlock()
+		return
+	}
+	block := blockchain.NewBlock(hs.bLeaf.Hash(), hs.highQC, *cmd, hs.bLeaf.View()+1, hs.cfg.ID())
 	hs.mut.Unlock()
 
 	hs.cfg.Propose(block)

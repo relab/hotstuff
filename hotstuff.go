@@ -12,6 +12,12 @@ type Hash [32]byte
 // Command is a client request to be executed by the consensus protocol
 type Command string
 
+// CommandQueue is a queue of commands to be proposed
+type CommandQueue interface {
+	// GetCommand returns the next command to be proposed.
+	GetCommand() *Command
+}
+
 type ToBytes interface {
 	ToBytes() []byte
 }
