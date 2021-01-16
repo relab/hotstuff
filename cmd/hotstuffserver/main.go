@@ -1,57 +1,41 @@
 package main
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
-	"log"
-	"net"
 	"os"
 	"os/signal"
-	"sync"
-	"sync/atomic"
 	"syscall"
-	"time"
 
-	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/crypto"
-	"github.com/relab/hotstuff/data"
 	"github.com/relab/hotstuff/internal/profiling"
-	"github.com/relab/hotstuff/pacemaker"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 )
 
 type options struct {
 	RootCAs         []string `mapstructure:"root-cas"`
 	Privkey         string
 	Cert            string
-	SelfID          config.ReplicaID   `mapstructure:"self-id"`
-	PmType          string             `mapstructure:"pacemaker"`
-	LeaderID        config.ReplicaID   `mapstructure:"leader-id"`
-	Schedule        []config.ReplicaID `mapstructure:"leader-schedule"`
-	ViewChange      int                `mapstructure:"view-change"`
-	ViewTimeout     int                `mapstructure:"view-timeout"`
-	BatchSize       int                `mapstructure:"batch-size"`
-	PrintThroughput bool               `mapstructure:"print-throughput"`
-	PrintCommands   bool               `mapstructure:"print-commands"`
-	ClientAddr      string             `mapstructure:"client-listen"`
-	PeerAddr        string             `mapstructure:"peer-listen"`
+	SelfID          hotstuff.ID `mapstructure:"self-id"`
+	PmType          string      `mapstructure:"pacemaker"`
+	LeaderID        hotstuff.ID `mapstructure:"leader-id"`
+	ViewTimeout     int         `mapstructure:"view-timeout"`
+	BatchSize       int         `mapstructure:"batch-size"`
+	PrintThroughput bool        `mapstructure:"print-throughput"`
+	PrintCommands   bool        `mapstructure:"print-commands"`
+	ClientAddr      string      `mapstructure:"client-listen"`
+	PeerAddr        string      `mapstructure:"peer-listen"`
 	TLS             bool
 	Interval        int
 	Output          string
 	Replicas        []struct {
-		ID         config.ReplicaID
+		ID         hotstuff.ID
 		PeerAddr   string `mapstructure:"peer-address"`
 		ClientAddr string `mapstructure:"client-address"`
 		Pubkey     string
@@ -192,7 +176,6 @@ func main() {
 
 	var clientAddress string
 	replicaConfig := config.NewConfig(conf.SelfID, privkey, creds)
-	replicaConfig.BatchSize = conf.BatchSize
 	for _, r := range conf.Replicas {
 		key, err := crypto.ReadPublicKeyFile(r.Pubkey)
 		if err != nil {
@@ -220,9 +203,8 @@ func main() {
 
 		replicaConfig.Replicas[r.ID] = info
 	}
-	replicaConfig.QuorumSize = len(replicaConfig.Replicas) - (len(replicaConfig.Replicas)-1)/3
 
-	srv := newHotStuffServer(&conf, replicaConfig, &tlsCert)
+	srv := newClientServer(&conf, replicaConfig, &tlsCert)
 	err = srv.Start(clientAddress)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to start HotStuff: %v\n", err)
@@ -232,142 +214,4 @@ func main() {
 	<-signals
 	fmt.Fprintf(os.Stderr, "Exiting...\n")
 	srv.Stop()
-}
-
-// cmdID is a unique identifier for a command
-type cmdID struct {
-	clientID    uint32
-	sequenceNum uint64
-}
-
-type hotstuffServer struct {
-	ctx       context.Context
-	cancel    context.CancelFunc
-	conf      *options
-	gorumsSrv *gorums.Server
-	hs        *hotstuff.HotStuff
-	pm        interface {
-		Run(context.Context)
-	}
-
-	mut          sync.Mutex
-	finishedCmds map[cmdID]chan struct{}
-
-	lastExecTime int64
-}
-
-func newHotStuffServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert *tls.Certificate) *hotstuffServer {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	serverOpts := []gorums.ServerOption{}
-	grpcServerOpts := []grpc.ServerOption{}
-
-	if conf.TLS {
-		grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(tlsCert)))
-	}
-
-	serverOpts = append(serverOpts, gorums.WithGRPCServerOptions(grpcServerOpts...))
-
-	srv := &hotstuffServer{
-		ctx:          ctx,
-		cancel:       cancel,
-		conf:         conf,
-		gorumsSrv:    gorums.NewServer(serverOpts...),
-		finishedCmds: make(map[cmdID]chan struct{}),
-		lastExecTime: time.Now().UnixNano(),
-	}
-	var pm hotstuff.Pacemaker
-	switch conf.PmType {
-	case "fixed":
-		pm = pacemaker.NewFixedLeader(conf.LeaderID)
-	case "round-robin":
-		pm = pacemaker.NewRoundRobin(
-			conf.ViewChange, conf.Schedule, time.Duration(conf.ViewTimeout)*time.Millisecond,
-		)
-	default:
-		fmt.Fprintf(os.Stderr, "Invalid pacemaker type: '%s'\n", conf.PmType)
-		os.Exit(1)
-	}
-	srv.hs = hotstuff.New(replicaConfig, pm, time.Minute)
-	srv.pm = pm.(interface{ Run(context.Context) })
-	// Use a custom server instead of the gorums one
-	client.RegisterClientServer(srv.gorumsSrv, srv)
-	return srv
-}
-
-func (srv *hotstuffServer) Start(address string) error {
-	lis, err := net.Listen("tcp", address)
-	if err != nil {
-		return err
-	}
-
-	err = srv.hs.Start()
-	if err != nil {
-		return err
-	}
-
-	go srv.gorumsSrv.Serve(lis)
-	go srv.pm.Run(srv.ctx)
-	go srv.onExec()
-
-	return nil
-}
-
-func (srv *hotstuffServer) Stop() {
-	srv.gorumsSrv.Stop()
-	srv.cancel()
-	srv.hs.Close()
-}
-
-func (srv *hotstuffServer) ExecCommand(_ context.Context, cmd *client.Command, out func(*client.Empty, error)) {
-	finished := make(chan struct{})
-	id := cmdID{cmd.ClientID, cmd.SequenceNumber}
-	srv.mut.Lock()
-	srv.finishedCmds[id] = finished
-	srv.mut.Unlock()
-	// marshal the message back to a byte so that HotStuff can process it.
-	// TODO: think of a better way to do this.
-	b, err := proto.MarshalOptions{Deterministic: true}.Marshal(cmd)
-	if err != nil {
-		log.Fatalf("Failed to marshal command: %v", err)
-		out(nil, status.Errorf(codes.InvalidArgument, "Failed to marshal command: %v", err))
-	}
-	srv.hs.AddCommand(data.Command(b))
-
-	go func(id cmdID, finished chan struct{}) {
-		<-finished
-
-		srv.mut.Lock()
-		delete(srv.finishedCmds, id)
-		srv.mut.Unlock()
-
-		// send response
-		out(&client.Empty{}, nil)
-	}(id, finished)
-}
-
-func (srv *hotstuffServer) onExec() {
-	for cmds := range srv.hs.GetExec() {
-		if len(cmds) > 0 && srv.conf.PrintThroughput {
-			now := time.Now().UnixNano()
-			prev := atomic.SwapInt64(&srv.lastExecTime, now)
-			fmt.Printf("%d, %d\n", now-prev, len(cmds))
-		}
-
-		for _, cmd := range cmds {
-			m := new(client.Command)
-			err := proto.Unmarshal([]byte(cmd), m)
-			if err != nil {
-				log.Printf("Failed to unmarshal command: %v\n", err)
-			}
-			if srv.conf.PrintCommands {
-				fmt.Printf("%s", m.Data)
-			}
-			srv.mut.Lock()
-			if c, ok := srv.finishedCmds[cmdID{m.ClientID, m.SequenceNumber}]; ok {
-				c <- struct{}{}
-			}
-			srv.mut.Unlock()
-		}
-	}
 }
