@@ -148,6 +148,19 @@ type Executor interface {
 	Exec(Command)
 }
 
-// ViewSynchronizer TODO
+// ViewSynchronizer synchronizes replicas to the same view
 type ViewSynchronizer interface {
+	LeaderRotation
+	// OnPropose should be called when a replica has received a new valid proposal.
+	OnPropose()
+	// OnFinishQC should be called when a replica has created a new qc
+	OnFinishQC()
+	// OnNewView should be called when a replica receives a valid NewView message
+	OnNewView()
+	// Init gives the synchronizer a consensus instance to synchronize
+	Init(Consensus)
+	// Start starts the synchronizer
+	Start()
+	// Stop stops the synchronizer
+	Stop()
 }
