@@ -157,7 +157,7 @@ type Node struct {
 
 // ExecCommand sends a command to all replicas and waits for valid signatures
 // from f+1 replicas
-func (c *Configuration) ExecCommand(ctx context.Context, in *Command) *FutureEmpty {
+func (c *Configuration) ExecCommand(ctx context.Context, in *Command) *AsyncEmpty {
 	cd := gorums.QuorumCallData{
 		Manager: c.mgr.Manager,
 		Nodes:   c.nodes,
@@ -172,8 +172,8 @@ func (c *Configuration) ExecCommand(ctx context.Context, in *Command) *FutureEmp
 		return c.qspec.ExecCommandQF(req.(*Command), r)
 	}
 
-	fut := gorums.FutureCall(ctx, cd)
-	return &FutureEmpty{fut}
+	fut := gorums.AsyncCall(ctx, cd)
+	return &AsyncEmpty{fut}
 }
 
 // QuorumSpec is the interface of quorum functions for Client.
@@ -211,15 +211,15 @@ type internalEmpty struct {
 	err   error
 }
 
-// FutureEmpty is a future object for processing replies.
-type FutureEmpty struct {
-	*gorums.Future
+// AsyncEmpty is a async object for processing replies.
+type AsyncEmpty struct {
+	*gorums.Async
 }
 
 // Get returns the reply and any error associated with the called method.
 // The method blocks until a reply or error is available.
-func (f *FutureEmpty) Get() (*empty.Empty, error) {
-	resp, err := f.Future.Get()
+func (f *AsyncEmpty) Get() (*empty.Empty, error) {
+	resp, err := f.Async.Get()
 	if err != nil {
 		return nil, err
 	}

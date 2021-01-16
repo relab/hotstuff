@@ -314,7 +314,7 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 			num++
 
 			c.wg.Add(1)
-			go func(promise *client.FutureEmpty, sendTime time.Time) {
+			go func(promise *client.AsyncEmpty, sendTime time.Time) {
 				_, err := promise.Get()
 				atomic.AddUint64(&c.inflight, ^uint64(0))
 				if err != nil {
