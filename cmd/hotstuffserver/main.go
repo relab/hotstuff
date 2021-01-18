@@ -12,6 +12,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/crypto"
+	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -203,6 +204,8 @@ func main() {
 
 		replicaConfig.Replicas[r.ID] = info
 	}
+
+	logging.NameLogger(fmt.Sprintf("hs%d", conf.SelfID))
 
 	srv := newClientServer(&conf, replicaConfig, &tlsCert)
 	err = srv.Start(clientAddress)

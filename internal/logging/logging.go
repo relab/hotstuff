@@ -49,3 +49,8 @@ func GetLogger() *zap.SugaredLogger {
 	}
 	return logger
 }
+
+func NameLogger(name string) *zap.SugaredLogger {
+	*logger = *GetLogger().Named(name)
+	return logger
+}
