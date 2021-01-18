@@ -119,6 +119,9 @@ type Consensus interface {
 	HighQC() QuorumCert
 	// Leaf returns the last proposed block
 	Leaf() Block
+	// CreateDummy inserts a dummy block at View+1.
+	// This is useful when a view must be skipped.
+	CreateDummy()
 	// Propose starts a new proposal
 	Propose()
 	// NewView sends a NewView message to the next leader

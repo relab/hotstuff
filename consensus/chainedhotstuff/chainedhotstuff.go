@@ -71,6 +71,14 @@ func (hs *chainedhotstuff) Leaf() hotstuff.Block {
 	return hs.bLeaf
 }
 
+func (hs *chainedhotstuff) CreateDummy() {
+	hs.mut.Lock()
+	dummy := blockchain.NewBlock(hs.bLeaf.Hash(), nil, hotstuff.Command(""), hs.bLeaf.View()+1, hs.cfg.ID())
+	hs.blocks.Store(dummy)
+	hs.bLeaf = dummy
+	hs.mut.Unlock()
+}
+
 func (hs *chainedhotstuff) updateHighQC(qc hotstuff.QuorumCert) {
 	if !hs.verifier.VerifyQuorumCert(qc) {
 		logger.Info("updateQCHigh: QC could not be verified!")

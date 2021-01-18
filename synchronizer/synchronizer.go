@@ -85,6 +85,7 @@ func (s *Synchronizer) newViewTimeout(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-s.timer.C:
+			s.hs.CreateDummy()
 			s.hs.NewView()
 			s.mut.Lock()
 			s.timer.Reset(s.timeout)
