@@ -189,7 +189,7 @@ func (hs *chainedhotstuff) NewView() {
 	}
 	leader, ok := hs.cfg.Replicas()[leaderID]
 	if !ok {
-		logger.Panicf("Replica with ID %d was not found!", leaderID)
+		logger.Warnf("Replica with ID %d was not found!", leaderID)
 	}
 	leader.NewView(hs.highQC)
 	hs.mut.Unlock()
@@ -216,7 +216,7 @@ func (hs *chainedhotstuff) OnPropose(block hotstuff.Block) {
 		// check if this block extends bLock
 		b := block
 		ok := true
-		if ok && b.View() > hs.bLock.View()+1 {
+		for ok && b.View() > hs.bLock.View()+1 {
 			b, ok = hs.blocks.Get(b.Parent())
 		}
 		if ok && b.Parent() == hs.bLock.Hash() {
@@ -262,7 +262,7 @@ func (hs *chainedhotstuff) OnPropose(block hotstuff.Block) {
 
 	leader, ok := hs.cfg.Replicas()[leaderID]
 	if !ok {
-		logger.Panicf("Replica with ID %d was not found!", leaderID)
+		logger.Warnf("Replica with ID %d was not found!", leaderID)
 	}
 
 	hs.mut.Unlock()
@@ -327,11 +327,11 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 // OnNewView handles an incoming NewView
 func (hs *chainedhotstuff) OnNewView(qc hotstuff.QuorumCert) {
 	hs.mut.Lock()
-	defer hs.mut.Unlock()
 
 	logger.Debug("OnNewView: ", qc)
 	hs.updateHighQC(qc)
 	// signal the synchronizer
+	hs.mut.Unlock()
 	hs.synchronizer.OnNewView()
 }
 

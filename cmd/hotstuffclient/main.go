@@ -286,7 +286,7 @@ func (c *hotstuffClient) GetStats() *benchmark.Result {
 }
 
 func (c *hotstuffClient) SendCommands(ctx context.Context) error {
-	var num uint64
+	num := uint64(1)
 	var sleeptime time.Duration
 	if c.conf.RateLimit > 0 {
 		sleeptime = time.Second / time.Duration(c.conf.RateLimit)
@@ -320,7 +320,7 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 				if err != nil {
 					qcError, ok := err.(gorums.QuorumCallError)
 					if !ok || qcError.Reason != context.Canceled.Error() {
-						log.Printf("Did not get enough signatures for command: %v\n", err)
+						log.Printf("Did not get enough replies for command: %v\n", err)
 					}
 				}
 				duration := time.Since(sendTime)

@@ -38,10 +38,17 @@ func (c *cmdCache) addCommand(cmd *client.Command) {
 }
 
 func (c *cmdCache) GetCommand() *hotstuff.Command {
+	if c.cache.Len() == 0 {
+		return nil
+	}
+
 	batch := new(client.Batch)
 
 	for i := 0; i < c.batchSize; i++ {
 		elem := c.cache.Front()
+		if elem == nil {
+			break
+		}
 		c.cache.Remove(elem)
 		cmd := elem.Value.(*client.Command)
 		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
