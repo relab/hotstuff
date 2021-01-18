@@ -3,6 +3,7 @@ package blockchain
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/relab/hotstuff"
 )
@@ -25,6 +26,16 @@ func NewBlock(parent hotstuff.Hash, cert hotstuff.QuorumCert, cmd hotstuff.Comma
 		view:     view,
 		proposer: proposer,
 	}
+}
+
+func (b *block) String() string {
+	return fmt.Sprintf(
+		"Block{ parent: \"%.6s\", proposer: %d, view: %d , cert: %v }",
+		b.parent[:],
+		b.proposer,
+		b.view,
+		b.cert,
+	)
 }
 
 func (b *block) hashSlow() hotstuff.Hash {
