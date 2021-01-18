@@ -179,14 +179,14 @@ func (ec *ecdsaCrypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 
 // VerifyQuorumCert verifies a quorum certificate
 func (ec *ecdsaCrypto) VerifyQuorumCert(cert hotstuff.QuorumCert) bool {
-	qc := cert.(*ecdsaQuorumCert)
-	if len(qc.sigs) < ec.cfg.QuorumSize() {
+	qc := cert.(QuorumCert)
+	if len(qc.Signatures()) < ec.cfg.QuorumSize() {
 		return false
 	}
 	hash := qc.BlockHash()
 	var wg sync.WaitGroup
 	var numVerified uint64 = 0
-	for id, psig := range qc.sigs {
+	for id, psig := range qc.Signatures() {
 		info, ok := ec.cfg.Replicas()[id]
 		if !ok {
 			logger.Error("VerifyQuorumSig: got signature from replica whose ID (%d) was not in config.", id)
