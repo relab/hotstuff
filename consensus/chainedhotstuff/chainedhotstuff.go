@@ -117,11 +117,18 @@ func (hs *chainedhotstuff) commit(block hotstuff.Block) {
 	}
 }
 
+func (hs *chainedhotstuff) qcRef(qc hotstuff.QuorumCert) (hotstuff.Block, bool) {
+	if qc == nil {
+		return nil, false
+	}
+	return hs.blocks.Get(qc.BlockHash())
+}
+
 func (hs *chainedhotstuff) update(block hotstuff.Block) {
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
 
-	block1, ok := hs.blocks.Get(block.QuorumCert().BlockHash())
+	block1, ok := hs.qcRef(block.QuorumCert())
 	if !ok {
 		return
 	}
@@ -129,7 +136,7 @@ func (hs *chainedhotstuff) update(block hotstuff.Block) {
 	logger.Debug("PRE_COMMIT: ", block1)
 	hs.updateHighQC(block.QuorumCert())
 
-	block2, ok := hs.blocks.Get(block1.QuorumCert().BlockHash())
+	block2, ok := hs.qcRef(block1.QuorumCert())
 	if !ok {
 		return
 	}
@@ -139,7 +146,7 @@ func (hs *chainedhotstuff) update(block hotstuff.Block) {
 		hs.bLock = block2
 	}
 
-	block3, ok := hs.blocks.Get(block2.QuorumCert().BlockHash())
+	block3, ok := hs.qcRef(block2.QuorumCert())
 	if !ok {
 		return
 	}
