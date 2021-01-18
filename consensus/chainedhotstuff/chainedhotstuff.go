@@ -35,10 +35,16 @@ type chainedhotstuff struct {
 }
 
 func (hs *chainedhotstuff) init() {
+	var err error
+	hs.pendingQCs = make(map[hotstuff.Hash][]hotstuff.PartialCert)
 	hs.bLock = blockchain.GetGenesis()
 	hs.bExec = blockchain.GetGenesis()
 	hs.bLeaf = blockchain.GetGenesis()
-	hs.highQC = blockchain.GetGenesis().QuorumCert()
+	hs.highQC, err = hs.signer.CreateQuorumCert(blockchain.GetGenesis(), []hotstuff.PartialCert{})
+	if err != nil {
+		logger.Panicf("Failed to create QC for genesis block!")
+	}
+	hs.blocks.Store(blockchain.GetGenesis())
 	hs.synchronizer.Init(hs)
 }
 
