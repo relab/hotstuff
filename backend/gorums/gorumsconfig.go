@@ -34,6 +34,9 @@ func (r *gorumsReplica) PublicKey() hotstuff.PublicKey {
 
 // Vote sends the partial certificate to the other replica
 func (r *gorumsReplica) Vote(cert hotstuff.PartialCert) {
+	if r.node == nil {
+		return
+	}
 	var ctx context.Context
 	r.voteCancel()
 	ctx, r.voteCancel = context.WithCancel(context.Background())
@@ -43,6 +46,9 @@ func (r *gorumsReplica) Vote(cert hotstuff.PartialCert) {
 
 // NewView sends the quorum certificate to the other replica
 func (r *gorumsReplica) NewView(qc hotstuff.QuorumCert) {
+	if r.node == nil {
+		return
+	}
 	var ctx context.Context
 	r.newviewCancel()
 	ctx, r.newviewCancel = context.WithCancel(context.Background())
@@ -65,6 +71,15 @@ func NewConfig(replicaCfg config.ReplicaConfig, connectTimeout time.Duration) *C
 		privKey:       &ecdsa.PrivateKey{PrivateKey: replicaCfg.PrivateKey},
 		replicas:      make(map[hotstuff.ID]hotstuff.Replica),
 		proposeCancel: func() {},
+	}
+
+	for id, r := range replicaCfg.Replicas {
+		cfg.replicas[id] = &gorumsReplica{
+			id:            r.ID,
+			pubKey:        r.PubKey,
+			voteCancel:    func() {},
+			newviewCancel: func() {},
+		}
 	}
 
 	return cfg
@@ -109,19 +124,7 @@ func (cfg *Config) Connect(connectTimeout time.Duration) error {
 
 	for _, node := range cfg.mgr.Nodes() {
 		id := hotstuff.ID(node.ID())
-		cfg.replicas[id] = &gorumsReplica{
-			node:          node,
-			id:            id,
-			pubKey:        cfg.replicaCfg.Replicas[id].PubKey,
-			voteCancel:    func() {},
-			newviewCancel: func() {},
-		}
-	}
-
-	cfg.replicas[cfg.ID()] = &gorumsReplica{
-		node:   nil,
-		id:     cfg.ID(),
-		pubKey: cfg.privKey.PublicKey(),
+		cfg.replicas[id].(*gorumsReplica).node = node
 	}
 
 	cfg.cfg, err = cfg.mgr.NewConfiguration(cfg.mgr.NodeIDs(), struct{}{})
