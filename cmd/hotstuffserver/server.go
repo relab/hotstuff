@@ -89,10 +89,14 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 		fmt.Fprintf(os.Stderr, "Invalid pacemaker type: '%s'\n", conf.PmType)
 		os.Exit(1)
 	}
-	srv.pm = synchronizer.New(leaderRotation, time.Duration(conf.ViewTimeout))
-	builder := chainedhotstuff.NewBuilder(srv.cfg, srv, srv.cmdCache, srv.pm)
-	srv.hs = builder.Build()
-	srv.hsSrv.StartServer(srv.hs)
+	srv.pm = synchronizer.New(leaderRotation, time.Duration(conf.ViewTimeout)*time.Millisecond)
+	srv.hs = chainedhotstuff.Builder{
+		Config:       srv.cfg,
+		Acceptor:     srv.cmdCache,
+		Executor:     srv,
+		Synchronizer: srv.pm,
+		CommandQueue: srv.cmdCache,
+	}.Build()
 	// Use a custom server instead of the gorums one
 	client.RegisterClientServer(srv.gorumsSrv, srv)
 	return srv

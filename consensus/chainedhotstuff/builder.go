@@ -12,35 +12,33 @@ type Builder struct {
 	BlockChain   hotstuff.BlockChain
 	Signer       hotstuff.Signer
 	Verifier     hotstuff.Verifier
+	CommandQueue hotstuff.CommandQueue
 	Executor     hotstuff.Executor
 	Acceptor     hotstuff.Acceptor
 	Synchronizer hotstuff.ViewSynchronizer
 }
 
-// NewBuilder returns a new Builder with default values
-func NewBuilder(cfg hotstuff.Config, executor hotstuff.Executor, acceptor hotstuff.Acceptor, synchronizer hotstuff.ViewSynchronizer) *Builder {
-	signer, verifier := ecdsa.New(cfg)
-	return &Builder{
-		Config:       cfg,
-		BlockChain:   blockchain.New(100),
-		Signer:       signer,
-		Verifier:     verifier,
-		Executor:     executor,
-		Acceptor:     acceptor,
-		Synchronizer: synchronizer,
-	}
-}
-
 // Build returns a new chained HotStuff instance
-func (b *Builder) Build() hotstuff.Consensus {
+func (b Builder) Build() hotstuff.Consensus {
 	hs := &chainedhotstuff{
 		cfg:          b.Config,
 		blocks:       b.BlockChain,
 		signer:       b.Signer,
 		verifier:     b.Verifier,
+		commands:     b.CommandQueue,
 		executor:     b.Executor,
 		acceptor:     b.Acceptor,
 		synchronizer: b.Synchronizer,
+	}
+	signer, verifier := ecdsa.New(b.Config)
+	if b.BlockChain == nil {
+		hs.blocks = blockchain.New(100)
+	}
+	if b.Signer == nil {
+		hs.signer = signer
+	}
+	if b.Verifier == nil {
+		hs.verifier = verifier
 	}
 	hs.init()
 	return hs
