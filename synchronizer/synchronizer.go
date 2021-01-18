@@ -45,6 +45,7 @@ func (s *Synchronizer) OnNewView() {
 
 func (s *Synchronizer) Init(hs hotstuff.Consensus) {
 	s.hs = hs
+	s.timer = time.NewTimer(s.timeout)
 }
 
 // Start starts the synchronizer
@@ -52,10 +53,10 @@ func (s *Synchronizer) Start() {
 	if s.GetLeader(s.hs.View()+1) == s.hs.Config().ID() {
 		s.hs.Propose()
 	}
-	s.timer = time.NewTimer(s.timeout)
+	s.timer.Reset(s.timeout)
 	var ctx context.Context
 	ctx, s.stop = context.WithCancel(context.Background())
-	s.newViewTimeout(ctx)
+	go s.newViewTimeout(ctx)
 }
 
 // Stop stops the synchronizer
