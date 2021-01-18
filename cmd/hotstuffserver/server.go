@@ -37,7 +37,7 @@ type clientSrv struct {
 	conf      *options
 	gorumsSrv *gorums.Server
 	hsSrv     *hotstuffgorums.Server
-	cfg       hotstuff.Config
+	cfg       *hotstuffgorums.Config
 	hs        hotstuff.Consensus
 	pm        hotstuff.ViewSynchronizer
 	cmdCache  *cmdCache
@@ -71,7 +71,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 	}
 
 	var err error
-	srv.cfg, err = hotstuffgorums.NewGorumsConfig(*replicaConfig, 1*time.Second)
+	srv.cfg = hotstuffgorums.NewConfig(*replicaConfig, 1*time.Second)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to init gorums backend: %s\n", err)
 		os.Exit(1)
@@ -104,10 +104,10 @@ func (srv *clientSrv) Start(address string) error {
 		return err
 	}
 
+	srv.hsSrv.StartServer(srv.hs)
+	srv.cfg.Connect(10 * time.Second)
+
 	srv.pm.Start()
-	if err != nil {
-		return err
-	}
 
 	go srv.gorumsSrv.Serve(lis)
 

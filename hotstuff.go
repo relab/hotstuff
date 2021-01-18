@@ -145,8 +145,6 @@ type Config interface {
 	QuorumSize() int
 	// Propose sends the block to all replicas in the configuration
 	Propose(block Block)
-	// Close closes connections opened by the configuration
-	Close()
 }
 
 // LeaderRotation implements a leader rotation scheme

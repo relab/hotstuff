@@ -50,33 +50,37 @@ func (r *gorumsReplica) NewView(qc hotstuff.QuorumCert) {
 	r.node.NewView(ctx, pqc, gorums.WithAsyncSend())
 }
 
-type gorumsConfig struct {
+type Config struct {
+	replicaCfg    config.ReplicaConfig
 	mgr           *proto.Manager
 	cfg           *proto.Configuration
-	id            hotstuff.ID
 	privKey       hotstuff.PrivateKey
 	replicas      map[hotstuff.ID]hotstuff.Replica
 	proposeCancel context.CancelFunc
 }
 
-func NewGorumsConfig(replicaCfg config.ReplicaConfig, connectTimeout time.Duration) (hotstuff.Config, error) {
-	cfg := &gorumsConfig{
-		id:            replicaCfg.ID,
+func NewConfig(replicaCfg config.ReplicaConfig, connectTimeout time.Duration) *Config {
+	cfg := &Config{
+		replicaCfg:    replicaCfg,
 		privKey:       &ecdsa.PrivateKey{PrivateKey: replicaCfg.PrivateKey},
 		replicas:      make(map[hotstuff.ID]hotstuff.Replica),
 		proposeCancel: func() {},
 	}
 
-	idMapping := make(map[string]uint32, len(replicaCfg.Replicas)-1)
-	for _, replica := range replicaCfg.Replicas {
-		if replica.ID != replicaCfg.ID {
+	return cfg
+}
+
+func (cfg *Config) Connect(connectTimeout time.Duration) error {
+	idMapping := make(map[string]uint32, len(cfg.replicaCfg.Replicas)-1)
+	for _, replica := range cfg.replicaCfg.Replicas {
+		if replica.ID != cfg.replicaCfg.ID {
 			idMapping[replica.Address] = uint32(replica.ID)
 		}
 	}
 
 	// embed own ID to allow other replicas to identify messages from this replica
 	md := metadata.New(map[string]string{
-		"id": fmt.Sprintf("%d", replicaCfg.ID),
+		"id": fmt.Sprintf("%d", cfg.replicaCfg.ID),
 	})
 
 	mgrOpts := []gorums.ManagerOption{
@@ -85,11 +89,12 @@ func NewGorumsConfig(replicaCfg config.ReplicaConfig, connectTimeout time.Durati
 		gorums.WithMetadata(md),
 	}
 	grpcOpts := []grpc.DialOption{
+		grpc.WithBlock(),
 		grpc.WithReturnConnectionError(),
 	}
 
-	if replicaCfg.Creds != nil {
-		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(replicaCfg.Creds))
+	if cfg.replicaCfg.Creds != nil {
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(cfg.replicaCfg.Creds))
 	} else {
 		grpcOpts = append(grpcOpts, grpc.WithInsecure())
 	}
@@ -99,7 +104,7 @@ func NewGorumsConfig(replicaCfg config.ReplicaConfig, connectTimeout time.Durati
 	var err error
 	cfg.mgr, err = proto.NewManager(mgrOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to connect to replicas: %w", err)
+		return fmt.Errorf("Failed to connect to replicas: %w", err)
 	}
 
 	for _, node := range cfg.mgr.Nodes() {
@@ -107,42 +112,51 @@ func NewGorumsConfig(replicaCfg config.ReplicaConfig, connectTimeout time.Durati
 		cfg.replicas[id] = &gorumsReplica{
 			node:          node,
 			id:            id,
-			pubKey:        replicaCfg.Replicas[id].PubKey,
+			pubKey:        cfg.replicaCfg.Replicas[id].PubKey,
 			voteCancel:    func() {},
 			newviewCancel: func() {},
 		}
 	}
 
-	cfg.cfg, err = cfg.mgr.NewConfiguration(cfg.mgr.NodeIDs(), struct{}{})
-	if err != nil {
-		return nil, fmt.Errorf("Failed to create configuration: %w", err)
+	cfg.replicas[cfg.ID()] = &gorumsReplica{
+		node:   nil,
+		id:     cfg.ID(),
+		pubKey: cfg.privKey.PublicKey(),
 	}
 
-	return cfg, nil
+	cfg.cfg, err = cfg.mgr.NewConfiguration(cfg.mgr.NodeIDs(), struct{}{})
+	if err != nil {
+		return fmt.Errorf("Failed to create configuration: %w", err)
+	}
+
+	return nil
 }
 
 // ID returns the id of this replica
-func (cfg *gorumsConfig) ID() hotstuff.ID {
-	return cfg.id
+func (cfg *Config) ID() hotstuff.ID {
+	return cfg.replicaCfg.ID
 }
 
 // PrivateKey returns the id of this replica
-func (cfg *gorumsConfig) PrivateKey() hotstuff.PrivateKey {
+func (cfg *Config) PrivateKey() hotstuff.PrivateKey {
 	return cfg.privKey
 }
 
 // Replicas returns all of the replicas in the configuration
-func (cfg *gorumsConfig) Replicas() map[hotstuff.ID]hotstuff.Replica {
+func (cfg *Config) Replicas() map[hotstuff.ID]hotstuff.Replica {
 	return cfg.replicas
 }
 
 // QuorumSize returns the size of a quorum
-func (cfg *gorumsConfig) QuorumSize() int {
-	return len(cfg.replicas) - (len(cfg.replicas)-1)/3
+func (cfg *Config) QuorumSize() int {
+	return len(cfg.replicaCfg.Replicas) - (len(cfg.replicaCfg.Replicas)-1)/3
 }
 
 // Propose sends the block to all replicas in the configuration
-func (cfg *gorumsConfig) Propose(block hotstuff.Block) {
+func (cfg *Config) Propose(block hotstuff.Block) {
+	if cfg.cfg == nil {
+		return
+	}
 	var ctx context.Context
 	cfg.proposeCancel()
 	ctx, cfg.proposeCancel = context.WithCancel(context.Background())
@@ -150,6 +164,6 @@ func (cfg *gorumsConfig) Propose(block hotstuff.Block) {
 	cfg.cfg.Propose(ctx, pblock, gorums.WithAsyncSend())
 }
 
-func (cfg *gorumsConfig) Close() {
+func (cfg *Config) Close() {
 	cfg.mgr.Close()
 }
