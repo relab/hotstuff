@@ -130,7 +130,7 @@ func (ec *ecdsaCrypto) getPrivateKey() *PrivateKey {
 }
 
 // Sign signs a single block and returns the signature
-func (ec *ecdsaCrypto) Sign(block hotstuff.Block) (cert hotstuff.PartialCert, err error) {
+func (ec *ecdsaCrypto) Sign(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
 	hash := block.Hash()
 	r, s, err := ecdsa.Sign(rand.Reader, ec.getPrivateKey().PrivateKey, hash[:])
 	if err != nil {
@@ -143,7 +143,7 @@ func (ec *ecdsaCrypto) Sign(block hotstuff.Block) (cert hotstuff.PartialCert, er
 }
 
 // CreateQuourmCert creates a from a list of partial certificates
-func (ec *ecdsaCrypto) CreateQuorumCert(block hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
+func (ec *ecdsaCrypto) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
 	hash := block.Hash()
 	qc := &QuorumCert{
 		signatures: make(map[hotstuff.ID]Signature),

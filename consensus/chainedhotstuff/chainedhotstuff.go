@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/internal/logging"
 )
 
@@ -26,9 +25,9 @@ type chainedhotstuff struct {
 	// protocol variables
 
 	lastVote hotstuff.View       // the last view that the replica voted in
-	bLock    hotstuff.Block      // the currently locked block
-	bExec    hotstuff.Block      // the last committed block
-	bLeaf    hotstuff.Block      // the last proposed block
+	bLock    *hotstuff.Block     // the currently locked block
+	bExec    *hotstuff.Block     // the last committed block
+	bLeaf    *hotstuff.Block     // the last proposed block
 	highQC   hotstuff.QuorumCert // the highest qc known to this replica
 
 	pendingQCs map[hotstuff.Hash][]hotstuff.PartialCert
@@ -37,14 +36,14 @@ type chainedhotstuff struct {
 func (hs *chainedhotstuff) init() {
 	var err error
 	hs.pendingQCs = make(map[hotstuff.Hash][]hotstuff.PartialCert)
-	hs.bLock = blockchain.GetGenesis()
-	hs.bExec = blockchain.GetGenesis()
-	hs.bLeaf = blockchain.GetGenesis()
-	hs.highQC, err = hs.signer.CreateQuorumCert(blockchain.GetGenesis(), []hotstuff.PartialCert{})
+	hs.bLock = hotstuff.GetGenesis()
+	hs.bExec = hotstuff.GetGenesis()
+	hs.bLeaf = hotstuff.GetGenesis()
+	hs.highQC, err = hs.signer.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
 	if err != nil {
 		logger.Panicf("Failed to create QC for genesis block!")
 	}
-	hs.blocks.Store(blockchain.GetGenesis())
+	hs.blocks.Store(hotstuff.GetGenesis())
 	hs.synchronizer.Init(hs)
 }
 
@@ -70,7 +69,7 @@ func (hs *chainedhotstuff) HighQC() hotstuff.QuorumCert {
 }
 
 // Leaf returns the last proposed block
-func (hs *chainedhotstuff) Leaf() hotstuff.Block {
+func (hs *chainedhotstuff) Leaf() *hotstuff.Block {
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
 
@@ -79,7 +78,7 @@ func (hs *chainedhotstuff) Leaf() hotstuff.Block {
 
 func (hs *chainedhotstuff) CreateDummy() {
 	hs.mut.Lock()
-	dummy := blockchain.NewBlock(hs.bLeaf.Hash(), nil, hotstuff.Command(""), hs.bLeaf.View()+1, hs.cfg.ID())
+	dummy := hotstuff.NewBlock(hs.bLeaf.Hash(), nil, hotstuff.Command(""), hs.bLeaf.View()+1, hs.cfg.ID())
 	hs.blocks.Store(dummy)
 	hs.bLeaf = dummy
 	hs.mut.Unlock()
@@ -107,7 +106,7 @@ func (hs *chainedhotstuff) updateHighQC(qc hotstuff.QuorumCert) {
 	}
 }
 
-func (hs *chainedhotstuff) commit(block hotstuff.Block) {
+func (hs *chainedhotstuff) commit(block *hotstuff.Block) {
 	if hs.bExec.View() < block.View() {
 		if parent, ok := hs.blocks.Get(block.Parent()); ok {
 			hs.commit(parent)
@@ -117,14 +116,14 @@ func (hs *chainedhotstuff) commit(block hotstuff.Block) {
 	}
 }
 
-func (hs *chainedhotstuff) qcRef(qc hotstuff.QuorumCert) (hotstuff.Block, bool) {
+func (hs *chainedhotstuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
 	if qc == nil {
 		return nil, false
 	}
 	return hs.blocks.Get(qc.BlockHash())
 }
 
-func (hs *chainedhotstuff) update(block hotstuff.Block) {
+func (hs *chainedhotstuff) update(block *hotstuff.Block) {
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
 
@@ -171,7 +170,7 @@ func (hs *chainedhotstuff) Propose() {
 		// return
 		cmd = new(hotstuff.Command)
 	}
-	block := blockchain.NewBlock(hs.bLeaf.Hash(), hs.highQC, *cmd, hs.bLeaf.View()+1, hs.cfg.ID())
+	block := hotstuff.NewBlock(hs.bLeaf.Hash(), hs.highQC, *cmd, hs.bLeaf.View()+1, hs.cfg.ID())
 	hs.mut.Unlock()
 
 	hs.cfg.Propose(block)
@@ -197,7 +196,7 @@ func (hs *chainedhotstuff) NewView() {
 }
 
 // OnPropose handles an incoming proposal
-func (hs *chainedhotstuff) OnPropose(block hotstuff.Block) {
+func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 	logger.Debug("OnPropose: ", block)
 	hs.mut.Lock()
 

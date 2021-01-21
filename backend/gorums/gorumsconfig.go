@@ -156,7 +156,7 @@ func (cfg *Config) QuorumSize() int {
 }
 
 // Propose sends the block to all replicas in the configuration
-func (cfg *Config) Propose(block hotstuff.Block) {
+func (cfg *Config) Propose(block *hotstuff.Block) {
 	if cfg.cfg == nil {
 		return
 	}

@@ -32,7 +32,7 @@ func (chain *blockChain) dropOldest() {
 }
 
 // Store stores a block in the blockchain
-func (chain *blockChain) Store(block hotstuff.Block) {
+func (chain *blockChain) Store(block *hotstuff.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
@@ -45,7 +45,7 @@ func (chain *blockChain) Store(block hotstuff.Block) {
 }
 
 // Get retrieves a block given its hash
-func (chain *blockChain) Get(hash hotstuff.Hash) (hotstuff.Block, bool) {
+func (chain *blockChain) Get(hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
@@ -56,5 +56,5 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (hotstuff.Block, bool) {
 
 	chain.accessOrder.MoveToFront(elem)
 
-	return elem.Value.(hotstuff.Block), true
+	return elem.Value.(*hotstuff.Block), true
 }

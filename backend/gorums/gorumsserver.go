@@ -104,16 +104,16 @@ func (srv *Server) Propose(ctx context.Context, block *proto.Block) {
 	}
 	// defaults to 0 if error
 	block.XProposer = uint32(id)
-	srv.hs.OnPropose(block)
+	srv.hs.OnPropose(proto.BlockFromProto(block))
 }
 
 func (srv *Server) Vote(ctx context.Context, cert *proto.PartialCert) {
-	srv.hs.OnVote(cert)
+	srv.hs.OnVote(proto.ParitalCertFromProto(cert))
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica
 func (srv *Server) NewView(ctx context.Context, msg *proto.QuorumCert) {
-	srv.hs.OnNewView(msg)
+	srv.hs.OnNewView(proto.QuorumCertFromProto(msg))
 }
 
 func (srv *Server) Stop() {

@@ -59,9 +59,9 @@ type QuorumCert interface {
 // Signer implements the methods requried to create signatures and certificates
 type Signer interface {
 	// Sign signs a single block and returns the signature
-	Sign(block Block) (cert PartialCert, err error)
+	Sign(block *Block) (cert PartialCert, err error)
 	// CreateQuourmCert creates a from a list of partial certificates
-	CreateQuorumCert(block Block, signatures []PartialCert) (cert QuorumCert, err error)
+	CreateQuorumCert(block *Block, signatures []PartialCert) (cert QuorumCert, err error)
 }
 
 // Verifier implements the methods required to verify partial and quorum certificates
@@ -84,29 +84,12 @@ type Replica interface {
 	NewView(qc QuorumCert)
 }
 
-// Block is a proposal that is made during the consensus protocol
-type Block interface {
-	ToBytes
-	// Hash returns the hash of the block
-	Hash() Hash
-	// Proposer returns the id of the proposer
-	Proposer() ID
-	// Parent returns the hash of the parent block
-	Parent() Hash
-	// Command returns the command
-	Command() Command
-	// Certificate returns the certificate that this block references
-	QuorumCert() QuorumCert
-	// View returns the view in which the block was proposed
-	View() View
-}
-
 // BlockChain is a datastructure that stores a chain of blocks
 type BlockChain interface {
 	// Store stores a block in the blockchain
-	Store(Block)
+	Store(*Block)
 	// Get retrieves a block given its hash
-	Get(Hash) (Block, bool)
+	Get(Hash) (*Block, bool)
 }
 
 // Consensus implements a consensus protocol
@@ -118,7 +101,7 @@ type Consensus interface {
 	// HighQC returns the highest QC known to the replica
 	HighQC() QuorumCert
 	// Leaf returns the last proposed block
-	Leaf() Block
+	Leaf() *Block
 	// CreateDummy inserts a dummy block at View+1.
 	// This is useful when a view must be skipped.
 	CreateDummy()
@@ -127,7 +110,7 @@ type Consensus interface {
 	// NewView sends a NewView message to the next leader
 	NewView()
 	// OnPropose handles an incoming proposal
-	OnPropose(block Block)
+	OnPropose(block *Block)
 	// OnVote handles an incoming vote
 	OnVote(cert PartialCert)
 	// OnVote handles an incoming NewView
@@ -144,7 +127,7 @@ type Config interface {
 	// QuorumSize returns the size of a quorum
 	QuorumSize() int
 	// Propose sends the block to all replicas in the configuration
-	Propose(block Block)
+	Propose(block *Block)
 }
 
 // LeaderRotation implements a leader rotation scheme

@@ -62,7 +62,7 @@ func QuorumCertFromProto(qc *QuorumCert) ecdsa.QuorumCert {
 	return ecdsa.NewQuorumCert(sigs, h)
 }
 
-func BlockToProto(block hotstuff.Block) *Block {
+func BlockToProto(block *hotstuff.Block) *Block {
 	parentHash := block.Parent()
 	return &Block{
 		XParent:  parentHash[:],
@@ -70,4 +70,16 @@ func BlockToProto(block hotstuff.Block) *Block {
 		QC:       QuorumCertToProto(block.QuorumCert()),
 		XView:    uint64(block.View()),
 	}
+}
+
+func BlockFromProto(block *Block) *hotstuff.Block {
+	var p hotstuff.Hash
+	copy(p[:], block.GetXParent())
+	return hotstuff.NewBlock(
+		p,
+		QuorumCertFromProto(block.GetQC()),
+		hotstuff.Command(block.GetXCommand()),
+		hotstuff.View(block.GetXView()),
+		hotstuff.ID(block.GetXProposer()),
+	)
 }
