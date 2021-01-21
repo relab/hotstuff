@@ -28,91 +28,90 @@ func (pk PrivateKey) PublicKey() hotstuff.PublicKey {
 
 var _ hotstuff.PrivateKey = (*PrivateKey)(nil)
 
-type Signature interface {
-	hotstuff.Signature
-
-	R() *big.Int
-	S() *big.Int
+type Signature struct {
+	r, s   *big.Int
+	signer hotstuff.ID
 }
 
-type ecdsaSignature struct {
-	r, s *big.Int
-	id   hotstuff.ID
+func NewSignature(r, s *big.Int, signer hotstuff.ID) Signature {
+	return Signature{r, s, signer}
 }
 
 // Signer returns the ID of the replica that generated the signature.
-func (sig ecdsaSignature) Signer() hotstuff.ID {
-	return sig.id
+func (sig Signature) Signer() hotstuff.ID {
+	return sig.signer
 }
 
-func (sig *ecdsaSignature) R() *big.Int {
+func (sig Signature) R() *big.Int {
 	return sig.r
 }
 
-func (sig *ecdsaSignature) S() *big.Int {
+func (sig Signature) S() *big.Int {
 	return sig.s
 }
 
 // RawBytes returns a raw byte string representation of the signature
-func (sig *ecdsaSignature) ToBytes() []byte {
+func (sig Signature) ToBytes() []byte {
 	var b []byte
 	b = append(b, sig.r.Bytes()...)
 	b = append(b, sig.s.Bytes()...)
 	return b
 }
 
-var _ Signature = (*ecdsaSignature)(nil)
+var _ hotstuff.Signature = (*Signature)(nil)
 
-type ecdsaPartialCert struct {
-	sig  Signature
-	hash hotstuff.Hash
+type PartialCert struct {
+	signature Signature
+	hash      hotstuff.Hash
+}
+
+func NewPartialCert(signature Signature, hash hotstuff.Hash) PartialCert {
+	return PartialCert{signature, hash}
 }
 
 // Signature returns the signature
-func (cert ecdsaPartialCert) Signature() hotstuff.Signature {
-	return cert.sig
+func (cert PartialCert) Signature() hotstuff.Signature {
+	return cert.signature
 }
 
 // BlockHash returns the hash of the block that was signed
-func (cert ecdsaPartialCert) BlockHash() hotstuff.Hash {
+func (cert PartialCert) BlockHash() hotstuff.Hash {
 	return cert.hash
 }
 
-func (cert ecdsaPartialCert) ToBytes() []byte {
-	return append(cert.hash[:], cert.sig.ToBytes()...)
+func (cert PartialCert) ToBytes() []byte {
+	return append(cert.hash[:], cert.signature.ToBytes()...)
 }
 
-var _ hotstuff.PartialCert = (*ecdsaPartialCert)(nil)
+var _ hotstuff.PartialCert = (*PartialCert)(nil)
 
-type QuorumCert interface {
-	hotstuff.QuorumCert
-
-	Signatures() map[hotstuff.ID]Signature
+type QuorumCert struct {
+	signatures map[hotstuff.ID]Signature
+	hash       hotstuff.Hash
 }
 
-type ecdsaQuorumCert struct {
-	sigs map[hotstuff.ID]Signature
-	hash hotstuff.Hash
+func NewQuorumCert(signatures map[hotstuff.ID]Signature, hash hotstuff.Hash) QuorumCert {
+	return QuorumCert{signatures, hash}
 }
 
-func (qc ecdsaQuorumCert) Signatures() map[hotstuff.ID]Signature {
-	return qc.sigs
+func (qc QuorumCert) Signatures() map[hotstuff.ID]Signature {
+	return qc.signatures
 }
 
 // BlockHash returns the hash of the block for which the certificate was created
-func (qc ecdsaQuorumCert) BlockHash() hotstuff.Hash {
+func (qc QuorumCert) BlockHash() hotstuff.Hash {
 	return qc.hash
 }
 
-func (qc ecdsaQuorumCert) ToBytes() []byte {
+func (qc QuorumCert) ToBytes() []byte {
 	b := qc.hash[:]
-	for _, sig := range qc.sigs {
+	for _, sig := range qc.signatures {
 		b = append(b, sig.ToBytes()...)
 	}
 	return b
 }
 
-var _ QuorumCert = (*ecdsaQuorumCert)(nil)
+var _ hotstuff.QuorumCert = (*QuorumCert)(nil)
 
 // TODO: consider adding caching back
 
@@ -137,8 +136,8 @@ func (ec *ecdsaCrypto) Sign(block hotstuff.Block) (cert hotstuff.PartialCert, er
 	if err != nil {
 		return nil, err
 	}
-	return &ecdsaPartialCert{
-		&ecdsaSignature{r, s, ec.cfg.ID()},
+	return &PartialCert{
+		Signature{r, s, ec.cfg.ID()},
 		hash,
 	}, nil
 }
@@ -146,19 +145,19 @@ func (ec *ecdsaCrypto) Sign(block hotstuff.Block) (cert hotstuff.PartialCert, er
 // CreateQuourmCert creates a from a list of partial certificates
 func (ec *ecdsaCrypto) CreateQuorumCert(block hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
 	hash := block.Hash()
-	qc := &ecdsaQuorumCert{
-		sigs: make(map[hotstuff.ID]Signature),
-		hash: hash,
+	qc := &QuorumCert{
+		signatures: make(map[hotstuff.ID]Signature),
+		hash:       hash,
 	}
 	for _, s := range signatures {
 		blockHash := s.BlockHash()
 		if !bytes.Equal(hash[:], blockHash[:]) {
 			return nil, ErrHashMismatch
 		}
-		if _, ok := qc.sigs[s.Signature().Signer()]; ok {
+		if _, ok := qc.signatures[s.Signature().Signer()]; ok {
 			return nil, ErrPartialDuplicate
 		}
-		qc.sigs[s.Signature().Signer()] = s.(Signature)
+		qc.signatures[s.Signature().Signer()] = s.(PartialCert).signature
 	}
 	return qc, nil
 }

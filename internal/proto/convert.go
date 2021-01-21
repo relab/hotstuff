@@ -1,17 +1,28 @@
 package proto
 
 import (
+	"math/big"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 )
 
 func SignatureToProto(sig hotstuff.Signature) *Signature {
-	s := sig.(ecdsa.Signature)
+	s := sig.(*ecdsa.Signature)
 	return &Signature{
 		ReplicaID: uint32(s.Signer()),
 		XR:        s.R().Bytes(),
 		XS:        s.S().Bytes(),
 	}
+}
+
+func SignatureFromProto(sig *Signature) ecdsa.Signature {
+	r := new(big.Int)
+	r.SetBytes(sig.GetXR())
+	s := new(big.Int)
+	s.SetBytes(sig.GetXS())
+
+	return ecdsa.NewSignature(r, s, hotstuff.ID(sig.GetReplicaID()))
 }
 
 func PartialCertToProto(cert hotstuff.PartialCert) *PartialCert {
@@ -20,6 +31,12 @@ func PartialCertToProto(cert hotstuff.PartialCert) *PartialCert {
 		Sig:  SignatureToProto(cert.Signature()),
 		Hash: hash[:],
 	}
+}
+
+func ParitalCertFromProto(cert *PartialCert) ecdsa.PartialCert {
+	var h hotstuff.Hash
+	copy(h[:], cert.GetHash())
+	return ecdsa.NewPartialCert(SignatureFromProto(cert.GetSig()), h)
 }
 
 func QuorumCertToProto(qc hotstuff.QuorumCert) *QuorumCert {
@@ -33,6 +50,16 @@ func QuorumCertToProto(qc hotstuff.QuorumCert) *QuorumCert {
 		Sigs: sigs,
 		Hash: hash[:],
 	}
+}
+
+func QuorumCertFromProto(qc *QuorumCert) ecdsa.QuorumCert {
+	var h hotstuff.Hash
+	copy(h[:], qc.GetHash())
+	sigs := make(map[hotstuff.ID]ecdsa.Signature, len(qc.GetSigs()))
+	for k, sig := range qc.GetSigs() {
+		sigs[hotstuff.ID(k)] = SignatureFromProto(sig)
+	}
+	return ecdsa.NewQuorumCert(sigs, h)
 }
 
 func BlockToProto(block hotstuff.Block) *Block {
