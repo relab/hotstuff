@@ -167,8 +167,9 @@ func (hs *chainedhotstuff) Propose() {
 	// Alternatively, we could let the pacemaker know when commands arrive, so that it
 	// can rall Propose() again.
 	if cmd == nil {
-		hs.mut.Unlock()
-		return
+		// hs.mut.Unlock()
+		// return
+		cmd = new(hotstuff.Command)
 	}
 	block := blockchain.NewBlock(hs.bLeaf.Hash(), hs.highQC, *cmd, hs.bLeaf.View()+1, hs.cfg.ID())
 	hs.mut.Unlock()
