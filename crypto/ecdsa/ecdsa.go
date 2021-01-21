@@ -157,7 +157,7 @@ func (ec *ecdsaCrypto) CreateQuorumCert(block *hotstuff.Block, signatures []hots
 		if _, ok := qc.signatures[s.Signature().Signer()]; ok {
 			return nil, ErrPartialDuplicate
 		}
-		qc.signatures[s.Signature().Signer()] = s.(PartialCert).signature
+		qc.signatures[s.Signature().Signer()] = s.(*PartialCert).signature
 	}
 	return qc, nil
 }

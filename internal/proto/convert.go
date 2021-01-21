@@ -8,7 +8,7 @@ import (
 )
 
 func SignatureToProto(sig hotstuff.Signature) *Signature {
-	s := sig.(*ecdsa.Signature)
+	s := sig.(ecdsa.Signature)
 	return &Signature{
 		ReplicaID: uint32(s.Signer()),
 		R:         s.R().Bytes(),
@@ -33,14 +33,14 @@ func PartialCertToProto(cert hotstuff.PartialCert) *PartialCert {
 	}
 }
 
-func ParitalCertFromProto(cert *PartialCert) ecdsa.PartialCert {
+func PartialCertFromProto(cert *PartialCert) ecdsa.PartialCert {
 	var h hotstuff.Hash
 	copy(h[:], cert.GetHash())
 	return ecdsa.NewPartialCert(SignatureFromProto(cert.GetSig()), h)
 }
 
 func QuorumCertToProto(qc hotstuff.QuorumCert) *QuorumCert {
-	c := qc.(ecdsa.QuorumCert)
+	c := qc.(*ecdsa.QuorumCert)
 	sigs := make(map[uint32]*Signature, len(c.Signatures()))
 	for id, psig := range c.Signatures() {
 		sigs[uint32(id)] = SignatureToProto(psig)
@@ -65,10 +65,11 @@ func QuorumCertFromProto(qc *QuorumCert) ecdsa.QuorumCert {
 func BlockToProto(block *hotstuff.Block) *Block {
 	parentHash := block.Parent()
 	return &Block{
-		Parent:  parentHash[:],
-		Command: []byte(block.Command()),
-		QC:      QuorumCertToProto(block.QuorumCert()),
-		View:    uint64(block.View()),
+		Parent:   parentHash[:],
+		Command:  []byte(block.Command()),
+		QC:       QuorumCertToProto(block.QuorumCert()),
+		View:     uint64(block.View()),
+		Proposer: uint32(block.Proposer()),
 	}
 }
 

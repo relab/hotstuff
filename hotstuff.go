@@ -72,6 +72,8 @@ type Verifier interface {
 	VerifyQuorumCert(qc QuorumCert) bool
 }
 
+//go:generate mockgen -destination=internal/mocks/mock_replica.go -package=mocks . Replica
+
 // Replica implements the methods that communicate with another replica
 type Replica interface {
 	// ID returns the replica's id
@@ -117,6 +119,7 @@ type Consensus interface {
 	OnNewView(qc QuorumCert)
 }
 
+//go:generate mockgen -destination=internal/mocks/mock_config.go -package=mocks . Config
 
 // Config holds information about Replicas and provides methods to send messages to the replicas
 type Config interface {
