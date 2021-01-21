@@ -23,17 +23,17 @@ service Hotstuff {
 }
 
 message Block {
-  bytes XParent = 1;
+  bytes Parent = 1;
   QuorumCert QC = 2;
-  uint64 XView = 3;
-  bytes XCommand = 4;
-  uint32 xProposer = 5;
+  uint64 View = 3;
+  bytes Command = 4;
+  uint32 Proposer = 5;
 }
 
 message Signature {
   uint32 ReplicaID = 1;
-  bytes XR = 2;
-  bytes XS = 3;
+  bytes R = 2;
+  bytes S = 3;
 }
 
 message PartialCert {

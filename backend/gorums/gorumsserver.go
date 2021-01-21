@@ -103,7 +103,7 @@ func (srv *Server) Propose(ctx context.Context, block *proto.Block) {
 		return
 	}
 	// defaults to 0 if error
-	block.XProposer = uint32(id)
+	block.Proposer = uint32(id)
 	srv.hs.OnPropose(proto.BlockFromProto(block))
 }
 
