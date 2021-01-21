@@ -117,6 +117,8 @@ type Consensus interface {
 	OnNewView(qc QuorumCert)
 }
 
+
+// Config holds information about Replicas and provides methods to send messages to the replicas
 type Config interface {
 	// ID returns the id of this replica
 	ID() ID
@@ -124,6 +126,10 @@ type Config interface {
 	PrivateKey() PrivateKey
 	// Replicas returns all of the replicas in the configuration
 	Replicas() map[ID]Replica
+	// Replica returns a replica if present in the configuration
+	Replica(ID) (replica Replica, ok bool)
+	// Len returns the number of replicas in the configuration
+	Len() int
 	// QuorumSize returns the size of a quorum
 	QuorumSize() int
 	// Propose sends the block to all replicas in the configuration

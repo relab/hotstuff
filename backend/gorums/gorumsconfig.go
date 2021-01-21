@@ -150,6 +150,15 @@ func (cfg *Config) Replicas() map[hotstuff.ID]hotstuff.Replica {
 	return cfg.replicas
 }
 
+func (cfg *Config) Replica(id hotstuff.ID) (replica hotstuff.Replica, ok bool) {
+	replica, ok = cfg.replicas[id]
+	return
+}
+
+func (cfg *Config) Len() int {
+	return len(cfg.replicas)
+}
+
 // QuorumSize returns the size of a quorum
 func (cfg *Config) QuorumSize() int {
 	return len(cfg.replicaCfg.Replicas) - (len(cfg.replicaCfg.Replicas)-1)/3

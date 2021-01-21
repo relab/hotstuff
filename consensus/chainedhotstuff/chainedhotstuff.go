@@ -187,7 +187,7 @@ func (hs *chainedhotstuff) NewView() {
 		hs.OnNewView(hs.highQC)
 		return
 	}
-	leader, ok := hs.cfg.Replicas()[leaderID]
+	leader, ok := hs.cfg.Replica(leaderID)
 	if !ok {
 		logger.Warnf("Replica with ID %d was not found!", leaderID)
 	}
@@ -260,7 +260,7 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 	// will do the update after the vote is sent
 	defer hs.update(block)
 
-	leader, ok := hs.cfg.Replicas()[leaderID]
+	leader, ok := hs.cfg.Replica(leaderID)
 	if !ok {
 		logger.Warnf("Replica with ID %d was not found!", leaderID)
 	}

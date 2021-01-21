@@ -166,7 +166,7 @@ func (ec *ecdsaCrypto) CreateQuorumCert(block *hotstuff.Block, signatures []hots
 func (ec *ecdsaCrypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 	// TODO: decide how to handle incompatible types. For now we'll simply panic
 	sig := cert.Signature().(Signature)
-	replica, ok := ec.cfg.Replicas()[sig.Signer()]
+	replica, ok := ec.cfg.Replica(sig.Signer())
 	if !ok {
 		logger.Info("ecdsaCrypto: got signature from replica whose ID (%d) was not in the config.")
 		return false
@@ -186,7 +186,7 @@ func (ec *ecdsaCrypto) VerifyQuorumCert(cert hotstuff.QuorumCert) bool {
 	var wg sync.WaitGroup
 	var numVerified uint64 = 0
 	for id, psig := range qc.Signatures() {
-		info, ok := ec.cfg.Replicas()[id]
+		info, ok := ec.cfg.Replica(id)
 		if !ok {
 			logger.Error("VerifyQuorumSig: got signature from replica whose ID (%d) was not in config.", id)
 		}
