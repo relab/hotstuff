@@ -12,6 +12,8 @@ type Hash [32]byte
 // Command is a client request to be executed by the consensus protocol
 type Command string
 
+//go:generate mockgen -destination=internal/mocks/cmdqueue_mock.go -package=mocks . CommandQueue
+
 // CommandQueue is a queue of commands to be proposed
 type CommandQueue interface {
 	// GetCommand returns the next command to be proposed.
@@ -72,7 +74,7 @@ type Verifier interface {
 	VerifyQuorumCert(qc QuorumCert) bool
 }
 
-//go:generate mockgen -destination=internal/mocks/mock_replica.go -package=mocks . Replica
+//go:generate mockgen -destination=internal/mocks/replica_mock.go -package=mocks . Replica
 
 // Replica implements the methods that communicate with another replica
 type Replica interface {
@@ -119,7 +121,7 @@ type Consensus interface {
 	OnNewView(qc QuorumCert)
 }
 
-//go:generate mockgen -destination=internal/mocks/mock_config.go -package=mocks . Config
+//go:generate mockgen -destination=internal/mocks/config_mock.go -package=mocks . Config
 
 // Config holds information about Replicas and provides methods to send messages to the replicas
 type Config interface {
@@ -145,17 +147,23 @@ type LeaderRotation interface {
 	GetLeader(View) ID
 }
 
+//go:generate mockgen -destination=internal/mocks/acceptor_mock.go -package=mocks . Acceptor
+
 // Acceptor is the mechanism that decides wether a command should be accepted by the replica
 type Acceptor interface {
 	// Accept returns true if the replica should accept the command, false otherwise
 	Accept(Command) bool
 }
 
+//go:generate mockgen -destination=internal/mocks/executor_mock.go -package=mocks . Executor
+
 // Executor executes a command
 type Executor interface {
 	// Exec executes the given command
 	Exec(Command)
 }
+
+//go:generate mockgen -destination=internal/mocks/synchronizer_mock.go -package=mocks . ViewSynchronizer
 
 // ViewSynchronizer synchronizes replicas to the same view
 type ViewSynchronizer interface {
