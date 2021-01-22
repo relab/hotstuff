@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"sort"
 	"sync"
 	"sync/atomic"
 
@@ -105,7 +106,17 @@ func (qc QuorumCert) BlockHash() hotstuff.Hash {
 
 func (qc QuorumCert) ToBytes() []byte {
 	b := qc.hash[:]
+	// sort signatures by id to ensure determinism
+	sigs := make([]Signature, 0, len(qc.signatures))
 	for _, sig := range qc.signatures {
+		i := sort.Search(len(sigs), func(i int) bool {
+			return sig.signer < sigs[i].signer
+		})
+		sigs = append(sigs, Signature{})
+		copy(sigs[i+1:], sigs[i:])
+		sigs[i] = sig
+	}
+	for _, sig := range sigs {
 		b = append(b, sig.ToBytes()...)
 	}
 	return b
