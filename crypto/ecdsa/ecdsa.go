@@ -189,7 +189,7 @@ func (ec *ecdsaCrypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 
 // VerifyQuorumCert verifies a quorum certificate
 func (ec *ecdsaCrypto) VerifyQuorumCert(cert hotstuff.QuorumCert) bool {
-	qc := cert.(QuorumCert)
+	qc := cert.(*QuorumCert)
 	if len(qc.Signatures()) < ec.cfg.QuorumSize() {
 		return false
 	}
