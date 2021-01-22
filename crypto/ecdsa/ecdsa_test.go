@@ -1,13 +1,13 @@
 package ecdsa
 
 import (
-	"crypto/ecdsa"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/internal/mocks"
+	"github.com/relab/hotstuff/internal/testutil"
 )
 
 func createKey(t *testing.T) *PrivateKey {
@@ -31,38 +31,9 @@ func createBlock(t *testing.T, signer hotstuff.Signer) *hotstuff.Block {
 	return b
 }
 
-func createMockReplica(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, key *ecdsa.PublicKey) *mocks.MockReplica {
-	t.Helper()
-
-	replica := mocks.NewMockReplica(ctrl)
-	replica.
-		EXPECT().
-		ID().
-		AnyTimes().
-		Return(id)
-	replica.
-		EXPECT().
-		PublicKey().
-		AnyTimes().
-		Return(key)
-
-	return replica
-}
-
 func createMockConfig(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, key *PrivateKey) *mocks.MockConfig {
 	t.Helper()
-
-	cfg := mocks.NewMockConfig(ctrl)
-	cfg.
-		EXPECT().
-		PrivateKey().
-		AnyTimes().
-		Return(key)
-	cfg.
-		EXPECT().
-		ID().
-		AnyTimes().
-		Return(id)
+	cfg := testutil.CreateMockConfig(t, ctrl, id, key)
 	cfg.
 		EXPECT().
 		QuorumSize().
@@ -87,7 +58,7 @@ func TestCreateAndVerifyPartialCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	key := createKey(t)
-	replica := createMockReplica(t, ctrl, 1, &key.PrivateKey.PublicKey)
+	replica := testutil.CreateMockReplica(t, ctrl, 1, &key.PrivateKey.PublicKey)
 	cfg := createMockConfig(t, ctrl, 1, key)
 	configAddReplica(t, cfg, replica)
 
@@ -118,7 +89,7 @@ func TestCreateAndVerifyQuorumCert(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		id := hotstuff.ID(i) + 1
 		keys = append(keys, createKey(t))
-		replicas = append(replicas, createMockReplica(t, ctrl, id, &keys[i].PrivateKey.PublicKey))
+		replicas = append(replicas, testutil.CreateMockReplica(t, ctrl, id, &keys[i].PrivateKey.PublicKey))
 		configs = append(configs, createMockConfig(t, ctrl, id, keys[i]))
 		signer, verifier := New(configs[i])
 		signers = append(signers, signer)
