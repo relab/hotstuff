@@ -108,7 +108,7 @@ func (srv *Server) Propose(ctx context.Context, block *proto.Block) {
 }
 
 func (srv *Server) Vote(ctx context.Context, cert *proto.PartialCert) {
-	srv.hs.OnVote(proto.ParitalCertFromProto(cert))
+	srv.hs.OnVote(proto.PartialCertFromProto(cert))
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica
