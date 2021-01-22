@@ -189,6 +189,11 @@ func (ec *ecdsaCrypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 
 // VerifyQuorumCert verifies a quorum certificate
 func (ec *ecdsaCrypto) VerifyQuorumCert(cert hotstuff.QuorumCert) bool {
+	// If QC was created for genesis, then skip verification.
+	if cert.BlockHash() == hotstuff.GetGenesis().Hash() {
+		return true
+	}
+
 	qc := cert.(*QuorumCert)
 	if len(qc.Signatures()) < ec.cfg.QuorumSize() {
 		return false

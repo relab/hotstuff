@@ -57,7 +57,7 @@ func (hs *chainedhotstuff) View() hotstuff.View {
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
 
-	return hs.bLeaf.View()
+	return hs.lastVote
 }
 
 // HighQC returns the highest QC known to the replica
@@ -87,6 +87,7 @@ func (hs *chainedhotstuff) CreateDummy() {
 func (hs *chainedhotstuff) updateHighQC(qc hotstuff.QuorumCert) {
 	if !hs.verifier.VerifyQuorumCert(qc) {
 		logger.Info("updateQCHigh: QC could not be verified!")
+		return
 	}
 
 	newBlock, ok := hs.blocks.Get(qc.BlockHash())
@@ -249,7 +250,7 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 	hs.blocks.Store(block)
 	hs.lastVote = block.View()
 
-	leaderID := hs.synchronizer.GetLeader(hs.lastVote)
+	leaderID := hs.synchronizer.GetLeader(hs.lastVote + 1)
 	if leaderID == hs.cfg.ID() {
 		hs.mut.Unlock()
 		hs.update(block)
