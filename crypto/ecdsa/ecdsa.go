@@ -34,8 +34,8 @@ type Signature struct {
 	signer hotstuff.ID
 }
 
-func NewSignature(r, s *big.Int, signer hotstuff.ID) Signature {
-	return Signature{r, s, signer}
+func NewSignature(r, s *big.Int, signer hotstuff.ID) *Signature {
+	return &Signature{r, s, signer}
 }
 
 // Signer returns the ID of the replica that generated the signature.
@@ -62,12 +62,12 @@ func (sig Signature) ToBytes() []byte {
 var _ hotstuff.Signature = (*Signature)(nil)
 
 type PartialCert struct {
-	signature Signature
+	signature *Signature
 	hash      hotstuff.Hash
 }
 
-func NewPartialCert(signature Signature, hash hotstuff.Hash) PartialCert {
-	return PartialCert{signature, hash}
+func NewPartialCert(signature *Signature, hash hotstuff.Hash) *PartialCert {
+	return &PartialCert{signature, hash}
 }
 
 // Signature returns the signature
@@ -87,15 +87,15 @@ func (cert PartialCert) ToBytes() []byte {
 var _ hotstuff.PartialCert = (*PartialCert)(nil)
 
 type QuorumCert struct {
-	signatures map[hotstuff.ID]Signature
+	signatures map[hotstuff.ID]*Signature
 	hash       hotstuff.Hash
 }
 
-func NewQuorumCert(signatures map[hotstuff.ID]Signature, hash hotstuff.Hash) QuorumCert {
-	return QuorumCert{signatures, hash}
+func NewQuorumCert(signatures map[hotstuff.ID]*Signature, hash hotstuff.Hash) *QuorumCert {
+	return &QuorumCert{signatures, hash}
 }
 
-func (qc QuorumCert) Signatures() map[hotstuff.ID]Signature {
+func (qc QuorumCert) Signatures() map[hotstuff.ID]*Signature {
 	return qc.signatures
 }
 
@@ -107,12 +107,12 @@ func (qc QuorumCert) BlockHash() hotstuff.Hash {
 func (qc QuorumCert) ToBytes() []byte {
 	b := qc.hash[:]
 	// sort signatures by id to ensure determinism
-	sigs := make([]Signature, 0, len(qc.signatures))
+	sigs := make([]*Signature, 0, len(qc.signatures))
 	for _, sig := range qc.signatures {
 		i := sort.Search(len(sigs), func(i int) bool {
 			return sig.signer < sigs[i].signer
 		})
-		sigs = append(sigs, Signature{})
+		sigs = append(sigs, nil)
 		copy(sigs[i+1:], sigs[i:])
 		sigs[i] = sig
 	}
@@ -148,7 +148,7 @@ func (ec *ecdsaCrypto) Sign(block *hotstuff.Block) (cert hotstuff.PartialCert, e
 		return nil, err
 	}
 	return &PartialCert{
-		Signature{r, s, ec.cfg.ID()},
+		&Signature{r, s, ec.cfg.ID()},
 		hash,
 	}, nil
 }
@@ -157,7 +157,7 @@ func (ec *ecdsaCrypto) Sign(block *hotstuff.Block) (cert hotstuff.PartialCert, e
 func (ec *ecdsaCrypto) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
 	hash := block.Hash()
 	qc := &QuorumCert{
-		signatures: make(map[hotstuff.ID]Signature),
+		signatures: make(map[hotstuff.ID]*Signature),
 		hash:       hash,
 	}
 	for _, s := range signatures {
@@ -176,7 +176,7 @@ func (ec *ecdsaCrypto) CreateQuorumCert(block *hotstuff.Block, signatures []hots
 // VerifyPartialCert verifies a single partial certificate
 func (ec *ecdsaCrypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 	// TODO: decide how to handle incompatible types. For now we'll simply panic
-	sig := cert.Signature().(Signature)
+	sig := cert.Signature().(*Signature)
 	replica, ok := ec.cfg.Replica(sig.Signer())
 	if !ok {
 		logger.Info("ecdsaCrypto: got signature from replica whose ID (%d) was not in the config.")
@@ -203,7 +203,7 @@ func (ec *ecdsaCrypto) VerifyQuorumCert(cert hotstuff.QuorumCert) bool {
 		}
 		pubKey := info.PublicKey().(*ecdsa.PublicKey)
 		wg.Add(1)
-		go func(psig Signature) {
+		go func(psig *Signature) {
 			if ecdsa.Verify(pubKey, hash[:], psig.R(), psig.S()) {
 				atomic.AddUint64(&numVerified, 1)
 			}

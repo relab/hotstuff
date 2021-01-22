@@ -80,8 +80,8 @@ func TestConvertQuorumCert(t *testing.T) {
 }
 
 func TestConvertBlock(t *testing.T) {
-	qc := ecdsa.NewQuorumCert(map[hotstuff.ID]ecdsa.Signature{}, hotstuff.Hash{})
-	want := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), &qc, "", 1, 1)
+	qc := ecdsa.NewQuorumCert(map[hotstuff.ID]*ecdsa.Signature{}, hotstuff.Hash{})
+	want := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "", 1, 1)
 	pb := BlockToProto(want)
 	got := BlockFromProto(pb)
 

@@ -8,7 +8,7 @@ import (
 )
 
 func SignatureToProto(sig hotstuff.Signature) *Signature {
-	s := sig.(ecdsa.Signature)
+	s := sig.(*ecdsa.Signature)
 	return &Signature{
 		ReplicaID: uint32(s.Signer()),
 		R:         s.R().Bytes(),
@@ -16,7 +16,7 @@ func SignatureToProto(sig hotstuff.Signature) *Signature {
 	}
 }
 
-func SignatureFromProto(sig *Signature) ecdsa.Signature {
+func SignatureFromProto(sig *Signature) *ecdsa.Signature {
 	r := new(big.Int)
 	r.SetBytes(sig.GetR())
 	s := new(big.Int)
@@ -33,7 +33,7 @@ func PartialCertToProto(cert hotstuff.PartialCert) *PartialCert {
 	}
 }
 
-func PartialCertFromProto(cert *PartialCert) ecdsa.PartialCert {
+func PartialCertFromProto(cert *PartialCert) *ecdsa.PartialCert {
 	var h hotstuff.Hash
 	copy(h[:], cert.GetHash())
 	return ecdsa.NewPartialCert(SignatureFromProto(cert.GetSig()), h)
@@ -52,10 +52,10 @@ func QuorumCertToProto(qc hotstuff.QuorumCert) *QuorumCert {
 	}
 }
 
-func QuorumCertFromProto(qc *QuorumCert) ecdsa.QuorumCert {
+func QuorumCertFromProto(qc *QuorumCert) *ecdsa.QuorumCert {
 	var h hotstuff.Hash
 	copy(h[:], qc.GetHash())
-	sigs := make(map[hotstuff.ID]ecdsa.Signature, len(qc.GetSigs()))
+	sigs := make(map[hotstuff.ID]*ecdsa.Signature, len(qc.GetSigs()))
 	for k, sig := range qc.GetSigs() {
 		sigs[hotstuff.ID(k)] = SignatureFromProto(sig)
 	}
