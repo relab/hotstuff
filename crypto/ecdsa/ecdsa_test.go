@@ -43,16 +43,6 @@ func createMockConfig(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, key
 	return cfg
 }
 
-func configAddReplica(t *testing.T, cfg *mocks.MockConfig, replica *mocks.MockReplica) {
-	t.Helper()
-
-	cfg.
-		EXPECT().
-		Replica(replica.ID()).
-		AnyTimes().
-		Return(replica, true)
-}
-
 func TestCreateAndVerifyPartialCert(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
@@ -60,7 +50,7 @@ func TestCreateAndVerifyPartialCert(t *testing.T) {
 	key := createKey(t)
 	replica := testutil.CreateMockReplica(t, ctrl, 1, &key.PrivateKey.PublicKey)
 	cfg := createMockConfig(t, ctrl, 1, key)
-	configAddReplica(t, cfg, replica)
+	testutil.ConfigAddReplica(t, cfg, replica)
 
 	signer, verifier := New(cfg)
 
@@ -98,7 +88,7 @@ func TestCreateAndVerifyQuorumCert(t *testing.T) {
 
 	for _, config := range configs {
 		for _, replica := range replicas {
-			configAddReplica(t, config, replica)
+			testutil.ConfigAddReplica(t, config, replica)
 		}
 	}
 
