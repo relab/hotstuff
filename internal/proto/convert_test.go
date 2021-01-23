@@ -8,32 +8,25 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/ecdsa"
-	"github.com/relab/hotstuff/internal/mocks"
+	"github.com/relab/hotstuff/internal/testutil"
 )
 
-func getMockConfig(t *testing.T, id hotstuff.ID) *mocks.MockConfig {
+func createKey(t *testing.T) *ecdsa.PrivateKey {
 	t.Helper()
 	pk, err := crypto.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctrl := gomock.NewController(t)
-	cfg := mocks.NewMockConfig(ctrl)
-	cfg.
-		EXPECT().
-		PrivateKey().
-		AnyTimes().
-		Return(&ecdsa.PrivateKey{PrivateKey: pk})
-	cfg.
-		EXPECT().
-		ID().
-		AnyTimes().
-		Return(id)
-	return cfg
+	return &ecdsa.PrivateKey{PrivateKey: pk}
 }
 
 func TestConvertPartialCert(t *testing.T) {
-	cfg := getMockConfig(t, 1)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	pk := createKey(t)
+
+	cfg := testutil.CreateMockConfig(t, ctrl, 1, pk)
 	signer, _ := ecdsa.New(cfg)
 	want, err := signer.Sign(hotstuff.GetGenesis())
 	if err != nil {
@@ -49,9 +42,13 @@ func TestConvertPartialCert(t *testing.T) {
 }
 
 func TestConvertQuorumCert(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	b1 := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), nil, "", 1, 1)
 	getSignature := func(id hotstuff.ID) hotstuff.PartialCert {
-		cfg := getMockConfig(t, id)
+		key := createKey(t)
+		cfg := testutil.CreateMockConfig(t, ctrl, id, key)
 		signer, _ := ecdsa.New(cfg)
 		pcert, err := signer.Sign(b1)
 		if err != nil {
@@ -63,7 +60,8 @@ func TestConvertQuorumCert(t *testing.T) {
 	sig1 := getSignature(1)
 	sig2 := getSignature(2)
 
-	cfg := getMockConfig(t, 0)
+	key := createKey(t)
+	cfg := testutil.CreateMockConfig(t, ctrl, 0, key)
 	signer, _ := ecdsa.New(cfg)
 
 	want, err := signer.CreateQuorumCert(b1, []hotstuff.PartialCert{sig1, sig2})
