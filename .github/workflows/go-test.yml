@@ -20,5 +20,7 @@ jobs:
             ${{ runner.os }}-go-
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: Download dependencies
+        run: go mod download
       - name: Test
-        run: go test ./...
+        run: go test -v ./...
