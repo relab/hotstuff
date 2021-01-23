@@ -52,8 +52,8 @@ func (hs *chainedhotstuff) Config() hotstuff.Config {
 	return hs.cfg
 }
 
-// View returns the current view
-func (hs *chainedhotstuff) View() hotstuff.View {
+// LastVote returns the view in which the replica last voted.
+func (hs *chainedhotstuff) LastVote() hotstuff.View {
 	hs.mut.Lock()
 	defer hs.mut.Unlock()
 

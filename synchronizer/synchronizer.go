@@ -50,7 +50,7 @@ func (s *Synchronizer) Init(hs hotstuff.Consensus) {
 
 // Start starts the synchronizer
 func (s *Synchronizer) Start() {
-	if s.GetLeader(s.hs.View()+1) == s.hs.Config().ID() {
+	if s.GetLeader(s.hs.Leaf().View()+1) == s.hs.Config().ID() {
 		s.hs.Propose()
 	}
 	s.timer.Reset(s.timeout)
@@ -65,7 +65,7 @@ func (s *Synchronizer) Stop() {
 }
 
 func (s *Synchronizer) beat() {
-	view := s.hs.View()
+	view := s.hs.Leaf().View()
 	s.mut.Lock()
 	if view <= s.lastBeat {
 		s.mut.Unlock()

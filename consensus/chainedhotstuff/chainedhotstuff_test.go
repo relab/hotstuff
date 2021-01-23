@@ -80,8 +80,8 @@ func TestPropose(t *testing.T) {
 
 	hs.Propose()
 
-	if hs.View() != 1 {
-		t.Errorf("Wrong view: got: %d, want: %d", hs.View(), 1)
+	if hs.LastVote() != 1 {
+		t.Errorf("Wrong view: got: %d, want: %d", hs.LastVote(), 1)
 	}
 }
 

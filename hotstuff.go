@@ -106,8 +106,8 @@ type BlockChain interface {
 type Consensus interface {
 	// Config returns the configuration of this replica
 	Config() Config
-	// View returns the current view
-	View() View
+	// LastVote returns the view in which the replica last voted
+	LastVote() View
 	// HighQC returns the highest QC known to the replica
 	HighQC() QuorumCert
 	// Leaf returns the last proposed block
