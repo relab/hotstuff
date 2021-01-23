@@ -309,6 +309,8 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 			return
 		}
 		hs.pendingQCs[cert.BlockHash()] = []hotstuff.PartialCert{cert}
+	} else {
+		hs.pendingQCs[cert.BlockHash()] = append(hs.pendingQCs[cert.BlockHash()], cert)
 	}
 
 	if len(votes) < hs.cfg.QuorumSize() {

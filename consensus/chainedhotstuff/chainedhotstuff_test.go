@@ -194,3 +194,82 @@ func TestCommit(t *testing.T) {
 	hs.OnPropose(b3)
 	hs.OnPropose(b4)
 }
+
+// TestVote checks that a leader can collect votes on a proposal to form a QC
+func TestVote(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	keys := make([]hotstuff.PrivateKey, 0, 3)
+	replicas := make([]*mocks.MockReplica, 0, 3)
+	configs := make([]*mocks.MockConfig, 0, 3)
+	signers := make([]hotstuff.Signer, 0, 3)
+
+	for i := 0; i < 3; i++ {
+		id := hotstuff.ID(i) + 1
+		keys = append(keys, createKey(t))
+		configs = append(configs, testutil.CreateMockConfig(t, ctrl, id, keys[i]))
+		replicas = append(replicas, testutil.CreateMockReplica(t, ctrl, id, keys[i].PublicKey()))
+		signer, _ := ecdsacrypto.New(configs[i])
+		signers = append(signers, signer)
+	}
+
+	for _, config := range configs {
+		for _, replica := range replicas {
+			testutil.ConfigAddReplica(t, config, replica)
+		}
+	}
+
+	// set up mocks for hotstuff
+	pk := createKey(t)
+
+	replica := testutil.CreateMockReplica(t, ctrl, 4, pk.PublicKey())
+	cfg := testutil.CreateMockConfig(t, ctrl, hotstuff.ID(4), pk)
+	cfg.EXPECT().QuorumSize().AnyTimes().Return(3)
+	testutil.ConfigAddReplica(t, cfg, replica)
+
+	for _, replica := range replicas {
+		testutil.ConfigAddReplica(t, cfg, replica)
+	}
+
+	// command queue should not be used
+	queue := mocks.NewMockCommandQueue(ctrl)
+
+	// executor should not be used
+	exec := mocks.NewMockExecutor(ctrl)
+
+	// acceptor should accept one block
+	acceptor := mocks.NewMockAcceptor(ctrl)
+	acceptor.EXPECT().Accept(gomock.Any()).Return(true)
+
+	// synchronizer should expect one proposal and one finishQC
+	synchronizer := mocks.NewMockViewSynchronizer(ctrl)
+	synchronizer.EXPECT().Init(gomock.Any())
+	synchronizer.EXPECT().OnPropose()
+	synchronizer.EXPECT().OnFinishQC()
+	synchronizer.EXPECT().GetLeader(gomock.Any()).AnyTimes().Return(hotstuff.ID(4))
+
+	hs := Builder{
+		Config:       cfg,
+		CommandQueue: queue,
+		Acceptor:     acceptor,
+		Executor:     exec,
+		Synchronizer: synchronizer,
+	}.Build()
+
+	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hs.HighQC(), "test", 1, 1)
+
+	hs.OnPropose(b)
+
+	for _, signer := range signers {
+		pc, err := signer.Sign(b)
+		if err != nil {
+			t.Fatalf("Failed to create partial certificate: %v", err)
+		}
+		hs.OnVote(pc)
+	}
+
+	if hs.HighQC().BlockHash() != b.Hash() {
+		t.Errorf("HighQC was not updated.")
+	}
+}
