@@ -44,8 +44,8 @@ func createMockConfig(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, key
 }
 
 func TestCreateAndVerifyPartialCert(t *testing.T) {
-
 	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	key := createKey(t)
 	replica := testutil.CreateMockReplica(t, ctrl, 1, &key.PrivateKey.PublicKey)
@@ -68,6 +68,7 @@ func TestCreateAndVerifyPartialCert(t *testing.T) {
 
 func TestCreateAndVerifyQuorumCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	keys := make([]*PrivateKey, 0, 3)
 	replicas := make([]*mocks.MockReplica, 0, 3)
