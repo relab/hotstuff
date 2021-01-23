@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -84,6 +86,10 @@ func (cert PartialCert) ToBytes() []byte {
 	return append(cert.hash[:], cert.signature.ToBytes()...)
 }
 
+func (cert PartialCert) String() string {
+	return fmt.Sprintf("PartialCert{ Block: %.6s, Signer: %d }", cert.hash.String(), cert.signature.signer)
+}
+
 var _ hotstuff.PartialCert = (*PartialCert)(nil)
 
 type QuorumCert struct {
@@ -120,6 +126,14 @@ func (qc QuorumCert) ToBytes() []byte {
 		b = append(b, sig.ToBytes()...)
 	}
 	return b
+}
+
+func (qc QuorumCert) String() string {
+	var sb strings.Builder
+	for _, sig := range qc.signatures {
+		sb.WriteString(" " + strconv.Itoa(int(sig.signer)) + " ")
+	}
+	return fmt.Sprintf("QC{ Block: %.6s, Sigs: [%s] }", qc.hash.String(), sb.String())
 }
 
 var _ hotstuff.QuorumCert = (*QuorumCert)(nil)
