@@ -26,6 +26,7 @@ func TestPropose(t *testing.T) {
 
 	// Setup mocks
 	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	// this replica
 	replica1 := testutil.CreateMockReplica(t, ctrl, hotstuff.ID(1), nil)
@@ -82,4 +83,114 @@ func TestPropose(t *testing.T) {
 	if hs.View() != 1 {
 		t.Errorf("Wrong view: got: %d, want: %d", hs.View(), 1)
 	}
+}
+
+func createQC(t *testing.T, block *hotstuff.Block, signers []hotstuff.Signer) hotstuff.QuorumCert {
+	t.Helper()
+	if len(signers) == 0 {
+		return nil
+	}
+	pcs := make([]hotstuff.PartialCert, 0, len(signers))
+	for _, signer := range signers {
+		pc, err := signer.Sign(block)
+		if err != nil {
+			t.Fatalf("Failed to sign block: %v", err)
+		}
+		pcs = append(pcs, pc)
+	}
+	qc, err := signers[0].CreateQuorumCert(block, pcs)
+	if err != nil {
+		t.Fatalf("Faield to create QC: %v", err)
+	}
+	return qc
+}
+
+// TestCommit checks that a replica commits and executes a valid branch
+func TestCommit(t *testing.T) {
+	// Create 3 signers, and then create at least 3 proposals to submit to the replica.
+	// Then check that the replica has executed the first one.
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	keys := make([]hotstuff.PrivateKey, 0, 3)
+	replicas := make([]*mocks.MockReplica, 0, 3)
+	configs := make([]*mocks.MockConfig, 0, 3)
+	signers := make([]hotstuff.Signer, 0, 3)
+
+	for i := 0; i < 3; i++ {
+		id := hotstuff.ID(i) + 1
+		keys = append(keys, createKey(t))
+		configs = append(configs, testutil.CreateMockConfig(t, ctrl, id, keys[i]))
+		replicas = append(replicas, testutil.CreateMockReplica(t, ctrl, id, keys[i].PublicKey()))
+		signer, _ := ecdsacrypto.New(configs[i])
+		signers = append(signers, signer)
+	}
+
+	for _, config := range configs {
+		for _, replica := range replicas {
+			testutil.ConfigAddReplica(t, config, replica)
+		}
+	}
+
+	// create the needed blocks and QCs
+	genesisQC := ecdsacrypto.NewQuorumCert(map[hotstuff.ID]*ecdsacrypto.Signature{}, hotstuff.GetGenesis().Hash())
+	b1 := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), genesisQC, "1", 1, 1)
+	b1QC := createQC(t, b1, signers)
+	b2 := hotstuff.NewBlock(b1.Hash(), b1QC, "2", 2, 1)
+	b2QC := createQC(t, b2, signers)
+	b3 := hotstuff.NewBlock(b2.Hash(), b2QC, "3", 3, 1)
+	b3QC := createQC(t, b3, signers)
+	b4 := hotstuff.NewBlock(b3.Hash(), b3QC, "4", 4, 1)
+
+	// set up mocks for hotstuff
+	pk := createKey(t)
+
+	cfg := testutil.CreateMockConfig(t, ctrl, hotstuff.ID(4), pk)
+	cfg.EXPECT().QuorumSize().AnyTimes().Return(3)
+
+	for _, replica := range replicas {
+		testutil.ConfigAddReplica(t, cfg, replica)
+	}
+
+	// the first replica will be the leader, so we expect it to receive votes
+	replicas[0].EXPECT().Vote(gomock.Any()).AnyTimes()
+
+	// command queue should not be used
+	queue := mocks.NewMockCommandQueue(ctrl)
+
+	// executor will check that the correct command is executed
+	exec := mocks.NewMockExecutor(ctrl)
+	exec.EXPECT().Exec(gomock.Any()).Do(func(arg interface{}) {
+		if arg.(hotstuff.Command) != b1.Command() {
+			t.Errorf("Wrong command executed: got: %s, want: %s", arg, b1.Command())
+		}
+	})
+
+	// acceptor expects to receive the commands in order
+	acceptor := mocks.NewMockAcceptor(ctrl)
+	gomock.InOrder(
+		acceptor.EXPECT().Accept(hotstuff.Command("1")).Return(true),
+		acceptor.EXPECT().Accept(hotstuff.Command("2")).Return(true),
+		acceptor.EXPECT().Accept(hotstuff.Command("3")).Return(true),
+		acceptor.EXPECT().Accept(hotstuff.Command("4")).Return(true),
+	)
+
+	synchronizer := mocks.NewMockViewSynchronizer(ctrl)
+	synchronizer.EXPECT().GetLeader(gomock.Any()).AnyTimes().Return(hotstuff.ID(1))
+	synchronizer.EXPECT().OnPropose().AnyTimes()
+	// the following should be called once
+	synchronizer.EXPECT().Init(gomock.Any())
+
+	hs := Builder{
+		Config:       cfg,
+		CommandQueue: queue,
+		Acceptor:     acceptor,
+		Executor:     exec,
+		Synchronizer: synchronizer,
+	}.Build()
+
+	hs.OnPropose(b1)
+	hs.OnPropose(b2)
+	hs.OnPropose(b3)
+	hs.OnPropose(b4)
 }
