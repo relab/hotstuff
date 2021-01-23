@@ -1,5 +1,7 @@
 package hotstuff
 
+import "encoding/base64"
+
 // ID uniquely identifies a replica
 type ID uint32
 
@@ -8,6 +10,10 @@ type View uint64
 
 // Hash is a SHA256 hash
 type Hash [32]byte
+
+func (h Hash) String() string {
+	return base64.StdEncoding.EncodeToString(h[:])
+}
 
 // Command is a client request to be executed by the consensus protocol
 type Command string
