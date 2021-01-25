@@ -85,14 +85,15 @@ func (hs *chainedhotstuff) CreateDummy() {
 }
 
 func (hs *chainedhotstuff) updateHighQC(qc hotstuff.QuorumCert) {
+	logger.Debugf("updateHighQC: %v", qc)
 	if !hs.verifier.VerifyQuorumCert(qc) {
-		logger.Info("updateQCHigh: QC could not be verified!")
+		logger.Info("updateHighQC: QC could not be verified!")
 		return
 	}
 
 	newBlock, ok := hs.blocks.Get(qc.BlockHash())
 	if !ok {
-		logger.Info("updateQCHigh: Could not find block referenced by new QC!")
+		logger.Info("updateHighQC: Could not find block referenced by new QC!")
 		return
 	}
 
@@ -160,6 +161,7 @@ func (hs *chainedhotstuff) update(block *hotstuff.Block) {
 
 // Propose proposes the given command
 func (hs *chainedhotstuff) Propose() {
+	logger.Debug("Propose")
 	hs.mut.Lock()
 	cmd := hs.commands.GetCommand()
 	// TODO: Should probably use channels/contexts here instead such that
@@ -172,6 +174,7 @@ func (hs *chainedhotstuff) Propose() {
 		cmd = new(hotstuff.Command)
 	}
 	block := hotstuff.NewBlock(hs.bLeaf.Hash(), hs.highQC, *cmd, hs.bLeaf.View()+1, hs.cfg.ID())
+	hs.blocks.Store(block)
 	hs.mut.Unlock()
 
 	hs.cfg.Propose(block)
@@ -180,6 +183,7 @@ func (hs *chainedhotstuff) Propose() {
 }
 
 func (hs *chainedhotstuff) NewView() {
+	logger.Debug("NewView")
 	hs.mut.Lock()
 	leaderID := hs.synchronizer.GetLeader(hs.bLeaf.View() + 1)
 	if leaderID == hs.cfg.ID() {
