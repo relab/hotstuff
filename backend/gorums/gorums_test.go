@@ -3,6 +3,8 @@ package gorums
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"testing"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/internal/mocks"
+	"google.golang.org/grpc/credentials"
 )
 
 func generateKey(t *testing.T) *ecdsa.PrivateKey {
@@ -24,7 +27,15 @@ func generateKey(t *testing.T) *ecdsa.PrivateKey {
 	return pk
 }
 
-func TestGorums(t *testing.T) {
+func TestGorumsNoTLS(t *testing.T) {
+	testGorums(t, false)
+}
+
+func TestGorumsTLS(t *testing.T) {
+	testGorums(t, true)
+}
+
+func testGorums(t *testing.T, useTLS bool) {
 	const n = 4 // number of replicas to start
 
 	ctrl := gomock.NewController(t)
@@ -34,6 +45,7 @@ func TestGorums(t *testing.T) {
 	keys := make([]*ecdsa.PrivateKey, 0, n)
 	replicas := make([]*config.ReplicaInfo, 0, n)
 	servers := make([]*Server, 0, n)
+	certificates := make([]*x509.Certificate, 0, n)
 
 	// generate keys and replicaInfo
 	for i := 0; i < n; i++ {
@@ -45,7 +57,33 @@ func TestGorums(t *testing.T) {
 		})
 	}
 
-	cfg := config.NewConfig(1, keys[0], nil)
+	var cp *x509.CertPool
+	var creds credentials.TransportCredentials
+	if useTLS {
+		caPK := generateKey(t)
+		ca, err := crypto.GenerateRootCert(caPK)
+		if err != nil {
+			t.Fatalf("Failed to generate CA: %v", err)
+		}
+
+		for i := 0; i < n; i++ {
+			cert, err := crypto.GenerateTLSCert(hotstuff.ID(i)+1, []string{"localhost"}, ca, replicas[i].PubKey, caPK)
+			if err != nil {
+				t.Fatalf("Failed to generate certificate: %v", err)
+			}
+			certificates = append(certificates, cert)
+
+		}
+		cp = x509.NewCertPool()
+		cp.AddCert(ca)
+		creds = credentials.NewTLS(&tls.Config{
+			RootCAs:      cp,
+			ClientCAs:    cp,
+			Certificates: []tls.Certificate{{Certificate: [][]byte{certificates[0].Raw}, PrivateKey: keys[0]}},
+		})
+	}
+
+	cfg := config.NewConfig(1, keys[0], creds)
 	for _, replica := range replicas {
 		cfg.Replicas[replica.ID] = replica
 	}
@@ -60,6 +98,14 @@ func TestGorums(t *testing.T) {
 		c := *cfg
 		c.ID = hotstuff.ID(i + 1)
 		c.PrivateKey = keys[i]
+		if useTLS {
+			c.Creds = credentials.NewTLS(&tls.Config{
+				RootCAs:      cp,
+				ClientCAs:    cp,
+				Certificates: []tls.Certificate{{Certificate: [][]byte{certificates[i].Raw}, PrivateKey: keys[i]}},
+				ClientAuth:   tls.RequireAndVerifyClientCert,
+			})
+		}
 		servers = append(servers, NewServer(c))
 		servers[i].StartServer(mockConsensus[i])
 	}
@@ -79,8 +125,12 @@ func TestGorums(t *testing.T) {
 	}
 
 	c := make(chan struct{}, 1)
-	// configure mocks. server with id 1 should not be used
-	for _, mock := range mockConsensus[1:] {
+	// configure mocks. server with id 1 should not receive any messages
+	for i, mock := range mockConsensus {
+		mock.EXPECT().Config().AnyTimes().Return(client)
+		if i == 0 {
+			continue
+		}
 		mock.EXPECT().OnPropose(gomock.AssignableToTypeOf(block)).Do(func(arg *hotstuff.Block) {
 			if arg.Hash() != block.Hash() {
 				t.Errorf("Block hash mismatch. got: %v, want: %v", arg, block)
@@ -113,5 +163,10 @@ func TestGorums(t *testing.T) {
 
 	for i := 0; i < (n-1)*3; i++ {
 		<-c
+	}
+
+	client.Close()
+	for _, server := range servers {
+		server.Stop()
 	}
 }
