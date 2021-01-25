@@ -111,6 +111,9 @@ func (srv *clientSrv) Start(address string) error {
 	srv.hsSrv.StartServer(srv.hs)
 	srv.cfg.Connect(10 * time.Second)
 
+	// sleep so that all replicas can be ready before we start
+	time.Sleep(time.Duration(srv.conf.ViewTimeout) * time.Millisecond)
+
 	srv.pm.Start()
 
 	go srv.gorumsSrv.Serve(lis)
