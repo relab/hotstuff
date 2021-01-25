@@ -3,6 +3,7 @@ package logging
 import (
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/mattn/go-isatty"
 	"go.uber.org/zap"
@@ -10,6 +11,7 @@ import (
 )
 
 var logger *zap.SugaredLogger
+var mut sync.Mutex
 
 func initLogger() {
 	var config zap.Config
@@ -44,6 +46,8 @@ func initLogger() {
 
 // GetLogger returns a pointer to the global logger for HotStuff
 func GetLogger() *zap.SugaredLogger {
+	mut.Lock()
+	defer mut.Unlock()
 	if logger == nil {
 		initLogger()
 	}
@@ -51,6 +55,8 @@ func GetLogger() *zap.SugaredLogger {
 }
 
 func NameLogger(name string) *zap.SugaredLogger {
-	*logger = *GetLogger().Named(name)
+	mut.Lock()
+	defer mut.Unlock()
+	*logger = *logger.Named(name)
 	return logger
 }
