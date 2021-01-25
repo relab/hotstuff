@@ -6,7 +6,10 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/logging"
 )
+
+var logger = logging.GetLogger()
 
 type Synchronizer struct {
 	hotstuff.LeaderRotation
@@ -30,7 +33,9 @@ func New(leaderRotation hotstuff.LeaderRotation, initialTimeout time.Duration) h
 func (s *Synchronizer) OnPropose() {
 	s.mut.Lock()
 	defer s.mut.Unlock()
-	s.timer.Reset(s.timeout)
+	if s.timer != nil {
+		s.timer.Reset(s.timeout)
+	}
 }
 
 // OnFinishQC should be called when a replica has created a new qc
@@ -45,7 +50,6 @@ func (s *Synchronizer) OnNewView() {
 
 func (s *Synchronizer) Init(hs hotstuff.Consensus) {
 	s.hs = hs
-	s.timer = time.NewTimer(s.timeout)
 }
 
 // Start starts the synchronizer
@@ -53,7 +57,7 @@ func (s *Synchronizer) Start() {
 	if s.GetLeader(s.hs.Leaf().View()+1) == s.hs.Config().ID() {
 		s.hs.Propose()
 	}
-	s.timer.Reset(s.timeout)
+	s.timer = time.NewTimer(s.timeout)
 	var ctx context.Context
 	ctx, s.stop = context.WithCancel(context.Background())
 	go s.newViewTimeout(ctx)
@@ -61,6 +65,9 @@ func (s *Synchronizer) Start() {
 
 // Stop stops the synchronizer
 func (s *Synchronizer) Stop() {
+	if s.timer != nil && !s.timer.Stop() {
+		<-s.timer.C
+	}
 	s.stop()
 }
 
@@ -69,6 +76,7 @@ func (s *Synchronizer) beat() {
 	s.mut.Lock()
 	if view <= s.lastBeat {
 		s.mut.Unlock()
+		logger.Debug("Can't beat more than once per view ", s.lastBeat)
 		return
 	}
 	if s.GetLeader(view) != s.hs.Config().ID() {
