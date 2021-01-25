@@ -102,6 +102,8 @@ type BlockChain interface {
 	Get(Hash) (*Block, bool)
 }
 
+//go:generate mockgen -destination=internal/mocks/consensus_mock.go -package=mocks . Consensus
+
 // Consensus implements a consensus protocol
 type Consensus interface {
 	// Config returns the configuration of this replica

@@ -71,7 +71,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 	}
 
 	var err error
-	srv.cfg = hotstuffgorums.NewConfig(*replicaConfig, 1*time.Second)
+	srv.cfg = hotstuffgorums.NewConfig(*replicaConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to init gorums backend: %s\n", err)
 		os.Exit(1)

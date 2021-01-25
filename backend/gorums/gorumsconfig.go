@@ -65,7 +65,7 @@ type Config struct {
 	proposeCancel context.CancelFunc
 }
 
-func NewConfig(replicaCfg config.ReplicaConfig, connectTimeout time.Duration) *Config {
+func NewConfig(replicaCfg config.ReplicaConfig) *Config {
 	cfg := &Config{
 		replicaCfg:    replicaCfg,
 		privKey:       &ecdsa.PrivateKey{PrivateKey: replicaCfg.PrivateKey},
