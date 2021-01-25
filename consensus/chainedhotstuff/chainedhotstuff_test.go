@@ -17,7 +17,7 @@ func createKey(t *testing.T) *ecdsacrypto.PrivateKey {
 	if err != nil {
 		t.Errorf("Failed to generate private key: %v", err)
 	}
-	return &ecdsacrypto.PrivateKey{pk}
+	return &ecdsacrypto.PrivateKey{PrivateKey: pk}
 }
 
 // TestPropose checks that a leader broadcasts a new proposal, and then sends a vote to the next leader
