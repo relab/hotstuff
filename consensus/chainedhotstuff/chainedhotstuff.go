@@ -295,17 +295,18 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 	logger.Debugf("OnVote: %.8s", cert.BlockHash())
 
 	hs.mut.Lock()
-	defer hs.mut.Unlock()
 
 	block, ok := hs.blocks.Get(cert.BlockHash())
 	if !ok {
 		logger.Info("OnVote: could not find block for certificate.")
+		hs.mut.Unlock()
 		return
 	}
 
 	votes, ok := hs.pendingQCs[cert.BlockHash()]
 	if !ok {
 		if block.View() <= hs.bLeaf.View() {
+			hs.mut.Unlock()
 			return
 		}
 		hs.pendingQCs[cert.BlockHash()] = []hotstuff.PartialCert{cert}
@@ -314,6 +315,7 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 	}
 
 	if len(votes) < hs.cfg.QuorumSize() {
+		hs.mut.Unlock()
 		return
 	}
 
@@ -323,6 +325,8 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 	}
 	delete(hs.pendingQCs, cert.BlockHash())
 	hs.updateHighQC(qc)
+
+	hs.mut.Unlock()
 	// signal the synchronizer
 	hs.synchronizer.OnFinishQC()
 }
