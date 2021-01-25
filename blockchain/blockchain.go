@@ -26,7 +26,7 @@ func New(maxSize int) hotstuff.BlockChain {
 
 func (chain *blockChain) dropOldest() {
 	elem := chain.accessOrder.Back()
-	block := elem.Value.(hotstuff.Block)
+	block := elem.Value.(*hotstuff.Block)
 	delete(chain.blocks, block.Hash())
 	chain.accessOrder.Remove(elem)
 }
