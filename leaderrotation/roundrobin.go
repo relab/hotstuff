@@ -10,7 +10,7 @@ type roundRobin struct {
 func (rr roundRobin) GetLeader(view hotstuff.View) hotstuff.ID {
 	// TODO: does not support reconfiguration
 	// assume IDs start at 1
-	return hotstuff.ID(hotstuff.View(rr.cfg.Len())%view + 1)
+	return hotstuff.ID(view%hotstuff.View(rr.cfg.Len()) + 1)
 }
 
 func NewRoundRobin(cfg hotstuff.Config) hotstuff.LeaderRotation {
