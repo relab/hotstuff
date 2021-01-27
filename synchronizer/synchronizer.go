@@ -20,9 +20,10 @@ type Synchronizer struct {
 	timer    *time.Timer
 	stop     context.CancelFunc
 	hs       hotstuff.Consensus
+	stopped  bool
 }
 
-func New(leaderRotation hotstuff.LeaderRotation, initialTimeout time.Duration) hotstuff.ViewSynchronizer {
+func New(leaderRotation hotstuff.LeaderRotation, initialTimeout time.Duration) *Synchronizer {
 	return &Synchronizer{
 		LeaderRotation: leaderRotation,
 		timeout:        initialTimeout,
@@ -65,6 +66,7 @@ func (s *Synchronizer) Start() {
 
 // Stop stops the synchronizer
 func (s *Synchronizer) Stop() {
+	s.stopped = true
 	if s.timer != nil && !s.timer.Stop() {
 		<-s.timer.C
 	}
@@ -72,6 +74,9 @@ func (s *Synchronizer) Stop() {
 }
 
 func (s *Synchronizer) beat() {
+	if s.stopped {
+		return
+	}
 	view := s.hs.Leaf().View()
 	s.mut.Lock()
 	if view <= s.lastBeat {
