@@ -86,14 +86,16 @@ func TestChainedHotstuff(t *testing.T) {
 	counters := make([]uint, n)
 	c := make(chan struct{}, n)
 	for i := 0; i < n; i++ {
+		counter := &counters[i]
+		pm := &synchronizers[i]
 		executor := mocks.NewMockExecutor(ctrl)
 		executor.EXPECT().Exec(gomock.Any()).AnyTimes().Do(func(arg hotstuff.Command) {
 			if arg != hotstuff.Command("foo") {
 				t.Fatalf("Unknown command executed: got %s, want: %s", arg, "foo")
 			}
-			counters[i]++
-			if counters[i] >= 10 {
-				synchronizers[i].Stop()
+			*counter++
+			if *counter >= 10 {
+				(*pm).Stop()
 				c <- struct{}{}
 			}
 		})
@@ -103,6 +105,7 @@ func TestChainedHotstuff(t *testing.T) {
 			Synchronizer: synchronizers[i],
 			Acceptor:     acceptor,
 			CommandQueue: commands,
+			Executor:     executor,
 		}.Build()
 	}
 
