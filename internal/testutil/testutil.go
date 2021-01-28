@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"net"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -52,4 +53,13 @@ func ConfigAddReplica(t *testing.T, cfg *mocks.MockConfig, replica *mocks.MockRe
 		Replica(replica.ID()).
 		AnyTimes().
 		Return(replica, true)
+}
+
+func CreateTCPListener(t *testing.T) net.Listener {
+	t.Helper()
+	lis, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatalf("Failed to create listener: %v", err)
+	}
+	return lis
 }

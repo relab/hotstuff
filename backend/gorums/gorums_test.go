@@ -5,7 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -15,6 +15,7 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/internal/mocks"
+	"github.com/relab/hotstuff/internal/testutil"
 	"google.golang.org/grpc/credentials"
 )
 
@@ -41,6 +42,7 @@ func testGorums(t *testing.T, useTLS bool) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	listeners := make([]net.Listener, n)
 	mockConsensus := make([]*mocks.MockConsensus, 0, n)
 	keys := make([]*ecdsa.PrivateKey, 0, n)
 	replicas := make([]*config.ReplicaInfo, 0, n)
@@ -49,10 +51,11 @@ func testGorums(t *testing.T, useTLS bool) {
 
 	// generate keys and replicaInfo
 	for i := 0; i < n; i++ {
+		listeners[i] = testutil.CreateTCPListener(t)
 		keys = append(keys, generateKey(t))
 		replicas = append(replicas, &config.ReplicaInfo{
 			ID:      hotstuff.ID(i) + 1,
-			Address: fmt.Sprintf(":1337%d", i),
+			Address: listeners[i].Addr().String(),
 			PubKey:  &keys[i].PublicKey,
 		})
 	}
@@ -67,7 +70,7 @@ func testGorums(t *testing.T, useTLS bool) {
 		}
 
 		for i := 0; i < n; i++ {
-			cert, err := crypto.GenerateTLSCert(hotstuff.ID(i)+1, []string{"localhost"}, ca, replicas[i].PubKey, caPK)
+			cert, err := crypto.GenerateTLSCert(hotstuff.ID(i)+1, []string{"localhost", "127.0.0.1"}, ca, replicas[i].PubKey, caPK)
 			if err != nil {
 				t.Fatalf("Failed to generate certificate: %v", err)
 			}
@@ -107,7 +110,7 @@ func testGorums(t *testing.T, useTLS bool) {
 			})
 		}
 		servers = append(servers, NewServer(c))
-		servers[i].StartServer(mockConsensus[i])
+		servers[i].StartOnListener(mockConsensus[i], listeners[i])
 	}
 
 	// create the configuration

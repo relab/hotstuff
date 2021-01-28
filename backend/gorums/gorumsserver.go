@@ -44,14 +44,20 @@ func NewServer(replicaConfig config.ReplicaConfig) *Server {
 	return srv
 }
 
-func (srv *Server) StartServer(hs hotstuff.Consensus) error {
-	srv.hs = hs
+// Start creates a listener on the configured address and starts the server
+func (srv *Server) Start(hs hotstuff.Consensus) error {
 	lis, err := net.Listen("tcp", srv.addr)
 	if err != nil {
 		return fmt.Errorf("Failed to listen on %s: %w", srv.addr, err)
 	}
-	go srv.gorumsSrv.Serve(lis)
+	srv.StartOnListener(hs, lis)
 	return nil
+}
+
+// StartOnListener starts the server on the given listener
+func (srv *Server) StartOnListener(hs hotstuff.Consensus, listener net.Listener) {
+	srv.hs = hs
+	go srv.gorumsSrv.Serve(listener)
 }
 
 func (srv *Server) getClientID(ctx context.Context) (hotstuff.ID, error) {

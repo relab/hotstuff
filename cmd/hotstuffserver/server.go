@@ -108,7 +108,7 @@ func (srv *clientSrv) Start(address string) error {
 		return err
 	}
 
-	srv.hsSrv.StartServer(srv.hs)
+	srv.hsSrv.Start(srv.hs)
 	srv.cfg.Connect(10 * time.Second)
 
 	// sleep so that all replicas can be ready before we start

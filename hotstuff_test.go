@@ -32,7 +32,7 @@ func createGorums(t *testing.T, baseCfg config.ReplicaConfig) (cfg *gorums.Confi
 	srv := gorums.NewServer(baseCfg)
 	start = func(c hotstuff.Consensus) {
 		t.Helper()
-		if err := srv.StartServer(c); err != nil {
+		if err := srv.Start(c); err != nil {
 			t.Fatalf("Failed to start gorums server: %v", err)
 		}
 	}
