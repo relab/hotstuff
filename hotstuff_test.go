@@ -1,6 +1,7 @@
 package hotstuff_test
 
 import (
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -68,13 +69,14 @@ func TestChainedHotstuff(t *testing.T) {
 	synchronizers := make([]*synchronizer.Synchronizer, n)
 	counters := make([]uint, n)
 	c := make(chan struct{}, n)
+	errChan := make(chan error, n)
 	for i := 0; i < n; i++ {
 		counter := &counters[i]
 		pm := &synchronizers[i]
 		executor := mocks.NewMockExecutor(ctrl)
 		executor.EXPECT().Exec(gomock.Any()).AnyTimes().Do(func(arg hotstuff.Command) {
 			if arg != hotstuff.Command("foo") {
-				t.Fatalf("Unknown command executed: got %s, want: %s", arg, "foo")
+				errChan <- fmt.Errorf("Unknown command executed: got %s, want: %s", arg, "foo")
 			}
 			*counter++
 			if *counter >= 10 {
@@ -107,6 +109,10 @@ func TestChainedHotstuff(t *testing.T) {
 	}
 
 	for i := 0; i < n; i++ {
-		<-c
+		select {
+		case <-c:
+		case err := <-errChan:
+			t.Fatal(err)
+		}
 	}
 }
