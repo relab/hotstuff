@@ -19,7 +19,7 @@ jobs:
       - name: Download dependencies
         run: go mod download
       - name: Generate coverage report
-        run: go test -v -coverprofile=coverage.txt ./...
+        run: go test -v -coverprofile=coverage.txt -covermode=atomic ./...
       - name: Upload coverage report
         uses: codecov/codecov-action@v1
         with:
