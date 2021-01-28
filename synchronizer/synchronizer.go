@@ -84,7 +84,7 @@ func (s *Synchronizer) beat() {
 		logger.Debug("Can't beat more than once per view ", s.lastBeat)
 		return
 	}
-	if s.GetLeader(view) != s.hs.Config().ID() {
+	if s.GetLeader(view+1) != s.hs.Config().ID() {
 		s.mut.Unlock()
 		return
 	}
