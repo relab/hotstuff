@@ -1,7 +1,7 @@
 package hotstuff_test
 
 import (
-	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -13,6 +13,7 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/internal/mocks"
+	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/leaderrotation"
 	"github.com/relab/hotstuff/synchronizer"
 )
@@ -24,24 +25,6 @@ func createKey(t *testing.T) *ecdsa.PrivateKey {
 		t.Fatalf("Failed to generate private key: %v", err)
 	}
 	return &ecdsa.PrivateKey{PrivateKey: key}
-}
-
-func createGorums(t *testing.T, baseCfg config.ReplicaConfig) (cfg *gorums.Config, start func(hotstuff.Consensus), teardown func()) {
-	t.Helper()
-	cfg = gorums.NewConfig(baseCfg)
-	srv := gorums.NewServer(baseCfg)
-	start = func(c hotstuff.Consensus) {
-		t.Helper()
-		if err := srv.Start(c); err != nil {
-			t.Fatalf("Failed to start gorums server: %v", err)
-		}
-	}
-	teardown = func() {
-		t.Helper()
-		cfg.Close()
-		srv.Stop()
-	}
-	return
 }
 
 func TestChainedHotstuff(t *testing.T) {
@@ -58,27 +41,27 @@ func TestChainedHotstuff(t *testing.T) {
 
 	baseCfg := config.NewConfig(0, nil, nil)
 
+	listeners := make([]net.Listener, n)
 	keys := make([]*ecdsa.PrivateKey, n)
 	for i := 0; i < n; i++ {
+		listeners[i] = testutil.CreateTCPListener(t)
 		keys[i] = createKey(t)
 		id := hotstuff.ID(i + 1)
 		baseCfg.Replicas[id] = &config.ReplicaInfo{
 			ID:      id,
-			Address: fmt.Sprintf(":1337%d", id),
+			Address: listeners[i].Addr().String(),
 			PubKey:  &keys[i].PrivateKey.PublicKey,
 		}
 	}
 
 	configs := make([]*gorums.Config, n)
-	starters := make([]func(hotstuff.Consensus), n)
+	servers := make([]*gorums.Server, n)
 	for i := 0; i < n; i++ {
 		c := *baseCfg
 		c.ID = hotstuff.ID(i + 1)
 		c.PrivateKey = keys[i].PrivateKey
-		cfg, start, teardown := createGorums(t, c)
-		configs[i] = cfg
-		starters[i] = start
-		defer teardown()
+		configs[i] = gorums.NewConfig(c)
+		servers[i] = gorums.NewServer(c)
 	}
 
 	replicas := make([]hotstuff.Consensus, n)
@@ -109,12 +92,14 @@ func TestChainedHotstuff(t *testing.T) {
 		}.Build()
 	}
 
-	for i, start := range starters {
-		start(replicas[i])
+	for i, server := range servers {
+		server.StartOnListener(replicas[i], listeners[i])
+		defer server.Stop()
 	}
 
 	for _, cfg := range configs {
 		cfg.Connect(time.Second)
+		defer cfg.Close()
 	}
 
 	for _, pm := range synchronizers {
