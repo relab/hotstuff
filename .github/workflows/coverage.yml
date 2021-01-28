@@ -1,7 +1,7 @@
 on: [push, pull_request]
 name: Code coverage
 jobs:
-  test:
+  codecov:
     runs-on: ubuntu-latest
     steps:
       - name: Install Go
@@ -26,4 +26,3 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.txt
           flags: unittests
-          verbose: true
