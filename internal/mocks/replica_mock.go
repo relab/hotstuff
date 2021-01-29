@@ -33,6 +33,18 @@ func (m *MockReplica) EXPECT() *MockReplicaMockRecorder {
 	return m.recorder
 }
 
+// Deliver mocks base method
+func (m *MockReplica) Deliver(arg0 *hotstuff.Block) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Deliver", arg0)
+}
+
+// Deliver indicates an expected call of Deliver
+func (mr *MockReplicaMockRecorder) Deliver(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Deliver", reflect.TypeOf((*MockReplica)(nil).Deliver), arg0)
+}
+
 // ID mocks base method
 func (m *MockReplica) ID() hotstuff.ID {
 	m.ctrl.T.Helper()

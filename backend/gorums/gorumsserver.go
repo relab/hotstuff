@@ -101,6 +101,10 @@ func (srv *Server) getClientID(ctx context.Context) (hotstuff.ID, error) {
 	return hotstuff.ID(id), nil
 }
 
+func (srv *Server) Stop() {
+	srv.gorumsSrv.Stop()
+}
+
 // Propose handles a replica's response to the Propose QC from the leader
 func (srv *Server) Propose(ctx context.Context, block *proto.Block) {
 	id, err := srv.getClientID(ctx)
@@ -113,15 +117,40 @@ func (srv *Server) Propose(ctx context.Context, block *proto.Block) {
 	srv.hs.OnPropose(proto.BlockFromProto(block))
 }
 
-func (srv *Server) Vote(ctx context.Context, cert *proto.PartialCert) {
+func (srv *Server) Vote(_ context.Context, cert *proto.PartialCert) {
 	srv.hs.OnVote(proto.PartialCertFromProto(cert))
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica
-func (srv *Server) NewView(ctx context.Context, msg *proto.QuorumCert) {
+func (srv *Server) NewView(_ context.Context, msg *proto.QuorumCert) {
 	srv.hs.OnNewView(proto.QuorumCertFromProto(msg))
 }
 
-func (srv *Server) Stop() {
-	srv.gorumsSrv.Stop()
+func (srv *Server) Fetch(ctx context.Context, pb *proto.BlockHash) {
+	var hash hotstuff.Hash
+	copy(hash[:], pb.GetHash())
+
+	logger.Debugf("OnFetch: %.8s", hash)
+
+	block, ok := srv.hs.BlockChain().Get(hash)
+	if !ok {
+		return
+	}
+
+	id, err := srv.getClientID(ctx)
+	if err != nil {
+		logger.Infof("Fetch: could not get peer id: %v", err)
+	}
+
+	replica, ok := srv.hs.Config().Replica(id)
+	if !ok {
+		logger.Infof("Fetch: could not find replica with id: %d", id)
+		return
+	}
+
+	replica.Deliver(block)
+}
+
+func (srv *Server) Deliver(_ context.Context, block *proto.Block) {
+	srv.hs.OnDeliver(proto.BlockFromProto(block))
 }

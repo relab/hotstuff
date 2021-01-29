@@ -1,6 +1,7 @@
 package chainedhotstuff
 
 import (
+	"context"
 	"sync"
 
 	"github.com/relab/hotstuff"
@@ -30,12 +31,18 @@ type chainedhotstuff struct {
 	bLeaf    *hotstuff.Block     // the last proposed block
 	highQC   hotstuff.QuorumCert // the highest qc known to this replica
 
-	pendingQCs map[hotstuff.Hash][]hotstuff.PartialCert
+	fetchCtx    context.Context
+	fetchCancel context.CancelFunc
+
+	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
+	pendingVotes  map[hotstuff.Hash][]hotstuff.PartialCert // unverified votes that are waiting for a Block
 }
 
 func (hs *chainedhotstuff) init() {
 	var err error
-	hs.pendingQCs = make(map[hotstuff.Hash][]hotstuff.PartialCert)
+	hs.verifiedVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
+	hs.pendingVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
+	hs.fetchCancel = func() {}
 	hs.bLock = hotstuff.GetGenesis()
 	hs.bExec = hotstuff.GetGenesis()
 	hs.bLeaf = hotstuff.GetGenesis()
@@ -250,6 +257,9 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 	// Signal the synchronizer
 	hs.synchronizer.OnPropose()
 
+	// cancel the last fetch
+	hs.fetchCancel()
+
 	pc, err := hs.signer.Sign(block)
 	if err != nil {
 		logger.Error("OnPropose: failed to sign vote: ", err)
@@ -275,8 +285,36 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 		logger.Warnf("Replica with ID %d was not found!", leaderID)
 	}
 
+	// clear pending votes
+	defer func() {
+		hs.mut.Lock()
+		hs.pendingVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
+		hs.mut.Unlock()
+	}()
+
+	if _, ok := hs.pendingVotes[block.Hash()]; ok {
+		defer hs.OnDeliver(block)
+	}
+
 	hs.mut.Unlock()
 	leader.Vote(pc)
+}
+
+func (hs *chainedhotstuff) fetchBlockForVote(vote hotstuff.PartialCert) {
+	hs.mut.Lock()
+	votes, ok := hs.pendingVotes[vote.BlockHash()]
+	votes = append(votes, vote)
+	hs.pendingVotes[vote.BlockHash()] = votes
+
+	if ok {
+		// another vote initiated fetching
+		hs.mut.Unlock()
+		return
+	}
+
+	hs.fetchCtx, hs.fetchCancel = context.WithCancel(context.Background())
+	hs.mut.Unlock()
+	hs.cfg.Fetch(hs.fetchCtx, vote.BlockHash())
 }
 
 // OnVote handles an incoming vote
@@ -284,17 +322,29 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 	defer func() {
 		hs.mut.Lock()
 		// delete any pending QCs with lower height than bLeaf
-		for k := range hs.pendingQCs {
+		for k := range hs.verifiedVotes {
 			if block, ok := hs.blocks.Get(k); ok {
 				if block.View() <= hs.bLeaf.View() {
-					delete(hs.pendingQCs, k)
+					delete(hs.verifiedVotes, k)
 				}
 			} else {
-				delete(hs.pendingQCs, k)
+				delete(hs.verifiedVotes, k)
 			}
 		}
 		hs.mut.Unlock()
 	}()
+
+	block, ok := hs.blocks.Get(cert.BlockHash())
+	if !ok {
+		logger.Debugf("Could not find block for vote: %.8s. Attempting to fetch.", cert.BlockHash())
+		hs.fetchBlockForVote(cert)
+		return
+	}
+
+	if block.View() <= hs.bLeaf.View() {
+		// too old
+		return
+	}
 
 	if !hs.verifier.VerifyPartialCert(cert) {
 		logger.Info("OnVote: Vote could not be verified!")
@@ -305,23 +355,9 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 
 	hs.mut.Lock()
 
-	block, ok := hs.blocks.Get(cert.BlockHash())
-	if !ok {
-		logger.Info("OnVote: could not find block for certificate.")
-		hs.mut.Unlock()
-		return
-	}
-
-	votes, ok := hs.pendingQCs[cert.BlockHash()]
-	if !ok {
-		if block.View() <= hs.bLeaf.View() {
-			hs.mut.Unlock()
-			return
-		}
-		hs.pendingQCs[cert.BlockHash()] = []hotstuff.PartialCert{cert}
-	} else {
-		hs.pendingQCs[cert.BlockHash()] = append(hs.pendingQCs[cert.BlockHash()], cert)
-	}
+	votes := hs.verifiedVotes[cert.BlockHash()]
+	votes = append(votes, cert)
+	hs.verifiedVotes[cert.BlockHash()] = votes
 
 	if len(votes) < hs.cfg.QuorumSize() {
 		hs.mut.Unlock()
@@ -332,7 +368,7 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 	if err != nil {
 		logger.Info("OnVote: could not create QC for block: ", err)
 	}
-	delete(hs.pendingQCs, cert.BlockHash())
+	delete(hs.verifiedVotes, cert.BlockHash())
 	hs.updateHighQC(qc)
 
 	hs.mut.Unlock()
@@ -349,6 +385,28 @@ func (hs *chainedhotstuff) OnNewView(qc hotstuff.QuorumCert) {
 	// signal the synchronizer
 	hs.mut.Unlock()
 	hs.synchronizer.OnNewView()
+}
+
+// OnDeliver handles an incoming block
+func (hs *chainedhotstuff) OnDeliver(block *hotstuff.Block) {
+	logger.Debugf("OnDeliver: %v", block)
+	hs.mut.Lock()
+	votes, ok := hs.pendingVotes[block.Hash()]
+
+	if !ok {
+		hs.mut.Unlock()
+		return
+	}
+
+	delete(hs.pendingVotes, block.Hash())
+
+	hs.blocks.Store(block)
+
+	hs.mut.Unlock()
+
+	for _, vote := range votes {
+		hs.OnVote(vote)
+	}
 }
 
 var _ hotstuff.Consensus = (*chainedhotstuff)(nil)

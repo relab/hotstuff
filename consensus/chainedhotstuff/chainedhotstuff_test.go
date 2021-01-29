@@ -1,6 +1,7 @@
 package chainedhotstuff
 
 import (
+	"context"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -36,7 +37,6 @@ func TestPropose(t *testing.T) {
 
 	td.acceptor.EXPECT().Accept(gomock.Any()).Return(true)
 
-	td.synchronizer.EXPECT().Init(gomock.Any())
 	td.synchronizer.EXPECT().OnPropose()
 
 	// RULES:
@@ -133,7 +133,9 @@ func newTestData(t *testing.T, ctrl *gomock.Controller, n int) testData {
 	td.executor = mocks.NewMockExecutor(ctrl)
 	td.synchronizer = mocks.NewMockViewSynchronizer(ctrl)
 
+	// basic configuration
 	td.config.EXPECT().QuorumSize().AnyTimes().Return(n - (n-1)/3)
+	td.synchronizer.EXPECT().Init(gomock.Any())
 
 	r := testutil.CreateMockReplica(t, ctrl, hotstuff.ID(n), pk.PublicKey())
 	testutil.ConfigAddReplica(t, td.config, r)
@@ -184,8 +186,6 @@ func TestCommit(t *testing.T) {
 
 	td.synchronizer.EXPECT().GetLeader(gomock.Any()).AnyTimes().Return(hotstuff.ID(1))
 	td.synchronizer.EXPECT().OnPropose().AnyTimes()
-	// the following should be called once
-	td.synchronizer.EXPECT().Init(gomock.Any())
 
 	hs := td.build()
 
@@ -205,7 +205,6 @@ func TestVote(t *testing.T) {
 	td.acceptor.EXPECT().Accept(gomock.Any()).Return(true)
 
 	// synchronizer should expect one proposal and one finishQC
-	td.synchronizer.EXPECT().Init(gomock.Any())
 	td.synchronizer.EXPECT().OnPropose()
 	td.synchronizer.EXPECT().OnFinishQC()
 	td.synchronizer.EXPECT().GetLeader(gomock.Any()).AnyTimes().Return(hotstuff.ID(4))
@@ -226,5 +225,58 @@ func TestVote(t *testing.T) {
 
 	if hs.HighQC().BlockHash() != b.Hash() {
 		t.Errorf("HighQC was not updated.")
+	}
+}
+
+// TestFetchBlock checks that a replica can fetch a block in order to create a QC
+func TestFetchBlock(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	td := newTestData(t, ctrl, 4)
+
+	// create test data
+	votesSent := make(chan struct{})
+	qcCreated := make(chan struct{})
+	genesisQC := ecdsacrypto.NewQuorumCert(map[hotstuff.ID]*ecdsacrypto.Signature{}, hotstuff.GetGenesis().Hash())
+	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), genesisQC, "foo", 1, 1)
+
+	votes := make([]hotstuff.PartialCert, len(td.signers))
+
+	for i, signer := range td.signers {
+		vote, err := signer.Sign(b)
+		if err != nil {
+			t.Fatalf("Failed to create partial certificate: %v", err)
+		}
+		votes[i] = vote
+	}
+
+	hs := td.build()
+
+	// configure mocks
+	td.config.
+		EXPECT().
+		Fetch(gomock.Any(), gomock.AssignableToTypeOf(b.Hash())).
+		Do(func(_ context.Context, h hotstuff.Hash) {
+			// wait for all votes to be sent
+			go func() {
+				<-votesSent
+				hs.OnDeliver(b)
+			}()
+		})
+
+	td.synchronizer.EXPECT().OnFinishQC().Do(func() {
+		close(qcCreated)
+	})
+
+	for _, vote := range votes {
+		hs.OnVote(vote)
+	}
+
+	close(votesSent)
+	<-qcCreated
+
+	if hs.HighQC().BlockHash() != b.Hash() {
+		t.Fatalf("A new QC was not created.")
 	}
 }

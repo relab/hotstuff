@@ -5,6 +5,7 @@
 package mocks
 
 import (
+	context "context"
 	gomock "github.com/golang/mock/gomock"
 	hotstuff "github.com/relab/hotstuff"
 	reflect "reflect"
@@ -31,6 +32,18 @@ func NewMockConfig(ctrl *gomock.Controller) *MockConfig {
 // EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockConfig) EXPECT() *MockConfigMockRecorder {
 	return m.recorder
+}
+
+// Fetch mocks base method
+func (m *MockConfig) Fetch(arg0 context.Context, arg1 hotstuff.Hash) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Fetch", arg0, arg1)
+}
+
+// Fetch indicates an expected call of Fetch
+func (mr *MockConfigMockRecorder) Fetch(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Fetch", reflect.TypeOf((*MockConfig)(nil).Fetch), arg0, arg1)
 }
 
 // ID mocks base method

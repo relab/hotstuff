@@ -56,6 +56,15 @@ func (r *gorumsReplica) NewView(qc hotstuff.QuorumCert) {
 	r.node.NewView(ctx, pqc, gorums.WithAsyncSend())
 }
 
+// Deliver sends the block to the other replica
+func (r *gorumsReplica) Deliver(block *hotstuff.Block) {
+	if r.node == nil {
+		return
+	}
+	// background context is probably fine here, since we are only talking to one replica
+	r.node.Deliver(context.Background(), proto.BlockToProto(block))
+}
+
 type Config struct {
 	replicaCfg    config.ReplicaConfig
 	mgr           *proto.Manager
@@ -174,6 +183,11 @@ func (cfg *Config) Propose(block *hotstuff.Block) {
 	ctx, cfg.proposeCancel = context.WithCancel(context.Background())
 	pblock := proto.BlockToProto(block)
 	cfg.cfg.Propose(ctx, pblock, gorums.WithAsyncSend())
+}
+
+// Fetch requests a block from all the replicas in the configuration
+func (cfg *Config) Fetch(ctx context.Context, hash hotstuff.Hash) {
+	cfg.cfg.Fetch(ctx, &proto.BlockHash{Hash: hash[:]})
 }
 
 func (cfg *Config) Close() {

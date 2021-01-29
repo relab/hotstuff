@@ -20,7 +20,17 @@ service Hotstuff {
   rpc NewView(QuorumCert) returns (google.protobuf.Empty) {
     option (gorums.unicast) = true;
   }
+
+  rpc Fetch(BlockHash) returns (google.protobuf.Empty) {
+    option (gorums.multicast) = true;
+  }
+
+  rpc Deliver(Block) returns (google.protobuf.Empty) {
+    option (gorums.unicast) = true;
+  }
 }
+
+message BlockHash { bytes Hash = 1; }
 
 message Block {
   bytes Parent = 1;

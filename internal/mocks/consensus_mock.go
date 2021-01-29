@@ -127,6 +127,18 @@ func (mr *MockConsensusMockRecorder) NewView() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockConsensus)(nil).NewView))
 }
 
+// OnDeliver mocks base method
+func (m *MockConsensus) OnDeliver(arg0 *hotstuff.Block) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "OnDeliver", arg0)
+}
+
+// OnDeliver indicates an expected call of OnDeliver
+func (mr *MockConsensusMockRecorder) OnDeliver(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnDeliver", reflect.TypeOf((*MockConsensus)(nil).OnDeliver), arg0)
+}
+
 // OnNewView mocks base method
 func (m *MockConsensus) OnNewView(arg0 hotstuff.QuorumCert) {
 	m.ctrl.T.Helper()

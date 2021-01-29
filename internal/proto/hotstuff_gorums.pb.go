@@ -170,6 +170,23 @@ func (c *Configuration) Propose(ctx context.Context, in *Block, opts ...gorums.C
 	gorums.Multicast(ctx, cd, opts...)
 }
 
+// Reference imports to suppress errors if they are not otherwise used.
+var _ empty.Empty
+
+// Fetch is a quorum call invoked on all nodes in configuration c,
+// with the same argument in, and returns a combined result.
+func (c *Configuration) Fetch(ctx context.Context, in *BlockHash, opts ...gorums.CallOption) {
+
+	cd := gorums.QuorumCallData{
+		Manager: c.mgr.Manager,
+		Nodes:   c.nodes,
+		Message: in,
+		Method:  "proto.Hotstuff.Fetch",
+	}
+
+	gorums.Multicast(ctx, cd, opts...)
+}
+
 // QuorumSpec is the interface of quorum functions for Hotstuff.
 type QuorumSpec interface {
 }
@@ -179,6 +196,8 @@ type Hotstuff interface {
 	Propose(context.Context, *Block)
 	Vote(context.Context, *PartialCert)
 	NewView(context.Context, *QuorumCert)
+	Fetch(context.Context, *BlockHash)
+	Deliver(context.Context, *Block)
 }
 
 func RegisterHotstuffServer(srv *gorums.Server, impl Hotstuff) {
@@ -193,6 +212,14 @@ func RegisterHotstuffServer(srv *gorums.Server, impl Hotstuff) {
 	srv.RegisterHandler("proto.Hotstuff.NewView", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
 		req := in.Message.(*QuorumCert)
 		impl.NewView(ctx, req)
+	})
+	srv.RegisterHandler("proto.Hotstuff.Fetch", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
+		req := in.Message.(*BlockHash)
+		impl.Fetch(ctx, req)
+	})
+	srv.RegisterHandler("proto.Hotstuff.Deliver", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
+		req := in.Message.(*Block)
+		impl.Deliver(ctx, req)
 	})
 }
 
@@ -225,6 +252,23 @@ func (n *Node) NewView(ctx context.Context, in *QuorumCert, opts ...gorums.CallO
 		Node:    n.Node,
 		Message: in,
 		Method:  "proto.Hotstuff.NewView",
+	}
+
+	gorums.Unicast(ctx, cd, opts...)
+}
+
+// Reference imports to suppress errors if they are not otherwise used.
+var _ empty.Empty
+
+// Deliver is a quorum call invoked on all nodes in configuration c,
+// with the same argument in, and returns a combined result.
+func (n *Node) Deliver(ctx context.Context, in *Block, opts ...gorums.CallOption) {
+
+	cd := gorums.CallData{
+		Manager: n.mgr.Manager,
+		Node:    n.Node,
+		Message: in,
+		Method:  "proto.Hotstuff.Deliver",
 	}
 
 	gorums.Unicast(ctx, cd, opts...)

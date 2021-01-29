@@ -1,6 +1,9 @@
 package hotstuff
 
-import "encoding/base64"
+import (
+	"context"
+	"encoding/base64"
+)
 
 // ID uniquely identifies a replica
 type ID uint32
@@ -92,6 +95,8 @@ type Replica interface {
 	Vote(cert PartialCert)
 	// NewView sends the quorum certificate to the other replica
 	NewView(qc QuorumCert)
+	// Deliver sends the block to the other replica
+	Deliver(block *Block)
 }
 
 // BlockChain is a datastructure that stores a chain of blocks
@@ -127,8 +132,10 @@ type Consensus interface {
 	OnPropose(block *Block)
 	// OnVote handles an incoming vote
 	OnVote(cert PartialCert)
-	// OnVote handles an incoming NewView
+	// OnNewView handles an incoming NewView
 	OnNewView(qc QuorumCert)
+	// OnDeliver handles an incoming block
+	OnDeliver(block *Block)
 }
 
 //go:generate mockgen -destination=internal/mocks/config_mock.go -package=mocks . Config
@@ -149,6 +156,8 @@ type Config interface {
 	QuorumSize() int
 	// Propose sends the block to all replicas in the configuration
 	Propose(block *Block)
+	// Fetch requests a block from all the replicas in the configuration
+	Fetch(ctx context.Context, hash Hash)
 }
 
 // LeaderRotation implements a leader rotation scheme
