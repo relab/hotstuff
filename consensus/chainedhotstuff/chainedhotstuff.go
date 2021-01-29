@@ -208,8 +208,9 @@ func (hs *chainedhotstuff) NewView() {
 	if !ok {
 		logger.Warnf("Replica with ID %d was not found!", leaderID)
 	}
-	leader.NewView(hs.highQC)
+	qc := hs.highQC
 	hs.mut.Unlock()
+	leader.NewView(qc)
 }
 
 // OnPropose handles an incoming proposal
@@ -250,6 +251,7 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 	}
 
 	if !hs.acceptor.Accept(block.Command()) {
+		hs.mut.Unlock()
 		logger.Info("OnPropose: command not accepted")
 		return
 	}
@@ -262,6 +264,7 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 
 	pc, err := hs.signer.Sign(block)
 	if err != nil {
+		hs.mut.Unlock()
 		logger.Error("OnPropose: failed to sign vote: ", err)
 		return
 	}
@@ -389,7 +392,6 @@ func (hs *chainedhotstuff) OnNewView(qc hotstuff.QuorumCert) {
 
 // OnDeliver handles an incoming block
 func (hs *chainedhotstuff) OnDeliver(block *hotstuff.Block) {
-	logger.Debugf("OnDeliver: %v", block)
 	hs.mut.Lock()
 	votes, ok := hs.pendingVotes[block.Hash()]
 
@@ -397,6 +399,8 @@ func (hs *chainedhotstuff) OnDeliver(block *hotstuff.Block) {
 		hs.mut.Unlock()
 		return
 	}
+
+	logger.Debugf("OnDeliver: %v", block)
 
 	delete(hs.pendingVotes, block.Hash())
 
