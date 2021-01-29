@@ -33,6 +33,20 @@ func (m *MockConsensus) EXPECT() *MockConsensusMockRecorder {
 	return m.recorder
 }
 
+// BlockChain mocks base method
+func (m *MockConsensus) BlockChain() hotstuff.BlockChain {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BlockChain")
+	ret0, _ := ret[0].(hotstuff.BlockChain)
+	return ret0
+}
+
+// BlockChain indicates an expected call of BlockChain
+func (mr *MockConsensusMockRecorder) BlockChain() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlockChain", reflect.TypeOf((*MockConsensus)(nil).BlockChain))
+}
+
 // Config mocks base method
 func (m *MockConsensus) Config() hotstuff.Config {
 	m.ctrl.T.Helper()

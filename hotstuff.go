@@ -114,6 +114,8 @@ type Consensus interface {
 	HighQC() QuorumCert
 	// Leaf returns the last proposed block
 	Leaf() *Block
+	// BlockChain returns the datastructure containing the blocks known to the replica
+	BlockChain() BlockChain
 	// CreateDummy inserts a dummy block at View+1.
 	// This is useful when a view must be skipped.
 	CreateDummy()

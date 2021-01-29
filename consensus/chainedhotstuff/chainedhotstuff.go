@@ -76,6 +76,11 @@ func (hs *chainedhotstuff) Leaf() *hotstuff.Block {
 	return hs.bLeaf
 }
 
+// BlockChain returns the datastructure contianing the blocks known to the replica
+func (hs *chainedhotstuff) BlockChain() hotstuff.BlockChain {
+	return hs.blocks
+}
+
 func (hs *chainedhotstuff) CreateDummy() {
 	hs.mut.Lock()
 	dummy := hotstuff.NewBlock(hs.bLeaf.Hash(), nil, hotstuff.Command(""), hs.bLeaf.View()+1, hs.cfg.ID())
