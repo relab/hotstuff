@@ -272,6 +272,18 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 	hs.blocks.Store(block)
 	hs.lastVote = block.View()
 
+	// as cleanup, we clear pending votes
+	defer func() {
+		hs.mut.Lock()
+		hs.pendingVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
+		hs.mut.Unlock()
+	}()
+
+	// before that, we should deliver this block
+	if _, ok := hs.pendingVotes[block.Hash()]; ok {
+		defer hs.OnDeliver(block)
+	}
+
 	leaderID := hs.synchronizer.GetLeader(hs.lastVote + 1)
 	if leaderID == hs.cfg.ID() {
 		hs.mut.Unlock()
@@ -280,24 +292,15 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 		return
 	}
 
-	// will do the update after the vote is sent
-	defer hs.update(block)
-
 	leader, ok := hs.cfg.Replica(leaderID)
 	if !ok {
 		logger.Warnf("Replica with ID %d was not found!", leaderID)
-	}
-
-	// clear pending votes
-	defer func() {
-		hs.mut.Lock()
-		hs.pendingVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
 		hs.mut.Unlock()
-	}()
-
-	if _, ok := hs.pendingVotes[block.Hash()]; ok {
-		defer hs.OnDeliver(block)
+		return
 	}
+
+	// will do the update after the vote is sent
+	defer hs.update(block)
 
 	hs.mut.Unlock()
 	leader.Vote(pc)
@@ -409,7 +412,7 @@ func (hs *chainedhotstuff) OnDeliver(block *hotstuff.Block) {
 	hs.mut.Unlock()
 
 	for _, vote := range votes {
-		hs.OnVote(vote)
+		go hs.OnVote(vote)
 	}
 }
 

@@ -67,10 +67,10 @@ func (s *Synchronizer) Start() {
 // Stop stops the synchronizer
 func (s *Synchronizer) Stop() {
 	s.stopped = true
+	s.stop()
 	if s.timer != nil && !s.timer.Stop() {
 		<-s.timer.C
 	}
-	s.stop()
 }
 
 func (s *Synchronizer) beat() {
