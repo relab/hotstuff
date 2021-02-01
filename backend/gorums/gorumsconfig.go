@@ -62,7 +62,7 @@ func (r *gorumsReplica) Deliver(block *hotstuff.Block) {
 		return
 	}
 	// background context is probably fine here, since we are only talking to one replica
-	r.node.Deliver(context.Background(), proto.BlockToProto(block))
+	r.node.Deliver(context.Background(), proto.BlockToProto(block), gorums.WithAsyncSend())
 }
 
 type Config struct {
@@ -187,7 +187,7 @@ func (cfg *Config) Propose(block *hotstuff.Block) {
 
 // Fetch requests a block from all the replicas in the configuration
 func (cfg *Config) Fetch(ctx context.Context, hash hotstuff.Hash) {
-	cfg.cfg.Fetch(ctx, &proto.BlockHash{Hash: hash[:]})
+	cfg.cfg.Fetch(ctx, &proto.BlockHash{Hash: hash[:]}, gorums.WithAsyncSend())
 }
 
 func (cfg *Config) Close() {
