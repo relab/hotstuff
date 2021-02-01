@@ -31,7 +31,6 @@ type chainedhotstuff struct {
 	bLeaf    *hotstuff.Block     // the last proposed block
 	highQC   hotstuff.QuorumCert // the highest qc known to this replica
 
-	fetchCtx    context.Context
 	fetchCancel context.CancelFunc
 
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
@@ -125,6 +124,10 @@ func (hs *chainedhotstuff) commit(block *hotstuff.Block) {
 		if parent, ok := hs.blocks.Get(block.Parent()); ok {
 			hs.commit(parent)
 		}
+		if block.QuorumCert() == nil {
+			// don't execute dummy nodes
+			return
+		}
 		logger.Debug("EXEC: ", block)
 		hs.executor.Exec(block.Command())
 	}
@@ -138,9 +141,6 @@ func (hs *chainedhotstuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool)
 }
 
 func (hs *chainedhotstuff) update(block *hotstuff.Block) {
-	hs.mut.Lock()
-	defer hs.mut.Unlock()
-
 	block1, ok := hs.qcRef(block.QuorumCert())
 	if !ok {
 		return
@@ -272,22 +272,16 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 	hs.blocks.Store(block)
 	hs.lastVote = block.View()
 
-	// as cleanup, we clear pending votes
-	defer func() {
-		hs.mut.Lock()
+	finish := func() {
+		hs.update(block)
+		hs.deliver(block)
 		hs.pendingVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
 		hs.mut.Unlock()
-	}()
-
-	// before that, we should deliver this block
-	if _, ok := hs.pendingVotes[block.Hash()]; ok {
-		defer hs.OnDeliver(block)
 	}
 
 	leaderID := hs.synchronizer.GetLeader(hs.lastVote + 1)
 	if leaderID == hs.cfg.ID() {
-		hs.mut.Unlock()
-		hs.update(block)
+		finish()
 		hs.OnVote(pc)
 		return
 	}
@@ -299,11 +293,8 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 		return
 	}
 
-	// will do the update after the vote is sent
-	defer hs.update(block)
-
-	hs.mut.Unlock()
 	leader.Vote(pc)
+	finish()
 }
 
 func (hs *chainedhotstuff) fetchBlockForVote(vote hotstuff.PartialCert) {
@@ -318,9 +309,10 @@ func (hs *chainedhotstuff) fetchBlockForVote(vote hotstuff.PartialCert) {
 		return
 	}
 
-	hs.fetchCtx, hs.fetchCancel = context.WithCancel(context.Background())
+	var ctx context.Context
+	ctx, hs.fetchCancel = context.WithCancel(context.Background())
 	hs.mut.Unlock()
-	hs.cfg.Fetch(hs.fetchCtx, vote.BlockHash())
+	hs.cfg.Fetch(ctx, vote.BlockHash())
 }
 
 // OnVote handles an incoming vote
@@ -393,13 +385,9 @@ func (hs *chainedhotstuff) OnNewView(qc hotstuff.QuorumCert) {
 	hs.synchronizer.OnNewView()
 }
 
-// OnDeliver handles an incoming block
-func (hs *chainedhotstuff) OnDeliver(block *hotstuff.Block) {
-	hs.mut.Lock()
+func (hs *chainedhotstuff) deliver(block *hotstuff.Block) {
 	votes, ok := hs.pendingVotes[block.Hash()]
-
 	if !ok {
-		hs.mut.Unlock()
 		return
 	}
 
@@ -409,11 +397,16 @@ func (hs *chainedhotstuff) OnDeliver(block *hotstuff.Block) {
 
 	hs.blocks.Store(block)
 
-	hs.mut.Unlock()
-
 	for _, vote := range votes {
 		go hs.OnVote(vote)
 	}
+}
+
+// OnDeliver handles an incoming block
+func (hs *chainedhotstuff) OnDeliver(block *hotstuff.Block) {
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
+	hs.deliver(block)
 }
 
 var _ hotstuff.Consensus = (*chainedhotstuff)(nil)
