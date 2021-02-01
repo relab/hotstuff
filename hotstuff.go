@@ -1,3 +1,6 @@
+// Package hotstuff defines the core types and interfaces that implement the HotStuff protocol.
+// These interfaces allow us to split the implementations into different modules,
+// and each module can have multiple can have multiple implementations.
 package hotstuff
 
 import (
@@ -29,7 +32,9 @@ type CommandQueue interface {
 	GetCommand() *Command
 }
 
+// ToBytes is an object that can be converted into bytes for the purposes of hashing, etc.
 type ToBytes interface {
+	// ToBytes returns the object as bytes
 	ToBytes() []byte
 }
 
@@ -41,6 +46,7 @@ type Credentials interface{}
 
 // PrivateKey is the private part of a replica's key pair
 type PrivateKey interface {
+	// PublicKey returns the public key associated with this private key
 	PublicKey() PublicKey
 }
 
