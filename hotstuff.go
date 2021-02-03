@@ -28,16 +28,16 @@
 //  |              |<-VerifyPartialCert()--|                         |                                 |
 //  |              |                       |                         |----------GetLeader()------------+
 //  +--------------+                       +-------------------------+             |
-//                                           |  |  |  |                            V
-//  +-----------------+                      |  |  |  |                   +--------|-------+
-//  |                 |<----Propose()--------+  |  |  |                   | LeaderRotation |
-//  |                 |                         |  |  |                   +----------------+
-//  |                 |<----Vote()--------------+  |  |
-//  | Config/Replica  |                            |  |
-//  |                 |<----NewView()--------------+  |
-//  |                 |                               |
-//  |                 |<----Fetch()-------------------+
-//  +-----------------+
+//                                           |  |  |  |  |  |                      v
+//  +-----------------+                      |  |  |  |  |  |             +--------|-------+
+//  |                 |<----Propose()--------+  |  |  |  |  |             | LeaderRotation |
+//  |                 |                         |  |  |  |  |             +----------------+
+//  |                 |<----Vote()--------------+  |  |  |  |
+//  | Config/Replica  |                            |  |  |  |             +----------------+
+//  |                 |<----NewView()--------------+  |  |  +-Store()---> |                |
+//  |                 |                               |  |                |   BlockChain   |
+//  |                 |<----Fetch()-------------------+  +----Get()-----> |                |
+//  +-----------------+                                                   +----------------+
 //
 // The `Consensus` interface is the "core" of the system, and it is the part that implements the consensus algorithm.
 // The `OnDeliver()`, `OnPropose()`, `OnVote()`, and `OnNewView()` methods should be called by some backend service to
