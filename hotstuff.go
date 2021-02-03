@@ -34,9 +34,9 @@
 //  |                |                          |  |  |  |  |             +----------------+
 //  |                |<----Vote()---------------+  |  |  |  |
 //  | Config/Replica |                             |  |  |  |             +----------------+
-//  |                |<----NewView()---------------+  |  |  +-Store()---> |                |
+//  |                |<----NewView()---------------+  |  |  +-Store()---->|                |
 //  |                |                                |  |                |   BlockChain   |
-//  |                |<----Fetch()--------------------+  +----Get()-----> |                |
+//  |                |<----Fetch()--------------------+  +----Get()------>|                |
 //  +----------------+                                                    +----------------+
 //
 // The `Consensus` interface is the "core" of the system, and it is the part that implements the consensus algorithm.
