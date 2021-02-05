@@ -19,7 +19,9 @@ jobs:
       - name: Download dependencies
         run: go mod download
       - name: Generate coverage report
-        run: go test -v -timeout 60s -coverprofile=coverage.txt -covermode=atomic ./...
+        run: go test -v -timeout 60s -coverprofile=coverage.tmp.txt -covermode=atomic ./...
+      - name: Remove generated code from coverage report
+        run: grep -v ".pb.go" coverage.tmp.txt > coverage.txt
       - name: Upload coverage report
         uses: codecov/codecov-action@v1
         with:
