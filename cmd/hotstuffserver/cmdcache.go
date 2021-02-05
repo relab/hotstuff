@@ -38,6 +38,9 @@ func (c *cmdCache) addCommand(cmd *client.Command) {
 }
 
 func (c *cmdCache) GetCommand() *hotstuff.Command {
+	c.mut.Lock()
+	defer c.mut.Unlock()
+
 	if c.cache.Len() == 0 {
 		return nil
 	}
@@ -55,7 +58,6 @@ func (c *cmdCache) GetCommand() *hotstuff.Command {
 			// command is too old, can't propose
 			continue
 		}
-		c.serialNumbers[cmd.GetClientID()] = cmd.GetSequenceNumber()
 		batch.Commands = append(batch.Commands, cmd)
 	}
 
