@@ -14,7 +14,7 @@ require (
 	github.com/mattn/go-isatty v0.0.12
 	github.com/mitchellh/mapstructure v1.4.0 // indirect
 	github.com/pelletier/go-toml v1.8.1 // indirect
-	github.com/relab/gorums v0.2.3-0.20210204152502-f967ccf61d04
+	github.com/relab/gorums v0.2.3-0.20210205114757-4181d26e812f
 	github.com/smartystreets/assertions v1.2.0 // indirect
 	github.com/spf13/afero v1.5.1 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
