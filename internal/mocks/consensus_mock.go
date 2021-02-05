@@ -140,7 +140,7 @@ func (mr *MockConsensusMockRecorder) OnDeliver(arg0 interface{}) *gomock.Call {
 }
 
 // OnNewView mocks base method
-func (m *MockConsensus) OnNewView(arg0 hotstuff.QuorumCert) {
+func (m *MockConsensus) OnNewView(arg0 hotstuff.NewView) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "OnNewView", arg0)
 }

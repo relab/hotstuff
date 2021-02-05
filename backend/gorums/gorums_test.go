@@ -146,8 +146,8 @@ func testGorums(t *testing.T, useTLS bool) {
 			}
 			c <- struct{}{}
 		})
-		mock.EXPECT().OnNewView(gomock.AssignableToTypeOf(qc)).Do(func(arg hotstuff.QuorumCert) {
-			if !bytes.Equal(arg.ToBytes(), qc.ToBytes()) {
+		mock.EXPECT().OnNewView(gomock.AssignableToTypeOf(hotstuff.NewView{})).Do(func(arg hotstuff.NewView) {
+			if !bytes.Equal(arg.QC.ToBytes(), qc.ToBytes()) {
 				t.Errorf("QC mismatch. got: %v, want: %v", arg, qc)
 			}
 			c <- struct{}{}
@@ -161,7 +161,7 @@ func testGorums(t *testing.T, useTLS bool) {
 			continue
 		}
 		replica.Vote(vote)
-		replica.NewView(qc)
+		replica.NewView(hotstuff.NewView{ID: 1, View: 1, QC: qc})
 	}
 
 	for i := 0; i < (n-1)*3; i++ {

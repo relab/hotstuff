@@ -17,7 +17,7 @@ service Hotstuff {
     option (gorums.unicast) = true;
   }
 
-  rpc NewView(QuorumCert) returns (google.protobuf.Empty) {
+  rpc NewView(NewViewMsg) returns (google.protobuf.Empty) {
     option (gorums.unicast) = true;
   }
 
@@ -54,4 +54,9 @@ message PartialCert {
 message QuorumCert {
   map<uint32, Signature> Sigs = 1;
   bytes Hash = 2;
+}
+
+message NewViewMsg {
+  uint64 View = 1;
+  QuorumCert QC = 2;
 }

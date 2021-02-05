@@ -45,15 +45,15 @@ func (r *gorumsReplica) Vote(cert hotstuff.PartialCert) {
 }
 
 // NewView sends the quorum certificate to the other replica
-func (r *gorumsReplica) NewView(qc hotstuff.QuorumCert) {
+func (r *gorumsReplica) NewView(msg hotstuff.NewView) {
 	if r.node == nil {
 		return
 	}
 	var ctx context.Context
 	r.newviewCancel()
 	ctx, r.newviewCancel = context.WithCancel(context.Background())
-	pqc := proto.QuorumCertToProto(qc)
-	r.node.NewView(ctx, pqc, gorums.WithAsyncSend())
+	pqc := proto.QuorumCertToProto(msg.QC)
+	r.node.NewView(ctx, &proto.NewViewMsg{View: uint64(msg.View), QC: pqc}, gorums.WithAsyncSend())
 }
 
 // Deliver sends the block to the other replica

@@ -33,14 +33,16 @@ type chainedhotstuff struct {
 
 	fetchCancel context.CancelFunc
 
-	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
-	pendingVotes  map[hotstuff.Hash][]hotstuff.PartialCert // unverified votes that are waiting for a Block
+	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert   // verified votes that could become a QC
+	pendingVotes  map[hotstuff.Hash][]hotstuff.PartialCert   // unverified votes that are waiting for a Block
+	newView       map[hotstuff.View]map[hotstuff.ID]struct{} // the set of replicas who have sent a newView message per view
 }
 
 func (hs *chainedhotstuff) init() {
 	var err error
 	hs.verifiedVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
 	hs.pendingVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
+	hs.newView = make(map[hotstuff.View]map[hotstuff.ID]struct{})
 	hs.fetchCancel = func() {}
 	hs.bLock = hotstuff.GetGenesis()
 	hs.bExec = hotstuff.GetGenesis()
@@ -197,20 +199,20 @@ func (hs *chainedhotstuff) Propose() {
 func (hs *chainedhotstuff) NewView() {
 	logger.Debug("NewView")
 	hs.mut.Lock()
+	msg := hotstuff.NewView{ID: hs.cfg.ID(), View: hs.bLeaf.View(), QC: hs.highQC}
 	leaderID := hs.synchronizer.GetLeader(hs.bLeaf.View() + 1)
 	if leaderID == hs.cfg.ID() {
 		hs.mut.Unlock()
 		// TODO: Is this necessary
-		hs.OnNewView(hs.highQC)
+		hs.OnNewView(msg)
 		return
 	}
 	leader, ok := hs.cfg.Replica(leaderID)
 	if !ok {
 		logger.Warnf("Replica with ID %d was not found!", leaderID)
 	}
-	qc := hs.highQC
 	hs.mut.Unlock()
-	leader.NewView(qc)
+	leader.NewView(msg)
 }
 
 // OnPropose handles an incoming proposal
@@ -339,19 +341,21 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 		return
 	}
 
+	hs.mut.Lock()
+
 	if block.View() <= hs.bLeaf.View() {
 		// too old
+		hs.mut.Unlock()
 		return
 	}
 
 	if !hs.verifier.VerifyPartialCert(cert) {
 		logger.Info("OnVote: Vote could not be verified!")
+		hs.mut.Unlock()
 		return
 	}
 
 	logger.Debugf("OnVote: %.8s", cert.BlockHash())
-
-	hs.mut.Lock()
 
 	votes := hs.verifiedVotes[cert.BlockHash()]
 	votes = append(votes, cert)
@@ -375,13 +379,38 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 }
 
 // OnNewView handles an incoming NewView
-func (hs *chainedhotstuff) OnNewView(qc hotstuff.QuorumCert) {
+func (hs *chainedhotstuff) OnNewView(msg hotstuff.NewView) {
+	defer func() {
+		// cleanup
+		hs.mut.Lock()
+		for view := range hs.newView {
+			if view < hs.bLeaf.View() {
+				delete(hs.newView, view)
+			}
+		}
+		hs.mut.Unlock()
+	}()
+
 	hs.mut.Lock()
 
-	logger.Debug("OnNewView: ", qc)
-	hs.updateHighQC(qc)
-	// signal the synchronizer
+	logger.Debug("OnNewView: ", msg)
+
+	hs.updateHighQC(msg.QC)
+
+	v, ok := hs.newView[msg.View]
+	if !ok {
+		v = make(map[hotstuff.ID]struct{})
+	}
+	v[msg.ID] = struct{}{}
+	hs.newView[msg.View] = v
+
+	if len(v) < hs.cfg.QuorumSize() {
+		hs.mut.Unlock()
+		return
+	}
+
 	hs.mut.Unlock()
+	// signal the synchronizer
 	hs.synchronizer.OnNewView()
 }
 

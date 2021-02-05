@@ -122,20 +122,29 @@ func (srv *Server) Vote(_ context.Context, cert *proto.PartialCert) {
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica
-func (srv *Server) NewView(_ context.Context, msg *proto.QuorumCert) {
-	srv.hs.OnNewView(proto.QuorumCertFromProto(msg))
+func (srv *Server) NewView(ctx context.Context, msg *proto.NewViewMsg) {
+	id, err := srv.getClientID(ctx)
+	if err != nil {
+		logger.Infof("Failed to get client ID: %v", err)
+		return
+	}
+	srv.hs.OnNewView(hotstuff.NewView{
+		ID:   id,
+		View: hotstuff.View(msg.GetView()),
+		QC:   proto.QuorumCertFromProto(msg.GetQC()),
+	})
 }
 
 func (srv *Server) Fetch(ctx context.Context, pb *proto.BlockHash) {
 	var hash hotstuff.Hash
 	copy(hash[:], pb.GetHash())
 
-	logger.Debugf("OnFetch: %.8s", hash)
-
 	block, ok := srv.hs.BlockChain().Get(hash)
 	if !ok {
 		return
 	}
+
+	logger.Debugf("OnFetch: %.8s", hash)
 
 	id, err := srv.getClientID(ctx)
 	if err != nil {

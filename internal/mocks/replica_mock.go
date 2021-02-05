@@ -60,7 +60,7 @@ func (mr *MockReplicaMockRecorder) ID() *gomock.Call {
 }
 
 // NewView mocks base method
-func (m *MockReplica) NewView(arg0 hotstuff.QuorumCert) {
+func (m *MockReplica) NewView(arg0 hotstuff.NewView) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "NewView", arg0)
 }

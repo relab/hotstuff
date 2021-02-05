@@ -16,7 +16,6 @@ import (
 type Configuration struct {
 	id    uint32
 	nodes []*gorums.Node
-	n     int
 	mgr   *Manager
 	qspec QuorumSpec
 	errs  chan gorums.Error
@@ -58,14 +57,14 @@ func (c *Configuration) NodeIDs() []uint32 {
 func (c *Configuration) Nodes() []*Node {
 	nodes := make([]*Node, 0, len(c.nodes))
 	for _, n := range c.nodes {
-		nodes = append(nodes, &Node{n, c.mgr})
+		nodes = append(nodes, &Node{n})
 	}
 	return nodes
 }
 
 // Size returns the number of nodes in the configuration.
 func (c *Configuration) Size() int {
-	return c.n
+	return len(c.nodes)
 }
 
 func (c *Configuration) String() string {
@@ -130,7 +129,6 @@ func (m *Manager) NewConfiguration(ids []uint32, qspec QuorumSpec) (*Configurati
 
 	c := &Configuration{
 		nodes: nodes,
-		n:     len(nodes),
 		mgr:   m,
 		qspec: qspec,
 	}
@@ -143,14 +141,13 @@ func (m *Manager) Nodes() []*Node {
 	gorumsNodes := m.Manager.Nodes()
 	nodes := make([]*Node, 0, len(gorumsNodes))
 	for _, n := range gorumsNodes {
-		nodes = append(nodes, &Node{n, m})
+		nodes = append(nodes, &Node{n})
 	}
 	return nodes
 }
 
 type Node struct {
 	*gorums.Node
-	mgr *Manager
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -195,7 +192,7 @@ type QuorumSpec interface {
 type Hotstuff interface {
 	Propose(context.Context, *Block)
 	Vote(context.Context, *PartialCert)
-	NewView(context.Context, *QuorumCert)
+	NewView(context.Context, *NewViewMsg)
 	Fetch(context.Context, *BlockHash)
 	Deliver(context.Context, *Block)
 }
@@ -210,7 +207,7 @@ func RegisterHotstuffServer(srv *gorums.Server, impl Hotstuff) {
 		impl.Vote(ctx, req)
 	})
 	srv.RegisterHandler("proto.Hotstuff.NewView", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*QuorumCert)
+		req := in.Message.(*NewViewMsg)
 		impl.NewView(ctx, req)
 	})
 	srv.RegisterHandler("proto.Hotstuff.Fetch", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
@@ -231,7 +228,6 @@ var _ emptypb.Empty
 func (n *Node) Vote(ctx context.Context, in *PartialCert, opts ...gorums.CallOption) {
 
 	cd := gorums.CallData{
-		Manager: n.mgr.Manager,
 		Node:    n.Node,
 		Message: in,
 		Method:  "proto.Hotstuff.Vote",
@@ -245,10 +241,9 @@ var _ emptypb.Empty
 
 // NewView is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (n *Node) NewView(ctx context.Context, in *QuorumCert, opts ...gorums.CallOption) {
+func (n *Node) NewView(ctx context.Context, in *NewViewMsg, opts ...gorums.CallOption) {
 
 	cd := gorums.CallData{
-		Manager: n.mgr.Manager,
 		Node:    n.Node,
 		Message: in,
 		Method:  "proto.Hotstuff.NewView",
@@ -265,7 +260,6 @@ var _ emptypb.Empty
 func (n *Node) Deliver(ctx context.Context, in *Block, opts ...gorums.CallOption) {
 
 	cd := gorums.CallData{
-		Manager: n.mgr.Manager,
 		Node:    n.Node,
 		Message: in,
 		Method:  "proto.Hotstuff.Deliver",

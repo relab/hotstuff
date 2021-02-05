@@ -48,6 +48,7 @@ package hotstuff
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 )
 
 // ID uniquely identifies a replica
@@ -142,7 +143,7 @@ type Replica interface {
 	// Vote sends the partial certificate to the other replica
 	Vote(cert PartialCert)
 	// NewView sends the quorum certificate to the other replica
-	NewView(qc QuorumCert)
+	NewView(msg NewView)
 	// Deliver sends the block to the other replica
 	Deliver(block *Block)
 }
@@ -153,6 +154,20 @@ type BlockChain interface {
 	Store(*Block)
 	// Get retrieves a block given its hash
 	Get(Hash) (*Block, bool)
+}
+
+// NewView represents a new-view message
+type NewView struct {
+	// The ID of the replica who sent the message
+	ID ID
+	// The view that the replica wants to enter
+	View View
+	// The quorum certificate
+	QC QuorumCert
+}
+
+func (n NewView) String() string {
+	return fmt.Sprintf("NewView{ ID: %d, View: %d, QC: %v }", n.ID, n.View, n.QC)
 }
 
 //go:generate mockgen -destination=internal/mocks/consensus_mock.go -package=mocks . Consensus
@@ -181,7 +196,7 @@ type Consensus interface {
 	// OnVote handles an incoming vote
 	OnVote(cert PartialCert)
 	// OnNewView handles an incoming NewView
-	OnNewView(qc QuorumCert)
+	OnNewView(msg NewView)
 	// OnDeliver handles an incoming block
 	OnDeliver(block *Block)
 }

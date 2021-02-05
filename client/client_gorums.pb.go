@@ -18,7 +18,6 @@ import (
 type Configuration struct {
 	id    uint32
 	nodes []*gorums.Node
-	n     int
 	mgr   *Manager
 	qspec QuorumSpec
 	errs  chan gorums.Error
@@ -60,14 +59,14 @@ func (c *Configuration) NodeIDs() []uint32 {
 func (c *Configuration) Nodes() []*Node {
 	nodes := make([]*Node, 0, len(c.nodes))
 	for _, n := range c.nodes {
-		nodes = append(nodes, &Node{n, c.mgr})
+		nodes = append(nodes, &Node{n})
 	}
 	return nodes
 }
 
 // Size returns the number of nodes in the configuration.
 func (c *Configuration) Size() int {
-	return c.n
+	return len(c.nodes)
 }
 
 func (c *Configuration) String() string {
@@ -132,7 +131,6 @@ func (m *Manager) NewConfiguration(ids []uint32, qspec QuorumSpec) (*Configurati
 
 	c := &Configuration{
 		nodes: nodes,
-		n:     len(nodes),
 		mgr:   m,
 		qspec: qspec,
 	}
@@ -145,14 +143,13 @@ func (m *Manager) Nodes() []*Node {
 	gorumsNodes := m.Manager.Nodes()
 	nodes := make([]*Node, 0, len(gorumsNodes))
 	for _, n := range gorumsNodes {
-		nodes = append(nodes, &Node{n, m})
+		nodes = append(nodes, &Node{n})
 	}
 	return nodes
 }
 
 type Node struct {
 	*gorums.Node
-	mgr *Manager
 }
 
 // ExecCommand sends a command to all replicas and waits for valid signatures

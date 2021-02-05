@@ -90,7 +90,7 @@ func (s *Synchronizer) beat() {
 	}
 	s.lastBeat = view
 	s.mut.Unlock()
-	s.hs.Propose()
+	go s.hs.Propose()
 }
 
 func (s *Synchronizer) newViewTimeout(ctx context.Context) {
@@ -100,7 +100,7 @@ func (s *Synchronizer) newViewTimeout(ctx context.Context) {
 			return
 		case <-s.timer.C:
 			s.hs.CreateDummy()
-			s.hs.NewView()
+			go s.hs.NewView()
 			s.mut.Lock()
 			s.timer.Reset(s.timeout)
 			s.mut.Unlock()
