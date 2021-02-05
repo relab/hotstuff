@@ -5,10 +5,10 @@ package client
 import (
 	context "context"
 	fmt "fmt"
-	empty "github.com/golang/protobuf/ptypes/empty"
 	gorums "github.com/relab/gorums"
 	encoding "google.golang.org/grpc/encoding"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	sort "sort"
 	sync "sync"
 )
@@ -165,9 +165,9 @@ func (c *Configuration) ExecCommand(ctx context.Context, in *Command) *AsyncEmpt
 		Method:  "client.Client.ExecCommand",
 	}
 	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
-		r := make(map[uint32]*empty.Empty, len(replies))
+		r := make(map[uint32]*emptypb.Empty, len(replies))
 		for k, v := range replies {
-			r[k] = v.(*empty.Empty)
+			r[k] = v.(*emptypb.Empty)
 		}
 		return c.qspec.ExecCommandQF(req.(*Command), r)
 	}
@@ -184,19 +184,19 @@ type QuorumSpec interface {
 	// supplied to the ExecCommand method at call time, and may or may not
 	// be used by the quorum function. If the in parameter is not needed
 	// you should implement your quorum function with '_ *Command'.
-	ExecCommandQF(in *Command, replies map[uint32]*empty.Empty) (*empty.Empty, bool)
+	ExecCommandQF(in *Command, replies map[uint32]*emptypb.Empty) (*emptypb.Empty, bool)
 }
 
 // Client is the server-side API for the Client Service
 type Client interface {
-	ExecCommand(context.Context, *Command, func(*empty.Empty, error))
+	ExecCommand(context.Context, *Command, func(*emptypb.Empty, error))
 }
 
 func RegisterClientServer(srv *gorums.Server, impl Client) {
 	srv.RegisterHandler("client.Client.ExecCommand", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*Command)
 		once := new(sync.Once)
-		f := func(resp *empty.Empty, err error) {
+		f := func(resp *emptypb.Empty, err error) {
 			once.Do(func() {
 				finished <- gorums.WrapMessage(in.Metadata, resp, err)
 			})
@@ -207,7 +207,7 @@ func RegisterClientServer(srv *gorums.Server, impl Client) {
 
 type internalEmpty struct {
 	nid   uint32
-	reply *empty.Empty
+	reply *emptypb.Empty
 	err   error
 }
 
@@ -218,10 +218,10 @@ type AsyncEmpty struct {
 
 // Get returns the reply and any error associated with the called method.
 // The method blocks until a reply or error is available.
-func (f *AsyncEmpty) Get() (*empty.Empty, error) {
+func (f *AsyncEmpty) Get() (*emptypb.Empty, error) {
 	resp, err := f.Async.Get()
 	if err != nil {
 		return nil, err
 	}
-	return resp.(*empty.Empty), err
+	return resp.(*emptypb.Empty), err
 }

@@ -5,9 +5,9 @@ package proto
 import (
 	context "context"
 	fmt "fmt"
-	empty "github.com/golang/protobuf/ptypes/empty"
 	gorums "github.com/relab/gorums"
 	encoding "google.golang.org/grpc/encoding"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	sort "sort"
 )
 
@@ -154,7 +154,7 @@ type Node struct {
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ empty.Empty
+var _ emptypb.Empty
 
 // Propose is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
@@ -171,7 +171,7 @@ func (c *Configuration) Propose(ctx context.Context, in *Block, opts ...gorums.C
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ empty.Empty
+var _ emptypb.Empty
 
 // Fetch is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
@@ -224,7 +224,7 @@ func RegisterHotstuffServer(srv *gorums.Server, impl Hotstuff) {
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ empty.Empty
+var _ emptypb.Empty
 
 // Vote is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
@@ -241,7 +241,7 @@ func (n *Node) Vote(ctx context.Context, in *PartialCert, opts ...gorums.CallOpt
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ empty.Empty
+var _ emptypb.Empty
 
 // NewView is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
@@ -258,7 +258,7 @@ func (n *Node) NewView(ctx context.Context, in *QuorumCert, opts ...gorums.CallO
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ empty.Empty
+var _ emptypb.Empty
 
 // Deliver is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
