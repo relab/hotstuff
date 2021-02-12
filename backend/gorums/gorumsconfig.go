@@ -41,7 +41,7 @@ func (r *gorumsReplica) Vote(cert hotstuff.PartialCert) {
 	r.voteCancel()
 	ctx, r.voteCancel = context.WithCancel(context.Background())
 	pcert := proto.PartialCertToProto(cert)
-	r.node.Vote(ctx, pcert, gorums.WithAsyncSend())
+	r.node.Vote(ctx, pcert, gorums.WithNoSendWaiting())
 }
 
 // NewView sends the quorum certificate to the other replica
@@ -53,7 +53,7 @@ func (r *gorumsReplica) NewView(msg hotstuff.NewView) {
 	r.newviewCancel()
 	ctx, r.newviewCancel = context.WithCancel(context.Background())
 	pqc := proto.QuorumCertToProto(msg.QC)
-	r.node.NewView(ctx, &proto.NewViewMsg{View: uint64(msg.View), QC: pqc}, gorums.WithAsyncSend())
+	r.node.NewView(ctx, &proto.NewViewMsg{View: uint64(msg.View), QC: pqc}, gorums.WithNoSendWaiting())
 }
 
 // Deliver sends the block to the other replica
@@ -62,7 +62,7 @@ func (r *gorumsReplica) Deliver(block *hotstuff.Block) {
 		return
 	}
 	// background context is probably fine here, since we are only talking to one replica
-	r.node.Deliver(context.Background(), proto.BlockToProto(block), gorums.WithAsyncSend())
+	r.node.Deliver(context.Background(), proto.BlockToProto(block), gorums.WithNoSendWaiting())
 }
 
 type Config struct {
@@ -182,12 +182,12 @@ func (cfg *Config) Propose(block *hotstuff.Block) {
 	cfg.proposeCancel()
 	ctx, cfg.proposeCancel = context.WithCancel(context.Background())
 	pblock := proto.BlockToProto(block)
-	cfg.cfg.Propose(ctx, pblock, gorums.WithAsyncSend())
+	cfg.cfg.Propose(ctx, pblock, gorums.WithNoSendWaiting())
 }
 
 // Fetch requests a block from all the replicas in the configuration
 func (cfg *Config) Fetch(ctx context.Context, hash hotstuff.Hash) {
-	cfg.cfg.Fetch(ctx, &proto.BlockHash{Hash: hash[:]}, gorums.WithAsyncSend())
+	cfg.cfg.Fetch(ctx, &proto.BlockHash{Hash: hash[:]}, gorums.WithNoSendWaiting())
 }
 
 func (cfg *Config) Close() {
