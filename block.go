@@ -6,6 +6,7 @@ import (
 	"fmt"
 )
 
+// Block contains a propsed "command", metadata for the protocol, and a link to the "parent" block.
 type Block struct {
 	// keep a copy of the hash to avoid hashing multiple times
 	hash     *Hash
@@ -16,6 +17,7 @@ type Block struct {
 	view     View
 }
 
+// NewBlock creates a new Block
 func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID) *Block {
 	return &Block{
 		parent:   parent,
@@ -41,7 +43,7 @@ func (b *Block) hashSlow() Hash {
 	return sha256.Sum256(b.ToBytes())
 }
 
-// Hash returns the hash of theBlock
+// Hash returns the hash of the Block
 func (b *Block) Hash() Hash {
 	if b.hash == nil {
 		b.hash = new(Hash)
@@ -50,12 +52,12 @@ func (b *Block) Hash() Hash {
 	return *b.hash
 }
 
-// Proposer returns the id of the proposer
+// Proposer returns the id of the replica who proposed the block.
 func (b *Block) Proposer() ID {
 	return b.proposer
 }
 
-// Parent returns the hash of the parentBlock
+// Parent returns the hash of the parent Block
 func (b *Block) Parent() Hash {
 	return b.parent
 }
@@ -65,7 +67,7 @@ func (b *Block) Command() Command {
 	return b.cmd
 }
 
-// Certificate returns the certificate that this Block references
+// QuorumCert returns the quorum certificate in the block
 func (b *Block) QuorumCert() QuorumCert {
 	return b.cert
 }
@@ -75,6 +77,7 @@ func (b *Block) View() View {
 	return b.view
 }
 
+// ToBytes returns the raw byte form of the Block, to be used for hashing, etc.
 func (b *Block) ToBytes() []byte {
 	buf := b.parent[:]
 	var proposerBuf [4]byte

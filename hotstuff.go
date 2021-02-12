@@ -39,9 +39,9 @@
 //  |                |<----Fetch()--------------------+  +----Get()------>|                |
 //  +----------------+                                                    +----------------+
 //
-// The `Consensus` interface is the "core" of the system, and it is the part that implements the consensus algorithm.
-// The `OnDeliver()`, `OnPropose()`, `OnVote()`, and `OnNewView()` methods should be called by some backend service to
-// deliver messages to the Consensus algorithm. The `Server` struct in the `backend/gorums` package is an example of
+// The Consensus interface is the "core" of the system, and it is the part that implements the consensus algorithm.
+// The OnDeliver(), OnPropose(), OnVote(), and OnNewView() methods should be called by some backend service to
+// deliver messages to the Consensus algorithm. The Server struct in the backend/gorums package is an example of
 // such a service.
 package hotstuff
 
@@ -54,7 +54,7 @@ import (
 // ID uniquely identifies a replica
 type ID uint32
 
-// View uniquely identifies a view
+// View is a number that uniquely identifies a view.
 type View uint64
 
 // Hash is a SHA256 hash
@@ -64,105 +64,106 @@ func (h Hash) String() string {
 	return base64.StdEncoding.EncodeToString(h[:])
 }
 
-// Command is a client request to be executed by the consensus protocol
+// Command is a client request to be executed by the consensus protocol.
+//
+// The string type is used because it is immutable and can hold arbitrary bytes of any length.
 type Command string
 
 //go:generate mockgen -destination=internal/mocks/cmdqueue_mock.go -package=mocks . CommandQueue
 
-// CommandQueue is a queue of commands to be proposed
+// CommandQueue is a queue of commands to be proposed.
 type CommandQueue interface {
 	// GetCommand returns the next command to be proposed.
 	GetCommand() *Command
 }
 
+//go:generate mockgen -destination=internal/mocks/acceptor_mock.go -package=mocks . Acceptor
+
+// Acceptor decides is a replica should accept a command.
+type Acceptor interface {
+	// Accept returns true if the replica should accept the command, false otherwise.
+	Accept(Command) bool
+}
+
+//go:generate mockgen -destination=internal/mocks/executor_mock.go -package=mocks . Executor
+
+// Executor is responsible for executing the commands that are committed by the consensus protocol.
+type Executor interface {
+	// Exec executes the given command.
+	Exec(Command)
+}
+
 // ToBytes is an object that can be converted into bytes for the purposes of hashing, etc.
 type ToBytes interface {
-	// ToBytes returns the object as bytes
+	// ToBytes returns the object as bytes.
 	ToBytes() []byte
 }
 
-// PublicKey is the public part of a replica's key pair
+// PublicKey is the public part of a replica's key pair.
 type PublicKey interface{}
 
-// Credentials are used to authenticate communication between replicas
-type Credentials interface{}
-
-// PrivateKey is the private part of a replica's key pair
+// PrivateKey is the private part of a replica's key pair.
 type PrivateKey interface {
-	// PublicKey returns the public key associated with this private key
+	// PublicKey returns the public key associated with this private key.
 	PublicKey() PublicKey
 }
 
-// Signature is a signature of a block
+// Signature is a cryptographic signature of a block.
 type Signature interface {
 	ToBytes
 	// Signer returns the ID of the replica that generated the signature.
 	Signer() ID
 }
 
-// PartialCert is a certificate for a block created by a single replica
+// PartialCert is a partial certificate for a block created by a single replica.
 type PartialCert interface {
 	ToBytes
-	// Signature returns the signature
+	// Signature returns the signature of the block.
 	Signature() Signature
-	// BlockHash returns the hash of the block that was signed
+	// BlockHash returns the hash of the block that was signed.
 	BlockHash() Hash
 }
 
-// QuorumCert is a certificate for a Block created by a quorum of replicas
+// QuorumCert (QC) is a certificate for a Block created by a quorum of partial certificates.
 type QuorumCert interface {
 	ToBytes
-	// BlockHash returns the hash of the block for which the certificate was created
+	// BlockHash returns the hash of the block that the QC was created for.
 	BlockHash() Hash
 }
 
-// Signer implements the methods requried to create signatures and certificates
+// Signer implements the methods requried to create signatures and certificates.
 type Signer interface {
-	// Sign signs a single block and returns the signature
+	// Sign signs a single block and returns the partial certificate.
 	Sign(block *Block) (cert PartialCert, err error)
-	// CreateQuourmCert creates a from a list of partial certificates
+	// CreateQuourmCert creates a quorum certificate from a list of partial certificates.
 	CreateQuorumCert(block *Block, signatures []PartialCert) (cert QuorumCert, err error)
 }
 
-// Verifier implements the methods required to verify partial and quorum certificates
+// Verifier implements the methods required to verify partial and quorum certificates.
 type Verifier interface {
-	// VerifyPartialCert verifies a single partial certificate
+	// VerifyPartialCert verifies a single partial certificate.
 	VerifyPartialCert(cert PartialCert) bool
-	// VerifyQuorumCert verifies a quorum certificate
+	// VerifyQuorumCert verifies a quorum certificate.
 	VerifyQuorumCert(qc QuorumCert) bool
 }
 
-//go:generate mockgen -destination=internal/mocks/replica_mock.go -package=mocks . Replica
-
-// Replica implements the methods that communicate with another replica
-type Replica interface {
-	// ID returns the replica's id
-	ID() ID
-	// PublicKey returns the replica's public key
-	PublicKey() PublicKey
-	// Vote sends the partial certificate to the other replica
-	Vote(cert PartialCert)
-	// NewView sends the quorum certificate to the other replica
-	NewView(msg NewView)
-	// Deliver sends the block to the other replica
-	Deliver(block *Block)
-}
-
-// BlockChain is a datastructure that stores a chain of blocks
+// BlockChain is a datastructure that stores a chain of blocks.
+// It is not required that a block is stored forever,
+// but a block must be stored until at least one of its children have been committed.
 type BlockChain interface {
-	// Store stores a block in the blockchain
+	// Store stores a block in the blockchain.
 	Store(*Block)
-	// Get retrieves a block given its hash
+	// Get retrieves a block given its hash.
 	Get(Hash) (*Block, bool)
 }
 
-// NewView represents a new-view message
+// NewView represents a new-view message.
 type NewView struct {
-	// The ID of the replica who sent the message
+	// The ID of the replica who sent the message.
 	ID ID
-	// The view that the replica wants to enter
+	// The view that the replica wants to enter.
 	View View
-	// The quorum certificate
+	// The highest QC known to the sender.
 	QC QuorumCert
 }
 
@@ -170,96 +171,106 @@ func (n NewView) String() string {
 	return fmt.Sprintf("NewView{ ID: %d, View: %d, QC: %v }", n.ID, n.View, n.QC)
 }
 
-//go:generate mockgen -destination=internal/mocks/consensus_mock.go -package=mocks . Consensus
+//go:generate mockgen -destination=internal/mocks/replica_mock.go -package=mocks . Replica
 
-// Consensus implements a consensus protocol
-type Consensus interface {
-	// Config returns the configuration of this replica
-	Config() Config
-	// LastVote returns the view in which the replica last voted
-	LastVote() View
-	// HighQC returns the highest QC known to the replica
-	HighQC() QuorumCert
-	// Leaf returns the last proposed block
-	Leaf() *Block
-	// BlockChain returns the datastructure containing the blocks known to the replica
-	BlockChain() BlockChain
-	// CreateDummy inserts a dummy block at View+1.
-	// This is useful when a view must be skipped.
-	CreateDummy()
-	// Propose starts a new proposal
-	Propose()
-	// NewView sends a NewView message to the next leader
-	NewView()
-	// OnPropose handles an incoming proposal
-	OnPropose(block *Block)
-	// OnVote handles an incoming vote
-	OnVote(cert PartialCert)
-	// OnNewView handles an incoming NewView
-	OnNewView(msg NewView)
-	// OnDeliver handles an incoming block
-	OnDeliver(block *Block)
+// Replica represents a remote replica participating in the consensus protocol.
+// The methods Vote, NewView, and Deliver must send the respective arguments to the remote replica.
+type Replica interface {
+	// ID returns the replica's id.
+	ID() ID
+	// PublicKey returns the replica's public key.
+	PublicKey() PublicKey
+	// Vote sends the partial certificate to the other replica.
+	Vote(cert PartialCert)
+	// NewView sends the quorum certificate to the other replica.
+	NewView(msg NewView)
+	// Deliver sends the block to the other replica.
+	Deliver(block *Block)
 }
 
 //go:generate mockgen -destination=internal/mocks/config_mock.go -package=mocks . Config
 
-// Config holds information about Replicas and provides methods to send messages to the replicas
+// Config holds information about the current configuration of replicas that participate in the protocol,
+// and some information about the local replica.
+// The methods Propose and Fetch should send their respective arguments to all replicas in the configuration,
+// execept the caller.
 type Config interface {
-	// ID returns the id of this replica
+	// ID returns the id of the local replica.
 	ID() ID
-	// PrivateKey returns the id of this replica
+	// PrivateKey returns the id of the local replica.
 	PrivateKey() PrivateKey
-	// Replicas returns all of the replicas in the configuration
+	// Replicas returns all of the replicas in the configuration.
 	Replicas() map[ID]Replica
-	// Replica returns a replica if present in the configuration
+	// Replica returns a replica if present in the configuration.
 	Replica(ID) (replica Replica, ok bool)
-	// Len returns the number of replicas in the configuration
+	// Len returns the number of replicas in the configuration.
 	Len() int
-	// QuorumSize returns the size of a quorum
+	// QuorumSize returns the size of a quorum.
 	QuorumSize() int
-	// Propose sends the block to all replicas in the configuration
+	// Propose sends the block to all replicas in the configuration.
 	Propose(block *Block)
-	// Fetch requests a block from all the replicas in the configuration
+	// Fetch requests a block from all the replicas in the configuration.
 	Fetch(ctx context.Context, hash Hash)
 }
 
-// LeaderRotation implements a leader rotation scheme
+//go:generate mockgen -destination=internal/mocks/consensus_mock.go -package=mocks . Consensus
+
+// Consensus implements a byzantine consensus protocol, such as HotStuff.
+// It contains the protocol data for a single replica.
+// The methods OnPropose, OnVote, OnNewView, and OnDeliver should be called upon receiving a corresponding message.
+type Consensus interface {
+	// Config returns the configuration used by the replica.
+	Config() Config
+	// LastVote returns the view in which the replica last voted.
+	LastVote() View
+	// HighQC returns the highest QC known to the replica.
+	HighQC() QuorumCert
+	// Leaf returns the last block that was added to the chain.
+	// This should be the block with the highest view that is known to the replica.
+	Leaf() *Block
+	// BlockChain returns the datastructure containing the blocks known to the replica.
+	BlockChain() BlockChain
+	// CreateDummy inserts a dummy block at View+1.
+	// This is useful when a view must be skipped.
+	CreateDummy()
+	// Propose starts a new proposal. The command is fetched from the command queue.
+	Propose()
+	// NewView sends a NewView message to the next leader.
+	NewView()
+	// OnPropose handles an incoming proposal.
+	// A leader should call this method on itself.
+	OnPropose(block *Block)
+	// OnVote handles an incoming vote.
+	// A leader should call this method on itself.
+	OnVote(cert PartialCert)
+	// OnNewView handles an incoming NewView.
+	// A leader should call this method on itself.
+	OnNewView(msg NewView)
+	// OnDeliver handles an incoming block that was requested through the "fetch" mechanism.
+	OnDeliver(block *Block)
+}
+
+// LeaderRotation implements a leader rotation scheme.
 type LeaderRotation interface {
-	// GetLeader returns the id of the leader in the given view
+	// GetLeader returns the id of the leader in the given view.
 	GetLeader(View) ID
-}
-
-//go:generate mockgen -destination=internal/mocks/acceptor_mock.go -package=mocks . Acceptor
-
-// Acceptor is the mechanism that decides wether a command should be accepted by the replica
-type Acceptor interface {
-	// Accept returns true if the replica should accept the command, false otherwise
-	Accept(Command) bool
-}
-
-//go:generate mockgen -destination=internal/mocks/executor_mock.go -package=mocks . Executor
-
-// Executor executes a command
-type Executor interface {
-	// Exec executes the given command
-	Exec(Command)
 }
 
 //go:generate mockgen -destination=internal/mocks/synchronizer_mock.go -package=mocks . ViewSynchronizer
 
-// ViewSynchronizer synchronizes replicas to the same view
+// ViewSynchronizer synchronizes replicas to the same view.
 type ViewSynchronizer interface {
 	LeaderRotation
-	// OnPropose should be called when a replica has received a new valid proposal.
+	// OnPropose should be called when the local replica has received a new valid proposal.
 	OnPropose()
-	// OnFinishQC should be called when a replica has created a new qc
+	// OnFinishQC should be called when the local replica has created a new qc.
 	OnFinishQC()
-	// OnNewView should be called when a replica receives a valid NewView message
+	// OnNewView should be called when the local replica receives a valid NewView message.
 	OnNewView()
-	// Init gives the synchronizer a consensus instance to synchronize
+	// Init gives the synchronizer a consensus instance to synchronize.
 	Init(Consensus)
-	// Start starts the synchronizer
+	// Start starts the synchronizer.
 	Start()
-	// Stop stops the synchronizer
+	// Stop stops the synchronizer.
 	Stop()
 }
