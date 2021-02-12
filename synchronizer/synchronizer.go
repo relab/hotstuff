@@ -68,9 +68,11 @@ func (s *Synchronizer) Start() {
 func (s *Synchronizer) Stop() {
 	s.stopped = true
 	s.stop()
+	s.mut.Lock()
 	if s.timer != nil && !s.timer.Stop() {
 		<-s.timer.C
 	}
+	s.mut.Unlock()
 }
 
 func (s *Synchronizer) beat() {

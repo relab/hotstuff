@@ -28,6 +28,7 @@ func createKey(t *testing.T) *ecdsa.PrivateKey {
 	return &ecdsa.PrivateKey{PrivateKey: key}
 }
 
+// TestChainedHotstuff runs chained hotstuff with the gorums backend and expects each replica to execute 10 times.
 func TestChainedHotstuff(t *testing.T) {
 	const n = 4
 	ctrl := gomock.NewController(t)
@@ -72,7 +73,6 @@ func TestChainedHotstuff(t *testing.T) {
 	errChan := make(chan error, n)
 	for i := 0; i < n; i++ {
 		counter := &counters[i]
-		pm := &synchronizers[i]
 		executor := mocks.NewMockExecutor(ctrl)
 		executor.EXPECT().Exec(gomock.Any()).AnyTimes().Do(func(arg hotstuff.Command) {
 			if arg != hotstuff.Command("foo") {
@@ -80,7 +80,6 @@ func TestChainedHotstuff(t *testing.T) {
 			}
 			*counter++
 			if *counter >= 10 {
-				(*pm).Stop()
 				c <- struct{}{}
 			}
 		})
@@ -111,6 +110,7 @@ func TestChainedHotstuff(t *testing.T) {
 	for i := 0; i < n; i++ {
 		select {
 		case <-c:
+			defer synchronizers[i].Stop()
 		case err := <-errChan:
 			t.Fatal(err)
 		}
