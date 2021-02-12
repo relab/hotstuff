@@ -79,7 +79,7 @@ func TestChainedHotstuff(t *testing.T) {
 				errChan <- fmt.Errorf("Unknown command executed: got %s, want: %s", arg, "foo")
 			}
 			*counter++
-			if *counter >= 10 {
+			if *counter >= 100 {
 				c <- struct{}{}
 			}
 		})
