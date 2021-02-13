@@ -51,7 +51,7 @@ func NewServer(replicaConfig config.ReplicaConfig) *Server {
 func (srv *Server) Start(hs hotstuff.Consensus) error {
 	lis, err := net.Listen("tcp", srv.addr)
 	if err != nil {
-		return fmt.Errorf("Failed to listen on %s: %w", srv.addr, err)
+		return fmt.Errorf("failed to listen on %s: %w", srv.addr, err)
 	}
 	srv.StartOnListener(hs, lis)
 	return nil

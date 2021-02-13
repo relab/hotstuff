@@ -99,7 +99,11 @@ func main() {
 		}
 	}()
 
-	viper.BindPFlags(pflag.CommandLine)
+	err = viper.BindPFlags(pflag.CommandLine)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to bind pflags: %v\n", err)
+		os.Exit(1)
+	}
 
 	// read main config file in working dir
 	viper.SetConfigName("hotstuff")

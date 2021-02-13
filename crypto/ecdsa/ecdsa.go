@@ -1,3 +1,4 @@
+// Package ecdsa provides a crypto implementation for HotStuff using Go's 'crypto/ecdsa' package.
 package ecdsa
 
 import (
@@ -19,10 +20,10 @@ import (
 var logger = logging.GetLogger()
 
 // ErrHashMismatch is the error used when a partial certificate hash does not match the hash of a block.
-var ErrHashMismatch = fmt.Errorf("Certificate hash does not match block hash")
+var ErrHashMismatch = fmt.Errorf("certificate hash does not match block hash")
 
 // ErrPartialDuplicate is the error used when two or more signatures were created by the same replica.
-var ErrPartialDuplicate = fmt.Errorf("Cannot add more than one signature per replica")
+var ErrPartialDuplicate = fmt.Errorf("cannot add more than one signature per replica")
 
 // PrivateKey is an ECDSA private key.
 //
@@ -234,19 +235,19 @@ func (ec *ecdsaCrypto) VerifyQuorumCert(cert hotstuff.QuorumCert) bool {
 	hash := qc.BlockHash()
 	var wg sync.WaitGroup
 	var numVerified uint64 = 0
-	for id, psig := range qc.Signatures() {
+	for id, pSig := range qc.Signatures() {
 		info, ok := ec.cfg.Replica(id)
 		if !ok {
 			logger.Error("VerifyQuorumSig: got signature from replica whose ID (%d) was not in config.", id)
 		}
 		pubKey := info.PublicKey().(*ecdsa.PublicKey)
 		wg.Add(1)
-		go func(psig *Signature) {
-			if ecdsa.Verify(pubKey, hash[:], psig.R(), psig.S()) {
+		go func(pSig *Signature) {
+			if ecdsa.Verify(pubKey, hash[:], pSig.R(), pSig.S()) {
 				atomic.AddUint64(&numVerified, 1)
 			}
 			wg.Done()
-		}(psig)
+		}(pSig)
 	}
 	wg.Wait()
 	return numVerified >= uint64(ec.cfg.QuorumSize())

@@ -1,5 +1,14 @@
 {
 	"go.testFlags": [
 		"-count=1"
+	],
+	"cSpell.enabled": true,
+	"cSpell.showStatus": true,
+	"cSpell.customWorkspaceDictionaries": [
+		{
+			"name": "hotstuff",
+			"addWords": true,
+			"path": "${workspaceRoot}/.vscode/dict.txt",
+		}
 	]
 }

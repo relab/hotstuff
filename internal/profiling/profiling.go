@@ -1,3 +1,4 @@
+// Package profiling provides helpers for using various profilers.
 package profiling
 
 import (

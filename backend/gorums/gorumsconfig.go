@@ -134,7 +134,7 @@ func (cfg *Config) Connect(connectTimeout time.Duration) error {
 
 	cfg.cfg, err = cfg.mgr.NewConfiguration(struct{}{}, gorums.WithNodeMap(idMapping))
 	if err != nil {
-		return fmt.Errorf("Failed to create configuration: %w", err)
+		return fmt.Errorf("failed to create configuration: %w", err)
 	}
 	for _, node := range cfg.cfg.Nodes() {
 		id := hotstuff.ID(node.ID())

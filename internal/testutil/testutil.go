@@ -1,3 +1,4 @@
+// Package testutil provides helper methods that are useful for implementing tests.
 package testutil
 
 import (
@@ -9,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/internal/mocks"
 )
 
+// CreateMockReplica returns a mock of a hotstuff.Replica.
 func CreateMockReplica(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, key hotstuff.PublicKey) *mocks.MockReplica {
 	t.Helper()
 
@@ -27,6 +29,7 @@ func CreateMockReplica(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, ke
 	return replica
 }
 
+// CreateMockConfig returns a mock of a hotstuff.Config.
 func CreateMockConfig(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, key hotstuff.PrivateKey) *mocks.MockConfig {
 	t.Helper()
 
@@ -45,6 +48,7 @@ func CreateMockConfig(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, key
 	return cfg
 }
 
+// ConfigAddReplica adds a mock replica to a mock configuration.
 func ConfigAddReplica(t *testing.T, cfg *mocks.MockConfig, replica *mocks.MockReplica) {
 	t.Helper()
 
@@ -55,6 +59,7 @@ func ConfigAddReplica(t *testing.T, cfg *mocks.MockConfig, replica *mocks.MockRe
 		Return(replica, true)
 }
 
+// CreateTCPListener creates a net.Listener on a random port.
 func CreateTCPListener(t *testing.T) net.Listener {
 	t.Helper()
 	lis, err := net.Listen("tcp", "localhost:0")

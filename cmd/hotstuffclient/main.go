@@ -98,7 +98,11 @@ func main() {
 		}
 	}()
 
-	viper.BindPFlags(pflag.CommandLine)
+	err = viper.BindPFlags(pflag.CommandLine)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to bind pflags: %v\n", err)
+		os.Exit(1)
+	}
 
 	// read main config file in working dir
 	viper.SetConfigName("hotstuff")
@@ -275,7 +279,10 @@ func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hot
 
 func (c *hotstuffClient) Close() {
 	c.mgr.Close()
-	c.reader.Close()
+	err := c.reader.Close()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func (c *hotstuffClient) GetStats() *benchmark.Result {

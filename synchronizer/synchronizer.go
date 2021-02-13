@@ -11,6 +11,9 @@ import (
 
 var logger = logging.GetLogger()
 
+// Synchronizer is a dumb implementation of the hotstuff.ViewSynchronizer interface.
+// It does not do anything to ensure synchronization, it simply makes the local replica
+// propose at the correct time, and send new view messages in case of a timeout.
 type Synchronizer struct {
 	hotstuff.LeaderRotation
 
@@ -23,6 +26,7 @@ type Synchronizer struct {
 	stopped  bool
 }
 
+// New creates a new Synchronizer.
 func New(leaderRotation hotstuff.LeaderRotation, initialTimeout time.Duration) *Synchronizer {
 	return &Synchronizer{
 		LeaderRotation: leaderRotation,
@@ -39,21 +43,22 @@ func (s *Synchronizer) OnPropose() {
 	}
 }
 
-// OnFinishQC should be called when a replica has created a new qc
+// OnFinishQC should be called when a replica has created a new qc.
 func (s *Synchronizer) OnFinishQC() {
 	s.beat()
 }
 
-// OnNewView should be called when a replica receives a valid NewView message
+// OnNewView should be called when a replica receives a valid NewView message.
 func (s *Synchronizer) OnNewView() {
 	s.beat()
 }
 
+// Init initializes the synchronizer with given the hotstuff instance.
 func (s *Synchronizer) Init(hs hotstuff.Consensus) {
 	s.hs = hs
 }
 
-// Start starts the synchronizer
+// Start starts the synchronizer.
 func (s *Synchronizer) Start() {
 	if s.GetLeader(s.hs.Leaf().View()+1) == s.hs.Config().ID() {
 		s.hs.Propose()
@@ -64,7 +69,7 @@ func (s *Synchronizer) Start() {
 	go s.newViewTimeout(ctx)
 }
 
-// Stop stops the synchronizer
+// Stop stops the synchronizer.
 func (s *Synchronizer) Stop() {
 	s.stopped = true
 	s.stop()

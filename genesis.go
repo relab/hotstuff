@@ -6,7 +6,7 @@ var genesisBlock = Block{
 	proposer: 0,
 }
 
-// Genesis returns a pointer to the genesis block, the starting point for the hotstuff blockchain
+// GetGenesis returns a pointer to the genesis block, the starting point for the hotstuff blockchain.
 func GetGenesis() *Block {
 	return &genesisBlock
 }

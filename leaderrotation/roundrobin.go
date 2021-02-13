@@ -13,6 +13,7 @@ func (rr roundRobin) GetLeader(view hotstuff.View) hotstuff.ID {
 	return hotstuff.ID(view%hotstuff.View(rr.cfg.Len()) + 1)
 }
 
+// NewRoundRobin returns a new round-robin leader rotation implementation.
 func NewRoundRobin(cfg hotstuff.Config) hotstuff.LeaderRotation {
 	return roundRobin{cfg}
 }

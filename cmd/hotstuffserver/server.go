@@ -108,15 +108,27 @@ func (srv *clientSrv) Start(address string) error {
 		return err
 	}
 
-	srv.hsSrv.Start(srv.hs)
-	srv.cfg.Connect(10 * time.Second)
+	err = srv.hsSrv.Start(srv.hs)
+	if err != nil {
+		return err
+	}
+
+	err = srv.cfg.Connect(10 * time.Second)
+	if err != nil {
+		return err
+	}
 
 	// sleep so that all replicas can be ready before we start
 	time.Sleep(time.Duration(srv.conf.ViewTimeout) * time.Millisecond)
 
 	srv.pm.Start()
 
-	go srv.gorumsSrv.Serve(lis)
+	go func() {
+		err := srv.gorumsSrv.Serve(lis)
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 
 	return nil
 }

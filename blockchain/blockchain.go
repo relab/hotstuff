@@ -1,3 +1,4 @@
+// Package blockchain provides an implementation of the hotstuff.Blockchain interface.
 package blockchain
 
 import (

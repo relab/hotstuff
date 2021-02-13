@@ -76,7 +76,7 @@ func TestChainedHotstuff(t *testing.T) {
 		executor := mocks.NewMockExecutor(ctrl)
 		executor.EXPECT().Exec(gomock.Any()).AnyTimes().Do(func(arg hotstuff.Command) {
 			if arg != hotstuff.Command("foo") {
-				errChan <- fmt.Errorf("Unknown command executed: got %s, want: %s", arg, "foo")
+				errChan <- fmt.Errorf("unknown command executed: got %s, want: %s", arg, "foo")
 			}
 			*counter++
 			if *counter >= 100 {
@@ -99,7 +99,10 @@ func TestChainedHotstuff(t *testing.T) {
 	}
 
 	for _, cfg := range configs {
-		cfg.Connect(time.Second)
+		err := cfg.Connect(time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
 		defer cfg.Close()
 	}
 
