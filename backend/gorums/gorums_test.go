@@ -28,26 +28,19 @@ func generateKey(t *testing.T) *ecdsa.PrivateKey {
 	return pk
 }
 
-func TestGorumsNoTLS(t *testing.T) {
-	testGorums(t, false)
+type testData struct {
+	n         int
+	cfg       *config.ReplicaConfig
+	listeners []net.Listener
+	keys      []*ecdsa.PrivateKey
 }
 
-func TestGorumsTLS(t *testing.T) {
-	testGorums(t, true)
-}
-
-func testGorums(t *testing.T, useTLS bool) {
-	const n = 4 // number of replicas to start
-
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+func setupReplicas(t *testing.T, n int) testData {
+	t.Helper()
 
 	listeners := make([]net.Listener, n)
-	mockConsensus := make([]*mocks.MockConsensus, 0, n)
 	keys := make([]*ecdsa.PrivateKey, 0, n)
 	replicas := make([]*config.ReplicaInfo, 0, n)
-	servers := make([]*Server, 0, n)
-	certificates := make([]*x509.Certificate, 0, n)
 
 	// generate keys and replicaInfo
 	for i := 0; i < n; i++ {
@@ -60,68 +53,89 @@ func testGorums(t *testing.T, useTLS bool) {
 		})
 	}
 
-	var cp *x509.CertPool
-	var creds credentials.TransportCredentials
-	if useTLS {
-		caPK := generateKey(t)
-		ca, err := crypto.GenerateRootCert(caPK)
-		if err != nil {
-			t.Fatalf("Failed to generate CA: %v", err)
-		}
-
-		for i := 0; i < n; i++ {
-			cert, err := crypto.GenerateTLSCert(hotstuff.ID(i)+1, []string{"localhost", "127.0.0.1"}, ca, replicas[i].PubKey, caPK)
-			if err != nil {
-				t.Fatalf("Failed to generate certificate: %v", err)
-			}
-			certificates = append(certificates, cert)
-
-		}
-		cp = x509.NewCertPool()
-		cp.AddCert(ca)
-		creds = credentials.NewTLS(&tls.Config{
-			RootCAs:      cp,
-			ClientCAs:    cp,
-			Certificates: []tls.Certificate{{Certificate: [][]byte{certificates[0].Raw}, PrivateKey: keys[0]}},
-		})
-	}
-
-	cfg := config.NewConfig(1, keys[0], creds)
+	cfg := config.NewConfig(1, keys[0], nil)
 	for _, replica := range replicas {
 		cfg.Replicas[replica.ID] = replica
 	}
 
-	// create mocks
+	return testData{n, cfg, listeners, keys}
+}
+
+func TestGorumsNoTLS(t *testing.T) {
+	const n = 4
+	td := setupReplicas(t, n)
+
+	testGorums(t, td)
+}
+
+func TestGorumsTLS(t *testing.T) {
+	const n = 4
+	td := setupReplicas(t, n)
+
+	certificates := make([]*x509.Certificate, 0, n)
+
+	caPK := generateKey(t)
+	ca, err := crypto.GenerateRootCert(caPK)
+	if err != nil {
+		t.Fatalf("Failed to generate CA: %v", err)
+	}
+
 	for i := 0; i < n; i++ {
+		cert, err := crypto.GenerateTLSCert(
+			hotstuff.ID(i)+1,
+			[]string{"localhost", "127.0.0.1"},
+			ca,
+			td.cfg.Replicas[hotstuff.ID(i)+1].PubKey,
+			caPK,
+		)
+		if err != nil {
+			t.Fatalf("Failed to generate certificate: %v", err)
+		}
+		certificates = append(certificates, cert)
+	}
+
+	cp := x509.NewCertPool()
+	cp.AddCert(ca)
+	creds := credentials.NewTLS(&tls.Config{
+		RootCAs:      cp,
+		ClientCAs:    cp,
+		Certificates: []tls.Certificate{{Certificate: [][]byte{certificates[0].Raw}, PrivateKey: td.keys[0]}},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+	})
+
+	td.cfg.Creds = creds
+	testGorums(t, td)
+}
+
+func testGorums(t *testing.T, td testData) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConsensus := make([]*mocks.MockConsensus, 0, td.n)
+	servers := make([]*Server, 0, td.n)
+
+	// create mocks
+	for i := 0; i < td.n; i++ {
 		mockConsensus = append(mockConsensus, mocks.NewMockConsensus(ctrl))
 	}
 
 	// start servers
-	for i := 0; i < n; i++ {
-		c := *cfg
+	for i := 0; i < td.n; i++ {
+		c := *td.cfg
 		c.ID = hotstuff.ID(i + 1)
-		c.PrivateKey = keys[i]
-		if useTLS {
-			c.Creds = credentials.NewTLS(&tls.Config{
-				RootCAs:      cp,
-				ClientCAs:    cp,
-				Certificates: []tls.Certificate{{Certificate: [][]byte{certificates[i].Raw}, PrivateKey: keys[i]}},
-				ClientAuth:   tls.RequireAndVerifyClientCert,
-			})
-		}
+		c.PrivateKey = td.keys[i]
 		servers = append(servers, NewServer(c))
-		servers[i].StartOnListener(mockConsensus[i], listeners[i])
+		servers[i].StartOnListener(mockConsensus[i], td.listeners[i])
 	}
 
 	// create the configuration
-	client := NewConfig(*cfg)
+	client := NewConfig(*td.cfg)
 
 	// test values
 	qc := ecdsacrypto.NewQuorumCert(map[hotstuff.ID]*ecdsacrypto.Signature{}, hotstuff.GetGenesis().Hash())
 	block := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "gorums_test", 1, 1)
 
 	signer, _ := ecdsacrypto.New(client)
-	signer.Sign(block)
 	vote, err := signer.Sign(block)
 	if err != nil {
 		t.Fatalf("Failed to create partial certificate: %v", err)
@@ -154,7 +168,11 @@ func testGorums(t *testing.T, useTLS bool) {
 		})
 	}
 
-	client.Connect(time.Second)
+	err = client.Connect(time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	client.Propose(block)
 	for id, replica := range client.Replicas() {
 		if id == client.ID() {
@@ -164,7 +182,7 @@ func testGorums(t *testing.T, useTLS bool) {
 		replica.NewView(hotstuff.NewView{ID: 1, View: 1, QC: qc})
 	}
 
-	for i := 0; i < (n-1)*3; i++ {
+	for i := 0; i < (td.n-1)*3; i++ {
 		<-c
 	}
 
