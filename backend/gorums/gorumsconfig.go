@@ -1,3 +1,4 @@
+// Package gorums implements a backend for HotStuff using the gorums framework.
 package gorums
 
 import (
@@ -22,17 +23,17 @@ type gorumsReplica struct {
 	newviewCancel context.CancelFunc
 }
 
-// ID returns the replica's id
+// ID returns the replica's ID.
 func (r *gorumsReplica) ID() hotstuff.ID {
 	return r.id
 }
 
-// PublicKey returns the replica's public key
+// PublicKey returns the replica's public key.
 func (r *gorumsReplica) PublicKey() hotstuff.PublicKey {
 	return r.pubKey
 }
 
-// Vote sends the partial certificate to the other replica
+// Vote sends the partial certificate to the other replica.
 func (r *gorumsReplica) Vote(cert hotstuff.PartialCert) {
 	if r.node == nil {
 		return
@@ -40,11 +41,11 @@ func (r *gorumsReplica) Vote(cert hotstuff.PartialCert) {
 	var ctx context.Context
 	r.voteCancel()
 	ctx, r.voteCancel = context.WithCancel(context.Background())
-	pcert := proto.PartialCertToProto(cert)
-	r.node.Vote(ctx, pcert, gorums.WithNoSendWaiting())
+	pCert := proto.PartialCertToProto(cert)
+	r.node.Vote(ctx, pCert, gorums.WithNoSendWaiting())
 }
 
-// NewView sends the quorum certificate to the other replica
+// NewView sends the quorum certificate to the other replica.
 func (r *gorumsReplica) NewView(msg hotstuff.NewView) {
 	if r.node == nil {
 		return
@@ -52,8 +53,8 @@ func (r *gorumsReplica) NewView(msg hotstuff.NewView) {
 	var ctx context.Context
 	r.newviewCancel()
 	ctx, r.newviewCancel = context.WithCancel(context.Background())
-	pqc := proto.QuorumCertToProto(msg.QC)
-	r.node.NewView(ctx, &proto.NewViewMsg{View: uint64(msg.View), QC: pqc}, gorums.WithNoSendWaiting())
+	pQC := proto.QuorumCertToProto(msg.QC)
+	r.node.NewView(ctx, &proto.NewViewMsg{View: uint64(msg.View), QC: pQC}, gorums.WithNoSendWaiting())
 }
 
 // Deliver sends the block to the other replica
@@ -65,6 +66,8 @@ func (r *gorumsReplica) Deliver(block *hotstuff.Block) {
 	r.node.Deliver(context.Background(), proto.BlockToProto(block), gorums.WithNoSendWaiting())
 }
 
+// Config holds information about the current configuration of replicas that participate in the protocol,
+// and some information about the local replica. It also provides methods to send messages to the other replicas.
 type Config struct {
 	replicaCfg    config.ReplicaConfig
 	mgr           *proto.Manager
@@ -74,6 +77,7 @@ type Config struct {
 	proposeCancel context.CancelFunc
 }
 
+// NewConfig creates a new configuration.
 func NewConfig(replicaCfg config.ReplicaConfig) *Config {
 	cfg := &Config{
 		replicaCfg:    replicaCfg,
@@ -94,6 +98,7 @@ func NewConfig(replicaCfg config.ReplicaConfig) *Config {
 	return cfg
 }
 
+// Connect opens connections to the replicas in the configuration.
 func (cfg *Config) Connect(connectTimeout time.Duration) error {
 	idMapping := make(map[string]uint32, len(cfg.replicaCfg.Replicas)-1)
 	for _, replica := range cfg.replicaCfg.Replicas {
@@ -139,26 +144,28 @@ func (cfg *Config) Connect(connectTimeout time.Duration) error {
 	return nil
 }
 
-// ID returns the id of this replica
+// ID returns the id of this replica.
 func (cfg *Config) ID() hotstuff.ID {
 	return cfg.replicaCfg.ID
 }
 
-// PrivateKey returns the id of this replica
+// PrivateKey returns the id of this replica.
 func (cfg *Config) PrivateKey() hotstuff.PrivateKey {
 	return cfg.privKey
 }
 
-// Replicas returns all of the replicas in the configuration
+// Replicas returns all of the replicas in the configuration.
 func (cfg *Config) Replicas() map[hotstuff.ID]hotstuff.Replica {
 	return cfg.replicas
 }
 
+// Replica returns a replica if it is present in the configuration.
 func (cfg *Config) Replica(id hotstuff.ID) (replica hotstuff.Replica, ok bool) {
 	replica, ok = cfg.replicas[id]
 	return
 }
 
+// Len returns the number of replicas in the configuration.
 func (cfg *Config) Len() int {
 	return len(cfg.replicas)
 }
@@ -176,8 +183,8 @@ func (cfg *Config) Propose(block *hotstuff.Block) {
 	var ctx context.Context
 	cfg.proposeCancel()
 	ctx, cfg.proposeCancel = context.WithCancel(context.Background())
-	pblock := proto.BlockToProto(block)
-	cfg.cfg.Propose(ctx, pblock, gorums.WithNoSendWaiting())
+	pBlock := proto.BlockToProto(block)
+	cfg.cfg.Propose(ctx, pBlock, gorums.WithNoSendWaiting())
 }
 
 // Fetch requests a block from all the replicas in the configuration
@@ -185,6 +192,7 @@ func (cfg *Config) Fetch(ctx context.Context, hash hotstuff.Hash) {
 	cfg.cfg.Fetch(ctx, &proto.BlockHash{Hash: hash[:]}, gorums.WithNoSendWaiting())
 }
 
+// Close closes all connections made by this configuration.
 func (cfg *Config) Close() {
 	cfg.mgr.Close()
 }

@@ -19,12 +19,15 @@ import (
 
 var logger = logging.GetLogger()
 
+// Server is the server-side of the gorums backend.
+// It is responsible for calling handler methods on the consensus instance.
 type Server struct {
 	addr      string
 	hs        hotstuff.Consensus
 	gorumsSrv *gorums.Server
 }
 
+// NewServer creates a new Server.
 func NewServer(replicaConfig config.ReplicaConfig) *Server {
 	srv := &Server{}
 	srv.addr = replicaConfig.Replicas[replicaConfig.ID].Address
@@ -44,7 +47,7 @@ func NewServer(replicaConfig config.ReplicaConfig) *Server {
 	return srv
 }
 
-// Start creates a listener on the configured address and starts the server
+// Start creates a listener on the configured address and starts the server.
 func (srv *Server) Start(hs hotstuff.Consensus) error {
 	lis, err := net.Listen("tcp", srv.addr)
 	if err != nil {
@@ -54,10 +57,15 @@ func (srv *Server) Start(hs hotstuff.Consensus) error {
 	return nil
 }
 
-// StartOnListener starts the server on the given listener
+// StartOnListener starts the server on the given listener.
 func (srv *Server) StartOnListener(hs hotstuff.Consensus, listener net.Listener) {
 	srv.hs = hs
-	go srv.gorumsSrv.Serve(listener)
+	go func() {
+		err := srv.gorumsSrv.Serve(listener)
+		if err != nil {
+			logger.Errorf("An error occurred while serving: %v", err)
+		}
+	}()
 }
 
 func (srv *Server) getClientID(ctx context.Context) (hotstuff.ID, error) {
@@ -101,11 +109,12 @@ func (srv *Server) getClientID(ctx context.Context) (hotstuff.ID, error) {
 	return hotstuff.ID(id), nil
 }
 
+// Stop stops the server.
 func (srv *Server) Stop() {
 	srv.gorumsSrv.Stop()
 }
 
-// Propose handles a replica's response to the Propose QC from the leader
+// Propose handles a replica's response to the Propose QC from the leader.
 func (srv *Server) Propose(ctx context.Context, block *proto.Block) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
@@ -117,11 +126,12 @@ func (srv *Server) Propose(ctx context.Context, block *proto.Block) {
 	srv.hs.OnPropose(proto.BlockFromProto(block))
 }
 
+// Vote handles an incoming vote message.
 func (srv *Server) Vote(_ context.Context, cert *proto.PartialCert) {
 	srv.hs.OnVote(proto.PartialCertFromProto(cert))
 }
 
-// NewView handles the leader's response to receiving a NewView rpc from a replica
+// NewView handles the leader's response to receiving a NewView rpc from a replica.
 func (srv *Server) NewView(ctx context.Context, msg *proto.NewViewMsg) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
@@ -135,6 +145,7 @@ func (srv *Server) NewView(ctx context.Context, msg *proto.NewViewMsg) {
 	})
 }
 
+// Fetch handles an incoming fetch request.
 func (srv *Server) Fetch(ctx context.Context, pb *proto.BlockHash) {
 	var hash hotstuff.Hash
 	copy(hash[:], pb.GetHash())
@@ -160,6 +171,7 @@ func (srv *Server) Fetch(ctx context.Context, pb *proto.BlockHash) {
 	replica.Deliver(block)
 }
 
+// Deliver handles an incoming deliver message.
 func (srv *Server) Deliver(_ context.Context, block *proto.Block) {
 	srv.hs.OnDeliver(proto.BlockFromProto(block))
 }
