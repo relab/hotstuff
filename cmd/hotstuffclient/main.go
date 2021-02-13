@@ -243,14 +243,11 @@ func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hot
 		grpcOpts = append(grpcOpts, grpc.WithInsecure())
 	}
 
-	mgr, err := client.NewManager(gorums.WithNodeMap(nodes), gorums.WithGrpcDialOptions(grpcOpts...),
+	mgr := client.NewManager(gorums.WithGrpcDialOptions(grpcOpts...),
 		gorums.WithDialTimeout(time.Minute),
 	)
-	if err != nil {
-		return nil, err
-	}
 	faulty := (len(replicaConfig.Replicas) - 1) / 3
-	gorumsConf, err := mgr.NewConfiguration(mgr.NodeIDs(), &qspec{faulty: faulty})
+	gorumsConf, err := mgr.NewConfiguration(&qspec{faulty: faulty}, gorums.WithNodeMap(nodes))
 	if err != nil {
 		mgr.Close()
 		return nil, err

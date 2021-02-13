@@ -4,7 +4,6 @@ package proto
 
 import (
 	context "context"
-	fmt "fmt"
 	gorums "github.com/relab/gorums"
 	encoding "google.golang.org/grpc/encoding"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -29,46 +28,35 @@ func (c *Configuration) Nodes() []*Node {
 	return nodes
 }
 
-// NewConfig returns a configuration for the given node addresses and quorum spec.
-// The returned func() must be called to close the underlying connections.
-// This is an experimental API.
-func NewConfig(qspec QuorumSpec, opts ...gorums.ManagerOption) (*Configuration, func(), error) {
-	man, err := NewManager(opts...)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create manager: %v", err)
-	}
-	c, err := man.NewConfiguration(man.NodeIDs(), qspec)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create configuration: %v", err)
-	}
-	return c, func() { man.Close() }, nil
-}
-
 func init() {
 	if encoding.GetCodec(gorums.ContentSubtype) == nil {
 		encoding.RegisterCodec(gorums.NewCodec())
 	}
 }
 
+// Manager maintains a connection pool of nodes on
+// which quorum calls can be performed.
 type Manager struct {
 	*gorums.Manager
 }
 
-func NewManager(opts ...gorums.ManagerOption) (mgr *Manager, err error) {
+// NewManager returns a new Manager for managing connection to nodes added
+// to the manager. This function accepts manager options used to configure
+// various aspects of the manager.
+func NewManager(opts ...gorums.ManagerOption) (mgr *Manager) {
 	mgr = &Manager{}
-	mgr.Manager, err = gorums.NewManager(opts...)
-	if err != nil {
-		return nil, err
-	}
-	return mgr, nil
+	mgr.Manager = gorums.NewManager(opts...)
+	return mgr
 }
 
-func (m *Manager) NewConfiguration(ids []uint32, qspec QuorumSpec) (c *Configuration, err error) {
+// NewConfiguration returns a configuration based on the provided list of nodes.
+// Nodes can be supplied using WithNodeMap or WithNodeList or WithNodeIDs.
+func (m *Manager) NewConfiguration(qspec QuorumSpec, opts ...gorums.ConfigOption) (c *Configuration, err error) {
 	c = &Configuration{
 		mgr:   m,
 		qspec: qspec,
 	}
-	c.Configuration, err = gorums.NewConfiguration(m.Manager, ids)
+	c.Configuration, err = gorums.NewConfiguration(m.Manager, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -96,15 +84,12 @@ var _ emptypb.Empty
 // Propose is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
 func (c *Configuration) Propose(ctx context.Context, in *Block, opts ...gorums.CallOption) {
-
 	cd := gorums.QuorumCallData{
-		Manager: c.mgr.Manager,
-		Nodes:   c.Configuration.Nodes(),
 		Message: in,
 		Method:  "proto.Hotstuff.Propose",
 	}
 
-	gorums.Multicast(ctx, cd, opts...)
+	c.Configuration.Multicast(ctx, cd, opts...)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -113,15 +98,12 @@ var _ emptypb.Empty
 // Fetch is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
 func (c *Configuration) Fetch(ctx context.Context, in *BlockHash, opts ...gorums.CallOption) {
-
 	cd := gorums.QuorumCallData{
-		Manager: c.mgr.Manager,
-		Nodes:   c.Configuration.Nodes(),
 		Message: in,
 		Method:  "proto.Hotstuff.Fetch",
 	}
 
-	gorums.Multicast(ctx, cd, opts...)
+	c.Configuration.Multicast(ctx, cd, opts...)
 }
 
 // QuorumSpec is the interface of quorum functions for Hotstuff.
@@ -166,14 +148,12 @@ var _ emptypb.Empty
 // Vote is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
 func (n *Node) Vote(ctx context.Context, in *PartialCert, opts ...gorums.CallOption) {
-
 	cd := gorums.CallData{
-		Node:    n.Node,
 		Message: in,
 		Method:  "proto.Hotstuff.Vote",
 	}
 
-	gorums.Unicast(ctx, cd, opts...)
+	n.Node.Unicast(ctx, cd, opts...)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -182,14 +162,12 @@ var _ emptypb.Empty
 // NewView is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
 func (n *Node) NewView(ctx context.Context, in *NewViewMsg, opts ...gorums.CallOption) {
-
 	cd := gorums.CallData{
-		Node:    n.Node,
 		Message: in,
 		Method:  "proto.Hotstuff.NewView",
 	}
 
-	gorums.Unicast(ctx, cd, opts...)
+	n.Node.Unicast(ctx, cd, opts...)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -198,12 +176,10 @@ var _ emptypb.Empty
 // Deliver is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
 func (n *Node) Deliver(ctx context.Context, in *Block, opts ...gorums.CallOption) {
-
 	cd := gorums.CallData{
-		Node:    n.Node,
 		Message: in,
 		Method:  "proto.Hotstuff.Deliver",
 	}
 
-	gorums.Unicast(ctx, cd, opts...)
+	n.Node.Unicast(ctx, cd, opts...)
 }

@@ -214,6 +214,8 @@ github.com/relab/gorums v0.2.3-0.20210205114757-4181d26e812f h1:hC3wpUrH83asgyzy
 github.com/relab/gorums v0.2.3-0.20210205114757-4181d26e812f/go.mod h1:XQdHb4Qrhr8F8HmHSGVpusHzED5KM0U6Po7Y5xSgZbA=
 github.com/relab/gorums v0.2.3-0.20210212101936-9762876cf185 h1:Mcxt/yJ7MZIKs5qS07zZD2x9CTHUpb7qGAaERgU861Y=
 github.com/relab/gorums v0.2.3-0.20210212101936-9762876cf185/go.mod h1:XQdHb4Qrhr8F8HmHSGVpusHzED5KM0U6Po7Y5xSgZbA=
+github.com/relab/gorums v0.2.3-0.20210213125733-f04667f97266 h1:T6PeYQZIIe8q4NZt0gDB5tNQCccv8bN2bM4xFOq6Hp4=
+github.com/relab/gorums v0.2.3-0.20210213125733-f04667f97266/go.mod h1:XQdHb4Qrhr8F8HmHSGVpusHzED5KM0U6Po7Y5xSgZbA=
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6SoW27p1b0cqNHllgS5HIMJraePCO15w5zCzIWYg=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/ryanuber/columnize v0.0.0-20160712163229-9b3edd62028f/go.mod h1:sm1tb6uqfes/u+d4ooFouqFdy9/2g9QGwK3SQygK0Ts=
@@ -430,6 +432,8 @@ google.golang.org/genproto v0.0.0-20210204154452-deb828366460 h1:pvsg2TgyP8bWrYq
 google.golang.org/genproto v0.0.0-20210204154452-deb828366460/go.mod h1:FWY/as6DDZQgahTzZj3fqbO1CbirC29ZNUFHwi0/+no=
 google.golang.org/genproto v0.0.0-20210211221406-4ccc9a5e4183 h1:5YmF1NDDcUX9p0CJqW+GQiLW0HHe7ZW5K6lsFk6mJeA=
 google.golang.org/genproto v0.0.0-20210211221406-4ccc9a5e4183/go.mod h1:FWY/as6DDZQgahTzZj3fqbO1CbirC29ZNUFHwi0/+no=
+google.golang.org/genproto v0.0.0-20210212180131-e7f2df4ecc2d h1:Edhcm0CKDPLQIecHCp5Iz57Lo7MfT6zUFBAlocmOjcY=
+google.golang.org/genproto v0.0.0-20210212180131-e7f2df4ecc2d/go.mod h1:FWY/as6DDZQgahTzZj3fqbO1CbirC29ZNUFHwi0/+no=
 google.golang.org/grpc v1.19.0/go.mod h1:mqu4LbDTu4XGKhr4mRzUsmM4RtVoemTSY81AxZiDr8c=
 google.golang.org/grpc v1.20.1/go.mod h1:10oTOabMzJvdu6/UiuZezV6QK5dSlG84ov/aaiqXj38=
 google.golang.org/grpc v1.21.1/go.mod h1:oYelfM1adQP15Ek0mdvEgi9Df8B9CZIaU1084ijfRaM=

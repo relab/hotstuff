@@ -109,7 +109,6 @@ func (cfg *Config) Connect(connectTimeout time.Duration) error {
 
 	mgrOpts := []gorums.ManagerOption{
 		gorums.WithDialTimeout(connectTimeout),
-		gorums.WithNodeMap(idMapping),
 		gorums.WithMetadata(md),
 	}
 	grpcOpts := []grpc.DialOption{
@@ -126,19 +125,15 @@ func (cfg *Config) Connect(connectTimeout time.Duration) error {
 	mgrOpts = append(mgrOpts, gorums.WithGrpcDialOptions(grpcOpts...))
 
 	var err error
-	cfg.mgr, err = proto.NewManager(mgrOpts...)
-	if err != nil {
-		return fmt.Errorf("Failed to connect to replicas: %w", err)
-	}
+	cfg.mgr = proto.NewManager(mgrOpts...)
 
-	for _, node := range cfg.mgr.Nodes() {
-		id := hotstuff.ID(node.ID())
-		cfg.replicas[id].(*gorumsReplica).node = node
-	}
-
-	cfg.cfg, err = cfg.mgr.NewConfiguration(cfg.mgr.NodeIDs(), struct{}{})
+	cfg.cfg, err = cfg.mgr.NewConfiguration(struct{}{}, gorums.WithNodeMap(idMapping))
 	if err != nil {
 		return fmt.Errorf("Failed to create configuration: %w", err)
+	}
+	for _, node := range cfg.cfg.Nodes() {
+		id := hotstuff.ID(node.ID())
+		cfg.replicas[id].(*gorumsReplica).node = node
 	}
 
 	return nil
