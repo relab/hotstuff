@@ -44,7 +44,7 @@ func initLogger() {
 	logger = l.Sugar()
 }
 
-// GetLogger returns a pointer to the global logger for HotStuff
+// GetLogger returns a pointer to the global logger for HotStuff.
 func GetLogger() *zap.SugaredLogger {
 	mut.Lock()
 	defer mut.Unlock()
@@ -54,6 +54,7 @@ func GetLogger() *zap.SugaredLogger {
 	return logger
 }
 
+// NameLogger sets the name of the logger.
 func NameLogger(name string) *zap.SugaredLogger {
 	mut.Lock()
 	defer mut.Unlock()
