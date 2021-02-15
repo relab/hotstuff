@@ -80,6 +80,7 @@ func createQC(t *testing.T, block *hotstuff.Block, signers []hotstuff.Signer) ho
 }
 
 type testData struct {
+	t        *testing.T
 	replicas []*mocks.MockReplica
 	configs  []*mocks.MockConfig
 	signers  []hotstuff.Signer
@@ -92,6 +93,8 @@ type testData struct {
 }
 
 func (td testData) build() hotstuff.Consensus {
+	td.t.Helper()
+
 	return Builder{
 		Acceptor:     td.acceptor,
 		Config:       td.config,
@@ -101,10 +104,47 @@ func (td testData) build() hotstuff.Consensus {
 	}.Build()
 }
 
+func (td testData) sign(block *hotstuff.Block) []hotstuff.PartialCert {
+	td.t.Helper()
+
+	votes := make([]hotstuff.PartialCert, len(td.signers))
+
+	for i, signer := range td.signers {
+		vote, err := signer.Sign(block)
+		if err != nil {
+			td.t.Fatalf("Failed to create partial certificate: %v", err)
+		}
+		votes[i] = vote
+	}
+
+	return votes
+}
+
+func (td testData) createQC(block *hotstuff.Block) hotstuff.QuorumCert {
+	td.t.Helper()
+
+	votes := td.sign(block)
+	qc, err := td.signers[0].CreateQuorumCert(block, votes)
+	if err != nil {
+		td.t.Fatalf("Failed to generate QC: %v", err)
+	}
+	return qc
+}
+
+func (td testData) advanceView(hs hotstuff.Consensus, lastProposal *hotstuff.Block) *hotstuff.Block {
+	td.t.Helper()
+
+	qc := td.createQC(lastProposal)
+	b := hotstuff.NewBlock(lastProposal.Hash(), qc, "foo", hs.LastVote()+1, 1)
+	hs.OnPropose(b)
+	return b
+}
+
 func newTestData(t *testing.T, ctrl *gomock.Controller, n int) testData {
 	t.Helper()
 
 	td := testData{
+		t:        t,
 		replicas: make([]*mocks.MockReplica, n-1),
 		configs:  make([]*mocks.MockConfig, n-1),
 		signers:  make([]hotstuff.Signer, n-1),
@@ -240,16 +280,7 @@ func TestFetchBlock(t *testing.T) {
 	qcCreated := make(chan struct{})
 	genesisQC := ecdsacrypto.NewQuorumCert(map[hotstuff.ID]*ecdsacrypto.Signature{}, hotstuff.GetGenesis().Hash())
 	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), genesisQC, "foo", 1, 1)
-
-	votes := make([]hotstuff.PartialCert, len(td.signers))
-
-	for i, signer := range td.signers {
-		vote, err := signer.Sign(b)
-		if err != nil {
-			t.Fatalf("Failed to create partial certificate: %v", err)
-		}
-		votes[i] = vote
-	}
+	votes := td.sign(b)
 
 	hs := td.build()
 
@@ -279,4 +310,66 @@ func TestFetchBlock(t *testing.T) {
 	if hs.HighQC().BlockHash() != b.Hash() {
 		t.Fatalf("A new QC was not created.")
 	}
+}
+
+// TestForkingAttack shows that it is possible to execute a forking attack against HotStuff.
+// A forking attack is when a proposal creates a fork in the block chain, leading to some commands never being executed.
+// Such as scenario is illustrated in the diagram below.
+// Let the arrows from the sides of the blocks represent parent links,
+// while the arrows from the corners of the blocks represent QC links:
+//          __________________________________
+//         /                                  \
+//        /                                    +---+
+//       /       +-----------------------------| E |
+//      / ___    |  ___       ___              +---+
+//     / /   \   v /   \     /   \
+//  +---+     +---+     +---+     +---+
+//  | A |<----| B |<----| C |<----| D |
+//  +---+     +---+     +---+     +---+
+//
+// Here, block E creates a new fork which means that blocks C and D will not be executed.
+func TestForkingAttack(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	td := newTestData(t, ctrl, 4)
+	// configure mocks
+	td.replicas[0].EXPECT().Vote(gomock.Any()).AnyTimes()
+	td.synchronizer.EXPECT().OnPropose().AnyTimes()
+	td.synchronizer.EXPECT().GetLeader(gomock.Any()).AnyTimes().Return(hotstuff.ID(1))
+	td.acceptor.EXPECT().Accept(gomock.Any()).AnyTimes().Return(true)
+
+	hs := td.build()
+
+	genesisQC := ecdsacrypto.NewQuorumCert(make(map[hotstuff.ID]*ecdsacrypto.Signature), hotstuff.GetGenesis().Hash())
+	a := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), genesisQC, "A", 1, 1)
+	aQC := td.createQC(a)
+	b := hotstuff.NewBlock(a.Hash(), aQC, "B", 2, 1)
+	bQC := td.createQC(b)
+	c := hotstuff.NewBlock(b.Hash(), bQC, "C", 3, 1)
+	cQC := td.createQC(c)
+	d := hotstuff.NewBlock(c.Hash(), cQC, "D", 4, 1)
+	e := hotstuff.NewBlock(b.Hash(), aQC, "E", 5, 1)
+
+	// expected order of execution
+	gomock.InOrder(
+		td.executor.EXPECT().Exec(a.Command()),
+		td.executor.EXPECT().Exec(b.Command()),
+		td.executor.EXPECT().Exec(e.Command()),
+	)
+
+	hs.OnPropose(a)
+	hs.OnPropose(b)
+	hs.OnPropose(c)
+	hs.OnPropose(d)
+
+	// sanity check
+	if hs.(*chainedhotstuff).bLock != b {
+		t.Fatalf("Not locked on B!")
+	}
+
+	hs.OnPropose(e)
+
+	// advance views until E is executed
+	block := td.advanceView(hs, e)
+	block = td.advanceView(hs, block)
+	_ = td.advanceView(hs, block)
 }
