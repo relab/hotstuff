@@ -236,10 +236,10 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 		// check if this block extends bLock
 		b := block
 		ok := true
-		for ok && b.View() > hs.bLock.View()+1 {
+		for ok && b.View() > hs.bLock.View() {
 			b, ok = hs.blocks.Get(b.Parent())
 		}
-		if ok && b.Parent() == hs.bLock.Hash() {
+		if ok && b.Hash() == hs.bLock.Hash() {
 			safe = true
 		} else {
 			logger.Debug("OnPropose: safety condition failed")
