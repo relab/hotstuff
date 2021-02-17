@@ -24,9 +24,9 @@ import (
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/crypto"
+	"github.com/relab/hotstuff/internal/cli"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/proto"
@@ -98,28 +98,34 @@ func main() {
 		}
 	}()
 
-	err = viper.BindPFlags(pflag.CommandLine)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to bind pflags: %v\n", err)
-		os.Exit(1)
-	}
-
-	// read main config file in working dir
-	viper.SetConfigName("hotstuff")
-	viper.AddConfigPath(".")
-	err = viper.ReadInConfig()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to read config: %v\n", err)
-		os.Exit(1)
-	}
-
 	var conf options
-	err = viper.Unmarshal(&conf)
+	err = cli.ReadConfig(&conf, "")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to unmarshal config: %v\n", err)
 		os.Exit(1)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		if conf.ExitAfter > 0 {
+			select {
+			case <-time.After(time.Duration(conf.ExitAfter) * time.Second):
+			case <-signals:
+				fmt.Fprintf(os.Stderr, "Exiting...\n")
+			}
+		} else {
+			<-signals
+			fmt.Fprintf(os.Stderr, "Exiting...\n")
+		}
+		cancel()
+	}()
+
+	start(ctx, &conf)
+}
+
+func start(ctx context.Context, conf *options) {
 	var creds credentials.TransportCredentials
 	if conf.TLS {
 		rootCAs, err := x509.SystemCertPool()
@@ -155,26 +161,11 @@ func main() {
 		}
 	}
 
-	client, err := newHotStuffClient(&conf, replicaConfig)
+	client, err := newHotStuffClient(conf, replicaConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to start client: %v\n", err)
 		os.Exit(1)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		if conf.ExitAfter > 0 {
-			select {
-			case <-time.After(time.Duration(conf.ExitAfter) * time.Second):
-			case <-signals:
-				fmt.Fprintf(os.Stderr, "Exiting...\n")
-			}
-		} else {
-			<-signals
-			fmt.Fprintf(os.Stderr, "Exiting...\n")
-		}
-		cancel()
-	}()
 
 	err = client.SendCommands(ctx)
 	if err != nil && !errors.Is(err, io.EOF) {

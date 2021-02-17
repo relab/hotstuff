@@ -60,18 +60,7 @@ func main() {
 	var caKey *ecdsa.PrivateKey
 	var ca *x509.Certificate
 	if *tls {
-		caKey, err = crypto.GeneratePrivateKey()
-		if err != nil {
-			logger.Fatalln("Failed to generate signing key: ", err)
-		}
-		ca, err = crypto.GenerateRootCert(caKey)
-		if err != nil {
-			logger.Fatalln("Failed to generate root certificate: ", err)
-		}
-		err = crypto.WriteCertFile(ca, filepath.Join(dest, "ca.crt"))
-		if err != nil {
-			logger.Fatalln("Failed to write root certificate: ", err)
-		}
+		caKey, ca = createRootCA(dest)
 	}
 
 	for i := 0; i < *numKeys; i++ {
@@ -86,20 +75,7 @@ func main() {
 		pubKeyPath := privKeyPath + ".pub"
 
 		if *tls {
-			var host string
-			if len(*hosts) == 1 {
-				host = (*hosts)[0]
-			} else {
-				host = (*hosts)[i]
-			}
-			cert, err := crypto.GenerateTLSCert(hotstuff.ID(*startID+i), []string{host}, ca, &pk.PublicKey, caKey)
-			if err != nil {
-				logger.Printf("Failed to generate TLS certificate: %v\n", err)
-			}
-			err = crypto.WriteCertFile(cert, certPath)
-			if err != nil {
-				logger.Printf("Failed to write certificate to file: %v\n", err)
-			}
+			createTLSCert(certPath, i, hotstuff.ID(*startID+i), *hosts, ca, caKey, &pk.PublicKey)
 		}
 
 		err = crypto.WritePrivateKeyFile(pk, privKeyPath)
@@ -111,5 +87,40 @@ func main() {
 		if err != nil {
 			logger.Fatalf("Failed to write public key file: %v\n", err)
 		}
+	}
+
+}
+
+func createRootCA(dest string) (pk *ecdsa.PrivateKey, ca *x509.Certificate) {
+	var err error
+	pk, err = crypto.GeneratePrivateKey()
+	if err != nil {
+		logger.Fatalln("Failed to generate signing key: ", err)
+	}
+	ca, err = crypto.GenerateRootCert(pk)
+	if err != nil {
+		logger.Fatalln("Failed to generate root certificate: ", err)
+	}
+	err = crypto.WriteCertFile(ca, filepath.Join(dest, "ca.crt"))
+	if err != nil {
+		logger.Fatalln("Failed to write root certificate: ", err)
+	}
+	return pk, ca
+}
+
+func createTLSCert(path string, i int, id hotstuff.ID, hosts []string, ca *x509.Certificate, priv *ecdsa.PrivateKey, pub *ecdsa.PublicKey) {
+	var host string
+	if len(hosts) == 1 {
+		host = hosts[0]
+	} else {
+		host = hosts[i]
+	}
+	cert, err := crypto.GenerateTLSCert(id, []string{host}, ca, pub, priv)
+	if err != nil {
+		logger.Printf("Failed to generate TLS certificate: %v\n", err)
+	}
+	err = crypto.WriteCertFile(cert, path)
+	if err != nil {
+		logger.Printf("Failed to write certificate to file: %v\n", err)
 	}
 }
