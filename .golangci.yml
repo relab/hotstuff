@@ -3,6 +3,7 @@ linters:
   enable:
     - golint
     - gocyclo
+    - misspell
 
 linters-settings:
   gocyclo:

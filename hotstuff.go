@@ -131,7 +131,7 @@ type QuorumCert interface {
 	BlockHash() Hash
 }
 
-// Signer implements the methods requried to create signatures and certificates.
+// Signer implements the methods required to create signatures and certificates.
 type Signer interface {
 	// Sign signs a single block and returns the partial certificate.
 	Sign(block *Block) (cert PartialCert, err error)
