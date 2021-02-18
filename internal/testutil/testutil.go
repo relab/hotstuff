@@ -68,3 +68,36 @@ func CreateTCPListener(t *testing.T) net.Listener {
 	}
 	return lis
 }
+
+// CreatePC creates a partial certificate using the given signer.
+func CreatePC(t *testing.T, block *hotstuff.Block, signer hotstuff.Signer) hotstuff.PartialCert {
+	t.Helper()
+	pc, err := signer.Sign(block)
+	if err != nil {
+		t.Fatalf("Failed to sign block: %v", err)
+	}
+	return pc
+}
+
+// CreatePCs creates partial certificates from multiple signers.
+func CreatePCs(t *testing.T, block *hotstuff.Block, signers []hotstuff.Signer) []hotstuff.PartialCert {
+	t.Helper()
+	pcs := make([]hotstuff.PartialCert, 0, len(signers))
+	for _, signer := range signers {
+		pcs = append(pcs, CreatePC(t, block, signer))
+	}
+	return pcs
+}
+
+// CreateQC creates a QC using the given signers.
+func CreateQC(t *testing.T, block *hotstuff.Block, signers []hotstuff.Signer) hotstuff.QuorumCert {
+	t.Helper()
+	if len(signers) == 0 {
+		return nil
+	}
+	qc, err := signers[0].CreateQuorumCert(block, CreatePCs(t, block, signers))
+	if err != nil {
+		t.Fatalf("Failed to create QC: %v", err)
+	}
+	return qc
+}
