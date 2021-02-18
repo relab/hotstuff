@@ -207,18 +207,21 @@ func (ec *ecdsaCrypto) CreateQuorumCert(block *hotstuff.Block, signatures []hots
 	return qc, nil
 }
 
-// VerifyPartialCert verifies a single partial certificate.
-func (ec *ecdsaCrypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
-	// TODO: decide how to handle incompatible types. For now we'll simply panic
-	sig := cert.Signature().(*Signature)
+func (ec *ecdsaCrypto) verifySignature(sig *Signature, hash hotstuff.Hash) bool {
 	replica, ok := ec.cfg.Replica(sig.Signer())
 	if !ok {
 		logger.Info("ecdsaCrypto: got signature from replica whose ID (%d) was not in the config.")
 		return false
 	}
 	pk := replica.PublicKey().(*ecdsa.PublicKey)
-	hash := cert.BlockHash()
 	return ecdsa.Verify(pk, hash[:], sig.R(), sig.S())
+}
+
+// VerifyPartialCert verifies a single partial certificate.
+func (ec *ecdsaCrypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
+	// TODO: decide how to handle incompatible types. For now we'll simply panic
+	sig := cert.Signature().(*Signature)
+	return ec.verifySignature(sig, cert.BlockHash())
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
@@ -232,25 +235,19 @@ func (ec *ecdsaCrypto) VerifyQuorumCert(cert hotstuff.QuorumCert) bool {
 	if len(qc.Signatures()) < ec.cfg.QuorumSize() {
 		return false
 	}
-	hash := qc.BlockHash()
+	var numVerified uint32
 	var wg sync.WaitGroup
-	var numVerified uint64 = 0
-	for id, pSig := range qc.Signatures() {
-		info, ok := ec.cfg.Replica(id)
-		if !ok {
-			logger.Error("VerifyQuorumSig: got signature from replica whose ID (%d) was not in config.", id)
-		}
-		pubKey := info.PublicKey().(*ecdsa.PublicKey)
-		wg.Add(1)
-		go func(pSig *Signature) {
-			if ecdsa.Verify(pubKey, hash[:], pSig.R(), pSig.S()) {
-				atomic.AddUint64(&numVerified, 1)
+	wg.Add(len(qc.signatures))
+	for _, pSig := range qc.signatures {
+		go func(sig *Signature) {
+			if ec.verifySignature(sig, qc.hash) {
+				atomic.AddUint32(&numVerified, 1)
 			}
 			wg.Done()
 		}(pSig)
 	}
 	wg.Wait()
-	return numVerified >= uint64(ec.cfg.QuorumSize())
+	return numVerified >= uint32(ec.cfg.QuorumSize())
 }
 
 var _ hotstuff.Signer = (*ecdsaCrypto)(nil)
