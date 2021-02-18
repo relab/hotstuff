@@ -59,26 +59,6 @@ func TestPropose(t *testing.T) {
 	}
 }
 
-func createQC(t *testing.T, block *hotstuff.Block, signers []hotstuff.Signer) hotstuff.QuorumCert {
-	t.Helper()
-	if len(signers) == 0 {
-		return nil
-	}
-	pcs := make([]hotstuff.PartialCert, 0, len(signers))
-	for _, signer := range signers {
-		pc, err := signer.Sign(block)
-		if err != nil {
-			t.Fatalf("Failed to sign block: %v", err)
-		}
-		pcs = append(pcs, pc)
-	}
-	qc, err := signers[0].CreateQuorumCert(block, pcs)
-	if err != nil {
-		t.Fatalf("Faield to create QC: %v", err)
-	}
-	return qc
-}
-
 type testData struct {
 	t        *testing.T
 	replicas []*mocks.MockReplica
@@ -104,31 +84,10 @@ func (td testData) build() hotstuff.Consensus {
 	}.Build()
 }
 
-func (td testData) sign(block *hotstuff.Block) []hotstuff.PartialCert {
-	td.t.Helper()
-
-	votes := make([]hotstuff.PartialCert, len(td.signers))
-
-	for i, signer := range td.signers {
-		vote, err := signer.Sign(block)
-		if err != nil {
-			td.t.Fatalf("Failed to create partial certificate: %v", err)
-		}
-		votes[i] = vote
-	}
-
-	return votes
-}
-
 func (td testData) createQC(block *hotstuff.Block) hotstuff.QuorumCert {
 	td.t.Helper()
 
-	votes := td.sign(block)
-	qc, err := td.signers[0].CreateQuorumCert(block, votes)
-	if err != nil {
-		td.t.Fatalf("Failed to generate QC: %v", err)
-	}
-	return qc
+	return testutil.CreateQC(td.t, block, td.signers)
 }
 
 func (td testData) advanceView(hs hotstuff.Consensus, lastProposal *hotstuff.Block) *hotstuff.Block {
@@ -199,11 +158,11 @@ func TestCommit(t *testing.T) {
 	// create the needed blocks and QCs
 	genesisQC := ecdsacrypto.NewQuorumCert(map[hotstuff.ID]*ecdsacrypto.Signature{}, hotstuff.GetGenesis().Hash())
 	b1 := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), genesisQC, "1", 1, 1)
-	b1QC := createQC(t, b1, td.signers)
+	b1QC := testutil.CreateQC(t, b1, td.signers)
 	b2 := hotstuff.NewBlock(b1.Hash(), b1QC, "2", 2, 1)
-	b2QC := createQC(t, b2, td.signers)
+	b2QC := testutil.CreateQC(t, b2, td.signers)
 	b3 := hotstuff.NewBlock(b2.Hash(), b2QC, "3", 3, 1)
-	b3QC := createQC(t, b3, td.signers)
+	b3QC := testutil.CreateQC(t, b3, td.signers)
 	b4 := hotstuff.NewBlock(b3.Hash(), b3QC, "4", 4, 1)
 
 	// the first replica will be the leader, so we expect it to receive votes
@@ -280,7 +239,7 @@ func TestFetchBlock(t *testing.T) {
 	qcCreated := make(chan struct{})
 	genesisQC := ecdsacrypto.NewQuorumCert(map[hotstuff.ID]*ecdsacrypto.Signature{}, hotstuff.GetGenesis().Hash())
 	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), genesisQC, "foo", 1, 1)
-	votes := td.sign(b)
+	votes := testutil.CreatePCs(t, b, td.signers)
 
 	hs := td.build()
 
