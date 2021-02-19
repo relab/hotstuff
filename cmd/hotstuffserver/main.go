@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"syscall"
@@ -198,7 +197,7 @@ func loadCreds(conf *options) (credentials.TransportCredentials, tls.Certificate
 	}
 
 	for _, ca := range conf.RootCAs {
-		cert, err := ioutil.ReadFile(ca)
+		cert, err := os.ReadFile(ca)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to read CA file: %v\n", err)
 			os.Exit(1)

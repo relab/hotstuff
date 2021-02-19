@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math"
 	"os"
@@ -134,7 +133,7 @@ func start(ctx context.Context, conf *options) {
 			os.Exit(1)
 		}
 		for _, ca := range conf.RootCAs {
-			cert, err := ioutil.ReadFile(ca)
+			cert, err := os.ReadFile(ca)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Failed to read CA: %v\n", err)
 				os.Exit(1)
@@ -249,7 +248,7 @@ func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hot
 	}
 	var reader io.ReadCloser
 	if conf.DataSource == "" {
-		reader = ioutil.NopCloser(rand.Reader)
+		reader = io.NopCloser(rand.Reader)
 	} else {
 		f, err := os.Open(conf.DataSource)
 		if err != nil {

@@ -8,7 +8,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"os"
@@ -161,7 +160,7 @@ func WriteCertFile(cert *x509.Certificate, file string) (err error) {
 }
 
 func readPemFile(file string) (b *pem.Block, err error) {
-	d, err := ioutil.ReadFile(file)
+	d, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +216,7 @@ func ReadPublicKeyFile(keyFile string) (key *ecdsa.PublicKey, err error) {
 
 // ReadCertFile read an x509 certificate from a file.
 func ReadCertFile(certFile string) (cert *x509.Certificate, err error) {
-	d, err := ioutil.ReadFile(certFile)
+	d, err := os.ReadFile(certFile)
 	if err != nil {
 		return nil, err
 	}
