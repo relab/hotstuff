@@ -135,7 +135,7 @@ type QuorumCert interface {
 type Signer interface {
 	// Sign signs a single block and returns the partial certificate.
 	Sign(block *Block) (cert PartialCert, err error)
-	// CreateQuourmCert creates a quorum certificate from a list of partial certificates.
+	// CreateQuorumCert creates a quorum certificate from a list of partial certificates.
 	CreateQuorumCert(block *Block, signatures []PartialCert) (cert QuorumCert, err error)
 }
 
@@ -193,7 +193,7 @@ type Replica interface {
 // Config holds information about the current configuration of replicas that participate in the protocol,
 // and some information about the local replica.
 // The methods Propose and Fetch should send their respective arguments to all replicas in the configuration,
-// execept the caller.
+// except the caller.
 type Config interface {
 	// ID returns the id of the local replica.
 	ID() ID

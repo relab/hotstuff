@@ -2,6 +2,7 @@ Cmds
 Debugf
 Infof
 Warnf
+cmdqueue
 durationpb
 felixge
 fgprof
