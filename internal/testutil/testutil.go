@@ -2,11 +2,13 @@
 package testutil
 
 import (
+	"crypto/ecdsa"
 	"net"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/internal/mocks"
 )
 
@@ -100,4 +102,14 @@ func CreateQC(t *testing.T, block *hotstuff.Block, signers []hotstuff.Signer) ho
 		t.Fatalf("Failed to create QC: %v", err)
 	}
 	return qc
+}
+
+// GenerateKey generates an ECDSA private key for use in tests.
+func GenerateKey(t *testing.T) *ecdsa.PrivateKey {
+	t.Helper()
+	key, err := crypto.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate private key: %v", err)
+	}
+	return key
 }

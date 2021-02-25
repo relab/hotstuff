@@ -9,7 +9,6 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
-	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/internal/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -81,7 +80,7 @@ type Config struct {
 func NewConfig(replicaCfg config.ReplicaConfig) *Config {
 	cfg := &Config{
 		replicaCfg:    replicaCfg,
-		privKey:       &ecdsa.PrivateKey{PrivateKey: replicaCfg.PrivateKey},
+		privKey:       replicaCfg.PrivateKey,
 		replicas:      make(map[hotstuff.ID]hotstuff.Replica),
 		proposeCancel: func() {},
 	}

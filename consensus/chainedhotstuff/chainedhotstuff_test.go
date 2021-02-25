@@ -6,20 +6,10 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/crypto"
 	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 )
-
-func createKey(t *testing.T) *ecdsacrypto.PrivateKey {
-	t.Helper()
-	pk, err := crypto.GeneratePrivateKey()
-	if err != nil {
-		t.Errorf("Failed to generate private key: %v", err)
-	}
-	return &ecdsacrypto.PrivateKey{PrivateKey: pk}
-}
 
 // TestPropose checks that a leader broadcasts a new proposal, and then sends a vote to the next leader
 func TestPropose(t *testing.T) {
@@ -111,9 +101,9 @@ func newTestData(t *testing.T, ctrl *gomock.Controller, n int) testData {
 
 	for i := 0; i < n-1; i++ {
 		id := hotstuff.ID(i) + 1
-		key := createKey(t)
+		key := testutil.GenerateKey(t)
 		td.configs[i] = testutil.CreateMockConfig(t, ctrl, id, key)
-		td.replicas[i] = testutil.CreateMockReplica(t, ctrl, id, key.PublicKey())
+		td.replicas[i] = testutil.CreateMockReplica(t, ctrl, id, &key.PublicKey)
 		signer, _ := ecdsacrypto.New(td.configs[i])
 		td.signers[i] = signer
 	}
@@ -124,7 +114,7 @@ func newTestData(t *testing.T, ctrl *gomock.Controller, n int) testData {
 		}
 	}
 
-	pk := createKey(t)
+	pk := testutil.GenerateKey(t)
 
 	td.acceptor = mocks.NewMockAcceptor(ctrl)
 	td.commands = mocks.NewMockCommandQueue(ctrl)
@@ -136,7 +126,7 @@ func newTestData(t *testing.T, ctrl *gomock.Controller, n int) testData {
 	td.config.EXPECT().QuorumSize().AnyTimes().Return(n - (n-1)/3)
 	td.synchronizer.EXPECT().Init(gomock.Any())
 
-	r := testutil.CreateMockReplica(t, ctrl, hotstuff.ID(n), pk.PublicKey())
+	r := testutil.CreateMockReplica(t, ctrl, hotstuff.ID(n), &pk.PublicKey)
 	testutil.ConfigAddReplica(t, td.config, r)
 
 	for _, replica := range td.replicas {

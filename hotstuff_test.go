@@ -1,6 +1,7 @@
 package hotstuff_test
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"net"
 	"testing"
@@ -11,22 +12,11 @@ import (
 	"github.com/relab/hotstuff/backend/gorums"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus/chainedhotstuff"
-	"github.com/relab/hotstuff/crypto"
-	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/leaderrotation"
 	"github.com/relab/hotstuff/synchronizer"
 )
-
-func createKey(t *testing.T) *ecdsa.PrivateKey {
-	t.Helper()
-	key, err := crypto.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("Failed to generate private key: %v", err)
-	}
-	return &ecdsa.PrivateKey{PrivateKey: key}
-}
 
 // TestChainedHotstuff runs chained hotstuff with the gorums backend and expects each replica to execute 10 times.
 func TestChainedHotstuff(t *testing.T) {
@@ -47,12 +37,12 @@ func TestChainedHotstuff(t *testing.T) {
 	keys := make([]*ecdsa.PrivateKey, n)
 	for i := 0; i < n; i++ {
 		listeners[i] = testutil.CreateTCPListener(t)
-		keys[i] = createKey(t)
+		keys[i] = testutil.GenerateKey(t)
 		id := hotstuff.ID(i + 1)
 		baseCfg.Replicas[id] = &config.ReplicaInfo{
 			ID:      id,
 			Address: listeners[i].Addr().String(),
-			PubKey:  &keys[i].PrivateKey.PublicKey,
+			PubKey:  &keys[i].PublicKey,
 		}
 	}
 
@@ -61,7 +51,7 @@ func TestChainedHotstuff(t *testing.T) {
 	for i := 0; i < n; i++ {
 		c := *baseCfg
 		c.ID = hotstuff.ID(i + 1)
-		c.PrivateKey = keys[i].PrivateKey
+		c.PrivateKey = keys[i]
 		configs[i] = gorums.NewConfig(c)
 		servers[i] = gorums.NewServer(c)
 	}

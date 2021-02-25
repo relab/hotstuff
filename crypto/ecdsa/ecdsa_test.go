@@ -7,7 +7,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 )
@@ -252,15 +251,6 @@ func runBoth(t *testing.T, run func(*testing.T, newFunc)) {
 	t.Run("WithCache", func(t *testing.T) { run(t, newCache) })
 }
 
-func createKey(t *testing.T) *PrivateKey {
-	t.Helper()
-	pk, err := crypto.GeneratePrivateKey()
-	if err != nil {
-		t.Errorf("Failed to generate private key: %v", err)
-	}
-	return &PrivateKey{pk}
-}
-
 func createBlock(t *testing.T, signer hotstuff.Signer) *hotstuff.Block {
 	t.Helper()
 
@@ -275,7 +265,7 @@ func createBlock(t *testing.T, signer hotstuff.Signer) *hotstuff.Block {
 
 func createMockConfig(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID) *mocks.MockConfig {
 	t.Helper()
-	cfg := testutil.CreateMockConfig(t, ctrl, id, createKey(t))
+	cfg := testutil.CreateMockConfig(t, ctrl, id, testutil.GenerateKey(t))
 	cfg.
 		EXPECT().
 		QuorumSize().
@@ -308,7 +298,7 @@ func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc newFunc) 
 	for i := 0; i < n; i++ {
 		id := hotstuff.ID(i) + 1
 		configs = append(configs, createMockConfig(t, ctrl, id))
-		replicas = append(replicas, testutil.CreateMockReplica(t, ctrl, id, configs[i].PrivateKey().PublicKey()))
+		replicas = append(replicas, testutil.CreateMockReplica(t, ctrl, id, configs[i].PrivateKey().Public()))
 		sign, verify := newFunc(configs[i])
 		signers = append(signers, sign)
 		verifiers = append(verifiers, verify)

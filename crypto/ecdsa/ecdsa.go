@@ -25,20 +25,6 @@ var ErrHashMismatch = fmt.Errorf("certificate hash does not match block hash")
 // ErrPartialDuplicate is the error used when two or more signatures were created by the same replica.
 var ErrPartialDuplicate = fmt.Errorf("cannot add more than one signature per replica")
 
-// PrivateKey is an ECDSA private key.
-//
-// This struct wraps the regular ecdsa.PrivateKey in order to implement the hotstuff.PrivateKey interface.
-type PrivateKey struct {
-	*ecdsa.PrivateKey
-}
-
-// PublicKey returns the public key associated with the private key
-func (pk PrivateKey) PublicKey() hotstuff.PublicKey {
-	return pk.Public()
-}
-
-var _ hotstuff.PrivateKey = (*PrivateKey)(nil)
-
 // Signature is an ECDSA signature
 type Signature struct {
 	r, s   *big.Int
@@ -169,14 +155,14 @@ func New(cfg hotstuff.Config) (hotstuff.Signer, hotstuff.Verifier) {
 	return ec, ec
 }
 
-func (ec *ecdsaCrypto) getPrivateKey() *PrivateKey {
+func (ec *ecdsaCrypto) getPrivateKey() *ecdsa.PrivateKey {
 	pk := ec.cfg.PrivateKey()
-	return pk.(*PrivateKey)
+	return pk.(*ecdsa.PrivateKey)
 }
 
 // Sign signs a hash.
 func (ec *ecdsaCrypto) Sign(hash hotstuff.Hash) (sig hotstuff.Signature, err error) {
-	r, s, err := ecdsa.Sign(rand.Reader, ec.getPrivateKey().PrivateKey, hash[:])
+	r, s, err := ecdsa.Sign(rand.Reader, ec.getPrivateKey(), hash[:])
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +176,7 @@ func (ec *ecdsaCrypto) Sign(hash hotstuff.Hash) (sig hotstuff.Signature, err err
 // Sign signs a single block and returns a partial certificate.
 func (ec *ecdsaCrypto) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
 	hash := block.Hash()
-	r, s, err := ecdsa.Sign(rand.Reader, ec.getPrivateKey().PrivateKey, hash[:])
+	r, s, err := ecdsa.Sign(rand.Reader, ec.getPrivateKey(), hash[:])
 	if err != nil {
 		return nil, err
 	}

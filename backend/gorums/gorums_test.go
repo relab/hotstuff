@@ -19,15 +19,6 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-func generateKey(t *testing.T) *ecdsa.PrivateKey {
-	t.Helper()
-	pk, err := crypto.GeneratePrivateKey()
-	if err != nil {
-		t.Errorf("Failed to generate private key: %v", err)
-	}
-	return pk
-}
-
 type testData struct {
 	n         int
 	cfg       *config.ReplicaConfig
@@ -45,7 +36,7 @@ func setupReplicas(t *testing.T, n int) testData {
 	// generate keys and replicaInfo
 	for i := 0; i < n; i++ {
 		listeners[i] = testutil.CreateTCPListener(t)
-		keys = append(keys, generateKey(t))
+		keys = append(keys, testutil.GenerateKey(t))
 		replicas = append(replicas, &config.ReplicaInfo{
 			ID:      hotstuff.ID(i) + 1,
 			Address: listeners[i].Addr().String(),
@@ -74,7 +65,7 @@ func TestGorumsTLS(t *testing.T) {
 
 	certificates := make([]*x509.Certificate, 0, n)
 
-	caPK := generateKey(t)
+	caPK := testutil.GenerateKey(t)
 	ca, err := crypto.GenerateRootCert(caPK)
 	if err != nil {
 		t.Fatalf("Failed to generate CA: %v", err)

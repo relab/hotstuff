@@ -47,6 +47,7 @@ package hotstuff
 
 import (
 	"context"
+	"crypto"
 	"encoding/base64"
 	"fmt"
 )
@@ -100,12 +101,12 @@ type ToBytes interface {
 }
 
 // PublicKey is the public part of a replica's key pair.
-type PublicKey interface{}
+type PublicKey = crypto.PublicKey
 
 // PrivateKey is the private part of a replica's key pair.
 type PrivateKey interface {
-	// PublicKey returns the public key associated with this private key.
-	PublicKey() PublicKey
+	// Public returns the public key associated with this private key.
+	Public() PublicKey
 }
 
 // Signature is a cryptographic signature of a block.
