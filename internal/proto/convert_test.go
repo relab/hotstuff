@@ -28,7 +28,7 @@ func TestConvertPartialCert(t *testing.T) {
 
 	cfg := testutil.CreateMockConfig(t, ctrl, 1, pk)
 	signer, _ := ecdsa.New(cfg)
-	want, err := signer.Sign(hotstuff.GetGenesis())
+	want, err := signer.CreatePartialCert(hotstuff.GetGenesis())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestConvertQuorumCert(t *testing.T) {
 		key := createKey(t)
 		cfg := testutil.CreateMockConfig(t, ctrl, id, key)
 		signer, _ := ecdsa.New(cfg)
-		pcert, err := signer.Sign(b1)
+		pcert, err := signer.CreatePartialCert(b1)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -56,9 +56,20 @@ func (c *signatureCache) check(key string) bool {
 	return true
 }
 
-// Sign signs a single block and returns the partial certificate.
-func (c *signatureCache) Sign(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
-	signature, err := c.ecdsaCrypto.Sign(block)
+// Sign signs a hash.
+func (c *signatureCache) Sign(hash hotstuff.Hash) (sig hotstuff.Signature, err error) {
+	sig, err = c.ecdsaCrypto.Sign(hash)
+	if err != nil {
+		return nil, err
+	}
+	k := string(sig.ToBytes())
+	c.insert(k)
+	return sig, nil
+}
+
+// CreatePartialCert signs a single block and returns the partial certificate.
+func (c *signatureCache) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
+	signature, err := c.ecdsaCrypto.CreatePartialCert(block)
 	if err != nil {
 		return nil, err
 	}
@@ -67,6 +78,27 @@ func (c *signatureCache) Sign(block *hotstuff.Block) (cert hotstuff.PartialCert,
 	c.insert(k)
 	c.mut.Unlock()
 	return signature, nil
+}
+
+// Verify verifies a signature given a hash.
+func (c *signatureCache) Verify(sig hotstuff.Signature, hash hotstuff.Hash) bool {
+	k := string(sig.ToBytes())
+	c.mut.Lock()
+	if c.check(k) {
+		c.mut.Unlock()
+		return true
+	}
+	c.mut.Unlock()
+
+	if !c.ecdsaCrypto.Verify(sig, hash) {
+		return false
+	}
+
+	c.mut.Lock()
+	c.insert(k)
+	c.mut.Unlock()
+
+	return true
 }
 
 // VerifyPartialCert verifies a single partial certificate.
@@ -117,7 +149,7 @@ func (c *signatureCache) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 		// on cache miss, we start a goroutine to verify the signature
 		wg.Add(1)
 		go func(sig *Signature) {
-			if c.ecdsaCrypto.verifySignature(sig, ecdsaQC.hash) {
+			if c.ecdsaCrypto.Verify(sig, ecdsaQC.hash) {
 				atomic.AddUint32(&numValid, 1)
 				c.mut.Lock()
 				c.insert(string(sig.ToBytes()))

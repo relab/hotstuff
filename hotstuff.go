@@ -133,14 +133,18 @@ type QuorumCert interface {
 
 // Signer implements the methods required to create signatures and certificates.
 type Signer interface {
-	// Sign signs a single block and returns the partial certificate.
-	Sign(block *Block) (cert PartialCert, err error)
+	// Sign signs a hash.
+	Sign(hash Hash) (sig Signature, err error)
+	// CreatePartialCert signs a single block and returns the partial certificate.
+	CreatePartialCert(block *Block) (cert PartialCert, err error)
 	// CreateQuorumCert creates a quorum certificate from a list of partial certificates.
 	CreateQuorumCert(block *Block, signatures []PartialCert) (cert QuorumCert, err error)
 }
 
 // Verifier implements the methods required to verify partial and quorum certificates.
 type Verifier interface {
+	// Verify verifies a signature given a hash.
+	Verify(sig Signature, hash Hash) bool
 	// VerifyPartialCert verifies a single partial certificate.
 	VerifyPartialCert(cert PartialCert) bool
 	// VerifyQuorumCert verifies a quorum certificate.

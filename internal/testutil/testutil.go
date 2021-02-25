@@ -72,7 +72,7 @@ func CreateTCPListener(t *testing.T) net.Listener {
 // CreatePC creates a partial certificate using the given signer.
 func CreatePC(t *testing.T, block *hotstuff.Block, signer hotstuff.Signer) hotstuff.PartialCert {
 	t.Helper()
-	pc, err := signer.Sign(block)
+	pc, err := signer.CreatePartialCert(block)
 	if err != nil {
 		t.Fatalf("Failed to sign block: %v", err)
 	}

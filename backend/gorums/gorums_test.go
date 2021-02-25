@@ -136,7 +136,7 @@ func testGorums(t *testing.T, td testData) {
 	block := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "gorums_test", 1, 1)
 
 	signer, _ := ecdsacrypto.New(client)
-	vote, err := signer.Sign(block)
+	vote, err := signer.CreatePartialCert(block)
 	if err != nil {
 		t.Fatalf("Failed to create partial certificate: %v", err)
 	}

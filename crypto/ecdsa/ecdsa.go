@@ -174,8 +174,21 @@ func (ec *ecdsaCrypto) getPrivateKey() *PrivateKey {
 	return pk.(*PrivateKey)
 }
 
+// Sign signs a hash.
+func (ec *ecdsaCrypto) Sign(hash hotstuff.Hash) (sig hotstuff.Signature, err error) {
+	r, s, err := ecdsa.Sign(rand.Reader, ec.getPrivateKey().PrivateKey, hash[:])
+	if err != nil {
+		return nil, err
+	}
+	return &Signature{
+		r:      r,
+		s:      s,
+		signer: ec.cfg.ID(),
+	}, nil
+}
+
 // Sign signs a single block and returns a partial certificate.
-func (ec *ecdsaCrypto) Sign(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
+func (ec *ecdsaCrypto) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
 	hash := block.Hash()
 	r, s, err := ecdsa.Sign(rand.Reader, ec.getPrivateKey().PrivateKey, hash[:])
 	if err != nil {
@@ -207,21 +220,23 @@ func (ec *ecdsaCrypto) CreateQuorumCert(block *hotstuff.Block, signatures []hots
 	return qc, nil
 }
 
-func (ec *ecdsaCrypto) verifySignature(sig *Signature, hash hotstuff.Hash) bool {
+// Verify verifies a signature given a hash.
+func (ec *ecdsaCrypto) Verify(sig hotstuff.Signature, hash hotstuff.Hash) bool {
+	_sig := sig.(*Signature)
 	replica, ok := ec.cfg.Replica(sig.Signer())
 	if !ok {
 		logger.Info("ecdsaCrypto: got signature from replica whose ID (%d) was not in the config.")
 		return false
 	}
 	pk := replica.PublicKey().(*ecdsa.PublicKey)
-	return ecdsa.Verify(pk, hash[:], sig.R(), sig.S())
+	return ecdsa.Verify(pk, hash[:], _sig.R(), _sig.S())
 }
 
 // VerifyPartialCert verifies a single partial certificate.
 func (ec *ecdsaCrypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 	// TODO: decide how to handle incompatible types. For now we'll simply panic
 	sig := cert.Signature().(*Signature)
-	return ec.verifySignature(sig, cert.BlockHash())
+	return ec.Verify(sig, cert.BlockHash())
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
@@ -240,7 +255,7 @@ func (ec *ecdsaCrypto) VerifyQuorumCert(cert hotstuff.QuorumCert) bool {
 	wg.Add(len(qc.signatures))
 	for _, pSig := range qc.signatures {
 		go func(sig *Signature) {
-			if ec.verifySignature(sig, qc.hash) {
+			if ec.Verify(sig, qc.hash) {
 				atomic.AddUint32(&numVerified, 1)
 			}
 			wg.Done()

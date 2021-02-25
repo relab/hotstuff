@@ -264,7 +264,7 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 	// cancel the last fetch
 	hs.fetchCancel()
 
-	pc, err := hs.signer.Sign(block)
+	pc, err := hs.signer.CreatePartialCert(block)
 	if err != nil {
 		hs.mut.Unlock()
 		logger.Error("OnPropose: failed to sign vote: ", err)

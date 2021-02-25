@@ -19,7 +19,7 @@ func TestCreatePartialCert(t *testing.T) {
 
 		td := newTestData(t, ctrl, 1, newFunc)
 
-		partialCert, err := td.signers[0].Sign(td.block)
+		partialCert, err := td.signers[0].CreatePartialCert(td.block)
 		if err != nil {
 			t.Fatalf("Failed to create partial certificate: %v", err)
 		}

@@ -215,7 +215,7 @@ func TestVote(t *testing.T) {
 	hs.OnPropose(b)
 
 	for _, signer := range td.signers {
-		pc, err := signer.Sign(b)
+		pc, err := signer.CreatePartialCert(b)
 		if err != nil {
 			t.Fatalf("Failed to create partial certificate: %v", err)
 		}
