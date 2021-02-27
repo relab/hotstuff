@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"sort"
@@ -24,6 +25,9 @@ var ErrHashMismatch = fmt.Errorf("certificate hash does not match block hash")
 
 // ErrPartialDuplicate is the error used when two or more signatures were created by the same replica.
 var ErrPartialDuplicate = fmt.Errorf("cannot add more than one signature per replica")
+
+// ErrViewMismatch is the error used when timeouts have different views.
+var ErrViewMismatch = fmt.Errorf("timeout views do not match")
 
 // Signature is an ECDSA signature
 type Signature struct {
@@ -93,9 +97,27 @@ func (cert PartialCert) String() string {
 
 var _ hotstuff.PartialCert = (*PartialCert)(nil)
 
-// QuorumCert is a set of signature that form a quorum certificate for a block.
+type aggregateSignature map[hotstuff.ID]*Signature
+
+func (agg aggregateSignature) ToBytes() (b []byte) {
+	sigs := make([]*Signature, 0, len(agg))
+	for _, sig := range agg {
+		i := sort.Search(len(sigs), func(i int) bool {
+			return sig.signer < sigs[i].signer
+		})
+		sigs = append(sigs, nil)
+		copy(sigs[i+1:], sigs[i:])
+		sigs[i] = sig
+	}
+	for _, sig := range sigs {
+		b = append(b, sig.ToBytes()...)
+	}
+	return b
+}
+
+// QuorumCert is a set of signatures that form a quorum certificate for a block.
 type QuorumCert struct {
-	signatures map[hotstuff.ID]*Signature
+	signatures aggregateSignature
 	hash       hotstuff.Hash
 }
 
@@ -115,21 +137,9 @@ func (qc QuorumCert) BlockHash() hotstuff.Hash {
 }
 
 // ToBytes returns a byte representation of the quorum certificate.
-func (qc QuorumCert) ToBytes() []byte {
-	b := qc.hash[:]
-	// sort signatures by id to ensure determinism
-	sigs := make([]*Signature, 0, len(qc.signatures))
-	for _, sig := range qc.signatures {
-		i := sort.Search(len(sigs), func(i int) bool {
-			return sig.signer < sigs[i].signer
-		})
-		sigs = append(sigs, nil)
-		copy(sigs[i+1:], sigs[i:])
-		sigs[i] = sig
-	}
-	for _, sig := range sigs {
-		b = append(b, sig.ToBytes()...)
-	}
+func (qc QuorumCert) ToBytes() (b []byte) {
+	b = append(b, qc.hash[:]...)
+	b = append(b, qc.signatures.ToBytes()...)
 	return b
 }
 
@@ -143,7 +153,34 @@ func (qc QuorumCert) String() string {
 
 var _ hotstuff.QuorumCert = (*QuorumCert)(nil)
 
-// TODO: consider adding caching back
+// TimeoutCert is a set of signatures that form a quorum certificate for a timed out view.
+type TimeoutCert struct {
+	signatures aggregateSignature
+	view       hotstuff.View
+}
+
+// NewTimeoutCert initializes a new TimeoutCert struct from the given values.
+func NewTimeoutCert(signatures map[hotstuff.ID]*Signature, view hotstuff.View) *TimeoutCert {
+	return &TimeoutCert{signatures, view}
+}
+
+// Signatures returns the set of signatures in the timeout certificate.
+func (tc TimeoutCert) Signatures() map[hotstuff.ID]*Signature {
+	return tc.signatures
+}
+
+// ToBytes returns the object as bytes.
+func (tc TimeoutCert) ToBytes() (b []byte) {
+	b = make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, uint64(tc.view))
+	b = append(b, tc.signatures.ToBytes()...)
+	return b
+}
+
+// View returns the view that timed out.
+func (tc TimeoutCert) View() hotstuff.View {
+	return tc.view
+}
 
 type ecdsaCrypto struct {
 	cfg hotstuff.Config
@@ -190,7 +227,7 @@ func (ec *ecdsaCrypto) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.P
 func (ec *ecdsaCrypto) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
 	hash := block.Hash()
 	qc := &QuorumCert{
-		signatures: make(map[hotstuff.ID]*Signature),
+		signatures: make(aggregateSignature),
 		hash:       hash,
 	}
 	for _, s := range signatures {
@@ -204,6 +241,24 @@ func (ec *ecdsaCrypto) CreateQuorumCert(block *hotstuff.Block, signatures []hots
 		qc.signatures[s.Signature().Signer()] = s.(*PartialCert).signature
 	}
 	return qc, nil
+}
+
+// CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
+func (ec *ecdsaCrypto) CreateTimeoutCert(view hotstuff.View, timeouts []*hotstuff.TimeoutMsg) (cert hotstuff.TimeoutCert, err error) {
+	tc := &TimeoutCert{
+		signatures: make(aggregateSignature),
+		view:       view,
+	}
+	for _, t := range timeouts {
+		if t.View != tc.view {
+			return nil, ErrViewMismatch
+		}
+		if _, ok := tc.signatures[t.Signature.Signer()]; ok {
+			return nil, ErrPartialDuplicate
+		}
+		tc.signatures[t.Signature.Signer()] = t.Signature.(*Signature)
+	}
+	return tc, nil
 }
 
 // Verify verifies a signature given a hash.
@@ -225,6 +280,25 @@ func (ec *ecdsaCrypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 	return ec.Verify(sig, cert.BlockHash())
 }
 
+func (ec *ecdsaCrypto) verifyAggregateSignature(agg aggregateSignature, hash hotstuff.Hash) bool {
+	if len(agg) < ec.cfg.QuorumSize() {
+		return false
+	}
+	var numVerified uint32
+	var wg sync.WaitGroup
+	wg.Add(len(agg))
+	for _, pSig := range agg {
+		go func(sig *Signature) {
+			if ec.Verify(sig, hash) {
+				atomic.AddUint32(&numVerified, 1)
+			}
+			wg.Done()
+		}(pSig)
+	}
+	wg.Wait()
+	return numVerified >= uint32(ec.cfg.QuorumSize())
+}
+
 // VerifyQuorumCert verifies a quorum certificate.
 func (ec *ecdsaCrypto) VerifyQuorumCert(cert hotstuff.QuorumCert) bool {
 	// If QC was created for genesis, then skip verification.
@@ -233,22 +307,13 @@ func (ec *ecdsaCrypto) VerifyQuorumCert(cert hotstuff.QuorumCert) bool {
 	}
 
 	qc := cert.(*QuorumCert)
-	if len(qc.Signatures()) < ec.cfg.QuorumSize() {
-		return false
-	}
-	var numVerified uint32
-	var wg sync.WaitGroup
-	wg.Add(len(qc.signatures))
-	for _, pSig := range qc.signatures {
-		go func(sig *Signature) {
-			if ec.Verify(sig, qc.hash) {
-				atomic.AddUint32(&numVerified, 1)
-			}
-			wg.Done()
-		}(pSig)
-	}
-	wg.Wait()
-	return numVerified >= uint32(ec.cfg.QuorumSize())
+	return ec.verifyAggregateSignature(qc.signatures, qc.hash)
+}
+
+// VerifyTimeoutCert verifies a timeout certificate.
+func (ec *ecdsaCrypto) VerifyTimeoutCert(cert hotstuff.TimeoutCert) bool {
+	tc := cert.(*TimeoutCert)
+	return ec.verifyAggregateSignature(tc.signatures, tc.view.ToHash())
 }
 
 var _ hotstuff.Signer = (*ecdsaCrypto)(nil)

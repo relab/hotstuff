@@ -123,15 +123,8 @@ func (c *signatureCache) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 	return true
 }
 
-// VerifyQuorumCert verifies a quorum certificate.
-func (c *signatureCache) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
-	// If QC was created for genesis, then skip verification.
-	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
-		return true
-	}
-
-	ecdsaQC := qc.(*QuorumCert)
-	if len(ecdsaQC.signatures) < c.ecdsaCrypto.cfg.QuorumSize() {
+func (c *signatureCache) verifyAggregateSignature(agg aggregateSignature, hash hotstuff.Hash) bool {
+	if len(agg) < c.ecdsaCrypto.cfg.QuorumSize() {
 		return false
 	}
 
@@ -140,7 +133,7 @@ func (c *signatureCache) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 
 	// first check if any signatures are cache
 	c.mut.Lock()
-	for _, sig := range ecdsaQC.signatures {
+	for _, sig := range agg {
 		k := string(sig.ToBytes())
 		if c.check(k) {
 			numValid++
@@ -149,7 +142,7 @@ func (c *signatureCache) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 		// on cache miss, we start a goroutine to verify the signature
 		wg.Add(1)
 		go func(sig *Signature) {
-			if c.ecdsaCrypto.Verify(sig, ecdsaQC.hash) {
+			if c.ecdsaCrypto.Verify(sig, hash) {
 				atomic.AddUint32(&numValid, 1)
 				c.mut.Lock()
 				c.insert(string(sig.ToBytes()))
@@ -162,4 +155,21 @@ func (c *signatureCache) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 
 	wg.Wait()
 	return numValid >= uint32(c.ecdsaCrypto.cfg.QuorumSize())
+}
+
+// VerifyQuorumCert verifies a quorum certificate.
+func (c *signatureCache) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
+	// If QC was created for genesis, then skip verification.
+	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
+		return true
+	}
+
+	ecdsaQC := qc.(*QuorumCert)
+	return c.verifyAggregateSignature(ecdsaQC.signatures, ecdsaQC.hash)
+}
+
+// VerifyTimeoutCert verifies a timeout certificate.
+func (c *signatureCache) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
+	ecdsaTC := tc.(*TimeoutCert)
+	return c.verifyAggregateSignature(ecdsaTC.signatures, ecdsaTC.view.ToHash())
 }

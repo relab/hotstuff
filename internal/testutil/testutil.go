@@ -71,17 +71,52 @@ func CreateTCPListener(t *testing.T) net.Listener {
 	return lis
 }
 
+// Sign creates a signature using the given signer.
+func Sign(t *testing.T, hash hotstuff.Hash, signer hotstuff.Signer) hotstuff.Signature {
+	t.Helper()
+	sig, err := signer.Sign(hash)
+	if err != nil {
+		t.Fatalf("Failed to sign block: %v", err)
+	}
+	return sig
+}
+
+// CreateSignatures creates partial certificates from multiple signers.
+func CreateSignatures(t *testing.T, hash hotstuff.Hash, signers []hotstuff.Signer) []hotstuff.Signature {
+	t.Helper()
+	sigs := make([]hotstuff.Signature, 0, len(signers))
+	for _, signer := range signers {
+		sigs = append(sigs, Sign(t, hash, signer))
+	}
+	return sigs
+}
+
+// CreateTimeouts creates a set of TimeoutMsg messages from the given signers.
+func CreateTimeouts(t *testing.T, view hotstuff.View, signers []hotstuff.Signer) (timeouts []*hotstuff.TimeoutMsg) {
+	t.Helper()
+	timeouts = make([]*hotstuff.TimeoutMsg, 0, len(signers))
+	sigs := CreateSignatures(t, view.ToHash(), signers)
+	for _, sig := range sigs {
+		timeouts = append(timeouts, &hotstuff.TimeoutMsg{
+			ID:        sig.Signer(),
+			View:      view,
+			Signature: sig,
+		})
+	}
+	return timeouts
+}
+
 // CreatePC creates a partial certificate using the given signer.
 func CreatePC(t *testing.T, block *hotstuff.Block, signer hotstuff.Signer) hotstuff.PartialCert {
 	t.Helper()
 	pc, err := signer.CreatePartialCert(block)
 	if err != nil {
-		t.Fatalf("Failed to sign block: %v", err)
+		t.Fatalf("Failed to create partial certificate: %v", err)
 	}
 	return pc
 }
 
-// CreatePCs creates partial certificates from multiple signers.
+// CreatePCs creates one partial certificate using each of the given signers.
 func CreatePCs(t *testing.T, block *hotstuff.Block, signers []hotstuff.Signer) []hotstuff.PartialCert {
 	t.Helper()
 	pcs := make([]hotstuff.PartialCert, 0, len(signers))
@@ -102,6 +137,19 @@ func CreateQC(t *testing.T, block *hotstuff.Block, signers []hotstuff.Signer) ho
 		t.Fatalf("Failed to create QC: %v", err)
 	}
 	return qc
+}
+
+// CreateTC generates a TC using the given signers.
+func CreateTC(t *testing.T, view hotstuff.View, signers []hotstuff.Signer) hotstuff.TimeoutCert {
+	t.Helper()
+	if len(signers) == 0 {
+		return nil
+	}
+	tc, err := signers[0].CreateTimeoutCert(view, CreateTimeouts(t, view, signers))
+	if err != nil {
+		t.Fatalf("Failed to create TC: %v", err)
+	}
+	return tc
 }
 
 // GenerateKey generates an ECDSA private key for use in tests.

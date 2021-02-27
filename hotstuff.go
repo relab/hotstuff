@@ -49,6 +49,7 @@ import (
 	"context"
 	"crypto"
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 )
 
@@ -57,6 +58,14 @@ type ID uint32
 
 // View is a number that uniquely identifies a view.
 type View uint64
+
+// ToHash converts the view to a Hash type. It does not actually hash the view.
+// Hashing a view is not necessary sinc
+func (v View) ToHash() Hash {
+	h := Hash{}
+	binary.LittleEndian.PutUint64(h[:8], uint64(v))
+	return h
+}
 
 // Hash is a SHA256 hash
 type Hash [32]byte
@@ -132,6 +141,13 @@ type QuorumCert interface {
 	BlockHash() Hash
 }
 
+// TimeoutCert (TC) is a certificate created by a quorum of timeout messages.
+type TimeoutCert interface {
+	ToBytes
+	// View returns the view that timed out.
+	View() View
+}
+
 // Signer implements the methods required to create signatures and certificates.
 type Signer interface {
 	// Sign signs a hash.
@@ -140,6 +156,8 @@ type Signer interface {
 	CreatePartialCert(block *Block) (cert PartialCert, err error)
 	// CreateQuorumCert creates a quorum certificate from a list of partial certificates.
 	CreateQuorumCert(block *Block, signatures []PartialCert) (cert QuorumCert, err error)
+	// CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
+	CreateTimeoutCert(view View, timeouts []*TimeoutMsg) (cert TimeoutCert, err error)
 }
 
 // Verifier implements the methods required to verify partial and quorum certificates.
@@ -150,6 +168,8 @@ type Verifier interface {
 	VerifyPartialCert(cert PartialCert) bool
 	// VerifyQuorumCert verifies a quorum certificate.
 	VerifyQuorumCert(qc QuorumCert) bool
+	// VerifyTimeoutCert verifies a timeout certificate.
+	VerifyTimeoutCert(tc TimeoutCert) bool
 }
 
 // BlockChain is a datastructure that stores a chain of blocks.
@@ -162,18 +182,16 @@ type BlockChain interface {
 	Get(Hash) (*Block, bool)
 }
 
-// NewView represents a new-view message.
-type NewView struct {
-	// The ID of the replica who sent the message.
-	ID ID
-	// The view that the replica wants to enter.
-	View View
-	// The highest QC known to the sender.
-	QC QuorumCert
+// TimeoutMsg is broadcast whenever a replica has a local timeout.
+type TimeoutMsg struct {
+	ID        ID         // The ID of the replica who sent the message.
+	View      View       // The view that the replica wants to enter.
+	Signature Signature  // A signature of the view
+	HighQC    QuorumCert // The highest QC known to the sender.
 }
 
-func (n NewView) String() string {
-	return fmt.Sprintf("NewView{ ID: %d, View: %d, QC: %v }", n.ID, n.View, n.QC)
+func (t TimeoutMsg) String() string {
+	return fmt.Sprintf("TimeoutMsg{ ID: %d, View: %d, QC: %v }", t.ID, t.View, t.HighQC)
 }
 
 //go:generate mockgen -destination=internal/mocks/replica_mock.go -package=mocks . Replica
@@ -188,7 +206,7 @@ type Replica interface {
 	// Vote sends the partial certificate to the other replica.
 	Vote(cert PartialCert)
 	// NewView sends the quorum certificate to the other replica.
-	NewView(msg NewView)
+	NewView(QuorumCert)
 	// Deliver sends the block to the other replica.
 	Deliver(block *Block)
 }
@@ -250,7 +268,7 @@ type Consensus interface {
 	OnVote(cert PartialCert)
 	// OnNewView handles an incoming NewView.
 	// A leader should call this method on itself.
-	OnNewView(msg NewView)
+	OnNewView(qc QuorumCert)
 	// OnDeliver handles an incoming block that was requested through the "fetch" mechanism.
 	OnDeliver(block *Block)
 }

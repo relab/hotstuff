@@ -88,6 +88,31 @@ func TestCreateQuorumCert(t *testing.T) {
 	runBoth(t, run)
 }
 
+func TestCreateTimeoutCert(t *testing.T) {
+	run := func(t *testing.T, newFunc newFunc) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		td := newTestData(t, ctrl, 4, newFunc)
+
+		timeouts := testutil.CreateTimeouts(t, 1, td.signers)
+
+		tc, err := td.signers[0].CreateTimeoutCert(1, timeouts)
+		if err != nil {
+			t.Fatalf("Failed to create QC: %v", err)
+		}
+
+		if tc.View() != hotstuff.View(1) {
+			t.Error("Timeout certificate view does not match original view.")
+		}
+
+		if len(tc.(*TimeoutCert).Signatures()) != len(timeouts) {
+			t.Error("Quorum certificate does not include all partial certificates!")
+		}
+	}
+	runBoth(t, run)
+}
+
 func TestCreateQuorumCertInvalid(t *testing.T) {
 	run := func(t *testing.T, newFunc newFunc) {
 		ctrl := gomock.NewController(t)
@@ -109,6 +134,38 @@ func TestCreateQuorumCertInvalid(t *testing.T) {
 
 		for _, test := range tests {
 			_, err := td.signers[0].CreateQuorumCert(td.block, test.votes)
+			if err == nil {
+				t.Fatalf("%s: Expected CreateQuorumCert to fail, but was successful!", test.name)
+			}
+			if !errors.Is(err, test.err) {
+				t.Fatalf("%s: got: %v, want: %v", test.name, err, test.err)
+			}
+		}
+	}
+	runBoth(t, run)
+}
+
+func TestCreateTimeoutCertInvalid(t *testing.T) {
+	run := func(t *testing.T, newFunc newFunc) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		td := newTestData(t, ctrl, 4, newFunc)
+
+		badView := append(testutil.CreateTimeouts(t, 1, td.signers), testutil.CreateTimeouts(t, 2, td.signers[:1])...)
+		duplicate := append(testutil.CreateTimeouts(t, 1, td.signers), testutil.CreateTimeouts(t, 1, td.signers[:1])...)
+
+		tests := []struct {
+			name  string
+			votes []*hotstuff.TimeoutMsg
+			err   error
+		}{
+			{"hash mismatch", badView, ErrViewMismatch},
+			{"duplicate", duplicate, ErrPartialDuplicate},
+		}
+
+		for _, test := range tests {
+			_, err := td.signers[0].CreateTimeoutCert(1, test.votes)
 			if err == nil {
 				t.Fatalf("%s: Expected CreateQuorumCert to fail, but was successful!", test.name)
 			}
@@ -148,6 +205,24 @@ func TestVerifyQuorumCert(t *testing.T) {
 		for i, verifier := range td.verifiers {
 			if !verifier.VerifyQuorumCert(qc) {
 				t.Errorf("Verifier %d failed to verify QC!", i+1)
+			}
+		}
+	}
+	runBoth(t, run)
+}
+
+func TestVerifyTimeoutCert(t *testing.T) {
+	run := func(t *testing.T, newFunc newFunc) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		td := newTestData(t, ctrl, 4, newFunc)
+
+		tc := testutil.CreateTC(t, 1, td.signers)
+
+		for i, verifier := range td.verifiers {
+			if !verifier.VerifyTimeoutCert(tc) {
+				t.Errorf("Verifier %d failed to verify TC!", i+1)
 			}
 		}
 	}
