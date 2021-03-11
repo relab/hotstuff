@@ -27,8 +27,6 @@ func TestPropose(t *testing.T) {
 
 	td.acceptor.EXPECT().Accept(gomock.Any()).Return(true)
 
-	td.synchronizer.EXPECT().OnPropose()
-
 	// RULES:
 
 	// leader should propose to other replicas.
@@ -174,7 +172,6 @@ func TestCommit(t *testing.T) {
 	)
 
 	td.synchronizer.EXPECT().GetLeader(gomock.Any()).AnyTimes().Return(hotstuff.ID(1))
-	td.synchronizer.EXPECT().OnPropose().AnyTimes()
 
 	hs := td.build()
 
@@ -190,12 +187,11 @@ func TestVote(t *testing.T) {
 	defer ctrl.Finish()
 
 	td := newTestData(t, ctrl, 4)
+	td.synchronizer.EXPECT().AdvanceView(gomock.Any())
 
 	td.acceptor.EXPECT().Accept(gomock.Any()).Return(true)
 
 	// synchronizer should expect one proposal and one finishQC
-	td.synchronizer.EXPECT().OnPropose()
-	td.synchronizer.EXPECT().OnFinishQC()
 	td.synchronizer.EXPECT().GetLeader(gomock.Any()).AnyTimes().Return(hotstuff.ID(4))
 
 	hs := td.build()
@@ -217,7 +213,7 @@ func TestVote(t *testing.T) {
 	}
 }
 
-// TestFetchBlock checks that a replica can fetch a block in order to create a QC
+// TestFetchBlock checks that a replica can fetch a block in order to create a QC.
 func TestFetchBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -245,9 +241,7 @@ func TestFetchBlock(t *testing.T) {
 			}()
 		})
 
-	td.synchronizer.EXPECT().OnFinishQC().Do(func() {
-		close(qcCreated)
-	})
+	td.synchronizer.EXPECT().AdvanceView(gomock.Any()).Do(func(arg interface{}) { close(qcCreated) })
 
 	for _, vote := range votes {
 		hs.OnVote(vote)
@@ -282,7 +276,6 @@ func TestForkingAttack(t *testing.T) {
 	td := newTestData(t, ctrl, 4)
 	// configure mocks
 	td.replicas[0].EXPECT().Vote(gomock.Any()).AnyTimes()
-	td.synchronizer.EXPECT().OnPropose().AnyTimes()
 	td.synchronizer.EXPECT().GetLeader(gomock.Any()).AnyTimes().Return(hotstuff.ID(1))
 	td.acceptor.EXPECT().Accept(gomock.Any()).AnyTimes().Return(true)
 
