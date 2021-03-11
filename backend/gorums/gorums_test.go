@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net"
+	"reflect"
 	"testing"
 	"time"
 
@@ -19,12 +20,132 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
+func TestConnect(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		const n = 4
+		td := setup(t, n)
+		ctrl := gomock.NewController(t)
+		_, teardown := createServers(t, td, ctrl)
+		defer teardown()
+		cfg := NewConfig(td.cfg)
+
+		err := cfg.Connect(time.Second)
+
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	runBoth(t, run)
+}
+
+func TestPropose(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		const n = 4
+		td := setup(t, n)
+		ctrl := gomock.NewController(t)
+		cfg, mocks, teardown := createConfig(t, td, ctrl)
+		defer teardown()
+
+		qc := ecdsacrypto.NewQuorumCert(make(map[hotstuff.ID]*ecdsacrypto.Signature), hotstuff.GetGenesis().Hash())
+		proposal := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "foo", 1, 1)
+		// the configuration has ID 1, so we won't be receiving any proposal for that replica.
+		c := make(chan struct{}, n-1)
+		for _, mock := range mocks[1:] {
+			mock.EXPECT().OnPropose(gomock.AssignableToTypeOf(proposal)).Do(func(block *hotstuff.Block) {
+				if block.Hash() != proposal.Hash() {
+					t.Error("hash mismatch")
+				}
+				c <- struct{}{}
+			})
+		}
+
+		cfg.Propose(proposal)
+		for i := 0; i < n-1; i++ {
+			<-c
+		}
+	}
+	runBoth(t, run)
+}
+
+func TestVote(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		const n = 4
+		td := setup(t, n)
+		ctrl := gomock.NewController(t)
+		cfg, mocks, teardown := createConfig(t, td, ctrl)
+		defer teardown()
+		signer, _ := ecdsacrypto.New(cfg)
+
+		qc := ecdsacrypto.NewQuorumCert(make(map[hotstuff.ID]*ecdsacrypto.Signature), hotstuff.GetGenesis().Hash())
+		proposal := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "foo", 1, 1)
+		pc := testutil.CreatePC(t, proposal, signer)
+
+		c := make(chan struct{})
+		mocks[1].EXPECT().OnVote(gomock.AssignableToTypeOf(pc)).Do(func(vote hotstuff.PartialCert) {
+			if !bytes.Equal(pc.ToBytes(), vote.ToBytes()) {
+				t.Error("The received partial certificate differs from the original.")
+			}
+			close(c)
+		})
+
+		replica, ok := cfg.Replica(2)
+		if !ok {
+			t.Fatalf("Failed to find replica with ID 2")
+		}
+
+		replica.Vote(pc)
+		<-c
+	}
+	runBoth(t, run)
+}
+
+func TestTimeout(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		const n = 4
+		td := setup(t, n)
+		ctrl := gomock.NewController(t)
+		cfg, _mocks, teardown := createConfig(t, td, ctrl)
+		defer teardown()
+		signer, _ := ecdsacrypto.New(cfg)
+
+		qc := ecdsacrypto.NewQuorumCert(make(map[hotstuff.ID]*ecdsacrypto.Signature), hotstuff.GetGenesis().Hash())
+		timeout := &hotstuff.TimeoutMsg{
+			ID:        1,
+			View:      1,
+			HighQC:    qc,
+			Signature: testutil.Sign(t, hotstuff.View(1).ToHash(), signer),
+		}
+
+		c := make(chan struct{}, n-1)
+		for _, mock := range _mocks[1:] {
+
+			pm := mocks.NewMockViewSynchronizer(ctrl)
+			pm.EXPECT().OnRemoteTimeout(gomock.AssignableToTypeOf(timeout)).Do(func(tm *hotstuff.TimeoutMsg) {
+				if !reflect.DeepEqual(timeout, tm) {
+					t.Fatalf("expected timeouts to be equal. got: %v, want: %v", tm, timeout)
+				}
+				c <- struct{}{}
+			})
+
+			mock.EXPECT().Synchronizer().Return(pm)
+		}
+
+		cfg.Timeout(timeout)
+		for i := 0; i < n-1; i++ {
+			<-c
+		}
+	}
+	runBoth(t, run)
+}
+
 type testData struct {
 	n         int
-	cfg       *config.ReplicaConfig
+	cfg       config.ReplicaConfig
 	listeners []net.Listener
 	keys      []*ecdsa.PrivateKey
 }
+
+type setupFunc func(t *testing.T, n int) testData
 
 func setupReplicas(t *testing.T, n int) testData {
 	t.Helper()
@@ -49,18 +170,11 @@ func setupReplicas(t *testing.T, n int) testData {
 		cfg.Replicas[replica.ID] = replica
 	}
 
-	return testData{n, cfg, listeners, keys}
+	return testData{n, *cfg, listeners, keys}
 }
 
-func TestGorumsNoTLS(t *testing.T) {
-	const n = 4
-	td := setupReplicas(t, n)
-
-	testGorums(t, td)
-}
-
-func TestGorumsTLS(t *testing.T) {
-	const n = 4
+func setupTLS(t *testing.T, n int) testData {
+	t.Helper()
 	td := setupReplicas(t, n)
 
 	certificates := make([]*x509.Certificate, 0, n)
@@ -95,90 +209,47 @@ func TestGorumsTLS(t *testing.T) {
 	})
 
 	td.cfg.Creds = creds
-	testGorums(t, td)
+	return td
 }
 
-func testGorums(t *testing.T, td testData) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+func runBoth(t *testing.T, run func(*testing.T, setupFunc)) {
+	t.Helper()
+	t.Run("NoTLS", func(t *testing.T) { run(t, setupReplicas) })
+	t.Run("WithTLS", func(t *testing.T) { run(t, setupTLS) })
+}
 
-	mockConsensus := make([]*mocks.MockConsensus, 0, td.n)
-	servers := make([]*Server, 0, td.n)
-
-	// create mocks
-	for i := 0; i < td.n; i++ {
-		mockConsensus = append(mockConsensus, mocks.NewMockConsensus(ctrl))
+func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (serverMocks []*mocks.MockConsensus, teardown func()) {
+	t.Helper()
+	servers := make([]*Server, td.n)
+	serverMocks = make([]*mocks.MockConsensus, td.n)
+	for i := range servers {
+		cfg := td.cfg
+		cfg.ID = hotstuff.ID(i + 1)
+		cfg.PrivateKey = td.keys[i]
+		servers[i] = NewServer(cfg)
+		serverMocks[i] = mocks.NewMockConsensus(ctrl)
+		servers[i].StartOnListener(serverMocks[i], td.listeners[i])
 	}
-
-	// start servers
-	for i := 0; i < td.n; i++ {
-		c := *td.cfg
-		c.ID = hotstuff.ID(i + 1)
-		c.PrivateKey = td.keys[i]
-		servers = append(servers, NewServer(c))
-		servers[i].StartOnListener(mockConsensus[i], td.listeners[i])
-	}
-
-	// create the configuration
-	client := NewConfig(*td.cfg)
-
-	// test values
-	qc := ecdsacrypto.NewQuorumCert(map[hotstuff.ID]*ecdsacrypto.Signature{}, hotstuff.GetGenesis().Hash())
-	block := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "gorums_test", 1, 1)
-
-	signer, _ := ecdsacrypto.New(client)
-	vote, err := signer.CreatePartialCert(block)
-	if err != nil {
-		t.Fatalf("Failed to create partial certificate: %v", err)
-	}
-
-	c := make(chan struct{}, 1)
-	// configure mocks. server with id 1 should not receive any messages
-	for i, mock := range mockConsensus {
-		mock.EXPECT().Config().AnyTimes().Return(client)
-		if i == 0 {
-			continue
+	return serverMocks, func() {
+		for _, srv := range servers {
+			srv.Stop()
 		}
-		mock.EXPECT().OnPropose(gomock.AssignableToTypeOf(block)).Do(func(arg *hotstuff.Block) {
-			if arg.Hash() != block.Hash() {
-				t.Errorf("Block hash mismatch. got: %v, want: %v", arg, block)
-			}
-			c <- struct{}{}
-		})
-		mock.EXPECT().OnVote(gomock.AssignableToTypeOf(vote)).Do(func(arg hotstuff.PartialCert) {
-			if !bytes.Equal(arg.ToBytes(), vote.ToBytes()) {
-				t.Errorf("Vote mismatch. got: %v, want: %v", arg, vote)
-			}
-			c <- struct{}{}
-		})
-		mock.EXPECT().OnNewView(gomock.AssignableToTypeOf(hotstuff.NewView{})).Do(func(arg hotstuff.NewView) {
-			if !bytes.Equal(arg.QC.ToBytes(), qc.ToBytes()) {
-				t.Errorf("QC mismatch. got: %v, want: %v", arg, qc)
-			}
-			c <- struct{}{}
-		})
 	}
+}
 
-	err = client.Connect(time.Second)
+func createConfig(t *testing.T, td testData, ctrl *gomock.Controller) (cfg *Config, serverMocks []*mocks.MockConsensus, teardown func()) {
+	t.Helper()
+	serverMocks, serverTeardown := createServers(t, td, ctrl)
+	cfg = NewConfig(td.cfg)
+	err := cfg.Connect(time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	client.Propose(block)
-	for id, replica := range client.Replicas() {
-		if id == client.ID() {
-			continue
-		}
-		replica.Vote(vote)
-		replica.NewView(hotstuff.NewView{ID: 1, View: 1, QC: qc})
+	for _, mock := range serverMocks {
+		mock.EXPECT().Config().AnyTimes().Return(cfg)
 	}
-
-	for i := 0; i < (td.n-1)*3; i++ {
-		<-c
-	}
-
-	client.Close()
-	for _, server := range servers {
-		server.Stop()
+	return cfg, serverMocks, func() {
+		cfg.Close()
+		serverTeardown()
 	}
 }
