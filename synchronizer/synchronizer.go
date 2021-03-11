@@ -1,7 +1,6 @@
 package synchronizer
 
 import (
-	"context"
 	"sync"
 	"time"
 
@@ -17,100 +16,167 @@ var logger = logging.GetLogger()
 type Synchronizer struct {
 	hotstuff.LeaderRotation
 
-	mut      sync.Mutex
-	lastBeat hotstuff.View
-	timeout  time.Duration
-	timer    *time.Timer
-	stop     context.CancelFunc
-	hs       hotstuff.Consensus
-	stopped  bool
+	mut sync.Mutex
+	hs  hotstuff.Consensus
+
+	baseTimeout  time.Duration
+	timer        *time.Timer
+	currentView  hotstuff.View
+	latestCommit hotstuff.View // the view in which the latest commit happened.
+	timeouts     map[hotstuff.View]map[hotstuff.ID]*hotstuff.TimeoutMsg
 }
 
 // New creates a new Synchronizer.
-func New(leaderRotation hotstuff.LeaderRotation, initialTimeout time.Duration) *Synchronizer {
+func New(leaderRotation hotstuff.LeaderRotation, baseTimeout time.Duration) *Synchronizer {
 	return &Synchronizer{
 		LeaderRotation: leaderRotation,
-		timeout:        initialTimeout,
+		baseTimeout:    baseTimeout,
 	}
 }
 
-// OnPropose should be called when a replica has received a new valid proposal.
-func (s *Synchronizer) OnPropose() {
+// Start starts the view timeout timer, and makes a proposal if the local replica is the leader.
+func (s *Synchronizer) Start() {
 	s.mut.Lock()
-	defer s.mut.Unlock()
-	if s.timer != nil {
-		s.timer.Reset(s.timeout)
+	s.timer = time.AfterFunc(s.viewDuration(s.currentView), s.onLocalTimeout)
+	if s.GetLeader(s.currentView) == s.hs.Config().ID() {
+		s.mut.Unlock()
+		s.hs.Propose()
+	} else {
+		s.mut.Unlock()
 	}
 }
 
-// OnFinishQC should be called when a replica has created a new qc.
-func (s *Synchronizer) OnFinishQC() {
-	s.beat()
+// Stop stops the view timeout timer.
+func (s *Synchronizer) Stop() {
+	s.timer.Stop()
 }
 
-// OnNewView should be called when a replica receives a valid NewView message.
-func (s *Synchronizer) OnNewView() {
-	s.beat()
-}
-
-// Init initializes the synchronizer with given the hotstuff instance.
+// Init gives the synchronizer a consensus instance to synchronize.
 func (s *Synchronizer) Init(hs hotstuff.Consensus) {
 	s.hs = hs
 }
 
-// Start starts the synchronizer.
-func (s *Synchronizer) Start() {
-	if s.GetLeader(s.hs.Leaf().View()+1) == s.hs.Config().ID() {
-		s.hs.Propose()
-	}
-	s.timer = time.NewTimer(s.timeout)
-	var ctx context.Context
-	ctx, s.stop = context.WithCancel(context.Background())
-	go s.newViewTimeout(ctx)
-}
-
-// Stop stops the synchronizer.
-func (s *Synchronizer) Stop() {
-	s.stopped = true
-	s.stop()
+// View returns the current view.
+func (s *Synchronizer) View() hotstuff.View {
 	s.mut.Lock()
-	if s.timer != nil && !s.timer.Stop() {
-		<-s.timer.C
-	}
-	s.mut.Unlock()
+	defer s.mut.Unlock()
+	return s.currentView
 }
 
-func (s *Synchronizer) beat() {
-	if s.stopped {
-		return
-	}
-	view := s.hs.Leaf().View()
-	s.mut.Lock()
-	if view <= s.lastBeat {
-		s.mut.Unlock()
-		logger.Debug("Can't beat more than once per view ", s.lastBeat)
-		return
-	}
-	if s.GetLeader(view+1) != s.hs.Config().ID() {
-		s.mut.Unlock()
-		return
-	}
-	s.lastBeat = view
-	s.mut.Unlock()
-	go s.hs.Propose()
+func (s *Synchronizer) viewDuration(view hotstuff.View) time.Duration {
+	// TODO: exponential backoff
+	return s.baseTimeout
 }
 
-func (s *Synchronizer) newViewTimeout(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
+func (s *Synchronizer) onLocalTimeout() {
+	// only run this once per view
+	if m, ok := s.timeouts[s.currentView]; ok {
+		if _, ok := m[s.hs.Config().ID()]; ok {
 			return
-		case <-s.timer.C:
-			s.hs.CreateDummy()
-			go s.hs.NewView()
-			s.mut.Lock()
-			s.timer.Reset(s.timeout)
-			s.mut.Unlock()
 		}
+	}
+	// stop voting for current view
+	s.hs.IncreaseLastVotedView(s.currentView)
+	sig, err := s.hs.Signer().Sign(s.currentView.ToHash())
+	if err != nil {
+		logger.Warnf("Failed to sign view: %v", err)
+		return
+	}
+	timeoutMsg := &hotstuff.TimeoutMsg{
+		ID:        s.hs.Config().ID(),
+		View:      s.currentView,
+		HighQC:    s.hs.HighQC(),
+		Signature: sig,
+	}
+	s.hs.Config().Timeout(timeoutMsg)
+	s.OnRemoteTimeout(timeoutMsg)
+}
+
+// OnRemoteTimeout handles an incoming timeout from a remote replica.
+func (s *Synchronizer) OnRemoteTimeout(timeout *hotstuff.TimeoutMsg) {
+	defer func() {
+		s.mut.Lock()
+		defer s.mut.Unlock()
+		// cleanup old timesuts
+		for view := range s.timeouts {
+			if view < s.currentView {
+				delete(s.timeouts, view)
+			}
+		}
+	}()
+
+	verifier := s.hs.Verifier()
+	if !verifier.Verify(timeout.Signature, timeout.View.ToHash()) {
+		return
+	}
+	s.mut.Lock()
+	logger.Debug("OnRemoteTimeout: ", timeout)
+
+	timeouts, ok := s.timeouts[timeout.View]
+	if !ok {
+		timeouts = make(map[hotstuff.ID]*hotstuff.TimeoutMsg)
+		s.timeouts[timeout.View] = timeouts
+	}
+
+	timeouts[timeout.ID] = timeout
+
+	if len(timeouts) < s.hs.Config().QuorumSize() {
+		s.mut.Unlock()
+		return
+	}
+
+	// TODO: should probably change CreateTimeoutCert and maybe also CreateQuorumCert
+	// to use maps instead of slices
+	timeoutList := make([]*hotstuff.TimeoutMsg, 0, len(timeouts))
+	for _, t := range timeouts {
+		timeoutList = append(timeoutList, t)
+	}
+
+	signer := s.hs.Signer()
+	tc, err := signer.CreateTimeoutCert(s.currentView, timeoutList)
+	if err != nil {
+		logger.Debugf("Failed to create timeout certificate: %v", err)
+		s.mut.Unlock()
+		return
+	}
+
+	s.mut.Unlock()
+	s.AdvanceView(hotstuff.SyncInfo{TC: tc})
+}
+
+// AdvanceView attempts to advance to the next view using the given QC.
+// qc must be either a regular quorum certificate, or a timeout certificate.
+func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+
+	var v hotstuff.View
+	if syncInfo.TC != nil {
+		v = syncInfo.TC.View()
+	} else {
+		s.hs.UpdateHighQC(syncInfo.QC)
+		b, ok := s.hs.BlockChain().Get(syncInfo.QC.BlockHash())
+		if !ok {
+			//TODO
+			return
+		}
+		v = b.View()
+		if s.latestCommit < v {
+			s.latestCommit = v
+		}
+	}
+
+	if v < s.currentView {
+		return
+	}
+
+	// TODO: stop timer
+	s.currentView = v + 1
+
+	leader := s.GetLeader(s.currentView)
+	if leader == s.hs.Config().ID() {
+		s.hs.Propose()
+	} else if replica, ok := s.hs.Config().Replica(leader); ok {
+		replica.NewView(syncInfo)
 	}
 }

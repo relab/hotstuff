@@ -93,6 +93,20 @@ func (c *Configuration) Propose(ctx context.Context, in *Block, opts ...gorums.C
 // Reference imports to suppress errors if they are not otherwise used.
 var _ emptypb.Empty
 
+// Timeout is a quorum call invoked on all nodes in configuration c,
+// with the same argument in, and returns a combined result.
+func (c *Configuration) Timeout(ctx context.Context, in *TimeoutMsg, opts ...gorums.CallOption) {
+	cd := gorums.QuorumCallData{
+		Message: in,
+		Method:  "proto.Hotstuff.Timeout",
+	}
+
+	c.Configuration.Multicast(ctx, cd, opts...)
+}
+
+// Reference imports to suppress errors if they are not otherwise used.
+var _ emptypb.Empty
+
 // Fetch is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
 func (c *Configuration) Fetch(ctx context.Context, in *BlockHash, opts ...gorums.CallOption) {
@@ -112,7 +126,8 @@ type QuorumSpec interface {
 type Hotstuff interface {
 	Propose(context.Context, *Block)
 	Vote(context.Context, *PartialCert)
-	NewView(context.Context, *NewViewMsg)
+	Timeout(context.Context, *TimeoutMsg)
+	NewView(context.Context, *SyncInfo)
 	Fetch(context.Context, *BlockHash)
 	Deliver(context.Context, *Block)
 }
@@ -126,8 +141,12 @@ func RegisterHotstuffServer(srv *gorums.Server, impl Hotstuff) {
 		req := in.Message.(*PartialCert)
 		impl.Vote(ctx, req)
 	})
+	srv.RegisterHandler("proto.Hotstuff.Timeout", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
+		req := in.Message.(*TimeoutMsg)
+		impl.Timeout(ctx, req)
+	})
 	srv.RegisterHandler("proto.Hotstuff.NewView", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*NewViewMsg)
+		req := in.Message.(*SyncInfo)
 		impl.NewView(ctx, req)
 	})
 	srv.RegisterHandler("proto.Hotstuff.Fetch", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
@@ -159,7 +178,7 @@ var _ emptypb.Empty
 
 // NewView is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (n *Node) NewView(ctx context.Context, in *NewViewMsg, opts ...gorums.CallOption) {
+func (n *Node) NewView(ctx context.Context, in *SyncInfo, opts ...gorums.CallOption) {
 	cd := gorums.CallData{
 		Message: in,
 		Method:  "proto.Hotstuff.NewView",

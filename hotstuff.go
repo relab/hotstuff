@@ -60,7 +60,6 @@ type ID uint32
 type View uint64
 
 // ToHash converts the view to a Hash type. It does not actually hash the view.
-// Hashing a view is not necessary sinc
 func (v View) ToHash() Hash {
 	h := Hash{}
 	binary.LittleEndian.PutUint64(h[:8], uint64(v))
@@ -132,6 +131,12 @@ type PartialCert interface {
 	Signature() Signature
 	// BlockHash returns the hash of the block that was signed.
 	BlockHash() Hash
+}
+
+// SyncInfo holds the highest known QC or TC.
+type SyncInfo struct {
+	QC QuorumCert
+	TC TimeoutCert
 }
 
 // QuorumCert (QC) is a certificate for a Block created by a quorum of partial certificates.
@@ -206,7 +211,7 @@ type Replica interface {
 	// Vote sends the partial certificate to the other replica.
 	Vote(cert PartialCert)
 	// NewView sends the quorum certificate to the other replica.
-	NewView(QuorumCert)
+	NewView(SyncInfo)
 	// Deliver sends the block to the other replica.
 	Deliver(block *Block)
 }
@@ -232,6 +237,8 @@ type Config interface {
 	QuorumSize() int
 	// Propose sends the block to all replicas in the configuration.
 	Propose(block *Block)
+	// Timeout sends the timeout message to all replicas.
+	Timeout(msg *TimeoutMsg)
 	// Fetch requests a block from all the replicas in the configuration.
 	Fetch(ctx context.Context, hash Hash)
 }
@@ -253,22 +260,27 @@ type Consensus interface {
 	Leaf() *Block
 	// BlockChain returns the datastructure containing the blocks known to the replica.
 	BlockChain() BlockChain
+	// Signer returns the signer.
+	Signer() Signer
+	// Verifier returns the verifier.
+	Verifier() Verifier
+	// Synchronizer returns the view synchronizer.
+	Synchronizer() ViewSynchronizer
+	// IncreaseLastVotedView ensures that no voting happens in a view earlier than `view`.
+	IncreaseLastVotedView(view View)
+	// UpdateHighQC updates HighQC if the given qc is higher than the old HighQC.
+	UpdateHighQC(qc QuorumCert)
 	// CreateDummy inserts a dummy block at View+1.
 	// This is useful when a view must be skipped.
 	CreateDummy()
 	// Propose starts a new proposal. The command is fetched from the command queue.
 	Propose()
-	// NewView sends a NewView message to the next leader.
-	NewView()
 	// OnPropose handles an incoming proposal.
 	// A leader should call this method on itself.
 	OnPropose(block *Block)
 	// OnVote handles an incoming vote.
 	// A leader should call this method on itself.
 	OnVote(cert PartialCert)
-	// OnNewView handles an incoming NewView.
-	// A leader should call this method on itself.
-	OnNewView(qc QuorumCert)
 	// OnDeliver handles an incoming block that was requested through the "fetch" mechanism.
 	OnDeliver(block *Block)
 }
@@ -284,12 +296,12 @@ type LeaderRotation interface {
 // ViewSynchronizer synchronizes replicas to the same view.
 type ViewSynchronizer interface {
 	LeaderRotation
-	// OnPropose should be called when the local replica has received a new valid proposal.
-	OnPropose()
-	// OnFinishQC should be called when the local replica has created a new qc.
-	OnFinishQC()
-	// OnNewView should be called when the local replica receives a valid NewView message.
-	OnNewView()
+
+	// OnRemoteTimeout handles an incoming timeout from a remote replica.
+	OnRemoteTimeout(*TimeoutMsg)
+	// AdvanceView attempts to advance to the next view using the given QC.
+	// qc must be either a regular quorum certificate, or a timeout certificate.
+	AdvanceView(SyncInfo)
 	// Init gives the synchronizer a consensus instance to synchronize.
 	Init(Consensus)
 	// Start starts the synchronizer.

@@ -92,3 +92,60 @@ func BlockFromProto(block *Block) *hotstuff.Block {
 		hotstuff.ID(block.GetProposer()),
 	)
 }
+
+func TimeoutMsgFromProto(m *TimeoutMsg) *hotstuff.TimeoutMsg {
+	return &hotstuff.TimeoutMsg{
+		View:      hotstuff.View(m.GetView()),
+		HighQC:    QuorumCertFromProto(m.GetQC()),
+		Signature: SignatureFromProto(m.GetSig()),
+	}
+}
+
+func TimeoutMsgToProto(timeoutMsg *hotstuff.TimeoutMsg) *TimeoutMsg {
+	return &TimeoutMsg{
+		View: uint64(timeoutMsg.View),
+		QC:   QuorumCertToProto(timeoutMsg.HighQC),
+		Sig:  SignatureToProto(timeoutMsg.Signature),
+	}
+}
+
+func TimeoutCertFromProto(m *TimeoutCert) hotstuff.TimeoutCert {
+	sigs := make(map[hotstuff.ID]*ecdsa.Signature, len(m.GetSigs()))
+	for k, sig := range m.GetSigs() {
+		sigs[hotstuff.ID(k)] = SignatureFromProto(sig)
+	}
+	return ecdsa.NewTimeoutCert(sigs, hotstuff.View(m.GetView()))
+}
+
+func TimeoutCertToProto(timeoutCert hotstuff.TimeoutCert) *TimeoutCert {
+	tc := timeoutCert.(*ecdsa.TimeoutCert)
+	sigs := make(map[uint32]*Signature, len(tc.Signatures()))
+	for id, sig := range tc.Signatures() {
+		sigs[uint32(id)] = SignatureToProto(sig)
+	}
+	return &TimeoutCert{
+		View: uint64(tc.View()),
+		Sigs: sigs,
+	}
+}
+
+func SyncInfoFromProto(m *SyncInfo) (syncInfo hotstuff.SyncInfo) {
+	if qc := m.GetQC(); qc != nil {
+		syncInfo.QC = QuorumCertFromProto(qc)
+	}
+	if tc := m.GetTC(); tc != nil {
+		syncInfo.TC = TimeoutCertFromProto(tc)
+	}
+	return
+}
+
+func SyncInfoToProto(syncInfo hotstuff.SyncInfo) *SyncInfo {
+	m := &SyncInfo{}
+	if syncInfo.QC != nil {
+		m.Certificate = &SyncInfo_QC{QuorumCertToProto(syncInfo.QC)}
+	}
+	if syncInfo.TC != nil {
+		m.Certificate = &SyncInfo_TC{TimeoutCertToProto(syncInfo.TC)}
+	}
+	return m
+}

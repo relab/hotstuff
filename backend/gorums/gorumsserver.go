@@ -132,17 +132,8 @@ func (srv *Server) Vote(_ context.Context, cert *proto.PartialCert) {
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
-func (srv *Server) NewView(ctx context.Context, msg *proto.NewViewMsg) {
-	id, err := srv.getClientID(ctx)
-	if err != nil {
-		logger.Infof("Failed to get client ID: %v", err)
-		return
-	}
-	srv.hs.OnNewView(hotstuff.NewView{
-		ID:   id,
-		View: hotstuff.View(msg.GetView()),
-		QC:   proto.QuorumCertFromProto(msg.GetQC()),
-	})
+func (srv *Server) NewView(ctx context.Context, msg *proto.SyncInfo) {
+	srv.hs.Synchronizer().AdvanceView(proto.SyncInfoFromProto(msg))
 }
 
 // Fetch handles an incoming fetch request.
@@ -174,4 +165,15 @@ func (srv *Server) Fetch(ctx context.Context, pb *proto.BlockHash) {
 // Deliver handles an incoming deliver message.
 func (srv *Server) Deliver(_ context.Context, block *proto.Block) {
 	srv.hs.OnDeliver(proto.BlockFromProto(block))
+}
+
+// Timeout handles an incoming TimeoutMsg.
+func (srv *Server) Timeout(ctx context.Context, msg *proto.TimeoutMsg) {
+	var err error
+	timeoutMsg := proto.TimeoutMsgFromProto(msg)
+	timeoutMsg.ID, err = srv.getClientID(ctx)
+	if err != nil {
+		logger.Infof("Could not get ID of replica: %v", err)
+	}
+	srv.hs.Synchronizer().OnRemoteTimeout(timeoutMsg)
 }

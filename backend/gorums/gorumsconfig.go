@@ -45,15 +45,14 @@ func (r *gorumsReplica) Vote(cert hotstuff.PartialCert) {
 }
 
 // NewView sends the quorum certificate to the other replica.
-func (r *gorumsReplica) NewView(msg hotstuff.NewView) {
+func (r *gorumsReplica) NewView(msg hotstuff.SyncInfo) {
 	if r.node == nil {
 		return
 	}
 	var ctx context.Context
 	r.newviewCancel()
 	ctx, r.newviewCancel = context.WithCancel(context.Background())
-	pQC := proto.QuorumCertToProto(msg.QC)
-	r.node.NewView(ctx, &proto.NewViewMsg{View: uint64(msg.View), QC: pQC}, gorums.WithNoSendWaiting())
+	r.node.NewView(ctx, proto.SyncInfoToProto(msg), gorums.WithNoSendWaiting())
 }
 
 // Deliver sends the block to the other replica
@@ -74,6 +73,7 @@ type Config struct {
 	privKey       hotstuff.PrivateKey
 	replicas      map[hotstuff.ID]hotstuff.Replica
 	proposeCancel context.CancelFunc
+	timeoutCancel context.CancelFunc
 }
 
 // NewConfig creates a new configuration.
@@ -83,6 +83,7 @@ func NewConfig(replicaCfg config.ReplicaConfig) *Config {
 		privKey:       replicaCfg.PrivateKey,
 		replicas:      make(map[hotstuff.ID]hotstuff.Replica),
 		proposeCancel: func() {},
+		timeoutCancel: func() {},
 	}
 
 	for id, r := range replicaCfg.Replicas {
@@ -184,6 +185,17 @@ func (cfg *Config) Propose(block *hotstuff.Block) {
 	ctx, cfg.proposeCancel = context.WithCancel(context.Background())
 	pBlock := proto.BlockToProto(block)
 	cfg.cfg.Propose(ctx, pBlock, gorums.WithNoSendWaiting())
+}
+
+// Timeout sends the timeout message to all replicas.
+func (cfg *Config) Timeout(msg *hotstuff.TimeoutMsg) {
+	if cfg.cfg == nil {
+		return
+	}
+	var ctx context.Context
+	cfg.timeoutCancel()
+	ctx, cfg.timeoutCancel = context.WithCancel(context.Background())
+	cfg.cfg.Timeout(ctx, proto.TimeoutMsgToProto(msg), gorums.WithNoSendWaiting())
 }
 
 // Fetch requests a block from all the replicas in the configuration

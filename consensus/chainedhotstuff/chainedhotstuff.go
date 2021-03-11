@@ -68,6 +68,28 @@ func (hs *chainedhotstuff) LastVote() hotstuff.View {
 	return hs.lastVote
 }
 
+// Signer returns the signer.
+func (hs *chainedhotstuff) Signer() hotstuff.Signer {
+	return hs.signer
+}
+
+// Verifier returns the verifier.
+func (hs *chainedhotstuff) Verifier() hotstuff.Verifier {
+	return hs.verifier
+}
+
+// Synchronizer returns the view synchronizer.
+func (hs *chainedhotstuff) Synchronizer() hotstuff.ViewSynchronizer {
+	return hs.synchronizer
+}
+
+// IncreaseLastVotedView ensures that no voting happens in a view earlier than `view`.
+func (hs *chainedhotstuff) IncreaseLastVotedView(view hotstuff.View) {
+	hs.mut.Lock()
+	hs.lastVote++
+	hs.mut.Unlock()
+}
+
 // HighQC returns the highest QC known to the replica
 func (hs *chainedhotstuff) HighQC() hotstuff.QuorumCert {
 	hs.mut.Lock()
@@ -97,6 +119,14 @@ func (hs *chainedhotstuff) CreateDummy() {
 	hs.mut.Unlock()
 }
 
+// UpdateHighQC updates HighQC if the given qc is higher than the old HighQC.
+func (hs *chainedhotstuff) UpdateHighQC(qc hotstuff.QuorumCert) {
+	hs.mut.Lock()
+	defer hs.mut.Unlock()
+	hs.updateHighQC(qc)
+}
+
+// updateHighQC differs from the exported version because it does not lock the mutex.
 func (hs *chainedhotstuff) updateHighQC(qc hotstuff.QuorumCert) {
 	logger.Debugf("updateHighQC: %v", qc)
 	if !hs.verifier.VerifyQuorumCert(qc) {
@@ -196,25 +226,6 @@ func (hs *chainedhotstuff) Propose() {
 	hs.OnPropose(block)
 }
 
-func (hs *chainedhotstuff) NewView() {
-	logger.Debug("NewView")
-	hs.mut.Lock()
-	msg := hotstuff.NewView{ID: hs.cfg.ID(), View: hs.bLeaf.View(), QC: hs.highQC}
-	leaderID := hs.synchronizer.GetLeader(hs.bLeaf.View() + 1)
-	if leaderID == hs.cfg.ID() {
-		hs.mut.Unlock()
-		// TODO: Is this necessary
-		hs.OnNewView(msg)
-		return
-	}
-	leader, ok := hs.cfg.Replica(leaderID)
-	if !ok {
-		logger.Warnf("Replica with ID %d was not found!", leaderID)
-	}
-	hs.mut.Unlock()
-	leader.NewView(msg)
-}
-
 // OnPropose handles an incoming proposal
 func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 	logger.Debug("OnPropose: ", block)
@@ -257,9 +268,6 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 		logger.Info("OnPropose: command not accepted")
 		return
 	}
-
-	// Signal the synchronizer
-	hs.synchronizer.OnPropose()
 
 	// cancel the last fetch
 	hs.fetchCancel()
@@ -375,43 +383,7 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 
 	hs.mut.Unlock()
 	// signal the synchronizer
-	hs.synchronizer.OnFinishQC()
-}
-
-// OnNewView handles an incoming NewView
-func (hs *chainedhotstuff) OnNewView(msg hotstuff.NewView) {
-	defer func() {
-		// cleanup
-		hs.mut.Lock()
-		for view := range hs.newView {
-			if view < hs.bLeaf.View() {
-				delete(hs.newView, view)
-			}
-		}
-		hs.mut.Unlock()
-	}()
-
-	hs.mut.Lock()
-
-	logger.Debug("OnNewView: ", msg)
-
-	hs.updateHighQC(msg.QC)
-
-	v, ok := hs.newView[msg.View]
-	if !ok {
-		v = make(map[hotstuff.ID]struct{})
-	}
-	v[msg.ID] = struct{}{}
-	hs.newView[msg.View] = v
-
-	if len(v) < hs.cfg.QuorumSize() {
-		hs.mut.Unlock()
-		return
-	}
-
-	hs.mut.Unlock()
-	// signal the synchronizer
-	hs.synchronizer.OnNewView()
+	hs.synchronizer.AdvanceView(hotstuff.SyncInfo{QC: qc})
 }
 
 func (hs *chainedhotstuff) deliver(block *hotstuff.Block) {

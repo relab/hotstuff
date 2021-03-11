@@ -17,7 +17,11 @@ service Hotstuff {
     option (gorums.unicast) = true;
   }
 
-  rpc NewView(NewViewMsg) returns (google.protobuf.Empty) {
+  rpc Timeout(TimeoutMsg) returns (google.protobuf.Empty) {
+    option (gorums.multicast) = true;
+  }
+
+  rpc NewView(SyncInfo) returns (google.protobuf.Empty) {
     option (gorums.unicast) = true;
   }
 
@@ -56,7 +60,25 @@ message QuorumCert {
   bytes Hash = 2;
 }
 
+message TimeoutCert {
+  map<uint32, Signature> Sigs = 1;
+  uint64 View = 2;
+}
+
 message NewViewMsg {
   uint64 View = 1;
   QuorumCert QC = 2;
+}
+
+message TimeoutMsg {
+  uint64 View = 1;
+  QuorumCert QC = 2;
+  Signature Sig = 3;
+}
+
+message SyncInfo {
+  oneof Certificate {
+    QuorumCert QC = 1;
+    TimeoutCert TC = 2;
+  }
 }
