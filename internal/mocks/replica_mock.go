@@ -5,6 +5,7 @@
 package mocks
 
 import (
+	crypto "crypto"
 	gomock "github.com/golang/mock/gomock"
 	hotstuff "github.com/relab/hotstuff"
 	reflect "reflect"
@@ -60,7 +61,7 @@ func (mr *MockReplicaMockRecorder) ID() *gomock.Call {
 }
 
 // NewView mocks base method
-func (m *MockReplica) NewView(arg0 hotstuff.NewView) {
+func (m *MockReplica) NewView(arg0 hotstuff.SyncInfo) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "NewView", arg0)
 }
@@ -72,10 +73,10 @@ func (mr *MockReplicaMockRecorder) NewView(arg0 interface{}) *gomock.Call {
 }
 
 // PublicKey mocks base method
-func (m *MockReplica) PublicKey() hotstuff.PublicKey {
+func (m *MockReplica) PublicKey() crypto.PublicKey {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PublicKey")
-	ret0, _ := ret[0].(hotstuff.PublicKey)
+	ret0, _ := ret[0].(crypto.PublicKey)
 	return ret0
 }
 

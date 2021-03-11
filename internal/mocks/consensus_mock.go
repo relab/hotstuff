@@ -87,6 +87,18 @@ func (mr *MockConsensusMockRecorder) HighQC() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HighQC", reflect.TypeOf((*MockConsensus)(nil).HighQC))
 }
 
+// IncreaseLastVotedView mocks base method
+func (m *MockConsensus) IncreaseLastVotedView(arg0 hotstuff.View) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "IncreaseLastVotedView", arg0)
+}
+
+// IncreaseLastVotedView indicates an expected call of IncreaseLastVotedView
+func (mr *MockConsensusMockRecorder) IncreaseLastVotedView(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncreaseLastVotedView", reflect.TypeOf((*MockConsensus)(nil).IncreaseLastVotedView), arg0)
+}
+
 // LastVote mocks base method
 func (m *MockConsensus) LastVote() hotstuff.View {
 	m.ctrl.T.Helper()
@@ -115,18 +127,6 @@ func (mr *MockConsensusMockRecorder) Leaf() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Leaf", reflect.TypeOf((*MockConsensus)(nil).Leaf))
 }
 
-// NewView mocks base method
-func (m *MockConsensus) NewView() {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "NewView")
-}
-
-// NewView indicates an expected call of NewView
-func (mr *MockConsensusMockRecorder) NewView() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockConsensus)(nil).NewView))
-}
-
 // OnDeliver mocks base method
 func (m *MockConsensus) OnDeliver(arg0 *hotstuff.Block) {
 	m.ctrl.T.Helper()
@@ -137,18 +137,6 @@ func (m *MockConsensus) OnDeliver(arg0 *hotstuff.Block) {
 func (mr *MockConsensusMockRecorder) OnDeliver(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnDeliver", reflect.TypeOf((*MockConsensus)(nil).OnDeliver), arg0)
-}
-
-// OnNewView mocks base method
-func (m *MockConsensus) OnNewView(arg0 hotstuff.NewView) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "OnNewView", arg0)
-}
-
-// OnNewView indicates an expected call of OnNewView
-func (mr *MockConsensusMockRecorder) OnNewView(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnNewView", reflect.TypeOf((*MockConsensus)(nil).OnNewView), arg0)
 }
 
 // OnPropose mocks base method
@@ -185,4 +173,58 @@ func (m *MockConsensus) Propose() {
 func (mr *MockConsensusMockRecorder) Propose() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Propose", reflect.TypeOf((*MockConsensus)(nil).Propose))
+}
+
+// Signer mocks base method
+func (m *MockConsensus) Signer() hotstuff.Signer {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Signer")
+	ret0, _ := ret[0].(hotstuff.Signer)
+	return ret0
+}
+
+// Signer indicates an expected call of Signer
+func (mr *MockConsensusMockRecorder) Signer() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Signer", reflect.TypeOf((*MockConsensus)(nil).Signer))
+}
+
+// Synchronizer mocks base method
+func (m *MockConsensus) Synchronizer() hotstuff.ViewSynchronizer {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Synchronizer")
+	ret0, _ := ret[0].(hotstuff.ViewSynchronizer)
+	return ret0
+}
+
+// Synchronizer indicates an expected call of Synchronizer
+func (mr *MockConsensusMockRecorder) Synchronizer() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Synchronizer", reflect.TypeOf((*MockConsensus)(nil).Synchronizer))
+}
+
+// UpdateHighQC mocks base method
+func (m *MockConsensus) UpdateHighQC(arg0 hotstuff.QuorumCert) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "UpdateHighQC", arg0)
+}
+
+// UpdateHighQC indicates an expected call of UpdateHighQC
+func (mr *MockConsensusMockRecorder) UpdateHighQC(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHighQC", reflect.TypeOf((*MockConsensus)(nil).UpdateHighQC), arg0)
+}
+
+// Verifier mocks base method
+func (m *MockConsensus) Verifier() hotstuff.Verifier {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Verifier")
+	ret0, _ := ret[0].(hotstuff.Verifier)
+	return ret0
+}
+
+// Verifier indicates an expected call of Verifier
+func (mr *MockConsensusMockRecorder) Verifier() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verifier", reflect.TypeOf((*MockConsensus)(nil).Verifier))
 }

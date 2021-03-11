@@ -142,3 +142,15 @@ func (mr *MockConfigMockRecorder) Replicas() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Replicas", reflect.TypeOf((*MockConfig)(nil).Replicas))
 }
+
+// Timeout mocks base method
+func (m *MockConfig) Timeout(arg0 *hotstuff.TimeoutMsg) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Timeout", arg0)
+}
+
+// Timeout indicates an expected call of Timeout
+func (mr *MockConfigMockRecorder) Timeout(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Timeout", reflect.TypeOf((*MockConfig)(nil).Timeout), arg0)
+}

@@ -33,6 +33,18 @@ func (m *MockViewSynchronizer) EXPECT() *MockViewSynchronizerMockRecorder {
 	return m.recorder
 }
 
+// AdvanceView mocks base method
+func (m *MockViewSynchronizer) AdvanceView(arg0 hotstuff.SyncInfo) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "AdvanceView", arg0)
+}
+
+// AdvanceView indicates an expected call of AdvanceView
+func (mr *MockViewSynchronizerMockRecorder) AdvanceView(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdvanceView", reflect.TypeOf((*MockViewSynchronizer)(nil).AdvanceView), arg0)
+}
+
 // GetLeader mocks base method
 func (m *MockViewSynchronizer) GetLeader(arg0 hotstuff.View) hotstuff.ID {
 	m.ctrl.T.Helper()
@@ -59,40 +71,16 @@ func (mr *MockViewSynchronizerMockRecorder) Init(arg0 interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockViewSynchronizer)(nil).Init), arg0)
 }
 
-// OnFinishQC mocks base method
-func (m *MockViewSynchronizer) OnFinishQC() {
+// OnRemoteTimeout mocks base method
+func (m *MockViewSynchronizer) OnRemoteTimeout(arg0 *hotstuff.TimeoutMsg) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "OnFinishQC")
+	m.ctrl.Call(m, "OnRemoteTimeout", arg0)
 }
 
-// OnFinishQC indicates an expected call of OnFinishQC
-func (mr *MockViewSynchronizerMockRecorder) OnFinishQC() *gomock.Call {
+// OnRemoteTimeout indicates an expected call of OnRemoteTimeout
+func (mr *MockViewSynchronizerMockRecorder) OnRemoteTimeout(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnFinishQC", reflect.TypeOf((*MockViewSynchronizer)(nil).OnFinishQC))
-}
-
-// OnNewView mocks base method
-func (m *MockViewSynchronizer) OnNewView() {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "OnNewView")
-}
-
-// OnNewView indicates an expected call of OnNewView
-func (mr *MockViewSynchronizerMockRecorder) OnNewView() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnNewView", reflect.TypeOf((*MockViewSynchronizer)(nil).OnNewView))
-}
-
-// OnPropose mocks base method
-func (m *MockViewSynchronizer) OnPropose() {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "OnPropose")
-}
-
-// OnPropose indicates an expected call of OnPropose
-func (mr *MockViewSynchronizerMockRecorder) OnPropose() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnPropose", reflect.TypeOf((*MockViewSynchronizer)(nil).OnPropose))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnRemoteTimeout", reflect.TypeOf((*MockViewSynchronizer)(nil).OnRemoteTimeout), arg0)
 }
 
 // Start mocks base method
