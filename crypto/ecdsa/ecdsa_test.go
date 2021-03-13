@@ -1,4 +1,4 @@
-package ecdsa
+package ecdsa_test
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/internal/mocks"
+	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/internal/testutil"
 )
 
@@ -54,7 +54,7 @@ func TestVerifyInvalidPartialCert(t *testing.T) {
 		defer ctrl.Finish()
 
 		td := newTestData(t, ctrl, 1, newFunc)
-		pc := NewPartialCert(NewSignature(big.NewInt(1), big.NewInt(2), 1), td.block.Hash())
+		pc := ecdsa.NewPartialCert(ecdsa.NewSignature(big.NewInt(1), big.NewInt(2), 1), td.block.Hash())
 
 		if td.verifiers[0].VerifyPartialCert(pc) {
 			t.Error("Invalid partial certificate was verified.")
@@ -81,7 +81,7 @@ func TestCreateQuorumCert(t *testing.T) {
 			t.Error("Quorum certificate hash does not match block hash!")
 		}
 
-		if len(qc.(*QuorumCert).Signatures()) != len(pcs) {
+		if len(qc.(*ecdsa.QuorumCert).Signatures()) != len(pcs) {
 			t.Error("Quorum certificate does not include all partial certificates!")
 		}
 	}
@@ -106,7 +106,7 @@ func TestCreateTimeoutCert(t *testing.T) {
 			t.Error("Timeout certificate view does not match original view.")
 		}
 
-		if len(tc.(*TimeoutCert).Signatures()) != len(timeouts) {
+		if len(tc.(*ecdsa.TimeoutCert).Signatures()) != len(timeouts) {
 			t.Error("Quorum certificate does not include all partial certificates!")
 		}
 	}
@@ -128,8 +128,8 @@ func TestCreateQuorumCertInvalid(t *testing.T) {
 			votes []hotstuff.PartialCert
 			err   error
 		}{
-			{"hash mismatch", badHash, ErrHashMismatch},
-			{"duplicate", duplicate, ErrPartialDuplicate},
+			{"hash mismatch", badHash, ecdsa.ErrHashMismatch},
+			{"duplicate", duplicate, ecdsa.ErrPartialDuplicate},
 		}
 
 		for _, test := range tests {
@@ -160,8 +160,8 @@ func TestCreateTimeoutCertInvalid(t *testing.T) {
 			votes []*hotstuff.TimeoutMsg
 			err   error
 		}{
-			{"hash mismatch", badView, ErrViewMismatch},
-			{"duplicate", duplicate, ErrPartialDuplicate},
+			{"hash mismatch", badView, ecdsa.ErrViewMismatch},
+			{"duplicate", duplicate, ecdsa.ErrPartialDuplicate},
 		}
 
 		for _, test := range tests {
@@ -184,7 +184,7 @@ func TestVerifyGenesisQC(t *testing.T) {
 
 		td := newTestData(t, ctrl, 4, newFunc)
 
-		genesisQC := NewQuorumCert(make(map[hotstuff.ID]*Signature), hotstuff.GetGenesis().Hash())
+		genesisQC := ecdsa.NewQuorumCert(make(map[hotstuff.ID]*ecdsa.Signature), hotstuff.GetGenesis().Hash())
 
 		if !td.verifiers[0].VerifyQuorumCert(genesisQC) {
 			t.Error("Genesis QC was not verified!")
@@ -241,9 +241,9 @@ func TestVerifyInvalidQuorumCert(t *testing.T) {
 			name string
 			qc   hotstuff.QuorumCert
 		}{
-			{"empty", NewQuorumCert(make(map[hotstuff.ID]*Signature), td.block.Hash())},
+			{"empty", ecdsa.NewQuorumCert(make(map[hotstuff.ID]*ecdsa.Signature), td.block.Hash())},
 			{"not enough signatures", testutil.CreateQC(t, td.block, td.signers[:2])},
-			{"hash mismatch", NewQuorumCert(goodQC.(*QuorumCert).Signatures(), hotstuff.Hash{})},
+			{"hash mismatch", ecdsa.NewQuorumCert(goodQC.(*ecdsa.QuorumCert).Signatures(), hotstuff.Hash{})},
 		}
 
 		for _, test := range tests {
@@ -322,7 +322,7 @@ func TestCacheDrop(t *testing.T) {
 
 func runBoth(t *testing.T, run func(*testing.T, newFunc)) {
 	t.Helper()
-	t.Run("NoCache", func(t *testing.T) { run(t, New) })
+	t.Run("NoCache", func(t *testing.T) { run(t, ecdsa.New) })
 	t.Run("WithCache", func(t *testing.T) { run(t, newCache) })
 }
 
@@ -338,22 +338,10 @@ func createBlock(t *testing.T, signer hotstuff.Signer) *hotstuff.Block {
 	return b
 }
 
-func createMockConfig(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID) *mocks.MockConfig {
-	t.Helper()
-	cfg := testutil.CreateMockConfig(t, ctrl, id, testutil.GenerateKey(t))
-	cfg.
-		EXPECT().
-		QuorumSize().
-		AnyTimes().
-		Return(3)
-
-	return cfg
-}
-
 type newFunc func() (hotstuff.Signer, hotstuff.Verifier)
 
 func newCache() (hotstuff.Signer, hotstuff.Verifier) {
-	return NewWithCache(5)
+	return ecdsa.NewWithCache(5)
 }
 
 type testData struct {
@@ -365,29 +353,12 @@ type testData struct {
 func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc newFunc) testData {
 	t.Helper()
 
-	replicas := make([]*mocks.MockReplica, 0, n)
-	configs := make([]*mocks.MockConfig, 0, n)
-	signers := make([]hotstuff.Signer, 0, n)
-	verifiers := make([]hotstuff.Verifier, 0, n)
-
-	for i := 0; i < n; i++ {
-		id := hotstuff.ID(i) + 1
-		configs = append(configs, createMockConfig(t, ctrl, id))
-		replicas = append(replicas, testutil.CreateMockReplica(t, ctrl, id, configs[i].PrivateKey().Public()))
-		sign, verify := newFunc()
-		signers = append(signers, sign)
-		verifiers = append(verifiers, verify)
-	}
-
-	for _, config := range configs {
-		for _, replica := range replicas {
-			testutil.ConfigAddReplica(t, config, replica)
-		}
-	}
+	bl := testutil.CreateBuilders(t, ctrl, n)
+	hl := bl.Build()
 
 	return testData{
-		signers:   signers,
-		verifiers: verifiers,
-		block:     createBlock(t, signers[0]),
+		signers:   hl.Signers(),
+		verifiers: hl.Verifiers(),
+		block:     createBlock(t, hl[0].Signer()),
 	}
 }

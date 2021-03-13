@@ -76,6 +76,14 @@ func (hl HotStuffList) Signers() (signers []hotstuff.Signer) {
 	return signers
 }
 
+func (hl HotStuffList) Verifiers() (verifiers []hotstuff.Verifier) {
+	verifiers = make([]hotstuff.Verifier, len(hl))
+	for i, hs := range hl {
+		verifiers[i] = hs.Verifier()
+	}
+	return verifiers
+}
+
 func (hl HotStuffList) Keys() (keys []hotstuff.PrivateKey) {
 	keys = make([]hotstuff.PrivateKey, len(hl))
 	for i, hs := range hl {
