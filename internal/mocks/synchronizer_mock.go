@@ -5,103 +5,78 @@
 package mocks
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	hotstuff "github.com/relab/hotstuff"
-	reflect "reflect"
 )
 
-// MockViewSynchronizer is a mock of ViewSynchronizer interface
+// MockViewSynchronizer is a mock of ViewSynchronizer interface.
 type MockViewSynchronizer struct {
 	ctrl     *gomock.Controller
 	recorder *MockViewSynchronizerMockRecorder
 }
 
-// MockViewSynchronizerMockRecorder is the mock recorder for MockViewSynchronizer
+// MockViewSynchronizerMockRecorder is the mock recorder for MockViewSynchronizer.
 type MockViewSynchronizerMockRecorder struct {
 	mock *MockViewSynchronizer
 }
 
-// NewMockViewSynchronizer creates a new mock instance
+// NewMockViewSynchronizer creates a new mock instance.
 func NewMockViewSynchronizer(ctrl *gomock.Controller) *MockViewSynchronizer {
 	mock := &MockViewSynchronizer{ctrl: ctrl}
 	mock.recorder = &MockViewSynchronizerMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockViewSynchronizer) EXPECT() *MockViewSynchronizerMockRecorder {
 	return m.recorder
 }
 
-// AdvanceView mocks base method
+// AdvanceView mocks base method.
 func (m *MockViewSynchronizer) AdvanceView(arg0 hotstuff.SyncInfo) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AdvanceView", arg0)
 }
 
-// AdvanceView indicates an expected call of AdvanceView
+// AdvanceView indicates an expected call of AdvanceView.
 func (mr *MockViewSynchronizerMockRecorder) AdvanceView(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdvanceView", reflect.TypeOf((*MockViewSynchronizer)(nil).AdvanceView), arg0)
 }
 
-// GetLeader mocks base method
-func (m *MockViewSynchronizer) GetLeader(arg0 hotstuff.View) hotstuff.ID {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLeader", arg0)
-	ret0, _ := ret[0].(hotstuff.ID)
-	return ret0
-}
-
-// GetLeader indicates an expected call of GetLeader
-func (mr *MockViewSynchronizerMockRecorder) GetLeader(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLeader", reflect.TypeOf((*MockViewSynchronizer)(nil).GetLeader), arg0)
-}
-
-// Init mocks base method
-func (m *MockViewSynchronizer) Init(arg0 hotstuff.Consensus) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Init", arg0)
-}
-
-// Init indicates an expected call of Init
-func (mr *MockViewSynchronizerMockRecorder) Init(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockViewSynchronizer)(nil).Init), arg0)
-}
-
-// OnRemoteTimeout mocks base method
+// OnRemoteTimeout mocks base method.
 func (m *MockViewSynchronizer) OnRemoteTimeout(arg0 *hotstuff.TimeoutMsg) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "OnRemoteTimeout", arg0)
 }
 
-// OnRemoteTimeout indicates an expected call of OnRemoteTimeout
+// OnRemoteTimeout indicates an expected call of OnRemoteTimeout.
 func (mr *MockViewSynchronizerMockRecorder) OnRemoteTimeout(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnRemoteTimeout", reflect.TypeOf((*MockViewSynchronizer)(nil).OnRemoteTimeout), arg0)
 }
 
-// Start mocks base method
+// Start mocks base method.
 func (m *MockViewSynchronizer) Start() {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Start")
 }
 
-// Start indicates an expected call of Start
+// Start indicates an expected call of Start.
 func (mr *MockViewSynchronizerMockRecorder) Start() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockViewSynchronizer)(nil).Start))
 }
 
-// Stop mocks base method
+// Stop mocks base method.
 func (m *MockViewSynchronizer) Stop() {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Stop")
 }
 
-// Stop indicates an expected call of Stop
+// Stop indicates an expected call of Stop.
 func (mr *MockViewSynchronizerMockRecorder) Stop() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockViewSynchronizer)(nil).Stop))

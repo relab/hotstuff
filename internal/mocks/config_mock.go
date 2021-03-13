@@ -6,61 +6,48 @@ package mocks
 
 import (
 	context "context"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	hotstuff "github.com/relab/hotstuff"
-	reflect "reflect"
 )
 
-// MockConfig is a mock of Config interface
+// MockConfig is a mock of Config interface.
 type MockConfig struct {
 	ctrl     *gomock.Controller
 	recorder *MockConfigMockRecorder
 }
 
-// MockConfigMockRecorder is the mock recorder for MockConfig
+// MockConfigMockRecorder is the mock recorder for MockConfig.
 type MockConfigMockRecorder struct {
 	mock *MockConfig
 }
 
-// NewMockConfig creates a new mock instance
+// NewMockConfig creates a new mock instance.
 func NewMockConfig(ctrl *gomock.Controller) *MockConfig {
 	mock := &MockConfig{ctrl: ctrl}
 	mock.recorder = &MockConfigMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockConfig) EXPECT() *MockConfigMockRecorder {
 	return m.recorder
 }
 
-// Fetch mocks base method
+// Fetch mocks base method.
 func (m *MockConfig) Fetch(arg0 context.Context, arg1 hotstuff.Hash) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Fetch", arg0, arg1)
 }
 
-// Fetch indicates an expected call of Fetch
+// Fetch indicates an expected call of Fetch.
 func (mr *MockConfigMockRecorder) Fetch(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Fetch", reflect.TypeOf((*MockConfig)(nil).Fetch), arg0, arg1)
 }
 
-// ID mocks base method
-func (m *MockConfig) ID() hotstuff.ID {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ID")
-	ret0, _ := ret[0].(hotstuff.ID)
-	return ret0
-}
-
-// ID indicates an expected call of ID
-func (mr *MockConfigMockRecorder) ID() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ID", reflect.TypeOf((*MockConfig)(nil).ID))
-}
-
-// Len mocks base method
+// Len mocks base method.
 func (m *MockConfig) Len() int {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Len")
@@ -68,39 +55,25 @@ func (m *MockConfig) Len() int {
 	return ret0
 }
 
-// Len indicates an expected call of Len
+// Len indicates an expected call of Len.
 func (mr *MockConfigMockRecorder) Len() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Len", reflect.TypeOf((*MockConfig)(nil).Len))
 }
 
-// PrivateKey mocks base method
-func (m *MockConfig) PrivateKey() hotstuff.PrivateKey {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PrivateKey")
-	ret0, _ := ret[0].(hotstuff.PrivateKey)
-	return ret0
-}
-
-// PrivateKey indicates an expected call of PrivateKey
-func (mr *MockConfigMockRecorder) PrivateKey() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrivateKey", reflect.TypeOf((*MockConfig)(nil).PrivateKey))
-}
-
-// Propose mocks base method
+// Propose mocks base method.
 func (m *MockConfig) Propose(arg0 *hotstuff.Block) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Propose", arg0)
 }
 
-// Propose indicates an expected call of Propose
+// Propose indicates an expected call of Propose.
 func (mr *MockConfigMockRecorder) Propose(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Propose", reflect.TypeOf((*MockConfig)(nil).Propose), arg0)
 }
 
-// QuorumSize mocks base method
+// QuorumSize mocks base method.
 func (m *MockConfig) QuorumSize() int {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "QuorumSize")
@@ -108,13 +81,13 @@ func (m *MockConfig) QuorumSize() int {
 	return ret0
 }
 
-// QuorumSize indicates an expected call of QuorumSize
+// QuorumSize indicates an expected call of QuorumSize.
 func (mr *MockConfigMockRecorder) QuorumSize() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QuorumSize", reflect.TypeOf((*MockConfig)(nil).QuorumSize))
 }
 
-// Replica mocks base method
+// Replica mocks base method.
 func (m *MockConfig) Replica(arg0 hotstuff.ID) (hotstuff.Replica, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Replica", arg0)
@@ -123,13 +96,13 @@ func (m *MockConfig) Replica(arg0 hotstuff.ID) (hotstuff.Replica, bool) {
 	return ret0, ret1
 }
 
-// Replica indicates an expected call of Replica
+// Replica indicates an expected call of Replica.
 func (mr *MockConfigMockRecorder) Replica(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Replica", reflect.TypeOf((*MockConfig)(nil).Replica), arg0)
 }
 
-// Replicas mocks base method
+// Replicas mocks base method.
 func (m *MockConfig) Replicas() map[hotstuff.ID]hotstuff.Replica {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Replicas")
@@ -137,19 +110,19 @@ func (m *MockConfig) Replicas() map[hotstuff.ID]hotstuff.Replica {
 	return ret0
 }
 
-// Replicas indicates an expected call of Replicas
+// Replicas indicates an expected call of Replicas.
 func (mr *MockConfigMockRecorder) Replicas() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Replicas", reflect.TypeOf((*MockConfig)(nil).Replicas))
 }
 
-// Timeout mocks base method
+// Timeout mocks base method.
 func (m *MockConfig) Timeout(arg0 *hotstuff.TimeoutMsg) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Timeout", arg0)
 }
 
-// Timeout indicates an expected call of Timeout
+// Timeout indicates an expected call of Timeout.
 func (mr *MockConfigMockRecorder) Timeout(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Timeout", reflect.TypeOf((*MockConfig)(nil).Timeout), arg0)

@@ -204,7 +204,7 @@ func TestVerifyQuorumCert(t *testing.T) {
 
 		for i, verifier := range td.verifiers {
 			if !verifier.VerifyQuorumCert(qc) {
-				t.Errorf("Verifier %d failed to verify QC!", i+1)
+				t.Errorf("verifier %d failed to verify QC!", i+1)
 			}
 		}
 	}
@@ -222,7 +222,7 @@ func TestVerifyTimeoutCert(t *testing.T) {
 
 		for i, verifier := range td.verifiers {
 			if !verifier.VerifyTimeoutCert(tc) {
-				t.Errorf("Verifier %d failed to verify TC!", i+1)
+				t.Errorf("verifier %d failed to verify TC!", i+1)
 			}
 		}
 	}
@@ -350,10 +350,10 @@ func createMockConfig(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID) *mo
 	return cfg
 }
 
-type newFunc func(hotstuff.Config) (hotstuff.Signer, hotstuff.Verifier)
+type newFunc func() (hotstuff.Signer, hotstuff.Verifier)
 
-func newCache(cfg hotstuff.Config) (hotstuff.Signer, hotstuff.Verifier) {
-	return NewWithCache(cfg, 5)
+func newCache() (hotstuff.Signer, hotstuff.Verifier) {
+	return NewWithCache(5)
 }
 
 type testData struct {
@@ -374,7 +374,7 @@ func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc newFunc) 
 		id := hotstuff.ID(i) + 1
 		configs = append(configs, createMockConfig(t, ctrl, id))
 		replicas = append(replicas, testutil.CreateMockReplica(t, ctrl, id, configs[i].PrivateKey().Public()))
-		sign, verify := newFunc(configs[i])
+		sign, verify := newFunc()
 		signers = append(signers, sign)
 		verifiers = append(verifiers, verify)
 	}

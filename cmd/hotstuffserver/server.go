@@ -19,7 +19,6 @@ import (
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus/chainedhotstuff"
 	"github.com/relab/hotstuff/leaderrotation"
-	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/proto"
@@ -36,10 +35,9 @@ type clientSrv struct {
 	cancel    context.CancelFunc
 	conf      *options
 	gorumsSrv *gorums.Server
-	hsSrv     *hotstuffgorums.Server
 	cfg       *hotstuffgorums.Config
-	hs        hotstuff.Consensus
-	pm        hotstuff.ViewSynchronizer
+	hsSrv     *hotstuffgorums.Server
+	hs        *hotstuff.HotStuff
 	cmdCache  *cmdCache
 
 	mut          sync.Mutex
@@ -70,33 +68,29 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 		lastExecTime: time.Now().UnixNano(),
 	}
 
-	var err error
+	builder := chainedhotstuff.DefaultModules(*replicaConfig, time.Duration(conf.ViewTimeout)*time.Millisecond)
 	srv.cfg = hotstuffgorums.NewConfig(*replicaConfig)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to init gorums backend: %s\n", err)
-		os.Exit(1)
-	}
-
 	srv.hsSrv = hotstuffgorums.NewServer(*replicaConfig)
+	builder.Register(srv.cfg, srv.hsSrv)
 
 	var leaderRotation hotstuff.LeaderRotation
 	switch conf.PmType {
 	case "fixed":
 		leaderRotation = leaderrotation.NewFixed(conf.LeaderID)
 	case "round-robin":
-		leaderRotation = leaderrotation.NewRoundRobin(srv.cfg)
+		leaderRotation = leaderrotation.NewRoundRobin()
 	default:
 		fmt.Fprintf(os.Stderr, "Invalid pacemaker type: '%s'\n", conf.PmType)
 		os.Exit(1)
 	}
-	srv.pm = synchronizer.New(leaderRotation, time.Duration(conf.ViewTimeout)*time.Millisecond)
-	srv.hs = chainedhotstuff.Builder{
-		Config:       srv.cfg,
-		Acceptor:     srv.cmdCache,
-		Executor:     srv,
-		Synchronizer: srv.pm,
-		CommandQueue: srv.cmdCache,
-	}.Build()
+	builder.Register(
+		leaderRotation,
+		srv,          // executor
+		srv.cmdCache, // acceptor and command queue
+
+	)
+	srv.hs = builder.Build()
+
 	// Use a custom server instead of the gorums one
 	client.RegisterClientServer(srv.gorumsSrv, srv)
 	return srv
@@ -108,7 +102,7 @@ func (srv *clientSrv) Start(address string) error {
 		return err
 	}
 
-	err = srv.hsSrv.Start(srv.hs)
+	err = srv.hsSrv.Start()
 	if err != nil {
 		return err
 	}
@@ -121,7 +115,7 @@ func (srv *clientSrv) Start(address string) error {
 	// sleep so that all replicas can be ready before we start
 	time.Sleep(time.Duration(srv.conf.ViewTimeout) * time.Millisecond)
 
-	srv.pm.Start()
+	srv.hs.ViewSynchronizer().Start()
 
 	go func() {
 		err := srv.gorumsSrv.Serve(lis)
@@ -134,7 +128,7 @@ func (srv *clientSrv) Start(address string) error {
 }
 
 func (srv *clientSrv) Stop() {
-	srv.pm.Stop()
+	srv.hs.ViewSynchronizer().Stop()
 	srv.cfg.Close()
 	srv.hsSrv.Stop()
 	srv.gorumsSrv.Stop()

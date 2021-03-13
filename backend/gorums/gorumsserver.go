@@ -22,9 +22,13 @@ var logger = logging.GetLogger()
 // Server is the server-side of the gorums backend.
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
+	mod       *hotstuff.HotStuff
 	addr      string
-	hs        hotstuff.Consensus
 	gorumsSrv *gorums.Server
+}
+
+func (srv *Server) InitModule(hs *hotstuff.HotStuff) {
+	srv.mod = hs
 }
 
 // NewServer creates a new Server.
@@ -48,18 +52,17 @@ func NewServer(replicaConfig config.ReplicaConfig) *Server {
 }
 
 // Start creates a listener on the configured address and starts the server.
-func (srv *Server) Start(hs hotstuff.Consensus) error {
+func (srv *Server) Start() error {
 	lis, err := net.Listen("tcp", srv.addr)
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", srv.addr, err)
 	}
-	srv.StartOnListener(hs, lis)
+	srv.StartOnListener(lis)
 	return nil
 }
 
 // StartOnListener starts the server on the given listener.
-func (srv *Server) StartOnListener(hs hotstuff.Consensus, listener net.Listener) {
-	srv.hs = hs
+func (srv *Server) StartOnListener(listener net.Listener) {
 	go func() {
 		err := srv.gorumsSrv.Serve(listener)
 		if err != nil {
@@ -81,7 +84,7 @@ func (srv *Server) getClientID(ctx context.Context) (hotstuff.ID, error) {
 		}
 		if len(tlsInfo.State.PeerCertificates) > 0 {
 			cert := tlsInfo.State.PeerCertificates[0]
-			for replicaID := range srv.hs.Config().Replicas() {
+			for replicaID := range srv.mod.Config().Replicas() {
 				if subject, err := strconv.Atoi(cert.Subject.CommonName); err == nil && hotstuff.ID(subject) == replicaID {
 					return replicaID, nil
 				}
@@ -123,17 +126,17 @@ func (srv *Server) Propose(ctx context.Context, block *proto.Block) {
 	}
 	// defaults to 0 if error
 	block.Proposer = uint32(id)
-	srv.hs.OnPropose(proto.BlockFromProto(block))
+	srv.mod.Consensus().OnPropose(proto.BlockFromProto(block))
 }
 
 // Vote handles an incoming vote message.
 func (srv *Server) Vote(_ context.Context, cert *proto.PartialCert) {
-	srv.hs.OnVote(proto.PartialCertFromProto(cert))
+	srv.mod.Consensus().OnVote(proto.PartialCertFromProto(cert))
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
 func (srv *Server) NewView(ctx context.Context, msg *proto.SyncInfo) {
-	srv.hs.Synchronizer().AdvanceView(proto.SyncInfoFromProto(msg))
+	srv.mod.ViewSynchronizer().AdvanceView(proto.SyncInfoFromProto(msg))
 }
 
 // Fetch handles an incoming fetch request.
@@ -141,7 +144,7 @@ func (srv *Server) Fetch(ctx context.Context, pb *proto.BlockHash) {
 	var hash hotstuff.Hash
 	copy(hash[:], pb.GetHash())
 
-	block, ok := srv.hs.BlockChain().Get(hash)
+	block, ok := srv.mod.BlockChain().Get(hash)
 	if !ok {
 		return
 	}
@@ -153,7 +156,7 @@ func (srv *Server) Fetch(ctx context.Context, pb *proto.BlockHash) {
 		logger.Infof("Fetch: could not get peer id: %v", err)
 	}
 
-	replica, ok := srv.hs.Config().Replica(id)
+	replica, ok := srv.mod.Config().Replica(id)
 	if !ok {
 		logger.Infof("Fetch: could not find replica with id: %d", id)
 		return
@@ -164,7 +167,7 @@ func (srv *Server) Fetch(ctx context.Context, pb *proto.BlockHash) {
 
 // Deliver handles an incoming deliver message.
 func (srv *Server) Deliver(_ context.Context, block *proto.Block) {
-	srv.hs.OnDeliver(proto.BlockFromProto(block))
+	srv.mod.Consensus().OnDeliver(proto.BlockFromProto(block))
 }
 
 // Timeout handles an incoming TimeoutMsg.
@@ -175,5 +178,5 @@ func (srv *Server) Timeout(ctx context.Context, msg *proto.TimeoutMsg) {
 	if err != nil {
 		logger.Infof("Could not get ID of replica: %v", err)
 	}
-	srv.hs.Synchronizer().OnRemoteTimeout(timeoutMsg)
+	srv.mod.ViewSynchronizer().OnRemoteTimeout(timeoutMsg)
 }

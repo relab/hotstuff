@@ -14,10 +14,9 @@ var logger = logging.GetLogger()
 // It does not do anything to ensure synchronization, it simply makes the local replica
 // propose at the correct time, and send new view messages in case of a timeout.
 type Synchronizer struct {
-	hotstuff.LeaderRotation
+	mod *hotstuff.HotStuff
 
 	mut sync.Mutex
-	hs  hotstuff.Consensus
 
 	baseTimeout  time.Duration
 	timer        *time.Timer
@@ -26,11 +25,16 @@ type Synchronizer struct {
 	timeouts     map[hotstuff.View]map[hotstuff.ID]*hotstuff.TimeoutMsg
 }
 
+func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff) {
+	s.mod = hs
+}
+
 // New creates a new Synchronizer.
-func New(leaderRotation hotstuff.LeaderRotation, baseTimeout time.Duration) *Synchronizer {
+func New(baseTimeout time.Duration) hotstuff.ViewSynchronizer {
 	return &Synchronizer{
-		LeaderRotation: leaderRotation,
-		baseTimeout:    baseTimeout,
+		currentView:  1,
+		latestCommit: 0,
+		baseTimeout:  baseTimeout,
 	}
 }
 
@@ -38,9 +42,9 @@ func New(leaderRotation hotstuff.LeaderRotation, baseTimeout time.Duration) *Syn
 func (s *Synchronizer) Start() {
 	s.mut.Lock()
 	s.timer = time.AfterFunc(s.viewDuration(s.currentView), s.onLocalTimeout)
-	if s.GetLeader(s.currentView) == s.hs.Config().ID() {
+	if s.mod.LeaderRotation().GetLeader(s.currentView) == s.mod.ID() {
 		s.mut.Unlock()
-		s.hs.Propose()
+		s.mod.Consensus().Propose()
 	} else {
 		s.mut.Unlock()
 	}
@@ -49,11 +53,6 @@ func (s *Synchronizer) Start() {
 // Stop stops the view timeout timer.
 func (s *Synchronizer) Stop() {
 	s.timer.Stop()
-}
-
-// Init gives the synchronizer a consensus instance to synchronize.
-func (s *Synchronizer) Init(hs hotstuff.Consensus) {
-	s.hs = hs
 }
 
 // View returns the current view.
@@ -71,24 +70,24 @@ func (s *Synchronizer) viewDuration(view hotstuff.View) time.Duration {
 func (s *Synchronizer) onLocalTimeout() {
 	// only run this once per view
 	if m, ok := s.timeouts[s.currentView]; ok {
-		if _, ok := m[s.hs.Config().ID()]; ok {
+		if _, ok := m[s.mod.ID()]; ok {
 			return
 		}
 	}
 	// stop voting for current view
-	s.hs.IncreaseLastVotedView(s.currentView)
-	sig, err := s.hs.Signer().Sign(s.currentView.ToHash())
+	s.mod.Consensus().IncreaseLastVotedView(s.currentView)
+	sig, err := s.mod.Signer().Sign(s.currentView.ToHash())
 	if err != nil {
 		logger.Warnf("Failed to sign view: %v", err)
 		return
 	}
 	timeoutMsg := &hotstuff.TimeoutMsg{
-		ID:        s.hs.Config().ID(),
+		ID:        s.mod.ID(),
 		View:      s.currentView,
-		HighQC:    s.hs.HighQC(),
+		HighQC:    s.mod.Consensus().HighQC(),
 		Signature: sig,
 	}
-	s.hs.Config().Timeout(timeoutMsg)
+	s.mod.Config().Timeout(timeoutMsg)
 	s.OnRemoteTimeout(timeoutMsg)
 }
 
@@ -105,7 +104,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout *hotstuff.TimeoutMsg) {
 		}
 	}()
 
-	verifier := s.hs.Verifier()
+	verifier := s.mod.Verifier()
 	if !verifier.Verify(timeout.Signature, timeout.View.ToHash()) {
 		return
 	}
@@ -120,7 +119,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout *hotstuff.TimeoutMsg) {
 
 	timeouts[timeout.ID] = timeout
 
-	if len(timeouts) < s.hs.Config().QuorumSize() {
+	if len(timeouts) < s.mod.Config().QuorumSize() {
 		s.mut.Unlock()
 		return
 	}
@@ -132,7 +131,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout *hotstuff.TimeoutMsg) {
 		timeoutList = append(timeoutList, t)
 	}
 
-	signer := s.hs.Signer()
+	signer := s.mod.Signer()
 	tc, err := signer.CreateTimeoutCert(s.currentView, timeoutList)
 	if err != nil {
 		logger.Debugf("Failed to create timeout certificate: %v", err)
@@ -154,8 +153,8 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	if syncInfo.TC != nil {
 		v = syncInfo.TC.View()
 	} else {
-		s.hs.UpdateHighQC(syncInfo.QC)
-		b, ok := s.hs.BlockChain().Get(syncInfo.QC.BlockHash())
+		s.mod.Consensus().UpdateHighQC(syncInfo.QC)
+		b, ok := s.mod.BlockChain().Get(syncInfo.QC.BlockHash())
 		if !ok {
 			//TODO
 			return
@@ -173,10 +172,10 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	// TODO: stop timer
 	s.currentView = v + 1
 
-	leader := s.GetLeader(s.currentView)
-	if leader == s.hs.Config().ID() {
-		s.hs.Propose()
-	} else if replica, ok := s.hs.Config().Replica(leader); ok {
+	leader := s.mod.LeaderRotation().GetLeader(s.currentView)
+	if leader == s.mod.ID() {
+		s.mod.Consensus().Propose()
+	} else if replica, ok := s.mod.Config().Replica(leader); ok {
 		replica.NewView(syncInfo)
 	}
 }

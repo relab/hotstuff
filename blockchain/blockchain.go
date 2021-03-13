@@ -17,13 +17,15 @@ type blockChain struct {
 	accessOrder list.List
 }
 
-// New creates a new BlockChain with a maximum size.
+// New creates a new blockChain with a maximum size.
 // Blocks are dropped in least recently used order.
 func New(maxSize int) hotstuff.BlockChain {
-	return &blockChain{
+	bc := &blockChain{
 		maxSize: maxSize,
 		blocks:  make(map[hotstuff.Hash]*list.Element),
 	}
+	bc.Store(hotstuff.GetGenesis())
+	return bc
 }
 
 func (chain *blockChain) dropOldest() {

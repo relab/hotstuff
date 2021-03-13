@@ -11,17 +11,9 @@ import (
 var logger = logging.GetLogger()
 
 type chainedhotstuff struct {
-	mut sync.Mutex
+	mod *hotstuff.HotStuff
 
-	// modular components
-	cfg          hotstuff.Config
-	commands     hotstuff.CommandQueue
-	blocks       hotstuff.BlockChain
-	signer       hotstuff.Signer
-	verifier     hotstuff.Verifier
-	executor     hotstuff.Executor
-	acceptor     hotstuff.Acceptor
-	synchronizer hotstuff.ViewSynchronizer
+	mut sync.Mutex
 
 	// protocol variables
 
@@ -38,8 +30,9 @@ type chainedhotstuff struct {
 	newView       map[hotstuff.View]map[hotstuff.ID]struct{} // the set of replicas who have sent a newView message per view
 }
 
-func (hs *chainedhotstuff) init() {
-	var err error
+// New returns a new chainedhotstuff instance.
+func New() hotstuff.Consensus {
+	hs := &chainedhotstuff{}
 	hs.verifiedVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
 	hs.pendingVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
 	hs.newView = make(map[hotstuff.View]map[hotstuff.ID]struct{})
@@ -47,17 +40,17 @@ func (hs *chainedhotstuff) init() {
 	hs.bLock = hotstuff.GetGenesis()
 	hs.bExec = hotstuff.GetGenesis()
 	hs.bLeaf = hotstuff.GetGenesis()
-	hs.highQC, err = hs.signer.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+	return hs
+}
+
+func (hs *chainedhotstuff) InitModule(mod *hotstuff.HotStuff) {
+	hs.mod = mod
+
+	var err error
+	hs.highQC, err = hs.mod.Signer().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
 	if err != nil {
 		logger.Panicf("Failed to create QC for genesis block!")
 	}
-	hs.blocks.Store(hotstuff.GetGenesis())
-	hs.synchronizer.Init(hs)
-}
-
-// Config returns the configuration of this replica
-func (hs *chainedhotstuff) Config() hotstuff.Config {
-	return hs.cfg
 }
 
 // LastVote returns the view in which the replica last voted.
@@ -66,21 +59,6 @@ func (hs *chainedhotstuff) LastVote() hotstuff.View {
 	defer hs.mut.Unlock()
 
 	return hs.lastVote
-}
-
-// Signer returns the signer.
-func (hs *chainedhotstuff) Signer() hotstuff.Signer {
-	return hs.signer
-}
-
-// Verifier returns the verifier.
-func (hs *chainedhotstuff) Verifier() hotstuff.Verifier {
-	return hs.verifier
-}
-
-// Synchronizer returns the view synchronizer.
-func (hs *chainedhotstuff) Synchronizer() hotstuff.ViewSynchronizer {
-	return hs.synchronizer
 }
 
 // IncreaseLastVotedView ensures that no voting happens in a view earlier than `view`.
@@ -106,15 +84,10 @@ func (hs *chainedhotstuff) Leaf() *hotstuff.Block {
 	return hs.bLeaf
 }
 
-// BlockChain returns the datastructure containing the blocks known to the replica
-func (hs *chainedhotstuff) BlockChain() hotstuff.BlockChain {
-	return hs.blocks
-}
-
 func (hs *chainedhotstuff) CreateDummy() {
 	hs.mut.Lock()
-	dummy := hotstuff.NewBlock(hs.bLeaf.Hash(), nil, hotstuff.Command(""), hs.bLeaf.View()+1, hs.cfg.ID())
-	hs.blocks.Store(dummy)
+	dummy := hotstuff.NewBlock(hs.bLeaf.Hash(), nil, hotstuff.Command(""), hs.bLeaf.View()+1, hs.mod.ID())
+	hs.mod.BlockChain().Store(dummy)
 	hs.bLeaf = dummy
 	hs.mut.Unlock()
 }
@@ -129,18 +102,18 @@ func (hs *chainedhotstuff) UpdateHighQC(qc hotstuff.QuorumCert) {
 // updateHighQC differs from the exported version because it does not lock the mutex.
 func (hs *chainedhotstuff) updateHighQC(qc hotstuff.QuorumCert) {
 	logger.Debugf("updateHighQC: %v", qc)
-	if !hs.verifier.VerifyQuorumCert(qc) {
+	if !hs.mod.Verifier().VerifyQuorumCert(qc) {
 		logger.Info("updateHighQC: QC could not be verified!")
 		return
 	}
 
-	newBlock, ok := hs.blocks.Get(qc.BlockHash())
+	newBlock, ok := hs.mod.BlockChain().Get(qc.BlockHash())
 	if !ok {
 		logger.Info("updateHighQC: Could not find block referenced by new QC!")
 		return
 	}
 
-	oldBlock, ok := hs.blocks.Get(hs.highQC.BlockHash())
+	oldBlock, ok := hs.mod.BlockChain().Get(hs.highQC.BlockHash())
 	if !ok {
 		logger.Panic("Block from the old highQC missing from chain")
 	}
@@ -153,7 +126,7 @@ func (hs *chainedhotstuff) updateHighQC(qc hotstuff.QuorumCert) {
 
 func (hs *chainedhotstuff) commit(block *hotstuff.Block) {
 	if hs.bExec.View() < block.View() {
-		if parent, ok := hs.blocks.Get(block.Parent()); ok {
+		if parent, ok := hs.mod.BlockChain().Get(block.Parent()); ok {
 			hs.commit(parent)
 		}
 		if block.QuorumCert() == nil {
@@ -161,7 +134,7 @@ func (hs *chainedhotstuff) commit(block *hotstuff.Block) {
 			return
 		}
 		logger.Debug("EXEC: ", block)
-		hs.executor.Exec(block.Command())
+		hs.mod.Executor().Exec(block.Command())
 	}
 }
 
@@ -169,7 +142,7 @@ func (hs *chainedhotstuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool)
 	if qc == nil {
 		return nil, false
 	}
-	return hs.blocks.Get(qc.BlockHash())
+	return hs.mod.BlockChain().Get(qc.BlockHash())
 }
 
 func (hs *chainedhotstuff) update(block *hotstuff.Block) {
@@ -207,7 +180,7 @@ func (hs *chainedhotstuff) update(block *hotstuff.Block) {
 func (hs *chainedhotstuff) Propose() {
 	logger.Debug("Propose")
 	hs.mut.Lock()
-	cmd := hs.commands.GetCommand()
+	cmd := hs.mod.CommandQueue().GetCommand()
 	// TODO: Should probably use channels/contexts here instead such that
 	// a proposal can be made a little later if a new command is added to the queue.
 	// Alternatively, we could let the pacemaker know when commands arrive, so that it
@@ -217,11 +190,11 @@ func (hs *chainedhotstuff) Propose() {
 		// return
 		cmd = new(hotstuff.Command)
 	}
-	block := hotstuff.NewBlock(hs.bLeaf.Hash(), hs.highQC, *cmd, hs.bLeaf.View()+1, hs.cfg.ID())
-	hs.blocks.Store(block)
+	block := hotstuff.NewBlock(hs.bLeaf.Hash(), hs.highQC, *cmd, hs.bLeaf.View()+1, hs.mod.ID())
+	hs.mod.BlockChain().Store(block)
 	hs.mut.Unlock()
 
-	hs.cfg.Propose(block)
+	hs.mod.Config().Propose(block)
 	// self vote
 	hs.OnPropose(block)
 }
@@ -237,7 +210,7 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 		return
 	}
 
-	qcBlock, haveQCBlock := hs.blocks.Get(block.QuorumCert().BlockHash())
+	qcBlock, haveQCBlock := hs.mod.BlockChain().Get(block.QuorumCert().BlockHash())
 
 	safe := false
 	if haveQCBlock && qcBlock.View() > hs.bLock.View() {
@@ -248,7 +221,7 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 		b := block
 		ok := true
 		for ok && b.View() > hs.bLock.View() {
-			b, ok = hs.blocks.Get(b.Parent())
+			b, ok = hs.mod.BlockChain().Get(b.Parent())
 		}
 		if ok && b.Hash() == hs.bLock.Hash() {
 			safe = true
@@ -263,7 +236,7 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 		return
 	}
 
-	if !hs.acceptor.Accept(block.Command()) {
+	if !hs.mod.Acceptor().Accept(block.Command()) {
 		hs.mut.Unlock()
 		logger.Info("OnPropose: command not accepted")
 		return
@@ -272,14 +245,14 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 	// cancel the last fetch
 	hs.fetchCancel()
 
-	pc, err := hs.signer.CreatePartialCert(block)
+	pc, err := hs.mod.Signer().CreatePartialCert(block)
 	if err != nil {
 		hs.mut.Unlock()
 		logger.Error("OnPropose: failed to sign vote: ", err)
 		return
 	}
 
-	hs.blocks.Store(block)
+	hs.mod.BlockChain().Store(block)
 	hs.lastVote = block.View()
 
 	finish := func() {
@@ -289,14 +262,14 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 		hs.mut.Unlock()
 	}
 
-	leaderID := hs.synchronizer.GetLeader(hs.lastVote + 1)
-	if leaderID == hs.cfg.ID() {
+	leaderID := hs.mod.LeaderRotation().GetLeader(hs.lastVote + 1)
+	if leaderID == hs.mod.ID() {
 		finish()
 		hs.OnVote(pc)
 		return
 	}
 
-	leader, ok := hs.cfg.Replica(leaderID)
+	leader, ok := hs.mod.Config().Replica(leaderID)
 	if !ok {
 		logger.Warnf("Replica with ID %d was not found!", leaderID)
 		hs.mut.Unlock()
@@ -322,7 +295,7 @@ func (hs *chainedhotstuff) fetchBlockForVote(vote hotstuff.PartialCert) {
 	var ctx context.Context
 	ctx, hs.fetchCancel = context.WithCancel(context.Background())
 	hs.mut.Unlock()
-	hs.cfg.Fetch(ctx, vote.BlockHash())
+	hs.mod.Config().Fetch(ctx, vote.BlockHash())
 }
 
 // OnVote handles an incoming vote
@@ -331,7 +304,7 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 		hs.mut.Lock()
 		// delete any pending QCs with lower height than bLeaf
 		for k := range hs.verifiedVotes {
-			if block, ok := hs.blocks.Get(k); ok {
+			if block, ok := hs.mod.BlockChain().Get(k); ok {
 				if block.View() <= hs.bLeaf.View() {
 					delete(hs.verifiedVotes, k)
 				}
@@ -342,7 +315,7 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 		hs.mut.Unlock()
 	}()
 
-	block, ok := hs.blocks.Get(cert.BlockHash())
+	block, ok := hs.mod.BlockChain().Get(cert.BlockHash())
 	if !ok {
 		logger.Debugf("Could not find block for vote: %.8s. Attempting to fetch.", cert.BlockHash())
 		hs.fetchBlockForVote(cert)
@@ -357,7 +330,7 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 		return
 	}
 
-	if !hs.verifier.VerifyPartialCert(cert) {
+	if !hs.mod.Verifier().VerifyPartialCert(cert) {
 		logger.Info("OnVote: Vote could not be verified!")
 		hs.mut.Unlock()
 		return
@@ -369,12 +342,12 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 	votes = append(votes, cert)
 	hs.verifiedVotes[cert.BlockHash()] = votes
 
-	if len(votes) < hs.cfg.QuorumSize() {
+	if len(votes) < hs.mod.Config().QuorumSize() {
 		hs.mut.Unlock()
 		return
 	}
 
-	qc, err := hs.signer.CreateQuorumCert(block, votes)
+	qc, err := hs.mod.Signer().CreateQuorumCert(block, votes)
 	if err != nil {
 		logger.Info("OnVote: could not create QC for block: ", err)
 	}
@@ -383,7 +356,7 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 
 	hs.mut.Unlock()
 	// signal the synchronizer
-	hs.synchronizer.AdvanceView(hotstuff.SyncInfo{QC: qc})
+	hs.mod.ViewSynchronizer().AdvanceView(hotstuff.SyncInfo{QC: qc})
 }
 
 func (hs *chainedhotstuff) deliver(block *hotstuff.Block) {
@@ -396,7 +369,7 @@ func (hs *chainedhotstuff) deliver(block *hotstuff.Block) {
 
 	delete(hs.pendingVotes, block.Hash())
 
-	hs.blocks.Store(block)
+	hs.mod.BlockChain().Store(block)
 
 	for _, vote := range votes {
 		go hs.OnVote(vote)

@@ -92,7 +92,7 @@ func (cert PartialCert) ToBytes() []byte {
 }
 
 func (cert PartialCert) String() string {
-	return fmt.Sprintf("PartialCert{ Block: %.6s, Signer: %d }", cert.hash.String(), cert.signature.signer)
+	return fmt.Sprintf("PartialCert{ Block: %.6s, signer: %d }", cert.hash.String(), cert.signature.signer)
 }
 
 var _ hotstuff.PartialCert = (*PartialCert)(nil)
@@ -183,17 +183,21 @@ func (tc TimeoutCert) View() hotstuff.View {
 }
 
 type ecdsaCrypto struct {
-	cfg hotstuff.Config
+	mod *hotstuff.HotStuff
 }
 
-// New returns a new Signer and a new Verifier.
-func New(cfg hotstuff.Config) (hotstuff.Signer, hotstuff.Verifier) {
-	ec := &ecdsaCrypto{cfg}
+func (ec *ecdsaCrypto) InitModule(hs *hotstuff.HotStuff) {
+	ec.mod = hs
+}
+
+// New returns a new signer and a new verifier.
+func New() (hotstuff.Signer, hotstuff.Verifier) {
+	ec := &ecdsaCrypto{}
 	return ec, ec
 }
 
 func (ec *ecdsaCrypto) getPrivateKey() *ecdsa.PrivateKey {
-	pk := ec.cfg.PrivateKey()
+	pk := ec.mod.PrivateKey()
 	return pk.(*ecdsa.PrivateKey)
 }
 
@@ -206,7 +210,7 @@ func (ec *ecdsaCrypto) Sign(hash hotstuff.Hash) (sig hotstuff.Signature, err err
 	return &Signature{
 		r:      r,
 		s:      s,
-		signer: ec.cfg.ID(),
+		signer: ec.mod.ID(),
 	}, nil
 }
 
@@ -218,7 +222,7 @@ func (ec *ecdsaCrypto) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.P
 		return nil, err
 	}
 	return &PartialCert{
-		&Signature{r, s, ec.cfg.ID()},
+		&Signature{r, s, ec.mod.ID()},
 		hash,
 	}, nil
 }
@@ -264,7 +268,7 @@ func (ec *ecdsaCrypto) CreateTimeoutCert(view hotstuff.View, timeouts []*hotstuf
 // Verify verifies a signature given a hash.
 func (ec *ecdsaCrypto) Verify(sig hotstuff.Signature, hash hotstuff.Hash) bool {
 	_sig := sig.(*Signature)
-	replica, ok := ec.cfg.Replica(sig.Signer())
+	replica, ok := ec.mod.Config().Replica(sig.Signer())
 	if !ok {
 		logger.Info("ecdsaCrypto: got signature from replica whose ID (%d) was not in the config.")
 		return false
@@ -281,7 +285,7 @@ func (ec *ecdsaCrypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 }
 
 func (ec *ecdsaCrypto) verifyAggregateSignature(agg aggregateSignature, hash hotstuff.Hash) bool {
-	if len(agg) < ec.cfg.QuorumSize() {
+	if len(agg) < ec.mod.Config().QuorumSize() {
 		return false
 	}
 	var numVerified uint32
@@ -296,7 +300,7 @@ func (ec *ecdsaCrypto) verifyAggregateSignature(agg aggregateSignature, hash hot
 		}(pSig)
 	}
 	wg.Wait()
-	return numVerified >= uint32(ec.cfg.QuorumSize())
+	return numVerified >= uint32(ec.mod.Config().QuorumSize())
 }
 
 // VerifyQuorumCert verifies a quorum certificate.

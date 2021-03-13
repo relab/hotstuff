@@ -53,6 +53,141 @@ import (
 	"fmt"
 )
 
+// HotStuff contains the modules that together implement the HotStuff protocol.
+type HotStuff struct {
+	// data
+
+	id         ID
+	privateKey PrivateKey
+
+	// modules
+
+	acceptor         Acceptor
+	blockChain       BlockChain
+	commandQueue     CommandQueue
+	config           Config
+	consensus        Consensus
+	executor         Executor
+	leaderRotation   LeaderRotation
+	signer           Signer
+	verifier         Verifier
+	viewSynchronizer ViewSynchronizer
+}
+
+func (hs *HotStuff) ID() ID {
+	return hs.id
+}
+
+func (hs *HotStuff) PrivateKey() PrivateKey {
+	return hs.privateKey
+}
+
+func (hs *HotStuff) Acceptor() Acceptor {
+	return hs.acceptor
+}
+
+func (hs *HotStuff) BlockChain() BlockChain {
+	return hs.blockChain
+}
+
+func (hs *HotStuff) CommandQueue() CommandQueue {
+	return hs.commandQueue
+}
+
+func (hs *HotStuff) Config() Config {
+	return hs.config
+}
+
+func (hs *HotStuff) Consensus() Consensus {
+	return hs.consensus
+}
+
+func (hs *HotStuff) Executor() Executor {
+	return hs.executor
+}
+
+func (hs *HotStuff) LeaderRotation() LeaderRotation {
+	return hs.leaderRotation
+}
+
+func (hs *HotStuff) Signer() Signer {
+	return hs.signer
+}
+
+func (hs *HotStuff) Verifier() Verifier {
+	return hs.verifier
+}
+
+func (hs *HotStuff) ViewSynchronizer() ViewSynchronizer {
+	return hs.viewSynchronizer
+}
+
+type Builder struct {
+	hs      *HotStuff
+	modules []Module
+}
+
+func NewBuilder(id ID, privateKey PrivateKey) Builder {
+	return Builder{hs: &HotStuff{id: id, privateKey: privateKey}}
+}
+
+// Register adds modules to the HotStuff object and initializes them.
+// Modules are assigned to fields based on the interface they implement.
+// If only the Module interface is implemented, the InitModule function will be called, but
+// the HotStuff object will not save a reference to the module.
+// Register will overwrite existing modules if the same type is registered twice.
+func (b *Builder) Register(modules ...interface{}) {
+	for _, module := range modules {
+		if m, ok := module.(Acceptor); ok {
+			b.hs.acceptor = m
+		}
+		if m, ok := module.(BlockChain); ok {
+			b.hs.blockChain = m
+		}
+		if m, ok := module.(CommandQueue); ok {
+			b.hs.commandQueue = m
+		}
+		if m, ok := module.(Config); ok {
+			b.hs.config = m
+		}
+		if m, ok := module.(Consensus); ok {
+			b.hs.consensus = m
+		}
+		if m, ok := module.(Executor); ok {
+			b.hs.executor = m
+		}
+		if m, ok := module.(LeaderRotation); ok {
+			b.hs.leaderRotation = m
+		}
+		if m, ok := module.(Signer); ok {
+			b.hs.signer = m
+		}
+		if m, ok := module.(Verifier); ok {
+			b.hs.verifier = m
+		}
+		if m, ok := module.(ViewSynchronizer); ok {
+			b.hs.viewSynchronizer = m
+		}
+		if m, ok := module.(Module); ok {
+			b.modules = append(b.modules, m)
+		}
+	}
+}
+
+// Build initializes all modules and returns the HotStuff object.
+func (b *Builder) Build() *HotStuff {
+	for _, module := range b.modules {
+		module.InitModule(b.hs)
+	}
+	return b.hs
+}
+
+// Module is an interface that can be implemented by types that need a reference to the HotStuff object.
+type Module interface {
+	// InitModule gives the module a reference to the HotStuff object.
+	InitModule(hs *HotStuff)
+}
+
 // ID uniquely identifies a replica
 type ID uint32
 
@@ -223,10 +358,6 @@ type Replica interface {
 // The methods Propose and Fetch should send their respective arguments to all replicas in the configuration,
 // except the caller.
 type Config interface {
-	// ID returns the id of the local replica.
-	ID() ID
-	// PrivateKey returns the id of the local replica.
-	PrivateKey() PrivateKey
 	// Replicas returns all of the replicas in the configuration.
 	Replicas() map[ID]Replica
 	// Replica returns a replica if present in the configuration.
@@ -249,8 +380,6 @@ type Config interface {
 // It contains the protocol data for a single replica.
 // The methods OnPropose, OnVote, OnNewView, and OnDeliver should be called upon receiving a corresponding message.
 type Consensus interface {
-	// Config returns the configuration used by the replica.
-	Config() Config
 	// LastVote returns the view in which the replica last voted.
 	LastVote() View
 	// HighQC returns the highest QC known to the replica.
@@ -258,14 +387,6 @@ type Consensus interface {
 	// Leaf returns the last block that was added to the chain.
 	// This should be the block with the highest view that is known to the replica.
 	Leaf() *Block
-	// BlockChain returns the datastructure containing the blocks known to the replica.
-	BlockChain() BlockChain
-	// Signer returns the signer.
-	Signer() Signer
-	// Verifier returns the verifier.
-	Verifier() Verifier
-	// Synchronizer returns the view synchronizer.
-	Synchronizer() ViewSynchronizer
 	// IncreaseLastVotedView ensures that no voting happens in a view earlier than `view`.
 	IncreaseLastVotedView(view View)
 	// UpdateHighQC updates HighQC if the given qc is higher than the old HighQC.
@@ -295,15 +416,11 @@ type LeaderRotation interface {
 
 // ViewSynchronizer synchronizes replicas to the same view.
 type ViewSynchronizer interface {
-	LeaderRotation
-
 	// OnRemoteTimeout handles an incoming timeout from a remote replica.
 	OnRemoteTimeout(*TimeoutMsg)
 	// AdvanceView attempts to advance to the next view using the given QC.
 	// qc must be either a regular quorum certificate, or a timeout certificate.
 	AdvanceView(SyncInfo)
-	// Init gives the synchronizer a consensus instance to synchronize.
-	Init(Consensus)
 	// Start starts the synchronizer.
 	Start()
 	// Stop stops the synchronizer.

@@ -17,10 +17,10 @@ type signatureCache struct {
 	order    list.List
 }
 
-// NewWithCache returns a new Signer and a new Verifier that use caching to speed up verification
-func NewWithCache(cfg hotstuff.Config, capacity int) (hotstuff.Signer, hotstuff.Verifier) {
+// NewWithCache returns a new signer and a new verifier that use caching to speed up verification
+func NewWithCache(capacity int) (hotstuff.Signer, hotstuff.Verifier) {
 	cache := &signatureCache{
-		ecdsaCrypto: ecdsaCrypto{cfg},
+		ecdsaCrypto: ecdsaCrypto{},
 		cache:       make(map[string]*list.Element, capacity),
 		capacity:    capacity,
 	}
@@ -124,7 +124,7 @@ func (c *signatureCache) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 }
 
 func (c *signatureCache) verifyAggregateSignature(agg aggregateSignature, hash hotstuff.Hash) bool {
-	if len(agg) < c.ecdsaCrypto.cfg.QuorumSize() {
+	if len(agg) < c.ecdsaCrypto.mod.Config().QuorumSize() {
 		return false
 	}
 
@@ -154,7 +154,7 @@ func (c *signatureCache) verifyAggregateSignature(agg aggregateSignature, hash h
 	c.mut.Unlock()
 
 	wg.Wait()
-	return numValid >= uint32(c.ecdsaCrypto.cfg.QuorumSize())
+	return numValid >= uint32(c.ecdsaCrypto.mod.Config().QuorumSize())
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
