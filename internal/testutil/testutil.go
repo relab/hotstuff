@@ -6,11 +6,132 @@ import (
 	"net"
 	"testing"
 
+	"github.com/relab/hotstuff/blockchain"
+	"github.com/relab/hotstuff/leaderrotation"
+
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
+	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/internal/mocks"
 )
+
+// TestModules returns a builder containing default modules for testing.
+func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey hotstuff.PrivateKey) hotstuff.Builder {
+	t.Helper()
+	builder := hotstuff.NewBuilder(id, privkey)
+
+	acceptor := mocks.NewMockAcceptor(ctrl)
+	acceptor.EXPECT().Accept(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes().Return(true)
+
+	executor := mocks.NewMockExecutor(ctrl)
+	executor.EXPECT().Exec(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes()
+
+	commandQ := mocks.NewMockCommandQueue(ctrl)
+	commandQ.EXPECT().GetCommand().AnyTimes().DoAndReturn(func() *hotstuff.Command {
+		cmd := hotstuff.Command("foo")
+		return &cmd
+	})
+
+	signer, verifier := ecdsacrypto.New()
+
+	config := mocks.NewMockConfig(ctrl)
+	config.EXPECT().Len().AnyTimes().Return(1)
+	config.EXPECT().QuorumSize().AnyTimes().Return(1)
+
+	replica := CreateMockReplica(t, ctrl, id, privkey.Public())
+	ConfigAddReplica(t, config, replica)
+
+	builder.Register(
+		blockchain.New(100),
+		mocks.NewMockConsensus(ctrl),
+		mocks.NewMockViewSynchronizer(ctrl),
+		leaderrotation.NewFixed(1),
+		config,
+		signer,
+		verifier,
+		acceptor,
+		executor,
+		commandQ,
+	)
+	return builder
+}
+
+type BuilderList []hotstuff.Builder
+type HotStuffList []*hotstuff.HotStuff
+
+func (bl BuilderList) Build() HotStuffList {
+	hl := HotStuffList{}
+	for _, hs := range bl {
+		hl = append(hl, hs.Build())
+	}
+	return hl
+}
+
+func (hl HotStuffList) Signers() (signers []hotstuff.Signer) {
+	signers = make([]hotstuff.Signer, len(hl))
+	for i, hs := range hl {
+		signers[i] = hs.Signer()
+	}
+	return signers
+}
+
+func (hl HotStuffList) Keys() (keys []hotstuff.PrivateKey) {
+	keys = make([]hotstuff.PrivateKey, len(hl))
+	for i, hs := range hl {
+		keys[i] = hs.PrivateKey()
+	}
+	return keys
+}
+
+// CreateBuilders creates n builders with default modules. Configurations are initialized with replicas.
+func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstuff.PrivateKey) (builders BuilderList) {
+	t.Helper()
+	builders = make([]hotstuff.Builder, n)
+	replicas := make([]*mocks.MockReplica, n)
+	configs := make([]*mocks.MockConfig, n)
+	for i := 0; i < n; i++ {
+		id := hotstuff.ID(i + 1)
+		var key hotstuff.PrivateKey
+		if i < len(keys) {
+			key = keys[i]
+		} else {
+			key = GenerateKey(t)
+		}
+		configs[i] = mocks.NewMockConfig(ctrl)
+		replicas[i] = CreateMockReplica(t, ctrl, id, key.Public())
+		builders[i] = TestModules(t, ctrl, id, key)
+		builders[i].Register(configs[i]) // replaces the config registered by TestModules()
+	}
+	for _, config := range configs {
+		for _, replica := range replicas {
+			ConfigAddReplica(t, config, replica)
+		}
+		config.EXPECT().Len().AnyTimes().Return(len(replicas))
+		config.EXPECT().QuorumSize().AnyTimes().Return(hotstuff.QuorumSize(len(replicas)))
+	}
+	return builders
+}
+
+// CreateMockConfigWithReplicas creates a configuration with n replicas.
+func CreateMockConfigWithReplicas(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstuff.PrivateKey) (*mocks.MockConfig, []*mocks.MockReplica) {
+	t.Helper()
+	cfg := mocks.NewMockConfig(ctrl)
+	replicas := make([]*mocks.MockReplica, n)
+	if len(keys) == 0 {
+		keys = make([]hotstuff.PrivateKey, 0, n)
+	}
+	for i := 0; i < n; i++ {
+		if len(keys) <= i {
+			keys = append(keys, GenerateKey(t))
+		}
+		replicas[i] = CreateMockReplica(t, ctrl, hotstuff.ID(i+1), keys[i].Public())
+		ConfigAddReplica(t, cfg, replicas[i])
+	}
+	cfg.EXPECT().Len().AnyTimes().Return(len(replicas))
+	cfg.EXPECT().QuorumSize().AnyTimes().Return(hotstuff.QuorumSize(len(replicas)))
+	return cfg, replicas
+}
 
 // CreateMockReplica returns a mock of a hotstuff.Replica.
 func CreateMockReplica(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, key hotstuff.PublicKey) *mocks.MockReplica {
@@ -29,25 +150,6 @@ func CreateMockReplica(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, ke
 		Return(key)
 
 	return replica
-}
-
-// CreateMockConfig returns a mock of a hotstuff.Config.
-func CreateMockConfig(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, key hotstuff.PrivateKey) *mocks.MockConfig {
-	t.Helper()
-
-	cfg := mocks.NewMockConfig(ctrl)
-	cfg.
-		EXPECT().
-		PrivateKey().
-		AnyTimes().
-		Return(key)
-	cfg.
-		EXPECT().
-		ID().
-		AnyTimes().
-		Return(id)
-
-	return cfg
 }
 
 // ConfigAddReplica adds a mock replica to a mock configuration.
@@ -160,4 +262,12 @@ func GenerateKey(t *testing.T) *ecdsa.PrivateKey {
 		t.Fatalf("Failed to generate private key: %v", err)
 	}
 	return key
+}
+
+func GenerateKeys(t *testing.T, n int) (keys []hotstuff.PrivateKey) {
+	keys = make([]hotstuff.PrivateKey, n)
+	for i := 0; i < n; i++ {
+		keys[i] = GenerateKey(t)
+	}
+	return keys
 }

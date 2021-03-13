@@ -9,36 +9,26 @@ import (
 	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
+	"github.com/relab/hotstuff/leaderrotation"
 )
 
 // TestPropose checks that a leader broadcasts a new proposal, and then sends a vote to the next leader
 func TestPropose(t *testing.T) {
 	// Setup mocks
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	td := newTestData(t, ctrl, 4)
-
-	// command queue that returns "foo"
-	td.commands.EXPECT().GetCommand().DoAndReturn(func() *hotstuff.Command {
-		cmd := hotstuff.Command("foo")
-		return &cmd
-	})
-
-	td.acceptor.EXPECT().Accept(gomock.Any()).Return(true)
+	hs := New()
+	builder := testutil.TestModules(t, ctrl, 1, testutil.GenerateKey(t))
+	cfg, replicas := testutil.CreateMockConfigWithReplicas(t, ctrl, 2)
+	builder.Register(hs, cfg, leaderrotation.NewFixed(2))
+	builder.Build()
 
 	// RULES:
 
 	// leader should propose to other replicas.
-	td.config.EXPECT().Propose(gomock.Any())
+	cfg.EXPECT().Propose(gomock.AssignableToTypeOf(&hotstuff.Block{}))
 
 	// leader should send its own vote to the next leader.
-	td.replicas[0].EXPECT().Vote(gomock.Any())
-
-	// leader should ask synchronizer for the id of the next leader
-	td.synchronizer.EXPECT().GetLeader(hotstuff.View(2)).Return(hotstuff.ID(1))
-
-	hs := td.build()
+	replicas[1].EXPECT().Vote(gomock.Any())
 
 	hs.Propose()
 
@@ -47,117 +37,35 @@ func TestPropose(t *testing.T) {
 	}
 }
 
-type testData struct {
-	t        *testing.T
-	replicas []*mocks.MockReplica
-	configs  []*mocks.MockConfig
-	signers  []hotstuff.Signer
-
-	acceptor     *mocks.MockAcceptor
-	commands     *mocks.MockCommandQueue
-	config       *mocks.MockConfig
-	executor     *mocks.MockExecutor
-	synchronizer *mocks.MockViewSynchronizer
-}
-
-func (td testData) build() hotstuff.Consensus {
-	td.t.Helper()
-
-	return Builder{
-		Acceptor:     td.acceptor,
-		Config:       td.config,
-		CommandQueue: td.commands,
-		Executor:     td.executor,
-		Synchronizer: td.synchronizer,
-	}.Build()
-}
-
-func (td testData) createQC(block *hotstuff.Block) hotstuff.QuorumCert {
-	td.t.Helper()
-
-	return testutil.CreateQC(td.t, block, td.signers)
-}
-
-func (td testData) advanceView(hs hotstuff.Consensus, lastProposal *hotstuff.Block) *hotstuff.Block {
-	td.t.Helper()
-
-	qc := td.createQC(lastProposal)
-	b := hotstuff.NewBlock(lastProposal.Hash(), qc, "foo", hs.LastVote()+1, 1)
-	hs.OnPropose(b)
-	return b
-}
-
-func newTestData(t *testing.T, ctrl *gomock.Controller, n int) testData {
-	t.Helper()
-
-	td := testData{
-		t:        t,
-		replicas: make([]*mocks.MockReplica, n-1),
-		configs:  make([]*mocks.MockConfig, n-1),
-		signers:  make([]hotstuff.Signer, n-1),
-	}
-
-	for i := 0; i < n-1; i++ {
-		id := hotstuff.ID(i) + 1
-		key := testutil.GenerateKey(t)
-		td.configs[i] = testutil.CreateMockConfig(t, ctrl, id, key)
-		td.replicas[i] = testutil.CreateMockReplica(t, ctrl, id, &key.PublicKey)
-		signer, _ := ecdsacrypto.New(td.configs[i])
-		td.signers[i] = signer
-	}
-
-	for _, config := range td.configs {
-		for _, replica := range td.replicas {
-			testutil.ConfigAddReplica(t, config, replica)
-		}
-	}
-
-	pk := testutil.GenerateKey(t)
-
-	td.acceptor = mocks.NewMockAcceptor(ctrl)
-	td.commands = mocks.NewMockCommandQueue(ctrl)
-	td.config = testutil.CreateMockConfig(t, ctrl, hotstuff.ID(n), pk)
-	td.executor = mocks.NewMockExecutor(ctrl)
-	td.synchronizer = mocks.NewMockViewSynchronizer(ctrl)
-
-	// basic configuration
-	td.config.EXPECT().QuorumSize().AnyTimes().Return(n - (n-1)/3)
-	td.synchronizer.EXPECT().Init(gomock.Any())
-
-	r := testutil.CreateMockReplica(t, ctrl, hotstuff.ID(n), &pk.PublicKey)
-	testutil.ConfigAddReplica(t, td.config, r)
-
-	for _, replica := range td.replicas {
-		testutil.ConfigAddReplica(t, td.config, replica)
-	}
-
-	return td
-}
-
 // TestCommit checks that a replica commits and executes a valid branch
 func TestCommit(t *testing.T) {
-	// Create 3 signers, and then create at least 3 proposals to submit to the replica.
-	// Then check that the replica has executed the first one.
+	const n = 4
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	td := newTestData(t, ctrl, 4)
+	hs := New()
+	keys := testutil.GenerateKeys(t, n)
+	bl := testutil.CreateBuilders(t, ctrl, n, keys...)
+	acceptor := mocks.NewMockAcceptor(ctrl)
+	executor := mocks.NewMockExecutor(ctrl)
+	cfg, replicas := testutil.CreateMockConfigWithReplicas(t, ctrl, n, keys...)
+	bl[0].Register(hs, cfg, acceptor, executor)
+	hl := bl.Build()
+	signers := hl.Signers()
 
 	// create the needed blocks and QCs
 	genesisQC := ecdsacrypto.NewQuorumCert(map[hotstuff.ID]*ecdsacrypto.Signature{}, hotstuff.GetGenesis().Hash())
 	b1 := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), genesisQC, "1", 1, 1)
-	b1QC := testutil.CreateQC(t, b1, td.signers)
+	b1QC := testutil.CreateQC(t, b1, signers)
 	b2 := hotstuff.NewBlock(b1.Hash(), b1QC, "2", 2, 1)
-	b2QC := testutil.CreateQC(t, b2, td.signers)
+	b2QC := testutil.CreateQC(t, b2, signers)
 	b3 := hotstuff.NewBlock(b2.Hash(), b2QC, "3", 3, 1)
-	b3QC := testutil.CreateQC(t, b3, td.signers)
+	b3QC := testutil.CreateQC(t, b3, signers)
 	b4 := hotstuff.NewBlock(b3.Hash(), b3QC, "4", 4, 1)
 
 	// the first replica will be the leader, so we expect it to receive votes
-	td.replicas[0].EXPECT().Vote(gomock.Any()).AnyTimes()
+	replicas[0].EXPECT().Vote(gomock.Any()).AnyTimes()
 
 	// executor will check that the correct command is executed
-	td.executor.EXPECT().Exec(gomock.Any()).Do(func(arg interface{}) {
+	executor.EXPECT().Exec(gomock.Any()).Do(func(arg interface{}) {
 		if arg.(hotstuff.Command) != b1.Command() {
 			t.Errorf("Wrong command executed: got: %s, want: %s", arg, b1.Command())
 		}
@@ -165,15 +73,11 @@ func TestCommit(t *testing.T) {
 
 	// acceptor expects to receive the commands in order
 	gomock.InOrder(
-		td.acceptor.EXPECT().Accept(hotstuff.Command("1")).Return(true),
-		td.acceptor.EXPECT().Accept(hotstuff.Command("2")).Return(true),
-		td.acceptor.EXPECT().Accept(hotstuff.Command("3")).Return(true),
-		td.acceptor.EXPECT().Accept(hotstuff.Command("4")).Return(true),
+		acceptor.EXPECT().Accept(hotstuff.Command("1")).Return(true),
+		acceptor.EXPECT().Accept(hotstuff.Command("2")).Return(true),
+		acceptor.EXPECT().Accept(hotstuff.Command("3")).Return(true),
+		acceptor.EXPECT().Accept(hotstuff.Command("4")).Return(true),
 	)
-
-	td.synchronizer.EXPECT().GetLeader(gomock.Any()).AnyTimes().Return(hotstuff.ID(1))
-
-	hs := td.build()
 
 	hs.OnPropose(b1)
 	hs.OnPropose(b2)
@@ -183,24 +87,22 @@ func TestCommit(t *testing.T) {
 
 // TestVote checks that a leader can collect votes on a proposal to form a QC
 func TestVote(t *testing.T) {
+	const n = 4
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	td := newTestData(t, ctrl, 4)
-	td.synchronizer.EXPECT().AdvanceView(gomock.Any())
+	hs := New()
+	bl := testutil.CreateBuilders(t, ctrl, n)
+	synchronizer := mocks.NewMockViewSynchronizer(ctrl)
+	bl[0].Register(hs, synchronizer)
+	hl := bl.Build()
 
-	td.acceptor.EXPECT().Accept(gomock.Any()).Return(true)
-
-	// synchronizer should expect one proposal and one finishQC
-	td.synchronizer.EXPECT().GetLeader(gomock.Any()).AnyTimes().Return(hotstuff.ID(4))
-
-	hs := td.build()
+	synchronizer.EXPECT().AdvanceView(gomock.AssignableToTypeOf(hotstuff.SyncInfo{}))
 
 	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hs.HighQC(), "test", 1, 1)
 
 	hs.OnPropose(b)
 
-	for _, signer := range td.signers {
+	for _, signer := range hl.Signers()[1:] {
 		pc, err := signer.CreatePartialCert(b)
 		if err != nil {
 			t.Fatalf("Failed to create partial certificate: %v", err)
@@ -215,22 +117,26 @@ func TestVote(t *testing.T) {
 
 // TestFetchBlock checks that a replica can fetch a block in order to create a QC.
 func TestFetchBlock(t *testing.T) {
+	const n = 4
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	td := newTestData(t, ctrl, 4)
+	hs := New()
+	keys := testutil.GenerateKeys(t, n)
+	bl := testutil.CreateBuilders(t, ctrl, 4, keys...)
+	cfg, _ := testutil.CreateMockConfigWithReplicas(t, ctrl, n, keys...)
+	synchronizer := mocks.NewMockViewSynchronizer(ctrl)
+	bl[0].Register(hs, cfg, synchronizer)
+	hl := bl.Build()
 
 	// create test data
 	votesSent := make(chan struct{})
 	qcCreated := make(chan struct{})
 	genesisQC := ecdsacrypto.NewQuorumCert(map[hotstuff.ID]*ecdsacrypto.Signature{}, hotstuff.GetGenesis().Hash())
 	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), genesisQC, "foo", 1, 1)
-	votes := testutil.CreatePCs(t, b, td.signers)
-
-	hs := td.build()
+	votes := testutil.CreatePCs(t, b, hl.Signers())
 
 	// configure mocks
-	td.config.
+	cfg.
 		EXPECT().
 		Fetch(gomock.Any(), gomock.AssignableToTypeOf(b.Hash())).
 		Do(func(_ context.Context, h hotstuff.Hash) {
@@ -241,7 +147,7 @@ func TestFetchBlock(t *testing.T) {
 			}()
 		})
 
-	td.synchronizer.EXPECT().AdvanceView(gomock.Any()).Do(func(arg interface{}) { close(qcCreated) })
+	synchronizer.EXPECT().AdvanceView(gomock.Any()).Do(func(arg interface{}) { close(qcCreated) })
 
 	for _, vote := range votes {
 		hs.OnVote(vote)
@@ -272,30 +178,35 @@ func TestFetchBlock(t *testing.T) {
 //
 // Here, block E creates a new fork which means that blocks C and D will not be executed.
 func TestForkingAttack(t *testing.T) {
+	const n = 4
 	ctrl := gomock.NewController(t)
-	td := newTestData(t, ctrl, 4)
-	// configure mocks
-	td.replicas[0].EXPECT().Vote(gomock.Any()).AnyTimes()
-	td.synchronizer.EXPECT().GetLeader(gomock.Any()).AnyTimes().Return(hotstuff.ID(1))
-	td.acceptor.EXPECT().Accept(gomock.Any()).AnyTimes().Return(true)
+	hs := New()
+	keys := testutil.GenerateKeys(t, n)
+	bl := testutil.CreateBuilders(t, ctrl, n, keys...)
+	cfg, replicas := testutil.CreateMockConfigWithReplicas(t, ctrl, n, keys...)
+	executor := mocks.NewMockExecutor(ctrl)
+	bl[0].Register(hs, cfg, executor)
+	hl := bl.Build()
+	signers := hl.Signers()
 
-	hs := td.build()
+	// configure mocks
+	replicas[0].EXPECT().Vote(gomock.Any()).AnyTimes()
 
 	genesisQC := ecdsacrypto.NewQuorumCert(make(map[hotstuff.ID]*ecdsacrypto.Signature), hotstuff.GetGenesis().Hash())
 	a := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), genesisQC, "A", 1, 1)
-	aQC := td.createQC(a)
+	aQC := testutil.CreateQC(t, a, signers)
 	b := hotstuff.NewBlock(a.Hash(), aQC, "B", 2, 1)
-	bQC := td.createQC(b)
+	bQC := testutil.CreateQC(t, b, signers)
 	c := hotstuff.NewBlock(b.Hash(), bQC, "C", 3, 1)
-	cQC := td.createQC(c)
+	cQC := testutil.CreateQC(t, c, signers)
 	d := hotstuff.NewBlock(c.Hash(), cQC, "D", 4, 1)
 	e := hotstuff.NewBlock(b.Hash(), aQC, "E", 5, 1)
 
 	// expected order of execution
 	gomock.InOrder(
-		td.executor.EXPECT().Exec(a.Command()),
-		td.executor.EXPECT().Exec(b.Command()),
-		td.executor.EXPECT().Exec(e.Command()),
+		executor.EXPECT().Exec(a.Command()),
+		executor.EXPECT().Exec(b.Command()),
+		executor.EXPECT().Exec(e.Command()),
 	)
 
 	hs.OnPropose(a)
@@ -311,7 +222,16 @@ func TestForkingAttack(t *testing.T) {
 	hs.OnPropose(e)
 
 	// advance views until E is executed
-	block := td.advanceView(hs, e)
-	block = td.advanceView(hs, block)
-	_ = td.advanceView(hs, block)
+	block := advanceView(t, hs, e, signers)
+	block = advanceView(t, hs, block, signers)
+	_ = advanceView(t, hs, block, signers)
+}
+
+func advanceView(t *testing.T, hs hotstuff.Consensus, lastProposal *hotstuff.Block, signers []hotstuff.Signer) *hotstuff.Block {
+	t.Helper()
+
+	qc := testutil.CreateQC(t, lastProposal, signers)
+	b := hotstuff.NewBlock(lastProposal.Hash(), qc, "foo", hs.LastVote()+1, 1)
+	hs.OnPropose(b)
+	return b
 }
