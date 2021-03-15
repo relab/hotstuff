@@ -9,7 +9,7 @@ import (
 // Block contains a propsed "command", metadata for the protocol, and a link to the "parent" block.
 type Block struct {
 	// keep a copy of the hash to avoid hashing multiple times
-	hash     *Hash
+	hash     Hash
 	parent   Hash
 	proposer ID
 	cmd      Command
@@ -19,13 +19,16 @@ type Block struct {
 
 // NewBlock creates a new Block
 func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID) *Block {
-	return &Block{
+	b := &Block{
 		parent:   parent,
 		cert:     cert,
 		cmd:      cmd,
 		view:     view,
 		proposer: proposer,
 	}
+	// cache the hash immediately because it is too racy to do it in Hash()
+	b.hash = sha256.Sum256(b.ToBytes())
+	return b
 }
 
 func (b *Block) String() string {
@@ -39,17 +42,9 @@ func (b *Block) String() string {
 	)
 }
 
-func (b *Block) hashSlow() Hash {
-	return sha256.Sum256(b.ToBytes())
-}
-
 // Hash returns the hash of the Block
 func (b *Block) Hash() Hash {
-	if b.hash == nil {
-		b.hash = new(Hash)
-		*b.hash = b.hashSlow()
-	}
-	return *b.hash
+	return b.hash
 }
 
 // Proposer returns the id of the replica who proposed the block.
