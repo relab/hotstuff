@@ -23,11 +23,15 @@ import (
 func TestConnect(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
-		td := setup(t, n)
 		ctrl := gomock.NewController(t)
-		_, teardown := createServers(t, td, ctrl)
+		td := setup(t, ctrl, n)
+		builder := testutil.TestModules(t, ctrl, 1, td.keys[0])
+		teardown := createServers(t, td, ctrl)
 		defer teardown()
 		cfg := NewConfig(td.cfg)
+
+		builder.Register(cfg)
+		builder.Build()
 
 		err := cfg.Connect(time.Second)
 
@@ -41,9 +45,13 @@ func TestConnect(t *testing.T) {
 func TestPropose(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
-		td := setup(t, n)
 		ctrl := gomock.NewController(t)
-		cfg, mocks, teardown := createConfig(t, td, ctrl)
+		td := setup(t, ctrl, n)
+		cfg, teardown := createConfig(t, td, ctrl)
+		mocks := createMocks(t, ctrl, td, n)
+		td.builders[0].Register(cfg)
+		td.builders.Build()
+
 		defer teardown()
 
 		qc := ecdsacrypto.NewQuorumCert(make(map[hotstuff.ID]*ecdsacrypto.Signature), hotstuff.GetGenesis().Hash())
@@ -70,11 +78,14 @@ func TestPropose(t *testing.T) {
 func TestVote(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
-		td := setup(t, n)
 		ctrl := gomock.NewController(t)
-		cfg, mocks, teardown := createConfig(t, td, ctrl)
+		td := setup(t, ctrl, n)
+		cfg, teardown := createConfig(t, td, ctrl)
 		defer teardown()
-		signer, _ := ecdsacrypto.New(cfg)
+		mocks := createMocks(t, ctrl, td, n)
+
+		hl := td.builders.Build()
+		signer := hl[0].Signer()
 
 		qc := ecdsacrypto.NewQuorumCert(make(map[hotstuff.ID]*ecdsacrypto.Signature), hotstuff.GetGenesis().Hash())
 		proposal := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "foo", 1, 1)
@@ -102,11 +113,17 @@ func TestVote(t *testing.T) {
 func TestTimeout(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
-		td := setup(t, n)
 		ctrl := gomock.NewController(t)
-		cfg, _mocks, teardown := createConfig(t, td, ctrl)
+		td := setup(t, ctrl, n)
+		cfg, teardown := createConfig(t, td, ctrl)
 		defer teardown()
-		signer, _ := ecdsacrypto.New(cfg)
+		synchronizers := make([]*mocks.MockViewSynchronizer, n)
+		for i := 0; i < n; i++ {
+			synchronizers[i] = mocks.NewMockViewSynchronizer(ctrl)
+			td.builders[i].Register(synchronizers[i])
+		}
+		hl := td.builders.Build()
+		signer := hl[0].Signer()
 
 		qc := ecdsacrypto.NewQuorumCert(make(map[hotstuff.ID]*ecdsacrypto.Signature), hotstuff.GetGenesis().Hash())
 		timeout := &hotstuff.TimeoutMsg{
@@ -117,17 +134,14 @@ func TestTimeout(t *testing.T) {
 		}
 
 		c := make(chan struct{}, n-1)
-		for _, mock := range _mocks[1:] {
+		for _, mock := range synchronizers[1:] {
 
-			pm := mocks.NewMockViewSynchronizer(ctrl)
-			pm.EXPECT().OnRemoteTimeout(gomock.AssignableToTypeOf(timeout)).Do(func(tm *hotstuff.TimeoutMsg) {
+			mock.EXPECT().OnRemoteTimeout(gomock.AssignableToTypeOf(timeout)).Do(func(tm *hotstuff.TimeoutMsg) {
 				if !reflect.DeepEqual(timeout, tm) {
 					t.Fatalf("expected timeouts to be equal. got: %v, want: %v", tm, timeout)
 				}
 				c <- struct{}{}
 			})
-
-			mock.EXPECT().Synchronizer().Return(pm)
 		}
 
 		cfg.Timeout(timeout)
@@ -142,16 +156,17 @@ type testData struct {
 	n         int
 	cfg       config.ReplicaConfig
 	listeners []net.Listener
-	keys      []*ecdsa.PrivateKey
+	keys      keys
+	builders  testutil.BuilderList
 }
 
-type setupFunc func(t *testing.T, n int) testData
+type setupFunc func(t *testing.T, ctrl *gomock.Controller, n int) testData
 
-func setupReplicas(t *testing.T, n int) testData {
+func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
 	t.Helper()
 
 	listeners := make([]net.Listener, n)
-	keys := make([]*ecdsa.PrivateKey, 0, n)
+	keys := make(keys, 0, n)
 	replicas := make([]*config.ReplicaInfo, 0, n)
 
 	// generate keys and replicaInfo
@@ -170,12 +185,12 @@ func setupReplicas(t *testing.T, n int) testData {
 		cfg.Replicas[replica.ID] = replica
 	}
 
-	return testData{n, *cfg, listeners, keys}
+	return testData{n, *cfg, listeners, keys, testutil.CreateBuilders(t, ctrl, n, keys.iface()...)}
 }
 
-func setupTLS(t *testing.T, n int) testData {
+func setupTLS(t *testing.T, ctrl *gomock.Controller, n int) testData {
 	t.Helper()
-	td := setupReplicas(t, n)
+	td := setupReplicas(t, ctrl, n)
 
 	certificates := make([]*x509.Certificate, 0, n)
 
@@ -218,38 +233,54 @@ func runBoth(t *testing.T, run func(*testing.T, setupFunc)) {
 	t.Run("WithTLS", func(t *testing.T) { run(t, setupTLS) })
 }
 
-func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (serverMocks []*mocks.MockConsensus, teardown func()) {
+func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (teardown func()) {
 	t.Helper()
 	servers := make([]*Server, td.n)
-	serverMocks = make([]*mocks.MockConsensus, td.n)
 	for i := range servers {
 		cfg := td.cfg
 		cfg.ID = hotstuff.ID(i + 1)
 		cfg.PrivateKey = td.keys[i]
 		servers[i] = NewServer(cfg)
-		serverMocks[i] = mocks.NewMockConsensus(ctrl)
-		servers[i].StartOnListener(serverMocks[i], td.listeners[i])
+		servers[i].StartOnListener(td.listeners[i])
+		td.builders[i].Register(servers[i])
 	}
-	return serverMocks, func() {
+	return func() {
 		for _, srv := range servers {
 			srv.Stop()
 		}
 	}
 }
 
-func createConfig(t *testing.T, td testData, ctrl *gomock.Controller) (cfg *Config, serverMocks []*mocks.MockConsensus, teardown func()) {
+func createConfig(t *testing.T, td testData, ctrl *gomock.Controller) (cfg *Config, teardown func()) {
 	t.Helper()
-	serverMocks, serverTeardown := createServers(t, td, ctrl)
+	serverTeardown := createServers(t, td, ctrl)
 	cfg = NewConfig(td.cfg)
 	err := cfg.Connect(time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, mock := range serverMocks {
-		mock.EXPECT().Config().AnyTimes().Return(cfg)
-	}
-	return cfg, serverMocks, func() {
+	return cfg, func() {
 		cfg.Close()
 		serverTeardown()
 	}
+}
+
+func createMocks(t *testing.T, ctrl *gomock.Controller, td testData, n int) (m []*mocks.MockConsensus) {
+	t.Helper()
+	m = make([]*mocks.MockConsensus, n)
+	for i := range m {
+		m[i] = mocks.NewMockConsensus(ctrl)
+		td.builders[i].Register(m[i])
+	}
+	return
+}
+
+type keys []*ecdsa.PrivateKey
+
+func (ks keys) iface() (i []hotstuff.PrivateKey) {
+	i = make([]hotstuff.PrivateKey, len(ks))
+	for j, s := range ks {
+		i[j] = s
+	}
+	return i
 }
