@@ -41,6 +41,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 
 	replica := CreateMockReplica(t, ctrl, id, privkey.Public())
 	ConfigAddReplica(t, config, replica)
+	config.EXPECT().Replicas().AnyTimes().Return((map[hotstuff.ID]hotstuff.Replica{1: replica}))
 
 	builder.Register(
 		blockchain.New(100),
@@ -117,6 +118,13 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 		}
 		config.EXPECT().Len().AnyTimes().Return(len(replicas))
 		config.EXPECT().QuorumSize().AnyTimes().Return(hotstuff.QuorumSize(len(replicas)))
+		config.EXPECT().Replicas().AnyTimes().DoAndReturn(func() map[hotstuff.ID]hotstuff.Replica {
+			m := make(map[hotstuff.ID]hotstuff.Replica)
+			for _, replica := range replicas {
+				m[replica.ID()] = replica
+			}
+			return m
+		})
 	}
 	return builders
 }
