@@ -14,7 +14,6 @@ import (
 	"github.com/relab/hotstuff/consensus/chainedhotstuff"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
-	"github.com/relab/hotstuff/leaderrotation"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -22,49 +21,45 @@ import (
 func TestChainedHotstuff(t *testing.T) {
 	const n = 4
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	acceptor := mocks.NewMockAcceptor(ctrl)
-	acceptor.EXPECT().Accept(gomock.Any()).AnyTimes().Return(true)
-	commands := mocks.NewMockCommandQueue(ctrl)
-	commands.EXPECT().GetCommand().AnyTimes().DoAndReturn(func() *hotstuff.Command {
-		cmd := hotstuff.Command("foo")
-		return &cmd
-	})
 
 	baseCfg := config.NewConfig(0, nil, nil)
 
 	listeners := make([]net.Listener, n)
-	keys := make([]*ecdsa.PrivateKey, n)
+	keys := make([]hotstuff.PrivateKey, n)
 	for i := 0; i < n; i++ {
 		listeners[i] = testutil.CreateTCPListener(t)
-		keys[i] = testutil.GenerateKey(t)
+		key := testutil.GenerateKey(t)
+		keys[i] = key
 		id := hotstuff.ID(i + 1)
 		baseCfg.Replicas[id] = &config.ReplicaInfo{
 			ID:      id,
 			Address: listeners[i].Addr().String(),
-			PubKey:  &keys[i].PublicKey,
+			PubKey:  &key.PublicKey,
 		}
 	}
 
+	builders := testutil.CreateBuilders(t, ctrl, n, keys...)
 	configs := make([]*gorums.Config, n)
 	servers := make([]*gorums.Server, n)
+	synchronizers := make([]hotstuff.ViewSynchronizer, n)
 	for i := 0; i < n; i++ {
 		c := *baseCfg
 		c.ID = hotstuff.ID(i + 1)
-		c.PrivateKey = keys[i]
+		c.PrivateKey = keys[i].(*ecdsa.PrivateKey)
 		configs[i] = gorums.NewConfig(c)
 		servers[i] = gorums.NewServer(c)
+		synchronizers[i] = synchronizer.New(time.Second)
+		builders[i].Register(chainedhotstuff.New(), configs[i], servers[i], synchronizers[i])
 	}
 
-	replicas := make([]hotstuff.Consensus, n)
-	synchronizers := make([]*synchronizer.Synchronizer, n)
+	executors := make([]*mocks.MockExecutor, n)
 	counters := make([]uint, n)
 	c := make(chan struct{}, n)
 	errChan := make(chan error, n)
 	for i := 0; i < n; i++ {
 		counter := &counters[i]
-		executor := mocks.NewMockExecutor(ctrl)
-		executor.EXPECT().Exec(gomock.Any()).AnyTimes().Do(func(arg hotstuff.Command) {
+		executors[i] = mocks.NewMockExecutor(ctrl)
+		executors[i].EXPECT().Exec(gomock.Any()).AnyTimes().Do(func(arg hotstuff.Command) {
 			if arg != hotstuff.Command("foo") {
 				errChan <- fmt.Errorf("unknown command executed: got %s, want: %s", arg, "foo")
 			}
@@ -73,18 +68,13 @@ func TestChainedHotstuff(t *testing.T) {
 				c <- struct{}{}
 			}
 		})
-		synchronizers[i] = synchronizer.New(leaderrotation.NewRoundRobin(configs[i]), 500*time.Millisecond)
-		replicas[i] = chainedhotstuff.Builder{
-			Config:       configs[i],
-			Synchronizer: synchronizers[i],
-			Acceptor:     acceptor,
-			CommandQueue: commands,
-			Executor:     executor,
-		}.Build()
+		builders[i].Register(executors[i])
 	}
 
+	builders.Build()
+
 	for i, server := range servers {
-		server.StartOnListener(replicas[i], listeners[i])
+		server.StartOnListener(listeners[i])
 		defer server.Stop()
 	}
 
@@ -96,8 +86,8 @@ func TestChainedHotstuff(t *testing.T) {
 		defer cfg.Close()
 	}
 
-	for _, pm := range synchronizers {
-		pm.Start()
+	for _, s := range synchronizers {
+		s.Start()
 	}
 
 	for i := 0; i < n; i++ {
