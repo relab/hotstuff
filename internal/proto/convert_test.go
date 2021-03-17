@@ -12,12 +12,11 @@ import (
 
 func TestConvertPartialCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	pk := testutil.GenerateKey(t)
+	builder := testutil.TestModules(t, ctrl, 1, testutil.GenerateKey(t))
+	hs := builder.Build()
+	signer := hs.Signer()
 
-	cfg := testutil.CreateMockConfig(t, ctrl, 1, pk)
-	signer, _ := ecdsa.New(cfg)
 	want, err := signer.CreatePartialCert(hotstuff.GetGenesis())
 	if err != nil {
 		t.Fatal(err)
@@ -33,28 +32,15 @@ func TestConvertPartialCert(t *testing.T) {
 
 func TestConvertQuorumCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+
+	builders := testutil.CreateBuilders(t, ctrl, 4)
+	hl := builders.Build()
 
 	b1 := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), nil, "", 1, 1)
-	getSignature := func(id hotstuff.ID) hotstuff.PartialCert {
-		key := testutil.GenerateKey(t)
-		cfg := testutil.CreateMockConfig(t, ctrl, id, key)
-		signer, _ := ecdsa.New(cfg)
-		pcert, err := signer.CreatePartialCert(b1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return pcert
-	}
 
-	sig1 := getSignature(1)
-	sig2 := getSignature(2)
+	signatures := testutil.CreatePCs(t, b1, hl.Signers())
 
-	key := testutil.GenerateKey(t)
-	cfg := testutil.CreateMockConfig(t, ctrl, 0, key)
-	signer, _ := ecdsa.New(cfg)
-
-	want, err := signer.CreateQuorumCert(b1, []hotstuff.PartialCert{sig1, sig2})
+	want, err := hl[0].Signer().CreateQuorumCert(b1, signatures)
 	if err != nil {
 		t.Fatal(err)
 	}
