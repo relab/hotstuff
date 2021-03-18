@@ -37,7 +37,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 
 	config := mocks.NewMockConfig(ctrl)
 	config.EXPECT().Len().AnyTimes().Return(1)
-	config.EXPECT().QuorumSize().AnyTimes().Return(1)
+	config.EXPECT().QuorumSize().AnyTimes().Return(3)
 
 	replica := CreateMockReplica(t, ctrl, id, privkey.Public())
 	ConfigAddReplica(t, config, replica)

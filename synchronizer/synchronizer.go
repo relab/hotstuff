@@ -36,6 +36,7 @@ func New(baseTimeout time.Duration) hotstuff.ViewSynchronizer {
 		latestCommit: 0,
 		baseTimeout:  baseTimeout,
 		timeouts:     make(map[hotstuff.View]map[hotstuff.ID]*hotstuff.TimeoutMsg),
+		timer:        time.NewTimer(0), // dummy timer that will be replaced after start() is called
 	}
 }
 
@@ -172,6 +173,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 
 	// TODO: stop timer
 	s.currentView = v + 1
+	s.timer.Reset(s.viewDuration(s.currentView))
 
 	leader := s.mod.LeaderRotation().GetLeader(s.currentView)
 	if leader == s.mod.ID() {

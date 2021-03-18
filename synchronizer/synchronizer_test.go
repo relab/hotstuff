@@ -27,7 +27,6 @@ func TestLocalTimeout(t *testing.T) {
 	c := make(chan struct{})
 	hs.EXPECT().IncreaseLastVotedView(hotstuff.View(1))
 	hs.EXPECT().HighQC().Return(qc)
-	leader.EXPECT().NewView(gomock.AssignableToTypeOf(hotstuff.SyncInfo{})).AnyTimes()
 	cfg.
 		EXPECT().
 		Timeout(gomock.AssignableToTypeOf(&hotstuff.TimeoutMsg{})).
