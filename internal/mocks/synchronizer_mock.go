@@ -81,3 +81,17 @@ func (mr *MockViewSynchronizerMockRecorder) Stop() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockViewSynchronizer)(nil).Stop))
 }
+
+// View mocks base method.
+func (m *MockViewSynchronizer) View() hotstuff.View {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "View")
+	ret0, _ := ret[0].(hotstuff.View)
+	return ret0
+}
+
+// View indicates an expected call of View.
+func (mr *MockViewSynchronizerMockRecorder) View() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "View", reflect.TypeOf((*MockViewSynchronizer)(nil).View))
+}
