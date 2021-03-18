@@ -35,6 +35,7 @@ func New(baseTimeout time.Duration) hotstuff.ViewSynchronizer {
 		currentView:  1,
 		latestCommit: 0,
 		baseTimeout:  baseTimeout,
+		timeouts:     make(map[hotstuff.View]map[hotstuff.ID]*hotstuff.TimeoutMsg),
 	}
 }
 

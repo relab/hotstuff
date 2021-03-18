@@ -421,6 +421,8 @@ type ViewSynchronizer interface {
 	// AdvanceView attempts to advance to the next view using the given QC.
 	// qc must be either a regular quorum certificate, or a timeout certificate.
 	AdvanceView(SyncInfo)
+	// View returns the current view.
+	View() View
 	// Start starts the synchronizer.
 	Start()
 	// Stop stops the synchronizer.

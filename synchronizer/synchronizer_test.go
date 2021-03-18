@@ -21,10 +21,13 @@ func TestLocalTimeout(t *testing.T) {
 	builder.Register(hs, s)
 	mods := builder.Build()
 	cfg := mods.Config().(*mocks.MockConfig)
+	leader := testutil.CreateMockReplica(t, ctrl, 1, testutil.GenerateKey(t))
+	testutil.ConfigAddReplica(t, cfg, leader)
 
 	c := make(chan struct{})
 	hs.EXPECT().IncreaseLastVotedView(hotstuff.View(1))
 	hs.EXPECT().HighQC().Return(qc)
+	leader.EXPECT().NewView(gomock.AssignableToTypeOf(hotstuff.SyncInfo{}))
 	cfg.
 		EXPECT().
 		Timeout(gomock.AssignableToTypeOf(&hotstuff.TimeoutMsg{})).
@@ -33,7 +36,7 @@ func TestLocalTimeout(t *testing.T) {
 				t.Errorf("wrong view. got: %v, want: %v", msg.View, 1)
 			}
 			if msg.ID != 2 {
-				t.Errorf("wrong ID. got: %v, want: %v", msg.ID, 1)
+				t.Errorf("wrong ID. got: %v, want: %v", msg.ID, 2)
 			}
 			if !bytes.Equal(msg.HighQC.ToBytes(), qc.ToBytes()) {
 				t.Errorf("wrong QC. got: %v, want: %v", msg.HighQC, qc)
@@ -46,4 +49,83 @@ func TestLocalTimeout(t *testing.T) {
 
 	s.Start()
 	<-c
+}
+
+func TestAdvanceViewQC(t *testing.T) {
+	const n = 4
+	ctrl := gomock.NewController(t)
+	builders := testutil.CreateBuilders(t, ctrl, n)
+	s := New(100 * time.Millisecond)
+	hs := mocks.NewMockConsensus(ctrl)
+	builders[0].Register(s, hs)
+
+	hl := builders.Build()
+	signers := hl.Signers()
+
+	block := hotstuff.NewBlock(
+		hotstuff.GetGenesis().Hash(),
+		ecdsa.NewQuorumCert(make(map[hotstuff.ID]*ecdsa.Signature), hotstuff.GetGenesis().Hash()),
+		"foo",
+		1,
+		2,
+	)
+	hl[0].BlockChain().Store(block)
+	qc := testutil.CreateQC(t, block, signers)
+	hs.EXPECT().UpdateHighQC(qc)
+	// synchronizer should tell hotstuff to propose
+	hs.EXPECT().Propose()
+
+	s.AdvanceView(hotstuff.SyncInfo{QC: qc})
+
+	if s.View() != 2 {
+		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())
+	}
+}
+
+func TestAdvanceViewTC(t *testing.T) {
+	const n = 4
+	ctrl := gomock.NewController(t)
+	builders := testutil.CreateBuilders(t, ctrl, n)
+	s := New(100 * time.Millisecond)
+	hs := mocks.NewMockConsensus(ctrl)
+	builders[0].Register(s, hs)
+
+	hl := builders.Build()
+	signers := hl.Signers()
+
+	tc := testutil.CreateTC(t, 1, signers)
+
+	// synchronizer should tell hotstuff to propose
+	hs.EXPECT().Propose()
+
+	s.AdvanceView(hotstuff.SyncInfo{TC: tc})
+
+	if s.View() != 2 {
+		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())
+	}
+}
+
+func TestRemoteTimeout(t *testing.T) {
+	const n = 4
+	ctrl := gomock.NewController(t)
+	builders := testutil.CreateBuilders(t, ctrl, n)
+	s := New(100 * time.Millisecond)
+	hs := mocks.NewMockConsensus(ctrl)
+	builders[0].Register(s, hs)
+
+	hl := builders.Build()
+	signers := hl.Signers()
+
+	timeouts := testutil.CreateTimeouts(t, 1, signers)
+
+	// synchronizer should tell hotstuff to propose
+	hs.EXPECT().Propose()
+
+	for _, timeout := range timeouts {
+		s.OnRemoteTimeout(timeout)
+	}
+
+	if s.View() != 2 {
+		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())
+	}
 }
