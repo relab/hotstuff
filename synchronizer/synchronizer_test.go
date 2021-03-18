@@ -37,8 +37,8 @@ func TestLocalTimeout(t *testing.T) {
 			if msg.ID != 2 {
 				t.Errorf("wrong ID. got: %v, want: %v", msg.ID, 2)
 			}
-			if !bytes.Equal(msg.HighQC.ToBytes(), qc.ToBytes()) {
-				t.Errorf("wrong QC. got: %v, want: %v", msg.HighQC, qc)
+			if !bytes.Equal(msg.SyncInfo.QC.ToBytes(), qc.ToBytes()) {
+				t.Errorf("wrong QC. got: %v, want: %v", msg.SyncInfo.QC, qc)
 			}
 			if !mods.Verifier().Verify(msg.Signature, msg.View.ToHash()) {
 				t.Error("failed to verify signature")

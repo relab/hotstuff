@@ -274,6 +274,16 @@ type SyncInfo struct {
 	TC TimeoutCert
 }
 
+func (si SyncInfo) String() string {
+	var cert interface{}
+	if si.QC != nil {
+		cert = si.QC
+	} else {
+		cert = si.TC
+	}
+	return fmt.Sprint(cert)
+}
+
 // QuorumCert (QC) is a certificate for a Block created by a quorum of partial certificates.
 type QuorumCert interface {
 	ToBytes
@@ -324,14 +334,14 @@ type BlockChain interface {
 
 // TimeoutMsg is broadcast whenever a replica has a local timeout.
 type TimeoutMsg struct {
-	ID        ID         // The ID of the replica who sent the message.
-	View      View       // The view that the replica wants to enter.
-	Signature Signature  // A signature of the view
-	HighQC    QuorumCert // The highest QC known to the sender.
+	ID        ID        // The ID of the replica who sent the message.
+	View      View      // The view that the replica wants to enter.
+	Signature Signature // A signature of the view
+	SyncInfo  SyncInfo  // The highest QC/TC known to the sender.
 }
 
 func (t TimeoutMsg) String() string {
-	return fmt.Sprintf("TimeoutMsg{ ID: %d, View: %d, QC: %v }", t.ID, t.View, t.HighQC)
+	return fmt.Sprintf("TimeoutMsg{ ID: %d, View: %d, SyncInfo: %v }", t.ID, t.View, t.SyncInfo)
 }
 
 //go:generate mockgen -destination=internal/mocks/replica_mock.go -package=mocks . Replica

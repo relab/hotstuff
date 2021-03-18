@@ -1,6 +1,7 @@
 package synchronizer
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -18,6 +19,7 @@ type Synchronizer struct {
 
 	mut sync.Mutex
 
+	highTC       hotstuff.TimeoutCert
 	baseTimeout  time.Duration
 	timer        *time.Timer
 	currentView  hotstuff.View
@@ -27,6 +29,11 @@ type Synchronizer struct {
 
 func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff) {
 	s.mod = hs
+	var err error
+	s.highTC, err = s.mod.Signer().CreateTimeoutCert(hotstuff.View(0), []*hotstuff.TimeoutMsg{})
+	if err != nil {
+		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
+	}
 }
 
 // New creates a new Synchronizer.
@@ -36,7 +43,7 @@ func New(baseTimeout time.Duration) hotstuff.ViewSynchronizer {
 		latestCommit: 0,
 		baseTimeout:  baseTimeout,
 		timeouts:     make(map[hotstuff.View]map[hotstuff.ID]*hotstuff.TimeoutMsg),
-		timer:        time.NewTimer(0), // dummy timer that will be replaced after start() is called
+		timer:        time.AfterFunc(0, func() {}), // dummy timer that will be replaced after start() is called
 	}
 }
 
@@ -69,6 +76,19 @@ func (s *Synchronizer) viewDuration(view hotstuff.View) time.Duration {
 	return s.baseTimeout
 }
 
+func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
+	qc := s.mod.Consensus().HighQC()
+	qcBlock, ok := s.mod.BlockChain().Get(qc.BlockHash())
+	if !ok {
+		// TODO
+		panic("highQC block missing")
+	}
+	if qcBlock.View() >= s.highTC.View() {
+		return hotstuff.SyncInfo{QC: qc}
+	}
+	return hotstuff.SyncInfo{TC: s.highTC}
+}
+
 func (s *Synchronizer) onLocalTimeout() {
 	// only run this once per view
 	if m, ok := s.timeouts[s.currentView]; ok {
@@ -86,7 +106,7 @@ func (s *Synchronizer) onLocalTimeout() {
 	timeoutMsg := &hotstuff.TimeoutMsg{
 		ID:        s.mod.ID(),
 		View:      s.currentView,
-		HighQC:    s.mod.Consensus().HighQC(),
+		SyncInfo:  s.SyncInfo(),
 		Signature: sig,
 	}
 	s.mod.Config().Timeout(timeoutMsg)
@@ -98,7 +118,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout *hotstuff.TimeoutMsg) {
 	defer func() {
 		s.mut.Lock()
 		defer s.mut.Unlock()
-		// cleanup old timesuts
+		// cleanup old timeouts
 		for view := range s.timeouts {
 			if view < s.currentView {
 				delete(s.timeouts, view)
@@ -154,6 +174,9 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	var v hotstuff.View
 	if syncInfo.TC != nil {
 		v = syncInfo.TC.View()
+		if v > s.highTC.View() {
+			s.highTC = syncInfo.TC
+		}
 	} else {
 		s.mod.Consensus().UpdateHighQC(syncInfo.QC)
 		b, ok := s.mod.BlockChain().Get(syncInfo.QC.BlockHash())

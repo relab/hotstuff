@@ -96,16 +96,16 @@ func BlockFromProto(block *Block) *hotstuff.Block {
 func TimeoutMsgFromProto(m *TimeoutMsg) *hotstuff.TimeoutMsg {
 	return &hotstuff.TimeoutMsg{
 		View:      hotstuff.View(m.GetView()),
-		HighQC:    QuorumCertFromProto(m.GetQC()),
+		SyncInfo:  SyncInfoFromProto(m.GetSyncInfo()),
 		Signature: SignatureFromProto(m.GetSig()),
 	}
 }
 
 func TimeoutMsgToProto(timeoutMsg *hotstuff.TimeoutMsg) *TimeoutMsg {
 	return &TimeoutMsg{
-		View: uint64(timeoutMsg.View),
-		QC:   QuorumCertToProto(timeoutMsg.HighQC),
-		Sig:  SignatureToProto(timeoutMsg.Signature),
+		View:     uint64(timeoutMsg.View),
+		SyncInfo: SyncInfoToProto(timeoutMsg.SyncInfo),
+		Sig:      SignatureToProto(timeoutMsg.Signature),
 	}
 }
 

@@ -72,7 +72,7 @@ message NewViewMsg {
 
 message TimeoutMsg {
   uint64 View = 1;
-  QuorumCert QC = 2;
+  SyncInfo SyncInfo = 2;
   Signature Sig = 3;
 }
 

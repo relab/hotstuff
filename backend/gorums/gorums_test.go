@@ -129,7 +129,7 @@ func TestTimeout(t *testing.T) {
 		timeout := &hotstuff.TimeoutMsg{
 			ID:        1,
 			View:      1,
-			HighQC:    qc,
+			SyncInfo:  hotstuff.SyncInfo{QC: qc},
 			Signature: testutil.Sign(t, hotstuff.View(1).ToHash(), signer),
 		}
 
