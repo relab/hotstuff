@@ -2,6 +2,7 @@ package gorums
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/tls"
 	"crypto/x509"
@@ -68,11 +69,13 @@ func TestPropose(t *testing.T) {
 			})
 		}
 
+		ctx, cancel := context.WithCancel(context.Background())
 		cfg.Propose(proposal)
 		for i := 1; i < n; i++ {
-			go hl[i].EventLoop().Run()
+			go hl[i].EventLoop().Run(ctx)
 			<-c
 		}
+		cancel()
 	}
 	runBoth(t, run)
 }
@@ -106,10 +109,12 @@ func TestVote(t *testing.T) {
 			t.Fatalf("Failed to find replica with ID 2")
 		}
 
-		go hl[1].EventLoop().Run()
+		ctx, cancel := context.WithCancel(context.Background())
+		go hl[1].EventLoop().Run(ctx)
 
 		replica.Vote(pc)
 		<-c
+		cancel()
 	}
 	runBoth(t, run)
 }
@@ -148,11 +153,13 @@ func TestTimeout(t *testing.T) {
 			})
 		}
 
+		ctx, cancel := context.WithCancel(context.Background())
 		cfg.Timeout(timeout)
 		for i := 1; i < n; i++ {
-			go hl[i].EventLoop().Run()
+			go hl[i].EventLoop().Run(ctx)
 			<-c
 		}
+		cancel()
 	}
 	runBoth(t, run)
 }

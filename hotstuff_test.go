@@ -1,6 +1,7 @@
 package hotstuff_test
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"net"
@@ -73,10 +74,12 @@ func TestChainedHotstuff(t *testing.T) {
 
 	hl := builders.Build()
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	for i, server := range servers {
 		server.StartOnListener(listeners[i])
 		defer server.Stop()
-		go hl[i].EventLoop().Run()
+		go hl[i].EventLoop().Run(ctx)
 	}
 
 	for _, cfg := range configs {
@@ -99,4 +102,5 @@ func TestChainedHotstuff(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	cancel()
 }

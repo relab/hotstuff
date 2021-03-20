@@ -1,5 +1,7 @@
 package hotstuff
 
+import "context"
+
 type EventLoop struct {
 	mod    *HotStuff
 	eventQ chan Event
@@ -17,6 +19,13 @@ func (el *EventLoop) InitModule(hs *HotStuff) {
 }
 
 func (el *EventLoop) AddEvent(event Event) {
+	// TODO: consider making it possible to register as an event handler for a specific kind of event.
+	// We could also have two types of handlers that run at different times.
+	// For example, the blockchain should process events at the time that they arrive.
+	// On the other hand, the consensus algorithm must wait until the event is at the front of the queue.
+	// It should also be possible to "consume" an event such that it is not added to the event queue,
+	// for example if we were unable to verify a signature.
+
 	// We let the blockchain process the event first, if it is able to, so that it may store blocks early.
 	// This could help avoid unnecessarily making fetch requests when blocks arrive out of order.
 	if ep, ok := el.mod.BlockChain().(EventProcessor); ok {
@@ -25,9 +34,14 @@ func (el *EventLoop) AddEvent(event Event) {
 	el.eventQ <- event
 }
 
-func (el *EventLoop) Run() {
-	for event := range el.eventQ {
-		el.processEvent(event)
+func (el *EventLoop) Run(ctx context.Context) {
+	for {
+		select {
+		case event := <-el.eventQ:
+			el.processEvent(event)
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
