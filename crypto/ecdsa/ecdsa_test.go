@@ -157,7 +157,7 @@ func TestCreateTimeoutCertInvalid(t *testing.T) {
 
 		tests := []struct {
 			name  string
-			votes []*hotstuff.TimeoutMsg
+			votes []hotstuff.TimeoutMsg
 			err   error
 		}{
 			{"hash mismatch", badView, ecdsa.ErrViewMismatch},

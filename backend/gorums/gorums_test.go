@@ -50,7 +50,7 @@ func TestPropose(t *testing.T) {
 		cfg, teardown := createConfig(t, td, ctrl)
 		mocks := createMocks(t, ctrl, td, n)
 		td.builders[0].Register(cfg)
-		td.builders.Build()
+		hl := td.builders.Build()
 
 		defer teardown()
 
@@ -59,7 +59,8 @@ func TestPropose(t *testing.T) {
 		// the configuration has ID 1, so we won't be receiving any proposal for that replica.
 		c := make(chan struct{}, n-1)
 		for _, mock := range mocks[1:] {
-			mock.EXPECT().OnPropose(gomock.AssignableToTypeOf(proposal)).Do(func(block *hotstuff.Block) {
+			mock.EXPECT().OnPropose(gomock.AssignableToTypeOf(hotstuff.ProposeMsg{})).Do(func(p hotstuff.ProposeMsg) {
+				block := p.Block
 				if block.Hash() != proposal.Hash() {
 					t.Error("hash mismatch")
 				}
@@ -68,7 +69,8 @@ func TestPropose(t *testing.T) {
 		}
 
 		cfg.Propose(proposal)
-		for i := 0; i < n-1; i++ {
+		for i := 1; i < n; i++ {
+			go hl[i].EventLoop().Run()
 			<-c
 		}
 	}
@@ -92,8 +94,8 @@ func TestVote(t *testing.T) {
 		pc := testutil.CreatePC(t, proposal, signer)
 
 		c := make(chan struct{})
-		mocks[1].EXPECT().OnVote(gomock.AssignableToTypeOf(pc)).Do(func(vote hotstuff.PartialCert) {
-			if !bytes.Equal(pc.ToBytes(), vote.ToBytes()) {
+		mocks[1].EXPECT().OnVote(gomock.AssignableToTypeOf(hotstuff.VoteMsg{})).Do(func(vote hotstuff.VoteMsg) {
+			if !bytes.Equal(pc.ToBytes(), vote.PartialCert.ToBytes()) {
 				t.Error("The received partial certificate differs from the original.")
 			}
 			close(c)
@@ -103,6 +105,8 @@ func TestVote(t *testing.T) {
 		if !ok {
 			t.Fatalf("Failed to find replica with ID 2")
 		}
+
+		go hl[1].EventLoop().Run()
 
 		replica.Vote(pc)
 		<-c
@@ -126,7 +130,7 @@ func TestTimeout(t *testing.T) {
 		signer := hl[0].Signer()
 
 		qc := ecdsacrypto.NewQuorumCert(make(map[hotstuff.ID]*ecdsacrypto.Signature), hotstuff.GetGenesis().Hash())
-		timeout := &hotstuff.TimeoutMsg{
+		timeout := hotstuff.TimeoutMsg{
 			ID:        1,
 			View:      1,
 			SyncInfo:  hotstuff.SyncInfo{QC: qc},
@@ -136,7 +140,7 @@ func TestTimeout(t *testing.T) {
 		c := make(chan struct{}, n-1)
 		for _, mock := range synchronizers[1:] {
 
-			mock.EXPECT().OnRemoteTimeout(gomock.AssignableToTypeOf(timeout)).Do(func(tm *hotstuff.TimeoutMsg) {
+			mock.EXPECT().OnRemoteTimeout(gomock.AssignableToTypeOf(timeout)).Do(func(tm hotstuff.TimeoutMsg) {
 				if !reflect.DeepEqual(timeout, tm) {
 					t.Fatalf("expected timeouts to be equal. got: %v, want: %v", tm, timeout)
 				}
@@ -145,7 +149,8 @@ func TestTimeout(t *testing.T) {
 		}
 
 		cfg.Timeout(timeout)
-		for i := 0; i < n-1; i++ {
+		for i := 1; i < n; i++ {
+			go hl[i].EventLoop().Run()
 			<-c
 		}
 	}

@@ -46,8 +46,20 @@ func (mr *MockViewSynchronizerMockRecorder) AdvanceView(arg0 interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdvanceView", reflect.TypeOf((*MockViewSynchronizer)(nil).AdvanceView), arg0)
 }
 
+// OnNewView mocks base method.
+func (m *MockViewSynchronizer) OnNewView(arg0 hotstuff.NewViewMsg) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "OnNewView", arg0)
+}
+
+// OnNewView indicates an expected call of OnNewView.
+func (mr *MockViewSynchronizerMockRecorder) OnNewView(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnNewView", reflect.TypeOf((*MockViewSynchronizer)(nil).OnNewView), arg0)
+}
+
 // OnRemoteTimeout mocks base method.
-func (m *MockViewSynchronizer) OnRemoteTimeout(arg0 *hotstuff.TimeoutMsg) {
+func (m *MockViewSynchronizer) OnRemoteTimeout(arg0 hotstuff.TimeoutMsg) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "OnRemoteTimeout", arg0)
 }

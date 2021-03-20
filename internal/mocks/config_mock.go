@@ -117,7 +117,7 @@ func (mr *MockConfigMockRecorder) Replicas() *gomock.Call {
 }
 
 // Timeout mocks base method.
-func (m *MockConfig) Timeout(arg0 *hotstuff.TimeoutMsg) {
+func (m *MockConfig) Timeout(arg0 hotstuff.TimeoutMsg) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Timeout", arg0)
 }

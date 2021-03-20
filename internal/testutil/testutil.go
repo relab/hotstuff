@@ -287,3 +287,29 @@ func GenerateKeys(t *testing.T, n int) (keys []hotstuff.PrivateKey) {
 	}
 	return keys
 }
+
+func NewProposeMsg(parent hotstuff.Hash, qc hotstuff.QuorumCert, cmd hotstuff.Command, view hotstuff.View, id hotstuff.ID) hotstuff.ProposeMsg {
+	return hotstuff.ProposeMsg{ID: id, Block: hotstuff.NewBlock(parent, qc, cmd, view, id)}
+}
+
+type leaderRotation struct {
+	t     *testing.T
+	order []hotstuff.ID
+}
+
+// GetLeader returns the id of the leader in the given view.
+func (l leaderRotation) GetLeader(v hotstuff.View) hotstuff.ID {
+	l.t.Helper()
+	if v == 0 {
+		l.t.Fatalf("attempt to get leader for view 0")
+	}
+	if v > hotstuff.View(len(l.order)) {
+		l.t.Fatalf("leader rotation only defined up to view: %v", len(l.order))
+	}
+	return l.order[v-1]
+}
+
+func NewLeaderRotation(t *testing.T, order ...hotstuff.ID) hotstuff.LeaderRotation {
+	t.Helper()
+	return leaderRotation{t, order}
+}

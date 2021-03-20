@@ -113,7 +113,7 @@ func (mr *MockConsensusMockRecorder) OnDeliver(arg0 interface{}) *gomock.Call {
 }
 
 // OnPropose mocks base method.
-func (m *MockConsensus) OnPropose(arg0 *hotstuff.Block) {
+func (m *MockConsensus) OnPropose(arg0 hotstuff.ProposeMsg) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "OnPropose", arg0)
 }
@@ -125,7 +125,7 @@ func (mr *MockConsensusMockRecorder) OnPropose(arg0 interface{}) *gomock.Call {
 }
 
 // OnVote mocks base method.
-func (m *MockConsensus) OnVote(arg0 hotstuff.PartialCert) {
+func (m *MockConsensus) OnVote(arg0 hotstuff.VoteMsg) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "OnVote", arg0)
 }
