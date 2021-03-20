@@ -43,11 +43,15 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 	ConfigAddReplica(t, config, replica)
 	config.EXPECT().Replicas().AnyTimes().Return((map[hotstuff.ID]hotstuff.Replica{1: replica}))
 
+	synchronizer := mocks.NewMockViewSynchronizer(ctrl)
+	synchronizer.EXPECT().Start().AnyTimes()
+	synchronizer.EXPECT().Stop().AnyTimes()
+
 	builder.Register(
 		blockchain.New(100),
 		mocks.NewMockConsensus(ctrl),
-		mocks.NewMockViewSynchronizer(ctrl),
 		leaderrotation.NewFixed(1),
+		synchronizer,
 		config,
 		signer,
 		verifier,

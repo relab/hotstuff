@@ -2,6 +2,7 @@ package chainedhotstuff
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -141,6 +142,7 @@ func TestFetchBlock(t *testing.T) {
 	votes := testutil.CreatePCs(t, b, hl.Signers())
 
 	// configure mocks
+	var mut sync.Mutex
 	cfg.
 		EXPECT().
 		Fetch(gomock.Any(), gomock.AssignableToTypeOf(b.Hash())).
@@ -148,7 +150,10 @@ func TestFetchBlock(t *testing.T) {
 			// wait for all votes to be sent
 			go func() {
 				<-votesSent
+				// TODO: we no longer protect hotstuff by mutex, so we'll just lock here manually for now.
+				mut.Lock()
 				hs.OnDeliver(b)
+				mut.Unlock()
 			}()
 		})
 

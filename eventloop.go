@@ -35,6 +35,10 @@ func (el *EventLoop) AddEvent(event Event) {
 }
 
 func (el *EventLoop) Run(ctx context.Context) {
+	// We start the view synchronizer from this goroutine such that we can avoid data races between Propose()
+	// and event handlers.
+	el.mod.ViewSynchronizer().Start()
+
 	for {
 		select {
 		case event := <-el.eventQ:

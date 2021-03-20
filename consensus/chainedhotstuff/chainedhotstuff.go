@@ -2,7 +2,6 @@ package chainedhotstuff
 
 import (
 	"context"
-	"sync"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/logging"
@@ -12,8 +11,6 @@ var logger = logging.GetLogger()
 
 type chainedhotstuff struct {
 	mod *hotstuff.HotStuff
-
-	mut sync.Mutex
 
 	// protocol variables
 
@@ -55,47 +52,33 @@ func (hs *chainedhotstuff) InitModule(mod *hotstuff.HotStuff) {
 
 // LastVote returns the view in which the replica last voted.
 func (hs *chainedhotstuff) LastVote() hotstuff.View {
-	hs.mut.Lock()
-	defer hs.mut.Unlock()
-
 	return hs.lastVote
 }
 
 // IncreaseLastVotedView ensures that no voting happens in a view earlier than `view`.
 func (hs *chainedhotstuff) IncreaseLastVotedView(view hotstuff.View) {
-	hs.mut.Lock()
 	hs.lastVote++
-	hs.mut.Unlock()
 }
 
 // HighQC returns the highest QC known to the replica
 func (hs *chainedhotstuff) HighQC() hotstuff.QuorumCert {
-	hs.mut.Lock()
-	defer hs.mut.Unlock()
 
 	return hs.highQC
 }
 
 // Leaf returns the last proposed block
 func (hs *chainedhotstuff) Leaf() *hotstuff.Block {
-	hs.mut.Lock()
-	defer hs.mut.Unlock()
-
 	return hs.bLeaf
 }
 
 func (hs *chainedhotstuff) CreateDummy() {
-	hs.mut.Lock()
 	dummy := hotstuff.NewBlock(hs.bLeaf.Hash(), nil, hotstuff.Command(""), hs.bLeaf.View()+1, hs.mod.ID())
 	hs.mod.BlockChain().Store(dummy)
 	hs.bLeaf = dummy
-	hs.mut.Unlock()
 }
 
 // UpdateHighQC updates HighQC if the given qc is higher than the old HighQC.
 func (hs *chainedhotstuff) UpdateHighQC(qc hotstuff.QuorumCert) {
-	hs.mut.Lock()
-	defer hs.mut.Unlock()
 	hs.updateHighQC(qc)
 }
 
@@ -179,20 +162,18 @@ func (hs *chainedhotstuff) update(block *hotstuff.Block) {
 // Propose proposes the given command
 func (hs *chainedhotstuff) Propose() {
 	logger.Debug("Propose")
-	hs.mut.Lock()
+
 	cmd := hs.mod.CommandQueue().GetCommand()
 	// TODO: Should probably use channels/contexts here instead such that
 	// a proposal can be made a little later if a new command is added to the queue.
 	// Alternatively, we could let the pacemaker know when commands arrive, so that it
 	// can rall Propose() again.
 	if cmd == nil {
-		// hs.mut.Unlock()
 		// return
 		cmd = new(hotstuff.Command)
 	}
 	block := hotstuff.NewBlock(hs.bLeaf.Hash(), hs.highQC, *cmd, hs.bLeaf.View()+1, hs.mod.ID())
 	hs.mod.BlockChain().Store(block)
-	hs.mut.Unlock()
 
 	hs.mod.Config().Propose(block)
 	// self vote
@@ -203,16 +184,13 @@ func (hs *chainedhotstuff) Propose() {
 func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	block := proposal.Block
 	logger.Debug("OnPropose: ", block)
-	hs.mut.Lock()
 
 	if proposal.ID != hs.mod.LeaderRotation().GetLeader(block.View()) {
-		hs.mut.Unlock()
 		logger.Info("OnPropose: block was not proposed by the expected leader")
 		return
 	}
 
 	if block.View() <= hs.lastVote {
-		hs.mut.Unlock()
 		logger.Info("OnPropose: block view was less than our view")
 		return
 	}
@@ -238,13 +216,11 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	}
 
 	if !safe {
-		hs.mut.Unlock()
 		logger.Info("OnPropose: block not safe")
 		return
 	}
 
 	if !hs.mod.Acceptor().Accept(block.Command()) {
-		hs.mut.Unlock()
 		logger.Info("OnPropose: command not accepted")
 		return
 	}
@@ -255,7 +231,6 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 
 	pc, err := hs.mod.Signer().CreatePartialCert(block)
 	if err != nil {
-		hs.mut.Unlock()
 		logger.Error("OnPropose: failed to sign vote: ", err)
 		return
 	}
@@ -266,7 +241,6 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 		hs.update(block)
 		hs.deliver(block)
 		hs.pendingVotes = make(map[hotstuff.Hash][]hotstuff.VoteMsg)
-		hs.mut.Unlock()
 		hs.mod.ViewSynchronizer().AdvanceView(hotstuff.SyncInfo{QC: block.QuorumCert()})
 	}
 
@@ -280,7 +254,6 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	leader, ok := hs.mod.Config().Replica(leaderID)
 	if !ok {
 		logger.Warnf("Replica with ID %d was not found!", leaderID)
-		hs.mut.Unlock()
 		return
 	}
 
@@ -289,7 +262,6 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 }
 
 func (hs *chainedhotstuff) fetchBlockForVote(voteMsg hotstuff.VoteMsg) {
-	hs.mut.Lock()
 	vote := voteMsg.PartialCert
 	votes, ok := hs.pendingVotes[vote.BlockHash()]
 	votes = append(votes, voteMsg)
@@ -297,20 +269,18 @@ func (hs *chainedhotstuff) fetchBlockForVote(voteMsg hotstuff.VoteMsg) {
 
 	if ok {
 		// another vote initiated fetching
-		hs.mut.Unlock()
 		return
 	}
 
 	var ctx context.Context
 	ctx, hs.fetchCancel = context.WithCancel(context.Background())
-	hs.mut.Unlock()
+
 	hs.mod.Config().Fetch(ctx, vote.BlockHash())
 }
 
 // OnVote handles an incoming vote
 func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 	defer func() {
-		hs.mut.Lock()
 		// delete any pending QCs with lower height than bLeaf
 		for k := range hs.verifiedVotes {
 			if block, ok := hs.mod.BlockChain().Get(k); ok {
@@ -321,7 +291,6 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 				delete(hs.verifiedVotes, k)
 			}
 		}
-		hs.mut.Unlock()
 	}()
 
 	cert := vote.PartialCert
@@ -333,17 +302,13 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 		return
 	}
 
-	hs.mut.Lock()
-
 	if block.View() <= hs.bLeaf.View() {
 		// too old
-		hs.mut.Unlock()
 		return
 	}
 
 	if !hs.mod.Verifier().VerifyPartialCert(cert) {
 		logger.Info("OnVote: Vote could not be verified!")
-		hs.mut.Unlock()
 		return
 	}
 
@@ -354,7 +319,6 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 	hs.verifiedVotes[cert.BlockHash()] = votes
 
 	if len(votes) < hs.mod.Config().QuorumSize() {
-		hs.mut.Unlock()
 		return
 	}
 
@@ -365,7 +329,6 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 	delete(hs.verifiedVotes, cert.BlockHash())
 	hs.updateHighQC(qc)
 
-	hs.mut.Unlock()
 	// signal the synchronizer
 	hs.mod.ViewSynchronizer().AdvanceView(hotstuff.SyncInfo{QC: qc})
 }
@@ -383,14 +346,12 @@ func (hs *chainedhotstuff) deliver(block *hotstuff.Block) {
 	hs.mod.BlockChain().Store(block)
 
 	for _, vote := range votes {
-		go hs.OnVote(vote)
+		hs.OnVote(vote)
 	}
 }
 
 // OnDeliver handles an incoming block
 func (hs *chainedhotstuff) OnDeliver(block *hotstuff.Block) {
-	hs.mut.Lock()
-	defer hs.mut.Unlock()
 	hs.deliver(block)
 }
 

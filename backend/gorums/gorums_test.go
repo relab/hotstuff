@@ -144,7 +144,8 @@ func TestTimeout(t *testing.T) {
 
 		c := make(chan struct{}, n-1)
 		for _, mock := range synchronizers[1:] {
-
+			mock.EXPECT().Start().AnyTimes()
+			mock.EXPECT().Stop().AnyTimes()
 			mock.EXPECT().OnRemoteTimeout(gomock.AssignableToTypeOf(timeout)).Do(func(tm hotstuff.TimeoutMsg) {
 				if !reflect.DeepEqual(timeout, tm) {
 					t.Fatalf("expected timeouts to be equal. got: %v, want: %v", tm, timeout)

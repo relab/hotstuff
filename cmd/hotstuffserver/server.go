@@ -124,8 +124,6 @@ func (srv *clientSrv) Start(address string) error {
 		}
 	}()
 
-	srv.hs.ViewSynchronizer().Start()
-
 	return nil
 }
 

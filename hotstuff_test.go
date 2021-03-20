@@ -79,7 +79,6 @@ func TestChainedHotstuff(t *testing.T) {
 	for i, server := range servers {
 		server.StartOnListener(listeners[i])
 		defer server.Stop()
-		go hl[i].EventLoop().Run(ctx)
 	}
 
 	for _, cfg := range configs {
@@ -90,8 +89,8 @@ func TestChainedHotstuff(t *testing.T) {
 		defer cfg.Close()
 	}
 
-	for _, s := range synchronizers {
-		s.Start()
+	for _, hs := range hl {
+		go hs.EventLoop().Run(ctx)
 	}
 
 	for i := 0; i < n; i++ {

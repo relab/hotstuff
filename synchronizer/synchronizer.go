@@ -2,7 +2,6 @@ package synchronizer
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/relab/hotstuff"
@@ -16,8 +15,6 @@ var logger = logging.GetLogger()
 // propose at the correct time, and send new view messages in case of a timeout.
 type Synchronizer struct {
 	mod *hotstuff.HotStuff
-
-	mut sync.Mutex
 
 	highTC       hotstuff.TimeoutCert
 	baseTimeout  time.Duration
@@ -49,13 +46,10 @@ func New(baseTimeout time.Duration) hotstuff.ViewSynchronizer {
 
 // Start starts the view timeout timer, and makes a proposal if the local replica is the leader.
 func (s *Synchronizer) Start() {
-	s.mut.Lock()
 	s.timer = time.AfterFunc(s.viewDuration(s.currentView), s.onLocalTimeout)
 	if s.mod.LeaderRotation().GetLeader(s.currentView) == s.mod.ID() {
-		s.mut.Unlock()
 		s.mod.Consensus().Propose()
 	} else {
-		s.mut.Unlock()
 	}
 }
 
@@ -66,8 +60,6 @@ func (s *Synchronizer) Stop() {
 
 // View returns the current view.
 func (s *Synchronizer) View() hotstuff.View {
-	s.mut.Lock()
-	defer s.mut.Unlock()
 	return s.currentView
 }
 
@@ -116,8 +108,6 @@ func (s *Synchronizer) onLocalTimeout() {
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
 func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	defer func() {
-		s.mut.Lock()
-		defer s.mut.Unlock()
 		// cleanup old timeouts
 		for view := range s.timeouts {
 			if view < s.currentView {
@@ -130,7 +120,6 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	if !verifier.Verify(timeout.Signature, timeout.View.ToHash()) {
 		return
 	}
-	s.mut.Lock()
 	logger.Debug("OnRemoteTimeout: ", timeout)
 
 	timeouts, ok := s.timeouts[timeout.View]
@@ -142,7 +131,6 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	timeouts[timeout.ID] = timeout
 
 	if len(timeouts) < s.mod.Config().QuorumSize() {
-		s.mut.Unlock()
 		return
 	}
 
@@ -157,11 +145,9 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	tc, err := signer.CreateTimeoutCert(s.currentView, timeoutList)
 	if err != nil {
 		logger.Debugf("Failed to create timeout certificate: %v", err)
-		s.mut.Unlock()
 		return
 	}
 
-	s.mut.Unlock()
 	s.AdvanceView(hotstuff.SyncInfo{TC: tc})
 }
 
@@ -173,9 +159,6 @@ func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
 // AdvanceView attempts to advance to the next view using the given QC.
 // qc must be either a regular quorum certificate, or a timeout certificate.
 func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
-	s.mut.Lock()
-	defer s.mut.Unlock()
-
 	var v hotstuff.View
 	if syncInfo.TC != nil {
 		v = syncInfo.TC.View()
