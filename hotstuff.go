@@ -53,6 +53,94 @@ import (
 	"fmt"
 )
 
+// Basic types:
+
+// ID uniquely identifies a replica
+type ID uint32
+
+// View is a number that uniquely identifies a view.
+type View uint64
+
+// ToHash converts the view to a Hash type. It does not actually hash the view.
+func (v View) ToHash() Hash {
+	h := Hash{}
+	binary.LittleEndian.PutUint64(h[:8], uint64(v))
+	return h
+}
+
+// Hash is a SHA256 hash
+type Hash [32]byte
+
+func (h Hash) String() string {
+	return base64.StdEncoding.EncodeToString(h[:])
+}
+
+// Command is a client request to be executed by the consensus protocol.
+//
+// The string type is used because it is immutable and can hold arbitrary bytes of any length.
+type Command string
+
+// ToBytes is an object that can be converted into bytes for the purposes of hashing, etc.
+type ToBytes interface {
+	// ToBytes returns the object as bytes.
+	ToBytes() []byte
+}
+
+// PublicKey is the public part of a replica's key pair.
+type PublicKey = crypto.PublicKey
+
+// PrivateKey is the private part of a replica's key pair.
+type PrivateKey interface {
+	// Public returns the public key associated with this private key.
+	Public() PublicKey
+}
+
+// Signature is a cryptographic signature of a block.
+type Signature interface {
+	ToBytes
+	// Signer returns the ID of the replica that generated the signature.
+	Signer() ID
+}
+
+// PartialCert is a partial certificate for a block created by a single replica.
+type PartialCert interface {
+	ToBytes
+	// Signature returns the signature of the block.
+	Signature() Signature
+	// BlockHash returns the hash of the block that was signed.
+	BlockHash() Hash
+}
+
+// SyncInfo holds the highest known QC or TC.
+type SyncInfo struct {
+	QC QuorumCert
+	TC TimeoutCert
+}
+
+func (si SyncInfo) String() string {
+	var cert interface{}
+	if si.QC != nil {
+		cert = si.QC
+	} else {
+		cert = si.TC
+	}
+	return fmt.Sprint(cert)
+}
+
+// QuorumCert (QC) is a certificate for a Block created by a quorum of partial certificates.
+type QuorumCert interface {
+	ToBytes
+	// BlockHash returns the hash of the block that the QC was created for.
+	BlockHash() Hash
+}
+
+// TimeoutCert (TC) is a certificate created by a quorum of timeout messages.
+type TimeoutCert interface {
+	ToBytes
+	// View returns the view that timed out.
+	View() View
+}
+
 // HotStuff contains the modules that together implement the HotStuff protocol.
 type HotStuff struct {
 	// data
@@ -182,36 +270,13 @@ func (b *Builder) Build() *HotStuff {
 	return b.hs
 }
 
+// Module interfaces
+
 // Module is an interface that can be implemented by types that need a reference to the HotStuff object.
 type Module interface {
 	// InitModule gives the module a reference to the HotStuff object.
 	InitModule(hs *HotStuff)
 }
-
-// ID uniquely identifies a replica
-type ID uint32
-
-// View is a number that uniquely identifies a view.
-type View uint64
-
-// ToHash converts the view to a Hash type. It does not actually hash the view.
-func (v View) ToHash() Hash {
-	h := Hash{}
-	binary.LittleEndian.PutUint64(h[:8], uint64(v))
-	return h
-}
-
-// Hash is a SHA256 hash
-type Hash [32]byte
-
-func (h Hash) String() string {
-	return base64.StdEncoding.EncodeToString(h[:])
-}
-
-// Command is a client request to be executed by the consensus protocol.
-//
-// The string type is used because it is immutable and can hold arbitrary bytes of any length.
-type Command string
 
 //go:generate mockgen -destination=internal/mocks/cmdqueue_mock.go -package=mocks . CommandQueue
 
@@ -235,67 +300,6 @@ type Acceptor interface {
 type Executor interface {
 	// Exec executes the given command.
 	Exec(Command)
-}
-
-// ToBytes is an object that can be converted into bytes for the purposes of hashing, etc.
-type ToBytes interface {
-	// ToBytes returns the object as bytes.
-	ToBytes() []byte
-}
-
-// PublicKey is the public part of a replica's key pair.
-type PublicKey = crypto.PublicKey
-
-// PrivateKey is the private part of a replica's key pair.
-type PrivateKey interface {
-	// Public returns the public key associated with this private key.
-	Public() PublicKey
-}
-
-// Signature is a cryptographic signature of a block.
-type Signature interface {
-	ToBytes
-	// Signer returns the ID of the replica that generated the signature.
-	Signer() ID
-}
-
-// PartialCert is a partial certificate for a block created by a single replica.
-type PartialCert interface {
-	ToBytes
-	// Signature returns the signature of the block.
-	Signature() Signature
-	// BlockHash returns the hash of the block that was signed.
-	BlockHash() Hash
-}
-
-// SyncInfo holds the highest known QC or TC.
-type SyncInfo struct {
-	QC QuorumCert
-	TC TimeoutCert
-}
-
-func (si SyncInfo) String() string {
-	var cert interface{}
-	if si.QC != nil {
-		cert = si.QC
-	} else {
-		cert = si.TC
-	}
-	return fmt.Sprint(cert)
-}
-
-// QuorumCert (QC) is a certificate for a Block created by a quorum of partial certificates.
-type QuorumCert interface {
-	ToBytes
-	// BlockHash returns the hash of the block that the QC was created for.
-	BlockHash() Hash
-}
-
-// TimeoutCert (TC) is a certificate created by a quorum of timeout messages.
-type TimeoutCert interface {
-	ToBytes
-	// View returns the view that timed out.
-	View() View
 }
 
 // Signer implements the methods required to create signatures and certificates.
