@@ -210,12 +210,12 @@ func CreateSignatures(t *testing.T, hash hotstuff.Hash, signers []hotstuff.Signe
 }
 
 // CreateTimeouts creates a set of TimeoutMsg messages from the given signers.
-func CreateTimeouts(t *testing.T, view hotstuff.View, signers []hotstuff.Signer) (timeouts []*hotstuff.TimeoutMsg) {
+func CreateTimeouts(t *testing.T, view hotstuff.View, signers []hotstuff.Signer) (timeouts []hotstuff.TimeoutMsg) {
 	t.Helper()
-	timeouts = make([]*hotstuff.TimeoutMsg, 0, len(signers))
+	timeouts = make([]hotstuff.TimeoutMsg, 0, len(signers))
 	sigs := CreateSignatures(t, view.ToHash(), signers)
 	for _, sig := range sigs {
-		timeouts = append(timeouts, &hotstuff.TimeoutMsg{
+		timeouts = append(timeouts, hotstuff.TimeoutMsg{
 			ID:        sig.Signer(),
 			View:      view,
 			Signature: sig,

@@ -248,7 +248,7 @@ func (ec *ecdsaCrypto) CreateQuorumCert(block *hotstuff.Block, signatures []hots
 }
 
 // CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
-func (ec *ecdsaCrypto) CreateTimeoutCert(view hotstuff.View, timeouts []*hotstuff.TimeoutMsg) (cert hotstuff.TimeoutCert, err error) {
+func (ec *ecdsaCrypto) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (cert hotstuff.TimeoutCert, err error) {
 	tc := &TimeoutCert{
 		signatures: make(aggregateSignature),
 		view:       view,

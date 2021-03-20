@@ -26,7 +26,7 @@ type chainedhotstuff struct {
 	fetchCancel context.CancelFunc
 
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert   // verified votes that could become a QC
-	pendingVotes  map[hotstuff.Hash][]hotstuff.PartialCert   // unverified votes that are waiting for a Block
+	pendingVotes  map[hotstuff.Hash][]hotstuff.VoteMsg       // unverified votes that are waiting for a Block
 	newView       map[hotstuff.View]map[hotstuff.ID]struct{} // the set of replicas who have sent a newView message per view
 }
 
@@ -34,7 +34,7 @@ type chainedhotstuff struct {
 func New() hotstuff.Consensus {
 	hs := &chainedhotstuff{}
 	hs.verifiedVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
-	hs.pendingVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
+	hs.pendingVotes = make(map[hotstuff.Hash][]hotstuff.VoteMsg)
 	hs.newView = make(map[hotstuff.View]map[hotstuff.ID]struct{})
 	hs.fetchCancel = func() {}
 	hs.bLock = hotstuff.GetGenesis()
@@ -196,13 +196,20 @@ func (hs *chainedhotstuff) Propose() {
 
 	hs.mod.Config().Propose(block)
 	// self vote
-	hs.OnPropose(block)
+	hs.OnPropose(hotstuff.ProposeMsg{ID: hs.mod.ID(), Block: block})
 }
 
 // OnPropose handles an incoming proposal
-func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
+func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
+	block := proposal.Block
 	logger.Debug("OnPropose: ", block)
 	hs.mut.Lock()
+
+	if proposal.ID != hs.mod.LeaderRotation().GetLeader(block.View()) {
+		hs.mut.Unlock()
+		logger.Info("OnPropose: block was not proposed by the expected leader")
+		return
+	}
 
 	if block.View() <= hs.lastVote {
 		hs.mut.Unlock()
@@ -244,6 +251,7 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 
 	// cancel the last fetch
 	hs.fetchCancel()
+	hs.mod.BlockChain().Store(block)
 
 	pc, err := hs.mod.Signer().CreatePartialCert(block)
 	if err != nil {
@@ -252,20 +260,20 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 		return
 	}
 
-	hs.mod.BlockChain().Store(block)
 	hs.lastVote = block.View()
 
 	finish := func() {
 		hs.update(block)
 		hs.deliver(block)
-		hs.pendingVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
+		hs.pendingVotes = make(map[hotstuff.Hash][]hotstuff.VoteMsg)
 		hs.mut.Unlock()
+		hs.mod.ViewSynchronizer().AdvanceView(hotstuff.SyncInfo{QC: block.QuorumCert()})
 	}
 
 	leaderID := hs.mod.LeaderRotation().GetLeader(hs.lastVote + 1)
 	if leaderID == hs.mod.ID() {
 		finish()
-		hs.OnVote(pc)
+		hs.OnVote(hotstuff.VoteMsg{ID: hs.mod.ID(), PartialCert: pc})
 		return
 	}
 
@@ -280,10 +288,11 @@ func (hs *chainedhotstuff) OnPropose(block *hotstuff.Block) {
 	finish()
 }
 
-func (hs *chainedhotstuff) fetchBlockForVote(vote hotstuff.PartialCert) {
+func (hs *chainedhotstuff) fetchBlockForVote(voteMsg hotstuff.VoteMsg) {
 	hs.mut.Lock()
+	vote := voteMsg.PartialCert
 	votes, ok := hs.pendingVotes[vote.BlockHash()]
-	votes = append(votes, vote)
+	votes = append(votes, voteMsg)
 	hs.pendingVotes[vote.BlockHash()] = votes
 
 	if ok {
@@ -299,7 +308,7 @@ func (hs *chainedhotstuff) fetchBlockForVote(vote hotstuff.PartialCert) {
 }
 
 // OnVote handles an incoming vote
-func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
+func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 	defer func() {
 		hs.mut.Lock()
 		// delete any pending QCs with lower height than bLeaf
@@ -315,10 +324,12 @@ func (hs *chainedhotstuff) OnVote(cert hotstuff.PartialCert) {
 		hs.mut.Unlock()
 	}()
 
+	cert := vote.PartialCert
+
 	block, ok := hs.mod.BlockChain().Get(cert.BlockHash())
 	if !ok {
 		logger.Debugf("Could not find block for vote: %.8s. Attempting to fetch.", cert.BlockHash())
-		hs.fetchBlockForVote(cert)
+		hs.fetchBlockForVote(vote)
 		return
 	}
 

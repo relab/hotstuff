@@ -71,11 +71,12 @@ func TestChainedHotstuff(t *testing.T) {
 		builders[i].Register(executors[i])
 	}
 
-	builders.Build()
+	hl := builders.Build()
 
 	for i, server := range servers {
 		server.StartOnListener(listeners[i])
 		defer server.Stop()
+		go hl[i].EventLoop().Run()
 	}
 
 	for _, cfg := range configs {

@@ -115,7 +115,7 @@ func (srv *clientSrv) Start(address string) error {
 	// sleep so that all replicas can be ready before we start
 	time.Sleep(time.Duration(srv.conf.ViewTimeout) * time.Millisecond)
 
-	srv.hs.ViewSynchronizer().Start()
+	go srv.hs.EventLoop().Run()
 
 	go func() {
 		err := srv.gorumsSrv.Serve(lis)
@@ -123,6 +123,8 @@ func (srv *clientSrv) Start(address string) error {
 			log.Println(err)
 		}
 	}()
+
+	srv.hs.ViewSynchronizer().Start()
 
 	return nil
 }

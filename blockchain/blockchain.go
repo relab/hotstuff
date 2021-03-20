@@ -62,3 +62,12 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (*hotstuff.Block, bool) {
 
 	return elem.Value.(*hotstuff.Block), true
 }
+
+func (chain *blockChain) ProcessEvent(event hotstuff.Event) {
+	proposal, ok := event.(hotstuff.ProposeMsg)
+	if !ok {
+		return
+	}
+	// TODO: "enhance" the block with helper functions for getting the parent, etc.
+	chain.Store(proposal.Block)
+}

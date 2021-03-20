@@ -124,19 +124,40 @@ func (srv *Server) Propose(ctx context.Context, block *proto.Block) {
 		logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
-	// defaults to 0 if error
 	block.Proposer = uint32(id)
-	srv.mod.Consensus().OnPropose(proto.BlockFromProto(block))
+
+	srv.mod.EventLoop().AddEvent(hotstuff.ProposeMsg{
+		ID:    id,
+		Block: proto.BlockFromProto(block),
+	})
 }
 
 // Vote handles an incoming vote message.
-func (srv *Server) Vote(_ context.Context, cert *proto.PartialCert) {
-	srv.mod.Consensus().OnVote(proto.PartialCertFromProto(cert))
+func (srv *Server) Vote(ctx context.Context, cert *proto.PartialCert) {
+	id, err := srv.getClientID(ctx)
+	if err != nil {
+		logger.Infof("Failed to get client ID: %v", err)
+		return
+	}
+
+	srv.mod.EventLoop().AddEvent(hotstuff.VoteMsg{
+		ID:          id,
+		PartialCert: proto.PartialCertFromProto(cert),
+	})
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
 func (srv *Server) NewView(ctx context.Context, msg *proto.SyncInfo) {
-	srv.mod.ViewSynchronizer().AdvanceView(proto.SyncInfoFromProto(msg))
+	id, err := srv.getClientID(ctx)
+	if err != nil {
+		logger.Infof("Failed to get client ID: %v", err)
+		return
+	}
+
+	srv.mod.EventLoop().AddEvent(hotstuff.NewViewMsg{
+		ID:       id,
+		SyncInfo: proto.SyncInfoFromProto(msg),
+	})
 }
 
 // Fetch handles an incoming fetch request.
@@ -178,5 +199,5 @@ func (srv *Server) Timeout(ctx context.Context, msg *proto.TimeoutMsg) {
 	if err != nil {
 		logger.Infof("Could not get ID of replica: %v", err)
 	}
-	srv.mod.ViewSynchronizer().OnRemoteTimeout(timeoutMsg)
+	srv.mod.EventLoop().AddEvent(timeoutMsg)
 }

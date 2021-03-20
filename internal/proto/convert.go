@@ -93,15 +93,15 @@ func BlockFromProto(block *Block) *hotstuff.Block {
 	)
 }
 
-func TimeoutMsgFromProto(m *TimeoutMsg) *hotstuff.TimeoutMsg {
-	return &hotstuff.TimeoutMsg{
+func TimeoutMsgFromProto(m *TimeoutMsg) hotstuff.TimeoutMsg {
+	return hotstuff.TimeoutMsg{
 		View:      hotstuff.View(m.GetView()),
 		SyncInfo:  SyncInfoFromProto(m.GetSyncInfo()),
 		Signature: SignatureFromProto(m.GetSig()),
 	}
 }
 
-func TimeoutMsgToProto(timeoutMsg *hotstuff.TimeoutMsg) *TimeoutMsg {
+func TimeoutMsgToProto(timeoutMsg hotstuff.TimeoutMsg) *TimeoutMsg {
 	return &TimeoutMsg{
 		View:     uint64(timeoutMsg.View),
 		SyncInfo: SyncInfoToProto(timeoutMsg.SyncInfo),

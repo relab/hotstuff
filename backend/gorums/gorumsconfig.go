@@ -188,7 +188,7 @@ func (cfg *Config) Propose(block *hotstuff.Block) {
 }
 
 // Timeout sends the timeout message to all replicas.
-func (cfg *Config) Timeout(msg *hotstuff.TimeoutMsg) {
+func (cfg *Config) Timeout(msg hotstuff.TimeoutMsg) {
 	if cfg.cfg == nil {
 		return
 	}
@@ -207,3 +207,5 @@ func (cfg *Config) Fetch(ctx context.Context, hash hotstuff.Hash) {
 func (cfg *Config) Close() {
 	cfg.mgr.Close()
 }
+
+var _ hotstuff.Config = (*Config)(nil)

@@ -24,13 +24,13 @@ type Synchronizer struct {
 	timer        *time.Timer
 	currentView  hotstuff.View
 	latestCommit hotstuff.View // the view in which the latest commit happened.
-	timeouts     map[hotstuff.View]map[hotstuff.ID]*hotstuff.TimeoutMsg
+	timeouts     map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
 }
 
 func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff) {
 	s.mod = hs
 	var err error
-	s.highTC, err = s.mod.Signer().CreateTimeoutCert(hotstuff.View(0), []*hotstuff.TimeoutMsg{})
+	s.highTC, err = s.mod.Signer().CreateTimeoutCert(hotstuff.View(0), []hotstuff.TimeoutMsg{})
 	if err != nil {
 		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
 	}
@@ -42,7 +42,7 @@ func New(baseTimeout time.Duration) hotstuff.ViewSynchronizer {
 		currentView:  1,
 		latestCommit: 0,
 		baseTimeout:  baseTimeout,
-		timeouts:     make(map[hotstuff.View]map[hotstuff.ID]*hotstuff.TimeoutMsg),
+		timeouts:     make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
 		timer:        time.AfterFunc(0, func() {}), // dummy timer that will be replaced after start() is called
 	}
 }
@@ -103,7 +103,7 @@ func (s *Synchronizer) onLocalTimeout() {
 		logger.Warnf("Failed to sign view: %v", err)
 		return
 	}
-	timeoutMsg := &hotstuff.TimeoutMsg{
+	timeoutMsg := hotstuff.TimeoutMsg{
 		ID:        s.mod.ID(),
 		View:      s.currentView,
 		SyncInfo:  s.SyncInfo(),
@@ -114,7 +114,7 @@ func (s *Synchronizer) onLocalTimeout() {
 }
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
-func (s *Synchronizer) OnRemoteTimeout(timeout *hotstuff.TimeoutMsg) {
+func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	defer func() {
 		s.mut.Lock()
 		defer s.mut.Unlock()
@@ -135,7 +135,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout *hotstuff.TimeoutMsg) {
 
 	timeouts, ok := s.timeouts[timeout.View]
 	if !ok {
-		timeouts = make(map[hotstuff.ID]*hotstuff.TimeoutMsg)
+		timeouts = make(map[hotstuff.ID]hotstuff.TimeoutMsg)
 		s.timeouts[timeout.View] = timeouts
 	}
 
@@ -148,7 +148,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout *hotstuff.TimeoutMsg) {
 
 	// TODO: should probably change CreateTimeoutCert and maybe also CreateQuorumCert
 	// to use maps instead of slices
-	timeoutList := make([]*hotstuff.TimeoutMsg, 0, len(timeouts))
+	timeoutList := make([]hotstuff.TimeoutMsg, 0, len(timeouts))
 	for _, t := range timeouts {
 		timeoutList = append(timeoutList, t)
 	}
@@ -165,6 +165,11 @@ func (s *Synchronizer) OnRemoteTimeout(timeout *hotstuff.TimeoutMsg) {
 	s.AdvanceView(hotstuff.SyncInfo{TC: tc})
 }
 
+// OnNewView handles an incoming NewViewMsg
+func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
+	s.AdvanceView(newView.SyncInfo)
+}
+
 // AdvanceView attempts to advance to the next view using the given QC.
 // qc must be either a regular quorum certificate, or a timeout certificate.
 func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
@@ -178,7 +183,6 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 			s.highTC = syncInfo.TC
 		}
 	} else {
-		s.mod.Consensus().UpdateHighQC(syncInfo.QC)
 		b, ok := s.mod.BlockChain().Get(syncInfo.QC.BlockHash())
 		if !ok {
 			//TODO

@@ -141,12 +141,55 @@ type TimeoutCert interface {
 	View() View
 }
 
+// Messages / Events
+
+// Event is a common interface that should be implemented by all the message types below.
+type Event interface{}
+
+// EventProcessor processes events.
+type EventProcessor interface {
+	// ProcessEvent processes the given event.
+	ProcessEvent(event Event)
+}
+
+// ProposeMsg is broadcast when a leader makes a proposal.
+type ProposeMsg struct {
+	ID    ID     // The ID of the replica who sent the message.
+	Block *Block // The block that is proposed.
+}
+
+// VoteMsg is sent to the leader by replicas voting on a proposal.
+type VoteMsg struct {
+	ID          ID          // the ID of the replica who sent the message.
+	PartialCert PartialCert // The partial certificate.
+}
+
+// TimeoutMsg is broadcast whenever a replica has a local timeout.
+type TimeoutMsg struct {
+	ID        ID        // The ID of the replica who sent the message.
+	View      View      // The view that the replica wants to enter.
+	Signature Signature // A signature of the view
+	SyncInfo  SyncInfo  // The highest QC/TC known to the sender.
+}
+
+// NewViewMsg is sent to the leader whenever a replica decides to advance to the next view.
+// It contains the highest QC or TC known to the replica.
+type NewViewMsg struct {
+	ID       ID       // The ID of the replica who sent the message.
+	SyncInfo SyncInfo // The highest QC / TC.
+}
+
+func (t TimeoutMsg) String() string {
+	return fmt.Sprintf("TimeoutMsg{ ID: %d, View: %d, SyncInfo: %v }", t.ID, t.View, t.SyncInfo)
+}
+
 // HotStuff contains the modules that together implement the HotStuff protocol.
 type HotStuff struct {
 	// data
 
 	id         ID
 	privateKey PrivateKey
+	eventLoop  *EventLoop
 
 	// modules
 
@@ -168,6 +211,10 @@ func (hs *HotStuff) ID() ID {
 
 func (hs *HotStuff) PrivateKey() PrivateKey {
 	return hs.privateKey
+}
+
+func (hs *HotStuff) EventLoop() *EventLoop {
+	return hs.eventLoop
 }
 
 func (hs *HotStuff) Acceptor() Acceptor {
@@ -216,7 +263,12 @@ type Builder struct {
 }
 
 func NewBuilder(id ID, privateKey PrivateKey) Builder {
-	return Builder{hs: &HotStuff{id: id, privateKey: privateKey}}
+	bl := Builder{hs: &HotStuff{
+		id:         id,
+		privateKey: privateKey,
+	}}
+	bl.Register(NewEventLoop(100))
+	return bl
 }
 
 // Register adds modules to the HotStuff object and initializes them.
@@ -226,6 +278,10 @@ func NewBuilder(id ID, privateKey PrivateKey) Builder {
 // Register will overwrite existing modules if the same type is registered twice.
 func (b *Builder) Register(modules ...interface{}) {
 	for _, module := range modules {
+		// allow overriding the event loop if a different buffer size is desired
+		if m, ok := module.(*EventLoop); ok {
+			b.hs.eventLoop = m
+		}
 		if m, ok := module.(Acceptor); ok {
 			b.hs.acceptor = m
 		}
@@ -311,7 +367,7 @@ type Signer interface {
 	// CreateQuorumCert creates a quorum certificate from a list of partial certificates.
 	CreateQuorumCert(block *Block, signatures []PartialCert) (cert QuorumCert, err error)
 	// CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
-	CreateTimeoutCert(view View, timeouts []*TimeoutMsg) (cert TimeoutCert, err error)
+	CreateTimeoutCert(view View, timeouts []TimeoutMsg) (cert TimeoutCert, err error)
 }
 
 // Verifier implements the methods required to verify partial and quorum certificates.
@@ -334,18 +390,6 @@ type BlockChain interface {
 	Store(*Block)
 	// Get retrieves a block given its hash.
 	Get(Hash) (*Block, bool)
-}
-
-// TimeoutMsg is broadcast whenever a replica has a local timeout.
-type TimeoutMsg struct {
-	ID        ID        // The ID of the replica who sent the message.
-	View      View      // The view that the replica wants to enter.
-	Signature Signature // A signature of the view
-	SyncInfo  SyncInfo  // The highest QC/TC known to the sender.
-}
-
-func (t TimeoutMsg) String() string {
-	return fmt.Sprintf("TimeoutMsg{ ID: %d, View: %d, SyncInfo: %v }", t.ID, t.View, t.SyncInfo)
 }
 
 //go:generate mockgen -destination=internal/mocks/replica_mock.go -package=mocks . Replica
@@ -383,7 +427,7 @@ type Config interface {
 	// Propose sends the block to all replicas in the configuration.
 	Propose(block *Block)
 	// Timeout sends the timeout message to all replicas.
-	Timeout(msg *TimeoutMsg)
+	Timeout(msg TimeoutMsg)
 	// Fetch requests a block from all the replicas in the configuration.
 	Fetch(ctx context.Context, hash Hash)
 }
@@ -412,10 +456,10 @@ type Consensus interface {
 	Propose()
 	// OnPropose handles an incoming proposal.
 	// A leader should call this method on itself.
-	OnPropose(block *Block)
+	OnPropose(proposal ProposeMsg)
 	// OnVote handles an incoming vote.
 	// A leader should call this method on itself.
-	OnVote(cert PartialCert)
+	OnVote(vote VoteMsg)
 	// OnDeliver handles an incoming block that was requested through the "fetch" mechanism.
 	OnDeliver(block *Block)
 }
@@ -431,10 +475,11 @@ type LeaderRotation interface {
 // ViewSynchronizer synchronizes replicas to the same view.
 type ViewSynchronizer interface {
 	// OnRemoteTimeout handles an incoming timeout from a remote replica.
-	OnRemoteTimeout(*TimeoutMsg)
+	OnRemoteTimeout(TimeoutMsg)
 	// AdvanceView attempts to advance to the next view using the given QC.
 	// qc must be either a regular quorum certificate, or a timeout certificate.
 	AdvanceView(SyncInfo)
+	OnNewView(NewViewMsg)
 	// View returns the current view.
 	View() View
 	// Start starts the synchronizer.
