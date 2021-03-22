@@ -93,6 +93,7 @@ func BlockFromProto(block *Block) *hotstuff.Block {
 	)
 }
 
+// TimeoutMsgFromProto converts a TimeoutMsg proto to the hotstuff type.
 func TimeoutMsgFromProto(m *TimeoutMsg) hotstuff.TimeoutMsg {
 	return hotstuff.TimeoutMsg{
 		View:      hotstuff.View(m.GetView()),
@@ -101,6 +102,7 @@ func TimeoutMsgFromProto(m *TimeoutMsg) hotstuff.TimeoutMsg {
 	}
 }
 
+// TimeoutMsgToProto converts a TimeoutMsg to the protobuf type.
 func TimeoutMsgToProto(timeoutMsg hotstuff.TimeoutMsg) *TimeoutMsg {
 	return &TimeoutMsg{
 		View:     uint64(timeoutMsg.View),
@@ -109,6 +111,7 @@ func TimeoutMsgToProto(timeoutMsg hotstuff.TimeoutMsg) *TimeoutMsg {
 	}
 }
 
+// TimeoutCertFromProto converts a timeout certificate from the protobuf type to the hotstuff type.
 func TimeoutCertFromProto(m *TimeoutCert) hotstuff.TimeoutCert {
 	sigs := make(map[hotstuff.ID]*ecdsa.Signature, len(m.GetSigs()))
 	for k, sig := range m.GetSigs() {
@@ -117,6 +120,7 @@ func TimeoutCertFromProto(m *TimeoutCert) hotstuff.TimeoutCert {
 	return ecdsa.NewTimeoutCert(sigs, hotstuff.View(m.GetView()))
 }
 
+// TimeoutCertToProto converts a timeout certificate from the hotstuff type to the protobuf type.
 func TimeoutCertToProto(timeoutCert hotstuff.TimeoutCert) *TimeoutCert {
 	tc := timeoutCert.(*ecdsa.TimeoutCert)
 	sigs := make(map[uint32]*Signature, len(tc.Signatures()))
@@ -129,6 +133,7 @@ func TimeoutCertToProto(timeoutCert hotstuff.TimeoutCert) *TimeoutCert {
 	}
 }
 
+// SyncInfoFromProto converts a SyncInfo struct from the protobuf type to the hotstuff type.
 func SyncInfoFromProto(m *SyncInfo) (syncInfo hotstuff.SyncInfo) {
 	if qc := m.GetQC(); qc != nil {
 		syncInfo.QC = QuorumCertFromProto(qc)
@@ -139,6 +144,7 @@ func SyncInfoFromProto(m *SyncInfo) (syncInfo hotstuff.SyncInfo) {
 	return
 }
 
+// SyncInfoToProto converts a SyncInfo struct from the hotstuff type to the protobuf type.
 func SyncInfoToProto(syncInfo hotstuff.SyncInfo) *SyncInfo {
 	m := &SyncInfo{}
 	if syncInfo.QC != nil {

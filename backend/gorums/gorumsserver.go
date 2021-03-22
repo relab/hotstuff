@@ -27,6 +27,7 @@ type Server struct {
 	gorumsSrv *gorums.Server
 }
 
+// InitModule initializes the server with the given HotStuff instance.
 func (srv *Server) InitModule(hs *hotstuff.HotStuff) {
 	srv.mod = hs
 }

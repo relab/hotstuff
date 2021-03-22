@@ -11,6 +11,8 @@ import (
 	"github.com/relab/hotstuff/synchronizer"
 )
 
+// DefaultModules returns a default set of modules that are suitable for chainedhotstuff.
+// You must provide your own implementations of the Acceptor, Config, CommandQueue, and Executor interfaces.
 func DefaultModules(replicaConfig config.ReplicaConfig, baseTimeout time.Duration) hotstuff.Builder {
 	builder := hotstuff.NewBuilder(replicaConfig.ID, replicaConfig.PrivateKey)
 	signer, verifier := ecdsa.NewWithCache(2 * len(replicaConfig.Replicas))

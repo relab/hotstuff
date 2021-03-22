@@ -24,6 +24,7 @@ type Synchronizer struct {
 	timeouts     map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
 }
 
+// InitModule initializes the synchronizer with the given HotStuff instance.
 func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff) {
 	s.mod = hs
 	var err error
@@ -49,7 +50,6 @@ func (s *Synchronizer) Start() {
 	s.timer = time.AfterFunc(s.viewDuration(s.currentView), s.onLocalTimeout)
 	if s.mod.LeaderRotation().GetLeader(s.currentView) == s.mod.ID() {
 		s.mod.Consensus().Propose()
-	} else {
 	}
 }
 
@@ -68,6 +68,7 @@ func (s *Synchronizer) viewDuration(view hotstuff.View) time.Duration {
 	return s.baseTimeout
 }
 
+// SyncInfo returns the highest known QC or TC.
 func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
 	qc := s.mod.Consensus().HighQC()
 	qcBlock, ok := s.mod.BlockChain().Get(qc.BlockHash())

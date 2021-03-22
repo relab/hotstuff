@@ -62,9 +62,13 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 	return builder
 }
 
+// BuilderList is a helper type to perform actions on a set of builders.
 type BuilderList []hotstuff.Builder
+
+// HotStuffList is a helper type to perform actions on a set of HotStuff instances.
 type HotStuffList []*hotstuff.HotStuff
 
+// Build calls Build() for all of the builders.
 func (bl BuilderList) Build() HotStuffList {
 	hl := HotStuffList{}
 	for _, hs := range bl {
@@ -73,6 +77,7 @@ func (bl BuilderList) Build() HotStuffList {
 	return hl
 }
 
+// Signers returns the set of signers from all of the HotStuff instances.
 func (hl HotStuffList) Signers() (signers []hotstuff.Signer) {
 	signers = make([]hotstuff.Signer, len(hl))
 	for i, hs := range hl {
@@ -81,6 +86,7 @@ func (hl HotStuffList) Signers() (signers []hotstuff.Signer) {
 	return signers
 }
 
+// Verifiers returns the set of verifiers from all of the HotStuff instances.
 func (hl HotStuffList) Verifiers() (verifiers []hotstuff.Verifier) {
 	verifiers = make([]hotstuff.Verifier, len(hl))
 	for i, hs := range hl {
@@ -89,6 +95,7 @@ func (hl HotStuffList) Verifiers() (verifiers []hotstuff.Verifier) {
 	return verifiers
 }
 
+// Keys returns the set of private keys from all of the HotStuff instances.
 func (hl HotStuffList) Keys() (keys []hotstuff.PrivateKey) {
 	keys = make([]hotstuff.PrivateKey, len(hl))
 	for i, hs := range hl {
@@ -284,6 +291,7 @@ func GenerateKey(t *testing.T) *ecdsa.PrivateKey {
 	return key
 }
 
+// GenerateKeys generates n keys.
 func GenerateKeys(t *testing.T, n int) (keys []hotstuff.PrivateKey) {
 	keys = make([]hotstuff.PrivateKey, n)
 	for i := 0; i < n; i++ {
@@ -292,6 +300,7 @@ func GenerateKeys(t *testing.T, n int) (keys []hotstuff.PrivateKey) {
 	return keys
 }
 
+// NewProposeMsg wraps a new block in a ProposeMsg.
 func NewProposeMsg(parent hotstuff.Hash, qc hotstuff.QuorumCert, cmd hotstuff.Command, view hotstuff.View, id hotstuff.ID) hotstuff.ProposeMsg {
 	return hotstuff.ProposeMsg{ID: id, Block: hotstuff.NewBlock(parent, qc, cmd, view, id)}
 }
@@ -313,6 +322,7 @@ func (l leaderRotation) GetLeader(v hotstuff.View) hotstuff.ID {
 	return l.order[v-1]
 }
 
+// NewLeaderRotation returns a leader rotation implementation that will return leaders in the specified order.
 func NewLeaderRotation(t *testing.T, order ...hotstuff.ID) hotstuff.LeaderRotation {
 	t.Helper()
 	return leaderRotation{t, order}

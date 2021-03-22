@@ -205,63 +205,78 @@ type HotStuff struct {
 	viewSynchronizer ViewSynchronizer
 }
 
+// ID returns the id.
 func (hs *HotStuff) ID() ID {
 	return hs.id
 }
 
+// PrivateKey returns the private key.
 func (hs *HotStuff) PrivateKey() PrivateKey {
 	return hs.privateKey
 }
 
+// EventLoop returns the event loop.
 func (hs *HotStuff) EventLoop() *EventLoop {
 	return hs.eventLoop
 }
 
+// Acceptor returns the acceptor.
 func (hs *HotStuff) Acceptor() Acceptor {
 	return hs.acceptor
 }
 
+// BlockChain returns the block chain.
 func (hs *HotStuff) BlockChain() BlockChain {
 	return hs.blockChain
 }
 
+// CommandQueue returns the command queue.
 func (hs *HotStuff) CommandQueue() CommandQueue {
 	return hs.commandQueue
 }
 
+// Config returns the configuration of replicas.
 func (hs *HotStuff) Config() Config {
 	return hs.config
 }
 
+// Consensus returns the consensus implementation.
 func (hs *HotStuff) Consensus() Consensus {
 	return hs.consensus
 }
 
+// Executor returns the executor.
 func (hs *HotStuff) Executor() Executor {
 	return hs.executor
 }
 
+// LeaderRotation returns the leader rotation implementation.
 func (hs *HotStuff) LeaderRotation() LeaderRotation {
 	return hs.leaderRotation
 }
 
+// Signer returns the signer.
 func (hs *HotStuff) Signer() Signer {
 	return hs.signer
 }
 
+// Verifier returns the verifier.
 func (hs *HotStuff) Verifier() Verifier {
 	return hs.verifier
 }
 
+// ViewSynchronizer returns the view synchronizer implementation.
 func (hs *HotStuff) ViewSynchronizer() ViewSynchronizer {
 	return hs.viewSynchronizer
 }
 
+// Builder is a helper for constructing a HotStuff instance.
 type Builder struct {
 	hs      *HotStuff
 	modules []Module
 }
 
+// NewBuilder creates a new Builder.
 func NewBuilder(id ID, privateKey PrivateKey) Builder {
 	bl := Builder{hs: &HotStuff{
 		id:         id,

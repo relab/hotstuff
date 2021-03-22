@@ -2,11 +2,13 @@ package hotstuff
 
 import "context"
 
+// EventLoop synchronously executes a queue of events.
 type EventLoop struct {
 	mod    *HotStuff
 	eventQ chan Event
 }
 
+// NewEventLoop returns a new event loop with the requested buffer size.
 func NewEventLoop(bufferSize uint) *EventLoop {
 	return &EventLoop{
 		eventQ: make(chan Event, bufferSize),
@@ -18,6 +20,7 @@ func (el *EventLoop) InitModule(hs *HotStuff) {
 	el.mod = hs
 }
 
+// AddEvent adds an event to the event queue. The event may be processed before it enters the queue.
 func (el *EventLoop) AddEvent(event Event) {
 	// TODO: consider making it possible to register as an event handler for a specific kind of event.
 	// We could also have two types of handlers that run at different times.
@@ -34,6 +37,7 @@ func (el *EventLoop) AddEvent(event Event) {
 	el.eventQ <- event
 }
 
+// Run runs the event loop. A context object can be provided to stop the event loop.
 func (el *EventLoop) Run(ctx context.Context) {
 	// We start the view synchronizer from this goroutine such that we can avoid data races between Propose()
 	// and event handlers.
@@ -49,6 +53,7 @@ func (el *EventLoop) Run(ctx context.Context) {
 	}
 }
 
+// processEvent dispatches the event to the correct handler.
 func (el *EventLoop) processEvent(e Event) {
 	switch event := e.(type) {
 	case ProposeMsg:
