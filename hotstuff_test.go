@@ -49,7 +49,9 @@ func TestChainedHotstuff(t *testing.T) {
 		c.PrivateKey = keys[i].(*ecdsa.PrivateKey)
 		configs[i] = gorums.NewConfig(c)
 		servers[i] = gorums.NewServer(c)
-		synchronizers[i] = synchronizer.New(time.Second)
+		synchronizers[i] = synchronizer.New(
+			hotstuff.ExponentialTimeout{Base: 100 * time.Millisecond, ExponentBase: 2, MaxExponent: 10},
+		)
 		builders[i].Register(chainedhotstuff.New(), configs[i], servers[i], synchronizers[i])
 	}
 

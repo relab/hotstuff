@@ -51,6 +51,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"time"
 )
 
 // Basic types:
@@ -181,6 +182,13 @@ type NewViewMsg struct {
 
 func (t TimeoutMsg) String() string {
 	return fmt.Sprintf("TimeoutMsg{ ID: %d, View: %d, SyncInfo: %v }", t.ID, t.View, t.SyncInfo)
+}
+
+// ExponentialTimeout describes a timeout of the form Base * ExponentBase ^ Power, where Power <= MaxExponent.
+type ExponentialTimeout struct {
+	Base         time.Duration
+	ExponentBase time.Duration
+	MaxExponent  uint
 }
 
 // HotStuff contains the modules that together implement the HotStuff protocol.

@@ -1,8 +1,6 @@
 package chainedhotstuff
 
 import (
-	"time"
-
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/config"
@@ -13,12 +11,12 @@ import (
 
 // DefaultModules returns a default set of modules that are suitable for chainedhotstuff.
 // You must provide your own implementations of the Acceptor, Config, CommandQueue, and Executor interfaces.
-func DefaultModules(replicaConfig config.ReplicaConfig, baseTimeout time.Duration) hotstuff.Builder {
+func DefaultModules(replicaConfig config.ReplicaConfig, timeout hotstuff.ExponentialTimeout) hotstuff.Builder {
 	builder := hotstuff.NewBuilder(replicaConfig.ID, replicaConfig.PrivateKey)
 	signer, verifier := ecdsa.NewWithCache(2 * len(replicaConfig.Replicas))
 	builder.Register(
 		New(),
-		synchronizer.New(baseTimeout),
+		synchronizer.New(timeout),
 		leaderrotation.NewRoundRobin(),
 		blockchain.New(100),
 		signer,

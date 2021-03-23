@@ -68,7 +68,10 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 		lastExecTime: time.Now().UnixNano(),
 	}
 
-	builder := chainedhotstuff.DefaultModules(*replicaConfig, time.Duration(conf.ViewTimeout)*time.Millisecond)
+	builder := chainedhotstuff.DefaultModules(
+		*replicaConfig,
+		hotstuff.ExponentialTimeout{Base: time.Duration(conf.ViewTimeout) * time.Millisecond, ExponentBase: 2, MaxExponent: 8},
+	)
 	srv.cfg = hotstuffgorums.NewConfig(*replicaConfig)
 	srv.hsSrv = hotstuffgorums.NewServer(*replicaConfig)
 	builder.Register(srv.cfg, srv.hsSrv)
@@ -113,7 +116,7 @@ func (srv *clientSrv) Start(address string) error {
 	}
 
 	// sleep so that all replicas can be ready before we start
-	time.Sleep(time.Duration(srv.conf.ViewTimeout) * time.Millisecond)
+	time.Sleep(time.Second)
 
 	go srv.hs.EventLoop().Run(srv.ctx)
 

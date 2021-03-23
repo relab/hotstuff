@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/leaderrotation"
@@ -326,4 +327,13 @@ func (l leaderRotation) GetLeader(v hotstuff.View) hotstuff.ID {
 func NewLeaderRotation(t *testing.T, order ...hotstuff.ID) hotstuff.LeaderRotation {
 	t.Helper()
 	return leaderRotation{t, order}
+}
+
+// FixedTimeout returns an ExponentialTimeout with a max exponent of 0.
+func FixedTimeout(timeout time.Duration) hotstuff.ExponentialTimeout {
+	return hotstuff.ExponentialTimeout{
+		Base:         timeout,
+		ExponentBase: 1,
+		MaxExponent:  0,
+	}
 }

@@ -14,10 +14,9 @@ var logger = logging.GetLogger()
 // It does not do anything to ensure synchronization, it simply makes the local replica
 // propose at the correct time, and send new view messages in case of a timeout.
 type Synchronizer struct {
-	mod *hotstuff.HotStuff
-
+	mod          *hotstuff.HotStuff
+	timeout      hotstuff.ExponentialTimeout
 	highTC       hotstuff.TimeoutCert
-	baseTimeout  time.Duration
 	timer        *time.Timer
 	currentView  hotstuff.View
 	latestCommit hotstuff.View // the view in which the latest commit happened.
@@ -35,11 +34,11 @@ func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff) {
 }
 
 // New creates a new Synchronizer.
-func New(baseTimeout time.Duration) hotstuff.ViewSynchronizer {
+func New(timeout hotstuff.ExponentialTimeout) hotstuff.ViewSynchronizer {
 	return &Synchronizer{
 		currentView:  1,
 		latestCommit: 0,
-		baseTimeout:  baseTimeout,
+		timeout:      timeout,
 		timeouts:     make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
 		timer:        time.AfterFunc(0, func() {}), // dummy timer that will be replaced after start() is called
 	}
@@ -64,8 +63,14 @@ func (s *Synchronizer) View() hotstuff.View {
 }
 
 func (s *Synchronizer) viewDuration(view hotstuff.View) time.Duration {
-	// TODO: exponential backoff
-	return s.baseTimeout
+	pow := view - s.latestCommit
+	if pow > hotstuff.View(s.timeout.MaxExponent) {
+		pow = hotstuff.View(s.timeout.MaxExponent)
+	}
+	multiplier := math.Pow(float64(s.timeout.ExponentBase), float64(pow))
+	return time.Duration(
+		math.Ceil(float64(s.timeout.Base) * multiplier),
+	)
 }
 
 // SyncInfo returns the highest known QC or TC.
