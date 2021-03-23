@@ -16,6 +16,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/logging"
+	"go.uber.org/multierr"
 )
 
 var logger = logging.GetLogger()
@@ -28,6 +29,9 @@ var ErrPartialDuplicate = fmt.Errorf("cannot add more than one signature per rep
 
 // ErrViewMismatch is the error used when timeouts have different views.
 var ErrViewMismatch = fmt.Errorf("timeout views do not match")
+
+// ErrNotAQuorum is the error used when a q
+var ErrNotAQuorum = fmt.Errorf("not a quorum")
 
 // Signature is an ECDSA signature
 type Signature struct {
@@ -234,17 +238,32 @@ func (ec *ecdsaCrypto) CreateQuorumCert(block *hotstuff.Block, signatures []hots
 		signatures: make(aggregateSignature),
 		hash:       hash,
 	}
+	// it will always be possible to create a valid QC for genesis block
+	if hash == hotstuff.GetGenesis().Hash() {
+		return qc, nil
+	}
 	for _, s := range signatures {
 		blockHash := s.BlockHash()
 		if !bytes.Equal(hash[:], blockHash[:]) {
-			return nil, ErrHashMismatch
+			err = multierr.Append(err, ErrHashMismatch)
+			continue
 		}
 		if _, ok := qc.signatures[s.Signature().Signer()]; ok {
-			return nil, ErrPartialDuplicate
+			err = multierr.Append(err, ErrPartialDuplicate)
+			continue
 		}
-		qc.signatures[s.Signature().Signer()] = s.(*PartialCert).signature
+		// use the registered verifier instead of ourself to verify.
+		// this makes it possible for the signatureCache to work.
+		if ec.mod.Verifier().VerifyPartialCert(s) {
+			qc.signatures[s.Signature().Signer()] = s.(*PartialCert).signature
+		}
 	}
-	return qc, nil
+
+	if len(qc.signatures) >= ec.mod.Config().QuorumSize() {
+		return qc, nil
+	}
+
+	return nil, multierr.Combine(ErrNotAQuorum, err)
 }
 
 // CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
@@ -253,16 +272,30 @@ func (ec *ecdsaCrypto) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff
 		signatures: make(aggregateSignature),
 		view:       view,
 	}
+	// it will always be possible to create a TC for view 0
+	if view == 0 {
+		return tc, nil
+	}
 	for _, t := range timeouts {
 		if t.View != tc.view {
-			return nil, ErrViewMismatch
+			err = multierr.Append(err, ErrHashMismatch)
+			continue
 		}
 		if _, ok := tc.signatures[t.Signature.Signer()]; ok {
-			return nil, ErrPartialDuplicate
+			err = multierr.Append(err, ErrPartialDuplicate)
+			continue
 		}
-		tc.signatures[t.Signature.Signer()] = t.Signature.(*Signature)
+		// use the registered verifier instead of ourself to verify.
+		// this makes it possible for the signatureCache to work.
+		if ec.mod.Verifier().Verify(t.Signature, view.ToHash()) {
+			tc.signatures[t.Signature.Signer()] = t.Signature.(*Signature)
+		}
 	}
-	return tc, nil
+	if len(tc.signatures) >= ec.mod.Config().QuorumSize() {
+		return tc, nil
+	}
+
+	return nil, multierr.Combine(ErrNotAQuorum, err)
 }
 
 // Verify verifies a signature given a hash.

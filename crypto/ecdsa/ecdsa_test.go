@@ -1,7 +1,6 @@
 package ecdsa_test
 
 import (
-	"errors"
 	"math/big"
 	"testing"
 
@@ -113,70 +112,6 @@ func TestCreateTimeoutCert(t *testing.T) {
 	runBoth(t, run)
 }
 
-func TestCreateQuorumCertInvalid(t *testing.T) {
-	run := func(t *testing.T, newFunc newFunc) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		td := newTestData(t, ctrl, 4, newFunc)
-
-		badHash := append(testutil.CreatePCs(t, td.block, td.signers), testutil.CreatePC(t, hotstuff.GetGenesis(), td.signers[0]))
-		duplicate := append(testutil.CreatePCs(t, td.block, td.signers), testutil.CreatePC(t, td.block, td.signers[0]))
-
-		tests := []struct {
-			name  string
-			votes []hotstuff.PartialCert
-			err   error
-		}{
-			{"hash mismatch", badHash, ecdsa.ErrHashMismatch},
-			{"duplicate", duplicate, ecdsa.ErrPartialDuplicate},
-		}
-
-		for _, test := range tests {
-			_, err := td.signers[0].CreateQuorumCert(td.block, test.votes)
-			if err == nil {
-				t.Fatalf("%s: Expected CreateQuorumCert to fail, but was successful!", test.name)
-			}
-			if !errors.Is(err, test.err) {
-				t.Fatalf("%s: got: %v, want: %v", test.name, err, test.err)
-			}
-		}
-	}
-	runBoth(t, run)
-}
-
-func TestCreateTimeoutCertInvalid(t *testing.T) {
-	run := func(t *testing.T, newFunc newFunc) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		td := newTestData(t, ctrl, 4, newFunc)
-
-		badView := append(testutil.CreateTimeouts(t, 1, td.signers), testutil.CreateTimeouts(t, 2, td.signers[:1])...)
-		duplicate := append(testutil.CreateTimeouts(t, 1, td.signers), testutil.CreateTimeouts(t, 1, td.signers[:1])...)
-
-		tests := []struct {
-			name  string
-			votes []hotstuff.TimeoutMsg
-			err   error
-		}{
-			{"hash mismatch", badView, ecdsa.ErrViewMismatch},
-			{"duplicate", duplicate, ecdsa.ErrPartialDuplicate},
-		}
-
-		for _, test := range tests {
-			_, err := td.signers[0].CreateTimeoutCert(1, test.votes)
-			if err == nil {
-				t.Fatalf("%s: Expected CreateQuorumCert to fail, but was successful!", test.name)
-			}
-			if !errors.Is(err, test.err) {
-				t.Fatalf("%s: got: %v, want: %v", test.name, err, test.err)
-			}
-		}
-	}
-	runBoth(t, run)
-}
-
 func TestVerifyGenesisQC(t *testing.T) {
 	run := func(t *testing.T, newFunc newFunc) {
 		ctrl := gomock.NewController(t)
@@ -235,15 +170,27 @@ func TestVerifyInvalidQuorumCert(t *testing.T) {
 		defer ctrl.Finish()
 
 		td := newTestData(t, ctrl, 4, newFunc)
-		goodQC := testutil.CreateQC(t, td.block, td.signers)
+		goodQC := testutil.CreateQC(t, td.block, td.signers[1:])
+		signatures := goodQC.(*ecdsa.QuorumCert).Signatures()
+
+		// set up a map of signatures that is too small to be valid
+		badSignatures := make(map[hotstuff.ID]*ecdsa.Signature, len(signatures)-1)
+		skip := true
+		for k, v := range signatures {
+			if skip {
+				skip = false
+				continue
+			}
+			badSignatures[k] = v
+		}
 
 		tests := []struct {
 			name string
 			qc   hotstuff.QuorumCert
 		}{
 			{"empty", ecdsa.NewQuorumCert(make(map[hotstuff.ID]*ecdsa.Signature), td.block.Hash())},
-			{"not enough signatures", testutil.CreateQC(t, td.block, td.signers[:2])},
-			{"hash mismatch", ecdsa.NewQuorumCert(goodQC.(*ecdsa.QuorumCert).Signatures(), hotstuff.Hash{})},
+			{"not enough signatures", ecdsa.NewQuorumCert(badSignatures, goodQC.BlockHash())},
+			{"hash mismatch", ecdsa.NewQuorumCert(signatures, hotstuff.Hash{})},
 		}
 
 		for _, test := range tests {
