@@ -18,7 +18,7 @@ func TestLocalTimeout(t *testing.T) {
 	qc := ecdsa.NewQuorumCert(make(map[hotstuff.ID]*ecdsa.Signature), hotstuff.GetGenesis().Hash())
 	builder := testutil.TestModules(t, ctrl, 2, testutil.GenerateKey(t))
 	hs := mocks.NewMockConsensus(ctrl)
-	s := New(testutil.FixedTimeout(100 * time.Millisecond))
+	s := New(testutil.FixedTimeout(time.Millisecond))
 	builder.Register(hs, s)
 	mods := builder.Build()
 	cfg := mods.Config().(*mocks.MockConfig)
