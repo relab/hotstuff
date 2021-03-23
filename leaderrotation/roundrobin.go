@@ -6,7 +6,7 @@ type roundRobin struct {
 	mod *hotstuff.HotStuff
 }
 
-func (rr roundRobin) InitModule(hs *hotstuff.HotStuff) {
+func (rr *roundRobin) InitModule(hs *hotstuff.HotStuff) {
 	rr.mod = hs
 }
 
@@ -19,5 +19,5 @@ func (rr roundRobin) GetLeader(view hotstuff.View) hotstuff.ID {
 
 // NewRoundRobin returns a new round-robin leader rotation implementation.
 func NewRoundRobin() hotstuff.LeaderRotation {
-	return roundRobin{}
+	return &roundRobin{}
 }
