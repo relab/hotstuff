@@ -2,6 +2,7 @@ package synchronizer
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/relab/hotstuff"
@@ -88,14 +89,7 @@ func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
 }
 
 func (s *Synchronizer) onLocalTimeout() {
-	// only run this once per view
-	if m, ok := s.timeouts[s.currentView]; ok {
-		if _, ok := m[s.mod.ID()]; ok {
-			return
-		}
-	}
-	// stop voting for current view
-	s.mod.Consensus().IncreaseLastVotedView(s.currentView)
+	logger.Debugf("OnLocalTimeout: %v", s.currentView)
 	sig, err := s.mod.Signer().Sign(s.currentView.ToHash())
 	if err != nil {
 		logger.Warnf("Failed to sign view: %v", err)
@@ -108,7 +102,7 @@ func (s *Synchronizer) onLocalTimeout() {
 		Signature: sig,
 	}
 	s.mod.Config().Timeout(timeoutMsg)
-	s.OnRemoteTimeout(timeoutMsg)
+	s.mod.EventLoop().AddEvent(timeoutMsg)
 }
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
@@ -128,13 +122,22 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	}
 	logger.Debug("OnRemoteTimeout: ", timeout)
 
+	// This has to be done in this function instead of onLocalTimeout in order to avoid
+	// race conditions.
+	if timeout.ID == s.mod.ID() {
+		// stop voting for current view
+		s.mod.Consensus().IncreaseLastVotedView(s.currentView)
+	}
+
 	timeouts, ok := s.timeouts[timeout.View]
 	if !ok {
 		timeouts = make(map[hotstuff.ID]hotstuff.TimeoutMsg)
 		s.timeouts[timeout.View] = timeouts
 	}
 
-	timeouts[timeout.ID] = timeout
+	if _, ok := timeouts[timeout.ID]; !ok {
+		timeouts[timeout.ID] = timeout
+	}
 
 	if len(timeouts) < s.mod.Config().QuorumSize() {
 		return
