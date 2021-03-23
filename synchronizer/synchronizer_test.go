@@ -2,6 +2,7 @@ package synchronizer
 
 import (
 	"bytes"
+	"context"
 	"testing"
 	"time"
 
@@ -25,7 +26,7 @@ func TestLocalTimeout(t *testing.T) {
 	testutil.ConfigAddReplica(t, cfg, leader)
 
 	c := make(chan struct{})
-	hs.EXPECT().IncreaseLastVotedView(hotstuff.View(1))
+	hs.EXPECT().IncreaseLastVotedView(hotstuff.View(1)).AnyTimes()
 	hs.EXPECT().HighQC().Return(qc)
 	cfg.
 		EXPECT().
@@ -45,9 +46,10 @@ func TestLocalTimeout(t *testing.T) {
 			}
 			close(c)
 		})
-
-	s.Start()
+	ctx, cancel := context.WithCancel(context.Background())
+	go mods.EventLoop().Run(ctx)
 	<-c
+	cancel()
 }
 
 func TestAdvanceViewQC(t *testing.T) {
@@ -115,7 +117,7 @@ func TestRemoteTimeout(t *testing.T) {
 	hl := builders.Build()
 	signers := hl.Signers()
 
-	timeouts := testutil.CreateTimeouts(t, 1, signers)
+	timeouts := testutil.CreateTimeouts(t, 1, signers[1:])
 
 	// synchronizer should tell hotstuff to propose
 	hs.EXPECT().Propose()
