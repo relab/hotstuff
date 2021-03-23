@@ -63,7 +63,9 @@ func (c *signatureCache) Sign(hash hotstuff.Hash) (sig hotstuff.Signature, err e
 		return nil, err
 	}
 	k := string(sig.ToBytes())
+	c.mut.Lock()
 	c.insert(k)
+	c.mut.Unlock()
 	return sig, nil
 }
 

@@ -34,7 +34,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 		return &cmd
 	})
 
-	signer, verifier := ecdsacrypto.New()
+	signer, verifier := ecdsacrypto.NewWithCache(10)
 
 	config := mocks.NewMockConfig(ctrl)
 	config.EXPECT().Len().AnyTimes().Return(1)
