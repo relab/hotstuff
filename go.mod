@@ -38,4 +38,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776 // indirect
 )
 
-replace github.com/relab/gorums => ../gorums
+replace github.com/relab/gorums => github.com/Raytar/gorums v0.0.0-20210325154949-feb7660601c0
