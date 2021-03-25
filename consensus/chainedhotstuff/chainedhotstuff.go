@@ -172,7 +172,7 @@ func (hs *chainedhotstuff) Propose() {
 		// return
 		cmd = new(hotstuff.Command)
 	}
-	block := hotstuff.NewBlock(hs.bLeaf.Hash(), hs.highQC, *cmd, hs.bLeaf.View()+1, hs.mod.ID())
+	block := hotstuff.NewBlock(hs.bLeaf.Hash(), hs.highQC, *cmd, hs.mod.ViewSynchronizer().View(), hs.mod.ID())
 	hs.mod.BlockChain().Store(block)
 
 	hs.mod.Config().Propose(block)
@@ -312,7 +312,7 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 		return
 	}
 
-	logger.Debugf("OnVote: %.8s", cert.BlockHash())
+	logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
 
 	votes := hs.verifiedVotes[cert.BlockHash()]
 	votes = append(votes, cert)
@@ -325,6 +325,7 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 	qc, err := hs.mod.Signer().CreateQuorumCert(block, votes)
 	if err != nil {
 		logger.Info("OnVote: could not create QC for block: ", err)
+		return
 	}
 	delete(hs.verifiedVotes, cert.BlockHash())
 	hs.updateHighQC(qc)
@@ -346,7 +347,7 @@ func (hs *chainedhotstuff) deliver(block *hotstuff.Block) {
 	hs.mod.BlockChain().Store(block)
 
 	for _, vote := range votes {
-		hs.OnVote(vote)
+		hs.mod.EventLoop().AddEvent(vote)
 	}
 }
 

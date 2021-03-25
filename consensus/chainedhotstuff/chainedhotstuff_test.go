@@ -24,6 +24,7 @@ func TestPropose(t *testing.T) {
 	builder.Build()
 
 	synchronizer.EXPECT().AdvanceView(gomock.AssignableToTypeOf(hotstuff.SyncInfo{})).AnyTimes()
+	synchronizer.EXPECT().View().Return(hotstuff.View(1))
 
 	// RULES:
 
@@ -158,13 +159,19 @@ func TestFetchBlock(t *testing.T) {
 		})
 
 	synchronizer.EXPECT().AdvanceView(gomock.Any()).Do(func(arg interface{}) { close(qcCreated) })
+	synchronizer.EXPECT().Start()
+	synchronizer.EXPECT().View().AnyTimes().Return(hotstuff.View(2))
 
 	for i, vote := range votes {
 		hs.OnVote(hotstuff.VoteMsg{ID: hotstuff.ID(i + 1), PartialCert: vote})
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	go hl[0].EventLoop().Run(ctx)
+
 	close(votesSent)
 	<-qcCreated
+	cancel()
 
 	if hs.HighQC().BlockHash() != b.Hash() {
 		t.Fatalf("A new QC was not created.")
