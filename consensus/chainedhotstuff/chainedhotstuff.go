@@ -190,7 +190,7 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 		return
 	}
 
-	if block.View() <= hs.lastVote {
+	if block.View() < hs.mod.ViewSynchronizer().View() {
 		logger.Info("OnPropose: block view was less than our view")
 		return
 	}
