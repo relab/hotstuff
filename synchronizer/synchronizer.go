@@ -1,6 +1,7 @@
 package synchronizer
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"time"
@@ -15,7 +16,10 @@ var logger = logging.GetLogger()
 // It does not do anything to ensure synchronization, it simply makes the local replica
 // propose at the correct time, and send new view messages in case of a timeout.
 type Synchronizer struct {
-	mod          *hotstuff.HotStuff
+	mod *hotstuff.HotStuff
+
+	viewCtx      context.Context
+	cancelCtx    context.CancelFunc
 	timeout      hotstuff.ExponentialTimeout
 	highTC       hotstuff.TimeoutCert
 	timer        *time.Timer
@@ -37,6 +41,7 @@ func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff) {
 // New creates a new Synchronizer.
 func New(timeout hotstuff.ExponentialTimeout) hotstuff.ViewSynchronizer {
 	return &Synchronizer{
+		cancelCtx:    func() {},
 		currentView:  1,
 		latestCommit: 0,
 		timeout:      timeout,
@@ -58,6 +63,11 @@ func (s *Synchronizer) Stop() {
 // View returns the current view.
 func (s *Synchronizer) View() hotstuff.View {
 	return s.currentView
+}
+
+// ViewContext returns a context that is cancelled at the end of the view.
+func (s *Synchronizer) ViewContext() context.Context {
+	return s.viewCtx
 }
 
 func (s *Synchronizer) viewDuration(view hotstuff.View) time.Duration {
@@ -190,6 +200,10 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	s.currentView = v + 1
 	s.timer.Reset(s.viewDuration(s.currentView))
 
+	// cancel the old view context and set up the next one
+	s.cancelCtx()
+	s.viewCtx, s.cancelCtx = context.WithCancel(context.Background())
+
 	leader := s.mod.LeaderRotation().GetLeader(s.currentView)
 	if leader == s.mod.ID() {
 		s.mod.Consensus().Propose()
@@ -197,3 +211,5 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		replica.NewView(syncInfo)
 	}
 }
+
+var _ hotstuff.ViewSynchronizer = (*Synchronizer)(nil)

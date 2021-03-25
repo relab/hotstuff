@@ -505,6 +505,8 @@ type ViewSynchronizer interface {
 	OnNewView(NewViewMsg)
 	// View returns the current view.
 	View() View
+	// ViewContext returns a context that is cancelled at the end of the view.
+	ViewContext() context.Context
 	// Start starts the synchronizer.
 	Start()
 	// Stop stops the synchronizer.

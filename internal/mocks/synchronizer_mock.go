@@ -5,6 +5,7 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -106,4 +107,18 @@ func (m *MockViewSynchronizer) View() hotstuff.View {
 func (mr *MockViewSynchronizerMockRecorder) View() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "View", reflect.TypeOf((*MockViewSynchronizer)(nil).View))
+}
+
+// ViewContext mocks base method.
+func (m *MockViewSynchronizer) ViewContext() context.Context {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ViewContext")
+	ret0, _ := ret[0].(context.Context)
+	return ret0
+}
+
+// ViewContext indicates an expected call of ViewContext.
+func (mr *MockViewSynchronizerMockRecorder) ViewContext() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ViewContext", reflect.TypeOf((*MockViewSynchronizer)(nil).ViewContext))
 }
