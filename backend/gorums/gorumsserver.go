@@ -12,9 +12,11 @@ import (
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
 )
 
 var logger = logging.GetLogger()
@@ -162,34 +164,19 @@ func (srv *Server) NewView(ctx context.Context, msg *proto.SyncInfo) {
 }
 
 // Fetch handles an incoming fetch request.
-func (srv *Server) Fetch(ctx context.Context, pb *proto.BlockHash) {
+func (srv *Server) Fetch(ctx context.Context, pb *proto.BlockHash, respond func(block *proto.Block, err error)) {
 	var hash hotstuff.Hash
 	copy(hash[:], pb.GetHash())
 
-	block, ok := srv.mod.BlockChain().Get(hash)
+	block, ok := srv.mod.BlockChain().LocalGet(hash)
 	if !ok {
+		respond(nil, status.Errorf(codes.NotFound, "requested block was not found"))
 		return
 	}
 
 	logger.Debugf("OnFetch: %.8s", hash)
 
-	id, err := srv.getClientID(ctx)
-	if err != nil {
-		logger.Infof("Fetch: could not get peer id: %v", err)
-	}
-
-	replica, ok := srv.mod.Config().Replica(id)
-	if !ok {
-		logger.Infof("Fetch: could not find replica with id: %d", id)
-		return
-	}
-
-	replica.Deliver(block)
-}
-
-// Deliver handles an incoming deliver message.
-func (srv *Server) Deliver(_ context.Context, block *proto.Block) {
-	srv.mod.Consensus().OnDeliver(proto.BlockFromProto(block))
+	respond(proto.BlockToProto(block), nil)
 }
 
 // Timeout handles an incoming TimeoutMsg.

@@ -11,7 +11,9 @@ import (
 	fmt "fmt"
 	gorums "github.com/relab/gorums"
 	encoding "google.golang.org/grpc/encoding"
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	sync "sync"
 )
 
 const (
@@ -135,23 +137,38 @@ func (c *Configuration) Timeout(ctx context.Context, in *TimeoutMsg, opts ...gor
 	c.Configuration.Multicast(ctx, cd, opts...)
 }
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
+// QuorumSpec is the interface of quorum functions for Hotstuff.
+type QuorumSpec interface {
+	gorums.ConfigOption
+
+	// FetchQF is the quorum function for the Fetch
+	// quorum call method. The in parameter is the request object
+	// supplied to the Fetch method at call time, and may or may not
+	// be used by the quorum function. If the in parameter is not needed
+	// you should implement your quorum function with '_ *BlockHash'.
+	FetchQF(in *BlockHash, replies map[uint32]*Block) (*Block, bool)
+}
 
 // Fetch is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (c *Configuration) Fetch(ctx context.Context, in *BlockHash, opts ...gorums.CallOption) {
+func (c *Configuration) Fetch(ctx context.Context, in *BlockHash, opts ...gorums.CallOption) (resp *Block, err error) {
 	cd := gorums.QuorumCallData{
 		Message: in,
 		Method:  "proto.Hotstuff.Fetch",
 	}
+	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
+		r := make(map[uint32]*Block, len(replies))
+		for k, v := range replies {
+			r[k] = v.(*Block)
+		}
+		return c.qspec.FetchQF(req.(*BlockHash), r)
+	}
 
-	c.Configuration.Multicast(ctx, cd, opts...)
-}
-
-// QuorumSpec is the interface of quorum functions for Hotstuff.
-type QuorumSpec interface {
-	gorums.ConfigOption
+	res, err := c.Configuration.QuorumCall(ctx, cd, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return res.(*Block), err
 }
 
 // Hotstuff is the server-side API for the Hotstuff Service
@@ -160,8 +177,7 @@ type Hotstuff interface {
 	Vote(context.Context, *PartialCert)
 	Timeout(context.Context, *TimeoutMsg)
 	NewView(context.Context, *SyncInfo)
-	Fetch(context.Context, *BlockHash)
-	Deliver(context.Context, *Block)
+	Fetch(context.Context, *BlockHash, func(*Block, error))
 }
 
 func RegisterHotstuffServer(srv *gorums.Server, impl Hotstuff) {
@@ -181,14 +197,22 @@ func RegisterHotstuffServer(srv *gorums.Server, impl Hotstuff) {
 		req := in.Message.(*SyncInfo)
 		impl.NewView(ctx, req)
 	})
-	srv.RegisterHandler("proto.Hotstuff.Fetch", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
+	srv.RegisterHandler("proto.Hotstuff.Fetch", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*BlockHash)
-		impl.Fetch(ctx, req)
+		once := new(sync.Once)
+		f := func(resp *Block, err error) {
+			once.Do(func() {
+				finished <- gorums.WrapMessage(in.Metadata, resp, err)
+			})
+		}
+		impl.Fetch(ctx, req, f)
 	})
-	srv.RegisterHandler("proto.Hotstuff.Deliver", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*Block)
-		impl.Deliver(ctx, req)
-	})
+}
+
+type internalBlock struct {
+	nid   uint32
+	reply *Block
+	err   error
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -214,20 +238,6 @@ func (n *Node) NewView(ctx context.Context, in *SyncInfo, opts ...gorums.CallOpt
 	cd := gorums.CallData{
 		Message: in,
 		Method:  "proto.Hotstuff.NewView",
-	}
-
-	n.Node.Unicast(ctx, cd, opts...)
-}
-
-// Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
-
-// Deliver is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (n *Node) Deliver(ctx context.Context, in *Block, opts ...gorums.CallOption) {
-	cd := gorums.CallData{
-		Message: in,
-		Method:  "proto.Hotstuff.Deliver",
 	}
 
 	n.Node.Unicast(ctx, cd, opts...)

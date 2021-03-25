@@ -1,8 +1,6 @@
 package chainedhotstuff
 
 import (
-	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -122,62 +120,6 @@ func TestVote(t *testing.T) {
 
 	if hs.HighQC().BlockHash() != b.Block.Hash() {
 		t.Errorf("HighQC was not updated.")
-	}
-}
-
-// TestFetchBlock checks that a replica can fetch a block in order to create a QC.
-func TestFetchBlock(t *testing.T) {
-	const n = 4
-	ctrl := gomock.NewController(t)
-
-	hs := New()
-	keys := testutil.GenerateKeys(t, n)
-	bl := testutil.CreateBuilders(t, ctrl, 4, keys...)
-	cfg, _ := testutil.CreateMockConfigWithReplicas(t, ctrl, n, keys...)
-	synchronizer := mocks.NewMockViewSynchronizer(ctrl)
-	bl[0].Register(hs, cfg, synchronizer)
-	hl := bl.Build()
-
-	// create test data
-	votesSent := make(chan struct{})
-	qcCreated := make(chan struct{})
-	genesisQC := ecdsacrypto.NewQuorumCert(map[hotstuff.ID]*ecdsacrypto.Signature{}, hotstuff.GetGenesis().Hash())
-	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), genesisQC, "foo", 1, 1)
-	votes := testutil.CreatePCs(t, b, hl.Signers())
-
-	// configure mocks
-	var mut sync.Mutex
-	cfg.
-		EXPECT().
-		Fetch(gomock.Any(), gomock.AssignableToTypeOf(b.Hash())).
-		Do(func(_ context.Context, h hotstuff.Hash) {
-			// wait for all votes to be sent
-			go func() {
-				<-votesSent
-				// TODO: we no longer protect hotstuff by mutex, so we'll just lock here manually for now.
-				mut.Lock()
-				hs.OnDeliver(b)
-				mut.Unlock()
-			}()
-		})
-
-	synchronizer.EXPECT().AdvanceView(gomock.Any()).Do(func(arg interface{}) { close(qcCreated) })
-	synchronizer.EXPECT().Start()
-	synchronizer.EXPECT().View().AnyTimes().Return(hotstuff.View(2))
-
-	for i, vote := range votes {
-		hs.OnVote(hotstuff.VoteMsg{ID: hotstuff.ID(i + 1), PartialCert: vote})
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	go hl[0].EventLoop().Run(ctx)
-
-	close(votesSent)
-	<-qcCreated
-	cancel()
-
-	if hs.HighQC().BlockHash() != b.Hash() {
-		t.Fatalf("A new QC was not created.")
 	}
 }
 

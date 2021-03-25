@@ -1,17 +1,25 @@
 package hotstuff
 
-import "context"
+import (
+	"context"
+	"reflect"
+	"sync"
+)
 
 // EventLoop synchronously executes a queue of events.
 type EventLoop struct {
-	mod    *HotStuff
-	eventQ chan Event
+	mod *HotStuff
+	mut sync.Mutex
+
+	eventQ        chan Event
+	waitingEvents map[Event][]Event
 }
 
 // NewEventLoop returns a new event loop with the requested buffer size.
 func NewEventLoop(bufferSize uint) *EventLoop {
 	return &EventLoop{
-		eventQ: make(chan Event, bufferSize),
+		eventQ:        make(chan Event, bufferSize),
+		waitingEvents: make(map[Event][]Event),
 	}
 }
 
@@ -65,4 +73,26 @@ func (el *EventLoop) processEvent(e Event) {
 	case NewViewMsg:
 		el.mod.ViewSynchronizer().OnNewView(event)
 	}
+
+	el.mut.Lock()
+	for k, v := range el.waitingEvents {
+		if reflect.TypeOf(e) == reflect.TypeOf(k) {
+			for _, event := range v {
+				el.AddEvent(event)
+			}
+			delete(el.waitingEvents, k)
+		}
+	}
+	el.mut.Unlock()
+}
+
+// AwaitEvent allows us to defer execution of an event until after another event has happened.
+// The eventType parameter decides the type of event to wait for, and it should be the zero value
+// of that event type. The event parameter is the event that will be deferred.
+func (el *EventLoop) AwaitEvent(eventType, event Event) {
+	el.mut.Lock()
+	v := el.waitingEvents[eventType]
+	v = append(v, event)
+	el.waitingEvents[eventType] = v
+	el.mut.Unlock()
 }

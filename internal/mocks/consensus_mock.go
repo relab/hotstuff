@@ -100,18 +100,6 @@ func (mr *MockConsensusMockRecorder) Leaf() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Leaf", reflect.TypeOf((*MockConsensus)(nil).Leaf))
 }
 
-// OnDeliver mocks base method.
-func (m *MockConsensus) OnDeliver(arg0 *hotstuff.Block) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "OnDeliver", arg0)
-}
-
-// OnDeliver indicates an expected call of OnDeliver.
-func (mr *MockConsensusMockRecorder) OnDeliver(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnDeliver", reflect.TypeOf((*MockConsensus)(nil).OnDeliver), arg0)
-}
-
 // OnPropose mocks base method.
 func (m *MockConsensus) OnPropose(arg0 hotstuff.ProposeMsg) {
 	m.ctrl.T.Helper()

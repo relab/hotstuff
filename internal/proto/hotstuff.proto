@@ -25,13 +25,7 @@ service Hotstuff {
     option (gorums.unicast) = true;
   }
 
-  rpc Fetch(BlockHash) returns (google.protobuf.Empty) {
-    option (gorums.multicast) = true;
-  }
-
-  rpc Deliver(Block) returns (google.protobuf.Empty) {
-    option (gorums.unicast) = true;
-  }
+  rpc Fetch(BlockHash) returns (Block) { option (gorums.quorumcall) = true; }
 }
 
 message BlockHash { bytes Hash = 1; }

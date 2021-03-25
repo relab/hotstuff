@@ -163,6 +163,7 @@ type ProposeMsg struct {
 type VoteMsg struct {
 	ID          ID          // the ID of the replica who sent the message.
 	PartialCert PartialCert // The partial certificate.
+	Deferred    bool
 }
 
 // TimeoutMsg is broadcast whenever a replica has a local timeout.
@@ -411,8 +412,12 @@ type Verifier interface {
 type BlockChain interface {
 	// Store stores a block in the blockchain.
 	Store(*Block)
-	// Get retrieves a block given its hash.
+
+	// Get retrieves a block given its hash, attempting to fetching it from other replicas if necessary.
 	Get(Hash) (*Block, bool)
+
+	// LocalGet retrieves a block given its hash, without fetching it from other replicas.
+	LocalGet(Hash) (*Block, bool)
 }
 
 //go:generate mockgen -destination=internal/mocks/replica_mock.go -package=mocks . Replica
@@ -428,8 +433,6 @@ type Replica interface {
 	Vote(cert PartialCert)
 	// NewView sends the quorum certificate to the other replica.
 	NewView(SyncInfo)
-	// Deliver sends the block to the other replica.
-	Deliver(block *Block)
 }
 
 //go:generate mockgen -destination=internal/mocks/config_mock.go -package=mocks . Config
@@ -452,7 +455,7 @@ type Config interface {
 	// Timeout sends the timeout message to all replicas.
 	Timeout(msg TimeoutMsg)
 	// Fetch requests a block from all the replicas in the configuration.
-	Fetch(ctx context.Context, hash Hash)
+	Fetch(ctx context.Context, hash Hash) (block *Block, ok bool)
 }
 
 //go:generate mockgen -destination=internal/mocks/consensus_mock.go -package=mocks . Consensus
@@ -483,8 +486,6 @@ type Consensus interface {
 	// OnVote handles an incoming vote.
 	// A leader should call this method on itself.
 	OnVote(vote VoteMsg)
-	// OnDeliver handles an incoming block that was requested through the "fetch" mechanism.
-	OnDeliver(block *Block)
 }
 
 // LeaderRotation implements a leader rotation scheme.

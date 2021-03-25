@@ -3,32 +3,48 @@ package blockchain
 
 import (
 	"container/list"
+	"context"
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/logging"
 )
+
+var logger = logging.GetLogger()
 
 // blockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type blockChain struct {
-	mut         sync.Mutex
-	maxSize     int
-	blocks      map[hotstuff.Hash]*list.Element
-	accessOrder list.List
+	mod *hotstuff.HotStuff
+
+	mut          sync.Mutex
+	maxSize      int
+	blocks       map[hotstuff.Hash]*list.Element
+	pendingFetch map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be cancelled
+	accessOrder  list.List
+}
+
+// InitModule gives the module a reference to the HotStuff object.
+func (chain *blockChain) InitModule(hs *hotstuff.HotStuff) {
+	chain.mod = hs
 }
 
 // New creates a new blockChain with a maximum size.
 // Blocks are dropped in least recently used order.
 func New(maxSize int) hotstuff.BlockChain {
 	bc := &blockChain{
-		maxSize: maxSize,
-		blocks:  make(map[hotstuff.Hash]*list.Element),
+		maxSize:      maxSize,
+		blocks:       make(map[hotstuff.Hash]*list.Element),
+		pendingFetch: make(map[hotstuff.Hash]context.CancelFunc),
 	}
 	bc.Store(hotstuff.GetGenesis())
 	return bc
 }
 
-func (chain *blockChain) dropOldest() {
+func (chain *blockChain) makeSpace() {
+	if len(chain.blocks) < chain.maxSize {
+		return
+	}
 	elem := chain.accessOrder.Back()
 	block := elem.Value.(*hotstuff.Block)
 	delete(chain.blocks, block.Hash())
@@ -40,16 +56,19 @@ func (chain *blockChain) Store(block *hotstuff.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
-	if len(chain.blocks)+1 > chain.maxSize {
-		chain.dropOldest()
-	}
+	chain.makeSpace()
 
 	elem := chain.accessOrder.PushFront(block)
 	chain.blocks[block.Hash()] = elem
+
+	// cancel any pending fetch operations
+	if cancel, ok := chain.pendingFetch[block.Hash()]; ok {
+		cancel()
+	}
 }
 
-// Get retrieves a block given its hash
-func (chain *blockChain) Get(hash hotstuff.Hash) (*hotstuff.Block, bool) {
+// Get retrieves a block given its hash. It will only try the local cache.
+func (chain *blockChain) LocalGet(hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
@@ -63,6 +82,51 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	return elem.Value.(*hotstuff.Block), true
 }
 
+// Get retrieves a block given its hash. Get will try to find the block locally.
+// If it is not available locally, it will try to fetch the block.
+func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
+	// need to declare vars early, or else we won't be able to use goto
+	var (
+		ctx    context.Context
+		cancel context.CancelFunc
+	)
+
+	chain.mut.Lock()
+	elem, ok := chain.blocks[hash]
+	if ok {
+		goto done
+	}
+
+	ctx, cancel = context.WithCancel(chain.mod.ViewSynchronizer().ViewContext())
+	chain.pendingFetch[hash] = cancel
+
+	chain.mut.Unlock()
+	logger.Debugf("Attempting to fetch block: %.8s", hash)
+	block, ok = chain.mod.Config().Fetch(ctx, hash)
+	chain.mut.Lock()
+
+	delete(chain.pendingFetch, hash)
+	if !ok {
+		// check again in case the block arrived while we we fetching
+		elem, ok = chain.blocks[hash]
+		goto done
+	}
+
+	chain.makeSpace()
+	elem = chain.accessOrder.PushFront(block)
+	chain.blocks[hash] = elem
+
+done:
+	defer chain.mut.Unlock()
+
+	if !ok {
+		return nil, false
+	}
+
+	chain.accessOrder.MoveToFront(elem)
+	return elem.Value.(*hotstuff.Block), true
+}
+
 func (chain *blockChain) ProcessEvent(event hotstuff.Event) {
 	proposal, ok := event.(hotstuff.ProposeMsg)
 	if !ok {
@@ -71,3 +135,5 @@ func (chain *blockChain) ProcessEvent(event hotstuff.Event) {
 	// TODO: "enhance" the block with helper functions for getting the parent, etc.
 	chain.Store(proposal.Block)
 }
+
+var _ hotstuff.BlockChain = (*blockChain)(nil)

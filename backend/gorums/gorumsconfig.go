@@ -3,6 +3,7 @@ package gorums
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 
 type gorumsReplica struct {
 	node          *proto.Node
+	eventChan     *gorums.Channel
 	id            hotstuff.ID
 	pubKey        hotstuff.PublicKey
 	voteCancel    context.CancelFunc
@@ -41,7 +43,7 @@ func (r *gorumsReplica) Vote(cert hotstuff.PartialCert) {
 	r.voteCancel()
 	ctx, r.voteCancel = context.WithCancel(context.Background())
 	pCert := proto.PartialCertToProto(cert)
-	r.node.Vote(ctx, pCert, gorums.WithNoSendWaiting())
+	r.node.Vote(ctx, pCert, r.eventChan, gorums.WithNoSendWaiting())
 }
 
 // NewView sends the quorum certificate to the other replica.
@@ -52,16 +54,7 @@ func (r *gorumsReplica) NewView(msg hotstuff.SyncInfo) {
 	var ctx context.Context
 	r.newviewCancel()
 	ctx, r.newviewCancel = context.WithCancel(context.Background())
-	r.node.NewView(ctx, proto.SyncInfoToProto(msg), gorums.WithNoSendWaiting())
-}
-
-// Deliver sends the block to the other replica
-func (r *gorumsReplica) Deliver(block *hotstuff.Block) {
-	if r.node == nil {
-		return
-	}
-	// background context is probably fine here, since we are only talking to one replica
-	r.node.Deliver(context.Background(), proto.BlockToProto(block), gorums.WithNoSendWaiting())
+	r.node.NewView(ctx, proto.SyncInfoToProto(msg), r.eventChan, gorums.WithNoSendWaiting())
 }
 
 // Config holds information about the current configuration of replicas that participate in the protocol,
@@ -72,6 +65,7 @@ type Config struct {
 	cfg           *proto.Configuration
 	privKey       hotstuff.PrivateKey
 	replicas      map[hotstuff.ID]hotstuff.Replica
+	eventChans    []*gorums.Channel
 	proposeCancel context.CancelFunc
 	timeoutCancel context.CancelFunc
 }
@@ -132,13 +126,21 @@ func (cfg *Config) Connect(connectTimeout time.Duration) error {
 	var err error
 	cfg.mgr = proto.NewManager(mgrOpts...)
 
-	cfg.cfg, err = cfg.mgr.NewConfiguration(gorums.WithNodeMap(idMapping))
+	cfg.cfg, err = cfg.mgr.NewConfiguration(qspec{}, gorums.WithNodeMap(idMapping))
 	if err != nil {
 		return fmt.Errorf("failed to create configuration: %w", err)
 	}
-	for _, node := range cfg.cfg.Nodes() {
+
+	cfg.eventChans, err = cfg.cfg.NewChannels()
+	if err != nil {
+		return fmt.Errorf("failed to create channels: %v", err)
+	}
+
+	for i, node := range cfg.cfg.Nodes() {
 		id := hotstuff.ID(node.ID())
-		cfg.replicas[id].(*gorumsReplica).node = node
+		replica := cfg.replicas[id].(*gorumsReplica)
+		replica.node = node
+		replica.eventChan = cfg.eventChans[i]
 	}
 
 	return nil
@@ -184,7 +186,7 @@ func (cfg *Config) Propose(block *hotstuff.Block) {
 	cfg.proposeCancel()
 	ctx, cfg.proposeCancel = context.WithCancel(context.Background())
 	pBlock := proto.BlockToProto(block)
-	cfg.cfg.Propose(ctx, pBlock, gorums.WithNoSendWaiting())
+	cfg.cfg.Propose(ctx, pBlock, cfg.eventChans, gorums.WithNoSendWaiting())
 }
 
 // Timeout sends the timeout message to all replicas.
@@ -195,12 +197,17 @@ func (cfg *Config) Timeout(msg hotstuff.TimeoutMsg) {
 	var ctx context.Context
 	cfg.timeoutCancel()
 	ctx, cfg.timeoutCancel = context.WithCancel(context.Background())
-	cfg.cfg.Timeout(ctx, proto.TimeoutMsgToProto(msg), gorums.WithNoSendWaiting())
+	cfg.cfg.Timeout(ctx, proto.TimeoutMsgToProto(msg), cfg.eventChans, gorums.WithNoSendWaiting())
 }
 
 // Fetch requests a block from all the replicas in the configuration
-func (cfg *Config) Fetch(ctx context.Context, hash hotstuff.Hash) {
-	cfg.cfg.Fetch(ctx, &proto.BlockHash{Hash: hash[:]}, gorums.WithNoSendWaiting())
+func (cfg *Config) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
+	protoBlock, err := cfg.cfg.Fetch(ctx, &proto.BlockHash{Hash: hash[:]})
+	if err != nil && !errors.Is(err, context.Canceled) {
+		logger.Infof("Failed to fetch block: %v", err)
+		return nil, false
+	}
+	return proto.BlockFromProto(protoBlock), true
 }
 
 // Close closes all connections made by this configuration.
@@ -209,3 +216,19 @@ func (cfg *Config) Close() {
 }
 
 var _ hotstuff.Config = (*Config)(nil)
+
+type qspec struct{}
+
+// FetchQF is the quorum function for the Fetch quorum call method.
+// It simply returns true if one of the replies matches the requested block.
+func (q qspec) FetchQF(in *proto.BlockHash, replies map[uint32]*proto.Block) (*proto.Block, bool) {
+	var h hotstuff.Hash
+	copy(h[:], in.GetHash())
+	for _, b := range replies {
+		block := proto.BlockFromProto(b)
+		if h == block.Hash() {
+			return b, true
+		}
+	}
+	return nil, false
+}

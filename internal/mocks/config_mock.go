@@ -36,9 +36,12 @@ func (m *MockConfig) EXPECT() *MockConfigMockRecorder {
 }
 
 // Fetch mocks base method.
-func (m *MockConfig) Fetch(arg0 context.Context, arg1 hotstuff.Hash) {
+func (m *MockConfig) Fetch(arg0 context.Context, arg1 hotstuff.Hash) (*hotstuff.Block, bool) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Fetch", arg0, arg1)
+	ret := m.ctrl.Call(m, "Fetch", arg0, arg1)
+	ret0, _ := ret[0].(*hotstuff.Block)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
 }
 
 // Fetch indicates an expected call of Fetch.

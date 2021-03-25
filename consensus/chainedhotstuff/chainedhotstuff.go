@@ -22,17 +22,13 @@ type chainedhotstuff struct {
 
 	fetchCancel context.CancelFunc
 
-	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert   // verified votes that could become a QC
-	pendingVotes  map[hotstuff.Hash][]hotstuff.VoteMsg       // unverified votes that are waiting for a Block
-	newView       map[hotstuff.View]map[hotstuff.ID]struct{} // the set of replicas who have sent a newView message per view
+	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
 }
 
 // New returns a new chainedhotstuff instance.
 func New() hotstuff.Consensus {
 	hs := &chainedhotstuff{}
 	hs.verifiedVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
-	hs.pendingVotes = make(map[hotstuff.Hash][]hotstuff.VoteMsg)
-	hs.newView = make(map[hotstuff.View]map[hotstuff.ID]struct{})
 	hs.fetchCancel = func() {}
 	hs.bLock = hotstuff.GetGenesis()
 	hs.bExec = hotstuff.GetGenesis()
@@ -239,8 +235,6 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 
 	finish := func() {
 		hs.update(block)
-		hs.deliver(block)
-		hs.pendingVotes = make(map[hotstuff.Hash][]hotstuff.VoteMsg)
 		hs.mod.ViewSynchronizer().AdvanceView(hotstuff.SyncInfo{QC: block.QuorumCert()})
 	}
 
@@ -261,29 +255,12 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	finish()
 }
 
-func (hs *chainedhotstuff) fetchBlockForVote(voteMsg hotstuff.VoteMsg) {
-	vote := voteMsg.PartialCert
-	votes, ok := hs.pendingVotes[vote.BlockHash()]
-	votes = append(votes, voteMsg)
-	hs.pendingVotes[vote.BlockHash()] = votes
-
-	if ok {
-		// another vote initiated fetching
-		return
-	}
-
-	var ctx context.Context
-	ctx, hs.fetchCancel = context.WithCancel(context.Background())
-
-	hs.mod.Config().Fetch(ctx, vote.BlockHash())
-}
-
 // OnVote handles an incoming vote
 func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 	defer func() {
 		// delete any pending QCs with lower height than bLeaf
 		for k := range hs.verifiedVotes {
-			if block, ok := hs.mod.BlockChain().Get(k); ok {
+			if block, ok := hs.mod.BlockChain().LocalGet(k); ok {
 				if block.View() <= hs.bLeaf.View() {
 					delete(hs.verifiedVotes, k)
 				}
@@ -294,12 +271,31 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 	}()
 
 	cert := vote.PartialCert
+	logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
 
-	block, ok := hs.mod.BlockChain().Get(cert.BlockHash())
-	if !ok {
-		logger.Debugf("Could not find block for vote: %.8s. Attempting to fetch.", cert.BlockHash())
-		hs.fetchBlockForVote(vote)
-		return
+	var (
+		block *hotstuff.Block
+		ok    bool
+	)
+
+	if !vote.Deferred {
+		// first, try to get the block from the local cache
+		block, ok = hs.mod.BlockChain().LocalGet(cert.BlockHash())
+		if !ok {
+			// if that does not work, we will try to handle this event later.
+			// hopefully, the block has arrived by then.
+			logger.Infof("Local cache miss for block: %.8s", cert.BlockHash())
+			vote.Deferred = true
+			hs.mod.EventLoop().AwaitEvent(hotstuff.ProposeMsg{}, vote)
+			return
+		}
+	} else {
+		// if the block has not arrived at this point we will try to fetch it.
+		block, ok = hs.mod.BlockChain().Get(cert.BlockHash())
+		if !ok {
+			logger.Debugf("Could not find block for vote: %.8s.", cert.BlockHash())
+			return
+		}
 	}
 
 	if block.View() <= hs.bLeaf.View() {
@@ -311,8 +307,6 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 		logger.Info("OnVote: Vote could not be verified!")
 		return
 	}
-
-	logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
 
 	votes := hs.verifiedVotes[cert.BlockHash()]
 	votes = append(votes, cert)
@@ -332,28 +326,6 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 
 	// signal the synchronizer
 	hs.mod.ViewSynchronizer().AdvanceView(hotstuff.SyncInfo{QC: qc})
-}
-
-func (hs *chainedhotstuff) deliver(block *hotstuff.Block) {
-	votes, ok := hs.pendingVotes[block.Hash()]
-	if !ok {
-		return
-	}
-
-	logger.Debugf("OnDeliver: %v", block)
-
-	delete(hs.pendingVotes, block.Hash())
-
-	hs.mod.BlockChain().Store(block)
-
-	for _, vote := range votes {
-		hs.mod.EventLoop().AddEvent(vote)
-	}
-}
-
-// OnDeliver handles an incoming block
-func (hs *chainedhotstuff) OnDeliver(block *hotstuff.Block) {
-	hs.deliver(block)
 }
 
 var _ hotstuff.Consensus = (*chainedhotstuff)(nil)
