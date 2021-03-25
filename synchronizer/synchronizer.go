@@ -48,9 +48,6 @@ func New(timeout hotstuff.ExponentialTimeout) hotstuff.ViewSynchronizer {
 // Start starts the view timeout timer, and makes a proposal if the local replica is the leader.
 func (s *Synchronizer) Start() {
 	s.timer = time.AfterFunc(s.viewDuration(s.currentView), s.onLocalTimeout)
-	if s.mod.LeaderRotation().GetLeader(s.currentView) == s.mod.ID() {
-		s.mod.Consensus().Propose()
-	}
 }
 
 // Stop stops the view timeout timer.
@@ -156,6 +153,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		logger.Debugf("Failed to create timeout certificate: %v", err)
 		return
 	}
+	delete(s.timeouts, timeout.View)
 
 	s.AdvanceView(hotstuff.SyncInfo{TC: tc})
 }
