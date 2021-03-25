@@ -132,7 +132,7 @@ func (cfg *Config) Connect(connectTimeout time.Duration) error {
 	var err error
 	cfg.mgr = proto.NewManager(mgrOpts...)
 
-	cfg.cfg, err = cfg.mgr.NewConfiguration(struct{}{}, gorums.WithNodeMap(idMapping))
+	cfg.cfg, err = cfg.mgr.NewConfiguration(gorums.WithNodeMap(idMapping))
 	if err != nil {
 		return fmt.Errorf("failed to create configuration: %w", err)
 	}
