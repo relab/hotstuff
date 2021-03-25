@@ -175,7 +175,6 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	} else {
 		b, ok := s.mod.BlockChain().Get(syncInfo.QC.BlockHash())
 		if !ok {
-			//TODO
 			return
 		}
 		v = b.View()
@@ -188,7 +187,6 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		return
 	}
 
-	// TODO: stop timer
 	s.currentView = v + 1
 	s.timer.Reset(s.viewDuration(s.currentView))
 
