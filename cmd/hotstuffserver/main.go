@@ -13,7 +13,6 @@ import (
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/internal/cli"
-	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc/credentials"
@@ -161,8 +160,6 @@ func start(ctx context.Context, conf *options) {
 
 		replicaConfig.Replicas[r.ID] = info
 	}
-
-	logging.NameLogger(fmt.Sprintf("hs%d", conf.SelfID))
 
 	srv := newClientServer(conf, replicaConfig, &tlsCert)
 	err = srv.Start(clientAddress)

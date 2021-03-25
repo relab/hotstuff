@@ -18,6 +18,7 @@ import (
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus/chainedhotstuff"
+	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/leaderrotation"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -90,7 +91,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 		leaderRotation,
 		srv,          // executor
 		srv.cmdCache, // acceptor and command queue
-
+		logging.New(fmt.Sprintf("hs%d", conf.SelfID)),
 	)
 	srv.hs = builder.Build()
 

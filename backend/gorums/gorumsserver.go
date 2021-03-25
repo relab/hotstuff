@@ -9,7 +9,6 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
-	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -18,8 +17,6 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 )
-
-var logger = logging.GetLogger()
 
 // Server is the server-side of the gorums backend.
 // It is responsible for calling handler methods on the consensus instance.
@@ -69,7 +66,7 @@ func (srv *Server) StartOnListener(listener net.Listener) {
 	go func() {
 		err := srv.gorumsSrv.Serve(listener)
 		if err != nil {
-			logger.Errorf("An error occurred while serving: %v", err)
+			srv.mod.Logger().Errorf("An error occurred while serving: %v", err)
 		}
 	}()
 }
@@ -124,7 +121,7 @@ func (srv *Server) Stop() {
 func (srv *Server) Propose(ctx context.Context, block *proto.Block) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
-		logger.Infof("Failed to get client ID: %v", err)
+		srv.mod.Logger().Infof("Failed to get client ID: %v", err)
 		return
 	}
 	block.Proposer = uint32(id)
@@ -139,7 +136,7 @@ func (srv *Server) Propose(ctx context.Context, block *proto.Block) {
 func (srv *Server) Vote(ctx context.Context, cert *proto.PartialCert) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
-		logger.Infof("Failed to get client ID: %v", err)
+		srv.mod.Logger().Infof("Failed to get client ID: %v", err)
 		return
 	}
 
@@ -153,7 +150,7 @@ func (srv *Server) Vote(ctx context.Context, cert *proto.PartialCert) {
 func (srv *Server) NewView(ctx context.Context, msg *proto.SyncInfo) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
-		logger.Infof("Failed to get client ID: %v", err)
+		srv.mod.Logger().Infof("Failed to get client ID: %v", err)
 		return
 	}
 
@@ -174,7 +171,7 @@ func (srv *Server) Fetch(ctx context.Context, pb *proto.BlockHash, respond func(
 		return
 	}
 
-	logger.Debugf("OnFetch: %.8s", hash)
+	srv.mod.Logger().Debugf("OnFetch: %.8s", hash)
 
 	respond(proto.BlockToProto(block), nil)
 }
@@ -185,7 +182,7 @@ func (srv *Server) Timeout(ctx context.Context, msg *proto.TimeoutMsg) {
 	timeoutMsg := proto.TimeoutMsgFromProto(msg)
 	timeoutMsg.ID, err = srv.getClientID(ctx)
 	if err != nil {
-		logger.Infof("Could not get ID of replica: %v", err)
+		srv.mod.Logger().Infof("Could not get ID of replica: %v", err)
 	}
 	srv.mod.EventLoop().AddEvent(timeoutMsg)
 }

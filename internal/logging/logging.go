@@ -3,17 +3,31 @@ package logging
 import (
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/mattn/go-isatty"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-var logger *zap.SugaredLogger
-var mut sync.Mutex
+// Logger is the logging interface used by hotstuff. It is based on zap.SugaredLogger
+type Logger interface {
+	DPanic(args ...interface{})
+	DPanicf(template string, args ...interface{})
+	Debug(args ...interface{})
+	Debugf(template string, args ...interface{})
+	Error(args ...interface{})
+	Errorf(template string, args ...interface{})
+	Fatal(args ...interface{})
+	Fatalf(template string, args ...interface{})
+	Info(args ...interface{})
+	Infof(template string, args ...interface{})
+	Panic(args ...interface{})
+	Panicf(template string, args ...interface{})
+	Warn(args ...interface{})
+	Warnf(template string, args ...interface{})
+}
 
-func initLogger() {
+func New(name string) Logger {
 	var config zap.Config
 	if strings.ToLower(os.Getenv("HOTSTUFF_LOG_TYPE")) == "json" {
 		config = zap.NewProductionConfig()
@@ -41,23 +55,5 @@ func initLogger() {
 	default:
 		config.Level.SetLevel(zap.ErrorLevel)
 	}
-	logger = l.Sugar()
-}
-
-// GetLogger returns a pointer to the global logger for HotStuff.
-func GetLogger() *zap.SugaredLogger {
-	mut.Lock()
-	defer mut.Unlock()
-	if logger == nil {
-		initLogger()
-	}
-	return logger
-}
-
-// NameLogger sets the name of the logger.
-func NameLogger(name string) *zap.SugaredLogger {
-	mut.Lock()
-	defer mut.Unlock()
-	*logger = *logger.Named(name)
-	return logger
+	return l.Sugar().Named(name)
 }

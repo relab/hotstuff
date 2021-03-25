@@ -52,6 +52,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"time"
+
+	"github.com/relab/hotstuff/internal/logging"
 )
 
 // Basic types:
@@ -198,6 +200,7 @@ type HotStuff struct {
 
 	id         ID
 	privateKey PrivateKey
+	logger     logging.Logger
 	eventLoop  *EventLoop
 
 	// modules
@@ -222,6 +225,10 @@ func (hs *HotStuff) ID() ID {
 // PrivateKey returns the private key.
 func (hs *HotStuff) PrivateKey() PrivateKey {
 	return hs.privateKey
+}
+
+func (hs *HotStuff) Logger() logging.Logger {
+	return hs.logger
 }
 
 // EventLoop returns the event loop.
@@ -290,6 +297,7 @@ func NewBuilder(id ID, privateKey PrivateKey) Builder {
 	bl := Builder{hs: &HotStuff{
 		id:         id,
 		privateKey: privateKey,
+		logger:     logging.New(""),
 	}}
 	bl.Register(NewEventLoop(100))
 	return bl
@@ -302,6 +310,9 @@ func NewBuilder(id ID, privateKey PrivateKey) Builder {
 // Register will overwrite existing modules if the same type is registered twice.
 func (b *Builder) Register(modules ...interface{}) {
 	for _, module := range modules {
+		if m, ok := module.(logging.Logger); ok {
+			b.hs.logger = m
+		}
 		// allow overriding the event loop if a different buffer size is desired
 		if m, ok := module.(*EventLoop); ok {
 			b.hs.eventLoop = m

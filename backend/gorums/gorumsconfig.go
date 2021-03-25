@@ -60,6 +60,8 @@ func (r *gorumsReplica) NewView(msg hotstuff.SyncInfo) {
 // Config holds information about the current configuration of replicas that participate in the protocol,
 // and some information about the local replica. It also provides methods to send messages to the other replicas.
 type Config struct {
+	mod *hotstuff.HotStuff
+
 	replicaCfg    config.ReplicaConfig
 	mgr           *proto.Manager
 	cfg           *proto.Configuration
@@ -68,6 +70,11 @@ type Config struct {
 	eventChans    []*gorums.Channel
 	proposeCancel context.CancelFunc
 	timeoutCancel context.CancelFunc
+}
+
+// InitModule gives the module a reference to the HotStuff object.
+func (cfg *Config) InitModule(hs *hotstuff.HotStuff) {
+	cfg.mod = hs
 }
 
 // NewConfig creates a new configuration.
@@ -204,7 +211,7 @@ func (cfg *Config) Timeout(msg hotstuff.TimeoutMsg) {
 func (cfg *Config) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	protoBlock, err := cfg.cfg.Fetch(ctx, &proto.BlockHash{Hash: hash[:]})
 	if err != nil && !errors.Is(err, context.Canceled) {
-		logger.Infof("Failed to fetch block: %v", err)
+		cfg.mod.Logger().Infof("Failed to fetch block: %v", err)
 		return nil, false
 	}
 	return proto.BlockFromProto(protoBlock), true

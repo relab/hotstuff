@@ -15,11 +15,8 @@ import (
 	"sync/atomic"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/internal/logging"
 	"go.uber.org/multierr"
 )
-
-var logger = logging.GetLogger()
 
 // ErrHashMismatch is the error used when a partial certificate hash does not match the hash of a block.
 var ErrHashMismatch = fmt.Errorf("certificate hash does not match block hash")
@@ -303,7 +300,7 @@ func (ec *ecdsaCrypto) Verify(sig hotstuff.Signature, hash hotstuff.Hash) bool {
 	_sig := sig.(*Signature)
 	replica, ok := ec.mod.Config().Replica(sig.Signer())
 	if !ok {
-		logger.Info("ecdsaCrypto: got signature from replica whose ID (%d) was not in the config.")
+		ec.mod.Logger().Info("ecdsaCrypto: got signature from replica whose ID (%d) was not in the config.")
 		return false
 	}
 	pk := replica.PublicKey().(*ecdsa.PublicKey)

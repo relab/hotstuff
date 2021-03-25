@@ -7,10 +7,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/internal/logging"
 )
-
-var logger = logging.GetLogger()
 
 // blockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
@@ -101,7 +98,7 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 	chain.pendingFetch[hash] = cancel
 
 	chain.mut.Unlock()
-	logger.Debugf("Attempting to fetch block: %.8s", hash)
+	chain.mod.Logger().Debugf("Attempting to fetch block: %.8s", hash)
 	block, ok = chain.mod.Config().Fetch(ctx, hash)
 	chain.mut.Lock()
 

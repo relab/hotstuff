@@ -7,10 +7,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/internal/logging"
 )
-
-var logger = logging.GetLogger()
 
 // Synchronizer is a dumb implementation of the hotstuff.ViewSynchronizer interface.
 // It does not do anything to ensure synchronization, it simply makes the local replica
@@ -96,10 +93,10 @@ func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
 }
 
 func (s *Synchronizer) onLocalTimeout() {
-	logger.Debugf("OnLocalTimeout: %v", s.currentView)
+	s.mod.Logger().Debugf("OnLocalTimeout: %v", s.currentView)
 	sig, err := s.mod.Signer().Sign(s.currentView.ToHash())
 	if err != nil {
-		logger.Warnf("Failed to sign view: %v", err)
+		s.mod.Logger().Warnf("Failed to sign view: %v", err)
 		return
 	}
 	timeoutMsg := hotstuff.TimeoutMsg{
@@ -127,7 +124,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	if !verifier.Verify(timeout.Signature, timeout.View.ToHash()) {
 		return
 	}
-	logger.Debug("OnRemoteTimeout: ", timeout)
+	s.mod.Logger().Debug("OnRemoteTimeout: ", timeout)
 
 	// This has to be done in this function instead of onLocalTimeout in order to avoid
 	// race conditions.
@@ -160,7 +157,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	signer := s.mod.Signer()
 	tc, err := signer.CreateTimeoutCert(s.currentView, timeoutList)
 	if err != nil {
-		logger.Debugf("Failed to create timeout certificate: %v", err)
+		s.mod.Logger().Debugf("Failed to create timeout certificate: %v", err)
 		return
 	}
 	delete(s.timeouts, timeout.View)

@@ -1,13 +1,6 @@
 package chainedhotstuff
 
-import (
-	"context"
-
-	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/internal/logging"
-)
-
-var logger = logging.GetLogger()
+import "github.com/relab/hotstuff"
 
 type chainedhotstuff struct {
 	mod *hotstuff.HotStuff
@@ -20,8 +13,6 @@ type chainedhotstuff struct {
 	bLeaf    *hotstuff.Block     // the last proposed block
 	highQC   hotstuff.QuorumCert // the highest qc known to this replica
 
-	fetchCancel context.CancelFunc
-
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
 }
 
@@ -29,7 +20,6 @@ type chainedhotstuff struct {
 func New() hotstuff.Consensus {
 	hs := &chainedhotstuff{}
 	hs.verifiedVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
-	hs.fetchCancel = func() {}
 	hs.bLock = hotstuff.GetGenesis()
 	hs.bExec = hotstuff.GetGenesis()
 	hs.bLeaf = hotstuff.GetGenesis()
@@ -42,7 +32,7 @@ func (hs *chainedhotstuff) InitModule(mod *hotstuff.HotStuff) {
 	var err error
 	hs.highQC, err = hs.mod.Signer().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
 	if err != nil {
-		logger.Panicf("Failed to create QC for genesis block!")
+		hs.mod.Logger().Panicf("Failed to create QC for genesis block!")
 	}
 }
 
@@ -80,21 +70,21 @@ func (hs *chainedhotstuff) UpdateHighQC(qc hotstuff.QuorumCert) {
 
 // updateHighQC differs from the exported version because it does not lock the mutex.
 func (hs *chainedhotstuff) updateHighQC(qc hotstuff.QuorumCert) {
-	logger.Debugf("updateHighQC: %v", qc)
+	hs.mod.Logger().Debugf("updateHighQC: %v", qc)
 	if !hs.mod.Verifier().VerifyQuorumCert(qc) {
-		logger.Info("updateHighQC: QC could not be verified!")
+		hs.mod.Logger().Info("updateHighQC: QC could not be verified!")
 		return
 	}
 
 	newBlock, ok := hs.mod.BlockChain().Get(qc.BlockHash())
 	if !ok {
-		logger.Info("updateHighQC: Could not find block referenced by new QC!")
+		hs.mod.Logger().Info("updateHighQC: Could not find block referenced by new QC!")
 		return
 	}
 
 	oldBlock, ok := hs.mod.BlockChain().Get(hs.highQC.BlockHash())
 	if !ok {
-		logger.Panic("Block from the old highQC missing from chain")
+		hs.mod.Logger().Panic("Block from the old highQC missing from chain")
 	}
 
 	if newBlock.View() > oldBlock.View() {
@@ -112,7 +102,7 @@ func (hs *chainedhotstuff) commit(block *hotstuff.Block) {
 			// don't execute dummy nodes
 			return
 		}
-		logger.Debug("EXEC: ", block)
+		hs.mod.Logger().Debug("EXEC: ", block)
 		hs.mod.Executor().Exec(block.Command())
 	}
 }
@@ -130,7 +120,7 @@ func (hs *chainedhotstuff) update(block *hotstuff.Block) {
 		return
 	}
 
-	logger.Debug("PRE_COMMIT: ", block1)
+	hs.mod.Logger().Debug("PRE_COMMIT: ", block1)
 	hs.updateHighQC(block.QuorumCert())
 
 	block2, ok := hs.qcRef(block1.QuorumCert())
@@ -139,7 +129,7 @@ func (hs *chainedhotstuff) update(block *hotstuff.Block) {
 	}
 
 	if block2.View() > hs.bLock.View() {
-		logger.Debug("COMMIT: ", block2)
+		hs.mod.Logger().Debug("COMMIT: ", block2)
 		hs.bLock = block2
 	}
 
@@ -149,7 +139,7 @@ func (hs *chainedhotstuff) update(block *hotstuff.Block) {
 	}
 
 	if block1.Parent() == block2.Hash() && block2.Parent() == block3.Hash() {
-		logger.Debug("DECIDE: ", block3)
+		hs.mod.Logger().Debug("DECIDE: ", block3)
 		hs.commit(block3)
 		hs.bExec = block3
 	}
@@ -157,7 +147,7 @@ func (hs *chainedhotstuff) update(block *hotstuff.Block) {
 
 // Propose proposes the given command
 func (hs *chainedhotstuff) Propose() {
-	logger.Debug("Propose")
+	hs.mod.Logger().Debug("Propose")
 
 	cmd := hs.mod.CommandQueue().GetCommand()
 	// TODO: Should probably use channels/contexts here instead such that
@@ -179,15 +169,15 @@ func (hs *chainedhotstuff) Propose() {
 // OnPropose handles an incoming proposal
 func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	block := proposal.Block
-	logger.Debug("OnPropose: ", block)
+	hs.mod.Logger().Debug("OnPropose: ", block)
 
 	if proposal.ID != hs.mod.LeaderRotation().GetLeader(block.View()) {
-		logger.Info("OnPropose: block was not proposed by the expected leader")
+		hs.mod.Logger().Info("OnPropose: block was not proposed by the expected leader")
 		return
 	}
 
 	if block.View() < hs.mod.ViewSynchronizer().View() {
-		logger.Info("OnPropose: block view was less than our view")
+		hs.mod.Logger().Info("OnPropose: block view was less than our view")
 		return
 	}
 
@@ -197,7 +187,7 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	if haveQCBlock && qcBlock.View() > hs.bLock.View() {
 		safe = true
 	} else {
-		logger.Debug("OnPropose: liveness condition failed")
+		hs.mod.Logger().Debug("OnPropose: liveness condition failed")
 		// check if this block extends bLock
 		b := block
 		ok := true
@@ -207,27 +197,25 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 		if ok && b.Hash() == hs.bLock.Hash() {
 			safe = true
 		} else {
-			logger.Debug("OnPropose: safety condition failed")
+			hs.mod.Logger().Debug("OnPropose: safety condition failed")
 		}
 	}
 
 	if !safe {
-		logger.Info("OnPropose: block not safe")
+		hs.mod.Logger().Info("OnPropose: block not safe")
 		return
 	}
 
 	if !hs.mod.Acceptor().Accept(block.Command()) {
-		logger.Info("OnPropose: command not accepted")
+		hs.mod.Logger().Info("OnPropose: command not accepted")
 		return
 	}
 
-	// cancel the last fetch
-	hs.fetchCancel()
 	hs.mod.BlockChain().Store(block)
 
 	pc, err := hs.mod.Signer().CreatePartialCert(block)
 	if err != nil {
-		logger.Error("OnPropose: failed to sign vote: ", err)
+		hs.mod.Logger().Error("OnPropose: failed to sign vote: ", err)
 		return
 	}
 
@@ -247,7 +235,7 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 
 	leader, ok := hs.mod.Config().Replica(leaderID)
 	if !ok {
-		logger.Warnf("Replica with ID %d was not found!", leaderID)
+		hs.mod.Logger().Warnf("Replica with ID %d was not found!", leaderID)
 		return
 	}
 
@@ -271,7 +259,7 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 	}()
 
 	cert := vote.PartialCert
-	logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
+	hs.mod.Logger().Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
 
 	var (
 		block *hotstuff.Block
@@ -284,7 +272,7 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 		if !ok {
 			// if that does not work, we will try to handle this event later.
 			// hopefully, the block has arrived by then.
-			logger.Infof("Local cache miss for block: %.8s", cert.BlockHash())
+			hs.mod.Logger().Infof("Local cache miss for block: %.8s", cert.BlockHash())
 			vote.Deferred = true
 			hs.mod.EventLoop().AwaitEvent(hotstuff.ProposeMsg{}, vote)
 			return
@@ -293,7 +281,7 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 		// if the block has not arrived at this point we will try to fetch it.
 		block, ok = hs.mod.BlockChain().Get(cert.BlockHash())
 		if !ok {
-			logger.Debugf("Could not find block for vote: %.8s.", cert.BlockHash())
+			hs.mod.Logger().Debugf("Could not find block for vote: %.8s.", cert.BlockHash())
 			return
 		}
 	}
@@ -304,7 +292,7 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 	}
 
 	if !hs.mod.Verifier().VerifyPartialCert(cert) {
-		logger.Info("OnVote: Vote could not be verified!")
+		hs.mod.Logger().Info("OnVote: Vote could not be verified!")
 		return
 	}
 
@@ -318,7 +306,7 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 
 	qc, err := hs.mod.Signer().CreateQuorumCert(block, votes)
 	if err != nil {
-		logger.Info("OnVote: could not create QC for block: ", err)
+		hs.mod.Logger().Info("OnVote: could not create QC for block: ", err)
 		return
 	}
 	delete(hs.verifiedVotes, cert.BlockHash())
