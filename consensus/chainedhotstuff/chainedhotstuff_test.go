@@ -19,13 +19,10 @@ func TestPropose(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	hs := New()
 	builder := testutil.TestModules(t, ctrl, 1, testutil.GenerateKey(t))
-	synchronizer := mocks.NewMockViewSynchronizer(ctrl)
+	synchronizer := synchronizer.New(testutil.FixedTimeout(time.Second))
 	cfg, replicas := testutil.CreateMockConfigWithReplicas(t, ctrl, 2)
 	builder.Register(hs, cfg, testutil.NewLeaderRotation(t, 1, 2), synchronizer)
 	builder.Build()
-
-	synchronizer.EXPECT().AdvanceView(gomock.AssignableToTypeOf(hotstuff.SyncInfo{})).AnyTimes()
-	synchronizer.EXPECT().View().AnyTimes().Return(hotstuff.View(1))
 
 	// RULES:
 
