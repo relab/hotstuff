@@ -3,6 +3,7 @@ package testutil
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
 	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
+	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/mocks"
 )
 
@@ -49,6 +51,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 	synchronizer.EXPECT().Stop().AnyTimes()
 
 	builder.Register(
+		logging.New(fmt.Sprintf("hs%d", id)),
 		blockchain.New(100),
 		mocks.NewMockConsensus(ctrl),
 		leaderrotation.NewFixed(1),
