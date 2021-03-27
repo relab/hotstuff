@@ -38,6 +38,7 @@ func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff) {
 // New creates a new Synchronizer.
 func New(timeout hotstuff.ExponentialTimeout) hotstuff.ViewSynchronizer {
 	return &Synchronizer{
+		viewCtx:      context.Background(),
 		cancelCtx:    func() {},
 		currentView:  1,
 		latestCommit: 0,
