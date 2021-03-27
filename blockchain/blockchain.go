@@ -109,6 +109,8 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 		goto done
 	}
 
+	chain.mod.Logger().Debugf("Successfully fetched block: %.8s", hash)
+
 	chain.makeSpace()
 	elem = chain.accessOrder.PushFront(block)
 	chain.blocks[hash] = elem

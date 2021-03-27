@@ -17,7 +17,6 @@ import (
 
 type gorumsReplica struct {
 	node          *proto.Node
-	eventChan     *gorums.Channel
 	id            hotstuff.ID
 	pubKey        hotstuff.PublicKey
 	voteCancel    context.CancelFunc
@@ -43,7 +42,7 @@ func (r *gorumsReplica) Vote(cert hotstuff.PartialCert) {
 	r.voteCancel()
 	ctx, r.voteCancel = context.WithCancel(context.Background())
 	pCert := proto.PartialCertToProto(cert)
-	r.node.Vote(ctx, pCert, r.eventChan, gorums.WithNoSendWaiting())
+	r.node.Vote(ctx, pCert, gorums.WithNoSendWaiting())
 }
 
 // NewView sends the quorum certificate to the other replica.
@@ -54,7 +53,7 @@ func (r *gorumsReplica) NewView(msg hotstuff.SyncInfo) {
 	var ctx context.Context
 	r.newviewCancel()
 	ctx, r.newviewCancel = context.WithCancel(context.Background())
-	r.node.NewView(ctx, proto.SyncInfoToProto(msg), r.eventChan, gorums.WithNoSendWaiting())
+	r.node.NewView(ctx, proto.SyncInfoToProto(msg), gorums.WithNoSendWaiting())
 }
 
 // Config holds information about the current configuration of replicas that participate in the protocol,
@@ -67,7 +66,6 @@ type Config struct {
 	cfg           *proto.Configuration
 	privKey       hotstuff.PrivateKey
 	replicas      map[hotstuff.ID]hotstuff.Replica
-	eventChans    []*gorums.Channel
 	proposeCancel context.CancelFunc
 	timeoutCancel context.CancelFunc
 }
@@ -138,16 +136,10 @@ func (cfg *Config) Connect(connectTimeout time.Duration) error {
 		return fmt.Errorf("failed to create configuration: %w", err)
 	}
 
-	cfg.eventChans, err = cfg.cfg.NewChannels()
-	if err != nil {
-		return fmt.Errorf("failed to create channels: %v", err)
-	}
-
-	for i, node := range cfg.cfg.Nodes() {
+	for _, node := range cfg.cfg.Nodes() {
 		id := hotstuff.ID(node.ID())
 		replica := cfg.replicas[id].(*gorumsReplica)
 		replica.node = node
-		replica.eventChan = cfg.eventChans[i]
 	}
 
 	return nil
@@ -193,7 +185,7 @@ func (cfg *Config) Propose(block *hotstuff.Block) {
 	cfg.proposeCancel()
 	ctx, cfg.proposeCancel = context.WithCancel(context.Background())
 	pBlock := proto.BlockToProto(block)
-	cfg.cfg.Propose(ctx, pBlock, cfg.eventChans, gorums.WithNoSendWaiting())
+	cfg.cfg.Propose(ctx, pBlock, gorums.WithNoSendWaiting())
 }
 
 // Timeout sends the timeout message to all replicas.
@@ -204,7 +196,7 @@ func (cfg *Config) Timeout(msg hotstuff.TimeoutMsg) {
 	var ctx context.Context
 	cfg.timeoutCancel()
 	ctx, cfg.timeoutCancel = context.WithCancel(context.Background())
-	cfg.cfg.Timeout(ctx, proto.TimeoutMsgToProto(msg), cfg.eventChans, gorums.WithNoSendWaiting())
+	cfg.cfg.Timeout(ctx, proto.TimeoutMsgToProto(msg), gorums.WithNoSendWaiting())
 }
 
 // Fetch requests a block from all the replicas in the configuration
