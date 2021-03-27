@@ -5,6 +5,7 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -34,16 +35,17 @@ func (m *MockCommandQueue) EXPECT() *MockCommandQueueMockRecorder {
 	return m.recorder
 }
 
-// GetCommand mocks base method.
-func (m *MockCommandQueue) GetCommand() *hotstuff.Command {
+// Get mocks base method.
+func (m *MockCommandQueue) Get(arg0 context.Context) (hotstuff.Command, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCommand")
-	ret0, _ := ret[0].(*hotstuff.Command)
-	return ret0
+	ret := m.ctrl.Call(m, "Get", arg0)
+	ret0, _ := ret[0].(hotstuff.Command)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
 }
 
-// GetCommand indicates an expected call of GetCommand.
-func (mr *MockCommandQueueMockRecorder) GetCommand() *gomock.Call {
+// Get indicates an expected call of Get.
+func (mr *MockCommandQueueMockRecorder) Get(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCommand", reflect.TypeOf((*MockCommandQueue)(nil).GetCommand))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockCommandQueue)(nil).Get), arg0)
 }

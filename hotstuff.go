@@ -374,8 +374,10 @@ type Module interface {
 
 // CommandQueue is a queue of commands to be proposed.
 type CommandQueue interface {
-	// GetCommand returns the next command to be proposed.
-	GetCommand() *Command
+	// Get returns the next command to be proposed.
+	// It may run until the context is cancelled.
+	// If no command is available, the 'ok' return value should be false.
+	Get(ctx context.Context) (cmd Command, ok bool)
 }
 
 //go:generate mockgen -destination=internal/mocks/acceptor_mock.go -package=mocks . Acceptor

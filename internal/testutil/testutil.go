@@ -2,6 +2,7 @@
 package testutil
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"net"
@@ -31,10 +32,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 	executor.EXPECT().Exec(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes()
 
 	commandQ := mocks.NewMockCommandQueue(ctrl)
-	commandQ.EXPECT().GetCommand().AnyTimes().DoAndReturn(func() *hotstuff.Command {
-		cmd := hotstuff.Command("foo")
-		return &cmd
-	})
+	commandQ.EXPECT().Get(gomock.Any()).AnyTimes().Return(hotstuff.Command("foo"), true)
 
 	signer, verifier := ecdsacrypto.NewWithCache(10)
 
@@ -49,6 +47,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 	synchronizer := mocks.NewMockViewSynchronizer(ctrl)
 	synchronizer.EXPECT().Start().AnyTimes()
 	synchronizer.EXPECT().Stop().AnyTimes()
+	synchronizer.EXPECT().ViewContext().AnyTimes().Return(context.Background())
 
 	builder.Register(
 		logging.New(fmt.Sprintf("hs%d", id)),

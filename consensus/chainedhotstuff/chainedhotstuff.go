@@ -149,16 +149,11 @@ func (hs *chainedhotstuff) update(block *hotstuff.Block) {
 func (hs *chainedhotstuff) Propose() {
 	hs.mod.Logger().Debug("Propose")
 
-	cmd := hs.mod.CommandQueue().GetCommand()
-	// TODO: Should probably use channels/contexts here instead such that
-	// a proposal can be made a little later if a new command is added to the queue.
-	// Alternatively, we could let the pacemaker know when commands arrive, so that it
-	// can rall Propose() again.
-	if cmd == nil {
-		// return
-		cmd = new(hotstuff.Command)
+	cmd, ok := hs.mod.CommandQueue().Get(hs.mod.ViewSynchronizer().ViewContext())
+	if !ok {
+		return
 	}
-	block := hotstuff.NewBlock(hs.bLeaf.Hash(), hs.highQC, *cmd, hs.mod.ViewSynchronizer().View(), hs.mod.ID())
+	block := hotstuff.NewBlock(hs.bLeaf.Hash(), hs.highQC, cmd, hs.mod.ViewSynchronizer().View(), hs.mod.ID())
 	hs.mod.BlockChain().Store(block)
 
 	hs.mod.Config().Propose(block)
