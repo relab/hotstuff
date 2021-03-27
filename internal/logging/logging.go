@@ -27,6 +27,7 @@ type Logger interface {
 	Warnf(template string, args ...interface{})
 }
 
+// New returns a new logger with the given name.
 func New(name string) Logger {
 	var config zap.Config
 	if strings.ToLower(os.Getenv("HOTSTUFF_LOG_TYPE")) == "json" {

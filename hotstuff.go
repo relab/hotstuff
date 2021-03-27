@@ -227,6 +227,7 @@ func (hs *HotStuff) PrivateKey() PrivateKey {
 	return hs.privateKey
 }
 
+// Logger returns the logger.
 func (hs *HotStuff) Logger() logging.Logger {
 	return hs.logger
 }
