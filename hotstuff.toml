@@ -1,4 +1,4 @@
-pacemaker = "fixed"
+pacemaker = "round-robin"
 leader-id = 1
 root-cas = ["keys/ca.crt"]
 
