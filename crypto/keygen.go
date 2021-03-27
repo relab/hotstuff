@@ -7,10 +7,13 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/relab/hotstuff"
@@ -236,4 +239,104 @@ func ReadCertFile(certFile string) (cert *x509.Certificate, err error) {
 	}
 
 	return cert, nil
+}
+
+// GenerateConfiguration creates keys and certificates for a configuration of 'n' replicas.
+// The keys and certificates are saved in the directory specified by 'dest'.
+// 'firstID' specifies the ID of the first replica in the configuration.
+// The last ID will be 'firstID' + 'n'.
+// 'pattern' describes the pattern for naming of key files.
+// For example, '*.key' would result in private keys with the name '1.key', if '1' is the starting ID.
+// 'hosts' specify the hosts for which the generated certificates should be valid.
+// If len('hosts') is 1, then all certificates will be valid for the same host.
+// If not, one of the hosts specified in 'hosts' will be used for each replica.
+func GenerateConfiguration(dest string, tls bool, firstID, n int, pattern string, hosts []string) error {
+	info, err := os.Stat(dest)
+	if errors.Is(err, os.ErrNotExist) {
+		err = os.MkdirAll(dest, 0755)
+		if err != nil {
+			return fmt.Errorf("cannot create '%s' directory: %w", dest, err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("cannot Stat '%s': %w", dest, err)
+	} else if !info.IsDir() {
+		return fmt.Errorf("destination '%s' is not a directory", dest)
+	}
+
+	if tls && len(hosts) > 1 && len(hosts) != n {
+		return fmt.Errorf("you must specify one host or IP for each certificate to generate")
+	}
+
+	var caKey *ecdsa.PrivateKey
+	var ca *x509.Certificate
+	if tls {
+		caKey, ca, err = createRootCA(dest)
+		if err != nil {
+			return err
+		}
+	}
+
+	for i := 0; i < n; i++ {
+		pk, err := GeneratePrivateKey()
+		if err != nil {
+			return fmt.Errorf("failed to generate key: %w", err)
+		}
+
+		basePath := filepath.Join(dest, strings.ReplaceAll(pattern, "*", fmt.Sprintf("%d", firstID+i)))
+		certPath := basePath + ".crt"
+		privKeyPath := basePath + ".key"
+		pubKeyPath := privKeyPath + ".pub"
+
+		if tls {
+			err = createTLSCert(certPath, i, hotstuff.ID(firstID+i), hosts, ca, caKey, &pk.PublicKey)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = WritePrivateKeyFile(pk, privKeyPath)
+		if err != nil {
+			return fmt.Errorf("failed to write private key file: %w", err)
+		}
+
+		err = WritePublicKeyFile(&pk.PublicKey, pubKeyPath)
+		if err != nil {
+			return fmt.Errorf("failed to write public key file: %w", err)
+		}
+	}
+	return nil
+}
+
+func createRootCA(dest string) (pk *ecdsa.PrivateKey, ca *x509.Certificate, err error) {
+	pk, err = GeneratePrivateKey()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate signing key: %w", err)
+	}
+	ca, err = GenerateRootCert(pk)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate root certificate: %w", err)
+	}
+	err = WriteCertFile(ca, filepath.Join(dest, "ca.crt"))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to write root certificate: %w", err)
+	}
+	return pk, ca, nil
+}
+
+func createTLSCert(path string, i int, id hotstuff.ID, hosts []string, ca *x509.Certificate, priv *ecdsa.PrivateKey, pub *ecdsa.PublicKey) error {
+	var host string
+	if len(hosts) == 1 {
+		host = hosts[0]
+	} else {
+		host = hosts[i]
+	}
+	cert, err := GenerateTLSCert(id, []string{host}, ca, pub, priv)
+	if err != nil {
+		return fmt.Errorf("failed to generate TLS certificate: %w", err)
+	}
+	err = WriteCertFile(cert, path)
+	if err != nil {
+		return fmt.Errorf("failed to write certificate to file: %w", err)
+	}
+	return nil
 }
