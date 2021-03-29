@@ -23,7 +23,7 @@ func TestHotStuff(t *testing.T) {
 	t.Cleanup(func() {
 		err := os.RemoveAll(testdir)
 		if err != nil {
-			t.Error(err)
+			t.Log(err)
 		}
 	})
 
@@ -55,16 +55,25 @@ func TestHotStuff(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	c := make(chan struct{}, len(replicas))
 	for _, replica := range replicas {
 		conf := *serverConf
 		conf.SelfID = replica.ID
 		conf.Privkey = fmt.Sprintf("%s/keys/%d.key", testdir, replica.ID)
 		conf.Output = fmt.Sprintf("%s/%d.out", testdir, replica.ID)
-		go runServer(ctx, &conf)
+		go func() {
+			runServer(ctx, &conf)
+			c <- struct{}{}
+		}()
 	}
 
 	runClient(ctx, clientConf)
 	cancel()
+
+	// make sure all replicas get to stop and close their output files
+	for range replicas {
+		<-c
+	}
 
 	inputHash := hashFile(t, path.Join(testdir, "input"))
 	for _, replica := range replicas {
@@ -85,6 +94,12 @@ func generateKeys(t *testing.T, path string) {
 func generateInput(t *testing.T, path string) {
 	t.Helper()
 	inputFile, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	defer func() {
+		err := inputFile.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 	if err != nil {
 		t.Fatal(err)
 	}
