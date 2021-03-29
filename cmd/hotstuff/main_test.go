@@ -47,8 +47,9 @@ func TestSMR(t *testing.T) {
 		Input:       path.Join(testdir, "input"),
 		PayloadSize: 100,
 		MaxInflight: 100,
-		BatchSize:   10,
 		Replicas:    replicas,
+		RootCAs:     []string{path.Join(testdir, "keys", "ca.crt")},
+		TLS:         true,
 	}
 
 	serverConf := &options{
@@ -56,6 +57,8 @@ func TestSMR(t *testing.T) {
 		PmType:      "round-robin",
 		Replicas:    replicas,
 		ViewTimeout: 100,
+		RootCAs:     []string{path.Join(testdir, "keys", "ca.crt")},
+		TLS:         true,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -65,6 +68,7 @@ func TestSMR(t *testing.T) {
 		conf := *serverConf
 		conf.SelfID = replica.ID
 		conf.Privkey = fmt.Sprintf("%s/keys/%d.key", testdir, replica.ID)
+		conf.Cert = fmt.Sprintf("%s/keys/%d.crt", testdir, replica.ID)
 		conf.Output = fmt.Sprintf("%s/%d.out", testdir, replica.ID)
 		go func() {
 			runServer(ctx, &conf)
