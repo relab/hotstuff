@@ -9,20 +9,24 @@
 
 ## Running the examples
 
-We have written an example client located in `cmd/hotstuffclient` and an example server located in `cmd/hotstuffserver`.
-These can be compiled by running `make`.
+We have written an example client and server, which can be started using the `cmd/hotstuff` program.
+They can be compiled by running `make`.
 They read a configuration file named `hotstuff.toml` from the working directory.
 An example configuration that runs on localhost is included in the root of the project.
-To generate public and private keys for the servers, run `cmd/hotstuffkeygen/hotstuffkeygen -p 'r*' -n 4 --hosts 127.0.0.1 --tls keys`.
+To generate public and private keys for the servers, run:
+
+```shell
+cmd/hotstuffkeygen/hotstuffkeygen -p 'r*' -n 4 --hosts 127.0.0.1 --tls keys
+```
+
 To start four servers, run `scripts/run_servers.sh` with any desired options.
-To start the client, run `cmd/hotstuffclient/hotstuffclient`.
+To start the client, run `cmd/hotstuff/hotstuff`.
 
 ## TODO
 
 * Further benchmarking and testing
 * Improving performance
   * Allow leaders to send command hashes instead of resending whole commands.
-* Allow a replica to "catch up" by fetching missing nodes
 * Add reconfiguration
 
 ## References
