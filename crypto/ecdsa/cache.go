@@ -3,7 +3,6 @@ package ecdsa
 import (
 	"container/list"
 	"sync"
-	"sync/atomic"
 
 	"github.com/relab/hotstuff"
 )
@@ -131,7 +130,7 @@ func (c *signatureCache) verifyAggregateSignature(agg aggregateSignature, hash h
 	}
 
 	var wg sync.WaitGroup
-	var numValid uint32
+	var numValid int
 
 	// first check if any signatures are cache
 	c.mut.Lock()
@@ -145,8 +144,8 @@ func (c *signatureCache) verifyAggregateSignature(agg aggregateSignature, hash h
 		wg.Add(1)
 		go func(sig *Signature) {
 			if c.ecdsaCrypto.Verify(sig, hash) {
-				atomic.AddUint32(&numValid, 1)
 				c.mut.Lock()
+				numValid++
 				c.insert(string(sig.ToBytes()))
 				c.mut.Unlock()
 			}
@@ -156,7 +155,7 @@ func (c *signatureCache) verifyAggregateSignature(agg aggregateSignature, hash h
 	c.mut.Unlock()
 
 	wg.Wait()
-	return numValid >= uint32(c.ecdsaCrypto.mod.Config().QuorumSize())
+	return numValid >= c.ecdsaCrypto.mod.Config().QuorumSize()
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
