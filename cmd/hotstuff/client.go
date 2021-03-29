@@ -10,8 +10,6 @@ import (
 	"log"
 	"math"
 	"os"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
@@ -70,6 +68,7 @@ func runClient(ctx context.Context, conf *options) {
 		os.Exit(1)
 	}
 
+	go client.handleCommands(ctx)
 	err = client.SendCommands(ctx)
 	if err != nil && !errors.Is(err, io.EOF) {
 		fmt.Fprintf(os.Stderr, "Failed to send commands: %v\n", err)
@@ -115,16 +114,24 @@ func (q *qspec) ExecCommandQF(_ *client.Command, signatures map[uint32]*empty.Em
 	return &empty.Empty{}, true
 }
 
+type pendingCmd struct {
+	sequenceNumber uint64
+	sendTime       time.Time
+	promise        *client.AsyncEmpty
+}
+
 type hotstuffClient struct {
-	inflight      uint64
-	reader        io.Reader
 	conf          *options
-	mgr           *client.Manager
 	replicaConfig *config.ReplicaConfig
+	mgr           *client.Manager
 	gorumsConfig  *client.Configuration
-	wg            sync.WaitGroup
-	stats         benchmark.Stats       // records latency and throughput
-	data          *client.BenchmarkData // stores time and duration for each command
+
+	highestCommitted uint64 // highest sequence number acknowledged by the replicas
+	pendingCmds      chan pendingCmd
+	done             chan struct{}
+	reader           io.Reader
+	stats            benchmark.Stats       // records latency and throughput
+	data             *client.BenchmarkData // stores time and duration for each command
 }
 
 func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hotstuffClient, error) {
@@ -152,11 +159,14 @@ func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hot
 	}
 
 	client := &hotstuffClient{
-		conf:          conf,
-		mgr:           mgr,
-		replicaConfig: replicaConfig,
-		gorumsConfig:  gorumsConf,
-		data:          &client.BenchmarkData{},
+		conf:             conf,
+		replicaConfig:    replicaConfig,
+		mgr:              mgr,
+		gorumsConfig:     gorumsConf,
+		pendingCmds:      make(chan pendingCmd, conf.MaxInflight),
+		highestCommitted: 1,
+		done:             make(chan struct{}),
+		data:             &client.BenchmarkData{},
 	}
 
 	if conf.Input != "" {
@@ -174,7 +184,10 @@ func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hot
 func (c *hotstuffClient) Close() {
 	c.mgr.Close()
 	if closer, ok := c.reader.(io.Closer); ok {
-		closer.Close()
+		err := closer.Close()
+		if err != nil {
+			log.Println("Failed to close reader: ", err)
+		}
 	}
 }
 
@@ -184,64 +197,86 @@ func (c *hotstuffClient) GetStats() *benchmark.Result {
 
 func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 	num := uint64(1)
+	lastCommand := uint64(0)
 	var sleeptime time.Duration
 	if c.conf.RateLimit > 0 {
 		sleeptime = time.Second / time.Duration(c.conf.RateLimit)
 	}
 
 	defer c.stats.End()
-	defer c.wg.Wait()
 	c.stats.Start()
 
 	for {
-		if atomic.LoadUint64(&c.inflight) < c.conf.MaxInflight {
-			atomic.AddUint64(&c.inflight, 1)
-			data := make([]byte, c.conf.PayloadSize)
-			n, err := c.reader.Read(data)
-			if err != nil {
-				return err
-			}
-			cmd := &client.Command{
-				ClientID:       uint32(c.conf.SelfID),
-				SequenceNumber: num,
-				Data:           data[:n],
-			}
-			now := time.Now()
-			promise := c.gorumsConfig.ExecCommand(ctx, cmd)
-			num++
-
-			c.wg.Add(1)
-			go func(promise *client.AsyncEmpty, sendTime time.Time) {
-				_, err := promise.Get()
-				atomic.AddUint64(&c.inflight, ^uint64(0))
-				if err != nil {
-					qcError, ok := err.(gorums.QuorumCallError)
-					if !ok || qcError.Reason != context.Canceled.Error() {
-						log.Printf("Did not get enough replies for command: %v\n", err)
-					}
-				}
-				duration := time.Since(sendTime)
-				c.stats.AddLatency(duration)
-				if c.conf.Benchmark {
-					c.data.Stats = append(c.data.Stats, &client.CommandStats{
-						StartTime: timestamppb.New(sendTime),
-						Duration:  durationpb.New(duration),
-					})
-				}
-				c.wg.Done()
-			}(promise, now)
+		if ctx.Err() != nil {
+			break
 		}
+
+		if lastCommand == c.highestCommitted {
+			break
+		}
+
+		data := make([]byte, c.conf.PayloadSize)
+		n, err := c.reader.Read(data)
+		if err != nil && err != io.EOF {
+			// if we get an error other than
+			return err
+		} else if err == io.EOF && n == 0 && lastCommand == 0 {
+			lastCommand = num
+		}
+
+		cmd := &client.Command{
+			ClientID:       uint32(c.conf.SelfID),
+			SequenceNumber: num,
+			Data:           data[:n],
+		}
+
+		promise := c.gorumsConfig.ExecCommand(ctx, cmd)
+
+		num++
+		c.pendingCmds <- pendingCmd{sequenceNumber: num, sendTime: time.Now(), promise: promise}
 
 		if c.conf.RateLimit > 0 {
 			time.Sleep(sleeptime)
 		}
 
-		err := ctx.Err()
-		if errors.Is(err, context.Canceled) {
-			return nil
+	}
+	return nil
+}
+
+// handleCommands will get pending commands from the pendingCmds channel and then
+// handle them as they become acknowledged by the replicas. We expect the commands to be
+// acknowledged in the order that they were sent.
+func (c *hotstuffClient) handleCommands(ctx context.Context) {
+	for {
+		var (
+			cmd pendingCmd
+			ok  bool
+		)
+		select {
+		case cmd, ok = <-c.pendingCmds:
+			if !ok {
+				return
+			}
+		case <-ctx.Done():
+			return
 		}
+		_, err := cmd.promise.Get()
 		if err != nil {
-			return err
+			qcError, ok := err.(gorums.QuorumCallError)
+			if !ok || qcError.Reason != context.Canceled.Error() {
+				log.Printf("Did not get enough replies for command: %v\n", err)
+			}
+		}
+		if cmd.sequenceNumber > c.highestCommitted {
+			c.highestCommitted = cmd.sequenceNumber
+		}
+		duration := time.Since(cmd.sendTime)
+		c.stats.AddLatency(duration)
+		if c.conf.Benchmark {
+			c.data.Stats = append(c.data.Stats, &client.CommandStats{
+				StartTime: timestamppb.New(cmd.sendTime),
+				Duration:  durationpb.New(duration),
+			})
 		}
 	}
 }
