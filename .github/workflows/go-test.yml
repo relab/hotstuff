@@ -23,4 +23,18 @@ jobs:
       - name: Download dependencies
         run: go mod download
       - name: Test
-        run: go test -v -timeout 60s ./...
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            go test -v -timeout 60s -coverpkg=./... -coverprofile=coverage.tmp.txt -covermode=atomic ./...
+            grep -v -E ".pb.go|_mock.go" coverage.tmp.txt > coverage.txt
+          else
+            go test -v -timeout 60s ./...
+          fi
+        shell: bash
+      - name: Upload code coverage report
+        if: runner.os == 'Linux'
+        uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.txt
+          flags: unittests
