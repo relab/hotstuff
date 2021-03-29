@@ -65,11 +65,6 @@ func (hs *chainedhotstuff) CreateDummy() {
 
 // UpdateHighQC updates HighQC if the given qc is higher than the old HighQC.
 func (hs *chainedhotstuff) UpdateHighQC(qc hotstuff.QuorumCert) {
-	hs.updateHighQC(qc)
-}
-
-// updateHighQC differs from the exported version because it does not lock the mutex.
-func (hs *chainedhotstuff) updateHighQC(qc hotstuff.QuorumCert) {
 	hs.mod.Logger().Debugf("updateHighQC: %v", qc)
 	if !hs.mod.Verifier().VerifyQuorumCert(qc) {
 		hs.mod.Logger().Info("updateHighQC: QC could not be verified!")
@@ -121,7 +116,7 @@ func (hs *chainedhotstuff) update(block *hotstuff.Block) {
 	}
 
 	hs.mod.Logger().Debug("PRE_COMMIT: ", block1)
-	hs.updateHighQC(block.QuorumCert())
+	hs.UpdateHighQC(block.QuorumCert())
 
 	block2, ok := hs.qcRef(block1.QuorumCert())
 	if !ok {
@@ -305,7 +300,7 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 		return
 	}
 	delete(hs.verifiedVotes, cert.BlockHash())
-	hs.updateHighQC(qc)
+	hs.UpdateHighQC(qc)
 
 	// signal the synchronizer
 	hs.mod.ViewSynchronizer().AdvanceView(hotstuff.SyncInfo{QC: qc})
