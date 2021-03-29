@@ -181,6 +181,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 			s.highTC = syncInfo.TC
 		}
 	} else {
+		s.mod.Consensus().UpdateHighQC(syncInfo.QC)
 		b, ok := s.mod.BlockChain().Get(syncInfo.QC.BlockHash())
 		if !ok {
 			return
