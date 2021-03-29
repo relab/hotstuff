@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -14,6 +15,22 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
 )
+
+var (
+	batchSize   int
+	payloadSize int
+	fileSize    int
+)
+
+func TestMain(m *testing.M) {
+	flag.IntVar(&batchSize, "batch-size", 50, "The number of commands to batch together for each block.")
+	flag.IntVar(&payloadSize, "payload-size", 10, "The size (in bytes) of each command.")
+	flag.IntVar(&fileSize, "file-size", 100000, "The size (in bytes) of the input file.")
+	flag.Parse()
+
+	rc := m.Run()
+	os.Exit(rc)
+}
 
 // TestSMR verifies that SMR works correctly. We run four replicas and a single client,
 // and then feed a random input to the replicas. Afterwards, we compare each replica's output
@@ -35,15 +52,15 @@ func TestSMR(t *testing.T) {
 	clientConf := &options{
 		SelfID:      1,
 		Input:       path.Join(testdir, "input"),
-		PayloadSize: 100,
-		MaxInflight: 100,
+		PayloadSize: payloadSize,
+		MaxInflight: uint64(4 * batchSize),
 		Replicas:    replicas,
 		RootCAs:     []string{path.Join(testdir, "keys", "ca.crt")},
 		TLS:         true,
 	}
 
 	serverConf := &options{
-		BatchSize:   10,
+		BatchSize:   batchSize,
 		PmType:      "round-robin",
 		Replicas:    replicas,
 		ViewTimeout: 100,
@@ -131,7 +148,7 @@ func generateInput(t *testing.T, path string) {
 	}
 
 	// create some input data to replicate
-	_, err = io.CopyN(inputFile, rand.Reader, 1000)
+	_, err = io.CopyN(inputFile, rand.Reader, int64(fileSize))
 	if err != nil {
 		t.Fatal(err)
 	}
