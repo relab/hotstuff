@@ -10,6 +10,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
@@ -31,8 +32,11 @@ func runClient(ctx context.Context, conf *options) {
 	if conf.TLS {
 		rootCAs, err := x509.SystemCertPool()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to get system cert pool: %v\n", err)
-			os.Exit(1)
+			// system cert pool is unavailable on windows
+			if runtime.GOOS != "windows" {
+				fmt.Fprintf(os.Stderr, "Failed to get system cert pool: %v\n", err)
+			}
+			rootCAs = x509.NewCertPool()
 		}
 		for _, ca := range conf.RootCAs {
 			cert, err := os.ReadFile(ca)

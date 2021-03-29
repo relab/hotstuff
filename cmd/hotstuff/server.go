@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -99,8 +100,11 @@ func loadCreds(conf *options) (credentials.TransportCredentials, tls.Certificate
 
 	rootCAs, err := x509.SystemCertPool()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to get system cert pool: %v\n", err)
-		os.Exit(1)
+		// system cert pool is unavailable on windows
+		if runtime.GOOS != "windows" {
+			fmt.Fprintf(os.Stderr, "Failed to get system cert pool: %v\n", err)
+		}
+		rootCAs = x509.NewCertPool()
 	}
 
 	for _, ca := range conf.RootCAs {
