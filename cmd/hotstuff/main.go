@@ -13,6 +13,14 @@ import (
 	"github.com/spf13/pflag"
 )
 
+type replica struct {
+	ID         hotstuff.ID
+	PeerAddr   string `mapstructure:"peer-address"`
+	ClientAddr string `mapstructure:"client-address"`
+	Pubkey     string
+	Cert       string
+}
+
 type options struct {
 	BatchSize       int         `mapstructure:"batch-size"`
 	Benchmark       bool        `mapstructure:"benchmark"`
@@ -33,13 +41,7 @@ type options struct {
 	SelfID          hotstuff.ID `mapstructure:"self-id"`
 	TLS             bool
 	ViewTimeout     int `mapstructure:"view-timeout"`
-	Replicas        []struct {
-		ID         hotstuff.ID
-		PeerAddr   string `mapstructure:"peer-address"`
-		ClientAddr string `mapstructure:"client-address"`
-		Pubkey     string
-		Cert       string
-	}
+	Replicas        []replica
 }
 
 func usage() {
