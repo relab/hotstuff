@@ -19,17 +19,7 @@ import (
 // and then feed a random input to the replicas. Afterwards, we compare each replica's output
 // with the input to make sure that it got replicated correctly.
 func TestSMR(t *testing.T) {
-	testdir, err := os.MkdirTemp("", "hotstufftest")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Cleanup(func() {
-		err := os.RemoveAll(testdir)
-		if err != nil {
-			t.Log(err)
-		}
-	})
+	testdir := t.TempDir()
 
 	ports := getFreePorts(t, 8)
 	generateKeys(t, path.Join(testdir, "keys"))
