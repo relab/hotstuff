@@ -1,48 +1,6 @@
 // Package hotstuff defines the core types and interfaces that implement the HotStuff protocol.
 // These interfaces allow us to split the implementations into different modules,
 // and each module can have multiple can have multiple implementations.
-//
-// The following diagram illustrates the relationships between these interfaces:
-//
-//                  OnDeliver()------------------------+
-//                                                     |                 +--------------+
-//                  OnPropose()---------------------+  |  +--Accept()--->|   Acceptor   |
-//                                                  |  |  |              +--------------+
-//                  OnVote()---------------------+  |  |  |
-//                                               |  |  |  |              +--------------+
-//                  OnNewView()---------------+  |  |  |  |  +--Exec()-->|   Executor   |
-//                                            |  |  |  |  |  |           +--------------+
-//                                            v  v  v  v  |  |
-//  +--------------+                       +-------------------------+                  +------------------+
-//  |              |                       |                         |<--Propose()------|                  |
-//  |              |<--------Sign()--------|                         |                  |                  |
-//  |    Signer    |                       |                         |<--NewView()------|                  |
-//  |              |<--CreateQuorumCert()--|                         |                  |                  |
-//  |              |                       |                         |---OnPropose()--->| ViewSynchronizer |
-//  +--------------+                       |                         |                  |                  |
-//                                         |        Consensus        |---OnNewView()--->|                  |
-//  +--------------+                       |                         |                  |                  |
-//  |              |                       |                         |---OnFinishQC()-->|                  |
-//  |              |<--VerifyQuorumCert()--|                         |                  +------------------+
-//  |   Verifier   |                       |                         |                              |
-//  |              |<-VerifyPartialCert()--|                         |                              |
-//  |              |                       |                         |-------GetLeader()------------+
-//  +--------------+                       +-------------------------+             |
-//                                           |  |  |  |  |  |                      v
-//  +----------------+                       |  |  |  |  |  |             +----------------+
-//  |                |<----Propose()---------+  |  |  |  |  |             | LeaderRotation |
-//  |                |                          |  |  |  |  |             +----------------+
-//  |                |<----Vote()---------------+  |  |  |  |
-//  | Config/Replica |                             |  |  |  |             +----------------+
-//  |                |<----NewView()---------------+  |  |  +-Store()---->|                |
-//  |                |                                |  |                |   BlockChain   |
-//  |                |<----Fetch()--------------------+  +----Get()------>|                |
-//  +----------------+                                                    +----------------+
-//
-// The Consensus interface is the "core" of the system, and it is the part that implements the consensus algorithm.
-// The OnDeliver(), OnPropose(), OnVote(), and OnNewView() methods should be called by some backend service to
-// deliver messages to the Consensus algorithm. The Server struct in the backend/gorums package is an example of
-// such a service.
 package hotstuff
 
 import (
