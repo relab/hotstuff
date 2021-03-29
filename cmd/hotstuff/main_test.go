@@ -15,7 +15,10 @@ import (
 	"github.com/relab/hotstuff/crypto"
 )
 
-func TestHotStuff(t *testing.T) {
+// TestSMR verifies that SMR works correctly. We run four replicas and a single client,
+// and then feed a random input to the replicas. Afterwards, we compare each replica's output
+// with the input to make sure that it got replicated correctly.
+func TestSMR(t *testing.T) {
 	testdir, err := os.MkdirTemp("", "hotstufftest")
 	if err != nil {
 		t.Fatal(err)
