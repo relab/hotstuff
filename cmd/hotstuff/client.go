@@ -11,6 +11,7 @@ import (
 	"math"
 	"os"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
@@ -130,6 +131,7 @@ type hotstuffClient struct {
 	mgr           *client.Manager
 	gorumsConfig  *client.Configuration
 
+	mut              sync.Mutex
 	highestCommitted uint64 // highest sequence number acknowledged by the replicas
 	pendingCmds      chan pendingCmd
 	done             chan struct{}
@@ -215,7 +217,12 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 			break
 		}
 
-		if lastCommand == c.highestCommitted {
+		// annoyingly, we need a mutex here to prevent the data race detector from complaining.
+		c.mut.Lock()
+		shouldStop := lastCommand == c.highestCommitted
+		c.mut.Unlock()
+
+		if shouldStop {
 			break
 		}
 
@@ -271,9 +278,11 @@ func (c *hotstuffClient) handleCommands(ctx context.Context) {
 				log.Printf("Did not get enough replies for command: %v\n", err)
 			}
 		}
+		c.mut.Lock()
 		if cmd.sequenceNumber > c.highestCommitted {
 			c.highestCommitted = cmd.sequenceNumber
 		}
+		c.mut.Unlock()
 		duration := time.Since(cmd.sendTime)
 		c.stats.AddLatency(duration)
 		if c.conf.Benchmark {
