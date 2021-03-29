@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -251,16 +250,9 @@ func ReadCertFile(certFile string) (cert *x509.Certificate, err error) {
 // If len('hosts') is 1, then all certificates will be valid for the same host.
 // If not, one of the hosts specified in 'hosts' will be used for each replica.
 func GenerateConfiguration(dest string, tls bool, firstID, n int, pattern string, hosts []string) error {
-	info, err := os.Stat(dest)
-	if errors.Is(err, os.ErrNotExist) {
-		err = os.MkdirAll(dest, 0755)
-		if err != nil {
-			return fmt.Errorf("cannot create '%s' directory: %w", dest, err)
-		}
-	} else if err != nil {
-		return fmt.Errorf("cannot Stat '%s': %w", dest, err)
-	} else if !info.IsDir() {
-		return fmt.Errorf("destination '%s' is not a directory", dest)
+	err := os.MkdirAll(dest, 0755)
+	if err != nil {
+		return fmt.Errorf("cannot create '%s' directory: %w", dest, err)
 	}
 
 	if tls && len(hosts) > 1 && len(hosts) != n {
