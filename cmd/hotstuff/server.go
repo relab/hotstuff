@@ -249,7 +249,10 @@ func (srv *clientSrv) Stop() {
 	srv.gorumsSrv.Stop()
 	srv.cancel()
 	if closer, ok := srv.output.(io.Closer); ok {
-		closer.Close()
+		err := closer.Close()
+		if err != nil {
+			log.Println("error closing output: ", err)
+		}
 	}
 }
 
