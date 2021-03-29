@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path"
 	"testing"
@@ -27,14 +28,15 @@ func TestHotStuff(t *testing.T) {
 		}
 	})
 
+	ports := getFreePorts(t, 8)
 	generateKeys(t, path.Join(testdir, "keys"))
 	generateInput(t, path.Join(testdir, "input"))
 
 	replicas := []replica{
-		genReplica(testdir, 1),
-		genReplica(testdir, 2),
-		genReplica(testdir, 3),
-		genReplica(testdir, 4),
+		genReplica(testdir, 1, ports.next(), ports.next()),
+		genReplica(testdir, 2, ports.next(), ports.next()),
+		genReplica(testdir, 3, ports.next(), ports.next()),
+		genReplica(testdir, 4, ports.next(), ports.next()),
 	}
 
 	clientConf := &options{
@@ -84,6 +86,33 @@ func TestHotStuff(t *testing.T) {
 	}
 }
 
+type ports []int
+
+func (p *ports) next() int {
+	port := (*p)[0]
+	*p = (*p)[1:]
+	return port
+}
+
+// getFreePorts will get free ports from the kernel by opening a listener on 127.0.0.1:0 and then closing it.
+func getFreePorts(t *testing.T, n int) ports {
+	ports := make(ports, n)
+	for i := 0; i < n; i++ {
+		lis, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			err := lis.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
+		ports[i] = lis.Addr().(*net.TCPAddr).Port
+	}
+	return ports
+}
+
 func generateKeys(t *testing.T, path string) {
 	t.Helper()
 	if err := crypto.GenerateConfiguration(path, true, 1, 4, "*", []string{"127.0.0.1"}); err != nil {
@@ -125,11 +154,11 @@ func hashFile(t *testing.T, path string) (hash hotstuff.Hash) {
 	return hash
 }
 
-func genReplica(testdir string, id hotstuff.ID) replica {
+func genReplica(testdir string, id hotstuff.ID, peerPort, clientPort int) replica {
 	return replica{
 		ID:         id,
-		PeerAddr:   fmt.Sprintf("127.0.0.1:1337%d", id),
-		ClientAddr: fmt.Sprintf("127.0.0.1:2337%d", id),
+		PeerAddr:   fmt.Sprintf("127.0.0.1:%d", peerPort),
+		ClientAddr: fmt.Sprintf("127.0.0.1:%d", clientPort),
 		Pubkey:     fmt.Sprintf("%s/keys/%d.key.pub", testdir, id),
 		Cert:       fmt.Sprintf("%s/keys/%d.crt", testdir, id),
 	}
