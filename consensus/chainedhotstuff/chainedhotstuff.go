@@ -7,11 +7,9 @@ type chainedhotstuff struct {
 
 	// protocol variables
 
-	lastVote hotstuff.View       // the last view that the replica voted in
-	bLock    *hotstuff.Block     // the currently locked block
-	bExec    *hotstuff.Block     // the last committed block
-	bLeaf    *hotstuff.Block     // the last proposed block
-	highQC   hotstuff.QuorumCert // the highest qc known to this replica
+	lastVote hotstuff.View   // the last view that the replica voted in
+	bLock    *hotstuff.Block // the currently locked block
+	bExec    *hotstuff.Block // the last committed block
 
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
 }
@@ -22,18 +20,11 @@ func New() hotstuff.Consensus {
 	hs.verifiedVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
 	hs.bLock = hotstuff.GetGenesis()
 	hs.bExec = hotstuff.GetGenesis()
-	hs.bLeaf = hotstuff.GetGenesis()
 	return hs
 }
 
 func (hs *chainedhotstuff) InitModule(mod *hotstuff.HotStuff) {
 	hs.mod = mod
-
-	var err error
-	hs.highQC, err = hs.mod.Signer().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
-	if err != nil {
-		hs.mod.Logger().Panicf("Failed to create QC for genesis block!")
-	}
 }
 
 // LastVote returns the view in which the replica last voted.
@@ -44,48 +35,6 @@ func (hs *chainedhotstuff) LastVote() hotstuff.View {
 // IncreaseLastVotedView ensures that no voting happens in a view earlier than `view`.
 func (hs *chainedhotstuff) IncreaseLastVotedView(view hotstuff.View) {
 	hs.lastVote++
-}
-
-// HighQC returns the highest QC known to the replica
-func (hs *chainedhotstuff) HighQC() hotstuff.QuorumCert {
-
-	return hs.highQC
-}
-
-// Leaf returns the last proposed block
-func (hs *chainedhotstuff) Leaf() *hotstuff.Block {
-	return hs.bLeaf
-}
-
-func (hs *chainedhotstuff) CreateDummy() {
-	dummy := hotstuff.NewBlock(hs.bLeaf.Hash(), nil, hotstuff.Command(""), hs.bLeaf.View()+1, hs.mod.ID())
-	hs.mod.BlockChain().Store(dummy)
-	hs.bLeaf = dummy
-}
-
-// UpdateHighQC updates HighQC if the given qc is higher than the old HighQC.
-func (hs *chainedhotstuff) UpdateHighQC(qc hotstuff.QuorumCert) {
-	hs.mod.Logger().Debugf("updateHighQC: %v", qc)
-	if !hs.mod.Verifier().VerifyQuorumCert(qc) {
-		hs.mod.Logger().Info("updateHighQC: QC could not be verified!")
-		return
-	}
-
-	newBlock, ok := hs.mod.BlockChain().Get(qc.BlockHash())
-	if !ok {
-		hs.mod.Logger().Info("updateHighQC: Could not find block referenced by new QC!")
-		return
-	}
-
-	oldBlock, ok := hs.mod.BlockChain().Get(hs.highQC.BlockHash())
-	if !ok {
-		hs.mod.Logger().Panic("Block from the old highQC missing from chain")
-	}
-
-	if newBlock.View() > oldBlock.View() {
-		hs.highQC = qc
-		hs.bLeaf = newBlock
-	}
 }
 
 func (hs *chainedhotstuff) commit(block *hotstuff.Block) {
@@ -116,7 +65,7 @@ func (hs *chainedhotstuff) update(block *hotstuff.Block) {
 	}
 
 	hs.mod.Logger().Debug("PRE_COMMIT: ", block1)
-	hs.UpdateHighQC(block.QuorumCert())
+	hs.mod.ViewSynchronizer().UpdateHighQC(block.QuorumCert())
 
 	block2, ok := hs.qcRef(block1.QuorumCert())
 	if !ok {
@@ -148,7 +97,13 @@ func (hs *chainedhotstuff) Propose() {
 	if !ok {
 		return
 	}
-	block := hotstuff.NewBlock(hs.bLeaf.Hash(), hs.highQC, cmd, hs.mod.ViewSynchronizer().View(), hs.mod.ID())
+	block := hotstuff.NewBlock(
+		hs.mod.ViewSynchronizer().LeafBlock().Hash(),
+		hs.mod.ViewSynchronizer().HighQC(),
+		cmd,
+		hs.mod.ViewSynchronizer().View(),
+		hs.mod.ID(),
+	)
 	hs.mod.BlockChain().Store(block)
 
 	hs.mod.Config().Propose(block)
@@ -239,7 +194,7 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 		// delete any pending QCs with lower height than bLeaf
 		for k := range hs.verifiedVotes {
 			if block, ok := hs.mod.BlockChain().LocalGet(k); ok {
-				if block.View() <= hs.bLeaf.View() {
+				if block.View() <= hs.mod.ViewSynchronizer().LeafBlock().View() {
 					delete(hs.verifiedVotes, k)
 				}
 			} else {
@@ -276,7 +231,7 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 		}
 	}
 
-	if block.View() <= hs.bLeaf.View() {
+	if block.View() <= hs.mod.ViewSynchronizer().LeafBlock().View() {
 		// too old
 		return
 	}
@@ -300,7 +255,6 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 		return
 	}
 	delete(hs.verifiedVotes, cert.BlockHash())
-	hs.UpdateHighQC(qc)
 
 	// signal the synchronizer
 	hs.mod.ViewSynchronizer().AdvanceView(hotstuff.SyncInfo{QC: qc})

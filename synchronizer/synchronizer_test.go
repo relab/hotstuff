@@ -27,7 +27,6 @@ func TestLocalTimeout(t *testing.T) {
 
 	c := make(chan struct{})
 	hs.EXPECT().IncreaseLastVotedView(hotstuff.View(1)).AnyTimes()
-	hs.EXPECT().HighQC().Return(qc)
 	cfg.
 		EXPECT().
 		Timeout(gomock.AssignableToTypeOf(hotstuff.TimeoutMsg{})).
@@ -72,7 +71,6 @@ func TestAdvanceViewQC(t *testing.T) {
 	)
 	hl[0].BlockChain().Store(block)
 	qc := testutil.CreateQC(t, block, signers)
-	hs.EXPECT().UpdateHighQC(qc).AnyTimes()
 	// synchronizer should tell hotstuff to propose
 	hs.EXPECT().Propose()
 

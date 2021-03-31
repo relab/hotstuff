@@ -15,20 +15,27 @@ import (
 type Synchronizer struct {
 	mod *hotstuff.HotStuff
 
-	viewCtx      context.Context
-	cancelCtx    context.CancelFunc
-	timeout      hotstuff.ExponentialTimeout
-	highTC       hotstuff.TimeoutCert
-	timer        *time.Timer
 	currentView  hotstuff.View
 	latestCommit hotstuff.View // the view in which the latest commit happened.
-	timeouts     map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
+	highTC       hotstuff.TimeoutCert
+	highQC       hotstuff.QuorumCert
+	leafBlock    *hotstuff.Block
+
+	viewCtx   context.Context
+	cancelCtx context.CancelFunc
+	timeout   hotstuff.ExponentialTimeout
+	timer     *time.Timer
+	timeouts  map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
 }
 
 // InitModule initializes the synchronizer with the given HotStuff instance.
 func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff) {
 	s.mod = hs
 	var err error
+	s.highQC, err = s.mod.Signer().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+	if err != nil {
+		panic(fmt.Errorf("unable to create empty quorum cert for genesis block: %v", err))
+	}
 	s.highTC, err = s.mod.Signer().CreateTimeoutCert(hotstuff.View(0), []hotstuff.TimeoutMsg{})
 	if err != nil {
 		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
@@ -38,10 +45,11 @@ func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff) {
 // New creates a new Synchronizer.
 func New(timeout hotstuff.ExponentialTimeout) hotstuff.ViewSynchronizer {
 	return &Synchronizer{
-		viewCtx:      context.Background(),
-		cancelCtx:    func() {},
+		leafBlock:    hotstuff.GetGenesis(),
 		currentView:  1,
 		latestCommit: 0,
+		viewCtx:      context.Background(),
+		cancelCtx:    func() {},
 		timeout:      timeout,
 		timeouts:     make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
 		timer:        time.AfterFunc(0, func() {}), // dummy timer that will be replaced after start() is called
@@ -56,6 +64,16 @@ func (s *Synchronizer) Start() {
 // Stop stops the view timeout timer.
 func (s *Synchronizer) Stop() {
 	s.timer.Stop()
+}
+
+// HighQC returns the highest known QC.
+func (s *Synchronizer) HighQC() hotstuff.QuorumCert {
+	return s.highQC
+}
+
+// LeafBlock returns the current leaf block.
+func (s *Synchronizer) LeafBlock() *hotstuff.Block {
+	return s.leafBlock
 }
 
 // View returns the current view.
@@ -81,7 +99,7 @@ func (s *Synchronizer) viewDuration(view hotstuff.View) time.Duration {
 
 // SyncInfo returns the highest known QC or TC.
 func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
-	qc := s.mod.Consensus().HighQC()
+	qc := s.highQC
 	qcBlock, ok := s.mod.BlockChain().Get(qc.BlockHash())
 	if !ok {
 		// TODO
@@ -181,7 +199,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 			s.highTC = syncInfo.TC
 		}
 	} else {
-		s.mod.Consensus().UpdateHighQC(syncInfo.QC)
+		s.UpdateHighQC(syncInfo.QC)
 		b, ok := s.mod.BlockChain().Get(syncInfo.QC.BlockHash())
 		if !ok {
 			return
@@ -208,6 +226,31 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		s.mod.Consensus().Propose()
 	} else if replica, ok := s.mod.Config().Replica(leader); ok {
 		replica.NewView(syncInfo)
+	}
+}
+
+// UpdateHighQC updates HighQC if the given qc is higher than the old HighQC.
+func (s *Synchronizer) UpdateHighQC(qc hotstuff.QuorumCert) {
+	s.mod.Logger().Debugf("updateHighQC: %v", qc)
+	if !s.mod.Verifier().VerifyQuorumCert(qc) {
+		s.mod.Logger().Info("updateHighQC: QC could not be verified!")
+		return
+	}
+
+	newBlock, ok := s.mod.BlockChain().Get(qc.BlockHash())
+	if !ok {
+		s.mod.Logger().Info("updateHighQC: Could not find block referenced by new QC!")
+		return
+	}
+
+	oldBlock, ok := s.mod.BlockChain().Get(s.highQC.BlockHash())
+	if !ok {
+		s.mod.Logger().Panic("Block from the old highQC missing from chain")
+	}
+
+	if newBlock.View() > oldBlock.View() {
+		s.highQC = qc
+		s.leafBlock = newBlock
 	}
 }
 

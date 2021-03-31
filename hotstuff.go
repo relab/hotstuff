@@ -438,18 +438,8 @@ type Config interface {
 type Consensus interface {
 	// LastVote returns the view in which the replica last voted.
 	LastVote() View
-	// HighQC returns the highest QC known to the replica.
-	HighQC() QuorumCert
-	// Leaf returns the last block that was added to the chain.
-	// This should be the block with the highest view that is known to the replica.
-	Leaf() *Block
 	// IncreaseLastVotedView ensures that no voting happens in a view earlier than `view`.
 	IncreaseLastVotedView(view View)
-	// UpdateHighQC updates HighQC if the given qc is higher than the old HighQC.
-	UpdateHighQC(qc QuorumCert)
-	// CreateDummy inserts a dummy block at View+1.
-	// This is useful when a view must be skipped.
-	CreateDummy()
 	// Propose starts a new proposal. The command is fetched from the command queue.
 	Propose()
 	// OnPropose handles an incoming proposal.
@@ -480,6 +470,12 @@ type ViewSynchronizer interface {
 	View() View
 	// ViewContext returns a context that is cancelled at the end of the view.
 	ViewContext() context.Context
+	// UpdateHighQC updates the highest known QC.
+	UpdateHighQC(QuorumCert)
+	// HighQC returns the highest known QC.
+	HighQC() QuorumCert
+	// LeafBlock returns the current leaf block.
+	LeafBlock() *Block
 	// Start starts the synchronizer.
 	Start()
 	// Stop stops the synchronizer.

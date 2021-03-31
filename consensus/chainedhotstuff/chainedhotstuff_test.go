@@ -96,14 +96,14 @@ func TestVote(t *testing.T) {
 
 	hs := New()
 	bl := testutil.CreateBuilders(t, ctrl, n)
-	synchronizer := mocks.NewMockViewSynchronizer(ctrl)
+	synchronizer := synchronizer.New(testutil.FixedTimeout(time.Second))
 	bl[0].Register(hs, synchronizer)
 	hl := bl.Build()
 
-	synchronizer.EXPECT().AdvanceView(gomock.AssignableToTypeOf(hotstuff.SyncInfo{})).AnyTimes()
-	synchronizer.EXPECT().View().Return(hotstuff.View(1))
+	// expect that the replica will propose after receiving enough votes.
+	hl[0].Config().(*mocks.MockConfig).EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.GetGenesis()))
 
-	b := testutil.NewProposeMsg(hotstuff.GetGenesis().Hash(), hs.HighQC(), "test", 1, 1)
+	b := testutil.NewProposeMsg(hotstuff.GetGenesis().Hash(), hl[0].ViewSynchronizer().HighQC(), "test", 1, 1)
 
 	hs.OnPropose(b)
 
@@ -115,7 +115,7 @@ func TestVote(t *testing.T) {
 		hs.OnVote(hotstuff.VoteMsg{ID: hotstuff.ID(i + 1), PartialCert: pc})
 	}
 
-	if hs.HighQC().BlockHash() != b.Block.Hash() {
+	if hl[0].ViewSynchronizer().HighQC().BlockHash() != b.Block.Hash() {
 		t.Errorf("HighQC was not updated.")
 	}
 }

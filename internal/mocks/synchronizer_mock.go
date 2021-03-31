@@ -47,6 +47,34 @@ func (mr *MockViewSynchronizerMockRecorder) AdvanceView(arg0 interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AdvanceView", reflect.TypeOf((*MockViewSynchronizer)(nil).AdvanceView), arg0)
 }
 
+// HighQC mocks base method.
+func (m *MockViewSynchronizer) HighQC() hotstuff.QuorumCert {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HighQC")
+	ret0, _ := ret[0].(hotstuff.QuorumCert)
+	return ret0
+}
+
+// HighQC indicates an expected call of HighQC.
+func (mr *MockViewSynchronizerMockRecorder) HighQC() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HighQC", reflect.TypeOf((*MockViewSynchronizer)(nil).HighQC))
+}
+
+// LeafBlock mocks base method.
+func (m *MockViewSynchronizer) LeafBlock() *hotstuff.Block {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LeafBlock")
+	ret0, _ := ret[0].(*hotstuff.Block)
+	return ret0
+}
+
+// LeafBlock indicates an expected call of LeafBlock.
+func (mr *MockViewSynchronizerMockRecorder) LeafBlock() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LeafBlock", reflect.TypeOf((*MockViewSynchronizer)(nil).LeafBlock))
+}
+
 // OnNewView mocks base method.
 func (m *MockViewSynchronizer) OnNewView(arg0 hotstuff.NewViewMsg) {
 	m.ctrl.T.Helper()
@@ -93,6 +121,18 @@ func (m *MockViewSynchronizer) Stop() {
 func (mr *MockViewSynchronizerMockRecorder) Stop() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockViewSynchronizer)(nil).Stop))
+}
+
+// UpdateHighQC mocks base method.
+func (m *MockViewSynchronizer) UpdateHighQC(arg0 hotstuff.QuorumCert) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "UpdateHighQC", arg0)
+}
+
+// UpdateHighQC indicates an expected call of UpdateHighQC.
+func (mr *MockViewSynchronizerMockRecorder) UpdateHighQC(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHighQC", reflect.TypeOf((*MockViewSynchronizer)(nil).UpdateHighQC), arg0)
 }
 
 // View mocks base method.

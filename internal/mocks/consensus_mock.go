@@ -34,32 +34,6 @@ func (m *MockConsensus) EXPECT() *MockConsensusMockRecorder {
 	return m.recorder
 }
 
-// CreateDummy mocks base method.
-func (m *MockConsensus) CreateDummy() {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "CreateDummy")
-}
-
-// CreateDummy indicates an expected call of CreateDummy.
-func (mr *MockConsensusMockRecorder) CreateDummy() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateDummy", reflect.TypeOf((*MockConsensus)(nil).CreateDummy))
-}
-
-// HighQC mocks base method.
-func (m *MockConsensus) HighQC() hotstuff.QuorumCert {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HighQC")
-	ret0, _ := ret[0].(hotstuff.QuorumCert)
-	return ret0
-}
-
-// HighQC indicates an expected call of HighQC.
-func (mr *MockConsensusMockRecorder) HighQC() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HighQC", reflect.TypeOf((*MockConsensus)(nil).HighQC))
-}
-
 // IncreaseLastVotedView mocks base method.
 func (m *MockConsensus) IncreaseLastVotedView(arg0 hotstuff.View) {
 	m.ctrl.T.Helper()
@@ -84,20 +58,6 @@ func (m *MockConsensus) LastVote() hotstuff.View {
 func (mr *MockConsensusMockRecorder) LastVote() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastVote", reflect.TypeOf((*MockConsensus)(nil).LastVote))
-}
-
-// Leaf mocks base method.
-func (m *MockConsensus) Leaf() *hotstuff.Block {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Leaf")
-	ret0, _ := ret[0].(*hotstuff.Block)
-	return ret0
-}
-
-// Leaf indicates an expected call of Leaf.
-func (mr *MockConsensusMockRecorder) Leaf() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Leaf", reflect.TypeOf((*MockConsensus)(nil).Leaf))
 }
 
 // OnPropose mocks base method.
@@ -134,16 +94,4 @@ func (m *MockConsensus) Propose() {
 func (mr *MockConsensusMockRecorder) Propose() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Propose", reflect.TypeOf((*MockConsensus)(nil).Propose))
-}
-
-// UpdateHighQC mocks base method.
-func (m *MockConsensus) UpdateHighQC(arg0 hotstuff.QuorumCert) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "UpdateHighQC", arg0)
-}
-
-// UpdateHighQC indicates an expected call of UpdateHighQC.
-func (mr *MockConsensusMockRecorder) UpdateHighQC(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHighQC", reflect.TypeOf((*MockConsensus)(nil).UpdateHighQC), arg0)
 }
