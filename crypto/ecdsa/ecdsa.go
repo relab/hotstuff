@@ -300,7 +300,7 @@ func (ec *ecdsaCrypto) Verify(sig hotstuff.Signature, hash hotstuff.Hash) bool {
 	_sig := sig.(*Signature)
 	replica, ok := ec.mod.Config().Replica(sig.Signer())
 	if !ok {
-		ec.mod.Logger().Info("ecdsaCrypto: got signature from replica whose ID (%d) was not in the config.")
+		ec.mod.Logger().Infof("ecdsaCrypto: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
 		return false
 	}
 	pk := replica.PublicKey().(*ecdsa.PublicKey)
