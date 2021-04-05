@@ -18,17 +18,27 @@ import (
 	"go.uber.org/multierr"
 )
 
-// ErrHashMismatch is the error used when a partial certificate hash does not match the hash of a block.
-var ErrHashMismatch = fmt.Errorf("certificate hash does not match block hash")
+const (
+	// PrivateKeyFileType is the PEM type for a private key.
+	PrivateKeyFileType = "ECDSA PRIVATE KEY"
 
-// ErrPartialDuplicate is the error used when two or more signatures were created by the same replica.
-var ErrPartialDuplicate = fmt.Errorf("cannot add more than one signature per replica")
+	// PublicKeyFileType is the PEM type for a public key.
+	PublicKeyFileType = "ECDSA PUBLIC KEY"
+)
 
-// ErrViewMismatch is the error used when timeouts have different views.
-var ErrViewMismatch = fmt.Errorf("timeout views do not match")
+var (
+	// ErrHashMismatch is the error used when a partial certificate hash does not match the hash of a block.
+	ErrHashMismatch = fmt.Errorf("certificate hash does not match block hash")
 
-// ErrNotAQuorum is the error used when a q
-var ErrNotAQuorum = fmt.Errorf("not a quorum")
+	// ErrPartialDuplicate is the error used when two or more signatures were created by the same replica.
+	ErrPartialDuplicate = fmt.Errorf("cannot add more than one signature per replica")
+
+	// ErrViewMismatch is the error used when timeouts have different views.
+	ErrViewMismatch = fmt.Errorf("timeout views do not match")
+
+	// ErrNotAQuorum is the error used when a q
+	ErrNotAQuorum = fmt.Errorf("not a quorum")
+)
 
 // Signature is an ECDSA signature
 type Signature struct {

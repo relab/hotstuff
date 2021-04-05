@@ -12,6 +12,11 @@ import (
 	"go.uber.org/multierr"
 )
 
+const (
+	PrivateKeyFileType = "BLS12-381 PRIVATE KEY"
+	PublicKeyFileType  = "BLS12-381 PUBLIC KEY"
+)
+
 var domain = []byte("BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_")
 
 // the order r of G1

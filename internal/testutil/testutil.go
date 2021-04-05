@@ -287,7 +287,7 @@ func CreateTC(t *testing.T, view hotstuff.View, signers []hotstuff.Signer) hotst
 // GenerateKey generates an ECDSA private key for use in tests.
 func GenerateKey(t *testing.T) *ecdsa.PrivateKey {
 	t.Helper()
-	key, err := crypto.GeneratePrivateKey()
+	key, err := crypto.GenerateECDSAPrivateKey()
 	if err != nil {
 		t.Fatalf("Failed to generate private key: %v", err)
 	}

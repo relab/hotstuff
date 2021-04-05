@@ -218,7 +218,7 @@ func setupTLS(t *testing.T, ctrl *gomock.Controller, n int) testData {
 			hotstuff.ID(i)+1,
 			[]string{"localhost", "127.0.0.1"},
 			ca,
-			td.cfg.Replicas[hotstuff.ID(i)+1].PubKey,
+			td.cfg.Replicas[hotstuff.ID(i)+1].PubKey.(*ecdsa.PublicKey),
 			caPK,
 		)
 		if err != nil {

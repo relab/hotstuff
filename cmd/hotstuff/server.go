@@ -92,7 +92,12 @@ func loadCreds(conf *options) (credentials.TransportCredentials, tls.Certificate
 		}
 	}
 
-	tlsCert, err := tls.LoadX509KeyPair(conf.Cert, conf.Privkey)
+	keyPath := conf.Privkey
+	if conf.CertKey != "" {
+		keyPath = conf.CertKey
+	}
+
+	tlsCert, err := tls.LoadX509KeyPair(conf.Cert, keyPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to parse certificate: %v\n", err)
 		os.Exit(1)

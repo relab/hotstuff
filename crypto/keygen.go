@@ -16,16 +16,26 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/crypto/bls12"
+	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
 )
 
-const privateKeyFileType = "HOTSTUFF PRIVATE KEY"
-const publicKeyFileType = "HOTSTUFF PUBLIC KEY"
+// GenerateBLSPrivateKey returns a new BLS12-381 private key.
+func GenerateBLSPrivateKey() (pk *bls12.PrivateKey, err error) {
+	pk, err = bls12.GeneratePrivateKey()
+	if err != nil {
+		return nil, err
+	}
+	return pk, nil
+}
 
-// GeneratePrivateKey returns a new public/private key pair based on ECDSA.
-func GeneratePrivateKey() (pk *ecdsa.PrivateKey, err error) {
-	curve := elliptic.P256()
-	pk, err = ecdsa.GenerateKey(curve, rand.Reader)
-	return
+// GenerateECDSAPrivateKey returns a new ECDSA private key.
+func GenerateECDSAPrivateKey() (pk *ecdsa.PrivateKey, err error) {
+	pk, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	return pk, nil
 }
 
 // GenerateRootCert generates a self-signed TLS certificate to act as a CA.
@@ -87,7 +97,7 @@ func GenerateTLSCert(id hotstuff.ID, hosts []string, parent *x509.Certificate, s
 }
 
 // WritePrivateKeyFile writes a private key to the specified file.
-func WritePrivateKeyFile(key *ecdsa.PrivateKey, filePath string) (err error) {
+func WritePrivateKeyFile(key hotstuff.PrivateKey, filePath string) (err error) {
 	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return
@@ -99,13 +109,22 @@ func WritePrivateKeyFile(key *ecdsa.PrivateKey, filePath string) (err error) {
 		}
 	}()
 
-	marshalled, err := x509.MarshalECPrivateKey(key)
-	if err != nil {
-		return
+	var marshalled []byte
+	var keyType string
+	switch k := key.(type) {
+	case *ecdsa.PrivateKey:
+		marshalled, err = x509.MarshalECPrivateKey(k)
+		if err != nil {
+			return
+		}
+		keyType = ecdsacrypto.PrivateKeyFileType
+	case *bls12.PrivateKey:
+		marshalled = k.ToBytes()
+		keyType = bls12.PrivateKeyFileType
 	}
 
 	b := &pem.Block{
-		Type:  privateKeyFileType,
+		Type:  keyType,
 		Bytes: marshalled,
 	}
 
@@ -114,7 +133,7 @@ func WritePrivateKeyFile(key *ecdsa.PrivateKey, filePath string) (err error) {
 }
 
 // WritePublicKeyFile writes a public key to the specified file.
-func WritePublicKeyFile(key *ecdsa.PublicKey, filePath string) (err error) {
+func WritePublicKeyFile(key hotstuff.PublicKey, filePath string) (err error) {
 	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return
@@ -126,13 +145,22 @@ func WritePublicKeyFile(key *ecdsa.PublicKey, filePath string) (err error) {
 		}
 	}()
 
-	marshalled, err := x509.MarshalPKIXPublicKey(key)
-	if err != nil {
-		return
+	var marshalled []byte
+	var keyType string
+	switch k := key.(type) {
+	case *ecdsa.PublicKey:
+		marshalled, err = x509.MarshalPKIXPublicKey(k)
+		if err != nil {
+			return
+		}
+		keyType = ecdsacrypto.PublicKeyFileType
+	case *bls12.PublicKey:
+		marshalled = k.ToBytes()
+		keyType = bls12.PublicKeyFileType
 	}
 
 	b := &pem.Block{
-		Type:  publicKeyFileType,
+		Type:  keyType,
 		Bytes: marshalled,
 	}
 
@@ -175,17 +203,23 @@ func readPemFile(file string) (b *pem.Block, err error) {
 }
 
 // ReadPrivateKeyFile reads a private key from the specified file.
-func ReadPrivateKeyFile(keyFile string) (key *ecdsa.PrivateKey, err error) {
+func ReadPrivateKeyFile(keyFile string) (key hotstuff.PrivateKey, err error) {
 	b, err := readPemFile(keyFile)
 	if err != nil {
 		return nil, err
 	}
 
-	if b.Type != privateKeyFileType {
-		return nil, fmt.Errorf("file type did not match")
+	switch b.Type {
+	case ecdsacrypto.PrivateKeyFileType:
+		key, err = x509.ParseECPrivateKey(b.Bytes)
+	case bls12.PrivateKeyFileType:
+		k := &bls12.PrivateKey{}
+		k.FromBytes(b.Bytes)
+		key = k
+	default:
+		return nil, fmt.Errorf("file type did not match any known types")
 	}
 
-	key, err = x509.ParseECPrivateKey(b.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse key: %w", err)
 	}
@@ -193,24 +227,25 @@ func ReadPrivateKeyFile(keyFile string) (key *ecdsa.PrivateKey, err error) {
 }
 
 // ReadPublicKeyFile reads a public key from the specified file.
-func ReadPublicKeyFile(keyFile string) (key *ecdsa.PublicKey, err error) {
+func ReadPublicKeyFile(keyFile string) (key hotstuff.PublicKey, err error) {
 	b, err := readPemFile(keyFile)
 	if err != nil {
 		return nil, err
 	}
 
-	if b.Type != publicKeyFileType {
-		return nil, fmt.Errorf("file type did not match")
+	switch b.Type {
+	case ecdsacrypto.PublicKeyFileType:
+		key, err = x509.ParsePKIXPublicKey(b.Bytes)
+	case bls12.PublicKeyFileType:
+		k := &bls12.PublicKey{}
+		k.FromBytes(b.Bytes)
+		key = k
+	default:
+		return nil, fmt.Errorf("file type did not match any known types")
 	}
 
-	k, err := x509.ParsePKIXPublicKey(b.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse key: %w", err)
-	}
-
-	key, ok := k.(*ecdsa.PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("key was of wrong type")
 	}
 
 	return
@@ -249,7 +284,7 @@ func ReadCertFile(certFile string) (cert *x509.Certificate, err error) {
 // 'hosts' specify the hosts for which the generated certificates should be valid.
 // If len('hosts') is 1, then all certificates will be valid for the same host.
 // If not, one of the hosts specified in 'hosts' will be used for each replica.
-func GenerateConfiguration(dest string, tls bool, firstID, n int, pattern string, hosts []string) error {
+func GenerateConfiguration(dest string, tls, bls bool, firstID, n int, pattern string, hosts []string) error {
 	err := os.MkdirAll(dest, 0755)
 	if err != nil {
 		return fmt.Errorf("cannot create '%s' directory: %w", dest, err)
@@ -269,7 +304,7 @@ func GenerateConfiguration(dest string, tls bool, firstID, n int, pattern string
 	}
 
 	for i := 0; i < n; i++ {
-		pk, err := GeneratePrivateKey()
+		pk, err := GenerateECDSAPrivateKey()
 		if err != nil {
 			return fmt.Errorf("failed to generate key: %w", err)
 		}
@@ -278,6 +313,8 @@ func GenerateConfiguration(dest string, tls bool, firstID, n int, pattern string
 		certPath := basePath + ".crt"
 		privKeyPath := basePath + ".key"
 		pubKeyPath := privKeyPath + ".pub"
+		blsPrivPath := basePath + ".bls"
+		blsPubPath := blsPrivPath + ".pub"
 
 		if tls {
 			err = createTLSCert(certPath, i, hotstuff.ID(firstID+i), hosts, ca, caKey, &pk.PublicKey)
@@ -295,12 +332,31 @@ func GenerateConfiguration(dest string, tls bool, firstID, n int, pattern string
 		if err != nil {
 			return fmt.Errorf("failed to write public key file: %w", err)
 		}
+
+		blsKey, err := bls12.GeneratePrivateKey()
+		if err != nil {
+			return fmt.Errorf("failed to generate bls12-381 private key: %w", err)
+		}
+
+		if !bls {
+			return nil
+		}
+
+		err = WritePrivateKeyFile(blsKey, blsPrivPath)
+		if err != nil {
+			return fmt.Errorf("failed to write private key file: %w", err)
+		}
+
+		err = WritePublicKeyFile(blsKey.Public(), blsPubPath)
+		if err != nil {
+			return fmt.Errorf("failed to write public key file: %w", err)
+		}
 	}
 	return nil
 }
 
 func createRootCA(dest string) (pk *ecdsa.PrivateKey, ca *x509.Certificate, err error) {
-	pk, err = GeneratePrivateKey()
+	pk, err = GenerateECDSAPrivateKey()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate signing key: %w", err)
 	}
