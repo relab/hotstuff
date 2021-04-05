@@ -21,8 +21,26 @@ type PublicKey struct {
 	p *bls12.PointG1
 }
 
+func (pub PublicKey) ToBytes() []byte {
+	return bls12.NewG1().ToCompressed(pub.p)
+}
+
+func (pub *PublicKey) FromBytes(b []byte) (err error) {
+	pub.p, err = bls12.NewG1().FromCompressed(b)
+	return err
+}
+
 type PrivateKey struct {
 	p *big.Int
+}
+
+func (priv PrivateKey) ToBytes() []byte {
+	return priv.p.Bytes()
+}
+
+func (priv PrivateKey) FromBytes(b []byte) {
+	priv.p = new(big.Int)
+	priv.p.SetBytes(b)
 }
 
 func GeneratePrivateKey() (*PrivateKey, error) {
@@ -54,6 +72,12 @@ func (s *Signature) ToBytes() []byte {
 	binary.LittleEndian.PutUint32(idBytes[:], uint32(s.signer))
 	// not sure if it is better to use compressed or uncompressed here.
 	return append(idBytes[:], bls12.NewG2().ToCompressed(s.s)...)
+}
+
+func (s *Signature) FromBytes(b []byte) (err error) {
+	s.signer = hotstuff.ID(binary.LittleEndian.Uint32(b))
+	s.s, err = bls12.NewG2().FromCompressed(b[3:])
+	return err
 }
 
 // Signer returns the ID of the replica that generated the signature.
