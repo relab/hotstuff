@@ -312,9 +312,7 @@ func GenerateConfiguration(dest string, tls, bls bool, firstID, n int, pattern s
 		basePath := filepath.Join(dest, strings.ReplaceAll(pattern, "*", fmt.Sprintf("%d", firstID+i)))
 		certPath := basePath + ".crt"
 		privKeyPath := basePath + ".key"
-		pubKeyPath := privKeyPath + ".pub"
 		blsPrivPath := basePath + ".bls"
-		blsPubPath := blsPrivPath + ".pub"
 
 		if tls {
 			err = createTLSCert(certPath, i, hotstuff.ID(firstID+i), hosts, ca, caKey, &pk.PublicKey)
@@ -323,14 +321,13 @@ func GenerateConfiguration(dest string, tls, bls bool, firstID, n int, pattern s
 			}
 		}
 
-		err = WritePrivateKeyFile(pk, privKeyPath)
+		err = writeKeyFiles(pk, privKeyPath)
 		if err != nil {
-			return fmt.Errorf("failed to write private key file: %w", err)
+			return err
 		}
 
-		err = WritePublicKeyFile(&pk.PublicKey, pubKeyPath)
-		if err != nil {
-			return fmt.Errorf("failed to write public key file: %w", err)
+		if !bls {
+			return nil
 		}
 
 		blsKey, err := bls12.GeneratePrivateKey()
@@ -338,19 +335,24 @@ func GenerateConfiguration(dest string, tls, bls bool, firstID, n int, pattern s
 			return fmt.Errorf("failed to generate bls12-381 private key: %w", err)
 		}
 
-		if !bls {
-			return nil
-		}
-
-		err = WritePrivateKeyFile(blsKey, blsPrivPath)
+		err = writeKeyFiles(blsKey, blsPrivPath)
 		if err != nil {
-			return fmt.Errorf("failed to write private key file: %w", err)
+			return err
 		}
+	}
+	return nil
+}
 
-		err = WritePublicKeyFile(blsKey.Public(), blsPubPath)
-		if err != nil {
-			return fmt.Errorf("failed to write public key file: %w", err)
-		}
+// writeKeyFiles writes both the private and public keys to files.
+func writeKeyFiles(key hotstuff.PrivateKey, keyPath string) (err error) {
+	err = WritePrivateKeyFile(key, keyPath)
+	if err != nil {
+		return fmt.Errorf("failed to write private key file: %w", err)
+	}
+	pubKeyPath := keyPath + ".pub"
+	err = WritePublicKeyFile(key.Public(), pubKeyPath)
+	if err != nil {
+		return fmt.Errorf("failed to write public key file: %w", err)
 	}
 	return nil
 }

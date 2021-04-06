@@ -76,6 +76,7 @@ func (priv *PrivateKey) Public() hotstuff.PublicKey {
 	return &PublicKey{p: bls12.NewG1().MulScalarBig(p, &bls12.G1One, priv.p)}
 }
 
+// Signature is a bls12-381 signature.
 type Signature struct {
 	signer hotstuff.ID
 	s      *bls12.PointG2
@@ -89,6 +90,7 @@ func (s *Signature) ToBytes() []byte {
 	return append(idBytes[:], bls12.NewG2().ToCompressed(s.s)...)
 }
 
+// FromBytes unmarshals a signature from a byte slice.
 func (s *Signature) FromBytes(b []byte) (err error) {
 	s.signer = hotstuff.ID(binary.LittleEndian.Uint32(b))
 	s.s, err = bls12.NewG2().FromCompressed(b[3:])
@@ -100,6 +102,7 @@ func (s *Signature) Signer() hotstuff.ID {
 	return s.signer
 }
 
+// PartialCert is a bls12-381 signature together with the block hash.
 type PartialCert struct {
 	sig  Signature
 	hash hotstuff.Hash
@@ -120,6 +123,9 @@ func (p *PartialCert) BlockHash() hotstuff.Hash {
 	return p.hash
 }
 
+// aggregateSignature is a bls12-381 aggregate signature. The participants map contains the IDs of the replicas who
+// participated in the creation of the signature. This allows us to build an aggregated public key to verify the
+// signature.
 type aggregateSignature struct {
 	sig          bls12.PointG2
 	participants map[hotstuff.ID]struct{} // The ids of the replicas who submitted signatures.
@@ -136,6 +142,7 @@ func (agg *aggregateSignature) ToBytes() []byte {
 	return b
 }
 
+// QuorumCert is a bls12-381 aggregate signature together with the block hash.
 type QuorumCert struct {
 	sig  *aggregateSignature
 	hash hotstuff.Hash
@@ -151,6 +158,8 @@ func (qc *QuorumCert) BlockHash() hotstuff.Hash {
 	return qc.hash
 }
 
+// TimeoutCert is a bls12-381 aggregate signature over a view. This serves as a proof that the synchronizer can safely
+// advance to the next view.
 type TimeoutCert struct {
 	sig  *aggregateSignature
 	view hotstuff.View
@@ -168,12 +177,15 @@ func (tc *TimeoutCert) View() hotstuff.View {
 	return tc.view
 }
 
+// bls12Crypto is a Signer/Verifier implementation that uses bls12-381 aggregate signatures.
 type bls12Crypto struct {
 	mod *hotstuff.HotStuff
 }
 
-func New() *bls12Crypto {
-	return &bls12Crypto{}
+// New returns a new bls12-381 signer and verifier.
+func New() (hotstuff.Signer, hotstuff.Verifier) {
+	bc := &bls12Crypto{}
+	return bc, bc
 }
 
 func (bc *bls12Crypto) getPrivateKey() *PrivateKey {
