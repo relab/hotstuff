@@ -73,7 +73,7 @@ func runServer(ctx context.Context, conf *options) {
 	}
 
 	srv := newClientServer(conf, replicaConfig, &tlsCert)
-	err = srv.Start(clientAddress)
+	err = srv.Start(ctx, clientAddress)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to start HotStuff: %v\n", err)
 		os.Exit(1)
@@ -140,8 +140,6 @@ type cmdID struct {
 }
 
 type clientSrv struct {
-	ctx       context.Context
-	cancel    context.CancelFunc
 	conf      *options
 	output    io.Writer
 	gorumsSrv *gorums.Server
@@ -157,8 +155,6 @@ type clientSrv struct {
 }
 
 func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert *tls.Certificate) *clientSrv {
-	ctx, cancel := context.WithCancel(context.Background())
-
 	serverOpts := []gorums.ServerOption{}
 	grpcServerOpts := []grpc.ServerOption{}
 
@@ -169,8 +165,6 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 	serverOpts = append(serverOpts, gorums.WithGRPCServerOptions(grpcServerOpts...))
 
 	srv := &clientSrv{
-		ctx:          ctx,
-		cancel:       cancel,
 		conf:         conf,
 		gorumsSrv:    gorums.NewServer(serverOpts...),
 		cmdCache:     newCmdCache(conf.BatchSize),
@@ -209,7 +203,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 	return srv
 }
 
-func (srv *clientSrv) Start(address string) (err error) {
+func (srv *clientSrv) Start(ctx context.Context, address string) (err error) {
 	if srv.conf.Output != "" {
 		// Since io.Discard is not a WriteCloser, we just store the file as a Writer.
 		srv.output, err = os.OpenFile(srv.conf.Output, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
@@ -239,7 +233,7 @@ func (srv *clientSrv) Start(address string) (err error) {
 	// sleep so that all replicas can be ready before we start
 	time.Sleep(time.Second)
 
-	go srv.hs.EventLoop().Run(srv.ctx)
+	go srv.hs.EventLoop().Run(ctx)
 
 	go func() {
 		err := srv.gorumsSrv.Serve(lis)
@@ -256,7 +250,6 @@ func (srv *clientSrv) Stop() {
 	srv.cfg.Close()
 	srv.hsSrv.Stop()
 	srv.gorumsSrv.Stop()
-	srv.cancel()
 	if closer, ok := srv.output.(io.Closer); ok {
 		err := closer.Close()
 		if err != nil {
