@@ -10,203 +10,58 @@ import (
 	"github.com/relab/hotstuff/internal/testutil"
 )
 
-func TestCreatePartialCert(t *testing.T) {
-	run := func(t *testing.T, newFunc newFunc) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		td := newTestData(t, ctrl, 1, newFunc)
-
-		partialCert, err := td.signers[0].CreatePartialCert(td.block)
-		if err != nil {
-			t.Fatalf("Failed to create partial certificate: %v", err)
-		}
-
-		if partialCert.BlockHash() != td.block.Hash() {
-			t.Error("Partial certificate hash does not match block hash!")
-		}
-
-		if signerID := partialCert.Signature().Signer(); signerID != hotstuff.ID(1) {
-			t.Errorf("Wrong ID for signer in partial certificate: got: %d, want: %d", signerID, hotstuff.ID(1))
-		}
-	}
-	runBoth(t, run)
-}
-
-func TestVerifyPartialCert(t *testing.T) {
-	run := func(t *testing.T, newFunc newFunc) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		td := newTestData(t, ctrl, 1, newFunc)
-		partialCert := testutil.CreatePC(t, td.block, td.signers[0])
-
-		if !td.verifiers[0].VerifyPartialCert(partialCert) {
-			t.Error("Partial Certificate was not verified.")
-		}
-	}
-	runBoth(t, run)
-}
-
 func TestVerifyInvalidPartialCert(t *testing.T) {
-	run := func(t *testing.T, newFunc newFunc) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-		td := newTestData(t, ctrl, 1, newFunc)
-		pc := ecdsa.NewPartialCert(ecdsa.NewSignature(big.NewInt(1), big.NewInt(2), 1), td.block.Hash())
+	td := newTestData(t, ctrl, 1)
+	pc := ecdsa.NewPartialCert(ecdsa.NewSignature(big.NewInt(1), big.NewInt(2), 1), td.block.Hash())
 
-		if td.verifiers[0].VerifyPartialCert(pc) {
-			t.Error("Invalid partial certificate was verified.")
-		}
+	if td.verifiers[0].VerifyPartialCert(pc) {
+		t.Error("Invalid partial certificate was verified.")
 	}
-	runBoth(t, run)
-}
-
-func TestCreateQuorumCert(t *testing.T) {
-	run := func(t *testing.T, newFunc newFunc) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		td := newTestData(t, ctrl, 4, newFunc)
-
-		pcs := testutil.CreatePCs(t, td.block, td.signers)
-
-		qc, err := td.signers[0].CreateQuorumCert(td.block, pcs)
-		if err != nil {
-			t.Fatalf("Failed to create QC: %v", err)
-		}
-
-		if qc.BlockHash() != td.block.Hash() {
-			t.Error("Quorum certificate hash does not match block hash!")
-		}
-
-		if len(qc.(*ecdsa.QuorumCert).Signatures()) != len(pcs) {
-			t.Error("Quorum certificate does not include all partial certificates!")
-		}
-	}
-	runBoth(t, run)
-}
-
-func TestCreateTimeoutCert(t *testing.T) {
-	run := func(t *testing.T, newFunc newFunc) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		td := newTestData(t, ctrl, 4, newFunc)
-
-		timeouts := testutil.CreateTimeouts(t, 1, td.signers)
-
-		tc, err := td.signers[0].CreateTimeoutCert(1, timeouts)
-		if err != nil {
-			t.Fatalf("Failed to create QC: %v", err)
-		}
-
-		if tc.View() != hotstuff.View(1) {
-			t.Error("Timeout certificate view does not match original view.")
-		}
-
-		if len(tc.(*ecdsa.TimeoutCert).Signatures()) != len(timeouts) {
-			t.Error("Quorum certificate does not include all partial certificates!")
-		}
-	}
-	runBoth(t, run)
-}
-
-func TestVerifyGenesisQC(t *testing.T) {
-	run := func(t *testing.T, newFunc newFunc) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		td := newTestData(t, ctrl, 4, newFunc)
-
-		genesisQC := ecdsa.NewQuorumCert(make(map[hotstuff.ID]*ecdsa.Signature), hotstuff.GetGenesis().Hash())
-
-		if !td.verifiers[0].VerifyQuorumCert(genesisQC) {
-			t.Error("Genesis QC was not verified!")
-		}
-	}
-	runBoth(t, run)
-}
-
-func TestVerifyQuorumCert(t *testing.T) {
-	run := func(t *testing.T, newFunc newFunc) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		td := newTestData(t, ctrl, 4, newFunc)
-
-		qc := testutil.CreateQC(t, td.block, td.signers)
-
-		for i, verifier := range td.verifiers {
-			if !verifier.VerifyQuorumCert(qc) {
-				t.Errorf("verifier %d failed to verify QC!", i+1)
-			}
-		}
-	}
-	runBoth(t, run)
-}
-
-func TestVerifyTimeoutCert(t *testing.T) {
-	run := func(t *testing.T, newFunc newFunc) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		td := newTestData(t, ctrl, 4, newFunc)
-
-		tc := testutil.CreateTC(t, 1, td.signers)
-
-		for i, verifier := range td.verifiers {
-			if !verifier.VerifyTimeoutCert(tc) {
-				t.Errorf("verifier %d failed to verify TC!", i+1)
-			}
-		}
-	}
-	runBoth(t, run)
 }
 
 func TestVerifyInvalidQuorumCert(t *testing.T) {
-	run := func(t *testing.T, newFunc newFunc) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-		td := newTestData(t, ctrl, 4, newFunc)
-		goodQC := testutil.CreateQC(t, td.block, td.signers[1:])
-		signatures := goodQC.(*ecdsa.QuorumCert).Signatures()
+	td := newTestData(t, ctrl, 4)
+	goodQC := testutil.CreateQC(t, td.block, td.signers[1:])
+	signatures := goodQC.(*ecdsa.QuorumCert).Signatures()
 
-		// set up a map of signatures that is too small to be valid
-		badSignatures := make(map[hotstuff.ID]*ecdsa.Signature, len(signatures)-1)
-		skip := true
-		for k, v := range signatures {
-			if skip {
-				skip = false
-				continue
-			}
-			badSignatures[k] = v
+	// set up a map of signatures that is too small to be valid
+	badSignatures := make(map[hotstuff.ID]*ecdsa.Signature, len(signatures)-1)
+	skip := true
+	for k, v := range signatures {
+		if skip {
+			skip = false
+			continue
 		}
+		badSignatures[k] = v
+	}
 
-		tests := []struct {
-			name string
-			qc   hotstuff.QuorumCert
-		}{
-			{"empty", ecdsa.NewQuorumCert(make(map[hotstuff.ID]*ecdsa.Signature), td.block.Hash())},
-			{"not enough signatures", ecdsa.NewQuorumCert(badSignatures, goodQC.BlockHash())},
-			{"hash mismatch", ecdsa.NewQuorumCert(signatures, hotstuff.Hash{})},
-		}
+	tests := []struct {
+		name string
+		qc   hotstuff.QuorumCert
+	}{
+		{"empty", ecdsa.NewQuorumCert(make(map[hotstuff.ID]*ecdsa.Signature), td.block.Hash())},
+		{"not enough signatures", ecdsa.NewQuorumCert(badSignatures, goodQC.BlockHash())},
+		{"hash mismatch", ecdsa.NewQuorumCert(signatures, hotstuff.Hash{})},
+	}
 
-		for _, test := range tests {
-			if td.verifiers[0].VerifyQuorumCert(test.qc) {
-				t.Errorf("%s: Expected QC to be invalid, but was validated.", test.name)
-			}
+	for _, test := range tests {
+		if td.verifiers[0].VerifyQuorumCert(test.qc) {
+			t.Errorf("%s: Expected QC to be invalid, but was validated.", test.name)
 		}
 	}
-	runBoth(t, run)
 }
 
 func TestVerifyCachedPartialCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	td := newTestData(t, ctrl, 2, newCache)
+	td := newTestData(t, ctrl, 2)
 	// create signature with other signer, so that it is not put in the cache right away.
 	pc := testutil.CreatePC(t, td.block, td.signers[1])
 
@@ -225,7 +80,7 @@ func TestVerifyCachedQuorumCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	td := newTestData(t, ctrl, 5, newCache)
+	td := newTestData(t, ctrl, 5)
 
 	// create signature with other signers, so that it is not put in the cache right away.
 	qc := testutil.CreateQC(t, td.block, td.signers[1:])
@@ -245,7 +100,7 @@ func TestCacheDrop(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	td := newTestData(t, ctrl, 5, newCache)
+	td := newTestData(t, ctrl, 5)
 
 	// create signatures with other signers, so that it is not put in the cache right away.
 	qc1 := testutil.CreateQC(t, td.block, td.signers[1:])
@@ -267,12 +122,6 @@ func TestCacheDrop(t *testing.T) {
 	}
 }
 
-func runBoth(t *testing.T, run func(*testing.T, newFunc)) {
-	t.Helper()
-	t.Run("NoCache", func(t *testing.T) { run(t, ecdsa.New) })
-	t.Run("WithCache", func(t *testing.T) { run(t, newCache) })
-}
-
 func createBlock(t *testing.T, signer hotstuff.Signer) *hotstuff.Block {
 	t.Helper()
 
@@ -285,19 +134,13 @@ func createBlock(t *testing.T, signer hotstuff.Signer) *hotstuff.Block {
 	return b
 }
 
-type newFunc func() (hotstuff.Signer, hotstuff.Verifier)
-
-func newCache() (hotstuff.Signer, hotstuff.Verifier) {
-	return ecdsa.NewWithCache(5)
-}
-
 type testData struct {
 	signers   []hotstuff.Signer
 	verifiers []hotstuff.Verifier
 	block     *hotstuff.Block
 }
 
-func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc newFunc) testData {
+func newTestData(t *testing.T, ctrl *gomock.Controller, n int) testData {
 	t.Helper()
 
 	bl := testutil.CreateBuilders(t, ctrl, n)

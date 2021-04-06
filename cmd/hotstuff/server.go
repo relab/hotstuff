@@ -21,7 +21,7 @@ import (
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus/chainedhotstuff"
-	"github.com/relab/hotstuff/crypto"
+	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/leaderrotation"
 	"google.golang.org/grpc"
@@ -30,7 +30,7 @@ import (
 )
 
 func runServer(ctx context.Context, conf *options) {
-	privkey, err := crypto.ReadPrivateKeyFile(conf.Privkey)
+	privkey, err := keygen.ReadPrivateKeyFile(conf.Privkey)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to read private key file: %v\n", err)
 		os.Exit(1)
@@ -45,7 +45,7 @@ func runServer(ctx context.Context, conf *options) {
 	var clientAddress string
 	replicaConfig := config.NewConfig(conf.SelfID, privkey, creds)
 	for _, r := range conf.Replicas {
-		key, err := crypto.ReadPublicKeyFile(r.Pubkey)
+		key, err := keygen.ReadPublicKeyFile(r.Pubkey)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to read public key file '%s': %v\n", r.Pubkey, err)
 			os.Exit(1)

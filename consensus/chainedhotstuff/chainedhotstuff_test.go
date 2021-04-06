@@ -18,7 +18,7 @@ func TestPropose(t *testing.T) {
 	// Setup mocks
 	ctrl := gomock.NewController(t)
 	hs := New()
-	builder := testutil.TestModules(t, ctrl, 1, testutil.GenerateKey(t))
+	builder := testutil.TestModules(t, ctrl, 1, testutil.GenerateECDSAKey(t))
 	synchronizer := synchronizer.New(testutil.FixedTimeout(time.Second))
 	cfg, replicas := testutil.CreateMockConfigWithReplicas(t, ctrl, 2)
 	builder.Register(hs, cfg, testutil.NewLeaderRotation(t, 1, 2), synchronizer)
@@ -44,7 +44,7 @@ func TestCommit(t *testing.T) {
 	const n = 4
 	ctrl := gomock.NewController(t)
 	hs := New()
-	keys := testutil.GenerateKeys(t, n)
+	keys := testutil.GenerateKeys(t, n, testutil.GenerateECDSAKey)
 	bl := testutil.CreateBuilders(t, ctrl, n, keys...)
 	acceptor := mocks.NewMockAcceptor(ctrl)
 	executor := mocks.NewMockExecutor(ctrl)
@@ -140,7 +140,7 @@ func TestForkingAttack(t *testing.T) {
 	const n = 4
 	ctrl := gomock.NewController(t)
 	hs := New()
-	keys := testutil.GenerateKeys(t, n)
+	keys := testutil.GenerateKeys(t, n, testutil.GenerateECDSAKey)
 	bl := testutil.CreateBuilders(t, ctrl, n, keys...)
 	cfg, replicas := testutil.CreateMockConfigWithReplicas(t, ctrl, n, keys...)
 	executor := mocks.NewMockExecutor(ctrl)

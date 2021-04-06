@@ -20,7 +20,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
-	"github.com/relab/hotstuff/crypto"
+	"github.com/relab/hotstuff/crypto/keygen"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/proto"
@@ -55,7 +55,7 @@ func runClient(ctx context.Context, conf *options) {
 
 	replicaConfig := config.NewConfig(0, nil, creds)
 	for _, r := range conf.Replicas {
-		key, err := crypto.ReadPublicKeyFile(r.Pubkey)
+		key, err := keygen.ReadPublicKeyFile(r.Pubkey)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to read public key file '%s': %v\n", r.Pubkey, err)
 			os.Exit(1)

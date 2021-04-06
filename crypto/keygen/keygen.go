@@ -1,4 +1,4 @@
-package crypto
+package keygen
 
 import (
 	"crypto/ecdsa"
@@ -19,15 +19,6 @@ import (
 	"github.com/relab/hotstuff/crypto/bls12"
 	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
 )
-
-// GenerateBLSPrivateKey returns a new BLS12-381 private key.
-func GenerateBLSPrivateKey() (pk *bls12.PrivateKey, err error) {
-	pk, err = bls12.GeneratePrivateKey()
-	if err != nil {
-		return nil, err
-	}
-	return pk, nil
-}
 
 // GenerateECDSAPrivateKey returns a new ECDSA private key.
 func GenerateECDSAPrivateKey() (pk *ecdsa.PrivateKey, err error) {
@@ -327,7 +318,7 @@ func GenerateConfiguration(dest string, tls, bls bool, firstID, n int, pattern s
 		}
 
 		if !bls {
-			return nil
+			continue
 		}
 
 		blsKey, err := bls12.GeneratePrivateKey()

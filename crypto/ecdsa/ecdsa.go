@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/crypto"
 	"go.uber.org/multierr"
 )
 
@@ -24,20 +25,6 @@ const (
 
 	// PublicKeyFileType is the PEM type for a public key.
 	PublicKeyFileType = "ECDSA PUBLIC KEY"
-)
-
-var (
-	// ErrHashMismatch is the error used when a partial certificate hash does not match the hash of a block.
-	ErrHashMismatch = fmt.Errorf("certificate hash does not match block hash")
-
-	// ErrPartialDuplicate is the error used when two or more signatures were created by the same replica.
-	ErrPartialDuplicate = fmt.Errorf("cannot add more than one signature per replica")
-
-	// ErrViewMismatch is the error used when timeouts have different views.
-	ErrViewMismatch = fmt.Errorf("timeout views do not match")
-
-	// ErrNotAQuorum is the error used when a q
-	ErrNotAQuorum = fmt.Errorf("not a quorum")
 )
 
 // Signature is an ECDSA signature
@@ -252,11 +239,11 @@ func (ec *ecdsaCrypto) CreateQuorumCert(block *hotstuff.Block, signatures []hots
 	for _, s := range signatures {
 		blockHash := s.BlockHash()
 		if !bytes.Equal(hash[:], blockHash[:]) {
-			err = multierr.Append(err, ErrHashMismatch)
+			err = multierr.Append(err, crypto.ErrHashMismatch)
 			continue
 		}
 		if _, ok := qc.signatures[s.Signature().Signer()]; ok {
-			err = multierr.Append(err, ErrPartialDuplicate)
+			err = multierr.Append(err, crypto.ErrPartialDuplicate)
 			continue
 		}
 		// use the registered verifier instead of ourself to verify.
@@ -270,7 +257,7 @@ func (ec *ecdsaCrypto) CreateQuorumCert(block *hotstuff.Block, signatures []hots
 		return qc, nil
 	}
 
-	return nil, multierr.Combine(ErrNotAQuorum, err)
+	return nil, multierr.Combine(crypto.ErrNotAQuorum, err)
 }
 
 // CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
@@ -285,11 +272,11 @@ func (ec *ecdsaCrypto) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff
 	}
 	for _, t := range timeouts {
 		if t.View != tc.view {
-			err = multierr.Append(err, ErrHashMismatch)
+			err = multierr.Append(err, crypto.ErrHashMismatch)
 			continue
 		}
 		if _, ok := tc.signatures[t.Signature.Signer()]; ok {
-			err = multierr.Append(err, ErrPartialDuplicate)
+			err = multierr.Append(err, crypto.ErrPartialDuplicate)
 			continue
 		}
 		// use the registered verifier instead of ourself to verify.
@@ -302,7 +289,7 @@ func (ec *ecdsaCrypto) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff
 		return tc, nil
 	}
 
-	return nil, multierr.Combine(ErrNotAQuorum, err)
+	return nil, multierr.Combine(crypto.ErrNotAQuorum, err)
 }
 
 // Verify verifies a signature given a hash.

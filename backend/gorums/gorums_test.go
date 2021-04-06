@@ -14,8 +14,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
-	"github.com/relab/hotstuff/crypto"
 	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
+	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 	"google.golang.org/grpc/credentials"
@@ -169,7 +169,7 @@ type testData struct {
 	n         int
 	cfg       config.ReplicaConfig
 	listeners []net.Listener
-	keys      keys
+	keys      []hotstuff.PrivateKey
 	builders  testutil.BuilderList
 }
 
@@ -179,17 +179,17 @@ func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
 	t.Helper()
 
 	listeners := make([]net.Listener, n)
-	keys := make(keys, 0, n)
+	keys := make([]hotstuff.PrivateKey, 0, n)
 	replicas := make([]*config.ReplicaInfo, 0, n)
 
 	// generate keys and replicaInfo
 	for i := 0; i < n; i++ {
 		listeners[i] = testutil.CreateTCPListener(t)
-		keys = append(keys, testutil.GenerateKey(t))
+		keys = append(keys, testutil.GenerateECDSAKey(t))
 		replicas = append(replicas, &config.ReplicaInfo{
 			ID:      hotstuff.ID(i) + 1,
 			Address: listeners[i].Addr().String(),
-			PubKey:  &keys[i].PublicKey,
+			PubKey:  keys[i].Public(),
 		})
 	}
 
@@ -198,7 +198,7 @@ func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
 		cfg.Replicas[replica.ID] = replica
 	}
 
-	return testData{n, *cfg, listeners, keys, testutil.CreateBuilders(t, ctrl, n, keys.iface()...)}
+	return testData{n, *cfg, listeners, keys, testutil.CreateBuilders(t, ctrl, n, keys...)}
 }
 
 func setupTLS(t *testing.T, ctrl *gomock.Controller, n int) testData {
@@ -207,19 +207,19 @@ func setupTLS(t *testing.T, ctrl *gomock.Controller, n int) testData {
 
 	certificates := make([]*x509.Certificate, 0, n)
 
-	caPK := testutil.GenerateKey(t)
-	ca, err := crypto.GenerateRootCert(caPK)
+	caPK := testutil.GenerateECDSAKey(t)
+	ca, err := keygen.GenerateRootCert(caPK.(*ecdsa.PrivateKey))
 	if err != nil {
 		t.Fatalf("Failed to generate CA: %v", err)
 	}
 
 	for i := 0; i < n; i++ {
-		cert, err := crypto.GenerateTLSCert(
+		cert, err := keygen.GenerateTLSCert(
 			hotstuff.ID(i)+1,
 			[]string{"localhost", "127.0.0.1"},
 			ca,
 			td.cfg.Replicas[hotstuff.ID(i)+1].PubKey.(*ecdsa.PublicKey),
-			caPK,
+			caPK.(*ecdsa.PrivateKey),
 		)
 		if err != nil {
 			t.Fatalf("Failed to generate certificate: %v", err)
@@ -286,14 +286,4 @@ func createMocks(t *testing.T, ctrl *gomock.Controller, td testData, n int) (m [
 		td.builders[i].Register(m[i])
 	}
 	return
-}
-
-type keys []*ecdsa.PrivateKey
-
-func (ks keys) iface() (i []hotstuff.PrivateKey) {
-	i = make([]hotstuff.PrivateKey, len(ks))
-	for j, s := range ks {
-		i[j] = s
-	}
-	return i
 }

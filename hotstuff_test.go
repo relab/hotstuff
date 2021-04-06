@@ -29,13 +29,13 @@ func TestChainedHotstuff(t *testing.T) {
 	keys := make([]hotstuff.PrivateKey, n)
 	for i := 0; i < n; i++ {
 		listeners[i] = testutil.CreateTCPListener(t)
-		key := testutil.GenerateKey(t)
+		key := testutil.GenerateECDSAKey(t)
 		keys[i] = key
 		id := hotstuff.ID(i + 1)
 		baseCfg.Replicas[id] = &config.ReplicaInfo{
 			ID:      id,
 			Address: listeners[i].Addr().String(),
-			PubKey:  &key.PublicKey,
+			PubKey:  key.Public(),
 		}
 	}
 

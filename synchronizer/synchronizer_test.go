@@ -16,13 +16,13 @@ import (
 func TestLocalTimeout(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	qc := ecdsa.NewQuorumCert(make(map[hotstuff.ID]*ecdsa.Signature), hotstuff.GetGenesis().Hash())
-	builder := testutil.TestModules(t, ctrl, 2, testutil.GenerateKey(t))
+	builder := testutil.TestModules(t, ctrl, 2, testutil.GenerateECDSAKey(t))
 	hs := mocks.NewMockConsensus(ctrl)
 	s := New(testutil.FixedTimeout(time.Millisecond))
 	builder.Register(hs, s)
 	mods := builder.Build()
 	cfg := mods.Config().(*mocks.MockConfig)
-	leader := testutil.CreateMockReplica(t, ctrl, 1, testutil.GenerateKey(t))
+	leader := testutil.CreateMockReplica(t, ctrl, 1, testutil.GenerateECDSAKey(t))
 	testutil.ConfigAddReplica(t, cfg, leader)
 
 	c := make(chan struct{})

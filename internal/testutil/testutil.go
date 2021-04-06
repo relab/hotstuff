@@ -3,7 +3,6 @@ package testutil
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"fmt"
 	"net"
 	"testing"
@@ -14,8 +13,9 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/crypto"
+	"github.com/relab/hotstuff/crypto/bls12"
 	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
+	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/mocks"
 )
@@ -66,7 +66,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 }
 
 // BuilderList is a helper type to perform actions on a set of builders.
-type BuilderList []hotstuff.Builder
+type BuilderList []*hotstuff.Builder
 
 // HotStuffList is a helper type to perform actions on a set of HotStuff instances.
 type HotStuffList []*hotstuff.HotStuff
@@ -110,7 +110,7 @@ func (hl HotStuffList) Keys() (keys []hotstuff.PrivateKey) {
 // CreateBuilders creates n builders with default modules. Configurations are initialized with replicas.
 func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstuff.PrivateKey) (builders BuilderList) {
 	t.Helper()
-	builders = make([]hotstuff.Builder, n)
+	builders = make([]*hotstuff.Builder, n)
 	replicas := make([]*mocks.MockReplica, n)
 	configs := make([]*mocks.MockConfig, n)
 	for i := 0; i < n; i++ {
@@ -119,11 +119,12 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 		if i < len(keys) {
 			key = keys[i]
 		} else {
-			key = GenerateKey(t)
+			key = GenerateECDSAKey(t)
 		}
 		configs[i] = mocks.NewMockConfig(ctrl)
 		replicas[i] = CreateMockReplica(t, ctrl, id, key.Public())
-		builders[i] = TestModules(t, ctrl, id, key)
+		builders[i] = new(hotstuff.Builder)
+		*builders[i] = TestModules(t, ctrl, id, key)
 		builders[i].Register(configs[i]) // replaces the config registered by TestModules()
 	}
 	for _, config := range configs {
@@ -153,7 +154,7 @@ func CreateMockConfigWithReplicas(t *testing.T, ctrl *gomock.Controller, n int, 
 	}
 	for i := 0; i < n; i++ {
 		if len(keys) <= i {
-			keys = append(keys, GenerateKey(t))
+			keys = append(keys, GenerateECDSAKey(t))
 		}
 		replicas[i] = CreateMockReplica(t, ctrl, hotstuff.ID(i+1), keys[i].Public())
 		ConfigAddReplica(t, cfg, replicas[i])
@@ -284,10 +285,20 @@ func CreateTC(t *testing.T, view hotstuff.View, signers []hotstuff.Signer) hotst
 	return tc
 }
 
-// GenerateKey generates an ECDSA private key for use in tests.
-func GenerateKey(t *testing.T) *ecdsa.PrivateKey {
+// GenerateECDSAKey generates an ECDSA private key for use in tests.
+func GenerateECDSAKey(t *testing.T) hotstuff.PrivateKey {
 	t.Helper()
-	key, err := crypto.GenerateECDSAPrivateKey()
+	key, err := keygen.GenerateECDSAPrivateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate private key: %v", err)
+	}
+	return key
+}
+
+// GenerateBLS12Key generates a BLS12-381 private key for use in tests.
+func GenerateBLS12Key(t *testing.T) hotstuff.PrivateKey {
+	t.Helper()
+	key, err := bls12.GeneratePrivateKey()
 	if err != nil {
 		t.Fatalf("Failed to generate private key: %v", err)
 	}
@@ -295,10 +306,10 @@ func GenerateKey(t *testing.T) *ecdsa.PrivateKey {
 }
 
 // GenerateKeys generates n keys.
-func GenerateKeys(t *testing.T, n int) (keys []hotstuff.PrivateKey) {
+func GenerateKeys(t *testing.T, n int, keyFunc func(t *testing.T) hotstuff.PrivateKey) (keys []hotstuff.PrivateKey) {
 	keys = make([]hotstuff.PrivateKey, n)
 	for i := 0; i < n; i++ {
-		keys[i] = GenerateKey(t)
+		keys[i] = keyFunc(t)
 	}
 	return keys
 }

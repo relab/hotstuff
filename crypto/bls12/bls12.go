@@ -8,7 +8,7 @@ import (
 
 	bls12 "github.com/kilic/bls12-381"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/crypto/ecdsa"
+	"github.com/relab/hotstuff/crypto"
 	"go.uber.org/multierr"
 )
 
@@ -133,6 +133,9 @@ type aggregateSignature struct {
 
 // ToBytes returns a byte representation of the aggregate signature.
 func (agg *aggregateSignature) ToBytes() []byte {
+	if agg == nil {
+		return nil
+	}
 	b := bls12.NewG2().ToCompressed(&agg.sig)
 	for id := range agg.participants {
 		var t [4]byte
@@ -238,22 +241,22 @@ func (bc *bls12Crypto) CreateQuorumCert(block *hotstuff.Block, signatures []hots
 		return &QuorumCert{hash: hotstuff.GetGenesis().Hash()}, nil
 	}
 	if len(signatures) < bc.mod.Config().QuorumSize() {
-		return nil, ecdsa.ErrNotAQuorum
+		return nil, crypto.ErrNotAQuorum
 	}
 	sigs := make(map[hotstuff.ID]*Signature, len(signatures))
 	for _, sig := range signatures {
 		if sig.BlockHash() != block.Hash() {
-			err = multierr.Append(err, ecdsa.ErrHashMismatch)
+			err = multierr.Append(err, crypto.ErrHashMismatch)
 			continue
 		}
 		if _, ok := sigs[sig.Signature().Signer()]; ok {
-			err = multierr.Append(err, ecdsa.ErrPartialDuplicate)
+			err = multierr.Append(err, crypto.ErrPartialDuplicate)
 			continue
 		}
 		sigs[sig.Signature().Signer()] = &sig.(*PartialCert).sig
 	}
 	if len(sigs) < bc.mod.Config().QuorumSize() {
-		return nil, multierr.Combine(ecdsa.ErrNotAQuorum, err)
+		return nil, multierr.Combine(crypto.ErrNotAQuorum, err)
 	}
 	aggSig := bc.aggregateSignatures(sigs)
 	return &QuorumCert{sig: aggSig, hash: block.Hash()}, nil
@@ -265,22 +268,22 @@ func (bc *bls12Crypto) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff
 		return &TimeoutCert{view: 0}, nil
 	}
 	if len(timeouts) < bc.mod.Config().QuorumSize() {
-		return nil, ecdsa.ErrNotAQuorum
+		return nil, crypto.ErrNotAQuorum
 	}
 	sigs := make(map[hotstuff.ID]*Signature, len(timeouts))
 	for _, timeout := range timeouts {
 		if timeout.View != view {
-			err = multierr.Append(err, ecdsa.ErrHashMismatch)
+			err = multierr.Append(err, crypto.ErrHashMismatch)
 			continue
 		}
 		if _, ok := sigs[timeout.ID]; ok {
-			err = multierr.Append(err, ecdsa.ErrPartialDuplicate)
+			err = multierr.Append(err, crypto.ErrPartialDuplicate)
 			continue
 		}
 		sigs[timeout.ID] = timeout.Signature.(*Signature)
 	}
 	if len(sigs) < bc.mod.Config().QuorumSize() {
-		return nil, multierr.Combine(ecdsa.ErrNotAQuorum, err)
+		return nil, multierr.Combine(crypto.ErrNotAQuorum, err)
 	}
 	aggSig := bc.aggregateSignatures(sigs)
 	return &TimeoutCert{sig: aggSig, view: view}, nil
@@ -337,12 +340,18 @@ func (bc *bls12Crypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 
 // VerifyQuorumCert verifies a quorum certificate.
 func (bc *bls12Crypto) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
+	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
+		return true
+	}
 	q := qc.(*QuorumCert)
 	return bc.fastAggregateVerify(q.sig, q.hash)
 }
 
 // VerifyTimeoutCert verifies a timeout certificate.
 func (bc *bls12Crypto) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
+	if tc.View() == 0 {
+		return true
+	}
 	t := tc.(*TimeoutCert)
 	return bc.fastAggregateVerify(t.sig, t.view.ToHash())
 }

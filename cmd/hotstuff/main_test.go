@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/crypto"
+	"github.com/relab/hotstuff/crypto/keygen"
 )
 
 var (
@@ -129,7 +129,7 @@ func getFreePorts(t *testing.T, n int) ports {
 
 func generateKeys(t *testing.T, path string) {
 	t.Helper()
-	if err := crypto.GenerateConfiguration(path, true, false, 1, 4, "*", []string{"127.0.0.1"}); err != nil {
+	if err := keygen.GenerateConfiguration(path, true, false, 1, 4, "*", []string{"127.0.0.1"}); err != nil {
 		t.Fatal(err)
 	}
 }

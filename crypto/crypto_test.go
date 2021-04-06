@@ -1,0 +1,200 @@
+package crypto_test
+
+import (
+	"testing"
+
+	"github.com/golang/mock/gomock"
+	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/crypto/bls12"
+	"github.com/relab/hotstuff/crypto/ecdsa"
+	"github.com/relab/hotstuff/internal/testutil"
+)
+
+func TestCreatePartialCert(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		td := setup(t, ctrl, 1)
+
+		partialCert, err := td.signers[0].CreatePartialCert(td.block)
+		if err != nil {
+			t.Fatalf("Failed to create partial certificate: %v", err)
+		}
+
+		if partialCert.BlockHash() != td.block.Hash() {
+			t.Error("Partial certificate hash does not match block hash!")
+		}
+
+		if signerID := partialCert.Signature().Signer(); signerID != hotstuff.ID(1) {
+			t.Errorf("Wrong ID for signer in partial certificate: got: %d, want: %d", signerID, hotstuff.ID(1))
+		}
+	}
+	runAll(t, run)
+}
+
+func TestVerifyPartialCert(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		td := setup(t, ctrl, 1)
+		partialCert := testutil.CreatePC(t, td.block, td.signers[0])
+
+		if !td.verifiers[0].VerifyPartialCert(partialCert) {
+			t.Error("Partial Certificate was not verified.")
+		}
+	}
+	runAll(t, run)
+}
+
+func TestCreateQuorumCert(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		td := setup(t, ctrl, 4)
+
+		pcs := testutil.CreatePCs(t, td.block, td.signers)
+
+		qc, err := td.signers[0].CreateQuorumCert(td.block, pcs)
+		if err != nil {
+			t.Fatalf("Failed to create QC: %v", err)
+		}
+
+		if qc.BlockHash() != td.block.Hash() {
+			t.Error("Quorum certificate hash does not match block hash!")
+		}
+	}
+	runAll(t, run)
+}
+
+func TestCreateTimeoutCert(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		td := setup(t, ctrl, 4)
+
+		timeouts := testutil.CreateTimeouts(t, 1, td.signers)
+
+		tc, err := td.signers[0].CreateTimeoutCert(1, timeouts)
+		if err != nil {
+			t.Fatalf("Failed to create QC: %v", err)
+		}
+
+		if tc.View() != hotstuff.View(1) {
+			t.Error("Timeout certificate view does not match original view.")
+		}
+	}
+	runAll(t, run)
+}
+
+func TestVerifyGenesisQC(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		td := setup(t, ctrl, 4)
+
+		genesisQC, err := td.signers[0].CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !td.verifiers[0].VerifyQuorumCert(genesisQC) {
+			t.Error("Genesis QC was not verified!")
+		}
+	}
+	runAll(t, run)
+}
+
+func TestVerifyQuorumCert(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		td := setup(t, ctrl, 4)
+
+		qc := testutil.CreateQC(t, td.block, td.signers)
+
+		for i, verifier := range td.verifiers {
+			if !verifier.VerifyQuorumCert(qc) {
+				t.Errorf("verifier %d failed to verify QC!", i+1)
+			}
+		}
+	}
+	runAll(t, run)
+}
+
+func TestVerifyTimeoutCert(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		td := setup(t, ctrl, 4)
+
+		tc := testutil.CreateTC(t, 1, td.signers)
+
+		for i, verifier := range td.verifiers {
+			if !verifier.VerifyTimeoutCert(tc) {
+				t.Errorf("verifier %d failed to verify TC!", i+1)
+			}
+		}
+	}
+	runAll(t, run)
+}
+
+func runAll(t *testing.T, run func(*testing.T, setupFunc)) {
+	t.Helper()
+	t.Run("Ecdsa", func(t *testing.T) { run(t, setup(ecdsa.New, testutil.GenerateECDSAKey)) })
+	t.Run("EcdsaCache", func(t *testing.T) { run(t, setup(newEcdsaCache, testutil.GenerateECDSAKey)) })
+	t.Run("BLS12-381", func(t *testing.T) { run(t, setup(bls12.New, testutil.GenerateBLS12Key)) })
+}
+
+func createBlock(t *testing.T, signer hotstuff.Signer) *hotstuff.Block {
+	t.Helper()
+
+	qc, err := signer.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+	if err != nil {
+		t.Errorf("Could not create empty QC for genesis: %v", err)
+	}
+
+	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "foo", 42, 1)
+	return b
+}
+
+type newFunc func() (hotstuff.Signer, hotstuff.Verifier)
+type keyFunc func(t *testing.T) hotstuff.PrivateKey
+type setupFunc func(*testing.T, *gomock.Controller, int) testData
+
+func setup(newFunc newFunc, keyFunc keyFunc) setupFunc {
+	return func(t *testing.T, ctrl *gomock.Controller, n int) testData {
+		return newTestData(t, ctrl, n, newFunc, keyFunc)
+	}
+}
+
+func newEcdsaCache() (hotstuff.Signer, hotstuff.Verifier) {
+	return ecdsa.NewWithCache(50)
+}
+
+type testData struct {
+	signers   []hotstuff.Signer
+	verifiers []hotstuff.Verifier
+	block     *hotstuff.Block
+}
+
+func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc newFunc, keyFunc keyFunc) testData {
+	t.Helper()
+
+	bl := testutil.CreateBuilders(t, ctrl, n, testutil.GenerateKeys(t, n, keyFunc)...)
+	for _, builder := range bl {
+		sign, verify := newFunc()
+		builder.Register(sign, verify)
+	}
+	hl := bl.Build()
+
+	return testData{
+		signers:   hl.Signers(),
+		verifiers: hl.Verifiers(),
+		block:     createBlock(t, hl[0].Signer()),
+	}
+}

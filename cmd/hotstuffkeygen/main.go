@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/relab/hotstuff/crypto"
+	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/spf13/pflag"
 )
 
@@ -36,7 +36,7 @@ func main() {
 	}
 
 	dest := pflag.Arg(0)
-	err := crypto.GenerateConfiguration(dest, *tls, *bls, *startID, *numKeys, *keyPattern, *hosts)
+	err := keygen.GenerateConfiguration(dest, *tls, *bls, *startID, *numKeys, *keyPattern, *hosts)
 	if err != nil {
 		logger.Fatal(err)
 	}
