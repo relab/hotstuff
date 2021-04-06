@@ -13,8 +13,11 @@ import (
 )
 
 const (
+	// PrivateKeyFileType is the PEM type for a private key.
 	PrivateKeyFileType = "BLS12-381 PRIVATE KEY"
-	PublicKeyFileType  = "BLS12-381 PUBLIC KEY"
+
+	// PublicKeyFileType is the PEM type for a public key.
+	PublicKeyFileType = "BLS12-381 PUBLIC KEY"
 )
 
 var domain = []byte("BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_")
@@ -22,32 +25,39 @@ var domain = []byte("BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_")
 // the order r of G1
 var curveOrder, _ = new(big.Int).SetString("73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001", 16)
 
+// PublicKey is a bls12-381 public key.
 type PublicKey struct {
 	p *bls12.PointG1
 }
 
+// ToBytes marshals the public key to a byte slice.
 func (pub PublicKey) ToBytes() []byte {
 	return bls12.NewG1().ToCompressed(pub.p)
 }
 
+// FromBytes unmarshals the public key from a byte slice.
 func (pub *PublicKey) FromBytes(b []byte) (err error) {
 	pub.p, err = bls12.NewG1().FromCompressed(b)
 	return err
 }
 
+// PrivateKey is a bls12-381 private key.
 type PrivateKey struct {
 	p *big.Int
 }
 
+// ToBytes marshals the private key to a byte slice.
 func (priv PrivateKey) ToBytes() []byte {
 	return priv.p.Bytes()
 }
 
+// FromBytes unmarshals the private key from a byte slice.
 func (priv PrivateKey) FromBytes(b []byte) {
 	priv.p = new(big.Int)
 	priv.p.SetBytes(b)
 }
 
+// GeneratePrivateKey generates a new private key.
 func GeneratePrivateKey() (*PrivateKey, error) {
 	// the private key is uniformly random integer such that 0 <= pk < r
 	pk, err := rand.Int(rand.Reader, curveOrder)
@@ -60,10 +70,10 @@ func GeneratePrivateKey() (*PrivateKey, error) {
 }
 
 // Public returns the public key associated with this private key.
-func (pk *PrivateKey) Public() hotstuff.PublicKey {
+func (priv *PrivateKey) Public() hotstuff.PublicKey {
 	p := &bls12.PointG1{}
 	// The public key is the secret key multiplied by the generator G1
-	return &PublicKey{p: bls12.NewG1().MulScalarBig(p, &bls12.G1One, pk.p)}
+	return &PublicKey{p: bls12.NewG1().MulScalarBig(p, &bls12.G1One, priv.p)}
 }
 
 type Signature struct {
