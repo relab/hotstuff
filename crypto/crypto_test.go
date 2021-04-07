@@ -5,6 +5,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/internal/testutil"
@@ -145,12 +146,13 @@ func TestVerifyTimeoutCert(t *testing.T) {
 
 func runAll(t *testing.T, run func(*testing.T, setupFunc)) {
 	t.Helper()
-	t.Run("Ecdsa", func(t *testing.T) { run(t, setup(ecdsa.New, testutil.GenerateECDSAKey)) })
-	t.Run("EcdsaCache", func(t *testing.T) { run(t, setup(newEcdsaCache, testutil.GenerateECDSAKey)) })
-	t.Run("BLS12-381", func(t *testing.T) { run(t, setup(bls12.New, testutil.GenerateBLS12Key)) })
+	t.Run("Ecdsa", func(t *testing.T) { run(t, setup(NewBase(ecdsa.New), testutil.GenerateECDSAKey)) })
+	t.Run("Cache+Ecdsa", func(t *testing.T) { run(t, setup(NewCache(ecdsa.New), testutil.GenerateECDSAKey)) })
+	t.Run("BLS12-381", func(t *testing.T) { run(t, setup(NewBase(bls12.New), testutil.GenerateBLS12Key)) })
+	t.Run("Cache+BLS12-381", func(t *testing.T) { run(t, setup(NewCache(bls12.New), testutil.GenerateBLS12Key)) })
 }
 
-func createBlock(t *testing.T, signer hotstuff.Signer) *hotstuff.Block {
+func createBlock(t *testing.T, signer hotstuff.Crypto) *hotstuff.Block {
 	t.Helper()
 
 	qc, err := signer.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
@@ -162,39 +164,46 @@ func createBlock(t *testing.T, signer hotstuff.Signer) *hotstuff.Block {
 	return b
 }
 
-type newFunc func() (hotstuff.Signer, hotstuff.Verifier)
 type keyFunc func(t *testing.T) hotstuff.PrivateKey
 type setupFunc func(*testing.T, *gomock.Controller, int) testData
 
-func setup(newFunc newFunc, keyFunc keyFunc) setupFunc {
+func setup(newFunc func() hotstuff.Crypto, keyFunc keyFunc) setupFunc {
 	return func(t *testing.T, ctrl *gomock.Controller, n int) testData {
 		return newTestData(t, ctrl, n, newFunc, keyFunc)
 	}
 }
 
-func newEcdsaCache() (hotstuff.Signer, hotstuff.Verifier) {
-	return ecdsa.NewWithCache(50)
+func NewCache(impl func() hotstuff.CryptoImpl) func() hotstuff.Crypto {
+	return func() hotstuff.Crypto {
+		return crypto.NewCache(impl(), 10)
+	}
+}
+
+func NewBase(impl func() hotstuff.CryptoImpl) func() hotstuff.Crypto {
+	return func() hotstuff.Crypto {
+		return crypto.New(impl())
+	}
 }
 
 type testData struct {
-	signers   []hotstuff.Signer
-	verifiers []hotstuff.Verifier
+	signers   []hotstuff.Crypto
+	verifiers []hotstuff.Crypto
 	block     *hotstuff.Block
 }
 
-func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc newFunc, keyFunc keyFunc) testData {
+func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() hotstuff.Crypto, keyFunc keyFunc) testData {
 	t.Helper()
 
 	bl := testutil.CreateBuilders(t, ctrl, n, testutil.GenerateKeys(t, n, keyFunc)...)
 	for _, builder := range bl {
-		sign, verify := newFunc()
-		builder.Register(sign, verify)
+		signer := newFunc()
+		builder.Register(signer)
 	}
 	hl := bl.Build()
 
 	return testData{
 		signers:   hl.Signers(),
 		verifiers: hl.Verifiers(),
-		block:     createBlock(t, hl[0].Signer()),
+		block:     createBlock(t, hl[0].Crypto()),
 	}
 }

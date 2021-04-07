@@ -4,27 +4,92 @@ import (
 	"math/big"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 )
 
 // SignatureToProto converts a hotstuff.Signature to a proto.Signature.
 func SignatureToProto(sig hotstuff.Signature) *Signature {
-	s := sig.(*ecdsa.Signature)
-	return &Signature{
-		ReplicaID: uint32(s.Signer()),
-		R:         s.R().Bytes(),
-		S:         s.S().Bytes(),
+	signature := &Signature{}
+	switch s := sig.(type) {
+	case *ecdsa.Signature:
+		signature.Sig = &Signature_ECDSASig{ECDSASig: &ECDSASignature{
+			Signer: uint32(s.Signer()),
+			R:      s.R().Bytes(),
+			S:      s.S().Bytes(),
+		}}
+	case *bls12.Signature:
+		signature.Sig = &Signature_BLS12Sig{BLS12Sig: &BLS12Signature{
+			Sig: s.ToBytes(),
+		}}
 	}
+	return signature
 }
 
 // SignatureFromProto converts a proto.Signature to an ecdsa.Signature.
-func SignatureFromProto(sig *Signature) *ecdsa.Signature {
-	r := new(big.Int)
-	r.SetBytes(sig.GetR())
-	s := new(big.Int)
-	s.SetBytes(sig.GetS())
+func SignatureFromProto(sig *Signature) hotstuff.Signature {
+	if signature := sig.GetECDSASig(); signature != nil {
+		r := new(big.Int)
+		r.SetBytes(signature.GetR())
+		s := new(big.Int)
+		s.SetBytes(signature.GetS())
+		return ecdsa.NewSignature(r, s, hotstuff.ID(signature.GetSigner()))
+	}
+	if signature := sig.GetBLS12Sig(); signature != nil {
+		s := &bls12.Signature{}
+		s.FromBytes(signature.GetSig())
+		return s
+	}
+	return nil
+}
 
-	return ecdsa.NewSignature(r, s, hotstuff.ID(sig.GetReplicaID()))
+func ThresholdSignatureToProto(sig hotstuff.ThresholdSignature) *ThresholdSignature {
+	signature := &ThresholdSignature{}
+	switch s := sig.(type) {
+	case *ecdsa.ThresholdSignature:
+		sigs := make(map[uint32]*ECDSASignature)
+		for _, p := range s.Signatures() {
+			sigs[uint32(p.Signer())] = &ECDSASignature{
+				Signer: uint32(p.Signer()),
+				R:      p.R().Bytes(),
+				S:      p.S().Bytes(),
+			}
+		}
+		signature.AggSig = &ThresholdSignature_ECDSASigs{ECDSASigs: &ECDSAThresholdSignature{
+			Sigs: sigs,
+		}}
+	case *bls12.AggregateSignature:
+		signature.AggSig = &ThresholdSignature_BLS12Sig{BLS12Sig: &BLS12AggregateSignature{
+			Sig: s.ToBytes(),
+		}}
+	}
+	return signature
+}
+
+func ThresholdSignatureFromProto(sig *ThresholdSignature) hotstuff.ThresholdSignature {
+	if signature := sig.GetECDSASigs(); signature != nil {
+		sigs := make(map[hotstuff.ID]*ecdsa.Signature, len(signature.GetSigs()))
+		for _, sig := range signature.GetSigs() {
+			r := new(big.Int)
+			r.SetBytes(sig.GetR())
+			s := new(big.Int)
+			s.SetBytes(sig.GetS())
+			sigs[hotstuff.ID(sig.GetSigner())] = ecdsa.NewSignature(r, s, hotstuff.ID(sig.GetSigner()))
+		}
+		return ecdsa.NewThresholdSignature(sigs)
+	}
+	if signature := sig.GetBLS12Sig(); signature != nil {
+		participants := make(hotstuff.IDSet, len(signature.GetParticipants()))
+		for _, participant := range signature.GetParticipants() {
+			participants.Add(hotstuff.ID(participant))
+		}
+		aggSig, err := bls12.NewAggregateSignature(signature.GetSig(), participants)
+		if err != nil {
+			return nil
+		}
+		return aggSig
+	}
+	return nil
 }
 
 // PartialCertToProto converts a hotstuff.PartialCert to a proto.Partialcert.
@@ -37,35 +102,26 @@ func PartialCertToProto(cert hotstuff.PartialCert) *PartialCert {
 }
 
 // PartialCertFromProto converts a proto.PartialCert to an ecdsa.PartialCert.
-func PartialCertFromProto(cert *PartialCert) *ecdsa.PartialCert {
+func PartialCertFromProto(cert *PartialCert) hotstuff.PartialCert {
 	var h hotstuff.Hash
 	copy(h[:], cert.GetHash())
-	return ecdsa.NewPartialCert(SignatureFromProto(cert.GetSig()), h)
+	return hotstuff.NewPartialCert(SignatureFromProto(cert.GetSig()), h)
 }
 
 // QuorumCertToProto converts a hotstuff.QuorumCert to a proto.QuorumCert.
 func QuorumCertToProto(qc hotstuff.QuorumCert) *QuorumCert {
-	c := qc.(*ecdsa.QuorumCert)
-	sigs := make(map[uint32]*Signature, len(c.Signatures()))
-	for id, pSig := range c.Signatures() {
-		sigs[uint32(id)] = SignatureToProto(pSig)
-	}
-	hash := c.BlockHash()
+	hash := qc.BlockHash()
 	return &QuorumCert{
-		Sigs: sigs,
+		Sig:  ThresholdSignatureToProto(qc.Signature()),
 		Hash: hash[:],
 	}
 }
 
 // QuorumCertFromProto converts a proto.QuorumCert to an ecdsa.QuorumCert.
-func QuorumCertFromProto(qc *QuorumCert) *ecdsa.QuorumCert {
+func QuorumCertFromProto(qc *QuorumCert) hotstuff.QuorumCert {
 	var h hotstuff.Hash
 	copy(h[:], qc.GetHash())
-	sigs := make(map[hotstuff.ID]*ecdsa.Signature, len(qc.GetSigs()))
-	for k, sig := range qc.GetSigs() {
-		sigs[hotstuff.ID(k)] = SignatureFromProto(sig)
-	}
-	return ecdsa.NewQuorumCert(sigs, h)
+	return hotstuff.NewQuorumCert(ThresholdSignatureFromProto(qc.GetSig()), h)
 }
 
 // BlockToProto converts a hotstuff.Block to a proto.Block.
@@ -113,45 +169,36 @@ func TimeoutMsgToProto(timeoutMsg hotstuff.TimeoutMsg) *TimeoutMsg {
 
 // TimeoutCertFromProto converts a timeout certificate from the protobuf type to the hotstuff type.
 func TimeoutCertFromProto(m *TimeoutCert) hotstuff.TimeoutCert {
-	sigs := make(map[hotstuff.ID]*ecdsa.Signature, len(m.GetSigs()))
-	for k, sig := range m.GetSigs() {
-		sigs[hotstuff.ID(k)] = SignatureFromProto(sig)
-	}
-	return ecdsa.NewTimeoutCert(sigs, hotstuff.View(m.GetView()))
+	return hotstuff.NewTimeoutCert(ThresholdSignatureFromProto(m.GetSig()), hotstuff.View(m.GetView()))
 }
 
 // TimeoutCertToProto converts a timeout certificate from the hotstuff type to the protobuf type.
 func TimeoutCertToProto(timeoutCert hotstuff.TimeoutCert) *TimeoutCert {
-	tc := timeoutCert.(*ecdsa.TimeoutCert)
-	sigs := make(map[uint32]*Signature, len(tc.Signatures()))
-	for id, sig := range tc.Signatures() {
-		sigs[uint32(id)] = SignatureToProto(sig)
-	}
 	return &TimeoutCert{
-		View: uint64(tc.View()),
-		Sigs: sigs,
+		View: uint64(timeoutCert.View()),
+		Sig:  ThresholdSignatureToProto(timeoutCert.Signature()),
 	}
 }
 
 // SyncInfoFromProto converts a SyncInfo struct from the protobuf type to the hotstuff type.
-func SyncInfoFromProto(m *SyncInfo) (syncInfo hotstuff.SyncInfo) {
+func SyncInfoFromProto(m *SyncInfo) hotstuff.SyncInfo {
 	if qc := m.GetQC(); qc != nil {
-		syncInfo.QC = QuorumCertFromProto(qc)
+		return hotstuff.SyncInfoWithQC(QuorumCertFromProto(qc))
 	}
 	if tc := m.GetTC(); tc != nil {
-		syncInfo.TC = TimeoutCertFromProto(tc)
+		return hotstuff.SyncInfoWithTC(TimeoutCertFromProto(tc))
 	}
-	return
+	return hotstuff.SyncInfo{}
 }
 
 // SyncInfoToProto converts a SyncInfo struct from the hotstuff type to the protobuf type.
 func SyncInfoToProto(syncInfo hotstuff.SyncInfo) *SyncInfo {
 	m := &SyncInfo{}
-	if syncInfo.QC != nil {
-		m.Certificate = &SyncInfo_QC{QuorumCertToProto(syncInfo.QC)}
+	if qc, ok := syncInfo.QC(); ok {
+		m.Certificate = &SyncInfo_QC{QuorumCertToProto(qc)}
 	}
-	if syncInfo.TC != nil {
-		m.Certificate = &SyncInfo_TC{TimeoutCertToProto(syncInfo.TC)}
+	if tc, ok := syncInfo.TC(); ok {
+		m.Certificate = &SyncInfo_TC{TimeoutCertToProto(tc)}
 	}
 	return m
 }

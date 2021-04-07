@@ -8,14 +8,13 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 )
 
 func TestLocalTimeout(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	qc := ecdsa.NewQuorumCert(make(map[hotstuff.ID]*ecdsa.Signature), hotstuff.GetGenesis().Hash())
+	qc := hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash())
 	builder := testutil.TestModules(t, ctrl, 2, testutil.GenerateECDSAKey(t))
 	hs := mocks.NewMockConsensus(ctrl)
 	s := New(testutil.FixedTimeout(time.Millisecond))
@@ -37,10 +36,10 @@ func TestLocalTimeout(t *testing.T) {
 			if msg.ID != 2 {
 				t.Errorf("wrong ID. got: %v, want: %v", msg.ID, 2)
 			}
-			if !bytes.Equal(msg.SyncInfo.QC.ToBytes(), qc.ToBytes()) {
-				t.Errorf("wrong QC. got: %v, want: %v", msg.SyncInfo.QC, qc)
+			if msgQC, ok := msg.SyncInfo.QC(); ok && !bytes.Equal(msgQC.ToBytes(), qc.ToBytes()) {
+				t.Errorf("wrong QC. got: %v, want: %v", msgQC, qc)
 			}
-			if !mods.Verifier().Verify(msg.Signature, msg.View.ToHash()) {
+			if !mods.Crypto().Verify(msg.Signature, msg.View.ToHash()) {
 				t.Error("failed to verify signature")
 			}
 			close(c)
@@ -64,7 +63,7 @@ func TestAdvanceViewQC(t *testing.T) {
 
 	block := hotstuff.NewBlock(
 		hotstuff.GetGenesis().Hash(),
-		ecdsa.NewQuorumCert(make(map[hotstuff.ID]*ecdsa.Signature), hotstuff.GetGenesis().Hash()),
+		hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash()),
 		"foo",
 		1,
 		2,
@@ -74,7 +73,7 @@ func TestAdvanceViewQC(t *testing.T) {
 	// synchronizer should tell hotstuff to propose
 	hs.EXPECT().Propose()
 
-	s.AdvanceView(hotstuff.SyncInfo{QC: qc})
+	s.AdvanceView(hotstuff.SyncInfoWithQC(qc))
 
 	if s.View() != 2 {
 		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())
@@ -97,7 +96,7 @@ func TestAdvanceViewTC(t *testing.T) {
 	// synchronizer should tell hotstuff to propose
 	hs.EXPECT().Propose()
 
-	s.AdvanceView(hotstuff.SyncInfo{TC: tc})
+	s.AdvanceView(hotstuff.SyncInfoWithTC(tc))
 
 	if s.View() != 2 {
 		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())

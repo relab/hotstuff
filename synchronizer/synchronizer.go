@@ -32,11 +32,11 @@ type Synchronizer struct {
 func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff) {
 	s.mod = hs
 	var err error
-	s.highQC, err = s.mod.Signer().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+	s.highQC, err = s.mod.Crypto().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
 	if err != nil {
 		panic(fmt.Errorf("unable to create empty quorum cert for genesis block: %v", err))
 	}
-	s.highTC, err = s.mod.Signer().CreateTimeoutCert(hotstuff.View(0), []hotstuff.TimeoutMsg{})
+	s.highTC, err = s.mod.Crypto().CreateTimeoutCert(hotstuff.View(0), []hotstuff.TimeoutMsg{})
 	if err != nil {
 		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
 	}
@@ -106,14 +106,14 @@ func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
 		panic("highQC block missing")
 	}
 	if qcBlock.View() >= s.highTC.View() {
-		return hotstuff.SyncInfo{QC: qc}
+		return hotstuff.SyncInfoWithQC(s.highQC)
 	}
-	return hotstuff.SyncInfo{TC: s.highTC}
+	return hotstuff.SyncInfoWithTC(s.highTC)
 }
 
 func (s *Synchronizer) onLocalTimeout() {
 	s.mod.Logger().Debugf("OnLocalTimeout: %v", s.currentView)
-	sig, err := s.mod.Signer().Sign(s.currentView.ToHash())
+	sig, err := s.mod.Crypto().Sign(s.currentView.ToHash())
 	if err != nil {
 		s.mod.Logger().Warnf("Failed to sign view: %v", err)
 		return
@@ -139,7 +139,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		}
 	}()
 
-	verifier := s.mod.Verifier()
+	verifier := s.mod.Crypto()
 	if !verifier.Verify(timeout.Signature, timeout.View.ToHash()) {
 		return
 	}
@@ -173,7 +173,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		timeoutList = append(timeoutList, t)
 	}
 
-	signer := s.mod.Signer()
+	signer := s.mod.Crypto()
 	tc, err := signer.CreateTimeoutCert(s.currentView, timeoutList)
 	if err != nil {
 		s.mod.Logger().Debugf("Failed to create timeout certificate: %v", err)
@@ -181,7 +181,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	}
 	delete(s.timeouts, timeout.View)
 
-	s.AdvanceView(hotstuff.SyncInfo{TC: tc})
+	s.AdvanceView(hotstuff.SyncInfoWithTC(tc))
 }
 
 // OnNewView handles an incoming NewViewMsg
@@ -193,14 +193,14 @@ func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
 // qc must be either a regular quorum certificate, or a timeout certificate.
 func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	var v hotstuff.View
-	if syncInfo.TC != nil {
-		v = syncInfo.TC.View()
+	if tc, ok := syncInfo.TC(); ok {
+		v = tc.View()
 		if v > s.highTC.View() {
-			s.highTC = syncInfo.TC
+			s.highTC = tc
 		}
-	} else {
-		s.UpdateHighQC(syncInfo.QC)
-		b, ok := s.mod.BlockChain().Get(syncInfo.QC.BlockHash())
+	} else if qc, ok := syncInfo.QC(); ok {
+		s.UpdateHighQC(qc)
+		b, ok := s.mod.BlockChain().Get(qc.BlockHash())
 		if !ok {
 			return
 		}
@@ -232,7 +232,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 // UpdateHighQC updates HighQC if the given qc is higher than the old HighQC.
 func (s *Synchronizer) UpdateHighQC(qc hotstuff.QuorumCert) {
 	s.mod.Logger().Debugf("updateHighQC: %v", qc)
-	if !s.mod.Verifier().VerifyQuorumCert(qc) {
+	if !s.mod.Crypto().VerifyQuorumCert(qc) {
 		s.mod.Logger().Info("updateHighQC: QC could not be verified!")
 		return
 	}

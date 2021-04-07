@@ -42,17 +42,13 @@ func (hs *chainedhotstuff) commit(block *hotstuff.Block) {
 		if parent, ok := hs.mod.BlockChain().Get(block.Parent()); ok {
 			hs.commit(parent)
 		}
-		if block.QuorumCert() == nil {
-			// don't execute dummy nodes
-			return
-		}
 		hs.mod.Logger().Debug("EXEC: ", block)
 		hs.mod.Executor().Exec(block.Command())
 	}
 }
 
 func (hs *chainedhotstuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
-	if qc == nil {
+	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
 	return hs.mod.BlockChain().Get(qc.BlockHash())
@@ -158,7 +154,7 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 
 	hs.mod.BlockChain().Store(block)
 
-	pc, err := hs.mod.Signer().CreatePartialCert(block)
+	pc, err := hs.mod.Crypto().CreatePartialCert(block)
 	if err != nil {
 		hs.mod.Logger().Error("OnPropose: failed to sign vote: ", err)
 		return
@@ -168,7 +164,7 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 
 	finish := func() {
 		hs.update(block)
-		hs.mod.ViewSynchronizer().AdvanceView(hotstuff.SyncInfo{QC: block.QuorumCert()})
+		hs.mod.ViewSynchronizer().AdvanceView(hotstuff.SyncInfoWithQC(block.QuorumCert()))
 	}
 
 	leaderID := hs.mod.LeaderRotation().GetLeader(hs.lastVote + 1)
@@ -236,7 +232,7 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 		return
 	}
 
-	if !hs.mod.Verifier().VerifyPartialCert(cert) {
+	if !hs.mod.Crypto().VerifyPartialCert(cert) {
 		hs.mod.Logger().Info("OnVote: Vote could not be verified!")
 		return
 	}
@@ -249,7 +245,7 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 		return
 	}
 
-	qc, err := hs.mod.Signer().CreateQuorumCert(block, votes)
+	qc, err := hs.mod.Crypto().CreateQuorumCert(block, votes)
 	if err != nil {
 		hs.mod.Logger().Info("OnVote: could not create QC for block: ", err)
 		return
@@ -257,7 +253,7 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 	delete(hs.verifiedVotes, cert.BlockHash())
 
 	// signal the synchronizer
-	hs.mod.ViewSynchronizer().AdvanceView(hotstuff.SyncInfo{QC: qc})
+	hs.mod.ViewSynchronizer().AdvanceView(hotstuff.SyncInfoWithQC(qc))
 }
 
 var _ hotstuff.Consensus = (*chainedhotstuff)(nil)

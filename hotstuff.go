@@ -19,6 +19,25 @@ import (
 // ID uniquely identifies a replica
 type ID uint32
 
+// IDSet is a set that stores replica IDs.
+type IDSet map[ID]struct{}
+
+// Add adds an ID to the set.
+func (s IDSet) Add(id ID) {
+	s[id] = struct{}{}
+}
+
+// Contains returns true if the set contains the given ID.
+func (s IDSet) Contains(id ID) bool {
+	_, ok := s[id]
+	return ok
+}
+
+// Remove removes the ID from the set.
+func (s IDSet) Remove(id ID) {
+	delete(s, id)
+}
+
 // View is a number that uniquely identifies a view.
 type View uint64
 
@@ -59,47 +78,124 @@ type PrivateKey interface {
 // Signature is a cryptographic signature of a block.
 type Signature interface {
 	ToBytes
-	// Signer returns the ID of the replica that generated the signature.
+	// Signer returns the ID of the replica that created the signature.
 	Signer() ID
 }
 
-// PartialCert is a partial certificate for a block created by a single replica.
-type PartialCert interface {
+// ThresholdSignature is a signature that is only valid when it contains the signatures of a quorum of replicas.
+type ThresholdSignature interface {
 	ToBytes
-	// Signature returns the signature of the block.
-	Signature() Signature
-	// BlockHash returns the hash of the block that was signed.
-	BlockHash() Hash
+	// Participants returns the IDs of replicas who participated in the threshold signature.
+	Participants() IDSet
+}
+
+// PartialCert is a signed block hash.
+type PartialCert struct {
+	signature Signature
+	blockHash Hash
+}
+
+func NewPartialCert(signature Signature, blockHash Hash) PartialCert {
+	return PartialCert{signature, blockHash}
+}
+
+func (pc PartialCert) Signature() Signature {
+	return pc.signature
+}
+
+func (pc PartialCert) BlockHash() Hash {
+	return pc.blockHash
+}
+
+func (pc PartialCert) ToBytes() []byte {
+	return append(pc.blockHash[:], pc.signature.ToBytes()...)
 }
 
 // SyncInfo holds the highest known QC or TC.
 type SyncInfo struct {
-	QC QuorumCert
-	TC TimeoutCert
+	qc QuorumCert
+	tc TimeoutCert
+}
+
+func SyncInfoWithQC(qc QuorumCert) SyncInfo {
+	return SyncInfo{qc: qc}
+}
+
+func SyncInfoWithTC(tc TimeoutCert) SyncInfo {
+	return SyncInfo{tc: tc}
+}
+
+func (si SyncInfo) QC() (_ QuorumCert, _ bool) {
+	if si.qc == (QuorumCert{}) {
+		return
+	}
+	return si.qc, true
+}
+
+func (si SyncInfo) TC() (_ TimeoutCert, _ bool) {
+	if si.tc == (TimeoutCert{}) {
+		return
+	}
+	return si.tc, true
 }
 
 func (si SyncInfo) String() string {
 	var cert interface{}
-	if si.QC != nil {
-		cert = si.QC
+	if si.qc != (QuorumCert{}) {
+		cert = si.qc
 	} else {
-		cert = si.TC
+		cert = si.tc
 	}
 	return fmt.Sprint(cert)
 }
 
 // QuorumCert (QC) is a certificate for a Block created by a quorum of partial certificates.
-type QuorumCert interface {
-	ToBytes
-	// BlockHash returns the hash of the block that the QC was created for.
-	BlockHash() Hash
+type QuorumCert struct {
+	signature ThresholdSignature
+	hash      Hash
+}
+
+func NewQuorumCert(signature ThresholdSignature, hash Hash) QuorumCert {
+	return QuorumCert{signature, hash}
+}
+
+func (qc QuorumCert) ToBytes() []byte {
+	if qc.signature == nil {
+		return qc.hash[:]
+	}
+	return append(qc.hash[:], qc.signature.ToBytes()...)
+}
+
+func (qc QuorumCert) Signature() ThresholdSignature {
+	return qc.signature
+}
+
+func (qc QuorumCert) BlockHash() Hash {
+	return qc.hash
 }
 
 // TimeoutCert (TC) is a certificate created by a quorum of timeout messages.
-type TimeoutCert interface {
-	ToBytes
-	// View returns the view that timed out.
-	View() View
+type TimeoutCert struct {
+	signature ThresholdSignature
+	view      View
+}
+
+func NewTimeoutCert(signature ThresholdSignature, view View) TimeoutCert {
+	return TimeoutCert{signature, view}
+}
+
+func (tc TimeoutCert) ToBytes() []byte {
+	var viewBytes [8]byte
+	binary.LittleEndian.PutUint64(viewBytes[:], uint64(tc.view))
+	return append(viewBytes[:], tc.signature.ToBytes()...)
+}
+
+func (tc TimeoutCert) Signature() ThresholdSignature {
+	return tc.signature
+}
+
+func (tc TimeoutCert) View() View {
+	return tc.view
 }
 
 // Messages / Events
@@ -170,8 +266,7 @@ type HotStuff struct {
 	consensus        Consensus
 	executor         Executor
 	leaderRotation   LeaderRotation
-	signer           Signer
-	verifier         Verifier
+	crypto           Crypto
 	viewSynchronizer ViewSynchronizer
 }
 
@@ -230,14 +325,9 @@ func (hs *HotStuff) LeaderRotation() LeaderRotation {
 	return hs.leaderRotation
 }
 
-// Signer returns the signer.
-func (hs *HotStuff) Signer() Signer {
-	return hs.signer
-}
-
-// Verifier returns the verifier.
-func (hs *HotStuff) Verifier() Verifier {
-	return hs.verifier
+// Crypto returns the cryptography implementation.
+func (hs *HotStuff) Crypto() Crypto {
+	return hs.crypto
 }
 
 // ViewSynchronizer returns the view synchronizer implementation.
@@ -297,11 +387,8 @@ func (b *Builder) Register(modules ...interface{}) {
 		if m, ok := module.(LeaderRotation); ok {
 			b.hs.leaderRotation = m
 		}
-		if m, ok := module.(Signer); ok {
-			b.hs.signer = m
-		}
-		if m, ok := module.(Verifier); ok {
-			b.hs.verifier = m
+		if m, ok := module.(Crypto); ok {
+			b.hs.crypto = m
 		}
 		if m, ok := module.(ViewSynchronizer); ok {
 			b.hs.viewSynchronizer = m
@@ -354,22 +441,29 @@ type Executor interface {
 	Exec(Command)
 }
 
-// Signer implements the methods required to create signatures and certificates.
-type Signer interface {
+// CryptoImpl implements only the cryptographic primitives that are needed for HotStuff.
+// This interface is implemented by the ecdsa and bls12 packages.
+type CryptoImpl interface {
 	// Sign signs a hash.
 	Sign(hash Hash) (sig Signature, err error)
+	// Verify verifies a signature given a hash.
+	Verify(sig Signature, hash Hash) bool
+	// CreateThresholdSignature creates a threshold signature from the given partial signatures.
+	CreateThresholdSignature(partialSignatures []Signature, hash Hash) (ThresholdSignature, error)
+	// VerifyThresholdSignature verifies a threshold signature.
+	VerifyThresholdSignature(signature ThresholdSignature, hash Hash) bool
+}
+
+// Crypto implements the methods required to create and verify signatures and certificates.
+// This is a higher level interface that is implemented by the crypto package itself.
+type Crypto interface {
+	CryptoImpl
 	// CreatePartialCert signs a single block and returns the partial certificate.
 	CreatePartialCert(block *Block) (cert PartialCert, err error)
 	// CreateQuorumCert creates a quorum certificate from a list of partial certificates.
 	CreateQuorumCert(block *Block, signatures []PartialCert) (cert QuorumCert, err error)
 	// CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
 	CreateTimeoutCert(view View, timeouts []TimeoutMsg) (cert TimeoutCert, err error)
-}
-
-// Verifier implements the methods required to verify partial and quorum certificates.
-type Verifier interface {
-	// Verify verifies a signature given a hash.
-	Verify(sig Signature, hash Hash) bool
 	// VerifyPartialCert verifies a single partial certificate.
 	VerifyPartialCert(cert PartialCert) bool
 	// VerifyQuorumCert verifies a quorum certificate.

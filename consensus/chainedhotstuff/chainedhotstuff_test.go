@@ -6,7 +6,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
-	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/leaderrotation"
@@ -55,7 +54,7 @@ func TestCommit(t *testing.T) {
 	signers := hl.Signers()
 
 	// create the needed blocks and QCs
-	genesisQC := ecdsacrypto.NewQuorumCert(map[hotstuff.ID]*ecdsacrypto.Signature{}, hotstuff.GetGenesis().Hash())
+	genesisQC := hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash())
 	b1 := testutil.NewProposeMsg(hotstuff.GetGenesis().Hash(), genesisQC, "1", 1, 2)
 	b1QC := testutil.CreateQC(t, b1.Block, signers)
 	b2 := testutil.NewProposeMsg(b1.Block.Hash(), b1QC, "2", 2, 2)
@@ -153,7 +152,7 @@ func TestForkingAttack(t *testing.T) {
 	replicas[1].EXPECT().Vote(gomock.Any()).AnyTimes()
 	replicas[1].EXPECT().NewView(gomock.Any()).AnyTimes()
 
-	genesisQC := ecdsacrypto.NewQuorumCert(make(map[hotstuff.ID]*ecdsacrypto.Signature), hotstuff.GetGenesis().Hash())
+	genesisQC := hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash())
 	a := testutil.NewProposeMsg(hotstuff.GetGenesis().Hash(), genesisQC, "A", 1, 2)
 	aQC := testutil.CreateQC(t, a.Block, signers)
 	b := testutil.NewProposeMsg(a.Block.Hash(), aQC, "B", 2, 2)
@@ -188,7 +187,7 @@ func TestForkingAttack(t *testing.T) {
 	_ = advanceView(t, hs, block, signers)
 }
 
-func advanceView(t *testing.T, hs hotstuff.Consensus, lastProposal *hotstuff.Block, signers []hotstuff.Signer) *hotstuff.Block {
+func advanceView(t *testing.T, hs hotstuff.Consensus, lastProposal *hotstuff.Block, signers []hotstuff.Crypto) *hotstuff.Block {
 	t.Helper()
 
 	qc := testutil.CreateQC(t, lastProposal, signers)

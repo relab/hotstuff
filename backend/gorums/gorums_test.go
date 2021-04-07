@@ -14,7 +14,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
-	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
@@ -55,7 +54,7 @@ func TestPropose(t *testing.T) {
 
 		defer teardown()
 
-		qc := ecdsacrypto.NewQuorumCert(make(map[hotstuff.ID]*ecdsacrypto.Signature), hotstuff.GetGenesis().Hash())
+		qc := hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash())
 		proposal := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "foo", 1, 1)
 		// the configuration has ID 1, so we won't be receiving any proposal for that replica.
 		c := make(chan struct{}, n-1)
@@ -90,9 +89,9 @@ func TestVote(t *testing.T) {
 		mocks := createMocks(t, ctrl, td, n)
 
 		hl := td.builders.Build()
-		signer := hl[0].Signer()
+		signer := hl[0].Crypto()
 
-		qc := ecdsacrypto.NewQuorumCert(make(map[hotstuff.ID]*ecdsacrypto.Signature), hotstuff.GetGenesis().Hash())
+		qc := hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash())
 		proposal := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "foo", 1, 1)
 		pc := testutil.CreatePC(t, proposal, signer)
 
@@ -132,13 +131,13 @@ func TestTimeout(t *testing.T) {
 			td.builders[i].Register(synchronizers[i])
 		}
 		hl := td.builders.Build()
-		signer := hl[0].Signer()
+		signer := hl[0].Crypto()
 
-		qc := ecdsacrypto.NewQuorumCert(make(map[hotstuff.ID]*ecdsacrypto.Signature), hotstuff.GetGenesis().Hash())
+		qc := hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash())
 		timeout := hotstuff.TimeoutMsg{
 			ID:        1,
 			View:      1,
-			SyncInfo:  hotstuff.SyncInfo{QC: qc},
+			SyncInfo:  hotstuff.SyncInfoWithQC(qc),
 			Signature: testutil.Sign(t, hotstuff.View(1).ToHash(), signer),
 		}
 

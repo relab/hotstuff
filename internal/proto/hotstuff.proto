@@ -38,10 +38,19 @@ message Block {
   uint32 Proposer = 5;
 }
 
-message Signature {
-  uint32 ReplicaID = 1;
+message ECDSASignature {
+  uint32 Signer = 1;
   bytes R = 2;
   bytes S = 3;
+}
+
+message BLS12Signature { bytes Sig = 1; }
+
+message Signature {
+  oneof Sig {
+    ECDSASignature ECDSASig = 1;
+    BLS12Signature BLS12Sig = 2;
+  }
 }
 
 message PartialCert {
@@ -49,13 +58,27 @@ message PartialCert {
   bytes Hash = 2;
 }
 
+message ECDSAThresholdSignature { map<uint32, ECDSASignature> Sigs = 1; }
+
+message BLS12AggregateSignature {
+  bytes Sig = 1;
+  repeated uint32 participants = 2;
+}
+
+message ThresholdSignature {
+  oneof AggSig {
+    ECDSAThresholdSignature ECDSASigs = 1;
+    BLS12AggregateSignature BLS12Sig = 2;
+  }
+}
+
 message QuorumCert {
-  map<uint32, Signature> Sigs = 1;
+  ThresholdSignature Sig = 1;
   bytes Hash = 2;
 }
 
 message TimeoutCert {
-  map<uint32, Signature> Sigs = 1;
+  ThresholdSignature Sig = 1;
   uint64 View = 2;
 }
 

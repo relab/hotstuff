@@ -82,9 +82,6 @@ func (b *Block) ToBytes() []byte {
 	binary.LittleEndian.PutUint64(viewBuf[:], uint64(b.view))
 	buf = append(buf, viewBuf[:]...)
 	buf = append(buf, []byte(b.cmd)...)
-	// genesis and dummy nodes have no certificates
-	if b.cert != nil {
-		buf = append(buf, b.cert.ToBytes()...)
-	}
+	buf = append(buf, b.cert.ToBytes()...)
 	return buf
 }

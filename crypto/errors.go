@@ -12,6 +12,9 @@ var (
 	// ErrViewMismatch is the error used when timeouts have different views.
 	ErrViewMismatch = fmt.Errorf("timeout views do not match")
 
-	// ErrNotAQuorum is the error used when a q
+	// ErrNotAQuorum is the error used when a quorum is not reached.
 	ErrNotAQuorum = fmt.Errorf("not a quorum")
+
+	// ErrWrongType is the error used when an incompatible type is encountered.
+	ErrWrongType = fmt.Errorf("incompatible type")
 )

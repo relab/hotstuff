@@ -4,6 +4,7 @@ package bls12
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"fmt"
 	"math/big"
 
 	bls12 "github.com/kilic/bls12-381"
@@ -102,82 +103,37 @@ func (s *Signature) Signer() hotstuff.ID {
 	return s.signer
 }
 
-// PartialCert is a bls12-381 signature together with the block hash.
-type PartialCert struct {
-	sig  Signature
-	hash hotstuff.Hash
-}
-
-// ToBytes returns the object as bytes.
-func (p *PartialCert) ToBytes() []byte {
-	return append(p.hash[:], p.sig.ToBytes()...)
-}
-
-// Signature returns the signature of the block.
-func (p *PartialCert) Signature() hotstuff.Signature {
-	return &p.sig
-}
-
-// BlockHash returns the hash of the block that was signed.
-func (p *PartialCert) BlockHash() hotstuff.Hash {
-	return p.hash
-}
-
-// aggregateSignature is a bls12-381 aggregate signature. The participants map contains the IDs of the replicas who
+// AggregateSignature is a bls12-381 aggregate signature. The participants map contains the IDs of the replicas who
 // participated in the creation of the signature. This allows us to build an aggregated public key to verify the
 // signature.
-type aggregateSignature struct {
+type AggregateSignature struct {
 	sig          bls12.PointG2
-	participants map[hotstuff.ID]struct{} // The ids of the replicas who submitted signatures.
+	participants hotstuff.IDSet // The ids of the replicas who submitted signatures.
+}
+
+func NewAggregateSignature(sig []byte, participants hotstuff.IDSet) (s *AggregateSignature, err error) {
+	p, err := bls12.NewG2().FromCompressed(sig)
+	if err != nil {
+		return nil, err
+	}
+	return &AggregateSignature{
+		sig:          *p,
+		participants: participants,
+	}, nil
 }
 
 // ToBytes returns a byte representation of the aggregate signature.
-func (agg *aggregateSignature) ToBytes() []byte {
+func (agg *AggregateSignature) ToBytes() []byte {
 	if agg == nil {
 		return nil
 	}
 	b := bls12.NewG2().ToCompressed(&agg.sig)
-	for id := range agg.participants {
-		var t [4]byte
-		binary.LittleEndian.PutUint32(t[:], uint32(id))
-		b = append(b, t[:]...)
-	}
 	return b
 }
 
-// QuorumCert is a bls12-381 aggregate signature together with the block hash.
-type QuorumCert struct {
-	sig  *aggregateSignature
-	hash hotstuff.Hash
-}
-
-// ToBytes returns the object as bytes.
-func (qc *QuorumCert) ToBytes() []byte {
-	return append(qc.sig.ToBytes(), qc.hash[:]...)
-}
-
-// BlockHash returns the hash of the block that the QC was created for.
-func (qc *QuorumCert) BlockHash() hotstuff.Hash {
-	return qc.hash
-}
-
-// TimeoutCert is a bls12-381 aggregate signature over a view. This serves as a proof that the synchronizer can safely
-// advance to the next view.
-type TimeoutCert struct {
-	sig  *aggregateSignature
-	view hotstuff.View
-}
-
-// ToBytes returns the object as bytes.
-func (tc *TimeoutCert) ToBytes() []byte {
-	var viewBytes [8]byte
-	binary.LittleEndian.PutUint64(viewBytes[:], uint64(tc.view))
-	return append(viewBytes[:], tc.sig.ToBytes()...)
-}
-
-// View returns the view that timed out.
-func (tc *TimeoutCert) View() hotstuff.View {
-	return tc.view
+// Participants returns the IDs of replicas who participated in the threshold signature.
+func (agg AggregateSignature) Participants() hotstuff.IDSet {
+	return agg.participants
 }
 
 // bls12Crypto is a Signer/Verifier implementation that uses bls12-381 aggregate signatures.
@@ -186,9 +142,9 @@ type bls12Crypto struct {
 }
 
 // New returns a new bls12-381 signer and verifier.
-func New() (hotstuff.Signer, hotstuff.Verifier) {
+func New() hotstuff.CryptoImpl {
 	bc := &bls12Crypto{}
-	return bc, bc
+	return bc
 }
 
 func (bc *bls12Crypto) getPrivateKey() *PrivateKey {
@@ -212,7 +168,7 @@ func (bc *bls12Crypto) Sign(hash hotstuff.Hash) (sig hotstuff.Signature, err err
 	return &Signature{signer: bc.mod.ID(), s: p}, nil
 }
 
-func (bc *bls12Crypto) aggregateSignatures(signatures map[hotstuff.ID]*Signature) *aggregateSignature {
+func (bc *bls12Crypto) aggregateSignatures(signatures map[hotstuff.ID]*Signature) *AggregateSignature {
 	if len(signatures) == 0 {
 		return nil
 	}
@@ -223,70 +179,7 @@ func (bc *bls12Crypto) aggregateSignatures(signatures map[hotstuff.ID]*Signature
 		g2.Add(&sig, &sig, s.s)
 		participants[id] = struct{}{}
 	}
-	return &aggregateSignature{sig: sig, participants: participants}
-}
-
-// CreatePartialCert signs a single block and returns the partial certificate.
-func (bc *bls12Crypto) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
-	sig, err := bc.Sign(block.Hash())
-	if err != nil {
-		return nil, err
-	}
-	return &PartialCert{sig: *sig.(*Signature), hash: block.Hash()}, nil
-}
-
-// CreateQuorumCert creates a quorum certificate from a list of partial certificates.
-func (bc *bls12Crypto) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
-	if block.Hash() == hotstuff.GetGenesis().Hash() {
-		return &QuorumCert{hash: hotstuff.GetGenesis().Hash()}, nil
-	}
-	if len(signatures) < bc.mod.Config().QuorumSize() {
-		return nil, crypto.ErrNotAQuorum
-	}
-	sigs := make(map[hotstuff.ID]*Signature, len(signatures))
-	for _, sig := range signatures {
-		if sig.BlockHash() != block.Hash() {
-			err = multierr.Append(err, crypto.ErrHashMismatch)
-			continue
-		}
-		if _, ok := sigs[sig.Signature().Signer()]; ok {
-			err = multierr.Append(err, crypto.ErrPartialDuplicate)
-			continue
-		}
-		sigs[sig.Signature().Signer()] = &sig.(*PartialCert).sig
-	}
-	if len(sigs) < bc.mod.Config().QuorumSize() {
-		return nil, multierr.Combine(crypto.ErrNotAQuorum, err)
-	}
-	aggSig := bc.aggregateSignatures(sigs)
-	return &QuorumCert{sig: aggSig, hash: block.Hash()}, nil
-}
-
-// CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
-func (bc *bls12Crypto) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (cert hotstuff.TimeoutCert, err error) {
-	if view == 0 {
-		return &TimeoutCert{view: 0}, nil
-	}
-	if len(timeouts) < bc.mod.Config().QuorumSize() {
-		return nil, crypto.ErrNotAQuorum
-	}
-	sigs := make(map[hotstuff.ID]*Signature, len(timeouts))
-	for _, timeout := range timeouts {
-		if timeout.View != view {
-			err = multierr.Append(err, crypto.ErrHashMismatch)
-			continue
-		}
-		if _, ok := sigs[timeout.ID]; ok {
-			err = multierr.Append(err, crypto.ErrPartialDuplicate)
-			continue
-		}
-		sigs[timeout.ID] = timeout.Signature.(*Signature)
-	}
-	if len(sigs) < bc.mod.Config().QuorumSize() {
-		return nil, multierr.Combine(crypto.ErrNotAQuorum, err)
-	}
-	aggSig := bc.aggregateSignatures(sigs)
-	return &TimeoutCert{sig: aggSig, view: view}, nil
+	return &AggregateSignature{sig: sig, participants: participants}
 }
 
 // Verify verifies a signature given a hash.
@@ -310,7 +203,13 @@ func (bc *bls12Crypto) Verify(sig hotstuff.Signature, hash hotstuff.Hash) bool {
 // TODO: I'm not sure to what extent we are vulnerable to a rogue public key attack here.
 // As far as I can tell, this is not a problem right now because we do not yet support reconfiguration,
 // and all public keys are known by all replicas.
-func (bc *bls12Crypto) fastAggregateVerify(sig *aggregateSignature, hash hotstuff.Hash) bool {
+
+// VerifyThresholdSignature verifies an aggregate signature.
+func (bc *bls12Crypto) VerifyThresholdSignature(signature hotstuff.ThresholdSignature, hash hotstuff.Hash) bool {
+	sig, ok := signature.(*AggregateSignature)
+	if !ok {
+		return false
+	}
 	pubKeys := make([]*PublicKey, 0, len(sig.participants))
 	for id := range sig.participants {
 		replica, ok := bc.mod.Config().Replica(id)
@@ -332,26 +231,26 @@ func (bc *bls12Crypto) fastAggregateVerify(sig *aggregateSignature, hash hotstuf
 	return engine.Result().IsOne()
 }
 
-// VerifyPartialCert verifies a single partial certificate.
-func (bc *bls12Crypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
-	c := cert.(*PartialCert)
-	return bc.Verify(&c.sig, c.hash)
-}
-
-// VerifyQuorumCert verifies a quorum certificate.
-func (bc *bls12Crypto) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
-	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
-		return true
+// CreateThresholdSignature creates a threshold signature from the given partial signatures.
+func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []hotstuff.Signature, hash hotstuff.Hash) (_ hotstuff.ThresholdSignature, err error) {
+	if len(partialSignatures) < bc.mod.Config().QuorumSize() {
+		return nil, crypto.ErrNotAQuorum
 	}
-	q := qc.(*QuorumCert)
-	return bc.fastAggregateVerify(q.sig, q.hash)
-}
-
-// VerifyTimeoutCert verifies a timeout certificate.
-func (bc *bls12Crypto) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
-	if tc.View() == 0 {
-		return true
+	sigs := make(map[hotstuff.ID]*Signature, len(partialSignatures))
+	for _, sig := range partialSignatures {
+		if _, ok := sigs[sig.Signer()]; ok {
+			err = multierr.Append(err, crypto.ErrPartialDuplicate)
+			continue
+		}
+		s, ok := sig.(*Signature)
+		if !ok {
+			err = multierr.Append(err, fmt.Errorf("%w: %T", crypto.ErrWrongType, s))
+			continue
+		}
+		sigs[sig.Signer()] = s
 	}
-	t := tc.(*TimeoutCert)
-	return bc.fastAggregateVerify(t.sig, t.view.ToHash())
+	if len(sigs) < bc.mod.Config().QuorumSize() {
+		return nil, multierr.Combine(crypto.ErrNotAQuorum, err)
+	}
+	return bc.aggregateSignatures(sigs), nil
 }
