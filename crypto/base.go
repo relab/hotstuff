@@ -2,23 +2,25 @@ package crypto
 
 import "github.com/relab/hotstuff"
 
-type Base struct {
+type base struct {
 	hotstuff.CryptoImpl
 }
 
-func New(impl hotstuff.CryptoImpl) Base {
-	return Base{CryptoImpl: impl}
+// New returns a new base implementation of the Crypto interface. It will use the given CryptoImpl to create and verify
+// signatures.
+func New(impl hotstuff.CryptoImpl) hotstuff.Crypto {
+	return base{CryptoImpl: impl}
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (base Base) InitModule(hs *hotstuff.HotStuff) {
+func (base base) InitModule(hs *hotstuff.HotStuff) {
 	if mod, ok := base.CryptoImpl.(hotstuff.Module); ok {
 		mod.InitModule(hs)
 	}
 }
 
 // CreatePartialCert signs a single block and returns the partial certificate.
-func (base Base) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
+func (base base) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
 	sig, err := base.Sign(block.Hash())
 	if err != nil {
 		return hotstuff.PartialCert{}, err
@@ -27,7 +29,7 @@ func (base Base) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.Partial
 }
 
 // CreateQuorumCert creates a quorum certificate from a list of partial certificates.
-func (base Base) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
+func (base base) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
 	// genesis QC is always valid.
 	if block.Hash() == hotstuff.GetGenesis().Hash() {
 		return hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash()), nil
@@ -44,7 +46,7 @@ func (base Base) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.P
 }
 
 // CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
-func (base Base) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (cert hotstuff.TimeoutCert, err error) {
+func (base base) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (cert hotstuff.TimeoutCert, err error) {
 	// view 0 is always valid.
 	if view == 0 {
 		return hotstuff.NewTimeoutCert(nil, 0), nil
@@ -61,12 +63,12 @@ func (base Base) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff.Timeo
 }
 
 // VerifyPartialCert verifies a single partial certificate.
-func (base Base) VerifyPartialCert(cert hotstuff.PartialCert) bool {
+func (base base) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 	return base.Verify(cert.Signature(), cert.BlockHash())
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
-func (base Base) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
+func (base base) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
 		return true
 	}
@@ -74,7 +76,7 @@ func (base Base) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 }
 
 // VerifyTimeoutCert verifies a timeout certificate.
-func (base Base) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
+func (base base) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
 	if tc.View() == 0 {
 		return true
 	}

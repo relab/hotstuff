@@ -26,8 +26,8 @@ type Signature struct {
 	signer hotstuff.ID
 }
 
-// NewSignature creates a new Signature struct from the given values.
-func NewSignature(r, s *big.Int, signer hotstuff.ID) *Signature {
+// RestoreSignature restores an existing signature. It should not be used to create new signatures, use Sign instead.
+func RestoreSignature(r, s *big.Int, signer hotstuff.ID) *Signature {
 	return &Signature{r, s, signer}
 }
 
@@ -56,12 +56,16 @@ func (sig Signature) ToBytes() []byte {
 
 var _ hotstuff.Signature = (*Signature)(nil)
 
+// ThresholdSignature is a list of (partial) signatures that form a valid threshold signature when there are a quorum
+// of valid (partial) signatures.
 type ThresholdSignature struct {
 	signatures   []*Signature
 	participants hotstuff.IDSet
 }
 
-func NewThresholdSignature(signatures map[hotstuff.ID]*Signature) *ThresholdSignature {
+// RestoreThresholdSignature should only be used to restore an existing threshold signature from a set of signatures.
+// To create a new verifiable threshold signature, use CreateThresholdSignature instead.
+func RestoreThresholdSignature(signatures []*Signature) *ThresholdSignature {
 	sig := &ThresholdSignature{
 		signatures:   make([]*Signature, 0, len(signatures)),
 		participants: make(hotstuff.IDSet, len(signatures)),
@@ -82,6 +86,7 @@ func (sig ThresholdSignature) ToBytes() []byte {
 	return b
 }
 
+// Signatures returns the list of signatures that the threshold signature contains.
 func (sig ThresholdSignature) Signatures() []*Signature {
 	return sig.signatures
 }
@@ -183,7 +188,16 @@ func (ec *ecdsaCrypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 		return false
 	}
 	results := make(chan bool)
+	// we'll use this to make sure that each signer only appears once
+	realParticipation := make(hotstuff.IDSet, len(sig.participants))
 	for _, pSig := range sig.signatures {
+		if !sig.participants.Contains(pSig.signer) {
+			continue
+		}
+		if realParticipation.Contains(pSig.signer) {
+			continue
+		}
+		realParticipation.Add(pSig.signer)
 		go func(sig *Signature) {
 			results <- ec.mod.Crypto().Verify(sig, hash)
 		}(pSig)

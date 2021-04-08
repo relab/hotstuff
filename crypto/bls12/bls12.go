@@ -111,7 +111,9 @@ type AggregateSignature struct {
 	participants hotstuff.IDSet // The ids of the replicas who submitted signatures.
 }
 
-func NewAggregateSignature(sig []byte, participants hotstuff.IDSet) (s *AggregateSignature, err error) {
+// RestoreAggregateSignature restores an existing aggregate signature. It should not be used to create new aggregate
+// signatures. Use CreateThresholdSignature instead.
+func RestoreAggregateSignature(sig []byte, participants hotstuff.IDSet) (s *AggregateSignature, err error) {
 	p, err := bls12.NewG2().FromCompressed(sig)
 	if err != nil {
 		return nil, err

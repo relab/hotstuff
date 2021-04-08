@@ -58,7 +58,7 @@ message PartialCert {
   bytes Hash = 2;
 }
 
-message ECDSAThresholdSignature { map<uint32, ECDSASignature> Sigs = 1; }
+message ECDSAThresholdSignature { repeated ECDSASignature Sigs = 1; }
 
 message BLS12AggregateSignature {
   bytes Sig = 1;

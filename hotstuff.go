@@ -9,6 +9,8 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/relab/hotstuff/internal/logging"
@@ -113,37 +115,45 @@ func (pc PartialCert) ToBytes() []byte {
 
 // SyncInfo holds the highest known QC or TC.
 type SyncInfo struct {
-	qc QuorumCert
-	tc TimeoutCert
+	qc *QuorumCert
+	tc *TimeoutCert
 }
 
+// SyncInfoWithQC creates a SyncInfo struct with the given QC.
 func SyncInfoWithQC(qc QuorumCert) SyncInfo {
-	return SyncInfo{qc: qc}
+	ptr := new(QuorumCert)
+	*ptr = qc
+	return SyncInfo{qc: ptr}
 }
 
+// SyncInfoWithTC creates a SyncInfo struct with the given TC.
 func SyncInfoWithTC(tc TimeoutCert) SyncInfo {
-	return SyncInfo{tc: tc}
+	ptr := new(TimeoutCert)
+	*ptr = tc
+	return SyncInfo{tc: ptr}
 }
 
+// QC returns the quorum certificate, if present.
 func (si SyncInfo) QC() (_ QuorumCert, _ bool) {
-	if si.qc == (QuorumCert{}) {
-		return
+	if si.qc != nil {
+		return *si.qc, true
 	}
-	return si.qc, true
+	return
 }
 
+// TC returns the timeout certificate, if present.
 func (si SyncInfo) TC() (_ TimeoutCert, _ bool) {
-	if si.tc == (TimeoutCert{}) {
-		return
+	if si.tc != nil {
+		return *si.tc, true
 	}
-	return si.tc, true
+	return
 }
 
 func (si SyncInfo) String() string {
 	var cert interface{}
-	if si.qc != (QuorumCert{}) {
+	if si.qc != nil {
 		cert = si.qc
-	} else {
+	} else if si.tc != nil {
 		cert = si.tc
 	}
 	return fmt.Sprint(cert)
@@ -174,6 +184,17 @@ func (qc QuorumCert) BlockHash() Hash {
 	return qc.hash
 }
 
+func (qc QuorumCert) String() string {
+	var sb strings.Builder
+	if qc.signature != nil {
+		for p := range qc.signature.Participants() {
+			sb.WriteString(strconv.FormatUint(uint64(p), 10))
+			sb.WriteByte(' ')
+		}
+	}
+	return fmt.Sprintf("QC{ hash: %.6s, IDs: [ %s] }", qc.hash, &sb)
+}
+
 // TimeoutCert (TC) is a certificate created by a quorum of timeout messages.
 type TimeoutCert struct {
 	signature ThresholdSignature
@@ -196,6 +217,17 @@ func (tc TimeoutCert) Signature() ThresholdSignature {
 
 func (tc TimeoutCert) View() View {
 	return tc.view
+}
+
+func (tc TimeoutCert) String() string {
+	var sb strings.Builder
+	if tc.signature != nil {
+		for p := range tc.signature.Participants() {
+			sb.WriteString(strconv.FormatUint(uint64(p), 10))
+			sb.WriteByte(' ')
+		}
+	}
+	return fmt.Sprintf("TC{ view: %d, IDs: [ %s] }", tc.view, &sb)
 }
 
 // Messages / Events

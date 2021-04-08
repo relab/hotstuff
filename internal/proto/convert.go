@@ -33,7 +33,7 @@ func SignatureFromProto(sig *Signature) hotstuff.Signature {
 		r.SetBytes(signature.GetR())
 		s := new(big.Int)
 		s.SetBytes(signature.GetS())
-		return ecdsa.NewSignature(r, s, hotstuff.ID(signature.GetSigner()))
+		return ecdsa.RestoreSignature(r, s, hotstuff.ID(signature.GetSigner()))
 	}
 	if signature := sig.GetBLS12Sig(); signature != nil {
 		s := &bls12.Signature{}
@@ -43,13 +43,14 @@ func SignatureFromProto(sig *Signature) hotstuff.Signature {
 	return nil
 }
 
+// ThresholdSignatureToProto converts a threshold signature to a protocol buffers message.
 func ThresholdSignatureToProto(sig hotstuff.ThresholdSignature) *ThresholdSignature {
 	signature := &ThresholdSignature{}
 	switch s := sig.(type) {
 	case *ecdsa.ThresholdSignature:
-		sigs := make(map[uint32]*ECDSASignature)
-		for _, p := range s.Signatures() {
-			sigs[uint32(p.Signer())] = &ECDSASignature{
+		sigs := make([]*ECDSASignature, len(s.Signatures()))
+		for i, p := range s.Signatures() {
+			sigs[i] = &ECDSASignature{
 				Signer: uint32(p.Signer()),
 				R:      p.R().Bytes(),
 				S:      p.S().Bytes(),
@@ -66,24 +67,25 @@ func ThresholdSignatureToProto(sig hotstuff.ThresholdSignature) *ThresholdSignat
 	return signature
 }
 
+// ThresholdSignatureFromProto converts a protocol buffers message to a threshold signature.
 func ThresholdSignatureFromProto(sig *ThresholdSignature) hotstuff.ThresholdSignature {
 	if signature := sig.GetECDSASigs(); signature != nil {
-		sigs := make(map[hotstuff.ID]*ecdsa.Signature, len(signature.GetSigs()))
-		for _, sig := range signature.GetSigs() {
+		sigs := make([]*ecdsa.Signature, len(signature.GetSigs()))
+		for i, sig := range signature.GetSigs() {
 			r := new(big.Int)
 			r.SetBytes(sig.GetR())
 			s := new(big.Int)
 			s.SetBytes(sig.GetS())
-			sigs[hotstuff.ID(sig.GetSigner())] = ecdsa.NewSignature(r, s, hotstuff.ID(sig.GetSigner()))
+			sigs[i] = ecdsa.RestoreSignature(r, s, hotstuff.ID(sig.GetSigner()))
 		}
-		return ecdsa.NewThresholdSignature(sigs)
+		return ecdsa.RestoreThresholdSignature(sigs)
 	}
 	if signature := sig.GetBLS12Sig(); signature != nil {
 		participants := make(hotstuff.IDSet, len(signature.GetParticipants()))
 		for _, participant := range signature.GetParticipants() {
 			participants.Add(hotstuff.ID(participant))
 		}
-		aggSig, err := bls12.NewAggregateSignature(signature.GetSig(), participants)
+		aggSig, err := bls12.RestoreAggregateSignature(signature.GetSig(), participants)
 		if err != nil {
 			return nil
 		}
