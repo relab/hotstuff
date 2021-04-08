@@ -102,14 +102,22 @@ func (c *cmdCache) Accept(cmd hotstuff.Command) bool {
 		return false
 	}
 
+	newSerialNumbers := make(map[uint32]uint64)
+
 	c.mut.Lock()
 	defer c.mut.Unlock()
+
 	for _, cmd := range batch.GetCommands() {
 		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
 			// command is too old, can't accept
 			return false
 		}
-		c.serialNumbers[cmd.GetClientID()] = cmd.GetSequenceNumber()
+		newSerialNumbers[cmd.GetClientID()] = cmd.GetSequenceNumber()
+	}
+
+	// only update the serial numbers if we accept the batch
+	for id, n := range newSerialNumbers {
+		c.serialNumbers[id] = n
 	}
 
 	return true
