@@ -63,8 +63,13 @@ func ThresholdSignatureToProto(sig hotstuff.ThresholdSignature) *ThresholdSignat
 			Sigs: sigs,
 		}}
 	case *bls12.AggregateSignature:
+		participants := make([]uint32, 0, len(s.Participants()))
+		for p := range s.Participants() {
+			participants = append(participants, uint32(p))
+		}
 		signature.AggSig = &ThresholdSignature_BLS12Sig{BLS12Sig: &BLS12AggregateSignature{
-			Sig: s.ToBytes(),
+			Sig:          s.ToBytes(),
+			Participants: participants,
 		}}
 	}
 	return signature

@@ -53,7 +53,7 @@ func (priv PrivateKey) ToBytes() []byte {
 }
 
 // FromBytes unmarshals the private key from a byte slice.
-func (priv PrivateKey) FromBytes(b []byte) {
+func (priv *PrivateKey) FromBytes(b []byte) {
 	priv.p = new(big.Int)
 	priv.p.SetBytes(b)
 }
@@ -94,7 +94,7 @@ func (s *Signature) ToBytes() []byte {
 // FromBytes unmarshals a signature from a byte slice.
 func (s *Signature) FromBytes(b []byte) (err error) {
 	s.signer = hotstuff.ID(binary.LittleEndian.Uint32(b))
-	s.s, err = bls12.NewG2().FromCompressed(b[3:])
+	s.s, err = bls12.NewG2().FromCompressed(b[4:])
 	return err
 }
 

@@ -36,17 +36,22 @@ func TestMain(m *testing.M) {
 // and then feed a random input to the replicas. Afterwards, we compare each replica's output
 // with the input to make sure that it got replicated correctly.
 func TestSMR(t *testing.T) {
+	t.Run("ECDSA", func(t *testing.T) { testSMRImpl(t, false) })
+	t.Run("BLS12-381", func(t *testing.T) { testSMRImpl(t, true) })
+}
+
+func testSMRImpl(t *testing.T, bls bool) {
 	testdir := t.TempDir()
 
 	ports := getFreePorts(t, 8)
-	generateKeys(t, path.Join(testdir, "keys"))
+	generateKeys(t, path.Join(testdir, "keys"), bls)
 	generateInput(t, path.Join(testdir, "input"))
 
 	replicas := []replica{
-		genReplica(testdir, 1, ports.next(), ports.next()),
-		genReplica(testdir, 2, ports.next(), ports.next()),
-		genReplica(testdir, 3, ports.next(), ports.next()),
-		genReplica(testdir, 4, ports.next(), ports.next()),
+		genReplica(testdir, 1, ports.next(), ports.next(), bls),
+		genReplica(testdir, 2, ports.next(), ports.next(), bls),
+		genReplica(testdir, 3, ports.next(), ports.next(), bls),
+		genReplica(testdir, 4, ports.next(), ports.next(), bls),
 	}
 
 	clientConf := &options{
@@ -74,8 +79,15 @@ func TestSMR(t *testing.T) {
 	for _, replica := range replicas {
 		conf := *serverConf
 		conf.SelfID = replica.ID
-		conf.Privkey = fmt.Sprintf("%s/keys/%d.key", testdir, replica.ID)
 		conf.Cert = fmt.Sprintf("%s/keys/%d.crt", testdir, replica.ID)
+		conf.CertKey = fmt.Sprintf("%s/keys/%d.key", testdir, replica.ID)
+		if bls {
+			conf.Crypto = "bls12"
+			conf.Privkey = fmt.Sprintf("%s/keys/%d.bls", testdir, replica.ID)
+		} else {
+			conf.Crypto = "ecdsa"
+			conf.Privkey = fmt.Sprintf("%s/keys/%d.key", testdir, replica.ID)
+		}
 		conf.Output = fmt.Sprintf("%s/%d.out", testdir, replica.ID)
 		go func() {
 			runServer(ctx, &conf)
@@ -127,9 +139,9 @@ func getFreePorts(t *testing.T, n int) ports {
 	return ports
 }
 
-func generateKeys(t *testing.T, path string) {
+func generateKeys(t *testing.T, path string, bls bool) {
 	t.Helper()
-	if err := keygen.GenerateConfiguration(path, true, false, 1, 4, "*", []string{"127.0.0.1"}); err != nil {
+	if err := keygen.GenerateConfiguration(path, true, bls, 1, 4, "*", []string{"127.0.0.1"}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -168,12 +180,17 @@ func hashFile(t *testing.T, path string) (hash hotstuff.Hash) {
 	return hash
 }
 
-func genReplica(testdir string, id hotstuff.ID, peerPort, clientPort int) replica {
-	return replica{
+func genReplica(testdir string, id hotstuff.ID, peerPort, clientPort int, bls bool) replica {
+	r := replica{
 		ID:         id,
 		PeerAddr:   fmt.Sprintf("127.0.0.1:%d", peerPort),
 		ClientAddr: fmt.Sprintf("127.0.0.1:%d", clientPort),
-		Pubkey:     fmt.Sprintf("%s/keys/%d.key.pub", testdir, id),
 		Cert:       fmt.Sprintf("%s/keys/%d.crt", testdir, id),
 	}
+	if bls {
+		r.Pubkey = fmt.Sprintf("%s/keys/%d.bls.pub", testdir, id)
+	} else {
+		r.Pubkey = fmt.Sprintf("%s/keys/%d.key.pub", testdir, id)
+	}
+	return r
 }

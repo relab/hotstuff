@@ -76,6 +76,9 @@ func (cache *cache) Sign(hash hotstuff.Hash) (sig hotstuff.Signature, err error)
 
 // Verify verifies a signature given a hash.
 func (cache *cache) Verify(sig hotstuff.Signature, hash hotstuff.Hash) bool {
+	if sig == nil {
+		return false
+	}
 	key := string(sig.ToBytes())
 	if cache.check(key) {
 		return true
@@ -99,6 +102,9 @@ func (cache *cache) CreateThresholdSignature(partialSignatures []hotstuff.Signat
 
 // VerifyThresholdSignature verifies a threshold signature.
 func (cache *cache) VerifyThresholdSignature(signature hotstuff.ThresholdSignature, hash hotstuff.Hash) bool {
+	if signature == nil {
+		return false
+	}
 	key := string(signature.ToBytes())
 	if cache.check(key) {
 		return true

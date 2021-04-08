@@ -26,6 +26,7 @@ type options struct {
 	Benchmark       bool        `mapstructure:"benchmark"`
 	Cert            string      `mapstructure:"cert"`
 	CertKey         string      `mapstructure:"cert-key"`
+	Crypto          string      `mapstructure:"crypto"`
 	ClientAddr      string      `mapstructure:"client-listen"`
 	ExitAfter       int         `mapstructure:"exit-after"`
 	Input           string      `mapstructure:"input"`
@@ -75,6 +76,7 @@ func main() {
 	pflag.String("privkey", "", "The path to the private key file (server)")
 	pflag.String("cert", "", "Path to the certificate (server)")
 	pflag.String("cert-key", "", "Path to the private key for the certificate (server)")
+	pflag.String("crypto", "ecdsa", "The name of the crypto implementation to use (server)")
 	pflag.Int("view-timeout", 1000, "How many milliseconds before a view is timed out (server)")
 	pflag.String("output", "", "Commands will be written here. (server)")
 	pflag.Int("batch-size", 100, "How many commands are batched together for each proposal (server)")
