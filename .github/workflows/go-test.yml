@@ -24,7 +24,6 @@ jobs:
         run: go mod download
       - name: Test
         run: |
-          export HOTSTUFF_LOG=debug
           if [ "$RUNNER_OS" == "Linux" ]; then
             go test -v -timeout 60s -coverpkg=./... -coverprofile=coverage.tmp.txt -covermode=atomic ./...
             grep -v -E ".pb.go|_mock.go" coverage.tmp.txt > coverage.txt
@@ -32,6 +31,8 @@ jobs:
             go test -v -timeout 60s ./...
           fi
         shell: bash
+        env:
+          HOTSTUFF_LOG: info
       - name: Upload code coverage report
         if: runner.os == 'Linux'
         uses: codecov/codecov-action@v1
