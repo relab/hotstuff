@@ -212,6 +212,9 @@ func (bc *bls12Crypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 	if !ok {
 		return false
 	}
+	if len(sig.participants) < bc.mod.Config().QuorumSize() {
+		return false
+	}
 	pubKeys := make([]*PublicKey, 0, len(sig.participants))
 	for id := range sig.participants {
 		replica, ok := bc.mod.Config().Replica(id)
