@@ -44,6 +44,7 @@ func (hs *chainedhotstuff) commit(block *hotstuff.Block) {
 		}
 		hs.mod.Logger().Debug("EXEC: ", block)
 		hs.mod.Executor().Exec(block.Command())
+		hs.bExec = block
 	}
 }
 
@@ -55,13 +56,14 @@ func (hs *chainedhotstuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool)
 }
 
 func (hs *chainedhotstuff) update(block *hotstuff.Block) {
+	hs.mod.ViewSynchronizer().UpdateHighQC(block.QuorumCert())
+
 	block1, ok := hs.qcRef(block.QuorumCert())
 	if !ok {
 		return
 	}
 
 	hs.mod.Logger().Debug("PRE_COMMIT: ", block1)
-	hs.mod.ViewSynchronizer().UpdateHighQC(block.QuorumCert())
 
 	block2, ok := hs.qcRef(block1.QuorumCert())
 	if !ok {
@@ -81,7 +83,28 @@ func (hs *chainedhotstuff) update(block *hotstuff.Block) {
 	if block1.Parent() == block2.Hash() && block2.Parent() == block3.Hash() {
 		hs.mod.Logger().Debug("DECIDE: ", block3)
 		hs.commit(block3)
-		hs.bExec = block3
+		// NOTE: we now update bExec in commit, instead of doing it here. Updating bExec here can be problematic,
+		// because it can lead to a block being executed twice. Let's consider a view where the leader's proposal is not
+		// accepted by the other replicas. In that case, the leader will have called update(), which leads to a block
+		// being executed. Let's call the view that failed 'v'. In the next view, v+1, the new leader will select the
+		// highest QC it knows. This should be the QC from view v-1, which references the block from v-2. When this is
+		// proposed to the old leader, it will again call update(), but this time it will not update bLock. It will,
+		// however, find a three chain and call execute. The block that has a three-chain will have a lower view (v-4)
+		// than bExec (v-3) at that point. commit() handles this correctly, and will not execute the block twice, but
+		// because we used to update bExec right here, the next view would cause the block from view v-3 to be executed
+		// again. By updating bExec within commit() instead, we solve this problem.
+		//
+		// The leader of view v: After view v
+		//         bExec   bLock
+		//           |       |
+		//           v       v
+		// ->[v-4]->[v-3]->[v-2]->[v-1]->[v]
+		//
+		// After view v+1 (assuming that we update bExec on the line below this comment):
+		//   bExec         bLock
+		//     |             |
+		//     v             v
+		// ->[v-4]->[v-3]->[v-2]->[v-1]->[v+1]
 	}
 }
 
