@@ -203,7 +203,7 @@ func (c *hotstuffClient) GetStats() *benchmark.Result {
 
 func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 	num := uint64(1)
-	lastCommand := uint64(0)
+	var lastCommand uint64 = math.MaxUint64
 	var sleeptime time.Duration
 	if c.conf.RateLimit > 0 {
 		sleeptime = time.Second / time.Duration(c.conf.RateLimit)
@@ -219,7 +219,7 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 
 		// annoyingly, we need a mutex here to prevent the data race detector from complaining.
 		c.mut.Lock()
-		shouldStop := lastCommand == c.highestCommitted
+		shouldStop := lastCommand <= c.highestCommitted
 		c.mut.Unlock()
 
 		if shouldStop {
@@ -229,9 +229,9 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 		data := make([]byte, c.conf.PayloadSize)
 		n, err := c.reader.Read(data)
 		if err != nil && err != io.EOF {
-			// if we get an error other than
+			// if we get an error other than EOF
 			return err
-		} else if err == io.EOF && n == 0 && lastCommand == 0 {
+		} else if err == io.EOF && n == 0 && lastCommand > num {
 			lastCommand = num
 		}
 

@@ -20,12 +20,16 @@ var (
 	batchSize   int
 	payloadSize int
 	fileSize    int
+	inFile      string
+	outdir      string
 )
 
 func TestMain(m *testing.M) {
 	flag.IntVar(&batchSize, "batch-size", 50, "The number of commands to batch together for each block.")
 	flag.IntVar(&payloadSize, "payload-size", 10, "The size (in bytes) of each command.")
 	flag.IntVar(&fileSize, "file-size", 100000, "The size (in bytes) of the input file.")
+	flag.StringVar(&inFile, "input", "", "The input file. If empty, a random file will be generated based on 'file-size'.")
+	flag.StringVar(&outdir, "outdir", "", "The path to the output directory. If empty, a temporary directory will be used.")
 	flag.Parse()
 
 	rc := m.Run()
@@ -41,11 +45,26 @@ func TestSMR(t *testing.T) {
 }
 
 func testSMRImpl(t *testing.T, bls bool) {
-	testdir := t.TempDir()
+	var (
+		testdir string
+		input   string
+	)
+
+	if outdir != "" {
+		testdir = outdir
+	} else {
+		testdir = t.TempDir()
+	}
+
+	if inFile != "" {
+		input = inFile
+	} else {
+		input = path.Join(testdir, "input")
+		generateInput(t, input)
+	}
 
 	ports := getFreePorts(t, 8)
 	generateKeys(t, path.Join(testdir, "keys"), bls)
-	generateInput(t, path.Join(testdir, "input"))
 
 	replicas := []replica{
 		genReplica(testdir, 1, ports.next(), ports.next(), bls),
@@ -56,7 +75,7 @@ func testSMRImpl(t *testing.T, bls bool) {
 
 	clientConf := &options{
 		SelfID:      1,
-		Input:       path.Join(testdir, "input"),
+		Input:       input,
 		PayloadSize: payloadSize,
 		MaxInflight: uint64(4 * batchSize),
 		Replicas:    replicas,
@@ -103,7 +122,7 @@ func testSMRImpl(t *testing.T, bls bool) {
 		<-c
 	}
 
-	inputHash := hashFile(t, path.Join(testdir, "input"))
+	inputHash := hashFile(t, input)
 	for _, replica := range replicas {
 		outHash := hashFile(t, fmt.Sprintf("%s/%d.out", testdir, replica.ID))
 		if inputHash != outHash {

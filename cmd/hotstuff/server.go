@@ -303,6 +303,7 @@ func (srv *clientSrv) Exec(cmd hotstuff.Command) {
 	batch := new(client.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {
+		log.Printf("Failed to unmarshal command: %v\n", err)
 		return
 	}
 
@@ -313,10 +314,10 @@ func (srv *clientSrv) Exec(cmd hotstuff.Command) {
 	}
 
 	for _, cmd := range batch.GetCommands() {
+		_, err := srv.output.Write(cmd.Data)
 		if err != nil {
-			log.Printf("Failed to unmarshal command: %v\n", err)
+			log.Printf("Error writing data: %v\n", err)
 		}
-		fmt.Fprintf(srv.output, "%s", cmd.Data)
 		srv.mut.Lock()
 		if c, ok := srv.finishedCmds[cmdID{cmd.ClientID, cmd.SequenceNumber}]; ok {
 			c <- struct{}{}
