@@ -97,18 +97,22 @@ type PartialCert struct {
 	blockHash Hash
 }
 
+// NewPartialCert returns a new partial certificate.
 func NewPartialCert(signature Signature, blockHash Hash) PartialCert {
 	return PartialCert{signature, blockHash}
 }
 
+// Signature returns the signature.
 func (pc PartialCert) Signature() Signature {
 	return pc.signature
 }
 
+// BlockHash returns the hash of the block that was signed.
 func (pc PartialCert) BlockHash() Hash {
 	return pc.blockHash
 }
 
+// ToBytes returns a byte representation of the partial certificate.
 func (pc PartialCert) ToBytes() []byte {
 	return append(pc.blockHash[:], pc.signature.ToBytes()...)
 }
@@ -165,10 +169,12 @@ type QuorumCert struct {
 	hash      Hash
 }
 
+// NewQuorumCert creates a new quorum cert from the given values.
 func NewQuorumCert(signature ThresholdSignature, hash Hash) QuorumCert {
 	return QuorumCert{signature, hash}
 }
 
+// ToBytes returns a byte representation of the quorum certificate.
 func (qc QuorumCert) ToBytes() []byte {
 	if qc.signature == nil {
 		return qc.hash[:]
@@ -176,10 +182,12 @@ func (qc QuorumCert) ToBytes() []byte {
 	return append(qc.hash[:], qc.signature.ToBytes()...)
 }
 
+// Signature returns the threshold signature.
 func (qc QuorumCert) Signature() ThresholdSignature {
 	return qc.signature
 }
 
+// BlockHash returns the hash of the block that was signed.
 func (qc QuorumCert) BlockHash() Hash {
 	return qc.hash
 }
@@ -201,20 +209,24 @@ type TimeoutCert struct {
 	view      View
 }
 
+// NewTimeoutCert returns a new timeout certificate.
 func NewTimeoutCert(signature ThresholdSignature, view View) TimeoutCert {
 	return TimeoutCert{signature, view}
 }
 
+// ToBytes returns a byte representation of the timeout certificate.
 func (tc TimeoutCert) ToBytes() []byte {
 	var viewBytes [8]byte
 	binary.LittleEndian.PutUint64(viewBytes[:], uint64(tc.view))
 	return append(viewBytes[:], tc.signature.ToBytes()...)
 }
 
+// Signature returns the threshold signature.
 func (tc TimeoutCert) Signature() ThresholdSignature {
 	return tc.signature
 }
 
+// View returns the view in which the timeouts occurred.
 func (tc TimeoutCert) View() View {
 	return tc.view
 }

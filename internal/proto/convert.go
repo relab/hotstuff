@@ -37,7 +37,10 @@ func SignatureFromProto(sig *Signature) hotstuff.Signature {
 	}
 	if signature := sig.GetBLS12Sig(); signature != nil {
 		s := &bls12.Signature{}
-		s.FromBytes(signature.GetSig())
+		err := s.FromBytes(signature.GetSig())
+		if err != nil {
+			return nil
+		}
 		return s
 	}
 	return nil

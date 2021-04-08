@@ -229,7 +229,10 @@ func ReadPublicKeyFile(keyFile string) (key hotstuff.PublicKey, err error) {
 		key, err = x509.ParsePKIXPublicKey(b.Bytes)
 	case bls12.PublicKeyFileType:
 		k := &bls12.PublicKey{}
-		k.FromBytes(b.Bytes)
+		err = k.FromBytes(b.Bytes)
+		if err != nil {
+			return nil, err
+		}
 		key = k
 	default:
 		return nil, fmt.Errorf("file type did not match any known types")

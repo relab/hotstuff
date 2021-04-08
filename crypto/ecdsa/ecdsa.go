@@ -159,7 +159,7 @@ func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []hotstuff.Sig
 
 		sig, ok := s.(*Signature)
 		if !ok {
-			multierr.Append(err, fmt.Errorf("%w: %T", crypto.ErrWrongType, s))
+			err = multierr.Append(err, fmt.Errorf("%w: %T", crypto.ErrWrongType, s))
 			continue
 		}
 
