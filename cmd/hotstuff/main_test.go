@@ -188,7 +188,12 @@ func generateInput(t *testing.T, path string) {
 func hashFile(t *testing.T, path string) (hash hotstuff.Hash) {
 	t.Helper()
 	f, err := os.Open(path)
-	defer f.Close()
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 	if err != nil {
 		t.Fatal(err)
 	}
