@@ -1,9 +1,14 @@
+CODECOV
 Cmds
 Debugf
+HOTSTUFF
 Infof
 SSWU
 Warnf
 cmdqueue
+covermode
+coverpkg
+coverprofile
 durationpb
 felixge
 fgprof
@@ -26,4 +31,5 @@ sigs
 structs
 timestamppb
 tmpl
+unittests
 unmarshals
