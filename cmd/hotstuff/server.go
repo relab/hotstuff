@@ -247,7 +247,11 @@ func (srv *clientSrv) Start(ctx context.Context, address string) (err error) {
 	// sleep so that all replicas can be ready before we start
 	time.Sleep(time.Second)
 
-	go srv.hs.EventLoop().Run(ctx)
+	c := make(chan struct{})
+	go func() {
+		srv.hs.EventLoop().Run(ctx)
+		close(c)
+	}()
 
 	go func() {
 		err := srv.gorumsSrv.Serve(lis)
@@ -256,6 +260,8 @@ func (srv *clientSrv) Start(ctx context.Context, address string) (err error) {
 		}
 	}()
 
+	// wait for the event loop to exit
+	<-c
 	return nil
 }
 

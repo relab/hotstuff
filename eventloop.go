@@ -56,8 +56,15 @@ func (el *EventLoop) Run(ctx context.Context) {
 		case event := <-el.eventQ:
 			el.processEvent(event)
 		case <-ctx.Done():
-			return
+			goto cancelled
 		}
+	}
+
+cancelled:
+	// HACK: when we get cancelled, we will handle the events that were in the queue at that time before quitting.
+	l := len(el.eventQ)
+	for i := 0; i < l; i++ {
+		el.processEvent(<-el.eventQ)
 	}
 }
 
