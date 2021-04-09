@@ -27,8 +27,6 @@ type IDSet interface {
 	Add(id ID)
 	// Contains returns true if the set contains the ID.
 	Contains(id ID) bool
-	// Len returns the number of IDs in the set.
-	Len() int
 	// ForEach calls f for each ID in the set.
 	ForEach(f func(ID))
 }
@@ -50,11 +48,6 @@ func (s idSetMap) Add(id ID) {
 func (s idSetMap) Contains(id ID) bool {
 	_, ok := s[id]
 	return ok
-}
-
-// Len returns the number of IDs in the set.
-func (s idSetMap) Len() int {
-	return len(s)
 }
 
 // ForEach calls f for each ID in the set.

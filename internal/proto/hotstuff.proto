@@ -62,7 +62,7 @@ message ECDSAThresholdSignature { repeated ECDSASignature Sigs = 1; }
 
 message BLS12AggregateSignature {
   bytes Sig = 1;
-  repeated uint32 participants = 2;
+  bytes participants = 2;
 }
 
 message ThresholdSignature {

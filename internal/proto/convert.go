@@ -63,13 +63,9 @@ func ThresholdSignatureToProto(sig hotstuff.ThresholdSignature) *ThresholdSignat
 			Sigs: sigs,
 		}}
 	case *bls12.AggregateSignature:
-		participants := make([]uint32, 0, s.Participants().Len())
-		s.Participants().ForEach(func(p hotstuff.ID) {
-			participants = append(participants, uint32(p))
-		})
 		signature.AggSig = &ThresholdSignature_BLS12Sig{BLS12Sig: &BLS12AggregateSignature{
 			Sig:          s.ToBytes(),
-			Participants: participants,
+			Participants: s.Bitfield(),
 		}}
 	}
 	return signature
@@ -89,11 +85,7 @@ func ThresholdSignatureFromProto(sig *ThresholdSignature) hotstuff.ThresholdSign
 		return ecdsa.RestoreThresholdSignature(sigs)
 	}
 	if signature := sig.GetBLS12Sig(); signature != nil {
-		participants := hotstuff.NewIDSet()
-		for _, participant := range signature.GetParticipants() {
-			participants.Add(hotstuff.ID(participant))
-		}
-		aggSig, err := bls12.RestoreAggregateSignature(signature.GetSig(), participants)
+		aggSig, err := bls12.RestoreAggregateSignature(signature.GetSig(), signature.GetParticipants())
 		if err != nil {
 			return nil
 		}

@@ -108,12 +108,12 @@ func (s *Signature) Signer() hotstuff.ID {
 // signature.
 type AggregateSignature struct {
 	sig          bls12.PointG2
-	participants hotstuff.IDSet // The ids of the replicas who submitted signatures.
+	participants crypto.Bitfield // The ids of the replicas who submitted signatures.
 }
 
 // RestoreAggregateSignature restores an existing aggregate signature. It should not be used to create new aggregate
 // signatures. Use CreateThresholdSignature instead.
-func RestoreAggregateSignature(sig []byte, participants hotstuff.IDSet) (s *AggregateSignature, err error) {
+func RestoreAggregateSignature(sig []byte, participants crypto.Bitfield) (s *AggregateSignature, err error) {
 	p, err := bls12.NewG2().FromCompressed(sig)
 	if err != nil {
 		return nil, err
@@ -135,6 +135,11 @@ func (agg *AggregateSignature) ToBytes() []byte {
 
 // Participants returns the IDs of replicas who participated in the threshold signature.
 func (agg AggregateSignature) Participants() hotstuff.IDSet {
+	return &agg.participants
+}
+
+// Bitfield returns the bitmask.
+func (agg AggregateSignature) Bitfield() crypto.Bitfield {
 	return agg.participants
 }
 
@@ -176,7 +181,7 @@ func (bc *bls12Crypto) aggregateSignatures(signatures map[hotstuff.ID]*Signature
 	}
 	g2 := bls12.NewG2()
 	sig := bls12.PointG2{}
-	participants := hotstuff.NewIDSet()
+	var participants crypto.Bitfield
 	for id, s := range signatures {
 		g2.Add(&sig, &sig, s.s)
 		participants.Add(id)
@@ -212,10 +217,7 @@ func (bc *bls12Crypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 	if !ok {
 		return false
 	}
-	if sig.participants.Len() < bc.mod.Config().QuorumSize() {
-		return false
-	}
-	pubKeys := make([]*PublicKey, 0, sig.participants.Len())
+	pubKeys := make([]*PublicKey, 0)
 	sig.participants.ForEach(func(id hotstuff.ID) {
 		replica, ok := bc.mod.Config().Replica(id)
 		if !ok {
