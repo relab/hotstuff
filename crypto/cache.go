@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"container/list"
+	"crypto/sha256"
 	"sync"
 
 	"github.com/relab/hotstuff"
@@ -11,7 +12,7 @@ type cache struct {
 	impl        hotstuff.CryptoImpl
 	mut         sync.Mutex
 	capacity    int
-	entries     map[string]*list.Element
+	entries     map[hotstuff.Hash]*list.Element
 	accessOrder list.List
 }
 
@@ -21,7 +22,7 @@ func NewCache(impl hotstuff.CryptoImpl, capacity int) hotstuff.Crypto {
 	return New(&cache{
 		impl:     impl,
 		capacity: capacity,
-		entries:  make(map[string]*list.Element, capacity),
+		entries:  make(map[hotstuff.Hash]*list.Element, capacity),
 	})
 }
 
@@ -32,7 +33,7 @@ func (cache *cache) InitModule(hs *hotstuff.HotStuff) {
 	}
 }
 
-func (cache *cache) insert(key string) {
+func (cache *cache) insert(key hotstuff.Hash) {
 	cache.mut.Lock()
 	defer cache.mut.Unlock()
 	elem, ok := cache.entries[key]
@@ -45,7 +46,7 @@ func (cache *cache) insert(key string) {
 	cache.entries[key] = elem
 }
 
-func (cache *cache) check(key string) bool {
+func (cache *cache) check(key hotstuff.Hash) bool {
 	cache.mut.Lock()
 	defer cache.mut.Unlock()
 	elem, ok := cache.entries[key]
@@ -60,7 +61,7 @@ func (cache *cache) evict() {
 	if len(cache.entries) < cache.capacity {
 		return
 	}
-	key := cache.accessOrder.Remove(cache.accessOrder.Back()).(string)
+	key := cache.accessOrder.Remove(cache.accessOrder.Back()).(hotstuff.Hash)
 	delete(cache.entries, key)
 }
 
@@ -70,7 +71,8 @@ func (cache *cache) Sign(hash hotstuff.Hash) (sig hotstuff.Signature, err error)
 	if err != nil {
 		return nil, err
 	}
-	cache.insert(string(sig.ToBytes()))
+	key := sha256.Sum256(append(hash[:], sig.ToBytes()...))
+	cache.insert(key)
 	return sig, nil
 }
 
@@ -79,7 +81,7 @@ func (cache *cache) Verify(sig hotstuff.Signature, hash hotstuff.Hash) bool {
 	if sig == nil {
 		return false
 	}
-	key := string(sig.ToBytes())
+	key := sha256.Sum256(append(hash[:], sig.ToBytes()...))
 	if cache.check(key) {
 		return true
 	}
@@ -96,7 +98,8 @@ func (cache *cache) CreateThresholdSignature(partialSignatures []hotstuff.Signat
 	if err != nil {
 		return nil, err
 	}
-	cache.insert(string(sig.ToBytes()))
+	key := sha256.Sum256(append(hash[:], sig.ToBytes()...))
+	cache.insert(key)
 	return sig, nil
 }
 
@@ -105,7 +108,7 @@ func (cache *cache) VerifyThresholdSignature(signature hotstuff.ThresholdSignatu
 	if signature == nil {
 		return false
 	}
-	key := string(signature.ToBytes())
+	key := sha256.Sum256(append(hash[:], signature.ToBytes()...))
 	if cache.check(key) {
 		return true
 	}
