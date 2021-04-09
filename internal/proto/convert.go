@@ -50,14 +50,14 @@ func SignatureFromProto(sig *Signature) hotstuff.Signature {
 func ThresholdSignatureToProto(sig hotstuff.ThresholdSignature) *ThresholdSignature {
 	signature := &ThresholdSignature{}
 	switch s := sig.(type) {
-	case *ecdsa.ThresholdSignature:
-		sigs := make([]*ECDSASignature, len(s.Signatures()))
-		for i, p := range s.Signatures() {
-			sigs[i] = &ECDSASignature{
+	case ecdsa.ThresholdSignature:
+		sigs := make([]*ECDSASignature, 0, len(s))
+		for _, p := range s {
+			sigs = append(sigs, &ECDSASignature{
 				Signer: uint32(p.Signer()),
 				R:      p.R().Bytes(),
 				S:      p.S().Bytes(),
-			}
+			})
 		}
 		signature.AggSig = &ThresholdSignature_ECDSASigs{ECDSASigs: &ECDSAThresholdSignature{
 			Sigs: sigs,

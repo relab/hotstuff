@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
@@ -56,23 +57,16 @@ func (sig Signature) ToBytes() []byte {
 
 var _ hotstuff.Signature = (*Signature)(nil)
 
-// ThresholdSignature is a list of (partial) signatures that form a valid threshold signature when there are a quorum
+// ThresholdSignature is a set of (partial) signatures that form a valid threshold signature when there are a quorum
 // of valid (partial) signatures.
-type ThresholdSignature struct {
-	signatures   []*Signature
-	participants hotstuff.IDSet
-}
+type ThresholdSignature map[hotstuff.ID]*Signature
 
 // RestoreThresholdSignature should only be used to restore an existing threshold signature from a set of signatures.
 // To create a new verifiable threshold signature, use CreateThresholdSignature instead.
-func RestoreThresholdSignature(signatures []*Signature) *ThresholdSignature {
-	sig := &ThresholdSignature{
-		signatures:   make([]*Signature, 0, len(signatures)),
-		participants: hotstuff.NewIDSet(),
-	}
+func RestoreThresholdSignature(signatures []*Signature) ThresholdSignature {
+	sig := make(ThresholdSignature, len(signatures))
 	for _, s := range signatures {
-		sig.signatures = append(sig.signatures, s)
-		sig.participants.Add(s.signer)
+		sig[s.signer] = s
 	}
 	return sig
 }
@@ -80,23 +74,45 @@ func RestoreThresholdSignature(signatures []*Signature) *ThresholdSignature {
 // ToBytes returns the object as bytes.
 func (sig ThresholdSignature) ToBytes() []byte {
 	var b []byte
-	for _, signature := range sig.signatures {
-		b = append(b, signature.ToBytes()...)
+	// sort by ID to make it deterministic
+	order := make([]hotstuff.ID, 0, len(sig))
+	for _, signature := range sig {
+		i := sort.Search(len(order), func(i int) bool { return signature.signer < order[i] })
+		order = append(order, 0)
+		copy(order[i+1:], order[i:])
+		order[i] = signature.signer
+	}
+	for _, id := range order {
+		b = append(b, sig[id].ToBytes()...)
 	}
 	return b
 }
 
-// Signatures returns the list of signatures that the threshold signature contains.
-func (sig ThresholdSignature) Signatures() []*Signature {
-	return sig.signatures
-}
-
 // Participants returns the IDs of replicas who participated in the threshold signature.
 func (sig ThresholdSignature) Participants() hotstuff.IDSet {
-	return sig.participants
+	return sig
+}
+
+// Add adds an ID to the set.
+func (sig ThresholdSignature) Add(id hotstuff.ID) {
+	panic("not implemented")
+}
+
+// Contains returns true if the set contains the ID.
+func (sig ThresholdSignature) Contains(id hotstuff.ID) bool {
+	_, ok := sig[id]
+	return ok
+}
+
+// ForEach calls f for each ID in the set.
+func (sig ThresholdSignature) ForEach(f func(hotstuff.ID)) {
+	for id := range sig {
+		f(id)
+	}
 }
 
 var _ hotstuff.ThresholdSignature = (*ThresholdSignature)(nil)
+var _ hotstuff.IDSet = (*ThresholdSignature)(nil)
 
 type ecdsaCrypto struct {
 	mod *hotstuff.HotStuff
@@ -147,12 +163,9 @@ func (ec *ecdsaCrypto) Verify(sig hotstuff.Signature, hash hotstuff.Hash) bool {
 
 // CreateThresholdSignature creates a threshold signature from the given partial signatures.
 func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []hotstuff.Signature, hash hotstuff.Hash) (_ hotstuff.ThresholdSignature, err error) {
-	thrSig := &ThresholdSignature{
-		signatures:   make([]*Signature, 0, ec.mod.Config().QuorumSize()),
-		participants: hotstuff.NewIDSet(),
-	}
+	thrSig := make(ThresholdSignature)
 	for _, s := range partialSignatures {
-		if thrSig.participants.Contains(s.Signer()) {
+		if thrSig.Participants().Contains(s.Signer()) {
 			err = multierr.Append(err, crypto.ErrPartialDuplicate)
 			continue
 		}
@@ -166,12 +179,11 @@ func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []hotstuff.Sig
 		// use the registered verifier instead of ourself to verify.
 		// this makes it possible for the signatureCache to work.
 		if ec.mod.Crypto().Verify(s, hash) {
-			thrSig.participants.Add(sig.signer)
-			thrSig.signatures = append(thrSig.signatures, sig)
+			thrSig[sig.signer] = sig
 		}
 	}
 
-	if len(thrSig.signatures) >= ec.mod.Config().QuorumSize() {
+	if len(thrSig) >= ec.mod.Config().QuorumSize() {
 		return thrSig, nil
 	}
 
@@ -180,30 +192,21 @@ func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []hotstuff.Sig
 
 // VerifyThresholdSignature verifies a threshold signature.
 func (ec *ecdsaCrypto) VerifyThresholdSignature(signature hotstuff.ThresholdSignature, hash hotstuff.Hash) bool {
-	sig, ok := signature.(*ThresholdSignature)
+	sig, ok := signature.(ThresholdSignature)
 	if !ok {
 		return false
 	}
-	if len(sig.signatures) < ec.mod.Config().QuorumSize() {
+	if len(sig) < ec.mod.Config().QuorumSize() {
 		return false
 	}
 	results := make(chan bool)
-	// we'll use this to make sure that each signer only appears once
-	realParticipation := hotstuff.NewIDSet()
-	for _, pSig := range sig.signatures {
-		if !sig.participants.Contains(pSig.signer) {
-			continue
-		}
-		if realParticipation.Contains(pSig.signer) {
-			continue
-		}
-		realParticipation.Add(pSig.signer)
+	for _, pSig := range sig {
 		go func(sig *Signature) {
 			results <- ec.mod.Crypto().Verify(sig, hash)
 		}(pSig)
 	}
 	numVerified := 0
-	for range sig.signatures {
+	for range sig {
 		if <-results {
 			numVerified++
 		}
