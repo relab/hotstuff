@@ -228,6 +228,9 @@ func (bc *bls12Crypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 		bc.mod.Logger().Error(err)
 		return false
 	}
+	if len(pubKeys) < bc.mod.Config().QuorumSize() {
+		return false
+	}
 	engine := bls12.NewEngine()
 	engine.AddPairInv(&bls12.G1One, &sig.sig)
 	for _, pub := range pubKeys {
