@@ -68,7 +68,7 @@ type ThresholdSignature struct {
 func RestoreThresholdSignature(signatures []*Signature) *ThresholdSignature {
 	sig := &ThresholdSignature{
 		signatures:   make([]*Signature, 0, len(signatures)),
-		participants: make(hotstuff.IDSet, len(signatures)),
+		participants: hotstuff.NewIDSet(),
 	}
 	for _, s := range signatures {
 		sig.signatures = append(sig.signatures, s)
@@ -149,7 +149,7 @@ func (ec *ecdsaCrypto) Verify(sig hotstuff.Signature, hash hotstuff.Hash) bool {
 func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []hotstuff.Signature, hash hotstuff.Hash) (_ hotstuff.ThresholdSignature, err error) {
 	thrSig := &ThresholdSignature{
 		signatures:   make([]*Signature, 0, ec.mod.Config().QuorumSize()),
-		participants: make(hotstuff.IDSet, ec.mod.Config().QuorumSize()),
+		participants: hotstuff.NewIDSet(),
 	}
 	for _, s := range partialSignatures {
 		if thrSig.participants.Contains(s.Signer()) {
@@ -189,7 +189,7 @@ func (ec *ecdsaCrypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 	}
 	results := make(chan bool)
 	// we'll use this to make sure that each signer only appears once
-	realParticipation := make(hotstuff.IDSet, len(sig.participants))
+	realParticipation := hotstuff.NewIDSet()
 	for _, pSig := range sig.signatures {
 		if !sig.participants.Contains(pSig.signer) {
 			continue

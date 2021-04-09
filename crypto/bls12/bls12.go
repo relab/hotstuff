@@ -176,10 +176,10 @@ func (bc *bls12Crypto) aggregateSignatures(signatures map[hotstuff.ID]*Signature
 	}
 	g2 := bls12.NewG2()
 	sig := bls12.PointG2{}
-	participants := make(map[hotstuff.ID]struct{}, len(signatures))
+	participants := hotstuff.NewIDSet()
 	for id, s := range signatures {
 		g2.Add(&sig, &sig, s.s)
-		participants[id] = struct{}{}
+		participants.Add(id)
 	}
 	return &AggregateSignature{sig: sig, participants: participants}
 }
@@ -212,17 +212,17 @@ func (bc *bls12Crypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 	if !ok {
 		return false
 	}
-	if len(sig.participants) < bc.mod.Config().QuorumSize() {
+	if sig.participants.Len() < bc.mod.Config().QuorumSize() {
 		return false
 	}
-	pubKeys := make([]*PublicKey, 0, len(sig.participants))
-	for id := range sig.participants {
+	pubKeys := make([]*PublicKey, 0, sig.participants.Len())
+	sig.participants.ForEach(func(id hotstuff.ID) {
 		replica, ok := bc.mod.Config().Replica(id)
 		if !ok {
-			return false
+			return
 		}
 		pubKeys = append(pubKeys, replica.PublicKey().(*PublicKey))
-	}
+	})
 	ps, err := bls12.NewG2().HashToCurve(hash[:], domain)
 	if err != nil {
 		bc.mod.Logger().Error(err)

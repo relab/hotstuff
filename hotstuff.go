@@ -21,23 +21,47 @@ import (
 // ID uniquely identifies a replica
 type ID uint32
 
-// IDSet is a set that stores replica IDs.
-type IDSet map[ID]struct{}
+// IDSet implements a set of replica IDs. It is used to show which replicas participated in some event.
+type IDSet interface {
+	// Add adds an ID to the set.
+	Add(id ID)
+	// Contains returns true if the set contains the ID.
+	Contains(id ID) bool
+	// Len returns the number of IDs in the set.
+	Len() int
+	// ForEach calls f for each ID in the set.
+	ForEach(f func(ID))
+}
+
+// idSetMap implements IDSet using a map.
+type idSetMap map[ID]struct{}
+
+// NewIDSet returns a new IDSet using the default implementation.
+func NewIDSet() IDSet {
+	return make(idSetMap)
+}
 
 // Add adds an ID to the set.
-func (s IDSet) Add(id ID) {
+func (s idSetMap) Add(id ID) {
 	s[id] = struct{}{}
 }
 
 // Contains returns true if the set contains the given ID.
-func (s IDSet) Contains(id ID) bool {
+func (s idSetMap) Contains(id ID) bool {
 	_, ok := s[id]
 	return ok
 }
 
-// Remove removes the ID from the set.
-func (s IDSet) Remove(id ID) {
-	delete(s, id)
+// Len returns the number of IDs in the set.
+func (s idSetMap) Len() int {
+	return len(s)
+}
+
+// ForEach calls f for each ID in the set.
+func (s idSetMap) ForEach(f func(ID)) {
+	for id := range s {
+		f(id)
+	}
 }
 
 // View is a number that uniquely identifies a view.
@@ -195,10 +219,10 @@ func (qc QuorumCert) BlockHash() Hash {
 func (qc QuorumCert) String() string {
 	var sb strings.Builder
 	if qc.signature != nil {
-		for p := range qc.signature.Participants() {
-			sb.WriteString(strconv.FormatUint(uint64(p), 10))
+		qc.signature.Participants().ForEach(func(id ID) {
+			sb.WriteString(strconv.FormatUint(uint64(id), 10))
 			sb.WriteByte(' ')
-		}
+		})
 	}
 	return fmt.Sprintf("QC{ hash: %.6s, IDs: [ %s] }", qc.hash, &sb)
 }
@@ -234,10 +258,10 @@ func (tc TimeoutCert) View() View {
 func (tc TimeoutCert) String() string {
 	var sb strings.Builder
 	if tc.signature != nil {
-		for p := range tc.signature.Participants() {
-			sb.WriteString(strconv.FormatUint(uint64(p), 10))
+		tc.signature.Participants().ForEach(func(id ID) {
+			sb.WriteString(strconv.FormatUint(uint64(id), 10))
 			sb.WriteByte(' ')
-		}
+		})
 	}
 	return fmt.Sprintf("TC{ view: %d, IDs: [ %s] }", tc.view, &sb)
 }
