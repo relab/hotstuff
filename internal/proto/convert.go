@@ -182,6 +182,24 @@ func TimeoutCertToProto(timeoutCert hotstuff.TimeoutCert) *TimeoutCert {
 	}
 }
 
+// AggregateQCFromProto converts an AggregateQC from the protobuf type to the hotstuff type.
+func AggregateQCFromProto(m *AggQC) hotstuff.AggregateQC {
+	qcs := make([]hotstuff.QuorumCert, len(m.GetQCs()))
+	for i, pQC := range m.GetQCs() {
+		qcs[i] = QuorumCertFromProto(pQC)
+	}
+	return hotstuff.NewAggregateQC(qcs, ThresholdSignatureFromProto(m.GetSig()))
+}
+
+// AggregateQCToProto converts an AggregateQC from the hotstuff type to the protobuf type.
+func AggregateQCToProto(aggQC hotstuff.AggregateQC) *AggQC {
+	pQCs := make([]*QuorumCert, len(aggQC.QCs()))
+	for i, qc := range aggQC.QCs() {
+		pQCs[i] = QuorumCertToProto(qc)
+	}
+	return &AggQC{QCs: pQCs, Sig: ThresholdSignatureToProto(aggQC.Sig())}
+}
+
 // SyncInfoFromProto converts a SyncInfo struct from the protobuf type to the hotstuff type.
 func SyncInfoFromProto(m *SyncInfo) hotstuff.SyncInfo {
 	if qc := m.GetQC(); qc != nil {
@@ -189,6 +207,9 @@ func SyncInfoFromProto(m *SyncInfo) hotstuff.SyncInfo {
 	}
 	if tc := m.GetTC(); tc != nil {
 		return hotstuff.SyncInfoWithTC(TimeoutCertFromProto(tc))
+	}
+	if aggQC := m.GetAggQC(); aggQC != nil {
+		return hotstuff.SyncInfoWithAggQC(AggregateQCFromProto(aggQC))
 	}
 	return hotstuff.SyncInfo{}
 }
@@ -201,6 +222,9 @@ func SyncInfoToProto(syncInfo hotstuff.SyncInfo) *SyncInfo {
 	}
 	if tc, ok := syncInfo.TC(); ok {
 		m.Certificate = &SyncInfo_TC{TimeoutCertToProto(tc)}
+	}
+	if aggQC, ok := syncInfo.AggQC(); ok {
+		m.Certificate = &SyncInfo_AggQC{AggQC: AggregateQCToProto(aggQC)}
 	}
 	return m
 }

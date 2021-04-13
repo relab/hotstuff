@@ -82,11 +82,6 @@ message TimeoutCert {
   uint64 View = 2;
 }
 
-message NewViewMsg {
-  uint64 View = 1;
-  QuorumCert QC = 2;
-}
-
 message TimeoutMsg {
   uint64 View = 1;
   SyncInfo SyncInfo = 2;
@@ -97,5 +92,11 @@ message SyncInfo {
   oneof Certificate {
     QuorumCert QC = 1;
     TimeoutCert TC = 2;
+    AggQC AggQC = 3;
   }
+}
+
+message AggQC {
+  repeated QuorumCert QCs = 1;
+  ThresholdSignature Sig = 2;
 }

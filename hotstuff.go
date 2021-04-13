@@ -136,8 +136,9 @@ func (pc PartialCert) ToBytes() []byte {
 
 // SyncInfo holds the highest known QC or TC.
 type SyncInfo struct {
-	qc *QuorumCert
-	tc *TimeoutCert
+	qc    *QuorumCert
+	tc    *TimeoutCert
+	aggQC *AggregateQC
 }
 
 // SyncInfoWithQC creates a SyncInfo struct with the given QC.
@@ -154,6 +155,13 @@ func SyncInfoWithTC(tc TimeoutCert) SyncInfo {
 	return SyncInfo{tc: ptr}
 }
 
+// SyncInfoWithAggQC creates a SyncInfo struct with the given AggregateQC.
+func SyncInfoWithAggQC(aggQC AggregateQC) SyncInfo {
+	ptr := new(AggregateQC)
+	*ptr = aggQC
+	return SyncInfo{aggQC: ptr}
+}
+
 // QC returns the quorum certificate, if present.
 func (si SyncInfo) QC() (_ QuorumCert, _ bool) {
 	if si.qc != nil {
@@ -166,6 +174,14 @@ func (si SyncInfo) QC() (_ QuorumCert, _ bool) {
 func (si SyncInfo) TC() (_ TimeoutCert, _ bool) {
 	if si.tc != nil {
 		return *si.tc, true
+	}
+	return
+}
+
+// AggQC returns the AggregateQC, if present.
+func (si SyncInfo) AggQC() (_ AggregateQC, _ bool) {
+	if si.aggQC != nil {
+		return *si.aggQC, true
 	}
 	return
 }
@@ -257,6 +273,24 @@ func (tc TimeoutCert) String() string {
 		})
 	}
 	return fmt.Sprintf("TC{ view: %d, IDs: [ %s] }", tc.view, &sb)
+}
+
+// AggregateQC is a set of QCs extracted from timeout messages and an aggregate signature of the timeout signatures.
+type AggregateQC struct {
+	qcs []QuorumCert
+	sig ThresholdSignature
+}
+
+func NewAggregateQC(qcs []QuorumCert, sig ThresholdSignature) AggregateQC {
+	return AggregateQC{qcs, sig}
+}
+
+func (aggQC AggregateQC) QCs() []QuorumCert {
+	return aggQC.qcs
+}
+
+func (aggQC AggregateQC) Sig() ThresholdSignature {
+	return aggQC.sig
 }
 
 // Messages / Events
