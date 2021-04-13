@@ -27,9 +27,9 @@ func NewCache(impl hotstuff.CryptoImpl, capacity int) hotstuff.Crypto {
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (cache *cache) InitModule(hs *hotstuff.HotStuff) {
+func (cache *cache) InitModule(hs *hotstuff.HotStuff, cfg *hotstuff.ConfigBuilder) {
 	if mod, ok := cache.impl.(hotstuff.Module); ok {
-		mod.InitModule(hs)
+		mod.InitModule(hs, cfg)
 	}
 }
 

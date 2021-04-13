@@ -231,7 +231,7 @@ func TestChainedHotstuff(t *testing.T) {
 		c := *baseCfg
 		c.ID = hotstuff.ID(i + 1)
 		c.PrivateKey = keys[i].(*ecdsa.PrivateKey)
-		configs[i] = gorums.NewConfig(c)
+		configs[i] = gorums.NewManager(c)
 		servers[i] = gorums.NewServer(c)
 		synchronizers[i] = synchronizer.New(
 			hotstuff.ExponentialTimeout{Base: 100 * time.Millisecond, ExponentBase: 2, MaxExponent: 10},

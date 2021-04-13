@@ -6,7 +6,7 @@ type roundRobin struct {
 	mod *hotstuff.HotStuff
 }
 
-func (rr *roundRobin) InitModule(hs *hotstuff.HotStuff) {
+func (rr *roundRobin) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
 	rr.mod = hs
 }
 

@@ -160,7 +160,7 @@ func (bc *bls12Crypto) getPrivateKey() *PrivateKey {
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (bc *bls12Crypto) InitModule(hs *hotstuff.HotStuff) {
+func (bc *bls12Crypto) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
 	bc.mod = hs
 }
 

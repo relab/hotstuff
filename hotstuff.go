@@ -316,6 +316,7 @@ type HotStuff struct {
 	id         ID
 	privateKey PrivateKey
 	logger     logging.Logger
+	cfg        Config
 	eventLoop  *EventLoop
 
 	// modules
@@ -344,6 +345,11 @@ func (hs *HotStuff) PrivateKey() PrivateKey {
 // Logger returns the logger.
 func (hs *HotStuff) Logger() logging.Logger {
 	return hs.logger
+}
+
+// Config returns the current configuration settings.
+func (hs *HotStuff) Config() *Config {
+	return &hs.cfg
 }
 
 // EventLoop returns the event loop.
@@ -399,6 +405,7 @@ func (hs *HotStuff) ViewSynchronizer() ViewSynchronizer {
 // Builder is a helper for constructing a HotStuff instance.
 type Builder struct {
 	hs      *HotStuff
+	cfg     ConfigBuilder
 	modules []Module
 }
 
@@ -463,8 +470,9 @@ func (b *Builder) Register(modules ...interface{}) {
 // Build initializes all modules and returns the HotStuff object.
 func (b *Builder) Build() *HotStuff {
 	for _, module := range b.modules {
-		module.InitModule(b.hs)
+		module.InitModule(b.hs, &b.cfg)
 	}
+	b.hs.cfg = b.cfg.cfg
 	return b.hs
 }
 
@@ -472,8 +480,9 @@ func (b *Builder) Build() *HotStuff {
 
 // Module is an interface that can be implemented by types that need a reference to the HotStuff object.
 type Module interface {
-	// InitModule gives the module a reference to the HotStuff object.
-	InitModule(hs *HotStuff)
+	// InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
+	// settings using the ConfigBuilder.
+	InitModule(hs *HotStuff, _ *ConfigBuilder)
 }
 
 //go:generate mockgen -destination=internal/mocks/cmdqueue_mock.go -package=mocks . CommandQueue

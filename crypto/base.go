@@ -13,9 +13,9 @@ func New(impl hotstuff.CryptoImpl) hotstuff.Crypto {
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (base base) InitModule(hs *hotstuff.HotStuff) {
+func (base base) InitModule(hs *hotstuff.HotStuff, cfg *hotstuff.ConfigBuilder) {
 	if mod, ok := base.CryptoImpl.(hotstuff.Module); ok {
-		mod.InitModule(hs)
+		mod.InitModule(hs, cfg)
 	}
 }
 

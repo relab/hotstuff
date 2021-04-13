@@ -24,7 +24,7 @@ func NewEventLoop(bufferSize uint) *EventLoop {
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (el *EventLoop) InitModule(hs *HotStuff) {
+func (el *EventLoop) InitModule(hs *HotStuff, _ *ConfigBuilder) {
 	el.mod = hs
 }
 

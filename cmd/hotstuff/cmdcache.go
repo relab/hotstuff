@@ -32,7 +32,7 @@ func newCmdCache(batchSize int) *cmdCache {
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (c *cmdCache) InitModule(hs *hotstuff.HotStuff) {
+func (c *cmdCache) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
 	c.mod = hs
 }
 

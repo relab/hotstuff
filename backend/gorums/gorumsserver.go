@@ -27,7 +27,7 @@ type Server struct {
 }
 
 // InitModule initializes the server with the given HotStuff instance.
-func (srv *Server) InitModule(hs *hotstuff.HotStuff) {
+func (srv *Server) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
 	srv.mod = hs
 }
 

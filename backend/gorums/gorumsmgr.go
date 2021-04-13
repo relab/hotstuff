@@ -71,7 +71,7 @@ type Manager struct {
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (cfg *Manager) InitModule(hs *hotstuff.HotStuff) {
+func (cfg *Manager) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
 	cfg.mod = hs
 }
 

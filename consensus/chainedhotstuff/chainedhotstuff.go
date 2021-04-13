@@ -23,7 +23,7 @@ func New() hotstuff.Consensus {
 	return hs
 }
 
-func (hs *chainedhotstuff) InitModule(mod *hotstuff.HotStuff) {
+func (hs *chainedhotstuff) InitModule(mod *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
 	hs.mod = mod
 }
 

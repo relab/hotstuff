@@ -29,7 +29,7 @@ type Synchronizer struct {
 }
 
 // InitModule initializes the synchronizer with the given HotStuff instance.
-func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff) {
+func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
 	s.mod = hs
 	var err error
 	s.highQC, err = s.mod.Crypto().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
