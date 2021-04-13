@@ -323,7 +323,7 @@ type HotStuff struct {
 	acceptor         Acceptor
 	blockChain       BlockChain
 	commandQueue     CommandQueue
-	config           Config
+	manager          Manager
 	consensus        Consensus
 	executor         Executor
 	leaderRotation   LeaderRotation
@@ -366,9 +366,9 @@ func (hs *HotStuff) CommandQueue() CommandQueue {
 	return hs.commandQueue
 }
 
-// Config returns the configuration of replicas.
-func (hs *HotStuff) Config() Config {
-	return hs.config
+// Manager returns the manager used to communicate with the replicas.
+func (hs *HotStuff) Manager() Manager {
+	return hs.manager
 }
 
 // Consensus returns the consensus implementation.
@@ -436,8 +436,8 @@ func (b *Builder) Register(modules ...interface{}) {
 		if m, ok := module.(CommandQueue); ok {
 			b.hs.commandQueue = m
 		}
-		if m, ok := module.(Config); ok {
-			b.hs.config = m
+		if m, ok := module.(Manager); ok {
+			b.hs.manager = m
 		}
 		if m, ok := module.(Consensus); ok {
 			b.hs.consensus = m
@@ -564,11 +564,9 @@ type Replica interface {
 
 //go:generate mockgen -destination=internal/mocks/config_mock.go -package=mocks . Config
 
-// Config holds information about the current configuration of replicas that participate in the protocol,
-// and some information about the local replica.
-// The methods Propose and Fetch should send their respective arguments to all replicas in the configuration,
-// except the caller.
-type Config interface {
+// Manager holds information about the current configuration of replicas that participate in the protocol.
+// It provides methods to send messages to the other replicas.
+type Manager interface {
 	// Replicas returns all of the replicas in the configuration.
 	Replicas() map[ID]Replica
 	// Replica returns a replica if present in the configuration.

@@ -84,7 +84,7 @@ func (srv *Server) getClientID(ctx context.Context) (hotstuff.ID, error) {
 		}
 		if len(tlsInfo.State.PeerCertificates) > 0 {
 			cert := tlsInfo.State.PeerCertificates[0]
-			for replicaID := range srv.mod.Config().Replicas() {
+			for replicaID := range srv.mod.Manager().Replicas() {
 				if subject, err := strconv.Atoi(cert.Subject.CommonName); err == nil && hotstuff.ID(subject) == replicaID {
 					return replicaID, nil
 				}

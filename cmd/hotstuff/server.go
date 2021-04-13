@@ -146,7 +146,7 @@ type clientSrv struct {
 	conf      *options
 	output    io.Writer
 	gorumsSrv *gorums.Server
-	cfg       *hotstuffgorums.Config
+	mgr       *hotstuffgorums.Manager
 	hsSrv     *hotstuffgorums.Server
 	hs        *hotstuff.HotStuff
 	cmdCache  *cmdCache
@@ -179,9 +179,9 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 		*replicaConfig,
 		hotstuff.ExponentialTimeout{Base: time.Duration(conf.ViewTimeout) * time.Millisecond, ExponentBase: 2, MaxExponent: 8},
 	)
-	srv.cfg = hotstuffgorums.NewConfig(*replicaConfig)
+	srv.mgr = hotstuffgorums.NewManager(*replicaConfig)
 	srv.hsSrv = hotstuffgorums.NewServer(*replicaConfig)
-	builder.Register(srv.cfg, srv.hsSrv)
+	builder.Register(srv.mgr, srv.hsSrv)
 
 	var leaderRotation hotstuff.LeaderRotation
 	switch conf.PmType {
@@ -204,7 +204,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 		os.Exit(1)
 	}
 	builder.Register(
-		crypto.NewCache(cryptoImpl, 2*srv.cfg.Len()),
+		crypto.NewCache(cryptoImpl, 2*srv.mgr.Len()),
 		leaderRotation,
 		srv,          // executor
 		srv.cmdCache, // acceptor and command queue
@@ -239,7 +239,7 @@ func (srv *clientSrv) Start(ctx context.Context, address string) (err error) {
 		return err
 	}
 
-	err = srv.cfg.Connect(10 * time.Second)
+	err = srv.mgr.Connect(10 * time.Second)
 	if err != nil {
 		return err
 	}
@@ -267,7 +267,7 @@ func (srv *clientSrv) Start(ctx context.Context, address string) (err error) {
 
 func (srv *clientSrv) Stop() {
 	srv.hs.ViewSynchronizer().Stop()
-	srv.cfg.Close()
+	srv.mgr.Close()
 	srv.hsSrv.Stop()
 	srv.gorumsSrv.Stop()
 	if closer, ok := srv.output.(io.Closer); ok {

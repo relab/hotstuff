@@ -192,7 +192,7 @@ func (bc *bls12Crypto) aggregateSignatures(signatures map[hotstuff.ID]*Signature
 // Verify verifies a signature given a hash.
 func (bc *bls12Crypto) Verify(sig hotstuff.Signature, hash hotstuff.Hash) bool {
 	s := sig.(*Signature)
-	replica, ok := bc.mod.Config().Replica(sig.Signer())
+	replica, ok := bc.mod.Manager().Replica(sig.Signer())
 	if !ok {
 		bc.mod.Logger().Infof("bls12Crypto: got signature from replica whose ID (%d) was not in the config", sig.Signer())
 	}
@@ -219,7 +219,7 @@ func (bc *bls12Crypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 	}
 	pubKeys := make([]*PublicKey, 0)
 	sig.participants.ForEach(func(id hotstuff.ID) {
-		replica, ok := bc.mod.Config().Replica(id)
+		replica, ok := bc.mod.Manager().Replica(id)
 		if !ok {
 			return
 		}
@@ -230,7 +230,7 @@ func (bc *bls12Crypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 		bc.mod.Logger().Error(err)
 		return false
 	}
-	if len(pubKeys) < bc.mod.Config().QuorumSize() {
+	if len(pubKeys) < bc.mod.Manager().QuorumSize() {
 		return false
 	}
 	engine := bls12.NewEngine()
@@ -243,7 +243,7 @@ func (bc *bls12Crypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 
 // CreateThresholdSignature creates a threshold signature from the given partial signatures.
 func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []hotstuff.Signature, hash hotstuff.Hash) (_ hotstuff.ThresholdSignature, err error) {
-	if len(partialSignatures) < bc.mod.Config().QuorumSize() {
+	if len(partialSignatures) < bc.mod.Manager().QuorumSize() {
 		return nil, crypto.ErrNotAQuorum
 	}
 	sigs := make(map[hotstuff.ID]*Signature, len(partialSignatures))
@@ -259,7 +259,7 @@ func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []hotstuff.Sig
 		}
 		sigs[sig.Signer()] = s
 	}
-	if len(sigs) < bc.mod.Config().QuorumSize() {
+	if len(sigs) < bc.mod.Manager().QuorumSize() {
 		return nil, multierr.Combine(crypto.ErrNotAQuorum, err)
 	}
 	return bc.aggregateSignatures(sigs), nil

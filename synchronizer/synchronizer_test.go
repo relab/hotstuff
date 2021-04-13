@@ -20,7 +20,7 @@ func TestLocalTimeout(t *testing.T) {
 	s := New(testutil.FixedTimeout(time.Millisecond))
 	builder.Register(hs, s)
 	mods := builder.Build()
-	cfg := mods.Config().(*mocks.MockConfig)
+	cfg := mods.Manager().(*mocks.MockConfig)
 	leader := testutil.CreateMockReplica(t, ctrl, 1, testutil.GenerateECDSAKey(t))
 	testutil.ConfigAddReplica(t, cfg, leader)
 

@@ -106,7 +106,7 @@ func TestVote(t *testing.T) {
 	hl := bl.Build()
 
 	// expect that the replica will propose after receiving enough votes.
-	hl[0].Config().(*mocks.MockConfig).EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.GetGenesis()))
+	hl[0].Manager().(*mocks.MockConfig).EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.GetGenesis()))
 
 	b := testutil.NewProposeMsg(hotstuff.GetGenesis().Hash(), hl[0].ViewSynchronizer().HighQC(), "test", 1, 1)
 
@@ -224,7 +224,7 @@ func TestChainedHotstuff(t *testing.T) {
 	}
 
 	builders := testutil.CreateBuilders(t, ctrl, n, keys...)
-	configs := make([]*gorums.Config, n)
+	configs := make([]*gorums.Manager, n)
 	servers := make([]*gorums.Server, n)
 	synchronizers := make([]hotstuff.ViewSynchronizer, n)
 	for i := 0; i < n; i++ {

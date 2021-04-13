@@ -28,7 +28,7 @@ func TestConnect(t *testing.T) {
 		builder := testutil.TestModules(t, ctrl, 1, td.keys[0])
 		teardown := createServers(t, td, ctrl)
 		defer teardown()
-		cfg := NewConfig(td.cfg)
+		cfg := NewManager(td.cfg)
 
 		builder.Register(cfg)
 		builder.Build()
@@ -47,9 +47,9 @@ func TestPropose(t *testing.T) {
 		const n = 4
 		ctrl := gomock.NewController(t)
 		td := setup(t, ctrl, n)
-		cfg, teardown := createConfig(t, td, ctrl)
+		mgr, teardown := createManager(t, td, ctrl)
 		mocks := createMocks(t, ctrl, td, n)
-		td.builders[0].Register(cfg)
+		td.builders[0].Register(mgr)
 		hl := td.builders.Build()
 
 		defer teardown()
@@ -69,7 +69,7 @@ func TestPropose(t *testing.T) {
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
-		cfg.Propose(proposal)
+		mgr.Propose(proposal)
 		for i := 1; i < n; i++ {
 			go hl[i].EventLoop().Run(ctx)
 			<-c
@@ -84,7 +84,7 @@ func TestVote(t *testing.T) {
 		const n = 4
 		ctrl := gomock.NewController(t)
 		td := setup(t, ctrl, n)
-		cfg, teardown := createConfig(t, td, ctrl)
+		cfg, teardown := createManager(t, td, ctrl)
 		defer teardown()
 		mocks := createMocks(t, ctrl, td, n)
 
@@ -123,7 +123,7 @@ func TestTimeout(t *testing.T) {
 		const n = 4
 		ctrl := gomock.NewController(t)
 		td := setup(t, ctrl, n)
-		cfg, teardown := createConfig(t, td, ctrl)
+		cfg, teardown := createManager(t, td, ctrl)
 		defer teardown()
 		synchronizers := make([]*mocks.MockViewSynchronizer, n)
 		for i := 0; i < n; i++ {
@@ -263,16 +263,16 @@ func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (teardown
 	}
 }
 
-func createConfig(t *testing.T, td testData, ctrl *gomock.Controller) (cfg *Config, teardown func()) {
+func createManager(t *testing.T, td testData, ctrl *gomock.Controller) (mgr *Manager, teardown func()) {
 	t.Helper()
 	serverTeardown := createServers(t, td, ctrl)
-	cfg = NewConfig(td.cfg)
-	err := cfg.Connect(time.Second)
+	mgr = NewManager(td.cfg)
+	err := mgr.Connect(time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return cfg, func() {
-		cfg.Close()
+	return mgr, func() {
+		mgr.Close()
 		serverTeardown()
 	}
 }

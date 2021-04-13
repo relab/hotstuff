@@ -56,9 +56,9 @@ func (r *gorumsReplica) NewView(msg hotstuff.SyncInfo) {
 	r.node.NewView(ctx, proto.SyncInfoToProto(msg), gorums.WithNoSendWaiting())
 }
 
-// Config holds information about the current configuration of replicas that participate in the protocol,
-// and some information about the local replica. It also provides methods to send messages to the other replicas.
-type Config struct {
+// Manager holds information about the current configuration of replicas that participate in the protocol.
+// It provides methods to send messages to the other replicas.
+type Manager struct {
 	mod *hotstuff.HotStuff
 
 	replicaCfg    config.ReplicaConfig
@@ -71,13 +71,13 @@ type Config struct {
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (cfg *Config) InitModule(hs *hotstuff.HotStuff) {
+func (cfg *Manager) InitModule(hs *hotstuff.HotStuff) {
 	cfg.mod = hs
 }
 
-// NewConfig creates a new configuration.
-func NewConfig(replicaCfg config.ReplicaConfig) *Config {
-	cfg := &Config{
+// NewManager creates a new manager.
+func NewManager(replicaCfg config.ReplicaConfig) *Manager {
+	cfg := &Manager{
 		replicaCfg:    replicaCfg,
 		privKey:       replicaCfg.PrivateKey,
 		replicas:      make(map[hotstuff.ID]hotstuff.Replica),
@@ -98,7 +98,7 @@ func NewConfig(replicaCfg config.ReplicaConfig) *Config {
 }
 
 // Connect opens connections to the replicas in the configuration.
-func (cfg *Config) Connect(connectTimeout time.Duration) error {
+func (cfg *Manager) Connect(connectTimeout time.Duration) error {
 	idMapping := make(map[string]uint32, len(cfg.replicaCfg.Replicas)-1)
 	for _, replica := range cfg.replicaCfg.Replicas {
 		if replica.ID != cfg.replicaCfg.ID {
@@ -146,38 +146,38 @@ func (cfg *Config) Connect(connectTimeout time.Duration) error {
 }
 
 // ID returns the id of this replica.
-func (cfg *Config) ID() hotstuff.ID {
+func (cfg *Manager) ID() hotstuff.ID {
 	return cfg.replicaCfg.ID
 }
 
 // PrivateKey returns the id of this replica.
-func (cfg *Config) PrivateKey() hotstuff.PrivateKey {
+func (cfg *Manager) PrivateKey() hotstuff.PrivateKey {
 	return cfg.privKey
 }
 
 // Replicas returns all of the replicas in the configuration.
-func (cfg *Config) Replicas() map[hotstuff.ID]hotstuff.Replica {
+func (cfg *Manager) Replicas() map[hotstuff.ID]hotstuff.Replica {
 	return cfg.replicas
 }
 
 // Replica returns a replica if it is present in the configuration.
-func (cfg *Config) Replica(id hotstuff.ID) (replica hotstuff.Replica, ok bool) {
+func (cfg *Manager) Replica(id hotstuff.ID) (replica hotstuff.Replica, ok bool) {
 	replica, ok = cfg.replicas[id]
 	return
 }
 
 // Len returns the number of replicas in the configuration.
-func (cfg *Config) Len() int {
+func (cfg *Manager) Len() int {
 	return len(cfg.replicas)
 }
 
 // QuorumSize returns the size of a quorum
-func (cfg *Config) QuorumSize() int {
+func (cfg *Manager) QuorumSize() int {
 	return hotstuff.QuorumSize(cfg.Len())
 }
 
 // Propose sends the block to all replicas in the configuration
-func (cfg *Config) Propose(block *hotstuff.Block) {
+func (cfg *Manager) Propose(block *hotstuff.Block) {
 	if cfg.cfg == nil {
 		return
 	}
@@ -189,7 +189,7 @@ func (cfg *Config) Propose(block *hotstuff.Block) {
 }
 
 // Timeout sends the timeout message to all replicas.
-func (cfg *Config) Timeout(msg hotstuff.TimeoutMsg) {
+func (cfg *Manager) Timeout(msg hotstuff.TimeoutMsg) {
 	if cfg.cfg == nil {
 		return
 	}
@@ -200,7 +200,7 @@ func (cfg *Config) Timeout(msg hotstuff.TimeoutMsg) {
 }
 
 // Fetch requests a block from all the replicas in the configuration
-func (cfg *Config) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
+func (cfg *Manager) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	protoBlock, err := cfg.cfg.Fetch(ctx, &proto.BlockHash{Hash: hash[:]})
 	if err != nil && !errors.Is(err, context.Canceled) {
 		cfg.mod.Logger().Infof("Failed to fetch block: %v", err)
@@ -210,11 +210,11 @@ func (cfg *Config) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Blo
 }
 
 // Close closes all connections made by this configuration.
-func (cfg *Config) Close() {
+func (cfg *Manager) Close() {
 	cfg.mgr.Close()
 }
 
-var _ hotstuff.Config = (*Config)(nil)
+var _ hotstuff.Manager = (*Manager)(nil)
 
 type qspec struct{}
 

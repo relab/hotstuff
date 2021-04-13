@@ -125,7 +125,7 @@ func (hs *chainedhotstuff) Propose() {
 	)
 	hs.mod.BlockChain().Store(block)
 
-	hs.mod.Config().Propose(block)
+	hs.mod.Manager().Propose(block)
 	// self vote
 	hs.OnPropose(hotstuff.ProposeMsg{ID: hs.mod.ID(), Block: block})
 }
@@ -197,7 +197,7 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 		return
 	}
 
-	leader, ok := hs.mod.Config().Replica(leaderID)
+	leader, ok := hs.mod.Manager().Replica(leaderID)
 	if !ok {
 		hs.mod.Logger().Warnf("Replica with ID %d was not found!", leaderID)
 		return
@@ -264,7 +264,7 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 	votes = append(votes, cert)
 	hs.verifiedVotes[cert.BlockHash()] = votes
 
-	if len(votes) < hs.mod.Config().QuorumSize() {
+	if len(votes) < hs.mod.Manager().QuorumSize() {
 		return
 	}
 

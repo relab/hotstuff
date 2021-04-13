@@ -152,7 +152,7 @@ func (ec *ecdsaCrypto) Verify(sig hotstuff.Signature, hash hotstuff.Hash) bool {
 	if !ok {
 		return false
 	}
-	replica, ok := ec.mod.Config().Replica(sig.Signer())
+	replica, ok := ec.mod.Manager().Replica(sig.Signer())
 	if !ok {
 		ec.mod.Logger().Infof("ecdsaCrypto: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
 		return false
@@ -183,7 +183,7 @@ func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []hotstuff.Sig
 		}
 	}
 
-	if len(thrSig) >= ec.mod.Config().QuorumSize() {
+	if len(thrSig) >= ec.mod.Manager().QuorumSize() {
 		return thrSig, nil
 	}
 
@@ -196,7 +196,7 @@ func (ec *ecdsaCrypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 	if !ok {
 		return false
 	}
-	if len(sig) < ec.mod.Config().QuorumSize() {
+	if len(sig) < ec.mod.Manager().QuorumSize() {
 		return false
 	}
 	results := make(chan bool)
@@ -211,7 +211,7 @@ func (ec *ecdsaCrypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 			numVerified++
 		}
 	}
-	return numVerified >= ec.mod.Config().QuorumSize()
+	return numVerified >= ec.mod.Manager().QuorumSize()
 }
 
 var _ hotstuff.CryptoImpl = (*ecdsaCrypto)(nil)
