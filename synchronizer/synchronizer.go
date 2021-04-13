@@ -145,6 +145,8 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	}
 	s.mod.Logger().Debug("OnRemoteTimeout: ", timeout)
 
+	s.AdvanceView(timeout.SyncInfo)
+
 	// This has to be done in this function instead of onLocalTimeout in order to avoid
 	// race conditions.
 	if timeout.ID == s.mod.ID() {
