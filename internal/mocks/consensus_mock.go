@@ -85,13 +85,13 @@ func (mr *MockConsensusMockRecorder) OnVote(arg0 interface{}) *gomock.Call {
 }
 
 // Propose mocks base method.
-func (m *MockConsensus) Propose() {
+func (m *MockConsensus) Propose(arg0 hotstuff.SyncInfo) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Propose")
+	m.ctrl.Call(m, "Propose", arg0)
 }
 
 // Propose indicates an expected call of Propose.
-func (mr *MockConsensusMockRecorder) Propose() *gomock.Call {
+func (mr *MockConsensusMockRecorder) Propose(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Propose", reflect.TypeOf((*MockConsensus)(nil).Propose))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Propose", reflect.TypeOf((*MockConsensus)(nil).Propose), arg0)
 }

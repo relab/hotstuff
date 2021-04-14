@@ -99,31 +99,37 @@ func (s *Synchronizer) viewDuration(view hotstuff.View) time.Duration {
 
 // SyncInfo returns the highest known QC or TC.
 func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
-	qc := s.highQC
-	qcBlock, ok := s.mod.BlockChain().Get(qc.BlockHash())
-	if !ok {
-		// TODO
-		panic("highQC block missing")
+	if s.highQC.View() >= s.highTC.View() {
+		return hotstuff.NewSyncInfo().WithQC(s.highQC)
 	}
-	if qcBlock.View() >= s.highTC.View() {
-		return hotstuff.SyncInfoWithQC(s.highQC)
-	}
-	return hotstuff.SyncInfoWithTC(s.highTC)
+	return hotstuff.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
 }
 
 func (s *Synchronizer) onLocalTimeout() {
 	s.mod.Logger().Debugf("OnLocalTimeout: %v", s.currentView)
+
 	sig, err := s.mod.Crypto().Sign(s.currentView.ToHash())
 	if err != nil {
 		s.mod.Logger().Warnf("Failed to sign view: %v", err)
 		return
 	}
 	timeoutMsg := hotstuff.TimeoutMsg{
-		ID:        s.mod.ID(),
-		View:      s.currentView,
-		SyncInfo:  s.SyncInfo(),
-		Signature: sig,
+		ID:            s.mod.ID(),
+		View:          s.currentView,
+		SyncInfo:      s.SyncInfo(),
+		ViewSignature: sig,
 	}
+
+	if s.mod.Config().ShouldUseAggQC() {
+		// generate a second signature that will become part of the aggregateQC
+		sig, err := s.mod.Crypto().Sign(timeoutMsg.Hash())
+		if err != nil {
+			s.mod.Logger().Warnf("Failed to sign timeout message: %v", err)
+			return
+		}
+		timeoutMsg.MsgSignature = sig
+	}
+
 	s.mod.Manager().Timeout(timeoutMsg)
 	s.mod.EventLoop().AddEvent(timeoutMsg)
 }
@@ -140,7 +146,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	}()
 
 	verifier := s.mod.Crypto()
-	if !verifier.Verify(timeout.Signature, timeout.View.ToHash()) {
+	if !verifier.Verify(timeout.ViewSignature, timeout.View.ToHash()) {
 		return
 	}
 	s.mod.Logger().Debug("OnRemoteTimeout: ", timeout)
@@ -175,15 +181,26 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		timeoutList = append(timeoutList, t)
 	}
 
-	signer := s.mod.Crypto()
-	tc, err := signer.CreateTimeoutCert(s.currentView, timeoutList)
+	tc, err := s.mod.Crypto().CreateTimeoutCert(s.currentView, timeoutList)
 	if err != nil {
 		s.mod.Logger().Debugf("Failed to create timeout certificate: %v", err)
 		return
 	}
+
+	si := s.SyncInfo().WithTC(tc)
+
+	if s.mod.Config().ShouldUseAggQC() {
+		aggQC, err := s.mod.Crypto().CreateAggregateQC(s.currentView, timeoutList)
+		if err != nil {
+			s.mod.Logger().Debugf("Failed to create aggregateQC: %v", err)
+		} else {
+			si.WithAggQC(aggQC)
+		}
+	}
+
 	delete(s.timeouts, timeout.View)
 
-	s.AdvanceView(hotstuff.SyncInfoWithTC(tc))
+	s.AdvanceView(si)
 }
 
 // OnNewView handles an incoming NewViewMsg
@@ -196,17 +213,21 @@ func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
 func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	var v hotstuff.View
 	if tc, ok := syncInfo.TC(); ok {
+		if !s.mod.Crypto().VerifyTimeoutCert(tc) {
+			s.mod.Logger().Info("Timeout Certificate could not be verified!")
+			return
+		}
 		v = tc.View()
 		if v > s.highTC.View() {
 			s.highTC = tc
 		}
 	} else if qc, ok := syncInfo.QC(); ok {
-		s.UpdateHighQC(qc)
-		b, ok := s.mod.BlockChain().Get(qc.BlockHash())
-		if !ok {
+		if !s.mod.Crypto().VerifyQuorumCert(qc) {
+			s.mod.Logger().Info("Quorum Certificate could not be verified!")
 			return
 		}
-		v = b.View()
+		s.UpdateHighQC(qc)
+		v = qc.View()
 		if s.latestCommit < v {
 			s.latestCommit = v
 		}
@@ -225,7 +246,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 
 	leader := s.mod.LeaderRotation().GetLeader(s.currentView)
 	if leader == s.mod.ID() {
-		s.mod.Consensus().Propose()
+		s.mod.Consensus().Propose(syncInfo)
 	} else if replica, ok := s.mod.Manager().Replica(leader); ok {
 		replica.NewView(syncInfo)
 	}

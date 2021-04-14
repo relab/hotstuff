@@ -14,13 +14,13 @@ import (
 
 func TestLocalTimeout(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	qc := hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash())
+	qc := hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
 	builder := testutil.TestModules(t, ctrl, 2, testutil.GenerateECDSAKey(t))
 	hs := mocks.NewMockConsensus(ctrl)
 	s := New(testutil.FixedTimeout(time.Millisecond))
 	builder.Register(hs, s)
 	mods := builder.Build()
-	cfg := mods.Manager().(*mocks.MockConfig)
+	cfg := mods.Manager().(*mocks.MockManager)
 	leader := testutil.CreateMockReplica(t, ctrl, 1, testutil.GenerateECDSAKey(t))
 	testutil.ConfigAddReplica(t, cfg, leader)
 
@@ -39,7 +39,7 @@ func TestLocalTimeout(t *testing.T) {
 			if msgQC, ok := msg.SyncInfo.QC(); ok && !bytes.Equal(msgQC.ToBytes(), qc.ToBytes()) {
 				t.Errorf("wrong QC. got: %v, want: %v", msgQC, qc)
 			}
-			if !mods.Crypto().Verify(msg.Signature, msg.View.ToHash()) {
+			if !mods.Crypto().Verify(msg.ViewSignature, msg.View.ToHash()) {
 				t.Error("failed to verify signature")
 			}
 			close(c)
@@ -63,7 +63,7 @@ func TestAdvanceViewQC(t *testing.T) {
 
 	block := hotstuff.NewBlock(
 		hotstuff.GetGenesis().Hash(),
-		hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash()),
+		hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
 		"foo",
 		1,
 		2,
@@ -71,9 +71,9 @@ func TestAdvanceViewQC(t *testing.T) {
 	hl[0].BlockChain().Store(block)
 	qc := testutil.CreateQC(t, block, signers)
 	// synchronizer should tell hotstuff to propose
-	hs.EXPECT().Propose()
+	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
 
-	s.AdvanceView(hotstuff.SyncInfoWithQC(qc))
+	s.AdvanceView(hotstuff.NewSyncInfo().WithQC(qc))
 
 	if s.View() != 2 {
 		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())
@@ -94,9 +94,9 @@ func TestAdvanceViewTC(t *testing.T) {
 	tc := testutil.CreateTC(t, 1, signers)
 
 	// synchronizer should tell hotstuff to propose
-	hs.EXPECT().Propose()
+	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
 
-	s.AdvanceView(hotstuff.SyncInfoWithTC(tc))
+	s.AdvanceView(hotstuff.NewSyncInfo().WithTC(tc))
 
 	if s.View() != 2 {
 		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())
@@ -117,7 +117,7 @@ func TestRemoteTimeout(t *testing.T) {
 	timeouts := testutil.CreateTimeouts(t, 1, signers[1:])
 
 	// synchronizer should tell hotstuff to propose
-	hs.EXPECT().Propose()
+	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
 
 	for _, timeout := range timeouts {
 		s.OnRemoteTimeout(timeout)

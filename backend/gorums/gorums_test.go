@@ -54,7 +54,7 @@ func TestPropose(t *testing.T) {
 
 		defer teardown()
 
-		qc := hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash())
+		qc := hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
 		proposal := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "foo", 1, 1)
 		// the configuration has ID 1, so we won't be receiving any proposal for that replica.
 		c := make(chan struct{}, n-1)
@@ -91,7 +91,7 @@ func TestVote(t *testing.T) {
 		hl := td.builders.Build()
 		signer := hl[0].Crypto()
 
-		qc := hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash())
+		qc := hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
 		proposal := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "foo", 1, 1)
 		pc := testutil.CreatePC(t, proposal, signer)
 
@@ -133,12 +133,12 @@ func TestTimeout(t *testing.T) {
 		hl := td.builders.Build()
 		signer := hl[0].Crypto()
 
-		qc := hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash())
+		qc := hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
 		timeout := hotstuff.TimeoutMsg{
-			ID:        1,
-			View:      1,
-			SyncInfo:  hotstuff.SyncInfoWithQC(qc),
-			Signature: testutil.Sign(t, hotstuff.View(1).ToHash(), signer),
+			ID:            1,
+			View:          1,
+			SyncInfo:      hotstuff.NewSyncInfo().WithQC(qc),
+			ViewSignature: testutil.Sign(t, hotstuff.View(1).ToHash(), signer),
 		}
 
 		c := make(chan struct{}, n-1)

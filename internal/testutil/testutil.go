@@ -37,7 +37,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 
 	signer := crypto.NewCache(ecdsa.New(), 10)
 
-	config := mocks.NewMockConfig(ctrl)
+	config := mocks.NewMockManager(ctrl)
 	config.EXPECT().Len().AnyTimes().Return(1)
 	config.EXPECT().QuorumSize().AnyTimes().Return(3)
 
@@ -112,7 +112,7 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 	t.Helper()
 	builders = make([]*hotstuff.Builder, n)
 	replicas := make([]*mocks.MockReplica, n)
-	configs := make([]*mocks.MockConfig, n)
+	configs := make([]*mocks.MockManager, n)
 	for i := 0; i < n; i++ {
 		id := hotstuff.ID(i + 1)
 		var key hotstuff.PrivateKey
@@ -121,7 +121,7 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 		} else {
 			key = GenerateECDSAKey(t)
 		}
-		configs[i] = mocks.NewMockConfig(ctrl)
+		configs[i] = mocks.NewMockManager(ctrl)
 		replicas[i] = CreateMockReplica(t, ctrl, id, key.Public())
 		builders[i] = new(hotstuff.Builder)
 		*builders[i] = TestModules(t, ctrl, id, key)
@@ -145,9 +145,9 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 }
 
 // CreateMockConfigWithReplicas creates a configuration with n replicas.
-func CreateMockConfigWithReplicas(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstuff.PrivateKey) (*mocks.MockConfig, []*mocks.MockReplica) {
+func CreateMockConfigWithReplicas(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstuff.PrivateKey) (*mocks.MockManager, []*mocks.MockReplica) {
 	t.Helper()
-	cfg := mocks.NewMockConfig(ctrl)
+	cfg := mocks.NewMockManager(ctrl)
 	replicas := make([]*mocks.MockReplica, n)
 	if len(keys) == 0 {
 		keys = make([]hotstuff.PrivateKey, 0, n)
@@ -184,7 +184,7 @@ func CreateMockReplica(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, ke
 }
 
 // ConfigAddReplica adds a mock replica to a mock configuration.
-func ConfigAddReplica(t *testing.T, cfg *mocks.MockConfig, replica *mocks.MockReplica) {
+func ConfigAddReplica(t *testing.T, cfg *mocks.MockManager, replica *mocks.MockReplica) {
 	t.Helper()
 
 	cfg.
@@ -231,9 +231,9 @@ func CreateTimeouts(t *testing.T, view hotstuff.View, signers []hotstuff.Crypto)
 	sigs := CreateSignatures(t, view.ToHash(), signers)
 	for _, sig := range sigs {
 		timeouts = append(timeouts, hotstuff.TimeoutMsg{
-			ID:        sig.Signer(),
-			View:      view,
-			Signature: sig,
+			ID:            sig.Signer(),
+			View:          view,
+			ViewSignature: sig,
 		})
 	}
 	return timeouts

@@ -241,8 +241,46 @@ func (bc *bls12Crypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 	return engine.Result().IsOne()
 }
 
+// VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
+func (bc *bls12Crypto) VerifyThresholdSignatureForMessageSet(signature hotstuff.ThresholdSignature, hashes map[hotstuff.ID]hotstuff.Hash) bool {
+	sig, ok := signature.(*AggregateSignature)
+	if !ok {
+		return false
+	}
+	hashSet := make(map[hotstuff.Hash]struct{})
+	engine := bls12.NewEngine()
+	engine.AddPairInv(&bls12.G1One, &sig.sig)
+	for id, hash := range hashes {
+		if _, ok := hashSet[hash]; ok {
+			continue
+		}
+		hashSet[hash] = struct{}{}
+		replica, ok := bc.mod.Manager().Replica(id)
+		if !ok {
+			return false
+		}
+		pk, ok := replica.PublicKey().(*PublicKey)
+		if !ok {
+			return false
+		}
+		p2, err := bls12.NewG2().HashToCurve(hash[:], domain)
+		if err != nil {
+			return false
+		}
+		engine.AddPair(pk.p, p2)
+	}
+	if !engine.Result().IsOne() {
+		return false
+	}
+	// if we managed to verify the aggregate signature, we just need to make sure that the number of verified signatures
+	// is a quorum.
+	return len(hashSet) >= bc.mod.Manager().QuorumSize()
+}
+
+// TODO: should we check each signature's validity before aggregating?
+
 // CreateThresholdSignature creates a threshold signature from the given partial signatures.
-func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []hotstuff.Signature, hash hotstuff.Hash) (_ hotstuff.ThresholdSignature, err error) {
+func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []hotstuff.Signature, _ hotstuff.Hash) (_ hotstuff.ThresholdSignature, err error) {
 	if len(partialSignatures) < bc.mod.Manager().QuorumSize() {
 		return nil, crypto.ErrNotAQuorum
 	}
@@ -263,4 +301,11 @@ func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []hotstuff.Sig
 		return nil, multierr.Combine(crypto.ErrNotAQuorum, err)
 	}
 	return bc.aggregateSignatures(sigs), nil
+}
+
+// CreateThresholdSignatureForMessageSet creates a threshold signature where each partial signature has signed a
+// different message hash.
+func (bc *bls12Crypto) CreateThresholdSignatureForMessageSet(partialSignatures []hotstuff.Signature, hashes map[hotstuff.ID]hotstuff.Hash) (hotstuff.ThresholdSignature, error) {
+	// Don't care about the hashes for signature aggregation.
+	return bc.CreateThresholdSignature(partialSignatures, hotstuff.Hash{})
 }

@@ -14,7 +14,6 @@ import (
 func TestCreatePartialCert(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
 
 		td := setup(t, ctrl, 1)
 
@@ -37,7 +36,7 @@ func TestCreatePartialCert(t *testing.T) {
 func TestVerifyPartialCert(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
+
 		td := setup(t, ctrl, 1)
 		partialCert := testutil.CreatePC(t, td.block, td.signers[0])
 
@@ -51,7 +50,6 @@ func TestVerifyPartialCert(t *testing.T) {
 func TestCreateQuorumCert(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
 
 		td := setup(t, ctrl, 4)
 
@@ -72,7 +70,6 @@ func TestCreateQuorumCert(t *testing.T) {
 func TestCreateTimeoutCert(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
 
 		td := setup(t, ctrl, 4)
 
@@ -93,7 +90,6 @@ func TestCreateTimeoutCert(t *testing.T) {
 func TestVerifyGenesisQC(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
 
 		td := setup(t, ctrl, 4)
 
@@ -111,7 +107,6 @@ func TestVerifyGenesisQC(t *testing.T) {
 func TestVerifyQuorumCert(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
 
 		td := setup(t, ctrl, 4)
 
@@ -129,7 +124,6 @@ func TestVerifyQuorumCert(t *testing.T) {
 func TestVerifyTimeoutCert(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
 
 		td := setup(t, ctrl, 4)
 

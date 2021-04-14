@@ -109,8 +109,13 @@ func (hs *chainedhotstuff) update(block *hotstuff.Block) {
 }
 
 // Propose proposes the given command
-func (hs *chainedhotstuff) Propose() {
+func (hs *chainedhotstuff) Propose(cert hotstuff.SyncInfo) {
 	hs.mod.Logger().Debug("Propose")
+
+	qc, ok := cert.QC()
+	if !ok {
+		hs.mod.Logger().Warn("Propose: no QC provided.")
+	}
 
 	cmd, ok := hs.mod.CommandQueue().Get(hs.mod.ViewSynchronizer().ViewContext())
 	if !ok {
@@ -118,7 +123,7 @@ func (hs *chainedhotstuff) Propose() {
 	}
 	block := hotstuff.NewBlock(
 		hs.mod.ViewSynchronizer().LeafBlock().Hash(),
-		hs.mod.ViewSynchronizer().HighQC(),
+		qc,
 		cmd,
 		hs.mod.ViewSynchronizer().View(),
 		hs.mod.ID(),
@@ -142,6 +147,11 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 
 	if block.View() < hs.mod.ViewSynchronizer().View() {
 		hs.mod.Logger().Info("OnPropose: block view was less than our view")
+		return
+	}
+
+	if !hs.mod.Crypto().VerifyQuorumCert(block.QuorumCert()) {
+		hs.mod.Logger().Info("OnPropose: invalid QC")
 		return
 	}
 
@@ -187,7 +197,7 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 
 	finish := func() {
 		hs.update(block)
-		hs.mod.ViewSynchronizer().AdvanceView(hotstuff.SyncInfoWithQC(block.QuorumCert()))
+		hs.mod.ViewSynchronizer().AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 	}
 
 	leaderID := hs.mod.LeaderRotation().GetLeader(hs.lastVote + 1)
@@ -276,7 +286,7 @@ func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
 	delete(hs.verifiedVotes, cert.BlockHash())
 
 	// signal the synchronizer
-	hs.mod.ViewSynchronizer().AdvanceView(hotstuff.SyncInfoWithQC(qc))
+	hs.mod.ViewSynchronizer().AdvanceView(hotstuff.NewSyncInfo().WithQC(qc))
 }
 
 var _ hotstuff.Consensus = (*chainedhotstuff)(nil)

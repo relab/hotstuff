@@ -190,6 +190,41 @@ func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []hotstuff.Sig
 	return nil, multierr.Combine(crypto.ErrNotAQuorum, err)
 }
 
+// CreateThresholdSignatureForMessageSet creates a ThresholdSignature of partial signatures where each partialSignature
+// has signed a different message hash.
+func (ec *ecdsaCrypto) CreateThresholdSignatureForMessageSet(partialSignatures []hotstuff.Signature, hashes map[hotstuff.ID]hotstuff.Hash) (_ hotstuff.ThresholdSignature, err error) {
+	thrSig := make(ThresholdSignature)
+	for _, s := range partialSignatures {
+		if thrSig.Participants().Contains(s.Signer()) {
+			err = multierr.Append(err, crypto.ErrPartialDuplicate)
+			continue
+		}
+
+		hash, ok := hashes[s.Signer()]
+		if !ok {
+			continue
+		}
+
+		sig, ok := s.(*Signature)
+		if !ok {
+			err = multierr.Append(err, fmt.Errorf("%w: %T", crypto.ErrWrongType, s))
+			continue
+		}
+
+		// use the registered verifier instead of ourself to verify.
+		// this makes it possible for the signatureCache to work.
+		if ec.mod.Crypto().Verify(s, hash) {
+			thrSig[sig.signer] = sig
+		}
+	}
+
+	if len(thrSig) >= ec.mod.Manager().QuorumSize() {
+		return thrSig, nil
+	}
+
+	return nil, multierr.Combine(crypto.ErrNotAQuorum, err)
+}
+
 // VerifyThresholdSignature verifies a threshold signature.
 func (ec *ecdsaCrypto) VerifyThresholdSignature(signature hotstuff.ThresholdSignature, hash hotstuff.Hash) bool {
 	sig, ok := signature.(ThresholdSignature)
@@ -204,6 +239,36 @@ func (ec *ecdsaCrypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 		go func(sig *Signature) {
 			results <- ec.mod.Crypto().Verify(sig, hash)
 		}(pSig)
+	}
+	numVerified := 0
+	for range sig {
+		if <-results {
+			numVerified++
+		}
+	}
+	return numVerified >= ec.mod.Manager().QuorumSize()
+}
+
+// VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
+func (ec *ecdsaCrypto) VerifyThresholdSignatureForMessageSet(signature hotstuff.ThresholdSignature, hashes map[hotstuff.ID]hotstuff.Hash) bool {
+	sig, ok := signature.(ThresholdSignature)
+	if !ok {
+		return false
+	}
+	hashSet := make(map[hotstuff.Hash]struct{})
+	results := make(chan bool)
+	for id, hash := range hashes {
+		if _, ok := hashSet[hash]; ok {
+			return false
+		}
+		hashSet[hash] = struct{}{}
+		s, ok := sig[id]
+		if !ok {
+			return false
+		}
+		go func(sig *Signature, hash hotstuff.Hash) {
+			results <- ec.mod.Crypto().Verify(sig, hash)
+		}(s, hash)
 	}
 	numVerified := 0
 	for range sig {

@@ -37,7 +37,7 @@ func TestPropose(t *testing.T) {
 	// leader should send its own vote to the next leader.
 	replicas[1].EXPECT().Vote(gomock.Any())
 
-	hs.Propose()
+	hs.Propose(hotstuff.NewSyncInfo().WithQC(synchronizer.HighQC()))
 
 	if hs.LastVote() != 1 {
 		t.Errorf("Wrong view: got: %d, want: %d", hs.LastVote(), 1)
@@ -60,7 +60,7 @@ func TestCommit(t *testing.T) {
 	signers := hl.Signers()
 
 	// create the needed blocks and QCs
-	genesisQC := hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash())
+	genesisQC := hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
 	b1 := testutil.NewProposeMsg(hotstuff.GetGenesis().Hash(), genesisQC, "1", 1, 2)
 	b1QC := testutil.CreateQC(t, b1.Block, signers)
 	b2 := testutil.NewProposeMsg(b1.Block.Hash(), b1QC, "2", 2, 2)
@@ -106,7 +106,7 @@ func TestVote(t *testing.T) {
 	hl := bl.Build()
 
 	// expect that the replica will propose after receiving enough votes.
-	hl[0].Manager().(*mocks.MockConfig).EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.GetGenesis()))
+	hl[0].Manager().(*mocks.MockManager).EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.GetGenesis()))
 
 	b := testutil.NewProposeMsg(hotstuff.GetGenesis().Hash(), hl[0].ViewSynchronizer().HighQC(), "test", 1, 1)
 
@@ -158,7 +158,7 @@ func TestForkingAttack(t *testing.T) {
 	replicas[1].EXPECT().Vote(gomock.Any()).AnyTimes()
 	replicas[1].EXPECT().NewView(gomock.Any()).AnyTimes()
 
-	genesisQC := hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash())
+	genesisQC := hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
 	a := testutil.NewProposeMsg(hotstuff.GetGenesis().Hash(), genesisQC, "A", 1, 2)
 	aQC := testutil.CreateQC(t, a.Block, signers)
 	b := testutil.NewProposeMsg(a.Block.Hash(), aQC, "B", 2, 2)

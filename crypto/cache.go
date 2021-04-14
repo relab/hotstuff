@@ -118,3 +118,43 @@ func (cache *cache) VerifyThresholdSignature(signature hotstuff.ThresholdSignatu
 	}
 	return false
 }
+
+// CreateThresholdSignatureForMessageSet creates a threshold signature where each partial signature has signed a
+// different message hash.
+func (cache *cache) CreateThresholdSignatureForMessageSet(partialSignatures []hotstuff.Signature, hashes map[hotstuff.ID]hotstuff.Hash) (hotstuff.ThresholdSignature, error) {
+	signature, err := cache.impl.CreateThresholdSignatureForMessageSet(partialSignatures, hashes)
+	if err != nil {
+		return nil, err
+	}
+	var key hotstuff.Hash
+	hash := sha256.New()
+	for _, h := range hashes {
+		hash.Write(h[:])
+	}
+	hash.Write(signature.ToBytes())
+	hash.Sum(key[:0])
+	cache.insert(key)
+	return signature, nil
+}
+
+// VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
+func (cache *cache) VerifyThresholdSignatureForMessageSet(signature hotstuff.ThresholdSignature, hashes map[hotstuff.ID]hotstuff.Hash) bool {
+	if signature == nil {
+		return false
+	}
+	var key hotstuff.Hash
+	hash := sha256.New()
+	for _, h := range hashes {
+		hash.Write(h[:])
+	}
+	hash.Write(signature.ToBytes())
+	hash.Sum(key[:0])
+	if cache.check(key) {
+		return true
+	}
+	if cache.impl.VerifyThresholdSignatureForMessageSet(signature, hashes) {
+		cache.insert(key)
+		return true
+	}
+	return false
+}

@@ -74,7 +74,8 @@ message ThresholdSignature {
 
 message QuorumCert {
   ThresholdSignature Sig = 1;
-  bytes Hash = 2;
+  uint64 View = 2;
+  bytes Hash = 3;
 }
 
 message TimeoutCert {
@@ -89,14 +90,13 @@ message TimeoutMsg {
 }
 
 message SyncInfo {
-  oneof Certificate {
-    QuorumCert QC = 1;
-    TimeoutCert TC = 2;
-    AggQC AggQC = 3;
-  }
+  optional QuorumCert QC = 1;
+  optional TimeoutCert TC = 2;
+  optional AggQC AggQC = 3;
 }
 
 message AggQC {
-  repeated QuorumCert QCs = 1;
+  map<uint32, QuorumCert> QCs = 1;
   ThresholdSignature Sig = 2;
+  uint64 View = 3;
 }

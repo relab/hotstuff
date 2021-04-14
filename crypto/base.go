@@ -1,6 +1,10 @@
 package crypto
 
-import "github.com/relab/hotstuff"
+import (
+	"crypto/sha256"
+
+	"github.com/relab/hotstuff"
+)
 
 type base struct {
 	hotstuff.CryptoImpl
@@ -32,7 +36,7 @@ func (base base) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.Partial
 func (base base) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
 	// genesis QC is always valid.
 	if block.Hash() == hotstuff.GetGenesis().Hash() {
-		return hotstuff.NewQuorumCert(nil, hotstuff.GetGenesis().Hash()), nil
+		return hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), nil
 	}
 	sigs := make([]hotstuff.Signature, 0, len(signatures))
 	for _, sig := range signatures {
@@ -42,7 +46,7 @@ func (base base) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.P
 	if err != nil {
 		return hotstuff.QuorumCert{}, err
 	}
-	return hotstuff.NewQuorumCert(sig, block.Hash()), nil
+	return hotstuff.NewQuorumCert(sig, block.View(), block.Hash()), nil
 }
 
 // CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
@@ -53,13 +57,33 @@ func (base base) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff.Timeo
 	}
 	sigs := make([]hotstuff.Signature, 0, len(timeouts))
 	for _, timeout := range timeouts {
-		sigs = append(sigs, timeout.Signature)
+		sigs = append(sigs, timeout.ViewSignature)
 	}
 	sig, err := base.CreateThresholdSignature(sigs, view.ToHash())
 	if err != nil {
 		return hotstuff.TimeoutCert{}, err
 	}
 	return hotstuff.NewTimeoutCert(sig, view), nil
+}
+
+func (base base) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (aggQC hotstuff.AggregateQC, err error) {
+	qcs := make(map[hotstuff.ID]hotstuff.QuorumCert)
+	sigs := make([]hotstuff.Signature, 0, len(timeouts))
+	hashes := make(map[hotstuff.ID]hotstuff.Hash)
+	for _, timeout := range timeouts {
+		if qc, ok := timeout.SyncInfo.QC(); ok {
+			qcs[timeout.ID] = qc
+		}
+		if timeout.MsgSignature != nil {
+			sigs = append(sigs, timeout.MsgSignature)
+			hashes[timeout.ID] = timeout.Hash()
+		}
+	}
+	sig, err := base.CreateThresholdSignatureForMessageSet(sigs, hashes)
+	if err != nil {
+		return aggQC, err
+	}
+	return hotstuff.NewAggregateQC(qcs, sig, view), nil
 }
 
 // VerifyPartialCert verifies a single partial certificate.
@@ -81,4 +105,31 @@ func (base base) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
 		return true
 	}
 	return base.VerifyThresholdSignature(tc.Signature(), tc.View().ToHash())
+}
+
+// VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
+func (base base) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (ok bool, highQC hotstuff.QuorumCert) {
+	s256 := sha256.New()
+	hashes := make(map[hotstuff.ID]hotstuff.Hash)
+	for id, qc := range aggQC.QCs() {
+		var h hotstuff.Hash
+		s256.Write(aggQC.View().ToBytes())
+		blockHash := qc.BlockHash()
+		s256.Write(blockHash[:])
+		s256.Write(id.ToBytes())
+		s256.Sum(h[:0])
+		hashes[id] = h
+
+		if highQC.View() < qc.View() {
+			highQC = qc
+		}
+	}
+	ok = base.VerifyThresholdSignatureForMessageSet(aggQC.Sig(), hashes)
+	if !ok {
+		return false, hotstuff.QuorumCert{}
+	}
+	if base.VerifyQuorumCert(highQC) {
+		return true, highQC
+	}
+	return false, hotstuff.QuorumCert{}
 }
