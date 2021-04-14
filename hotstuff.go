@@ -418,6 +418,7 @@ type HotStuff struct {
 	leaderRotation   LeaderRotation
 	crypto           Crypto
 	viewSynchronizer ViewSynchronizer
+	votingMachine    VotingMachine
 }
 
 // ID returns the id.
@@ -490,6 +491,11 @@ func (hs *HotStuff) ViewSynchronizer() ViewSynchronizer {
 	return hs.viewSynchronizer
 }
 
+// VotingMachine returns the voting machine.
+func (hs *HotStuff) VotingMachine() VotingMachine {
+	return hs.votingMachine
+}
+
 // Builder is a helper for constructing a HotStuff instance.
 type Builder struct {
 	hs      *HotStuff
@@ -548,6 +554,9 @@ func (b *Builder) Register(modules ...interface{}) {
 		}
 		if m, ok := module.(ViewSynchronizer); ok {
 			b.hs.viewSynchronizer = m
+		}
+		if m, ok := module.(VotingMachine); ok {
+			b.hs.votingMachine = m
 		}
 		if m, ok := module.(Module); ok {
 			b.modules = append(b.modules, m)
@@ -695,17 +704,18 @@ type Manager interface {
 // It contains the protocol data for a single replica.
 // The methods OnPropose, OnVote, OnNewView, and OnDeliver should be called upon receiving a corresponding message.
 type Consensus interface {
-	// LastVote returns the view in which the replica last voted.
-	LastVote() View
-	// IncreaseLastVotedView ensures that no voting happens in a view earlier than `view`.
-	IncreaseLastVotedView(view View)
+	// StopVoting ensures that no voting happens in a view earlier than `view`.
+	StopVoting(view View)
 	// Propose starts a new proposal. The command is fetched from the command queue.
 	Propose(cert SyncInfo)
 	// OnPropose handles an incoming proposal.
 	// A leader should call this method on itself.
 	OnPropose(proposal ProposeMsg)
+}
+
+// VotingMachine handles incoming votes, and combines them into a Quorum Certificate when a quorum of votes is received.
+type VotingMachine interface {
 	// OnVote handles an incoming vote.
-	// A leader should call this method on itself.
 	OnVote(vote VoteMsg)
 }
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/blockchain"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/leaderrotation"
 
@@ -55,6 +56,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 		blockchain.New(100),
 		mocks.NewMockConsensus(ctrl),
 		leaderrotation.NewFixed(1),
+		consensus.NewVotingMachine(),
 		synchronizer,
 		config,
 		signer,

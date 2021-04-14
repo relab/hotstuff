@@ -2,7 +2,8 @@ package chainedhotstuff
 
 import "github.com/relab/hotstuff"
 
-type chainedhotstuff struct {
+// ChainedHotstuff implements the pipelined three-phase HotStuff protocol.
+type ChainedHotstuff struct {
 	mod *hotstuff.HotStuff
 
 	// protocol variables
@@ -10,34 +11,29 @@ type chainedhotstuff struct {
 	lastVote hotstuff.View   // the last view that the replica voted in
 	bLock    *hotstuff.Block // the currently locked block
 	bExec    *hotstuff.Block // the last committed block
-
-	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
 }
 
 // New returns a new chainedhotstuff instance.
-func New() hotstuff.Consensus {
-	hs := &chainedhotstuff{}
-	hs.verifiedVotes = make(map[hotstuff.Hash][]hotstuff.PartialCert)
+func New() *ChainedHotstuff {
+	hs := &ChainedHotstuff{}
 	hs.bLock = hotstuff.GetGenesis()
 	hs.bExec = hotstuff.GetGenesis()
 	return hs
 }
 
-func (hs *chainedhotstuff) InitModule(mod *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
+// InitModule gives ChainedHotstuff a pointer to the other modules.
+func (hs *ChainedHotstuff) InitModule(mod *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
 	hs.mod = mod
 }
 
-// LastVote returns the view in which the replica last voted.
-func (hs *chainedhotstuff) LastVote() hotstuff.View {
-	return hs.lastVote
+// StopVoting ensures that no voting happens in a view earlier than `view`.
+func (hs *ChainedHotstuff) StopVoting(view hotstuff.View) {
+	if hs.lastVote < view {
+		hs.lastVote = view
+	}
 }
 
-// IncreaseLastVotedView ensures that no voting happens in a view earlier than `view`.
-func (hs *chainedhotstuff) IncreaseLastVotedView(view hotstuff.View) {
-	hs.lastVote++
-}
-
-func (hs *chainedhotstuff) commit(block *hotstuff.Block) {
+func (hs *ChainedHotstuff) commit(block *hotstuff.Block) {
 	if hs.bExec.View() < block.View() {
 		if parent, ok := hs.mod.BlockChain().Get(block.Parent()); ok {
 			hs.commit(parent)
@@ -48,14 +44,14 @@ func (hs *chainedhotstuff) commit(block *hotstuff.Block) {
 	}
 }
 
-func (hs *chainedhotstuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
+func (hs *ChainedHotstuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
 	return hs.mod.BlockChain().Get(qc.BlockHash())
 }
 
-func (hs *chainedhotstuff) update(block *hotstuff.Block) {
+func (hs *ChainedHotstuff) update(block *hotstuff.Block) {
 	hs.mod.ViewSynchronizer().UpdateHighQC(block.QuorumCert())
 
 	block1, ok := hs.qcRef(block.QuorumCert())
@@ -109,7 +105,7 @@ func (hs *chainedhotstuff) update(block *hotstuff.Block) {
 }
 
 // Propose proposes the given command
-func (hs *chainedhotstuff) Propose(cert hotstuff.SyncInfo) {
+func (hs *ChainedHotstuff) Propose(cert hotstuff.SyncInfo) {
 	hs.mod.Logger().Debug("Propose")
 
 	qc, ok := cert.QC()
@@ -136,7 +132,7 @@ func (hs *chainedhotstuff) Propose(cert hotstuff.SyncInfo) {
 }
 
 // OnPropose handles an incoming proposal
-func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
+func (hs *ChainedHotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	block := proposal.Block
 	hs.mod.Logger().Debug("OnPropose: ", block)
 
@@ -203,7 +199,7 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	leaderID := hs.mod.LeaderRotation().GetLeader(hs.lastVote + 1)
 	if leaderID == hs.mod.ID() {
 		finish()
-		hs.OnVote(hotstuff.VoteMsg{ID: hs.mod.ID(), PartialCert: pc})
+		hs.mod.VotingMachine().OnVote(hotstuff.VoteMsg{ID: hs.mod.ID(), PartialCert: pc})
 		return
 	}
 
@@ -217,76 +213,4 @@ func (hs *chainedhotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	finish()
 }
 
-// OnVote handles an incoming vote
-func (hs *chainedhotstuff) OnVote(vote hotstuff.VoteMsg) {
-	defer func() {
-		// delete any pending QCs with lower height than bLeaf
-		for k := range hs.verifiedVotes {
-			if block, ok := hs.mod.BlockChain().LocalGet(k); ok {
-				if block.View() <= hs.mod.ViewSynchronizer().LeafBlock().View() {
-					delete(hs.verifiedVotes, k)
-				}
-			} else {
-				delete(hs.verifiedVotes, k)
-			}
-		}
-	}()
-
-	cert := vote.PartialCert
-	hs.mod.Logger().Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
-
-	var (
-		block *hotstuff.Block
-		ok    bool
-	)
-
-	if !vote.Deferred {
-		// first, try to get the block from the local cache
-		block, ok = hs.mod.BlockChain().LocalGet(cert.BlockHash())
-		if !ok {
-			// if that does not work, we will try to handle this event later.
-			// hopefully, the block has arrived by then.
-			hs.mod.Logger().Infof("Local cache miss for block: %.8s", cert.BlockHash())
-			vote.Deferred = true
-			hs.mod.EventLoop().AwaitEvent(hotstuff.ProposeMsg{}, vote)
-			return
-		}
-	} else {
-		// if the block has not arrived at this point we will try to fetch it.
-		block, ok = hs.mod.BlockChain().Get(cert.BlockHash())
-		if !ok {
-			hs.mod.Logger().Debugf("Could not find block for vote: %.8s.", cert.BlockHash())
-			return
-		}
-	}
-
-	if block.View() <= hs.mod.ViewSynchronizer().LeafBlock().View() {
-		// too old
-		return
-	}
-
-	if !hs.mod.Crypto().VerifyPartialCert(cert) {
-		hs.mod.Logger().Info("OnVote: Vote could not be verified!")
-		return
-	}
-
-	votes := hs.verifiedVotes[cert.BlockHash()]
-	votes = append(votes, cert)
-	hs.verifiedVotes[cert.BlockHash()] = votes
-
-	if len(votes) < hs.mod.Manager().QuorumSize() {
-		return
-	}
-
-	qc, err := hs.mod.Crypto().CreateQuorumCert(block, votes)
-	if err != nil {
-		hs.mod.Logger().Info("OnVote: could not create QC for block: ", err)
-		return
-	}
-	delete(hs.verifiedVotes, cert.BlockHash())
-
-	// signal the synchronizer
-	hs.mod.ViewSynchronizer().AdvanceView(hotstuff.NewSyncInfo().WithQC(qc))
-}
-
-var _ hotstuff.Consensus = (*chainedhotstuff)(nil)
+var _ hotstuff.Consensus = (*ChainedHotstuff)(nil)

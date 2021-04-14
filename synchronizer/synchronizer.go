@@ -157,7 +157,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	// race conditions.
 	if timeout.ID == s.mod.ID() {
 		// stop voting for current view
-		s.mod.Consensus().IncreaseLastVotedView(s.currentView)
+		s.mod.Consensus().StopVoting(s.currentView)
 	}
 
 	timeouts, ok := s.timeouts[timeout.View]

@@ -25,7 +25,7 @@ func TestLocalTimeout(t *testing.T) {
 	testutil.ConfigAddReplica(t, cfg, leader)
 
 	c := make(chan struct{})
-	hs.EXPECT().IncreaseLastVotedView(hotstuff.View(1)).AnyTimes()
+	hs.EXPECT().StopVoting(hotstuff.View(1)).AnyTimes()
 	cfg.
 		EXPECT().
 		Timeout(gomock.AssignableToTypeOf(hotstuff.TimeoutMsg{})).

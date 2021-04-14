@@ -39,8 +39,8 @@ func TestPropose(t *testing.T) {
 
 	hs.Propose(hotstuff.NewSyncInfo().WithQC(synchronizer.HighQC()))
 
-	if hs.LastVote() != 1 {
-		t.Errorf("Wrong view: got: %d, want: %d", hs.LastVote(), 1)
+	if hs.lastVote != 1 {
+		t.Errorf("Wrong view: got: %d, want: %d", hs.lastVote, 1)
 	}
 }
 
@@ -92,37 +92,6 @@ func TestCommit(t *testing.T) {
 	hs.OnPropose(b2)
 	hs.OnPropose(b3)
 	hs.OnPropose(b4)
-}
-
-// TestVote checks that a leader can collect votes on a proposal to form a QC
-func TestVote(t *testing.T) {
-	const n = 4
-	ctrl := gomock.NewController(t)
-
-	hs := New()
-	bl := testutil.CreateBuilders(t, ctrl, n)
-	synchronizer := synchronizer.New(testutil.FixedTimeout(time.Second))
-	bl[0].Register(hs, synchronizer)
-	hl := bl.Build()
-
-	// expect that the replica will propose after receiving enough votes.
-	hl[0].Manager().(*mocks.MockManager).EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.GetGenesis()))
-
-	b := testutil.NewProposeMsg(hotstuff.GetGenesis().Hash(), hl[0].ViewSynchronizer().HighQC(), "test", 1, 1)
-
-	hs.OnPropose(b)
-
-	for i, signer := range hl.Signers()[1:] {
-		pc, err := signer.CreatePartialCert(b.Block)
-		if err != nil {
-			t.Fatalf("Failed to create partial certificate: %v", err)
-		}
-		hs.OnVote(hotstuff.VoteMsg{ID: hotstuff.ID(i + 1), PartialCert: pc})
-	}
-
-	if hl[0].ViewSynchronizer().HighQC().BlockHash() != b.Block.Hash() {
-		t.Errorf("HighQC was not updated.")
-	}
 }
 
 // TestForkingAttack shows that it is possible to execute a forking attack against HotStuff.
@@ -181,7 +150,7 @@ func TestForkingAttack(t *testing.T) {
 	hs.OnPropose(d)
 
 	// sanity check
-	if hs.(*chainedhotstuff).bLock != b.Block {
+	if hs.bLock != b.Block {
 		t.Fatalf("Not locked on B!")
 	}
 
@@ -193,11 +162,11 @@ func TestForkingAttack(t *testing.T) {
 	_ = advanceView(t, hs, block, signers)
 }
 
-func advanceView(t *testing.T, hs hotstuff.Consensus, lastProposal *hotstuff.Block, signers []hotstuff.Crypto) *hotstuff.Block {
+func advanceView(t *testing.T, hs *ChainedHotstuff, lastProposal *hotstuff.Block, signers []hotstuff.Crypto) *hotstuff.Block {
 	t.Helper()
 
 	qc := testutil.CreateQC(t, lastProposal, signers)
-	b := hotstuff.NewBlock(lastProposal.Hash(), qc, "foo", hs.LastVote()+1, 2)
+	b := hotstuff.NewBlock(lastProposal.Hash(), qc, "foo", hs.lastVote+1, 2)
 	hs.OnPropose(hotstuff.ProposeMsg{ID: b.Proposer(), Block: b})
 	return b
 }

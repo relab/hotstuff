@@ -74,7 +74,7 @@ func (el *EventLoop) processEvent(e Event) {
 	case ProposeMsg:
 		el.mod.Consensus().OnPropose(event)
 	case VoteMsg:
-		el.mod.Consensus().OnVote(event)
+		el.mod.VotingMachine().OnVote(event)
 	case TimeoutMsg:
 		el.mod.ViewSynchronizer().OnRemoteTimeout(event)
 	case NewViewMsg:
