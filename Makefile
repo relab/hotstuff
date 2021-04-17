@@ -5,7 +5,7 @@ gorums_go := $(proto_src:%.proto=%_gorums.pb.go)
 
 binaries := cmd/hotstuff/hotstuff cmd/hotstuffkeygen/hotstuffkeygen
 
-.PHONY: all debug protos download tools $(binaries)
+.PHONY: all debug clean protos download tools $(binaries)
 
 all: $(binaries)
 
@@ -15,13 +15,16 @@ debug: $(binaries)
 $(binaries): protos
 	@go build -o ./$@ $(GCFLAGS) ./$(dir $@)
 
-protos: tools download $(proto_go) $(gorums_go)
+protos: $(proto_go) $(gorums_go)
 
 download:
 	@go mod download
 
 tools: download
 	@cat tools.go | grep _ | awk -F'"' '{print $$2}' | xargs -I % go install %
+
+clean:
+	@rm -fv $(binaries)
 
 %.pb.go %_gorums.pb.go : %.proto
 	protoc -I=$(proto_include):. \
