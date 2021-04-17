@@ -118,18 +118,18 @@ func (srv *Server) Stop() {
 }
 
 // Propose handles a replica's response to the Propose QC from the leader.
-func (srv *Server) Propose(ctx context.Context, block *proto.Block) {
+func (srv *Server) Propose(ctx context.Context, proposal *proto.Proposal) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
 		srv.mod.Logger().Infof("Failed to get client ID: %v", err)
 		return
 	}
-	block.Proposer = uint32(id)
 
-	srv.mod.EventLoop().AddEvent(hotstuff.ProposeMsg{
-		ID:    id,
-		Block: proto.BlockFromProto(block),
-	})
+	proposal.Block.Proposer = uint32(id)
+	proposeMsg := proto.ProposalFromProto(proposal)
+	proposeMsg.ID = id
+
+	srv.mod.EventLoop().AddEvent(proposeMsg)
 }
 
 // Vote handles an incoming vote message.

@@ -127,6 +127,27 @@ func QuorumCertFromProto(qc *QuorumCert) hotstuff.QuorumCert {
 	return hotstuff.NewQuorumCert(ThresholdSignatureFromProto(qc.GetSig()), hotstuff.View(qc.GetView()), h)
 }
 
+// ProposalToProto converts a ProposeMsg to a protobuf message.
+func ProposalToProto(proposal hotstuff.ProposeMsg) *Proposal {
+	p := &Proposal{
+		Block: BlockToProto(proposal.Block),
+	}
+	if proposal.AggregateQC != nil {
+		p.AggQC = AggregateQCToProto(*proposal.AggregateQC)
+	}
+	return p
+}
+
+// ProposalFromProto converts a protobuf message to a ProposeMsg.
+func ProposalFromProto(p *Proposal) (proposal hotstuff.ProposeMsg) {
+	proposal.Block = BlockFromProto(p.GetBlock())
+	if p.GetAggQC() != nil {
+		aggQC := AggregateQCFromProto(p.GetAggQC())
+		proposal.AggregateQC = &aggQC
+	}
+	return
+}
+
 // BlockToProto converts a hotstuff.Block to a proto.Block.
 func BlockToProto(block *hotstuff.Block) *Block {
 	parentHash := block.Parent()
@@ -154,20 +175,28 @@ func BlockFromProto(block *Block) *hotstuff.Block {
 
 // TimeoutMsgFromProto converts a TimeoutMsg proto to the hotstuff type.
 func TimeoutMsgFromProto(m *TimeoutMsg) hotstuff.TimeoutMsg {
-	return hotstuff.TimeoutMsg{
+	timeoutMsg := hotstuff.TimeoutMsg{
 		View:          hotstuff.View(m.GetView()),
 		SyncInfo:      SyncInfoFromProto(m.GetSyncInfo()),
-		ViewSignature: SignatureFromProto(m.GetSig()),
+		ViewSignature: SignatureFromProto(m.GetViewSig()),
 	}
+	if m.GetViewSig() != nil {
+		timeoutMsg.MsgSignature = SignatureFromProto(m.GetMsgSig())
+	}
+	return timeoutMsg
 }
 
 // TimeoutMsgToProto converts a TimeoutMsg to the protobuf type.
 func TimeoutMsgToProto(timeoutMsg hotstuff.TimeoutMsg) *TimeoutMsg {
-	return &TimeoutMsg{
+	tm := &TimeoutMsg{
 		View:     uint64(timeoutMsg.View),
 		SyncInfo: SyncInfoToProto(timeoutMsg.SyncInfo),
-		Sig:      SignatureToProto(timeoutMsg.ViewSignature),
+		ViewSig:  SignatureToProto(timeoutMsg.ViewSignature),
 	}
+	if timeoutMsg.MsgSignature != nil {
+		tm.MsgSig = SignatureToProto(timeoutMsg.MsgSignature)
+	}
+	return tm
 }
 
 // TimeoutCertFromProto converts a timeout certificate from the protobuf type to the hotstuff type.

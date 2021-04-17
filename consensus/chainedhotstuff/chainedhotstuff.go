@@ -2,8 +2,8 @@ package chainedhotstuff
 
 import "github.com/relab/hotstuff"
 
-// ChainedHotstuff implements the pipelined three-phase HotStuff protocol.
-type ChainedHotstuff struct {
+// ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
+type ChainedHotStuff struct {
 	mod *hotstuff.HotStuff
 
 	// protocol variables
@@ -14,26 +14,26 @@ type ChainedHotstuff struct {
 }
 
 // New returns a new chainedhotstuff instance.
-func New() *ChainedHotstuff {
-	hs := &ChainedHotstuff{}
+func New() *ChainedHotStuff {
+	hs := &ChainedHotStuff{}
 	hs.bLock = hotstuff.GetGenesis()
 	hs.bExec = hotstuff.GetGenesis()
 	return hs
 }
 
 // InitModule gives ChainedHotstuff a pointer to the other modules.
-func (hs *ChainedHotstuff) InitModule(mod *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
+func (hs *ChainedHotStuff) InitModule(mod *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
 	hs.mod = mod
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
-func (hs *ChainedHotstuff) StopVoting(view hotstuff.View) {
+func (hs *ChainedHotStuff) StopVoting(view hotstuff.View) {
 	if hs.lastVote < view {
 		hs.lastVote = view
 	}
 }
 
-func (hs *ChainedHotstuff) commit(block *hotstuff.Block) {
+func (hs *ChainedHotStuff) commit(block *hotstuff.Block) {
 	if hs.bExec.View() < block.View() {
 		if parent, ok := hs.mod.BlockChain().Get(block.Parent()); ok {
 			hs.commit(parent)
@@ -44,14 +44,14 @@ func (hs *ChainedHotstuff) commit(block *hotstuff.Block) {
 	}
 }
 
-func (hs *ChainedHotstuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
+func (hs *ChainedHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
 	return hs.mod.BlockChain().Get(qc.BlockHash())
 }
 
-func (hs *ChainedHotstuff) update(block *hotstuff.Block) {
+func (hs *ChainedHotStuff) update(block *hotstuff.Block) {
 	hs.mod.ViewSynchronizer().UpdateHighQC(block.QuorumCert())
 
 	block1, ok := hs.qcRef(block.QuorumCert())
@@ -105,7 +105,7 @@ func (hs *ChainedHotstuff) update(block *hotstuff.Block) {
 }
 
 // Propose proposes the given command
-func (hs *ChainedHotstuff) Propose(cert hotstuff.SyncInfo) {
+func (hs *ChainedHotStuff) Propose(cert hotstuff.SyncInfo) {
 	hs.mod.Logger().Debug("Propose")
 
 	qc, ok := cert.QC()
@@ -126,13 +126,14 @@ func (hs *ChainedHotstuff) Propose(cert hotstuff.SyncInfo) {
 	)
 	hs.mod.BlockChain().Store(block)
 
-	hs.mod.Manager().Propose(block)
+	proposal := hotstuff.ProposeMsg{ID: hs.mod.ID(), Block: block}
+	hs.mod.Manager().Propose(proposal)
 	// self vote
-	hs.OnPropose(hotstuff.ProposeMsg{ID: hs.mod.ID(), Block: block})
+	hs.OnPropose(proposal)
 }
 
 // OnPropose handles an incoming proposal
-func (hs *ChainedHotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
+func (hs *ChainedHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	block := proposal.Block
 	hs.mod.Logger().Debug("OnPropose: ", block)
 
@@ -159,12 +160,7 @@ func (hs *ChainedHotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	} else {
 		hs.mod.Logger().Debug("OnPropose: liveness condition failed")
 		// check if this block extends bLock
-		b := block
-		ok := true
-		for ok && b.View() > hs.bLock.View() {
-			b, ok = hs.mod.BlockChain().Get(b.Parent())
-		}
-		if ok && b.Hash() == hs.bLock.Hash() {
+		if hs.mod.BlockChain().Extends(block, hs.bLock) {
 			safe = true
 		} else {
 			hs.mod.Logger().Debug("OnPropose: safety condition failed")
@@ -213,4 +209,4 @@ func (hs *ChainedHotstuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	finish()
 }
 
-var _ hotstuff.Consensus = (*ChainedHotstuff)(nil)
+var _ hotstuff.Consensus = (*ChainedHotStuff)(nil)

@@ -21,6 +21,7 @@ import (
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus/chainedhotstuff"
+	"github.com/relab/hotstuff/consensus/fasthotstuff"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
@@ -193,6 +194,16 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 		fmt.Fprintf(os.Stderr, "Invalid pacemaker type: '%s'\n", conf.PmType)
 		os.Exit(1)
 	}
+	var consensus hotstuff.Consensus
+	switch conf.Consensus {
+	case "chainedhotstuff":
+		consensus = chainedhotstuff.New()
+	case "fasthotstuff":
+		consensus = fasthotstuff.New()
+	default:
+		fmt.Fprintf(os.Stderr, "Invalid consensus type: '%s'\n", conf.Consensus)
+		os.Exit(1)
+	}
 	var cryptoImpl hotstuff.CryptoImpl
 	switch conf.Crypto {
 	case "ecdsa":
@@ -204,6 +215,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 		os.Exit(1)
 	}
 	builder.Register(
+		consensus,
 		crypto.NewCache(cryptoImpl, 2*srv.mgr.Len()),
 		leaderRotation,
 		srv,          // executor

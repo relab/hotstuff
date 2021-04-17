@@ -65,7 +65,7 @@ func (mr *MockManagerMockRecorder) Len() *gomock.Call {
 }
 
 // Propose mocks base method.
-func (m *MockManager) Propose(arg0 *hotstuff.Block) {
+func (m *MockManager) Propose(arg0 hotstuff.ProposeMsg) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Propose", arg0)
 }

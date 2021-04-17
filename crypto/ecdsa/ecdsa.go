@@ -193,6 +193,7 @@ func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []hotstuff.Sig
 // CreateThresholdSignatureForMessageSet creates a ThresholdSignature of partial signatures where each partialSignature
 // has signed a different message hash.
 func (ec *ecdsaCrypto) CreateThresholdSignatureForMessageSet(partialSignatures []hotstuff.Signature, hashes map[hotstuff.ID]hotstuff.Hash) (_ hotstuff.ThresholdSignature, err error) {
+	ec.mod.Logger().Debug(hashes)
 	thrSig := make(ThresholdSignature)
 	for _, s := range partialSignatures {
 		if thrSig.Participants().Contains(s.Signer()) {
@@ -251,6 +252,7 @@ func (ec *ecdsaCrypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 
 // VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
 func (ec *ecdsaCrypto) VerifyThresholdSignatureForMessageSet(signature hotstuff.ThresholdSignature, hashes map[hotstuff.ID]hotstuff.Hash) bool {
+	ec.mod.Logger().Debug(hashes)
 	sig, ok := signature.(ThresholdSignature)
 	if !ok {
 		return false

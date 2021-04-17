@@ -177,15 +177,15 @@ func (cfg *Manager) QuorumSize() int {
 }
 
 // Propose sends the block to all replicas in the configuration
-func (cfg *Manager) Propose(block *hotstuff.Block) {
+func (cfg *Manager) Propose(proposal hotstuff.ProposeMsg) {
 	if cfg.cfg == nil {
 		return
 	}
 	var ctx context.Context
 	cfg.proposeCancel()
 	ctx, cfg.proposeCancel = context.WithCancel(context.Background())
-	pBlock := proto.BlockToProto(block)
-	cfg.cfg.Propose(ctx, pBlock, gorums.WithNoSendWaiting())
+	p := proto.ProposalToProto(proposal)
+	cfg.cfg.Propose(ctx, p, gorums.WithNoSendWaiting())
 }
 
 // Timeout sends the timeout message to all replicas.

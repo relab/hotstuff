@@ -126,6 +126,16 @@ done:
 	return elem.Value.(*hotstuff.Block), true
 }
 
+// Extends checks if the given block extends the branch of the target block.
+func (chain *blockChain) Extends(block, target *hotstuff.Block) bool {
+	current := block
+	ok := true
+	for ok && current.View() > target.View() {
+		current, ok = chain.Get(current.Parent())
+	}
+	return ok && current.Hash() == target.Hash()
+}
+
 func (chain *blockChain) ProcessEvent(event hotstuff.Event) {
 	proposal, ok := event.(hotstuff.ProposeMsg)
 	if !ok {

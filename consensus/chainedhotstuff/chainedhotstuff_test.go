@@ -32,7 +32,7 @@ func TestPropose(t *testing.T) {
 	// RULES:
 
 	// leader should propose to other replicas.
-	cfg.EXPECT().Propose(gomock.AssignableToTypeOf(&hotstuff.Block{}))
+	cfg.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.ProposeMsg{}))
 
 	// leader should send its own vote to the next leader.
 	replicas[1].EXPECT().Vote(gomock.Any())
@@ -162,7 +162,7 @@ func TestForkingAttack(t *testing.T) {
 	_ = advanceView(t, hs, block, signers)
 }
 
-func advanceView(t *testing.T, hs *ChainedHotstuff, lastProposal *hotstuff.Block, signers []hotstuff.Crypto) *hotstuff.Block {
+func advanceView(t *testing.T, hs *ChainedHotStuff, lastProposal *hotstuff.Block, signers []hotstuff.Crypto) *hotstuff.Block {
 	t.Helper()
 
 	qc := testutil.CreateQC(t, lastProposal, signers)

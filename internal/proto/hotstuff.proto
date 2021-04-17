@@ -9,7 +9,7 @@ import "google/protobuf/empty.proto";
 option go_package = "github.com/relab/hotstuff/internal/proto";
 
 service Hotstuff {
-  rpc Propose(Block) returns (google.protobuf.Empty) {
+  rpc Propose(Proposal) returns (google.protobuf.Empty) {
     option (gorums.multicast) = true;
   }
 
@@ -26,6 +26,11 @@ service Hotstuff {
   }
 
   rpc Fetch(BlockHash) returns (Block) { option (gorums.quorumcall) = true; }
+}
+
+message Proposal {
+  Block Block = 1;
+  optional AggQC AggQC = 2;
 }
 
 message BlockHash { bytes Hash = 1; }
@@ -86,7 +91,8 @@ message TimeoutCert {
 message TimeoutMsg {
   uint64 View = 1;
   SyncInfo SyncInfo = 2;
-  Signature Sig = 3;
+  Signature ViewSig = 3;
+  optional Signature MsgSig = 4;
 }
 
 message SyncInfo {

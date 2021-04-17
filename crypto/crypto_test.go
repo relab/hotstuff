@@ -138,6 +138,29 @@ func TestVerifyTimeoutCert(t *testing.T) {
 	runAll(t, run)
 }
 
+func TestVerifyAggregateQC(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		ctrl := gomock.NewController(t)
+		td := setup(t, ctrl, 4)
+
+		timeouts := testutil.CreateTimeouts(t, 1, td.signers)
+		aggQC, err := td.signers[0].CreateAggregateQC(1, timeouts)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ok, highQC := td.signers[0].VerifyAggregateQC(aggQC)
+		if !ok {
+			t.Fatal("AggregateQC was not verified")
+		}
+
+		if highQC.BlockHash() != hotstuff.GetGenesis().Hash() {
+			t.Fatal("Wrong hash for highQC")
+		}
+	}
+	runAll(t, run)
+}
+
 func runAll(t *testing.T, run func(*testing.T, setupFunc)) {
 	t.Helper()
 	t.Run("Ecdsa", func(t *testing.T) { run(t, setup(NewBase(ecdsa.New), testutil.GenerateECDSAKey)) })

@@ -194,7 +194,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		if err != nil {
 			s.mod.Logger().Debugf("Failed to create aggregateQC: %v", err)
 		} else {
-			si.WithAggQC(aggQC)
+			si = si.WithAggQC(aggQC)
 		}
 	}
 

@@ -346,8 +346,9 @@ type EventProcessor interface {
 
 // ProposeMsg is broadcast when a leader makes a proposal.
 type ProposeMsg struct {
-	ID    ID     // The ID of the replica who sent the message.
-	Block *Block // The block that is proposed.
+	ID          ID           // The ID of the replica who sent the message.
+	Block       *Block       // The block that is proposed.
+	AggregateQC *AggregateQC // Optional AggregateQC
 }
 
 // VoteMsg is sent to the leader by replicas voting on a proposal.
@@ -367,7 +368,7 @@ type TimeoutMsg struct {
 }
 
 // Hash returns a hash of the timeout message.
-func (timeout *TimeoutMsg) Hash() Hash {
+func (timeout TimeoutMsg) Hash() Hash {
 	var h Hash
 	hash := sha256.New()
 	hash.Write(timeout.View.ToBytes())
@@ -660,6 +661,9 @@ type BlockChain interface {
 
 	// LocalGet retrieves a block given its hash, without fetching it from other replicas.
 	LocalGet(Hash) (*Block, bool)
+
+	// Extends checks if the given block extends the branch of the target hash.
+	Extends(block, target *Block) bool
 }
 
 //go:generate mockgen -destination=internal/mocks/replica_mock.go -package=mocks . Replica
@@ -691,7 +695,7 @@ type Manager interface {
 	// QuorumSize returns the size of a quorum.
 	QuorumSize() int
 	// Propose sends the block to all replicas in the configuration.
-	Propose(block *Block)
+	Propose(proposal ProposeMsg)
 	// Timeout sends the timeout message to all replicas.
 	Timeout(msg TimeoutMsg)
 	// Fetch requests a block from all the replicas in the configuration.

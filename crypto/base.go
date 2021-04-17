@@ -1,8 +1,6 @@
 package crypto
 
 import (
-	"crypto/sha256"
-
 	"github.com/relab/hotstuff"
 )
 
@@ -108,28 +106,30 @@ func (base base) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
 }
 
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
-func (base base) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (ok bool, highQC hotstuff.QuorumCert) {
-	s256 := sha256.New()
+func (base base) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (bool, hotstuff.QuorumCert) {
+	var highQC *hotstuff.QuorumCert
 	hashes := make(map[hotstuff.ID]hotstuff.Hash)
 	for id, qc := range aggQC.QCs() {
-		var h hotstuff.Hash
-		s256.Write(aggQC.View().ToBytes())
-		blockHash := qc.BlockHash()
-		s256.Write(blockHash[:])
-		s256.Write(id.ToBytes())
-		s256.Sum(h[:0])
-		hashes[id] = h
-
-		if highQC.View() < qc.View() {
-			highQC = qc
+		if highQC == nil {
+			highQC = new(hotstuff.QuorumCert)
+			*highQC = qc
+		} else if highQC.View() < qc.View() {
+			*highQC = qc
 		}
+
+		// reconstruct the TimeoutMsg to get the hash
+		hashes[id] = hotstuff.TimeoutMsg{
+			ID:       id,
+			View:     aggQC.View(),
+			SyncInfo: hotstuff.NewSyncInfo().WithQC(qc),
+		}.Hash()
 	}
-	ok = base.VerifyThresholdSignatureForMessageSet(aggQC.Sig(), hashes)
+	ok := base.VerifyThresholdSignatureForMessageSet(aggQC.Sig(), hashes)
 	if !ok {
 		return false, hotstuff.QuorumCert{}
 	}
-	if base.VerifyQuorumCert(highQC) {
-		return true, highQC
+	if base.VerifyQuorumCert(*highQC) {
+		return true, *highQC
 	}
 	return false, hotstuff.QuorumCert{}
 }

@@ -68,7 +68,7 @@ func TestPropose(t *testing.T) {
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
-		mgr.Propose(proposal)
+		mgr.Propose(hotstuff.ProposeMsg{ID: 1, Block: proposal})
 		for i := 1; i < n; i++ {
 			go hl[i].EventLoop().Run(ctx)
 			<-c

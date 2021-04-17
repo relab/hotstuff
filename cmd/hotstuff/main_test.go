@@ -40,15 +40,19 @@ func TestMain(m *testing.M) {
 // and then feed a random input to the replicas. Afterwards, we compare each replica's output
 // with the input to make sure that it got replicated correctly.
 func TestSMR(t *testing.T) {
-	t.Run("ECDSA", func(t *testing.T) { testSMRImpl(t, false) })
-	t.Run("BLS12-381", func(t *testing.T) { testSMRImpl(t, true) })
+	t.Run("ChainedHotStuff+ECDSA", func(t *testing.T) { testSMRImpl(t, "chainedhotstuff", "ecdsa") })
+	t.Run("ChainedHotStuff+BLS12-381", func(t *testing.T) { testSMRImpl(t, "chainedhotstuff", "bls12") })
+	t.Run("FastHotStuff+ECDSA", func(t *testing.T) { testSMRImpl(t, "fasthotstuff", "ecdsa") })
+	t.Run("FastHotStuff+BLS12-381", func(t *testing.T) { testSMRImpl(t, "fasthotstuff", "bls12") })
 }
 
-func testSMRImpl(t *testing.T, bls bool) {
+func testSMRImpl(t *testing.T, consensus, crypto string) {
 	var (
 		testdir string
 		input   string
 	)
+
+	bls := crypto == "bls12"
 
 	if outdir != "" {
 		testdir = outdir
@@ -84,6 +88,8 @@ func testSMRImpl(t *testing.T, bls bool) {
 	}
 
 	serverConf := &options{
+		Crypto:      crypto,
+		Consensus:   consensus,
 		BatchSize:   batchSize,
 		PmType:      "round-robin",
 		Replicas:    replicas,
@@ -101,10 +107,8 @@ func testSMRImpl(t *testing.T, bls bool) {
 		conf.Cert = fmt.Sprintf("%s/keys/%d.crt", testdir, replica.ID)
 		conf.CertKey = fmt.Sprintf("%s/keys/%d.key", testdir, replica.ID)
 		if bls {
-			conf.Crypto = "bls12"
 			conf.Privkey = fmt.Sprintf("%s/keys/%d.bls", testdir, replica.ID)
 		} else {
-			conf.Crypto = "ecdsa"
 			conf.Privkey = fmt.Sprintf("%s/keys/%d.key", testdir, replica.ID)
 		}
 		conf.Output = fmt.Sprintf("%s/%d.out", testdir, replica.ID)

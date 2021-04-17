@@ -230,13 +230,17 @@ func CreateSignatures(t *testing.T, hash hotstuff.Hash, signers []hotstuff.Crypt
 func CreateTimeouts(t *testing.T, view hotstuff.View, signers []hotstuff.Crypto) (timeouts []hotstuff.TimeoutMsg) {
 	t.Helper()
 	timeouts = make([]hotstuff.TimeoutMsg, 0, len(signers))
-	sigs := CreateSignatures(t, view.ToHash(), signers)
-	for _, sig := range sigs {
+	viewSigs := CreateSignatures(t, view.ToHash(), signers)
+	for _, sig := range viewSigs {
 		timeouts = append(timeouts, hotstuff.TimeoutMsg{
 			ID:            sig.Signer(),
 			View:          view,
 			ViewSignature: sig,
+			SyncInfo:      hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())),
 		})
+	}
+	for i := range timeouts {
+		timeouts[i].MsgSignature = Sign(t, timeouts[i].Hash(), signers[i])
 	}
 	return timeouts
 }
