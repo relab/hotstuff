@@ -2,6 +2,7 @@ package fasthotstuff
 
 import "github.com/relab/hotstuff"
 
+// FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {
 	mod *hotstuff.HotStuff
 
@@ -9,6 +10,7 @@ type FastHotStuff struct {
 	lastVote hotstuff.View
 }
 
+// New returns a new FastHotStuff instance.
 func New() *FastHotStuff {
 	return &FastHotStuff{
 		bExec:    hotstuff.GetGenesis(),
