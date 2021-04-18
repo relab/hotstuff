@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"os"
 	"runtime"
@@ -21,6 +20,7 @@ import (
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/internal/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/proto"
@@ -29,25 +29,24 @@ import (
 )
 
 func runClient(ctx context.Context, conf *options) {
+	logger := logging.New(fmt.Sprintf("cli%d", conf.SelfID))
 	var creds credentials.TransportCredentials
 	if conf.TLS {
 		rootCAs, err := x509.SystemCertPool()
 		if err != nil {
 			// system cert pool is unavailable on windows
 			if runtime.GOOS != "windows" {
-				fmt.Fprintf(os.Stderr, "Failed to get system cert pool: %v\n", err)
+				logger.Errorf("Failed to get system cert pool: %v", err)
 			}
 			rootCAs = x509.NewCertPool()
 		}
 		for _, ca := range conf.RootCAs {
 			cert, err := os.ReadFile(ca)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to read CA: %v\n", err)
-				os.Exit(1)
+				logger.Panicf("Failed to read CA: %v", err)
 			}
 			if !rootCAs.AppendCertsFromPEM(cert) {
-				fmt.Fprintf(os.Stderr, "Failed to decode CA\n")
-				os.Exit(1)
+				logger.Panicf("Failed to decode CA")
 			}
 		}
 		creds = credentials.NewClientTLSFromCert(rootCAs, "")
@@ -57,8 +56,7 @@ func runClient(ctx context.Context, conf *options) {
 	for _, r := range conf.Replicas {
 		key, err := keygen.ReadPublicKeyFile(r.Pubkey)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to read public key file '%s': %v\n", r.Pubkey, err)
-			os.Exit(1)
+			logger.Panicf("Failed to read public key file '%s': %v", r.Pubkey, err)
 		}
 		replicaConfig.Replicas[r.ID] = &config.ReplicaInfo{
 			ID:      r.ID,
@@ -69,18 +67,20 @@ func runClient(ctx context.Context, conf *options) {
 
 	client, err := newHotStuffClient(conf, replicaConfig)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to start client: %v\n", err)
-		os.Exit(1)
+		logger.Panicf("Failed to start client: %v", err)
 	}
+	client.logger = logger
+
+	logger.Info("Starting to send commands")
 
 	go client.handleCommands(ctx)
 	err = client.SendCommands(ctx)
 	if err != nil && !errors.Is(err, io.EOF) {
-		fmt.Fprintf(os.Stderr, "Failed to send commands: %v\n", err)
-		client.Close()
-		os.Exit(1)
+		logger.Panicf("Failed to send commands: %v", err)
 	}
 	client.Close()
+
+	logger.Info("Done sending commands")
 
 	stats := client.GetStats()
 	throughput := stats.Throughput
@@ -88,7 +88,7 @@ func runClient(ctx context.Context, conf *options) {
 	latencySD := math.Sqrt(stats.LatencyVar) / float64(time.Millisecond)
 
 	if !conf.Benchmark {
-		fmt.Printf("Throughput (ops/sec): %.2f, Latency (ms): %.2f, Latency Std.dev (ms): %.2f\n",
+		logger.Infof("Throughput (ops/sec): %.2f, Latency (ms): %.2f, Latency Std.dev (ms): %.2f",
 			throughput,
 			latency,
 			latencySD,
@@ -99,11 +99,11 @@ func runClient(ctx context.Context, conf *options) {
 		client.data.LatencyVariance = math.Pow(latencySD, 2) // variance in ms^2
 		b, err := proto.Marshal(client.data)
 		if err != nil {
-			log.Fatalf("Could not marshal benchmarkdata: %v\n", err)
+			logger.Panicf("Could not marshal benchmarkdata: %v", err)
 		}
 		_, err = os.Stdout.Write(b)
 		if err != nil {
-			log.Fatalf("Could not write data: %v\n", err)
+			logger.Panicf("Could not write data: %v", err)
 		}
 	}
 }
@@ -126,6 +126,7 @@ type pendingCmd struct {
 }
 
 type hotstuffClient struct {
+	logger        logging.Logger
 	conf          *options
 	replicaConfig *config.ReplicaConfig
 	mgr           *client.Manager
@@ -192,7 +193,7 @@ func (c *hotstuffClient) Close() {
 	if closer, ok := c.reader.(io.Closer); ok {
 		err := closer.Close()
 		if err != nil {
-			log.Println("Failed to close reader: ", err)
+			c.logger.Warn("Failed to close reader: ", err)
 		}
 	}
 }
@@ -233,6 +234,7 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 			return err
 		} else if err == io.EOF && n == 0 && lastCommand > num {
 			lastCommand = num
+			c.logger.Info("Reached end of file. Sending empty commands until last command is executed...")
 		}
 
 		cmd := &client.Command{
@@ -275,7 +277,7 @@ func (c *hotstuffClient) handleCommands(ctx context.Context) {
 		if err != nil {
 			qcError, ok := err.(gorums.QuorumCallError)
 			if !ok || qcError.Reason != context.Canceled.Error() {
-				log.Printf("Did not get enough replies for command: %v\n", err)
+				c.logger.Warnf("Did not get enough replies for command: %v\n", err)
 			}
 		}
 		c.mut.Lock()
