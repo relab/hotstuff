@@ -50,7 +50,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 		if !ok {
 			// if that does not work, we will try to handle this event later.
 			// hopefully, the block has arrived by then.
-			vm.mod.Logger().Infof("Local cache miss for block: %.8s", cert.BlockHash())
+			vm.mod.Logger().Debugf("Local cache miss for block: %.8s", cert.BlockHash())
 			vote.Deferred = true
 			vm.mod.EventLoop().AwaitEvent(hotstuff.ProposeMsg{}, vote)
 			return
