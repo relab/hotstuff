@@ -27,7 +27,7 @@ var (
 func TestMain(m *testing.M) {
 	flag.IntVar(&batchSize, "batch-size", 10, "The number of commands to batch together for each block.")
 	flag.IntVar(&payloadSize, "payload-size", 100, "The size (in bytes) of each command.")
-	flag.IntVar(&fileSize, "file-size", 1000000, "The size (in bytes) of the input file.")
+	flag.IntVar(&fileSize, "file-size", 500000, "The size (in bytes) of the input file.")
 	flag.StringVar(&inFile, "input", "", "The input file. If empty, a random file will be generated based on 'file-size'.")
 	flag.StringVar(&outdir, "outdir", "", "The path to the output directory. If empty, a temporary directory will be used.")
 	flag.Parse()
