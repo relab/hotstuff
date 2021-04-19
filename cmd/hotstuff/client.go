@@ -248,6 +248,10 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 		num++
 		c.pendingCmds <- pendingCmd{sequenceNumber: num, sendTime: time.Now(), promise: promise}
 
+		if num%100 == 0 {
+			c.logger.Infof("%d commands sent", num)
+		}
+
 		if c.conf.RateLimit > 0 {
 			time.Sleep(sleeptime)
 		}

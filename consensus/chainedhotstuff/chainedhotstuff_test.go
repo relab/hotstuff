@@ -82,9 +82,13 @@ func TestCommit(t *testing.T) {
 
 	// acceptor expects to receive the commands in order
 	gomock.InOrder(
+		acceptor.EXPECT().Proposed(gomock.Any()),
 		acceptor.EXPECT().Accept(hotstuff.Command("1")).Return(true),
+		acceptor.EXPECT().Proposed(hotstuff.Command("1")),
 		acceptor.EXPECT().Accept(hotstuff.Command("2")).Return(true),
+		acceptor.EXPECT().Proposed(hotstuff.Command("2")),
 		acceptor.EXPECT().Accept(hotstuff.Command("3")).Return(true),
+		acceptor.EXPECT().Proposed(hotstuff.Command("3")),
 		acceptor.EXPECT().Accept(hotstuff.Command("4")).Return(true),
 	)
 

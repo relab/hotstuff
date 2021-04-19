@@ -47,3 +47,15 @@ func (mr *MockAcceptorMockRecorder) Accept(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Accept", reflect.TypeOf((*MockAcceptor)(nil).Accept), arg0)
 }
+
+// Proposed mocks base method.
+func (m *MockAcceptor) Proposed(arg0 hotstuff.Command) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Proposed", arg0)
+}
+
+// Proposed indicates an expected call of Proposed.
+func (mr *MockAcceptorMockRecorder) Proposed(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Proposed", reflect.TypeOf((*MockAcceptor)(nil).Proposed), arg0)
+}

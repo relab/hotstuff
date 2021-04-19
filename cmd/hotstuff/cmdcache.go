@@ -53,10 +53,12 @@ func (c *cmdCache) addCommand(cmd *client.Command) {
 	}
 }
 
+// Get returns a batch of commands to propose.
 func (c *cmdCache) Get(ctx context.Context) (cmd hotstuff.Command, ok bool) {
-	c.mut.Lock()
-	defer c.mut.Unlock()
+	batch := new(client.Batch)
 
+	c.mut.Lock()
+awaitBatch:
 	// wait until we can send a new batch.
 	for c.cache.Len() <= c.batchSize {
 		c.mut.Unlock()
@@ -68,8 +70,8 @@ func (c *cmdCache) Get(ctx context.Context) (cmd hotstuff.Command, ok bool) {
 		c.mut.Lock()
 	}
 
-	batch := new(client.Batch)
-
+	// Get the batch. Note that we may not be able to fill the batch, but that should be fine as long as we can send
+	// at least one command.
 	for i := 0; i < c.batchSize; i++ {
 		elem := c.cache.Front()
 		if elem == nil {
@@ -78,12 +80,21 @@ func (c *cmdCache) Get(ctx context.Context) (cmd hotstuff.Command, ok bool) {
 		c.cache.Remove(elem)
 		cmd := elem.Value.(*client.Command)
 		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
-			// command is too old, can't propose
+			// command is too old
+			i--
 			continue
 		}
 		batch.Commands = append(batch.Commands, cmd)
 	}
 
+	// if we still got no (new) commands, try to wait again
+	if len(batch.Commands) == 0 {
+		goto awaitBatch
+	}
+
+	defer c.mut.Unlock()
+
+	// otherwise, we should have at least one command
 	b, err := c.marshaler.Marshal(batch)
 	if err != nil {
 		c.mod.Logger().Errorf("Failed to marshal batch: %v", err)
@@ -94,6 +105,7 @@ func (c *cmdCache) Get(ctx context.Context) (cmd hotstuff.Command, ok bool) {
 	return cmd, true
 }
 
+// Accept returns true if the replica can accept the batch.
 func (c *cmdCache) Accept(cmd hotstuff.Command) bool {
 	batch := new(client.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
@@ -101,8 +113,6 @@ func (c *cmdCache) Accept(cmd hotstuff.Command) bool {
 		c.mod.Logger().Errorf("Failed to unmarshal batch: %v", err)
 		return false
 	}
-
-	newSerialNumbers := make(map[uint32]uint64)
 
 	c.mut.Lock()
 	defer c.mut.Unlock()
@@ -112,13 +122,28 @@ func (c *cmdCache) Accept(cmd hotstuff.Command) bool {
 			// command is too old, can't accept
 			return false
 		}
-		newSerialNumbers[cmd.GetClientID()] = cmd.GetSequenceNumber()
-	}
-
-	// only update the serial numbers if we accept the batch
-	for id, n := range newSerialNumbers {
-		c.serialNumbers[id] = n
 	}
 
 	return true
 }
+
+// Proposed updates the serial numbers such that we will not accept the given batch again.
+func (c *cmdCache) Proposed(cmd hotstuff.Command) {
+	batch := new(client.Batch)
+	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
+	if err != nil {
+		c.mod.Logger().Errorf("Failed to unmarshal batch: %v", err)
+		return
+	}
+
+	c.mut.Lock()
+	defer c.mut.Unlock()
+
+	for _, cmd := range batch.GetCommands() {
+		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
+		}
+		c.serialNumbers[cmd.GetClientID()] = cmd.GetSequenceNumber()
+	}
+}
+
+var _ hotstuff.Acceptor = (*cmdCache)(nil)

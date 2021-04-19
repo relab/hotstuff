@@ -43,7 +43,14 @@ func (fhs *FastHotStuff) Propose(cert hotstuff.SyncInfo) {
 	}
 
 	qc, ok := cert.QC()
-	if !ok {
+	if ok {
+		qcBlock, ok := fhs.mod.BlockChain().Get(qc.BlockHash())
+		if !ok {
+			fhs.mod.Logger().Errorf("Could not get block for QC: %s", qc)
+			return
+		}
+		fhs.mod.Acceptor().Proposed(qcBlock.Command())
+	} else {
 		fhs.mod.Logger().Warnf("Propose was called with no QC!")
 		return
 	}
@@ -109,19 +116,30 @@ func (fhs *FastHotStuff) update(block *hotstuff.Block) {
 // OnPropose handles an incoming proposal.
 // A leader should call this method on itself.
 func (fhs *FastHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
-	safe := false
-	block := proposal.Block
+	fhs.mod.Logger().Debugf("OnPropose: %s", proposal.Block)
+
+	var (
+		safe     = false
+		block    = proposal.Block
+		hqcBlock *hotstuff.Block
+		ok       bool
+	)
 
 	if proposal.AggregateQC == nil {
 		safe = fhs.mod.Crypto().VerifyQuorumCert(block.QuorumCert()) &&
 			block.View() >= fhs.mod.ViewSynchronizer().View() &&
 			block.View() == block.QuorumCert().View()+1
+		hqcBlock, ok = fhs.mod.BlockChain().Get(block.QuorumCert().BlockHash())
+		if !ok {
+			fhs.mod.Logger().Warn("Missing block for QC: %s", block.QuorumCert())
+			return
+		}
 	} else {
 		// If we get an AggregateQC, we need to verify the AggregateQC, and the highQC it contains.
 		// Then, we must check that the proposed block extends the highQC.block.
 		ok, highQC := fhs.mod.Crypto().VerifyAggregateQC(*proposal.AggregateQC)
 		if ok && fhs.mod.Crypto().VerifyQuorumCert(highQC) {
-			hqcBlock, ok := fhs.mod.BlockChain().Get(highQC.BlockHash())
+			hqcBlock, ok = fhs.mod.BlockChain().Get(highQC.BlockHash())
 			if ok && fhs.mod.BlockChain().Extends(block, hqcBlock) {
 				safe = true
 				// create a new block containing the QC from the aggregateQC
@@ -130,6 +148,8 @@ func (fhs *FastHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 		}
 	}
 
+	fhs.mod.Acceptor().Proposed(hqcBlock.Command())
+
 	defer fhs.update(block)
 
 	if !safe {
@@ -137,17 +157,16 @@ func (fhs *FastHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 		return
 	}
 
-	defer fhs.mod.ViewSynchronizer().AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
-
-	if !fhs.mod.Acceptor().Accept(block.Command()) {
-		fhs.mod.Logger().Info("OnPropose: command not accepted")
-		return
-	}
-
 	fhs.mod.BlockChain().Store(block)
+	defer fhs.mod.ViewSynchronizer().AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 
 	if fhs.lastVote >= block.View() {
 		// already voted, or StopVoting was called for this view.
+		return
+	}
+
+	if !fhs.mod.Acceptor().Accept(block.Command()) {
+		fhs.mod.Logger().Info("OnPropose: command not accepted")
 		return
 	}
 

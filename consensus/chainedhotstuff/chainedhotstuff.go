@@ -109,7 +109,15 @@ func (hs *ChainedHotStuff) Propose(cert hotstuff.SyncInfo) {
 	hs.mod.Logger().Debug("Propose")
 
 	qc, ok := cert.QC()
-	if !ok {
+	if ok {
+		// tell the acceptor that the previous proposal succeeded.
+		qcBlock, ok := hs.mod.BlockChain().Get(qc.BlockHash())
+		if !ok {
+			hs.mod.Logger().Error("Could not find block for QC: %s", qc)
+			return
+		}
+		hs.mod.Acceptor().Proposed(qcBlock.Command())
+	} else {
 		hs.mod.Logger().Warn("Propose: no QC provided.")
 	}
 
@@ -153,6 +161,8 @@ func (hs *ChainedHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	}
 
 	qcBlock, haveQCBlock := hs.mod.BlockChain().Get(block.QuorumCert().BlockHash())
+	// Tell the acceptor that the QC's block was proposed successfully.
+	hs.mod.Acceptor().Proposed(qcBlock.Command())
 
 	safe := false
 	if haveQCBlock && qcBlock.View() > hs.bLock.View() {

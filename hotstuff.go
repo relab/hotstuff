@@ -599,6 +599,9 @@ type CommandQueue interface {
 type Acceptor interface {
 	// Accept returns true if the replica should accept the command, false otherwise.
 	Accept(Command) bool
+	// Proposed tells the acceptor that the propose phase for the given command succeeded, and it should no longer be
+	// accepted in the future.
+	Proposed(Command)
 }
 
 //go:generate mockgen -destination=internal/mocks/executor_mock.go -package=mocks . Executor
