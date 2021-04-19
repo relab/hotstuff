@@ -148,14 +148,14 @@ func (fhs *FastHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 		}
 	}
 
-	fhs.mod.Acceptor().Proposed(hqcBlock.Command())
-
 	defer fhs.update(block)
 
 	if !safe {
 		fhs.mod.Logger().Info("OnPropose: block not safe")
 		return
 	}
+
+	fhs.mod.Acceptor().Proposed(hqcBlock.Command())
 
 	fhs.mod.BlockChain().Store(block)
 	defer fhs.mod.ViewSynchronizer().AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))

@@ -161,8 +161,6 @@ func (hs *ChainedHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	}
 
 	qcBlock, haveQCBlock := hs.mod.BlockChain().Get(block.QuorumCert().BlockHash())
-	// Tell the acceptor that the QC's block was proposed successfully.
-	hs.mod.Acceptor().Proposed(qcBlock.Command())
 
 	safe := false
 	if haveQCBlock && qcBlock.View() > hs.bLock.View() {
@@ -181,6 +179,9 @@ func (hs *ChainedHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 		hs.mod.Logger().Info("OnPropose: block not safe")
 		return
 	}
+
+	// Tell the acceptor that the QC's block was proposed successfully.
+	hs.mod.Acceptor().Proposed(qcBlock.Command())
 
 	if !hs.mod.Acceptor().Accept(block.Command()) {
 		hs.mod.Logger().Info("OnPropose: command not accepted")
