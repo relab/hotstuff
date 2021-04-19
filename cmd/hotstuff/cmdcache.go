@@ -140,9 +140,9 @@ func (c *cmdCache) Proposed(cmd hotstuff.Command) {
 	defer c.mut.Unlock()
 
 	for _, cmd := range batch.GetCommands() {
-		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
+		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo < cmd.GetSequenceNumber() {
+			c.serialNumbers[cmd.GetClientID()] = cmd.GetSequenceNumber()
 		}
-		c.serialNumbers[cmd.GetClientID()] = cmd.GetSequenceNumber()
 	}
 }
 
