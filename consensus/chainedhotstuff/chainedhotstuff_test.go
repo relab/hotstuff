@@ -24,7 +24,7 @@ func TestPropose(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	hs := New()
 	builder := testutil.TestModules(t, ctrl, 1, testutil.GenerateECDSAKey(t))
-	synchronizer := synchronizer.New(testutil.FixedTimeout(time.Second))
+	synchronizer := synchronizer.New(testutil.FixedTimeout(1000))
 	cfg, replicas := testutil.CreateMockConfigWithReplicas(t, ctrl, 2)
 	builder.Register(hs, cfg, testutil.NewLeaderRotation(t, 1, 2), synchronizer)
 	builder.Build()
@@ -53,7 +53,7 @@ func TestCommit(t *testing.T) {
 	bl := testutil.CreateBuilders(t, ctrl, n, keys...)
 	acceptor := mocks.NewMockAcceptor(ctrl)
 	executor := mocks.NewMockExecutor(ctrl)
-	synchronizer := synchronizer.New(testutil.FixedTimeout(time.Second))
+	synchronizer := synchronizer.New(testutil.FixedTimeout(1000))
 	cfg, replicas := testutil.CreateMockConfigWithReplicas(t, ctrl, n, keys...)
 	bl[0].Register(hs, cfg, acceptor, executor, synchronizer, leaderrotation.NewFixed(2))
 	hl := bl.Build()
@@ -122,7 +122,7 @@ func TestForkingAttack(t *testing.T) {
 	bl := testutil.CreateBuilders(t, ctrl, n, keys...)
 	cfg, replicas := testutil.CreateMockConfigWithReplicas(t, ctrl, n, keys...)
 	executor := mocks.NewMockExecutor(ctrl)
-	synchronizer := synchronizer.New(testutil.FixedTimeout(time.Second))
+	synchronizer := synchronizer.New(testutil.FixedTimeout(1000))
 	bl[0].Register(hs, cfg, executor, synchronizer, leaderrotation.NewFixed(2))
 	hl := bl.Build()
 	signers := hl.Signers()
@@ -207,7 +207,7 @@ func TestChainedHotstuff(t *testing.T) {
 		configs[i] = gorums.NewManager(c)
 		servers[i] = gorums.NewServer(c)
 		synchronizers[i] = synchronizer.New(
-			hotstuff.ExponentialTimeout{Base: 100 * time.Millisecond, ExponentBase: 2, MaxExponent: 10},
+			hotstuff.ExponentialTimeout{BaseMS: 100, ExponentBase: 2, MaxExponent: 10},
 		)
 		builders[i].Register(New(), configs[i], servers[i], synchronizers[i])
 	}

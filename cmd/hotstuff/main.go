@@ -43,7 +43,7 @@ type options struct {
 	RootCAs         []string    `mapstructure:"root-cas"`
 	SelfID          hotstuff.ID `mapstructure:"self-id"`
 	TLS             bool
-	ViewTimeout     int `mapstructure:"view-timeout"`
+	ViewTimeout     uint `mapstructure:"view-timeout"`
 	Replicas        []replica
 }
 

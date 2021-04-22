@@ -2,7 +2,6 @@ package consensus_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
@@ -19,7 +18,7 @@ func TestVote(t *testing.T) {
 
 	chs := chainedhotstuff.New()
 	bl := testutil.CreateBuilders(t, ctrl, n)
-	synchronizer := synchronizer.New(testutil.FixedTimeout(time.Second))
+	synchronizer := synchronizer.New(testutil.FixedTimeout(1000))
 	bl[0].Register(chs, synchronizer)
 	hl := bl.Build()
 	hs := hl[0]

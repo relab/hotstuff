@@ -92,8 +92,8 @@ func (s *Synchronizer) viewDuration(view hotstuff.View) time.Duration {
 		pow = hotstuff.View(s.timeout.MaxExponent)
 	}
 	multiplier := math.Pow(float64(s.timeout.ExponentBase), float64(pow))
-	return time.Duration(
-		math.Ceil(float64(s.timeout.Base) * multiplier),
+	return time.Millisecond * time.Duration(
+		math.Ceil(float64(s.timeout.BaseMS)*multiplier),
 	)
 }
 

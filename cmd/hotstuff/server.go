@@ -178,7 +178,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 
 	builder := chainedhotstuff.DefaultModules(
 		*replicaConfig,
-		hotstuff.ExponentialTimeout{Base: time.Duration(conf.ViewTimeout) * time.Millisecond, ExponentBase: 2, MaxExponent: 8},
+		hotstuff.ExponentialTimeout{BaseMS: conf.ViewTimeout, ExponentBase: 1, MaxExponent: 3},
 	)
 	srv.mgr = hotstuffgorums.NewManager(*replicaConfig)
 	srv.hsSrv = hotstuffgorums.NewServer(*replicaConfig)

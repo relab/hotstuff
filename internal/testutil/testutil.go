@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/consensus"
@@ -350,9 +349,9 @@ func NewLeaderRotation(t *testing.T, order ...hotstuff.ID) hotstuff.LeaderRotati
 }
 
 // FixedTimeout returns an ExponentialTimeout with a max exponent of 0.
-func FixedTimeout(timeout time.Duration) hotstuff.ExponentialTimeout {
+func FixedTimeout(timeout uint) hotstuff.ExponentialTimeout {
 	return hotstuff.ExponentialTimeout{
-		Base:         timeout,
+		BaseMS:       timeout,
 		ExponentBase: 1,
 		MaxExponent:  0,
 	}

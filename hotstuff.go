@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/relab/hotstuff/internal/logging"
 )
@@ -393,8 +392,8 @@ type NewViewMsg struct {
 
 // ExponentialTimeout describes a timeout of the form Base * ExponentBase ^ Power, where Power <= MaxExponent.
 type ExponentialTimeout struct {
-	Base         time.Duration
-	ExponentBase time.Duration
+	BaseMS       uint
+	ExponentBase uint
 	MaxExponent  uint
 }
 

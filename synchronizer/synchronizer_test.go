@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
@@ -17,7 +16,7 @@ func TestLocalTimeout(t *testing.T) {
 	qc := hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
 	builder := testutil.TestModules(t, ctrl, 2, testutil.GenerateECDSAKey(t))
 	hs := mocks.NewMockConsensus(ctrl)
-	s := New(testutil.FixedTimeout(time.Millisecond))
+	s := New(testutil.FixedTimeout(1))
 	builder.Register(hs, s)
 	mods := builder.Build()
 	cfg := mods.Manager().(*mocks.MockManager)
@@ -54,7 +53,7 @@ func TestAdvanceViewQC(t *testing.T) {
 	const n = 4
 	ctrl := gomock.NewController(t)
 	builders := testutil.CreateBuilders(t, ctrl, n)
-	s := New(testutil.FixedTimeout(100 * time.Millisecond))
+	s := New(testutil.FixedTimeout(1000))
 	hs := mocks.NewMockConsensus(ctrl)
 	builders[0].Register(s, hs)
 
@@ -84,7 +83,7 @@ func TestAdvanceViewTC(t *testing.T) {
 	const n = 4
 	ctrl := gomock.NewController(t)
 	builders := testutil.CreateBuilders(t, ctrl, n)
-	s := New(testutil.FixedTimeout(100 * time.Millisecond))
+	s := New(testutil.FixedTimeout(100))
 	hs := mocks.NewMockConsensus(ctrl)
 	builders[0].Register(s, hs)
 
@@ -107,7 +106,7 @@ func TestRemoteTimeout(t *testing.T) {
 	const n = 4
 	ctrl := gomock.NewController(t)
 	builders := testutil.CreateBuilders(t, ctrl, n)
-	s := New(testutil.FixedTimeout(100 * time.Millisecond))
+	s := New(testutil.FixedTimeout(100))
 	hs := mocks.NewMockConsensus(ctrl)
 	builders[0].Register(s, hs)
 
