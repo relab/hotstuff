@@ -392,9 +392,9 @@ type NewViewMsg struct {
 
 // ExponentialTimeout describes a timeout of the form Base * ExponentBase ^ Power, where Power <= MaxExponent.
 type ExponentialTimeout struct {
-	BaseMS       uint
-	ExponentBase uint
-	MaxExponent  uint
+	Base         float64
+	ExponentBase float64
+	MaxExponent  float64
 }
 
 // HotStuff contains the modules that together implement the HotStuff protocol.

@@ -87,13 +87,13 @@ func (s *Synchronizer) ViewContext() context.Context {
 }
 
 func (s *Synchronizer) viewDuration(view hotstuff.View) time.Duration {
-	pow := view - s.latestCommit
-	if pow > hotstuff.View(s.timeout.MaxExponent) {
-		pow = hotstuff.View(s.timeout.MaxExponent)
+	pow := float64(s.currentView - s.latestCommit)
+	if pow > s.timeout.MaxExponent {
+		pow = s.timeout.MaxExponent
 	}
-	multiplier := math.Pow(float64(s.timeout.ExponentBase), float64(pow))
+	multiplier := math.Pow(s.timeout.ExponentBase, pow)
 	return time.Millisecond * time.Duration(
-		math.Ceil(float64(s.timeout.BaseMS)*multiplier),
+		math.Ceil(s.timeout.Base*multiplier),
 	)
 }
 

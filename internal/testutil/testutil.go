@@ -349,9 +349,9 @@ func NewLeaderRotation(t *testing.T, order ...hotstuff.ID) hotstuff.LeaderRotati
 }
 
 // FixedTimeout returns an ExponentialTimeout with a max exponent of 0.
-func FixedTimeout(timeout uint) hotstuff.ExponentialTimeout {
+func FixedTimeout(timeout float64) hotstuff.ExponentialTimeout {
 	return hotstuff.ExponentialTimeout{
-		BaseMS:       timeout,
+		Base:         timeout,
 		ExponentBase: 1,
 		MaxExponent:  0,
 	}

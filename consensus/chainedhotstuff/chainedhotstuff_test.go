@@ -207,7 +207,7 @@ func TestChainedHotstuff(t *testing.T) {
 		configs[i] = gorums.NewManager(c)
 		servers[i] = gorums.NewServer(c)
 		synchronizers[i] = synchronizer.New(
-			hotstuff.ExponentialTimeout{BaseMS: 100, ExponentBase: 2, MaxExponent: 10},
+			hotstuff.ExponentialTimeout{Base: 100, ExponentBase: 2, MaxExponent: 10},
 		)
 		builders[i].Register(New(), configs[i], servers[i], synchronizers[i])
 	}
