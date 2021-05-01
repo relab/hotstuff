@@ -34,6 +34,7 @@ type Synchronizer struct {
 
 // InitModule initializes the synchronizer with the given HotStuff instance.
 func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
+	s.duration.InitModule(hs, nil)
 	s.mod = hs
 	var err error
 	s.highQC, err = s.mod.Crypto().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
@@ -52,11 +53,15 @@ func New(timeout hotstuff.ExponentialTimeout) hotstuff.ViewSynchronizer {
 		leafBlock:    hotstuff.GetGenesis(),
 		currentView:  1,
 		latestCommit: 0,
-		viewCtx:      context.Background(),
-		cancelCtx:    func() {},
-		timeout:      timeout,
-		timeouts:     make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
-		timer:        time.AfterFunc(0, func() {}), // dummy timer that will be replaced after start() is called
+
+		viewCtx:   context.Background(),
+		cancelCtx: func() {},
+
+		duration: viewDuration{limit: 1000},
+		timeout:  timeout,
+		timer:    time.AfterFunc(0, func() {}), // dummy timer that will be replaced after start() is called
+
+		timeouts: make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
 	}
 }
 
@@ -99,8 +104,6 @@ func (s *Synchronizer) viewDuration(view hotstuff.View) time.Duration {
 	base := s.duration.timeout()
 	if base == 0 {
 		base = s.timeout.Base
-	} else {
-		s.mod.Logger().Debugf("View timeout base: %f", base)
 	}
 	return time.Millisecond * time.Duration(
 		math.Ceil(base*multiplier),
