@@ -106,16 +106,17 @@ func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
 }
 
 func (s *Synchronizer) onLocalTimeout() {
-	s.mod.Logger().Debugf("OnLocalTimeout: %v", s.currentView)
+	view := s.currentView
+	s.mod.Logger().Debugf("OnLocalTimeout: %v", view)
 
-	sig, err := s.mod.Crypto().Sign(s.currentView.ToHash())
+	sig, err := s.mod.Crypto().Sign(view.ToHash())
 	if err != nil {
 		s.mod.Logger().Warnf("Failed to sign view: %v", err)
 		return
 	}
 	timeoutMsg := hotstuff.TimeoutMsg{
 		ID:            s.mod.ID(),
-		View:          s.currentView,
+		View:          view,
 		SyncInfo:      s.SyncInfo(),
 		ViewSignature: sig,
 	}
@@ -151,14 +152,14 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	}
 	s.mod.Logger().Debug("OnRemoteTimeout: ", timeout)
 
-	s.AdvanceView(timeout.SyncInfo)
-
 	// This has to be done in this function instead of onLocalTimeout in order to avoid
 	// race conditions.
 	if timeout.ID == s.mod.ID() {
 		// stop voting for current view
 		s.mod.Consensus().StopVoting(s.currentView)
 	}
+
+	s.AdvanceView(timeout.SyncInfo)
 
 	timeouts, ok := s.timeouts[timeout.View]
 	if !ok {
@@ -181,7 +182,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		timeoutList = append(timeoutList, t)
 	}
 
-	tc, err := s.mod.Crypto().CreateTimeoutCert(s.currentView, timeoutList)
+	tc, err := s.mod.Crypto().CreateTimeoutCert(timeout.View, timeoutList)
 	if err != nil {
 		s.mod.Logger().Debugf("Failed to create timeout certificate: %v", err)
 		return
