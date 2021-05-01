@@ -99,7 +99,7 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 
 	chain.mut.Unlock()
 	chain.mod.Logger().Debugf("Attempting to fetch block: %.8s", hash)
-	block, ok = chain.mod.Manager().Fetch(ctx, hash)
+	block, ok = chain.mod.Config().Fetch(ctx, hash)
 	chain.mut.Lock()
 
 	delete(chain.pendingFetch, hash)

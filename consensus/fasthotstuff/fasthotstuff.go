@@ -70,7 +70,7 @@ func (fhs *FastHotStuff) Propose(cert hotstuff.SyncInfo) {
 
 	fhs.mod.BlockChain().Store(proposal.Block)
 
-	fhs.mod.Manager().Propose(proposal)
+	fhs.mod.Config().Propose(proposal)
 	fhs.OnPropose(proposal)
 }
 
@@ -184,7 +184,7 @@ func (fhs *FastHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 		return
 	}
 
-	leader, ok := fhs.mod.Manager().Replica(leaderID)
+	leader, ok := fhs.mod.Config().Replica(leaderID)
 	if !ok {
 		fhs.mod.Logger().Warn("Leader with ID %d was not found", leaderID)
 		return

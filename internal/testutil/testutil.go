@@ -38,7 +38,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 
 	signer := crypto.NewCache(ecdsa.New(), 10)
 
-	config := mocks.NewMockManager(ctrl)
+	config := mocks.NewMockConfig(ctrl)
 	config.EXPECT().Len().AnyTimes().Return(1)
 	config.EXPECT().QuorumSize().AnyTimes().Return(3)
 
@@ -114,7 +114,7 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 	t.Helper()
 	builders = make([]*hotstuff.Builder, n)
 	replicas := make([]*mocks.MockReplica, n)
-	configs := make([]*mocks.MockManager, n)
+	configs := make([]*mocks.MockConfig, n)
 	for i := 0; i < n; i++ {
 		id := hotstuff.ID(i + 1)
 		var key hotstuff.PrivateKey
@@ -123,7 +123,7 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 		} else {
 			key = GenerateECDSAKey(t)
 		}
-		configs[i] = mocks.NewMockManager(ctrl)
+		configs[i] = mocks.NewMockConfig(ctrl)
 		replicas[i] = CreateMockReplica(t, ctrl, id, key.Public())
 		builders[i] = new(hotstuff.Builder)
 		*builders[i] = TestModules(t, ctrl, id, key)
@@ -147,9 +147,9 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 }
 
 // CreateMockConfigWithReplicas creates a configuration with n replicas.
-func CreateMockConfigWithReplicas(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstuff.PrivateKey) (*mocks.MockManager, []*mocks.MockReplica) {
+func CreateMockConfigWithReplicas(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstuff.PrivateKey) (*mocks.MockConfig, []*mocks.MockReplica) {
 	t.Helper()
-	cfg := mocks.NewMockManager(ctrl)
+	cfg := mocks.NewMockConfig(ctrl)
 	replicas := make([]*mocks.MockReplica, n)
 	if len(keys) == 0 {
 		keys = make([]hotstuff.PrivateKey, 0, n)
@@ -186,7 +186,7 @@ func CreateMockReplica(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, ke
 }
 
 // ConfigAddReplica adds a mock replica to a mock configuration.
-func ConfigAddReplica(t *testing.T, cfg *mocks.MockManager, replica *mocks.MockReplica) {
+func ConfigAddReplica(t *testing.T, cfg *mocks.MockConfig, replica *mocks.MockReplica) {
 	t.Helper()
 
 	cfg.

@@ -24,7 +24,7 @@ func TestVote(t *testing.T) {
 	hs := hl[0]
 
 	// expect that the replica will propose after receiving enough votes.
-	hs.Manager().(*mocks.MockManager).EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.ProposeMsg{}))
+	hs.Config().(*mocks.MockConfig).EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.ProposeMsg{}))
 
 	b := testutil.NewProposeMsg(hotstuff.GetGenesis().Hash(), hl[0].ViewSynchronizer().HighQC(), "test", 1, 1)
 

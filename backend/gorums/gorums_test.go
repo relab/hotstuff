@@ -27,7 +27,7 @@ func TestConnect(t *testing.T) {
 		builder := testutil.TestModules(t, ctrl, 1, td.keys[0])
 		teardown := createServers(t, td, ctrl)
 		defer teardown()
-		cfg := NewManager(td.cfg)
+		cfg := NewConfig(td.cfg)
 
 		builder.Register(cfg)
 		builder.Build()
@@ -46,9 +46,9 @@ func TestPropose(t *testing.T) {
 		const n = 4
 		ctrl := gomock.NewController(t)
 		td := setup(t, ctrl, n)
-		mgr, teardown := createManager(t, td, ctrl)
+		cfg, teardown := createConfig(t, td, ctrl)
 		mocks := createMocks(t, ctrl, td, n)
-		td.builders[0].Register(mgr)
+		td.builders[0].Register(cfg)
 		hl := td.builders.Build()
 
 		defer teardown()
@@ -68,7 +68,7 @@ func TestPropose(t *testing.T) {
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
-		mgr.Propose(hotstuff.ProposeMsg{ID: 1, Block: proposal})
+		cfg.Propose(hotstuff.ProposeMsg{ID: 1, Block: proposal})
 		for i := 1; i < n; i++ {
 			go hl[i].EventLoop().Run(ctx)
 			<-c
@@ -83,7 +83,7 @@ func TestPropose(t *testing.T) {
 // 		const n = 4
 // 		ctrl := gomock.NewController(t)
 // 		td := setup(t, ctrl, n)
-// 		cfg, teardown := createManager(t, td, ctrl)
+// 		cfg, teardown := createConfig(t, td, ctrl)
 // 		defer teardown()
 // 		mocks := createMocks(t, ctrl, td, n)
 
@@ -122,7 +122,7 @@ func TestTimeout(t *testing.T) {
 		const n = 4
 		ctrl := gomock.NewController(t)
 		td := setup(t, ctrl, n)
-		cfg, teardown := createManager(t, td, ctrl)
+		cfg, teardown := createConfig(t, td, ctrl)
 		defer teardown()
 		synchronizers := make([]*mocks.MockViewSynchronizer, n)
 		for i := 0; i < n; i++ {
@@ -262,16 +262,16 @@ func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (teardown
 	}
 }
 
-func createManager(t *testing.T, td testData, ctrl *gomock.Controller) (mgr *Manager, teardown func()) {
+func createConfig(t *testing.T, td testData, ctrl *gomock.Controller) (cfg *Config, teardown func()) {
 	t.Helper()
 	serverTeardown := createServers(t, td, ctrl)
-	mgr = NewManager(td.cfg)
-	err := mgr.Connect(time.Second)
+	cfg = NewConfig(td.cfg)
+	err := cfg.Connect(time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return mgr, func() {
-		mgr.Close()
+	return cfg, func() {
+		cfg.Close()
 		serverTeardown()
 	}
 }

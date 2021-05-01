@@ -131,7 +131,7 @@ func (s *Synchronizer) onLocalTimeout() {
 		timeoutMsg.MsgSignature = sig
 	}
 
-	s.mod.Manager().Timeout(timeoutMsg)
+	s.mod.Config().Timeout(timeoutMsg)
 	s.mod.EventLoop().AddEvent(timeoutMsg)
 }
 
@@ -171,7 +171,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		timeouts[timeout.ID] = timeout
 	}
 
-	if len(timeouts) < s.mod.Manager().QuorumSize() {
+	if len(timeouts) < s.mod.Config().QuorumSize() {
 		return
 	}
 
@@ -248,7 +248,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	leader := s.mod.LeaderRotation().GetLeader(s.currentView)
 	if leader == s.mod.ID() {
 		s.mod.Consensus().Propose(syncInfo)
-	} else if replica, ok := s.mod.Manager().Replica(leader); ok {
+	} else if replica, ok := s.mod.Config().Replica(leader); ok {
 		replica.NewView(syncInfo)
 	}
 }

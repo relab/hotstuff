@@ -78,7 +78,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 	votes = append(votes, cert)
 	vm.verifiedVotes[cert.BlockHash()] = votes
 
-	if len(votes) < vm.mod.Manager().QuorumSize() {
+	if len(votes) < vm.mod.Config().QuorumSize() {
 		return
 	}
 

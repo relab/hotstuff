@@ -197,14 +197,14 @@ func TestChainedHotstuff(t *testing.T) {
 	}
 
 	builders := testutil.CreateBuilders(t, ctrl, n, keys...)
-	configs := make([]*gorums.Manager, n)
+	configs := make([]*gorums.Config, n)
 	servers := make([]*gorums.Server, n)
 	synchronizers := make([]hotstuff.ViewSynchronizer, n)
 	for i := 0; i < n; i++ {
 		c := *baseCfg
 		c.ID = hotstuff.ID(i + 1)
 		c.PrivateKey = keys[i].(*ecdsa.PrivateKey)
-		configs[i] = gorums.NewManager(c)
+		configs[i] = gorums.NewConfig(c)
 		servers[i] = gorums.NewServer(c)
 		synchronizers[i] = synchronizer.New(
 			hotstuff.ExponentialTimeout{Base: 100, ExponentBase: 2, MaxExponent: 10},

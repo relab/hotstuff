@@ -14,7 +14,7 @@ func (rr *roundRobin) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuild
 func (rr roundRobin) GetLeader(view hotstuff.View) hotstuff.ID {
 	// TODO: does not support reconfiguration
 	// assume IDs start at 1
-	return hotstuff.ID(view%hotstuff.View(rr.mod.Manager().Len()) + 1)
+	return hotstuff.ID(view%hotstuff.View(rr.mod.Config().Len()) + 1)
 }
 
 // NewRoundRobin returns a new round-robin leader rotation implementation.

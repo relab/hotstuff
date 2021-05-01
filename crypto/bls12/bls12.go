@@ -192,7 +192,7 @@ func (bc *bls12Crypto) aggregateSignatures(signatures map[hotstuff.ID]*Signature
 // Verify verifies a signature given a hash.
 func (bc *bls12Crypto) Verify(sig hotstuff.Signature, hash hotstuff.Hash) bool {
 	s := sig.(*Signature)
-	replica, ok := bc.mod.Manager().Replica(sig.Signer())
+	replica, ok := bc.mod.Config().Replica(sig.Signer())
 	if !ok {
 		bc.mod.Logger().Infof("bls12Crypto: got signature from replica whose ID (%d) was not in the config", sig.Signer())
 	}
@@ -219,7 +219,7 @@ func (bc *bls12Crypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 	}
 	pubKeys := make([]*PublicKey, 0)
 	sig.participants.ForEach(func(id hotstuff.ID) {
-		replica, ok := bc.mod.Manager().Replica(id)
+		replica, ok := bc.mod.Config().Replica(id)
 		if !ok {
 			return
 		}
@@ -230,7 +230,7 @@ func (bc *bls12Crypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 		bc.mod.Logger().Error(err)
 		return false
 	}
-	if len(pubKeys) < bc.mod.Manager().QuorumSize() {
+	if len(pubKeys) < bc.mod.Config().QuorumSize() {
 		return false
 	}
 	engine := bls12.NewEngine()
@@ -255,7 +255,7 @@ func (bc *bls12Crypto) VerifyThresholdSignatureForMessageSet(signature hotstuff.
 			continue
 		}
 		hashSet[hash] = struct{}{}
-		replica, ok := bc.mod.Manager().Replica(id)
+		replica, ok := bc.mod.Config().Replica(id)
 		if !ok {
 			return false
 		}
@@ -274,14 +274,14 @@ func (bc *bls12Crypto) VerifyThresholdSignatureForMessageSet(signature hotstuff.
 	}
 	// if we managed to verify the aggregate signature, we just need to make sure that the number of verified signatures
 	// is a quorum.
-	return len(hashSet) >= bc.mod.Manager().QuorumSize()
+	return len(hashSet) >= bc.mod.Config().QuorumSize()
 }
 
 // TODO: should we check each signature's validity before aggregating?
 
 // CreateThresholdSignature creates a threshold signature from the given partial signatures.
 func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []hotstuff.Signature, _ hotstuff.Hash) (_ hotstuff.ThresholdSignature, err error) {
-	if len(partialSignatures) < bc.mod.Manager().QuorumSize() {
+	if len(partialSignatures) < bc.mod.Config().QuorumSize() {
 		return nil, crypto.ErrNotAQuorum
 	}
 	sigs := make(map[hotstuff.ID]*Signature, len(partialSignatures))
@@ -297,7 +297,7 @@ func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []hotstuff.Sig
 		}
 		sigs[sig.Signer()] = s
 	}
-	if len(sigs) < bc.mod.Manager().QuorumSize() {
+	if len(sigs) < bc.mod.Config().QuorumSize() {
 		return nil, multierr.Combine(crypto.ErrNotAQuorum, err)
 	}
 	return bc.aggregateSignatures(sigs), nil
