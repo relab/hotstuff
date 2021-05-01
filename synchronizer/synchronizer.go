@@ -21,11 +21,15 @@ type Synchronizer struct {
 	highQC       hotstuff.QuorumCert
 	leafBlock    *hotstuff.Block
 
-	viewCtx   context.Context
+	duration viewDuration
+	timeout  hotstuff.ExponentialTimeout
+	timer    *time.Timer
+
+	viewCtx   context.Context // a context that is cancelled at the end of the current view
 	cancelCtx context.CancelFunc
-	timeout   hotstuff.ExponentialTimeout
-	timer     *time.Timer
-	timeouts  map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
+
+	// map of collected timeout messages per view
+	timeouts map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
 }
 
 // InitModule initializes the synchronizer with the given HotStuff instance.
@@ -92,8 +96,14 @@ func (s *Synchronizer) viewDuration(view hotstuff.View) time.Duration {
 		pow = s.timeout.MaxExponent
 	}
 	multiplier := math.Pow(s.timeout.ExponentBase, pow)
+	base := s.duration.timeout()
+	if base == 0 {
+		base = s.timeout.Base
+	} else {
+		s.mod.Logger().Debugf("View timeout base: %f", base)
+	}
 	return time.Millisecond * time.Duration(
-		math.Ceil(s.timeout.Base*multiplier),
+		math.Ceil(base*multiplier),
 	)
 }
 
@@ -232,6 +242,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		if s.latestCommit < v {
 			s.latestCommit = v
 		}
+		s.duration.stopTimer()
 	}
 
 	if v < s.currentView {
@@ -240,6 +251,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 
 	s.currentView = v + 1
 	s.timer.Reset(s.viewDuration(s.currentView))
+	s.duration.startTimer()
 
 	// cancel the old view context and set up the next one
 	s.cancelCtx()
