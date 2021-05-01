@@ -20,9 +20,9 @@ func New() *FastHotStuff {
 
 // InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
 // settings using the ConfigBuilder.
-func (fhs *FastHotStuff) InitModule(hs *hotstuff.HotStuff, cfg *hotstuff.ConfigBuilder) {
+func (fhs *FastHotStuff) InitModule(hs *hotstuff.HotStuff, opts *hotstuff.OptionsBuilder) {
 	fhs.mod = hs
-	cfg.SetShouldUseAggQC()
+	opts.SetShouldUseAggQC()
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.

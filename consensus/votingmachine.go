@@ -17,7 +17,7 @@ func NewVotingMachine() *VotingMachine {
 
 // InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
 // settings using the ConfigBuilder.
-func (vm *VotingMachine) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
+func (vm *VotingMachine) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
 	vm.mod = hs
 }
 

@@ -29,7 +29,7 @@ type Synchronizer struct {
 }
 
 // InitModule initializes the synchronizer with the given HotStuff instance.
-func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
+func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
 	s.mod = hs
 	var err error
 	s.highQC, err = s.mod.Crypto().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
@@ -121,7 +121,7 @@ func (s *Synchronizer) onLocalTimeout() {
 		ViewSignature: sig,
 	}
 
-	if s.mod.Config().ShouldUseAggQC() {
+	if s.mod.Options().ShouldUseAggQC() {
 		// generate a second signature that will become part of the aggregateQC
 		sig, err := s.mod.Crypto().Sign(timeoutMsg.Hash())
 		if err != nil {
@@ -190,7 +190,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 
 	si := s.SyncInfo().WithTC(tc)
 
-	if s.mod.Config().ShouldUseAggQC() {
+	if s.mod.Options().ShouldUseAggQC() {
 		aggQC, err := s.mod.Crypto().CreateAggregateQC(s.currentView, timeoutList)
 		if err != nil {
 			s.mod.Logger().Debugf("Failed to create aggregateQC: %v", err)

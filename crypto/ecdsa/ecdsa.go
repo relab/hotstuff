@@ -118,7 +118,7 @@ type ecdsaCrypto struct {
 	mod *hotstuff.HotStuff
 }
 
-func (ec *ecdsaCrypto) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
+func (ec *ecdsaCrypto) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
 	ec.mod = hs
 }
 

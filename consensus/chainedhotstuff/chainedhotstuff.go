@@ -22,7 +22,7 @@ func New() *ChainedHotStuff {
 }
 
 // InitModule gives ChainedHotstuff a pointer to the other modules.
-func (hs *ChainedHotStuff) InitModule(mod *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
+func (hs *ChainedHotStuff) InitModule(mod *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
 	hs.mod = mod
 }
 

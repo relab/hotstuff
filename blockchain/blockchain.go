@@ -22,7 +22,7 @@ type blockChain struct {
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (chain *blockChain) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.ConfigBuilder) {
+func (chain *blockChain) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
 	chain.mod = hs
 }
 

@@ -404,7 +404,7 @@ type HotStuff struct {
 	id         ID
 	privateKey PrivateKey
 	logger     logging.Logger
-	cfg        Config
+	opts       Options
 	eventLoop  *EventLoop
 
 	// modules
@@ -436,9 +436,9 @@ func (hs *HotStuff) Logger() logging.Logger {
 	return hs.logger
 }
 
-// Config returns the current configuration settings.
-func (hs *HotStuff) Config() *Config {
-	return &hs.cfg
+// Options returns the current configuration settings.
+func (hs *HotStuff) Options() *Options {
+	return &hs.opts
 }
 
 // EventLoop returns the event loop.
@@ -499,7 +499,7 @@ func (hs *HotStuff) VotingMachine() VotingMachine {
 // Builder is a helper for constructing a HotStuff instance.
 type Builder struct {
 	hs      *HotStuff
-	cfg     ConfigBuilder
+	cfg     OptionsBuilder
 	modules []Module
 }
 
@@ -569,7 +569,7 @@ func (b *Builder) Build() *HotStuff {
 	for _, module := range b.modules {
 		module.InitModule(b.hs, &b.cfg)
 	}
-	b.hs.cfg = b.cfg.cfg
+	b.hs.opts = b.cfg.opts
 	return b.hs
 }
 
@@ -579,7 +579,7 @@ func (b *Builder) Build() *HotStuff {
 type Module interface {
 	// InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
 	// settings using the ConfigBuilder.
-	InitModule(hs *HotStuff, _ *ConfigBuilder)
+	InitModule(hs *HotStuff, _ *OptionsBuilder)
 }
 
 //go:generate mockgen -destination=internal/mocks/cmdqueue_mock.go -package=mocks . CommandQueue
