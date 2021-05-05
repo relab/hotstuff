@@ -109,9 +109,10 @@ func (v *viewDuration) Duration() time.Duration {
 		}
 		dev = math.Sqrt(m2 / c)
 	}
-	base := v.mean + dev*conf
-	if v.count%v.limit == 0 {
-		v.mod.Logger().Infof("last %d views: Mean: %.2fms, Std.dev: %.2f, 95%% conf: %.2fms", v.limit, v.mean, dev, base)
+	duration := v.mean + dev*conf
+
+	if uint64(v.mod.ViewSynchronizer().View())%v.limit == 0 {
+		v.mod.Logger().Infof("Mean: %.2fms, Dev: %.2f, Timeout: %.2fms (last %d views)", v.mean, dev, duration, v.limit)
 	}
-	return time.Duration(base * float64(time.Millisecond))
+	return time.Duration(duration * float64(time.Millisecond))
 }
