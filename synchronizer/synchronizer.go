@@ -245,7 +245,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		if s.latestCommit < v {
 			s.latestCommit = v
 		}
-		s.duration.stopTimer()
+		s.duration.stopViewTimer()
 	}
 
 	if v < s.currentView {
@@ -254,7 +254,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 
 	s.currentView = v + 1
 	s.timer.Reset(s.viewDuration(s.currentView))
-	s.duration.startTimer()
+	s.duration.startViewTimer()
 
 	// cancel the old view context and set up the next one
 	s.cancelCtx()

@@ -8,14 +8,15 @@ import (
 )
 
 // viewDuration uses statistics from previous views to guess a good value for the view duration.
+// It only takes a limited amount of measurements into account.
 type viewDuration struct {
-	mod          *hotstuff.HotStuff
-	limit        uint64
-	count        uint64
-	startTime    time.Time // the start time for the current measurement
-	mean         float64   // the mean view duration
-	m2           float64   // sum of squares of differences from the mean
-	lastPeriodM2 float64   // m2 calculated from the last period
+	mod       *hotstuff.HotStuff
+	limit     uint64    // how many measurements should be included in mean.
+	count     uint64    // total number of measurements
+	startTime time.Time // the start time for the current measurement
+	mean      float64   // the mean view duration
+	m2        float64   // sum of squares of differences from the mean
+	prevM2    float64   // m2 calculated from the last period
 }
 
 // InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
@@ -24,7 +25,9 @@ func (v *viewDuration) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuil
 	v.mod = hs
 }
 
-func (v *viewDuration) stopTimer() {
+// stopViewTimer calculates the duration of the view
+// and updates the internal values used for mean and variance calculations.
+func (v *viewDuration) stopViewTimer() {
 	if v.startTime.IsZero() {
 		return
 	}
@@ -32,9 +35,11 @@ func (v *viewDuration) stopTimer() {
 	duration := float64(time.Since(v.startTime)) / float64(time.Millisecond)
 	v.count++
 
-	// reset m2 occasionally
+	// Reset m2 occasionally such that we will pick up on changes in variance faster.
+	// We store the m2 to prevM2, which will be used when calculating the variance.
+	// This ensures that at least 'limit' measurements have contributed to the approximate variance.
 	if v.count%v.limit == 0 {
-		v.lastPeriodM2 = v.m2
+		v.prevM2 = v.m2
 		v.m2 = 0
 	}
 
@@ -54,7 +59,8 @@ func (v *viewDuration) stopTimer() {
 	v.m2 += d1 * d2
 }
 
-func (v *viewDuration) startTimer() {
+// startViewTimer records the start time of a view.
+func (v *viewDuration) startViewTimer() {
 	v.startTime = time.Now()
 }
 
@@ -65,9 +71,10 @@ func (v *viewDuration) timeout() float64 {
 	if v.count > 1 {
 		c := float64(v.count)
 		m2 := v.m2
+		// The standard deviation is calculated from the sum of prevM2 and m2.
 		if v.count >= v.limit {
 			c += float64(v.limit)
-			m2 += v.lastPeriodM2
+			m2 += v.prevM2
 		}
 		dev = math.Sqrt(m2 / c)
 	}
