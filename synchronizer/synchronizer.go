@@ -19,6 +19,11 @@ type Synchronizer struct {
 	highQC      hotstuff.QuorumCert
 	leafBlock   *hotstuff.Block
 
+	// A pointer to the last timeout message that we sent.
+	// If a timeout happens again before we advance to the next view,
+	// we will simply send this timeout again.
+	lastTimeout *hotstuff.TimeoutMsg
+
 	duration ViewDuration
 	timer    *time.Timer
 
@@ -102,6 +107,13 @@ func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
 }
 
 func (s *Synchronizer) onLocalTimeout() {
+	defer s.timer.Reset(s.duration.Duration())
+
+	if s.lastTimeout != nil && s.lastTimeout.View == s.currentView {
+		s.mod.Config().Timeout(*s.lastTimeout)
+		return
+	}
+
 	s.duration.ViewTimeout() // increase the duration of the next view
 	view := s.currentView
 	s.mod.Logger().Debugf("OnLocalTimeout: %v", view)
@@ -127,6 +139,7 @@ func (s *Synchronizer) onLocalTimeout() {
 		}
 		timeoutMsg.MsgSignature = sig
 	}
+	s.lastTimeout = &timeoutMsg
 
 	s.mod.Config().Timeout(timeoutMsg)
 	s.mod.EventLoop().AddEvent(timeoutMsg)
@@ -234,7 +247,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	}
 
 	s.currentView = v + 1
-	s.timer.Reset(s.duration.Duration())
+	s.lastTimeout = nil
 	s.duration.ViewStarted()
 
 	// cancel the old view context and set up the next one

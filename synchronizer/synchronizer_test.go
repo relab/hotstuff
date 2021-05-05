@@ -17,7 +17,7 @@ func TestLocalTimeout(t *testing.T) {
 	qc := hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
 	builder := testutil.TestModules(t, ctrl, 2, testutil.GenerateECDSAKey(t))
 	hs := mocks.NewMockConsensus(ctrl)
-	s := New(testutil.FixedTimeout(1))
+	s := New(testutil.FixedTimeout(10))
 	builder.Register(hs, s)
 	mods := builder.Build()
 	cfg := mods.Config().(*mocks.MockConfig)
@@ -43,7 +43,7 @@ func TestLocalTimeout(t *testing.T) {
 				t.Error("failed to verify signature")
 			}
 			close(c)
-		})
+		}).AnyTimes()
 	ctx, cancel := context.WithCancel(context.Background())
 	go mods.EventLoop().Run(ctx)
 	<-c
