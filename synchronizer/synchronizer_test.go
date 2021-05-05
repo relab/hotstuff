@@ -1,4 +1,4 @@
-package synchronizer
+package synchronizer_test
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
+	. "github.com/relab/hotstuff/synchronizer"
 )
 
 func TestLocalTimeout(t *testing.T) {

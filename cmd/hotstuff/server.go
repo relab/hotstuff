@@ -28,6 +28,7 @@ import (
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/leaderrotation"
+	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/proto"
@@ -178,7 +179,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 
 	builder := chainedhotstuff.DefaultModules(
 		*replicaConfig,
-		hotstuff.ExponentialTimeout{Base: conf.ViewTimeout, ExponentBase: 1, MaxExponent: 5},
+		synchronizer.NewViewDuration(1000, conf.ViewTimeout, 1.5),
 	)
 	srv.cfg = hotstuffgorums.NewConfig(*replicaConfig)
 	srv.hsSrv = hotstuffgorums.NewServer(*replicaConfig)

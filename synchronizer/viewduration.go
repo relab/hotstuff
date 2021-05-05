@@ -7,11 +7,37 @@ import (
 	"github.com/relab/hotstuff"
 )
 
+// ViewDuration determines the duration of a view.
+// The view synchronizer uses this interface to set its timeouts.
+type ViewDuration interface {
+	// Duration returns the duration that the next view should last.
+	Duration() time.Duration
+	// ViewStarted is called by the synchronizer when starting a new view.
+	ViewStarted()
+	// ViewSucceeded is called by the synchronizer when a view ended successfully.
+	ViewSucceeded()
+	// ViewTimeout is called by the synchronizer when a view timed out.
+	ViewTimeout()
+}
+
+// NewViewDuration returns a ViewDuration that approximates the view duration based on durations of previous views.
+// sampleSize determines the number of previous views that should be considered.
+// startTimeout determines the view duration of the first views.
+// When a timeout occurs, the next view duration will be multiplied by the multiplier.
+func NewViewDuration(sampleSize uint64, startTimeout, multiplier float64) ViewDuration {
+	return &viewDuration{
+		limit: sampleSize,
+		mean:  startTimeout,
+		mul:   multiplier,
+	}
+}
+
 // viewDuration uses statistics from previous views to guess a good value for the view duration.
 // It only takes a limited amount of measurements into account.
 type viewDuration struct {
 	mod       *hotstuff.HotStuff
-	limit     uint64    // how many measurements should be included in mean.
+	mul       float64   // on failed views, multiply the current mean by this number (should be > 1)
+	limit     uint64    // how many measurements should be included in mean
 	count     uint64    // total number of measurements
 	startTime time.Time // the start time for the current measurement
 	mean      float64   // the mean view duration
@@ -25,9 +51,9 @@ func (v *viewDuration) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuil
 	v.mod = hs
 }
 
-// stopViewTimer calculates the duration of the view
+// ViewSucceeded calculates the duration of the view
 // and updates the internal values used for mean and variance calculations.
-func (v *viewDuration) stopViewTimer() {
+func (v *viewDuration) ViewSucceeded() {
 	if v.startTime.IsZero() {
 		return
 	}
@@ -59,13 +85,18 @@ func (v *viewDuration) stopViewTimer() {
 	v.m2 += d1 * d2
 }
 
-// startViewTimer records the start time of a view.
-func (v *viewDuration) startViewTimer() {
+// ViewTimeout should be called when a view timeout occurred. It will multiply the current mean by 'mul'.
+func (v *viewDuration) ViewTimeout() {
+	v.mean *= v.mul
+}
+
+// ViewStarted records the start time of a view.
+func (v *viewDuration) ViewStarted() {
 	v.startTime = time.Now()
 }
 
-// timeout returns the upper bound of the 95% confidence interval for the mean view duration.
-func (v *viewDuration) timeout() float64 {
+// Duration returns the upper bound of the 95% confidence interval for the mean view duration.
+func (v *viewDuration) Duration() time.Duration {
 	conf := 1.96 // 95% confidence
 	dev := float64(0)
 	if v.count > 1 {
@@ -80,7 +111,7 @@ func (v *viewDuration) timeout() float64 {
 	}
 	base := v.mean + dev*conf
 	if v.count%v.limit == 0 {
-		v.mod.Logger().Infof("last %d views: Mean: %.2fms, Std.dev: %.2f, 95%% conf: %.2f", v.limit, v.mean, dev, base)
+		v.mod.Logger().Infof("last %d views: Mean: %.2fms, Std.dev: %.2f, 95%% conf: %.2fms", v.limit, v.mean, dev, base)
 	}
-	return base
+	return time.Duration(base * float64(time.Millisecond))
 }

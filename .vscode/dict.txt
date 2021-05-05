@@ -5,6 +5,7 @@ HOTSTUFF
 Infof
 SSWU
 Warnf
+Welford's
 cmdqueue
 covermode
 coverpkg

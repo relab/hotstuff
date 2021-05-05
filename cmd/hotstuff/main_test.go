@@ -93,7 +93,7 @@ func testSMRImpl(t *testing.T, consensus, crypto string) {
 		BatchSize:   batchSize,
 		PmType:      "round-robin",
 		Replicas:    replicas,
-		ViewTimeout: 10,
+		ViewTimeout: 100,
 		RootCAs:     []string{path.Join(testdir, "keys", "ca.crt")},
 		TLS:         true,
 	}

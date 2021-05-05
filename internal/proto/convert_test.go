@@ -6,6 +6,8 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/crypto"
+	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/internal/testutil"
 )
 
@@ -60,5 +62,24 @@ func TestConvertBlock(t *testing.T) {
 
 	if want.Hash() != got.Hash() {
 		t.Error("Hashes don't match.")
+	}
+}
+
+func TestConvertTimeoutCertBLS12(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	builders := testutil.CreateBuilders(t, ctrl, 4, testutil.GenerateKeys(t, 4, testutil.GenerateBLS12Key)...)
+	for i := range builders {
+		builders[i].Register(crypto.New(bls12.New()))
+	}
+	hl := builders.Build()
+
+	tc1 := testutil.CreateTC(t, 1, hl.Signers())
+
+	pb := TimeoutCertToProto(tc1)
+	tc2 := TimeoutCertFromProto(pb)
+
+	if !hl[0].Crypto().VerifyTimeoutCert(tc2) {
+		t.Fatal("Failed to verify timeout cert")
 	}
 }

@@ -390,13 +390,6 @@ type NewViewMsg struct {
 	SyncInfo SyncInfo // The highest QC / TC.
 }
 
-// ExponentialTimeout describes a timeout of the form Base * ExponentBase ^ Power, where Power <= MaxExponent.
-type ExponentialTimeout struct {
-	Base         float64
-	ExponentBase float64
-	MaxExponent  float64
-}
-
 // HotStuff contains the modules that together implement the HotStuff protocol.
 type HotStuff struct {
 	// data

@@ -3,7 +3,6 @@ package synchronizer
 import (
 	"context"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/relab/hotstuff"
@@ -15,14 +14,12 @@ import (
 type Synchronizer struct {
 	mod *hotstuff.HotStuff
 
-	currentView  hotstuff.View
-	latestCommit hotstuff.View // the view in which the latest commit happened.
-	highTC       hotstuff.TimeoutCert
-	highQC       hotstuff.QuorumCert
-	leafBlock    *hotstuff.Block
+	currentView hotstuff.View
+	highTC      hotstuff.TimeoutCert
+	highQC      hotstuff.QuorumCert
+	leafBlock   *hotstuff.Block
 
-	duration viewDuration
-	timeout  hotstuff.ExponentialTimeout
+	duration ViewDuration
 	timer    *time.Timer
 
 	viewCtx   context.Context // a context that is cancelled at the end of the current view
@@ -33,8 +30,10 @@ type Synchronizer struct {
 }
 
 // InitModule initializes the synchronizer with the given HotStuff instance.
-func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
-	s.duration.InitModule(hs, nil)
+func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff, opts *hotstuff.OptionsBuilder) {
+	if duration, ok := s.duration.(hotstuff.Module); ok {
+		duration.InitModule(hs, opts)
+	}
 	s.mod = hs
 	var err error
 	s.highQC, err = s.mod.Crypto().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
@@ -48,26 +47,25 @@ func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuil
 }
 
 // New creates a new Synchronizer.
-func New(timeout hotstuff.ExponentialTimeout) hotstuff.ViewSynchronizer {
+func New(viewDuration ViewDuration) hotstuff.ViewSynchronizer {
 	return &Synchronizer{
-		leafBlock:    hotstuff.GetGenesis(),
-		currentView:  1,
-		latestCommit: 0,
+		leafBlock:   hotstuff.GetGenesis(),
+		currentView: 1,
 
 		viewCtx:   context.Background(),
-		cancelCtx: func() {},
+		cancelCtx: func() {}, // dummy cancelFunc that will be replaced when a new view is started
 
-		duration: viewDuration{limit: 1000},
-		timeout:  timeout,
+		duration: viewDuration,
 		timer:    time.AfterFunc(0, func() {}), // dummy timer that will be replaced after start() is called
 
 		timeouts: make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
 	}
 }
 
-// Start starts the view timeout timer, and makes a proposal if the local replica is the leader.
+// Start starts the view timeout timer.
 func (s *Synchronizer) Start() {
-	s.timer = time.AfterFunc(s.viewDuration(s.currentView), s.onLocalTimeout)
+	// We'll just timeout immediately, because we need a TC to synchronize with the other replicas.
+	s.timer = time.AfterFunc(0, s.onLocalTimeout)
 }
 
 // Stop stops the view timeout timer.
@@ -95,21 +93,6 @@ func (s *Synchronizer) ViewContext() context.Context {
 	return s.viewCtx
 }
 
-func (s *Synchronizer) viewDuration(view hotstuff.View) time.Duration {
-	pow := float64(s.currentView - s.latestCommit)
-	if pow > s.timeout.MaxExponent {
-		pow = s.timeout.MaxExponent
-	}
-	multiplier := math.Pow(s.timeout.ExponentBase, pow)
-	base := s.duration.timeout()
-	if base == 0 {
-		base = s.timeout.Base
-	}
-	return time.Millisecond * time.Duration(
-		math.Ceil(base*multiplier),
-	)
-}
-
 // SyncInfo returns the highest known QC or TC.
 func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
 	if s.highQC.View() >= s.highTC.View() {
@@ -119,6 +102,7 @@ func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
 }
 
 func (s *Synchronizer) onLocalTimeout() {
+	s.duration.ViewTimeout() // increase the duration of the next view
 	view := s.currentView
 	s.mod.Logger().Debugf("OnLocalTimeout: %v", view)
 
@@ -242,10 +226,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		}
 		s.UpdateHighQC(qc)
 		v = qc.View()
-		if s.latestCommit < v {
-			s.latestCommit = v
-		}
-		s.duration.stopViewTimer()
+		s.duration.ViewSucceeded()
 	}
 
 	if v < s.currentView {
@@ -253,8 +234,8 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	}
 
 	s.currentView = v + 1
-	s.timer.Reset(s.viewDuration(s.currentView))
-	s.duration.startViewTimer()
+	s.timer.Reset(s.duration.Duration())
+	s.duration.ViewStarted()
 
 	// cancel the old view context and set up the next one
 	s.cancelCtx()

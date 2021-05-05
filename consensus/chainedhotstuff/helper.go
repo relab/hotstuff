@@ -13,12 +13,12 @@ import (
 
 // DefaultModules returns a default set of modules that are suitable for chainedhotstuff.
 // You must provide your own implementations of the Acceptor, Config, CommandQueue, and Executor interfaces.
-func DefaultModules(replicaConfig config.ReplicaConfig, timeout hotstuff.ExponentialTimeout) hotstuff.Builder {
+func DefaultModules(replicaConfig config.ReplicaConfig, duration synchronizer.ViewDuration) hotstuff.Builder {
 	builder := hotstuff.NewBuilder(replicaConfig.ID, replicaConfig.PrivateKey)
 	signer := crypto.NewCache(ecdsa.New(), 2*len(replicaConfig.Replicas))
 	builder.Register(
 		New(),
-		synchronizer.New(timeout),
+		synchronizer.New(duration),
 		leaderrotation.NewRoundRobin(),
 		blockchain.New(100),
 		consensus.NewVotingMachine(),

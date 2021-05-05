@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/leaderrotation"
+	"github.com/relab/hotstuff/synchronizer"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
@@ -349,10 +351,15 @@ func NewLeaderRotation(t *testing.T, order ...hotstuff.ID) hotstuff.LeaderRotati
 }
 
 // FixedTimeout returns an ExponentialTimeout with a max exponent of 0.
-func FixedTimeout(timeout float64) hotstuff.ExponentialTimeout {
-	return hotstuff.ExponentialTimeout{
-		Base:         timeout,
-		ExponentBase: 1,
-		MaxExponent:  0,
-	}
+func FixedTimeout(timeout float64) synchronizer.ViewDuration {
+	return fixedDuration{time.Duration(timeout * float64(time.Millisecond))}
 }
+
+type fixedDuration struct {
+	timeout time.Duration
+}
+
+func (d fixedDuration) Duration() time.Duration { return d.timeout }
+func (d fixedDuration) ViewStarted()            {}
+func (d fixedDuration) ViewSucceeded()          {}
+func (d fixedDuration) ViewTimeout()            {}
