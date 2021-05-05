@@ -104,7 +104,7 @@ func (v *viewDuration) Duration() time.Duration {
 		m2 := v.m2
 		// The standard deviation is calculated from the sum of prevM2 and m2.
 		if v.count >= v.limit {
-			c += float64(v.limit)
+			c = float64(v.limit) + float64(v.count%v.limit)
 			m2 += v.prevM2
 		}
 		dev = math.Sqrt(m2 / c)
