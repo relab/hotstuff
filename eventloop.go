@@ -79,6 +79,9 @@ func (el *EventLoop) processEvent(e Event) {
 		el.mod.ViewSynchronizer().OnRemoteTimeout(event)
 	case NewViewMsg:
 		el.mod.ViewSynchronizer().OnNewView(event)
+	case func():
+		// allow modules to enqueue their own event handling
+		event()
 	}
 
 	el.mut.Lock()

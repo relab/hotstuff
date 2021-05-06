@@ -70,7 +70,10 @@ func New(viewDuration ViewDuration) hotstuff.ViewSynchronizer {
 // Start starts the view timeout timer.
 func (s *Synchronizer) Start() {
 	// We'll just timeout immediately, because we need a TC to synchronize with the other replicas.
-	s.timer = time.AfterFunc(0, s.onLocalTimeout)
+	s.timer = time.AfterFunc(0, func() {
+		// The event loop will execute onLocalTimeout for us.
+		s.mod.EventLoop().AddEvent(s.onLocalTimeout)
+	})
 }
 
 // Stop stops the view timeout timer.
@@ -140,9 +143,11 @@ func (s *Synchronizer) onLocalTimeout() {
 		timeoutMsg.MsgSignature = sig
 	}
 	s.lastTimeout = &timeoutMsg
+	// stop voting for current view
+	s.mod.Consensus().StopVoting(s.currentView)
 
 	s.mod.Config().Timeout(timeoutMsg)
-	s.mod.EventLoop().AddEvent(timeoutMsg)
+	s.OnRemoteTimeout(timeoutMsg)
 }
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
@@ -161,13 +166,6 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		return
 	}
 	s.mod.Logger().Debug("OnRemoteTimeout: ", timeout)
-
-	// This has to be done in this function instead of onLocalTimeout in order to avoid
-	// race conditions.
-	if timeout.ID == s.mod.ID() {
-		// stop voting for current view
-		s.mod.Consensus().StopVoting(s.currentView)
-	}
 
 	s.AdvanceView(timeout.SyncInfo)
 
