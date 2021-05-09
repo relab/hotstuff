@@ -56,6 +56,7 @@ func (el *EventLoop) Run(ctx context.Context) {
 		case event := <-el.eventQ:
 			el.processEvent(event)
 		case <-ctx.Done():
+			el.mod.ViewSynchronizer().Stop()
 			goto cancelled
 		}
 	}

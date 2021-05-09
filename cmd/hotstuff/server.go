@@ -78,14 +78,11 @@ func runServer(ctx context.Context, conf *options) {
 	}
 
 	srv := newClientServer(conf, replicaConfig, &tlsCert)
-	err = srv.Start(ctx, clientAddress)
+	err = srv.Run(ctx, clientAddress)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to start HotStuff: %v\n", err)
 		os.Exit(1)
 	}
-
-	<-ctx.Done()
-	srv.Stop()
 }
 
 func loadCreds(conf *options) (credentials.TransportCredentials, tls.Certificate) {
@@ -154,7 +151,7 @@ type clientSrv struct {
 	cmdCache  *cmdCache
 
 	mut          sync.Mutex
-	finishedCmds map[cmdID]chan struct{}
+	execHandlers map[cmdID]func(*empty.Empty, error)
 
 	lastExecTime int64
 }
@@ -173,7 +170,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 		conf:         conf,
 		gorumsSrv:    gorums.NewServer(serverOpts...),
 		cmdCache:     newCmdCache(conf.BatchSize),
-		finishedCmds: make(map[cmdID]chan struct{}),
+		execHandlers: make(map[cmdID]func(*empty.Empty, error)),
 		lastExecTime: time.Now().UnixNano(),
 	}
 
@@ -230,7 +227,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 	return srv
 }
 
-func (srv *clientSrv) Start(ctx context.Context, address string) (err error) {
+func (srv *clientSrv) Run(ctx context.Context, address string) (err error) {
 	if srv.conf.Output != "" {
 		// Since io.Discard is not a WriteCloser, we just store the file as a Writer.
 		srv.output, err = os.OpenFile(srv.conf.Output, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
@@ -257,9 +254,6 @@ func (srv *clientSrv) Start(ctx context.Context, address string) (err error) {
 		return err
 	}
 
-	// sleep so that all replicas can be ready before we start
-	time.Sleep(time.Second)
-
 	c := make(chan struct{})
 	go func() {
 		srv.hs.EventLoop().Run(ctx)
@@ -275,14 +269,15 @@ func (srv *clientSrv) Start(ctx context.Context, address string) (err error) {
 
 	// wait for the event loop to exit
 	<-c
+
+	srv.stop()
 	return nil
 }
 
-func (srv *clientSrv) Stop() {
-	srv.hs.ViewSynchronizer().Stop()
+func (srv *clientSrv) stop() {
+	srv.gorumsSrv.Stop()
 	srv.cfg.Close()
 	srv.hsSrv.Stop()
-	srv.gorumsSrv.Stop()
 	if closer, ok := srv.output.(io.Closer); ok {
 		err := closer.Close()
 		if err != nil {
@@ -292,24 +287,13 @@ func (srv *clientSrv) Stop() {
 }
 
 func (srv *clientSrv) ExecCommand(_ context.Context, cmd *client.Command, out func(*empty.Empty, error)) {
-	finished := make(chan struct{})
 	id := cmdID{cmd.ClientID, cmd.SequenceNumber}
+
 	srv.mut.Lock()
-	srv.finishedCmds[id] = finished
+	srv.execHandlers[id] = out
 	srv.mut.Unlock()
 
 	srv.cmdCache.addCommand(cmd)
-
-	go func(id cmdID, finished chan struct{}) {
-		<-finished
-
-		srv.mut.Lock()
-		delete(srv.finishedCmds, id)
-		srv.mut.Unlock()
-
-		// send response
-		out(&empty.Empty{}, nil)
-	}(id, finished)
 }
 
 func (srv *clientSrv) Exec(cmd hotstuff.Command) {
@@ -332,8 +316,8 @@ func (srv *clientSrv) Exec(cmd hotstuff.Command) {
 			log.Printf("Error writing data: %v\n", err)
 		}
 		srv.mut.Lock()
-		if c, ok := srv.finishedCmds[cmdID{cmd.ClientID, cmd.SequenceNumber}]; ok {
-			c <- struct{}{}
+		if reply, ok := srv.execHandlers[cmdID{cmd.ClientID, cmd.SequenceNumber}]; ok {
+			reply(&empty.Empty{}, nil)
 		}
 		srv.mut.Unlock()
 	}
