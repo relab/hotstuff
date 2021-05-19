@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/client"
+	"github.com/relab/hotstuff/internal/client"
 	"google.golang.org/protobuf/proto"
 )
 
