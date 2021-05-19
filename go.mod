@@ -3,6 +3,7 @@ module github.com/relab/hotstuff
 go 1.16
 
 require (
+	github.com/Raytar/iago v0.0.0
 	github.com/felixge/fgprof v0.9.1
 	github.com/golang/mock v1.5.0
 	github.com/golang/protobuf v1.5.2
@@ -16,3 +17,7 @@ require (
 	google.golang.org/grpc v1.37.0
 	google.golang.org/protobuf v1.26.0
 )
+
+replace github.com/Raytar/iago => ../iago
+
+replace github.com/Raytar/wrfs => ../wrfs
