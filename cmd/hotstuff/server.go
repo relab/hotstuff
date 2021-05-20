@@ -256,6 +256,7 @@ func (srv *clientSrv) Run(ctx context.Context, address string) (err error) {
 
 	c := make(chan struct{})
 	go func() {
+		srv.hs.ViewSynchronizer().Start(ctx)
 		srv.hs.EventLoop().Run(ctx)
 		close(c)
 	}()

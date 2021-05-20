@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/logging"
 )
 
@@ -334,15 +335,6 @@ func (aggQC AggregateQC) View() View {
 
 // Messages / Events
 
-// Event is a common interface that should be implemented by all the message types below.
-type Event interface{}
-
-// EventProcessor processes events.
-type EventProcessor interface {
-	// ProcessEvent processes the given event.
-	ProcessEvent(event Event)
-}
-
 // ProposeMsg is broadcast when a leader makes a proposal.
 type ProposeMsg struct {
 	ID          ID           // The ID of the replica who sent the message.
@@ -398,7 +390,7 @@ type HotStuff struct {
 	privateKey PrivateKey
 	logger     logging.Logger
 	opts       Options
-	eventLoop  *EventLoop
+	eventLoop  *eventloop.EventLoop
 
 	// modules
 
@@ -435,7 +427,7 @@ func (hs *HotStuff) Options() *Options {
 }
 
 // EventLoop returns the event loop.
-func (hs *HotStuff) EventLoop() *EventLoop {
+func (hs *HotStuff) EventLoop() *eventloop.EventLoop {
 	return hs.eventLoop
 }
 
@@ -503,7 +495,7 @@ func NewBuilder(id ID, privateKey PrivateKey) Builder {
 		privateKey: privateKey,
 		logger:     logging.New(""),
 	}}
-	bl.Register(NewEventLoop(100))
+	bl.Register(eventloop.New(100))
 	return bl
 }
 
@@ -518,7 +510,7 @@ func (b *Builder) Register(modules ...interface{}) {
 			b.hs.logger = m
 		}
 		// allow overriding the event loop if a different buffer size is desired
-		if m, ok := module.(*EventLoop); ok {
+		if m, ok := module.(*eventloop.EventLoop); ok {
 			b.hs.eventLoop = m
 		}
 		if m, ok := module.(Acceptor); ok {
@@ -744,8 +736,6 @@ type ViewSynchronizer interface {
 	HighQC() QuorumCert
 	// LeafBlock returns the current leaf block.
 	LeafBlock() *Block
-	// Start starts the synchronizer.
-	Start()
-	// Stop stops the synchronizer.
-	Stop()
+	// Start starts the synchronizer with the given context.
+	Start(context.Context)
 }

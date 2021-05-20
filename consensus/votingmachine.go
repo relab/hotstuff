@@ -1,9 +1,14 @@
 package consensus
 
-import "github.com/relab/hotstuff"
+import (
+	"sync"
+
+	"github.com/relab/hotstuff"
+)
 
 // VotingMachine collects votes.
 type VotingMachine struct {
+	mut           sync.Mutex
 	mod           *hotstuff.HotStuff
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
 }
@@ -19,23 +24,15 @@ func NewVotingMachine() *VotingMachine {
 // settings using the ConfigBuilder.
 func (vm *VotingMachine) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
 	vm.mod = hs
+	vm.mod.EventLoop().RegisterAsyncHandler(func(event interface{}) (consume bool) {
+		vote := event.(hotstuff.VoteMsg)
+		go vm.OnVote(vote)
+		return true
+	}, hotstuff.VoteMsg{})
 }
 
 // OnVote handles an incoming vote.
 func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
-	defer func() {
-		// delete any pending QCs with lower height than bLeaf
-		for k := range vm.verifiedVotes {
-			if block, ok := vm.mod.BlockChain().LocalGet(k); ok {
-				if block.View() <= vm.mod.ViewSynchronizer().LeafBlock().View() {
-					delete(vm.verifiedVotes, k)
-				}
-			} else {
-				delete(vm.verifiedVotes, k)
-			}
-		}
-	}()
-
 	cert := vote.PartialCert
 	vm.mod.Logger().Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
 
@@ -74,6 +71,23 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 		return
 	}
 
+	vm.mut.Lock()
+	defer vm.mut.Unlock()
+
+	// this defer will clean up any old votes in verifiedVotes
+	defer func() {
+		// delete any pending QCs with lower height than bLeaf
+		for k := range vm.verifiedVotes {
+			if block, ok := vm.mod.BlockChain().LocalGet(k); ok {
+				if block.View() <= vm.mod.ViewSynchronizer().LeafBlock().View() {
+					delete(vm.verifiedVotes, k)
+				}
+			} else {
+				delete(vm.verifiedVotes, k)
+			}
+		}
+	}()
+
 	votes := vm.verifiedVotes[cert.BlockHash()]
 	votes = append(votes, cert)
 	vm.verifiedVotes[cert.BlockHash()] = votes
@@ -90,5 +104,5 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 	delete(vm.verifiedVotes, cert.BlockHash())
 
 	// signal the synchronizer
-	vm.mod.ViewSynchronizer().AdvanceView(hotstuff.NewSyncInfo().WithQC(qc))
+	vm.mod.EventLoop().AddEvent(hotstuff.NewViewMsg{ID: vm.mod.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
 }

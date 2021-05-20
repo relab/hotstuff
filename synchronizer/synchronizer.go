@@ -40,6 +40,19 @@ func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff, opts *hotstuff.OptionsB
 		duration.InitModule(hs, opts)
 	}
 	s.mod = hs
+
+	s.mod.EventLoop().RegisterHandler(func(event interface{}) (consume bool) {
+		newViewMsg := event.(hotstuff.NewViewMsg)
+		s.OnNewView(newViewMsg)
+		return true
+	}, hotstuff.NewViewMsg{})
+
+	s.mod.EventLoop().RegisterHandler(func(event interface{}) (consume bool) {
+		timeoutMsg := event.(hotstuff.TimeoutMsg)
+		s.OnRemoteTimeout(timeoutMsg)
+		return true
+	}, hotstuff.TimeoutMsg{})
+
 	var err error
 	s.highQC, err = s.mod.Crypto().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
 	if err != nil {
@@ -67,18 +80,18 @@ func New(viewDuration ViewDuration) hotstuff.ViewSynchronizer {
 	}
 }
 
-// Start starts the view timeout timer.
-func (s *Synchronizer) Start() {
+// Start starts the synchronizer with the given context.
+func (s *Synchronizer) Start(ctx context.Context) {
 	// We'll just timeout immediately, because we need a TC to synchronize with the other replicas.
 	s.timer = time.AfterFunc(0, func() {
 		// The event loop will execute onLocalTimeout for us.
 		s.mod.EventLoop().AddEvent(s.onLocalTimeout)
 	})
-}
 
-// Stop stops the view timeout timer.
-func (s *Synchronizer) Stop() {
-	s.timer.Stop()
+	go func() {
+		<-ctx.Done()
+		s.timer.Stop()
+	}()
 }
 
 // HighQC returns the highest known QC.

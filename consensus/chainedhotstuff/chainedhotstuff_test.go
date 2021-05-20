@@ -249,13 +249,15 @@ func TestChainedHotstuff(t *testing.T) {
 	}
 
 	for _, hs := range hl {
-		go hs.EventLoop().Run(ctx)
+		go func(hs *hotstuff.HotStuff) {
+			hs.ViewSynchronizer().Start(ctx)
+			hs.EventLoop().Run(ctx)
+		}(hs)
 	}
 
 	for i := 0; i < n; i++ {
 		select {
 		case <-c:
-			defer synchronizers[i].Stop()
 		case err := <-errChan:
 			t.Fatal(err)
 		}

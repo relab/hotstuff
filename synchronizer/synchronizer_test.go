@@ -45,7 +45,10 @@ func TestLocalTimeout(t *testing.T) {
 			close(c)
 		}).AnyTimes()
 	ctx, cancel := context.WithCancel(context.Background())
-	go mods.EventLoop().Run(ctx)
+	go func() {
+		mods.ViewSynchronizer().Start(ctx)
+		mods.EventLoop().Run(ctx)
+	}()
 	<-c
 	cancel()
 }

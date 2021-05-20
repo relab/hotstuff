@@ -24,6 +24,12 @@ type blockChain struct {
 // InitModule gives the module a reference to the HotStuff object.
 func (chain *blockChain) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
 	chain.mod = hs
+
+	chain.mod.EventLoop().RegisterAsyncHandler(func(event interface{}) (consume bool) {
+		proposal := event.(hotstuff.ProposeMsg)
+		chain.Store(proposal.Block)
+		return false
+	}, hotstuff.ProposeMsg{})
 }
 
 // New creates a new blockChain with a maximum size.
@@ -134,15 +140,6 @@ func (chain *blockChain) Extends(block, target *hotstuff.Block) bool {
 		current, ok = chain.Get(current.Parent())
 	}
 	return ok && current.Hash() == target.Hash()
-}
-
-func (chain *blockChain) ProcessEvent(event hotstuff.Event) {
-	proposal, ok := event.(hotstuff.ProposeMsg)
-	if !ok {
-		return
-	}
-	// TODO: "enhance" the block with helper functions for getting the parent, etc.
-	chain.Store(proposal.Block)
 }
 
 var _ hotstuff.BlockChain = (*blockChain)(nil)

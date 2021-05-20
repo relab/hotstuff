@@ -23,6 +23,11 @@ func New() *FastHotStuff {
 func (fhs *FastHotStuff) InitModule(hs *hotstuff.HotStuff, opts *hotstuff.OptionsBuilder) {
 	fhs.mod = hs
 	opts.SetShouldUseAggQC()
+	fhs.mod.EventLoop().RegisterHandler(func(event interface{}) (consume bool) {
+		proposal := event.(hotstuff.ProposeMsg)
+		fhs.OnPropose(proposal)
+		return true
+	}, hotstuff.ProposeMsg{})
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.

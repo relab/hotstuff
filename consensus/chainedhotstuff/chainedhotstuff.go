@@ -24,6 +24,11 @@ func New() *ChainedHotStuff {
 // InitModule gives ChainedHotstuff a pointer to the other modules.
 func (hs *ChainedHotStuff) InitModule(mod *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
 	hs.mod = mod
+	hs.mod.EventLoop().RegisterHandler(func(event interface{}) (consume bool) {
+		proposal := event.(hotstuff.ProposeMsg)
+		hs.OnPropose(proposal)
+		return true
+	}, hotstuff.ProposeMsg{})
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
