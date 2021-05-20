@@ -1,9 +1,9 @@
 proto_include := $(shell go list -m -f {{.Dir}} github.com/relab/gorums)
-proto_src := client/client.proto internal/proto/hotstuff.proto
+proto_src := internal/client/client.proto internal/proto/hotstuff.proto
 proto_go := $(proto_src:%.proto=%.pb.go)
 gorums_go := $(proto_src:%.proto=%_gorums.pb.go)
 
-binaries := cmd/hotstuff/hotstuff cmd/hotstuffkeygen/hotstuffkeygen
+binaries := cmd/hotstuff/hotstuff
 
 .PHONY: all debug clean protos download tools $(binaries)
 
