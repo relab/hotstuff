@@ -1,0 +1,127 @@
+syntax = "proto3";
+
+package orchestration;
+
+import "gorums.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/relab/hotstuff/client";
+
+// ReplicaInfo is the information that the replicas need about each other.
+message ReplicaInfo {
+  // The ID of the replica.
+  uint32 ID = 1;
+  // The IP address and port to connect to.
+  string Address = 2;
+  // The public key of the replica.
+  bytes PublicKey = 3;
+}
+
+// ReplicaRunConfig is all the information needed to start a replica.
+message ReplicaRunConfig {
+  // The replica's ID.
+  uint32 ID = 1;
+  // The configuration of replicas.
+  map<uint32, ReplicaInfo> Replicas = 2;
+  // The replica's private key.
+  bytes PrivateKey = 3;
+  // Determines whether TLS should be used.
+  bool UseTLS = 4;
+  // The replica's TLS certificate.
+  optional bytes Certificate = 5;
+  // The private key of the TLS certificate.
+  optional bytes CertificateKey = 6;
+  // The certificate authority that created the TLS certificates.
+  optional bytes CertificateAuthority = 7;
+  // The name of the crypto implementation to use.
+  string Crypto = 8;
+  // The name of the leader election algorithm to use.
+  string LeaderElection = 9;
+  // The number of client commands that should be batched together.
+  uint32 BatchSize = 10;
+}
+
+// ClientRunConfig is all the information needed to start a client.
+message ClientRunConfig {
+  // The client's ID.
+  uint32 ID = 1;
+  // The configuration of replicas.
+  map<uint32, ReplicaInfo> Replicas = 2;
+  // Determines whether TLS should be used.
+  bool UseTLS = 4;
+  // The certificate authority that created the TLS certificates.
+  optional bytes CertificateAuthority = 7;
+  // The maximum number of concurrent requests.
+  uint32 MaxConcurrent = 8;
+  // The size in bytes of each command.
+  uint32 PayloadSize = 9;
+}
+
+
+service Orchestrator {
+  rpc CreateReplica(CreateReplicaRequest) returns (CreateReplicaResponse) {
+    option (gorums.quorumcall) = true;
+    option (gorums.per_node_arg) = true;
+  }
+
+  rpc CreateClient(CreateClientRequest) returns (CreateClientResponse) {
+    option (gorums.quorumcall) = true;
+    option (gorums.per_node_arg) = true;
+  }
+
+  rpc StartReplica(StartReplicaRequest) returns (StartReplicaResponse) {
+    option (gorums.quorumcall) = true;
+    option (gorums.per_node_arg) = true;
+  }
+
+  rpc StartClient(StartClientRequest) returns (StartClientResponse) {
+    option (gorums.quorumcall) = true;
+    option (gorums.per_node_arg) = true;
+  }
+
+  rpc StopReplica(StopReplicaRequest) returns (StopReplicaResponse) {
+    option (gorums.quorumcall) = true;
+    option (gorums.per_node_arg) = true;
+  }
+
+  rpc StopClient(StopClientRequest) returns (StopClientResponse) {
+    option (gorums.quorumcall) = true;
+    option (gorums.per_node_arg) = true;
+  }
+}
+
+message CreateReplicaRequest {
+  ReplicaRunConfig RunConfig = 1;
+}
+
+message CreateReplicaResponse {}
+
+message CreateClientRequest {
+  ClientRunConfig RunConfig = 1;
+}
+
+message CreateClientResponse {}
+
+message StartReplicaRequest {
+  uint32 ID = 1;
+}
+
+message StartReplicaResponse {}
+
+message StartClientRequest {
+  uint32 ID = 1;
+}
+
+message StartClientResponse {}
+
+message StopReplicaRequest {
+  uint32 ID = 1;
+}
+
+message StopReplicaResponse {}
+
+message StopClientRequest {
+  uint32 ID = 1;
+}
+
+message StopClientResponse {}
