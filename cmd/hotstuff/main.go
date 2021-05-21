@@ -7,14 +7,14 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/cli"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/spf13/pflag"
 )
 
 type replica struct {
-	ID         hotstuff.ID
+	ID         consensus.ID
 	PeerAddr   string `mapstructure:"peer-address"`
 	ClientAddr string `mapstructure:"client-address"`
 	Pubkey     string
@@ -22,26 +22,26 @@ type replica struct {
 }
 
 type options struct {
-	BatchSize       int         `mapstructure:"batch-size"`
-	Benchmark       bool        `mapstructure:"benchmark"`
-	Cert            string      `mapstructure:"cert"`
-	CertKey         string      `mapstructure:"cert-key"`
-	Crypto          string      `mapstructure:"crypto"`
-	Consensus       string      `mapstructure:"consensus"`
-	ClientAddr      string      `mapstructure:"client-listen"`
-	ExitAfter       int         `mapstructure:"exit-after"`
-	Input           string      `mapstructure:"input"`
-	LeaderID        hotstuff.ID `mapstructure:"leader-id"`
-	MaxInflight     uint64      `mapstructure:"max-inflight"`
-	Output          string      `mapstructure:"print-commands"`
-	PayloadSize     int         `mapstructure:"payload-size"`
-	PeerAddr        string      `mapstructure:"peer-listen"`
-	PmType          string      `mapstructure:"pacemaker"`
-	PrintThroughput bool        `mapstructure:"print-throughput"`
+	BatchSize       int          `mapstructure:"batch-size"`
+	Benchmark       bool         `mapstructure:"benchmark"`
+	Cert            string       `mapstructure:"cert"`
+	CertKey         string       `mapstructure:"cert-key"`
+	Crypto          string       `mapstructure:"crypto"`
+	Consensus       string       `mapstructure:"consensus"`
+	ClientAddr      string       `mapstructure:"client-listen"`
+	ExitAfter       int          `mapstructure:"exit-after"`
+	Input           string       `mapstructure:"input"`
+	LeaderID        consensus.ID `mapstructure:"leader-id"`
+	MaxInflight     uint64       `mapstructure:"max-inflight"`
+	Output          string       `mapstructure:"print-commands"`
+	PayloadSize     int          `mapstructure:"payload-size"`
+	PeerAddr        string       `mapstructure:"peer-listen"`
+	PmType          string       `mapstructure:"pacemaker"`
+	PrintThroughput bool         `mapstructure:"print-throughput"`
 	Privkey         string
-	RateLimit       int         `mapstructure:"rate-limit"`
-	RootCAs         []string    `mapstructure:"root-cas"`
-	SelfID          hotstuff.ID `mapstructure:"self-id"`
+	RateLimit       int          `mapstructure:"rate-limit"`
+	RootCAs         []string     `mapstructure:"root-cas"`
+	SelfID          consensus.ID `mapstructure:"self-id"`
 	TLS             bool
 	ViewTimeout     float64 `mapstructure:"view-timeout"`
 	Replicas        []replica
@@ -50,7 +50,7 @@ type options struct {
 func usage() {
 	fmt.Printf("Usage: %s [options]\n", os.Args[0])
 	fmt.Println()
-	fmt.Println("Loads configuration from ./hotstuff.toml and file specified by --config")
+	fmt.Println("Loads configuration from ./consensus.toml and file specified by --config")
 	fmt.Println()
 	fmt.Println("Options:")
 	pflag.PrintDefaults()

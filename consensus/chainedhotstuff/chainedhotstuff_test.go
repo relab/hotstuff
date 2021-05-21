@@ -9,13 +9,12 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend/gorums"
 	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/leaderrotation"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -33,12 +32,12 @@ func TestPropose(t *testing.T) {
 	// RULES:
 
 	// leader should propose to other replicas.
-	cfg.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.ProposeMsg{}))
+	cfg.EXPECT().Propose(gomock.AssignableToTypeOf(consensus.ProposeMsg{}))
 
 	// leader should send its own vote to the next leader.
 	replicas[1].EXPECT().Vote(gomock.Any())
 
-	hs.Propose(hotstuff.NewSyncInfo().WithQC(synchronizer.HighQC()))
+	hs.Propose(consensus.NewSyncInfo().WithQC(synchronizer.HighQC()))
 
 	if hs.lastVote != 1 {
 		t.Errorf("Wrong view: got: %d, want: %d", hs.lastVote, 1)
@@ -61,8 +60,8 @@ func TestCommit(t *testing.T) {
 	signers := hl.Signers()
 
 	// create the needed blocks and QCs
-	genesisQC := hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
-	b1 := testutil.NewProposeMsg(hotstuff.GetGenesis().Hash(), genesisQC, "1", 1, 2)
+	genesisQC := consensus.NewQuorumCert(nil, 0, consensus.GetGenesis().Hash())
+	b1 := testutil.NewProposeMsg(consensus.GetGenesis().Hash(), genesisQC, "1", 1, 2)
 	b1QC := testutil.CreateQC(t, b1.Block, signers)
 	b2 := testutil.NewProposeMsg(b1.Block.Hash(), b1QC, "2", 2, 2)
 	b2QC := testutil.CreateQC(t, b2.Block, signers)
@@ -76,7 +75,7 @@ func TestCommit(t *testing.T) {
 
 	// executor will check that the correct command is executed
 	executor.EXPECT().Exec(gomock.Any()).Do(func(arg interface{}) {
-		if arg.(hotstuff.Command) != b1.Block.Command() {
+		if arg.(consensus.Command) != b1.Block.Command() {
 			t.Errorf("Wrong command executed: got: %s, want: %s", arg, b1.Block.Command())
 		}
 	})
@@ -84,13 +83,13 @@ func TestCommit(t *testing.T) {
 	// acceptor expects to receive the commands in order
 	gomock.InOrder(
 		acceptor.EXPECT().Proposed(gomock.Any()),
-		acceptor.EXPECT().Accept(hotstuff.Command("1")).Return(true),
-		acceptor.EXPECT().Proposed(hotstuff.Command("1")),
-		acceptor.EXPECT().Accept(hotstuff.Command("2")).Return(true),
-		acceptor.EXPECT().Proposed(hotstuff.Command("2")),
-		acceptor.EXPECT().Accept(hotstuff.Command("3")).Return(true),
-		acceptor.EXPECT().Proposed(hotstuff.Command("3")),
-		acceptor.EXPECT().Accept(hotstuff.Command("4")).Return(true),
+		acceptor.EXPECT().Accept(consensus.Command("1")).Return(true),
+		acceptor.EXPECT().Proposed(consensus.Command("1")),
+		acceptor.EXPECT().Accept(consensus.Command("2")).Return(true),
+		acceptor.EXPECT().Proposed(consensus.Command("2")),
+		acceptor.EXPECT().Accept(consensus.Command("3")).Return(true),
+		acceptor.EXPECT().Proposed(consensus.Command("3")),
+		acceptor.EXPECT().Accept(consensus.Command("4")).Return(true),
 	)
 
 	hs.OnPropose(b1)
@@ -132,8 +131,8 @@ func TestForkingAttack(t *testing.T) {
 	replicas[1].EXPECT().Vote(gomock.Any()).AnyTimes()
 	replicas[1].EXPECT().NewView(gomock.Any()).AnyTimes()
 
-	genesisQC := hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
-	a := testutil.NewProposeMsg(hotstuff.GetGenesis().Hash(), genesisQC, "A", 1, 2)
+	genesisQC := consensus.NewQuorumCert(nil, 0, consensus.GetGenesis().Hash())
+	a := testutil.NewProposeMsg(consensus.GetGenesis().Hash(), genesisQC, "A", 1, 2)
 	aQC := testutil.CreateQC(t, a.Block, signers)
 	b := testutil.NewProposeMsg(a.Block.Hash(), aQC, "B", 2, 2)
 	bQC := testutil.CreateQC(t, b.Block, signers)
@@ -167,12 +166,12 @@ func TestForkingAttack(t *testing.T) {
 	_ = advanceView(t, hs, block, signers)
 }
 
-func advanceView(t *testing.T, hs *ChainedHotStuff, lastProposal *hotstuff.Block, signers []modules.Crypto) *hotstuff.Block {
+func advanceView(t *testing.T, hs *ChainedHotStuff, lastProposal *consensus.Block, signers []consensus.Crypto) *consensus.Block {
 	t.Helper()
 
 	qc := testutil.CreateQC(t, lastProposal, signers)
-	b := hotstuff.NewBlock(lastProposal.Hash(), qc, "foo", hs.lastVote+1, 2)
-	hs.OnPropose(hotstuff.ProposeMsg{ID: b.Proposer(), Block: b})
+	b := consensus.NewBlock(lastProposal.Hash(), qc, "foo", hs.lastVote+1, 2)
+	hs.OnPropose(consensus.ProposeMsg{ID: b.Proposer(), Block: b})
 	return b
 }
 
@@ -184,12 +183,12 @@ func TestChainedHotstuff(t *testing.T) {
 	baseCfg := config.NewConfig(0, nil, nil)
 
 	listeners := make([]net.Listener, n)
-	keys := make([]hotstuff.PrivateKey, n)
+	keys := make([]consensus.PrivateKey, n)
 	for i := 0; i < n; i++ {
 		listeners[i] = testutil.CreateTCPListener(t)
 		key := testutil.GenerateECDSAKey(t)
 		keys[i] = key
-		id := hotstuff.ID(i + 1)
+		id := consensus.ID(i + 1)
 		baseCfg.Replicas[id] = &config.ReplicaInfo{
 			ID:      id,
 			Address: listeners[i].Addr().String(),
@@ -200,10 +199,10 @@ func TestChainedHotstuff(t *testing.T) {
 	builders := testutil.CreateBuilders(t, ctrl, n, keys...)
 	configs := make([]*gorums.Config, n)
 	servers := make([]*gorums.Server, n)
-	synchronizers := make([]modules.Synchronizer, n)
+	synchronizers := make([]consensus.Synchronizer, n)
 	for i := 0; i < n; i++ {
 		c := *baseCfg
-		c.ID = hotstuff.ID(i + 1)
+		c.ID = consensus.ID(i + 1)
 		c.PrivateKey = keys[i].(*ecdsa.PrivateKey)
 		configs[i] = gorums.NewConfig(c)
 		servers[i] = gorums.NewServer(c)
@@ -220,8 +219,8 @@ func TestChainedHotstuff(t *testing.T) {
 	for i := 0; i < n; i++ {
 		counter := &counters[i]
 		executors[i] = mocks.NewMockExecutor(ctrl)
-		executors[i].EXPECT().Exec(gomock.Any()).AnyTimes().Do(func(arg hotstuff.Command) {
-			if arg != hotstuff.Command("foo") {
+		executors[i].EXPECT().Exec(gomock.Any()).AnyTimes().Do(func(arg consensus.Command) {
+			if arg != consensus.Command("foo") {
 				errChan <- fmt.Errorf("unknown command executed: got %s, want: %s", arg, "foo")
 			}
 			*counter++
@@ -250,7 +249,7 @@ func TestChainedHotstuff(t *testing.T) {
 	}
 
 	for _, hs := range hl {
-		go func(hs *modules.Modules) {
+		go func(hs *consensus.Modules) {
 			hs.Synchronizer().Start(ctx)
 			hs.EventLoop().Run(ctx)
 		}(hs)

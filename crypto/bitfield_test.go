@@ -4,13 +4,13 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/consensus"
 )
 
 // TestBitfieldAdd checks that the bitfield can extend itself to fit larger IDs.
 func TestBitfieldAdd(t *testing.T) {
 	testCases := []struct {
-		id  hotstuff.ID
+		id  consensus.ID
 		len int
 	}{{1, 1}, {9, 2}, {17, 3}}
 
@@ -30,8 +30,8 @@ func TestBitfieldAdd(t *testing.T) {
 }
 
 func TestBitfieldContains(t *testing.T) {
-	random := hotstuff.ID(rand.Intn(254)) + 2 // should not be 0 or 1
-	testCases := []hotstuff.ID{1, random, random + 1}
+	random := consensus.ID(rand.Intn(254)) + 2 // should not be 0 or 1
+	testCases := []consensus.ID{1, random, random + 1}
 
 	var bm Bitfield
 
@@ -56,14 +56,14 @@ func TestBitfieldContains(t *testing.T) {
 }
 
 func TestBitfieldForEach(t *testing.T) {
-	random := hotstuff.ID(rand.Intn(254)) + 2 // should not be 0 or 1
-	testCases := []hotstuff.ID{1, random, random + 1}
+	random := consensus.ID(rand.Intn(254)) + 2 // should not be 0 or 1
+	testCases := []consensus.ID{1, random, random + 1}
 
 	var bm Bitfield
 
 	// first check that the bitfield is empty
 	count := 0
-	bm.ForEach(func(i hotstuff.ID) {
+	bm.ForEach(func(i consensus.ID) {
 		count++
 	})
 
@@ -77,8 +77,8 @@ func TestBitfieldForEach(t *testing.T) {
 	}
 
 	// now check that the bitfield contains the test cases
-	var got []hotstuff.ID
-	bm.ForEach(func(i hotstuff.ID) {
+	var got []consensus.ID
+	bm.ForEach(func(i consensus.ID) {
 		got = append(got, i)
 	})
 

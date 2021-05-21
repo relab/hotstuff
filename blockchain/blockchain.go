@@ -1,4 +1,4 @@
-// Package blockchain provides an implementation of the modules.BlockChain interface.
+// Package blockchain provides an implementation of the consensus.BlockChain interface.
 package blockchain
 
 import (
@@ -6,42 +6,41 @@ import (
 	"context"
 	"sync"
 
-	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/consensus"
 )
 
 // blockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type blockChain struct {
-	mod *modules.Modules
+	mod *consensus.Modules
 
 	mut          sync.Mutex
 	maxSize      int
-	blocks       map[hotstuff.Hash]*list.Element
-	pendingFetch map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be cancelled
+	blocks       map[consensus.Hash]*list.Element
+	pendingFetch map[consensus.Hash]context.CancelFunc // allows a pending fetch operation to be cancelled
 	accessOrder  list.List
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (chain *blockChain) InitModule(hs *modules.Modules, _ *modules.OptionsBuilder) {
+func (chain *blockChain) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder) {
 	chain.mod = hs
 
 	chain.mod.EventLoop().RegisterAsyncHandler(func(event interface{}) (consume bool) {
-		proposal := event.(hotstuff.ProposeMsg)
+		proposal := event.(consensus.ProposeMsg)
 		chain.Store(proposal.Block)
 		return false
-	}, hotstuff.ProposeMsg{})
+	}, consensus.ProposeMsg{})
 }
 
 // New creates a new blockChain with a maximum size.
 // Blocks are dropped in least recently used order.
-func New(maxSize int) modules.BlockChain {
+func New(maxSize int) consensus.BlockChain {
 	bc := &blockChain{
 		maxSize:      maxSize,
-		blocks:       make(map[hotstuff.Hash]*list.Element),
-		pendingFetch: make(map[hotstuff.Hash]context.CancelFunc),
+		blocks:       make(map[consensus.Hash]*list.Element),
+		pendingFetch: make(map[consensus.Hash]context.CancelFunc),
 	}
-	bc.Store(hotstuff.GetGenesis())
+	bc.Store(consensus.GetGenesis())
 	return bc
 }
 
@@ -50,13 +49,13 @@ func (chain *blockChain) makeSpace() {
 		return
 	}
 	elem := chain.accessOrder.Back()
-	block := elem.Value.(*hotstuff.Block)
+	block := elem.Value.(*consensus.Block)
 	delete(chain.blocks, block.Hash())
 	chain.accessOrder.Remove(elem)
 }
 
 // Store stores a block in the blockchain
-func (chain *blockChain) Store(block *hotstuff.Block) {
+func (chain *blockChain) Store(block *consensus.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
@@ -72,7 +71,7 @@ func (chain *blockChain) Store(block *hotstuff.Block) {
 }
 
 // Get retrieves a block given its hash. It will only try the local cache.
-func (chain *blockChain) LocalGet(hash hotstuff.Hash) (*hotstuff.Block, bool) {
+func (chain *blockChain) LocalGet(hash consensus.Hash) (*consensus.Block, bool) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
@@ -83,12 +82,12 @@ func (chain *blockChain) LocalGet(hash hotstuff.Hash) (*hotstuff.Block, bool) {
 
 	chain.accessOrder.MoveToFront(elem)
 
-	return elem.Value.(*hotstuff.Block), true
+	return elem.Value.(*consensus.Block), true
 }
 
 // Get retrieves a block given its hash. Get will try to find the block locally.
 // If it is not available locally, it will try to fetch the block.
-func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
+func (chain *blockChain) Get(hash consensus.Hash) (block *consensus.Block, ok bool) {
 	// need to declare vars early, or else we won't be able to use goto
 	var (
 		ctx    context.Context
@@ -130,11 +129,11 @@ done:
 	}
 
 	chain.accessOrder.MoveToFront(elem)
-	return elem.Value.(*hotstuff.Block), true
+	return elem.Value.(*consensus.Block), true
 }
 
 // Extends checks if the given block extends the branch of the target block.
-func (chain *blockChain) Extends(block, target *hotstuff.Block) bool {
+func (chain *blockChain) Extends(block, target *consensus.Block) bool {
 	current := block
 	ok := true
 	for ok && current.View() > target.View() {
@@ -143,4 +142,4 @@ func (chain *blockChain) Extends(block, target *hotstuff.Block) bool {
 	return ok && current.Hash() == target.Hash()
 }
 
-var _ modules.BlockChain = (*blockChain)(nil)
+var _ consensus.BlockChain = (*blockChain)(nil)

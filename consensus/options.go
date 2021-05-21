@@ -1,4 +1,4 @@
-package modules
+package consensus
 
 // Options stores runtime configuration settings.
 type Options struct {

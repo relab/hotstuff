@@ -8,34 +8,33 @@ import (
 	"time"
 
 	"github.com/relab/gorums"
-	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto"
-	"github.com/relab/hotstuff/modules"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
 
 type gorumsReplica struct {
 	node          *proto.Node
-	id            hotstuff.ID
-	pubKey        hotstuff.PublicKey
+	id            consensus.ID
+	pubKey        consensus.PublicKey
 	voteCancel    context.CancelFunc
 	newviewCancel context.CancelFunc
 }
 
 // ID returns the replica's ID.
-func (r *gorumsReplica) ID() hotstuff.ID {
+func (r *gorumsReplica) ID() consensus.ID {
 	return r.id
 }
 
 // PublicKey returns the replica's public key.
-func (r *gorumsReplica) PublicKey() hotstuff.PublicKey {
+func (r *gorumsReplica) PublicKey() consensus.PublicKey {
 	return r.pubKey
 }
 
 // Vote sends the partial certificate to the other replica.
-func (r *gorumsReplica) Vote(cert hotstuff.PartialCert) {
+func (r *gorumsReplica) Vote(cert consensus.PartialCert) {
 	if r.node == nil {
 		return
 	}
@@ -47,7 +46,7 @@ func (r *gorumsReplica) Vote(cert hotstuff.PartialCert) {
 }
 
 // NewView sends the quorum certificate to the other replica.
-func (r *gorumsReplica) NewView(msg hotstuff.SyncInfo) {
+func (r *gorumsReplica) NewView(msg consensus.SyncInfo) {
 	if r.node == nil {
 		return
 	}
@@ -60,19 +59,19 @@ func (r *gorumsReplica) NewView(msg hotstuff.SyncInfo) {
 // Config holds information about the current configuration of replicas that participate in the protocol,
 // and some information about the local replica. It also provides methods to send messages to the other replicas.
 type Config struct {
-	mod *modules.Modules
+	mod *consensus.Modules
 
 	replicaCfg    config.ReplicaConfig
 	mgr           *proto.Manager
 	cfg           *proto.Configuration
-	privKey       hotstuff.PrivateKey
-	replicas      map[hotstuff.ID]modules.Replica
+	privKey       consensus.PrivateKey
+	replicas      map[consensus.ID]consensus.Replica
 	proposeCancel context.CancelFunc
 	timeoutCancel context.CancelFunc
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (cfg *Config) InitModule(hs *modules.Modules, _ *modules.OptionsBuilder) {
+func (cfg *Config) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder) {
 	cfg.mod = hs
 }
 
@@ -81,7 +80,7 @@ func NewConfig(replicaCfg config.ReplicaConfig) *Config {
 	cfg := &Config{
 		replicaCfg:    replicaCfg,
 		privKey:       replicaCfg.PrivateKey,
-		replicas:      make(map[hotstuff.ID]modules.Replica),
+		replicas:      make(map[consensus.ID]consensus.Replica),
 		proposeCancel: func() {},
 		timeoutCancel: func() {},
 	}
@@ -138,7 +137,7 @@ func (cfg *Config) Connect(connectTimeout time.Duration) error {
 	}
 
 	for _, node := range cfg.cfg.Nodes() {
-		id := hotstuff.ID(node.ID())
+		id := consensus.ID(node.ID())
 		replica := cfg.replicas[id].(*gorumsReplica)
 		replica.node = node
 	}
@@ -147,22 +146,22 @@ func (cfg *Config) Connect(connectTimeout time.Duration) error {
 }
 
 // ID returns the id of this replica.
-func (cfg *Config) ID() hotstuff.ID {
+func (cfg *Config) ID() consensus.ID {
 	return cfg.replicaCfg.ID
 }
 
 // PrivateKey returns the id of this replica.
-func (cfg *Config) PrivateKey() hotstuff.PrivateKey {
+func (cfg *Config) PrivateKey() consensus.PrivateKey {
 	return cfg.privKey
 }
 
 // Replicas returns all of the replicas in the configuration.
-func (cfg *Config) Replicas() map[hotstuff.ID]modules.Replica {
+func (cfg *Config) Replicas() map[consensus.ID]consensus.Replica {
 	return cfg.replicas
 }
 
 // Replica returns a replica if it is present in the configuration.
-func (cfg *Config) Replica(id hotstuff.ID) (replica modules.Replica, ok bool) {
+func (cfg *Config) Replica(id consensus.ID) (replica consensus.Replica, ok bool) {
 	replica, ok = cfg.replicas[id]
 	return
 }
@@ -174,11 +173,11 @@ func (cfg *Config) Len() int {
 
 // QuorumSize returns the size of a quorum
 func (cfg *Config) QuorumSize() int {
-	return hotstuff.QuorumSize(cfg.Len())
+	return consensus.QuorumSize(cfg.Len())
 }
 
 // Propose sends the block to all replicas in the configuration
-func (cfg *Config) Propose(proposal hotstuff.ProposeMsg) {
+func (cfg *Config) Propose(proposal consensus.ProposeMsg) {
 	if cfg.cfg == nil {
 		return
 	}
@@ -190,7 +189,7 @@ func (cfg *Config) Propose(proposal hotstuff.ProposeMsg) {
 }
 
 // Timeout sends the timeout message to all replicas.
-func (cfg *Config) Timeout(msg hotstuff.TimeoutMsg) {
+func (cfg *Config) Timeout(msg consensus.TimeoutMsg) {
 	if cfg.cfg == nil {
 		return
 	}
@@ -201,7 +200,7 @@ func (cfg *Config) Timeout(msg hotstuff.TimeoutMsg) {
 }
 
 // Fetch requests a block from all the replicas in the configuration
-func (cfg *Config) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
+func (cfg *Config) Fetch(ctx context.Context, hash consensus.Hash) (*consensus.Block, bool) {
 	protoBlock, err := cfg.cfg.Fetch(ctx, &proto.BlockHash{Hash: hash[:]})
 	if err != nil && !errors.Is(err, context.Canceled) {
 		cfg.mod.Logger().Infof("Failed to fetch block: %v", err)
@@ -215,14 +214,14 @@ func (cfg *Config) Close() {
 	cfg.mgr.Close()
 }
 
-var _ modules.Configuration = (*Config)(nil)
+var _ consensus.Configuration = (*Config)(nil)
 
 type qspec struct{}
 
 // FetchQF is the quorum function for the Fetch quorum call method.
 // It simply returns true if one of the replies matches the requested block.
 func (q qspec) FetchQF(in *proto.BlockHash, replies map[uint32]*proto.Block) (*proto.Block, bool) {
-	var h hotstuff.Hash
+	var h consensus.Hash
 	copy(h[:], in.GetHash())
 	for _, b := range replies {
 		block := proto.BlockFromProto(b)

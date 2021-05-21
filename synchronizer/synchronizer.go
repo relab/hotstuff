@@ -5,25 +5,22 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/consensus"
 )
 
-// Synchronizer is a dumb implementation of the modules.Synchronizer interface.
-// It does not do anything to ensure synchronization, it simply makes the local replica
-// propose at the correct time, and send new view messages in case of a timeout.
+// Synchronizer synchronizes replicas to the same view.
 type Synchronizer struct {
-	mod *modules.Modules
+	mod *consensus.Modules
 
-	currentView hotstuff.View
-	highTC      hotstuff.TimeoutCert
-	highQC      hotstuff.QuorumCert
-	leafBlock   *hotstuff.Block
+	currentView consensus.View
+	highTC      consensus.TimeoutCert
+	highQC      consensus.QuorumCert
+	leafBlock   *consensus.Block
 
 	// A pointer to the last timeout message that we sent.
 	// If a timeout happens again before we advance to the next view,
 	// we will simply send this timeout again.
-	lastTimeout *hotstuff.TimeoutMsg
+	lastTimeout *consensus.TimeoutMsg
 
 	duration ViewDuration
 	timer    *time.Timer
@@ -32,43 +29,43 @@ type Synchronizer struct {
 	cancelCtx context.CancelFunc
 
 	// map of collected timeout messages per view
-	timeouts map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
+	timeouts map[consensus.View]map[consensus.ID]consensus.TimeoutMsg
 }
 
 // InitModule initializes the synchronizer with the given HotStuff instance.
-func (s *Synchronizer) InitModule(hs *modules.Modules, opts *modules.OptionsBuilder) {
-	if duration, ok := s.duration.(modules.Module); ok {
+func (s *Synchronizer) InitModule(hs *consensus.Modules, opts *consensus.OptionsBuilder) {
+	if duration, ok := s.duration.(consensus.Module); ok {
 		duration.InitModule(hs, opts)
 	}
 	s.mod = hs
 
 	s.mod.EventLoop().RegisterHandler(func(event interface{}) (consume bool) {
-		newViewMsg := event.(hotstuff.NewViewMsg)
+		newViewMsg := event.(consensus.NewViewMsg)
 		s.OnNewView(newViewMsg)
 		return true
-	}, hotstuff.NewViewMsg{})
+	}, consensus.NewViewMsg{})
 
 	s.mod.EventLoop().RegisterHandler(func(event interface{}) (consume bool) {
-		timeoutMsg := event.(hotstuff.TimeoutMsg)
+		timeoutMsg := event.(consensus.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
 		return true
-	}, hotstuff.TimeoutMsg{})
+	}, consensus.TimeoutMsg{})
 
 	var err error
-	s.highQC, err = s.mod.Crypto().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+	s.highQC, err = s.mod.Crypto().CreateQuorumCert(consensus.GetGenesis(), []consensus.PartialCert{})
 	if err != nil {
 		panic(fmt.Errorf("unable to create empty quorum cert for genesis block: %v", err))
 	}
-	s.highTC, err = s.mod.Crypto().CreateTimeoutCert(hotstuff.View(0), []hotstuff.TimeoutMsg{})
+	s.highTC, err = s.mod.Crypto().CreateTimeoutCert(consensus.View(0), []consensus.TimeoutMsg{})
 	if err != nil {
 		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
 	}
 }
 
 // New creates a new Synchronizer.
-func New(viewDuration ViewDuration) modules.Synchronizer {
+func New(viewDuration ViewDuration) consensus.Synchronizer {
 	return &Synchronizer{
-		leafBlock:   hotstuff.GetGenesis(),
+		leafBlock:   consensus.GetGenesis(),
 		currentView: 1,
 
 		viewCtx:   context.Background(),
@@ -77,7 +74,7 @@ func New(viewDuration ViewDuration) modules.Synchronizer {
 		duration: viewDuration,
 		timer:    time.AfterFunc(0, func() {}), // dummy timer that will be replaced after start() is called
 
-		timeouts: make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
+		timeouts: make(map[consensus.View]map[consensus.ID]consensus.TimeoutMsg),
 	}
 }
 
@@ -96,17 +93,17 @@ func (s *Synchronizer) Start(ctx context.Context) {
 }
 
 // HighQC returns the highest known QC.
-func (s *Synchronizer) HighQC() hotstuff.QuorumCert {
+func (s *Synchronizer) HighQC() consensus.QuorumCert {
 	return s.highQC
 }
 
 // LeafBlock returns the current leaf block.
-func (s *Synchronizer) LeafBlock() *hotstuff.Block {
+func (s *Synchronizer) LeafBlock() *consensus.Block {
 	return s.leafBlock
 }
 
 // View returns the current view.
-func (s *Synchronizer) View() hotstuff.View {
+func (s *Synchronizer) View() consensus.View {
 	return s.currentView
 }
 
@@ -116,11 +113,11 @@ func (s *Synchronizer) ViewContext() context.Context {
 }
 
 // SyncInfo returns the highest known QC or TC.
-func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
+func (s *Synchronizer) SyncInfo() consensus.SyncInfo {
 	if s.highQC.View() >= s.highTC.View() {
-		return hotstuff.NewSyncInfo().WithQC(s.highQC)
+		return consensus.NewSyncInfo().WithQC(s.highQC)
 	}
-	return hotstuff.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
+	return consensus.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
 }
 
 func (s *Synchronizer) onLocalTimeout() {
@@ -140,7 +137,7 @@ func (s *Synchronizer) onLocalTimeout() {
 		s.mod.Logger().Warnf("Failed to sign view: %v", err)
 		return
 	}
-	timeoutMsg := hotstuff.TimeoutMsg{
+	timeoutMsg := consensus.TimeoutMsg{
 		ID:            s.mod.ID(),
 		View:          view,
 		SyncInfo:      s.SyncInfo(),
@@ -165,7 +162,7 @@ func (s *Synchronizer) onLocalTimeout() {
 }
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
-func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
+func (s *Synchronizer) OnRemoteTimeout(timeout consensus.TimeoutMsg) {
 	defer func() {
 		// cleanup old timeouts
 		for view := range s.timeouts {
@@ -185,7 +182,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 
 	timeouts, ok := s.timeouts[timeout.View]
 	if !ok {
-		timeouts = make(map[hotstuff.ID]hotstuff.TimeoutMsg)
+		timeouts = make(map[consensus.ID]consensus.TimeoutMsg)
 		s.timeouts[timeout.View] = timeouts
 	}
 
@@ -199,7 +196,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 
 	// TODO: should probably change CreateTimeoutCert and maybe also CreateQuorumCert
 	// to use maps instead of slices
-	timeoutList := make([]hotstuff.TimeoutMsg, 0, len(timeouts))
+	timeoutList := make([]consensus.TimeoutMsg, 0, len(timeouts))
 	for _, t := range timeouts {
 		timeoutList = append(timeoutList, t)
 	}
@@ -226,15 +223,15 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	s.AdvanceView(si)
 }
 
-// OnNewView handles an incoming NewViewMsg
-func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
+// OnNewView handles an incoming consensus.NewViewMsg
+func (s *Synchronizer) OnNewView(newView consensus.NewViewMsg) {
 	s.AdvanceView(newView.SyncInfo)
 }
 
 // AdvanceView attempts to advance to the next view using the given QC.
 // qc must be either a regular quorum certificate, or a timeout certificate.
-func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
-	var v hotstuff.View
+func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
+	var v consensus.View
 	if tc, ok := syncInfo.TC(); ok {
 		if !s.mod.Crypto().VerifyTimeoutCert(tc) {
 			s.mod.Logger().Info("Timeout Certificate could not be verified!")
@@ -275,7 +272,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 }
 
 // UpdateHighQC updates HighQC if the given qc is higher than the old HighQC.
-func (s *Synchronizer) UpdateHighQC(qc hotstuff.QuorumCert) {
+func (s *Synchronizer) UpdateHighQC(qc consensus.QuorumCert) {
 	s.mod.Logger().Debugf("updateHighQC: %v", qc)
 	if !s.mod.Crypto().VerifyQuorumCert(qc) {
 		s.mod.Logger().Info("updateHighQC: QC could not be verified!")
@@ -299,4 +296,4 @@ func (s *Synchronizer) UpdateHighQC(qc hotstuff.QuorumCert) {
 	}
 }
 
-var _ modules.Synchronizer = (*Synchronizer)(nil)
+var _ consensus.Synchronizer = (*Synchronizer)(nil)

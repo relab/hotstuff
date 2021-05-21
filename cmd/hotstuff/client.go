@@ -16,7 +16,7 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
 	"github.com/relab/gorums/benchmark"
-	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/client"
@@ -159,7 +159,7 @@ func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hot
 		gorums.WithDialTimeout(time.Minute),
 	)
 
-	gorumsConf, err := mgr.NewConfiguration(&qspec{faulty: hotstuff.NumFaulty(len(conf.Replicas))}, gorums.WithNodeMap(nodes))
+	gorumsConf, err := mgr.NewConfiguration(&qspec{faulty: consensus.NumFaulty(len(conf.Replicas))}, gorums.WithNodeMap(nodes))
 	if err != nil {
 		mgr.Close()
 		return nil, err

@@ -12,7 +12,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto/keygen"
 )
 
@@ -189,7 +189,7 @@ func generateInput(t *testing.T, path string) {
 	}
 }
 
-func hashFile(t *testing.T, path string) (hash hotstuff.Hash) {
+func hashFile(t *testing.T, path string) (hash consensus.Hash) {
 	t.Helper()
 	f, err := os.Open(path)
 	defer func() {
@@ -209,7 +209,7 @@ func hashFile(t *testing.T, path string) (hash hotstuff.Hash) {
 	return hash
 }
 
-func genReplica(testdir string, id hotstuff.ID, peerPort, clientPort int, bls bool) replica {
+func genReplica(testdir string, id consensus.ID, peerPort, clientPort int, bls bool) replica {
 	r := replica{
 		ID:         id,
 		PeerAddr:   fmt.Sprintf("127.0.0.1:%d", peerPort),

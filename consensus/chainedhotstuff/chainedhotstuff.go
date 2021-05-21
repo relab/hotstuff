@@ -1,47 +1,46 @@
 package chainedhotstuff
 
 import (
-	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/consensus"
 )
 
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {
-	mod *modules.Modules
+	mod *consensus.Modules
 
 	// protocol variables
 
-	lastVote hotstuff.View   // the last view that the replica voted in
-	bLock    *hotstuff.Block // the currently locked block
-	bExec    *hotstuff.Block // the last committed block
+	lastVote consensus.View   // the last view that the replica voted in
+	bLock    *consensus.Block // the currently locked block
+	bExec    *consensus.Block // the last committed block
 }
 
 // New returns a new chainedhotstuff instance.
 func New() *ChainedHotStuff {
 	hs := &ChainedHotStuff{}
-	hs.bLock = hotstuff.GetGenesis()
-	hs.bExec = hotstuff.GetGenesis()
+	hs.bLock = consensus.GetGenesis()
+	hs.bExec = consensus.GetGenesis()
 	return hs
 }
 
-// InitModule gives ChainedHotstuff a pointer to the other modules.
-func (hs *ChainedHotStuff) InitModule(mod *modules.Modules, _ *modules.OptionsBuilder) {
+// InitModule gives ChainedHotstuff a pointer to the other consensus.
+func (hs *ChainedHotStuff) InitModule(mod *consensus.Modules, _ *consensus.OptionsBuilder) {
 	hs.mod = mod
 	hs.mod.EventLoop().RegisterHandler(func(event interface{}) (consume bool) {
-		proposal := event.(hotstuff.ProposeMsg)
+		proposal := event.(consensus.ProposeMsg)
 		hs.OnPropose(proposal)
 		return true
-	}, hotstuff.ProposeMsg{})
+	}, consensus.ProposeMsg{})
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
-func (hs *ChainedHotStuff) StopVoting(view hotstuff.View) {
+func (hs *ChainedHotStuff) StopVoting(view consensus.View) {
 	if hs.lastVote < view {
 		hs.lastVote = view
 	}
 }
 
-func (hs *ChainedHotStuff) commit(block *hotstuff.Block) {
+func (hs *ChainedHotStuff) commit(block *consensus.Block) {
 	if hs.bExec.View() < block.View() {
 		if parent, ok := hs.mod.BlockChain().Get(block.Parent()); ok {
 			hs.commit(parent)
@@ -52,14 +51,14 @@ func (hs *ChainedHotStuff) commit(block *hotstuff.Block) {
 	}
 }
 
-func (hs *ChainedHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
-	if (hotstuff.Hash{}) == qc.BlockHash() {
+func (hs *ChainedHotStuff) qcRef(qc consensus.QuorumCert) (*consensus.Block, bool) {
+	if (consensus.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
 	return hs.mod.BlockChain().Get(qc.BlockHash())
 }
 
-func (hs *ChainedHotStuff) update(block *hotstuff.Block) {
+func (hs *ChainedHotStuff) update(block *consensus.Block) {
 	hs.mod.Synchronizer().UpdateHighQC(block.QuorumCert())
 
 	block1, ok := hs.qcRef(block.QuorumCert())
@@ -113,7 +112,7 @@ func (hs *ChainedHotStuff) update(block *hotstuff.Block) {
 }
 
 // Propose proposes the given command
-func (hs *ChainedHotStuff) Propose(cert hotstuff.SyncInfo) {
+func (hs *ChainedHotStuff) Propose(cert consensus.SyncInfo) {
 	hs.mod.Logger().Debug("Propose")
 
 	qc, ok := cert.QC()
@@ -133,7 +132,7 @@ func (hs *ChainedHotStuff) Propose(cert hotstuff.SyncInfo) {
 	if !ok {
 		return
 	}
-	block := hotstuff.NewBlock(
+	block := consensus.NewBlock(
 		hs.mod.Synchronizer().LeafBlock().Hash(),
 		qc,
 		cmd,
@@ -142,14 +141,14 @@ func (hs *ChainedHotStuff) Propose(cert hotstuff.SyncInfo) {
 	)
 	hs.mod.BlockChain().Store(block)
 
-	proposal := hotstuff.ProposeMsg{ID: hs.mod.ID(), Block: block}
+	proposal := consensus.ProposeMsg{ID: hs.mod.ID(), Block: block}
 	hs.mod.Configuration().Propose(proposal)
 	// self vote
 	hs.OnPropose(proposal)
 }
 
 // OnPropose handles an incoming proposal
-func (hs *ChainedHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
+func (hs *ChainedHotStuff) OnPropose(proposal consensus.ProposeMsg) {
 	block := proposal.Block
 	hs.mod.Logger().Debug("OnPropose: ", block)
 
@@ -208,13 +207,13 @@ func (hs *ChainedHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 
 	finish := func() {
 		hs.update(block)
-		hs.mod.Synchronizer().AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+		hs.mod.Synchronizer().AdvanceView(consensus.NewSyncInfo().WithQC(block.QuorumCert()))
 	}
 
 	leaderID := hs.mod.LeaderRotation().GetLeader(hs.lastVote + 1)
 	if leaderID == hs.mod.ID() {
 		finish()
-		hs.mod.VotingMachine().OnVote(hotstuff.VoteMsg{ID: hs.mod.ID(), PartialCert: pc})
+		hs.mod.VotingMachine().OnVote(consensus.VoteMsg{ID: hs.mod.ID(), PartialCert: pc})
 		return
 	}
 
@@ -228,4 +227,4 @@ func (hs *ChainedHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	finish()
 }
 
-var _ modules.Consensus = (*ChainedHotStuff)(nil)
+var _ consensus.Consensus = (*ChainedHotStuff)(nil)

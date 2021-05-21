@@ -1,6 +1,6 @@
 # hotstuff
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/relab/hotstuff.svg)](https://pkg.go.dev/github.com/relab/hotstuff)
+[![Go Reference](https://pkg.go.dev/badge/github.com/relab/consensus.svg)](https://pkg.go.dev/github.com/relab/hotstuff)
 ![Test](https://github.com/relab/hotstuff/workflows/Test/badge.svg)
 ![golangci-lint](https://github.com/relab/hotstuff/workflows/golangci-lint/badge.svg)
 [![codecov](https://codecov.io/gh/relab/hotstuff/branch/master/graph/badge.svg?token=IYZ7WD6ZAH)](https://codecov.io/gh/relab/hotstuff)
@@ -11,7 +11,7 @@
 
 We have written an example client and server, which can be started using the `cmd/hotstuff` program.
 They can be compiled by running `make`.
-They read a configuration file named `hotstuff.toml` from the working directory.
+They read a configuration file named `consensus.toml` from the working directory.
 An example configuration that runs on localhost is included in the root of the project.
 To generate public and private keys for the servers, run:
 

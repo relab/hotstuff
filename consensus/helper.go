@@ -1,4 +1,4 @@
-package hotstuff
+package consensus
 
 // NumFaulty calculates 'f', which is the number of replicas that can be faulty for a configuration of size 'n'.
 func NumFaulty(n int) int {

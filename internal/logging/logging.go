@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// Logger is the logging interface used by hotstuff. It is based on zap.SugaredLogger
+// Logger is the logging interface used by consensus. It is based on zap.SugaredLogger
 type Logger interface {
 	DPanic(args ...interface{})
 	DPanicf(template string, args ...interface{})

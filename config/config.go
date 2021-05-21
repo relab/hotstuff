@@ -1,35 +1,35 @@
-// Package config contains structs that are useful for initializing hotstuff.
+// Package config contains structs that are useful for initializing consensus.
 //
-// These structs do not implement the modules.Replica or modules.Configuration interfaces,
+// These structs do not implement the consensus.Replica or consensus.Configuration interfaces,
 // but do contain more or less the same information.
 package config
 
 import (
-	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/consensus"
 	"google.golang.org/grpc/credentials"
 )
 
 // ReplicaInfo holds information about a replica.
 type ReplicaInfo struct {
-	ID      hotstuff.ID
+	ID      consensus.ID
 	Address string
-	PubKey  hotstuff.PublicKey
+	PubKey  consensus.PublicKey
 }
 
 // ReplicaConfig holds information needed by a replica.
 type ReplicaConfig struct {
-	ID         hotstuff.ID
-	PrivateKey hotstuff.PrivateKey
+	ID         consensus.ID
+	PrivateKey consensus.PrivateKey
 	Creds      credentials.TransportCredentials
-	Replicas   map[hotstuff.ID]*ReplicaInfo
+	Replicas   map[consensus.ID]*ReplicaInfo
 }
 
 // NewConfig returns a new ReplicaConfig instance.
-func NewConfig(id hotstuff.ID, privateKey hotstuff.PrivateKey, creds credentials.TransportCredentials) *ReplicaConfig {
+func NewConfig(id consensus.ID, privateKey consensus.PrivateKey, creds credentials.TransportCredentials) *ReplicaConfig {
 	return &ReplicaConfig{
 		ID:         id,
 		PrivateKey: privateKey,
 		Creds:      creds,
-		Replicas:   make(map[hotstuff.ID]*ReplicaInfo),
+		Replicas:   make(map[consensus.ID]*ReplicaInfo),
 	}
 }

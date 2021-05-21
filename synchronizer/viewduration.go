@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/consensus"
 )
 
 // ViewDuration determines the duration of a view.
@@ -35,7 +35,7 @@ func NewViewDuration(sampleSize uint64, startTimeout, multiplier float64) ViewDu
 // viewDuration uses statistics from previous views to guess a good value for the view duration.
 // It only takes a limited amount of measurements into account.
 type viewDuration struct {
-	mod       *modules.Modules
+	mod       *consensus.Modules
 	mul       float64   // on failed views, multiply the current mean by this number (should be > 1)
 	limit     uint64    // how many measurements should be included in mean
 	count     uint64    // total number of measurements
@@ -47,7 +47,7 @@ type viewDuration struct {
 
 // InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
 // settings using the ConfigBuilder.
-func (v *viewDuration) InitModule(hs *modules.Modules, _ *modules.OptionsBuilder) {
+func (v *viewDuration) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder) {
 	v.mod = hs
 }
 

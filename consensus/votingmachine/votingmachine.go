@@ -1,44 +1,43 @@
-package consensus
+package votingmachine
 
 import (
 	"sync"
 
-	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/consensus"
 )
 
 // VotingMachine collects votes.
 type VotingMachine struct {
 	mut           sync.Mutex
-	mod           *modules.Modules
-	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
+	mod           *consensus.Modules
+	verifiedVotes map[consensus.Hash][]consensus.PartialCert // verified votes that could become a QC
 }
 
 // NewVotingMachine returns a new VotingMachine.
 func NewVotingMachine() *VotingMachine {
 	return &VotingMachine{
-		verifiedVotes: make(map[hotstuff.Hash][]hotstuff.PartialCert),
+		verifiedVotes: make(map[consensus.Hash][]consensus.PartialCert),
 	}
 }
 
 // InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
 // settings using the ConfigBuilder.
-func (vm *VotingMachine) InitModule(hs *modules.Modules, _ *modules.OptionsBuilder) {
+func (vm *VotingMachine) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder) {
 	vm.mod = hs
 	vm.mod.EventLoop().RegisterAsyncHandler(func(event interface{}) (consume bool) {
-		vote := event.(hotstuff.VoteMsg)
+		vote := event.(consensus.VoteMsg)
 		go vm.OnVote(vote)
 		return true
-	}, hotstuff.VoteMsg{})
+	}, consensus.VoteMsg{})
 }
 
 // OnVote handles an incoming vote.
-func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
+func (vm *VotingMachine) OnVote(vote consensus.VoteMsg) {
 	cert := vote.PartialCert
 	vm.mod.Logger().Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
 
 	var (
-		block *hotstuff.Block
+		block *consensus.Block
 		ok    bool
 	)
 
@@ -50,7 +49,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 			// hopefully, the block has arrived by then.
 			vm.mod.Logger().Debugf("Local cache miss for block: %.8s", cert.BlockHash())
 			vote.Deferred = true
-			vm.mod.EventLoop().AwaitEvent(hotstuff.ProposeMsg{}, vote)
+			vm.mod.EventLoop().AwaitEvent(consensus.ProposeMsg{}, vote)
 			return
 		}
 	} else {
@@ -105,5 +104,5 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 	delete(vm.verifiedVotes, cert.BlockHash())
 
 	// signal the synchronizer
-	vm.mod.EventLoop().AddEvent(hotstuff.NewViewMsg{ID: vm.mod.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
+	vm.mod.EventLoop().AddEvent(consensus.NewViewMsg{ID: vm.mod.ID(), SyncInfo: consensus.NewSyncInfo().WithQC(qc)})
 }

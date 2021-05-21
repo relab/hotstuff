@@ -1,50 +1,49 @@
 package fasthotstuff
 
 import (
-	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/consensus"
 )
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {
-	mod *modules.Modules
+	mod *consensus.Modules
 
-	bExec    *hotstuff.Block
-	lastVote hotstuff.View
+	bExec    *consensus.Block
+	lastVote consensus.View
 }
 
 // New returns a new FastHotStuff instance.
 func New() *FastHotStuff {
 	return &FastHotStuff{
-		bExec:    hotstuff.GetGenesis(),
+		bExec:    consensus.GetGenesis(),
 		lastVote: 0,
 	}
 }
 
 // InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
 // settings using the ConfigBuilder.
-func (fhs *FastHotStuff) InitModule(hs *modules.Modules, opts *modules.OptionsBuilder) {
+func (fhs *FastHotStuff) InitModule(hs *consensus.Modules, opts *consensus.OptionsBuilder) {
 	fhs.mod = hs
 	opts.SetShouldUseAggQC()
 	fhs.mod.EventLoop().RegisterHandler(func(event interface{}) (consume bool) {
-		proposal := event.(hotstuff.ProposeMsg)
+		proposal := event.(consensus.ProposeMsg)
 		fhs.OnPropose(proposal)
 		return true
-	}, hotstuff.ProposeMsg{})
+	}, consensus.ProposeMsg{})
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
-func (fhs *FastHotStuff) StopVoting(view hotstuff.View) {
+func (fhs *FastHotStuff) StopVoting(view consensus.View) {
 	if fhs.lastVote < view {
 		fhs.lastVote = view
 	}
 }
 
 // Propose starts a new proposal. The command is fetched from the command queue.
-func (fhs *FastHotStuff) Propose(cert hotstuff.SyncInfo) {
+func (fhs *FastHotStuff) Propose(cert consensus.SyncInfo) {
 	fhs.mod.Logger().Debug("Propose")
 
-	proposal := hotstuff.ProposeMsg{ID: fhs.mod.ID()}
+	proposal := consensus.ProposeMsg{ID: fhs.mod.ID()}
 
 	if aggQC, ok := cert.AggQC(); ok {
 		proposal.AggregateQC = &aggQC
@@ -68,7 +67,7 @@ func (fhs *FastHotStuff) Propose(cert hotstuff.SyncInfo) {
 		return
 	}
 
-	proposal.Block = hotstuff.NewBlock(
+	proposal.Block = consensus.NewBlock(
 		fhs.mod.Synchronizer().LeafBlock().Hash(),
 		qc,
 		cmd,
@@ -82,14 +81,14 @@ func (fhs *FastHotStuff) Propose(cert hotstuff.SyncInfo) {
 	fhs.OnPropose(proposal)
 }
 
-func (fhs *FastHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
-	if (hotstuff.Hash{}) == qc.BlockHash() {
+func (fhs *FastHotStuff) qcRef(qc consensus.QuorumCert) (*consensus.Block, bool) {
+	if (consensus.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
 	return fhs.mod.BlockChain().Get(qc.BlockHash())
 }
 
-func (fhs *FastHotStuff) execute(block *hotstuff.Block) {
+func (fhs *FastHotStuff) execute(block *consensus.Block) {
 	if fhs.bExec.View() < block.View() {
 		if parent, ok := fhs.mod.BlockChain().Get(block.Parent()); ok {
 			fhs.execute(parent)
@@ -100,7 +99,7 @@ func (fhs *FastHotStuff) execute(block *hotstuff.Block) {
 	}
 }
 
-func (fhs *FastHotStuff) update(block *hotstuff.Block) {
+func (fhs *FastHotStuff) update(block *consensus.Block) {
 	fhs.mod.Synchronizer().UpdateHighQC(block.QuorumCert())
 	fhs.mod.Logger().Debug("PREPARE: ", block)
 
@@ -123,13 +122,13 @@ func (fhs *FastHotStuff) update(block *hotstuff.Block) {
 
 // OnPropose handles an incoming proposal.
 // A leader should call this method on itself.
-func (fhs *FastHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
+func (fhs *FastHotStuff) OnPropose(proposal consensus.ProposeMsg) {
 	fhs.mod.Logger().Debugf("OnPropose: %s", proposal.Block)
 
 	var (
 		safe     = false
 		block    = proposal.Block
-		hqcBlock *hotstuff.Block
+		hqcBlock *consensus.Block
 		ok       bool
 	)
 
@@ -151,7 +150,7 @@ func (fhs *FastHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 			if ok && fhs.mod.BlockChain().Extends(block, hqcBlock) {
 				safe = true
 				// create a new block containing the QC from the aggregateQC
-				block = hotstuff.NewBlock(block.Parent(), highQC, block.Command(), block.View(), block.Proposer())
+				block = consensus.NewBlock(block.Parent(), highQC, block.Command(), block.View(), block.Proposer())
 			}
 		}
 	}
@@ -166,7 +165,7 @@ func (fhs *FastHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	fhs.mod.Acceptor().Proposed(hqcBlock.Command())
 
 	fhs.mod.BlockChain().Store(block)
-	defer fhs.mod.Synchronizer().AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+	defer fhs.mod.Synchronizer().AdvanceView(consensus.NewSyncInfo().WithQC(block.QuorumCert()))
 
 	if fhs.lastVote >= block.View() {
 		// already voted, or StopVoting was called for this view.
@@ -188,7 +187,7 @@ func (fhs *FastHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 
 	leaderID := fhs.mod.LeaderRotation().GetLeader(block.View() + 1)
 	if leaderID == fhs.mod.ID() {
-		fhs.mod.VotingMachine().OnVote(hotstuff.VoteMsg{ID: fhs.mod.ID(), PartialCert: vote})
+		fhs.mod.VotingMachine().OnVote(consensus.VoteMsg{ID: fhs.mod.ID(), PartialCert: vote})
 		return
 	}
 
@@ -201,4 +200,4 @@ func (fhs *FastHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	leader.Vote(vote)
 }
 
-var _ modules.Consensus = (*FastHotStuff)(nil)
+var _ consensus.Consensus = (*FastHotStuff)(nil)

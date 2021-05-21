@@ -5,15 +5,14 @@ import (
 	"context"
 	"sync"
 
-	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/client"
-	"github.com/relab/hotstuff/modules"
 	"google.golang.org/protobuf/proto"
 )
 
 type cmdCache struct {
 	mut           sync.Mutex
-	mod           *modules.Modules
+	mod           *consensus.Modules
 	c             chan struct{}
 	batchSize     int
 	serialNumbers map[uint32]uint64 // highest proposed serial number per client ID
@@ -33,7 +32,7 @@ func newCmdCache(batchSize int) *cmdCache {
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (c *cmdCache) InitModule(hs *modules.Modules, _ *modules.OptionsBuilder) {
+func (c *cmdCache) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder) {
 	c.mod = hs
 }
 
@@ -55,7 +54,7 @@ func (c *cmdCache) addCommand(cmd *client.Command) {
 }
 
 // Get returns a batch of commands to propose.
-func (c *cmdCache) Get(ctx context.Context) (cmd hotstuff.Command, ok bool) {
+func (c *cmdCache) Get(ctx context.Context) (cmd consensus.Command, ok bool) {
 	batch := new(client.Batch)
 
 	c.mut.Lock()
@@ -102,12 +101,12 @@ awaitBatch:
 		return "", false
 	}
 
-	cmd = hotstuff.Command(b)
+	cmd = consensus.Command(b)
 	return cmd, true
 }
 
 // Accept returns true if the replica can accept the batch.
-func (c *cmdCache) Accept(cmd hotstuff.Command) bool {
+func (c *cmdCache) Accept(cmd consensus.Command) bool {
 	batch := new(client.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -129,7 +128,7 @@ func (c *cmdCache) Accept(cmd hotstuff.Command) bool {
 }
 
 // Proposed updates the serial numbers such that we will not accept the given batch again.
-func (c *cmdCache) Proposed(cmd hotstuff.Command) {
+func (c *cmdCache) Proposed(cmd consensus.Command) {
 	batch := new(client.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -147,4 +146,4 @@ func (c *cmdCache) Proposed(cmd hotstuff.Command) {
 	}
 }
 
-var _ modules.Acceptor = (*cmdCache)(nil)
+var _ consensus.Acceptor = (*cmdCache)(nil)

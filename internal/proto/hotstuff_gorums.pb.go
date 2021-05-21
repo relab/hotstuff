@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-gorums v0.5.0-devel
 // 	protoc            v3.15.7
-// source: internal/proto/hotstuff.proto
+// source: internal/proto/consensus.proto
 
 package proto
 

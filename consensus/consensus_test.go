@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/synchronizer"
 )
@@ -22,11 +22,11 @@ func TestVote(t *testing.T) {
 	hs.EventLoop().RegisterAsyncHandler(func(event interface{}) (consume bool) {
 		ok = true
 		return true
-	}, hotstuff.NewViewMsg{})
+	}, consensus.NewViewMsg{})
 
 	b := testutil.NewProposeMsg(
-		hotstuff.GetGenesis().Hash(),
-		hotstuff.NewQuorumCert(nil, 1, hotstuff.GetGenesis().Hash()),
+		consensus.GetGenesis().Hash(),
+		consensus.NewQuorumCert(nil, 1, consensus.GetGenesis().Hash()),
 		"test", 1, 1,
 	)
 	hs.BlockChain().Store(b.Block)
@@ -36,7 +36,7 @@ func TestVote(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create partial certificate: %v", err)
 		}
-		hs.VotingMachine().OnVote(hotstuff.VoteMsg{ID: hotstuff.ID(i + 1), PartialCert: pc})
+		hs.VotingMachine().OnVote(consensus.VoteMsg{ID: consensus.ID(i + 1), PartialCert: pc})
 	}
 	if !ok {
 		t.Error("No new view event happened")

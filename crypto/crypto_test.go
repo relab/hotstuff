@@ -4,12 +4,11 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/internal/testutil"
-	"github.com/relab/hotstuff/modules"
 )
 
 func TestCreatePartialCert(t *testing.T) {
@@ -27,8 +26,8 @@ func TestCreatePartialCert(t *testing.T) {
 			t.Error("Partial certificate hash does not match block hash!")
 		}
 
-		if signerID := partialCert.Signature().Signer(); signerID != hotstuff.ID(1) {
-			t.Errorf("Wrong ID for signer in partial certificate: got: %d, want: %d", signerID, hotstuff.ID(1))
+		if signerID := partialCert.Signature().Signer(); signerID != consensus.ID(1) {
+			t.Errorf("Wrong ID for signer in partial certificate: got: %d, want: %d", signerID, consensus.ID(1))
 		}
 	}
 	runAll(t, run)
@@ -81,7 +80,7 @@ func TestCreateTimeoutCert(t *testing.T) {
 			t.Fatalf("Failed to create QC: %v", err)
 		}
 
-		if tc.View() != hotstuff.View(1) {
+		if tc.View() != consensus.View(1) {
 			t.Error("Timeout certificate view does not match original view.")
 		}
 	}
@@ -94,7 +93,7 @@ func TestVerifyGenesisQC(t *testing.T) {
 
 		td := setup(t, ctrl, 4)
 
-		genesisQC, err := td.signers[0].CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+		genesisQC, err := td.signers[0].CreateQuorumCert(consensus.GetGenesis(), []consensus.PartialCert{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -155,7 +154,7 @@ func TestVerifyAggregateQC(t *testing.T) {
 			t.Fatal("AggregateQC was not verified")
 		}
 
-		if highQC.BlockHash() != hotstuff.GetGenesis().Hash() {
+		if highQC.BlockHash() != consensus.GetGenesis().Hash() {
 			t.Fatal("Wrong hash for highQC")
 		}
 	}
@@ -170,46 +169,46 @@ func runAll(t *testing.T, run func(*testing.T, setupFunc)) {
 	t.Run("Cache+BLS12-381", func(t *testing.T) { run(t, setup(NewCache(bls12.New), testutil.GenerateBLS12Key)) })
 }
 
-func createBlock(t *testing.T, signer modules.Crypto) *hotstuff.Block {
+func createBlock(t *testing.T, signer consensus.Crypto) *consensus.Block {
 	t.Helper()
 
-	qc, err := signer.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+	qc, err := signer.CreateQuorumCert(consensus.GetGenesis(), []consensus.PartialCert{})
 	if err != nil {
 		t.Errorf("Could not create empty QC for genesis: %v", err)
 	}
 
-	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "foo", 42, 1)
+	b := consensus.NewBlock(consensus.GetGenesis().Hash(), qc, "foo", 42, 1)
 	return b
 }
 
-type keyFunc func(t *testing.T) hotstuff.PrivateKey
+type keyFunc func(t *testing.T) consensus.PrivateKey
 type setupFunc func(*testing.T, *gomock.Controller, int) testData
 
-func setup(newFunc func() modules.Crypto, keyFunc keyFunc) setupFunc {
+func setup(newFunc func() consensus.Crypto, keyFunc keyFunc) setupFunc {
 	return func(t *testing.T, ctrl *gomock.Controller, n int) testData {
 		return newTestData(t, ctrl, n, newFunc, keyFunc)
 	}
 }
 
-func NewCache(impl func() modules.CryptoImpl) func() modules.Crypto {
-	return func() modules.Crypto {
+func NewCache(impl func() consensus.CryptoImpl) func() consensus.Crypto {
+	return func() consensus.Crypto {
 		return crypto.NewCache(impl(), 10)
 	}
 }
 
-func NewBase(impl func() modules.CryptoImpl) func() modules.Crypto {
-	return func() modules.Crypto {
+func NewBase(impl func() consensus.CryptoImpl) func() consensus.Crypto {
+	return func() consensus.Crypto {
 		return crypto.New(impl())
 	}
 }
 
 type testData struct {
-	signers   []modules.Crypto
-	verifiers []modules.Crypto
-	block     *hotstuff.Block
+	signers   []consensus.Crypto
+	verifiers []consensus.Crypto
+	block     *consensus.Block
 }
 
-func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() modules.Crypto, keyFunc keyFunc) testData {
+func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() consensus.Crypto, keyFunc keyFunc) testData {
 	t.Helper()
 
 	bl := testutil.CreateBuilders(t, ctrl, n, testutil.GenerateKeys(t, n, keyFunc)...)

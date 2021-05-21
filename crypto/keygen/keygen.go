@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto/bls12"
 	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
 )
@@ -54,7 +54,7 @@ func GenerateRootCert(privateKey *ecdsa.PrivateKey) (cert *x509.Certificate, err
 }
 
 // GenerateTLSCert generates a TLS certificate for the server that is valid for the given hosts.
-func GenerateTLSCert(id hotstuff.ID, hosts []string, parent *x509.Certificate, signeeKey *ecdsa.PublicKey, signerKey *ecdsa.PrivateKey) (cert *x509.Certificate, err error) {
+func GenerateTLSCert(id consensus.ID, hosts []string, parent *x509.Certificate, signeeKey *ecdsa.PublicKey, signerKey *ecdsa.PrivateKey) (cert *x509.Certificate, err error) {
 	sn, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func GenerateTLSCert(id hotstuff.ID, hosts []string, parent *x509.Certificate, s
 }
 
 // WritePrivateKeyFile writes a private key to the specified file.
-func WritePrivateKeyFile(key hotstuff.PrivateKey, filePath string) (err error) {
+func WritePrivateKeyFile(key consensus.PrivateKey, filePath string) (err error) {
 	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return
@@ -124,7 +124,7 @@ func WritePrivateKeyFile(key hotstuff.PrivateKey, filePath string) (err error) {
 }
 
 // WritePublicKeyFile writes a public key to the specified file.
-func WritePublicKeyFile(key hotstuff.PublicKey, filePath string) (err error) {
+func WritePublicKeyFile(key consensus.PublicKey, filePath string) (err error) {
 	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return
@@ -194,7 +194,7 @@ func readPemFile(file string) (b *pem.Block, err error) {
 }
 
 // ReadPrivateKeyFile reads a private key from the specified file.
-func ReadPrivateKeyFile(keyFile string) (key hotstuff.PrivateKey, err error) {
+func ReadPrivateKeyFile(keyFile string) (key consensus.PrivateKey, err error) {
 	b, err := readPemFile(keyFile)
 	if err != nil {
 		return nil, err
@@ -218,7 +218,7 @@ func ReadPrivateKeyFile(keyFile string) (key hotstuff.PrivateKey, err error) {
 }
 
 // ReadPublicKeyFile reads a public key from the specified file.
-func ReadPublicKeyFile(keyFile string) (key hotstuff.PublicKey, err error) {
+func ReadPublicKeyFile(keyFile string) (key consensus.PublicKey, err error) {
 	b, err := readPemFile(keyFile)
 	if err != nil {
 		return nil, err
@@ -309,7 +309,7 @@ func GenerateConfiguration(dest string, tls, bls bool, firstID, n int, pattern s
 		blsPrivPath := basePath + ".bls"
 
 		if tls {
-			err = createTLSCert(certPath, i, hotstuff.ID(firstID+i), hosts, ca, caKey, &pk.PublicKey)
+			err = createTLSCert(certPath, i, consensus.ID(firstID+i), hosts, ca, caKey, &pk.PublicKey)
 			if err != nil {
 				return err
 			}
@@ -338,7 +338,7 @@ func GenerateConfiguration(dest string, tls, bls bool, firstID, n int, pattern s
 }
 
 // writeKeyFiles writes both the private and public keys to files.
-func writeKeyFiles(key hotstuff.PrivateKey, keyPath string) (err error) {
+func writeKeyFiles(key consensus.PrivateKey, keyPath string) (err error) {
 	err = WritePrivateKeyFile(key, keyPath)
 	if err != nil {
 		return fmt.Errorf("failed to write private key file: %w", err)
@@ -367,7 +367,7 @@ func createRootCA(dest string) (pk *ecdsa.PrivateKey, ca *x509.Certificate, err 
 	return pk, ca, nil
 }
 
-func createTLSCert(path string, i int, id hotstuff.ID, hosts []string, ca *x509.Certificate, priv *ecdsa.PrivateKey, pub *ecdsa.PublicKey) error {
+func createTLSCert(path string, i int, id consensus.ID, hosts []string, ca *x509.Certificate, priv *ecdsa.PrivateKey, pub *ecdsa.PublicKey) error {
 	var host string
 	if len(hosts) == 1 {
 		host = hosts[0]

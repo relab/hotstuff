@@ -16,9 +16,9 @@ import (
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
-	"github.com/relab/hotstuff"
 	hotstuffgorums "github.com/relab/hotstuff/backend/gorums"
 	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/chainedhotstuff"
 	"github.com/relab/hotstuff/consensus/fasthotstuff"
 	"github.com/relab/hotstuff/crypto"
@@ -28,7 +28,6 @@ import (
 	"github.com/relab/hotstuff/internal/client"
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/leaderrotation"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -148,7 +147,7 @@ type clientSrv struct {
 	gorumsSrv *gorums.Server
 	cfg       *hotstuffgorums.Config
 	hsSrv     *hotstuffgorums.Server
-	hs        *modules.Modules
+	hs        *consensus.Modules
 	cmdCache  *cmdCache
 
 	mut          sync.Mutex
@@ -183,7 +182,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 	srv.hsSrv = hotstuffgorums.NewServer(*replicaConfig)
 	builder.Register(srv.cfg, srv.hsSrv)
 
-	var leaderRotation modules.LeaderRotation
+	var leaderRotation consensus.LeaderRotation
 	switch conf.PmType {
 	case "fixed":
 		leaderRotation = leaderrotation.NewFixed(conf.LeaderID)
@@ -193,17 +192,17 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 		fmt.Fprintf(os.Stderr, "Invalid pacemaker type: '%s'\n", conf.PmType)
 		os.Exit(1)
 	}
-	var consensus modules.Consensus
+	var consensusImpl consensus.Consensus
 	switch conf.Consensus {
 	case "chainedhotstuff":
-		consensus = chainedhotstuff.New()
+		consensusImpl = chainedhotstuff.New()
 	case "fasthotstuff":
-		consensus = fasthotstuff.New()
+		consensusImpl = fasthotstuff.New()
 	default:
 		fmt.Fprintf(os.Stderr, "Invalid consensus type: '%s'\n", conf.Consensus)
 		os.Exit(1)
 	}
-	var cryptoImpl modules.CryptoImpl
+	var cryptoImpl consensus.CryptoImpl
 	switch conf.Crypto {
 	case "ecdsa":
 		cryptoImpl = ecdsa.New()
@@ -214,7 +213,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 		os.Exit(1)
 	}
 	builder.Register(
-		consensus,
+		consensusImpl,
 		crypto.NewCache(cryptoImpl, 2*srv.cfg.Len()),
 		leaderRotation,
 		srv,          // executor
@@ -298,7 +297,7 @@ func (srv *clientSrv) ExecCommand(_ context.Context, cmd *client.Command, out fu
 	srv.cmdCache.addCommand(cmd)
 }
 
-func (srv *clientSrv) Exec(cmd hotstuff.Command) {
+func (srv *clientSrv) Exec(cmd consensus.Command) {
 	batch := new(client.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {

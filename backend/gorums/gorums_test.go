@@ -11,12 +11,11 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/testutil"
-	"github.com/relab/hotstuff/modules"
 	"google.golang.org/grpc/credentials"
 )
 
@@ -43,7 +42,7 @@ func TestConnect(t *testing.T) {
 }
 
 // testBase is a generic test for a unicast/multicast call
-func testBase(t *testing.T, send func(modules.Configuration), handle eventloop.EventHandler, typ interface{}) {
+func testBase(t *testing.T, send func(consensus.Configuration), handle eventloop.EventHandler, typ interface{}) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		ctrl := gomock.NewController(t)
@@ -66,20 +65,20 @@ func testBase(t *testing.T, send func(modules.Configuration), handle eventloop.E
 
 func TestPropose(t *testing.T) {
 	var wg sync.WaitGroup
-	want := hotstuff.ProposeMsg{
+	want := consensus.ProposeMsg{
 		ID: 1,
-		Block: hotstuff.NewBlock(
-			hotstuff.GetGenesis().Hash(),
-			hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
+		Block: consensus.NewBlock(
+			consensus.GetGenesis().Hash(),
+			consensus.NewQuorumCert(nil, 0, consensus.GetGenesis().Hash()),
 			"foo", 1, 1,
 		),
 	}
-	testBase(t, func(cfg modules.Configuration) {
+	testBase(t, func(cfg consensus.Configuration) {
 		wg.Add(3)
 		cfg.Propose(want)
 		wg.Wait()
 	}, func(event interface{}) (consume bool) {
-		got := event.(hotstuff.ProposeMsg)
+		got := event.(consensus.ProposeMsg)
 		if got.ID != want.ID {
 			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
 		}
@@ -93,18 +92,18 @@ func TestPropose(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	var wg sync.WaitGroup
-	want := hotstuff.TimeoutMsg{
+	want := consensus.TimeoutMsg{
 		ID:            1,
 		View:          1,
 		ViewSignature: nil,
-		SyncInfo:      hotstuff.NewSyncInfo(),
+		SyncInfo:      consensus.NewSyncInfo(),
 	}
-	testBase(t, func(cfg modules.Configuration) {
+	testBase(t, func(cfg consensus.Configuration) {
 		wg.Add(3)
 		cfg.Timeout(want)
 		wg.Wait()
 	}, func(event interface{}) (consume bool) {
-		got := event.(hotstuff.TimeoutMsg)
+		got := event.(consensus.TimeoutMsg)
 		if got.ID != want.ID {
 			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
 		}
@@ -121,7 +120,7 @@ type testData struct {
 	n         int
 	cfg       config.ReplicaConfig
 	listeners []net.Listener
-	keys      []hotstuff.PrivateKey
+	keys      []consensus.PrivateKey
 	builders  testutil.BuilderList
 }
 
@@ -131,7 +130,7 @@ func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
 	t.Helper()
 
 	listeners := make([]net.Listener, n)
-	keys := make([]hotstuff.PrivateKey, 0, n)
+	keys := make([]consensus.PrivateKey, 0, n)
 	replicas := make([]*config.ReplicaInfo, 0, n)
 
 	// generate keys and replicaInfo
@@ -139,7 +138,7 @@ func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
 		listeners[i] = testutil.CreateTCPListener(t)
 		keys = append(keys, testutil.GenerateECDSAKey(t))
 		replicas = append(replicas, &config.ReplicaInfo{
-			ID:      hotstuff.ID(i) + 1,
+			ID:      consensus.ID(i) + 1,
 			Address: listeners[i].Addr().String(),
 			PubKey:  keys[i].Public(),
 		})
@@ -167,10 +166,10 @@ func setupTLS(t *testing.T, ctrl *gomock.Controller, n int) testData {
 
 	for i := 0; i < n; i++ {
 		cert, err := keygen.GenerateTLSCert(
-			hotstuff.ID(i)+1,
+			consensus.ID(i)+1,
 			[]string{"localhost", "127.0.0.1"},
 			ca,
-			td.cfg.Replicas[hotstuff.ID(i)+1].PubKey.(*ecdsa.PublicKey),
+			td.cfg.Replicas[consensus.ID(i)+1].PubKey.(*ecdsa.PublicKey),
 			caPK.(*ecdsa.PrivateKey),
 		)
 		if err != nil {
@@ -203,7 +202,7 @@ func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (teardown
 	servers := make([]*Server, td.n)
 	for i := range servers {
 		cfg := td.cfg
-		cfg.ID = hotstuff.ID(i + 1)
+		cfg.ID = consensus.ID(i + 1)
 		cfg.PrivateKey = td.keys[i]
 		servers[i] = NewServer(cfg)
 		servers[i].StartOnListener(td.listeners[i])

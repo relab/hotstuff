@@ -1,9 +1,8 @@
-package modules
+package consensus
 
 import (
 	"context"
 
-	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/logging"
 )
@@ -12,8 +11,8 @@ import (
 type Modules struct {
 	// data
 
-	id         hotstuff.ID
-	privateKey hotstuff.PrivateKey
+	id         ID
+	privateKey PrivateKey
 	logger     logging.Logger
 	opts       Options
 	eventLoop  *eventloop.EventLoop
@@ -33,12 +32,12 @@ type Modules struct {
 }
 
 // ID returns the id.
-func (hs *Modules) ID() hotstuff.ID {
+func (hs *Modules) ID() ID {
 	return hs.id
 }
 
 // PrivateKey returns the private key.
-func (hs *Modules) PrivateKey() hotstuff.PrivateKey {
+func (hs *Modules) PrivateKey() PrivateKey {
 	return hs.privateKey
 }
 
@@ -115,7 +114,7 @@ type Builder struct {
 }
 
 // NewBuilder creates a new Builder.
-func NewBuilder(id hotstuff.ID, privateKey hotstuff.PrivateKey) Builder {
+func NewBuilder(id ID, privateKey PrivateKey) Builder {
 	bl := Builder{hs: &Modules{
 		id:         id,
 		privateKey: privateKey,
@@ -200,7 +199,7 @@ type CommandQueue interface {
 	// Get returns the next command to be proposed.
 	// It may run until the context is cancelled.
 	// If no command is available, the 'ok' return value should be false.
-	Get(ctx context.Context) (cmd hotstuff.Command, ok bool)
+	Get(ctx context.Context) (cmd Command, ok bool)
 }
 
 //go:generate mockgen -destination=../internal/mocks/acceptor_mock.go -package=mocks . Acceptor
@@ -208,10 +207,10 @@ type CommandQueue interface {
 // Acceptor decides is a replica should accept a command.
 type Acceptor interface {
 	// Accept returns true if the replica should accept the command, false otherwise.
-	Accept(hotstuff.Command) bool
+	Accept(Command) bool
 	// Proposed tells the acceptor that the propose phase for the given command succeeded, and it should no longer be
 	// accepted in the future.
-	Proposed(hotstuff.Command)
+	Proposed(Command)
 }
 
 //go:generate mockgen -destination=../internal/mocks/executor_mock.go -package=mocks . Executor
@@ -219,25 +218,25 @@ type Acceptor interface {
 // Executor is responsible for executing the commands that are committed by the consensus protocol.
 type Executor interface {
 	// Exec executes the given command.
-	Exec(hotstuff.Command)
+	Exec(Command)
 }
 
 // CryptoImpl implements only the cryptographic primitives that are needed for HotStuff.
 // This interface is implemented by the ecdsa and bls12 packages.
 type CryptoImpl interface {
 	// Sign signs a hash.
-	Sign(hash hotstuff.Hash) (sig hotstuff.Signature, err error)
+	Sign(hash Hash) (sig Signature, err error)
 	// Verify verifies a signature given a hash.
-	Verify(sig hotstuff.Signature, hash hotstuff.Hash) bool
+	Verify(sig Signature, hash Hash) bool
 	// CreateThresholdSignature creates a threshold signature from the given partial signatures.
-	CreateThresholdSignature(partialSignatures []hotstuff.Signature, hash hotstuff.Hash) (hotstuff.ThresholdSignature, error)
+	CreateThresholdSignature(partialSignatures []Signature, hash Hash) (ThresholdSignature, error)
 	// CreateThresholdSignatureForMessageSet creates a threshold signature where each partial signature has signed a
 	// different message hash.
-	CreateThresholdSignatureForMessageSet(partialSignatures []hotstuff.Signature, hashes map[hotstuff.ID]hotstuff.Hash) (hotstuff.ThresholdSignature, error)
+	CreateThresholdSignatureForMessageSet(partialSignatures []Signature, hashes map[ID]Hash) (ThresholdSignature, error)
 	// VerifyThresholdSignature verifies a threshold signature.
-	VerifyThresholdSignature(signature hotstuff.ThresholdSignature, hash hotstuff.Hash) bool
+	VerifyThresholdSignature(signature ThresholdSignature, hash Hash) bool
 	// VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
-	VerifyThresholdSignatureForMessageSet(signature hotstuff.ThresholdSignature, hashes map[hotstuff.ID]hotstuff.Hash) bool
+	VerifyThresholdSignatureForMessageSet(signature ThresholdSignature, hashes map[ID]Hash) bool
 }
 
 // Crypto implements the methods required to create and verify signatures and certificates.
@@ -245,21 +244,21 @@ type CryptoImpl interface {
 type Crypto interface {
 	CryptoImpl
 	// CreatePartialCert signs a single block and returns the partial certificate.
-	CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error)
+	CreatePartialCert(block *Block) (cert PartialCert, err error)
 	// CreateQuorumCert creates a quorum certificate from a list of partial certificates.
-	CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error)
+	CreateQuorumCert(block *Block, signatures []PartialCert) (cert QuorumCert, err error)
 	// CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
-	CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (cert hotstuff.TimeoutCert, err error)
+	CreateTimeoutCert(view View, timeouts []TimeoutMsg) (cert TimeoutCert, err error)
 	// CreateAggregateQC creates an AggregateQC from the given timeout messages.
-	CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (aggQC hotstuff.AggregateQC, err error)
+	CreateAggregateQC(view View, timeouts []TimeoutMsg) (aggQC AggregateQC, err error)
 	// VerifyPartialCert verifies a single partial certificate.
-	VerifyPartialCert(cert hotstuff.PartialCert) bool
+	VerifyPartialCert(cert PartialCert) bool
 	// VerifyQuorumCert verifies a quorum certificate.
-	VerifyQuorumCert(qc hotstuff.QuorumCert) bool
+	VerifyQuorumCert(qc QuorumCert) bool
 	// VerifyTimeoutCert verifies a timeout certificate.
-	VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool
+	VerifyTimeoutCert(tc TimeoutCert) bool
 	// VerifyAggregateQC verifies an AggregateQC.
-	VerifyAggregateQC(aggQC hotstuff.AggregateQC) (ok bool, highQC hotstuff.QuorumCert)
+	VerifyAggregateQC(aggQC AggregateQC) (ok bool, highQC QuorumCert)
 }
 
 // BlockChain is a datastructure that stores a chain of blocks.
@@ -267,16 +266,16 @@ type Crypto interface {
 // but a block must be stored until at least one of its children have been committed.
 type BlockChain interface {
 	// Store stores a block in the blockchain.
-	Store(*hotstuff.Block)
+	Store(*Block)
 
 	// Get retrieves a block given its hash, attempting to fetching it from other replicas if necessary.
-	Get(hotstuff.Hash) (*hotstuff.Block, bool)
+	Get(Hash) (*Block, bool)
 
 	// LocalGet retrieves a block given its hash, without fetching it from other replicas.
-	LocalGet(hotstuff.Hash) (*hotstuff.Block, bool)
+	LocalGet(Hash) (*Block, bool)
 
 	// Extends checks if the given block extends the branch of the target hash.
-	Extends(block, target *hotstuff.Block) bool
+	Extends(block, target *Block) bool
 }
 
 //go:generate mockgen -destination=../internal/mocks/replica_mock.go -package=mocks . Replica
@@ -285,13 +284,13 @@ type BlockChain interface {
 // The methods Vote, NewView, and Deliver must send the respective arguments to the remote replica.
 type Replica interface {
 	// ID returns the replica's id.
-	ID() hotstuff.ID
+	ID() ID
 	// PublicKey returns the replica's public key.
-	PublicKey() hotstuff.PublicKey
+	PublicKey() PublicKey
 	// Vote sends the partial certificate to the other replica.
-	Vote(cert hotstuff.PartialCert)
+	Vote(cert PartialCert)
 	// NewView sends the quorum certificate to the other replica.
-	NewView(hotstuff.SyncInfo)
+	NewView(SyncInfo)
 }
 
 //go:generate mockgen -destination=../internal/mocks/configuration_mock.go -package=mocks . Configuration
@@ -300,19 +299,19 @@ type Replica interface {
 // It provides methods to send messages to the other replicas.
 type Configuration interface {
 	// Replicas returns all of the replicas in the configuration.
-	Replicas() map[hotstuff.ID]Replica
+	Replicas() map[ID]Replica
 	// Replica returns a replica if present in the configuration.
-	Replica(hotstuff.ID) (replica Replica, ok bool)
+	Replica(ID) (replica Replica, ok bool)
 	// Len returns the number of replicas in the configuration.
 	Len() int
 	// QuorumSize returns the size of a quorum.
 	QuorumSize() int
 	// Propose sends the block to all replicas in the configuration.
-	Propose(proposal hotstuff.ProposeMsg)
+	Propose(proposal ProposeMsg)
 	// Timeout sends the timeout message to all replicas.
-	Timeout(msg hotstuff.TimeoutMsg)
+	Timeout(msg TimeoutMsg)
 	// Fetch requests a block from all the replicas in the configuration.
-	Fetch(ctx context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool)
+	Fetch(ctx context.Context, hash Hash) (block *Block, ok bool)
 }
 
 //go:generate mockgen -destination=../internal/mocks/consensus_mock.go -package=mocks . Consensus
@@ -322,46 +321,43 @@ type Configuration interface {
 // The methods OnPropose, OnVote, OnNewView, and OnDeliver should be called upon receiving a corresponding message.
 type Consensus interface {
 	// StopVoting ensures that no voting happens in a view earlier than `view`.
-	StopVoting(view hotstuff.View)
+	StopVoting(view View)
 	// Propose starts a new proposal. The command is fetched from the command queue.
-	Propose(cert hotstuff.SyncInfo)
+	Propose(cert SyncInfo)
 	// OnPropose handles an incoming proposal.
 	// A leader should call this method on itself.
-	OnPropose(proposal hotstuff.ProposeMsg)
+	OnPropose(proposal ProposeMsg)
 }
 
 // VotingMachine handles incoming votes, and combines them into a Quorum Certificate when a quorum of votes is received.
 type VotingMachine interface {
 	// OnVote handles an incoming vote.
-	OnVote(vote hotstuff.VoteMsg)
+	OnVote(vote VoteMsg)
 }
 
 // LeaderRotation implements a leader rotation scheme.
 type LeaderRotation interface {
 	// GetLeader returns the id of the leader in the given view.
-	GetLeader(hotstuff.View) hotstuff.ID
+	GetLeader(View) ID
 }
 
 //go:generate mockgen -destination=../internal/mocks/synchronizer_mock.go -package=mocks . Synchronizer
 
 // Synchronizer synchronizes replicas to the same view.
 type Synchronizer interface {
-	// OnRemoteTimeout handles an incoming timeout from a remote replica.
-	OnRemoteTimeout(hotstuff.TimeoutMsg)
 	// AdvanceView attempts to advance to the next view using the given QC.
 	// qc must be either a regular quorum certificate, or a timeout certificate.
-	AdvanceView(hotstuff.SyncInfo)
-	OnNewView(hotstuff.NewViewMsg)
+	AdvanceView(SyncInfo)
 	// View returns the current view.
-	View() hotstuff.View
+	View() View
 	// ViewContext returns a context that is cancelled at the end of the view.
 	ViewContext() context.Context
 	// UpdateHighQC updates the highest known QC.
-	UpdateHighQC(hotstuff.QuorumCert)
+	UpdateHighQC(QuorumCert)
 	// HighQC returns the highest known QC.
-	HighQC() hotstuff.QuorumCert
+	HighQC() QuorumCert
 	// LeafBlock returns the current leaf block.
-	LeafBlock() *hotstuff.Block
+	LeafBlock() *Block
 	// Start starts the synchronizer with the given context.
 	Start(context.Context)
 }
