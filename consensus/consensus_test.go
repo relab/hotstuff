@@ -5,8 +5,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus/chainedhotstuff"
-	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/synchronizer"
 )
@@ -15,30 +13,32 @@ import (
 func TestVote(t *testing.T) {
 	const n = 4
 	ctrl := gomock.NewController(t)
-
-	chs := chainedhotstuff.New()
 	bl := testutil.CreateBuilders(t, ctrl, n)
-	synchronizer := synchronizer.New(testutil.FixedTimeout(1000))
-	bl[0].Register(chs, synchronizer)
+	bl[0].Register(synchronizer.New(testutil.FixedTimeout(1000)))
 	hl := bl.Build()
 	hs := hl[0]
 
-	// expect that the replica will propose after receiving enough votes.
-	hs.Config().(*mocks.MockConfig).EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.ProposeMsg{}))
+	ok := false
+	hs.EventLoop().RegisterAsyncHandler(func(event interface{}) (consume bool) {
+		ok = true
+		return true
+	}, hotstuff.NewViewMsg{})
 
-	b := testutil.NewProposeMsg(hotstuff.GetGenesis().Hash(), hl[0].ViewSynchronizer().HighQC(), "test", 1, 1)
+	b := testutil.NewProposeMsg(
+		hotstuff.GetGenesis().Hash(),
+		hotstuff.NewQuorumCert(nil, 1, hotstuff.GetGenesis().Hash()),
+		"test", 1, 1,
+	)
+	hs.BlockChain().Store(b.Block)
 
-	chs.OnPropose(b)
-
-	for i, signer := range hl.Signers()[1:] {
+	for i, signer := range hl.Signers() {
 		pc, err := signer.CreatePartialCert(b.Block)
 		if err != nil {
 			t.Fatalf("Failed to create partial certificate: %v", err)
 		}
 		hs.VotingMachine().OnVote(hotstuff.VoteMsg{ID: hotstuff.ID(i + 1), PartialCert: pc})
 	}
-
-	if hl[0].ViewSynchronizer().HighQC().BlockHash() != b.Block.Hash() {
-		t.Errorf("HighQC was not updated.")
+	if !ok {
+		t.Error("No new view event happened")
 	}
 }

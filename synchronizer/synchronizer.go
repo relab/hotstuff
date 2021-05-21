@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/modules"
 )
 
-// Synchronizer is a dumb implementation of the hotstuff.ViewSynchronizer interface.
+// Synchronizer is a dumb implementation of the modules.Synchronizer interface.
 // It does not do anything to ensure synchronization, it simply makes the local replica
 // propose at the correct time, and send new view messages in case of a timeout.
 type Synchronizer struct {
-	mod *hotstuff.HotStuff
+	mod *modules.Modules
 
 	currentView hotstuff.View
 	highTC      hotstuff.TimeoutCert
@@ -35,8 +36,8 @@ type Synchronizer struct {
 }
 
 // InitModule initializes the synchronizer with the given HotStuff instance.
-func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff, opts *hotstuff.OptionsBuilder) {
-	if duration, ok := s.duration.(hotstuff.Module); ok {
+func (s *Synchronizer) InitModule(hs *modules.Modules, opts *modules.OptionsBuilder) {
+	if duration, ok := s.duration.(modules.Module); ok {
 		duration.InitModule(hs, opts)
 	}
 	s.mod = hs
@@ -65,7 +66,7 @@ func (s *Synchronizer) InitModule(hs *hotstuff.HotStuff, opts *hotstuff.OptionsB
 }
 
 // New creates a new Synchronizer.
-func New(viewDuration ViewDuration) hotstuff.ViewSynchronizer {
+func New(viewDuration ViewDuration) modules.Synchronizer {
 	return &Synchronizer{
 		leafBlock:   hotstuff.GetGenesis(),
 		currentView: 1,
@@ -126,7 +127,7 @@ func (s *Synchronizer) onLocalTimeout() {
 	defer s.timer.Reset(s.duration.Duration())
 
 	if s.lastTimeout != nil && s.lastTimeout.View == s.currentView {
-		s.mod.Config().Timeout(*s.lastTimeout)
+		s.mod.Configuration().Timeout(*s.lastTimeout)
 		return
 	}
 
@@ -159,7 +160,7 @@ func (s *Synchronizer) onLocalTimeout() {
 	// stop voting for current view
 	s.mod.Consensus().StopVoting(s.currentView)
 
-	s.mod.Config().Timeout(timeoutMsg)
+	s.mod.Configuration().Timeout(timeoutMsg)
 	s.OnRemoteTimeout(timeoutMsg)
 }
 
@@ -192,7 +193,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		timeouts[timeout.ID] = timeout
 	}
 
-	if len(timeouts) < s.mod.Config().QuorumSize() {
+	if len(timeouts) < s.mod.Configuration().QuorumSize() {
 		return
 	}
 
@@ -268,7 +269,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	leader := s.mod.LeaderRotation().GetLeader(s.currentView)
 	if leader == s.mod.ID() {
 		s.mod.Consensus().Propose(syncInfo)
-	} else if replica, ok := s.mod.Config().Replica(leader); ok {
+	} else if replica, ok := s.mod.Configuration().Replica(leader); ok {
 		replica.NewView(syncInfo)
 	}
 }
@@ -298,4 +299,4 @@ func (s *Synchronizer) UpdateHighQC(qc hotstuff.QuorumCert) {
 	}
 }
 
-var _ hotstuff.ViewSynchronizer = (*Synchronizer)(nil)
+var _ modules.Synchronizer = (*Synchronizer)(nil)

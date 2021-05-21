@@ -7,12 +7,13 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/client"
+	"github.com/relab/hotstuff/modules"
 	"google.golang.org/protobuf/proto"
 )
 
 type cmdCache struct {
 	mut           sync.Mutex
-	mod           *hotstuff.HotStuff
+	mod           *modules.Modules
 	c             chan struct{}
 	batchSize     int
 	serialNumbers map[uint32]uint64 // highest proposed serial number per client ID
@@ -32,7 +33,7 @@ func newCmdCache(batchSize int) *cmdCache {
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (c *cmdCache) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
+func (c *cmdCache) InitModule(hs *modules.Modules, _ *modules.OptionsBuilder) {
 	c.mod = hs
 }
 
@@ -146,4 +147,4 @@ func (c *cmdCache) Proposed(cmd hotstuff.Command) {
 	}
 }
 
-var _ hotstuff.Acceptor = (*cmdCache)(nil)
+var _ modules.Acceptor = (*cmdCache)(nil)

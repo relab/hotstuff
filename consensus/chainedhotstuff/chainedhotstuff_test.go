@@ -15,6 +15,7 @@ import (
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/leaderrotation"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -25,7 +26,7 @@ func TestPropose(t *testing.T) {
 	hs := New()
 	builder := testutil.TestModules(t, ctrl, 1, testutil.GenerateECDSAKey(t))
 	synchronizer := synchronizer.New(testutil.FixedTimeout(1000))
-	cfg, replicas := testutil.CreateMockConfigWithReplicas(t, ctrl, 2)
+	cfg, replicas := testutil.CreateMockConfigurationWithReplicas(t, ctrl, 2)
 	builder.Register(hs, cfg, testutil.NewLeaderRotation(t, 1, 2), synchronizer)
 	builder.Build()
 
@@ -54,7 +55,7 @@ func TestCommit(t *testing.T) {
 	acceptor := mocks.NewMockAcceptor(ctrl)
 	executor := mocks.NewMockExecutor(ctrl)
 	synchronizer := synchronizer.New(testutil.FixedTimeout(1000))
-	cfg, replicas := testutil.CreateMockConfigWithReplicas(t, ctrl, n, keys...)
+	cfg, replicas := testutil.CreateMockConfigurationWithReplicas(t, ctrl, n, keys...)
 	bl[0].Register(hs, cfg, acceptor, executor, synchronizer, leaderrotation.NewFixed(2))
 	hl := bl.Build()
 	signers := hl.Signers()
@@ -120,7 +121,7 @@ func TestForkingAttack(t *testing.T) {
 	hs := New()
 	keys := testutil.GenerateKeys(t, n, testutil.GenerateECDSAKey)
 	bl := testutil.CreateBuilders(t, ctrl, n, keys...)
-	cfg, replicas := testutil.CreateMockConfigWithReplicas(t, ctrl, n, keys...)
+	cfg, replicas := testutil.CreateMockConfigurationWithReplicas(t, ctrl, n, keys...)
 	executor := mocks.NewMockExecutor(ctrl)
 	synchronizer := synchronizer.New(testutil.FixedTimeout(1000))
 	bl[0].Register(hs, cfg, executor, synchronizer, leaderrotation.NewFixed(2))
@@ -166,7 +167,7 @@ func TestForkingAttack(t *testing.T) {
 	_ = advanceView(t, hs, block, signers)
 }
 
-func advanceView(t *testing.T, hs *ChainedHotStuff, lastProposal *hotstuff.Block, signers []hotstuff.Crypto) *hotstuff.Block {
+func advanceView(t *testing.T, hs *ChainedHotStuff, lastProposal *hotstuff.Block, signers []modules.Crypto) *hotstuff.Block {
 	t.Helper()
 
 	qc := testutil.CreateQC(t, lastProposal, signers)
@@ -199,7 +200,7 @@ func TestChainedHotstuff(t *testing.T) {
 	builders := testutil.CreateBuilders(t, ctrl, n, keys...)
 	configs := make([]*gorums.Config, n)
 	servers := make([]*gorums.Server, n)
-	synchronizers := make([]hotstuff.ViewSynchronizer, n)
+	synchronizers := make([]modules.Synchronizer, n)
 	for i := 0; i < n; i++ {
 		c := *baseCfg
 		c.ID = hotstuff.ID(i + 1)
@@ -249,8 +250,8 @@ func TestChainedHotstuff(t *testing.T) {
 	}
 
 	for _, hs := range hl {
-		go func(hs *hotstuff.HotStuff) {
-			hs.ViewSynchronizer().Start(ctx)
+		go func(hs *modules.Modules) {
+			hs.Synchronizer().Start(ctx)
 			hs.EventLoop().Run(ctx)
 		}(hs)
 	}

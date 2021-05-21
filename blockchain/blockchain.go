@@ -1,4 +1,4 @@
-// Package blockchain provides an implementation of the hotstuff.Blockchain interface.
+// Package blockchain provides an implementation of the modules.BlockChain interface.
 package blockchain
 
 import (
@@ -7,12 +7,13 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/modules"
 )
 
 // blockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type blockChain struct {
-	mod *hotstuff.HotStuff
+	mod *modules.Modules
 
 	mut          sync.Mutex
 	maxSize      int
@@ -22,7 +23,7 @@ type blockChain struct {
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (chain *blockChain) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
+func (chain *blockChain) InitModule(hs *modules.Modules, _ *modules.OptionsBuilder) {
 	chain.mod = hs
 
 	chain.mod.EventLoop().RegisterAsyncHandler(func(event interface{}) (consume bool) {
@@ -34,7 +35,7 @@ func (chain *blockChain) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBu
 
 // New creates a new blockChain with a maximum size.
 // Blocks are dropped in least recently used order.
-func New(maxSize int) hotstuff.BlockChain {
+func New(maxSize int) modules.BlockChain {
 	bc := &blockChain{
 		maxSize:      maxSize,
 		blocks:       make(map[hotstuff.Hash]*list.Element),
@@ -100,12 +101,12 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 		goto done
 	}
 
-	ctx, cancel = context.WithCancel(chain.mod.ViewSynchronizer().ViewContext())
+	ctx, cancel = context.WithCancel(chain.mod.Synchronizer().ViewContext())
 	chain.pendingFetch[hash] = cancel
 
 	chain.mut.Unlock()
 	chain.mod.Logger().Debugf("Attempting to fetch block: %.8s", hash)
-	block, ok = chain.mod.Config().Fetch(ctx, hash)
+	block, ok = chain.mod.Configuration().Fetch(ctx, hash)
 	chain.mut.Lock()
 
 	delete(chain.pendingFetch, hash)
@@ -142,4 +143,4 @@ func (chain *blockChain) Extends(block, target *hotstuff.Block) bool {
 	return ok && current.Hash() == target.Hash()
 }
 
-var _ hotstuff.BlockChain = (*blockChain)(nil)
+var _ modules.BlockChain = (*blockChain)(nil)

@@ -1,6 +1,6 @@
 // Package config contains structs that are useful for initializing hotstuff.
 //
-// These structs do not implement the hotstuff.Replica or hotstuff.Config interfaces,
+// These structs do not implement the modules.Replica or modules.Configuration interfaces,
 // but do contain more or less the same information.
 package config
 

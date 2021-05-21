@@ -1,4 +1,4 @@
-package hotstuff
+package modules
 
 // Options stores runtime configuration settings.
 type Options struct {

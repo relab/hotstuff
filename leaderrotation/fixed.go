@@ -1,6 +1,9 @@
 package leaderrotation
 
-import "github.com/relab/hotstuff"
+import (
+	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/modules"
+)
 
 type fixed struct {
 	leader hotstuff.ID
@@ -12,6 +15,6 @@ func (f fixed) GetLeader(_ hotstuff.View) hotstuff.ID {
 }
 
 // NewFixed returns a new fixed-leader leader rotation implementation.
-func NewFixed(leader hotstuff.ID) hotstuff.LeaderRotation {
+func NewFixed(leader hotstuff.ID) modules.LeaderRotation {
 	return fixed{leader}
 }

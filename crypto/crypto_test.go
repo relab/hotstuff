@@ -9,6 +9,7 @@ import (
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/internal/testutil"
+	"github.com/relab/hotstuff/modules"
 )
 
 func TestCreatePartialCert(t *testing.T) {
@@ -169,7 +170,7 @@ func runAll(t *testing.T, run func(*testing.T, setupFunc)) {
 	t.Run("Cache+BLS12-381", func(t *testing.T) { run(t, setup(NewCache(bls12.New), testutil.GenerateBLS12Key)) })
 }
 
-func createBlock(t *testing.T, signer hotstuff.Crypto) *hotstuff.Block {
+func createBlock(t *testing.T, signer modules.Crypto) *hotstuff.Block {
 	t.Helper()
 
 	qc, err := signer.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
@@ -184,31 +185,31 @@ func createBlock(t *testing.T, signer hotstuff.Crypto) *hotstuff.Block {
 type keyFunc func(t *testing.T) hotstuff.PrivateKey
 type setupFunc func(*testing.T, *gomock.Controller, int) testData
 
-func setup(newFunc func() hotstuff.Crypto, keyFunc keyFunc) setupFunc {
+func setup(newFunc func() modules.Crypto, keyFunc keyFunc) setupFunc {
 	return func(t *testing.T, ctrl *gomock.Controller, n int) testData {
 		return newTestData(t, ctrl, n, newFunc, keyFunc)
 	}
 }
 
-func NewCache(impl func() hotstuff.CryptoImpl) func() hotstuff.Crypto {
-	return func() hotstuff.Crypto {
+func NewCache(impl func() modules.CryptoImpl) func() modules.Crypto {
+	return func() modules.Crypto {
 		return crypto.NewCache(impl(), 10)
 	}
 }
 
-func NewBase(impl func() hotstuff.CryptoImpl) func() hotstuff.Crypto {
-	return func() hotstuff.Crypto {
+func NewBase(impl func() modules.CryptoImpl) func() modules.Crypto {
+	return func() modules.Crypto {
 		return crypto.New(impl())
 	}
 }
 
 type testData struct {
-	signers   []hotstuff.Crypto
-	verifiers []hotstuff.Crypto
+	signers   []modules.Crypto
+	verifiers []modules.Crypto
 	block     *hotstuff.Block
 }
 
-func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() hotstuff.Crypto, keyFunc keyFunc) testData {
+func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() modules.Crypto, keyFunc keyFunc) testData {
 	t.Helper()
 
 	bl := testutil.CreateBuilders(t, ctrl, n, testutil.GenerateKeys(t, n, keyFunc)...)

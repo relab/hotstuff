@@ -6,7 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net"
-	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,8 +14,9 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/internal/mocks"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/testutil"
+	"github.com/relab/hotstuff/modules"
 	"google.golang.org/grpc/credentials"
 )
 
@@ -41,90 +42,79 @@ func TestConnect(t *testing.T) {
 	runBoth(t, run)
 }
 
-func TestPropose(t *testing.T) {
+// testBase is a generic test for a unicast/multicast call
+func testBase(t *testing.T, send func(modules.Configuration), handle eventloop.EventHandler, typ interface{}) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		ctrl := gomock.NewController(t)
 		td := setup(t, ctrl, n)
 		cfg, teardown := createConfig(t, td, ctrl)
-		mocks := createMocks(t, ctrl, td, n)
+		defer teardown()
 		td.builders[0].Register(cfg)
 		hl := td.builders.Build()
 
-		defer teardown()
-
-		qc := hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
-		proposal := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "foo", 1, 1)
-		// the configuration has ID 1, so we won't be receiving any proposal for that replica.
-		c := make(chan struct{}, n-1)
-		for _, mock := range mocks[1:] {
-			mock.EXPECT().OnPropose(gomock.AssignableToTypeOf(hotstuff.ProposeMsg{})).Do(func(p hotstuff.ProposeMsg) {
-				block := p.Block
-				if block.Hash() != proposal.Hash() {
-					t.Error("hash mismatch")
-				}
-				c <- struct{}{}
-			})
-		}
-
 		ctx, cancel := context.WithCancel(context.Background())
-		cfg.Propose(hotstuff.ProposeMsg{ID: 1, Block: proposal})
-		for i := 1; i < n; i++ {
-			go func(hs *hotstuff.HotStuff) {
-				hs.ViewSynchronizer().Start(ctx)
-				hs.EventLoop().Run(ctx)
-			}(hl[i])
-			<-c
+		for _, hs := range hl[1:] {
+			hs.EventLoop().RegisterHandler(handle, typ)
+			go hs.EventLoop().Run(ctx)
 		}
+		send(cfg)
 		cancel()
 	}
 	runBoth(t, run)
 }
 
-func TestTimeout(t *testing.T) {
-	run := func(t *testing.T, setup setupFunc) {
-		const n = 4
-		ctrl := gomock.NewController(t)
-		td := setup(t, ctrl, n)
-		cfg, teardown := createConfig(t, td, ctrl)
-		defer teardown()
-		synchronizers := make([]*mocks.MockViewSynchronizer, n)
-		for i := 0; i < n; i++ {
-			synchronizers[i] = mocks.NewMockViewSynchronizer(ctrl)
-			td.builders[i].Register(synchronizers[i])
-		}
-		hl := td.builders.Build()
-		signer := hl[0].Crypto()
-
-		qc := hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
-		timeout := hotstuff.TimeoutMsg{
-			ID:            1,
-			View:          1,
-			SyncInfo:      hotstuff.NewSyncInfo().WithQC(qc),
-			ViewSignature: testutil.Sign(t, hotstuff.View(1).ToHash(), signer),
-		}
-
-		c := make(chan struct{}, n-1)
-		for _, mock := range synchronizers[1:] {
-			mock.EXPECT().Start().AnyTimes()
-			mock.EXPECT().Stop().AnyTimes()
-			mock.EXPECT().OnRemoteTimeout(gomock.AssignableToTypeOf(timeout)).Do(func(tm hotstuff.TimeoutMsg) {
-				if !reflect.DeepEqual(timeout, tm) {
-					t.Fatalf("expected timeouts to be equal. got: %v, want: %v", tm, timeout)
-				}
-				c <- struct{}{}
-			})
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		cfg.Timeout(timeout)
-		for i := 1; i < n; i++ {
-			go hl[i].EventLoop().Run(ctx)
-			<-c
-		}
-		cancel()
+func TestPropose(t *testing.T) {
+	var wg sync.WaitGroup
+	want := hotstuff.ProposeMsg{
+		ID: 1,
+		Block: hotstuff.NewBlock(
+			hotstuff.GetGenesis().Hash(),
+			hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
+			"foo", 1, 1,
+		),
 	}
-	runBoth(t, run)
+	testBase(t, func(cfg modules.Configuration) {
+		wg.Add(3)
+		cfg.Propose(want)
+		wg.Wait()
+	}, func(event interface{}) (consume bool) {
+		got := event.(hotstuff.ProposeMsg)
+		if got.ID != want.ID {
+			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
+		}
+		if got.Block.Hash() != want.Block.Hash() {
+			t.Error("block hashes do not match")
+		}
+		wg.Done()
+		return true
+	}, want)
+}
+
+func TestTimeout(t *testing.T) {
+	var wg sync.WaitGroup
+	want := hotstuff.TimeoutMsg{
+		ID:            1,
+		View:          1,
+		ViewSignature: nil,
+		SyncInfo:      hotstuff.NewSyncInfo(),
+	}
+	testBase(t, func(cfg modules.Configuration) {
+		wg.Add(3)
+		cfg.Timeout(want)
+		wg.Wait()
+	}, func(event interface{}) (consume bool) {
+		got := event.(hotstuff.TimeoutMsg)
+		if got.ID != want.ID {
+			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
+		}
+		if got.View != want.View {
+			t.Errorf("wrong view in proposal: got: %d, want: %d", got.View, want.View)
+		}
+		wg.Done()
+		return true
+	}, want)
+
 }
 
 type testData struct {
@@ -238,14 +228,4 @@ func createConfig(t *testing.T, td testData, ctrl *gomock.Controller) (cfg *Conf
 		cfg.Close()
 		serverTeardown()
 	}
-}
-
-func createMocks(t *testing.T, ctrl *gomock.Controller, td testData, n int) (m []*mocks.MockConsensus) {
-	t.Helper()
-	m = make([]*mocks.MockConsensus, n)
-	for i := range m {
-		m[i] = mocks.NewMockConsensus(ctrl)
-		td.builders[i].Register(m[i])
-	}
-	return
 }

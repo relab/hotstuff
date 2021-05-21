@@ -6,10 +6,11 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/modules"
 )
 
 type cache struct {
-	impl        hotstuff.CryptoImpl
+	impl        modules.CryptoImpl
 	mut         sync.Mutex
 	capacity    int
 	entries     map[hotstuff.Hash]*list.Element
@@ -18,7 +19,7 @@ type cache struct {
 
 // NewCache returns a new Crypto implementation that caches the results of the operations of the given CryptoImpl
 // implementation.
-func NewCache(impl hotstuff.CryptoImpl, capacity int) hotstuff.Crypto {
+func NewCache(impl modules.CryptoImpl, capacity int) modules.Crypto {
 	return New(&cache{
 		impl:     impl,
 		capacity: capacity,
@@ -27,8 +28,8 @@ func NewCache(impl hotstuff.CryptoImpl, capacity int) hotstuff.Crypto {
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (cache *cache) InitModule(hs *hotstuff.HotStuff, cfg *hotstuff.OptionsBuilder) {
-	if mod, ok := cache.impl.(hotstuff.Module); ok {
+func (cache *cache) InitModule(hs *modules.Modules, cfg *modules.OptionsBuilder) {
+	if mod, ok := cache.impl.(modules.Module); ok {
 		mod.InitModule(hs, cfg)
 	}
 }

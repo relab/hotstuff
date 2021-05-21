@@ -2,21 +2,22 @@ package crypto
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/modules"
 )
 
 type base struct {
-	hotstuff.CryptoImpl
+	modules.CryptoImpl
 }
 
 // New returns a new base implementation of the Crypto interface. It will use the given CryptoImpl to create and verify
 // signatures.
-func New(impl hotstuff.CryptoImpl) hotstuff.Crypto {
+func New(impl modules.CryptoImpl) modules.Crypto {
 	return base{CryptoImpl: impl}
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (base base) InitModule(hs *hotstuff.HotStuff, cfg *hotstuff.OptionsBuilder) {
-	if mod, ok := base.CryptoImpl.(hotstuff.Module); ok {
+func (base base) InitModule(hs *modules.Modules, cfg *modules.OptionsBuilder) {
+	if mod, ok := base.CryptoImpl.(modules.Module); ok {
 		mod.InitModule(hs, cfg)
 	}
 }

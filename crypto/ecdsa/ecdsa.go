@@ -10,6 +10,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
+	"github.com/relab/hotstuff/modules"
 	"go.uber.org/multierr"
 )
 
@@ -115,15 +116,15 @@ var _ hotstuff.ThresholdSignature = (*ThresholdSignature)(nil)
 var _ hotstuff.IDSet = (*ThresholdSignature)(nil)
 
 type ecdsaCrypto struct {
-	mod *hotstuff.HotStuff
+	mod *modules.Modules
 }
 
-func (ec *ecdsaCrypto) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
+func (ec *ecdsaCrypto) InitModule(hs *modules.Modules, _ *modules.OptionsBuilder) {
 	ec.mod = hs
 }
 
 // New returns a new signer and a new verifier.
-func New() hotstuff.CryptoImpl {
+func New() modules.CryptoImpl {
 	ec := &ecdsaCrypto{}
 	return ec
 }
@@ -152,7 +153,7 @@ func (ec *ecdsaCrypto) Verify(sig hotstuff.Signature, hash hotstuff.Hash) bool {
 	if !ok {
 		return false
 	}
-	replica, ok := ec.mod.Config().Replica(sig.Signer())
+	replica, ok := ec.mod.Configuration().Replica(sig.Signer())
 	if !ok {
 		ec.mod.Logger().Infof("ecdsaCrypto: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
 		return false
@@ -183,7 +184,7 @@ func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []hotstuff.Sig
 		}
 	}
 
-	if len(thrSig) >= ec.mod.Config().QuorumSize() {
+	if len(thrSig) >= ec.mod.Configuration().QuorumSize() {
 		return thrSig, nil
 	}
 
@@ -219,7 +220,7 @@ func (ec *ecdsaCrypto) CreateThresholdSignatureForMessageSet(partialSignatures [
 		}
 	}
 
-	if len(thrSig) >= ec.mod.Config().QuorumSize() {
+	if len(thrSig) >= ec.mod.Configuration().QuorumSize() {
 		return thrSig, nil
 	}
 
@@ -232,7 +233,7 @@ func (ec *ecdsaCrypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 	if !ok {
 		return false
 	}
-	if len(sig) < ec.mod.Config().QuorumSize() {
+	if len(sig) < ec.mod.Configuration().QuorumSize() {
 		return false
 	}
 	results := make(chan bool)
@@ -247,7 +248,7 @@ func (ec *ecdsaCrypto) VerifyThresholdSignature(signature hotstuff.ThresholdSign
 			numVerified++
 		}
 	}
-	return numVerified >= ec.mod.Config().QuorumSize()
+	return numVerified >= ec.mod.Configuration().QuorumSize()
 }
 
 // VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
@@ -278,7 +279,7 @@ func (ec *ecdsaCrypto) VerifyThresholdSignatureForMessageSet(signature hotstuff.
 			numVerified++
 		}
 	}
-	return numVerified >= ec.mod.Config().QuorumSize()
+	return numVerified >= ec.mod.Configuration().QuorumSize()
 }
 
-var _ hotstuff.CryptoImpl = (*ecdsaCrypto)(nil)
+var _ modules.CryptoImpl = (*ecdsaCrypto)(nil)

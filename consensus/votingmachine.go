@@ -4,12 +4,13 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/modules"
 )
 
 // VotingMachine collects votes.
 type VotingMachine struct {
 	mut           sync.Mutex
-	mod           *hotstuff.HotStuff
+	mod           *modules.Modules
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
 }
 
@@ -22,7 +23,7 @@ func NewVotingMachine() *VotingMachine {
 
 // InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
 // settings using the ConfigBuilder.
-func (vm *VotingMachine) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
+func (vm *VotingMachine) InitModule(hs *modules.Modules, _ *modules.OptionsBuilder) {
 	vm.mod = hs
 	vm.mod.EventLoop().RegisterAsyncHandler(func(event interface{}) (consume bool) {
 		vote := event.(hotstuff.VoteMsg)
@@ -61,7 +62,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 		}
 	}
 
-	if block.View() <= vm.mod.ViewSynchronizer().LeafBlock().View() {
+	if block.View() <= vm.mod.Synchronizer().LeafBlock().View() {
 		// too old
 		return
 	}
@@ -79,7 +80,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 		// delete any pending QCs with lower height than bLeaf
 		for k := range vm.verifiedVotes {
 			if block, ok := vm.mod.BlockChain().LocalGet(k); ok {
-				if block.View() <= vm.mod.ViewSynchronizer().LeafBlock().View() {
+				if block.View() <= vm.mod.Synchronizer().LeafBlock().View() {
 					delete(vm.verifiedVotes, k)
 				}
 			} else {
@@ -92,7 +93,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 	votes = append(votes, cert)
 	vm.verifiedVotes[cert.BlockHash()] = votes
 
-	if len(votes) < vm.mod.Config().QuorumSize() {
+	if len(votes) < vm.mod.Configuration().QuorumSize() {
 		return
 	}
 

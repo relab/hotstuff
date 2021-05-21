@@ -12,6 +12,7 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/leaderrotation"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 
 	"github.com/golang/mock/gomock"
@@ -24,9 +25,9 @@ import (
 )
 
 // TestModules returns a builder containing default modules for testing.
-func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey hotstuff.PrivateKey) hotstuff.Builder {
+func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey hotstuff.PrivateKey) modules.Builder {
 	t.Helper()
-	builder := hotstuff.NewBuilder(id, privkey)
+	builder := modules.NewBuilder(id, privkey)
 
 	acceptor := mocks.NewMockAcceptor(ctrl)
 	acceptor.EXPECT().Accept(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes().Return(true)
@@ -40,17 +41,16 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 
 	signer := crypto.NewCache(ecdsa.New(), 10)
 
-	config := mocks.NewMockConfig(ctrl)
+	config := mocks.NewMockConfiguration(ctrl)
 	config.EXPECT().Len().AnyTimes().Return(1)
 	config.EXPECT().QuorumSize().AnyTimes().Return(3)
 
 	replica := CreateMockReplica(t, ctrl, id, privkey.Public())
 	ConfigAddReplica(t, config, replica)
-	config.EXPECT().Replicas().AnyTimes().Return((map[hotstuff.ID]hotstuff.Replica{1: replica}))
+	config.EXPECT().Replicas().AnyTimes().Return((map[hotstuff.ID]modules.Replica{1: replica}))
 
-	synchronizer := mocks.NewMockViewSynchronizer(ctrl)
-	synchronizer.EXPECT().Start().AnyTimes()
-	synchronizer.EXPECT().Stop().AnyTimes()
+	synchronizer := mocks.NewMockSynchronizer(ctrl)
+	synchronizer.EXPECT().Start(gomock.Any()).AnyTimes()
 	synchronizer.EXPECT().ViewContext().AnyTimes().Return(context.Background())
 
 	builder.Register(
@@ -70,10 +70,10 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 }
 
 // BuilderList is a helper type to perform actions on a set of builders.
-type BuilderList []*hotstuff.Builder
+type BuilderList []*modules.Builder
 
 // HotStuffList is a helper type to perform actions on a set of HotStuff instances.
-type HotStuffList []*hotstuff.HotStuff
+type HotStuffList []*modules.Modules
 
 // Build calls Build() for all of the builders.
 func (bl BuilderList) Build() HotStuffList {
@@ -85,8 +85,8 @@ func (bl BuilderList) Build() HotStuffList {
 }
 
 // Signers returns the set of signers from all of the HotStuff instances.
-func (hl HotStuffList) Signers() (signers []hotstuff.Crypto) {
-	signers = make([]hotstuff.Crypto, len(hl))
+func (hl HotStuffList) Signers() (signers []modules.Crypto) {
+	signers = make([]modules.Crypto, len(hl))
 	for i, hs := range hl {
 		signers[i] = hs.Crypto()
 	}
@@ -94,8 +94,8 @@ func (hl HotStuffList) Signers() (signers []hotstuff.Crypto) {
 }
 
 // Verifiers returns the set of verifiers from all of the HotStuff instances.
-func (hl HotStuffList) Verifiers() (verifiers []hotstuff.Crypto) {
-	verifiers = make([]hotstuff.Crypto, len(hl))
+func (hl HotStuffList) Verifiers() (verifiers []modules.Crypto) {
+	verifiers = make([]modules.Crypto, len(hl))
 	for i, hs := range hl {
 		verifiers[i] = hs.Crypto()
 	}
@@ -114,9 +114,9 @@ func (hl HotStuffList) Keys() (keys []hotstuff.PrivateKey) {
 // CreateBuilders creates n builders with default modules. Configurations are initialized with replicas.
 func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstuff.PrivateKey) (builders BuilderList) {
 	t.Helper()
-	builders = make([]*hotstuff.Builder, n)
+	builders = make([]*modules.Builder, n)
 	replicas := make([]*mocks.MockReplica, n)
-	configs := make([]*mocks.MockConfig, n)
+	configs := make([]*mocks.MockConfiguration, n)
 	for i := 0; i < n; i++ {
 		id := hotstuff.ID(i + 1)
 		var key hotstuff.PrivateKey
@@ -125,9 +125,9 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 		} else {
 			key = GenerateECDSAKey(t)
 		}
-		configs[i] = mocks.NewMockConfig(ctrl)
+		configs[i] = mocks.NewMockConfiguration(ctrl)
 		replicas[i] = CreateMockReplica(t, ctrl, id, key.Public())
-		builders[i] = new(hotstuff.Builder)
+		builders[i] = new(modules.Builder)
 		*builders[i] = TestModules(t, ctrl, id, key)
 		builders[i].Register(configs[i]) // replaces the config registered by TestModules()
 	}
@@ -137,8 +137,8 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 		}
 		config.EXPECT().Len().AnyTimes().Return(len(replicas))
 		config.EXPECT().QuorumSize().AnyTimes().Return(hotstuff.QuorumSize(len(replicas)))
-		config.EXPECT().Replicas().AnyTimes().DoAndReturn(func() map[hotstuff.ID]hotstuff.Replica {
-			m := make(map[hotstuff.ID]hotstuff.Replica)
+		config.EXPECT().Replicas().AnyTimes().DoAndReturn(func() map[hotstuff.ID]modules.Replica {
+			m := make(map[hotstuff.ID]modules.Replica)
 			for _, replica := range replicas {
 				m[replica.ID()] = replica
 			}
@@ -148,10 +148,10 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 	return builders
 }
 
-// CreateMockConfigWithReplicas creates a configuration with n replicas.
-func CreateMockConfigWithReplicas(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstuff.PrivateKey) (*mocks.MockConfig, []*mocks.MockReplica) {
+// CreateMockConfigurationWithReplicas creates a configuration with n replicas.
+func CreateMockConfigurationWithReplicas(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstuff.PrivateKey) (*mocks.MockConfiguration, []*mocks.MockReplica) {
 	t.Helper()
-	cfg := mocks.NewMockConfig(ctrl)
+	cfg := mocks.NewMockConfiguration(ctrl)
 	replicas := make([]*mocks.MockReplica, n)
 	if len(keys) == 0 {
 		keys = make([]hotstuff.PrivateKey, 0, n)
@@ -168,7 +168,7 @@ func CreateMockConfigWithReplicas(t *testing.T, ctrl *gomock.Controller, n int, 
 	return cfg, replicas
 }
 
-// CreateMockReplica returns a mock of a hotstuff.Replica.
+// CreateMockReplica returns a mock of a modules.Replica.
 func CreateMockReplica(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, key hotstuff.PublicKey) *mocks.MockReplica {
 	t.Helper()
 
@@ -188,7 +188,7 @@ func CreateMockReplica(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, ke
 }
 
 // ConfigAddReplica adds a mock replica to a mock configuration.
-func ConfigAddReplica(t *testing.T, cfg *mocks.MockConfig, replica *mocks.MockReplica) {
+func ConfigAddReplica(t *testing.T, cfg *mocks.MockConfiguration, replica *mocks.MockReplica) {
 	t.Helper()
 
 	cfg.
@@ -209,7 +209,7 @@ func CreateTCPListener(t *testing.T) net.Listener {
 }
 
 // Sign creates a signature using the given signer.
-func Sign(t *testing.T, hash hotstuff.Hash, signer hotstuff.Crypto) hotstuff.Signature {
+func Sign(t *testing.T, hash hotstuff.Hash, signer modules.Crypto) hotstuff.Signature {
 	t.Helper()
 	sig, err := signer.Sign(hash)
 	if err != nil {
@@ -219,7 +219,7 @@ func Sign(t *testing.T, hash hotstuff.Hash, signer hotstuff.Crypto) hotstuff.Sig
 }
 
 // CreateSignatures creates partial certificates from multiple signers.
-func CreateSignatures(t *testing.T, hash hotstuff.Hash, signers []hotstuff.Crypto) []hotstuff.Signature {
+func CreateSignatures(t *testing.T, hash hotstuff.Hash, signers []modules.Crypto) []hotstuff.Signature {
 	t.Helper()
 	sigs := make([]hotstuff.Signature, 0, len(signers))
 	for _, signer := range signers {
@@ -229,7 +229,7 @@ func CreateSignatures(t *testing.T, hash hotstuff.Hash, signers []hotstuff.Crypt
 }
 
 // CreateTimeouts creates a set of TimeoutMsg messages from the given signers.
-func CreateTimeouts(t *testing.T, view hotstuff.View, signers []hotstuff.Crypto) (timeouts []hotstuff.TimeoutMsg) {
+func CreateTimeouts(t *testing.T, view hotstuff.View, signers []modules.Crypto) (timeouts []hotstuff.TimeoutMsg) {
 	t.Helper()
 	timeouts = make([]hotstuff.TimeoutMsg, 0, len(signers))
 	viewSigs := CreateSignatures(t, view.ToHash(), signers)
@@ -248,7 +248,7 @@ func CreateTimeouts(t *testing.T, view hotstuff.View, signers []hotstuff.Crypto)
 }
 
 // CreatePC creates a partial certificate using the given signer.
-func CreatePC(t *testing.T, block *hotstuff.Block, signer hotstuff.Crypto) hotstuff.PartialCert {
+func CreatePC(t *testing.T, block *hotstuff.Block, signer modules.Crypto) hotstuff.PartialCert {
 	t.Helper()
 	pc, err := signer.CreatePartialCert(block)
 	if err != nil {
@@ -258,7 +258,7 @@ func CreatePC(t *testing.T, block *hotstuff.Block, signer hotstuff.Crypto) hotst
 }
 
 // CreatePCs creates one partial certificate using each of the given signers.
-func CreatePCs(t *testing.T, block *hotstuff.Block, signers []hotstuff.Crypto) []hotstuff.PartialCert {
+func CreatePCs(t *testing.T, block *hotstuff.Block, signers []modules.Crypto) []hotstuff.PartialCert {
 	t.Helper()
 	pcs := make([]hotstuff.PartialCert, 0, len(signers))
 	for _, signer := range signers {
@@ -268,7 +268,7 @@ func CreatePCs(t *testing.T, block *hotstuff.Block, signers []hotstuff.Crypto) [
 }
 
 // CreateQC creates a QC using the given signers.
-func CreateQC(t *testing.T, block *hotstuff.Block, signers []hotstuff.Crypto) hotstuff.QuorumCert {
+func CreateQC(t *testing.T, block *hotstuff.Block, signers []modules.Crypto) hotstuff.QuorumCert {
 	t.Helper()
 	if len(signers) == 0 {
 		return hotstuff.QuorumCert{}
@@ -281,7 +281,7 @@ func CreateQC(t *testing.T, block *hotstuff.Block, signers []hotstuff.Crypto) ho
 }
 
 // CreateTC generates a TC using the given signers.
-func CreateTC(t *testing.T, view hotstuff.View, signers []hotstuff.Crypto) hotstuff.TimeoutCert {
+func CreateTC(t *testing.T, view hotstuff.View, signers []modules.Crypto) hotstuff.TimeoutCert {
 	t.Helper()
 	if len(signers) == 0 {
 		return hotstuff.TimeoutCert{}
@@ -345,7 +345,7 @@ func (l leaderRotation) GetLeader(v hotstuff.View) hotstuff.ID {
 }
 
 // NewLeaderRotation returns a leader rotation implementation that will return leaders in the specified order.
-func NewLeaderRotation(t *testing.T, order ...hotstuff.ID) hotstuff.LeaderRotation {
+func NewLeaderRotation(t *testing.T, order ...hotstuff.ID) modules.LeaderRotation {
 	t.Helper()
 	return leaderRotation{t, order}
 }

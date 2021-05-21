@@ -28,6 +28,7 @@ import (
 	"github.com/relab/hotstuff/internal/client"
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/leaderrotation"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -147,7 +148,7 @@ type clientSrv struct {
 	gorumsSrv *gorums.Server
 	cfg       *hotstuffgorums.Config
 	hsSrv     *hotstuffgorums.Server
-	hs        *hotstuff.HotStuff
+	hs        *modules.Modules
 	cmdCache  *cmdCache
 
 	mut          sync.Mutex
@@ -182,7 +183,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 	srv.hsSrv = hotstuffgorums.NewServer(*replicaConfig)
 	builder.Register(srv.cfg, srv.hsSrv)
 
-	var leaderRotation hotstuff.LeaderRotation
+	var leaderRotation modules.LeaderRotation
 	switch conf.PmType {
 	case "fixed":
 		leaderRotation = leaderrotation.NewFixed(conf.LeaderID)
@@ -192,7 +193,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 		fmt.Fprintf(os.Stderr, "Invalid pacemaker type: '%s'\n", conf.PmType)
 		os.Exit(1)
 	}
-	var consensus hotstuff.Consensus
+	var consensus modules.Consensus
 	switch conf.Consensus {
 	case "chainedhotstuff":
 		consensus = chainedhotstuff.New()
@@ -202,7 +203,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 		fmt.Fprintf(os.Stderr, "Invalid consensus type: '%s'\n", conf.Consensus)
 		os.Exit(1)
 	}
-	var cryptoImpl hotstuff.CryptoImpl
+	var cryptoImpl modules.CryptoImpl
 	switch conf.Crypto {
 	case "ecdsa":
 		cryptoImpl = ecdsa.New()
@@ -256,7 +257,7 @@ func (srv *clientSrv) Run(ctx context.Context, address string) (err error) {
 
 	c := make(chan struct{})
 	go func() {
-		srv.hs.ViewSynchronizer().Start(ctx)
+		srv.hs.Synchronizer().Start(ctx)
 		srv.hs.EventLoop().Run(ctx)
 		close(c)
 	}()

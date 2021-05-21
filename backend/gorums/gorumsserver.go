@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/internal/proto"
+	"github.com/relab/hotstuff/modules"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -21,13 +22,13 @@ import (
 // Server is the server-side of the gorums backend.
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
-	mod       *hotstuff.HotStuff
+	mod       *modules.Modules
 	addr      string
 	gorumsSrv *gorums.Server
 }
 
 // InitModule initializes the server with the given HotStuff instance.
-func (srv *Server) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
+func (srv *Server) InitModule(hs *modules.Modules, _ *modules.OptionsBuilder) {
 	srv.mod = hs
 }
 
@@ -84,7 +85,7 @@ func (srv *Server) getClientID(ctx context.Context) (hotstuff.ID, error) {
 		}
 		if len(tlsInfo.State.PeerCertificates) > 0 {
 			cert := tlsInfo.State.PeerCertificates[0]
-			for replicaID := range srv.mod.Config().Replicas() {
+			for replicaID := range srv.mod.Configuration().Replicas() {
 				if subject, err := strconv.Atoi(cert.Subject.CommonName); err == nil && hotstuff.ID(subject) == replicaID {
 					return replicaID, nil
 				}

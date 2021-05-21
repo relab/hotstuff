@@ -20,7 +20,7 @@ func TestLocalTimeout(t *testing.T) {
 	s := New(testutil.FixedTimeout(10))
 	builder.Register(hs, s)
 	mods := builder.Build()
-	cfg := mods.Config().(*mocks.MockConfig)
+	cfg := mods.Configuration().(*mocks.MockConfiguration)
 	leader := testutil.CreateMockReplica(t, ctrl, 1, testutil.GenerateECDSAKey(t))
 	testutil.ConfigAddReplica(t, cfg, leader)
 
@@ -46,7 +46,7 @@ func TestLocalTimeout(t *testing.T) {
 		}).AnyTimes()
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		mods.ViewSynchronizer().Start(ctx)
+		mods.Synchronizer().Start(ctx)
 		mods.EventLoop().Run(ctx)
 	}()
 	<-c

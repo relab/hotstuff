@@ -1,10 +1,13 @@
 package chainedhotstuff
 
-import "github.com/relab/hotstuff"
+import (
+	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/modules"
+)
 
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {
-	mod *hotstuff.HotStuff
+	mod *modules.Modules
 
 	// protocol variables
 
@@ -22,7 +25,7 @@ func New() *ChainedHotStuff {
 }
 
 // InitModule gives ChainedHotstuff a pointer to the other modules.
-func (hs *ChainedHotStuff) InitModule(mod *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
+func (hs *ChainedHotStuff) InitModule(mod *modules.Modules, _ *modules.OptionsBuilder) {
 	hs.mod = mod
 	hs.mod.EventLoop().RegisterHandler(func(event interface{}) (consume bool) {
 		proposal := event.(hotstuff.ProposeMsg)
@@ -57,7 +60,7 @@ func (hs *ChainedHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool)
 }
 
 func (hs *ChainedHotStuff) update(block *hotstuff.Block) {
-	hs.mod.ViewSynchronizer().UpdateHighQC(block.QuorumCert())
+	hs.mod.Synchronizer().UpdateHighQC(block.QuorumCert())
 
 	block1, ok := hs.qcRef(block.QuorumCert())
 	if !ok {
@@ -126,21 +129,21 @@ func (hs *ChainedHotStuff) Propose(cert hotstuff.SyncInfo) {
 		hs.mod.Logger().Warn("Propose: no QC provided.")
 	}
 
-	cmd, ok := hs.mod.CommandQueue().Get(hs.mod.ViewSynchronizer().ViewContext())
+	cmd, ok := hs.mod.CommandQueue().Get(hs.mod.Synchronizer().ViewContext())
 	if !ok {
 		return
 	}
 	block := hotstuff.NewBlock(
-		hs.mod.ViewSynchronizer().LeafBlock().Hash(),
+		hs.mod.Synchronizer().LeafBlock().Hash(),
 		qc,
 		cmd,
-		hs.mod.ViewSynchronizer().View(),
+		hs.mod.Synchronizer().View(),
 		hs.mod.ID(),
 	)
 	hs.mod.BlockChain().Store(block)
 
 	proposal := hotstuff.ProposeMsg{ID: hs.mod.ID(), Block: block}
-	hs.mod.Config().Propose(proposal)
+	hs.mod.Configuration().Propose(proposal)
 	// self vote
 	hs.OnPropose(proposal)
 }
@@ -155,7 +158,7 @@ func (hs *ChainedHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 		return
 	}
 
-	if block.View() < hs.mod.ViewSynchronizer().View() {
+	if block.View() < hs.mod.Synchronizer().View() {
 		hs.mod.Logger().Info("OnPropose: block view was less than our view")
 		return
 	}
@@ -205,7 +208,7 @@ func (hs *ChainedHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 
 	finish := func() {
 		hs.update(block)
-		hs.mod.ViewSynchronizer().AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+		hs.mod.Synchronizer().AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 	}
 
 	leaderID := hs.mod.LeaderRotation().GetLeader(hs.lastVote + 1)
@@ -215,7 +218,7 @@ func (hs *ChainedHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 		return
 	}
 
-	leader, ok := hs.mod.Config().Replica(leaderID)
+	leader, ok := hs.mod.Configuration().Replica(leaderID)
 	if !ok {
 		hs.mod.Logger().Warnf("Replica with ID %d was not found!", leaderID)
 		return
@@ -225,4 +228,4 @@ func (hs *ChainedHotStuff) OnPropose(proposal hotstuff.ProposeMsg) {
 	finish()
 }
 
-var _ hotstuff.Consensus = (*ChainedHotStuff)(nil)
+var _ modules.Consensus = (*ChainedHotStuff)(nil)

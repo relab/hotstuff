@@ -11,6 +11,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/internal/proto"
+	"github.com/relab/hotstuff/modules"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -59,19 +60,19 @@ func (r *gorumsReplica) NewView(msg hotstuff.SyncInfo) {
 // Config holds information about the current configuration of replicas that participate in the protocol,
 // and some information about the local replica. It also provides methods to send messages to the other replicas.
 type Config struct {
-	mod *hotstuff.HotStuff
+	mod *modules.Modules
 
 	replicaCfg    config.ReplicaConfig
 	mgr           *proto.Manager
 	cfg           *proto.Configuration
 	privKey       hotstuff.PrivateKey
-	replicas      map[hotstuff.ID]hotstuff.Replica
+	replicas      map[hotstuff.ID]modules.Replica
 	proposeCancel context.CancelFunc
 	timeoutCancel context.CancelFunc
 }
 
 // InitModule gives the module a reference to the HotStuff object.
-func (cfg *Config) InitModule(hs *hotstuff.HotStuff, _ *hotstuff.OptionsBuilder) {
+func (cfg *Config) InitModule(hs *modules.Modules, _ *modules.OptionsBuilder) {
 	cfg.mod = hs
 }
 
@@ -80,7 +81,7 @@ func NewConfig(replicaCfg config.ReplicaConfig) *Config {
 	cfg := &Config{
 		replicaCfg:    replicaCfg,
 		privKey:       replicaCfg.PrivateKey,
-		replicas:      make(map[hotstuff.ID]hotstuff.Replica),
+		replicas:      make(map[hotstuff.ID]modules.Replica),
 		proposeCancel: func() {},
 		timeoutCancel: func() {},
 	}
@@ -156,12 +157,12 @@ func (cfg *Config) PrivateKey() hotstuff.PrivateKey {
 }
 
 // Replicas returns all of the replicas in the configuration.
-func (cfg *Config) Replicas() map[hotstuff.ID]hotstuff.Replica {
+func (cfg *Config) Replicas() map[hotstuff.ID]modules.Replica {
 	return cfg.replicas
 }
 
 // Replica returns a replica if it is present in the configuration.
-func (cfg *Config) Replica(id hotstuff.ID) (replica hotstuff.Replica, ok bool) {
+func (cfg *Config) Replica(id hotstuff.ID) (replica modules.Replica, ok bool) {
 	replica, ok = cfg.replicas[id]
 	return
 }
@@ -214,7 +215,7 @@ func (cfg *Config) Close() {
 	cfg.mgr.Close()
 }
 
-var _ hotstuff.Config = (*Config)(nil)
+var _ modules.Configuration = (*Config)(nil)
 
 type qspec struct{}
 
