@@ -1,13 +1,13 @@
 syntax = "proto3";
 
-package client;
+package clientpb;
 
 import "gorums.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 
-option go_package = "github.com/relab/hotstuff/internal/client";
+option go_package = "github.com/relab/hotstuff/internal/proto/clientpb";
 
 // Client is the client-facing API to HotStuff
 service Client {

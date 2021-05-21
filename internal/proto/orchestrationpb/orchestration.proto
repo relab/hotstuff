@@ -1,11 +1,11 @@
 syntax = "proto3";
 
-package orchestration;
+package orchestrationpb;
 
 import "gorums.proto";
 import "google/protobuf/empty.proto";
 
-option go_package = "github.com/relab/hotstuff/client";
+option go_package = "github.com/relab/hotstuff/internal/proto/orchestrationpb";
 
 // ReplicaInfo is the information that the replicas need about each other.
 message ReplicaInfo {
@@ -41,7 +41,7 @@ message ReplicaRunConfig {
   uint32 BatchSize = 10;
 }
 
-// ClientRunConfig is all the information needed to start a client.
+// ClientRunConfig is all the information needed to start a clientpb.
 message ClientRunConfig {
   // The client's ID.
   uint32 ID = 1;

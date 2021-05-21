@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/internal/client"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -36,7 +36,7 @@ func (c *cmdCache) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder
 	c.mod = hs
 }
 
-func (c *cmdCache) addCommand(cmd *client.Command) {
+func (c *cmdCache) addCommand(cmd *clientpb.Command) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
@@ -55,7 +55,7 @@ func (c *cmdCache) addCommand(cmd *client.Command) {
 
 // Get returns a batch of commands to propose.
 func (c *cmdCache) Get(ctx context.Context) (cmd consensus.Command, ok bool) {
-	batch := new(client.Batch)
+	batch := new(clientpb.Batch)
 
 	c.mut.Lock()
 awaitBatch:
@@ -78,7 +78,7 @@ awaitBatch:
 			break
 		}
 		c.cache.Remove(elem)
-		cmd := elem.Value.(*client.Command)
+		cmd := elem.Value.(*clientpb.Command)
 		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
 			// command is too old
 			i--
@@ -107,7 +107,7 @@ awaitBatch:
 
 // Accept returns true if the replica can accept the batch.
 func (c *cmdCache) Accept(cmd consensus.Command) bool {
-	batch := new(client.Batch)
+	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
 		c.mod.Logger().Errorf("Failed to unmarshal batch: %v", err)
@@ -129,7 +129,7 @@ func (c *cmdCache) Accept(cmd consensus.Command) bool {
 
 // Proposed updates the serial numbers such that we will not accept the given batch again.
 func (c *cmdCache) Proposed(cmd consensus.Command) {
-	batch := new(client.Batch)
+	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
 		c.mod.Logger().Errorf("Failed to unmarshal batch: %v", err)

@@ -16,11 +16,11 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
 	"github.com/relab/gorums/benchmark"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/internal/client"
 	"github.com/relab/hotstuff/internal/logging"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/proto"
@@ -112,7 +112,7 @@ type qspec struct {
 	faulty int
 }
 
-func (q *qspec) ExecCommandQF(_ *client.Command, signatures map[uint32]*empty.Empty) (*empty.Empty, bool) {
+func (q *qspec) ExecCommandQF(_ *clientpb.Command, signatures map[uint32]*empty.Empty) (*empty.Empty, bool) {
 	if len(signatures) < q.faulty+1 {
 		return nil, false
 	}
@@ -122,23 +122,23 @@ func (q *qspec) ExecCommandQF(_ *client.Command, signatures map[uint32]*empty.Em
 type pendingCmd struct {
 	sequenceNumber uint64
 	sendTime       time.Time
-	promise        *client.AsyncEmpty
+	promise        *clientpb.AsyncEmpty
 }
 
 type hotstuffClient struct {
 	logger        logging.Logger
 	conf          *options
 	replicaConfig *config.ReplicaConfig
-	mgr           *client.Manager
-	gorumsConfig  *client.Configuration
+	mgr           *clientpb.Manager
+	gorumsConfig  *clientpb.Configuration
 
 	mut              sync.Mutex
 	highestCommitted uint64 // highest sequence number acknowledged by the replicas
 	pendingCmds      chan pendingCmd
 	done             chan struct{}
 	reader           io.Reader
-	stats            benchmark.Stats       // records latency and throughput
-	data             *client.BenchmarkData // stores time and duration for each command
+	stats            benchmark.Stats         // records latency and throughput
+	data             *clientpb.BenchmarkData // stores time and duration for each command
 }
 
 func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hotstuffClient, error) {
@@ -155,7 +155,7 @@ func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hot
 		grpcOpts = append(grpcOpts, grpc.WithInsecure())
 	}
 
-	mgr := client.NewManager(gorums.WithGrpcDialOptions(grpcOpts...),
+	mgr := clientpb.NewManager(gorums.WithGrpcDialOptions(grpcOpts...),
 		gorums.WithDialTimeout(time.Minute),
 	)
 
@@ -173,7 +173,7 @@ func newHotStuffClient(conf *options, replicaConfig *config.ReplicaConfig) (*hot
 		pendingCmds:      make(chan pendingCmd, conf.MaxInflight),
 		highestCommitted: 1,
 		done:             make(chan struct{}),
-		data:             &client.BenchmarkData{},
+		data:             &clientpb.BenchmarkData{},
 	}
 
 	if conf.Input != "" {
@@ -237,7 +237,7 @@ func (c *hotstuffClient) SendCommands(ctx context.Context) error {
 			c.logger.Info("Reached end of file. Sending empty commands until last command is executed...")
 		}
 
-		cmd := &client.Command{
+		cmd := &clientpb.Command{
 			ClientID:       uint32(c.conf.SelfID),
 			SequenceNumber: num,
 			Data:           data[:n],
@@ -292,7 +292,7 @@ func (c *hotstuffClient) handleCommands(ctx context.Context) {
 		duration := time.Since(cmd.sendTime)
 		c.stats.AddLatency(duration)
 		if c.conf.Benchmark {
-			c.data.Stats = append(c.data.Stats, &client.CommandStats{
+			c.data.Stats = append(c.data.Stats, &clientpb.CommandStats{
 				StartTime: timestamppb.New(cmd.sendTime),
 				Duration:  durationpb.New(duration),
 			})

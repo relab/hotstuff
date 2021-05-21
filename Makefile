@@ -1,5 +1,5 @@
 proto_include := $(shell go list -m -f {{.Dir}} github.com/relab/gorums)
-proto_src := internal/client/client.proto internal/proto/consensus.proto
+proto_src := internal/proto/clientpb/clientpb.proto internal/proto/hotstuffpb/hotstuff.proto
 proto_go := $(proto_src:%.proto=%.pb.go)
 gorums_go := $(proto_src:%.proto=%_gorums.pb.go)
 

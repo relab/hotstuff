@@ -9,7 +9,7 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/internal/proto"
+	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -47,7 +47,7 @@ func NewServer(replicaConfig config.ReplicaConfig) *Server {
 
 	srv.gorumsSrv = gorums.NewServer(serverOpts...)
 
-	proto.RegisterHotstuffServer(srv.gorumsSrv, srv)
+	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, srv)
 	return srv
 }
 
@@ -118,7 +118,7 @@ func (srv *Server) Stop() {
 }
 
 // Propose handles a replica's response to the Propose QC from the leader.
-func (srv *Server) Propose(ctx context.Context, proposal *proto.Proposal) {
+func (srv *Server) Propose(ctx context.Context, proposal *hotstuffpb.Proposal) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
 		srv.mod.Logger().Infof("Failed to get client ID: %v", err)
@@ -126,14 +126,14 @@ func (srv *Server) Propose(ctx context.Context, proposal *proto.Proposal) {
 	}
 
 	proposal.Block.Proposer = uint32(id)
-	proposeMsg := proto.ProposalFromProto(proposal)
+	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
 
 	srv.mod.EventLoop().AddEvent(proposeMsg)
 }
 
 // Vote handles an incoming vote message.
-func (srv *Server) Vote(ctx context.Context, cert *proto.PartialCert) {
+func (srv *Server) Vote(ctx context.Context, cert *hotstuffpb.PartialCert) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
 		srv.mod.Logger().Infof("Failed to get client ID: %v", err)
@@ -142,12 +142,12 @@ func (srv *Server) Vote(ctx context.Context, cert *proto.PartialCert) {
 
 	srv.mod.EventLoop().AddEvent(consensus.VoteMsg{
 		ID:          id,
-		PartialCert: proto.PartialCertFromProto(cert),
+		PartialCert: hotstuffpb.PartialCertFromProto(cert),
 	})
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
-func (srv *Server) NewView(ctx context.Context, msg *proto.SyncInfo) {
+func (srv *Server) NewView(ctx context.Context, msg *hotstuffpb.SyncInfo) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
 		srv.mod.Logger().Infof("Failed to get client ID: %v", err)
@@ -156,12 +156,12 @@ func (srv *Server) NewView(ctx context.Context, msg *proto.SyncInfo) {
 
 	srv.mod.EventLoop().AddEvent(consensus.NewViewMsg{
 		ID:       id,
-		SyncInfo: proto.SyncInfoFromProto(msg),
+		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
 	})
 }
 
 // Fetch handles an incoming fetch request.
-func (srv *Server) Fetch(ctx context.Context, pb *proto.BlockHash, respond func(block *proto.Block, err error)) {
+func (srv *Server) Fetch(ctx context.Context, pb *hotstuffpb.BlockHash, respond func(block *hotstuffpb.Block, err error)) {
 	var hash consensus.Hash
 	copy(hash[:], pb.GetHash())
 
@@ -173,13 +173,13 @@ func (srv *Server) Fetch(ctx context.Context, pb *proto.BlockHash, respond func(
 
 	srv.mod.Logger().Debugf("OnFetch: %.8s", hash)
 
-	respond(proto.BlockToProto(block), nil)
+	respond(hotstuffpb.BlockToProto(block), nil)
 }
 
 // Timeout handles an incoming TimeoutMsg.
-func (srv *Server) Timeout(ctx context.Context, msg *proto.TimeoutMsg) {
+func (srv *Server) Timeout(ctx context.Context, msg *hotstuffpb.TimeoutMsg) {
 	var err error
-	timeoutMsg := proto.TimeoutMsgFromProto(msg)
+	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
 	timeoutMsg.ID, err = srv.getClientID(ctx)
 	if err != nil {
 		srv.mod.Logger().Infof("Could not get ID of replica: %v", err)

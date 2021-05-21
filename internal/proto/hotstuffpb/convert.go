@@ -1,4 +1,4 @@
-package proto
+package hotstuffpb
 
 import (
 	"math/big"
@@ -8,7 +8,7 @@ import (
 	"github.com/relab/hotstuff/crypto/ecdsa"
 )
 
-// SignatureToProto converts a consensus.Signature to a proto.Signature.
+// SignatureToProto converts a consensus.Signature to a hotstuffpb.Signature.
 func SignatureToProto(sig consensus.Signature) *Signature {
 	signature := &Signature{}
 	switch s := sig.(type) {
@@ -26,7 +26,7 @@ func SignatureToProto(sig consensus.Signature) *Signature {
 	return signature
 }
 
-// SignatureFromProto converts a proto.Signature to an ecdsa.Signature.
+// SignatureFromProto converts a hotstuffpb.Signature to an ecdsa.Signature.
 func SignatureFromProto(sig *Signature) consensus.Signature {
 	if signature := sig.GetECDSASig(); signature != nil {
 		r := new(big.Int)
@@ -94,7 +94,7 @@ func ThresholdSignatureFromProto(sig *ThresholdSignature) consensus.ThresholdSig
 	return nil
 }
 
-// PartialCertToProto converts a consensus.PartialCert to a proto.Partialcert.
+// PartialCertToProto converts a consensus.PartialCert to a hotstuffpb.Partialcert.
 func PartialCertToProto(cert consensus.PartialCert) *PartialCert {
 	hash := cert.BlockHash()
 	return &PartialCert{
@@ -103,14 +103,14 @@ func PartialCertToProto(cert consensus.PartialCert) *PartialCert {
 	}
 }
 
-// PartialCertFromProto converts a proto.PartialCert to an ecdsa.PartialCert.
+// PartialCertFromProto converts a hotstuffpb.PartialCert to an ecdsa.PartialCert.
 func PartialCertFromProto(cert *PartialCert) consensus.PartialCert {
 	var h consensus.Hash
 	copy(h[:], cert.GetHash())
 	return consensus.NewPartialCert(SignatureFromProto(cert.GetSig()), h)
 }
 
-// QuorumCertToProto converts a consensus.QuorumCert to a proto.QuorumCert.
+// QuorumCertToProto converts a consensus.QuorumCert to a hotstuffpb.QuorumCert.
 func QuorumCertToProto(qc consensus.QuorumCert) *QuorumCert {
 	hash := qc.BlockHash()
 	return &QuorumCert{
@@ -120,7 +120,7 @@ func QuorumCertToProto(qc consensus.QuorumCert) *QuorumCert {
 	}
 }
 
-// QuorumCertFromProto converts a proto.QuorumCert to an ecdsa.QuorumCert.
+// QuorumCertFromProto converts a hotstuffpb.QuorumCert to an ecdsa.QuorumCert.
 func QuorumCertFromProto(qc *QuorumCert) consensus.QuorumCert {
 	var h consensus.Hash
 	copy(h[:], qc.GetHash())
@@ -148,7 +148,7 @@ func ProposalFromProto(p *Proposal) (proposal consensus.ProposeMsg) {
 	return
 }
 
-// BlockToProto converts a consensus.Block to a proto.Block.
+// BlockToProto converts a consensus.Block to a hotstuffpb.Block.
 func BlockToProto(block *consensus.Block) *Block {
 	parentHash := block.Parent()
 	return &Block{
@@ -160,7 +160,7 @@ func BlockToProto(block *consensus.Block) *Block {
 	}
 }
 
-// BlockFromProto converts a proto.Block to a consensus.Block.
+// BlockFromProto converts a hotstuffpb.Block to a consensus.Block.
 func BlockFromProto(block *Block) *consensus.Block {
 	var p consensus.Hash
 	copy(p[:], block.GetParent())

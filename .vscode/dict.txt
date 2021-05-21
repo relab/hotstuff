@@ -3,9 +3,11 @@ Cmds
 Debugf
 HOTSTUFF
 Infof
+QC's
 SSWU
 Warnf
 Welford's
+clientpb
 cmdqueue
 covermode
 coverpkg
@@ -19,12 +21,15 @@ gomock
 gorums
 grpc
 hotstuffgorums
+hotstuffpb
 iface
 kilic
+mitchellh
 pflag
 pflags
 propsed
 protobuf
+protoc
 ptypes
 qspec
 relab

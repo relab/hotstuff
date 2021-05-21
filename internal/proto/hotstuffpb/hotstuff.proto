@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-package proto;
+package hotstuffpb;
 
 import "gorums.proto";
 
 import "google/protobuf/empty.proto";
 
-option go_package = "github.com/relab/hotstuff/internal/proto";
+option go_package = "github.com/relab/hotstuff/internal/proto/hotstuffpb";
 
 service Hotstuff {
   rpc Propose(Proposal) returns (google.protobuf.Empty) {

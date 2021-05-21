@@ -25,8 +25,8 @@ import (
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/internal/client"
 	"github.com/relab/hotstuff/internal/logging"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/leaderrotation"
 	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc"
@@ -223,7 +223,7 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 	srv.hs = builder.Build()
 
 	// Use a custom server instead of the gorums one
-	client.RegisterClientServer(srv.gorumsSrv, srv)
+	clientpb.RegisterClientServer(srv.gorumsSrv, srv)
 	return srv
 }
 
@@ -287,7 +287,7 @@ func (srv *clientSrv) stop() {
 	}
 }
 
-func (srv *clientSrv) ExecCommand(_ context.Context, cmd *client.Command, out func(*empty.Empty, error)) {
+func (srv *clientSrv) ExecCommand(_ context.Context, cmd *clientpb.Command, out func(*empty.Empty, error)) {
 	id := cmdID{cmd.ClientID, cmd.SequenceNumber}
 
 	srv.mut.Lock()
@@ -298,7 +298,7 @@ func (srv *clientSrv) ExecCommand(_ context.Context, cmd *client.Command, out fu
 }
 
 func (srv *clientSrv) Exec(cmd consensus.Command) {
-	batch := new(client.Batch)
+	batch := new(clientpb.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {
 		log.Printf("Failed to unmarshal command: %v\n", err)

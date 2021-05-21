@@ -10,13 +10,13 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/internal/proto"
+	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
 
 type gorumsReplica struct {
-	node          *proto.Node
+	node          *hotstuffpb.Node
 	id            consensus.ID
 	pubKey        consensus.PublicKey
 	voteCancel    context.CancelFunc
@@ -41,7 +41,7 @@ func (r *gorumsReplica) Vote(cert consensus.PartialCert) {
 	var ctx context.Context
 	r.voteCancel()
 	ctx, r.voteCancel = context.WithCancel(context.Background())
-	pCert := proto.PartialCertToProto(cert)
+	pCert := hotstuffpb.PartialCertToProto(cert)
 	r.node.Vote(ctx, pCert, gorums.WithNoSendWaiting())
 }
 
@@ -53,7 +53,7 @@ func (r *gorumsReplica) NewView(msg consensus.SyncInfo) {
 	var ctx context.Context
 	r.newviewCancel()
 	ctx, r.newviewCancel = context.WithCancel(context.Background())
-	r.node.NewView(ctx, proto.SyncInfoToProto(msg), gorums.WithNoSendWaiting())
+	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(msg), gorums.WithNoSendWaiting())
 }
 
 // Config holds information about the current configuration of replicas that participate in the protocol,
@@ -62,8 +62,8 @@ type Config struct {
 	mod *consensus.Modules
 
 	replicaCfg    config.ReplicaConfig
-	mgr           *proto.Manager
-	cfg           *proto.Configuration
+	mgr           *hotstuffpb.Manager
+	cfg           *hotstuffpb.Configuration
 	privKey       consensus.PrivateKey
 	replicas      map[consensus.ID]consensus.Replica
 	proposeCancel context.CancelFunc
@@ -129,7 +129,7 @@ func (cfg *Config) Connect(connectTimeout time.Duration) error {
 	mgrOpts = append(mgrOpts, gorums.WithGrpcDialOptions(grpcOpts...))
 
 	var err error
-	cfg.mgr = proto.NewManager(mgrOpts...)
+	cfg.mgr = hotstuffpb.NewManager(mgrOpts...)
 
 	cfg.cfg, err = cfg.mgr.NewConfiguration(qspec{}, gorums.WithNodeMap(idMapping))
 	if err != nil {
@@ -184,7 +184,7 @@ func (cfg *Config) Propose(proposal consensus.ProposeMsg) {
 	var ctx context.Context
 	cfg.proposeCancel()
 	ctx, cfg.proposeCancel = context.WithCancel(context.Background())
-	p := proto.ProposalToProto(proposal)
+	p := hotstuffpb.ProposalToProto(proposal)
 	cfg.cfg.Propose(ctx, p, gorums.WithNoSendWaiting())
 }
 
@@ -196,17 +196,17 @@ func (cfg *Config) Timeout(msg consensus.TimeoutMsg) {
 	var ctx context.Context
 	cfg.timeoutCancel()
 	ctx, cfg.timeoutCancel = context.WithCancel(context.Background())
-	cfg.cfg.Timeout(ctx, proto.TimeoutMsgToProto(msg), gorums.WithNoSendWaiting())
+	cfg.cfg.Timeout(ctx, hotstuffpb.TimeoutMsgToProto(msg), gorums.WithNoSendWaiting())
 }
 
 // Fetch requests a block from all the replicas in the configuration
 func (cfg *Config) Fetch(ctx context.Context, hash consensus.Hash) (*consensus.Block, bool) {
-	protoBlock, err := cfg.cfg.Fetch(ctx, &proto.BlockHash{Hash: hash[:]})
+	protoBlock, err := cfg.cfg.Fetch(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
 	if err != nil && !errors.Is(err, context.Canceled) {
 		cfg.mod.Logger().Infof("Failed to fetch block: %v", err)
 		return nil, false
 	}
-	return proto.BlockFromProto(protoBlock), true
+	return hotstuffpb.BlockFromProto(protoBlock), true
 }
 
 // Close closes all connections made by this configuration.
@@ -220,11 +220,11 @@ type qspec struct{}
 
 // FetchQF is the quorum function for the Fetch quorum call method.
 // It simply returns true if one of the replies matches the requested block.
-func (q qspec) FetchQF(in *proto.BlockHash, replies map[uint32]*proto.Block) (*proto.Block, bool) {
+func (q qspec) FetchQF(in *hotstuffpb.BlockHash, replies map[uint32]*hotstuffpb.Block) (*hotstuffpb.Block, bool) {
 	var h consensus.Hash
 	copy(h[:], in.GetHash())
 	for _, b := range replies {
-		block := proto.BlockFromProto(b)
+		block := hotstuffpb.BlockFromProto(b)
 		if h == block.Hash() {
 			return b, true
 		}

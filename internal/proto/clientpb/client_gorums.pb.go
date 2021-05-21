@@ -2,9 +2,9 @@
 // versions:
 // 	protoc-gen-gorums v0.5.0-devel
 // 	protoc            v3.15.7
-// source: internal/proto/consensus.proto
+// source: internal/proto/clientpb/clientpb.proto
 
-package proto
+package clientpb
 
 import (
 	context "context"
@@ -121,98 +121,47 @@ type Node struct {
 	*gorums.Node
 }
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
-
-// Propose is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (c *Configuration) Propose(ctx context.Context, in *Proposal, opts ...gorums.CallOption) {
+// ExecCommand sends a command to all replicas and waits for valid signatures
+// from f+1 replicas
+func (c *Configuration) ExecCommand(ctx context.Context, in *Command) *AsyncEmpty {
 	cd := gorums.QuorumCallData{
 		Message: in,
-		Method:  "proto.Hotstuff.Propose",
+		Method:  "clientpb.Client.ExecCommand",
+	}
+	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
+		r := make(map[uint32]*emptypb.Empty, len(replies))
+		for k, v := range replies {
+			r[k] = v.(*emptypb.Empty)
+		}
+		return c.qspec.ExecCommandQF(req.(*Command), r)
 	}
 
-	c.Configuration.Multicast(ctx, cd, opts...)
+	fut := c.Configuration.AsyncCall(ctx, cd)
+	return &AsyncEmpty{fut}
 }
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
-
-// Timeout is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (c *Configuration) Timeout(ctx context.Context, in *TimeoutMsg, opts ...gorums.CallOption) {
-	cd := gorums.QuorumCallData{
-		Message: in,
-		Method:  "proto.Hotstuff.Timeout",
-	}
-
-	c.Configuration.Multicast(ctx, cd, opts...)
-}
-
-// QuorumSpec is the interface of quorum functions for Hotstuff.
+// QuorumSpec is the interface of quorum functions for Client.
 type QuorumSpec interface {
 	gorums.ConfigOption
 
-	// FetchQF is the quorum function for the Fetch
-	// quorum call method. The in parameter is the request object
-	// supplied to the Fetch method at call time, and may or may not
+	// ExecCommandQF is the quorum function for the ExecCommand
+	// asynchronous quorum call method. The in parameter is the request object
+	// supplied to the ExecCommand method at call time, and may or may not
 	// be used by the quorum function. If the in parameter is not needed
-	// you should implement your quorum function with '_ *BlockHash'.
-	FetchQF(in *BlockHash, replies map[uint32]*Block) (*Block, bool)
+	// you should implement your quorum function with '_ *Command'.
+	ExecCommandQF(in *Command, replies map[uint32]*emptypb.Empty) (*emptypb.Empty, bool)
 }
 
-// Fetch is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (c *Configuration) Fetch(ctx context.Context, in *BlockHash) (resp *Block, err error) {
-	cd := gorums.QuorumCallData{
-		Message: in,
-		Method:  "proto.Hotstuff.Fetch",
-	}
-	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
-		r := make(map[uint32]*Block, len(replies))
-		for k, v := range replies {
-			r[k] = v.(*Block)
-		}
-		return c.qspec.FetchQF(req.(*BlockHash), r)
-	}
-
-	res, err := c.Configuration.QuorumCall(ctx, cd)
-	if err != nil {
-		return nil, err
-	}
-	return res.(*Block), err
+// Client is the server-side API for the Client Service
+type Client interface {
+	ExecCommand(context.Context, *Command, func(*emptypb.Empty, error))
 }
 
-// Hotstuff is the server-side API for the Hotstuff Service
-type Hotstuff interface {
-	Propose(context.Context, *Proposal)
-	Vote(context.Context, *PartialCert)
-	Timeout(context.Context, *TimeoutMsg)
-	NewView(context.Context, *SyncInfo)
-	Fetch(context.Context, *BlockHash, func(*Block, error))
-}
-
-func RegisterHotstuffServer(srv *gorums.Server, impl Hotstuff) {
-	srv.RegisterHandler("proto.Hotstuff.Propose", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*Proposal)
-		impl.Propose(ctx, req)
-	})
-	srv.RegisterHandler("proto.Hotstuff.Vote", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*PartialCert)
-		impl.Vote(ctx, req)
-	})
-	srv.RegisterHandler("proto.Hotstuff.Timeout", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*TimeoutMsg)
-		impl.Timeout(ctx, req)
-	})
-	srv.RegisterHandler("proto.Hotstuff.NewView", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*SyncInfo)
-		impl.NewView(ctx, req)
-	})
-	srv.RegisterHandler("proto.Hotstuff.Fetch", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
-		req := in.Message.(*BlockHash)
+func RegisterClientServer(srv *gorums.Server, impl Client) {
+	srv.RegisterHandler("clientpb.Client.ExecCommand", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
+		req := in.Message.(*Command)
 		once := new(sync.Once)
-		f := func(resp *Block, err error) {
+		f := func(resp *emptypb.Empty, err error) {
 			once.Do(func() {
 				select {
 				case finished <- gorums.WrapMessage(in.Metadata, resp, err):
@@ -220,40 +169,27 @@ func RegisterHotstuffServer(srv *gorums.Server, impl Hotstuff) {
 				}
 			})
 		}
-		impl.Fetch(ctx, req, f)
+		impl.ExecCommand(ctx, req, f)
 	})
 }
 
-type internalBlock struct {
+type internalEmpty struct {
 	nid   uint32
-	reply *Block
+	reply *emptypb.Empty
 	err   error
 }
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
-
-// Vote is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (n *Node) Vote(ctx context.Context, in *PartialCert, opts ...gorums.CallOption) {
-	cd := gorums.CallData{
-		Message: in,
-		Method:  "proto.Hotstuff.Vote",
-	}
-
-	n.Node.Unicast(ctx, cd, opts...)
+// AsyncEmpty is a async object for processing replies.
+type AsyncEmpty struct {
+	*gorums.Async
 }
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
-
-// NewView is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (n *Node) NewView(ctx context.Context, in *SyncInfo, opts ...gorums.CallOption) {
-	cd := gorums.CallData{
-		Message: in,
-		Method:  "proto.Hotstuff.NewView",
+// Get returns the reply and any error associated with the called method.
+// The method blocks until a reply or error is available.
+func (f *AsyncEmpty) Get() (*emptypb.Empty, error) {
+	resp, err := f.Async.Get()
+	if err != nil {
+		return nil, err
 	}
-
-	n.Node.Unicast(ctx, cd, opts...)
+	return resp.(*emptypb.Empty), err
 }
