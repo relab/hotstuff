@@ -1,43 +1,41 @@
-package votingmachine
+package consensus
 
 import (
 	"sync"
-
-	"github.com/relab/hotstuff/consensus"
 )
 
 // VotingMachine collects votes.
 type VotingMachine struct {
 	mut           sync.Mutex
-	mod           *consensus.Modules
-	verifiedVotes map[consensus.Hash][]consensus.PartialCert // verified votes that could become a QC
+	mod           *Modules
+	verifiedVotes map[Hash][]PartialCert // verified votes that could become a QC
 }
 
 // NewVotingMachine returns a new VotingMachine.
 func NewVotingMachine() *VotingMachine {
 	return &VotingMachine{
-		verifiedVotes: make(map[consensus.Hash][]consensus.PartialCert),
+		verifiedVotes: make(map[Hash][]PartialCert),
 	}
 }
 
 // InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
 // settings using the ConfigBuilder.
-func (vm *VotingMachine) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (vm *VotingMachine) InitModule(hs *Modules, _ *OptionsBuilder) {
 	vm.mod = hs
 	vm.mod.EventLoop().RegisterAsyncHandler(func(event interface{}) (consume bool) {
-		vote := event.(consensus.VoteMsg)
+		vote := event.(VoteMsg)
 		go vm.OnVote(vote)
 		return true
-	}, consensus.VoteMsg{})
+	}, VoteMsg{})
 }
 
 // OnVote handles an incoming vote.
-func (vm *VotingMachine) OnVote(vote consensus.VoteMsg) {
+func (vm *VotingMachine) OnVote(vote VoteMsg) {
 	cert := vote.PartialCert
 	vm.mod.Logger().Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
 
 	var (
-		block *consensus.Block
+		block *Block
 		ok    bool
 	)
 
@@ -49,7 +47,7 @@ func (vm *VotingMachine) OnVote(vote consensus.VoteMsg) {
 			// hopefully, the block has arrived by then.
 			vm.mod.Logger().Debugf("Local cache miss for block: %.8s", cert.BlockHash())
 			vote.Deferred = true
-			vm.mod.EventLoop().AwaitEvent(consensus.ProposeMsg{}, vote)
+			vm.mod.EventLoop().AwaitEvent(ProposeMsg{}, vote)
 			return
 		}
 	} else {
@@ -104,5 +102,5 @@ func (vm *VotingMachine) OnVote(vote consensus.VoteMsg) {
 	delete(vm.verifiedVotes, cert.BlockHash())
 
 	// signal the synchronizer
-	vm.mod.EventLoop().AddEvent(consensus.NewViewMsg{ID: vm.mod.ID(), SyncInfo: consensus.NewSyncInfo().WithQC(qc)})
+	vm.mod.EventLoop().AddEvent(NewViewMsg{ID: vm.mod.ID(), SyncInfo: NewSyncInfo().WithQC(qc)})
 }

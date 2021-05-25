@@ -4,7 +4,6 @@ import (
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/consensus/votingmachine"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/leaderrotation"
@@ -21,7 +20,6 @@ func DefaultModules(replicaConfig config.ReplicaConfig, duration synchronizer.Vi
 		synchronizer.New(duration),
 		leaderrotation.NewRoundRobin(),
 		blockchain.New(100),
-		votingmachine.NewVotingMachine(),
 		signer,
 	)
 	return builder

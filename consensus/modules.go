@@ -28,7 +28,7 @@ type Modules struct {
 	leaderRotation LeaderRotation
 	crypto         Crypto
 	synchronizer   Synchronizer
-	votingMachine  VotingMachine
+	votingMachine  *VotingMachine
 }
 
 // ID returns the id.
@@ -101,11 +101,6 @@ func (hs *Modules) Synchronizer() Synchronizer {
 	return hs.synchronizer
 }
 
-// VotingMachine returns the voting machine.
-func (hs *Modules) VotingMachine() VotingMachine {
-	return hs.votingMachine
-}
-
 // Builder is a helper for constructing a HotStuff instance.
 type Builder struct {
 	hs      *Modules
@@ -116,11 +111,13 @@ type Builder struct {
 // NewBuilder creates a new Builder.
 func NewBuilder(id ID, privateKey PrivateKey) Builder {
 	bl := Builder{hs: &Modules{
-		id:         id,
-		privateKey: privateKey,
-		logger:     logging.New(""),
+		id:            id,
+		privateKey:    privateKey,
+		logger:        logging.New(""),
+		votingMachine: NewVotingMachine(),
 	}}
-	bl.Register(eventloop.New(100))
+	// some of the default modules need to be registered
+	bl.Register(eventloop.New(100), bl.hs.votingMachine)
 	return bl
 }
 
@@ -164,9 +161,6 @@ func (b *Builder) Register(modules ...interface{}) {
 		}
 		if m, ok := module.(Synchronizer); ok {
 			b.hs.synchronizer = m
-		}
-		if m, ok := module.(VotingMachine); ok {
-			b.hs.votingMachine = m
 		}
 		if m, ok := module.(Module); ok {
 			b.modules = append(b.modules, m)
@@ -324,15 +318,6 @@ type Consensus interface {
 	StopVoting(view View)
 	// Propose starts a new proposal. The command is fetched from the command queue.
 	Propose(cert SyncInfo)
-	// OnPropose handles an incoming proposal.
-	// A leader should call this method on itself.
-	OnPropose(proposal ProposeMsg)
-}
-
-// VotingMachine handles incoming votes, and combines them into a Quorum Certificate when a quorum of votes is received.
-type VotingMachine interface {
-	// OnVote handles an incoming vote.
-	OnVote(vote VoteMsg)
 }
 
 // LeaderRotation implements a leader rotation scheme.

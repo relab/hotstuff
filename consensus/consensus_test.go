@@ -1,6 +1,7 @@
 package consensus_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -19,8 +20,10 @@ func TestVote(t *testing.T) {
 	hs := hl[0]
 
 	ok := false
+	ctx, cancel := context.WithCancel(context.Background())
 	hs.EventLoop().RegisterAsyncHandler(func(event interface{}) (consume bool) {
 		ok = true
+		cancel()
 		return true
 	}, consensus.NewViewMsg{})
 
@@ -36,8 +39,11 @@ func TestVote(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create partial certificate: %v", err)
 		}
-		hs.VotingMachine().OnVote(consensus.VoteMsg{ID: consensus.ID(i + 1), PartialCert: pc})
+		hs.EventLoop().AddEvent(consensus.VoteMsg{ID: consensus.ID(i + 1), PartialCert: pc})
 	}
+
+	hs.EventLoop().Run(ctx)
+
 	if !ok {
 		t.Error("No new view event happened")
 	}

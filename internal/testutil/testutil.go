@@ -11,7 +11,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/consensus/votingmachine"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
@@ -56,7 +55,6 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id consensus.ID, privkey
 		blockchain.New(100),
 		mocks.NewMockConsensus(ctrl),
 		leaderrotation.NewFixed(1),
-		votingmachine.NewVotingMachine(),
 		synchronizer,
 		config,
 		signer,

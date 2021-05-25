@@ -213,7 +213,7 @@ func (hs *ChainedHotStuff) OnPropose(proposal consensus.ProposeMsg) {
 	leaderID := hs.mod.LeaderRotation().GetLeader(hs.lastVote + 1)
 	if leaderID == hs.mod.ID() {
 		finish()
-		hs.mod.VotingMachine().OnVote(consensus.VoteMsg{ID: hs.mod.ID(), PartialCert: pc})
+		hs.mod.EventLoop().AddEvent(consensus.VoteMsg{ID: hs.mod.ID(), PartialCert: pc})
 		return
 	}
 
