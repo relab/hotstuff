@@ -3,7 +3,6 @@ syntax = "proto3";
 package orchestrationpb;
 
 import "gorums.proto";
-import "google/protobuf/empty.proto";
 
 option go_package = "github.com/relab/hotstuff/internal/proto/orchestrationpb";
 
@@ -56,7 +55,6 @@ message ClientRunConfig {
   // The size in bytes of each command.
   uint32 PayloadSize = 9;
 }
-
 
 service Orchestrator {
   rpc CreateReplica(CreateReplicaRequest) returns (CreateReplicaResponse) {
