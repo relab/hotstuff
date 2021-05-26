@@ -7,17 +7,15 @@ import (
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 )
 
-type replica struct{}
-
 type client struct{}
 
 type worker struct {
-	replicas map[consensus.ID]replica
+	replicas map[consensus.ID]replica.Replica
 	clients  map[consensus.ID]client
 }
 
-func (w *worker) CreateReplica(_ context.Context, _ *orchestrationpb.CreateReplicaRequest, _ func(*orchestrationpb.CreateReplicaResponse, error)) {
-	panic("not implemented") // TODO: Implement
+func (w *worker) CreateReplica(ctx context.Context, cfg *orchestrationpb.CreateReplicaRequest, ret func(*orchestrationpb.CreateReplicaResponse, error)) {
+
 }
 
 func (w *worker) CreateClient(_ context.Context, _ *orchestrationpb.CreateClientRequest, _ func(*orchestrationpb.CreateClientResponse, error)) {
