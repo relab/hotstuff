@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"os"
-	"runtime"
 	"sync"
 	"time"
 
@@ -22,117 +20,15 @@ import (
 	"github.com/relab/hotstuff/consensus/fasthotstuff"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
-	"github.com/relab/hotstuff/crypto/ecdsa"
+	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/logging"
-	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/leaderrotation"
 	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
-
-func runServer(ctx context.Context, conf *options) {
-	privkey, err := keygen.ReadPrivateKeyFile(conf.Privkey)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to read private key file: %v\n", err)
-		os.Exit(1)
-	}
-
-	var creds credentials.TransportCredentials
-	var tlsCert tls.Certificate
-	if conf.TLS {
-		creds, tlsCert = loadCreds(conf)
-	}
-
-	var clientAddress string
-	replicaConfig := config.NewConfig(conf.SelfID, privkey, creds)
-	for _, r := range conf.Replicas {
-		key, err := keygen.ReadPublicKeyFile(r.Pubkey)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to read public key file '%s': %v\n", r.Pubkey, err)
-			os.Exit(1)
-		}
-
-		info := &config.ReplicaInfo{
-			ID:      r.ID,
-			Address: r.PeerAddr,
-			PubKey:  key,
-		}
-
-		if r.ID == conf.SelfID {
-			// override own addresses if set
-			if conf.ClientAddr != "" {
-				clientAddress = conf.ClientAddr
-			} else {
-				clientAddress = r.ClientAddr
-			}
-			if conf.PeerAddr != "" {
-				info.Address = conf.PeerAddr
-			}
-		}
-
-		replicaConfig.Replicas[r.ID] = info
-	}
-
-	srv := newClientServer(conf, replicaConfig, &tlsCert)
-	err = srv.Run(ctx, clientAddress)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to start HotStuff: %v\n", err)
-		os.Exit(1)
-	}
-}
-
-func loadCreds(conf *options) (credentials.TransportCredentials, tls.Certificate) {
-	if conf.Cert == "" {
-		for _, replica := range conf.Replicas {
-			if replica.ID == conf.SelfID {
-				conf.Cert = replica.Cert
-			}
-		}
-	}
-
-	keyPath := conf.Privkey
-	if conf.CertKey != "" {
-		keyPath = conf.CertKey
-	}
-
-	tlsCert, err := tls.LoadX509KeyPair(conf.Cert, keyPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to parse certificate: %v\n", err)
-		os.Exit(1)
-	}
-
-	rootCAs, err := x509.SystemCertPool()
-	if err != nil {
-		// system cert pool is unavailable on windows
-		if runtime.GOOS != "windows" {
-			fmt.Fprintf(os.Stderr, "Failed to get system cert pool: %v\n", err)
-		}
-		rootCAs = x509.NewCertPool()
-	}
-
-	for _, ca := range conf.RootCAs {
-		cert, err := os.ReadFile(ca)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to read CA file: %v\n", err)
-			os.Exit(1)
-		}
-		if !rootCAs.AppendCertsFromPEM(cert) {
-			fmt.Fprintf(os.Stderr, "Failed to add CA to cert pool.\n")
-			os.Exit(1)
-		}
-	}
-	creds := credentials.NewTLS(&tls.Config{
-		Certificates: []tls.Certificate{tlsCert},
-		RootCAs:      rootCAs,
-		ClientCAs:    rootCAs,
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-	})
-
-	return creds, tlsCert
-}
 
 // cmdID is a unique identifier for a command
 type cmdID struct {
@@ -141,13 +37,12 @@ type cmdID struct {
 }
 
 type Replica struct {
-	conf      *options
-	output    io.Writer
-	gorumsSrv *gorums.Server
-	cfg       *hotstuffgorums.Config
-	hsSrv     *hotstuffgorums.Server
-	hs        *consensus.Modules
-	cmdCache  *cmdCache
+	output io.Writer
+	*clientSrv
+	cfg      *hotstuffgorums.Config
+	hsSrv    *hotstuffgorums.Server
+	hs       *consensus.Modules
+	cmdCache *cmdCache
 
 	mut          sync.Mutex
 	execHandlers map[cmdID]func(*empty.Empty, error)
@@ -155,56 +50,108 @@ type Replica struct {
 	lastExecTime int64
 }
 
-func New(conf *orchestrationpb.ReplicaRunConfig) *Replica {
+func getCertificate(conf *orchestrationpb.ReplicaRunConfig) (*tls.Certificate, error) {
+	if conf.GetCertificate() != nil {
+		var key []byte
+		if conf.GetCertificateKey() != nil {
+			key = conf.GetCertificateKey()
+		} else {
+			key = conf.GetPrivateKey()
+		}
+		cert, err := tls.X509KeyPair(conf.GetCertificate(), key)
+		if err != nil {
+			return nil, err
+		}
+		return &cert, nil
+	}
+	return nil, nil
+}
+
+func getConfiguration(conf *orchestrationpb.ReplicaRunConfig) (*config.ReplicaConfig, error) {
+	pk, err := keygen.ParsePrivateKey(conf.GetPrivateKey())
+	if err != nil {
+		return nil, err
+	}
+	cert, err := getCertificate(conf)
+	if err != nil {
+		return nil, err
+	}
+	cp := x509.NewCertPool()
+	cp.AppendCertsFromPEM(conf.GetCertificateAuthority())
+	cfg := &config.ReplicaConfig{
+		ID:         consensus.ID(conf.GetID()),
+		PrivateKey: pk,
+		Creds: credentials.NewTLS(&tls.Config{
+			Certificates: []tls.Certificate{*cert},
+			RootCAs:      cp,
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+		}),
+	}
+	for _, replica := range conf.GetReplicas() {
+		pubKey, err := keygen.ReadPublicKeyFile(string(replica.GetPublicKey()))
+		if err != nil {
+			return nil, err
+		}
+		cfg.Replicas[consensus.ID(replica.GetID())] = &config.ReplicaInfo{
+			ID:      consensus.ID(replica.GetID()),
+			Address: replica.GetAddress(),
+			PubKey:  pubKey,
+		}
+	}
+	return cfg, nil
+}
+
+func New(conf *orchestrationpb.ReplicaRunConfig) (replica *Replica, err error) {
 	serverOpts := []gorums.ServerOption{}
 	grpcServerOpts := []grpc.ServerOption{}
 
-	if conf.TLS {
-		grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(tlsCert)))
+	cert, err := getCertificate(conf)
+	if err != nil {
+		return nil, err
+	}
+	if cert != nil {
+		grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(cert)))
 	}
 
 	serverOpts = append(serverOpts, gorums.WithGRPCServerOptions(grpcServerOpts...))
-
+	clientSrv, err := newClientServer(conf, serverOpts)
+	if err != nil {
+		return nil, err
+	}
 	srv := &Replica{
-		conf:         conf,
-		gorumsSrv:    gorums.NewServer(serverOpts...),
-		cmdCache:     newCmdCache(conf.BatchSize),
+		clientSrv:    clientSrv,
+		cmdCache:     newCmdCache(int(conf.GetBatchSize())),
 		execHandlers: make(map[cmdID]func(*empty.Empty, error)),
 		lastExecTime: time.Now().UnixNano(),
 	}
 
+	replicaConfig, err := getConfiguration(conf)
+	if err != nil {
+		return nil, err
+	}
+
 	builder := chainedhotstuff.DefaultModules(
 		*replicaConfig,
-		synchronizer.NewViewDuration(1000, conf.ViewTimeout, 1.5),
+		synchronizer.NewViewDuration(1000, float64(conf.GetInitialTimeout()), 1.5),
 	)
 	srv.cfg = hotstuffgorums.NewConfig(*replicaConfig)
 	srv.hsSrv = hotstuffgorums.NewServer(*replicaConfig)
 	builder.Register(srv.cfg, srv.hsSrv)
 
-	var leaderRotation consensus.LeaderRotation
-	switch conf.PmType {
-	case "fixed":
-		leaderRotation = leaderrotation.NewFixed(conf.LeaderID)
-	case "round-robin":
-		leaderRotation = leaderrotation.NewRoundRobin()
-	default:
-		fmt.Fprintf(os.Stderr, "Invalid pacemaker type: '%s'\n", conf.PmType)
-		os.Exit(1)
-	}
 	var consensusImpl consensus.Consensus
-	switch conf.Consensus {
+	switch conf.GetConsensus() {
 	case "chainedhotstuff":
 		consensusImpl = chainedhotstuff.New()
 	case "fasthotstuff":
 		consensusImpl = fasthotstuff.New()
 	default:
-		fmt.Fprintf(os.Stderr, "Invalid consensus type: '%s'\n", conf.Consensus)
+		fmt.Fprintf(os.Stderr, "Invalid consensus type: '%s'\n", conf.GetConsensus())
 		os.Exit(1)
 	}
 	var cryptoImpl consensus.CryptoImpl
 	switch conf.Crypto {
 	case "ecdsa":
-		cryptoImpl = ecdsa.New()
+		cryptoImpl = ecdsacrypto.New()
 	case "bls12":
 		cryptoImpl = bls12.New()
 	default:
@@ -214,35 +161,17 @@ func New(conf *orchestrationpb.ReplicaRunConfig) *Replica {
 	builder.Register(
 		consensusImpl,
 		crypto.NewCache(cryptoImpl, 2*srv.cfg.Len()),
-		leaderRotation,
+		leaderrotation.NewRoundRobin(),
 		srv,          // executor
 		srv.cmdCache, // acceptor and command queue
-		logging.New(fmt.Sprintf("hs%d", conf.SelfID)),
+		logging.New(fmt.Sprintf("hs%d", conf.GetID())),
 	)
 	srv.hs = builder.Build()
 
-	// Use a custom server instead of the gorums one
-	clientpb.RegisterClientServer(srv.gorumsSrv, srv)
-	return srv
+	return srv, nil
 }
 
 func (srv *Replica) Run(ctx context.Context, address string) (err error) {
-	if srv.conf.Output != "" {
-		// Since io.Discard is not a WriteCloser, we just store the file as a Writer.
-		srv.output, err = os.OpenFile(srv.conf.Output, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-		if err != nil {
-			return err
-		}
-	} else {
-		// I wish we could make this a WriteCloser...
-		srv.output = io.Discard
-	}
-
-	lis, err := net.Listen("tcp", address)
-	if err != nil {
-		return err
-	}
-
 	err = srv.hsSrv.Start()
 	if err != nil {
 		return err
@@ -260,12 +189,10 @@ func (srv *Replica) Run(ctx context.Context, address string) (err error) {
 		close(c)
 	}()
 
-	go func() {
-		err := srv.gorumsSrv.Serve(lis)
-		if err != nil {
-			log.Println(err)
-		}
-	}()
+	err = srv.clientSrv.Start(address)
+	if err != nil {
+		log.Println(err)
+	}
 
 	// wait for the event loop to exit
 	<-c
@@ -275,7 +202,7 @@ func (srv *Replica) Run(ctx context.Context, address string) (err error) {
 }
 
 func (srv *Replica) stop() {
-	srv.gorumsSrv.Stop()
+	srv.clientSrv.Stop()
 	srv.cfg.Close()
 	srv.hsSrv.Stop()
 	if closer, ok := srv.output.(io.Closer); ok {

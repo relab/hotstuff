@@ -26,12 +26,14 @@ type clientSrv struct {
 }
 
 // newClientServer returns a new client server.
-func newClientServer(conf *orchestrationpb.ReplicaRunConfig, srvOpts []gorums.ServerOption) *clientSrv {
-	return &clientSrv{
+func newClientServer(conf *orchestrationpb.ReplicaRunConfig, srvOpts []gorums.ServerOption) (srv *clientSrv, err error) {
+	srv = &clientSrv{
 		handlers: make(map[cmdID]func(*empty.Empty, error)),
 		srv:      gorums.NewServer(srvOpts...),
 		cmdCache: newCmdCache(int(conf.GetBatchSize())),
 	}
+	clientpb.RegisterClientServer(srv.srv, srv)
+	return srv, nil
 }
 
 // InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
@@ -41,7 +43,7 @@ func (srv *clientSrv) InitModule(mod *consensus.Modules, opts *consensus.Options
 	srv.cmdCache.InitModule(mod, opts)
 }
 
-func (srv *clientSrv) Start(ctx context.Context, addr string) error {
+func (srv *clientSrv) Start(addr string) error {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err

@@ -34,10 +34,14 @@ message ReplicaRunConfig {
   optional bytes CertificateAuthority = 7;
   // The name of the crypto implementation to use.
   string Crypto = 8;
+  // The name of the consensus implementation to use.
+  string Consensus = 12;
   // The name of the leader election algorithm to use.
   string LeaderElection = 9;
   // The number of client commands that should be batched together.
   uint32 BatchSize = 10;
+  // The initial view timeout in milliseconds.
+  float InitialTimeout = 11;
 }
 
 // ClientRunConfig is all the information needed to start a clientpb.

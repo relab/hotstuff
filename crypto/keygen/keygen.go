@@ -193,13 +193,9 @@ func readPemFile(file string) (b *pem.Block, err error) {
 	return b, nil
 }
 
-// ReadPrivateKeyFile reads a private key from the specified file.
-func ReadPrivateKeyFile(keyFile string) (key consensus.PrivateKey, err error) {
-	b, err := readPemFile(keyFile)
-	if err != nil {
-		return nil, err
-	}
-
+// ParsePrivateKey parses a PEM encoded private key.
+func ParsePrivateKey(buf []byte) (key consensus.PrivateKey, err error) {
+	b, _ := pem.Decode(buf)
 	switch b.Type {
 	case ecdsacrypto.PrivateKeyFileType:
 		key, err = x509.ParseECPrivateKey(b.Bytes)
@@ -210,20 +206,23 @@ func ReadPrivateKeyFile(keyFile string) (key consensus.PrivateKey, err error) {
 	default:
 		return nil, fmt.Errorf("file type did not match any known types")
 	}
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse key: %w", err)
 	}
 	return
 }
 
-// ReadPublicKeyFile reads a public key from the specified file.
-func ReadPublicKeyFile(keyFile string) (key consensus.PublicKey, err error) {
-	b, err := readPemFile(keyFile)
+// ReadPrivateKeyFile reads a private key from the specified file.
+func ReadPrivateKeyFile(keyFile string) (key consensus.PrivateKey, err error) {
+	b, err := os.ReadFile(keyFile)
 	if err != nil {
 		return nil, err
 	}
+	return ParsePrivateKey(b)
+}
 
+func ParsePublicKey(buf []byte) (key consensus.PublicKey, err error) {
+	b, _ := pem.Decode(buf)
 	switch b.Type {
 	case ecdsacrypto.PublicKeyFileType:
 		key, err = x509.ParsePKIXPublicKey(b.Bytes)
@@ -237,12 +236,19 @@ func ReadPublicKeyFile(keyFile string) (key consensus.PublicKey, err error) {
 	default:
 		return nil, fmt.Errorf("file type did not match any known types")
 	}
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse key: %w", err)
 	}
-
 	return
+}
+
+// ReadPublicKeyFile reads a public key from the specified file.
+func ReadPublicKeyFile(keyFile string) (key consensus.PublicKey, err error) {
+	b, err := os.ReadFile(keyFile)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePublicKey(b)
 }
 
 // ReadCertFile read an x509 certificate from a file.
