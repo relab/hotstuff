@@ -13,14 +13,14 @@ import (
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
-	hotstuffgorums "github.com/relab/hotstuff/backend/gorums"
+	backend "github.com/relab/hotstuff/backend/gorums"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/chainedhotstuff"
 	"github.com/relab/hotstuff/consensus/fasthotstuff"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
-	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
+	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
@@ -39,8 +39,8 @@ type cmdID struct {
 type Replica struct {
 	output io.Writer
 	*clientSrv
-	cfg      *hotstuffgorums.Config
-	hsSrv    *hotstuffgorums.Server
+	cfg      *backend.Config
+	hsSrv    *backend.Server
 	hs       *consensus.Modules
 	cmdCache *cmdCache
 
@@ -72,21 +72,28 @@ func getConfiguration(conf *orchestrationpb.ReplicaRunConfig) (*config.ReplicaCo
 	if err != nil {
 		return nil, err
 	}
-	cert, err := getCertificate(conf)
-	if err != nil {
-		return nil, err
-	}
-	cp := x509.NewCertPool()
-	cp.AppendCertsFromPEM(conf.GetCertificateAuthority())
-	cfg := &config.ReplicaConfig{
-		ID:         consensus.ID(conf.GetID()),
-		PrivateKey: pk,
-		Creds: credentials.NewTLS(&tls.Config{
+
+	var creds credentials.TransportCredentials
+	if conf.GetUseTLS() {
+		cert, err := getCertificate(conf)
+		if err != nil {
+			return nil, err
+		}
+		cp := x509.NewCertPool()
+		cp.AppendCertsFromPEM(conf.GetCertificateAuthority())
+		creds = credentials.NewTLS(&tls.Config{
 			Certificates: []tls.Certificate{*cert},
 			RootCAs:      cp,
 			ClientAuth:   tls.RequireAndVerifyClientCert,
-		}),
+		})
 	}
+
+	cfg := &config.ReplicaConfig{
+		ID:         consensus.ID(conf.GetID()),
+		PrivateKey: pk,
+		Creds:      creds,
+	}
+
 	for _, replica := range conf.GetReplicas() {
 		pubKey, err := keygen.ReadPublicKeyFile(string(replica.GetPublicKey()))
 		if err != nil {
@@ -105,12 +112,14 @@ func New(conf *orchestrationpb.ReplicaRunConfig) (replica *Replica, err error) {
 	serverOpts := []gorums.ServerOption{}
 	grpcServerOpts := []grpc.ServerOption{}
 
-	cert, err := getCertificate(conf)
-	if err != nil {
-		return nil, err
-	}
-	if cert != nil {
-		grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(cert)))
+	if conf.GetUseTLS() {
+		cert, err := getCertificate(conf)
+		if err != nil {
+			return nil, err
+		}
+		if cert != nil {
+			grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(cert)))
+		}
 	}
 
 	serverOpts = append(serverOpts, gorums.WithGRPCServerOptions(grpcServerOpts...))
@@ -134,8 +143,8 @@ func New(conf *orchestrationpb.ReplicaRunConfig) (replica *Replica, err error) {
 		*replicaConfig,
 		synchronizer.NewViewDuration(1000, float64(conf.GetInitialTimeout()), 1.5),
 	)
-	srv.cfg = hotstuffgorums.NewConfig(*replicaConfig)
-	srv.hsSrv = hotstuffgorums.NewServer(*replicaConfig)
+	srv.cfg = backend.NewConfig(*replicaConfig)
+	srv.hsSrv = backend.NewServer(*replicaConfig)
 	builder.Register(srv.cfg, srv.hsSrv)
 
 	var consensusImpl consensus.Consensus
@@ -151,7 +160,7 @@ func New(conf *orchestrationpb.ReplicaRunConfig) (replica *Replica, err error) {
 	var cryptoImpl consensus.CryptoImpl
 	switch conf.Crypto {
 	case "ecdsa":
-		cryptoImpl = ecdsacrypto.New()
+		cryptoImpl = ecdsa.New()
 	case "bls12":
 		cryptoImpl = bls12.New()
 	default:
