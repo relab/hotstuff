@@ -14,6 +14,7 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
 	backend "github.com/relab/hotstuff/backend/gorums"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/chainedhotstuff"
@@ -108,6 +109,7 @@ func getConfiguration(conf *orchestrationpb.ReplicaRunConfig) (*config.ReplicaCo
 	return cfg, nil
 }
 
+// New returns a new replica.
 func New(conf *orchestrationpb.ReplicaRunConfig) (replica *Replica, err error) {
 	serverOpts := []gorums.ServerOption{}
 	grpcServerOpts := []grpc.ServerOption{}
@@ -139,14 +141,6 @@ func New(conf *orchestrationpb.ReplicaRunConfig) (replica *Replica, err error) {
 		return nil, err
 	}
 
-	builder := chainedhotstuff.DefaultModules(
-		*replicaConfig,
-		synchronizer.NewViewDuration(1000, float64(conf.GetInitialTimeout()), 1.5),
-	)
-	srv.cfg = backend.NewConfig(*replicaConfig)
-	srv.hsSrv = backend.NewServer(*replicaConfig)
-	builder.Register(srv.cfg, srv.hsSrv)
-
 	var consensusImpl consensus.Consensus
 	switch conf.GetConsensus() {
 	case "chainedhotstuff":
@@ -157,6 +151,7 @@ func New(conf *orchestrationpb.ReplicaRunConfig) (replica *Replica, err error) {
 		fmt.Fprintf(os.Stderr, "Invalid consensus type: '%s'\n", conf.GetConsensus())
 		os.Exit(1)
 	}
+
 	var cryptoImpl consensus.CryptoImpl
 	switch conf.Crypto {
 	case "ecdsa":
@@ -167,12 +162,24 @@ func New(conf *orchestrationpb.ReplicaRunConfig) (replica *Replica, err error) {
 		fmt.Fprintf(os.Stderr, "Invalid crypto type: '%s'\n", conf.Crypto)
 		os.Exit(1)
 	}
+
+	srv.cfg = backend.NewConfig(*replicaConfig)
+	srv.hsSrv = backend.NewServer(*replicaConfig)
+
+	builder := consensus.NewBuilder(replicaConfig.ID, replicaConfig.PrivateKey)
+
 	builder.Register(
+		srv.cfg,
+		srv.hsSrv,
 		consensusImpl,
 		crypto.NewCache(cryptoImpl, 2*srv.cfg.Len()),
 		leaderrotation.NewRoundRobin(),
 		srv,          // executor
 		srv.cmdCache, // acceptor and command queue
+		synchronizer.New(synchronizer.NewViewDuration(
+			uint64(conf.TimeoutSamples), float64(conf.InitialTimeout), float64(conf.TimeoutMultiplier)),
+		),
+		blockchain.New(int(conf.BlockCacheSize)),
 		logging.New(fmt.Sprintf("hs%d", conf.GetID())),
 	)
 	srv.hs = builder.Build()
@@ -180,6 +187,7 @@ func New(conf *orchestrationpb.ReplicaRunConfig) (replica *Replica, err error) {
 	return srv, nil
 }
 
+// Run runs the replica until the context is cancelled.
 func (srv *Replica) Run(ctx context.Context, address string) (err error) {
 	err = srv.hsSrv.Start()
 	if err != nil {
