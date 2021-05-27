@@ -52,7 +52,7 @@ type Replica struct {
 }
 
 func getCertificate(conf *orchestrationpb.ReplicaRunConfig) (*tls.Certificate, error) {
-	if conf.GetCertificate() != nil {
+	if conf.GetUseTLS() && conf.GetCertificate() != nil {
 		var key []byte
 		if conf.GetCertificateKey() != nil {
 			key = conf.GetCertificateKey()
@@ -114,14 +114,12 @@ func New(conf *orchestrationpb.ReplicaRunConfig) (replica *Replica, err error) {
 	serverOpts := []gorums.ServerOption{}
 	grpcServerOpts := []grpc.ServerOption{}
 
-	if conf.GetUseTLS() {
-		cert, err := getCertificate(conf)
-		if err != nil {
-			return nil, err
-		}
-		if cert != nil {
-			grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(cert)))
-		}
+	cert, err := getCertificate(conf)
+	if err != nil {
+		return nil, err
+	}
+	if cert != nil {
+		grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(cert)))
 	}
 
 	serverOpts = append(serverOpts, gorums.WithGRPCServerOptions(grpcServerOpts...))
