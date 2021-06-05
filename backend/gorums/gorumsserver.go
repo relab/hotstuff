@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/relab/gorums"
-	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"google.golang.org/grpc"
@@ -22,7 +21,6 @@ import (
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
 	mod       *consensus.Modules
-	addr      string
 	gorumsSrv *gorums.Server
 }
 
@@ -32,30 +30,24 @@ func (srv *Server) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder
 }
 
 // NewServer creates a new Server.
-func NewServer(replicaConfig config.ReplicaConfig) *Server {
+func NewServer(opts ...gorums.ServerOption) *Server {
 	srv := &Server{}
-	srv.addr = replicaConfig.Replicas[replicaConfig.ID].Address
 
-	serverOpts := []gorums.ServerOption{}
 	grpcServerOpts := []grpc.ServerOption{}
 
-	if replicaConfig.Creds != nil {
-		grpcServerOpts = append(grpcServerOpts, grpc.Creds(replicaConfig.Creds.Clone()))
-	}
+	opts = append(opts, gorums.WithGRPCServerOptions(grpcServerOpts...))
 
-	serverOpts = append(serverOpts, gorums.WithGRPCServerOptions(grpcServerOpts...))
-
-	srv.gorumsSrv = gorums.NewServer(serverOpts...)
+	srv.gorumsSrv = gorums.NewServer(opts...)
 
 	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, srv)
 	return srv
 }
 
 // Start creates a listener on the configured address and starts the server.
-func (srv *Server) Start() error {
-	lis, err := net.Listen("tcp", srv.addr)
+func (srv *Server) Start(addr string) error {
+	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("failed to listen on %s: %w", srv.addr, err)
+		return fmt.Errorf("failed to listen on %s: %w", addr, err)
 	}
 	srv.StartOnListener(lis)
 	return nil

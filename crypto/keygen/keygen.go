@@ -11,8 +11,6 @@ import (
 	"math/big"
 	"net"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/relab/hotstuff/consensus"
@@ -87,31 +85,69 @@ func GenerateTLSCert(id consensus.ID, hosts []string, parent *x509.Certificate, 
 	return x509.ParseCertificate(caBytes)
 }
 
+// PrivateKeyToPem encodes the private key in PEM format.
+func PrivateKeyToPEM(key consensus.PrivateKey) ([]byte, error) {
+	var (
+		marshalled []byte
+		keyType    string
+		err        error
+	)
+	switch k := key.(type) {
+	case *ecdsa.PrivateKey:
+		marshalled, err = x509.MarshalECPrivateKey(k)
+		if err != nil {
+			return nil, err
+		}
+		keyType = ecdsacrypto.PrivateKeyFileType
+	case *bls12.PrivateKey:
+		marshalled = k.ToBytes()
+		keyType = bls12.PrivateKeyFileType
+	}
+	b := &pem.Block{
+		Type:  keyType,
+		Bytes: marshalled,
+	}
+	return pem.EncodeToMemory(b), nil
+}
+
 // WritePrivateKeyFile writes a private key to the specified file.
 func WritePrivateKeyFile(key consensus.PrivateKey, filePath string) (err error) {
 	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return
 	}
-
 	defer func() {
 		if cerr := f.Close(); err == nil {
 			err = cerr
 		}
 	}()
 
-	var marshalled []byte
-	var keyType string
+	b, err := PrivateKeyToPEM(key)
+	if err != nil {
+		return
+	}
+
+	_, err = f.Write(b)
+	return
+}
+
+// PublicKeyToPEM encodes the public key in PEM format.
+func PublicKeyToPEM(key consensus.PublicKey) ([]byte, error) {
+	var (
+		marshalled []byte
+		keyType    string
+		err        error
+	)
 	switch k := key.(type) {
-	case *ecdsa.PrivateKey:
-		marshalled, err = x509.MarshalECPrivateKey(k)
+	case *ecdsa.PublicKey:
+		marshalled, err = x509.MarshalPKIXPublicKey(k)
 		if err != nil {
-			return
+			return nil, err
 		}
-		keyType = ecdsacrypto.PrivateKeyFileType
-	case *bls12.PrivateKey:
+		keyType = ecdsacrypto.PublicKeyFileType
+	case *bls12.PublicKey:
 		marshalled = k.ToBytes()
-		keyType = bls12.PrivateKeyFileType
+		keyType = bls12.PublicKeyFileType
 	}
 
 	b := &pem.Block{
@@ -119,8 +155,7 @@ func WritePrivateKeyFile(key consensus.PrivateKey, filePath string) (err error) 
 		Bytes: marshalled,
 	}
 
-	err = pem.Encode(f, b)
-	return
+	return pem.EncodeToMemory(b), nil
 }
 
 // WritePublicKeyFile writes a public key to the specified file.
@@ -136,27 +171,13 @@ func WritePublicKeyFile(key consensus.PublicKey, filePath string) (err error) {
 		}
 	}()
 
-	var marshalled []byte
-	var keyType string
-	switch k := key.(type) {
-	case *ecdsa.PublicKey:
-		marshalled, err = x509.MarshalPKIXPublicKey(k)
-		if err != nil {
-			return
-		}
-		keyType = ecdsacrypto.PublicKeyFileType
-	case *bls12.PublicKey:
-		marshalled = k.ToBytes()
-		keyType = bls12.PublicKeyFileType
+	b, err := PublicKeyToPEM(key)
+	if err != nil {
+		return err
 	}
 
-	b := &pem.Block{
-		Type:  keyType,
-		Bytes: marshalled,
-	}
-
-	err = pem.Encode(f, b)
-	return
+	_, err = f.Write(b)
+	return err
 }
 
 // WriteCertFile writes an x509 certificate to a file.
@@ -221,8 +242,12 @@ func ReadPrivateKeyFile(keyFile string) (key consensus.PrivateKey, err error) {
 	return ParsePrivateKey(b)
 }
 
+// ParsePublicKey parses a PEM encoded public key
 func ParsePublicKey(buf []byte) (key consensus.PublicKey, err error) {
 	b, _ := pem.Decode(buf)
+	if b == nil {
+		return nil, fmt.Errorf("failed to decode PEM block")
+	}
 	switch b.Type {
 	case ecdsacrypto.PublicKeyFileType:
 		key, err = x509.ParsePKIXPublicKey(b.Bytes)
@@ -275,89 +300,63 @@ func ReadCertFile(certFile string) (cert *x509.Certificate, err error) {
 	return cert, nil
 }
 
-// GenerateConfiguration creates keys and certificates for a configuration of 'n' replicas.
-// The keys and certificates are saved in the directory specified by 'dest'.
-// 'firstID' specifies the ID of the first replica in the configuration.
-// The last ID will be 'firstID' + 'n'.
-// 'pattern' describes the pattern for naming of key files.
-// For example, '*.key' would result in private keys with the name '1.key', if '1' is the starting ID.
-// 'hosts' specify the hosts for which the generated certificates should be valid.
-// If len('hosts') is 1, then all certificates will be valid for the same host.
-// If not, one of the hosts specified in 'hosts' will be used for each replica.
-func GenerateConfiguration(dest string, tls, bls bool, firstID, n int, pattern string, hosts []string) error {
-	err := os.MkdirAll(dest, 0755)
-	if err != nil {
-		return fmt.Errorf("cannot create '%s' directory: %w", dest, err)
-	}
-
-	if tls && len(hosts) > 1 && len(hosts) != n {
-		return fmt.Errorf("you must specify one host or IP for each certificate to generate")
-	}
-
-	var caKey *ecdsa.PrivateKey
-	var ca *x509.Certificate
-	if tls {
-		caKey, ca, err = createRootCA(dest)
-		if err != nil {
-			return err
-		}
-	}
-
-	for i := 0; i < n; i++ {
-		pk, err := GenerateECDSAPrivateKey()
-		if err != nil {
-			return fmt.Errorf("failed to generate key: %w", err)
-		}
-
-		basePath := filepath.Join(dest, strings.ReplaceAll(pattern, "*", fmt.Sprintf("%d", firstID+i)))
-		certPath := basePath + ".crt"
-		privKeyPath := basePath + ".key"
-		blsPrivPath := basePath + ".bls"
-
-		if tls {
-			err = createTLSCert(certPath, i, consensus.ID(firstID+i), hosts, ca, caKey, &pk.PublicKey)
-			if err != nil {
-				return err
-			}
-		}
-
-		err = writeKeyFiles(pk, privKeyPath)
-		if err != nil {
-			return err
-		}
-
-		if !bls {
-			continue
-		}
-
-		blsKey, err := bls12.GeneratePrivateKey()
-		if err != nil {
-			return fmt.Errorf("failed to generate bls12-381 private key: %w", err)
-		}
-
-		err = writeKeyFiles(blsKey, blsPrivPath)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+// KeyChain contains the keys and certificates needed by a replica, in PEM format.
+type KeyChain struct {
+	PrivateKey     []byte
+	PublicKey      []byte
+	Certificate    []byte
+	CertificateKey []byte
 }
 
-// writeKeyFiles writes both the private and public keys to files.
-func writeKeyFiles(key consensus.PrivateKey, keyPath string) (err error) {
-	err = WritePrivateKeyFile(key, keyPath)
+// GenerateKeyChains generates keys and certificates for a replica.
+func GenerateKeyChain(id consensus.ID, address, crypto string, ca *x509.Certificate, caKey *ecdsa.PrivateKey) (KeyChain, error) {
+	ecdsaKey, err := GenerateECDSAPrivateKey()
 	if err != nil {
-		return fmt.Errorf("failed to write private key file: %w", err)
+		return KeyChain{}, err
 	}
-	pubKeyPath := keyPath + ".pub"
-	err = WritePublicKeyFile(key.Public(), pubKeyPath)
+	certKeyPEM, err := PrivateKeyToPEM(ecdsaKey)
 	if err != nil {
-		return fmt.Errorf("failed to write public key file: %w", err)
+		return KeyChain{}, err
 	}
-	return nil
+
+	cert, err := GenerateTLSCert(id, []string{address}, ca, &ecdsaKey.PublicKey, caKey)
+	if err != nil {
+		return KeyChain{}, err
+	}
+
+	certPEM := CertToPEM(cert)
+
+	var privateKey consensus.PrivateKey
+	switch crypto {
+	case "ecdsa":
+		privateKey = ecdsaKey
+	case "bls12":
+		privateKey, err = bls12.GeneratePrivateKey()
+		if err != nil {
+			return KeyChain{}, fmt.Errorf("failed to generate bls12-381 private key: %w", err)
+		}
+	}
+
+	privateKeyPEM, err := PrivateKeyToPEM(privateKey)
+	if err != nil {
+		return KeyChain{}, err
+	}
+
+	publicKeyPEM, err := PublicKeyToPEM(privateKey.Public())
+	if err != nil {
+		return KeyChain{}, err
+	}
+
+	return KeyChain{
+		PrivateKey:     privateKeyPEM,
+		PublicKey:      publicKeyPEM,
+		Certificate:    certPEM,
+		CertificateKey: certKeyPEM,
+	}, nil
 }
 
-func createRootCA(dest string) (pk *ecdsa.PrivateKey, ca *x509.Certificate, err error) {
+// GenerateCA returns a certificate authority for generating new certificates.
+func GenerateCA() (pk *ecdsa.PrivateKey, ca *x509.Certificate, err error) {
 	pk, err = GenerateECDSAPrivateKey()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate signing key: %w", err)
@@ -366,27 +365,13 @@ func createRootCA(dest string) (pk *ecdsa.PrivateKey, ca *x509.Certificate, err 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate root certificate: %w", err)
 	}
-	err = WriteCertFile(ca, filepath.Join(dest, "ca.crt"))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to write root certificate: %w", err)
-	}
 	return pk, ca, nil
 }
 
-func createTLSCert(path string, i int, id consensus.ID, hosts []string, ca *x509.Certificate, priv *ecdsa.PrivateKey, pub *ecdsa.PublicKey) error {
-	var host string
-	if len(hosts) == 1 {
-		host = hosts[0]
-	} else {
-		host = hosts[i]
-	}
-	cert, err := GenerateTLSCert(id, []string{host}, ca, pub, priv)
-	if err != nil {
-		return fmt.Errorf("failed to generate TLS certificate: %w", err)
-	}
-	err = WriteCertFile(cert, path)
-	if err != nil {
-		return fmt.Errorf("failed to write certificate to file: %w", err)
-	}
-	return nil
+// CertToPEM encodes an x509 certificate in PEM format.
+func CertToPEM(cert *x509.Certificate) []byte {
+	return pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert.Raw,
+	})
 }

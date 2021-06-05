@@ -204,7 +204,7 @@ func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (teardown
 		cfg := td.cfg
 		cfg.ID = consensus.ID(i + 1)
 		cfg.PrivateKey = td.keys[i]
-		servers[i] = NewServer(cfg)
+		servers[i] = NewServer(cfg.Creds)
 		servers[i].StartOnListener(td.listeners[i])
 		td.builders[i].Register(servers[i])
 	}

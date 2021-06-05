@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.26.0
 // 	protoc        v3.15.7
-// source: internal/proto/clientpb/clientpb.proto
+// source: internal/proto/clientpb/client.proto
 
 package clientpb
 

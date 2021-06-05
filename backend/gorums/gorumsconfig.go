@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/config"
@@ -76,60 +75,43 @@ func (cfg *Config) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder
 }
 
 // NewConfig creates a new configuration.
-func NewConfig(replicaCfg config.ReplicaConfig) *Config {
+func NewConfig(id consensus.ID, opts ...gorums.ManagerOption) *Config {
 	cfg := &Config{
-		replicaCfg:    replicaCfg,
-		privKey:       replicaCfg.PrivateKey,
 		replicas:      make(map[consensus.ID]consensus.Replica),
 		proposeCancel: func() {},
 		timeoutCancel: func() {},
 	}
-
-	for id, r := range replicaCfg.Replicas {
-		cfg.replicas[id] = &gorumsReplica{
-			id:            r.ID,
-			pubKey:        r.PubKey,
-			voteCancel:    func() {},
-			newviewCancel: func() {},
-		}
-	}
-
-	return cfg
-}
-
-// Connect opens connections to the replicas in the configuration.
-func (cfg *Config) Connect(connectTimeout time.Duration) error {
-	idMapping := make(map[string]uint32, len(cfg.replicaCfg.Replicas)-1)
-	for _, replica := range cfg.replicaCfg.Replicas {
-		if replica.ID != cfg.replicaCfg.ID {
-			idMapping[replica.Address] = uint32(replica.ID)
-		}
-	}
-
 	// embed own ID to allow other replicas to identify messages from this replica
 	md := metadata.New(map[string]string{
-		"id": fmt.Sprintf("%d", cfg.replicaCfg.ID),
+		"id": fmt.Sprintf("%d", id),
 	})
 
-	mgrOpts := []gorums.ManagerOption{
-		gorums.WithDialTimeout(connectTimeout),
-		gorums.WithMetadata(md),
-	}
+	opts = append(opts, gorums.WithMetadata(md))
 	grpcOpts := []grpc.DialOption{
 		grpc.WithBlock(),
 		grpc.WithReturnConnectionError(),
 	}
 
-	if cfg.replicaCfg.Creds != nil {
-		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(cfg.replicaCfg.Creds))
-	} else {
-		grpcOpts = append(grpcOpts, grpc.WithInsecure())
+	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
+
+	cfg.mgr = hotstuffpb.NewManager(opts...)
+	return cfg
+}
+
+// Connect opens connections to the replicas in the configuration.
+func (cfg *Config) Connect(replicaCfg *config.ReplicaConfig, opts ...gorums.ManagerOption) (err error) {
+	idMapping := make(map[string]uint32, len(replicaCfg.Replicas)-1)
+	for _, replica := range replicaCfg.Replicas {
+		cfg.replicas[replica.ID] = &gorumsReplica{
+			id:            replica.ID,
+			pubKey:        replica.PubKey,
+			newviewCancel: func() {},
+			voteCancel:    func() {},
+		}
+		if replica.ID != replicaCfg.ID {
+			idMapping[replica.Address] = uint32(replica.ID)
+		}
 	}
-
-	mgrOpts = append(mgrOpts, gorums.WithGrpcDialOptions(grpcOpts...))
-
-	var err error
-	cfg.mgr = hotstuffpb.NewManager(mgrOpts...)
 
 	cfg.cfg, err = cfg.mgr.NewConfiguration(qspec{}, gorums.WithNodeMap(idMapping))
 	if err != nil {
@@ -143,16 +125,6 @@ func (cfg *Config) Connect(connectTimeout time.Duration) error {
 	}
 
 	return nil
-}
-
-// ID returns the id of this replica.
-func (cfg *Config) ID() consensus.ID {
-	return cfg.replicaCfg.ID
-}
-
-// PrivateKey returns the id of this replica.
-func (cfg *Config) PrivateKey() consensus.PrivateKey {
-	return cfg.privKey
 }
 
 // Replicas returns all of the replicas in the configuration.

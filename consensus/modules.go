@@ -11,11 +11,12 @@ import (
 type Modules struct {
 	// data
 
-	id         ID
-	privateKey PrivateKey
-	logger     logging.Logger
-	opts       Options
-	eventLoop  *eventloop.EventLoop
+	id            ID
+	privateKey    PrivateKey
+	logger        logging.Logger
+	opts          Options
+	eventLoop     *eventloop.EventLoop
+	votingMachine *VotingMachine
 
 	// modules
 
@@ -28,7 +29,6 @@ type Modules struct {
 	leaderRotation LeaderRotation
 	crypto         Crypto
 	synchronizer   Synchronizer
-	votingMachine  *VotingMachine
 }
 
 // ID returns the id.

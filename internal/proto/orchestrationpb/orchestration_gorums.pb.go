@@ -129,14 +129,7 @@ type QuorumSpec interface {
 	// supplied to the CreateReplica method at call time, and may or may not
 	// be used by the quorum function. If the in parameter is not needed
 	// you should implement your quorum function with '_ *CreateReplicaRequest'.
-	CreateReplicaQF(in *CreateReplicaRequest, replies map[uint32]*CreateReplicaResponse) (*CreateReplicaResponse, bool)
-
-	// CreateClientQF is the quorum function for the CreateClient
-	// quorum call method. The in parameter is the request object
-	// supplied to the CreateClient method at call time, and may or may not
-	// be used by the quorum function. If the in parameter is not needed
-	// you should implement your quorum function with '_ *CreateClientRequest'.
-	CreateClientQF(in *CreateClientRequest, replies map[uint32]*CreateClientResponse) (*CreateClientResponse, bool)
+	CreateReplicaQF(in *CreateReplicaRequest, replies map[uint32]*CreateReplicaResponse) (*ReplicaConfiguration, bool)
 
 	// StartReplicaQF is the quorum function for the StartReplica
 	// quorum call method. The in parameter is the request object
@@ -145,19 +138,26 @@ type QuorumSpec interface {
 	// you should implement your quorum function with '_ *StartReplicaRequest'.
 	StartReplicaQF(in *StartReplicaRequest, replies map[uint32]*StartReplicaResponse) (*StartReplicaResponse, bool)
 
-	// StartClientQF is the quorum function for the StartClient
-	// quorum call method. The in parameter is the request object
-	// supplied to the StartClient method at call time, and may or may not
-	// be used by the quorum function. If the in parameter is not needed
-	// you should implement your quorum function with '_ *StartClientRequest'.
-	StartClientQF(in *StartClientRequest, replies map[uint32]*StartClientResponse) (*StartClientResponse, bool)
-
 	// StopReplicaQF is the quorum function for the StopReplica
 	// quorum call method. The in parameter is the request object
 	// supplied to the StopReplica method at call time, and may or may not
 	// be used by the quorum function. If the in parameter is not needed
 	// you should implement your quorum function with '_ *StopReplicaRequest'.
 	StopReplicaQF(in *StopReplicaRequest, replies map[uint32]*StopReplicaResponse) (*StopReplicaResponse, bool)
+
+	// CreateClientQF is the quorum function for the CreateClient
+	// quorum call method. The in parameter is the request object
+	// supplied to the CreateClient method at call time, and may or may not
+	// be used by the quorum function. If the in parameter is not needed
+	// you should implement your quorum function with '_ *CreateClientRequest'.
+	CreateClientQF(in *CreateClientRequest, replies map[uint32]*CreateClientResponse) (*CreateClientResponse, bool)
+
+	// StartClientQF is the quorum function for the StartClient
+	// quorum call method. The in parameter is the request object
+	// supplied to the StartClient method at call time, and may or may not
+	// be used by the quorum function. If the in parameter is not needed
+	// you should implement your quorum function with '_ *StartClientRequest'.
+	StartClientQF(in *StartClientRequest, replies map[uint32]*StartClientResponse) (*StartClientResponse, bool)
 
 	// StopClientQF is the quorum function for the StopClient
 	// quorum call method. The in parameter is the request object
@@ -167,12 +167,9 @@ type QuorumSpec interface {
 	StopClientQF(in *StopClientRequest, replies map[uint32]*StopClientResponse) (*StopClientResponse, bool)
 }
 
-// CreateReplica is a quorum call invoked on each node in configuration c,
-// with the argument returned by the provided function f, and returns the combined result.
-// The per node function f receives a copy of the CreateReplicaRequest request argument and
-// returns a CreateReplicaRequest manipulated to be passed to the given nodeID.
-// The function f must be thread-safe.
-func (c *Configuration) CreateReplica(ctx context.Context, in *CreateReplicaRequest, f func(*CreateReplicaRequest, uint32) *CreateReplicaRequest) (resp *CreateReplicaResponse, err error) {
+// CreateReplica creates replicas on the workers.
+// The workers respond with the ports that the new replicas are listening on.
+func (c *Configuration) CreateReplica(ctx context.Context, in *CreateReplicaRequest, f func(*CreateReplicaRequest, uint32) *CreateReplicaRequest) (resp *ReplicaConfiguration, err error) {
 	cd := gorums.QuorumCallData{
 		Message: in,
 		Method:  "orchestrationpb.Orchestrator.CreateReplica",
@@ -192,7 +189,59 @@ func (c *Configuration) CreateReplica(ctx context.Context, in *CreateReplicaRequ
 	if err != nil {
 		return nil, err
 	}
-	return res.(*CreateReplicaResponse), err
+	return res.(*ReplicaConfiguration), err
+}
+
+// StartReplica starts the replicas.
+func (c *Configuration) StartReplica(ctx context.Context, in *StartReplicaRequest, f func(*StartReplicaRequest, uint32) *StartReplicaRequest) (resp *StartReplicaResponse, err error) {
+	cd := gorums.QuorumCallData{
+		Message: in,
+		Method:  "orchestrationpb.Orchestrator.StartReplica",
+	}
+	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
+		r := make(map[uint32]*StartReplicaResponse, len(replies))
+		for k, v := range replies {
+			r[k] = v.(*StartReplicaResponse)
+		}
+		return c.qspec.StartReplicaQF(req.(*StartReplicaRequest), r)
+	}
+	cd.PerNodeArgFn = func(req protoreflect.ProtoMessage, nid uint32) protoreflect.ProtoMessage {
+		return f(req.(*StartReplicaRequest), nid)
+	}
+
+	res, err := c.Configuration.QuorumCall(ctx, cd)
+	if err != nil {
+		return nil, err
+	}
+	return res.(*StartReplicaResponse), err
+}
+
+// StopReplica is a quorum call invoked on each node in configuration c,
+// with the argument returned by the provided function f, and returns the combined result.
+// The per node function f receives a copy of the StopReplicaRequest request argument and
+// returns a StopReplicaRequest manipulated to be passed to the given nodeID.
+// The function f must be thread-safe.
+func (c *Configuration) StopReplica(ctx context.Context, in *StopReplicaRequest, f func(*StopReplicaRequest, uint32) *StopReplicaRequest) (resp *StopReplicaResponse, err error) {
+	cd := gorums.QuorumCallData{
+		Message: in,
+		Method:  "orchestrationpb.Orchestrator.StopReplica",
+	}
+	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
+		r := make(map[uint32]*StopReplicaResponse, len(replies))
+		for k, v := range replies {
+			r[k] = v.(*StopReplicaResponse)
+		}
+		return c.qspec.StopReplicaQF(req.(*StopReplicaRequest), r)
+	}
+	cd.PerNodeArgFn = func(req protoreflect.ProtoMessage, nid uint32) protoreflect.ProtoMessage {
+		return f(req.(*StopReplicaRequest), nid)
+	}
+
+	res, err := c.Configuration.QuorumCall(ctx, cd)
+	if err != nil {
+		return nil, err
+	}
+	return res.(*StopReplicaResponse), err
 }
 
 // CreateClient is a quorum call invoked on each node in configuration c,
@@ -223,34 +272,6 @@ func (c *Configuration) CreateClient(ctx context.Context, in *CreateClientReques
 	return res.(*CreateClientResponse), err
 }
 
-// StartReplica is a quorum call invoked on each node in configuration c,
-// with the argument returned by the provided function f, and returns the combined result.
-// The per node function f receives a copy of the StartReplicaRequest request argument and
-// returns a StartReplicaRequest manipulated to be passed to the given nodeID.
-// The function f must be thread-safe.
-func (c *Configuration) StartReplica(ctx context.Context, in *StartReplicaRequest, f func(*StartReplicaRequest, uint32) *StartReplicaRequest) (resp *StartReplicaResponse, err error) {
-	cd := gorums.QuorumCallData{
-		Message: in,
-		Method:  "orchestrationpb.Orchestrator.StartReplica",
-	}
-	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
-		r := make(map[uint32]*StartReplicaResponse, len(replies))
-		for k, v := range replies {
-			r[k] = v.(*StartReplicaResponse)
-		}
-		return c.qspec.StartReplicaQF(req.(*StartReplicaRequest), r)
-	}
-	cd.PerNodeArgFn = func(req protoreflect.ProtoMessage, nid uint32) protoreflect.ProtoMessage {
-		return f(req.(*StartReplicaRequest), nid)
-	}
-
-	res, err := c.Configuration.QuorumCall(ctx, cd)
-	if err != nil {
-		return nil, err
-	}
-	return res.(*StartReplicaResponse), err
-}
-
 // StartClient is a quorum call invoked on each node in configuration c,
 // with the argument returned by the provided function f, and returns the combined result.
 // The per node function f receives a copy of the StartClientRequest request argument and
@@ -277,34 +298,6 @@ func (c *Configuration) StartClient(ctx context.Context, in *StartClientRequest,
 		return nil, err
 	}
 	return res.(*StartClientResponse), err
-}
-
-// StopReplica is a quorum call invoked on each node in configuration c,
-// with the argument returned by the provided function f, and returns the combined result.
-// The per node function f receives a copy of the StopReplicaRequest request argument and
-// returns a StopReplicaRequest manipulated to be passed to the given nodeID.
-// The function f must be thread-safe.
-func (c *Configuration) StopReplica(ctx context.Context, in *StopReplicaRequest, f func(*StopReplicaRequest, uint32) *StopReplicaRequest) (resp *StopReplicaResponse, err error) {
-	cd := gorums.QuorumCallData{
-		Message: in,
-		Method:  "orchestrationpb.Orchestrator.StopReplica",
-	}
-	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
-		r := make(map[uint32]*StopReplicaResponse, len(replies))
-		for k, v := range replies {
-			r[k] = v.(*StopReplicaResponse)
-		}
-		return c.qspec.StopReplicaQF(req.(*StopReplicaRequest), r)
-	}
-	cd.PerNodeArgFn = func(req protoreflect.ProtoMessage, nid uint32) protoreflect.ProtoMessage {
-		return f(req.(*StopReplicaRequest), nid)
-	}
-
-	res, err := c.Configuration.QuorumCall(ctx, cd)
-	if err != nil {
-		return nil, err
-	}
-	return res.(*StopReplicaResponse), err
 }
 
 // StopClient is a quorum call invoked on each node in configuration c,
@@ -338,10 +331,10 @@ func (c *Configuration) StopClient(ctx context.Context, in *StopClientRequest, f
 // Orchestrator is the server-side API for the Orchestrator Service
 type Orchestrator interface {
 	CreateReplica(context.Context, *CreateReplicaRequest, func(*CreateReplicaResponse, error))
-	CreateClient(context.Context, *CreateClientRequest, func(*CreateClientResponse, error))
 	StartReplica(context.Context, *StartReplicaRequest, func(*StartReplicaResponse, error))
-	StartClient(context.Context, *StartClientRequest, func(*StartClientResponse, error))
 	StopReplica(context.Context, *StopReplicaRequest, func(*StopReplicaResponse, error))
+	CreateClient(context.Context, *CreateClientRequest, func(*CreateClientResponse, error))
+	StartClient(context.Context, *StartClientRequest, func(*StartClientResponse, error))
 	StopClient(context.Context, *StopClientRequest, func(*StopClientResponse, error))
 }
 
@@ -359,19 +352,6 @@ func RegisterOrchestratorServer(srv *gorums.Server, impl Orchestrator) {
 		}
 		impl.CreateReplica(ctx, req, f)
 	})
-	srv.RegisterHandler("orchestrationpb.Orchestrator.CreateClient", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
-		req := in.Message.(*CreateClientRequest)
-		once := new(sync.Once)
-		f := func(resp *CreateClientResponse, err error) {
-			once.Do(func() {
-				select {
-				case finished <- gorums.WrapMessage(in.Metadata, resp, err):
-				case <-ctx.Done():
-				}
-			})
-		}
-		impl.CreateClient(ctx, req, f)
-	})
 	srv.RegisterHandler("orchestrationpb.Orchestrator.StartReplica", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*StartReplicaRequest)
 		once := new(sync.Once)
@@ -385,19 +365,6 @@ func RegisterOrchestratorServer(srv *gorums.Server, impl Orchestrator) {
 		}
 		impl.StartReplica(ctx, req, f)
 	})
-	srv.RegisterHandler("orchestrationpb.Orchestrator.StartClient", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
-		req := in.Message.(*StartClientRequest)
-		once := new(sync.Once)
-		f := func(resp *StartClientResponse, err error) {
-			once.Do(func() {
-				select {
-				case finished <- gorums.WrapMessage(in.Metadata, resp, err):
-				case <-ctx.Done():
-				}
-			})
-		}
-		impl.StartClient(ctx, req, f)
-	})
 	srv.RegisterHandler("orchestrationpb.Orchestrator.StopReplica", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*StopReplicaRequest)
 		once := new(sync.Once)
@@ -410,6 +377,32 @@ func RegisterOrchestratorServer(srv *gorums.Server, impl Orchestrator) {
 			})
 		}
 		impl.StopReplica(ctx, req, f)
+	})
+	srv.RegisterHandler("orchestrationpb.Orchestrator.CreateClient", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
+		req := in.Message.(*CreateClientRequest)
+		once := new(sync.Once)
+		f := func(resp *CreateClientResponse, err error) {
+			once.Do(func() {
+				select {
+				case finished <- gorums.WrapMessage(in.Metadata, resp, err):
+				case <-ctx.Done():
+				}
+			})
+		}
+		impl.CreateClient(ctx, req, f)
+	})
+	srv.RegisterHandler("orchestrationpb.Orchestrator.StartClient", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
+		req := in.Message.(*StartClientRequest)
+		once := new(sync.Once)
+		f := func(resp *StartClientResponse, err error) {
+			once.Do(func() {
+				select {
+				case finished <- gorums.WrapMessage(in.Metadata, resp, err):
+				case <-ctx.Done():
+				}
+			})
+		}
+		impl.StartClient(ctx, req, f)
 	})
 	srv.RegisterHandler("orchestrationpb.Orchestrator.StopClient", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*StopClientRequest)

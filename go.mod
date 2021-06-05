@@ -31,3 +31,5 @@ require (
 replace github.com/Raytar/iago => ../iago
 
 replace github.com/Raytar/wrfs => ../wrfs
+
+replace github.com/relab/gorums => ../gorums

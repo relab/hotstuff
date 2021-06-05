@@ -179,7 +179,8 @@ func newClientServer(conf *options, replicaConfig *config.ReplicaConfig, tlsCert
 		synchronizer.NewViewDuration(1000, conf.ViewTimeout, 1.5),
 	)
 	srv.cfg = hotstuffgorums.NewConfig(*replicaConfig)
-	srv.hsSrv = hotstuffgorums.NewServer(*replicaConfig)
+	// TODO
+	srv.hsSrv = hotstuffgorums.NewServer(nil)
 	builder.Register(srv.cfg, srv.hsSrv)
 
 	var leaderRotation consensus.LeaderRotation
@@ -244,7 +245,7 @@ func (srv *clientSrv) Run(ctx context.Context, address string) (err error) {
 		return err
 	}
 
-	err = srv.hsSrv.Start()
+	err = srv.hsSrv.Start(srv.conf.Replicas[srv.conf.SelfID].PeerAddr)
 	if err != nil {
 		return err
 	}

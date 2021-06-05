@@ -6,7 +6,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"log"
+	"net"
 	"os"
 	"sync"
 	"time"
@@ -22,9 +22,7 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
-	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/logging"
-	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/leaderrotation"
 	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc"
@@ -37,8 +35,47 @@ type cmdID struct {
 	sequenceNum uint64
 }
 
+// Config configures a replica.
+type Config struct {
+	// The id of the replica.
+	ID consensus.ID
+	// The private key of the replica.
+	PrivateKey consensus.PrivateKey
+	// Controls whether TLS is used.
+	TLS bool
+	// The TLS certificate.
+	Certificate *tls.Certificate
+	// The root certificates trusted by the replica.
+	RootCAs *x509.CertPool
+	// The name of the consensus implementation.
+	Consensus string
+	// The name of the crypto implementation.
+	Crypto string
+	// The name of the leader rotation algorithm.
+	LeaderRotation string
+	// The number of client commands that should be batched together in a block.
+	BatchSize uint32
+	// The number of blocks that should be cached.
+	BlockCacheSize uint32
+	// The timeout of the first view.
+	InitialTimeout float64
+	// The number of past views that should be used to calculate the next view duration.
+	TimeoutSamples uint32
+	// The number to multiply the view duration by in case of a view timeout.
+	TimeoutMultiplier float64
+	// Where to write command payloads.
+	Output io.WriteCloser
+	// Options for the client server.
+	ClientServerOptions []gorums.ServerOption
+	// Options for the replica server.
+	ReplicaServerOptions []gorums.ServerOption
+	// Options for the replica manager.
+	ManagerOptions []gorums.ManagerOption
+}
+
+// Replica is a participant in the consensus protocol.
 type Replica struct {
-	output io.Writer
+	output io.WriteCloser
 	*clientSrv
 	cfg      *backend.Config
 	hsSrv    *backend.Server
@@ -47,106 +84,35 @@ type Replica struct {
 
 	mut          sync.Mutex
 	execHandlers map[cmdID]func(*empty.Empty, error)
+	cancel       context.CancelFunc
+	done         chan struct{}
 
 	lastExecTime int64
 }
 
-func getCertificate(conf *orchestrationpb.ReplicaRunConfig) (*tls.Certificate, error) {
-	if conf.GetUseTLS() && conf.GetCertificate() != nil {
-		var key []byte
-		if conf.GetCertificateKey() != nil {
-			key = conf.GetCertificateKey()
-		} else {
-			key = conf.GetPrivateKey()
-		}
-		cert, err := tls.X509KeyPair(conf.GetCertificate(), key)
-		if err != nil {
-			return nil, err
-		}
-		return &cert, nil
-	}
-	return nil, nil
-}
-
-func getConfiguration(conf *orchestrationpb.ReplicaRunConfig) (*config.ReplicaConfig, error) {
-	pk, err := keygen.ParsePrivateKey(conf.GetPrivateKey())
-	if err != nil {
-		return nil, err
-	}
-
-	var creds credentials.TransportCredentials
-	if conf.GetUseTLS() {
-		cert, err := getCertificate(conf)
-		if err != nil {
-			return nil, err
-		}
-		cp := x509.NewCertPool()
-		cp.AppendCertsFromPEM(conf.GetCertificateAuthority())
-		creds = credentials.NewTLS(&tls.Config{
-			Certificates: []tls.Certificate{*cert},
-			RootCAs:      cp,
-			ClientAuth:   tls.RequireAndVerifyClientCert,
-		})
-	}
-
-	cfg := &config.ReplicaConfig{
-		ID:         consensus.ID(conf.GetID()),
-		PrivateKey: pk,
-		Creds:      creds,
-	}
-
-	for _, replica := range conf.GetReplicas() {
-		pubKey, err := keygen.ReadPublicKeyFile(string(replica.GetPublicKey()))
-		if err != nil {
-			return nil, err
-		}
-		cfg.Replicas[consensus.ID(replica.GetID())] = &config.ReplicaInfo{
-			ID:      consensus.ID(replica.GetID()),
-			Address: replica.GetAddress(),
-			PubKey:  pubKey,
-		}
-	}
-	return cfg, nil
-}
-
 // New returns a new replica.
-func New(conf *orchestrationpb.ReplicaRunConfig) (replica *Replica, err error) {
-	serverOpts := []gorums.ServerOption{}
-	grpcServerOpts := []grpc.ServerOption{}
+func New(conf Config) (replica *Replica, err error) {
+	clientSrvOpts := conf.ClientServerOptions
 
-	cert, err := getCertificate(conf)
-	if err != nil {
-		return nil, err
-	}
-	if cert != nil {
-		grpcServerOpts = append(grpcServerOpts, grpc.Creds(credentials.NewServerTLSFromCert(cert)))
+	if conf.TLS {
+		clientSrvOpts = append(clientSrvOpts, gorums.WithGRPCServerOptions(
+			grpc.Creds(credentials.NewServerTLSFromCert(conf.Certificate)),
+		))
 	}
 
-	serverOpts = append(serverOpts, gorums.WithGRPCServerOptions(grpcServerOpts...))
-	clientSrv, err := newClientServer(conf, serverOpts)
-	if err != nil {
-		return nil, err
-	}
-	srv := &Replica{
-		clientSrv:    clientSrv,
-		cmdCache:     newCmdCache(int(conf.GetBatchSize())),
-		execHandlers: make(map[cmdID]func(*empty.Empty, error)),
-		lastExecTime: time.Now().UnixNano(),
-	}
-
-	replicaConfig, err := getConfiguration(conf)
+	clientSrv, err := newClientServer(conf, clientSrvOpts)
 	if err != nil {
 		return nil, err
 	}
 
 	var consensusImpl consensus.Consensus
-	switch conf.GetConsensus() {
+	switch conf.Consensus {
 	case "chainedhotstuff":
 		consensusImpl = chainedhotstuff.New()
 	case "fasthotstuff":
 		consensusImpl = fasthotstuff.New()
 	default:
-		fmt.Fprintf(os.Stderr, "Invalid consensus type: '%s'\n", conf.GetConsensus())
+		fmt.Fprintf(os.Stderr, "Invalid consensus type: '%s'\n", conf.Consensus)
 		os.Exit(1)
 	}
 
@@ -161,69 +127,108 @@ func New(conf *orchestrationpb.ReplicaRunConfig) (replica *Replica, err error) {
 		os.Exit(1)
 	}
 
-	srv.cfg = backend.NewConfig(*replicaConfig)
-	srv.hsSrv = backend.NewServer(*replicaConfig)
+	var leaderRotation consensus.LeaderRotation
+	switch conf.LeaderRotation {
+	case "round-robin":
+		leaderRotation = leaderrotation.NewRoundRobin()
+	case "fixed":
+		// TODO: consider making this configurable.
+		leaderRotation = leaderrotation.NewFixed(1)
+	}
 
-	builder := consensus.NewBuilder(replicaConfig.ID, replicaConfig.PrivateKey)
+	srv := &Replica{
+		clientSrv:    clientSrv,
+		cmdCache:     newCmdCache(int(conf.BatchSize)),
+		execHandlers: make(map[cmdID]func(*empty.Empty, error)),
+		output:       conf.Output,
+		lastExecTime: time.Now().UnixNano(),
+		cancel:       func() {},
+		done:         make(chan struct{}),
+	}
+
+	replicaSrvOpts := conf.ReplicaServerOptions
+	if conf.TLS {
+		replicaSrvOpts = append(replicaSrvOpts, gorums.WithGRPCServerOptions(
+			grpc.Creds(credentials.NewTLS(&tls.Config{
+				Certificates: []tls.Certificate{*conf.Certificate},
+				ClientCAs:    conf.RootCAs,
+				ClientAuth:   tls.RequireAndVerifyClientCert,
+			})),
+		))
+	}
+
+	srv.hsSrv = backend.NewServer(replicaSrvOpts...)
+
+	managerOpts := conf.ManagerOptions
+	if conf.TLS {
+		managerOpts = append(managerOpts, gorums.WithGrpcDialOptions(grpc.WithTransportCredentials(
+			credentials.NewTLS(&tls.Config{
+				RootCAs:      conf.RootCAs,
+				Certificates: []tls.Certificate{*conf.Certificate},
+			}),
+		)))
+	}
+	srv.cfg = backend.NewConfig(conf.ID, managerOpts...)
+
+	builder := consensus.NewBuilder(conf.ID, conf.PrivateKey)
 
 	builder.Register(
 		srv.cfg,
 		srv.hsSrv,
 		consensusImpl,
-		crypto.NewCache(cryptoImpl, 2*srv.cfg.Len()),
-		leaderrotation.NewRoundRobin(),
+		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
+		leaderRotation,
 		srv,          // executor
 		srv.cmdCache, // acceptor and command queue
 		synchronizer.New(synchronizer.NewViewDuration(
 			uint64(conf.TimeoutSamples), float64(conf.InitialTimeout), float64(conf.TimeoutMultiplier)),
 		),
 		blockchain.New(int(conf.BlockCacheSize)),
-		logging.New(fmt.Sprintf("hs%d", conf.GetID())),
+		logging.New(fmt.Sprintf("hs%d", conf.ID)),
 	)
 	srv.hs = builder.Build()
 
 	return srv, nil
 }
 
-// Run runs the replica until the context is cancelled.
-func (srv *Replica) Run(ctx context.Context, address string) (err error) {
-	err = srv.hsSrv.Start()
-	if err != nil {
-		return err
-	}
-
-	err = srv.cfg.Connect(10 * time.Second)
-	if err != nil {
-		return err
-	}
-
-	c := make(chan struct{})
-	go func() {
-		srv.hs.Synchronizer().Start(ctx)
-		srv.hs.EventLoop().Run(ctx)
-		close(c)
-	}()
-
-	err = srv.clientSrv.Start(address)
-	if err != nil {
-		log.Println(err)
-	}
-
-	// wait for the event loop to exit
-	<-c
-
-	srv.stop()
-	return nil
+// StartServers starts the client and replica servers.
+func (srv *Replica) StartServers(replicaListen, clientListen net.Listener) {
+	srv.hsSrv.StartOnListener(replicaListen)
+	srv.clientSrv.StartOnListener(clientListen)
 }
 
-func (srv *Replica) stop() {
+// Connect connects to the other replicas.
+func (srv *Replica) Connect(replicas *config.ReplicaConfig) error {
+	return srv.cfg.Connect(replicas)
+}
+
+// Start runs the replica in a goroutine.
+func (srv *Replica) Start() {
+	var ctx context.Context
+	ctx, srv.cancel = context.WithCancel(context.Background())
+	go func() {
+		srv.Run(ctx)
+		close(srv.done)
+	}()
+}
+
+// Stop stops the replica and closes connections.
+func (srv *Replica) Stop() {
+	srv.cancel()
+	<-srv.done
+	srv.Close()
+}
+
+// Run runs the replica until the context is cancelled.
+func (srv *Replica) Run(ctx context.Context) {
+	srv.hs.Synchronizer().Start(ctx)
+	srv.hs.EventLoop().Run(ctx)
+}
+
+// Close closes the connections and stops the servers used by the replica.
+func (srv *Replica) Close() error {
 	srv.clientSrv.Stop()
 	srv.cfg.Close()
 	srv.hsSrv.Stop()
-	if closer, ok := srv.output.(io.Closer); ok {
-		err := closer.Close()
-		if err != nil {
-			log.Println("error closing output: ", err)
-		}
-	}
+	return srv.output.Close()
 }

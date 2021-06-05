@@ -1,13 +1,13 @@
-package main
+package client
 
 import (
 	"context"
 	"crypto/rand"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"sync"
 	"time"
 
@@ -16,12 +16,9 @@ import (
 	"github.com/relab/gorums/benchmark"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 )
 
 type qspec struct {
@@ -41,14 +38,23 @@ type pendingCmd struct {
 	promise        *clientpb.AsyncEmpty
 }
 
+// Config contains config options for a client.
+type Config struct {
+	ID            consensus.ID
+	TLS           bool
+	MaxConcurrent uint32
+	PayloadSize   uint32
+	Input         string
+}
+
 // Client is a hotstuff client.
 type Client struct {
-	logger        logging.Logger
-	conf          *orchestrationpb.ClientRunConfig
-	replicaConfig *config.ReplicaConfig
-	mgr           *clientpb.Manager
-	gorumsConfig  *clientpb.Configuration
-
+	id               consensus.ID
+	logger           logging.Logger
+	replicaConfig    *config.ReplicaConfig
+	mgr              *clientpb.Manager
+	gorumsConfig     *clientpb.Configuration
+	payloadSize      uint32
 	mut              sync.Mutex
 	highestCommitted uint64 // highest sequence number acknowledged by the replicas
 	pendingCmds      chan pendingCmd
@@ -59,30 +65,32 @@ type Client struct {
 }
 
 // New returns a new Client.
-func New(conf *orchestrationpb.ClientRunConfig) (*Client, error) {
-	logger := logging.New(fmt.Sprintf("cli%d", conf.GetID()))
+func New(conf Config) (client *Client, err error) {
+	logger := logging.New(fmt.Sprintf("cli%d", conf.ID))
 
-	var creds credentials.TransportCredentials
-	if conf.GetUseTLS() {
-		rootCA := x509.NewCertPool()
-		rootCA.AppendCertsFromPEM(conf.GetCertificateAuthority())
-		creds = credentials.NewClientTLSFromCert(rootCA, "")
+	client = &Client{
+		id:               conf.ID,
+		logger:           logger,
+		pendingCmds:      make(chan pendingCmd, conf.MaxConcurrent),
+		highestCommitted: 1,
+		done:             make(chan struct{}),
+		data:             &clientpb.BenchmarkData{},
 	}
 
-	replicaConfig := config.NewConfig(consensus.ID(conf.GetID()), nil, creds)
-	for id, r := range conf.GetReplicas() {
-		key, err := keygen.ParsePublicKey(r.GetPublicKey())
+	if conf.Input != "" {
+		client.reader, err = os.Open(conf.Input)
 		if err != nil {
-			logger.Panicf("Failed to parse public key:", err)
 			return nil, err
 		}
-		replicaConfig.Replicas[consensus.ID(id)] = &config.ReplicaInfo{
-			ID:      consensus.ID(id),
-			Address: r.GetAddress(),
-			PubKey:  key,
-		}
+	} else {
+		client.reader = rand.Reader
 	}
 
+	return client, nil
+}
+
+// Connect connects the client to the replicas.
+func (c *Client) Connect(replicaConfig *config.ReplicaConfig, opts ...gorums.ManagerOption) (err error) {
 	nodes := make(map[string]uint32, len(replicaConfig.Replicas))
 	for _, r := range replicaConfig.Replicas {
 		nodes[r.Address] = uint32(r.ID)
@@ -90,45 +98,22 @@ func New(conf *orchestrationpb.ClientRunConfig) (*Client, error) {
 
 	grpcOpts := []grpc.DialOption{grpc.WithBlock()}
 
-	if conf.GetUseTLS() {
+	if replicaConfig.Creds != nil {
 		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(replicaConfig.Creds))
 	} else {
 		grpcOpts = append(grpcOpts, grpc.WithInsecure())
 	}
 
-	mgr := clientpb.NewManager(gorums.WithGrpcDialOptions(grpcOpts...),
-		gorums.WithDialTimeout(time.Minute),
-	)
+	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
 
-	gorumsConf, err := mgr.NewConfiguration(&qspec{faulty: consensus.NumFaulty(len(conf.Replicas))}, gorums.WithNodeMap(nodes))
+	c.mgr = clientpb.NewManager(opts...)
+
+	c.gorumsConfig, err = c.mgr.NewConfiguration(&qspec{faulty: consensus.NumFaulty(len(replicaConfig.Replicas))}, gorums.WithNodeMap(nodes))
 	if err != nil {
-		mgr.Close()
-		return nil, err
+		c.mgr.Close()
+		return err
 	}
-
-	client := &Client{
-		logger:           logger,
-		conf:             conf,
-		replicaConfig:    replicaConfig,
-		mgr:              mgr,
-		gorumsConfig:     gorumsConf,
-		pendingCmds:      make(chan pendingCmd, conf.GetMaxConcurrent()),
-		highestCommitted: 1,
-		done:             make(chan struct{}),
-		data:             &clientpb.BenchmarkData{},
-	}
-
-	// TODO
-	// if conf.Input != "" {
-	// 	client.reader, err = os.Open(conf.Input)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// } else {
-	client.reader = rand.Reader
-	// }
-
-	return client, nil
+	return nil
 }
 
 // Run runs the client until the context is closed.
@@ -180,7 +165,7 @@ func (c *Client) sendCommands(ctx context.Context) error {
 			break
 		}
 
-		data := make([]byte, c.conf.PayloadSize)
+		data := make([]byte, c.payloadSize)
 		n, err := c.reader.Read(data)
 		if err != nil && err != io.EOF {
 			// if we get an error other than EOF
@@ -191,7 +176,7 @@ func (c *Client) sendCommands(ctx context.Context) error {
 		}
 
 		cmd := &clientpb.Command{
-			ClientID:       uint32(c.conf.GetID()),
+			ClientID:       uint32(c.id),
 			SequenceNumber: num,
 			Data:           data[:n],
 		}

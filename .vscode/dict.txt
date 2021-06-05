@@ -25,6 +25,7 @@ hotstuffpb
 iface
 kilic
 mitchellh
+orchestrationpb
 pflag
 pflags
 propsed

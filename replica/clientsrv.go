@@ -11,7 +11,6 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -26,11 +25,11 @@ type clientSrv struct {
 }
 
 // newClientServer returns a new client server.
-func newClientServer(conf *orchestrationpb.ReplicaRunConfig, srvOpts []gorums.ServerOption) (srv *clientSrv, err error) {
+func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv, err error) {
 	srv = &clientSrv{
 		handlers: make(map[cmdID]func(*empty.Empty, error)),
 		srv:      gorums.NewServer(srvOpts...),
-		cmdCache: newCmdCache(int(conf.GetBatchSize())),
+		cmdCache: newCmdCache(int(conf.BatchSize)),
 	}
 	clientpb.RegisterClientServer(srv.srv, srv)
 	return srv, nil
@@ -48,13 +47,17 @@ func (srv *clientSrv) Start(addr string) error {
 	if err != nil {
 		return err
 	}
+	srv.StartOnListener(lis)
+	return nil
+}
+
+func (srv *clientSrv) StartOnListener(lis net.Listener) {
 	go func() {
 		err := srv.srv.Serve(lis)
 		if err != nil {
 			srv.mod.Logger().Error(err)
 		}
 	}()
-	return nil
 }
 
 func (srv *clientSrv) Stop() {
