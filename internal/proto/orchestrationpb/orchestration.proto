@@ -55,6 +55,17 @@ message ReplicaInfo {
   uint32 ClientPort = 5;
 }
 
+message ClientOpts {
+  // The client's ID.
+  uint32 ID = 1;
+  // Determines whether TLS should be used.
+  bool UseTLS = 4;
+  // The maximum number of concurrent requests.
+  uint32 MaxConcurrent = 8;
+  // The size in bytes of each command.
+  uint32 PayloadSize = 9;
+}
+
 // ReplicaConfiguration is a configuration of replicas.
 message ReplicaConfiguration { map<uint32, ReplicaInfo> Replicas = 1; }
 
@@ -74,11 +85,6 @@ service Orchestrator {
   }
 
   rpc StopReplica(StopReplicaRequest) returns (StopReplicaResponse) {
-    option (gorums.quorumcall) = true;
-    option (gorums.per_node_arg) = true;
-  }
-
-  rpc CreateClient(CreateClientRequest) returns (CreateClientResponse) {
     option (gorums.quorumcall) = true;
     option (gorums.per_node_arg) = true;
   }
@@ -115,29 +121,17 @@ message StopReplicaResponse {}
 
 // Client messages
 
-message CreateClientRequest {
-  // The client's ID.
-  uint32 ID = 1;
-  // Determines whether TLS should be used.
-  bool UseTLS = 4;
+message StartClientRequest {
+  // The clients to create.
+  map<uint32, ClientOpts> Clients = 1;
   // The certificate authority that created the TLS certificates.
   optional bytes CertificateAuthority = 7;
-  // The maximum number of concurrent requests.
-  uint32 MaxConcurrent = 8;
-  // The size in bytes of each command.
-  uint32 PayloadSize = 9;
-}
-
-message CreateClientResponse {}
-
-message StartClientRequest {
-  uint32 ID = 1;
-  // The configuration of replicas.
-  map<uint32, ReplicaInfo> Configuration = 2;
+  // The replicas to connect to.
+  map<uint32, ReplicaInfo> Configuration = 10;
 }
 
 message StartClientResponse {}
 
-message StopClientRequest { uint32 ID = 1; }
+message StopClientRequest { repeated uint32 IDs = 1; }
 
 message StopClientResponse {}

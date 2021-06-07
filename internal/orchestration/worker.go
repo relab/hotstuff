@@ -2,6 +2,7 @@ package orchestration
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
 	"io"
@@ -17,6 +18,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/replica"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 )
 
@@ -67,7 +69,7 @@ func (w *Worker) CreateReplica(ctx context.Context, req *orchestrationpb.CreateR
 			InitialTimeout:    float64(cfg.GetInitialTimeout()),
 			TimeoutSamples:    cfg.GetTimeoutSamples(),
 			TimeoutMultiplier: float64(cfg.GetTimeoutMultiplier()),
-			Output:            nopCloser{io.Discard},
+			Output:            writeNopCloser{io.Discard},
 			ManagerOptions: []gorums.ManagerOption{
 				gorums.WithDialTimeout(10 * time.Second), // TODO: make this configurable?
 			},
@@ -127,6 +129,7 @@ func (w *Worker) StartReplica(_ context.Context, req *orchestrationpb.StartRepli
 		err = replica.Connect(cfg)
 		if err != nil {
 			ret(nil, err)
+			return
 		}
 		replica.Start()
 	}
@@ -146,16 +149,47 @@ func (w *Worker) StopReplica(_ context.Context, req *orchestrationpb.StopReplica
 	ret(&orchestrationpb.StopReplicaResponse{}, nil)
 }
 
-func (w *Worker) CreateClient(_ context.Context, _ *orchestrationpb.CreateClientRequest, _ func(*orchestrationpb.CreateClientResponse, error)) {
-	panic("not implemented") // TODO: Implement
+func (w *Worker) StartClient(_ context.Context, req *orchestrationpb.StartClientRequest, ret func(*orchestrationpb.StartClientResponse, error)) {
+	for _, opts := range req.GetClients() {
+		c := client.Config{
+			ID:            consensus.ID(opts.GetID()),
+			TLS:           opts.GetUseTLS(),
+			MaxConcurrent: opts.GetMaxConcurrent(),
+			PayloadSize:   opts.GetPayloadSize(),
+			Input:         readNopCloser{rand.Reader},
+		}
+		cli := client.New(c)
+		cfg, err := getConfiguration(consensus.ID(opts.GetID()), req.GetConfiguration())
+		if err != nil {
+			ret(nil, err)
+			return
+		}
+		ca := req.GetCertificateAuthority()
+		cp := x509.NewCertPool()
+		cp.AppendCertsFromPEM(ca)
+		creds := credentials.NewClientTLSFromCert(cp, "")
+		cfg.Creds = creds
+		err = cli.Connect(cfg, gorums.WithDialTimeout(10*time.Second))
+		if err != nil {
+			ret(nil, err)
+			return
+		}
+		cli.Start()
+		w.clients[consensus.ID(opts.GetID())] = cli
+	}
+	ret(&orchestrationpb.StartClientResponse{}, nil)
 }
 
-func (w *Worker) StartClient(_ context.Context, _ *orchestrationpb.StartClientRequest, _ func(*orchestrationpb.StartClientResponse, error)) {
-	panic("not implemented") // TODO: Implement
-}
-
-func (w *Worker) StopClient(_ context.Context, _ *orchestrationpb.StopClientRequest, _ func(*orchestrationpb.StopClientResponse, error)) {
-	panic("not implemented") // TODO: Implement
+func (w *Worker) StopClient(_ context.Context, req *orchestrationpb.StopClientRequest, ret func(*orchestrationpb.StopClientResponse, error)) {
+	for _, id := range req.GetIDs() {
+		cli, ok := w.clients[consensus.ID(id)]
+		if !ok {
+			ret(nil, status.Errorf(codes.NotFound, "the client with ID %d was not found", id))
+			return
+		}
+		cli.Stop()
+	}
+	ret(&orchestrationpb.StopClientResponse{}, nil)
 }
 
 func getCertificate(conf *orchestrationpb.ReplicaOpts) (*tls.Certificate, error) {
@@ -204,8 +238,14 @@ func getPort(lis net.Listener) (uint32, error) {
 	return uint32(port), nil
 }
 
-type nopCloser struct {
+type writeNopCloser struct {
 	io.Writer
 }
 
-func (nopCloser) Close() error { return nil }
+func (writeNopCloser) Close() error { return nil }
+
+type readNopCloser struct {
+	io.Reader
+}
+
+func (readNopCloser) Close() error { return nil }

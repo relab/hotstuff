@@ -2,12 +2,10 @@ package client
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
 	"math"
-	"os"
 	"sync"
 	"time"
 
@@ -44,7 +42,7 @@ type Config struct {
 	TLS           bool
 	MaxConcurrent uint32
 	PayloadSize   uint32
-	Input         string
+	Input         io.ReadCloser
 }
 
 // Client is a hotstuff client.
@@ -58,14 +56,15 @@ type Client struct {
 	mut              sync.Mutex
 	highestCommitted uint64 // highest sequence number acknowledged by the replicas
 	pendingCmds      chan pendingCmd
+	cancel           context.CancelFunc
 	done             chan struct{}
-	reader           io.Reader
+	reader           io.ReadCloser
 	stats            benchmark.Stats         // records latency and throughput
 	data             *clientpb.BenchmarkData // stores time and duration for each command
 }
 
 // New returns a new Client.
-func New(conf Config) (client *Client, err error) {
+func New(conf Config) (client *Client) {
 	logger := logging.New(fmt.Sprintf("cli%d", conf.ID))
 
 	client = &Client{
@@ -77,16 +76,7 @@ func New(conf Config) (client *Client, err error) {
 		data:             &clientpb.BenchmarkData{},
 	}
 
-	if conf.Input != "" {
-		client.reader, err = os.Open(conf.Input)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		client.reader = rand.Reader
-	}
-
-	return client, nil
+	return client
 }
 
 // Connect connects the client to the replicas.
@@ -129,13 +119,23 @@ func (c *Client) Run(ctx context.Context) {
 	c.logger.Info("Done sending commands")
 }
 
+func (c *Client) Start() {
+	var ctx context.Context
+	ctx, c.cancel = context.WithCancel(context.Background())
+	go c.Run(ctx)
+	close(c.done)
+}
+
+func (c *Client) Stop() {
+	c.cancel()
+	<-c.done
+}
+
 func (c *Client) close() {
 	c.mgr.Close()
-	if closer, ok := c.reader.(io.Closer); ok {
-		err := closer.Close()
-		if err != nil {
-			c.logger.Warn("Failed to close reader: ", err)
-		}
+	err := c.reader.Close()
+	if err != nil {
+		c.logger.Warn("Failed to close reader: ", err)
 	}
 }
 
