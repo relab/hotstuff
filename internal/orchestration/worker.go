@@ -17,8 +17,8 @@ import (
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/replica"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 )
 
@@ -71,7 +71,8 @@ func (w *Worker) CreateReplica(ctx context.Context, req *orchestrationpb.CreateR
 			TimeoutMultiplier: float64(cfg.GetTimeoutMultiplier()),
 			Output:            writeNopCloser{io.Discard},
 			ManagerOptions: []gorums.ManagerOption{
-				gorums.WithDialTimeout(10 * time.Second), // TODO: make this configurable?
+				gorums.WithDialTimeout(time.Duration(cfg.GetConnectTimeout() * float32(time.Millisecond))),
+				gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
 			},
 		}
 		r, err := replica.New(c)
@@ -121,7 +122,7 @@ func (w *Worker) StartReplica(_ context.Context, req *orchestrationpb.StartRepli
 			ret(nil, status.Errorf(codes.NotFound, "The replica with ID %d was not found.", id))
 			return
 		}
-		cfg, err := getConfiguration(consensus.ID(id), req.GetConfiguration())
+		cfg, err := getConfiguration(consensus.ID(id), req.GetConfiguration(), false)
 		if err != nil {
 			ret(nil, err)
 			return
@@ -131,7 +132,7 @@ func (w *Worker) StartReplica(_ context.Context, req *orchestrationpb.StartRepli
 			ret(nil, err)
 			return
 		}
-		replica.Start()
+		defer replica.Start()
 	}
 	ret(&orchestrationpb.StartReplicaResponse{}, nil)
 }
@@ -150,26 +151,29 @@ func (w *Worker) StopReplica(_ context.Context, req *orchestrationpb.StopReplica
 }
 
 func (w *Worker) StartClient(_ context.Context, req *orchestrationpb.StartClientRequest, ret func(*orchestrationpb.StartClientResponse, error)) {
+	ca := req.GetCertificateAuthority()
+	cp := x509.NewCertPool()
+	cp.AppendCertsFromPEM(ca)
 	for _, opts := range req.GetClients() {
 		c := client.Config{
 			ID:            consensus.ID(opts.GetID()),
 			TLS:           opts.GetUseTLS(),
+			RootCAs:       cp,
 			MaxConcurrent: opts.GetMaxConcurrent(),
 			PayloadSize:   opts.GetPayloadSize(),
 			Input:         readNopCloser{rand.Reader},
+			ManagerOptions: []gorums.ManagerOption{
+				gorums.WithDialTimeout(time.Duration(opts.GetConnectTimeout() * float32(time.Millisecond))),
+				gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
+			},
 		}
 		cli := client.New(c)
-		cfg, err := getConfiguration(consensus.ID(opts.GetID()), req.GetConfiguration())
+		cfg, err := getConfiguration(consensus.ID(opts.GetID()), req.GetConfiguration(), true)
 		if err != nil {
 			ret(nil, err)
 			return
 		}
-		ca := req.GetCertificateAuthority()
-		cp := x509.NewCertPool()
-		cp.AppendCertsFromPEM(ca)
-		creds := credentials.NewClientTLSFromCert(cp, "")
-		cfg.Creds = creds
-		err = cli.Connect(cfg, gorums.WithDialTimeout(10*time.Second))
+		err = cli.Connect(cfg)
 		if err != nil {
 			ret(nil, err)
 			return
@@ -209,7 +213,7 @@ func getCertificate(conf *orchestrationpb.ReplicaOpts) (*tls.Certificate, error)
 	return nil, nil
 }
 
-func getConfiguration(id consensus.ID, conf map[uint32]*orchestrationpb.ReplicaInfo) (*config.ReplicaConfig, error) {
+func getConfiguration(id consensus.ID, conf map[uint32]*orchestrationpb.ReplicaInfo, client bool) (*config.ReplicaConfig, error) {
 	cfg := &config.ReplicaConfig{ID: id, Replicas: make(map[consensus.ID]*config.ReplicaInfo)}
 
 	for _, replica := range conf {
@@ -217,9 +221,15 @@ func getConfiguration(id consensus.ID, conf map[uint32]*orchestrationpb.ReplicaI
 		if err != nil {
 			return nil, err
 		}
+		var addr string
+		if client {
+			addr = net.JoinHostPort(replica.GetAddress(), strconv.Itoa(int(replica.GetClientPort())))
+		} else {
+			addr = net.JoinHostPort(replica.GetAddress(), strconv.Itoa(int(replica.GetReplicaPort())))
+		}
 		cfg.Replicas[consensus.ID(replica.GetID())] = &config.ReplicaInfo{
 			ID:      consensus.ID(replica.GetID()),
-			Address: net.JoinHostPort(replica.GetAddress(), strconv.Itoa(int(replica.GetReplicaPort()))),
+			Address: addr,
 			PubKey:  pubKey,
 		}
 	}

@@ -308,7 +308,7 @@ type KeyChain struct {
 	CertificateKey []byte
 }
 
-// GenerateKeyChains generates keys and certificates for a replica.
+// GenerateKeyChain generates keys and certificates for a replica.
 func GenerateKeyChain(id consensus.ID, address, crypto string, ca *x509.Certificate, caKey *ecdsa.PrivateKey) (KeyChain, error) {
 	ecdsaKey, err := GenerateECDSAPrivateKey()
 	if err != nil {

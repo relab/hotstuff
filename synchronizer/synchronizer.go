@@ -64,12 +64,13 @@ func (s *Synchronizer) InitModule(hs *consensus.Modules, opts *consensus.Options
 
 // New creates a new Synchronizer.
 func New(viewDuration ViewDuration) consensus.Synchronizer {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Synchronizer{
 		leafBlock:   consensus.GetGenesis(),
 		currentView: 1,
 
-		viewCtx:   context.Background(),
-		cancelCtx: func() {}, // dummy cancelFunc that will be replaced when a new view is started
+		viewCtx:   ctx,
+		cancelCtx: cancel,
 
 		duration: viewDuration,
 		timer:    time.AfterFunc(0, func() {}), // dummy timer that will be replaced after start() is called
@@ -80,9 +81,9 @@ func New(viewDuration ViewDuration) consensus.Synchronizer {
 
 // Start starts the synchronizer with the given context.
 func (s *Synchronizer) Start(ctx context.Context) {
-	// We'll just timeout immediately, because we need a TC to synchronize with the other replicas.
-	s.timer = time.AfterFunc(0, func() {
+	s.timer = time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
+		s.cancelCtx()
 		s.mod.EventLoop().AddEvent(s.onLocalTimeout)
 	})
 
@@ -121,7 +122,11 @@ func (s *Synchronizer) SyncInfo() consensus.SyncInfo {
 }
 
 func (s *Synchronizer) onLocalTimeout() {
-	defer s.timer.Reset(s.duration.Duration())
+	defer func() {
+		s.cancelCtx()
+		s.viewCtx, s.cancelCtx = context.WithCancel(context.Background())
+		s.timer.Reset(s.duration.Duration())
+	}()
 
 	if s.lastTimeout != nil && s.lastTimeout.View == s.currentView {
 		s.mod.Configuration().Timeout(*s.lastTimeout)

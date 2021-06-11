@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +18,7 @@ import (
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 type qspec struct {
@@ -38,11 +40,13 @@ type pendingCmd struct {
 
 // Config contains config options for a client.
 type Config struct {
-	ID            consensus.ID
-	TLS           bool
-	MaxConcurrent uint32
-	PayloadSize   uint32
-	Input         io.ReadCloser
+	ID             consensus.ID
+	TLS            bool
+	RootCAs        *x509.CertPool
+	MaxConcurrent  uint32
+	PayloadSize    uint32
+	Input          io.ReadCloser
+	ManagerOptions []gorums.ManagerOption
 }
 
 // Client is a hotstuff client.
@@ -59,8 +63,8 @@ type Client struct {
 	cancel           context.CancelFunc
 	done             chan struct{}
 	reader           io.ReadCloser
-	stats            benchmark.Stats         // records latency and throughput
-	data             *clientpb.BenchmarkData // stores time and duration for each command
+	stats            benchmark.Stats // records latency and throughput
+	// data             *clientpb.BenchmarkData // stores time and duration for each command
 }
 
 // New returns a new Client.
@@ -73,31 +77,32 @@ func New(conf Config) (client *Client) {
 		pendingCmds:      make(chan pendingCmd, conf.MaxConcurrent),
 		highestCommitted: 1,
 		done:             make(chan struct{}),
-		data:             &clientpb.BenchmarkData{},
+		reader:           conf.Input,
+		// data:             &clientpb.BenchmarkData{},
 	}
+
+	grpcOpts := []grpc.DialOption{grpc.WithBlock()}
+
+	if conf.TLS {
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(conf.RootCAs, "")))
+	} else {
+		grpcOpts = append(grpcOpts, grpc.WithInsecure())
+	}
+
+	opts := conf.ManagerOptions
+	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
+
+	client.mgr = clientpb.NewManager(opts...)
 
 	return client
 }
 
 // Connect connects the client to the replicas.
-func (c *Client) Connect(replicaConfig *config.ReplicaConfig, opts ...gorums.ManagerOption) (err error) {
+func (c *Client) Connect(replicaConfig *config.ReplicaConfig) (err error) {
 	nodes := make(map[string]uint32, len(replicaConfig.Replicas))
 	for _, r := range replicaConfig.Replicas {
 		nodes[r.Address] = uint32(r.ID)
 	}
-
-	grpcOpts := []grpc.DialOption{grpc.WithBlock()}
-
-	if replicaConfig.Creds != nil {
-		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(replicaConfig.Creds))
-	} else {
-		grpcOpts = append(grpcOpts, grpc.WithInsecure())
-	}
-
-	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
-
-	c.mgr = clientpb.NewManager(opts...)
-
 	c.gorumsConfig, err = c.mgr.NewConfiguration(&qspec{faulty: consensus.NumFaulty(len(replicaConfig.Replicas))}, gorums.WithNodeMap(nodes))
 	if err != nil {
 		c.mgr.Close()

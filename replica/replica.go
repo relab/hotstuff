@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"sync"
 	"time"
 
@@ -77,10 +76,9 @@ type Config struct {
 type Replica struct {
 	output io.WriteCloser
 	*clientSrv
-	cfg      *backend.Config
-	hsSrv    *backend.Server
-	hs       *consensus.Modules
-	cmdCache *cmdCache
+	cfg   *backend.Config
+	hsSrv *backend.Server
+	hs    *consensus.Modules
 
 	mut          sync.Mutex
 	execHandlers map[cmdID]func(*empty.Empty, error)
@@ -112,8 +110,7 @@ func New(conf Config) (replica *Replica, err error) {
 	case "fasthotstuff":
 		consensusImpl = fasthotstuff.New()
 	default:
-		fmt.Fprintf(os.Stderr, "Invalid consensus type: '%s'\n", conf.Consensus)
-		os.Exit(1)
+		return nil, fmt.Errorf("invalid consensus name: '%s'", conf.Consensus)
 	}
 
 	var cryptoImpl consensus.CryptoImpl
@@ -123,8 +120,7 @@ func New(conf Config) (replica *Replica, err error) {
 	case "bls12":
 		cryptoImpl = bls12.New()
 	default:
-		fmt.Fprintf(os.Stderr, "Invalid crypto type: '%s'\n", conf.Crypto)
-		os.Exit(1)
+		return nil, fmt.Errorf("invalid crypto name: '%s'", conf.Crypto)
 	}
 
 	var leaderRotation consensus.LeaderRotation
@@ -134,11 +130,12 @@ func New(conf Config) (replica *Replica, err error) {
 	case "fixed":
 		// TODO: consider making this configurable.
 		leaderRotation = leaderrotation.NewFixed(1)
+	default:
+		return nil, fmt.Errorf("invalid crypto type: '%s'", conf.Crypto)
 	}
 
 	srv := &Replica{
 		clientSrv:    clientSrv,
-		cmdCache:     newCmdCache(int(conf.BatchSize)),
 		execHandlers: make(map[cmdID]func(*empty.Empty, error)),
 		output:       conf.Output,
 		lastExecTime: time.Now().UnixNano(),
@@ -167,6 +164,8 @@ func New(conf Config) (replica *Replica, err error) {
 				Certificates: []tls.Certificate{*conf.Certificate},
 			}),
 		)))
+	} else {
+		managerOpts = append(managerOpts, gorums.WithGrpcDialOptions(grpc.WithInsecure()))
 	}
 	srv.cfg = backend.NewConfig(conf.ID, managerOpts...)
 
@@ -178,8 +177,8 @@ func New(conf Config) (replica *Replica, err error) {
 		consensusImpl,
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		leaderRotation,
-		srv,          // executor
-		srv.cmdCache, // acceptor and command queue
+		srv,                    // executor
+		srv.clientSrv.cmdCache, // acceptor and command queue
 		synchronizer.New(synchronizer.NewViewDuration(
 			uint64(conf.TimeoutSamples), float64(conf.InitialTimeout), float64(conf.TimeoutMultiplier)),
 		),

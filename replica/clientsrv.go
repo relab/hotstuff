@@ -30,6 +30,7 @@ func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv
 		handlers: make(map[cmdID]func(*empty.Empty, error)),
 		srv:      gorums.NewServer(srvOpts...),
 		cmdCache: newCmdCache(int(conf.BatchSize)),
+		output:   conf.Output,
 	}
 	clientpb.RegisterClientServer(srv.srv, srv)
 	return srv, nil

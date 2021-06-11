@@ -30,6 +30,8 @@ message ReplicaOpts {
   string LeaderElection = 10;
   // The number of client commands that should be batched together.
   uint32 BatchSize = 11;
+  // The timeout of the initial connection setup.
+  float ConnectTimeout = 17;
   // The initial view duration in milliseconds.
   float InitialTimeout = 12;
   // The number of samples used to calculate view duration.
@@ -64,6 +66,8 @@ message ClientOpts {
   uint32 MaxConcurrent = 8;
   // The size in bytes of each command.
   uint32 PayloadSize = 9;
+  // The timeout of the initial connection.
+  float ConnectTimeout = 10;
 }
 
 // ReplicaConfiguration is a configuration of replicas.

@@ -63,7 +63,6 @@ type Config struct {
 	replicaCfg    config.ReplicaConfig
 	mgr           *hotstuffpb.Manager
 	cfg           *hotstuffpb.Configuration
-	privKey       consensus.PrivateKey
 	replicas      map[consensus.ID]consensus.Replica
 	proposeCancel context.CancelFunc
 	timeoutCancel context.CancelFunc

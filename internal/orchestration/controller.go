@@ -23,6 +23,7 @@ type Experiment struct {
 	PayloadSize    int
 	MaxConcurrent  int
 	Duration       time.Duration
+	ConnectTimeout time.Duration
 	Consensus      string
 	Crypto         string
 	LeaderRotation string
@@ -76,7 +77,7 @@ func (e *Experiment) Run(hosts []string) error {
 
 func (e *Experiment) connect(hosts []string) (err error) {
 	e.mgr = orchestrationpb.NewManager(
-		gorums.WithDialTimeout(10*time.Second),
+		gorums.WithDialTimeout(e.ConnectTimeout),
 		gorums.WithGrpcDialOptions(grpc.WithBlock(), grpc.WithInsecure()),
 	)
 	e.config, err = e.mgr.NewConfiguration(qspec{e}, gorums.WithNodeList(hosts))
@@ -113,7 +114,8 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 					BlockCacheSize:       uint32(5 * e.NumReplicas),
 					InitialTimeout:       1000,
 					TimeoutSamples:       1000,
-					TimeoutMultiplier:    1000,
+					TimeoutMultiplier:    1.2,
+					ConnectTimeout:       float32(e.ConnectTimeout / time.Millisecond),
 				}
 				node, _ := e.mgr.Node(u)
 				keyChain, err := keygen.GenerateKeyChain(id, node.Host(), e.Crypto, e.ca, e.caKey)
@@ -171,10 +173,11 @@ func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration) err
 				}
 				nextID++
 				scr.Clients[uint32(id)] = &orchestrationpb.ClientOpts{
-					ID:            uint32(id),
-					UseTLS:        true,
-					MaxConcurrent: uint32(e.MaxConcurrent),
-					PayloadSize:   uint32(e.PayloadSize),
+					ID:             uint32(id),
+					UseTLS:         true,
+					MaxConcurrent:  uint32(e.MaxConcurrent),
+					PayloadSize:    uint32(e.PayloadSize),
+					ConnectTimeout: float32(e.ConnectTimeout / time.Millisecond),
 				}
 			}
 			return scr

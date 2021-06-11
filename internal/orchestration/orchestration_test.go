@@ -30,9 +30,11 @@ func TestOrchestration(t *testing.T) {
 	experiment := &orchestration.Experiment{
 		NumReplicas:    4,
 		NumClients:     1,
-		BatchSize:      100,
+		BatchSize:      10,
+		MaxConcurrent:  250,
 		PayloadSize:    100,
-		Duration:       5 * time.Second,
+		ConnectTimeout: 5 * time.Hour,
+		Duration:       5 * time.Hour,
 		Consensus:      "chainedhotstuff",
 		Crypto:         "ecdsa",
 		LeaderRotation: "round-robin",
