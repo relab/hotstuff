@@ -260,6 +260,8 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 		return
 	}
 
+	s.timer.Stop()
+
 	s.currentView = v + 1
 	s.lastTimeout = nil
 	s.duration.ViewStarted()
@@ -267,6 +269,8 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 	// cancel the old view context and set up the next one
 	s.cancelCtx()
 	s.viewCtx, s.cancelCtx = context.WithCancel(context.Background())
+
+	s.timer.Reset(s.duration.Duration())
 
 	leader := s.mod.LeaderRotation().GetLeader(s.currentView)
 	if leader == s.mod.ID() {
