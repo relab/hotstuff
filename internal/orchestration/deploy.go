@@ -30,7 +30,7 @@ func Deploy(g iago.Group, exePath, port string) (err error) {
 
 	g.Run(iago.Task{
 		Name:    "Start hotstuff binary",
-		Action:  iago.Shell(fmt.Sprintf("nohup $HOME/hotstuff worker --listen %d &", port)),
+		Action:  iago.Shell(fmt.Sprintf("nohup $HOME/hotstuff worker --listen %s &", port)),
 		OnError: silentPanic,
 	})
 
