@@ -29,12 +29,12 @@ func TestOrchestration(t *testing.T) {
 	addr := lis.Addr().String()
 	experiment := &orchestration.Experiment{
 		NumReplicas:    4,
-		NumClients:     1,
-		BatchSize:      10,
+		NumClients:     2,
+		BatchSize:      100,
 		MaxConcurrent:  250,
 		PayloadSize:    100,
-		ConnectTimeout: 5 * time.Hour,
-		Duration:       5 * time.Hour,
+		ConnectTimeout: 1 * time.Second,
+		Duration:       10 * time.Second,
 		Consensus:      "chainedhotstuff",
 		Crypto:         "ecdsa",
 		LeaderRotation: "round-robin",
