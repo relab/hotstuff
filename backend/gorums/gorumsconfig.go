@@ -98,7 +98,7 @@ func NewConfig(id consensus.ID, opts ...gorums.ManagerOption) *Config {
 }
 
 // Connect opens connections to the replicas in the configuration.
-func (cfg *Config) Connect(replicaCfg *config.ReplicaConfig, opts ...gorums.ManagerOption) (err error) {
+func (cfg *Config) Connect(replicaCfg *config.ReplicaConfig) (err error) {
 	idMapping := make(map[string]uint32, len(replicaCfg.Replicas)-1)
 	for _, replica := range replicaCfg.Replicas {
 		cfg.replicas[replica.ID] = &gorumsReplica{
