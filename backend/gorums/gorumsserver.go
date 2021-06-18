@@ -110,7 +110,7 @@ func (srv *Server) Stop() {
 }
 
 // Propose handles a replica's response to the Propose QC from the leader.
-func (srv *Server) Propose(ctx context.Context, proposal *hotstuffpb.Proposal) {
+func (srv *Server) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
 		srv.mod.Logger().Infof("Failed to get client ID: %v", err)
@@ -125,7 +125,7 @@ func (srv *Server) Propose(ctx context.Context, proposal *hotstuffpb.Proposal) {
 }
 
 // Vote handles an incoming vote message.
-func (srv *Server) Vote(ctx context.Context, cert *hotstuffpb.PartialCert) {
+func (srv *Server) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
 		srv.mod.Logger().Infof("Failed to get client ID: %v", err)
@@ -139,7 +139,7 @@ func (srv *Server) Vote(ctx context.Context, cert *hotstuffpb.PartialCert) {
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
-func (srv *Server) NewView(ctx context.Context, msg *hotstuffpb.SyncInfo) {
+func (srv *Server) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
 		srv.mod.Logger().Infof("Failed to get client ID: %v", err)
@@ -153,23 +153,22 @@ func (srv *Server) NewView(ctx context.Context, msg *hotstuffpb.SyncInfo) {
 }
 
 // Fetch handles an incoming fetch request.
-func (srv *Server) Fetch(ctx context.Context, pb *hotstuffpb.BlockHash, respond func(block *hotstuffpb.Block, err error)) {
+func (srv *Server) Fetch(ctx gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*hotstuffpb.Block, error) {
 	var hash consensus.Hash
 	copy(hash[:], pb.GetHash())
 
 	block, ok := srv.mod.BlockChain().LocalGet(hash)
 	if !ok {
-		respond(nil, status.Errorf(codes.NotFound, "requested block was not found"))
-		return
+		return nil, status.Errorf(codes.NotFound, "requested block was not found")
 	}
 
 	srv.mod.Logger().Debugf("OnFetch: %.8s", hash)
 
-	respond(hotstuffpb.BlockToProto(block), nil)
+	return hotstuffpb.BlockToProto(block), nil
 }
 
 // Timeout handles an incoming TimeoutMsg.
-func (srv *Server) Timeout(ctx context.Context, msg *hotstuffpb.TimeoutMsg) {
+func (srv *Server) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
 	var err error
 	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
 	timeoutMsg.ID, err = srv.getClientID(ctx)

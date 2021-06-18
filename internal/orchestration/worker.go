@@ -1,7 +1,6 @@
 package orchestration
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
@@ -36,21 +35,19 @@ func NewWorker() *Worker {
 	}
 }
 
-func (w *Worker) CreateReplica(ctx context.Context, req *orchestrationpb.CreateReplicaRequest, ret func(*orchestrationpb.CreateReplicaResponse, error)) {
+func (w *Worker) CreateReplica(ctx gorums.ServerCtx, req *orchestrationpb.CreateReplicaRequest) (*orchestrationpb.CreateReplicaResponse, error) {
 	resp := &orchestrationpb.CreateReplicaResponse{Replicas: make(map[uint32]*orchestrationpb.ReplicaInfo)}
 	for _, cfg := range req.GetReplicas() {
 		privKey, err := keygen.ParsePrivateKey(cfg.GetPrivateKey())
 		if err != nil {
-			ret(nil, err)
-			return
+			return nil, err
 		}
 		var certificate tls.Certificate
 		var rootCAs *x509.CertPool
 		if cfg.GetUseTLS() {
 			certificate, err = tls.X509KeyPair(cfg.GetCertificate(), cfg.GetCertificateKey())
 			if err != nil {
-				ret(nil, err)
-				return
+				return nil, err
 			}
 			rootCAs = x509.NewCertPool()
 			rootCAs.AppendCertsFromPEM(cfg.GetCertificateAuthority())
@@ -77,29 +74,24 @@ func (w *Worker) CreateReplica(ctx context.Context, req *orchestrationpb.CreateR
 		}
 		r, err := replica.New(c)
 		if err != nil {
-			ret(nil, err)
-			return
+			return nil, err
 		}
 
 		replicaListener, err := net.Listen("tcp", ":0")
 		if err != nil {
-			ret(nil, err)
-			return
+			return nil, err
 		}
 		replicaPort, err := getPort(replicaListener)
 		if err != nil {
-			ret(nil, err)
-			return
+			return nil, err
 		}
 		clientListener, err := net.Listen("tcp", ":0")
 		if err != nil {
-			ret(nil, err)
-			return
+			return nil, err
 		}
 		clientPort, err := getPort(clientListener)
 		if err != nil {
-			ret(nil, err)
-			return
+			return nil, err
 		}
 
 		r.StartServers(replicaListener, clientListener)
@@ -112,45 +104,41 @@ func (w *Worker) CreateReplica(ctx context.Context, req *orchestrationpb.CreateR
 			ClientPort:  clientPort,
 		}
 	}
-	ret(resp, nil)
+	return resp, nil
 }
 
-func (w *Worker) StartReplica(_ context.Context, req *orchestrationpb.StartReplicaRequest, ret func(*orchestrationpb.StartReplicaResponse, error)) {
+func (w *Worker) StartReplica(_ gorums.ServerCtx, req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {
 	for _, id := range req.GetIDs() {
 		replica, ok := w.replicas[consensus.ID(id)]
 		if !ok {
-			ret(nil, status.Errorf(codes.NotFound, "The replica with ID %d was not found.", id))
-			return
+			return nil, status.Errorf(codes.NotFound, "The replica with ID %d was not found.", id)
 		}
 		cfg, err := getConfiguration(consensus.ID(id), req.GetConfiguration(), false)
 		if err != nil {
-			ret(nil, err)
-			return
+			return nil, err
 		}
 		err = replica.Connect(cfg)
 		if err != nil {
-			ret(nil, err)
-			return
+			return nil, err
 		}
 		defer replica.Start()
 	}
-	ret(&orchestrationpb.StartReplicaResponse{}, nil)
+	return &orchestrationpb.StartReplicaResponse{}, nil
 }
 
-func (w *Worker) StopReplica(_ context.Context, req *orchestrationpb.StopReplicaRequest, ret func(*orchestrationpb.StopReplicaResponse, error)) {
+func (w *Worker) StopReplica(_ gorums.ServerCtx, req *orchestrationpb.StopReplicaRequest) (*orchestrationpb.StopReplicaResponse, error) {
 	for _, id := range req.GetIDs() {
 		r, ok := w.replicas[consensus.ID(id)]
 		if !ok {
-			ret(nil, status.Errorf(codes.NotFound, "The replica with id %d was not found.", id))
-			return
+			return nil, status.Errorf(codes.NotFound, "The replica with id %d was not found.", id)
 		}
 		r.Stop()
 		// TODO: return test results
 	}
-	ret(&orchestrationpb.StopReplicaResponse{}, nil)
+	return &orchestrationpb.StopReplicaResponse{}, nil
 }
 
-func (w *Worker) StartClient(_ context.Context, req *orchestrationpb.StartClientRequest, ret func(*orchestrationpb.StartClientResponse, error)) {
+func (w *Worker) StartClient(_ gorums.ServerCtx, req *orchestrationpb.StartClientRequest) (*orchestrationpb.StartClientResponse, error) {
 	ca := req.GetCertificateAuthority()
 	cp := x509.NewCertPool()
 	cp.AppendCertsFromPEM(ca)
@@ -170,30 +158,27 @@ func (w *Worker) StartClient(_ context.Context, req *orchestrationpb.StartClient
 		cli := client.New(c)
 		cfg, err := getConfiguration(consensus.ID(opts.GetID()), req.GetConfiguration(), true)
 		if err != nil {
-			ret(nil, err)
-			return
+			return nil, err
 		}
 		err = cli.Connect(cfg)
 		if err != nil {
-			ret(nil, err)
-			return
+			return nil, err
 		}
 		cli.Start()
 		w.clients[consensus.ID(opts.GetID())] = cli
 	}
-	ret(&orchestrationpb.StartClientResponse{}, nil)
+	return &orchestrationpb.StartClientResponse{}, nil
 }
 
-func (w *Worker) StopClient(_ context.Context, req *orchestrationpb.StopClientRequest, ret func(*orchestrationpb.StopClientResponse, error)) {
+func (w *Worker) StopClient(_ gorums.ServerCtx, req *orchestrationpb.StopClientRequest) (*orchestrationpb.StopClientResponse, error) {
 	for _, id := range req.GetIDs() {
 		cli, ok := w.clients[consensus.ID(id)]
 		if !ok {
-			ret(nil, status.Errorf(codes.NotFound, "the client with ID %d was not found", id))
-			return
+			return nil, status.Errorf(codes.NotFound, "the client with ID %d was not found", id)
 		}
 		cli.Stop()
 	}
-	ret(&orchestrationpb.StopClientResponse{}, nil)
+	return &orchestrationpb.StopClientResponse{}, nil
 }
 
 func getCertificate(conf *orchestrationpb.ReplicaOpts) (*tls.Certificate, error) {

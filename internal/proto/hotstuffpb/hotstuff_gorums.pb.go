@@ -13,7 +13,6 @@ import (
 	encoding "google.golang.org/grpc/encoding"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
-	sync "sync"
 )
 
 const (
@@ -185,42 +184,42 @@ func (c *Configuration) Fetch(ctx context.Context, in *BlockHash) (resp *Block, 
 
 // Hotstuff is the server-side API for the Hotstuff Service
 type Hotstuff interface {
-	Propose(context.Context, *Proposal)
-	Vote(context.Context, *PartialCert)
-	Timeout(context.Context, *TimeoutMsg)
-	NewView(context.Context, *SyncInfo)
-	Fetch(context.Context, *BlockHash, func(*Block, error))
+	Propose(ctx gorums.ServerCtx, request *Proposal)
+	Vote(ctx gorums.ServerCtx, request *PartialCert)
+	Timeout(ctx gorums.ServerCtx, request *TimeoutMsg)
+	NewView(ctx gorums.ServerCtx, request *SyncInfo)
+	Fetch(ctx gorums.ServerCtx, request *BlockHash) (response *Block, err error)
 }
 
 func RegisterHotstuffServer(srv *gorums.Server, impl Hotstuff) {
-	srv.RegisterHandler("hotstuffpb.Hotstuff.Propose", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
+	srv.RegisterHandler("hotstuffpb.Hotstuff.Propose", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
 		req := in.Message.(*Proposal)
+		defer ctx.Release()
 		impl.Propose(ctx, req)
 	})
-	srv.RegisterHandler("hotstuffpb.Hotstuff.Vote", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
+	srv.RegisterHandler("hotstuffpb.Hotstuff.Vote", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
 		req := in.Message.(*PartialCert)
+		defer ctx.Release()
 		impl.Vote(ctx, req)
 	})
-	srv.RegisterHandler("hotstuffpb.Hotstuff.Timeout", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
+	srv.RegisterHandler("hotstuffpb.Hotstuff.Timeout", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
 		req := in.Message.(*TimeoutMsg)
+		defer ctx.Release()
 		impl.Timeout(ctx, req)
 	})
-	srv.RegisterHandler("hotstuffpb.Hotstuff.NewView", func(ctx context.Context, in *gorums.Message, _ chan<- *gorums.Message) {
+	srv.RegisterHandler("hotstuffpb.Hotstuff.NewView", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
 		req := in.Message.(*SyncInfo)
+		defer ctx.Release()
 		impl.NewView(ctx, req)
 	})
-	srv.RegisterHandler("hotstuffpb.Hotstuff.Fetch", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
+	srv.RegisterHandler("hotstuffpb.Hotstuff.Fetch", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*BlockHash)
-		once := new(sync.Once)
-		f := func(resp *Block, err error) {
-			once.Do(func() {
-				select {
-				case finished <- gorums.WrapMessage(in.Metadata, resp, err):
-				case <-ctx.Done():
-				}
-			})
+		defer ctx.Release()
+		resp, err := impl.Fetch(ctx, req)
+		select {
+		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
+		case <-ctx.Done():
 		}
-		impl.Fetch(ctx, req, f)
 	})
 }
 

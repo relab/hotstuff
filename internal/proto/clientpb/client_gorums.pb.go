@@ -13,7 +13,6 @@ import (
 	encoding "google.golang.org/grpc/encoding"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
-	sync "sync"
 )
 
 const (
@@ -154,22 +153,18 @@ type QuorumSpec interface {
 
 // Client is the server-side API for the Client Service
 type Client interface {
-	ExecCommand(context.Context, *Command, func(*emptypb.Empty, error))
+	ExecCommand(ctx gorums.ServerCtx, request *Command) (response *emptypb.Empty, err error)
 }
 
 func RegisterClientServer(srv *gorums.Server, impl Client) {
-	srv.RegisterHandler("clientpb.Client.ExecCommand", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
+	srv.RegisterHandler("clientpb.Client.ExecCommand", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*Command)
-		once := new(sync.Once)
-		f := func(resp *emptypb.Empty, err error) {
-			once.Do(func() {
-				select {
-				case finished <- gorums.WrapMessage(in.Metadata, resp, err):
-				case <-ctx.Done():
-				}
-			})
+		defer ctx.Release()
+		resp, err := impl.ExecCommand(ctx, req)
+		select {
+		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
+		case <-ctx.Done():
 		}
-		impl.ExecCommand(ctx, req, f)
 	})
 }
 

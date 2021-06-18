@@ -1,7 +1,6 @@
 package replica
 
 import (
-	"context"
 	"io"
 	"log"
 	"net"
@@ -16,21 +15,21 @@ import (
 
 // clientSrv serves a client.
 type clientSrv struct {
-	mut      sync.Mutex
-	mod      *consensus.Modules
-	srv      *gorums.Server
-	handlers map[cmdID]func(*empty.Empty, error)
-	cmdCache *cmdCache
-	output   io.Writer
+	mut          sync.Mutex
+	mod          *consensus.Modules
+	srv          *gorums.Server
+	awaitingCmds map[cmdID]chan<- struct{}
+	cmdCache     *cmdCache
+	output       io.Writer
 }
 
 // newClientServer returns a new client server.
 func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv, err error) {
 	srv = &clientSrv{
-		handlers: make(map[cmdID]func(*empty.Empty, error)),
-		srv:      gorums.NewServer(srvOpts...),
-		cmdCache: newCmdCache(int(conf.BatchSize)),
-		output:   conf.Output,
+		awaitingCmds: make(map[cmdID]chan<- struct{}),
+		srv:          gorums.NewServer(srvOpts...),
+		cmdCache:     newCmdCache(int(conf.BatchSize)),
+		output:       conf.Output,
 	}
 	clientpb.RegisterClientServer(srv.srv, srv)
 	return srv, nil
@@ -65,14 +64,18 @@ func (srv *clientSrv) Stop() {
 	srv.srv.Stop()
 }
 
-func (srv *clientSrv) ExecCommand(_ context.Context, cmd *clientpb.Command, out func(*empty.Empty, error)) {
+func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*empty.Empty, error) {
 	id := cmdID{cmd.ClientID, cmd.SequenceNumber}
 
+	c := make(chan struct{})
 	srv.mut.Lock()
-	srv.handlers[id] = out
+	srv.awaitingCmds[id] = c
 	srv.mut.Unlock()
 
 	srv.cmdCache.addCommand(cmd)
+	ctx.Release()
+	<-c
+	return &empty.Empty{}, nil
 }
 
 func (srv *clientSrv) Exec(cmd consensus.Command) {
@@ -91,8 +94,8 @@ func (srv *clientSrv) Exec(cmd consensus.Command) {
 			log.Printf("Error writing data: %v\n", err)
 		}
 		srv.mut.Lock()
-		if reply, ok := srv.handlers[cmdID{cmd.ClientID, cmd.SequenceNumber}]; ok {
-			reply(&empty.Empty{}, nil)
+		if done, ok := srv.awaitingCmds[cmdID{cmd.ClientID, cmd.SequenceNumber}]; ok {
+			close(done)
 		}
 		srv.mut.Unlock()
 	}

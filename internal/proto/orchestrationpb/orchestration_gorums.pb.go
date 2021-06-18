@@ -12,7 +12,6 @@ import (
 	gorums "github.com/relab/gorums"
 	encoding "google.golang.org/grpc/encoding"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	sync "sync"
 )
 
 const (
@@ -295,78 +294,58 @@ func (c *Configuration) StopClient(ctx context.Context, in *StopClientRequest, f
 
 // Orchestrator is the server-side API for the Orchestrator Service
 type Orchestrator interface {
-	CreateReplica(context.Context, *CreateReplicaRequest, func(*CreateReplicaResponse, error))
-	StartReplica(context.Context, *StartReplicaRequest, func(*StartReplicaResponse, error))
-	StopReplica(context.Context, *StopReplicaRequest, func(*StopReplicaResponse, error))
-	StartClient(context.Context, *StartClientRequest, func(*StartClientResponse, error))
-	StopClient(context.Context, *StopClientRequest, func(*StopClientResponse, error))
+	CreateReplica(ctx gorums.ServerCtx, request *CreateReplicaRequest) (response *CreateReplicaResponse, err error)
+	StartReplica(ctx gorums.ServerCtx, request *StartReplicaRequest) (response *StartReplicaResponse, err error)
+	StopReplica(ctx gorums.ServerCtx, request *StopReplicaRequest) (response *StopReplicaResponse, err error)
+	StartClient(ctx gorums.ServerCtx, request *StartClientRequest) (response *StartClientResponse, err error)
+	StopClient(ctx gorums.ServerCtx, request *StopClientRequest) (response *StopClientResponse, err error)
 }
 
 func RegisterOrchestratorServer(srv *gorums.Server, impl Orchestrator) {
-	srv.RegisterHandler("orchestrationpb.Orchestrator.CreateReplica", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
+	srv.RegisterHandler("orchestrationpb.Orchestrator.CreateReplica", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*CreateReplicaRequest)
-		once := new(sync.Once)
-		f := func(resp *CreateReplicaResponse, err error) {
-			once.Do(func() {
-				select {
-				case finished <- gorums.WrapMessage(in.Metadata, resp, err):
-				case <-ctx.Done():
-				}
-			})
+		defer ctx.Release()
+		resp, err := impl.CreateReplica(ctx, req)
+		select {
+		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
+		case <-ctx.Done():
 		}
-		impl.CreateReplica(ctx, req, f)
 	})
-	srv.RegisterHandler("orchestrationpb.Orchestrator.StartReplica", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
+	srv.RegisterHandler("orchestrationpb.Orchestrator.StartReplica", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*StartReplicaRequest)
-		once := new(sync.Once)
-		f := func(resp *StartReplicaResponse, err error) {
-			once.Do(func() {
-				select {
-				case finished <- gorums.WrapMessage(in.Metadata, resp, err):
-				case <-ctx.Done():
-				}
-			})
+		defer ctx.Release()
+		resp, err := impl.StartReplica(ctx, req)
+		select {
+		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
+		case <-ctx.Done():
 		}
-		impl.StartReplica(ctx, req, f)
 	})
-	srv.RegisterHandler("orchestrationpb.Orchestrator.StopReplica", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
+	srv.RegisterHandler("orchestrationpb.Orchestrator.StopReplica", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*StopReplicaRequest)
-		once := new(sync.Once)
-		f := func(resp *StopReplicaResponse, err error) {
-			once.Do(func() {
-				select {
-				case finished <- gorums.WrapMessage(in.Metadata, resp, err):
-				case <-ctx.Done():
-				}
-			})
+		defer ctx.Release()
+		resp, err := impl.StopReplica(ctx, req)
+		select {
+		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
+		case <-ctx.Done():
 		}
-		impl.StopReplica(ctx, req, f)
 	})
-	srv.RegisterHandler("orchestrationpb.Orchestrator.StartClient", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
+	srv.RegisterHandler("orchestrationpb.Orchestrator.StartClient", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*StartClientRequest)
-		once := new(sync.Once)
-		f := func(resp *StartClientResponse, err error) {
-			once.Do(func() {
-				select {
-				case finished <- gorums.WrapMessage(in.Metadata, resp, err):
-				case <-ctx.Done():
-				}
-			})
+		defer ctx.Release()
+		resp, err := impl.StartClient(ctx, req)
+		select {
+		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
+		case <-ctx.Done():
 		}
-		impl.StartClient(ctx, req, f)
 	})
-	srv.RegisterHandler("orchestrationpb.Orchestrator.StopClient", func(ctx context.Context, in *gorums.Message, finished chan<- *gorums.Message) {
+	srv.RegisterHandler("orchestrationpb.Orchestrator.StopClient", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*StopClientRequest)
-		once := new(sync.Once)
-		f := func(resp *StopClientResponse, err error) {
-			once.Do(func() {
-				select {
-				case finished <- gorums.WrapMessage(in.Metadata, resp, err):
-				case <-ctx.Done():
-				}
-			})
+		defer ctx.Release()
+		resp, err := impl.StopClient(ctx, req)
+		select {
+		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
+		case <-ctx.Done():
 		}
-		impl.StopClient(ctx, req, f)
 	})
 }
 
