@@ -5,6 +5,15 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
+			"name": "Run main.go",
+			"type": "go",
+			"request": "launch",
+			"mode": "debug",
+			"program": "${workspaceRoot}/main.go",
+			"cwd": "${workspaceRoot}",
+			"args": ["run"]
+		},
+		{
 			"name": "Launch file",
 			"type": "go",
 			"request": "launch",
