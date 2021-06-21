@@ -14,16 +14,19 @@ import (
 
 var (
 	// experiment options
-	numReplicas    int
-	numClients     int
-	batchSize      int
-	payloadSize    int
-	maxConcurrent  int
-	duration       int
-	connectTimeout int
-	consensusName  string
-	cryptoName     string
-	leaderRotation string
+	numReplicas       int
+	numClients        int
+	batchSize         int
+	payloadSize       int
+	maxConcurrent     int
+	duration          time.Duration
+	connectTimeout    time.Duration
+	viewTimeout       time.Duration
+	timeoutSamples    int
+	timeoutMultiplier float32
+	consensusName     string
+	cryptoName        string
+	leaderRotation    string
 
 	// worker flags
 	remotePort    int
@@ -51,8 +54,11 @@ func init() {
 	runCmd.Flags().IntVar(&batchSize, "batch-size", 1, "number of commands to batch together in each block")
 	runCmd.Flags().IntVar(&payloadSize, "payload-size", 0, "size in bytes of the command payload")
 	runCmd.Flags().IntVar(&maxConcurrent, "max-concurrent", 4, "maximum number of conccurrent commands per client")
-	runCmd.Flags().IntVar(&duration, "duration", 5, "duration (in seconds) of the experiment")
-	runCmd.Flags().IntVar(&connectTimeout, "connect-timeout", 1000, "duration (in milliseconds) of the initial connection timeout")
+	runCmd.Flags().DurationVar(&duration, "duration", 5*time.Second, "duration of the experiment")
+	runCmd.Flags().DurationVar(&connectTimeout, "connect-timeout", time.Second, "duration of the initial connection timeout")
+	runCmd.Flags().DurationVar(&viewTimeout, "view-timeout", time.Second, "duration of the first view")
+	runCmd.Flags().IntVar(&timeoutSamples, "duration-samples", 1000, "number of previous views to consider when predicting view duration")
+	runCmd.Flags().Float32Var(&timeoutMultiplier, "timeout-multiplier", 1.2, "number to multiply the view duration by in case of a timeout")
 	runCmd.Flags().StringVar(&consensusName, "consensus", "chainedhotstuff", "name of the consensus implementation")
 	runCmd.Flags().StringVar(&cryptoName, "crypto", "ecdsa", "name of the crypto implementation")
 	runCmd.Flags().StringVar(&leaderRotation, "leader-rotation", "round-robin", "name of the leader rotation algorithm")
@@ -68,16 +74,19 @@ func init() {
 
 func runController() {
 	experiment := orchestration.Experiment{
-		NumReplicas:    numReplicas,
-		NumClients:     numClients,
-		BatchSize:      batchSize,
-		PayloadSize:    payloadSize,
-		MaxConcurrent:  maxConcurrent,
-		Duration:       time.Duration(duration) * time.Second,
-		ConnectTimeout: time.Duration(connectTimeout) * time.Millisecond,
-		Consensus:      consensusName,
-		Crypto:         cryptoName,
-		LeaderRotation: leaderRotation,
+		NumReplicas:       numReplicas,
+		NumClients:        numClients,
+		BatchSize:         batchSize,
+		PayloadSize:       payloadSize,
+		MaxConcurrent:     maxConcurrent,
+		Duration:          duration,
+		ConnectTimeout:    connectTimeout,
+		ViewTimeout:       viewTimeout,
+		TimoutSamples:     timeoutSamples,
+		TimeoutMultiplier: timeoutMultiplier,
+		Consensus:         consensusName,
+		Crypto:            cryptoName,
+		LeaderRotation:    leaderRotation,
 	}
 
 	g, err := iago.NewSSHGroup(hosts, sshConfigPath)

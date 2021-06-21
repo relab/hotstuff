@@ -17,16 +17,19 @@ import (
 
 // Experiment holds variables for an experiment.
 type Experiment struct {
-	NumReplicas    int
-	NumClients     int
-	BatchSize      int
-	PayloadSize    int
-	MaxConcurrent  int
-	Duration       time.Duration
-	ConnectTimeout time.Duration
-	Consensus      string
-	Crypto         string
-	LeaderRotation string
+	NumReplicas       int
+	NumClients        int
+	BatchSize         int
+	PayloadSize       int
+	MaxConcurrent     int
+	Duration          time.Duration
+	ConnectTimeout    time.Duration
+	ViewTimeout       time.Duration
+	TimoutSamples     int
+	TimeoutMultiplier float32
+	Consensus         string
+	Crypto            string
+	LeaderRotation    string
 
 	mgr    *orchestrationpb.Manager
 	config *orchestrationpb.Configuration
@@ -112,9 +115,9 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 					LeaderElection:       e.LeaderRotation,
 					BatchSize:            uint32(e.BatchSize),
 					BlockCacheSize:       uint32(5 * e.NumReplicas),
-					InitialTimeout:       1000,
-					TimeoutSamples:       1000,
-					TimeoutMultiplier:    1.2,
+					InitialTimeout:       float32(e.ViewTimeout) / float32(time.Millisecond),
+					TimeoutSamples:       uint32(e.TimoutSamples),
+					TimeoutMultiplier:    e.TimeoutMultiplier,
 					ConnectTimeout:       float32(e.ConnectTimeout / time.Millisecond),
 				}
 				node, _ := e.mgr.Node(u)
