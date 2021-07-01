@@ -11,11 +11,13 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/testutil"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
 
@@ -27,12 +29,13 @@ func TestConnect(t *testing.T) {
 		builder := testutil.TestModules(t, ctrl, 1, td.keys[0])
 		teardown := createServers(t, td, ctrl)
 		defer teardown()
-		cfg := NewConfig(td.cfg)
+		td.builders.Build()
+		cfg := NewConfig(td.cfg.ID, gorums.WithGrpcDialOptions(grpc.WithBlock()), gorums.WithDialTimeout(time.Second))
 
 		builder.Register(cfg)
 		builder.Build()
 
-		err := cfg.Connect(time.Second)
+		err := cfg.Connect(&cfg.replicaCfg)
 
 		if err != nil {
 			t.Error(err)
@@ -204,7 +207,7 @@ func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (teardown
 		cfg := td.cfg
 		cfg.ID = consensus.ID(i + 1)
 		cfg.PrivateKey = td.keys[i]
-		servers[i] = NewServer(cfg.Creds)
+		servers[i] = NewServer(gorums.WithGRPCServerOptions(grpc.Creds(cfg.Creds)))
 		servers[i].StartOnListener(td.listeners[i])
 		td.builders[i].Register(servers[i])
 	}
@@ -218,8 +221,8 @@ func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (teardown
 func createConfig(t *testing.T, td testData, ctrl *gomock.Controller) (cfg *Config, teardown func()) {
 	t.Helper()
 	serverTeardown := createServers(t, td, ctrl)
-	cfg = NewConfig(td.cfg)
-	err := cfg.Connect(time.Second)
+	cfg = NewConfig(td.cfg.ID)
+	err := cfg.Connect(&cfg.replicaCfg)
 	if err != nil {
 		t.Fatal(err)
 	}
