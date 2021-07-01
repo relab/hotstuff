@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  worker:
+    build:
+      context: "."
+    networks:
+      hotstuff:
+
+  controller:
+    build:
+      context: ".."
+    networks:
+      hotstuff:
+
+networks:
+  hotstuff:
+    ipam:
+      config:
+        - subnet: "192.168.1.0/24"
