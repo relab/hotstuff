@@ -161,10 +161,7 @@ func RegisterClientServer(srv *gorums.Server, impl Client) {
 		req := in.Message.(*Command)
 		defer ctx.Release()
 		resp, err := impl.ExecCommand(ctx, req)
-		select {
-		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
-		case <-ctx.Done():
-		}
+		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
 	})
 }
 

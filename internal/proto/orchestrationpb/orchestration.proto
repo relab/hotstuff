@@ -4,6 +4,8 @@ package orchestrationpb;
 
 import "gorums.proto";
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/relab/hotstuff/internal/proto/orchestrationpb";
 
 // ReplicaOpts contains the confiugration options for a replica.
@@ -83,8 +85,8 @@ service Orchestrator {
   }
 
   // StartReplica starts the replicas.
-  rpc StartReplica(StartReplicaRequest) returns (StartReplicaResponse) {
-    option (gorums.quorumcall) = true;
+  rpc StartReplica(StartReplicaRequest) returns (stream ReplicaStreamResponse) {
+    option (gorums.correctable) = true;
     option (gorums.per_node_arg) = true;
   }
 
@@ -117,7 +119,12 @@ message StartReplicaRequest {
   map<uint32, ReplicaInfo> Configuration = 2;
 }
 
-message StartReplicaResponse {}
+message ReplicaStreamResponse{
+  oneof Message {
+    LogLine LogLine = 1;
+    Result Result = 2;
+  }
+}
 
 message StopReplicaRequest { repeated uint32 IDs = 1; }
 
@@ -139,3 +146,17 @@ message StartClientResponse {}
 message StopClientRequest { repeated uint32 IDs = 1; }
 
 message StopClientResponse {}
+
+// misc messages
+
+message LogLine {
+  uint32 ID = 1;
+  int32 LogLevel = 2;
+  string Message = 3;
+  google.protobuf.Timestamp Time = 4;
+}
+
+message Result {
+  uint32 ID = 1;
+  bytes CommandsHash = 2;
+}
