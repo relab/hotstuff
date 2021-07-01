@@ -3,7 +3,7 @@ package orchestration
 import (
 	"fmt"
 
-	"github.com/Raytar/iago"
+	"github.com/relab/iago"
 )
 
 // Deploy deploys the hotstuff binary to a group of servers and starts a worker on the given port.
@@ -30,7 +30,7 @@ func Deploy(g iago.Group, exePath, port string) (err error) {
 
 	g.Run(iago.Task{
 		Name:    "Start hotstuff binary",
-		Action:  iago.Shell(fmt.Sprintf("nohup $HOME/hotstuff worker --listen %s &", port)),
+		Action:  iago.Shell{Command: fmt.Sprintf("nohup $HOME/hotstuff worker %s &", port)},
 		OnError: silentPanic,
 	})
 

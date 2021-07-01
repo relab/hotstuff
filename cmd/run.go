@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Raytar/iago"
 	"github.com/relab/hotstuff/internal/orchestration"
+	"github.com/relab/iago"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
