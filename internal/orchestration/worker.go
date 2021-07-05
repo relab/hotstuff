@@ -127,15 +127,19 @@ func (w *Worker) StartReplica(_ gorums.ServerCtx, req *orchestrationpb.StartRepl
 }
 
 func (w *Worker) StopReplica(_ gorums.ServerCtx, req *orchestrationpb.StopReplicaRequest) (*orchestrationpb.StopReplicaResponse, error) {
+	res := &orchestrationpb.StopReplicaResponse{
+		Hashes: make(map[uint32][]byte),
+	}
 	for _, id := range req.GetIDs() {
 		r, ok := w.replicas[consensus.ID(id)]
 		if !ok {
 			return nil, status.Errorf(codes.NotFound, "The replica with id %d was not found.", id)
 		}
 		r.Stop()
+		res.Hashes[id] = r.GetHash()
 		// TODO: return test results
 	}
-	return &orchestrationpb.StopReplicaResponse{}, nil
+	return res, nil
 }
 
 func (w *Worker) StartClient(_ gorums.ServerCtx, req *orchestrationpb.StartClientRequest) (*orchestrationpb.StartClientResponse, error) {

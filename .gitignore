@@ -21,6 +21,7 @@ __debug_bin
 cmd/hotstuffkeygen/hotstuffkeygen
 cmd/hotstuff/hotstuff
 cmd/plot/plot
+hotstuff
 
 # other
 keys/

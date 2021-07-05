@@ -1,6 +1,7 @@
 package orchestration
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/x509"
@@ -151,12 +152,21 @@ func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration) er
 }
 
 func (e *Experiment) stopReplicas() error {
-	_, err := e.config.StopReplica(context.Background(), &orchestrationpb.StopReplicaRequest{},
+	res, err := e.config.StopReplica(context.Background(), &orchestrationpb.StopReplicaRequest{},
 		func(srr *orchestrationpb.StopReplicaRequest, u uint32) *orchestrationpb.StopReplicaRequest {
 			srr.IDs = getIDs(u, e.nodesToReplicas)
 			return srr
 		},
 	)
+	var cmp []byte
+	for _, hash := range res.GetHashes() {
+		if cmp == nil {
+			cmp = hash
+		}
+		if !bytes.Equal(cmp, hash) {
+			return fmt.Errorf("hash mismatch")
+		}
+	}
 	return err
 }
 
@@ -242,7 +252,13 @@ func (q qspec) StartReplicaQF(_ *orchestrationpb.StartReplicaRequest, replies ma
 }
 
 func (q qspec) StopReplicaQF(_ *orchestrationpb.StopReplicaRequest, replies map[uint32]*orchestrationpb.StopReplicaResponse) (*orchestrationpb.StopReplicaResponse, bool) {
-	return &orchestrationpb.StopReplicaResponse{}, len(replies) == q.e.config.Size()
+	hashes := make(map[uint32][]byte)
+	for _, reply := range replies {
+		for id, hash := range reply.GetHashes() {
+			hashes[id] = hash
+		}
+	}
+	return &orchestrationpb.StopReplicaResponse{Hashes: hashes}, len(replies) == q.e.config.Size()
 }
 
 func (q qspec) StartClientQF(_ *orchestrationpb.StartClientRequest, replies map[uint32]*orchestrationpb.StartClientResponse) (*orchestrationpb.StartClientResponse, bool) {

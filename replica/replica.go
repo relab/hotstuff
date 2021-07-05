@@ -231,3 +231,7 @@ func (srv *Replica) Close() error {
 	srv.hsSrv.Stop()
 	return srv.output.Close()
 }
+
+func (srv *Replica) GetHash() (b []byte) {
+	return srv.clientSrv.hash.Sum(b)
+}

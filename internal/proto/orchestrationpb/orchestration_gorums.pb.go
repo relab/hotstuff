@@ -306,46 +306,31 @@ func RegisterOrchestratorServer(srv *gorums.Server, impl Orchestrator) {
 		req := in.Message.(*CreateReplicaRequest)
 		defer ctx.Release()
 		resp, err := impl.CreateReplica(ctx, req)
-		select {
-		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
-		case <-ctx.Done():
-		}
+		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
 	})
 	srv.RegisterHandler("orchestrationpb.Orchestrator.StartReplica", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*StartReplicaRequest)
 		defer ctx.Release()
 		resp, err := impl.StartReplica(ctx, req)
-		select {
-		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
-		case <-ctx.Done():
-		}
+		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
 	})
 	srv.RegisterHandler("orchestrationpb.Orchestrator.StopReplica", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*StopReplicaRequest)
 		defer ctx.Release()
 		resp, err := impl.StopReplica(ctx, req)
-		select {
-		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
-		case <-ctx.Done():
-		}
+		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
 	})
 	srv.RegisterHandler("orchestrationpb.Orchestrator.StartClient", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*StartClientRequest)
 		defer ctx.Release()
 		resp, err := impl.StartClient(ctx, req)
-		select {
-		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
-		case <-ctx.Done():
-		}
+		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
 	})
 	srv.RegisterHandler("orchestrationpb.Orchestrator.StopClient", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*StopClientRequest)
 		defer ctx.Release()
 		resp, err := impl.StopClient(ctx, req)
-		select {
-		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
-		case <-ctx.Done():
-		}
+		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
 	})
 }
 

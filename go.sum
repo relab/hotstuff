@@ -563,6 +563,8 @@ github.com/prometheus/procfs v0.6.0/go.mod h1:cz+aTbrPOrUb4q7XlbU9ygM+/jj0fzG6c1
 github.com/prometheus/tsdb v0.7.1/go.mod h1:qhTCs0VvXwvX/y3TZrWD7rabWM+ijKTux40TwIPHuXU=
 github.com/relab/gorums v0.5.1-0.20210618201939-a065aa7e4060 h1:n8Rzjs3+BI93dt3tyK0ZbVdq8APzzZsdO+iTi/i9cC4=
 github.com/relab/gorums v0.5.1-0.20210618201939-a065aa7e4060/go.mod h1:j1Hja1FIIYjBZ7MlnGhXY1fdY6CeGXS38FBNHJ2w1ic=
+github.com/relab/gorums v0.5.1-0.20210629194217-9811e4f219ca h1:cqb1YBlUAB97vAdEYb9v+46Rwcnd5cmIrKwmAkrpeXg=
+github.com/relab/gorums v0.5.1-0.20210629194217-9811e4f219ca/go.mod h1:j1Hja1FIIYjBZ7MlnGhXY1fdY6CeGXS38FBNHJ2w1ic=
 github.com/relab/iago v0.0.0-20210701091925-d8002c05352f h1:+0k4JMxusPlzKwFVPdgOOyItXphrDPN2GhONUk0bFFA=
 github.com/relab/iago v0.0.0-20210701091925-d8002c05352f/go.mod h1:XVPUvl/J3EuhxRsrTpxOSRxtPYT/HkJE3qW/izyXK+I=
 github.com/relab/wrfs v0.0.0-20210628111300-b51570396aec h1:VG/tFt+ffJMtZj5PIf5S3P7zsTwWsCOqFMyqZ0mPvyY=
