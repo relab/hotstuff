@@ -9,7 +9,7 @@ require (
 	github.com/kilic/bls12-381 v0.1.1-0.20210208205449-6045b0235e36
 	github.com/mattn/go-isatty v0.0.12
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/relab/gorums v0.5.1-0.20210629194217-9811e4f219ca
+	github.com/relab/gorums v0.5.1-0.20210618201939-a065aa7e4060
 	github.com/relab/iago v0.0.0-20210701091925-d8002c05352f
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5

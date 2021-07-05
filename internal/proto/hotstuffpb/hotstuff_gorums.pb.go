@@ -216,7 +216,10 @@ func RegisterHotstuffServer(srv *gorums.Server, impl Hotstuff) {
 		req := in.Message.(*BlockHash)
 		defer ctx.Release()
 		resp, err := impl.Fetch(ctx, req)
-		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
+		select {
+		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
+		case <-ctx.Done():
+		}
 	})
 }
 

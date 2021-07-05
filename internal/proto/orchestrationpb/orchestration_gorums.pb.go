@@ -10,9 +10,7 @@ import (
 	context "context"
 	fmt "fmt"
 	gorums "github.com/relab/gorums"
-	ordering "github.com/relab/gorums/ordering"
 	encoding "google.golang.org/grpc/encoding"
-	proto "google.golang.org/protobuf/proto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -121,28 +119,6 @@ type Node struct {
 	*gorums.Node
 }
 
-// StartReplica starts the replicas.
-func (c *Configuration) StartReplica(ctx context.Context, in *StartReplicaRequest, f func(*StartReplicaRequest, uint32) *StartReplicaRequest) *CorrectableStreamReplicaStreamResponse {
-	cd := gorums.CorrectableCallData{
-		Message:      in,
-		Method:       "orchestrationpb.Orchestrator.StartReplica",
-		ServerStream: true,
-	}
-	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, int, bool) {
-		r := make(map[uint32]*ReplicaStreamResponse, len(replies))
-		for k, v := range replies {
-			r[k] = v.(*ReplicaStreamResponse)
-		}
-		return c.qspec.StartReplicaQF(req.(*StartReplicaRequest), r)
-	}
-	cd.PerNodeArgFn = func(req protoreflect.ProtoMessage, nid uint32) protoreflect.ProtoMessage {
-		return f(req.(*StartReplicaRequest), nid)
-	}
-
-	corr := c.Configuration.CorrectableCall(ctx, cd)
-	return &CorrectableStreamReplicaStreamResponse{corr}
-}
-
 // QuorumSpec is the interface of quorum functions for Orchestrator.
 type QuorumSpec interface {
 	gorums.ConfigOption
@@ -155,11 +131,11 @@ type QuorumSpec interface {
 	CreateReplicaQF(in *CreateReplicaRequest, replies map[uint32]*CreateReplicaResponse) (*ReplicaConfiguration, bool)
 
 	// StartReplicaQF is the quorum function for the StartReplica
-	// correctable stream quorum call method. The in parameter is the request object
+	// quorum call method. The in parameter is the request object
 	// supplied to the StartReplica method at call time, and may or may not
 	// be used by the quorum function. If the in parameter is not needed
 	// you should implement your quorum function with '_ *StartReplicaRequest'.
-	StartReplicaQF(in *StartReplicaRequest, replies map[uint32]*ReplicaStreamResponse) (*ReplicaStreamResponse, int, bool)
+	StartReplicaQF(in *StartReplicaRequest, replies map[uint32]*StartReplicaResponse) (*StartReplicaResponse, bool)
 
 	// StopReplicaQF is the quorum function for the StopReplica
 	// quorum call method. The in parameter is the request object
@@ -206,6 +182,30 @@ func (c *Configuration) CreateReplica(ctx context.Context, in *CreateReplicaRequ
 		return nil, err
 	}
 	return res.(*ReplicaConfiguration), err
+}
+
+// StartReplica starts the replicas.
+func (c *Configuration) StartReplica(ctx context.Context, in *StartReplicaRequest, f func(*StartReplicaRequest, uint32) *StartReplicaRequest) (resp *StartReplicaResponse, err error) {
+	cd := gorums.QuorumCallData{
+		Message: in,
+		Method:  "orchestrationpb.Orchestrator.StartReplica",
+	}
+	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
+		r := make(map[uint32]*StartReplicaResponse, len(replies))
+		for k, v := range replies {
+			r[k] = v.(*StartReplicaResponse)
+		}
+		return c.qspec.StartReplicaQF(req.(*StartReplicaRequest), r)
+	}
+	cd.PerNodeArgFn = func(req protoreflect.ProtoMessage, nid uint32) protoreflect.ProtoMessage {
+		return f(req.(*StartReplicaRequest), nid)
+	}
+
+	res, err := c.Configuration.QuorumCall(ctx, cd)
+	if err != nil {
+		return nil, err
+	}
+	return res.(*StartReplicaResponse), err
 }
 
 // StopReplica is a quorum call invoked on each node in configuration c,
@@ -295,7 +295,7 @@ func (c *Configuration) StopClient(ctx context.Context, in *StopClientRequest, f
 // Orchestrator is the server-side API for the Orchestrator Service
 type Orchestrator interface {
 	CreateReplica(ctx gorums.ServerCtx, request *CreateReplicaRequest) (response *CreateReplicaResponse, err error)
-	StartReplica(ctx gorums.ServerCtx, request *StartReplicaRequest, send func(response *ReplicaStreamResponse) error) error
+	StartReplica(ctx gorums.ServerCtx, request *StartReplicaRequest) (response *StartReplicaResponse, err error)
 	StopReplica(ctx gorums.ServerCtx, request *StopReplicaRequest) (response *StopReplicaResponse, err error)
 	StartClient(ctx gorums.ServerCtx, request *StartClientRequest) (response *StartClientResponse, err error)
 	StopClient(ctx gorums.ServerCtx, request *StopClientRequest) (response *StopClientResponse, err error)
@@ -306,37 +306,46 @@ func RegisterOrchestratorServer(srv *gorums.Server, impl Orchestrator) {
 		req := in.Message.(*CreateReplicaRequest)
 		defer ctx.Release()
 		resp, err := impl.CreateReplica(ctx, req)
-		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
+		select {
+		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
+		case <-ctx.Done():
+		}
 	})
 	srv.RegisterHandler("orchestrationpb.Orchestrator.StartReplica", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*StartReplicaRequest)
 		defer ctx.Release()
-		err := impl.StartReplica(ctx, req, func(resp *ReplicaStreamResponse) error {
-			// create a copy of the metadata, to avoid a data race between WrapMessage and SendMsg
-			md := proto.Clone(in.Metadata)
-			return gorums.SendMessage(ctx, finished, gorums.WrapMessage(md.(*ordering.Metadata), resp, nil))
-		})
-		if err != nil {
-			gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, nil, err))
+		resp, err := impl.StartReplica(ctx, req)
+		select {
+		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
+		case <-ctx.Done():
 		}
 	})
 	srv.RegisterHandler("orchestrationpb.Orchestrator.StopReplica", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*StopReplicaRequest)
 		defer ctx.Release()
 		resp, err := impl.StopReplica(ctx, req)
-		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
+		select {
+		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
+		case <-ctx.Done():
+		}
 	})
 	srv.RegisterHandler("orchestrationpb.Orchestrator.StartClient", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*StartClientRequest)
 		defer ctx.Release()
 		resp, err := impl.StartClient(ctx, req)
-		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
+		select {
+		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
+		case <-ctx.Done():
+		}
 	})
 	srv.RegisterHandler("orchestrationpb.Orchestrator.StopClient", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*StopClientRequest)
 		defer ctx.Release()
 		resp, err := impl.StopClient(ctx, req)
-		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
+		select {
+		case finished <- gorums.WrapMessage(in.Metadata, resp, err):
+		case <-ctx.Done():
+		}
 	})
 }
 
@@ -346,15 +355,15 @@ type internalCreateReplicaResponse struct {
 	err   error
 }
 
-type internalReplicaStreamResponse struct {
-	nid   uint32
-	reply *ReplicaStreamResponse
-	err   error
-}
-
 type internalStartClientResponse struct {
 	nid   uint32
 	reply *StartClientResponse
+	err   error
+}
+
+type internalStartReplicaResponse struct {
+	nid   uint32
+	reply *StartReplicaResponse
 	err   error
 }
 
@@ -368,22 +377,4 @@ type internalStopReplicaResponse struct {
 	nid   uint32
 	reply *StopReplicaResponse
 	err   error
-}
-
-// CorrectableStreamReplicaStreamResponse is a correctable object for processing replies.
-type CorrectableStreamReplicaStreamResponse struct {
-	*gorums.Correctable
-}
-
-// Get returns the reply, level and any error associated with the
-// called method. The method does not block until a (possibly
-// intermediate) reply or error is available. Level is set to LevelNotSet if no
-// reply has yet been received. The Done or Watch methods should be used to
-// ensure that a reply is available.
-func (c *CorrectableStreamReplicaStreamResponse) Get() (*ReplicaStreamResponse, int, error) {
-	resp, level, err := c.Correctable.Get()
-	if err != nil {
-		return nil, level, err
-	}
-	return resp.(*ReplicaStreamResponse), level, err
 }
