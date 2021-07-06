@@ -1,0 +1,18 @@
+FROM alpine
+
+# unlock the root account, otherwise SSH will not allow us to log in
+# TODO: consider using a non-root account
+RUN passwd -u root
+
+RUN apk add --no-cache --update openssh
+
+# allow root login and pubkey authentication
+RUN sed -i s/#PermitRootLogin.*/PermitRootLogin\ prohibit-password/ /etc/ssh/sshd_config
+RUN sed -i s/#PubkeyAuthentication.*/PubkeyAuthentication\ yes/ /etc/ssh/sshd_config
+
+ADD scripts/entrypoint.sh /entrypoint.sh
+
+WORKDIR /root
+ADD scripts/id.pub .ssh/authorized_keys
+
+ENTRYPOINT [ "/entrypoint.sh" ]

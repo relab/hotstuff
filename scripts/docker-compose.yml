@@ -3,15 +3,20 @@ version: '3.8'
 services:
   worker:
     build:
-      context: "."
+      context: ".."
+      dockerfile: "scripts/Dockerfile.worker"
     networks:
       hotstuff:
+    environment:
+      - AUTHORIZED_KEYS=${AUTHORIZED_KEYS}
 
   controller:
     build:
       context: ".."
+      dockerfile: "scripts/Dockerfile.controller"
     networks:
       hotstuff:
+    entrypoint: sleep infinity
 
 networks:
   hotstuff:

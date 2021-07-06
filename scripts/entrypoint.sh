@@ -1,6 +1,7 @@
-#!/bin/bash
+#!/bin/sh
 
-mkdir "$HOME/.ssh"
-echo "$AUTHORIZED_KEYS" > "$HOME/.ssh/authorized_keys"
-service ssh start
-exec "$@"
+# generate host keys if not present
+ssh-keygen -A
+
+# do not detach (-D), log to stderr (-e), passthrough other arguments
+exec /usr/sbin/sshd -D -e "$@"

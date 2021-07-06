@@ -31,3 +31,6 @@ gcloud_test
 test.png
 test.pdf
 rr/
+
+scripts/id
+scripts/id.pub
