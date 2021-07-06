@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -87,12 +88,18 @@ func runController() {
 		log.Fatalln("Failed to deploy workers: ", err)
 	}
 
-	if worker {
-		go runWorker(remotePort)
-		hosts = append(hosts, "localhost:"+strconv.Itoa(remotePort))
+	// append the port to each hostname
+	hostsPorts := make([]string, 0)
+	for _, h := range hosts {
+		hostsPorts = append(hostsPorts, fmt.Sprintf("%s:%d", h, remotePort))
 	}
 
-	err = experiment.Run(hosts)
+	if worker {
+		go runWorker(remotePort)
+		hostsPorts = append(hostsPorts, fmt.Sprintf("localhost:%d", remotePort))
+	}
+
+	err = experiment.Run(hostsPorts)
 	if err != nil {
 		log.Fatal(err)
 	}
