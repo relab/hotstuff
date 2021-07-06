@@ -2,6 +2,7 @@ package orchestration
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/relab/iago"
 )
@@ -29,8 +30,12 @@ func Deploy(g iago.Group, exePath, port string) (err error) {
 	})
 
 	g.Run(iago.Task{
-		Name:    "Start hotstuff binary",
-		Action:  iago.Shell{Command: fmt.Sprintf("nohup $HOME/hotstuff worker %s &", port)},
+		Name: "Start hotstuff binary",
+		Action: iago.Shell{
+			Command: fmt.Sprintf("env HOTSTUFF_LOG=info nohup $HOME/hotstuff worker %s &", port),
+			Stdout:  os.Stdout,
+			Stderr:  os.Stderr,
+		},
 		OnError: silentPanic,
 	})
 
