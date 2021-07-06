@@ -10,9 +10,8 @@ require (
 	github.com/mattn/go-isatty v0.0.12
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/relab/gorums v0.5.1-0.20210629194217-9811e4f219ca
-	github.com/relab/iago v0.0.0-20210701091925-d8002c05352f
+	github.com/relab/iago v0.0.0-20210706135455-e04d2c7a0714
 	github.com/spf13/cobra v1.0.0
-	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.1
 	go.uber.org/multierr v1.7.0
 	go.uber.org/zap v1.16.0
