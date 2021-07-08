@@ -7,8 +7,6 @@ services:
       dockerfile: "scripts/Dockerfile.worker"
     networks:
       hotstuff:
-    environment:
-      - AUTHORIZED_KEYS=${AUTHORIZED_KEYS}
 
   controller:
     build:
