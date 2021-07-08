@@ -14,6 +14,7 @@ import (
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Experiment holds variables for an experiment.
@@ -75,6 +76,8 @@ func (e *Experiment) Run(hosts []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to stop replicas: %w", err)
 	}
+
+	e.config.Quit(context.Background(), &emptypb.Empty{})
 
 	return nil
 }

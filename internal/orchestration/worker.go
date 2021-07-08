@@ -19,19 +19,22 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Worker runs clients and replicas.
 type Worker struct {
-	replicas map[consensus.ID]*replica.Replica
-	clients  map[consensus.ID]*client.Client
+	replicas     map[consensus.ID]*replica.Replica
+	clients      map[consensus.ID]*client.Client
+	quitCallback func()
 }
 
 // NewWorker returns a new worker.
-func NewWorker() *Worker {
+func NewWorker(quitCallback func()) *Worker {
 	return &Worker{
-		replicas: make(map[consensus.ID]*replica.Replica),
-		clients:  make(map[consensus.ID]*client.Client),
+		replicas:     make(map[consensus.ID]*replica.Replica),
+		clients:      make(map[consensus.ID]*client.Client),
+		quitCallback: quitCallback,
 	}
 }
 
@@ -183,6 +186,10 @@ func (w *Worker) StopClient(_ gorums.ServerCtx, req *orchestrationpb.StopClientR
 		cli.Stop()
 	}
 	return &orchestrationpb.StopClientResponse{}, nil
+}
+
+func (w *Worker) Quit(_ gorums.ServerCtx, req *emptypb.Empty) {
+	w.quitCallback()
 }
 
 func getCertificate(conf *orchestrationpb.ReplicaOpts) (*tls.Certificate, error) {

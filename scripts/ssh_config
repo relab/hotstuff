@@ -1,3 +1,5 @@
+# ssh_config used with the controller container
+
 Host hotstuff_worker_*
 	User root
 	IdentityFile ~/.ssh/id

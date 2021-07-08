@@ -3,6 +3,7 @@ syntax = "proto3";
 package orchestrationpb;
 
 import "gorums.proto";
+import "google/protobuf/empty.proto";
 
 option go_package = "github.com/relab/hotstuff/internal/proto/orchestrationpb";
 
@@ -101,6 +102,10 @@ service Orchestrator {
   rpc StopClient(StopClientRequest) returns (StopClientResponse) {
     option (gorums.quorumcall) = true;
     option (gorums.per_node_arg) = true;
+  }
+
+  rpc Quit(google.protobuf.Empty) returns (google.protobuf.Empty) {
+    option (gorums.multicast) = true;
   }
 }
 

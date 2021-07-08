@@ -103,4 +103,9 @@ func runController() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	err = g.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
 }

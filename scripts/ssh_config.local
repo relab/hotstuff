@@ -1,0 +1,7 @@
+# ssh_config used with single worker (on localhost)
+
+Host 127.0.0.1 localhost
+	User root
+	Port 2020
+	IdentityFile ./scripts/id
+	UserKnownHostsFile ./scripts/known_hosts

@@ -1,4 +1,4 @@
-FROM golang:alpine AS builder
+FROM golang AS builder
 
 WORKDIR /go/src/github.com/relab/hotstuff
 
@@ -8,11 +8,12 @@ COPY go.sum .
 RUN go mod download
 
 COPY . .
-RUN go install -ldflags='-s -w' ./...
+RUN go install ./...
 
-FROM alpine
+FROM ubuntu
 
-RUN apk add --no-cache --update openssh
+RUN apt-get update
+RUN apt-get install -y openssh-client
 
 COPY --from=builder /go/bin/* /usr/bin/
 

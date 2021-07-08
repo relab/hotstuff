@@ -51,7 +51,7 @@ func runWorker(port int) {
 		log.Fatalf("Failed to listen on port %d: %v", port, err)
 	}
 	srv := gorums.NewServer()
-	w := orchestration.NewWorker()
+	w := orchestration.NewWorker(srv.Stop)
 	orchestrationpb.RegisterOrchestratorServer(srv, w)
 	err = srv.Serve(lis)
 	if err != nil {

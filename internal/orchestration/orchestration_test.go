@@ -16,8 +16,8 @@ func TestOrchestration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	worker := orchestration.NewWorker()
 	srv := gorums.NewServer()
+	worker := orchestration.NewWorker(srv.Stop)
 	orchestrationpb.RegisterOrchestratorServer(srv, worker)
 	go func() {
 		err := srv.Serve(lis)
@@ -37,7 +37,7 @@ func TestOrchestration(t *testing.T) {
 		ViewTimeout:       1000,
 		TimoutSamples:     1000,
 		TimeoutMultiplier: 1.2,
-		Duration:          10 * time.Second,
+		Duration:          1 * time.Second,
 		Consensus:         "chainedhotstuff",
 		Crypto:            "ecdsa",
 		LeaderRotation:    "round-robin",

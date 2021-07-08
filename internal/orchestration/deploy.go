@@ -29,15 +29,17 @@ func Deploy(g iago.Group, exePath, port string) (err error) {
 		OnError: silentPanic,
 	})
 
-	g.Run(iago.Task{
-		Name: "Start hotstuff binary",
-		Action: iago.Shell{
-			Command: fmt.Sprintf("env HOTSTUFF_LOG=info nohup $HOME/hotstuff worker %s &", port),
-			Stdout:  os.Stdout,
-			Stderr:  os.Stderr,
-		},
-		OnError: silentPanic,
-	})
+	go func() {
+		g.Run(iago.Task{
+			Name: "Start hotstuff binary",
+			Action: iago.Shell{
+				Command: fmt.Sprintf("env HOTSTUFF_LOG=info $HOME/hotstuff worker %s", port),
+				Stdout:  os.Stdout,
+				Stderr:  os.Stderr,
+			},
+			OnError: silentPanic,
+		})
+	}()
 
 	return nil
 }
