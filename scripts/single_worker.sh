@@ -2,6 +2,10 @@
 
 image="hotstuff_worker"
 
+if [ ! -f "./id" ]; then
+	ssh-keygen -t ed25519 -C "hotstuff-test" -f "./id" -N ""
+fi
+
 # ensure that the image is built
 docker images | grep "$image" &>/dev/null \
 	|| docker build -t "$image" -f "./Dockerfile.worker" ".."
