@@ -99,7 +99,28 @@ func runController() {
 		hostsPorts = append(hostsPorts, fmt.Sprintf("localhost:%d", remotePort))
 	}
 
-	err = experiment.Run(hostsPorts)
+	experiment.Hosts = hostsPorts
+
+	experiment.HostConfigs = make(map[string]orchestration.HostConfig)
+
+	var hostConfigs []struct {
+		Name     string
+		Clients  int
+		Replicas int
+	}
+
+	err = viper.UnmarshalKey("hosts-config", &hostConfigs)
+	if err != nil {
+		log.Fatalln(fmt.Errorf("failed to unmarshal hosts-config: %w", err))
+	}
+
+	for _, cfg := range hostConfigs {
+		experiment.HostConfigs[cfg.Name] = orchestration.HostConfig{Replicas: cfg.Replicas, Clients: cfg.Clients}
+	}
+
+	log.Println(experiment.HostConfigs)
+
+	err = experiment.Run()
 	if err != nil {
 		log.Fatal(err)
 	}

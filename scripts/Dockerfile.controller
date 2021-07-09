@@ -21,3 +21,4 @@ WORKDIR /root
 ADD scripts/id .ssh/
 ADD scripts/id.pub .ssh/
 ADD scripts/ssh_config .ssh/config
+ADD scripts/example_config.toml ./example_config.toml

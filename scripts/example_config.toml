@@ -1,0 +1,15 @@
+clients = 2
+replicas = 8
+
+hosts = [ 
+	"hotstuff_worker_1",
+	"hotstuff_worker_2",
+	"hotstuff_worker_3",
+	"hotstuff_worker_4",
+]
+
+# specific assingments for some hosts
+[[hosts-config]]
+name = "hotstuff_worker_1"
+clients = 2
+replicas = 0

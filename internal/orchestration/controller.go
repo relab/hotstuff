@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/x509"
 	"fmt"
+	"log"
 	"net"
 	"time"
 
@@ -16,6 +17,12 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
+
+// HostConfig specifies the number of replicas and clients that should be started on a specific host.
+type HostConfig struct {
+	Replicas int
+	Clients  int
+}
 
 // Experiment holds variables for an experiment.
 type Experiment struct {
@@ -33,8 +40,13 @@ type Experiment struct {
 	Crypto            string
 	LeaderRotation    string
 
+	Hosts       []string
+	HostConfigs map[string]HostConfig
+
 	mgr    *orchestrationpb.Manager
 	config *orchestrationpb.Configuration
+
+	nodesToHosts map[uint32]string
 
 	// the replica IDs associated with each node.
 	nodesToReplicas map[uint32][]consensus.ID
@@ -44,10 +56,17 @@ type Experiment struct {
 	ca             *x509.Certificate
 }
 
-func (e *Experiment) Run(hosts []string) error {
-	err := e.connect(hosts)
+func (e *Experiment) Run() (err error) {
+	err = e.connect()
 	if err != nil {
 		return fmt.Errorf("failed to connect to hosts: %w", err)
+	}
+
+	defer e.quit()
+
+	err = e.assignReplicasAndClients()
+	if err != nil {
+		return err
 	}
 
 	cfg, err := e.createReplicas()
@@ -77,40 +96,53 @@ func (e *Experiment) Run(hosts []string) error {
 		return fmt.Errorf("failed to stop replicas: %w", err)
 	}
 
-	e.config.Quit(context.Background(), &emptypb.Empty{})
-
 	return nil
 }
 
-func (e *Experiment) connect(hosts []string) (err error) {
+func (e *Experiment) connect() (err error) {
+	id := uint32(1)
+	e.nodesToHosts = make(map[uint32]string)
+	// needed for Gorums
+	hostsToNodes := make(map[string]uint32)
+	for _, host := range e.Hosts {
+		hostOnly, _, err := net.SplitHostPort(host)
+		if err != nil {
+			return err
+		}
+		e.nodesToHosts[id] = hostOnly
+		hostsToNodes[host] = id
+		id++
+	}
+
 	e.mgr = orchestrationpb.NewManager(
 		gorums.WithDialTimeout(e.ConnectTimeout),
 		gorums.WithGrpcDialOptions(grpc.WithBlock(), grpc.WithInsecure()),
 	)
-	e.config, err = e.mgr.NewConfiguration(qspec{e}, gorums.WithNodeList(hosts))
+	e.config, err = e.mgr.NewConfiguration(qspec{e}, gorums.WithNodeMap(hostsToNodes))
+
 	return err
 }
 
 func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration, err error) {
-	e.nodesToReplicas = make(map[uint32][]consensus.ID)
+	// recover panics from perNodeFunc
+	defer func() {
+		perr, _ := recover().(error)
+		if err == nil {
+			err = perr
+		}
+	}()
 
 	e.caKey, e.ca, err = keygen.GenerateCA()
 	if err != nil {
 		return nil, err
 	}
 
-	nextID := consensus.ID(1)
-
 	cfg, err = e.config.CreateReplica(
 		context.Background(),
 		&orchestrationpb.CreateReplicaRequest{},
 		func(crr *orchestrationpb.CreateReplicaRequest, u uint32) *orchestrationpb.CreateReplicaRequest {
 			crr = &orchestrationpb.CreateReplicaRequest{Replicas: make(map[uint32]*orchestrationpb.ReplicaOpts)}
-			for i := 0; i < e.NumReplicas/e.config.Size(); i++ {
-				id := nextID
-				if id > consensus.ID(e.NumReplicas) {
-					return nil
-				}
+			for _, id := range e.nodesToReplicas[u] {
 				opts := orchestrationpb.ReplicaOpts{
 					CertificateAuthority: keygen.CertToPEM(e.ca),
 					UseTLS:               true,
@@ -125,12 +157,12 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 					ConnectTimeout:       float32(e.ConnectTimeout / time.Millisecond),
 				}
 				node, _ := e.mgr.Node(u)
+
 				keyChain, err := keygen.GenerateKeyChain(id, node.Host(), e.Crypto, e.ca, e.caKey)
 				if err != nil {
-					panic("failed to generate keychain")
+					panic(fmt.Errorf("failed to generate keychain: %w", err))
 				}
-				e.nodesToReplicas[u] = append(e.nodesToReplicas[u], id)
-				nextID++
+
 				opts.ID = uint32(id)
 				opts.PrivateKey = keyChain.PrivateKey
 				opts.PublicKey = keyChain.PublicKey
@@ -142,6 +174,99 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 		},
 	)
 	return
+}
+
+// assignReplicasAndClients assigns replica and client ids to each host,
+// based on the requested amount of replicas/clients and the assignments for each host.
+func (e *Experiment) assignReplicasAndClients() (err error) {
+	e.nodesToReplicas = make(map[uint32][]consensus.ID)
+	e.nodesToClients = make(map[uint32][]consensus.ID)
+
+	nextReplicaID := consensus.ID(1)
+	nextClientID := consensus.ID(1)
+
+	// number of replicas that should be auto assigned
+	remainingReplicas := e.NumReplicas
+	remainingClients := e.NumClients
+
+	// how many workers that should be auto assigned
+	autoConfig := len(e.Hosts)
+
+	// determine how many replicas should be assigned automatically
+	for _, hostCfg := range e.HostConfigs {
+		// TODO: ensure that this host is part of e.Hosts
+		remainingReplicas -= hostCfg.Replicas
+		remainingClients -= hostCfg.Clients
+		autoConfig--
+	}
+
+	var (
+		replicasPerNode   int
+		remainderReplicas int
+		clientsPerNode    int
+		remainderClients  int
+	)
+
+	if autoConfig > 0 {
+		replicasPerNode = remainingReplicas / autoConfig
+		remainderReplicas = remainingReplicas % autoConfig
+		clientsPerNode = remainingClients / autoConfig
+		remainderClients = remainingClients % autoConfig
+	}
+
+	// ensure that we have not assigned more replicas or clients than requested
+	if remainingReplicas < 0 {
+		return fmt.Errorf(
+			"invalid replica configuration: %d replicas requested, but host configuration specifies %d",
+			e.NumReplicas, e.NumReplicas-remainingReplicas,
+		)
+	}
+	if remainingClients < 0 {
+		return fmt.Errorf(
+			"invalid client configuration: %d clients requested, but host configuration specifies %d",
+			e.NumClients, e.NumClients-remainingClients,
+		)
+	}
+
+	for id, host := range e.nodesToHosts {
+		var (
+			numReplicas int
+			numClients  int
+		)
+		if hostCfg, ok := e.HostConfigs[host]; ok {
+			numReplicas = hostCfg.Replicas
+			numClients = hostCfg.Clients
+		} else {
+			numReplicas = replicasPerNode
+			remainingReplicas -= replicasPerNode
+			if remainderReplicas > 0 {
+				numReplicas++
+				remainderReplicas--
+				remainingReplicas--
+			}
+			numClients = clientsPerNode
+			remainingClients -= clientsPerNode
+			if remainderClients > 0 {
+				numClients++
+				remainderClients--
+				remainingClients--
+			}
+		}
+
+		for i := 0; i < numReplicas; i++ {
+			e.nodesToReplicas[id] = append(e.nodesToReplicas[id], nextReplicaID)
+			log.Printf("replica %d assigned to host %s", nextReplicaID, host)
+			nextReplicaID++
+		}
+
+		for i := 0; i < numClients; i++ {
+			e.nodesToClients[id] = append(e.nodesToClients[id], nextClientID)
+			log.Printf("client %d assigned to host %s", nextClientID, host)
+			nextClientID++
+		}
+	}
+	// TODO: warn if not all clients/replicas were assigned
+	return nil
 }
 
 func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration) error {
@@ -175,18 +300,13 @@ func (e *Experiment) stopReplicas() error {
 
 func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration) error {
 	nextID := consensus.ID(1)
-	e.nodesToClients = make(map[uint32][]consensus.ID)
 	_, err := e.config.StartClient(context.Background(), &orchestrationpb.StartClientRequest{},
 		func(scr *orchestrationpb.StartClientRequest, u uint32) *orchestrationpb.StartClientRequest {
 			scr = &orchestrationpb.StartClientRequest{}
 			scr.Clients = make(map[uint32]*orchestrationpb.ClientOpts)
 			scr.Configuration = cfg.GetReplicas()
 			scr.CertificateAuthority = keygen.CertToPEM(e.ca)
-			for i := 0; i < e.NumClients/e.config.Size(); i++ {
-				id := nextID
-				if id > consensus.ID(e.NumClients) {
-					return nil
-				}
+			for _, id := range e.nodesToClients[u] {
 				nextID++
 				scr.Clients[uint32(id)] = &orchestrationpb.ClientOpts{
 					ID:             uint32(id),
@@ -211,6 +331,13 @@ func (e *Experiment) stopClients() error {
 		},
 	)
 	return err
+}
+
+func (e *Experiment) quit() {
+	e.config.Quit(context.Background(), &emptypb.Empty{})
+	// allow some time for the workers to receive the messages
+	time.Sleep(100 * time.Millisecond)
+	e.mgr.Close()
 }
 
 func getIDs(nodeID uint32, m map[uint32][]consensus.ID) []uint32 {
@@ -270,4 +397,11 @@ func (q qspec) StartClientQF(_ *orchestrationpb.StartClientRequest, replies map[
 
 func (q qspec) StopClientQF(_ *orchestrationpb.StopClientRequest, replies map[uint32]*orchestrationpb.StopClientResponse) (*orchestrationpb.StopClientResponse, bool) {
 	return &orchestrationpb.StopClientResponse{}, len(replies) == q.e.config.Size()
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

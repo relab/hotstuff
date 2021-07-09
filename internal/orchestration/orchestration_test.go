@@ -41,9 +41,10 @@ func TestOrchestration(t *testing.T) {
 		Consensus:         "chainedhotstuff",
 		Crypto:            "ecdsa",
 		LeaderRotation:    "round-robin",
+		Hosts:             []string{addr},
 	}
 
-	err = experiment.Run([]string{addr})
+	err = experiment.Run()
 	if err != nil {
 		t.Fatal(err)
 	}
