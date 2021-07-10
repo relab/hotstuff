@@ -85,7 +85,7 @@ func GenerateTLSCert(id consensus.ID, hosts []string, parent *x509.Certificate, 
 	return x509.ParseCertificate(caBytes)
 }
 
-// PrivateKeyToPem encodes the private key in PEM format.
+// PrivateKeyToPEM encodes the private key in PEM format.
 func PrivateKeyToPEM(key consensus.PrivateKey) ([]byte, error) {
 	var (
 		marshalled []byte

@@ -56,6 +56,7 @@ type Experiment struct {
 	ca             *x509.Certificate
 }
 
+// Run runs the experiment.
 func (e *Experiment) Run() (err error) {
 	err = e.connect()
 	if err != nil {

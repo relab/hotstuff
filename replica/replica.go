@@ -229,6 +229,7 @@ func (srv *Replica) Close() error {
 	return srv.output.Close()
 }
 
+// GetHash returns the hash of all executed commands.
 func (srv *Replica) GetHash() (b []byte) {
 	return srv.clientSrv.hash.Sum(b)
 }

@@ -124,6 +124,7 @@ func (c *Client) Run(ctx context.Context) {
 	c.logger.Info("Done sending commands")
 }
 
+// Start starts the client.
 func (c *Client) Start() {
 	var ctx context.Context
 	ctx, c.cancel = context.WithCancel(context.Background())
@@ -131,6 +132,7 @@ func (c *Client) Start() {
 	close(c.done)
 }
 
+// Stop stops the client.
 func (c *Client) Stop() {
 	c.cancel()
 	<-c.done
