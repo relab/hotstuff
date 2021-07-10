@@ -123,8 +123,14 @@ func (s *Synchronizer) SyncInfo() consensus.SyncInfo {
 
 func (s *Synchronizer) onLocalTimeout() {
 	defer func() {
-		s.cancelCtx()
-		s.viewCtx, s.cancelCtx = context.WithCancel(context.Background())
+		// Reset the timer and ctx here so that we can get a new timeout in the same view.
+		// I think this is necessary to ensure that we can keep sending the same timeout message
+		// until we get a timeout certificate.
+		//
+		// TODO: figure out the best way to handle this context and timeout.
+		if s.viewCtx.Err() != nil {
+			s.newCtx()
+		}
 		s.timer.Reset(s.duration.Duration())
 	}()
 
@@ -267,8 +273,7 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 	s.duration.ViewStarted()
 
 	// cancel the old view context and set up the next one
-	s.cancelCtx()
-	s.viewCtx, s.cancelCtx = context.WithCancel(context.Background())
+	s.newCtx()
 
 	s.timer.Reset(s.duration.Duration())
 
@@ -303,6 +308,11 @@ func (s *Synchronizer) UpdateHighQC(qc consensus.QuorumCert) {
 		s.highQC = qc
 		s.leafBlock = newBlock
 	}
+}
+
+func (s *Synchronizer) newCtx() {
+	s.cancelCtx()
+	s.viewCtx, s.cancelCtx = context.WithTimeout(context.Background(), s.duration.Duration())
 }
 
 var _ consensus.Synchronizer = (*Synchronizer)(nil)
