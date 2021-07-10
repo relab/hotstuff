@@ -156,18 +156,15 @@ func New(conf Config) (replica *Replica, err error) {
 
 	srv.hsSrv = backend.NewServer(replicaSrvOpts...)
 
+	var creds credentials.TransportCredentials
 	managerOpts := conf.ManagerOptions
 	if conf.TLS {
-		managerOpts = append(managerOpts, gorums.WithGrpcDialOptions(grpc.WithTransportCredentials(
-			credentials.NewTLS(&tls.Config{
-				RootCAs:      conf.RootCAs,
-				Certificates: []tls.Certificate{*conf.Certificate},
-			}),
-		)))
-	} else {
-		managerOpts = append(managerOpts, gorums.WithGrpcDialOptions(grpc.WithInsecure()))
+		creds = credentials.NewTLS(&tls.Config{
+			RootCAs:      conf.RootCAs,
+			Certificates: []tls.Certificate{*conf.Certificate},
+		})
 	}
-	srv.cfg = backend.NewConfig(conf.ID, managerOpts...)
+	srv.cfg = backend.NewConfig(conf.ID, creds, managerOpts...)
 
 	builder := consensus.NewBuilder(conf.ID, conf.PrivateKey)
 

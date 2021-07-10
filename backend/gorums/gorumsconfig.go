@@ -11,6 +11,7 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -74,7 +75,7 @@ func (cfg *Config) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder
 }
 
 // NewConfig creates a new configuration.
-func NewConfig(id consensus.ID, opts ...gorums.ManagerOption) *Config {
+func NewConfig(id consensus.ID, creds credentials.TransportCredentials, opts ...gorums.ManagerOption) *Config {
 	cfg := &Config{
 		replicas:      make(map[consensus.ID]consensus.Replica),
 		proposeCancel: func() {},
@@ -89,6 +90,12 @@ func NewConfig(id consensus.ID, opts ...gorums.ManagerOption) *Config {
 	grpcOpts := []grpc.DialOption{
 		grpc.WithBlock(),
 		grpc.WithReturnConnectionError(),
+	}
+
+	if creds == nil {
+		grpcOpts = append(grpcOpts, grpc.WithInsecure())
+	} else {
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(creds))
 	}
 
 	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))

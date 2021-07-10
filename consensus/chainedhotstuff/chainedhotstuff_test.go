@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/relab/hotstuff/backend/gorums"
+	"github.com/relab/gorums"
+	backend "github.com/relab/hotstuff/backend/gorums"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/mocks"
@@ -197,15 +198,15 @@ func TestChainedHotstuff(t *testing.T) {
 	}
 
 	builders := testutil.CreateBuilders(t, ctrl, n, keys...)
-	configs := make([]*gorums.Config, n)
-	servers := make([]*gorums.Server, n)
+	configs := make([]*backend.Config, n)
+	servers := make([]*backend.Server, n)
 	synchronizers := make([]consensus.Synchronizer, n)
 	for i := 0; i < n; i++ {
 		c := *baseCfg
 		c.ID = consensus.ID(i + 1)
 		c.PrivateKey = keys[i].(*ecdsa.PrivateKey)
-		configs[i] = gorums.NewConfig(c)
-		servers[i] = gorums.NewServer(c)
+		configs[i] = backend.NewConfig(c.ID, nil, gorums.WithDialTimeout(time.Second))
+		servers[i] = backend.NewServer()
 		synchronizers[i] = synchronizer.New(
 			synchronizer.NewViewDuration(1000, 100, 2),
 		)
@@ -241,7 +242,7 @@ func TestChainedHotstuff(t *testing.T) {
 	}
 
 	for _, cfg := range configs {
-		err := cfg.Connect(time.Second)
+		err := cfg.Connect(baseCfg)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -30,12 +30,13 @@ func TestConnect(t *testing.T) {
 		teardown := createServers(t, td, ctrl)
 		defer teardown()
 		td.builders.Build()
-		cfg := NewConfig(td.cfg.ID, gorums.WithGrpcDialOptions(grpc.WithBlock()), gorums.WithDialTimeout(time.Second))
+
+		cfg := NewConfig(td.cfg.ID, td.cfg.Creds, gorums.WithDialTimeout(time.Second))
 
 		builder.Register(cfg)
 		builder.Build()
 
-		err := cfg.Connect(&cfg.replicaCfg)
+		err := cfg.Connect(&td.cfg)
 
 		if err != nil {
 			t.Error(err)
@@ -221,8 +222,8 @@ func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (teardown
 func createConfig(t *testing.T, td testData, ctrl *gomock.Controller) (cfg *Config, teardown func()) {
 	t.Helper()
 	serverTeardown := createServers(t, td, ctrl)
-	cfg = NewConfig(td.cfg.ID)
-	err := cfg.Connect(&cfg.replicaCfg)
+	cfg = NewConfig(td.cfg.ID, td.cfg.Creds, gorums.WithDialTimeout(time.Second))
+	err := cfg.Connect(&td.cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
