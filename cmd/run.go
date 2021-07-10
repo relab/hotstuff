@@ -31,9 +31,9 @@ func init() {
 	runCmd.Flags().Int("batch-size", 1, "number of commands to batch together in each block")
 	runCmd.Flags().Int("payload-size", 0, "size in bytes of the command payload")
 	runCmd.Flags().Int("max-concurrent", 4, "maximum number of conccurrent commands per client")
-	runCmd.Flags().Duration("duration", 5*time.Second, "duration of the experiment")
-	runCmd.Flags().Duration("connect-timeout", time.Second, "duration of the initial connection timeout")
-	runCmd.Flags().Duration("view-timeout", time.Second, "duration of the first view")
+	runCmd.Flags().Duration("duration", 10*time.Second, "duration of the experiment")
+	runCmd.Flags().Duration("connect-timeout", 5*time.Second, "duration of the initial connection timeout")
+	runCmd.Flags().Duration("view-timeout", 100*time.Millisecond, "duration of the first view")
 	runCmd.Flags().Int("duration-samples", 1000, "number of previous views to consider when predicting view duration")
 	runCmd.Flags().Float32("timeout-multiplier", 1.2, "number to multiply the view duration by in case of a timeout")
 	runCmd.Flags().String("consensus", "chainedhotstuff", "name of the consensus implementation")
@@ -45,6 +45,7 @@ func init() {
 	runCmd.Flags().StringSlice("hosts", nil, "the remote hosts to run the experiment on via ssh")
 	runCmd.Flags().String("exe", "", "path to the executable to deploy and run on remote workers")
 	runCmd.Flags().String("ssh-config", "", "path to ssh_config file to resolve host aliases (defaults to ~/.ssh/config)")
+	runCmd.Flags().String("log-level", "warn", "set the log level (debug, info, warn, error)")
 
 	viper.BindPFlags(runCmd.Flags())
 }
@@ -83,7 +84,7 @@ func runController() {
 		}
 	}
 
-	err = orchestration.Deploy(g, exePath, strconv.Itoa(remotePort))
+	err = orchestration.Deploy(g, exePath, strconv.Itoa(remotePort), viper.GetString("log-level"))
 	if err != nil {
 		log.Fatalln("Failed to deploy workers: ", err)
 	}

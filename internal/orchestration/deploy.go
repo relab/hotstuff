@@ -8,7 +8,7 @@ import (
 )
 
 // Deploy deploys the hotstuff binary to a group of servers and starts a worker on the given port.
-func Deploy(g iago.Group, exePath, port string) (err error) {
+func Deploy(g iago.Group, exePath, port, logLevel string) (err error) {
 	// catch panics and return any errors
 	defer func() {
 		err, _ = recover().(error)
@@ -33,7 +33,7 @@ func Deploy(g iago.Group, exePath, port string) (err error) {
 		g.Run(iago.Task{
 			Name: "Start hotstuff binary",
 			Action: iago.Shell{
-				Command: fmt.Sprintf("env HOTSTUFF_LOG=info $HOME/hotstuff worker %s", port),
+				Command: fmt.Sprintf("env HOTSTUFF_LOG=%s $HOME/hotstuff worker %s", logLevel, port),
 				Stdout:  os.Stdout,
 				Stderr:  os.Stderr,
 			},

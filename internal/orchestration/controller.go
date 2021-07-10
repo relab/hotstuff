@@ -273,8 +273,9 @@ func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration) er
 	_, err := e.config.StartReplica(context.Background(), &orchestrationpb.StartReplicaRequest{
 		Configuration: cfg.GetReplicas(),
 	}, func(srr *orchestrationpb.StartReplicaRequest, u uint32) *orchestrationpb.StartReplicaRequest {
-		srr.IDs = getIDs(u, e.nodesToReplicas)
-		return srr
+		req := &orchestrationpb.StartReplicaRequest{Configuration: srr.GetConfiguration()}
+		req.IDs = getIDs(u, e.nodesToReplicas)
+		return req
 	})
 	return err
 }
