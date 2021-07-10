@@ -53,7 +53,6 @@ type Config struct {
 type Client struct {
 	id               consensus.ID
 	logger           logging.Logger
-	replicaConfig    *config.ReplicaConfig
 	mgr              *clientpb.Manager
 	gorumsConfig     *clientpb.Configuration
 	payloadSize      uint32

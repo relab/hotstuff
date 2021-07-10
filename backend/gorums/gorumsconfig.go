@@ -61,7 +61,6 @@ func (r *gorumsReplica) NewView(msg consensus.SyncInfo) {
 type Config struct {
 	mod *consensus.Modules
 
-	replicaCfg    config.ReplicaConfig
 	mgr           *hotstuffpb.Manager
 	cfg           *hotstuffpb.Configuration
 	replicas      map[consensus.ID]consensus.Replica

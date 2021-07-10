@@ -201,19 +201,6 @@ func WriteCertFile(cert *x509.Certificate, file string) (err error) {
 	return pem.Encode(f, b)
 }
 
-func readPemFile(file string) (b *pem.Block, err error) {
-	d, err := os.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
-
-	b, _ = pem.Decode(d)
-	if b == nil {
-		return nil, fmt.Errorf("failed to decode PEM")
-	}
-	return b, nil
-}
-
 // ParsePrivateKey parses a PEM encoded private key.
 func ParsePrivateKey(buf []byte) (key consensus.PrivateKey, err error) {
 	b, _ := pem.Decode(buf)

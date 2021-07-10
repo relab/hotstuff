@@ -141,8 +141,8 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 	cfg, err = e.config.CreateReplica(
 		context.Background(),
 		&orchestrationpb.CreateReplicaRequest{},
-		func(crr *orchestrationpb.CreateReplicaRequest, u uint32) *orchestrationpb.CreateReplicaRequest {
-			crr = &orchestrationpb.CreateReplicaRequest{Replicas: make(map[uint32]*orchestrationpb.ReplicaOpts)}
+		func(_ *orchestrationpb.CreateReplicaRequest, u uint32) *orchestrationpb.CreateReplicaRequest {
+			req := &orchestrationpb.CreateReplicaRequest{Replicas: make(map[uint32]*orchestrationpb.ReplicaOpts)}
 			for _, id := range e.nodesToReplicas[u] {
 				opts := orchestrationpb.ReplicaOpts{
 					CertificateAuthority: keygen.CertToPEM(e.ca),
@@ -169,9 +169,9 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 				opts.PublicKey = keyChain.PublicKey
 				opts.Certificate = keyChain.Certificate
 				opts.CertificateKey = keyChain.CertificateKey
-				crr.Replicas[uint32(id)] = &opts
+				req.Replicas[uint32(id)] = &opts
 			}
-			return crr
+			return req
 		},
 	)
 	return
@@ -303,14 +303,14 @@ func (e *Experiment) stopReplicas() error {
 func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration) error {
 	nextID := consensus.ID(1)
 	_, err := e.config.StartClient(context.Background(), &orchestrationpb.StartClientRequest{},
-		func(scr *orchestrationpb.StartClientRequest, u uint32) *orchestrationpb.StartClientRequest {
-			scr = &orchestrationpb.StartClientRequest{}
-			scr.Clients = make(map[uint32]*orchestrationpb.ClientOpts)
-			scr.Configuration = cfg.GetReplicas()
-			scr.CertificateAuthority = keygen.CertToPEM(e.ca)
+		func(_ *orchestrationpb.StartClientRequest, u uint32) *orchestrationpb.StartClientRequest {
+			req := &orchestrationpb.StartClientRequest{}
+			req.Clients = make(map[uint32]*orchestrationpb.ClientOpts)
+			req.Configuration = cfg.GetReplicas()
+			req.CertificateAuthority = keygen.CertToPEM(e.ca)
 			for _, id := range e.nodesToClients[u] {
 				nextID++
-				scr.Clients[uint32(id)] = &orchestrationpb.ClientOpts{
+				req.Clients[uint32(id)] = &orchestrationpb.ClientOpts{
 					ID:             uint32(id),
 					UseTLS:         true,
 					MaxConcurrent:  uint32(e.MaxConcurrent),
@@ -318,7 +318,7 @@ func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration) err
 					ConnectTimeout: float32(e.ConnectTimeout / time.Millisecond),
 				}
 			}
-			return scr
+			return req
 		},
 	)
 	return err
@@ -326,10 +326,10 @@ func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration) err
 
 func (e *Experiment) stopClients() error {
 	_, err := e.config.StopClient(context.Background(), &orchestrationpb.StopClientRequest{},
-		func(scr *orchestrationpb.StopClientRequest, u uint32) *orchestrationpb.StopClientRequest {
-			scr = &orchestrationpb.StopClientRequest{}
-			scr.IDs = getIDs(u, e.nodesToClients)
-			return scr
+		func(_ *orchestrationpb.StopClientRequest, u uint32) *orchestrationpb.StopClientRequest {
+			req := &orchestrationpb.StopClientRequest{}
+			req.IDs = getIDs(u, e.nodesToClients)
+			return req
 		},
 	)
 	return err
@@ -399,11 +399,4 @@ func (q qspec) StartClientQF(_ *orchestrationpb.StartClientRequest, replies map[
 
 func (q qspec) StopClientQF(_ *orchestrationpb.StopClientRequest, replies map[uint32]*orchestrationpb.StopClientResponse) (*orchestrationpb.StopClientResponse, bool) {
 	return &orchestrationpb.StopClientResponse{}, len(replies) == q.e.config.Size()
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

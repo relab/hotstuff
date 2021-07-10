@@ -138,7 +138,10 @@ func (w *worker) StopReplica(_ gorums.ServerCtx, req *orchestrationpb.StopReplic
 		if !ok {
 			return nil, status.Errorf(codes.NotFound, "The replica with id %d was not found.", id)
 		}
-		r.Stop()
+		err := r.Stop()
+		if err != nil {
+			return nil, err
+		}
 		res.Hashes[id] = r.GetHash()
 		// TODO: return test results
 	}
@@ -190,23 +193,6 @@ func (w *worker) StopClient(_ gorums.ServerCtx, req *orchestrationpb.StopClientR
 
 func (w *worker) Quit(_ gorums.ServerCtx, req *emptypb.Empty) {
 	w.quitCallback()
-}
-
-func getCertificate(conf *orchestrationpb.ReplicaOpts) (*tls.Certificate, error) {
-	if conf.GetUseTLS() && conf.GetCertificate() != nil {
-		var key []byte
-		if conf.GetCertificateKey() != nil {
-			key = conf.GetCertificateKey()
-		} else {
-			key = conf.GetPrivateKey()
-		}
-		cert, err := tls.X509KeyPair(conf.GetCertificate(), key)
-		if err != nil {
-			return nil, err
-		}
-		return &cert, nil
-	}
-	return nil, nil
 }
 
 func getConfiguration(id consensus.ID, conf map[uint32]*orchestrationpb.ReplicaInfo, client bool) (*config.ReplicaConfig, error) {

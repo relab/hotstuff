@@ -47,7 +47,10 @@ func init() {
 	runCmd.Flags().String("ssh-config", "", "path to ssh_config file to resolve host aliases (defaults to ~/.ssh/config)")
 	runCmd.Flags().String("log-level", "warn", "set the log level (debug, info, warn, error)")
 
-	viper.BindPFlags(runCmd.Flags())
+	err := viper.BindPFlags(runCmd.Flags())
+	if err != nil {
+		panic(err)
+	}
 }
 
 func runController() {

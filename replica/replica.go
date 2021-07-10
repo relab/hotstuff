@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
@@ -80,7 +79,6 @@ type Replica struct {
 	hsSrv *backend.Server
 	hs    *consensus.Modules
 
-	mut          sync.Mutex
 	execHandlers map[cmdID]func(*empty.Empty, error)
 	cancel       context.CancelFunc
 	done         chan struct{}
@@ -209,10 +207,10 @@ func (srv *Replica) Start() {
 }
 
 // Stop stops the replica and closes connections.
-func (srv *Replica) Stop() {
+func (srv *Replica) Stop() error {
 	srv.cancel()
 	<-srv.done
-	srv.Close()
+	return srv.Close()
 }
 
 // Run runs the replica until the context is cancelled.
