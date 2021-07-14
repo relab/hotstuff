@@ -133,7 +133,7 @@ type nopLogger struct{}
 
 func (nopLogger) Log(proto.Message) error { return nil }
 
-// Noplogger returns a logger that does not log anything.
+// NopLogger returns a logger that does not log anything.
 // This is useful for testing and other situations where data logging is disabled.
 func NopLogger() DataLogger {
 	return nopLogger{}
