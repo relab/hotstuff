@@ -3,6 +3,7 @@ package consensus
 import (
 	"context"
 
+	"github.com/relab/hotstuff/datalogger"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/logging"
 )
@@ -17,6 +18,7 @@ type Modules struct {
 	opts          Options
 	eventLoop     *eventloop.EventLoop
 	votingMachine *VotingMachine
+	dataLogger    datalogger.DataLogger
 
 	// modules
 
@@ -54,6 +56,14 @@ func (hs *Modules) Options() *Options {
 // EventLoop returns the event loop.
 func (hs *Modules) EventLoop() *eventloop.EventLoop {
 	return hs.eventLoop
+}
+
+// DataLogger returns the data logger.
+func (hs *Modules) DataLogger() datalogger.DataLogger {
+	if hs.dataLogger == nil {
+		return datalogger.NopLogger()
+	}
+	return hs.dataLogger
 }
 
 // Acceptor returns the acceptor.

@@ -11,6 +11,11 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+// DataLogger is the interface used for logging data stored in protobuf messages.
+type DataLogger interface {
+	Log(proto.Message) error
+}
+
 // LogWriter writes protobuf messages to a common log.
 type LogWriter struct {
 	mut       sync.Mutex
@@ -18,10 +23,12 @@ type LogWriter struct {
 	marshaler proto.MarshalOptions
 }
 
+var _ DataLogger = (*LogWriter)(nil)
+
 // NewWriter returns a new LogWriter. dest is the io.Writer that the LogWriter should log to.
 // The LogWriter will close the dest in the LogWriter.Close() method if the dest implements io.Closer.
-func NewWriter(dest io.Writer) LogWriter {
-	return LogWriter{
+func NewWriter(dest io.Writer) *LogWriter {
+	return &LogWriter{
 		dest:      dest,
 		marshaler: proto.MarshalOptions{},
 	}
@@ -74,15 +81,15 @@ type LogReader struct {
 
 // NewReader returns a new LogReader. src is the io.Reader that the LogReader should read the log from.
 // The LogReader will close the src in the LogReader.Close() method if the src implements io.Closer.
-func NewReader(src io.Reader) LogReader {
-	return LogReader{
+func NewReader(src io.Reader) *LogReader {
+	return &LogReader{
 		src:         src,
 		unmarshaler: proto.UnmarshalOptions{},
 	}
 }
 
 // Close closes the LogReader. If the src reader implements io.Closer, it will be closed.
-func (w LogReader) Close() error {
+func (w *LogReader) Close() error {
 	if closer, ok := w.src.(io.Closer); ok {
 		return closer.Close()
 	}
@@ -90,7 +97,7 @@ func (w LogReader) Close() error {
 }
 
 // Read reads a protobuf message from the log.
-func (w LogReader) Read() (proto.Message, error) {
+func (w *LogReader) Read() (proto.Message, error) {
 	var msgLenBuf [4]byte
 	_, err := io.ReadFull(w.src, msgLenBuf[:])
 	if err != nil {
@@ -120,4 +127,14 @@ func (w LogReader) Read() (proto.Message, error) {
 	}
 
 	return msg, nil
+}
+
+type nopLogger struct{}
+
+func (nopLogger) Log(proto.Message) error { return nil }
+
+// Noplogger returns a logger that does not log anything.
+// This is useful for testing and other situations where data logging is disabled.
+func NopLogger() DataLogger {
+	return nopLogger{}
 }
