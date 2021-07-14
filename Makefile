@@ -25,6 +25,10 @@ download:
 tools: download
 	@cat tools.go | grep _ | awk -F'"' '{print $$2}' | xargs -I % go install %
 
+test:
+	@go test -v ./...
+	@(cd scripts; bash deploy_test.sh)
+
 clean:
 	@rm -fv $(binaries)
 
