@@ -33,6 +33,9 @@ jobs:
         shell: bash
         env:
           HOTSTUFF_LOG: info
+      - name: Run docker tests
+        if: runner.os == 'Linux'
+        run: cd scripts; bash deploy_test.sh
       - name: Upload code coverage report
         if: runner.os == 'Linux'
         uses: codecov/codecov-action@v1
