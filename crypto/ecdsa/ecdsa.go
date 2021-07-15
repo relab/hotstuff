@@ -137,7 +137,7 @@ func (ec *ecdsaCrypto) getPrivateKey() *ecdsa.PrivateKey {
 func (ec *ecdsaCrypto) Sign(hash consensus.Hash) (sig consensus.Signature, err error) {
 	r, s, err := ecdsa.Sign(rand.Reader, ec.getPrivateKey(), hash[:])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ecdsa: sign failed: %w", err)
 	}
 	return &Signature{
 		r:      r,
