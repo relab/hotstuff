@@ -46,12 +46,12 @@ func (w *LogWriter) Close() error {
 func (w *LogWriter) Log(msg proto.Message) error {
 	any, err := anypb.New(msg)
 	if err != nil {
-		return fmt.Errorf("failed to create Any message: %w", err)
+		return fmt.Errorf("datalogger: failed to create Any message: %w", err)
 	}
 
 	buf, err := w.marshaler.Marshal(any)
 	if err != nil {
-		return fmt.Errorf("failed to marshal Any message: %w", err)
+		return fmt.Errorf("datalogger: failed to marshal Any message: %w", err)
 	}
 
 	var msgLen [4]byte
@@ -62,12 +62,12 @@ func (w *LogWriter) Log(msg proto.Message) error {
 
 	_, err = w.dest.Write(msgLen[:])
 	if err != nil {
-		return fmt.Errorf("failed to write message length to log: %w", err)
+		return fmt.Errorf("datalogger: failed to write message length to log: %w", err)
 	}
 
 	_, err = w.dest.Write(buf)
 	if err != nil {
-		return fmt.Errorf("failed to write message to log: %w", err)
+		return fmt.Errorf("datalogger: failed to write message to log: %w", err)
 	}
 
 	return nil
@@ -101,29 +101,29 @@ func (w *LogReader) Read() (proto.Message, error) {
 	var msgLenBuf [4]byte
 	_, err := io.ReadFull(w.src, msgLenBuf[:])
 	if err != nil {
-		return nil, fmt.Errorf("failed to read message length: %w", err)
+		return nil, fmt.Errorf("datalogger: failed to read message length: %w", err)
 	}
 
 	msgLen := binary.LittleEndian.Uint32(msgLenBuf[:])
 	if msgLen > 2147483648 { // 2 GiB limit
-		return nil, errors.New("message length is greater than 2 GiB")
+		return nil, errors.New("datalogger: message length is greater than 2 GiB")
 	}
 
 	buf := make([]byte, msgLen)
 	_, err = io.ReadFull(w.src, buf)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read message: %w", err)
+		return nil, fmt.Errorf("datalogger: failed to read message: %w", err)
 	}
 
 	any := anypb.Any{}
 	err = w.unmarshaler.Unmarshal(buf, &any)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal to Any message: %w", err)
+		return nil, fmt.Errorf("datalogger: failed to unmarshal to Any message: %w", err)
 	}
 
 	msg, err := any.UnmarshalNew()
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal message from Any message: %w", err)
+		return nil, fmt.Errorf("datalogger: failed to unmarshal message from Any message: %w", err)
 	}
 
 	return msg, nil
