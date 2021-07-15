@@ -39,7 +39,10 @@ func (pub PublicKey) ToBytes() []byte {
 // FromBytes unmarshals the public key from a byte slice.
 func (pub *PublicKey) FromBytes(b []byte) (err error) {
 	pub.p, err = bls12.NewG1().FromCompressed(b)
-	return err
+	if err != nil {
+		return fmt.Errorf("bls12: failed to decompress public key: %w", err)
+	}
+	return nil
 }
 
 // PrivateKey is a bls12-381 private key.
@@ -63,7 +66,7 @@ func GeneratePrivateKey() (*PrivateKey, error) {
 	// the private key is uniformly random integer such that 0 <= pk < r
 	pk, err := rand.Int(rand.Reader, curveOrder)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("bls12: failed to generate private key: %w", err)
 	}
 	return &PrivateKey{
 		p: pk,
@@ -95,7 +98,10 @@ func (s *Signature) ToBytes() []byte {
 func (s *Signature) FromBytes(b []byte) (err error) {
 	s.signer = consensus.ID(binary.LittleEndian.Uint32(b))
 	s.s, err = bls12.NewG2().FromCompressed(b[4:])
-	return err
+	if err != nil {
+		return fmt.Errorf("bls12: failed to decompress signature: %w", err)
+	}
+	return nil
 }
 
 // Signer returns the ID of the replica that generated the signature.
@@ -116,7 +122,7 @@ type AggregateSignature struct {
 func RestoreAggregateSignature(sig []byte, participants crypto.Bitfield) (s *AggregateSignature, err error) {
 	p, err := bls12.NewG2().FromCompressed(sig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("bls12: failed to restore aggregate signature: %w", err)
 	}
 	return &AggregateSignature{
 		sig:          *p,
@@ -168,7 +174,7 @@ func (bc *bls12Crypto) InitModule(hs *consensus.Modules, _ *consensus.OptionsBui
 func (bc *bls12Crypto) Sign(hash consensus.Hash) (sig consensus.Signature, err error) {
 	p, err := bls12.NewG2().HashToCurve(hash[:], domain)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("bls12: hash to curve failed: %w", err)
 	}
 	pk := bc.getPrivateKey()
 	bls12.NewG2().MulScalarBig(p, p, pk.p)
