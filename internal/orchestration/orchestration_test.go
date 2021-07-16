@@ -5,28 +5,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/internal/orchestration"
-	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
+	"github.com/relab/hotstuff/internal/protostream"
 )
 
 func TestOrchestration(t *testing.T) {
-	lis, err := net.Listen("tcp", ":0")
-	if err != nil {
-		t.Fatal(err)
-	}
+	controllerStream, workerStream := net.Pipe()
 
-	srv := gorums.NewServer()
-	worker := orchestration.NewWorker(srv.Stop)
-	orchestrationpb.RegisterOrchestratorServer(srv, worker)
-	go func() {
-		err := srv.Serve(lis)
-		if err != nil {
-			panic(err)
-		}
-	}()
+	workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
+	worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream))
 
-	addr := lis.Addr().String()
 	experiment := &orchestration.Experiment{
 		NumReplicas:       4,
 		NumClients:        2,
@@ -41,10 +29,20 @@ func TestOrchestration(t *testing.T) {
 		Consensus:         "chainedhotstuff",
 		Crypto:            "ecdsa",
 		LeaderRotation:    "round-robin",
-		Hosts:             []string{addr},
+		Hosts:             map[string]orchestration.RemoteWorker{"127.0.0.1": workerProxy},
 	}
 
-	err = experiment.Run()
+	c := make(chan error)
+	go func() {
+		c <- worker.Run()
+	}()
+
+	err := experiment.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = <-c
 	if err != nil {
 		t.Fatal(err)
 	}

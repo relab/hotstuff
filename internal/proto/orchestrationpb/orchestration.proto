@@ -2,10 +2,11 @@ syntax = "proto3";
 
 package orchestrationpb;
 
-import "gorums.proto";
-import "google/protobuf/empty.proto";
-
 option go_package = "github.com/relab/hotstuff/internal/proto/orchestrationpb";
+
+/* -------------------------------------------------------------------------- */
+/*                              General messages                              */
+/* -------------------------------------------------------------------------- */
 
 // ReplicaOpts contains the confiugration options for a replica.
 message ReplicaOpts {
@@ -74,46 +75,17 @@ message ClientOpts {
 // ReplicaConfiguration is a configuration of replicas.
 message ReplicaConfiguration { map<uint32, ReplicaInfo> Replicas = 1; }
 
-service Orchestrator {
-  // CreateReplica creates replicas on the workers.
-  // The workers respond with the ports that the new replicas are listening on.
-  rpc CreateReplica(CreateReplicaRequest) returns (CreateReplicaResponse) {
-    option (gorums.quorumcall) = true;
-    option (gorums.per_node_arg) = true;
-    option (gorums.custom_return_type) = "ReplicaConfiguration";
-  }
+/* -------------------------------------------------------------------------- */
+/*                        RPC request/response messages                       */
+/* -------------------------------------------------------------------------- */
 
-  // StartReplica starts the replicas.
-  rpc StartReplica(StartReplicaRequest) returns (StartReplicaResponse) {
-    option (gorums.quorumcall) = true;
-    option (gorums.per_node_arg) = true;
-  }
-
-  rpc StopReplica(StopReplicaRequest) returns (StopReplicaResponse) {
-    option (gorums.quorumcall) = true;
-    option (gorums.per_node_arg) = true;
-  }
-
-  rpc StartClient(StartClientRequest) returns (StartClientResponse) {
-    option (gorums.quorumcall) = true;
-    option (gorums.per_node_arg) = true;
-  }
-
-  rpc StopClient(StopClientRequest) returns (StopClientResponse) {
-    option (gorums.quorumcall) = true;
-    option (gorums.per_node_arg) = true;
-  }
-
-  rpc Quit(google.protobuf.Empty) returns (google.protobuf.Empty) {
-    option (gorums.multicast) = true;
-  }
-}
-
-// Replica messages
+/* ---------------------------- CreateReplica RPC --------------------------- */
 
 message CreateReplicaRequest { map<uint32, ReplicaOpts> Replicas = 1; }
 
 message CreateReplicaResponse { map<uint32, ReplicaInfo> Replicas = 1; }
+
+/* ---------------------------- StartReplica RPC ---------------------------- */
 
 message StartReplicaRequest {
   // The replica IDs that should be started.
@@ -124,13 +96,15 @@ message StartReplicaRequest {
 
 message StartReplicaResponse {}
 
+/* ----------------------------- StopReplica RPC ---------------------------- */
+
 message StopReplicaRequest { repeated uint32 IDs = 1; }
 
 message StopReplicaResponse {
   map<uint32, bytes> Hashes = 1;
 }
 
-// Client messages
+/* ----------------------------- StartClient RPC ---------------------------- */
 
 message StartClientRequest {
   // The clients to create.
@@ -143,6 +117,14 @@ message StartClientRequest {
 
 message StartClientResponse {}
 
+/* ----------------------------- StopClient RPC ----------------------------- */
+
 message StopClientRequest { repeated uint32 IDs = 1; }
 
 message StopClientResponse {}
+
+/* -------------------------------- Quit RPC -------------------------------- */
+
+message QuitRequest {}
+
+/* -------------------------------------------------------------------------- */

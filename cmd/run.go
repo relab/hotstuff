@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"fmt"
-	"log"
+	"io"
+	"net"
 	"os"
-	"strconv"
 	"time"
 
+	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/orchestration"
+	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/iago"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -40,7 +42,6 @@ func init() {
 	runCmd.Flags().String("crypto", "ecdsa", "name of the crypto implementation")
 	runCmd.Flags().String("leader-rotation", "round-robin", "name of the leader rotation algorithm")
 
-	runCmd.Flags().Int("port", 4000, "the port to start remote workers on")
 	runCmd.Flags().Bool("worker", false, "run a local worker")
 	runCmd.Flags().StringSlice("hosts", nil, "the remote hosts to run the experiment on via ssh")
 	runCmd.Flags().String("exe", "", "path to the executable to deploy and run on remote workers")
@@ -70,40 +71,52 @@ func runController() {
 		LeaderRotation:    viper.GetString("leader-rotation"),
 	}
 
-	remotePort := viper.GetInt("port")
+	log := logging.New("ctrl")
+
 	worker := viper.GetBool("worker")
 	hosts := viper.GetStringSlice("hosts")
 	exePath := viper.GetString("exe")
 
 	g, err := iago.NewSSHGroup(hosts, viper.GetString("ssh-config"))
 	if err != nil {
-		log.Fatalln("Failed to connect to remote hosts: ", err)
+		log.Fatal("Failed to connect to remote hosts: ", err)
 	}
 
 	if exePath == "" {
 		exePath, err = os.Executable()
 		if err != nil {
-			log.Fatalln("Failed to get executable path: ", err)
+			log.Fatal("Failed to get executable path: ", err)
 		}
 	}
 
-	err = orchestration.Deploy(g, exePath, strconv.Itoa(remotePort), viper.GetString("log-level"))
+	sessions, err := orchestration.Deploy(g, exePath, viper.GetString("log-level"))
 	if err != nil {
-		log.Fatalln("Failed to deploy workers: ", err)
+		log.Fatal("Failed to deploy workers: ", err)
 	}
 
-	// append the port to each hostname
-	hostsPorts := make([]string, 0)
-	for _, h := range hosts {
-		hostsPorts = append(hostsPorts, fmt.Sprintf("%s:%d", h, remotePort))
+	errors := make(chan error)
+
+	experiment.Hosts = make(map[string]orchestration.RemoteWorker)
+
+	for host, session := range sessions {
+		experiment.Hosts[host] = orchestration.NewRemoteWorker(
+			protostream.NewWriter(session.Stdin()), protostream.NewReader(session.Stdout()),
+		)
+		go stderrPipe(session.Stderr(), errors)
 	}
 
 	if worker {
-		go runWorker(remotePort)
-		hostsPorts = append(hostsPorts, fmt.Sprintf("localhost:%d", remotePort))
+		// set up a local worker
+		controllerPipe, workerPipe := net.Pipe()
+		go func() {
+			worker := orchestration.NewWorker(protostream.NewWriter(workerPipe), protostream.NewReader(workerPipe))
+			err := worker.Run()
+			if err != nil {
+				log.Fatal(err)
+			}
+		}()
+		experiment.Hosts["localhost"] = orchestration.NewRemoteWorker(protostream.NewWriter(controllerPipe), protostream.NewReader(controllerPipe))
 	}
-
-	experiment.Hosts = hostsPorts
 
 	experiment.HostConfigs = make(map[string]orchestration.HostConfig)
 
@@ -115,22 +128,39 @@ func runController() {
 
 	err = viper.UnmarshalKey("hosts-config", &hostConfigs)
 	if err != nil {
-		log.Fatalln(fmt.Errorf("failed to unmarshal hosts-config: %w", err))
+		log.Fatal(fmt.Errorf("failed to unmarshal hosts-config: %w", err))
 	}
 
 	for _, cfg := range hostConfigs {
 		experiment.HostConfigs[cfg.Name] = orchestration.HostConfig{Replicas: cfg.Replicas, Clients: cfg.Clients}
 	}
 
-	log.Println(experiment.HostConfigs)
-
 	err = experiment.Run()
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	for _, session := range sessions {
+		err := session.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	for range sessions {
+		err = <-errors
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	err = g.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func stderrPipe(r io.Reader, errChan chan<- error) {
+	_, err := io.Copy(os.Stderr, r)
+	errChan <- err
 }

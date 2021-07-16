@@ -2,12 +2,10 @@ package cmd
 
 import (
 	"log"
-	"net"
-	"strconv"
+	"os"
 
-	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/internal/orchestration"
-	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
+	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/spf13/cobra"
 )
 
@@ -21,13 +19,8 @@ and usage of using your command. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		port, err := strconv.Atoi(args[0])
-		if err != nil {
-			log.Fatalln("port must be a number")
-		}
-		runWorker(port)
+		runWorker()
 	},
 }
 
@@ -45,16 +38,10 @@ func init() {
 	// workerCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func runWorker(port int) {
-	lis, err := net.Listen("tcp", ":"+strconv.Itoa(port))
+func runWorker() {
+	worker := orchestration.NewWorker(protostream.NewWriter(os.Stdout), protostream.NewReader(os.Stdin))
+	err := worker.Run()
 	if err != nil {
-		log.Fatalf("Failed to listen on port %d: %v", port, err)
-	}
-	srv := gorums.NewServer()
-	w := orchestration.NewWorker(srv.Stop)
-	orchestrationpb.RegisterOrchestratorServer(srv, w)
-	err = srv.Serve(lis)
-	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
 	}
 }

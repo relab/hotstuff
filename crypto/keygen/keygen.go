@@ -296,7 +296,7 @@ type KeyChain struct {
 }
 
 // GenerateKeyChain generates keys and certificates for a replica.
-func GenerateKeyChain(id consensus.ID, address, crypto string, ca *x509.Certificate, caKey *ecdsa.PrivateKey) (KeyChain, error) {
+func GenerateKeyChain(id consensus.ID, validFor []string, crypto string, ca *x509.Certificate, caKey *ecdsa.PrivateKey) (KeyChain, error) {
 	ecdsaKey, err := GenerateECDSAPrivateKey()
 	if err != nil {
 		return KeyChain{}, err
@@ -306,7 +306,7 @@ func GenerateKeyChain(id consensus.ID, address, crypto string, ca *x509.Certific
 		return KeyChain{}, err
 	}
 
-	cert, err := GenerateTLSCert(id, []string{address}, ca, &ecdsaKey.PublicKey, caKey)
+	cert, err := GenerateTLSCert(id, validFor, ca, &ecdsaKey.PublicKey, caKey)
 	if err != nil {
 		return KeyChain{}, err
 	}

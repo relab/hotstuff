@@ -15,6 +15,7 @@ require (
 	github.com/spf13/viper v1.7.1
 	go.uber.org/multierr v1.7.0
 	go.uber.org/zap v1.16.0
+	google.golang.org/genproto v0.0.0-20210510173355-fb37daa5cd7a
 	google.golang.org/grpc v1.37.0
 	google.golang.org/protobuf v1.26.0
 )

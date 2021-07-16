@@ -15,30 +15,70 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
+	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/replica"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/proto"
 )
 
-// worker runs clients and replicas.
-type worker struct {
-	replicas     map[consensus.ID]*replica.Replica
-	clients      map[consensus.ID]*client.Client
-	quitCallback func()
+// Worker starts and runs clients and replicas based on commands from the controller.
+type Worker struct {
+	send *protostream.Writer
+	recv *protostream.Reader
+
+	replicas map[consensus.ID]*replica.Replica
+	clients  map[consensus.ID]*client.Client
 }
 
-// NewWorker returns a new worker.
-func NewWorker(quitCallback func()) orchestrationpb.Orchestrator {
-	return &worker{
-		replicas:     make(map[consensus.ID]*replica.Replica),
-		clients:      make(map[consensus.ID]*client.Client),
-		quitCallback: quitCallback,
+// Run runs the worker until it receives a command to quit.
+func (w *Worker) Run() error {
+	for {
+		msg, err := w.recv.Read()
+		if err != nil {
+			return err
+		}
+
+		var res proto.Message
+		switch req := msg.(type) {
+		case *orchestrationpb.CreateReplicaRequest:
+			res, err = w.createReplica(req)
+		case *orchestrationpb.StartReplicaRequest:
+			res, err = w.startReplica(req)
+		case *orchestrationpb.StopReplicaRequest:
+			res, err = w.stopReplica(req)
+		case *orchestrationpb.StartClientRequest:
+			res, err = w.startClient(req)
+		case *orchestrationpb.StopClientRequest:
+			res, err = w.stopClient(req)
+		case *orchestrationpb.QuitRequest:
+			return nil
+		}
+
+		if err != nil {
+			s, _ := status.FromError(err)
+			res = s.Proto()
+		}
+
+		err = w.send.Write(res)
+		if err != nil {
+			return err
+		}
 	}
 }
 
-func (w *worker) CreateReplica(ctx gorums.ServerCtx, req *orchestrationpb.CreateReplicaRequest) (*orchestrationpb.CreateReplicaResponse, error) {
+// NewWorker returns a new worker.
+func NewWorker(send *protostream.Writer, recv *protostream.Reader) Worker {
+	return Worker{
+		send:     send,
+		recv:     recv,
+		replicas: make(map[consensus.ID]*replica.Replica),
+		clients:  make(map[consensus.ID]*client.Client),
+	}
+}
+
+func (w *Worker) createReplica(req *orchestrationpb.CreateReplicaRequest) (*orchestrationpb.CreateReplicaResponse, error) {
 	resp := &orchestrationpb.CreateReplicaResponse{Replicas: make(map[uint32]*orchestrationpb.ReplicaInfo)}
 	for _, cfg := range req.GetReplicas() {
 		privKey, err := keygen.ParsePrivateKey(cfg.GetPrivateKey())
@@ -110,7 +150,7 @@ func (w *worker) CreateReplica(ctx gorums.ServerCtx, req *orchestrationpb.Create
 	return resp, nil
 }
 
-func (w *worker) StartReplica(_ gorums.ServerCtx, req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {
+func (w *Worker) startReplica(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {
 	for _, id := range req.GetIDs() {
 		replica, ok := w.replicas[consensus.ID(id)]
 		if !ok {
@@ -129,7 +169,7 @@ func (w *worker) StartReplica(_ gorums.ServerCtx, req *orchestrationpb.StartRepl
 	return &orchestrationpb.StartReplicaResponse{}, nil
 }
 
-func (w *worker) StopReplica(_ gorums.ServerCtx, req *orchestrationpb.StopReplicaRequest) (*orchestrationpb.StopReplicaResponse, error) {
+func (w *Worker) stopReplica(req *orchestrationpb.StopReplicaRequest) (*orchestrationpb.StopReplicaResponse, error) {
 	res := &orchestrationpb.StopReplicaResponse{
 		Hashes: make(map[uint32][]byte),
 	}
@@ -148,7 +188,7 @@ func (w *worker) StopReplica(_ gorums.ServerCtx, req *orchestrationpb.StopReplic
 	return res, nil
 }
 
-func (w *worker) StartClient(_ gorums.ServerCtx, req *orchestrationpb.StartClientRequest) (*orchestrationpb.StartClientResponse, error) {
+func (w *Worker) startClient(req *orchestrationpb.StartClientRequest) (*orchestrationpb.StartClientResponse, error) {
 	ca := req.GetCertificateAuthority()
 	cp := x509.NewCertPool()
 	cp.AppendCertsFromPEM(ca)
@@ -180,7 +220,7 @@ func (w *worker) StartClient(_ gorums.ServerCtx, req *orchestrationpb.StartClien
 	return &orchestrationpb.StartClientResponse{}, nil
 }
 
-func (w *worker) StopClient(_ gorums.ServerCtx, req *orchestrationpb.StopClientRequest) (*orchestrationpb.StopClientResponse, error) {
+func (w *Worker) stopClient(req *orchestrationpb.StopClientRequest) (*orchestrationpb.StopClientResponse, error) {
 	for _, id := range req.GetIDs() {
 		cli, ok := w.clients[consensus.ID(id)]
 		if !ok {
@@ -189,10 +229,6 @@ func (w *worker) StopClient(_ gorums.ServerCtx, req *orchestrationpb.StopClientR
 		cli.Stop()
 	}
 	return &orchestrationpb.StopClientResponse{}, nil
-}
-
-func (w *worker) Quit(_ gorums.ServerCtx, req *emptypb.Empty) {
-	w.quitCallback()
 }
 
 func getConfiguration(id consensus.ID, conf map[uint32]*orchestrationpb.ReplicaInfo, client bool) (*config.ReplicaConfig, error) {

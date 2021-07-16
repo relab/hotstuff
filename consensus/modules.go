@@ -3,7 +3,6 @@ package consensus
 import (
 	"context"
 
-	"github.com/relab/hotstuff/datalogger"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/logging"
 )
@@ -18,7 +17,7 @@ type Modules struct {
 	opts          Options
 	eventLoop     *eventloop.EventLoop
 	votingMachine *VotingMachine
-	dataLogger    datalogger.DataLogger
+	dataLogger    DataLogger
 
 	// modules
 
@@ -59,9 +58,9 @@ func (hs *Modules) EventLoop() *eventloop.EventLoop {
 }
 
 // DataLogger returns the data logger.
-func (hs *Modules) DataLogger() datalogger.DataLogger {
+func (hs *Modules) DataLogger() DataLogger {
 	if hs.dataLogger == nil {
-		return datalogger.NopLogger()
+		return NopLogger()
 	}
 	return hs.dataLogger
 }
@@ -144,6 +143,9 @@ func (b *Builder) Register(modules ...interface{}) {
 		// allow overriding the event loop if a different buffer size is desired
 		if m, ok := module.(*eventloop.EventLoop); ok {
 			b.hs.eventLoop = m
+		}
+		if m, ok := module.(DataLogger); ok {
+			b.hs.dataLogger = m
 		}
 		if m, ok := module.(Acceptor); ok {
 			b.hs.acceptor = m

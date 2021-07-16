@@ -1,27 +1,27 @@
-package datalogger_test
+package protostream_test
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/datalogger"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
+	"github.com/relab/hotstuff/internal/protostream"
 )
 
 func TestDataLogger(t *testing.T) {
-	var buf bytes.Buffer                                   // in-memory log
+	var buf bytes.Buffer                                   // in-memory stream
 	msg := hotstuffpb.BlockToProto(consensus.GetGenesis()) // test message
 
-	logWriter := datalogger.NewWriter(&buf)
-	logReader := datalogger.NewReader(&buf)
+	writer := protostream.NewWriter(&buf)
+	reader := protostream.NewReader(&buf)
 
-	err := logWriter.Log(msg)
+	err := writer.Write(msg)
 	if err != nil {
 		t.Fatalf("Log failed: %v", err)
 	}
 
-	gotMsg, err := logReader.Read()
+	gotMsg, err := reader.Read()
 	if err != nil {
 		t.Fatalf("Read failed: %v", err)
 	}
