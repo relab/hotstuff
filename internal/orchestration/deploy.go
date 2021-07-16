@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"sync"
 
 	"github.com/relab/iago"
@@ -55,18 +54,22 @@ type WorkerSession struct {
 	cmd    iago.CmdRunner
 }
 
+// Stdin returns a writer to the the worker's stdin stream.
 func (ws WorkerSession) Stdin() io.Writer {
 	return ws.stdin
 }
 
+// Stdout returns a reader of the worker's stdout stream.
 func (ws WorkerSession) Stdout() io.Reader {
 	return ws.stdout
 }
 
+// Stderr returns a reader of the worker's stderr stream.
 func (ws WorkerSession) Stderr() io.Reader {
 	return ws.stderr
 }
 
+// Close closes the session and all of its streams.
 func (ws WorkerSession) Close() (err error) {
 	err = multierr.Append(err, ws.cmd.Wait())
 	// apparently, closing the streams can return EOF, so we'll have to check for that.
@@ -80,14 +83,6 @@ func (ws WorkerSession) Close() (err error) {
 		err = multierr.Append(err, cerr)
 	}
 	return
-}
-
-func (ws WorkerSession) stderrPipe() error {
-	_, err := io.Copy(os.Stderr, ws.stderr)
-	if err != nil {
-		panic(err)
-	}
-	return nil
 }
 
 type workerSetup struct {

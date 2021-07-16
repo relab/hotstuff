@@ -35,6 +35,7 @@ propsed
 protobuf
 protoc
 ptypes
+qerr
 qspec
 relab
 sigs

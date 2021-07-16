@@ -50,7 +50,12 @@ type Experiment struct {
 
 // Run runs the experiment.
 func (e *Experiment) Run() (err error) {
-	defer e.quit()
+	defer func() {
+		qerr := e.quit()
+		if err == nil {
+			err = qerr
+		}
+	}()
 
 	err = e.assignReplicasAndClients()
 	if err != nil {
