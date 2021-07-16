@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"time"
@@ -106,16 +107,7 @@ func runController() {
 	}
 
 	if worker {
-		// set up a local worker
-		controllerPipe, workerPipe := net.Pipe()
-		go func() {
-			worker := orchestration.NewWorker(protostream.NewWriter(workerPipe), protostream.NewReader(workerPipe))
-			err := worker.Run()
-			if err != nil {
-				log.Fatal(err)
-			}
-		}()
-		experiment.Hosts["localhost"] = orchestration.NewRemoteWorker(protostream.NewWriter(controllerPipe), protostream.NewReader(controllerPipe))
+		experiment.Hosts["localhost"] = localWorker()
 	}
 
 	experiment.HostConfigs = make(map[string]orchestration.HostConfig)
@@ -158,6 +150,19 @@ func runController() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func localWorker() orchestration.RemoteWorker {
+	// set up a local worker
+	controllerPipe, workerPipe := net.Pipe()
+	go func() {
+		worker := orchestration.NewWorker(protostream.NewWriter(workerPipe), protostream.NewReader(workerPipe))
+		err := worker.Run()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+	return orchestration.NewRemoteWorker(protostream.NewWriter(controllerPipe), protostream.NewReader(controllerPipe))
 }
 
 func stderrPipe(r io.Reader, errChan chan<- error) {
