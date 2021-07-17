@@ -47,7 +47,6 @@ func init() {
 	runCmd.Flags().StringSlice("hosts", nil, "the remote hosts to run the experiment on via ssh")
 	runCmd.Flags().String("exe", "", "path to the executable to deploy and run on remote workers")
 	runCmd.Flags().String("ssh-config", "", "path to ssh_config file to resolve host aliases (defaults to ~/.ssh/config)")
-	runCmd.Flags().String("log-level", "warn", "set the log level (debug, info, warn, error)")
 
 	err := viper.BindPFlags(runCmd.Flags())
 	if err != nil {

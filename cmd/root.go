@@ -13,6 +13,7 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var (
 	cfgFile string
+
 	rootCmd = &cobra.Command{
 		Use:   "hotstuff",
 		Short: "hotstuff is a TODO",
@@ -28,6 +29,14 @@ to quickly create a Cobra application.`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+
+	logLevel := viper.GetString("log-level")
+	err := os.Setenv("HOTSTUFF_LOG", logLevel)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -42,6 +51,9 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.hotstuff.yaml)")
+
+	rootCmd.PersistentFlags().String("log-level", "info", "sets the log level (debug, info, warn, error")
+	cobra.CheckErr(viper.BindPFlag("log-level", rootCmd.PersistentFlags().Lookup("log-level")))
 }
 
 // initConfig reads in config file and ENV variables if set.
