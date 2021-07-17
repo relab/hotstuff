@@ -105,7 +105,7 @@ func runController() {
 		go stderrPipe(session.Stderr(), errors)
 	}
 
-	if worker {
+	if worker || len(hosts) == 0 {
 		experiment.Hosts["localhost"] = localWorker()
 	}
 
