@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand"
+	"path"
 	"sync"
 
 	"github.com/relab/iago"
+	fs "github.com/relab/wrfs"
 	"go.uber.org/multierr"
 )
 
@@ -27,13 +30,30 @@ func Deploy(g iago.Group, exePath, logLevel string) (workers map[string]WorkerSe
 		panic(err)
 	}
 
+	tmpDir := "hotstuff." + randString(8)
+
+	g.Run(iago.Task{
+		Name: "Create temporary directory",
+		Action: iago.Func(func(ctx context.Context, host iago.Host) (err error) {
+			testDir := tempDirPath(host, tmpDir)
+			host.SetVar("dir", testDir)
+			err = fs.MkdirAll(host.GetFS(), iago.P(tempDirPath(host, tmpDir)).Path, 0755)
+			return err
+		}),
+		OnError: silentPanic,
+	})
+
 	g.Run(iago.Task{
 		Name: "Upload hotstuff binary",
-		Action: iago.Upload{
-			Src:  iago.P(exePath),
-			Dest: iago.P("$HOME/hotstuff"),
-			Mode: 0755,
-		},
+		Action: iago.Func(func(ctx context.Context, host iago.Host) (err error) {
+			dest := path.Join(tempDirPath(host, tmpDir), "hotstuff")
+			host.SetVar("exe", dest)
+			return iago.Upload{
+				Src:  iago.P(exePath),
+				Dest: iago.P(dest),
+				Mode: 0755,
+			}.Apply(ctx, host)
+		}),
 		OnError: silentPanic,
 	})
 
@@ -114,7 +134,7 @@ func (w *workerSetup) Apply(ctx context.Context, host iago.Host) (err error) {
 		return err
 	}
 
-	err = cmd.Start(iago.Expand(host, fmt.Sprintf("env HOTSTUFF_LOG=%s $HOME/hotstuff worker", w.logLevel)))
+	err = cmd.Start(iago.Expand(host, fmt.Sprintf("%s --log-level=%s worker", iago.GetStringVar(host, "exe"), w.logLevel)))
 	if err != nil {
 		return err
 	}
@@ -124,4 +144,21 @@ func (w *workerSetup) Apply(ctx context.Context, host iago.Host) (err error) {
 	w.mut.Unlock()
 
 	return nil
+}
+
+func tempDirPath(host iago.Host, dirName string) string {
+	tmp := host.GetEnv("TMPDIR")
+	if tmp == "" {
+		tmp = "/tmp"
+	}
+	return iago.CleanPath(path.Join(tmp, dirName))
+}
+
+func randString(n int) string {
+	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	s := make([]rune, n)
+	for i := range s {
+		s[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(s)
 }

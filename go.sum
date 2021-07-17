@@ -602,6 +602,10 @@ github.com/relab/gorums v0.5.1-0.20210629194217-9811e4f219ca h1:cqb1YBlUAB97vAdE
 github.com/relab/gorums v0.5.1-0.20210629194217-9811e4f219ca/go.mod h1:j1Hja1FIIYjBZ7MlnGhXY1fdY6CeGXS38FBNHJ2w1ic=
 github.com/relab/iago v0.0.0-20210706135455-e04d2c7a0714 h1:NRikLJayu/jwce22Xlo0Uzh+R3RPoJX/bwz6zgT++cA=
 github.com/relab/iago v0.0.0-20210706135455-e04d2c7a0714/go.mod h1:XVPUvl/J3EuhxRsrTpxOSRxtPYT/HkJE3qW/izyXK+I=
+github.com/relab/iago v0.0.0-20210717103745-7b740c0f2cf6 h1:CTx7+PLK90PxGH+Qa5a3fDkqjryCl5y2IWxSxjSmM+Q=
+github.com/relab/iago v0.0.0-20210717103745-7b740c0f2cf6/go.mod h1:XVPUvl/J3EuhxRsrTpxOSRxtPYT/HkJE3qW/izyXK+I=
+github.com/relab/iago v0.0.0-20210717120200-b53897e11148 h1:eI0LE1g9iFjEnjwfW40aJNzKTp0TxOYvf6kiID0mVoY=
+github.com/relab/iago v0.0.0-20210717120200-b53897e11148/go.mod h1:XVPUvl/J3EuhxRsrTpxOSRxtPYT/HkJE3qW/izyXK+I=
 github.com/relab/wrfs v0.0.0-20210628111300-b51570396aec h1:VG/tFt+ffJMtZj5PIf5S3P7zsTwWsCOqFMyqZ0mPvyY=
 github.com/relab/wrfs v0.0.0-20210628111300-b51570396aec/go.mod h1:8BTalsvE1BexSfZZFmZfmJKqfoXPzsP/ixpVOmg7Udk=
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6SoW27p1b0cqNHllgS5HIMJraePCO15w5zCzIWYg=
