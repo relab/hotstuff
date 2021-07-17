@@ -11,11 +11,11 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/relab/gorums v0.5.1-0.20210629194217-9811e4f219ca
 	github.com/relab/iago v0.0.0-20210706135455-e04d2c7a0714
-	github.com/spf13/cobra v1.0.0
-	github.com/spf13/viper v1.7.1
+	github.com/spf13/cobra v1.2.1
+	github.com/spf13/viper v1.8.1
 	go.uber.org/multierr v1.7.0
-	go.uber.org/zap v1.16.0
-	google.golang.org/genproto v0.0.0-20210510173355-fb37daa5cd7a
-	google.golang.org/grpc v1.37.0
+	go.uber.org/zap v1.17.0
+	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c
+	google.golang.org/grpc v1.38.0
 	google.golang.org/protobuf v1.26.0
 )
