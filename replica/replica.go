@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io"
 	"net"
 	"time"
 
@@ -62,7 +61,7 @@ type Config struct {
 	// The number to multiply the view duration by in case of a view timeout.
 	TimeoutMultiplier float64
 	// Where to write command payloads.
-	Output io.WriteCloser
+	DataLogger consensus.DataLogger
 	// Options for the client server.
 	ClientServerOptions []gorums.ServerOption
 	// Options for the replica server.
@@ -73,7 +72,7 @@ type Config struct {
 
 // Replica is a participant in the consensus protocol.
 type Replica struct {
-	output io.WriteCloser
+	dataLogger consensus.DataLogger
 	*clientSrv
 	cfg   *backend.Config
 	hsSrv *backend.Server
@@ -135,7 +134,7 @@ func New(conf Config) (replica *Replica, err error) {
 	srv := &Replica{
 		clientSrv:    clientSrv,
 		execHandlers: make(map[cmdID]func(*empty.Empty, error)),
-		output:       conf.Output,
+		dataLogger:   conf.DataLogger,
 		lastExecTime: time.Now().UnixNano(),
 		cancel:       func() {},
 		done:         make(chan struct{}),
@@ -224,7 +223,7 @@ func (srv *Replica) Close() error {
 	srv.clientSrv.Stop()
 	srv.cfg.Close()
 	srv.hsSrv.Stop()
-	return srv.output.Close()
+	return srv.dataLogger.Close()
 }
 
 // GetHash returns the hash of all executed commands.

@@ -12,7 +12,12 @@ type DataLogger interface {
 }
 
 type dataLogger struct {
-	wr protostream.Writer
+	wr *protostream.Writer
+}
+
+// NewDataLogger returns a new data logger that logs to the given writer.
+func NewDataLogger(wr *protostream.Writer) DataLogger {
+	return &dataLogger{wr}
 }
 
 func (dl dataLogger) Log(msg proto.Message) error {

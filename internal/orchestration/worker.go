@@ -28,6 +28,8 @@ type Worker struct {
 	send *protostream.Writer
 	recv *protostream.Reader
 
+	dataLogger consensus.DataLogger
+
 	replicas map[consensus.ID]*replica.Replica
 	clients  map[consensus.ID]*client.Client
 }
@@ -69,12 +71,13 @@ func (w *Worker) Run() error {
 }
 
 // NewWorker returns a new worker.
-func NewWorker(send *protostream.Writer, recv *protostream.Reader) Worker {
+func NewWorker(send *protostream.Writer, recv *protostream.Reader, dl consensus.DataLogger) Worker {
 	return Worker{
-		send:     send,
-		recv:     recv,
-		replicas: make(map[consensus.ID]*replica.Replica),
-		clients:  make(map[consensus.ID]*client.Client),
+		send:       send,
+		recv:       recv,
+		dataLogger: dl,
+		replicas:   make(map[consensus.ID]*replica.Replica),
+		clients:    make(map[consensus.ID]*client.Client),
 	}
 }
 
@@ -109,7 +112,7 @@ func (w *Worker) createReplica(req *orchestrationpb.CreateReplicaRequest) (*orch
 			InitialTimeout:    float64(cfg.GetInitialTimeout()),
 			TimeoutSamples:    cfg.GetTimeoutSamples(),
 			TimeoutMultiplier: float64(cfg.GetTimeoutMultiplier()),
-			Output:            writeNopCloser{io.Discard},
+			DataLogger:        w.dataLogger,
 			ManagerOptions: []gorums.ManagerOption{
 				gorums.WithDialTimeout(time.Duration(cfg.GetConnectTimeout() * float32(time.Millisecond))),
 				gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
@@ -199,7 +202,7 @@ func (w *Worker) startClient(req *orchestrationpb.StartClientRequest) (*orchestr
 			RootCAs:       cp,
 			MaxConcurrent: opts.GetMaxConcurrent(),
 			PayloadSize:   opts.GetPayloadSize(),
-			Input:         readNopCloser{rand.Reader},
+			Input:         io.NopCloser(rand.Reader),
 			ManagerOptions: []gorums.ManagerOption{
 				gorums.WithDialTimeout(time.Duration(opts.GetConnectTimeout() * float32(time.Millisecond))),
 				gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
@@ -265,15 +268,3 @@ func getPort(lis net.Listener) (uint32, error) {
 	}
 	return uint32(port), nil
 }
-
-type writeNopCloser struct {
-	io.Writer
-}
-
-func (writeNopCloser) Close() error { return nil }
-
-type readNopCloser struct {
-	io.Reader
-}
-
-func (readNopCloser) Close() error { return nil }

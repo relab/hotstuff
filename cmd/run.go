@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/protostream"
@@ -155,7 +156,8 @@ func localWorker() orchestration.RemoteWorker {
 	// set up a local worker
 	controllerPipe, workerPipe := net.Pipe()
 	go func() {
-		worker := orchestration.NewWorker(protostream.NewWriter(workerPipe), protostream.NewReader(workerPipe))
+		// TODO: replace the NopLogger with a proper logger.
+		worker := orchestration.NewWorker(protostream.NewWriter(workerPipe), protostream.NewReader(workerPipe), consensus.NopLogger())
 		err := worker.Run()
 		if err != nil {
 			log.Fatal(err)

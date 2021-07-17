@@ -3,7 +3,6 @@ package replica
 import (
 	"crypto/sha256"
 	"hash"
-	"io"
 	"log"
 	"net"
 	"sync"
@@ -22,7 +21,7 @@ type clientSrv struct {
 	srv          *gorums.Server
 	awaitingCmds map[cmdID]chan<- struct{}
 	cmdCache     *cmdCache
-	output       io.Writer
+	dataLogger   consensus.DataLogger
 	hash         hash.Hash
 }
 
@@ -32,7 +31,7 @@ func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv
 		awaitingCmds: make(map[cmdID]chan<- struct{}),
 		srv:          gorums.NewServer(srvOpts...),
 		cmdCache:     newCmdCache(int(conf.BatchSize)),
-		output:       conf.Output,
+		dataLogger:   conf.DataLogger,
 		hash:         sha256.New(),
 	}
 	clientpb.RegisterClientServer(srv.srv, srv)
@@ -94,7 +93,6 @@ func (srv *clientSrv) Exec(cmd consensus.Command) {
 
 	for _, cmd := range batch.GetCommands() {
 		_, _ = srv.hash.Write(cmd.Data)
-		_, err := srv.output.Write(cmd.Data)
 		if err != nil {
 			log.Printf("Error writing data: %v\n", err)
 		}
