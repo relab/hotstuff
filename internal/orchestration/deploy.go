@@ -37,7 +37,7 @@ func Deploy(g iago.Group, exePath, logLevel string) (workers map[string]WorkerSe
 		Action: iago.Func(func(ctx context.Context, host iago.Host) (err error) {
 			testDir := tempDirPath(host, tmpDir)
 			host.SetVar("dir", testDir)
-			err = fs.MkdirAll(host.GetFS(), iago.P(tempDirPath(host, tmpDir)).Path, 0755)
+			err = fs.MkdirAll(host.GetFS(), iago.CleanPath(tempDirPath(host, tmpDir)), 0755)
 			return err
 		}),
 		OnError: silentPanic,
@@ -151,7 +151,7 @@ func tempDirPath(host iago.Host, dirName string) string {
 	if tmp == "" {
 		tmp = "/tmp"
 	}
-	return iago.CleanPath(path.Join(tmp, dirName))
+	return path.Join(tmp, dirName)
 }
 
 func randString(n int) string {
