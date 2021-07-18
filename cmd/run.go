@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -9,7 +8,6 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/iago"
@@ -72,28 +70,20 @@ func runController() {
 		LeaderRotation:    viper.GetString("leader-rotation"),
 	}
 
-	log := logging.New("ctrl")
-
 	worker := viper.GetBool("worker")
 	hosts := viper.GetStringSlice("hosts")
 	exePath := viper.GetString("exe")
 
 	g, err := iago.NewSSHGroup(hosts, viper.GetString("ssh-config"))
-	if err != nil {
-		log.Fatal("Failed to connect to remote hosts: ", err)
-	}
+	checkf("Failed to connect to remote hosts: %v", err)
 
 	if exePath == "" {
 		exePath, err = os.Executable()
-		if err != nil {
-			log.Fatal("Failed to get executable path: ", err)
-		}
+		checkf("Failed to get executable path: %v", err)
 	}
 
 	sessions, err := orchestration.Deploy(g, exePath, viper.GetString("log-level"))
-	if err != nil {
-		log.Fatal("Failed to deploy workers: ", err)
-	}
+	checkf("Failed to deploy workers: %v", err)
 
 	errors := make(chan error)
 
@@ -119,36 +109,34 @@ func runController() {
 	}
 
 	err = viper.UnmarshalKey("hosts-config", &hostConfigs)
-	if err != nil {
-		log.Fatal(fmt.Errorf("failed to unmarshal hosts-config: %w", err))
-	}
+	checkf("failed to unmarshal hosts-config: %v", err)
 
 	for _, cfg := range hostConfigs {
 		experiment.HostConfigs[cfg.Name] = orchestration.HostConfig{Replicas: cfg.Replicas, Clients: cfg.Clients}
 	}
 
 	err = experiment.Run()
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkf("failed to run experiment: %v", err)
 
 	for _, session := range sessions {
 		err := session.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
+		checkf("failed to close ssh command session: %v", err)
 	}
 
 	for range sessions {
 		err = <-errors
-		if err != nil {
-			log.Fatal(err)
-		}
+		checkf("failed to read from remote's standard error stream %v", err)
 	}
 
 	err = g.Close()
-	if err != nil {
-		log.Fatal(err)
+	checkf("failed to close ssh connections: %v", err)
+}
+
+func checkf(format string, args ...interface{}) {
+	for _, arg := range args {
+		if err, _ := arg.(error); err != nil {
+			log.Fatalf(format, args...)
+		}
 	}
 }
 
