@@ -93,14 +93,6 @@ func (e *Experiment) Run() (err error) {
 }
 
 func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration, err error) {
-	// recover panics from perNodeFunc
-	defer func() {
-		perr, _ := recover().(error)
-		if err == nil {
-			err = perr
-		}
-	}()
-
 	e.caKey, e.ca, err = keygen.GenerateCA()
 	if err != nil {
 		return nil, err
