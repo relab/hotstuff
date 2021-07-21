@@ -2,10 +2,10 @@ package orchestration
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"math/rand"
 	"path"
+	"strings"
 	"sync"
 
 	"github.com/relab/iago"
@@ -13,11 +13,21 @@ import (
 	"go.uber.org/multierr"
 )
 
+// DeployConfig contains configuration options for deployment.
+type DeployConfig struct {
+	ExePath      string
+	LogLevel     string
+	CPUProfiling bool
+	MemProfiling bool
+	Tracing      bool
+	Fgprof       bool
+}
+
 // Deploy deploys the hotstuff binary to a group of servers and starts a worker on the given port.
-func Deploy(g iago.Group, exePath, logLevel string) (workers map[string]WorkerSession, err error) {
+func Deploy(g iago.Group, cfg DeployConfig) (workers map[string]WorkerSession, err error) {
 	w := workerSetup{
-		logLevel: logLevel,
-		workers:  make(map[string]WorkerSession),
+		cfg:     cfg,
+		workers: make(map[string]WorkerSession),
 	}
 
 	// catch panics and return any errors
@@ -34,7 +44,7 @@ func Deploy(g iago.Group, exePath, logLevel string) (workers map[string]WorkerSe
 
 	g.Run(iago.Task{
 		Name: "Create temporary directory",
-		Action: iago.Func(func(ctx context.Context, host iago.Host) (err error) {
+		Action: iago.Do(func(ctx context.Context, host iago.Host) (err error) {
 			testDir := tempDirPath(host, tmpDir)
 			host.SetVar("dir", testDir)
 			err = fs.MkdirAll(host.GetFS(), iago.CleanPath(tempDirPath(host, tmpDir)), 0755)
@@ -45,13 +55,13 @@ func Deploy(g iago.Group, exePath, logLevel string) (workers map[string]WorkerSe
 
 	g.Run(iago.Task{
 		Name: "Upload hotstuff binary",
-		Action: iago.Func(func(ctx context.Context, host iago.Host) (err error) {
+		Action: iago.Do(func(ctx context.Context, host iago.Host) (err error) {
 			dest := path.Join(tempDirPath(host, tmpDir), "hotstuff")
 			host.SetVar("exe", dest)
 			return iago.Upload{
-				Src:  iago.P(exePath),
+				Src:  iago.P(cfg.ExePath),
 				Dest: iago.P(dest),
-				Mode: 0755,
+				Perm: iago.NewPerm(0755),
 			}.Apply(ctx, host)
 		}),
 		OnError: silentPanic,
@@ -64,6 +74,41 @@ func Deploy(g iago.Group, exePath, logLevel string) (workers map[string]WorkerSe
 	})
 
 	return w.workers, nil
+}
+
+// FetchData downloads the data from the workers.
+func FetchData(g iago.Group, dest string) (err error) {
+	// catch panics and return any errors
+	defer func() {
+		err, _ = recover().(error)
+	}()
+
+	// alternative error handler that does not log
+	silentPanic := func(err error) {
+		panic(err)
+	}
+
+	g.Run(iago.Task{
+		Name: "Download test data",
+		Action: iago.Do(func(ctx context.Context, host iago.Host) (err error) {
+			return iago.Download{
+				Src:  iago.P(iago.GetStringVar(host, "dir")), // assuming the dir variable was set earlier
+				Dest: iago.P(dest),
+			}.Apply(ctx, host)
+		}),
+		OnError: silentPanic,
+	})
+
+	g.Run(iago.Task{
+		Name: "Remove test directory",
+		Action: iago.Do(func(ctx context.Context, host iago.Host) (err error) {
+			err = fs.RemoveAll(host.GetFS(), iago.CleanPath(iago.GetStringVar(host, "dir")))
+			return err
+		}),
+		OnError: silentPanic,
+	})
+
+	return nil
 }
 
 // WorkerSession contains the state of a connected worker.
@@ -106,8 +151,7 @@ func (ws WorkerSession) Close() (err error) {
 }
 
 type workerSetup struct {
-	// worker arguments
-	logLevel string
+	cfg DeployConfig
 
 	mut     sync.Mutex
 	workers map[string]WorkerSession
@@ -134,7 +178,36 @@ func (w *workerSetup) Apply(ctx context.Context, host iago.Host) (err error) {
 		return err
 	}
 
-	err = cmd.Start(iago.Expand(host, fmt.Sprintf("%s --log-level=%s worker", iago.GetStringVar(host, "exe"), w.logLevel)))
+	dir := iago.GetStringVar(host, "dir")
+
+	var sb strings.Builder
+	sb.WriteString(iago.GetStringVar(host, "exe"))
+	sb.WriteString(" ")
+	if w.cfg.CPUProfiling {
+		sb.WriteString("--cpu-profile ")
+		sb.WriteString(path.Join(dir, "cpuprofile"))
+		sb.WriteString(" ")
+	}
+	if w.cfg.MemProfiling {
+		sb.WriteString("--mem-profile ")
+		sb.WriteString(path.Join(dir, "memprofile"))
+		sb.WriteString(" ")
+	}
+	if w.cfg.Tracing {
+		sb.WriteString("--trace ")
+		sb.WriteString(path.Join(dir, "trace"))
+		sb.WriteString(" ")
+	}
+	if w.cfg.Fgprof {
+		sb.WriteString("--fgprof-profile ")
+		sb.WriteString(path.Join(dir, "fgprofprofile"))
+		sb.WriteString(" ")
+	}
+	sb.WriteString("--log-level ")
+	sb.WriteString(w.cfg.LogLevel)
+	sb.WriteString(" worker")
+
+	err = cmd.Start(iago.Expand(host, sb.String()))
 	if err != nil {
 		return err
 	}

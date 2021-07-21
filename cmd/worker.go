@@ -67,11 +67,11 @@ func runWorker() {
 
 	dataLogger := consensus.NopLogger()
 	if dataPath != "" {
-		r, err := os.OpenFile(dataPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+		f, err := os.OpenFile(dataPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 		if err != nil {
 			log.Fatalln("failed to create data path: ", err)
 		}
-		dataLogger = consensus.NewDataLogger(protostream.NewWriter(r))
+		dataLogger = consensus.NewDataLogger(protostream.NewWriter(f))
 		defer func() {
 			err = dataLogger.Close()
 			if err != nil {

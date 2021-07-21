@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/relab/hotstuff/consensus"
@@ -47,6 +48,12 @@ func init() {
 	runCmd.Flags().String("exe", "", "path to the executable to deploy and run on remote workers")
 	runCmd.Flags().String("ssh-config", "", "path to ssh_config file to resolve host aliases (defaults to ~/.ssh/config)")
 
+	runCmd.Flags().String("output", "", "the directory to save data and profiles to (disabled by default)")
+	runCmd.Flags().Bool("cpu-profile", false, "enable cpu profiling")
+	runCmd.Flags().Bool("mem-profile", false, "enable memory profiling")
+	runCmd.Flags().Bool("trace", false, "enable trace")
+	runCmd.Flags().Bool("fgprof-profile", false, "enable fgprof")
+
 	err := viper.BindPFlags(runCmd.Flags())
 	if err != nil {
 		panic(err)
@@ -54,6 +61,11 @@ func init() {
 }
 
 func runController() {
+	outputDir, err := filepath.Abs(viper.GetString("output"))
+	checkf("failed to get absolute path: %v", err)
+	err = os.MkdirAll(outputDir, 0755)
+	checkf("failed to create output directory: %v", err)
+
 	experiment := orchestration.Experiment{
 		NumReplicas:       viper.GetInt("replicas"),
 		NumClients:        viper.GetInt("clients"),
@@ -82,7 +94,14 @@ func runController() {
 		checkf("Failed to get executable path: %v", err)
 	}
 
-	sessions, err := orchestration.Deploy(g, exePath, viper.GetString("log-level"))
+	sessions, err := orchestration.Deploy(g, orchestration.DeployConfig{
+		ExePath:      exePath,
+		LogLevel:     viper.GetString("log-level"),
+		CPUProfiling: viper.GetBool("cpu-profile"),
+		MemProfiling: viper.GetBool("mem-profile"),
+		Tracing:      viper.GetBool("trace"),
+		Fgprof:       viper.GetBool("fgprof-profile"),
+	})
 	checkf("Failed to deploy workers: %v", err)
 
 	errors := make(chan error)
@@ -127,6 +146,9 @@ func runController() {
 		err = <-errors
 		checkf("failed to read from remote's standard error stream %v", err)
 	}
+
+	err = orchestration.FetchData(g, outputDir)
+	checkf("failed to fetch data: %v", err)
 
 	err = g.Close()
 	checkf("failed to close ssh connections: %v", err)
