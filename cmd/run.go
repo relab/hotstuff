@@ -20,7 +20,14 @@ import (
 var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run an experiment.",
-	Long:  `The run command runs an experiment locally or on remote workers.`,
+	Long: `The run command runs an experiment locally or on remote workers.
+By default, a local experiment is run.
+To run experiments on remote machines, you must create a 'ssh_config' file (or use ~/.ssh/config).
+This should at the very least specify the identity file to use.
+It is also required that the host keys for all remote machines are present in a 'known_hosts' file.
+Then, you must use the '--ssh-config' parameter to specify the location of your 'ssh_config' file
+(or omit it to use ~/.ssh/config). Then, you must specify the list of remote machines to connect to
+using the '--host' parameter. This should be a comma separated list of hostnames or ip addresses.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		runController()
 	},

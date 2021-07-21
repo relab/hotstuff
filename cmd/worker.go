@@ -21,14 +21,11 @@ var (
 
 // workerCmd represents the worker command
 var workerCmd = &cobra.Command{
-	Use:   "worker",
-	Short: "Run a worker that takes part in an experiment.",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Hidden: true,
+	Use:    "worker",
+	Short:  "Run a worker.",
+	Long: `Starts a worker that reads commands from stdin and writes responses to stdout.
+This is only intended to be used by a controller (hotstuff run).`,
 	Run: func(cmd *cobra.Command, args []string) {
 		runWorker()
 	},
