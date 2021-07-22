@@ -33,8 +33,6 @@ jobs:
         shell: bash
         env:
           HOTSTUFF_LOG: info
-      - name: Restore Docker Cache
-        uses: satackey/action-docker-layer-caching@v0.0.11
       - name: Run docker tests
         if: runner.os == 'Linux'
         run: |
