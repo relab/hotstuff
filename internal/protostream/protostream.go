@@ -19,20 +19,11 @@ type Writer struct {
 }
 
 // NewWriter returns a new Writer. dest is the io.Writer that the Writer should write to (the stream).
-// The Writer will close the io.Writer in the Writer.Close() method if the io.Writer implements io.Closer.
 func NewWriter(dest io.Writer) *Writer {
 	return &Writer{
 		dest:      dest,
 		marshaler: proto.MarshalOptions{},
 	}
-}
-
-// Close closes the Writer. If the dest writer implements io.Closer, it will be closed.
-func (w *Writer) Close() error {
-	if closer, ok := w.dest.(io.Closer); ok {
-		return closer.Close()
-	}
-	return nil
 }
 
 // Write writes the proto message to the stream.
@@ -74,20 +65,11 @@ type Reader struct {
 }
 
 // NewReader returns a new Reader. src is the io.Reader that the Reader should read the log from.
-// The Reader will close the src in the Reader.Close() method if the src implements io.Closer.
 func NewReader(src io.Reader) *Reader {
 	return &Reader{
 		src:         src,
 		unmarshaler: proto.UnmarshalOptions{},
 	}
-}
-
-// Close closes the Reader. If the src reader implements io.Closer, it will be closed.
-func (w *Reader) Close() error {
-	if closer, ok := w.src.(io.Closer); ok {
-		return closer.Close()
-	}
-	return nil
 }
 
 // Read reads a protobuf message from the stream.

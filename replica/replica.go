@@ -206,10 +206,10 @@ func (srv *Replica) Start() {
 }
 
 // Stop stops the replica and closes connections.
-func (srv *Replica) Stop() error {
+func (srv *Replica) Stop() {
 	srv.cancel()
 	<-srv.done
-	return srv.Close()
+	srv.Close()
 }
 
 // Run runs the replica until the context is cancelled.
@@ -219,11 +219,10 @@ func (srv *Replica) Run(ctx context.Context) {
 }
 
 // Close closes the connections and stops the servers used by the replica.
-func (srv *Replica) Close() error {
+func (srv *Replica) Close() {
 	srv.clientSrv.Stop()
 	srv.cfg.Close()
 	srv.hsSrv.Stop()
-	return srv.dataLogger.Close()
 }
 
 // GetHash returns the hash of all executed commands.

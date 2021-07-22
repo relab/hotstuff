@@ -181,10 +181,7 @@ func (w *Worker) stopReplica(req *orchestrationpb.StopReplicaRequest) (*orchestr
 		if !ok {
 			return nil, status.Errorf(codes.NotFound, "The replica with id %d was not found.", id)
 		}
-		err := r.Stop()
-		if err != nil {
-			return nil, err
-		}
+		r.Stop()
 		res.Hashes[id] = r.GetHash()
 		// TODO: return test results
 	}

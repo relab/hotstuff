@@ -70,7 +70,7 @@ func runWorker() {
 		}
 		dataLogger = consensus.NewDataLogger(protostream.NewWriter(f))
 		defer func() {
-			err = dataLogger.Close()
+			err = f.Close()
 			if err != nil {
 				log.Fatalln("failed to close data logger: ", err)
 			}
