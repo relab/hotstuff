@@ -26,16 +26,20 @@ func NewWriter(dest io.Writer) *Writer {
 	}
 }
 
-// Write writes the proto message to the stream.
-func (w *Writer) Write(msg proto.Message) error {
+// WriteAny writes a proto message to the stream wrapped in an anypb.Any message.
+func (w *Writer) WriteAny(msg proto.Message) error {
 	any, err := anypb.New(msg)
 	if err != nil {
 		return fmt.Errorf("protostream: failed to create Any message: %w", err)
 	}
+	return w.Write(any)
+}
 
-	buf, err := w.marshaler.Marshal(any)
+// Write writes a proto message to the stream.
+func (w *Writer) Write(msg proto.Message) error {
+	buf, err := w.marshaler.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("protostream: failed to marshal Any message: %w", err)
+		return fmt.Errorf("protostream: failed to marshal message: %w", err)
 	}
 
 	var msgLen [4]byte
@@ -72,33 +76,10 @@ func NewReader(src io.Reader) *Reader {
 	}
 }
 
-// Read reads a protobuf message from the stream.
-func (w *Reader) Read() (proto.Message, error) {
-	w.mut.Lock()
-	defer w.mut.Unlock()
-
-	var msgLenBuf [4]byte
-	_, err := io.ReadFull(w.src, msgLenBuf[:])
-	if err != nil {
-		return nil, fmt.Errorf("protostream: failed to read message length: %w", err)
-	}
-
-	msgLen := binary.LittleEndian.Uint32(msgLenBuf[:])
-	if msgLen > 2147483648 { // 2 GiB limit
-		return nil, errors.New("protostream: message length is greater than 2 GiB")
-	}
-
-	buf := make([]byte, msgLen)
-	_, err = io.ReadFull(w.src, buf)
-	if err != nil {
-		return nil, fmt.Errorf("protostream: failed to read message: %w", err)
-	}
-
+// ReadAny reads a protobuf message wrapped in an anypb.Any message from the stream.
+func (r *Reader) ReadAny() (proto.Message, error) {
 	any := anypb.Any{}
-	err = w.unmarshaler.Unmarshal(buf, &any)
-	if err != nil {
-		return nil, fmt.Errorf("protostream: failed to unmarshal to Any message: %w", err)
-	}
+	r.Read(&any)
 
 	msg, err := any.UnmarshalNew()
 	if err != nil {
@@ -106,4 +87,34 @@ func (w *Reader) Read() (proto.Message, error) {
 	}
 
 	return msg, nil
+}
+
+// Read reads a protobuf message from the stream and unmarshals it into the dst message.
+func (r *Reader) Read(dst proto.Message) error {
+	r.mut.Lock()
+	defer r.mut.Unlock()
+
+	var msgLenBuf [4]byte
+	_, err := io.ReadFull(r.src, msgLenBuf[:])
+	if err != nil {
+		return fmt.Errorf("protostream: failed to read message length: %w", err)
+	}
+
+	msgLen := binary.LittleEndian.Uint32(msgLenBuf[:])
+	if msgLen > 2147483648 { // 2 GiB limit
+		return errors.New("protostream: message length is greater than 2 GiB")
+	}
+
+	buf := make([]byte, msgLen)
+	_, err = io.ReadFull(r.src, buf)
+	if err != nil {
+		return fmt.Errorf("protostream: failed to read message: %w", err)
+	}
+
+	err = r.unmarshaler.Unmarshal(buf, dst)
+	if err != nil {
+		return fmt.Errorf("protostream: failed to unmarshal message: %w", err)
+	}
+
+	return nil
 }

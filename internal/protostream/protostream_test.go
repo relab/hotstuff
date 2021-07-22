@@ -16,12 +16,12 @@ func TestDataLogger(t *testing.T) {
 	writer := protostream.NewWriter(&buf)
 	reader := protostream.NewReader(&buf)
 
-	err := writer.Write(msg)
+	err := writer.WriteAny(msg)
 	if err != nil {
 		t.Fatalf("Log failed: %v", err)
 	}
 
-	gotMsg, err := reader.Read()
+	gotMsg, err := reader.ReadAny()
 	if err != nil {
 		t.Fatalf("Read failed: %v", err)
 	}

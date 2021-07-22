@@ -25,11 +25,11 @@ func NewRemoteWorker(send *protostream.Writer, recv *protostream.Reader) RemoteW
 }
 
 func (w RemoteWorker) rpc(req proto.Message) (res proto.Message, err error) {
-	err = w.send.Write(req)
+	err = w.send.WriteAny(req)
 	if err != nil {
 		return nil, err
 	}
-	res, err = w.recv.Read()
+	res, err = w.recv.ReadAny()
 	if err != nil {
 		return nil, err
 	}
@@ -108,5 +108,5 @@ func (w RemoteWorker) StopClient(req *orchestrationpb.StopClientRequest) (res *o
 
 // Quit requests that the remote worker exits.
 func (w RemoteWorker) Quit() (err error) {
-	return w.send.Write(&orchestrationpb.QuitRequest{})
+	return w.send.WriteAny(&orchestrationpb.QuitRequest{})
 }

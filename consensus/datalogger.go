@@ -20,7 +20,7 @@ func NewDataLogger(wr *protostream.Writer) DataLogger {
 }
 
 func (dl dataLogger) Log(msg proto.Message) error {
-	return dl.wr.Write(msg)
+	return dl.wr.WriteAny(msg)
 }
 
 type nopLogger struct{}

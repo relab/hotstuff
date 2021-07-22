@@ -37,7 +37,7 @@ type Worker struct {
 // Run runs the worker until it receives a command to quit.
 func (w *Worker) Run() error {
 	for {
-		msg, err := w.recv.Read()
+		msg, err := w.recv.ReadAny()
 		if err != nil {
 			return err
 		}
@@ -63,7 +63,7 @@ func (w *Worker) Run() error {
 			res = s.Proto()
 		}
 
-		err = w.send.Write(res)
+		err = w.send.WriteAny(res)
 		if err != nil {
 			return err
 		}
