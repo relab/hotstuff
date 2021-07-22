@@ -7,7 +7,7 @@ import (
 	"github.com/relab/hotstuff/internal/logging"
 )
 
-// Modules contains the modules that together implement the Modules protocol.
+// Modules contains the modules that together implement the HotStuff protocol.
 type Modules struct {
 	// data
 
