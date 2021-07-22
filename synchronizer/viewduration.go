@@ -80,7 +80,7 @@ func (v *viewDuration) ViewSucceeded() {
 
 	// Welford's algorithm
 	d1 := duration - v.mean
-	v.mean += duration / c
+	v.mean += d1 / c
 	d2 := duration - v.mean
 	v.m2 += d1 * d2
 }
