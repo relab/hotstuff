@@ -46,12 +46,12 @@ func (w *Writer) Write(msg proto.Message) error {
 
 	_, err = w.dest.Write(msgLen[:])
 	if err != nil {
-		return fmt.Errorf("protostream: failed to write message length to log: %w", err)
+		return fmt.Errorf("protostream: failed to write message length: %w", err)
 	}
 
 	_, err = w.dest.Write(buf)
 	if err != nil {
-		return fmt.Errorf("protostream: failed to write message to log: %w", err)
+		return fmt.Errorf("protostream: failed to write message: %w", err)
 	}
 
 	return nil
