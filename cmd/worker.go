@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"log"
 	"os"
 
@@ -68,7 +69,7 @@ func runWorker() {
 		if err != nil {
 			log.Fatalln("failed to create data path: ", err)
 		}
-		dataLogger = consensus.NewDataLogger(protostream.NewWriter(f))
+		dataLogger = consensus.NewDataLogger(protostream.NewWriter(bufio.NewWriter(f)))
 		defer func() {
 			err = f.Close()
 			if err != nil {
