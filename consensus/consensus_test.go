@@ -21,11 +21,11 @@ func TestVote(t *testing.T) {
 
 	ok := false
 	ctx, cancel := context.WithCancel(context.Background())
-	hs.EventLoop().RegisterAsyncHandler(func(event interface{}) (consume bool) {
+	hs.EventLoop().RegisterAsyncHandler(consensus.NewViewMsg{}, func(event interface{}) (consume bool) {
 		ok = true
 		cancel()
 		return true
-	}, consensus.NewViewMsg{})
+	})
 
 	b := testutil.NewProposeMsg(
 		consensus.GetGenesis().Hash(),

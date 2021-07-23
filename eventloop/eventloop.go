@@ -32,7 +32,7 @@ func New(bufferSize uint) *EventLoop {
 
 // RegisterHandler registers a handler for events with the same type as the 'eventType' argument.
 // The handler is executed synchronously. There can only be one synchronous handler for each type.
-func (el *EventLoop) RegisterHandler(handler EventHandler, eventType interface{}) {
+func (el *EventLoop) RegisterHandler(eventType interface{}, handler EventHandler) {
 	t := reflect.TypeOf(eventType)
 	el.handlers[t] = handler
 }
@@ -42,7 +42,7 @@ func (el *EventLoop) RegisterHandler(handler EventHandler, eventType interface{}
 // There can be multiple async handlers per type.
 // If the handler returns true, it will prevent any other handlers from getting the event,
 // and the event will not be added to the event queue.
-func (el *EventLoop) RegisterAsyncHandler(handler EventHandler, eventType interface{}) {
+func (el *EventLoop) RegisterAsyncHandler(eventType interface{}, handler EventHandler) {
 	t := reflect.TypeOf(eventType)
 	el.asyncHandlers[t] = append(el.asyncHandlers[t], handler)
 }

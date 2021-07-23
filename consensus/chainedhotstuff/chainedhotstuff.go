@@ -26,11 +26,11 @@ func New() *ChainedHotStuff {
 // InitModule gives ChainedHotstuff a pointer to the other consensus.
 func (hs *ChainedHotStuff) InitModule(mod *consensus.Modules, _ *consensus.OptionsBuilder) {
 	hs.mod = mod
-	hs.mod.EventLoop().RegisterHandler(func(event interface{}) (consume bool) {
+	hs.mod.EventLoop().RegisterHandler(consensus.ProposeMsg{}, func(event interface{}) (consume bool) {
 		proposal := event.(consensus.ProposeMsg)
 		hs.OnPropose(proposal)
 		return true
-	}, consensus.ProposeMsg{})
+	})
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.

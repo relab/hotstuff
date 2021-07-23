@@ -46,7 +46,7 @@ func TestConnect(t *testing.T) {
 }
 
 // testBase is a generic test for a unicast/multicast call
-func testBase(t *testing.T, send func(consensus.Configuration), handle eventloop.EventHandler, typ interface{}) {
+func testBase(t *testing.T, typ interface{}, send func(consensus.Configuration), handle eventloop.EventHandler) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		ctrl := gomock.NewController(t)
@@ -58,7 +58,7 @@ func testBase(t *testing.T, send func(consensus.Configuration), handle eventloop
 
 		ctx, cancel := context.WithCancel(context.Background())
 		for _, hs := range hl[1:] {
-			hs.EventLoop().RegisterHandler(handle, typ)
+			hs.EventLoop().RegisterHandler(typ, handle)
 			go hs.Run(ctx)
 		}
 		send(cfg)
@@ -77,7 +77,7 @@ func TestPropose(t *testing.T) {
 			"foo", 1, 1,
 		),
 	}
-	testBase(t, func(cfg consensus.Configuration) {
+	testBase(t, want, func(cfg consensus.Configuration) {
 		wg.Add(3)
 		cfg.Propose(want)
 		wg.Wait()
@@ -91,7 +91,7 @@ func TestPropose(t *testing.T) {
 		}
 		wg.Done()
 		return true
-	}, want)
+	})
 }
 
 func TestTimeout(t *testing.T) {
@@ -102,7 +102,7 @@ func TestTimeout(t *testing.T) {
 		ViewSignature: nil,
 		SyncInfo:      consensus.NewSyncInfo(),
 	}
-	testBase(t, func(cfg consensus.Configuration) {
+	testBase(t, want, func(cfg consensus.Configuration) {
 		wg.Add(3)
 		cfg.Timeout(want)
 		wg.Wait()
@@ -116,7 +116,7 @@ func TestTimeout(t *testing.T) {
 		}
 		wg.Done()
 		return true
-	}, want)
+	})
 
 }
 
