@@ -252,7 +252,7 @@ func TestChainedHotstuff(t *testing.T) {
 	for _, hs := range hl {
 		go func(hs *consensus.Modules) {
 			hs.Synchronizer().Start(ctx)
-			hs.EventLoop().Run(ctx)
+			hs.Run(ctx)
 		}(hs)
 	}
 

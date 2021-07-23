@@ -215,7 +215,7 @@ func (srv *Replica) Stop() {
 // Run runs the replica until the context is cancelled.
 func (srv *Replica) Run(ctx context.Context) {
 	srv.hs.Synchronizer().Start(ctx)
-	srv.hs.EventLoop().Run(ctx)
+	srv.hs.Run(ctx)
 }
 
 // Close closes the connections and stops the servers used by the replica.

@@ -42,7 +42,7 @@ func TestVote(t *testing.T) {
 		hs.EventLoop().AddEvent(consensus.VoteMsg{ID: consensus.ID(i + 1), PartialCert: pc})
 	}
 
-	hs.EventLoop().Run(ctx)
+	hs.Run(ctx)
 
 	if !ok {
 		t.Error("No new view event happened")

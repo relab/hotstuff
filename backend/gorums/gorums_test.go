@@ -59,7 +59,7 @@ func testBase(t *testing.T, send func(consensus.Configuration), handle eventloop
 		ctx, cancel := context.WithCancel(context.Background())
 		for _, hs := range hl[1:] {
 			hs.EventLoop().RegisterHandler(handle, typ)
-			go hs.EventLoop().Run(ctx)
+			go hs.Run(ctx)
 		}
 		send(cfg)
 		cancel()

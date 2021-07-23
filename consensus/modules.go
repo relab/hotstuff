@@ -33,6 +33,24 @@ type Modules struct {
 	synchronizer   Synchronizer
 }
 
+// Run starts both event loops using the provided context and returns when both event loops have exited.
+func (mod *Modules) Run(ctx context.Context) {
+	mainDone := make(chan struct{})
+	go func() {
+		mod.eventLoop.Run(ctx)
+		close(mainDone)
+	}()
+
+	secondaryDone := make(chan struct{})
+	go func() {
+		mod.dataEventLoop.Run(ctx)
+		close(secondaryDone)
+	}()
+
+	<-mainDone
+	<-secondaryDone
+}
+
 // ID returns the id.
 func (mod *Modules) ID() ID {
 	return mod.id
