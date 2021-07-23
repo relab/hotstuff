@@ -16,6 +16,7 @@ type Modules struct {
 	logger        logging.Logger
 	opts          Options
 	eventLoop     *eventloop.EventLoop
+	dataEventLoop *eventloop.EventLoop
 	votingMachine *VotingMachine
 	dataLogger    DataLogger
 
@@ -33,100 +34,113 @@ type Modules struct {
 }
 
 // ID returns the id.
-func (hs *Modules) ID() ID {
-	return hs.id
+func (mod *Modules) ID() ID {
+	return mod.id
 }
 
 // PrivateKey returns the private key.
-func (hs *Modules) PrivateKey() PrivateKey {
-	return hs.privateKey
+func (mod *Modules) PrivateKey() PrivateKey {
+	return mod.privateKey
 }
 
 // Logger returns the logger.
-func (hs *Modules) Logger() logging.Logger {
-	return hs.logger
+func (mod *Modules) Logger() logging.Logger {
+	return mod.logger
 }
 
 // Options returns the current configuration settings.
-func (hs *Modules) Options() *Options {
-	return &hs.opts
+func (mod *Modules) Options() *Options {
+	return &mod.opts
 }
 
-// EventLoop returns the event loop.
-func (hs *Modules) EventLoop() *eventloop.EventLoop {
-	return hs.eventLoop
+// EventLoop returns the main event loop.
+//
+// This event loop should be used by components that participate in the consensus protocol.
+// Events related to data collection should instead use the secondary event loop,
+// which is accessible using the DataEventLoop() method.
+func (mod *Modules) EventLoop() *eventloop.EventLoop {
+	return mod.eventLoop
+}
+
+// DataEventLoop returns the secondary event loop, which is used for collection of data.
+//
+// This event loop should be used for handling data collection related events.
+func (mod *Modules) DataEventLoop() *eventloop.EventLoop {
+	return mod.dataEventLoop
 }
 
 // DataLogger returns the data logger.
-func (hs *Modules) DataLogger() DataLogger {
-	if hs.dataLogger == nil {
+func (mod *Modules) DataLogger() DataLogger {
+	if mod.dataLogger == nil {
 		return NopLogger()
 	}
-	return hs.dataLogger
+	return mod.dataLogger
 }
 
 // Acceptor returns the acceptor.
-func (hs *Modules) Acceptor() Acceptor {
-	return hs.acceptor
+func (mod *Modules) Acceptor() Acceptor {
+	return mod.acceptor
 }
 
 // BlockChain returns the block chain.
-func (hs *Modules) BlockChain() BlockChain {
-	return hs.blockChain
+func (mod *Modules) BlockChain() BlockChain {
+	return mod.blockChain
 }
 
 // CommandQueue returns the command queue.
-func (hs *Modules) CommandQueue() CommandQueue {
-	return hs.commandQueue
+func (mod *Modules) CommandQueue() CommandQueue {
+	return mod.commandQueue
 }
 
 // Configuration returns the configuration of replicas.
-func (hs *Modules) Configuration() Configuration {
-	return hs.config
+func (mod *Modules) Configuration() Configuration {
+	return mod.config
 }
 
 // Consensus returns the consensus implementation.
-func (hs *Modules) Consensus() Consensus {
-	return hs.consensus
+func (mod *Modules) Consensus() Consensus {
+	return mod.consensus
 }
 
 // Executor returns the executor.
-func (hs *Modules) Executor() Executor {
-	return hs.executor
+func (mod *Modules) Executor() Executor {
+	return mod.executor
 }
 
 // LeaderRotation returns the leader rotation implementation.
-func (hs *Modules) LeaderRotation() LeaderRotation {
-	return hs.leaderRotation
+func (mod *Modules) LeaderRotation() LeaderRotation {
+	return mod.leaderRotation
 }
 
 // Crypto returns the cryptography implementation.
-func (hs *Modules) Crypto() Crypto {
-	return hs.crypto
+func (mod *Modules) Crypto() Crypto {
+	return mod.crypto
 }
 
 // Synchronizer returns the view synchronizer implementation.
-func (hs *Modules) Synchronizer() Synchronizer {
-	return hs.synchronizer
+func (mod *Modules) Synchronizer() Synchronizer {
+	return mod.synchronizer
 }
 
 // Builder is a helper for constructing a HotStuff instance.
 type Builder struct {
-	hs      *Modules
+	mod     *Modules
 	cfg     OptionsBuilder
 	modules []Module
 }
 
 // NewBuilder creates a new Builder.
 func NewBuilder(id ID, privateKey PrivateKey) Builder {
-	bl := Builder{hs: &Modules{
+	bl := Builder{mod: &Modules{
 		id:            id,
 		privateKey:    privateKey,
 		logger:        logging.New(""),
 		votingMachine: NewVotingMachine(),
+		eventLoop:     eventloop.New(100), // TODO: make this configurable
+		dataEventLoop: eventloop.New(100),
 	}}
 	// some of the default modules need to be registered
-	bl.Register(eventloop.New(100), bl.hs.votingMachine)
+	bl.Register(bl.mod.eventLoop, bl.mod.dataEventLoop, bl.mod.votingMachine)
 	return bl
 }
 
@@ -138,41 +152,37 @@ func NewBuilder(id ID, privateKey PrivateKey) Builder {
 func (b *Builder) Register(modules ...interface{}) {
 	for _, module := range modules {
 		if m, ok := module.(logging.Logger); ok {
-			b.hs.logger = m
-		}
-		// allow overriding the event loop if a different buffer size is desired
-		if m, ok := module.(*eventloop.EventLoop); ok {
-			b.hs.eventLoop = m
+			b.mod.logger = m
 		}
 		if m, ok := module.(DataLogger); ok {
-			b.hs.dataLogger = m
+			b.mod.dataLogger = m
 		}
 		if m, ok := module.(Acceptor); ok {
-			b.hs.acceptor = m
+			b.mod.acceptor = m
 		}
 		if m, ok := module.(BlockChain); ok {
-			b.hs.blockChain = m
+			b.mod.blockChain = m
 		}
 		if m, ok := module.(CommandQueue); ok {
-			b.hs.commandQueue = m
+			b.mod.commandQueue = m
 		}
 		if m, ok := module.(Configuration); ok {
-			b.hs.config = m
+			b.mod.config = m
 		}
 		if m, ok := module.(Consensus); ok {
-			b.hs.consensus = m
+			b.mod.consensus = m
 		}
 		if m, ok := module.(Executor); ok {
-			b.hs.executor = m
+			b.mod.executor = m
 		}
 		if m, ok := module.(LeaderRotation); ok {
-			b.hs.leaderRotation = m
+			b.mod.leaderRotation = m
 		}
 		if m, ok := module.(Crypto); ok {
-			b.hs.crypto = m
+			b.mod.crypto = m
 		}
 		if m, ok := module.(Synchronizer); ok {
-			b.hs.synchronizer = m
+			b.mod.synchronizer = m
 		}
 		if m, ok := module.(Module); ok {
 			b.modules = append(b.modules, m)
@@ -183,10 +193,10 @@ func (b *Builder) Register(modules ...interface{}) {
 // Build initializes all modules and returns the HotStuff object.
 func (b *Builder) Build() *Modules {
 	for _, module := range b.modules {
-		module.InitModule(b.hs, &b.cfg)
+		module.InitModule(b.mod, &b.cfg)
 	}
-	b.hs.opts = b.cfg.opts
-	return b.hs
+	b.mod.opts = b.cfg.opts
+	return b.mod
 }
 
 // Module interfaces
@@ -195,7 +205,7 @@ func (b *Builder) Build() *Modules {
 type Module interface {
 	// InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
 	// settings using the ConfigBuilder.
-	InitModule(hs *Modules, _ *OptionsBuilder)
+	InitModule(mod *Modules, _ *OptionsBuilder)
 }
 
 //go:generate mockgen -destination=../internal/mocks/cmdqueue_mock.go -package=mocks . CommandQueue
