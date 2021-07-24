@@ -102,5 +102,6 @@ func (vm *VotingMachine) OnVote(vote VoteMsg) {
 	delete(vm.verifiedVotes, cert.BlockHash())
 
 	// signal the synchronizer
+	// because votes are handled asynchronously, we can safely use AddEvent without starting a goroutine.
 	vm.mod.EventLoop().AddEvent(NewViewMsg{ID: vm.mod.ID(), SyncInfo: NewSyncInfo().WithQC(qc)})
 }

@@ -187,7 +187,7 @@ func (fhs *FastHotStuff) OnPropose(proposal consensus.ProposeMsg) {
 
 	leaderID := fhs.mod.LeaderRotation().GetLeader(block.View() + 1)
 	if leaderID == fhs.mod.ID() {
-		fhs.mod.EventLoop().AddEvent(consensus.VoteMsg{ID: fhs.mod.ID(), PartialCert: vote})
+		go fhs.mod.EventLoop().AddEvent(consensus.VoteMsg{ID: fhs.mod.ID(), PartialCert: vote})
 		return
 	}
 
