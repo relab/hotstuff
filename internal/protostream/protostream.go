@@ -79,7 +79,10 @@ func NewReader(src io.Reader) *Reader {
 // ReadAny reads a protobuf message wrapped in an anypb.Any message from the stream.
 func (r *Reader) ReadAny() (proto.Message, error) {
 	any := anypb.Any{}
-	r.Read(&any)
+	err := r.Read(&any)
+	if err != nil {
+		return nil, err
+	}
 
 	msg, err := any.UnmarshalNew()
 	if err != nil {
