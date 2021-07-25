@@ -4,19 +4,29 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"io"
 	"net"
 	"strconv"
 	"time"
 
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/consensus/chainedhotstuff"
+	"github.com/relab/hotstuff/consensus/fasthotstuff"
+	"github.com/relab/hotstuff/crypto"
+	"github.com/relab/hotstuff/crypto/bls12"
+	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/leaderrotation"
 	"github.com/relab/hotstuff/replica"
+	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -45,15 +55,15 @@ func (w *Worker) Run() error {
 		var res proto.Message
 		switch req := msg.(type) {
 		case *orchestrationpb.CreateReplicaRequest:
-			res, err = w.createReplica(req)
+			res, err = w.createReplicas(req)
 		case *orchestrationpb.StartReplicaRequest:
-			res, err = w.startReplica(req)
+			res, err = w.startReplicas(req)
 		case *orchestrationpb.StopReplicaRequest:
-			res, err = w.stopReplica(req)
+			res, err = w.stopReplicas(req)
 		case *orchestrationpb.StartClientRequest:
-			res, err = w.startClient(req)
+			res, err = w.startClients(req)
 		case *orchestrationpb.StopClientRequest:
-			res, err = w.stopClient(req)
+			res, err = w.stopClients(req)
 		case *orchestrationpb.QuitRequest:
 			return nil
 		}
@@ -81,51 +91,18 @@ func NewWorker(send *protostream.Writer, recv *protostream.Reader, dl consensus.
 	}
 }
 
-func (w *Worker) createReplica(req *orchestrationpb.CreateReplicaRequest) (*orchestrationpb.CreateReplicaResponse, error) {
+func (w *Worker) createReplicas(req *orchestrationpb.CreateReplicaRequest) (*orchestrationpb.CreateReplicaResponse, error) {
 	resp := &orchestrationpb.CreateReplicaResponse{Replicas: make(map[uint32]*orchestrationpb.ReplicaInfo)}
 	for _, cfg := range req.GetReplicas() {
-		privKey, err := keygen.ParsePrivateKey(cfg.GetPrivateKey())
+		r, err := w.createReplica(cfg)
 		if err != nil {
-			return nil, err
-		}
-		var certificate tls.Certificate
-		var rootCAs *x509.CertPool
-		if cfg.GetUseTLS() {
-			certificate, err = tls.X509KeyPair(cfg.GetCertificate(), cfg.GetCertificateKey())
-			if err != nil {
-				return nil, err
-			}
-			rootCAs = x509.NewCertPool()
-			rootCAs.AppendCertsFromPEM(cfg.GetCertificateAuthority())
-		}
-		c := replica.Config{
-			ID:                consensus.ID(cfg.GetID()),
-			PrivateKey:        privKey,
-			TLS:               cfg.GetUseTLS(),
-			Certificate:       &certificate,
-			RootCAs:           rootCAs,
-			Consensus:         cfg.GetConsensus(),
-			Crypto:            cfg.GetCrypto(),
-			LeaderRotation:    cfg.GetLeaderElection(),
-			BatchSize:         cfg.GetBatchSize(),
-			BlockCacheSize:    cfg.GetBlockCacheSize(),
-			InitialTimeout:    float64(cfg.GetInitialTimeout()),
-			TimeoutSamples:    cfg.GetTimeoutSamples(),
-			TimeoutMultiplier: float64(cfg.GetTimeoutMultiplier()),
-			DataLogger:        w.dataLogger,
-			ManagerOptions: []gorums.ManagerOption{
-				gorums.WithDialTimeout(time.Duration(cfg.GetConnectTimeout() * float32(time.Millisecond))),
-				gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
-			},
-		}
-		r, err := replica.New(c)
-		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create replica: %w", err)
 		}
 
+		// set up listeners and get the ports
 		replicaListener, err := net.Listen("tcp", ":0")
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create listener: %w", err)
 		}
 		replicaPort, err := getPort(replicaListener)
 		if err != nil {
@@ -133,7 +110,7 @@ func (w *Worker) createReplica(req *orchestrationpb.CreateReplicaRequest) (*orch
 		}
 		clientListener, err := net.Listen("tcp", ":0")
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create listener: %w", err)
 		}
 		clientPort, err := getPort(clientListener)
 		if err != nil {
@@ -141,7 +118,7 @@ func (w *Worker) createReplica(req *orchestrationpb.CreateReplicaRequest) (*orch
 		}
 
 		r.StartServers(replicaListener, clientListener)
-		w.replicas[c.ID] = r
+		w.replicas[consensus.ID(cfg.GetID())] = r
 
 		resp.Replicas[cfg.GetID()] = &orchestrationpb.ReplicaInfo{
 			ID:          cfg.GetID(),
@@ -153,7 +130,87 @@ func (w *Worker) createReplica(req *orchestrationpb.CreateReplicaRequest) (*orch
 	return resp, nil
 }
 
-func (w *Worker) startReplica(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {
+func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Replica, error) {
+	// get private key and certificates
+	privKey, err := keygen.ParsePrivateKey(opts.GetPrivateKey())
+	if err != nil {
+		return nil, err
+	}
+	var certificate tls.Certificate
+	var rootCAs *x509.CertPool
+	if opts.GetUseTLS() {
+		certificate, err = tls.X509KeyPair(opts.GetCertificate(), opts.GetCertificateKey())
+		if err != nil {
+			return nil, err
+		}
+		rootCAs = x509.NewCertPool()
+		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
+	}
+	// prepare modules
+	builder := consensus.NewBuilder(consensus.ID(opts.GetID()), privKey)
+
+	var consensusImpl consensus.Consensus
+	switch opts.GetConsensus() {
+	case "chainedhotstuff":
+		consensusImpl = chainedhotstuff.New()
+	case "fasthotstuff":
+		consensusImpl = fasthotstuff.New()
+	default:
+		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
+	}
+
+	var cryptoImpl consensus.CryptoImpl
+	switch opts.GetCrypto() {
+	case "ecdsa":
+		cryptoImpl = ecdsa.New()
+	case "bls12":
+		cryptoImpl = bls12.New()
+	default:
+		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
+	}
+
+	var leaderRotation consensus.LeaderRotation
+	switch opts.GetLeaderRotation() {
+	case "round-robin":
+		leaderRotation = leaderrotation.NewRoundRobin()
+	case "fixed":
+		// TODO: consider making this configurable.
+		leaderRotation = leaderrotation.NewFixed(1)
+	default:
+		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
+	}
+
+	sync := synchronizer.New(synchronizer.NewViewDuration(
+		uint64(opts.GetTimeoutSamples()), float64(opts.GetInitialTimeout()), float64(opts.GetTimeoutMultiplier()),
+	))
+
+	builder.Register(
+		consensusImpl,
+		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
+		leaderRotation,
+		sync,
+		w.dataLogger,
+		blockchain.New(int(opts.GetBlockCacheSize())),
+		logging.New(fmt.Sprintf("hs%d", opts.GetID())),
+	)
+
+	c := replica.Config{
+		ID:          consensus.ID(opts.GetID()),
+		PrivateKey:  privKey,
+		TLS:         opts.GetUseTLS(),
+		Certificate: &certificate,
+		RootCAs:     rootCAs,
+		BatchSize:   opts.GetBatchSize(),
+		ManagerOptions: []gorums.ManagerOption{
+			gorums.WithDialTimeout(time.Duration(opts.GetConnectTimeout() * float32(time.Millisecond))),
+			gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
+		},
+	}
+
+	return replica.New(c, builder), nil
+}
+
+func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {
 	for _, id := range req.GetIDs() {
 		replica, ok := w.replicas[consensus.ID(id)]
 		if !ok {
@@ -172,7 +229,7 @@ func (w *Worker) startReplica(req *orchestrationpb.StartReplicaRequest) (*orches
 	return &orchestrationpb.StartReplicaResponse{}, nil
 }
 
-func (w *Worker) stopReplica(req *orchestrationpb.StopReplicaRequest) (*orchestrationpb.StopReplicaResponse, error) {
+func (w *Worker) stopReplicas(req *orchestrationpb.StopReplicaRequest) (*orchestrationpb.StopReplicaResponse, error) {
 	res := &orchestrationpb.StopReplicaResponse{
 		Hashes: make(map[uint32][]byte),
 	}
@@ -188,7 +245,7 @@ func (w *Worker) stopReplica(req *orchestrationpb.StopReplicaRequest) (*orchestr
 	return res, nil
 }
 
-func (w *Worker) startClient(req *orchestrationpb.StartClientRequest) (*orchestrationpb.StartClientResponse, error) {
+func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchestrationpb.StartClientResponse, error) {
 	ca := req.GetCertificateAuthority()
 	cp := x509.NewCertPool()
 	cp.AppendCertsFromPEM(ca)
@@ -220,7 +277,7 @@ func (w *Worker) startClient(req *orchestrationpb.StartClientRequest) (*orchestr
 	return &orchestrationpb.StartClientResponse{}, nil
 }
 
-func (w *Worker) stopClient(req *orchestrationpb.StopClientRequest) (*orchestrationpb.StopClientResponse, error) {
+func (w *Worker) stopClients(req *orchestrationpb.StopClientRequest) (*orchestrationpb.StopClientResponse, error) {
 	for _, id := range req.GetIDs() {
 		cli, ok := w.clients[consensus.ID(id)]
 		if !ok {

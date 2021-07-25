@@ -108,7 +108,7 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 				UseTLS:               true,
 				Crypto:               e.Crypto,
 				Consensus:            e.Consensus,
-				LeaderElection:       e.LeaderRotation,
+				LeaderRotation:       e.LeaderRotation,
 				BatchSize:            uint32(e.BatchSize),
 				BlockCacheSize:       uint32(5 * e.NumReplicas),
 				InitialTimeout:       float32(e.ViewTimeout) / float32(time.Millisecond),

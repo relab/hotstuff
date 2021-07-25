@@ -21,21 +21,19 @@ type clientSrv struct {
 	srv          *gorums.Server
 	awaitingCmds map[cmdID]chan<- struct{}
 	cmdCache     *cmdCache
-	dataLogger   consensus.DataLogger
 	hash         hash.Hash
 }
 
 // newClientServer returns a new client server.
-func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv, err error) {
+func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv) {
 	srv = &clientSrv{
 		awaitingCmds: make(map[cmdID]chan<- struct{}),
 		srv:          gorums.NewServer(srvOpts...),
 		cmdCache:     newCmdCache(int(conf.BatchSize)),
-		dataLogger:   conf.DataLogger,
 		hash:         sha256.New(),
 	}
 	clientpb.RegisterClientServer(srv.srv, srv)
-	return srv, nil
+	return srv
 }
 
 // InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
