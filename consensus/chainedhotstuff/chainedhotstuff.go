@@ -187,8 +187,10 @@ func (hs *ChainedHotStuff) OnPropose(proposal consensus.ProposeMsg) {
 		return
 	}
 
-	// Tell the acceptor that the QC's block was proposed successfully.
-	hs.mod.Acceptor().Proposed(qcBlock.Command())
+	if haveQCBlock {
+		// Tell the acceptor that the QC's block was proposed successfully.
+		hs.mod.Acceptor().Proposed(qcBlock.Command())
+	}
 
 	if !hs.mod.Acceptor().Accept(block.Command()) {
 		hs.mod.Logger().Info("OnPropose: command not accepted")
