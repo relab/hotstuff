@@ -7,20 +7,31 @@ import (
 	"time"
 )
 
-// EventHandler processes the given event. It should return true if the event is consumed.
-type EventHandler func(event interface{}) (consume bool)
+// EventHandler processes an event.
+type EventHandler func(event interface{})
 
-// EventLoop synchronously executes a queue of events.
+type handlerDesc struct {
+	async  bool
+	handle EventHandler
+}
+
+// EventLoop accepts events of any type and executes relevant event handlers.
+// It supports registering both observers and handlers based on the type of event that they accept.
+// The difference between them is that there can be many observers per event type, but only one handler.
+// Handlers and observers can either be executed asynchronously, immediately after AddEvent() is called,
+// or synchronously, after the event has passed through the event queue.
+// An asynchronous handler consumes events, which means that synchronous observers will not be notified of them.
 type EventLoop struct {
 	mut sync.Mutex
 
 	eventQ        chan interface{}
 	waitingEvents map[interface{}][]interface{}
 
-	handlers      map[reflect.Type]EventHandler
-	asyncHandlers map[reflect.Type][]EventHandler
-	tickers       map[int]*ticker
-	tickerID      int
+	handlers  map[reflect.Type]handlerDesc
+	observers map[reflect.Type][]handlerDesc
+
+	tickers  map[int]*ticker
+	tickerID int
 }
 
 // New returns a new event loop with the requested buffer size.
@@ -28,28 +39,51 @@ func New(bufferSize uint) *EventLoop {
 	el := &EventLoop{
 		eventQ:        make(chan interface{}, bufferSize),
 		waitingEvents: make(map[interface{}][]interface{}),
-		handlers:      make(map[reflect.Type]EventHandler),
-		asyncHandlers: make(map[reflect.Type][]EventHandler),
+		handlers:      make(map[reflect.Type]handlerDesc),
+		observers:     make(map[reflect.Type][]handlerDesc),
 		tickers:       make(map[int]*ticker),
 	}
 	return el
 }
 
 // RegisterHandler registers a handler for events with the same type as the 'eventType' argument.
-// The handler is executed synchronously. There can only be one synchronous handler for each type.
+// The handler is executed synchronously. There can be only one handler per event type.
 func (el *EventLoop) RegisterHandler(eventType interface{}, handler EventHandler) {
-	t := reflect.TypeOf(eventType)
-	el.handlers[t] = handler
+	el.handlers[reflect.TypeOf(eventType)] = handlerDesc{
+		async:  false,
+		handle: handler,
+	}
 }
 
 // RegisterAsyncHandler registers a handler for events with the same type as the 'eventType' argument.
 // The handler is executed asynchronously, immediately after a new event arrives.
-// There can be multiple async handlers per type.
-// If the handler returns true, it will prevent any other handlers from getting the event,
-// and the event will not be added to the event queue.
+// The handler consumes the event, which means that it will not be observed by synchronous observers.
+// There can be only one handler per event type.
 func (el *EventLoop) RegisterAsyncHandler(eventType interface{}, handler EventHandler) {
+	el.handlers[reflect.TypeOf(eventType)] = handlerDesc{
+		async:  true,
+		handle: handler,
+	}
+}
+
+// RegisterObserver registers an observer for events with the same type as the 'eventType' argument.
+// The observer is executed synchronously before any registered handler.
+func (el *EventLoop) RegisterObserver(eventType interface{}, observer EventHandler) {
 	t := reflect.TypeOf(eventType)
-	el.asyncHandlers[t] = append(el.asyncHandlers[t], handler)
+	el.observers[t] = append(el.observers[t], handlerDesc{
+		async:  false,
+		handle: observer,
+	})
+}
+
+// RegisterAsyncObserver registers an observer for events with the same type as the 'eventType' argument.
+// The observer is executed asynchronously before any registered handler.
+func (el *EventLoop) RegisterAsyncObserver(eventType interface{}, observer EventHandler) {
+	t := reflect.TypeOf(eventType)
+	el.observers[t] = append(el.observers[t], handlerDesc{
+		async:  true,
+		handle: observer,
+	})
 }
 
 // AddEvent adds an event to the event queue.
@@ -59,12 +93,18 @@ func (el *EventLoop) RegisterAsyncHandler(eventType interface{}, handler EventHa
 // If you need to send add an event from a handler, use a goroutine:
 //  go EventLoop.AddEvent(...)
 func (el *EventLoop) AddEvent(event interface{}) {
-	for _, handler := range el.asyncHandlers[reflect.TypeOf(event)] {
-		if handler(event) {
-			return // event was consumed
+	t := reflect.TypeOf(event)
+	// run async observers
+	for _, observer := range el.observers[t] {
+		if observer.async {
+			observer.handle(event)
 		}
 	}
-
+	// run async handler
+	if handler, ok := el.handlers[t]; ok && handler.async {
+		handler.handle(event)
+		return
+	}
 	el.eventQ <- event
 }
 
@@ -92,27 +132,38 @@ cancelled:
 }
 
 // processEvent dispatches the event to the correct handler.
-func (el *EventLoop) processEvent(e interface{}) {
-	if f, ok := e.(func()); ok {
+func (el *EventLoop) processEvent(event interface{}) {
+	t := reflect.TypeOf(event)
+	defer el.dispatchDelayedEvents(t)
+
+	if f, ok := event.(func()); ok {
 		f()
-	} else {
-		handler := el.handlers[reflect.TypeOf(e)]
-		if handler != nil {
-			handler(e)
+		return
+	}
+
+	// run observers
+	for _, observer := range el.observers[t] {
+		if !observer.async {
+			observer.handle(event)
 		}
 	}
 
+	if handler, ok := el.handlers[t]; ok && !handler.async {
+		handler.handle(event)
+	}
+}
+
+func (el *EventLoop) dispatchDelayedEvents(t reflect.Type) {
+
 	el.mut.Lock()
-	for k, v := range el.waitingEvents {
-		if reflect.TypeOf(e) == reflect.TypeOf(k) {
-			// must use a goroutine to avoid deadlock
-			go func(events []interface{}) {
-				for _, event := range v {
-					el.AddEvent(event)
-				}
-			}(v)
-			delete(el.waitingEvents, k)
-		}
+	if delayed, ok := el.waitingEvents[t]; ok {
+		// must use a goroutine to avoid deadlock
+		go func(events []interface{}) {
+			for _, event := range delayed {
+				el.AddEvent(event)
+			}
+		}(delayed)
+		delete(el.waitingEvents, t)
 	}
 	el.mut.Unlock()
 }

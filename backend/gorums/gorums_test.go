@@ -81,7 +81,7 @@ func TestPropose(t *testing.T) {
 		wg.Add(3)
 		cfg.Propose(want)
 		wg.Wait()
-	}, func(event interface{}) (consume bool) {
+	}, func(event interface{}) {
 		got := event.(consensus.ProposeMsg)
 		if got.ID != want.ID {
 			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
@@ -90,7 +90,6 @@ func TestPropose(t *testing.T) {
 			t.Error("block hashes do not match")
 		}
 		wg.Done()
-		return true
 	})
 }
 
@@ -106,7 +105,7 @@ func TestTimeout(t *testing.T) {
 		wg.Add(3)
 		cfg.Timeout(want)
 		wg.Wait()
-	}, func(event interface{}) (consume bool) {
+	}, func(event interface{}) {
 		got := event.(consensus.TimeoutMsg)
 		if got.ID != want.ID {
 			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
@@ -115,7 +114,6 @@ func TestTimeout(t *testing.T) {
 			t.Errorf("wrong view in proposal: got: %d, want: %d", got.View, want.View)
 		}
 		wg.Done()
-		return true
 	})
 
 }

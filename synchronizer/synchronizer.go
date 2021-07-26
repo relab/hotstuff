@@ -39,16 +39,14 @@ func (s *Synchronizer) InitModule(hs *consensus.Modules, opts *consensus.Options
 	}
 	s.mod = hs
 
-	s.mod.EventLoop().RegisterHandler(consensus.NewViewMsg{}, func(event interface{}) (consume bool) {
+	s.mod.EventLoop().RegisterHandler(consensus.NewViewMsg{}, func(event interface{}) {
 		newViewMsg := event.(consensus.NewViewMsg)
 		s.OnNewView(newViewMsg)
-		return true
 	})
 
-	s.mod.EventLoop().RegisterHandler(consensus.TimeoutMsg{}, func(event interface{}) (consume bool) {
+	s.mod.EventLoop().RegisterHandler(consensus.TimeoutMsg{}, func(event interface{}) {
 		timeoutMsg := event.(consensus.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
-		return true
 	})
 
 	var err error

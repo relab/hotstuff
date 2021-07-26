@@ -13,9 +13,8 @@ type testEvent int
 func TestSyncHandler(t *testing.T) {
 	el := eventloop.New(10)
 	c := make(chan interface{})
-	el.RegisterHandler(testEvent(0), func(event interface{}) (consume bool) {
+	el.RegisterHandler(testEvent(0), func(event interface{}) {
 		c <- event
-		return true
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -44,9 +43,8 @@ func TestSyncHandler(t *testing.T) {
 func TestTicker(t *testing.T) {
 	el := eventloop.New(10)
 	count := 0
-	el.RegisterHandler(testEvent(0), func(event interface{}) (consume bool) {
+	el.RegisterHandler(testEvent(0), func(event interface{}) {
 		count += int(event.(testEvent))
-		return true
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

@@ -22,10 +22,9 @@ func NewVotingMachine() *VotingMachine {
 // settings using the ConfigBuilder.
 func (vm *VotingMachine) InitModule(hs *Modules, _ *OptionsBuilder) {
 	vm.mod = hs
-	vm.mod.EventLoop().RegisterAsyncHandler(VoteMsg{}, func(event interface{}) (consume bool) {
+	vm.mod.EventLoop().RegisterAsyncHandler(VoteMsg{}, func(event interface{}) {
 		vote := event.(VoteMsg)
 		go vm.OnVote(vote)
-		return true
 	})
 }
 

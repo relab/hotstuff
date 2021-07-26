@@ -25,10 +25,9 @@ type blockChain struct {
 func (chain *blockChain) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder) {
 	chain.mod = hs
 
-	chain.mod.EventLoop().RegisterAsyncHandler(consensus.ProposeMsg{}, func(event interface{}) (consume bool) {
+	chain.mod.EventLoop().RegisterAsyncObserver(consensus.ProposeMsg{}, func(event interface{}) {
 		proposal := event.(consensus.ProposeMsg)
 		chain.Store(proposal.Block)
-		return false
 	})
 }
 
