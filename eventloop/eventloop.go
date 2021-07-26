@@ -108,10 +108,10 @@ func (el *EventLoop) processEvent(e interface{}) {
 	el.mut.Unlock()
 }
 
-// AwaitEvent allows us to defer execution of an event until after another event has happened.
+// DelayUntil allows us to delay handling of an event until after another event has happened.
 // The eventType parameter decides the type of event to wait for, and it should be the zero value
-// of that event type. The event parameter is the event that will be deferred.
-func (el *EventLoop) AwaitEvent(eventType, event interface{}) {
+// of that event type. The event parameter is the event that will be delayed.
+func (el *EventLoop) DelayUntil(eventType, event interface{}) {
 	el.mut.Lock()
 	v := el.waitingEvents[eventType]
 	v = append(v, event)
