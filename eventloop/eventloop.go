@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"sync"
+	"time"
 )
 
 // EventHandler processes the given event. It should return true if the event is consumed.
@@ -18,16 +19,20 @@ type EventLoop struct {
 
 	handlers      map[reflect.Type]EventHandler
 	asyncHandlers map[reflect.Type][]EventHandler
+	tickers       map[int]*ticker
+	tickerID      int
 }
 
 // New returns a new event loop with the requested buffer size.
 func New(bufferSize uint) *EventLoop {
-	return &EventLoop{
+	el := &EventLoop{
 		eventQ:        make(chan interface{}, bufferSize),
 		waitingEvents: make(map[interface{}][]interface{}),
 		handlers:      make(map[reflect.Type]EventHandler),
 		asyncHandlers: make(map[reflect.Type][]EventHandler),
+		tickers:       make(map[int]*ticker),
 	}
+	return el
 }
 
 // RegisterHandler registers a handler for events with the same type as the 'eventType' argument.
@@ -68,6 +73,10 @@ func (el *EventLoop) Run(ctx context.Context) {
 	for {
 		select {
 		case event := <-el.eventQ:
+			if e, ok := event.(startTickerEvent); ok {
+				el.startTicker(ctx, e.tickerID)
+				break
+			}
 			el.processEvent(event)
 		case <-ctx.Done():
 			goto cancelled
@@ -117,4 +126,79 @@ func (el *EventLoop) DelayUntil(eventType, event interface{}) {
 	v = append(v, event)
 	el.waitingEvents[eventType] = v
 	el.mut.Unlock()
+}
+
+type ticker struct {
+	interval time.Duration
+	event    interface{}
+	cancel   context.CancelFunc
+}
+
+type startTickerEvent struct {
+	tickerID int
+}
+
+// AddTicker adds a ticker with the specified interval and returns the ticker id.
+// The ticker will send the specified event on the event loop at regular intervals.
+// The returned ticker id can be used to remove the ticker with RemoveTicker.
+// The ticker will not be started before the event loop is running.
+func (el *EventLoop) AddTicker(interval time.Duration, event interface{}) int {
+	el.mut.Lock()
+
+	id := el.tickerID
+	el.tickerID++
+
+	ticker := ticker{
+		interval: interval,
+		event:    event,
+		cancel:   func() {}, // initialized to empty function to avoid nil
+	}
+	el.tickers[id] = &ticker
+
+	el.mut.Unlock()
+
+	el.eventQ <- startTickerEvent{id}
+
+	return id
+}
+
+// RemoveTicker removes the ticker with the specified id.
+// If the ticker was removed, RemoveTicker will return true.
+// If the ticker does not exist, false will be returned instead.
+func (el *EventLoop) RemoveTicker(id int) bool {
+	el.mut.Lock()
+	defer el.mut.Unlock()
+
+	ticker, ok := el.tickers[id]
+	if !ok {
+		return false
+	}
+	ticker.cancel()
+	delete(el.tickers, id)
+	return true
+}
+
+func (el *EventLoop) startTicker(ctx context.Context, id int) {
+	// lock the mutex such that the ticker cannot be removed until we have started it
+	el.mut.Lock()
+	defer el.mut.Unlock()
+	ticker, ok := el.tickers[id]
+	if !ok {
+		return
+	}
+	ctx, ticker.cancel = context.WithCancel(ctx)
+	go el.runTicker(ctx, ticker)
+}
+
+func (el *EventLoop) runTicker(ctx context.Context, ticker *ticker) {
+	t := time.NewTicker(ticker.interval)
+	for {
+		select {
+		case <-t.C:
+			el.AddEvent(ticker.event)
+		case <-ctx.Done():
+			t.Stop()
+			return
+		}
+	}
 }
