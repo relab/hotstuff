@@ -181,7 +181,7 @@ func (el *EventLoop) DelayUntil(eventType, event interface{}) {
 
 type ticker struct {
 	interval time.Duration
-	event    interface{}
+	callback func(time.Time) interface{}
 	cancel   context.CancelFunc
 }
 
@@ -193,7 +193,7 @@ type startTickerEvent struct {
 // The ticker will send the specified event on the event loop at regular intervals.
 // The returned ticker id can be used to remove the ticker with RemoveTicker.
 // The ticker will not be started before the event loop is running.
-func (el *EventLoop) AddTicker(interval time.Duration, event interface{}) int {
+func (el *EventLoop) AddTicker(interval time.Duration, callback func(tick time.Time) (event interface{})) int {
 	el.mut.Lock()
 
 	id := el.tickerID
@@ -201,7 +201,7 @@ func (el *EventLoop) AddTicker(interval time.Duration, event interface{}) int {
 
 	ticker := ticker{
 		interval: interval,
-		event:    event,
+		callback: callback,
 		cancel:   func() {}, // initialized to empty function to avoid nil
 	}
 	el.tickers[id] = &ticker
@@ -245,8 +245,8 @@ func (el *EventLoop) runTicker(ctx context.Context, ticker *ticker) {
 	t := time.NewTicker(ticker.interval)
 	for {
 		select {
-		case <-t.C:
-			el.AddEvent(ticker.event)
+		case tick := <-t.C:
+			el.AddEvent(ticker.callback(tick))
 		case <-ctx.Done():
 			t.Stop()
 			return
