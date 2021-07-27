@@ -13,6 +13,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto/bls12"
 	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
@@ -52,7 +53,7 @@ func GenerateRootCert(privateKey *ecdsa.PrivateKey) (cert *x509.Certificate, err
 }
 
 // GenerateTLSCert generates a TLS certificate for the server that is valid for the given hosts.
-func GenerateTLSCert(id consensus.ID, hosts []string, parent *x509.Certificate, signeeKey *ecdsa.PublicKey, signerKey *ecdsa.PrivateKey) (cert *x509.Certificate, err error) {
+func GenerateTLSCert(id hotstuff.ID, hosts []string, parent *x509.Certificate, signeeKey *ecdsa.PublicKey, signerKey *ecdsa.PrivateKey) (cert *x509.Certificate, err error) {
 	sn, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
 	if err != nil {
 		return nil, err
@@ -296,7 +297,7 @@ type KeyChain struct {
 }
 
 // GenerateKeyChain generates keys and certificates for a replica.
-func GenerateKeyChain(id consensus.ID, validFor []string, crypto string, ca *x509.Certificate, caKey *ecdsa.PrivateKey) (KeyChain, error) {
+func GenerateKeyChain(id hotstuff.ID, validFor []string, crypto string, ca *x509.Certificate, caKey *ecdsa.PrivateKey) (KeyChain, error) {
 	ecdsaKey, err := GenerateECDSAPrivateKey()
 	if err != nil {
 		return KeyChain{}, err

@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"google.golang.org/grpc"
@@ -63,7 +64,7 @@ func (srv *Server) StartOnListener(listener net.Listener) {
 	}()
 }
 
-func (srv *Server) getClientID(ctx context.Context) (consensus.ID, error) {
+func (srv *Server) getClientID(ctx context.Context) (hotstuff.ID, error) {
 	peerInfo, ok := peer.FromContext(ctx)
 	if !ok {
 		return 0, fmt.Errorf("getClientID: peerInfo not available")
@@ -77,7 +78,7 @@ func (srv *Server) getClientID(ctx context.Context) (consensus.ID, error) {
 		if len(tlsInfo.State.PeerCertificates) > 0 {
 			cert := tlsInfo.State.PeerCertificates[0]
 			for replicaID := range srv.mod.Configuration().Replicas() {
-				if subject, err := strconv.Atoi(cert.Subject.CommonName); err == nil && consensus.ID(subject) == replicaID {
+				if subject, err := strconv.Atoi(cert.Subject.CommonName); err == nil && hotstuff.ID(subject) == replicaID {
 					return replicaID, nil
 				}
 			}
@@ -101,7 +102,7 @@ func (srv *Server) getClientID(ctx context.Context) (consensus.ID, error) {
 		return 0, fmt.Errorf("getClientID: cannot parse ID field: %w", err)
 	}
 
-	return consensus.ID(id), nil
+	return hotstuff.ID(id), nil
 }
 
 // Stop stops the server.

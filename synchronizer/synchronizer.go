@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 )
 
@@ -29,7 +30,7 @@ type Synchronizer struct {
 	cancelCtx context.CancelFunc
 
 	// map of collected timeout messages per view
-	timeouts map[consensus.View]map[consensus.ID]consensus.TimeoutMsg
+	timeouts map[consensus.View]map[hotstuff.ID]consensus.TimeoutMsg
 }
 
 // InitModule initializes the synchronizer with the given HotStuff instance.
@@ -73,7 +74,7 @@ func New(viewDuration ViewDuration) consensus.Synchronizer {
 		duration: viewDuration,
 		timer:    time.AfterFunc(0, func() {}), // dummy timer that will be replaced after start() is called
 
-		timeouts: make(map[consensus.View]map[consensus.ID]consensus.TimeoutMsg),
+		timeouts: make(map[consensus.View]map[hotstuff.ID]consensus.TimeoutMsg),
 	}
 }
 
@@ -191,7 +192,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout consensus.TimeoutMsg) {
 
 	timeouts, ok := s.timeouts[timeout.View]
 	if !ok {
-		timeouts = make(map[consensus.ID]consensus.TimeoutMsg)
+		timeouts = make(map[hotstuff.ID]consensus.TimeoutMsg)
 		s.timeouts[timeout.View] = timeouts
 	}
 

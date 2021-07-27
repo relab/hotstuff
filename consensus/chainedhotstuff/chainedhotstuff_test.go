@@ -10,6 +10,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff"
 	backend "github.com/relab/hotstuff/backend/gorums"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
@@ -189,7 +190,7 @@ func TestChainedHotstuff(t *testing.T) {
 		listeners[i] = testutil.CreateTCPListener(t)
 		key := testutil.GenerateECDSAKey(t)
 		keys[i] = key
-		id := consensus.ID(i + 1)
+		id := hotstuff.ID(i + 1)
 		baseCfg.Replicas[id] = &config.ReplicaInfo{
 			ID:      id,
 			Address: listeners[i].Addr().String(),
@@ -203,7 +204,7 @@ func TestChainedHotstuff(t *testing.T) {
 	synchronizers := make([]consensus.Synchronizer, n)
 	for i := 0; i < n; i++ {
 		c := *baseCfg
-		c.ID = consensus.ID(i + 1)
+		c.ID = hotstuff.ID(i + 1)
 		c.PrivateKey = keys[i].(*ecdsa.PrivateKey)
 		configs[i] = backend.NewConfig(c.ID, nil, gorums.WithDialTimeout(time.Second))
 		servers[i] = backend.NewServer()

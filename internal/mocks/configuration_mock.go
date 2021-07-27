@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	hotstuff "github.com/relab/hotstuff"
 	consensus "github.com/relab/hotstuff/consensus"
 )
 
@@ -91,7 +92,7 @@ func (mr *MockConfigurationMockRecorder) QuorumSize() *gomock.Call {
 }
 
 // Replica mocks base method.
-func (m *MockConfiguration) Replica(arg0 consensus.ID) (consensus.Replica, bool) {
+func (m *MockConfiguration) Replica(arg0 hotstuff.ID) (consensus.Replica, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Replica", arg0)
 	ret0, _ := ret[0].(consensus.Replica)
@@ -106,10 +107,10 @@ func (mr *MockConfigurationMockRecorder) Replica(arg0 interface{}) *gomock.Call 
 }
 
 // Replicas mocks base method.
-func (m *MockConfiguration) Replicas() map[consensus.ID]consensus.Replica {
+func (m *MockConfiguration) Replicas() map[hotstuff.ID]consensus.Replica {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Replicas")
-	ret0, _ := ret[0].(map[consensus.ID]consensus.Replica)
+	ret0, _ := ret[0].(map[hotstuff.ID]consensus.Replica)
 	return ret0
 }
 

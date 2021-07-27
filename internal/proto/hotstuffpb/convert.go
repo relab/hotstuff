@@ -3,6 +3,7 @@ package hotstuffpb
 import (
 	"math/big"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
@@ -33,7 +34,7 @@ func SignatureFromProto(sig *Signature) consensus.Signature {
 		r.SetBytes(signature.GetR())
 		s := new(big.Int)
 		s.SetBytes(signature.GetS())
-		return ecdsa.RestoreSignature(r, s, consensus.ID(signature.GetSigner()))
+		return ecdsa.RestoreSignature(r, s, hotstuff.ID(signature.GetSigner()))
 	}
 	if signature := sig.GetBLS12Sig(); signature != nil {
 		s := &bls12.Signature{}
@@ -80,7 +81,7 @@ func ThresholdSignatureFromProto(sig *ThresholdSignature) consensus.ThresholdSig
 			r.SetBytes(sig.GetR())
 			s := new(big.Int)
 			s.SetBytes(sig.GetS())
-			sigs[i] = ecdsa.RestoreSignature(r, s, consensus.ID(sig.GetSigner()))
+			sigs[i] = ecdsa.RestoreSignature(r, s, hotstuff.ID(sig.GetSigner()))
 		}
 		return ecdsa.RestoreThresholdSignature(sigs)
 	}
@@ -169,7 +170,7 @@ func BlockFromProto(block *Block) *consensus.Block {
 		QuorumCertFromProto(block.GetQC()),
 		consensus.Command(block.GetCommand()),
 		consensus.View(block.GetView()),
-		consensus.ID(block.GetProposer()),
+		hotstuff.ID(block.GetProposer()),
 	)
 }
 
@@ -214,9 +215,9 @@ func TimeoutCertToProto(timeoutCert consensus.TimeoutCert) *TimeoutCert {
 
 // AggregateQCFromProto converts an AggregateQC from the protobuf type to the hotstuff type.
 func AggregateQCFromProto(m *AggQC) consensus.AggregateQC {
-	qcs := make(map[consensus.ID]consensus.QuorumCert)
+	qcs := make(map[hotstuff.ID]consensus.QuorumCert)
 	for id, pQC := range m.GetQCs() {
-		qcs[consensus.ID(id)] = QuorumCertFromProto(pQC)
+		qcs[hotstuff.ID(id)] = QuorumCertFromProto(pQC)
 	}
 	return consensus.NewAggregateQC(qcs, ThresholdSignatureFromProto(m.GetSig()), consensus.View(m.GetView()))
 }

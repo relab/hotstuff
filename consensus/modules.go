@@ -3,6 +3,7 @@ package consensus
 import (
 	"context"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/logging"
 )
@@ -11,7 +12,7 @@ import (
 type Modules struct {
 	// data
 
-	id            ID
+	id            hotstuff.ID
 	privateKey    PrivateKey
 	logger        logging.Logger
 	opts          Options
@@ -52,7 +53,7 @@ func (mod *Modules) Run(ctx context.Context) {
 }
 
 // ID returns the id.
-func (mod *Modules) ID() ID {
+func (mod *Modules) ID() hotstuff.ID {
 	return mod.id
 }
 
@@ -148,7 +149,7 @@ type Builder struct {
 }
 
 // NewBuilder creates a new Builder.
-func NewBuilder(id ID, privateKey PrivateKey) Builder {
+func NewBuilder(id hotstuff.ID, privateKey PrivateKey) Builder {
 	bl := Builder{mod: &Modules{
 		id:            id,
 		privateKey:    privateKey,
@@ -266,11 +267,11 @@ type CryptoImpl interface {
 	CreateThresholdSignature(partialSignatures []Signature, hash Hash) (ThresholdSignature, error)
 	// CreateThresholdSignatureForMessageSet creates a threshold signature where each partial signature has signed a
 	// different message hash.
-	CreateThresholdSignatureForMessageSet(partialSignatures []Signature, hashes map[ID]Hash) (ThresholdSignature, error)
+	CreateThresholdSignatureForMessageSet(partialSignatures []Signature, hashes map[hotstuff.ID]Hash) (ThresholdSignature, error)
 	// VerifyThresholdSignature verifies a threshold signature.
 	VerifyThresholdSignature(signature ThresholdSignature, hash Hash) bool
 	// VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
-	VerifyThresholdSignatureForMessageSet(signature ThresholdSignature, hashes map[ID]Hash) bool
+	VerifyThresholdSignatureForMessageSet(signature ThresholdSignature, hashes map[hotstuff.ID]Hash) bool
 }
 
 // Crypto implements the methods required to create and verify signatures and certificates.
@@ -318,7 +319,7 @@ type BlockChain interface {
 // The methods Vote, NewView, and Deliver must send the respective arguments to the remote replica.
 type Replica interface {
 	// ID returns the replica's id.
-	ID() ID
+	ID() hotstuff.ID
 	// PublicKey returns the replica's public key.
 	PublicKey() PublicKey
 	// Vote sends the partial certificate to the other replica.
@@ -333,9 +334,9 @@ type Replica interface {
 // It provides methods to send messages to the other replicas.
 type Configuration interface {
 	// Replicas returns all of the replicas in the configuration.
-	Replicas() map[ID]Replica
+	Replicas() map[hotstuff.ID]Replica
 	// Replica returns a replica if present in the configuration.
-	Replica(ID) (replica Replica, ok bool)
+	Replica(hotstuff.ID) (replica Replica, ok bool)
 	// Len returns the number of replicas in the configuration.
 	Len() int
 	// QuorumSize returns the size of a quorum.
@@ -363,7 +364,7 @@ type Consensus interface {
 // LeaderRotation implements a leader rotation scheme.
 type LeaderRotation interface {
 	// GetLeader returns the id of the leader in the given view.
-	GetLeader(View) ID
+	GetLeader(View) hotstuff.ID
 }
 
 //go:generate mockgen -destination=../internal/mocks/synchronizer_mock.go -package=mocks . Synchronizer

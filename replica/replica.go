@@ -9,6 +9,7 @@ import (
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff"
 	backend "github.com/relab/hotstuff/backend/gorums"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
@@ -25,7 +26,7 @@ type cmdID struct {
 // Config configures a replica.
 type Config struct {
 	// The id of the replica.
-	ID consensus.ID
+	ID hotstuff.ID
 	// The private key of the replica.
 	PrivateKey consensus.PrivateKey
 	// Controls whether TLS is used.

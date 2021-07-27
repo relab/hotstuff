@@ -9,7 +9,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"go.uber.org/multierr"
@@ -41,9 +41,9 @@ type Experiment struct {
 	HostConfigs map[string]HostConfig
 
 	// the host associated with each replica.
-	hostsToReplicas map[string][]consensus.ID
+	hostsToReplicas map[string][]hotstuff.ID
 	// the host associated with each client.
-	hostsToClients map[string][]consensus.ID
+	hostsToClients map[string][]hotstuff.ID
 	caKey          *ecdsa.PrivateKey
 	ca             *x509.Certificate
 }
@@ -155,11 +155,11 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 // assignReplicasAndClients assigns replica and client ids to each host,
 // based on the requested amount of replicas/clients and the assignments for each host.
 func (e *Experiment) assignReplicasAndClients() (err error) {
-	e.hostsToReplicas = make(map[string][]consensus.ID)
-	e.hostsToClients = make(map[string][]consensus.ID)
+	e.hostsToReplicas = make(map[string][]hotstuff.ID)
+	e.hostsToClients = make(map[string][]hotstuff.ID)
 
-	nextReplicaID := consensus.ID(1)
-	nextClientID := consensus.ID(1)
+	nextReplicaID := hotstuff.ID(1)
+	nextClientID := hotstuff.ID(1)
 
 	// number of replicas that should be auto assigned
 	remainingReplicas := e.NumReplicas
@@ -332,7 +332,7 @@ func (e *Experiment) quit() error {
 	return nil
 }
 
-func getIDs(host string, m map[string][]consensus.ID) []uint32 {
+func getIDs(host string, m map[string][]hotstuff.ID) []uint32 {
 	var ids []uint32
 	for _, id := range m[host] {
 		ids = append(ids, uint32(id))

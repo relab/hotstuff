@@ -8,6 +8,7 @@ import (
 	"math/big"
 
 	bls12 "github.com/kilic/bls12-381"
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"go.uber.org/multierr"
@@ -82,7 +83,7 @@ func (priv *PrivateKey) Public() consensus.PublicKey {
 
 // Signature is a bls12-381 signature.
 type Signature struct {
-	signer consensus.ID
+	signer hotstuff.ID
 	s      *bls12.PointG2
 }
 
@@ -96,7 +97,7 @@ func (s *Signature) ToBytes() []byte {
 
 // FromBytes unmarshals a signature from a byte slice.
 func (s *Signature) FromBytes(b []byte) (err error) {
-	s.signer = consensus.ID(binary.LittleEndian.Uint32(b))
+	s.signer = hotstuff.ID(binary.LittleEndian.Uint32(b))
 	s.s, err = bls12.NewG2().FromCompressed(b[4:])
 	if err != nil {
 		return fmt.Errorf("bls12: failed to decompress signature: %w", err)
@@ -105,7 +106,7 @@ func (s *Signature) FromBytes(b []byte) (err error) {
 }
 
 // Signer returns the ID of the replica that generated the signature.
-func (s *Signature) Signer() consensus.ID {
+func (s *Signature) Signer() hotstuff.ID {
 	return s.signer
 }
 
@@ -181,7 +182,7 @@ func (bc *bls12Crypto) Sign(hash consensus.Hash) (sig consensus.Signature, err e
 	return &Signature{signer: bc.mod.ID(), s: p}, nil
 }
 
-func (bc *bls12Crypto) aggregateSignatures(signatures map[consensus.ID]*Signature) *AggregateSignature {
+func (bc *bls12Crypto) aggregateSignatures(signatures map[hotstuff.ID]*Signature) *AggregateSignature {
 	if len(signatures) == 0 {
 		return nil
 	}
@@ -224,7 +225,7 @@ func (bc *bls12Crypto) VerifyThresholdSignature(signature consensus.ThresholdSig
 		return false
 	}
 	pubKeys := make([]*PublicKey, 0)
-	sig.participants.ForEach(func(id consensus.ID) {
+	sig.participants.ForEach(func(id hotstuff.ID) {
 		replica, ok := bc.mod.Configuration().Replica(id)
 		if !ok {
 			return
@@ -248,7 +249,7 @@ func (bc *bls12Crypto) VerifyThresholdSignature(signature consensus.ThresholdSig
 }
 
 // VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
-func (bc *bls12Crypto) VerifyThresholdSignatureForMessageSet(signature consensus.ThresholdSignature, hashes map[consensus.ID]consensus.Hash) bool {
+func (bc *bls12Crypto) VerifyThresholdSignatureForMessageSet(signature consensus.ThresholdSignature, hashes map[hotstuff.ID]consensus.Hash) bool {
 	sig, ok := signature.(*AggregateSignature)
 	if !ok {
 		return false
@@ -290,7 +291,7 @@ func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []consensus.Si
 	if len(partialSignatures) < bc.mod.Configuration().QuorumSize() {
 		return nil, crypto.ErrNotAQuorum
 	}
-	sigs := make(map[consensus.ID]*Signature, len(partialSignatures))
+	sigs := make(map[hotstuff.ID]*Signature, len(partialSignatures))
 	for _, sig := range partialSignatures {
 		if _, ok := sigs[sig.Signer()]; ok {
 			err = multierr.Append(err, crypto.ErrPartialDuplicate)
@@ -311,7 +312,7 @@ func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []consensus.Si
 
 // CreateThresholdSignatureForMessageSet creates a threshold signature where each partial signature has signed a
 // different message hash.
-func (bc *bls12Crypto) CreateThresholdSignatureForMessageSet(partialSignatures []consensus.Signature, hashes map[consensus.ID]consensus.Hash) (consensus.ThresholdSignature, error) {
+func (bc *bls12Crypto) CreateThresholdSignatureForMessageSet(partialSignatures []consensus.Signature, hashes map[hotstuff.ID]consensus.Hash) (consensus.ThresholdSignature, error) {
 	// Don't care about the hashes for signature aggregation.
 	return bc.CreateThresholdSignature(partialSignatures, consensus.Hash{})
 }

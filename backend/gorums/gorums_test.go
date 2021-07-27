@@ -12,6 +12,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto/keygen"
@@ -140,7 +141,7 @@ func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
 		listeners[i] = testutil.CreateTCPListener(t)
 		keys = append(keys, testutil.GenerateECDSAKey(t))
 		replicas = append(replicas, &config.ReplicaInfo{
-			ID:      consensus.ID(i) + 1,
+			ID:      hotstuff.ID(i) + 1,
 			Address: listeners[i].Addr().String(),
 			PubKey:  keys[i].Public(),
 		})
@@ -168,10 +169,10 @@ func setupTLS(t *testing.T, ctrl *gomock.Controller, n int) testData {
 
 	for i := 0; i < n; i++ {
 		cert, err := keygen.GenerateTLSCert(
-			consensus.ID(i)+1,
+			hotstuff.ID(i)+1,
 			[]string{"localhost", "127.0.0.1"},
 			ca,
-			td.cfg.Replicas[consensus.ID(i)+1].PubKey.(*ecdsa.PublicKey),
+			td.cfg.Replicas[hotstuff.ID(i)+1].PubKey.(*ecdsa.PublicKey),
 			caPK.(*ecdsa.PrivateKey),
 		)
 		if err != nil {
@@ -204,7 +205,7 @@ func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (teardown
 	servers := make([]*Server, td.n)
 	for i := range servers {
 		cfg := td.cfg
-		cfg.ID = consensus.ID(i + 1)
+		cfg.ID = hotstuff.ID(i + 1)
 		cfg.PrivateKey = td.keys[i]
 		servers[i] = NewServer(gorums.WithGRPCServerOptions(grpc.Creds(cfg.Creds)))
 		servers[i].StartOnListener(td.listeners[i])

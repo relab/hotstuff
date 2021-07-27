@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/synchronizer"
@@ -38,7 +39,7 @@ func TestVote(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create partial certificate: %v", err)
 		}
-		hs.EventLoop().AddEvent(consensus.VoteMsg{ID: consensus.ID(i + 1), PartialCert: pc})
+		hs.EventLoop().AddEvent(consensus.VoteMsg{ID: hotstuff.ID(i + 1), PartialCert: pc})
 	}
 
 	hs.Run(ctx)

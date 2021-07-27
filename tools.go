@@ -1,6 +1,6 @@
 // +build tools
 
-package main
+package hotstuff
 
 import (
 	_ "github.com/relab/gorums/cmd/protoc-gen-gorums"

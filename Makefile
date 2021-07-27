@@ -6,7 +6,7 @@ proto_src := internal/proto/clientpb/client.proto \
 proto_go := $(proto_src:%.proto=%.pb.go)
 gorums_go := $(proto_src:%.proto=%_gorums.pb.go)
 
-binaries := ./hotstuff
+binaries := ./hotstuff-cli/hotstuff-cli
 
 .PHONY: all debug clean protos download tools $(binaries)
 

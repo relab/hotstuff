@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
@@ -22,7 +23,7 @@ import (
 )
 
 // TestModules returns a builder containing default modules for testing.
-func TestModules(t *testing.T, ctrl *gomock.Controller, id consensus.ID, privkey consensus.PrivateKey) consensus.Builder {
+func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey consensus.PrivateKey) consensus.Builder {
 	t.Helper()
 	builder := consensus.NewBuilder(id, privkey)
 
@@ -44,7 +45,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id consensus.ID, privkey
 
 	replica := CreateMockReplica(t, ctrl, id, privkey.Public())
 	ConfigAddReplica(t, config, replica)
-	config.EXPECT().Replicas().AnyTimes().Return((map[consensus.ID]consensus.Replica{1: replica}))
+	config.EXPECT().Replicas().AnyTimes().Return((map[hotstuff.ID]consensus.Replica{1: replica}))
 
 	synchronizer := mocks.NewMockSynchronizer(ctrl)
 	synchronizer.EXPECT().Start(gomock.Any()).AnyTimes()
@@ -114,7 +115,7 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...consen
 	replicas := make([]*mocks.MockReplica, n)
 	configs := make([]*mocks.MockConfiguration, n)
 	for i := 0; i < n; i++ {
-		id := consensus.ID(i + 1)
+		id := hotstuff.ID(i + 1)
 		var key consensus.PrivateKey
 		if i < len(keys) {
 			key = keys[i]
@@ -133,8 +134,8 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...consen
 		}
 		config.EXPECT().Len().AnyTimes().Return(len(replicas))
 		config.EXPECT().QuorumSize().AnyTimes().Return(consensus.QuorumSize(len(replicas)))
-		config.EXPECT().Replicas().AnyTimes().DoAndReturn(func() map[consensus.ID]consensus.Replica {
-			m := make(map[consensus.ID]consensus.Replica)
+		config.EXPECT().Replicas().AnyTimes().DoAndReturn(func() map[hotstuff.ID]consensus.Replica {
+			m := make(map[hotstuff.ID]consensus.Replica)
 			for _, replica := range replicas {
 				m[replica.ID()] = replica
 			}
@@ -156,7 +157,7 @@ func CreateMockConfigurationWithReplicas(t *testing.T, ctrl *gomock.Controller, 
 		if len(keys) <= i {
 			keys = append(keys, GenerateECDSAKey(t))
 		}
-		replicas[i] = CreateMockReplica(t, ctrl, consensus.ID(i+1), keys[i].Public())
+		replicas[i] = CreateMockReplica(t, ctrl, hotstuff.ID(i+1), keys[i].Public())
 		ConfigAddReplica(t, cfg, replicas[i])
 	}
 	cfg.EXPECT().Len().AnyTimes().Return(len(replicas))
@@ -165,7 +166,7 @@ func CreateMockConfigurationWithReplicas(t *testing.T, ctrl *gomock.Controller, 
 }
 
 // CreateMockReplica returns a mock of a consensus.Replica.
-func CreateMockReplica(t *testing.T, ctrl *gomock.Controller, id consensus.ID, key consensus.PublicKey) *mocks.MockReplica {
+func CreateMockReplica(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, key consensus.PublicKey) *mocks.MockReplica {
 	t.Helper()
 
 	replica := mocks.NewMockReplica(ctrl)
@@ -319,17 +320,17 @@ func GenerateKeys(t *testing.T, n int, keyFunc func(t *testing.T) consensus.Priv
 }
 
 // NewProposeMsg wraps a new block in a ProposeMsg.
-func NewProposeMsg(parent consensus.Hash, qc consensus.QuorumCert, cmd consensus.Command, view consensus.View, id consensus.ID) consensus.ProposeMsg {
+func NewProposeMsg(parent consensus.Hash, qc consensus.QuorumCert, cmd consensus.Command, view consensus.View, id hotstuff.ID) consensus.ProposeMsg {
 	return consensus.ProposeMsg{ID: id, Block: consensus.NewBlock(parent, qc, cmd, view, id)}
 }
 
 type leaderRotation struct {
 	t     *testing.T
-	order []consensus.ID
+	order []hotstuff.ID
 }
 
 // GetLeader returns the id of the leader in the given view.
-func (l leaderRotation) GetLeader(v consensus.View) consensus.ID {
+func (l leaderRotation) GetLeader(v consensus.View) hotstuff.ID {
 	l.t.Helper()
 	if v == 0 {
 		l.t.Fatalf("attempt to get leader for view 0")
@@ -341,7 +342,7 @@ func (l leaderRotation) GetLeader(v consensus.View) consensus.ID {
 }
 
 // NewLeaderRotation returns a leader rotation implementation that will return leaders in the specified order.
-func NewLeaderRotation(t *testing.T, order ...consensus.ID) consensus.LeaderRotation {
+func NewLeaderRotation(t *testing.T, order ...hotstuff.ID) consensus.LeaderRotation {
 	t.Helper()
 	return leaderRotation{t, order}
 }

@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+
+	"github.com/relab/hotstuff"
 )
 
 // Block contains a propsed "command", metadata for the protocol, and a link to the "parent" block.
@@ -11,14 +13,14 @@ type Block struct {
 	// keep a copy of the hash to avoid hashing multiple times
 	hash     Hash
 	parent   Hash
-	proposer ID
+	proposer hotstuff.ID
 	cmd      Command
 	cert     QuorumCert
 	view     View
 }
 
 // NewBlock creates a new Block
-func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID) *Block {
+func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer hotstuff.ID) *Block {
 	b := &Block{
 		parent:   parent,
 		cert:     cert,
@@ -48,7 +50,7 @@ func (b *Block) Hash() Hash {
 }
 
 // Proposer returns the id of the replica who proposed the block.
-func (b *Block) Proposer() ID {
+func (b *Block) Proposer() hotstuff.ID {
 	return b.proposer
 }
 

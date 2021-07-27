@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
@@ -26,8 +27,8 @@ func TestCreatePartialCert(t *testing.T) {
 			t.Error("Partial certificate hash does not match block hash!")
 		}
 
-		if signerID := partialCert.Signature().Signer(); signerID != consensus.ID(1) {
-			t.Errorf("Wrong ID for signer in partial certificate: got: %d, want: %d", signerID, consensus.ID(1))
+		if signerID := partialCert.Signature().Signer(); signerID != hotstuff.ID(1) {
+			t.Errorf("Wrong ID for signer in partial certificate: got: %d, want: %d", signerID, hotstuff.ID(1))
 		}
 	}
 	runAll(t, run)

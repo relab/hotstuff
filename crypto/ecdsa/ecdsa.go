@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"go.uber.org/multierr"
@@ -24,16 +25,16 @@ const (
 // Signature is an ECDSA signature
 type Signature struct {
 	r, s   *big.Int
-	signer consensus.ID
+	signer hotstuff.ID
 }
 
 // RestoreSignature restores an existing signature. It should not be used to create new signatures, use Sign instead.
-func RestoreSignature(r, s *big.Int, signer consensus.ID) *Signature {
+func RestoreSignature(r, s *big.Int, signer hotstuff.ID) *Signature {
 	return &Signature{r, s, signer}
 }
 
 // Signer returns the ID of the replica that generated the signature.
-func (sig Signature) Signer() consensus.ID {
+func (sig Signature) Signer() hotstuff.ID {
 	return sig.signer
 }
 
@@ -59,7 +60,7 @@ var _ consensus.Signature = (*Signature)(nil)
 
 // ThresholdSignature is a set of (partial) signatures that form a valid threshold signature when there are a quorum
 // of valid (partial) signatures.
-type ThresholdSignature map[consensus.ID]*Signature
+type ThresholdSignature map[hotstuff.ID]*Signature
 
 // RestoreThresholdSignature should only be used to restore an existing threshold signature from a set of signatures.
 // To create a new verifiable threshold signature, use CreateThresholdSignature instead.
@@ -75,7 +76,7 @@ func RestoreThresholdSignature(signatures []*Signature) ThresholdSignature {
 func (sig ThresholdSignature) ToBytes() []byte {
 	var b []byte
 	// sort by ID to make it deterministic
-	order := make([]consensus.ID, 0, len(sig))
+	order := make([]hotstuff.ID, 0, len(sig))
 	for _, signature := range sig {
 		i := sort.Search(len(order), func(i int) bool { return signature.signer < order[i] })
 		order = append(order, 0)
@@ -94,18 +95,18 @@ func (sig ThresholdSignature) Participants() consensus.IDSet {
 }
 
 // Add adds an ID to the set.
-func (sig ThresholdSignature) Add(id consensus.ID) {
+func (sig ThresholdSignature) Add(id hotstuff.ID) {
 	panic("not implemented")
 }
 
 // Contains returns true if the set contains the ID.
-func (sig ThresholdSignature) Contains(id consensus.ID) bool {
+func (sig ThresholdSignature) Contains(id hotstuff.ID) bool {
 	_, ok := sig[id]
 	return ok
 }
 
 // ForEach calls f for each ID in the set.
-func (sig ThresholdSignature) ForEach(f func(consensus.ID)) {
+func (sig ThresholdSignature) ForEach(f func(hotstuff.ID)) {
 	for id := range sig {
 		f(id)
 	}
@@ -192,7 +193,7 @@ func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []consensus.Si
 
 // CreateThresholdSignatureForMessageSet creates a ThresholdSignature of partial signatures where each partialSignature
 // has signed a different message hash.
-func (ec *ecdsaCrypto) CreateThresholdSignatureForMessageSet(partialSignatures []consensus.Signature, hashes map[consensus.ID]consensus.Hash) (_ consensus.ThresholdSignature, err error) {
+func (ec *ecdsaCrypto) CreateThresholdSignatureForMessageSet(partialSignatures []consensus.Signature, hashes map[hotstuff.ID]consensus.Hash) (_ consensus.ThresholdSignature, err error) {
 	ec.mod.Logger().Debug(hashes)
 	thrSig := make(ThresholdSignature)
 	for _, s := range partialSignatures {
@@ -251,7 +252,7 @@ func (ec *ecdsaCrypto) VerifyThresholdSignature(signature consensus.ThresholdSig
 }
 
 // VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
-func (ec *ecdsaCrypto) VerifyThresholdSignatureForMessageSet(signature consensus.ThresholdSignature, hashes map[consensus.ID]consensus.Hash) bool {
+func (ec *ecdsaCrypto) VerifyThresholdSignatureForMessageSet(signature consensus.ThresholdSignature, hashes map[hotstuff.ID]consensus.Hash) bool {
 	ec.mod.Logger().Debug(hashes)
 	sig, ok := signature.(ThresholdSignature)
 	if !ok {

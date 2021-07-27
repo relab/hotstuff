@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	hotstuff "github.com/relab/hotstuff"
 	consensus "github.com/relab/hotstuff/consensus"
 )
 
@@ -36,10 +37,10 @@ func (m *MockReplica) EXPECT() *MockReplicaMockRecorder {
 }
 
 // ID mocks base method.
-func (m *MockReplica) ID() consensus.ID {
+func (m *MockReplica) ID() hotstuff.ID {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ID")
-	ret0, _ := ret[0].(consensus.ID)
+	ret0, _ := ret[0].(hotstuff.ID)
 	return ret0
 }
 

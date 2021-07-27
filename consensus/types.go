@@ -7,30 +7,22 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/relab/hotstuff"
 )
-
-// ID uniquely identifies a replica
-type ID uint32
-
-// ToBytes returns the ID as bytes.
-func (id ID) ToBytes() []byte {
-	var idBytes [4]byte
-	binary.LittleEndian.PutUint32(idBytes[:], uint32(id))
-	return idBytes[:]
-}
 
 // IDSet implements a set of replica IDs. It is used to show which replicas participated in some event.
 type IDSet interface {
 	// Add adds an ID to the set.
-	Add(id ID)
+	Add(id hotstuff.ID)
 	// Contains returns true if the set contains the ID.
-	Contains(id ID) bool
+	Contains(id hotstuff.ID) bool
 	// ForEach calls f for each ID in the set.
-	ForEach(f func(ID))
+	ForEach(f func(hotstuff.ID))
 }
 
 // idSetMap implements IDSet using a map.
-type idSetMap map[ID]struct{}
+type idSetMap map[hotstuff.ID]struct{}
 
 // NewIDSet returns a new IDSet using the default implementation.
 func NewIDSet() IDSet {
@@ -38,18 +30,18 @@ func NewIDSet() IDSet {
 }
 
 // Add adds an ID to the set.
-func (s idSetMap) Add(id ID) {
+func (s idSetMap) Add(id hotstuff.ID) {
 	s[id] = struct{}{}
 }
 
 // Contains returns true if the set contains the given ID.
-func (s idSetMap) Contains(id ID) bool {
+func (s idSetMap) Contains(id hotstuff.ID) bool {
 	_, ok := s[id]
 	return ok
 }
 
 // ForEach calls f for each ID in the set.
-func (s idSetMap) ForEach(f func(ID)) {
+func (s idSetMap) ForEach(f func(hotstuff.ID)) {
 	for id := range s {
 		f(id)
 	}
@@ -103,7 +95,7 @@ type PrivateKey interface {
 type Signature interface {
 	ToBytes
 	// Signer returns the ID of the replica that created the signature.
-	Signer() ID
+	Signer() hotstuff.ID
 }
 
 // ThresholdSignature is a signature that is only valid when it contains the signatures of a quorum of replicas.
@@ -249,7 +241,7 @@ func (qc QuorumCert) View() View {
 func (qc QuorumCert) String() string {
 	var sb strings.Builder
 	if qc.signature != nil {
-		qc.signature.Participants().ForEach(func(id ID) {
+		qc.signature.Participants().ForEach(func(id hotstuff.ID) {
 			sb.WriteString(strconv.FormatUint(uint64(id), 10))
 			sb.WriteByte(' ')
 		})
@@ -288,7 +280,7 @@ func (tc TimeoutCert) View() View {
 func (tc TimeoutCert) String() string {
 	var sb strings.Builder
 	if tc.signature != nil {
-		tc.signature.Participants().ForEach(func(id ID) {
+		tc.signature.Participants().ForEach(func(id hotstuff.ID) {
 			sb.WriteString(strconv.FormatUint(uint64(id), 10))
 			sb.WriteByte(' ')
 		})
@@ -298,18 +290,18 @@ func (tc TimeoutCert) String() string {
 
 // AggregateQC is a set of QCs extracted from timeout messages and an aggregate signature of the timeout signatures.
 type AggregateQC struct {
-	qcs  map[ID]QuorumCert
+	qcs  map[hotstuff.ID]QuorumCert
 	sig  ThresholdSignature
 	view View
 }
 
 // NewAggregateQC returns a new AggregateQC from the QC map and the threshold signature.
-func NewAggregateQC(qcs map[ID]QuorumCert, sig ThresholdSignature, view View) AggregateQC {
+func NewAggregateQC(qcs map[hotstuff.ID]QuorumCert, sig ThresholdSignature, view View) AggregateQC {
 	return AggregateQC{qcs, sig, view}
 }
 
 // QCs returns the quorum certificates in the AggregateQC.
-func (aggQC AggregateQC) QCs() map[ID]QuorumCert {
+func (aggQC AggregateQC) QCs() map[hotstuff.ID]QuorumCert {
 	return aggQC.qcs
 }
 

@@ -1,6 +1,7 @@
 package leaderrotation
 
 import (
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 )
 
@@ -13,10 +14,10 @@ func (rr *roundRobin) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuil
 }
 
 // GetLeader returns the id of the leader in the given view
-func (rr roundRobin) GetLeader(view consensus.View) consensus.ID {
+func (rr roundRobin) GetLeader(view consensus.View) hotstuff.ID {
 	// TODO: does not support reconfiguration
 	// assume IDs start at 1
-	return consensus.ID(view%consensus.View(rr.mod.Configuration().Len()) + 1)
+	return hotstuff.ID(view%consensus.View(rr.mod.Configuration().Len()) + 1)
 }
 
 // NewRoundRobin returns a new round-robin leader rotation implementation.

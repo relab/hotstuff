@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"sync"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 )
 
@@ -121,7 +122,7 @@ func (cache *cache) VerifyThresholdSignature(signature consensus.ThresholdSignat
 
 // CreateThresholdSignatureForMessageSet creates a threshold signature where each partial signature has signed a
 // different message hash.
-func (cache *cache) CreateThresholdSignatureForMessageSet(partialSignatures []consensus.Signature, hashes map[consensus.ID]consensus.Hash) (consensus.ThresholdSignature, error) {
+func (cache *cache) CreateThresholdSignatureForMessageSet(partialSignatures []consensus.Signature, hashes map[hotstuff.ID]consensus.Hash) (consensus.ThresholdSignature, error) {
 	signature, err := cache.impl.CreateThresholdSignatureForMessageSet(partialSignatures, hashes)
 	if err != nil {
 		return nil, err
@@ -138,7 +139,7 @@ func (cache *cache) CreateThresholdSignatureForMessageSet(partialSignatures []co
 }
 
 // VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
-func (cache *cache) VerifyThresholdSignatureForMessageSet(signature consensus.ThresholdSignature, hashes map[consensus.ID]consensus.Hash) bool {
+func (cache *cache) VerifyThresholdSignatureForMessageSet(signature consensus.ThresholdSignature, hashes map[hotstuff.ID]consensus.Hash) bool {
 	if signature == nil {
 		return false
 	}

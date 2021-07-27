@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 )
 
@@ -65,9 +66,9 @@ func (base base) CreateTimeoutCert(view consensus.View, timeouts []consensus.Tim
 }
 
 func (base base) CreateAggregateQC(view consensus.View, timeouts []consensus.TimeoutMsg) (aggQC consensus.AggregateQC, err error) {
-	qcs := make(map[consensus.ID]consensus.QuorumCert)
+	qcs := make(map[hotstuff.ID]consensus.QuorumCert)
 	sigs := make([]consensus.Signature, 0, len(timeouts))
-	hashes := make(map[consensus.ID]consensus.Hash)
+	hashes := make(map[hotstuff.ID]consensus.Hash)
 	for _, timeout := range timeouts {
 		if qc, ok := timeout.SyncInfo.QC(); ok {
 			qcs[timeout.ID] = qc
@@ -108,7 +109,7 @@ func (base base) VerifyTimeoutCert(tc consensus.TimeoutCert) bool {
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
 func (base base) VerifyAggregateQC(aggQC consensus.AggregateQC) (bool, consensus.QuorumCert) {
 	var highQC *consensus.QuorumCert
-	hashes := make(map[consensus.ID]consensus.Hash)
+	hashes := make(map[hotstuff.ID]consensus.Hash)
 	for id, qc := range aggQC.QCs() {
 		if highQC == nil {
 			highQC = new(consensus.QuorumCert)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
@@ -17,14 +18,14 @@ import (
 
 type gorumsReplica struct {
 	node          *hotstuffpb.Node
-	id            consensus.ID
+	id            hotstuff.ID
 	pubKey        consensus.PublicKey
 	voteCancel    context.CancelFunc
 	newviewCancel context.CancelFunc
 }
 
 // ID returns the replica's ID.
-func (r *gorumsReplica) ID() consensus.ID {
+func (r *gorumsReplica) ID() hotstuff.ID {
 	return r.id
 }
 
@@ -63,7 +64,7 @@ type Config struct {
 
 	mgr           *hotstuffpb.Manager
 	cfg           *hotstuffpb.Configuration
-	replicas      map[consensus.ID]consensus.Replica
+	replicas      map[hotstuff.ID]consensus.Replica
 	proposeCancel context.CancelFunc
 	timeoutCancel context.CancelFunc
 }
@@ -74,9 +75,9 @@ func (cfg *Config) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder
 }
 
 // NewConfig creates a new configuration.
-func NewConfig(id consensus.ID, creds credentials.TransportCredentials, opts ...gorums.ManagerOption) *Config {
+func NewConfig(id hotstuff.ID, creds credentials.TransportCredentials, opts ...gorums.ManagerOption) *Config {
 	cfg := &Config{
-		replicas:      make(map[consensus.ID]consensus.Replica),
+		replicas:      make(map[hotstuff.ID]consensus.Replica),
 		proposeCancel: func() {},
 		timeoutCancel: func() {},
 	}
@@ -124,7 +125,7 @@ func (cfg *Config) Connect(replicaCfg *config.ReplicaConfig) (err error) {
 	}
 
 	for _, node := range cfg.cfg.Nodes() {
-		id := consensus.ID(node.ID())
+		id := hotstuff.ID(node.ID())
 		replica := cfg.replicas[id].(*gorumsReplica)
 		replica.node = node
 	}
@@ -133,12 +134,12 @@ func (cfg *Config) Connect(replicaCfg *config.ReplicaConfig) (err error) {
 }
 
 // Replicas returns all of the replicas in the configuration.
-func (cfg *Config) Replicas() map[consensus.ID]consensus.Replica {
+func (cfg *Config) Replicas() map[hotstuff.ID]consensus.Replica {
 	return cfg.replicas
 }
 
 // Replica returns a replica if it is present in the configuration.
-func (cfg *Config) Replica(id consensus.ID) (replica consensus.Replica, ok bool) {
+func (cfg *Config) Replica(id hotstuff.ID) (replica consensus.Replica, ok bool) {
 	replica, ok = cfg.replicas[id]
 	return
 }

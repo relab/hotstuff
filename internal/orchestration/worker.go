@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
@@ -40,8 +41,8 @@ type Worker struct {
 
 	dataLogger consensus.DataLogger
 
-	replicas map[consensus.ID]*replica.Replica
-	clients  map[consensus.ID]*client.Client
+	replicas map[hotstuff.ID]*replica.Replica
+	clients  map[hotstuff.ID]*client.Client
 }
 
 // Run runs the worker until it receives a command to quit.
@@ -86,8 +87,8 @@ func NewWorker(send *protostream.Writer, recv *protostream.Reader, dl consensus.
 		send:       send,
 		recv:       recv,
 		dataLogger: dl,
-		replicas:   make(map[consensus.ID]*replica.Replica),
-		clients:    make(map[consensus.ID]*client.Client),
+		replicas:   make(map[hotstuff.ID]*replica.Replica),
+		clients:    make(map[hotstuff.ID]*client.Client),
 	}
 }
 
@@ -118,7 +119,7 @@ func (w *Worker) createReplicas(req *orchestrationpb.CreateReplicaRequest) (*orc
 		}
 
 		r.StartServers(replicaListener, clientListener)
-		w.replicas[consensus.ID(cfg.GetID())] = r
+		w.replicas[hotstuff.ID(cfg.GetID())] = r
 
 		resp.Replicas[cfg.GetID()] = &orchestrationpb.ReplicaInfo{
 			ID:          cfg.GetID(),
@@ -147,7 +148,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 	}
 	// prepare modules
-	builder := consensus.NewBuilder(consensus.ID(opts.GetID()), privKey)
+	builder := consensus.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 
 	var consensusImpl consensus.Consensus
 	switch opts.GetConsensus() {
@@ -195,7 +196,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	)
 
 	c := replica.Config{
-		ID:          consensus.ID(opts.GetID()),
+		ID:          hotstuff.ID(opts.GetID()),
 		PrivateKey:  privKey,
 		TLS:         opts.GetUseTLS(),
 		Certificate: &certificate,
@@ -212,11 +213,11 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 
 func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {
 	for _, id := range req.GetIDs() {
-		replica, ok := w.replicas[consensus.ID(id)]
+		replica, ok := w.replicas[hotstuff.ID(id)]
 		if !ok {
 			return nil, status.Errorf(codes.NotFound, "The replica with ID %d was not found.", id)
 		}
-		cfg, err := getConfiguration(consensus.ID(id), req.GetConfiguration(), false)
+		cfg, err := getConfiguration(hotstuff.ID(id), req.GetConfiguration(), false)
 		if err != nil {
 			return nil, err
 		}
@@ -234,7 +235,7 @@ func (w *Worker) stopReplicas(req *orchestrationpb.StopReplicaRequest) (*orchest
 		Hashes: make(map[uint32][]byte),
 	}
 	for _, id := range req.GetIDs() {
-		r, ok := w.replicas[consensus.ID(id)]
+		r, ok := w.replicas[hotstuff.ID(id)]
 		if !ok {
 			return nil, status.Errorf(codes.NotFound, "The replica with id %d was not found.", id)
 		}
@@ -251,7 +252,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 	cp.AppendCertsFromPEM(ca)
 	for _, opts := range req.GetClients() {
 		c := client.Config{
-			ID:            consensus.ID(opts.GetID()),
+			ID:            hotstuff.ID(opts.GetID()),
 			TLS:           opts.GetUseTLS(),
 			RootCAs:       cp,
 			MaxConcurrent: opts.GetMaxConcurrent(),
@@ -263,7 +264,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			},
 		}
 		cli := client.New(c)
-		cfg, err := getConfiguration(consensus.ID(opts.GetID()), req.GetConfiguration(), true)
+		cfg, err := getConfiguration(hotstuff.ID(opts.GetID()), req.GetConfiguration(), true)
 		if err != nil {
 			return nil, err
 		}
@@ -272,14 +273,14 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			return nil, err
 		}
 		cli.Start()
-		w.clients[consensus.ID(opts.GetID())] = cli
+		w.clients[hotstuff.ID(opts.GetID())] = cli
 	}
 	return &orchestrationpb.StartClientResponse{}, nil
 }
 
 func (w *Worker) stopClients(req *orchestrationpb.StopClientRequest) (*orchestrationpb.StopClientResponse, error) {
 	for _, id := range req.GetIDs() {
-		cli, ok := w.clients[consensus.ID(id)]
+		cli, ok := w.clients[hotstuff.ID(id)]
 		if !ok {
 			return nil, status.Errorf(codes.NotFound, "the client with ID %d was not found", id)
 		}
@@ -288,8 +289,8 @@ func (w *Worker) stopClients(req *orchestrationpb.StopClientRequest) (*orchestra
 	return &orchestrationpb.StopClientResponse{}, nil
 }
 
-func getConfiguration(id consensus.ID, conf map[uint32]*orchestrationpb.ReplicaInfo, client bool) (*config.ReplicaConfig, error) {
-	cfg := &config.ReplicaConfig{ID: id, Replicas: make(map[consensus.ID]*config.ReplicaInfo)}
+func getConfiguration(id hotstuff.ID, conf map[uint32]*orchestrationpb.ReplicaInfo, client bool) (*config.ReplicaConfig, error) {
+	cfg := &config.ReplicaConfig{ID: id, Replicas: make(map[hotstuff.ID]*config.ReplicaInfo)}
 
 	for _, replica := range conf {
 		pubKey, err := keygen.ParsePublicKey(replica.GetPublicKey())
@@ -302,8 +303,8 @@ func getConfiguration(id consensus.ID, conf map[uint32]*orchestrationpb.ReplicaI
 		} else {
 			addr = net.JoinHostPort(replica.GetAddress(), strconv.Itoa(int(replica.GetReplicaPort())))
 		}
-		cfg.Replicas[consensus.ID(replica.GetID())] = &config.ReplicaInfo{
-			ID:      consensus.ID(replica.GetID()),
+		cfg.Replicas[hotstuff.ID(replica.GetID())] = &config.ReplicaInfo{
+			ID:      hotstuff.ID(replica.GetID()),
 			Address: addr,
 			PubKey:  pubKey,
 		}

@@ -13,6 +13,7 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
 	"github.com/relab/gorums/benchmark"
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/logging"
@@ -40,7 +41,7 @@ type pendingCmd struct {
 
 // Config contains config options for a client.
 type Config struct {
-	ID             consensus.ID
+	ID             hotstuff.ID
 	TLS            bool
 	RootCAs        *x509.CertPool
 	MaxConcurrent  uint32
@@ -51,7 +52,7 @@ type Config struct {
 
 // Client is a hotstuff client.
 type Client struct {
-	id               consensus.ID
+	id               hotstuff.ID
 	logger           logging.Logger
 	mgr              *clientpb.Manager
 	gorumsConfig     *clientpb.Configuration
