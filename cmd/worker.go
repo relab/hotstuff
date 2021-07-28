@@ -5,10 +5,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/modules"
 	"github.com/spf13/cobra"
 )
 
@@ -63,13 +63,13 @@ func runWorker() {
 		}
 	}()
 
-	dataLogger := consensus.NopLogger()
+	dataLogger := modules.NopLogger()
 	if dataPath != "" {
 		f, err := os.OpenFile(dataPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 		if err != nil {
 			log.Fatalln("failed to create data path: ", err)
 		}
-		dataLogger = consensus.NewDataLogger(protostream.NewWriter(bufio.NewWriter(f)))
+		dataLogger = modules.NewDataLogger(protostream.NewWriter(bufio.NewWriter(f)))
 		defer func() {
 			err = f.Close()
 			if err != nil {

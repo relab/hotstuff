@@ -21,13 +21,14 @@ import (
 // Server is the server-side of the gorums backend.
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
-	mod       *consensus.Modules
+	mods      *consensus.Modules
 	gorumsSrv *gorums.Server
 }
 
-// InitModule initializes the server with the given HotStuff instance.
-func (srv *Server) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder) {
-	srv.mod = hs
+// InitConsensusModule gives the module a reference to the Modules object.
+// It also allows the module to set module options using the OptionsBuilder.
+func (srv *Server) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+	srv.mods = mods
 }
 
 // NewServer creates a new Server.
@@ -59,7 +60,7 @@ func (srv *Server) StartOnListener(listener net.Listener) {
 	go func() {
 		err := srv.gorumsSrv.Serve(listener)
 		if err != nil {
-			srv.mod.Logger().Errorf("An error occurred while serving: %v", err)
+			srv.mods.Logger().Errorf("An error occurred while serving: %v", err)
 		}
 	}()
 }
@@ -77,7 +78,7 @@ func (srv *Server) getClientID(ctx context.Context) (hotstuff.ID, error) {
 		}
 		if len(tlsInfo.State.PeerCertificates) > 0 {
 			cert := tlsInfo.State.PeerCertificates[0]
-			for replicaID := range srv.mod.Configuration().Replicas() {
+			for replicaID := range srv.mods.Configuration().Replicas() {
 				if subject, err := strconv.Atoi(cert.Subject.CommonName); err == nil && hotstuff.ID(subject) == replicaID {
 					return replicaID, nil
 				}
@@ -114,7 +115,7 @@ func (srv *Server) Stop() {
 func (srv *Server) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
-		srv.mod.Logger().Infof("Failed to get client ID: %v", err)
+		srv.mods.Logger().Infof("Failed to get client ID: %v", err)
 		return
 	}
 
@@ -122,18 +123,18 @@ func (srv *Server) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) 
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
 
-	srv.mod.EventLoop().AddEvent(proposeMsg)
+	srv.mods.EventLoop().AddEvent(proposeMsg)
 }
 
 // Vote handles an incoming vote message.
 func (srv *Server) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
-		srv.mod.Logger().Infof("Failed to get client ID: %v", err)
+		srv.mods.Logger().Infof("Failed to get client ID: %v", err)
 		return
 	}
 
-	srv.mod.EventLoop().AddEvent(consensus.VoteMsg{
+	srv.mods.EventLoop().AddEvent(consensus.VoteMsg{
 		ID:          id,
 		PartialCert: hotstuffpb.PartialCertFromProto(cert),
 	})
@@ -143,11 +144,11 @@ func (srv *Server) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
 func (srv *Server) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo) {
 	id, err := srv.getClientID(ctx)
 	if err != nil {
-		srv.mod.Logger().Infof("Failed to get client ID: %v", err)
+		srv.mods.Logger().Infof("Failed to get client ID: %v", err)
 		return
 	}
 
-	srv.mod.EventLoop().AddEvent(consensus.NewViewMsg{
+	srv.mods.EventLoop().AddEvent(consensus.NewViewMsg{
 		ID:       id,
 		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
 	})
@@ -158,12 +159,12 @@ func (srv *Server) Fetch(ctx gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*hotst
 	var hash consensus.Hash
 	copy(hash[:], pb.GetHash())
 
-	block, ok := srv.mod.BlockChain().LocalGet(hash)
+	block, ok := srv.mods.BlockChain().LocalGet(hash)
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "requested block was not found")
 	}
 
-	srv.mod.Logger().Debugf("OnFetch: %.8s", hash)
+	srv.mods.Logger().Debugf("OnFetch: %.8s", hash)
 
 	return hotstuffpb.BlockToProto(block), nil
 }
@@ -174,7 +175,7 @@ func (srv *Server) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
 	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
 	timeoutMsg.ID, err = srv.getClientID(ctx)
 	if err != nil {
-		srv.mod.Logger().Infof("Could not get ID of replica: %v", err)
+		srv.mods.Logger().Infof("Could not get ID of replica: %v", err)
 	}
-	srv.mod.EventLoop().AddEvent(timeoutMsg)
+	srv.mods.EventLoop().AddEvent(timeoutMsg)
 }

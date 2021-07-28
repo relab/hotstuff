@@ -35,7 +35,7 @@ func NewViewDuration(sampleSize uint64, startTimeout, multiplier float64) ViewDu
 // viewDuration uses statistics from previous views to guess a good value for the view duration.
 // It only takes a limited amount of measurements into account.
 type viewDuration struct {
-	mod       *consensus.Modules
+	mods      *consensus.Modules
 	mul       float64   // on failed views, multiply the current mean by this number (should be > 1)
 	limit     uint64    // how many measurements should be included in mean
 	count     uint64    // total number of measurements
@@ -45,10 +45,10 @@ type viewDuration struct {
 	prevM2    float64   // m2 calculated from the last period
 }
 
-// InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
-// settings using the ConfigBuilder.
-func (v *viewDuration) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder) {
-	v.mod = hs
+// InitConsensusModule gives the module a reference to the Modules object.
+// It also allows the module to set module options using the OptionsBuilder.
+func (v *viewDuration) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+	v.mods = mods
 }
 
 // ViewSucceeded calculates the duration of the view
@@ -111,8 +111,8 @@ func (v *viewDuration) Duration() time.Duration {
 	}
 	duration := v.mean + dev*conf
 
-	if uint64(v.mod.Synchronizer().View())%v.limit == 0 {
-		v.mod.Logger().Infof("Mean: %.2fms, Dev: %.2f, Timeout: %.2fms (last %d views)", v.mean, dev, duration, v.limit)
+	if uint64(v.mods.Synchronizer().View())%v.limit == 0 {
+		v.mods.Logger().Infof("Mean: %.2fms, Dev: %.2f, Timeout: %.2fms (last %d views)", v.mean, dev, duration, v.limit)
 	}
 	return time.Duration(duration * float64(time.Millisecond))
 }

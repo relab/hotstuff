@@ -12,7 +12,7 @@ import (
 // blockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type blockChain struct {
-	mod *consensus.Modules
+	mods *consensus.Modules
 
 	mut          sync.Mutex
 	maxSize      int
@@ -21,11 +21,12 @@ type blockChain struct {
 	accessOrder  list.List
 }
 
-// InitModule gives the module a reference to the HotStuff object.
-func (chain *blockChain) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder) {
-	chain.mod = hs
+// InitConsensusModule gives the module a reference to the Modules object.
+// It also allows the module to set module options using the OptionsBuilder.
+func (chain *blockChain) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+	chain.mods = mods
 
-	chain.mod.EventLoop().RegisterAsyncObserver(consensus.ProposeMsg{}, func(event interface{}) {
+	chain.mods.EventLoop().RegisterAsyncObserver(consensus.ProposeMsg{}, func(event interface{}) {
 		proposal := event.(consensus.ProposeMsg)
 		chain.Store(proposal.Block)
 	})
@@ -99,12 +100,12 @@ func (chain *blockChain) Get(hash consensus.Hash) (block *consensus.Block, ok bo
 		goto done
 	}
 
-	ctx, cancel = context.WithCancel(chain.mod.Synchronizer().ViewContext())
+	ctx, cancel = context.WithCancel(chain.mods.Synchronizer().ViewContext())
 	chain.pendingFetch[hash] = cancel
 
 	chain.mut.Unlock()
-	chain.mod.Logger().Debugf("Attempting to fetch block: %.8s", hash)
-	block, ok = chain.mod.Configuration().Fetch(ctx, hash)
+	chain.mods.Logger().Debugf("Attempting to fetch block: %.8s", hash)
+	block, ok = chain.mods.Configuration().Fetch(ctx, hash)
 	chain.mut.Lock()
 
 	delete(chain.pendingFetch, hash)
@@ -114,7 +115,7 @@ func (chain *blockChain) Get(hash consensus.Hash) (block *consensus.Block, ok bo
 		goto done
 	}
 
-	chain.mod.Logger().Debugf("Successfully fetched block: %.8s", hash)
+	chain.mods.Logger().Debugf("Successfully fetched block: %.8s", hash)
 
 	chain.makeSpace()
 	elem = chain.accessOrder.PushFront(block)

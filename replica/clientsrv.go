@@ -11,13 +11,14 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/modules"
 	"google.golang.org/protobuf/proto"
 )
 
 // clientSrv serves a client.
 type clientSrv struct {
 	mut          sync.Mutex
-	mod          *consensus.Modules
+	mods         *modules.Modules
 	srv          *gorums.Server
 	awaitingCmds map[cmdID]chan<- struct{}
 	cmdCache     *cmdCache
@@ -36,11 +37,10 @@ func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv
 	return srv
 }
 
-// InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
-// settings using the ConfigBuilder.
-func (srv *clientSrv) InitModule(mod *consensus.Modules, opts *consensus.OptionsBuilder) {
-	srv.mod = mod
-	srv.cmdCache.InitModule(mod, opts)
+// InitModule gives the module access to the other modules.
+func (srv *clientSrv) InitModule(mods *modules.Modules) {
+	srv.mods = mods
+	srv.cmdCache.InitModule(mods)
 }
 
 func (srv *clientSrv) Start(addr string) error {
@@ -56,7 +56,7 @@ func (srv *clientSrv) StartOnListener(lis net.Listener) {
 	go func() {
 		err := srv.srv.Serve(lis)
 		if err != nil {
-			srv.mod.Logger().Error(err)
+			srv.mods.Logger().Error(err)
 		}
 	}()
 }

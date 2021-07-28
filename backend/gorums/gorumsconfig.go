@@ -60,7 +60,7 @@ func (r *gorumsReplica) NewView(msg consensus.SyncInfo) {
 // Config holds information about the current configuration of replicas that participate in the protocol,
 // and some information about the local replica. It also provides methods to send messages to the other replicas.
 type Config struct {
-	mod *consensus.Modules
+	mods *consensus.Modules
 
 	mgr           *hotstuffpb.Manager
 	cfg           *hotstuffpb.Configuration
@@ -69,9 +69,10 @@ type Config struct {
 	timeoutCancel context.CancelFunc
 }
 
-// InitModule gives the module a reference to the HotStuff object.
-func (cfg *Config) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder) {
-	cfg.mod = hs
+// InitConsensusModule gives the module a reference to the Modules object.
+// It also allows the module to set module options using the OptionsBuilder.
+func (cfg *Config) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+	cfg.mods = mods
 }
 
 // NewConfig creates a new configuration.
@@ -181,7 +182,7 @@ func (cfg *Config) Timeout(msg consensus.TimeoutMsg) {
 func (cfg *Config) Fetch(ctx context.Context, hash consensus.Hash) (*consensus.Block, bool) {
 	protoBlock, err := cfg.cfg.Fetch(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
 	if err != nil && !errors.Is(err, context.Canceled) {
-		cfg.mod.Logger().Infof("Failed to fetch block: %v", err)
+		cfg.mods.Logger().Infof("Failed to fetch block: %v", err)
 		return nil, false
 	}
 	return hotstuffpb.BlockFromProto(protoBlock), true

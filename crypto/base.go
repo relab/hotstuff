@@ -15,10 +15,11 @@ func New(impl consensus.CryptoImpl) consensus.Crypto {
 	return base{CryptoImpl: impl}
 }
 
-// InitModule gives the module a reference to the HotStuff object.
-func (base base) InitModule(hs *consensus.Modules, cfg *consensus.OptionsBuilder) {
+// InitConsensusModule gives the module a reference to the Modules object.
+// It also allows the module to set module options using the OptionsBuilder.
+func (base base) InitConsensusModule(mods *consensus.Modules, cfg *consensus.OptionsBuilder) {
 	if mod, ok := base.CryptoImpl.(consensus.Module); ok {
-		mod.InitModule(hs, cfg)
+		mod.InitConsensusModule(mods, cfg)
 	}
 }
 

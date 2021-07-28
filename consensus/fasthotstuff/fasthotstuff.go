@@ -6,7 +6,7 @@ import (
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {
-	mod *consensus.Modules
+	mods *consensus.Modules
 
 	bExec    *consensus.Block
 	lastVote consensus.View
@@ -20,12 +20,12 @@ func New() *FastHotStuff {
 	}
 }
 
-// InitModule gives the module a reference to the HotStuff object. It also allows the module to set configuration
-// settings using the ConfigBuilder.
-func (fhs *FastHotStuff) InitModule(hs *consensus.Modules, opts *consensus.OptionsBuilder) {
-	fhs.mod = hs
+// InitConsensusModule gives the module a reference to the Modules object.
+// It also allows the module to set module options using the OptionsBuilder.
+func (fhs *FastHotStuff) InitConsensusModule(mods *consensus.Modules, opts *consensus.OptionsBuilder) {
+	fhs.mods = mods
 	opts.SetShouldUseAggQC()
-	fhs.mod.EventLoop().RegisterHandler(consensus.ProposeMsg{}, func(event interface{}) {
+	fhs.mods.EventLoop().RegisterHandler(consensus.ProposeMsg{}, func(event interface{}) {
 		proposal := event.(consensus.ProposeMsg)
 		fhs.OnPropose(proposal)
 	})
@@ -40,9 +40,9 @@ func (fhs *FastHotStuff) StopVoting(view consensus.View) {
 
 // Propose starts a new proposal. The command is fetched from the command queue.
 func (fhs *FastHotStuff) Propose(cert consensus.SyncInfo) {
-	fhs.mod.Logger().Debug("Propose")
+	fhs.mods.Logger().Debug("Propose")
 
-	proposal := consensus.ProposeMsg{ID: fhs.mod.ID()}
+	proposal := consensus.ProposeMsg{ID: fhs.mods.ID()}
 
 	if aggQC, ok := cert.AggQC(); ok {
 		proposal.AggregateQC = &aggQC
@@ -50,33 +50,33 @@ func (fhs *FastHotStuff) Propose(cert consensus.SyncInfo) {
 
 	qc, ok := cert.QC()
 	if ok {
-		qcBlock, ok := fhs.mod.BlockChain().Get(qc.BlockHash())
+		qcBlock, ok := fhs.mods.BlockChain().Get(qc.BlockHash())
 		if !ok {
-			fhs.mod.Logger().Errorf("Could not get block for QC: %s", qc)
+			fhs.mods.Logger().Errorf("Could not get block for QC: %s", qc)
 			return
 		}
-		fhs.mod.Acceptor().Proposed(qcBlock.Command())
+		fhs.mods.Acceptor().Proposed(qcBlock.Command())
 	} else {
-		fhs.mod.Logger().Warnf("Propose was called with no QC!")
+		fhs.mods.Logger().Warnf("Propose was called with no QC!")
 		return
 	}
 
-	cmd, ok := fhs.mod.CommandQueue().Get(fhs.mod.Synchronizer().ViewContext())
+	cmd, ok := fhs.mods.CommandQueue().Get(fhs.mods.Synchronizer().ViewContext())
 	if !ok {
 		return
 	}
 
 	proposal.Block = consensus.NewBlock(
-		fhs.mod.Synchronizer().LeafBlock().Hash(),
+		fhs.mods.Synchronizer().LeafBlock().Hash(),
 		qc,
 		cmd,
-		fhs.mod.Synchronizer().View(),
-		fhs.mod.ID(),
+		fhs.mods.Synchronizer().View(),
+		fhs.mods.ID(),
 	)
 
-	fhs.mod.BlockChain().Store(proposal.Block)
+	fhs.mods.BlockChain().Store(proposal.Block)
 
-	fhs.mod.Configuration().Propose(proposal)
+	fhs.mods.Configuration().Propose(proposal)
 	fhs.OnPropose(proposal)
 }
 
@@ -84,29 +84,29 @@ func (fhs *FastHotStuff) qcRef(qc consensus.QuorumCert) (*consensus.Block, bool)
 	if (consensus.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return fhs.mod.BlockChain().Get(qc.BlockHash())
+	return fhs.mods.BlockChain().Get(qc.BlockHash())
 }
 
 func (fhs *FastHotStuff) execute(block *consensus.Block) {
 	if fhs.bExec.View() < block.View() {
-		if parent, ok := fhs.mod.BlockChain().Get(block.Parent()); ok {
+		if parent, ok := fhs.mods.BlockChain().Get(block.Parent()); ok {
 			fhs.execute(parent)
 		}
-		fhs.mod.Logger().Debug("EXEC: ", block)
-		fhs.mod.Executor().Exec(block.Command())
+		fhs.mods.Logger().Debug("EXEC: ", block)
+		fhs.mods.Executor().Exec(block.Command())
 		fhs.bExec = block
 	}
 }
 
 func (fhs *FastHotStuff) update(block *consensus.Block) {
-	fhs.mod.Synchronizer().UpdateHighQC(block.QuorumCert())
-	fhs.mod.Logger().Debug("PREPARE: ", block)
+	fhs.mods.Synchronizer().UpdateHighQC(block.QuorumCert())
+	fhs.mods.Logger().Debug("PREPARE: ", block)
 
 	parent, ok := fhs.qcRef(block.QuorumCert())
 	if !ok {
 		return
 	}
-	fhs.mod.Logger().Debug("PRECOMMIT: ", parent)
+	fhs.mods.Logger().Debug("PRECOMMIT: ", parent)
 
 	grandparent, ok := fhs.qcRef(parent.QuorumCert())
 	if !ok {
@@ -114,7 +114,7 @@ func (fhs *FastHotStuff) update(block *consensus.Block) {
 	}
 	if block.Parent() == parent.Hash() && block.View() == parent.View()+1 &&
 		parent.Parent() == grandparent.Hash() && parent.View() == grandparent.View()+1 {
-		fhs.mod.Logger().Debug("COMMIT: ", grandparent)
+		fhs.mods.Logger().Debug("COMMIT: ", grandparent)
 		fhs.execute(grandparent)
 	}
 }
@@ -122,7 +122,7 @@ func (fhs *FastHotStuff) update(block *consensus.Block) {
 // OnPropose handles an incoming proposal.
 // A leader should call this method on itself.
 func (fhs *FastHotStuff) OnPropose(proposal consensus.ProposeMsg) {
-	fhs.mod.Logger().Debugf("OnPropose: %s", proposal.Block)
+	fhs.mods.Logger().Debugf("OnPropose: %s", proposal.Block)
 
 	var (
 		safe     = false
@@ -132,21 +132,21 @@ func (fhs *FastHotStuff) OnPropose(proposal consensus.ProposeMsg) {
 	)
 
 	if proposal.AggregateQC == nil {
-		safe = fhs.mod.Crypto().VerifyQuorumCert(block.QuorumCert()) &&
-			block.View() >= fhs.mod.Synchronizer().View() &&
+		safe = fhs.mods.Crypto().VerifyQuorumCert(block.QuorumCert()) &&
+			block.View() >= fhs.mods.Synchronizer().View() &&
 			block.View() == block.QuorumCert().View()+1
-		hqcBlock, ok = fhs.mod.BlockChain().Get(block.QuorumCert().BlockHash())
+		hqcBlock, ok = fhs.mods.BlockChain().Get(block.QuorumCert().BlockHash())
 		if !ok {
-			fhs.mod.Logger().Warn("Missing block for QC: %s", block.QuorumCert())
+			fhs.mods.Logger().Warn("Missing block for QC: %s", block.QuorumCert())
 			return
 		}
 	} else {
 		// If we get an AggregateQC, we need to verify the AggregateQC, and the highQC it contains.
 		// Then, we must check that the proposed block extends the highQC.block.
-		ok, highQC := fhs.mod.Crypto().VerifyAggregateQC(*proposal.AggregateQC)
-		if ok && fhs.mod.Crypto().VerifyQuorumCert(highQC) {
-			hqcBlock, ok = fhs.mod.BlockChain().Get(highQC.BlockHash())
-			if ok && fhs.mod.BlockChain().Extends(block, hqcBlock) {
+		ok, highQC := fhs.mods.Crypto().VerifyAggregateQC(*proposal.AggregateQC)
+		if ok && fhs.mods.Crypto().VerifyQuorumCert(highQC) {
+			hqcBlock, ok = fhs.mods.BlockChain().Get(highQC.BlockHash())
+			if ok && fhs.mods.BlockChain().Extends(block, hqcBlock) {
 				safe = true
 				// create a new block containing the QC from the aggregateQC
 				block = consensus.NewBlock(block.Parent(), highQC, block.Command(), block.View(), block.Proposer())
@@ -157,42 +157,42 @@ func (fhs *FastHotStuff) OnPropose(proposal consensus.ProposeMsg) {
 	defer fhs.update(block)
 
 	if !safe {
-		fhs.mod.Logger().Info("OnPropose: block not safe")
+		fhs.mods.Logger().Info("OnPropose: block not safe")
 		return
 	}
 
-	fhs.mod.Acceptor().Proposed(hqcBlock.Command())
+	fhs.mods.Acceptor().Proposed(hqcBlock.Command())
 
-	fhs.mod.BlockChain().Store(block)
-	defer fhs.mod.Synchronizer().AdvanceView(consensus.NewSyncInfo().WithQC(block.QuorumCert()))
+	fhs.mods.BlockChain().Store(block)
+	defer fhs.mods.Synchronizer().AdvanceView(consensus.NewSyncInfo().WithQC(block.QuorumCert()))
 
 	if fhs.lastVote >= block.View() {
 		// already voted, or StopVoting was called for this view.
 		return
 	}
 
-	if !fhs.mod.Acceptor().Accept(block.Command()) {
-		fhs.mod.Logger().Info("OnPropose: command not accepted")
+	if !fhs.mods.Acceptor().Accept(block.Command()) {
+		fhs.mods.Logger().Info("OnPropose: command not accepted")
 		return
 	}
 
-	vote, err := fhs.mod.Crypto().CreatePartialCert(block)
+	vote, err := fhs.mods.Crypto().CreatePartialCert(block)
 	if err != nil {
-		fhs.mod.Logger().Error("OnPropose: failed to sign block: ", err)
+		fhs.mods.Logger().Error("OnPropose: failed to sign block: ", err)
 		return
 	}
 
 	fhs.lastVote = block.View()
 
-	leaderID := fhs.mod.LeaderRotation().GetLeader(block.View() + 1)
-	if leaderID == fhs.mod.ID() {
-		go fhs.mod.EventLoop().AddEvent(consensus.VoteMsg{ID: fhs.mod.ID(), PartialCert: vote})
+	leaderID := fhs.mods.LeaderRotation().GetLeader(block.View() + 1)
+	if leaderID == fhs.mods.ID() {
+		go fhs.mods.EventLoop().AddEvent(consensus.VoteMsg{ID: fhs.mods.ID(), PartialCert: vote})
 		return
 	}
 
-	leader, ok := fhs.mod.Configuration().Replica(leaderID)
+	leader, ok := fhs.mods.Configuration().Replica(leaderID)
 	if !ok {
-		fhs.mod.Logger().Warn("Leader with ID %d was not found", leaderID)
+		fhs.mods.Logger().Warn("Leader with ID %d was not found", leaderID)
 		return
 	}
 

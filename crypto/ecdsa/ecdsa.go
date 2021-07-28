@@ -116,11 +116,13 @@ var _ consensus.ThresholdSignature = (*ThresholdSignature)(nil)
 var _ consensus.IDSet = (*ThresholdSignature)(nil)
 
 type ecdsaCrypto struct {
-	mod *consensus.Modules
+	mods *consensus.Modules
 }
 
-func (ec *ecdsaCrypto) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder) {
-	ec.mod = hs
+// InitConsensusModule gives the module a reference to the Modules object.
+// It also allows the module to set module options using the OptionsBuilder.
+func (ec *ecdsaCrypto) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+	ec.mods = mods
 }
 
 // New returns a new signer and a new verifier.
@@ -130,7 +132,7 @@ func New() consensus.CryptoImpl {
 }
 
 func (ec *ecdsaCrypto) getPrivateKey() *ecdsa.PrivateKey {
-	pk := ec.mod.PrivateKey()
+	pk := ec.mods.PrivateKey()
 	return pk.(*ecdsa.PrivateKey)
 }
 
@@ -143,7 +145,7 @@ func (ec *ecdsaCrypto) Sign(hash consensus.Hash) (sig consensus.Signature, err e
 	return &Signature{
 		r:      r,
 		s:      s,
-		signer: ec.mod.ID(),
+		signer: ec.mods.ID(),
 	}, nil
 }
 
@@ -153,9 +155,9 @@ func (ec *ecdsaCrypto) Verify(sig consensus.Signature, hash consensus.Hash) bool
 	if !ok {
 		return false
 	}
-	replica, ok := ec.mod.Configuration().Replica(sig.Signer())
+	replica, ok := ec.mods.Configuration().Replica(sig.Signer())
 	if !ok {
-		ec.mod.Logger().Infof("ecdsaCrypto: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
+		ec.mods.Logger().Infof("ecdsaCrypto: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
 		return false
 	}
 	pk := replica.PublicKey().(*ecdsa.PublicKey)
@@ -179,12 +181,12 @@ func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []consensus.Si
 
 		// use the registered verifier instead of ourself to verify.
 		// this makes it possible for the signatureCache to work.
-		if ec.mod.Crypto().Verify(s, hash) {
+		if ec.mods.Crypto().Verify(s, hash) {
 			thrSig[sig.signer] = sig
 		}
 	}
 
-	if len(thrSig) >= ec.mod.Configuration().QuorumSize() {
+	if len(thrSig) >= ec.mods.Configuration().QuorumSize() {
 		return thrSig, nil
 	}
 
@@ -194,7 +196,7 @@ func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []consensus.Si
 // CreateThresholdSignatureForMessageSet creates a ThresholdSignature of partial signatures where each partialSignature
 // has signed a different message hash.
 func (ec *ecdsaCrypto) CreateThresholdSignatureForMessageSet(partialSignatures []consensus.Signature, hashes map[hotstuff.ID]consensus.Hash) (_ consensus.ThresholdSignature, err error) {
-	ec.mod.Logger().Debug(hashes)
+	ec.mods.Logger().Debug(hashes)
 	thrSig := make(ThresholdSignature)
 	for _, s := range partialSignatures {
 		if thrSig.Participants().Contains(s.Signer()) {
@@ -215,12 +217,12 @@ func (ec *ecdsaCrypto) CreateThresholdSignatureForMessageSet(partialSignatures [
 
 		// use the registered verifier instead of ourself to verify.
 		// this makes it possible for the signatureCache to work.
-		if ec.mod.Crypto().Verify(s, hash) {
+		if ec.mods.Crypto().Verify(s, hash) {
 			thrSig[sig.signer] = sig
 		}
 	}
 
-	if len(thrSig) >= ec.mod.Configuration().QuorumSize() {
+	if len(thrSig) >= ec.mods.Configuration().QuorumSize() {
 		return thrSig, nil
 	}
 
@@ -233,13 +235,13 @@ func (ec *ecdsaCrypto) VerifyThresholdSignature(signature consensus.ThresholdSig
 	if !ok {
 		return false
 	}
-	if len(sig) < ec.mod.Configuration().QuorumSize() {
+	if len(sig) < ec.mods.Configuration().QuorumSize() {
 		return false
 	}
 	results := make(chan bool)
 	for _, pSig := range sig {
 		go func(sig *Signature) {
-			results <- ec.mod.Crypto().Verify(sig, hash)
+			results <- ec.mods.Crypto().Verify(sig, hash)
 		}(pSig)
 	}
 	numVerified := 0
@@ -248,12 +250,12 @@ func (ec *ecdsaCrypto) VerifyThresholdSignature(signature consensus.ThresholdSig
 			numVerified++
 		}
 	}
-	return numVerified >= ec.mod.Configuration().QuorumSize()
+	return numVerified >= ec.mods.Configuration().QuorumSize()
 }
 
 // VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
 func (ec *ecdsaCrypto) VerifyThresholdSignatureForMessageSet(signature consensus.ThresholdSignature, hashes map[hotstuff.ID]consensus.Hash) bool {
-	ec.mod.Logger().Debug(hashes)
+	ec.mods.Logger().Debug(hashes)
 	sig, ok := signature.(ThresholdSignature)
 	if !ok {
 		return false
@@ -270,7 +272,7 @@ func (ec *ecdsaCrypto) VerifyThresholdSignatureForMessageSet(signature consensus
 			return false
 		}
 		go func(sig *Signature, hash consensus.Hash) {
-			results <- ec.mod.Crypto().Verify(sig, hash)
+			results <- ec.mods.Crypto().Verify(sig, hash)
 		}(s, hash)
 	}
 	numVerified := 0
@@ -279,7 +281,7 @@ func (ec *ecdsaCrypto) VerifyThresholdSignatureForMessageSet(signature consensus
 			numVerified++
 		}
 	}
-	return numVerified >= ec.mod.Configuration().QuorumSize()
+	return numVerified >= ec.mods.Configuration().QuorumSize()
 }
 
 var _ consensus.CryptoImpl = (*ecdsaCrypto)(nil)

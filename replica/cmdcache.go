@@ -7,12 +7,13 @@ import (
 
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/modules"
 	"google.golang.org/protobuf/proto"
 )
 
 type cmdCache struct {
 	mut           sync.Mutex
-	mod           *consensus.Modules
+	mods          *modules.Modules
 	c             chan struct{}
 	batchSize     int
 	serialNumbers map[uint32]uint64 // highest proposed serial number per client ID
@@ -31,9 +32,9 @@ func newCmdCache(batchSize int) *cmdCache {
 	}
 }
 
-// InitModule gives the module a reference to the HotStuff object.
-func (c *cmdCache) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder) {
-	c.mod = hs
+// InitModule gives the module access to the other modules.
+func (c *cmdCache) InitModule(mods *modules.Modules) {
+	c.mods = mods
 }
 
 func (c *cmdCache) addCommand(cmd *clientpb.Command) {
@@ -97,7 +98,7 @@ awaitBatch:
 	// otherwise, we should have at least one command
 	b, err := c.marshaler.Marshal(batch)
 	if err != nil {
-		c.mod.Logger().Errorf("Failed to marshal batch: %v", err)
+		c.mods.Logger().Errorf("Failed to marshal batch: %v", err)
 		return "", false
 	}
 
@@ -110,7 +111,7 @@ func (c *cmdCache) Accept(cmd consensus.Command) bool {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
-		c.mod.Logger().Errorf("Failed to unmarshal batch: %v", err)
+		c.mods.Logger().Errorf("Failed to unmarshal batch: %v", err)
 		return false
 	}
 
@@ -132,7 +133,7 @@ func (c *cmdCache) Proposed(cmd consensus.Command) {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
-		c.mod.Logger().Errorf("Failed to unmarshal batch: %v", err)
+		c.mods.Logger().Errorf("Failed to unmarshal batch: %v", err)
 		return
 	}
 

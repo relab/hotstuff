@@ -6,7 +6,7 @@ import (
 
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {
-	mod *consensus.Modules
+	mods *consensus.Modules
 
 	// protocol variables
 
@@ -23,10 +23,11 @@ func New() *ChainedHotStuff {
 	return hs
 }
 
-// InitModule gives ChainedHotstuff a pointer to the other consensus.
-func (hs *ChainedHotStuff) InitModule(mod *consensus.Modules, _ *consensus.OptionsBuilder) {
-	hs.mod = mod
-	hs.mod.EventLoop().RegisterHandler(consensus.ProposeMsg{}, func(event interface{}) {
+// InitConsensusModule gives the module a reference to the Modules object.
+// It also allows the module to set module options using the OptionsBuilder.
+func (hs *ChainedHotStuff) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+	hs.mods = mods
+	hs.mods.EventLoop().RegisterHandler(consensus.ProposeMsg{}, func(event interface{}) {
 		proposal := event.(consensus.ProposeMsg)
 		hs.OnPropose(proposal)
 	})
@@ -41,11 +42,11 @@ func (hs *ChainedHotStuff) StopVoting(view consensus.View) {
 
 func (hs *ChainedHotStuff) commit(block *consensus.Block) {
 	if hs.bExec.View() < block.View() {
-		if parent, ok := hs.mod.BlockChain().Get(block.Parent()); ok {
+		if parent, ok := hs.mods.BlockChain().Get(block.Parent()); ok {
 			hs.commit(parent)
 		}
-		hs.mod.Logger().Debug("EXEC: ", block)
-		hs.mod.Executor().Exec(block.Command())
+		hs.mods.Logger().Debug("EXEC: ", block)
+		hs.mods.Executor().Exec(block.Command())
 		hs.bExec = block
 	}
 }
@@ -54,18 +55,18 @@ func (hs *ChainedHotStuff) qcRef(qc consensus.QuorumCert) (*consensus.Block, boo
 	if (consensus.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return hs.mod.BlockChain().Get(qc.BlockHash())
+	return hs.mods.BlockChain().Get(qc.BlockHash())
 }
 
 func (hs *ChainedHotStuff) update(block *consensus.Block) {
-	hs.mod.Synchronizer().UpdateHighQC(block.QuorumCert())
+	hs.mods.Synchronizer().UpdateHighQC(block.QuorumCert())
 
 	block1, ok := hs.qcRef(block.QuorumCert())
 	if !ok {
 		return
 	}
 
-	hs.mod.Logger().Debug("PRE_COMMIT: ", block1)
+	hs.mods.Logger().Debug("PRE_COMMIT: ", block1)
 
 	block2, ok := hs.qcRef(block1.QuorumCert())
 	if !ok {
@@ -73,7 +74,7 @@ func (hs *ChainedHotStuff) update(block *consensus.Block) {
 	}
 
 	if block2.View() > hs.bLock.View() {
-		hs.mod.Logger().Debug("COMMIT: ", block2)
+		hs.mods.Logger().Debug("COMMIT: ", block2)
 		hs.bLock = block2
 	}
 
@@ -83,7 +84,7 @@ func (hs *ChainedHotStuff) update(block *consensus.Block) {
 	}
 
 	if block1.Parent() == block2.Hash() && block2.Parent() == block3.Hash() {
-		hs.mod.Logger().Debug("DECIDE: ", block3)
+		hs.mods.Logger().Debug("DECIDE: ", block3)
 		hs.commit(block3)
 		// NOTE: we now update bExec in commit, instead of doing it here. Updating bExec here can be problematic,
 		// because it can lead to a block being executed twice. Let's consider a view where the leader's proposal is not
@@ -112,36 +113,36 @@ func (hs *ChainedHotStuff) update(block *consensus.Block) {
 
 // Propose proposes the given command
 func (hs *ChainedHotStuff) Propose(cert consensus.SyncInfo) {
-	hs.mod.Logger().Debug("Propose")
+	hs.mods.Logger().Debug("Propose")
 
 	qc, ok := cert.QC()
 	if ok {
 		// tell the acceptor that the previous proposal succeeded.
-		qcBlock, ok := hs.mod.BlockChain().Get(qc.BlockHash())
+		qcBlock, ok := hs.mods.BlockChain().Get(qc.BlockHash())
 		if !ok {
-			hs.mod.Logger().Error("Could not find block for QC: %s", qc)
+			hs.mods.Logger().Error("Could not find block for QC: %s", qc)
 			return
 		}
-		hs.mod.Acceptor().Proposed(qcBlock.Command())
+		hs.mods.Acceptor().Proposed(qcBlock.Command())
 	} else {
-		hs.mod.Logger().Warn("Propose: no QC provided.")
+		hs.mods.Logger().Warn("Propose: no QC provided.")
 	}
 
-	cmd, ok := hs.mod.CommandQueue().Get(hs.mod.Synchronizer().ViewContext())
+	cmd, ok := hs.mods.CommandQueue().Get(hs.mods.Synchronizer().ViewContext())
 	if !ok {
 		return
 	}
 	block := consensus.NewBlock(
-		hs.mod.Synchronizer().LeafBlock().Hash(),
+		hs.mods.Synchronizer().LeafBlock().Hash(),
 		qc,
 		cmd,
-		hs.mod.Synchronizer().View(),
-		hs.mod.ID(),
+		hs.mods.Synchronizer().View(),
+		hs.mods.ID(),
 	)
-	hs.mod.BlockChain().Store(block)
+	hs.mods.BlockChain().Store(block)
 
-	proposal := consensus.ProposeMsg{ID: hs.mod.ID(), Block: block}
-	hs.mod.Configuration().Propose(proposal)
+	proposal := consensus.ProposeMsg{ID: hs.mods.ID(), Block: block}
+	hs.mods.Configuration().Propose(proposal)
 	// self vote
 	hs.OnPropose(proposal)
 }
@@ -149,58 +150,58 @@ func (hs *ChainedHotStuff) Propose(cert consensus.SyncInfo) {
 // OnPropose handles an incoming proposal
 func (hs *ChainedHotStuff) OnPropose(proposal consensus.ProposeMsg) {
 	block := proposal.Block
-	hs.mod.Logger().Debug("OnPropose: ", block)
+	hs.mods.Logger().Debug("OnPropose: ", block)
 
-	if proposal.ID != hs.mod.LeaderRotation().GetLeader(block.View()) {
-		hs.mod.Logger().Info("OnPropose: block was not proposed by the expected leader")
+	if proposal.ID != hs.mods.LeaderRotation().GetLeader(block.View()) {
+		hs.mods.Logger().Info("OnPropose: block was not proposed by the expected leader")
 		return
 	}
 
-	if block.View() < hs.mod.Synchronizer().View() {
-		hs.mod.Logger().Info("OnPropose: block view was less than our view")
+	if block.View() < hs.mods.Synchronizer().View() {
+		hs.mods.Logger().Info("OnPropose: block view was less than our view")
 		return
 	}
 
-	if !hs.mod.Crypto().VerifyQuorumCert(block.QuorumCert()) {
-		hs.mod.Logger().Info("OnPropose: invalid QC")
+	if !hs.mods.Crypto().VerifyQuorumCert(block.QuorumCert()) {
+		hs.mods.Logger().Info("OnPropose: invalid QC")
 		return
 	}
 
-	qcBlock, haveQCBlock := hs.mod.BlockChain().Get(block.QuorumCert().BlockHash())
+	qcBlock, haveQCBlock := hs.mods.BlockChain().Get(block.QuorumCert().BlockHash())
 
 	safe := false
 	if haveQCBlock && qcBlock.View() > hs.bLock.View() {
 		safe = true
 	} else {
-		hs.mod.Logger().Debug("OnPropose: liveness condition failed")
+		hs.mods.Logger().Debug("OnPropose: liveness condition failed")
 		// check if this block extends bLock
-		if hs.mod.BlockChain().Extends(block, hs.bLock) {
+		if hs.mods.BlockChain().Extends(block, hs.bLock) {
 			safe = true
 		} else {
-			hs.mod.Logger().Debug("OnPropose: safety condition failed")
+			hs.mods.Logger().Debug("OnPropose: safety condition failed")
 		}
 	}
 
 	if !safe {
-		hs.mod.Logger().Info("OnPropose: block not safe")
+		hs.mods.Logger().Info("OnPropose: block not safe")
 		return
 	}
 
 	if haveQCBlock {
 		// Tell the acceptor that the QC's block was proposed successfully.
-		hs.mod.Acceptor().Proposed(qcBlock.Command())
+		hs.mods.Acceptor().Proposed(qcBlock.Command())
 	}
 
-	if !hs.mod.Acceptor().Accept(block.Command()) {
-		hs.mod.Logger().Info("OnPropose: command not accepted")
+	if !hs.mods.Acceptor().Accept(block.Command()) {
+		hs.mods.Logger().Info("OnPropose: command not accepted")
 		return
 	}
 
-	hs.mod.BlockChain().Store(block)
+	hs.mods.BlockChain().Store(block)
 
-	pc, err := hs.mod.Crypto().CreatePartialCert(block)
+	pc, err := hs.mods.Crypto().CreatePartialCert(block)
 	if err != nil {
-		hs.mod.Logger().Error("OnPropose: failed to sign vote: ", err)
+		hs.mods.Logger().Error("OnPropose: failed to sign vote: ", err)
 		return
 	}
 
@@ -208,19 +209,19 @@ func (hs *ChainedHotStuff) OnPropose(proposal consensus.ProposeMsg) {
 
 	finish := func() {
 		hs.update(block)
-		hs.mod.Synchronizer().AdvanceView(consensus.NewSyncInfo().WithQC(block.QuorumCert()))
+		hs.mods.Synchronizer().AdvanceView(consensus.NewSyncInfo().WithQC(block.QuorumCert()))
 	}
 
-	leaderID := hs.mod.LeaderRotation().GetLeader(hs.lastVote + 1)
-	if leaderID == hs.mod.ID() {
+	leaderID := hs.mods.LeaderRotation().GetLeader(hs.lastVote + 1)
+	if leaderID == hs.mods.ID() {
 		finish()
-		go hs.mod.EventLoop().AddEvent(consensus.VoteMsg{ID: hs.mod.ID(), PartialCert: pc})
+		go hs.mods.EventLoop().AddEvent(consensus.VoteMsg{ID: hs.mods.ID(), PartialCert: pc})
 		return
 	}
 
-	leader, ok := hs.mod.Configuration().Replica(leaderID)
+	leader, ok := hs.mods.Configuration().Replica(leaderID)
 	if !ok {
-		hs.mod.Logger().Warnf("Replica with ID %d was not found!", leaderID)
+		hs.mods.Logger().Warnf("Replica with ID %d was not found!", leaderID)
 		return
 	}
 

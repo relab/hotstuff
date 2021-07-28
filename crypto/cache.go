@@ -27,10 +27,11 @@ func NewCache(impl consensus.CryptoImpl, capacity int) consensus.Crypto {
 	})
 }
 
-// InitModule gives the module a reference to the HotStuff object.
-func (cache *cache) InitModule(hs *consensus.Modules, cfg *consensus.OptionsBuilder) {
+// InitConsensusModule gives the module a reference to the Modules object.
+// It also allows the module to set module options using the OptionsBuilder.
+func (cache *cache) InitConsensusModule(mods *consensus.Modules, cfg *consensus.OptionsBuilder) {
 	if mod, ok := cache.impl.(consensus.Module); ok {
-		mod.InitModule(hs, cfg)
+		mod.InitConsensusModule(mods, cfg)
 	}
 }
 

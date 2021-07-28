@@ -26,6 +26,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/leaderrotation"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc"
@@ -39,7 +40,7 @@ type Worker struct {
 	send *protostream.Writer
 	recv *protostream.Reader
 
-	dataLogger consensus.DataLogger
+	dataLogger modules.DataLogger
 
 	replicas map[hotstuff.ID]*replica.Replica
 	clients  map[hotstuff.ID]*client.Client
@@ -82,7 +83,7 @@ func (w *Worker) Run() error {
 }
 
 // NewWorker returns a new worker.
-func NewWorker(send *protostream.Writer, recv *protostream.Reader, dl consensus.DataLogger) Worker {
+func NewWorker(send *protostream.Writer, recv *protostream.Reader, dl modules.DataLogger) Worker {
 	return Worker{
 		send:       send,
 		recv:       recv,

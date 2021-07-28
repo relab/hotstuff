@@ -6,18 +6,20 @@ import (
 )
 
 type roundRobin struct {
-	mod *consensus.Modules
+	mods *consensus.Modules
 }
 
-func (rr *roundRobin) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder) {
-	rr.mod = hs
+// InitConsensusModule gives the module a reference to the Modules object.
+// It also allows the module to set module options using the OptionsBuilder.
+func (rr *roundRobin) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+	rr.mods = mods
 }
 
 // GetLeader returns the id of the leader in the given view
 func (rr roundRobin) GetLeader(view consensus.View) hotstuff.ID {
 	// TODO: does not support reconfiguration
 	// assume IDs start at 1
-	return hotstuff.ID(view%consensus.View(rr.mod.Configuration().Len()) + 1)
+	return hotstuff.ID(view%consensus.View(rr.mods.Configuration().Len()) + 1)
 }
 
 // NewRoundRobin returns a new round-robin leader rotation implementation.

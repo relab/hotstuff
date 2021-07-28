@@ -152,7 +152,7 @@ func (agg AggregateSignature) Bitfield() crypto.Bitfield {
 
 // bls12Crypto is a Signer/Verifier implementation that uses bls12-381 aggregate signatures.
 type bls12Crypto struct {
-	mod *consensus.Modules
+	mods *consensus.Modules
 }
 
 // New returns a new bls12-381 signer and verifier.
@@ -162,13 +162,14 @@ func New() consensus.CryptoImpl {
 }
 
 func (bc *bls12Crypto) getPrivateKey() *PrivateKey {
-	pk := bc.mod.PrivateKey()
+	pk := bc.mods.PrivateKey()
 	return pk.(*PrivateKey)
 }
 
-// InitModule gives the module a reference to the HotStuff object.
-func (bc *bls12Crypto) InitModule(hs *consensus.Modules, _ *consensus.OptionsBuilder) {
-	bc.mod = hs
+// InitConsensusModule gives the module a reference to the Modules object.
+// It also allows the module to set module options using the OptionsBuilder.
+func (bc *bls12Crypto) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+	bc.mods = mods
 }
 
 // Sign signs a hash.
@@ -179,7 +180,7 @@ func (bc *bls12Crypto) Sign(hash consensus.Hash) (sig consensus.Signature, err e
 	}
 	pk := bc.getPrivateKey()
 	bls12.NewG2().MulScalarBig(p, p, pk.p)
-	return &Signature{signer: bc.mod.ID(), s: p}, nil
+	return &Signature{signer: bc.mods.ID(), s: p}, nil
 }
 
 func (bc *bls12Crypto) aggregateSignatures(signatures map[hotstuff.ID]*Signature) *AggregateSignature {
@@ -199,9 +200,9 @@ func (bc *bls12Crypto) aggregateSignatures(signatures map[hotstuff.ID]*Signature
 // Verify verifies a signature given a hash.
 func (bc *bls12Crypto) Verify(sig consensus.Signature, hash consensus.Hash) bool {
 	s := sig.(*Signature)
-	replica, ok := bc.mod.Configuration().Replica(sig.Signer())
+	replica, ok := bc.mods.Configuration().Replica(sig.Signer())
 	if !ok {
-		bc.mod.Logger().Infof("bls12Crypto: got signature from replica whose ID (%d) was not in the config", sig.Signer())
+		bc.mods.Logger().Infof("bls12Crypto: got signature from replica whose ID (%d) was not in the config", sig.Signer())
 	}
 	pk := replica.PublicKey().(*PublicKey)
 	p, err := bls12.NewG2().HashToCurve(hash[:], domain)
@@ -226,7 +227,7 @@ func (bc *bls12Crypto) VerifyThresholdSignature(signature consensus.ThresholdSig
 	}
 	pubKeys := make([]*PublicKey, 0)
 	sig.participants.ForEach(func(id hotstuff.ID) {
-		replica, ok := bc.mod.Configuration().Replica(id)
+		replica, ok := bc.mods.Configuration().Replica(id)
 		if !ok {
 			return
 		}
@@ -234,10 +235,10 @@ func (bc *bls12Crypto) VerifyThresholdSignature(signature consensus.ThresholdSig
 	})
 	ps, err := bls12.NewG2().HashToCurve(hash[:], domain)
 	if err != nil {
-		bc.mod.Logger().Error(err)
+		bc.mods.Logger().Error(err)
 		return false
 	}
-	if len(pubKeys) < bc.mod.Configuration().QuorumSize() {
+	if len(pubKeys) < bc.mods.Configuration().QuorumSize() {
 		return false
 	}
 	engine := bls12.NewEngine()
@@ -262,7 +263,7 @@ func (bc *bls12Crypto) VerifyThresholdSignatureForMessageSet(signature consensus
 			continue
 		}
 		hashSet[hash] = struct{}{}
-		replica, ok := bc.mod.Configuration().Replica(id)
+		replica, ok := bc.mods.Configuration().Replica(id)
 		if !ok {
 			return false
 		}
@@ -281,14 +282,14 @@ func (bc *bls12Crypto) VerifyThresholdSignatureForMessageSet(signature consensus
 	}
 	// if we managed to verify the aggregate signature, we just need to make sure that the number of verified signatures
 	// is a quorum.
-	return len(hashSet) >= bc.mod.Configuration().QuorumSize()
+	return len(hashSet) >= bc.mods.Configuration().QuorumSize()
 }
 
 // TODO: should we check each signature's validity before aggregating?
 
 // CreateThresholdSignature creates a threshold signature from the given partial signatures.
 func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []consensus.Signature, _ consensus.Hash) (_ consensus.ThresholdSignature, err error) {
-	if len(partialSignatures) < bc.mod.Configuration().QuorumSize() {
+	if len(partialSignatures) < bc.mods.Configuration().QuorumSize() {
 		return nil, crypto.ErrNotAQuorum
 	}
 	sigs := make(map[hotstuff.ID]*Signature, len(partialSignatures))
@@ -304,7 +305,7 @@ func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []consensus.Si
 		}
 		sigs[sig.Signer()] = s
 	}
-	if len(sigs) < bc.mod.Configuration().QuorumSize() {
+	if len(sigs) < bc.mods.Configuration().QuorumSize() {
 		return nil, multierr.Combine(crypto.ErrNotAQuorum, err)
 	}
 	return bc.aggregateSignatures(sigs), nil

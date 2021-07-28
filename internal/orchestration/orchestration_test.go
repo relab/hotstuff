@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/modules"
 )
 
 func TestOrchestration(t *testing.T) {
@@ -15,7 +15,7 @@ func TestOrchestration(t *testing.T) {
 		controllerStream, workerStream := net.Pipe()
 
 		workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
-		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), consensus.NopLogger())
+		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), modules.NopLogger())
 
 		experiment := &orchestration.Experiment{
 			NumReplicas:       4,
