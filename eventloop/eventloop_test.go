@@ -2,6 +2,7 @@ package eventloop_test
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -41,6 +42,11 @@ func TestSyncHandler(t *testing.T) {
 }
 
 func TestTicker(t *testing.T) {
+	if os.Getenv("GITHUB_ACTIONS") != "" {
+		t.Skip()
+		return
+	}
+
 	el := eventloop.New(10)
 	count := 0
 	el.RegisterHandler(testEvent(0), func(event interface{}) {
