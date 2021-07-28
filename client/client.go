@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"sync"
@@ -12,12 +11,11 @@ import (
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
-	"github.com/relab/gorums/benchmark"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/modules"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -53,7 +51,7 @@ type Config struct {
 // Client is a hotstuff client.
 type Client struct {
 	id               hotstuff.ID
-	logger           logging.Logger
+	mods             *modules.Modules
 	mgr              *clientpb.Manager
 	gorumsConfig     *clientpb.Configuration
 	payloadSize      uint32
@@ -63,22 +61,20 @@ type Client struct {
 	cancel           context.CancelFunc
 	done             chan struct{}
 	reader           io.ReadCloser
-	stats            benchmark.Stats // records latency and throughput
-	// data             *clientpb.BenchmarkData // stores time and duration for each command
 }
 
 // New returns a new Client.
-func New(conf Config) (client *Client) {
-	logger := logging.New(fmt.Sprintf("cli%d", conf.ID))
+func New(conf Config, builder modules.Builder) (client *Client) {
+
+	mods := builder.Build()
 
 	client = &Client{
 		id:               conf.ID,
-		logger:           logger,
+		mods:             mods,
 		pendingCmds:      make(chan pendingCmd, conf.MaxConcurrent),
 		highestCommitted: 1,
 		done:             make(chan struct{}),
 		reader:           conf.Input,
-		// data:             &clientpb.BenchmarkData{},
 	}
 
 	grpcOpts := []grpc.DialOption{grpc.WithBlock()}
@@ -113,15 +109,15 @@ func (c *Client) Connect(replicaConfig *config.ReplicaConfig) (err error) {
 
 // Run runs the client until the context is closed.
 func (c *Client) Run(ctx context.Context) {
-	c.logger.Info("Starting to send commands")
+	c.mods.Logger().Info("Starting to send commands")
 	go c.handleCommands(ctx)
 	err := c.sendCommands(ctx)
 	if err != nil && !errors.Is(err, io.EOF) {
-		c.logger.Panicf("Failed to send commands: %v", err)
+		c.mods.Logger().Panicf("Failed to send commands: %v", err)
 	}
 	c.close()
 
-	c.logger.Info("Done sending commands")
+	c.mods.Logger().Info("Done sending commands")
 }
 
 // Start starts the client.
@@ -142,21 +138,13 @@ func (c *Client) close() {
 	c.mgr.Close()
 	err := c.reader.Close()
 	if err != nil {
-		c.logger.Warn("Failed to close reader: ", err)
+		c.mods.Logger().Warn("Failed to close reader: ", err)
 	}
-}
-
-// GetStats returns the results of the benchmark.
-func (c *Client) GetStats() *benchmark.Result {
-	return c.stats.GetResult()
 }
 
 func (c *Client) sendCommands(ctx context.Context) error {
 	num := uint64(1)
 	var lastCommand uint64 = math.MaxUint64
-
-	defer c.stats.End()
-	c.stats.Start()
 
 	for {
 		if ctx.Err() != nil {
@@ -179,7 +167,7 @@ func (c *Client) sendCommands(ctx context.Context) error {
 			return err
 		} else if err == io.EOF && n == 0 && lastCommand > num {
 			lastCommand = num
-			c.logger.Info("Reached end of file. Sending empty commands until last command is executed...")
+			c.mods.Logger().Info("Reached end of file. Sending empty commands until last command is executed...")
 		}
 
 		cmd := &clientpb.Command{
@@ -194,7 +182,7 @@ func (c *Client) sendCommands(ctx context.Context) error {
 		c.pendingCmds <- pendingCmd{sequenceNumber: num, sendTime: time.Now(), promise: promise}
 
 		if num%100 == 0 {
-			c.logger.Infof("%d commands sent", num)
+			c.mods.Logger().Infof("%d commands sent", num)
 		}
 
 	}
@@ -222,7 +210,7 @@ func (c *Client) handleCommands(ctx context.Context) {
 		if err != nil {
 			qcError, ok := err.(gorums.QuorumCallError)
 			if !ok || qcError.Reason != context.Canceled.Error() {
-				c.logger.Warnf("Did not get enough replies for command: %v\n", err)
+				c.mods.Logger().Warnf("Did not get enough replies for command: %v\n", err)
 			}
 		}
 		c.mut.Lock()
@@ -230,8 +218,8 @@ func (c *Client) handleCommands(ctx context.Context) {
 			c.highestCommitted = cmd.sequenceNumber
 		}
 		c.mut.Unlock()
+
 		duration := time.Since(cmd.sendTime)
-		c.stats.AddLatency(duration)
 		// if c.conf.Benchmark {
 		// 	c.data.Stats = append(c.data.Stats, &clientpb.CommandStats{
 		// 		StartTime: timestamppb.New(cmd.sendTime),

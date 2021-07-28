@@ -264,7 +264,9 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 				gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
 			},
 		}
-		cli := client.New(c)
+		mods := modules.NewBuilder(c.ID)
+		mods.Register(w.dataLogger)
+		cli := client.New(c, mods)
 		cfg, err := getConfiguration(hotstuff.ID(opts.GetID()), req.GetConfiguration(), true)
 		if err != nil {
 			return nil, err

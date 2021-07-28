@@ -3,8 +3,6 @@ syntax = "proto3";
 package clientpb;
 
 import "gorums.proto";
-import "google/protobuf/timestamp.proto";
-import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 
 option go_package = "github.com/relab/hotstuff/internal/proto/clientpb";
@@ -29,20 +27,3 @@ message Command {
 
 // Batch is a list of commands to be executed
 message Batch { repeated Command Commands = 1; }
-
-// CommandStats contains the start time and duration that elapsed before a
-// command was executed.
-message CommandStats {
-  google.protobuf.Timestamp StartTime = 1;
-  google.protobuf.Duration Duration = 2;
-}
-
-// BenchmarkData contains the throughput (in ops/sec) and latency (in ms) as
-// measured by the client, as well as the time and duration information for each
-// command.
-message BenchmarkData {
-  double MeasuredThroughput = 1; // ops/sec
-  double MeasuredLatency = 2;    // ms
-  double LatencyVariance = 3;    // ms^2
-  repeated CommandStats Stats = 4;
-}
