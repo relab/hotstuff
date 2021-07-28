@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"log"
 	"os"
+	"time"
 
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/profiling"
@@ -18,6 +19,9 @@ var (
 	memProfile    string
 	trace         string
 	fgprofProfile string
+
+	metrics             []string
+	measurementInterval time.Duration
 )
 
 // workerCmd represents the worker command
@@ -49,6 +53,9 @@ func init() {
 	workerCmd.Flags().StringVar(&memProfile, "mem-profile", "", "Path to store a memory profile")
 	workerCmd.Flags().StringVar(&trace, "trace", "", "Path to store a trace")
 	workerCmd.Flags().StringVar(&fgprofProfile, "fgprof-profile", "", "Path to store a fgprof profile")
+
+	workerCmd.Flags().StringSliceVar(&metrics, "metrics", nil, "the metrics to enable")
+	workerCmd.Flags().DurationVar(&measurementInterval, "measurement-interval", 0, "the interval between measurements")
 }
 
 func runWorker() {
@@ -78,7 +85,7 @@ func runWorker() {
 		}()
 	}
 
-	worker := orchestration.NewWorker(protostream.NewWriter(os.Stdout), protostream.NewReader(os.Stdin), dataLogger)
+	worker := orchestration.NewWorker(protostream.NewWriter(os.Stdout), protostream.NewReader(os.Stdin), dataLogger, metrics, measurementInterval)
 	err = worker.Run()
 	if err != nil {
 		log.Println(err)

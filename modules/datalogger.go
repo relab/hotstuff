@@ -2,7 +2,7 @@ package modules
 
 import (
 	"github.com/relab/hotstuff/internal/protostream"
-	"github.com/relab/hotstuff/measurements/types"
+	"github.com/relab/hotstuff/metrics/types"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"

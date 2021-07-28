@@ -111,6 +111,11 @@ func (c *Client) Connect(replicaConfig *config.ReplicaConfig) (err error) {
 
 // Run runs the client until the context is closed.
 func (c *Client) Run(ctx context.Context) {
+	eventLoopDone := make(chan struct{})
+	go func() {
+		c.mods.DataEventLoop().Run(ctx)
+		close(eventLoopDone)
+	}()
 	c.mods.Logger().Info("Starting to send commands")
 	go c.handleCommands(ctx)
 	err := c.sendCommands(ctx)
@@ -120,6 +125,7 @@ func (c *Client) Run(ctx context.Context) {
 	c.close()
 
 	c.mods.Logger().Info("Done sending commands")
+	<-eventLoopDone
 }
 
 // Start starts the client.
@@ -222,11 +228,11 @@ func (c *Client) handleCommands(ctx context.Context) {
 		c.mut.Unlock()
 
 		duration := time.Since(cmd.sendTime)
-		// if c.conf.Benchmark {
-		// 	c.data.Stats = append(c.data.Stats, &clientpb.CommandStats{
-		// 		StartTime: timestamppb.New(cmd.sendTime),
-		// 		Duration:  durationpb.New(duration),
-		// 	})
-		// }
+		c.mods.DataEventLoop().AddEvent(LatencyMeasurementEvent{Latency: duration})
 	}
+}
+
+// LatencyMeasurementEvent represents a single latency measurement.
+type LatencyMeasurementEvent struct {
+	Latency time.Duration
 }

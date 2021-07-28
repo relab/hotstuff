@@ -60,6 +60,8 @@ func init() {
 	runCmd.Flags().Bool("mem-profile", false, "enable memory profiling")
 	runCmd.Flags().Bool("trace", false, "enable trace")
 	runCmd.Flags().Bool("fgprof-profile", false, "enable fgprof")
+	runCmd.Flags().StringSlice("metrics", []string{"client-latency", "throughput"}, "list of metrics to enable")
+	runCmd.Flags().Duration("measurement-interval", 0, "time interval between measurements")
 
 	err := viper.BindPFlags(runCmd.Flags())
 	if err != nil {
@@ -74,19 +76,21 @@ func runController() {
 	checkf("failed to create output directory: %v", err)
 
 	experiment := orchestration.Experiment{
-		NumReplicas:       viper.GetInt("replicas"),
-		NumClients:        viper.GetInt("clients"),
-		BatchSize:         viper.GetInt("batch-size"),
-		PayloadSize:       viper.GetInt("payload-size"),
-		MaxConcurrent:     viper.GetInt("max-concurrent"),
-		Duration:          viper.GetDuration("duration"),
-		ConnectTimeout:    viper.GetDuration("connect-timeout"),
-		ViewTimeout:       viper.GetDuration("view-timeout"),
-		TimoutSamples:     viper.GetInt("duration-samples"),
-		TimeoutMultiplier: float32(viper.GetFloat64("timeout-multiplier")),
-		Consensus:         viper.GetString("consensus"),
-		Crypto:            viper.GetString("crypto"),
-		LeaderRotation:    viper.GetString("leader-rotation"),
+		NumReplicas:         viper.GetInt("replicas"),
+		NumClients:          viper.GetInt("clients"),
+		BatchSize:           viper.GetInt("batch-size"),
+		PayloadSize:         viper.GetInt("payload-size"),
+		MaxConcurrent:       viper.GetInt("max-concurrent"),
+		Duration:            viper.GetDuration("duration"),
+		ConnectTimeout:      viper.GetDuration("connect-timeout"),
+		ViewTimeout:         viper.GetDuration("view-timeout"),
+		TimoutSamples:       viper.GetInt("duration-samples"),
+		TimeoutMultiplier:   float32(viper.GetFloat64("timeout-multiplier")),
+		Consensus:           viper.GetString("consensus"),
+		Crypto:              viper.GetString("crypto"),
+		LeaderRotation:      viper.GetString("leader-rotation"),
+		Metrics:             viper.GetStringSlice("metrics"),
+		MeasurementInterval: viper.GetDuration("measurement-interval"),
 	}
 
 	worker := viper.GetBool("worker")
@@ -102,12 +106,14 @@ func runController() {
 	}
 
 	sessions, err := orchestration.Deploy(g, orchestration.DeployConfig{
-		ExePath:      exePath,
-		LogLevel:     viper.GetString("log-level"),
-		CPUProfiling: viper.GetBool("cpu-profile"),
-		MemProfiling: viper.GetBool("mem-profile"),
-		Tracing:      viper.GetBool("trace"),
-		Fgprof:       viper.GetBool("fgprof-profile"),
+		ExePath:             exePath,
+		LogLevel:            viper.GetString("log-level"),
+		CPUProfiling:        viper.GetBool("cpu-profile"),
+		MemProfiling:        viper.GetBool("mem-profile"),
+		Tracing:             viper.GetBool("trace"),
+		Fgprof:              viper.GetBool("fgprof-profile"),
+		Metrics:             viper.GetStringSlice("metrics"),
+		MeasurementInterval: viper.GetDuration("measurement-interval"),
 	})
 	checkf("Failed to deploy workers: %v", err)
 
@@ -174,7 +180,13 @@ func localWorker() orchestration.RemoteWorker {
 	controllerPipe, workerPipe := net.Pipe()
 	go func() {
 		// TODO: replace the NopLogger with a proper logger.
-		worker := orchestration.NewWorker(protostream.NewWriter(workerPipe), protostream.NewReader(workerPipe), modules.NopLogger())
+		worker := orchestration.NewWorker(
+			protostream.NewWriter(workerPipe),
+			protostream.NewReader(workerPipe),
+			modules.NopLogger(),
+			viper.GetStringSlice("metrics"),
+			viper.GetDuration("measurement-interval"),
+		)
 		err := worker.Run()
 		if err != nil {
 			log.Fatal(err)

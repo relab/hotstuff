@@ -7,6 +7,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/relab/iago"
 	fs "github.com/relab/wrfs"
@@ -15,12 +16,14 @@ import (
 
 // DeployConfig contains configuration options for deployment.
 type DeployConfig struct {
-	ExePath      string
-	LogLevel     string
-	CPUProfiling bool
-	MemProfiling bool
-	Tracing      bool
-	Fgprof       bool
+	ExePath             string
+	LogLevel            string
+	CPUProfiling        bool
+	MemProfiling        bool
+	Tracing             bool
+	Fgprof              bool
+	Metrics             []string
+	MeasurementInterval time.Duration
 }
 
 // Deploy deploys the hotstuff binary to a group of servers and starts a worker on the given port.
@@ -183,6 +186,20 @@ func (w *workerSetup) Apply(ctx context.Context, host iago.Host) (err error) {
 	var sb strings.Builder
 	sb.WriteString(iago.GetStringVar(host, "exe"))
 	sb.WriteString(" ")
+
+	if w.cfg.MeasurementInterval > 0 {
+		sb.WriteString("--measurement-interval ")
+		sb.WriteString(w.cfg.MeasurementInterval.String())
+		sb.WriteString(" ")
+	}
+
+	sb.WriteString("--metrics=\"")
+	for _, metric := range w.cfg.Metrics {
+		sb.WriteString(metric)
+		sb.WriteString(",")
+	}
+	sb.WriteString("\" ")
+
 	if w.cfg.CPUProfiling {
 		sb.WriteString("--cpu-profile ")
 		sb.WriteString(path.Join(dir, "cpuprofile"))

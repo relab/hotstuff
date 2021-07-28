@@ -5,9 +5,12 @@ HOTSTUFF
 Infof
 QC's
 SSWU
+TMPDIR
 Warnf
+Welford
 Welford's
 anypb
+checkf
 clientpb
 cmdqueue
 covermode
@@ -17,6 +20,7 @@ durationpb
 emptypb
 felixge
 fgprof
+fgprofprofile
 gocyclo
 golint
 gomock
@@ -44,3 +48,5 @@ timestamppb
 tmpl
 unittests
 unmarshals
+wcfg
+wrfs

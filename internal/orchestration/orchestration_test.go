@@ -15,7 +15,7 @@ func TestOrchestration(t *testing.T) {
 		controllerStream, workerStream := net.Pipe()
 
 		workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
-		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), modules.NopLogger())
+		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), modules.NopLogger(), nil, 0)
 
 		experiment := &orchestration.Experiment{
 			NumReplicas:       4,

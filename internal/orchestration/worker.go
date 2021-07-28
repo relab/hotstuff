@@ -22,10 +22,10 @@ import (
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/leaderrotation"
+	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/synchronizer"
@@ -40,7 +40,9 @@ type Worker struct {
 	send *protostream.Writer
 	recv *protostream.Reader
 
-	dataLogger modules.DataLogger
+	dataLogger          modules.DataLogger
+	metrics             []string
+	measurementInterval time.Duration
 
 	replicas map[hotstuff.ID]*replica.Replica
 	clients  map[hotstuff.ID]*client.Client
@@ -83,13 +85,15 @@ func (w *Worker) Run() error {
 }
 
 // NewWorker returns a new worker.
-func NewWorker(send *protostream.Writer, recv *protostream.Reader, dl modules.DataLogger) Worker {
+func NewWorker(send *protostream.Writer, recv *protostream.Reader, dl modules.DataLogger, metrics []string, measurementInterval time.Duration) Worker {
 	return Worker{
-		send:       send,
-		recv:       recv,
-		dataLogger: dl,
-		replicas:   make(map[hotstuff.ID]*replica.Replica),
-		clients:    make(map[hotstuff.ID]*client.Client),
+		send:                send,
+		recv:                recv,
+		dataLogger:          dl,
+		metrics:             metrics,
+		measurementInterval: measurementInterval,
+		replicas:            make(map[hotstuff.ID]*replica.Replica),
+		clients:             make(map[hotstuff.ID]*client.Client),
 	}
 }
 
@@ -193,8 +197,13 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		sync,
 		w.dataLogger,
 		blockchain.New(int(opts.GetBlockCacheSize())),
-		logging.New(fmt.Sprintf("hs%d", opts.GetID())),
 	)
+
+	if w.measurementInterval > 0 {
+		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
+		builder.Register(replicaMetrics...)
+		builder.Register(metrics.NewTicker(w.measurementInterval))
+	}
 
 	c := replica.Config{
 		ID:          hotstuff.ID(opts.GetID()),
@@ -265,6 +274,13 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			},
 		}
 		mods := modules.NewBuilder(c.ID)
+
+		if w.measurementInterval > 0 {
+			clientMetrics := metrics.GetClientMetrics(w.metrics...)
+			mods.Register(clientMetrics...)
+			mods.Register(metrics.NewTicker(w.measurementInterval))
+		}
+
 		mods.Register(w.dataLogger)
 		cli := client.New(c, mods)
 		cfg, err := getConfiguration(hotstuff.ID(opts.GetID()), req.GetConfiguration(), true)

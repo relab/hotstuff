@@ -23,19 +23,21 @@ type HostConfig struct {
 
 // Experiment holds variables for an experiment.
 type Experiment struct {
-	NumReplicas       int
-	NumClients        int
-	BatchSize         int
-	PayloadSize       int
-	MaxConcurrent     int
-	Duration          time.Duration
-	ConnectTimeout    time.Duration
-	ViewTimeout       time.Duration
-	TimoutSamples     int
-	TimeoutMultiplier float32
-	Consensus         string
-	Crypto            string
-	LeaderRotation    string
+	NumReplicas         int
+	NumClients          int
+	BatchSize           int
+	PayloadSize         int
+	MaxConcurrent       int
+	Duration            time.Duration
+	ConnectTimeout      time.Duration
+	ViewTimeout         time.Duration
+	TimoutSamples       int
+	TimeoutMultiplier   float32
+	Consensus           string
+	Crypto              string
+	LeaderRotation      string
+	Metrics             []string
+	MeasurementInterval time.Duration
 
 	Hosts       map[string]RemoteWorker
 	HostConfigs map[string]HostConfig
