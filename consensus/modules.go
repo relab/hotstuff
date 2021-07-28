@@ -113,7 +113,7 @@ func (mods *Modules) Synchronizer() Synchronizer {
 
 // Builder is a helper for constructing a HotStuff instance.
 type Builder struct {
-	coreBuilder modules.Builder
+	baseBuilder modules.Builder
 	mods        *Modules
 	cfg         OptionsBuilder
 	modules     []Module
@@ -122,7 +122,7 @@ type Builder struct {
 // NewBuilder creates a new Builder.
 func NewBuilder(id hotstuff.ID, privateKey PrivateKey) Builder {
 	bl := Builder{
-		coreBuilder: modules.NewBuilder(id),
+		baseBuilder: modules.NewBuilder(id),
 		mods: &Modules{
 			privateKey:    privateKey,
 			votingMachine: NewVotingMachine(),
@@ -141,6 +141,7 @@ func NewBuilder(id hotstuff.ID, privateKey PrivateKey) Builder {
 // Register will overwrite existing modules if the same type is registered twice.
 func (b *Builder) Register(mods ...interface{}) {
 	for _, module := range mods {
+		b.baseBuilder.Register(module)
 		if m, ok := module.(Acceptor); ok {
 			b.mods.acceptor = m
 		}
@@ -171,10 +172,6 @@ func (b *Builder) Register(mods ...interface{}) {
 		if m, ok := module.(Module); ok {
 			b.modules = append(b.modules, m)
 		}
-		// if the module is a modules.Module instead, we register with that builder.
-		if m, ok := module.(modules.Module); ok {
-			b.coreBuilder.Register(m)
-		}
 	}
 }
 
@@ -184,7 +181,7 @@ func (b *Builder) Build() *Modules {
 		module.InitConsensusModule(b.mods, &b.cfg)
 	}
 	b.mods.opts = b.cfg.opts
-	b.mods.Modules = b.coreBuilder.Build()
+	b.mods.Modules = b.baseBuilder.Build()
 	return b.mods
 }
 

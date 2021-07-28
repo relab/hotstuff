@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net"
+	"strconv"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
@@ -13,6 +14,7 @@ import (
 	backend "github.com/relab/hotstuff/backend/gorums"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/internal/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -104,6 +106,7 @@ func New(conf Config, builder consensus.Builder) (replica *Replica) {
 		srv.hsSrv,              // event handling
 		srv.clientSrv,          // executor
 		srv.clientSrv.cmdCache, // acceptor and command queue
+		logging.New("hs"+strconv.Itoa(int(conf.ID))),
 	)
 	srv.hs = builder.Build()
 
