@@ -188,7 +188,7 @@ func (w *workerSetup) Apply(ctx context.Context, host iago.Host) (err error) {
 	sb.WriteString(" ")
 
 	sb.WriteString("--data-path ")
-	sb.WriteString(path.Join(dir, "measurements"))
+	sb.WriteString(path.Join(dir, "measurements.json"))
 	sb.WriteString(" ")
 
 	if w.cfg.MeasurementInterval > 0 {
