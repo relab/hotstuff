@@ -187,6 +187,10 @@ func (w *workerSetup) Apply(ctx context.Context, host iago.Host) (err error) {
 	sb.WriteString(iago.GetStringVar(host, "exe"))
 	sb.WriteString(" ")
 
+	sb.WriteString("--data-path ")
+	sb.WriteString(path.Join(dir, "measurements"))
+	sb.WriteString(" ")
+
 	if w.cfg.MeasurementInterval > 0 {
 		sb.WriteString("--measurement-interval ")
 		sb.WriteString(w.cfg.MeasurementInterval.String())

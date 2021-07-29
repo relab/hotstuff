@@ -16,8 +16,8 @@ type Ticker struct {
 }
 
 // NewTicker returns a new ticker.
-func NewTicker(interval time.Duration) Ticker {
-	return Ticker{}
+func NewTicker(interval time.Duration) *Ticker {
+	return &Ticker{interval: interval}
 }
 
 // InitModule gives the module access to the other modules.
@@ -27,13 +27,14 @@ func (t *Ticker) InitModule(mods *modules.Modules) {
 }
 
 func (t *Ticker) tick(tickTime time.Time) interface{} {
-	var elapsed time.Duration
+	var event interface{}
+	// skip the first tick so that elapsed will be nonzero
 	if !t.lastTick.IsZero() {
-		elapsed = tickTime.Sub(t.lastTick)
-	}
-	event := &types.TickEvent{
-		Timestamp: tickTime,
-		Elapsed:   elapsed,
+		elapsed := tickTime.Sub(t.lastTick)
+		event = types.TickEvent{
+			Timestamp: tickTime,
+			Elapsed:   elapsed,
+		}
 	}
 	t.lastTick = tickTime
 	return event

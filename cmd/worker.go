@@ -60,28 +60,25 @@ func init() {
 
 func runWorker() {
 	stopProfilers, err := profiling.StartProfilers(cpuProfile, memProfile, trace, fgprofProfile)
-	if err != nil {
-		log.Fatalln("failed to start profilers: ", err)
-	}
+	checkf("failed to start profilers: %v", err)
 	defer func() {
 		err = stopProfilers()
-		if err != nil {
-			log.Fatalln("failed to stop profilers: ", err)
-		}
+		checkf("failed to stop profilers: %v", err)
 	}()
 
 	dataLogger := modules.NopLogger()
 	if dataPath != "" {
 		f, err := os.OpenFile(dataPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-		if err != nil {
-			log.Fatalln("failed to create data path: ", err)
-		}
-		dataLogger = modules.NewDataLogger(protostream.NewWriter(bufio.NewWriter(f)))
+		checkf("failed to create data path: %v", err)
+		writer := bufio.NewWriter(f)
+		dataLogger, err = modules.NewJSONDataLogger(writer)
 		defer func() {
+			err = dataLogger.Close()
+			checkf("failed to close data logger: %v", err)
+			err = writer.Flush()
+			checkf("failed to flush writer: %v", err)
 			err = f.Close()
-			if err != nil {
-				log.Fatalln("failed to close data logger: ", err)
-			}
+			checkf("failed to close writer: %v", err)
 		}()
 	}
 
