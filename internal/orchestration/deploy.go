@@ -48,9 +48,9 @@ func Deploy(g iago.Group, cfg DeployConfig) (workers map[string]WorkerSession, e
 	g.Run(iago.Task{
 		Name: "Create temporary directory",
 		Action: iago.Do(func(ctx context.Context, host iago.Host) (err error) {
-			testDir := tempDirPath(host, tmpDir)
+			testDir := tempDirPath(host, tmpDir+"/data")
 			host.SetVar("dir", testDir)
-			err = fs.MkdirAll(host.GetFS(), iago.CleanPath(tempDirPath(host, tmpDir)), 0755)
+			err = fs.MkdirAll(host.GetFS(), iago.CleanPath(testDir), 0755)
 			return err
 		}),
 		OnError: silentPanic,
