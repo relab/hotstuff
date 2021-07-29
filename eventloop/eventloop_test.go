@@ -43,7 +43,7 @@ func TestSyncHandler(t *testing.T) {
 
 func TestTicker(t *testing.T) {
 	if os.Getenv("GITHUB_ACTIONS") != "" {
-		t.Skip()
+		t.SkipNow()
 		return
 	}
 
