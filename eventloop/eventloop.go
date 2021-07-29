@@ -243,14 +243,20 @@ func (el *EventLoop) startTicker(ctx context.Context, id int) {
 
 func (el *EventLoop) runTicker(ctx context.Context, ticker *ticker) {
 	t := time.NewTicker(ticker.interval)
+	defer t.Stop()
+
+	if ctx.Err() != nil {
+		return
+	}
+
 	// send the first event immediately
 	el.AddEvent(ticker.callback(time.Now()))
+
 	for {
 		select {
 		case tick := <-t.C:
 			el.AddEvent(ticker.callback(tick))
 		case <-ctx.Done():
-			t.Stop()
 			return
 		}
 	}
