@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"time"
+
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
@@ -39,10 +41,11 @@ func (t *Throughput) recordCommit(commands int) {
 }
 
 func (t *Throughput) tick(tick types.TickEvent) {
-	event, err := types.NewReplicaEvent(uint32(t.mods.ID()), tick.Timestamp, &types.ThroughputMeasurement{
+	now := time.Now()
+	event, err := types.NewReplicaEvent(uint32(t.mods.ID()), now, &types.ThroughputMeasurement{
 		Commits:  t.commitCount,
 		Commands: t.commandCount,
-		Duration: durationpb.New(tick.Elapsed),
+		Duration: durationpb.New(now.Sub(tick.LastTick)),
 	})
 	if err != nil {
 		t.mods.Logger().Errorf("failed to create event: %v", err)

@@ -28,12 +28,9 @@ func (t *Ticker) InitModule(mods *modules.Modules) {
 
 func (t *Ticker) tick(tickTime time.Time) interface{} {
 	var event interface{}
-	// skip the first tick so that elapsed will be nonzero
 	if !t.lastTick.IsZero() {
-		elapsed := tickTime.Sub(t.lastTick)
 		event = types.TickEvent{
-			Timestamp: tickTime,
-			Elapsed:   elapsed,
+			LastTick: t.lastTick,
 		}
 	}
 	t.lastTick = tickTime

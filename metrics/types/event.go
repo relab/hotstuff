@@ -33,8 +33,6 @@ func NewClientEvent(id uint32, timestamp time.Time, data proto.Message) (*Event,
 
 // TickEvent is sent when new measurements should be recorded.
 type TickEvent struct {
-	// the time when the tick happened
-	Timestamp time.Time
-	// the time elapsed since last tick
-	Elapsed time.Duration
+	// The time when the previous tick happened.
+	LastTick time.Time
 }
