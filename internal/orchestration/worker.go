@@ -272,6 +272,9 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 				gorums.WithDialTimeout(time.Duration(opts.GetConnectTimeout() * float32(time.Millisecond))),
 				gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
 			},
+			RateLimit:        opts.GetRateLimit(),
+			RateStep:         opts.GetRateStep(),
+			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 		}
 		mods := modules.NewBuilder(c.ID)
 

@@ -13,6 +13,7 @@ import (
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"go.uber.org/multierr"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // HostConfig specifies the number of replicas and clients that should be started on a specific host.
@@ -38,6 +39,9 @@ type Experiment struct {
 	LeaderRotation      string
 	Metrics             []string
 	MeasurementInterval time.Duration
+	RateLimit           float64
+	RateStep            float64
+	RateStepInterval    time.Duration
 
 	Hosts       map[string]RemoteWorker
 	HostConfigs map[string]HostConfig
@@ -297,11 +301,14 @@ func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration) err
 		req.CertificateAuthority = keygen.CertToPEM(e.ca)
 		for _, id := range e.hostsToClients[host] {
 			req.Clients[uint32(id)] = &orchestrationpb.ClientOpts{
-				ID:             uint32(id),
-				UseTLS:         true,
-				MaxConcurrent:  uint32(e.MaxConcurrent),
-				PayloadSize:    uint32(e.PayloadSize),
-				ConnectTimeout: float32(e.ConnectTimeout / time.Millisecond),
+				ID:               uint32(id),
+				UseTLS:           true,
+				MaxConcurrent:    uint32(e.MaxConcurrent),
+				PayloadSize:      uint32(e.PayloadSize),
+				ConnectTimeout:   float32(e.ConnectTimeout / time.Millisecond),
+				RateLimit:        e.RateLimit,
+				RateStep:         e.RateStep,
+				RateStepInterval: durationpb.New(e.RateStepInterval),
 			}
 		}
 		_, err := worker.StartClient(req)

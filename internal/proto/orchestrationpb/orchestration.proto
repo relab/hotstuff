@@ -4,6 +4,8 @@ package orchestrationpb;
 
 option go_package = "github.com/relab/hotstuff/internal/proto/orchestrationpb";
 
+import "google/protobuf/duration.proto";
+
 /* -------------------------------------------------------------------------- */
 /*                              General messages                              */
 /* -------------------------------------------------------------------------- */
@@ -70,6 +72,12 @@ message ClientOpts {
   uint32 PayloadSize = 9;
   // The timeout of the initial connection.
   float ConnectTimeout = 10;
+  // The limit on how many commands can be sent per second.
+  double RateLimit = 11;
+  // The amount of commands per second to increase the rate limit by.
+  double RateStep = 12;
+  // How often to increase the rate limit.
+  google.protobuf.Duration RateStepInterval = 13;
 }
 
 // ReplicaConfiguration is a configuration of replicas.

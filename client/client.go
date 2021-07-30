@@ -18,6 +18,7 @@ import (
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
+	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -41,28 +42,34 @@ type pendingCmd struct {
 
 // Config contains config options for a client.
 type Config struct {
-	ID             hotstuff.ID
-	TLS            bool
-	RootCAs        *x509.CertPool
-	MaxConcurrent  uint32
-	PayloadSize    uint32
-	Input          io.ReadCloser
-	ManagerOptions []gorums.ManagerOption
+	ID               hotstuff.ID
+	TLS              bool
+	RootCAs          *x509.CertPool
+	MaxConcurrent    uint32
+	PayloadSize      uint32
+	Input            io.ReadCloser
+	ManagerOptions   []gorums.ManagerOption
+	RateLimit        float64       // initial rate limit
+	RateStep         float64       // rate limit step up
+	RateStepInterval time.Duration // step up interval
 }
 
 // Client is a hotstuff client.
 type Client struct {
+	mut              sync.Mutex
 	id               hotstuff.ID
 	mods             *modules.Modules
 	mgr              *clientpb.Manager
 	gorumsConfig     *clientpb.Configuration
 	payloadSize      uint32
-	mut              sync.Mutex
 	highestCommitted uint64 // highest sequence number acknowledged by the replicas
 	pendingCmds      chan pendingCmd
 	cancel           context.CancelFunc
 	done             chan struct{}
 	reader           io.ReadCloser
+	limiter          *rate.Limiter
+	stepUp           float64
+	stepUpInterval   time.Duration
 }
 
 // New returns a new Client.
@@ -77,6 +84,9 @@ func New(conf Config, builder modules.Builder) (client *Client) {
 		highestCommitted: 1,
 		done:             make(chan struct{}),
 		reader:           conf.Input,
+		limiter:          rate.NewLimiter(rate.Limit(conf.RateLimit), 1),
+		stepUp:           conf.RateStep,
+		stepUpInterval:   conf.RateStepInterval,
 	}
 
 	grpcOpts := []grpc.DialOption{grpc.WithBlock()}
@@ -151,12 +161,27 @@ func (c *Client) close() {
 }
 
 func (c *Client) sendCommands(ctx context.Context) error {
-	num := uint64(1)
-	var lastCommand uint64 = math.MaxUint64
+	var (
+		num         uint64 = 1
+		lastCommand uint64 = math.MaxUint64
+		lastStep           = time.Now()
+	)
 
 	for {
 		if ctx.Err() != nil {
 			break
+		}
+
+		// step up the rate limiter
+		now := time.Now()
+		if now.Sub(lastStep) > c.stepUpInterval {
+			c.limiter.SetLimit(c.limiter.Limit() + rate.Limit(c.stepUp))
+			lastStep = now
+		}
+
+		err := c.limiter.Wait(ctx)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			return err
 		}
 
 		// annoyingly, we need a mutex here to prevent the data race detector from complaining.

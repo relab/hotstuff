@@ -3,6 +3,7 @@ package cmd
 import (
 	"io"
 	"log"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -60,8 +61,12 @@ func init() {
 	runCmd.Flags().Bool("mem-profile", false, "enable memory profiling")
 	runCmd.Flags().Bool("trace", false, "enable trace")
 	runCmd.Flags().Bool("fgprof-profile", false, "enable fgprof")
+
 	runCmd.Flags().StringSlice("metrics", []string{"client-latency", "throughput"}, "list of metrics to enable")
 	runCmd.Flags().Duration("measurement-interval", 0, "time interval between measurements")
+	runCmd.Flags().Float64("rate-limit", math.Inf(1), "rate limit for clients (in commands/second)")
+	runCmd.Flags().Float64("rate-step", 0, "rate limit step up for clients (in commands/second)")
+	runCmd.Flags().Duration("rate-step-interval", time.Hour, "how often the client rate limit should be increased")
 
 	err := viper.BindPFlags(runCmd.Flags())
 	if err != nil {
@@ -91,6 +96,9 @@ func runController() {
 		LeaderRotation:      viper.GetString("leader-rotation"),
 		Metrics:             viper.GetStringSlice("metrics"),
 		MeasurementInterval: viper.GetDuration("measurement-interval"),
+		RateLimit:           viper.GetFloat64("rate-limit"),
+		RateStep:            viper.GetFloat64("rate-step"),
+		RateStepInterval:    viper.GetDuration("rate-step-interval"),
 	}
 
 	worker := viper.GetBool("worker")
