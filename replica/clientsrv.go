@@ -87,7 +87,7 @@ func (srv *clientSrv) Exec(cmd consensus.Command) {
 		return
 	}
 
-	srv.mods.DataEventLoop().AddEvent(consensus.CommitEvent{Commands: len(batch.GetCommands())})
+	srv.mods.MetricsEventLoop().AddEvent(consensus.CommitEvent{Commands: len(batch.GetCommands())})
 
 	for _, cmd := range batch.GetCommands() {
 		_, _ = srv.hash.Write(cmd.Data)

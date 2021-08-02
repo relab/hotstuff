@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/internal/protostream"
 )
 
-func TestDataLogger(t *testing.T) {
+func TestProtostream(t *testing.T) {
 	var buf bytes.Buffer                                   // in-memory stream
 	msg := hotstuffpb.BlockToProto(consensus.GetGenesis()) // test message
 
@@ -18,12 +18,12 @@ func TestDataLogger(t *testing.T) {
 
 	err := writer.WriteAny(msg)
 	if err != nil {
-		t.Fatalf("Log failed: %v", err)
+		t.Fatalf("WriteAny failed: %v", err)
 	}
 
 	gotMsg, err := reader.ReadAny()
 	if err != nil {
-		t.Fatalf("Read failed: %v", err)
+		t.Fatalf("ReadAny failed: %v", err)
 	}
 
 	got, ok := gotMsg.(*hotstuffpb.Block)

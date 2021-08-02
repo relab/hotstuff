@@ -123,7 +123,7 @@ func (c *Client) Connect(replicaConfig *config.ReplicaConfig) (err error) {
 func (c *Client) Run(ctx context.Context) {
 	eventLoopDone := make(chan struct{})
 	go func() {
-		c.mods.DataEventLoop().Run(ctx)
+		c.mods.MetricsEventLoop().Run(ctx)
 		close(eventLoopDone)
 	}()
 	c.mods.Logger().Info("Starting to send commands")
@@ -253,7 +253,7 @@ func (c *Client) handleCommands(ctx context.Context) {
 		c.mut.Unlock()
 
 		duration := time.Since(cmd.sendTime)
-		c.mods.DataEventLoop().AddEvent(LatencyMeasurementEvent{Latency: duration})
+		c.mods.MetricsEventLoop().AddEvent(LatencyMeasurementEvent{Latency: duration})
 	}
 }
 

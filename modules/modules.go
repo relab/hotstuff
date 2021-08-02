@@ -21,7 +21,7 @@ type Module interface {
 type Modules struct {
 	id            hotstuff.ID
 	logger        logging.Logger
-	dataLogger    DataLogger
+	metricsLogger MetricsLogger
 	dataEventLoop *eventloop.EventLoop
 }
 
@@ -35,17 +35,17 @@ func (mod Modules) Logger() logging.Logger {
 	return mod.logger
 }
 
-// DataLogger returns the data logger.
-func (mod Modules) DataLogger() DataLogger {
-	if mod.dataLogger == nil {
+// MetricsLogger returns the metrics logger.
+func (mod Modules) MetricsLogger() MetricsLogger {
+	if mod.metricsLogger == nil {
 		return NopLogger()
 	}
-	return mod.dataLogger
+	return mod.metricsLogger
 }
 
-// DataEventLoop returns the data event loop.
-// The data event loop is used for processing of measurement data.
-func (mod Modules) DataEventLoop() *eventloop.EventLoop {
+// MetricsEventLoop returns the metrics event loop.
+// The metrics event loop is used for processing of measurement data.
+func (mod Modules) MetricsEventLoop() *eventloop.EventLoop {
 	return mod.dataEventLoop
 }
 
@@ -71,8 +71,8 @@ func (b *Builder) Register(modules ...interface{}) {
 		if m, ok := module.(logging.Logger); ok {
 			b.mod.logger = m
 		}
-		if m, ok := module.(DataLogger); ok {
-			b.mod.dataLogger = m
+		if m, ok := module.(MetricsLogger); ok {
+			b.mod.metricsLogger = m
 		}
 		if m, ok := module.(Module); ok {
 			b.modules = append(b.modules, m)

@@ -39,7 +39,7 @@ func (mods *Modules) Run(ctx context.Context) {
 
 	secondaryDone := make(chan struct{})
 	go func() {
-		mods.DataEventLoop().Run(ctx)
+		mods.MetricsEventLoop().Run(ctx)
 		close(secondaryDone)
 	}()
 

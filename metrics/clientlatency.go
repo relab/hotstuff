@@ -14,7 +14,7 @@ func init() {
 	})
 }
 
-// ClientLatency processes LatencyMeasurementEvents, and writes LatencyMeasurements to the data logger.
+// ClientLatency processes LatencyMeasurementEvents, and writes LatencyMeasurements to the metrics logger.
 type ClientLatency struct {
 	mods *modules.Modules
 	wf   Welford
@@ -24,12 +24,12 @@ type ClientLatency struct {
 func (lr *ClientLatency) InitModule(mods *modules.Modules) {
 	lr.mods = mods
 
-	lr.mods.DataEventLoop().RegisterHandler(client.LatencyMeasurementEvent{}, func(event interface{}) {
+	lr.mods.MetricsEventLoop().RegisterHandler(client.LatencyMeasurementEvent{}, func(event interface{}) {
 		latencyEvent := event.(client.LatencyMeasurementEvent)
 		lr.addLatency(latencyEvent.Latency)
 	})
 
-	lr.mods.DataEventLoop().RegisterObserver(types.TickEvent{}, func(event interface{}) {
+	lr.mods.MetricsEventLoop().RegisterObserver(types.TickEvent{}, func(event interface{}) {
 		lr.tick(event.(types.TickEvent))
 	})
 
@@ -49,6 +49,6 @@ func (lr *ClientLatency) tick(tick types.TickEvent) {
 		Latency:  mean,
 		Variance: variance,
 	}
-	lr.mods.DataLogger().Log(event)
+	lr.mods.MetricsLogger().Log(event)
 	lr.wf.Reset()
 }

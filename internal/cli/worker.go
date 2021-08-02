@@ -66,15 +66,15 @@ func runWorker() {
 		checkf("failed to stop profilers: %v", err)
 	}()
 
-	dataLogger := modules.NopLogger()
+	metricsLogger := modules.NopLogger()
 	if dataPath != "" {
 		f, err := os.OpenFile(dataPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 		checkf("failed to create data path: %v", err)
 		writer := bufio.NewWriter(f)
-		dataLogger, err = modules.NewJSONDataLogger(writer)
+		metricsLogger, err = modules.NewJSONLogger(writer)
 		defer func() {
-			err = dataLogger.Close()
-			checkf("failed to close data logger: %v", err)
+			err = metricsLogger.Close()
+			checkf("failed to close metrics logger: %v", err)
 			err = writer.Flush()
 			checkf("failed to flush writer: %v", err)
 			err = f.Close()
@@ -82,7 +82,7 @@ func runWorker() {
 		}()
 	}
 
-	worker := orchestration.NewWorker(protostream.NewWriter(os.Stdout), protostream.NewReader(os.Stdin), dataLogger, metrics, measurementInterval)
+	worker := orchestration.NewWorker(protostream.NewWriter(os.Stdout), protostream.NewReader(os.Stdin), metricsLogger, metrics, measurementInterval)
 	err = worker.Run()
 	if err != nil {
 		log.Println(err)

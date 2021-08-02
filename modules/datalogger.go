@@ -10,34 +10,34 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// DataLogger logs data in protobuf message format.
-type DataLogger interface {
+// MetricsLogger logs data in protobuf message format.
+type MetricsLogger interface {
 	Log(proto.Message)
 	io.Closer
 }
 
-type jsonDataLogger struct {
+type jsonLogger struct {
 	mut   sync.Mutex
 	mods  *Modules
 	wr    io.Writer
 	first bool
 }
 
-// NewJSONDataLogger returns a new data logger that logs to the given writer.
-func NewJSONDataLogger(wr io.Writer) (DataLogger, error) {
+// NewJSONLogger returns a new metrics logger that logs to the specified writer.
+func NewJSONLogger(wr io.Writer) (MetricsLogger, error) {
 	_, err := io.WriteString(wr, "[\n")
 	if err != nil {
 		return nil, fmt.Errorf("failed to write start of JSON array: %v", err)
 	}
-	return &jsonDataLogger{wr: wr, first: true}, nil
+	return &jsonLogger{wr: wr, first: true}, nil
 }
 
-// InitModule initializes the data logger module.
-func (dl *jsonDataLogger) InitModule(mods *Modules) {
+// InitModule initializes the metrics logger module.
+func (dl *jsonLogger) InitModule(mods *Modules) {
 	dl.mods = mods
 }
 
-func (dl *jsonDataLogger) Log(msg proto.Message) {
+func (dl *jsonLogger) Log(msg proto.Message) {
 	var (
 		any *anypb.Any
 		err error
@@ -56,7 +56,7 @@ func (dl *jsonDataLogger) Log(msg proto.Message) {
 	}
 }
 
-func (dl *jsonDataLogger) write(msg proto.Message) (err error) {
+func (dl *jsonLogger) write(msg proto.Message) (err error) {
 	dl.mut.Lock()
 	defer dl.mut.Unlock()
 
@@ -81,8 +81,8 @@ func (dl *jsonDataLogger) write(msg proto.Message) (err error) {
 	return err
 }
 
-// Close closes the data logger
-func (dl *jsonDataLogger) Close() error {
+// Close closes the metrics logger
+func (dl *jsonLogger) Close() error {
 	_, err := io.WriteString(dl.wr, "\n]")
 	return err
 }
@@ -92,8 +92,8 @@ type nopLogger struct{}
 func (nopLogger) Log(proto.Message) {}
 func (nopLogger) Close() error      { return nil }
 
-// NopLogger returns a logger that does not log anything.
-// This is useful for testing and other situations where data logging is disabled.
-func NopLogger() DataLogger {
+// NopLogger returns a metrics logger that discards any messages.
+// This is useful for testing and other situations where metrics logging is disabled.
+func NopLogger() MetricsLogger {
 	return nopLogger{}
 }

@@ -40,7 +40,7 @@ type Worker struct {
 	send *protostream.Writer
 	recv *protostream.Reader
 
-	dataLogger          modules.DataLogger
+	metricsLogger       modules.MetricsLogger
 	metrics             []string
 	measurementInterval time.Duration
 
@@ -85,11 +85,11 @@ func (w *Worker) Run() error {
 }
 
 // NewWorker returns a new worker.
-func NewWorker(send *protostream.Writer, recv *protostream.Reader, dl modules.DataLogger, metrics []string, measurementInterval time.Duration) Worker {
+func NewWorker(send *protostream.Writer, recv *protostream.Reader, dl modules.MetricsLogger, metrics []string, measurementInterval time.Duration) Worker {
 	return Worker{
 		send:                send,
 		recv:                recv,
-		dataLogger:          dl,
+		metricsLogger:       dl,
 		metrics:             metrics,
 		measurementInterval: measurementInterval,
 		replicas:            make(map[hotstuff.ID]*replica.Replica),
@@ -195,7 +195,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		leaderRotation,
 		sync,
-		w.dataLogger,
+		w.metricsLogger,
 		blockchain.New(int(opts.GetBlockCacheSize())),
 	)
 
@@ -284,7 +284,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			mods.Register(metrics.NewTicker(w.measurementInterval))
 		}
 
-		mods.Register(w.dataLogger)
+		mods.Register(w.metricsLogger)
 		cli := client.New(c, mods)
 		cfg, err := getConfiguration(hotstuff.ID(opts.GetID()), req.GetConfiguration(), true)
 		if err != nil {
