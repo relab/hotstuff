@@ -1,3 +1,4 @@
+// Package protostream implements reading and writing of protobuf messages to data streams.
 package protostream
 
 import (

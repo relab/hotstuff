@@ -1,3 +1,4 @@
+// Package fasthotstuff implements the two-chain Fast-HotStuff protocol.
 package fasthotstuff
 
 import (

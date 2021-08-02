@@ -1,3 +1,6 @@
+// Package client implements a simple client for testing HotStuff.
+// The client reads data from an input stream and sends the data in commands to a HotStuff replica.
+// The client waits for replies from f+1 replicas before it considers a command to be executed.
 package client
 
 import (

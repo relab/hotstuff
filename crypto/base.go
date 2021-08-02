@@ -1,3 +1,4 @@
+// Package crypto provides a base for the crypto implementations.
 package crypto
 
 import (

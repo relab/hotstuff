@@ -1,3 +1,4 @@
+// Package chainedhotstuff implements the pipelined three-chain version of the HotStuff protocol.
 package chainedhotstuff
 
 import (

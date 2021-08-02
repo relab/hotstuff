@@ -1,3 +1,9 @@
+// Package orchestration implements deployment and orchestration of hotstuff replicas and clients on remote hosts.
+// A "controller" uses the iago framework to connect to hosts via ssh and deploy hotstuff.
+// This is implemented by the Deploy() function.
+// The deploy function also starts a "worker" on each connected host.
+// The controller communicates via workers through the worker's stdin and stdout streams.
+// The worker's stderr stream is forwarded to the stderr stream of the controller.
 package orchestration
 
 import (
