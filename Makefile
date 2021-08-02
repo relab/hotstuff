@@ -6,7 +6,7 @@ proto_src := internal/proto/clientpb/client.proto \
 proto_go := $(proto_src:%.proto=%.pb.go)
 gorums_go := $(proto_src:%.proto=%_gorums.pb.go)
 
-binaries := ./hotstuff-cli/hotstuff-cli
+binaries := hotstuff
 
 .PHONY: all debug clean protos download tools $(binaries)
 
@@ -16,7 +16,7 @@ debug: GCFLAGS += -gcflags='all=-N -l'
 debug: $(binaries)
 
 $(binaries): protos
-	@go build -o ./$@ $(GCFLAGS) ./$(dir $@)
+	@go build -o ./$@ $(GCFLAGS) ./cmd/$@
 
 protos: $(proto_go) $(gorums_go)
 

@@ -18,18 +18,16 @@
 __debug_bin
 
 # binaries
-hotstuff-cli/hotstuff-cli
+/hotstuff
 
 
 # other
-keys/
 *.in
-gcp_token.json
-gcloud_test
-test.png
-test.pdf
+
 rr/
 
 scripts/id
 scripts/id.pub
 scripts/known_hosts
+
+measurements.json
