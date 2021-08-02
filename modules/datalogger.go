@@ -1,8 +1,6 @@
 package modules
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"sync"
@@ -22,7 +20,6 @@ type jsonDataLogger struct {
 	mut   sync.Mutex
 	mods  *Modules
 	wr    io.Writer
-	buf   bytes.Buffer
 	first bool
 }
 
@@ -62,7 +59,6 @@ func (dl *jsonDataLogger) Log(msg proto.Message) {
 func (dl *jsonDataLogger) write(msg proto.Message) (err error) {
 	dl.mut.Lock()
 	defer dl.mut.Unlock()
-	dl.buf.Reset()
 
 	if dl.first {
 		dl.first = false
@@ -74,15 +70,14 @@ func (dl *jsonDataLogger) write(msg proto.Message) (err error) {
 		}
 	}
 
-	b, err := protojson.Marshal(msg)
+	b, err := protojson.MarshalOptions{
+		Indent:          "\t",
+		EmitUnpopulated: true,
+	}.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message to JSON: %w", err)
 	}
-	err = json.Indent(&dl.buf, b, "", "\t")
-	if err != nil {
-		return fmt.Errorf("failed to indent JSON: %w", err)
-	}
-	_, err = io.Copy(dl.wr, &dl.buf)
+	_, err = dl.wr.Write(b)
 	return err
 }
 
