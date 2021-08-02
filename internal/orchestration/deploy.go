@@ -54,9 +54,11 @@ func Deploy(g iago.Group, cfg DeployConfig) (workers map[string]WorkerSession, e
 	g.Run(iago.Task{
 		Name: "Create temporary directory",
 		Action: iago.Do(func(ctx context.Context, host iago.Host) (err error) {
-			testDir := tempDirPath(host, tmpDir+"/data")
-			host.SetVar("dir", testDir)
-			err = fs.MkdirAll(host.GetFS(), iago.CleanPath(testDir), 0755)
+			testDir := tempDirPath(host, tmpDir)
+			dataDir := testDir + "/data"
+			host.SetVar("test-dir", testDir)
+			host.SetVar("data-dir", dataDir)
+			err = fs.MkdirAll(host.GetFS(), iago.CleanPath(dataDir), 0755)
 			return err
 		}),
 		OnError: silentPanic,
@@ -65,7 +67,7 @@ func Deploy(g iago.Group, cfg DeployConfig) (workers map[string]WorkerSession, e
 	g.Run(iago.Task{
 		Name: "Upload hotstuff binary",
 		Action: iago.Do(func(ctx context.Context, host iago.Host) (err error) {
-			dest := path.Join(tempDirPath(host, tmpDir), "hotstuff")
+			dest := iago.GetStringVar(host, "test-dir") + "/hotstuff"
 			host.SetVar("exe", dest)
 			return iago.Upload{
 				Src:  iago.P(cfg.ExePath),
@@ -101,7 +103,7 @@ func FetchData(g iago.Group, dest string) (err error) {
 		Name: "Download test data",
 		Action: iago.Do(func(ctx context.Context, host iago.Host) (err error) {
 			return iago.Download{
-				Src:  iago.P(iago.GetStringVar(host, "dir")), // assuming the dir variable was set earlier
+				Src:  iago.P(iago.GetStringVar(host, "data-dir")), // assuming the dir variable was set earlier
 				Dest: iago.P(dest),
 			}.Apply(ctx, host)
 		}),
@@ -111,7 +113,7 @@ func FetchData(g iago.Group, dest string) (err error) {
 	g.Run(iago.Task{
 		Name: "Remove test directory",
 		Action: iago.Do(func(ctx context.Context, host iago.Host) (err error) {
-			err = fs.RemoveAll(host.GetFS(), iago.CleanPath(iago.GetStringVar(host, "dir")))
+			err = fs.RemoveAll(host.GetFS(), iago.CleanPath(iago.GetStringVar(host, "test-dir")))
 			return err
 		}),
 		OnError: silentPanic,
@@ -187,7 +189,7 @@ func (w *workerSetup) Apply(ctx context.Context, host iago.Host) (err error) {
 		return err
 	}
 
-	dir := iago.GetStringVar(host, "dir")
+	dir := iago.GetStringVar(host, "data-dir")
 
 	var sb strings.Builder
 	sb.WriteString(iago.GetStringVar(host, "exe"))
