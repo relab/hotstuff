@@ -7,11 +7,9 @@ import (
 	"io"
 	"sync"
 
-	"github.com/relab/hotstuff/metrics/types"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // DataLogger logs data in protobuf message format.
@@ -43,23 +41,19 @@ func (dl *jsonDataLogger) InitModule(mods *Modules) {
 }
 
 func (dl *jsonDataLogger) Log(msg proto.Message) {
-	var err error
-	if _, ok := msg.(*types.Event); !ok {
-		var any *anypb.Any
+	var (
+		any *anypb.Any
+		err error
+		ok  bool
+	)
+	if any, ok = msg.(*anypb.Any); !ok {
 		any, err = anypb.New(msg)
 		if err != nil {
 			dl.mods.Logger().Errorf("failed to create Any message: %v", err)
 			return
 		}
-		event := &types.Event{
-			ID:        uint32(dl.mods.ID()),
-			Timestamp: timestamppb.Now(),
-			Data:      any,
-		}
-		err = dl.write(event)
-	} else {
-		err = dl.write(msg)
 	}
+	err = dl.write(any)
 	if err != nil {
 		dl.mods.Logger().Errorf("failed to write message to log: %v", err)
 	}

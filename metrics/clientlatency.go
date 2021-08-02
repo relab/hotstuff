@@ -44,13 +44,10 @@ func (lr *ClientLatency) addLatency(latency time.Duration) {
 
 func (lr *ClientLatency) tick(tick types.TickEvent) {
 	mean, variance, _ := lr.wf.Get()
-	event, err := types.NewClientEvent(uint32(lr.mods.ID()), time.Now(), &types.LatencyMeasurement{
+	event := &types.LatencyMeasurement{
+		Event:    types.NewClientEvent(uint32(lr.mods.ID()), time.Now()),
 		Latency:  mean,
 		Variance: variance,
-	})
-	if err != nil {
-		lr.mods.Logger().Errorf("failed to create event: %v", err)
-		return
 	}
 	lr.mods.DataLogger().Log(event)
 	lr.wf.Reset()

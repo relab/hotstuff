@@ -4,7 +4,6 @@ package types;
 
 option go_package = "github.com/relab/hotstuff/metrics/types";
 
-import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/duration.proto";
 
@@ -15,16 +14,17 @@ message Event {
   uint32 ID = 1;
   bool Client = 2;
   google.protobuf.Timestamp Timestamp = 3;
-  google.protobuf.Any Data = 4;
 }
 
 message ThroughputMeasurement {
-  uint64 Commits = 1;
-  uint64 Commands = 2;
-  google.protobuf.Duration Duration = 3;
+  Event Event = 1;
+  uint64 Commits = 2;
+  uint64 Commands = 3;
+  google.protobuf.Duration Duration = 4;
 }
 
 message LatencyMeasurement {
-  double Latency = 1;
-  double Variance = 2;
+  Event Event = 1;
+  double Latency = 2;
+  double Variance = 3;
 }

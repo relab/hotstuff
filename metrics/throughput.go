@@ -42,14 +42,11 @@ func (t *Throughput) recordCommit(commands int) {
 
 func (t *Throughput) tick(tick types.TickEvent) {
 	now := time.Now()
-	event, err := types.NewReplicaEvent(uint32(t.mods.ID()), now, &types.ThroughputMeasurement{
+	event := &types.ThroughputMeasurement{
+		Event:    types.NewReplicaEvent(uint32(t.mods.ID()), now),
 		Commits:  t.commitCount,
 		Commands: t.commandCount,
 		Duration: durationpb.New(now.Sub(tick.LastTick)),
-	})
-	if err != nil {
-		t.mods.Logger().Errorf("failed to create event: %v", err)
-		return
 	}
 	t.mods.DataLogger().Log(event)
 	// reset count for next tick
