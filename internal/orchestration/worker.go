@@ -26,6 +26,7 @@ import (
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/leaderrotation"
 	"github.com/relab/hotstuff/metrics"
+	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/synchronizer"
@@ -137,6 +138,8 @@ func (w *Worker) createReplicas(req *orchestrationpb.CreateReplicaRequest) (*orc
 }
 
 func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Replica, error) {
+	w.metricsLogger.Log(opts)
+
 	// get private key and certificates
 	privKey, err := keygen.ParsePrivateKey(opts.GetPrivateKey())
 	if err != nil {
@@ -235,7 +238,10 @@ func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orche
 		if err != nil {
 			return nil, err
 		}
-		defer replica.Start()
+		defer func(id uint32) {
+			w.metricsLogger.Log(&types.StartEvent{Event: types.NewReplicaEvent(id, time.Now())})
+			replica.Start()
+		}(id)
 	}
 	return &orchestrationpb.StartReplicaResponse{}, nil
 }
@@ -261,6 +267,8 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 	cp := x509.NewCertPool()
 	cp.AppendCertsFromPEM(ca)
 	for _, opts := range req.GetClients() {
+		w.metricsLogger.Log(opts)
+
 		c := client.Config{
 			ID:            hotstuff.ID(opts.GetID()),
 			TLS:           opts.GetUseTLS(),
@@ -295,6 +303,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			return nil, err
 		}
 		cli.Start()
+		w.metricsLogger.Log(&types.StartEvent{Event: types.NewClientEvent(uint32(c.ID), time.Now())})
 		w.clients[hotstuff.ID(opts.GetID())] = cli
 	}
 	return &orchestrationpb.StartClientResponse{}, nil

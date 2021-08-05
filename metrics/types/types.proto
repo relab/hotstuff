@@ -7,6 +7,10 @@ option go_package = "github.com/relab/hotstuff/metrics/types";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/duration.proto";
 
+message StartEvent {
+  Event Event = 1;
+}
+
 // Event is the basic type that is recorded by hotstuff.
 // It contains the ID of the replica/client, the type (replica/client),
 // the timestamp of the event, and the data.
