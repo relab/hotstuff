@@ -43,11 +43,12 @@ func (lr *ClientLatency) addLatency(latency time.Duration) {
 }
 
 func (lr *ClientLatency) tick(tick types.TickEvent) {
-	mean, variance, _ := lr.wf.Get()
+	mean, variance, count := lr.wf.Get()
 	event := &types.LatencyMeasurement{
 		Event:    types.NewClientEvent(uint32(lr.mods.ID()), time.Now()),
 		Latency:  mean,
 		Variance: variance,
+		Count:    count,
 	}
 	lr.mods.MetricsLogger().Log(event)
 	lr.wf.Reset()
