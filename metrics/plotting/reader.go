@@ -4,30 +4,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
-	"reflect"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// Measurements is a list of measurements.
-type Measurements interface {
-	// Add adds a measurement to the list.
+// Plotter processes measurements from a reader.
+type Plotter interface {
+	// Adds a measurement to the plotter.
 	Add(interface{})
 }
 
 // Reader reads measurements from JSON.
 type Reader struct {
-	plots map[reflect.Type]Measurements
-	rd    io.Reader
+	plotters []Plotter
+	rd       io.Reader
 }
 
-// NewReader returns a new reader that reads from the specified source.
-func NewReader(rd io.Reader) *Reader {
+// NewReader returns a new reader that reads from the specified source and adds measurements to the plotters.
+func NewReader(rd io.Reader, plotters ...Plotter) *Reader {
 	return &Reader{
-		plots: make(map[reflect.Type]Measurements),
-		rd:    rd,
+		plotters: plotters,
+		rd:       rd,
 	}
 }
 
@@ -78,11 +76,8 @@ func (r *Reader) read(b []byte) error {
 		return fmt.Errorf("failed to unmarshal Any message: %w", err)
 	}
 
-	t := reflect.TypeOf(msg)
-	if p, ok := r.plots[t]; ok {
+	for _, p := range r.plotters {
 		p.Add(msg)
-	} else {
-		log.Printf("Unknown event type: %T", msg)
 	}
 
 	return nil

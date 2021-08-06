@@ -3,19 +3,24 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
-	"github.com/relab/hotstuff/internal/plotting"
+	_ "github.com/relab/hotstuff/internal/proto/orchestrationpb"
+	"github.com/relab/hotstuff/metrics/plotting"
 	_ "github.com/relab/hotstuff/metrics/types"
 )
 
 func main() {
-	f, err := os.Open("foo/localhost/measurements.json")
+	file, err := os.Open(os.Args[1])
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
-	p := plotting.NewReader(f)
-	err = p.ReadAll()
-	if err != nil {
-		log.Fatal(err)
+	latencyPlot := plotting.NewClientLatencyPlot()
+	reader := plotting.NewReader(file, &latencyPlot)
+	if err := reader.ReadAll(); err != nil {
+		log.Fatalln(err)
+	}
+	if err := latencyPlot.PlotAverage(os.Args[2], time.Second); err != nil {
+		log.Fatalln(err)
 	}
 }
