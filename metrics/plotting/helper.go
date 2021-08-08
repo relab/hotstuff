@@ -79,7 +79,7 @@ func GroupByTimeInterval(startTimes *StartTimes, m MeasurementMap, interval time
 		if len(group.Measurements) > 0 {
 			groups = append(groups, group)
 		}
-		if remaining == 0 {
+		if remaining <= 0 {
 			break
 		}
 		currentTime += interval

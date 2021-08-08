@@ -17,7 +17,8 @@ func main() {
 	}
 	latencyPlot := plotting.NewClientLatencyPlot()
 	throughputPlot := plotting.NewThroughputPlot()
-	reader := plotting.NewReader(file, &latencyPlot, &throughputPlot)
+	throughputVSLatencyPlot := plotting.NewThroughputVSLatencyPlot()
+	reader := plotting.NewReader(file, &latencyPlot, &throughputPlot, &throughputVSLatencyPlot)
 	if err := reader.ReadAll(); err != nil {
 		log.Fatalln(err)
 	}
@@ -25,6 +26,9 @@ func main() {
 		log.Fatalln(err)
 	}
 	if err := throughputPlot.PlotAverage(os.Args[3], time.Second); err != nil {
+		log.Fatalln(err)
+	}
+	if err := throughputVSLatencyPlot.PlotAverage(os.Args[4], time.Second); err != nil {
 		log.Fatalln(err)
 	}
 }
