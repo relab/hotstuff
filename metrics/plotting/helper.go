@@ -91,8 +91,8 @@ func GroupByTimeInterval(startTimes *StartTimes, m MeasurementMap, interval time
 // and y is the average value of each group. The getValue function must return the
 // value and sample count for the given measurement.
 func TimeAndAverage(groups []MeasurementGroup, getValue func(Measurement) (float64, uint64)) plotter.XYer {
-	points := make(xyer, len(groups))
-	for i, group := range groups {
+	points := make(xyer, 0, len(groups))
+	for _, group := range groups {
 		var (
 			sum float64
 			num uint64
@@ -102,9 +102,11 @@ func TimeAndAverage(groups []MeasurementGroup, getValue func(Measurement) (float
 			sum += v * float64(n)
 			num += n
 		}
-		points[i] = point{
-			x: group.Time.Seconds(),
-			y: sum / float64(num),
+		if num > 0 {
+			points = append(points, point{
+				x: group.Time.Seconds(),
+				y: sum / float64(num),
+			})
 		}
 	}
 	return points

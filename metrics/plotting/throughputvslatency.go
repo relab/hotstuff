@@ -87,8 +87,8 @@ func (p *ThroughputVSLatencyPlot) PlotAverage(filename string, measurementInterv
 
 func avgThroughputVSAvgLatency(p *ThroughputVSLatencyPlot, interval time.Duration) plotter.XYer {
 	groups := GroupByTimeInterval(&p.startTimes, p.measurements, interval)
-	points := make(xyer, len(groups))
-	for i, group := range groups {
+	points := make(xyer, 0, len(groups))
+	for _, group := range groups {
 		var (
 			latencySum    float64
 			latencyNum    uint64
@@ -105,9 +105,11 @@ func avgThroughputVSAvgLatency(p *ThroughputVSLatencyPlot, interval time.Duratio
 				throughputNum++
 			}
 		}
-		points[i] = point{
-			x: throughputSum / float64(throughputNum),
-			y: latencySum / float64(latencyNum),
+		if throughputNum > 0 && latencyNum > 0 {
+			points = append(points, point{
+				x: throughputSum / float64(throughputNum),
+				y: latencySum / float64(latencyNum),
+			})
 		}
 	}
 	return points
