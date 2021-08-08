@@ -23,7 +23,7 @@ func NewTicker(interval time.Duration) *Ticker {
 // InitModule gives the module access to the other modules.
 func (t *Ticker) InitModule(mods *modules.Modules) {
 	t.mods = mods
-	t.tickerID = t.mods.MetricsEventLoop().AddTicker(t.interval, t.tick)
+	t.tickerID = t.mods.EventLoop().AddTicker(t.interval, t.tick)
 }
 
 func (t *Ticker) tick(tickTime time.Time) interface{} {
