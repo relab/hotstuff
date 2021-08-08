@@ -13,18 +13,21 @@ import (
 	"gonum.org/v1/plot/vg"
 )
 
+// ThroughputPlot is a plotter that plots throughput vs time.
 type ThroughputPlot struct {
 	startTimes   StartTimes
-	measurements map[uint32][]*types.ThroughputMeasurement
+	measurements MeasurementMap
 }
 
+// NewThroughputPlot returns a new throughput plotter.
 func NewThroughputPlot() ThroughputPlot {
 	return ThroughputPlot{
 		startTimes:   NewStartTimes(),
-		measurements: make(map[uint32][]*types.ThroughputMeasurement),
+		measurements: NewMeasurementMap(),
 	}
 }
 
+// Add adds a measurement to the plotter.
 func (p *ThroughputPlot) Add(measurement interface{}) {
 	p.startTimes.Add(measurement)
 
@@ -39,9 +42,10 @@ func (p *ThroughputPlot) Add(measurement interface{}) {
 	}
 
 	id := throughput.GetEvent().GetID()
-	p.measurements[id] = append(p.measurements[id], throughput)
+	p.measurements.Add(id, throughput)
 }
 
+// PlotAverage plots the average throughput of all replicas at specified time intervals.
 func (p *ThroughputPlot) PlotAverage(filename string, measurementInterval time.Duration) (err error) {
 	plt, err := plot.New()
 	if err != nil {
@@ -61,7 +65,7 @@ func (p *ThroughputPlot) PlotAverage(filename string, measurementInterval time.D
 	plt.Y.Tick.Marker = hplot.Ticks{N: 10}
 
 	// TODO: error bars
-	if err := plotutil.AddLinePoints(plt, avgThroughputIter(p, measurementInterval)); err != nil {
+	if err := plotutil.AddLinePoints(plt, avgThroughput(p, measurementInterval)); err != nil {
 		return fmt.Errorf("failed to add line plot: %w", err)
 	}
 
@@ -72,66 +76,10 @@ func (p *ThroughputPlot) PlotAverage(filename string, measurementInterval time.D
 	return nil
 }
 
-type throughputDataPoint struct {
-	time       float64
-	throughput float64
-}
-
-type avgThroughput struct {
-	dataPoints []throughputDataPoint
-}
-
-func avgThroughputIter(p *ThroughputPlot, interval time.Duration) *avgThroughput {
-	indices := make([]int, len(p.measurements))
-	throughput := avgThroughput{}
-
-	var currentTime time.Duration
-	for {
-		var (
-			sum float64
-			num int
-			i   int
-		)
-
-		// sum all measurements that fall within the current time interval
-		measurementsRemaining := 0
-		for _, measurements := range p.measurements {
-			measurementsRemaining += len(measurements) - indices[i]
-			for indices[i] < len(measurements) {
-				m := measurements[indices[i]]
-				t, ok := p.startTimes.ClientOffset(m.GetEvent().GetID(), m.GetEvent().GetTimestamp().AsTime())
-				if ok && t < currentTime+interval {
-					sum += float64(m.GetCommits()) / m.GetDuration().AsDuration().Seconds()
-					num++
-					indices[i]++
-				} else {
-					break
-				}
-			}
-			i++
-		}
-		if num > 0 {
-			throughput.dataPoints = append(throughput.dataPoints, throughputDataPoint{
-				time:       currentTime.Seconds(),
-				throughput: sum / float64(num),
-			})
-		}
-		if measurementsRemaining == 0 {
-			break
-		}
-		currentTime += interval
-	}
-
-	return &throughput
-}
-
-// Len returns the number of x, y pairs.
-func (t *avgThroughput) Len() int {
-	return len(t.dataPoints)
-}
-
-// XY returns an x, y pair.
-func (t *avgThroughput) XY(i int) (x float64, y float64) {
-	dp := t.dataPoints[i]
-	return dp.time, dp.throughput
+func avgThroughput(p *ThroughputPlot, interval time.Duration) plotter.XYer {
+	intervals := GroupByTimeInterval(&p.startTimes, p.measurements, interval)
+	return TimeAndAverage(intervals, func(m Measurement) (float64, uint64) {
+		tp := m.(*types.ThroughputMeasurement)
+		return float64(tp.GetCommands()) / tp.GetDuration().AsDuration().Seconds(), 1
+	})
 }

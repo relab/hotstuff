@@ -16,14 +16,14 @@ import (
 // ClientLatencyPlot plots client latency measurements.
 type ClientLatencyPlot struct {
 	startTimes   StartTimes
-	measurements map[uint32][]*types.LatencyMeasurement
+	measurements MeasurementMap
 }
 
 // NewClientLatencyPlot returns a new client latency plotter.
 func NewClientLatencyPlot() ClientLatencyPlot {
 	return ClientLatencyPlot{
 		startTimes:   NewStartTimes(),
-		measurements: make(map[uint32][]*types.LatencyMeasurement),
+		measurements: NewMeasurementMap(),
 	}
 }
 
@@ -41,7 +41,7 @@ func (p *ClientLatencyPlot) Add(measurement interface{}) {
 		return
 	}
 	id := latency.GetEvent().GetID()
-	p.measurements[id] = append(p.measurements[id], latency)
+	p.measurements.Add(id, latency)
 }
 
 // PlotAverage plots the average latency of all clients within each measurement interval.
@@ -64,7 +64,7 @@ func (p *ClientLatencyPlot) PlotAverage(filename string, measurementInterval tim
 	plt.Y.Tick.Marker = hplot.Ticks{N: 10}
 
 	// TODO: error bars
-	if err := plotutil.AddLinePoints(plt, avgLatencyIter(p, measurementInterval)); err != nil {
+	if err := plotutil.AddLinePoints(plt, avgLatency(p, measurementInterval)); err != nil {
 		return fmt.Errorf("failed to add line plot: %w", err)
 	}
 
@@ -75,66 +75,10 @@ func (p *ClientLatencyPlot) PlotAverage(filename string, measurementInterval tim
 	return nil
 }
 
-type dataPoint struct {
-	time    float64
-	latency float64
-}
-
-type avgLatency struct {
-	dataPoints []dataPoint
-}
-
-func avgLatencyIter(p *ClientLatencyPlot, interval time.Duration) *avgLatency {
-	indices := make([]int, len(p.measurements))
-	latencies := avgLatency{}
-
-	var currentTime time.Duration
-	for {
-		var (
-			sum float64
-			num int
-			i   int
-		)
-
-		// sum all measurements that fall within the current time interval
-		measurementsRemaining := 0
-		for _, measurements := range p.measurements {
-			measurementsRemaining += len(measurements) - indices[i]
-			for indices[i] < len(measurements) {
-				m := measurements[indices[i]]
-				t, ok := p.startTimes.ClientOffset(m.GetEvent().GetID(), m.GetEvent().GetTimestamp().AsTime())
-				if ok && t < currentTime+interval {
-					sum += m.GetLatency() * float64(m.GetCount())
-					num += int(m.GetCount())
-					indices[i]++
-				} else {
-					break
-				}
-			}
-			i++
-		}
-		if num > 0 {
-			latencies.dataPoints = append(latencies.dataPoints, dataPoint{
-				time:    currentTime.Seconds(),
-				latency: sum / float64(num),
-			})
-		}
-		if measurementsRemaining == 0 {
-			break
-		}
-		currentTime += interval
-	}
-
-	return &latencies
-}
-
-// Len returns the number of x, y pairs.
-func (l *avgLatency) Len() int {
-	return len(l.dataPoints)
-}
-
-// XY returns an x, y pair.
-func (l *avgLatency) XY(i int) (x float64, y float64) {
-	dp := l.dataPoints[i]
-	return dp.time, dp.latency
+func avgLatency(p *ClientLatencyPlot, interval time.Duration) plotter.XYer {
+	intervals := GroupByTimeInterval(&p.startTimes, p.measurements, interval)
+	return TimeAndAverage(intervals, func(m Measurement) (float64, uint64) {
+		latency := m.(*types.LatencyMeasurement)
+		return latency.GetLatency(), latency.GetCount()
+	})
 }

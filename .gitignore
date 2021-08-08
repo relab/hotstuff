@@ -32,3 +32,4 @@ scripts/id.pub
 scripts/known_hosts
 
 measurements.json
+*.pdf
