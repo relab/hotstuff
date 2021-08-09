@@ -99,16 +99,18 @@ func FetchData(g iago.Group, dest string) (err error) {
 		panic(err)
 	}
 
-	g.Run(iago.Task{
-		Name: "Download test data",
-		Action: iago.Do(func(ctx context.Context, host iago.Host) (err error) {
-			return iago.Download{
-				Src:  iago.P(iago.GetStringVar(host, "data-dir")), // assuming the dir variable was set earlier
-				Dest: iago.P(dest),
-			}.Apply(ctx, host)
-		}),
-		OnError: silentPanic,
-	})
+	if dest != "" {
+		g.Run(iago.Task{
+			Name: "Download test data",
+			Action: iago.Do(func(ctx context.Context, host iago.Host) (err error) {
+				return iago.Download{
+					Src:  iago.P(iago.GetStringVar(host, "data-dir")), // assuming the dir variable was set earlier
+					Dest: iago.P(dest),
+				}.Apply(ctx, host)
+			}),
+			OnError: silentPanic,
+		})
+	}
 
 	g.Run(iago.Task{
 		Name: "Remove test directory",

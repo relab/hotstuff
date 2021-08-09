@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"io"
 	"log"
 	"math"
@@ -75,10 +76,14 @@ func init() {
 }
 
 func runController() {
-	outputDir, err := filepath.Abs(viper.GetString("output"))
-	checkf("failed to get absolute path: %v", err)
-	err = os.MkdirAll(outputDir, 0755)
-	checkf("failed to create output directory: %v", err)
+	var err error
+	outputDir := ""
+	if output := viper.GetString("output"); output != "" {
+		outputDir, err = filepath.Abs(output)
+		checkf("failed to get absolute path: %v", err)
+		err = os.MkdirAll(outputDir, 0755)
+		checkf("failed to create output directory: %v", err)
+	}
 
 	experiment := orchestration.Experiment{
 		NumReplicas:       viper.GetInt("replicas"),
@@ -135,7 +140,9 @@ func runController() {
 	}
 
 	if worker || len(hosts) == 0 {
-		experiment.Hosts["localhost"] = localWorker()
+		worker, wait := localWorker(outputDir, viper.GetStringSlice("metrics"), viper.GetDuration("measurement-interval"))
+		defer wait()
+		experiment.Hosts["localhost"] = worker
 	}
 
 	experiment.HostConfigs = make(map[string]orchestration.HostConfig)
@@ -181,24 +188,49 @@ func checkf(format string, args ...interface{}) {
 	}
 }
 
-func localWorker() orchestration.RemoteWorker {
+func localWorker(output string, metrics []string, interval time.Duration) (worker orchestration.RemoteWorker, wait func()) {
 	// set up a local worker
 	controllerPipe, workerPipe := net.Pipe()
+	c := make(chan struct{})
 	go func() {
-		// TODO: replace the NopLogger with a proper logger.
+		var logger modules.MetricsLogger
+		if output != "" {
+			f, err := os.OpenFile(filepath.Join(output, "measurements.json"), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+			checkf("failed to create output file: %v", err)
+			defer func() { checkf("failed to close output file: %v", f.Close()) }()
+
+			wr := bufio.NewWriter(f)
+			defer func() { checkf("failed to flush writer: %v", wr.Flush()) }()
+
+			logger, err = modules.NewJSONLogger(wr)
+			checkf("failed to create JSON logger: %v", err)
+			defer func() { checkf("failed to close logger: %v", logger.Close()) }()
+		} else {
+			logger = modules.NopLogger()
+		}
+
 		worker := orchestration.NewWorker(
 			protostream.NewWriter(workerPipe),
 			protostream.NewReader(workerPipe),
-			modules.NopLogger(),
-			viper.GetStringSlice("metrics"),
-			viper.GetDuration("measurement-interval"),
+			logger,
+			metrics,
+			interval,
 		)
+
 		err := worker.Run()
 		if err != nil {
 			log.Fatal(err)
 		}
+		close(c)
 	}()
-	return orchestration.NewRemoteWorker(protostream.NewWriter(controllerPipe), protostream.NewReader(controllerPipe))
+
+	wait = func() {
+		<-c
+	}
+
+	return orchestration.NewRemoteWorker(
+		protostream.NewWriter(controllerPipe), protostream.NewReader(controllerPipe),
+	), wait
 }
 
 func stderrPipe(r io.Reader, errChan chan<- error) {
