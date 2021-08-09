@@ -24,12 +24,12 @@ type ClientLatency struct {
 func (lr *ClientLatency) InitModule(mods *modules.Modules) {
 	lr.mods = mods
 
-	lr.mods.EventLoop().RegisterHandler(client.LatencyMeasurementEvent{}, func(event interface{}) {
+	lr.mods.MetricsEventLoop().RegisterHandler(client.LatencyMeasurementEvent{}, func(event interface{}) {
 		latencyEvent := event.(client.LatencyMeasurementEvent)
 		lr.addLatency(latencyEvent.Latency)
 	})
 
-	lr.mods.EventLoop().RegisterObserver(types.TickEvent{}, func(event interface{}) {
+	lr.mods.MetricsEventLoop().RegisterObserver(types.TickEvent{}, func(event interface{}) {
 		lr.tick(event.(types.TickEvent))
 	})
 

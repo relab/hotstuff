@@ -5,8 +5,6 @@
 package modules
 
 import (
-	"context"
-
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/logging"
@@ -24,56 +22,45 @@ type Modules struct {
 	id            hotstuff.ID
 	logger        logging.Logger
 	metricsLogger MetricsLogger
-	eventloop     *eventloop.EventLoop
+	dataEventLoop *eventloop.EventLoop
 }
 
 // ID returns the id of this client.
-func (mods Modules) ID() hotstuff.ID {
-	return mods.id
+func (mod Modules) ID() hotstuff.ID {
+	return mod.id
 }
 
 // Logger returns the logger.
-func (mods Modules) Logger() logging.Logger {
-	return mods.logger
+func (mod Modules) Logger() logging.Logger {
+	return mod.logger
 }
 
 // MetricsLogger returns the metrics logger.
-func (mods Modules) MetricsLogger() MetricsLogger {
-	if mods.metricsLogger == nil {
+func (mod Modules) MetricsLogger() MetricsLogger {
+	if mod.metricsLogger == nil {
 		return NopLogger()
 	}
-	return mods.metricsLogger
+	return mod.metricsLogger
 }
 
-// EventLoop returns the metrics event loop.
+// MetricsEventLoop returns the metrics event loop.
 // The metrics event loop is used for processing of measurement data.
-func (mods Modules) EventLoop() *eventloop.EventLoop {
-	return mods.eventloop
-}
-
-// Run starts the event loop and returns when the event loop exits.
-func (mods *Modules) Run(ctx context.Context) {
-	mainDone := make(chan struct{})
-	go func() {
-		mods.EventLoop().Run(ctx)
-		close(mainDone)
-	}()
-
-	<-mainDone
+func (mod Modules) MetricsEventLoop() *eventloop.EventLoop {
+	return mod.dataEventLoop
 }
 
 // Builder is a helper for setting up client modules.
 type Builder struct {
-	mods    Modules
+	mod     Modules
 	modules []Module
 }
 
 // NewBuilder returns a new builder.
 func NewBuilder(id hotstuff.ID) Builder {
-	bl := Builder{mods: Modules{
-		id:        id,
-		logger:    logging.New(""),
-		eventloop: eventloop.New(100),
+	bl := Builder{mod: Modules{
+		id:            id,
+		logger:        logging.New(""),
+		dataEventLoop: eventloop.New(100),
 	}}
 	return bl
 }
@@ -82,13 +69,10 @@ func NewBuilder(id hotstuff.ID) Builder {
 func (b *Builder) Register(modules ...interface{}) {
 	for _, module := range modules {
 		if m, ok := module.(logging.Logger); ok {
-			b.mods.logger = m
+			b.mod.logger = m
 		}
 		if m, ok := module.(MetricsLogger); ok {
-			b.mods.metricsLogger = m
-		}
-		if m, ok := module.(*eventloop.EventLoop); ok {
-			b.mods.eventloop = m
+			b.mod.metricsLogger = m
 		}
 		if m, ok := module.(Module); ok {
 			b.modules = append(b.modules, m)
@@ -99,7 +83,7 @@ func (b *Builder) Register(modules ...interface{}) {
 // Build initializes all registered modules and returns the Modules object.
 func (b *Builder) Build() *Modules {
 	for _, module := range b.modules {
-		module.InitModule(&b.mods)
+		module.InitModule(&b.mod)
 	}
-	return &b.mods
+	return &b.mod
 }

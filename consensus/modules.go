@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -14,6 +15,7 @@ type Modules struct {
 
 	privateKey    PrivateKey
 	opts          Options
+	eventLoop     *eventloop.EventLoop
 	votingMachine *VotingMachine
 
 	acceptor       Acceptor
@@ -27,6 +29,24 @@ type Modules struct {
 	synchronizer   Synchronizer
 }
 
+// Run starts both event loops using the provided context and returns when both event loops have exited.
+func (mods *Modules) Run(ctx context.Context) {
+	mainDone := make(chan struct{})
+	go func() {
+		mods.EventLoop().Run(ctx)
+		close(mainDone)
+	}()
+
+	secondaryDone := make(chan struct{})
+	go func() {
+		mods.MetricsEventLoop().Run(ctx)
+		close(secondaryDone)
+	}()
+
+	<-mainDone
+	<-secondaryDone
+}
+
 // PrivateKey returns the private key.
 func (mods *Modules) PrivateKey() PrivateKey {
 	return mods.privateKey
@@ -35,6 +55,15 @@ func (mods *Modules) PrivateKey() PrivateKey {
 // Options returns the current configuration settings.
 func (mods *Modules) Options() *Options {
 	return &mods.opts
+}
+
+// EventLoop returns the main event loop.
+//
+// This event loop should be used by components that participate in the consensus protocol.
+// Events related to data collection should instead use the secondary event loop,
+// which is accessible using the DataEventLoop() method.
+func (mods *Modules) EventLoop() *eventloop.EventLoop {
+	return mods.eventLoop
 }
 
 // Acceptor returns the acceptor.
@@ -97,6 +126,7 @@ func NewBuilder(id hotstuff.ID, privateKey PrivateKey) Builder {
 		mods: &Modules{
 			privateKey:    privateKey,
 			votingMachine: NewVotingMachine(),
+			eventLoop:     eventloop.New(100), // TODO: make this configurable
 		},
 	}
 	// some of the default modules need to be registered
@@ -147,11 +177,11 @@ func (b *Builder) Register(mods ...interface{}) {
 
 // Build initializes all modules and returns the HotStuff object.
 func (b *Builder) Build() *Modules {
-	b.mods.Modules = b.baseBuilder.Build()
 	for _, module := range b.modules {
 		module.InitConsensusModule(b.mods, &b.cfg)
 	}
 	b.mods.opts = b.cfg.opts
+	b.mods.Modules = b.baseBuilder.Build()
 	return b.mods
 }
 
