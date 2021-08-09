@@ -243,6 +243,7 @@ func (s *Synchronizer) OnNewView(newView consensus.NewViewMsg) {
 // qc must be either a regular quorum certificate, or a timeout certificate.
 func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 	var v consensus.View
+	timeout := false
 	if tc, ok := syncInfo.TC(); ok {
 		if !s.mods.Crypto().VerifyTimeoutCert(tc) {
 			s.mods.Logger().Info("Timeout Certificate could not be verified!")
@@ -252,6 +253,7 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 		if v > s.highTC.View() {
 			s.highTC = tc
 		}
+		timeout = true
 	} else if qc, ok := syncInfo.QC(); ok {
 		if !s.mods.Crypto().VerifyQuorumCert(qc) {
 			s.mods.Logger().Info("Quorum Certificate could not be verified!")
@@ -276,6 +278,8 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 	s.newCtx()
 
 	s.timer.Reset(s.duration.Duration())
+
+	s.mods.MetricsEventLoop().AddEvent(ViewChangeEvent{View: s.currentView, Timeout: timeout})
 
 	leader := s.mods.LeaderRotation().GetLeader(s.currentView)
 	if leader == s.mods.ID() {
@@ -316,3 +320,9 @@ func (s *Synchronizer) newCtx() {
 }
 
 var _ consensus.Synchronizer = (*Synchronizer)(nil)
+
+// ViewChangeEvent is sent on the metrics event loop whenever a view change occurs.
+type ViewChangeEvent struct {
+	View    consensus.View
+	Timeout bool
+}

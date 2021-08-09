@@ -31,3 +31,11 @@ message LatencyMeasurement {
   double Variance = 3;
   uint64 Count = 4;
 }
+
+message ViewTimeouts {
+  Event Event = 1;
+  // Number of views since last reading.
+  uint64 Views = 2;
+  // Number of view timeouts.
+  uint64 Timeouts = 3;
+}
