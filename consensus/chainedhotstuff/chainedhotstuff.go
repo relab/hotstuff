@@ -158,8 +158,8 @@ func (hs *ChainedHotStuff) OnPropose(proposal consensus.ProposeMsg) {
 		return
 	}
 
-	if block.View() < hs.mods.Synchronizer().View() {
-		hs.mods.Logger().Info("OnPropose: block view was less than our view")
+	if view := block.View(); view < hs.mods.Synchronizer().View() || view <= hs.lastVote {
+		hs.mods.Logger().Info("OnPropose: block view too low")
 		return
 	}
 
