@@ -122,7 +122,7 @@ func (fhs *FastHotStuff) update(block *consensus.Block) {
 
 // OnPropose handles an incoming proposal.
 // A leader should call this method on itself.
-func (fhs *FastHotStuff) OnPropose(proposal consensus.ProposeMsg) {
+func (fhs *FastHotStuff) OnPropose(proposal consensus.ProposeMsg) { // nolint: gocyclo
 	fhs.mods.Logger().Debugf("OnPropose: %s", proposal.Block)
 
 	var (
@@ -146,17 +146,15 @@ func (fhs *FastHotStuff) OnPropose(proposal consensus.ProposeMsg) {
 			fhs.mods.Logger().Warn("Missing block for QC: %s", block.QuorumCert())
 			return
 		}
-	} else {
+	} else if ok, highQC := fhs.mods.Crypto().VerifyAggregateQC(*proposal.AggregateQC); ok &&
+		fhs.mods.Crypto().VerifyQuorumCert(highQC) {
 		// If we get an AggregateQC, we need to verify the AggregateQC, and the highQC it contains.
 		// Then, we must check that the proposed block extends the highQC.block.
-		ok, highQC := fhs.mods.Crypto().VerifyAggregateQC(*proposal.AggregateQC)
-		if ok && fhs.mods.Crypto().VerifyQuorumCert(highQC) {
-			hqcBlock, ok = fhs.mods.BlockChain().Get(highQC.BlockHash())
-			if ok && fhs.mods.BlockChain().Extends(block, hqcBlock) {
-				safe = true
-				// create a new block containing the QC from the aggregateQC
-				block = consensus.NewBlock(block.Parent(), highQC, block.Command(), block.View(), block.Proposer())
-			}
+		hqcBlock, ok = fhs.mods.BlockChain().Get(highQC.BlockHash())
+		if ok && fhs.mods.BlockChain().Extends(block, hqcBlock) {
+			safe = true
+			// create a new block containing the QC from the aggregateQC
+			block = consensus.NewBlock(block.Parent(), highQC, block.Command(), block.View(), block.Proposer())
 		}
 	}
 
