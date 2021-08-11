@@ -41,8 +41,8 @@ func TestPropose(t *testing.T) {
 
 	hs.Propose(consensus.NewSyncInfo().WithQC(synchronizer.HighQC()))
 
-	if hs.lastVote != 1 {
-		t.Errorf("Wrong view: got: %d, want: %d", hs.lastVote, 1)
+	if view := synchronizer.View(); view != 1 {
+		t.Errorf("Wrong view: got: %d, want: %d", view, 1)
 	}
 }
 
@@ -172,7 +172,7 @@ func advanceView(t *testing.T, hs *ChainedHotStuff, lastProposal *consensus.Bloc
 	t.Helper()
 
 	qc := testutil.CreateQC(t, lastProposal, signers)
-	b := consensus.NewBlock(lastProposal.Hash(), qc, "foo", hs.lastVote+1, 2)
+	b := consensus.NewBlock(lastProposal.Hash(), qc, "foo", lastProposal.View()+1, 2)
 	hs.OnPropose(consensus.ProposeMsg{ID: b.Proposer(), Block: b})
 	return b
 }
