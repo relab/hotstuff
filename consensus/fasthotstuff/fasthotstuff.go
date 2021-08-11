@@ -132,6 +132,11 @@ func (fhs *FastHotStuff) OnPropose(proposal consensus.ProposeMsg) {
 		ok       bool
 	)
 
+	if proposal.ID != fhs.mods.LeaderRotation().GetLeader(block.View()) {
+		fhs.mods.Logger().Info("OnPropose: block was not proposed by the expected leader")
+		return
+	}
+
 	if proposal.AggregateQC == nil {
 		safe = fhs.mods.Crypto().VerifyQuorumCert(block.QuorumCert()) &&
 			block.View() >= fhs.mods.Synchronizer().View() &&
