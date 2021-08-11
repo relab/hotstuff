@@ -1,11 +1,47 @@
 package plotting
 
 import (
+	"fmt"
+	"image/color"
 	"time"
 
 	"github.com/relab/hotstuff/metrics/types"
+	"go-hep.org/x/hep/hplot"
+	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/plotutil"
+	"gonum.org/v1/plot/vg"
 )
+
+// GonumPlot sets up a gonum/plot and calls f to add data.
+func GonumPlot(filename, xlabel, ylabel string, f func(plt *plot.Plot) error) error {
+	plt, err := plot.New()
+	if err != nil {
+		return fmt.Errorf("failed to create plot: %w", err)
+	}
+
+	grid := plotter.NewGrid()
+	grid.Horizontal.Color = color.Gray{Y: 200}
+	grid.Horizontal.Dashes = plotutil.Dashes(2)
+	grid.Vertical.Color = color.Gray{Y: 200}
+	grid.Vertical.Dashes = plotutil.Dashes(2)
+	plt.Add(grid)
+
+	plt.X.Label.Text = xlabel
+	plt.X.Tick.Marker = hplot.Ticks{N: 10}
+	plt.Y.Label.Text = ylabel
+	plt.Y.Tick.Marker = hplot.Ticks{N: 10}
+
+	if err = f(plt); err != nil {
+		return err
+	}
+
+	if err := plt.Save(6*vg.Inch, 6*vg.Inch, filename); err != nil {
+		return fmt.Errorf("failed to save plot: %w", err)
+	}
+
+	return nil
+}
 
 // MeasurementMap is a map that stores lists Measurement objects associated
 // with the ID of the client/replica where they where taken.
