@@ -54,4 +54,6 @@ func TestOrchestration(t *testing.T) {
 	t.Run("ChainedHotStuff+BLS12", func(t *testing.T) { run("chainedhotstuff", "bls12") })
 	t.Run("Fast-HotStuff+ECDSA", func(t *testing.T) { run("fasthotstuff", "ecdsa") })
 	t.Run("Fast-HotStuff+BLS12", func(t *testing.T) { run("fasthotstuff", "bls12") })
+	t.Run("Simple-HotStuff+ECDSA", func(t *testing.T) { run("simplehotstuff", "ecdsa") })
+	t.Run("Simple-HotStuff+BLS12", func(t *testing.T) { run("simplehotstuff", "bls12") })
 }

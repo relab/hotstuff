@@ -18,6 +18,7 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/chainedhotstuff"
 	"github.com/relab/hotstuff/consensus/fasthotstuff"
+	"github.com/relab/hotstuff/consensus/simplehotstuff"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
@@ -164,6 +165,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		consensusImpl = chainedhotstuff.New()
 	case "fasthotstuff":
 		consensusImpl = fasthotstuff.New()
+	case "simplehotstuff":
+		consensusImpl = simplehotstuff.New()
 	default:
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
 	}
