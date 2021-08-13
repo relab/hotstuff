@@ -121,12 +121,13 @@ func (hs *ChainedHotStuff) Propose(cert consensus.SyncInfo) {
 		// tell the acceptor that the previous proposal succeeded.
 		qcBlock, ok := hs.mods.BlockChain().Get(qc.BlockHash())
 		if !ok {
-			hs.mods.Logger().Error("Could not find block for QC: %s", qc)
+			hs.mods.Logger().Errorf("Could not find block for QC: %s", qc)
 			return
 		}
 		hs.mods.Acceptor().Proposed(qcBlock.Command())
 	} else {
 		hs.mods.Logger().Warn("Propose: no QC provided.")
+		return
 	}
 
 	cmd, ok := hs.mods.CommandQueue().Get(hs.mods.Synchronizer().ViewContext())
