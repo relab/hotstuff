@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"bytes"
 	"crypto"
 	"encoding/base64"
 	"encoding/binary"
@@ -236,6 +237,20 @@ func (qc QuorumCert) BlockHash() Hash {
 // View returns the view in which the QC was created.
 func (qc QuorumCert) View() View {
 	return qc.view
+}
+
+// Equals returns true if the other QC equals this QC.
+func (qc QuorumCert) Equals(other QuorumCert) bool {
+	if qc.view != other.view {
+		return false
+	}
+	if qc.hash != other.hash {
+		return false
+	}
+	if qc.signature == nil || other.signature == nil {
+		return qc.signature == other.signature
+	}
+	return bytes.Equal(qc.signature.ToBytes(), other.signature.ToBytes())
 }
 
 func (qc QuorumCert) String() string {
