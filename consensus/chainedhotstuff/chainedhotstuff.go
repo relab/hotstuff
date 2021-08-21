@@ -15,11 +15,10 @@ type ChainedHotStuff struct {
 }
 
 // New returns a new chainedhotstuff instance.
-func New() consensus.Consensus {
-	hs := &ChainedHotStuff{
+func New() consensus.Rules {
+	return &ChainedHotStuff{
 		bLock: consensus.GetGenesis(),
 	}
-	return consensus.New(hs)
 }
 
 // InitConsensusModule gives the module a reference to the Modules object.

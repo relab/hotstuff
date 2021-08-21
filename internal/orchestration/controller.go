@@ -43,10 +43,12 @@ type Experiment struct {
 
 	Hosts       map[string]RemoteWorker
 	HostConfigs map[string]HostConfig
+	Byzantine   map[string]int // number of replicas to assign to each byzantine strategy
 
 	// the host associated with each replica.
 	hostsToReplicas map[string][]hotstuff.ID
 	// the host associated with each client.
+	replicaOpts    map[hotstuff.ID]*orchestrationpb.ReplicaOpts
 	hostsToClients map[string][]hotstuff.ID
 	caKey          *ecdsa.PrivateKey
 	ca             *x509.Certificate
@@ -107,19 +109,18 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 	for host, worker := range e.Hosts {
 		req := &orchestrationpb.CreateReplicaRequest{Replicas: make(map[uint32]*orchestrationpb.ReplicaOpts)}
 		for _, id := range e.hostsToReplicas[host] {
-			opts := orchestrationpb.ReplicaOpts{
-				CertificateAuthority: keygen.CertToPEM(e.ca),
-				UseTLS:               true,
-				Crypto:               e.Crypto,
-				Consensus:            e.Consensus,
-				LeaderRotation:       e.LeaderRotation,
-				BatchSize:            uint32(e.BatchSize),
-				BlockCacheSize:       uint32(5 * e.NumReplicas),
-				InitialTimeout:       float32(e.ViewTimeout) / float32(time.Millisecond),
-				TimeoutSamples:       uint32(e.TimoutSamples),
-				TimeoutMultiplier:    e.TimeoutMultiplier,
-				ConnectTimeout:       float32(e.ConnectTimeout / time.Millisecond),
-			}
+			opts := e.replicaOpts[id]
+			opts.CertificateAuthority = keygen.CertToPEM(e.ca)
+			opts.UseTLS = true
+			opts.Crypto = e.Crypto
+			opts.Consensus = e.Consensus
+			opts.LeaderRotation = e.LeaderRotation
+			opts.BatchSize = uint32(e.BatchSize)
+			opts.BlockCacheSize = uint32(5 * e.NumReplicas)
+			opts.InitialTimeout = float32(e.ViewTimeout) / float32(time.Millisecond)
+			opts.TimeoutSamples = uint32(e.TimoutSamples)
+			opts.TimeoutMultiplier = e.TimeoutMultiplier
+			opts.ConnectTimeout = float32(e.ConnectTimeout / time.Millisecond)
 
 			// the generated certificate should be valid for the hostname and its ip addresses.
 			validFor := []string{host}
@@ -135,12 +136,11 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 				return nil, fmt.Errorf("failed to generate keychain: %w", err)
 			}
 
-			opts.ID = uint32(id)
 			opts.PrivateKey = keyChain.PrivateKey
 			opts.PublicKey = keyChain.PublicKey
 			opts.Certificate = keyChain.Certificate
 			opts.CertificateKey = keyChain.CertificateKey
-			req.Replicas[uint32(id)] = &opts
+			req.Replicas[opts.ID] = opts
 		}
 		wcfg, err := worker.CreateReplica(req)
 		if err != nil {
@@ -160,6 +160,7 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 // based on the requested amount of replicas/clients and the assignments for each host.
 func (e *Experiment) assignReplicasAndClients() (err error) {
 	e.hostsToReplicas = make(map[string][]hotstuff.ID)
+	e.replicaOpts = make(map[hotstuff.ID]*orchestrationpb.ReplicaOpts)
 	e.hostsToClients = make(map[string][]hotstuff.ID)
 
 	nextReplicaID := hotstuff.ID(1)
@@ -234,7 +235,19 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 		}
 
 		for i := 0; i < numReplicas; i++ {
+			var byzantineStrategy string
+			for strategy, count := range e.Byzantine {
+				if count > 0 {
+					e.Byzantine[strategy]--
+					byzantineStrategy = strategy
+				}
+			}
+			replicaOpts := orchestrationpb.ReplicaOpts{
+				ID:                uint32(nextReplicaID),
+				ByzantineStrategy: byzantineStrategy,
+			}
 			e.hostsToReplicas[host] = append(e.hostsToReplicas[host], nextReplicaID)
+			e.replicaOpts[nextReplicaID] = &replicaOpts
 			log.Printf("replica %d assigned to host %s", nextReplicaID, host)
 			nextReplicaID++
 		}
@@ -264,7 +277,7 @@ func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration) (e
 	for range e.Hosts {
 		err = multierr.Append(err, <-errors)
 	}
-	return nil
+	return err
 }
 
 func (e *Experiment) stopReplicas() error {

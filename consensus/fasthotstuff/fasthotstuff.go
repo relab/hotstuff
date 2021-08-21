@@ -11,8 +11,8 @@ type FastHotStuff struct {
 }
 
 // New returns a new FastHotStuff instance.
-func New() consensus.Consensus {
-	return consensus.New(&FastHotStuff{})
+func New() consensus.Rules {
+	return &FastHotStuff{}
 }
 
 // InitConsensusModule gives the module a reference to the Modules object.

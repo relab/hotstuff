@@ -2,12 +2,15 @@ package cli
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"math"
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/relab/hotstuff/internal/orchestration"
@@ -68,6 +71,7 @@ func init() {
 	runCmd.Flags().Float64("rate-limit", math.Inf(1), "rate limit for clients (in commands/second)")
 	runCmd.Flags().Float64("rate-step", 0, "rate limit step up for clients (in commands/second)")
 	runCmd.Flags().Duration("rate-step-interval", time.Hour, "how often the client rate limit should be increased")
+	runCmd.Flags().StringSlice("byzantine", nil, "byzantine strategies to use, as a comma separated list of 'name:count'")
 
 	err := viper.BindPFlags(runCmd.Flags())
 	if err != nil {
@@ -103,6 +107,9 @@ func runController() {
 		RateStep:          viper.GetFloat64("rate-step"),
 		RateStepInterval:  viper.GetDuration("rate-step-interval"),
 	}
+
+	experiment.Byzantine, err = parseByzantine()
+	checkf("%v", err)
 
 	worker := viper.GetBool("worker")
 	hosts := viper.GetStringSlice("hosts")
@@ -186,6 +193,23 @@ func checkf(format string, args ...interface{}) {
 			log.Fatalf(format, args...)
 		}
 	}
+}
+
+func parseByzantine() (map[string]int, error) {
+	strategies := make(map[string]int)
+	byzantine := viper.GetStringSlice("byzantine")
+	for _, arg := range byzantine {
+		parts := strings.Split(arg, ":")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("byzantine must be specified as a comma separated list of 'name:count'")
+		}
+		count, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return nil, fmt.Errorf("could not read number of replicas for byzantine strategy '%s': %w", arg, err)
+		}
+		strategies[parts[0]] = count
+	}
+	return strategies, nil
 }
 
 func localWorker(output string, metrics []string, interval time.Duration) (worker orchestration.RemoteWorker, wait func()) {

@@ -16,6 +16,7 @@ import (
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/consensus/byzantine"
 	"github.com/relab/hotstuff/consensus/chainedhotstuff"
 	"github.com/relab/hotstuff/consensus/fasthotstuff"
 	"github.com/relab/hotstuff/consensus/simplehotstuff"
@@ -159,16 +160,26 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	// prepare modules
 	builder := consensus.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 
-	var consensusImpl consensus.Consensus
+	var consensusRules consensus.Rules
 	switch opts.GetConsensus() {
 	case "chainedhotstuff":
-		consensusImpl = chainedhotstuff.New()
+		consensusRules = chainedhotstuff.New()
 	case "fasthotstuff":
-		consensusImpl = fasthotstuff.New()
+		consensusRules = fasthotstuff.New()
 	case "simplehotstuff":
-		consensusImpl = simplehotstuff.New()
+		consensusRules = simplehotstuff.New()
 	default:
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
+	}
+
+	switch opts.GetByzantineStrategy() {
+	case "silence":
+		consensusRules = byzantine.NewSilence(consensusRules)
+	case "fork":
+		consensusRules = byzantine.NewFork(consensusRules)
+	case "":
+	default:
+		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
 	}
 
 	var cryptoImpl consensus.CryptoImpl
@@ -197,7 +208,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	))
 
 	builder.Register(
-		consensusImpl,
+		consensus.New(consensusRules),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		leaderRotation,
 		sync,

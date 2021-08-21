@@ -13,10 +13,10 @@ type SimpleHotStuff struct {
 }
 
 // New returns a new SimpleHotStuff instance.
-func New() consensus.Consensus {
-	return consensus.New(&SimpleHotStuff{
+func New() consensus.Rules {
+	return &SimpleHotStuff{
 		locked: consensus.GetGenesis(),
-	})
+	}
 }
 
 // InitConsensusModule gives the module a reference to the Modules object.

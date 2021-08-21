@@ -13,6 +13,13 @@ type Rules interface {
 	CommitRule(*Block) *Block
 }
 
+// ProposeRuler is an optional interface that adds a ProposeRule method.
+// This allows implementors to specify how new blocks are created.
+type ProposeRuler interface {
+	// ProposeRule creates a new proposal.
+	ProposeRule(cert SyncInfo, cmd Command) (proposal ProposeMsg, ok bool)
+}
+
 // consensusBase provides a default implementation of the Consensus interface
 // for implementations of the ConsensusImpl interface.
 type consensusBase struct {
@@ -66,22 +73,32 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 
 	cmd, ok := cs.mods.CommandQueue().Get(cs.mods.Synchronizer().ViewContext())
 	if !ok {
+		cs.mods.Logger().Debug("Propose: No command")
 		return
 	}
 
-	proposal := ProposeMsg{
-		ID: cs.mods.ID(),
-		Block: NewBlock(
-			cs.mods.Synchronizer().LeafBlock().Hash(),
-			qc,
-			cmd,
-			cs.mods.Synchronizer().View(),
-			cs.mods.ID(),
-		),
-	}
+	var proposal ProposeMsg
+	if proposer, ok := cs.impl.(ProposeRuler); ok {
+		proposal, ok = proposer.ProposeRule(cert, cmd)
+		if !ok {
+			cs.mods.Logger().Debug("Propose: No block")
+			return
+		}
+	} else {
+		proposal = ProposeMsg{
+			ID: cs.mods.ID(),
+			Block: NewBlock(
+				cs.mods.Synchronizer().LeafBlock().Hash(),
+				qc,
+				cmd,
+				cs.mods.Synchronizer().View(),
+				cs.mods.ID(),
+			),
+		}
 
-	if aggQC, ok := cert.AggQC(); ok && cs.mods.Options().ShouldUseAggQC() {
-		proposal.AggregateQC = &aggQC
+		if aggQC, ok := cert.AggQC(); ok && cs.mods.Options().ShouldUseAggQC() {
+			proposal.AggregateQC = &aggQC
+		}
 	}
 
 	cs.mods.BlockChain().Store(proposal.Block)
