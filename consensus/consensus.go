@@ -136,8 +136,9 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 
 	if cs.mods.Options().ShouldUseAggQC() && proposal.AggregateQC != nil {
 		ok, highQC := cs.mods.Crypto().VerifyAggregateQC(*proposal.AggregateQC)
-		if ok {
+		if !ok {
 			cs.mods.Logger().Warn("OnPropose: failed to verify aggregate QC")
+			return
 		}
 		// NOTE: for simplicity, we require that the highQC found in the AggregateQC equals the QC embedded in the block.
 		if !block.QuorumCert().Equals(highQC) {
