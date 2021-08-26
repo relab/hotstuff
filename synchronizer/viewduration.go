@@ -24,10 +24,11 @@ type ViewDuration interface {
 // sampleSize determines the number of previous views that should be considered.
 // startTimeout determines the view duration of the first views.
 // When a timeout occurs, the next view duration will be multiplied by the multiplier.
-func NewViewDuration(sampleSize uint64, startTimeout, multiplier float64) ViewDuration {
+func NewViewDuration(sampleSize uint64, startTimeout, maxTimeout, multiplier float64) ViewDuration {
 	return &viewDuration{
 		limit: sampleSize,
 		mean:  startTimeout,
+		max:   maxTimeout,
 		mul:   multiplier,
 	}
 }
@@ -43,6 +44,7 @@ type viewDuration struct {
 	mean      float64   // the mean view duration
 	m2        float64   // sum of squares of differences from the mean
 	prevM2    float64   // m2 calculated from the last period
+	max       float64   // upper bound on view timeout
 }
 
 // InitConsensusModule gives the module a reference to the Modules object.
@@ -109,7 +111,11 @@ func (v *viewDuration) Duration() time.Duration {
 		}
 		dev = math.Sqrt(m2 / c)
 	}
+
 	duration := v.mean + dev*conf
+	if v.max > 0 && duration > v.max {
+		duration = v.max
+	}
 
 	if uint64(v.mods.Synchronizer().View())%v.limit == 0 {
 		v.mods.Logger().Infof("Mean: %.2fms, Dev: %.2f, Timeout: %.2fms (last %d views)", v.mean, dev, duration, v.limit)

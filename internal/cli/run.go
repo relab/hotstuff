@@ -14,11 +14,13 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/internal/orchestration"
+	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/iago"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // runCmd represents the run command
@@ -49,6 +51,7 @@ func init() {
 	runCmd.Flags().Duration("duration", 10*time.Second, "duration of the experiment")
 	runCmd.Flags().Duration("connect-timeout", 5*time.Second, "duration of the initial connection timeout")
 	runCmd.Flags().Duration("view-timeout", 100*time.Millisecond, "duration of the first view")
+	runCmd.Flags().Duration("max-timeout", 0, "upper limit on view timeouts")
 	runCmd.Flags().Int("duration-samples", 1000, "number of previous views to consider when predicting view duration")
 	runCmd.Flags().Float32("timeout-multiplier", 1.2, "number to multiply the view duration by in case of a timeout")
 	runCmd.Flags().String("consensus", "chainedhotstuff", "name of the consensus implementation")
@@ -90,22 +93,30 @@ func runController() {
 	}
 
 	experiment := orchestration.Experiment{
-		NumReplicas:       viper.GetInt("replicas"),
-		NumClients:        viper.GetInt("clients"),
-		BatchSize:         viper.GetInt("batch-size"),
-		PayloadSize:       viper.GetInt("payload-size"),
-		MaxConcurrent:     viper.GetInt("max-concurrent"),
-		Duration:          viper.GetDuration("duration"),
-		ConnectTimeout:    viper.GetDuration("connect-timeout"),
-		ViewTimeout:       viper.GetDuration("view-timeout"),
-		TimoutSamples:     viper.GetInt("duration-samples"),
-		TimeoutMultiplier: float32(viper.GetFloat64("timeout-multiplier")),
-		Consensus:         viper.GetString("consensus"),
-		Crypto:            viper.GetString("crypto"),
-		LeaderRotation:    viper.GetString("leader-rotation"),
-		RateLimit:         viper.GetFloat64("rate-limit"),
-		RateStep:          viper.GetFloat64("rate-step"),
-		RateStepInterval:  viper.GetDuration("rate-step-interval"),
+		NumReplicas: viper.GetInt("replicas"),
+		NumClients:  viper.GetInt("clients"),
+		Duration:    viper.GetDuration("duration"),
+		ReplicaOpts: &orchestrationpb.ReplicaOpts{
+			UseTLS:            true,
+			BatchSize:         viper.GetUint32("batch-size"),
+			TimeoutMultiplier: float32(viper.GetFloat64("timeout-multiplier")),
+			Consensus:         viper.GetString("consensus"),
+			Crypto:            viper.GetString("crypto"),
+			LeaderRotation:    viper.GetString("leader-rotation"),
+			ConnectTimeout:    durationpb.New(viper.GetDuration("connect-timeout")),
+			InitialTimeout:    durationpb.New(viper.GetDuration("view-timeout")),
+			TimeoutSamples:    viper.GetUint32("duration-samples"),
+			MaxTimeout:        durationpb.New(viper.GetDuration("max-timeout")),
+		},
+		ClientOpts: &orchestrationpb.ClientOpts{
+			UseTLS:           true,
+			ConnectTimeout:   durationpb.New(viper.GetDuration("connect-timeout")),
+			PayloadSize:      viper.GetUint32("payload-size"),
+			MaxConcurrent:    viper.GetUint32("max-concurrent"),
+			RateLimit:        viper.GetFloat64("rate-limit"),
+			RateStep:         viper.GetFloat64("rate-step"),
+			RateStepInterval: durationpb.New(viper.GetDuration("rate-step-interval")),
+		},
 	}
 
 	experiment.Byzantine, err = parseByzantine()

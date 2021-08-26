@@ -204,7 +204,10 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 
 	sync := synchronizer.New(synchronizer.NewViewDuration(
-		uint64(opts.GetTimeoutSamples()), float64(opts.GetInitialTimeout()), float64(opts.GetTimeoutMultiplier()),
+		uint64(opts.GetTimeoutSamples()),
+		float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
+		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
+		float64(opts.GetTimeoutMultiplier()),
 	))
 
 	builder.Register(
@@ -230,7 +233,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		RootCAs:     rootCAs,
 		BatchSize:   opts.GetBatchSize(),
 		ManagerOptions: []gorums.ManagerOption{
-			gorums.WithDialTimeout(time.Duration(opts.GetConnectTimeout() * float32(time.Millisecond))),
+			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 			gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
 		},
 	}
@@ -291,7 +294,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			PayloadSize:   opts.GetPayloadSize(),
 			Input:         io.NopCloser(rand.Reader),
 			ManagerOptions: []gorums.ManagerOption{
-				gorums.WithDialTimeout(time.Duration(opts.GetConnectTimeout() * float32(time.Millisecond))),
+				gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 				gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
 			},
 			RateLimit:        opts.GetRateLimit(),

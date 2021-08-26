@@ -35,9 +35,11 @@ message ReplicaOpts {
   // The number of client commands that should be batched together.
   uint32 BatchSize = 11;
   // The timeout of the initial connection setup.
-  float ConnectTimeout = 17;
-  // The initial view duration in milliseconds.
-  float InitialTimeout = 12;
+  google.protobuf.Duration ConnectTimeout = 17;
+  // The initial view duration.
+  google.protobuf.Duration InitialTimeout = 12;
+  // The maximum view timeout.
+  google.protobuf.Duration MaxTimeout = 19;
   // The number of samples used to calculate view duration.
   uint32 TimeoutSamples = 13;
   // The number that the old view duration should be multiplied by when a new
@@ -71,7 +73,7 @@ message ClientOpts {
   // The size in bytes of each command.
   uint32 PayloadSize = 9;
   // The timeout of the initial connection.
-  float ConnectTimeout = 10;
+  google.protobuf.Duration ConnectTimeout = 10;
   // The limit on how many commands can be sent per second.
   double RateLimit = 11;
   // The amount of commands per second to increase the rate limit by.

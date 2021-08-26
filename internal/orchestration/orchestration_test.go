@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/internal/orchestration"
+	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/modules"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func TestOrchestration(t *testing.T) {
@@ -18,20 +20,25 @@ func TestOrchestration(t *testing.T) {
 		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), modules.NopLogger(), nil, 0)
 
 		experiment := &orchestration.Experiment{
-			NumReplicas:       4,
-			NumClients:        2,
-			BatchSize:         100,
-			MaxConcurrent:     250,
-			PayloadSize:       100,
-			ConnectTimeout:    1 * time.Second,
-			ViewTimeout:       1000,
-			TimoutSamples:     1000,
-			TimeoutMultiplier: 1.2,
-			Duration:          1 * time.Second,
-			Consensus:         consensusImpl,
-			Crypto:            crypto,
-			LeaderRotation:    "round-robin",
-			Hosts:             map[string]orchestration.RemoteWorker{"127.0.0.1": workerProxy},
+			NumReplicas: 4,
+			NumClients:  2,
+			ClientOpts: &orchestrationpb.ClientOpts{
+				ConnectTimeout: durationpb.New(time.Second),
+				MaxConcurrent:  250,
+				PayloadSize:    100,
+			},
+			ReplicaOpts: &orchestrationpb.ReplicaOpts{
+				BatchSize:         100,
+				ConnectTimeout:    durationpb.New(time.Second),
+				InitialTimeout:    durationpb.New(100 * time.Millisecond),
+				TimeoutSamples:    1000,
+				TimeoutMultiplier: 1.2,
+				Consensus:         consensusImpl,
+				Crypto:            crypto,
+				LeaderRotation:    "round-robin",
+			},
+			Duration: 1 * time.Second,
+			Hosts:    map[string]orchestration.RemoteWorker{"127.0.0.1": workerProxy},
 		}
 
 		c := make(chan error)

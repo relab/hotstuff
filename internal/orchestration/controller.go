@@ -13,7 +13,7 @@ import (
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"go.uber.org/multierr"
-	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/proto"
 )
 
 // HostConfig specifies the number of replicas and clients that should be started on a specific host.
@@ -24,22 +24,12 @@ type HostConfig struct {
 
 // Experiment holds variables for an experiment.
 type Experiment struct {
-	NumReplicas       int
-	NumClients        int
-	BatchSize         int
-	PayloadSize       int
-	MaxConcurrent     int
-	Duration          time.Duration
-	ConnectTimeout    time.Duration
-	ViewTimeout       time.Duration
-	TimoutSamples     int
-	TimeoutMultiplier float32
-	Consensus         string
-	Crypto            string
-	LeaderRotation    string
-	RateLimit         float64
-	RateStep          float64
-	RateStepInterval  time.Duration
+	*orchestrationpb.ReplicaOpts
+	*orchestrationpb.ClientOpts
+
+	NumReplicas int
+	NumClients  int
+	Duration    time.Duration
 
 	Hosts       map[string]RemoteWorker
 	HostConfigs map[string]HostConfig
@@ -111,15 +101,6 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 		for _, id := range e.hostsToReplicas[host] {
 			opts := e.replicaOpts[id]
 			opts.CertificateAuthority = keygen.CertToPEM(e.ca)
-			opts.UseTLS = true
-			opts.Crypto = e.Crypto
-			opts.Consensus = e.Consensus
-			opts.LeaderRotation = e.LeaderRotation
-			opts.BatchSize = uint32(e.BatchSize)
-			opts.InitialTimeout = float32(e.ViewTimeout) / float32(time.Millisecond)
-			opts.TimeoutSamples = uint32(e.TimoutSamples)
-			opts.TimeoutMultiplier = e.TimeoutMultiplier
-			opts.ConnectTimeout = float32(e.ConnectTimeout / time.Millisecond)
 
 			// the generated certificate should be valid for the hostname and its ip addresses.
 			validFor := []string{host}
@@ -241,12 +222,14 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 					byzantineStrategy = strategy
 				}
 			}
-			replicaOpts := orchestrationpb.ReplicaOpts{
-				ID:                uint32(nextReplicaID),
-				ByzantineStrategy: byzantineStrategy,
-			}
+
+			// copy the replica opts
+			replicaOpts := proto.Clone(e.ReplicaOpts).(*orchestrationpb.ReplicaOpts)
+			replicaOpts.ID = uint32(nextReplicaID)
+			replicaOpts.ByzantineStrategy = byzantineStrategy
+
 			e.hostsToReplicas[host] = append(e.hostsToReplicas[host], nextReplicaID)
-			e.replicaOpts[nextReplicaID] = &replicaOpts
+			e.replicaOpts[nextReplicaID] = replicaOpts
 			log.Printf("replica %d assigned to host %s", nextReplicaID, host)
 			nextReplicaID++
 		}
@@ -310,16 +293,9 @@ func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration) err
 		req.Configuration = cfg.GetReplicas()
 		req.CertificateAuthority = keygen.CertToPEM(e.ca)
 		for _, id := range e.hostsToClients[host] {
-			req.Clients[uint32(id)] = &orchestrationpb.ClientOpts{
-				ID:               uint32(id),
-				UseTLS:           true,
-				MaxConcurrent:    uint32(e.MaxConcurrent),
-				PayloadSize:      uint32(e.PayloadSize),
-				ConnectTimeout:   float32(e.ConnectTimeout / time.Millisecond),
-				RateLimit:        e.RateLimit,
-				RateStep:         e.RateStep,
-				RateStepInterval: durationpb.New(e.RateStepInterval),
-			}
+			clientOpts := proto.Clone(e.ClientOpts).(*orchestrationpb.ClientOpts)
+			clientOpts.ID = uint32(id)
+			req.Clients[uint32(id)] = clientOpts
 		}
 		_, err := worker.StartClient(req)
 		if err != nil {
