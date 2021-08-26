@@ -309,6 +309,7 @@ func (s *Synchronizer) UpdateHighQC(qc consensus.QuorumCert) {
 	}
 
 	if newBlock.View() > oldBlock.View() {
+		s.mods.Logger().Debug("HighQC updated")
 		s.highQC = qc
 		s.leafBlock = newBlock
 	}

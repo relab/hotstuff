@@ -1,5 +1,7 @@
 package consensus
 
+import "sync"
+
 // Rules is the minimum interface that a consensus implementations must implement.
 // Implementations of this interface can be wrapped in the ConsensusBase struct.
 // Together, these provide an implementation of the main Consensus interface.
@@ -27,7 +29,9 @@ type consensusBase struct {
 	mods *Modules
 
 	lastVote View
-	bExec    *Block
+
+	mut   sync.Mutex
+	bExec *Block
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
@@ -37,6 +41,12 @@ func New(impl Rules) Consensus {
 		lastVote: 0,
 		bExec:    GetGenesis(),
 	}
+}
+
+func (cs *consensusBase) CommittedBlock() *Block {
+	cs.mut.Lock()
+	defer cs.mut.Unlock()
+	return cs.bExec
 }
 
 func (cs *consensusBase) InitConsensusModule(mods *Modules, opts *OptionsBuilder) {
@@ -109,6 +119,8 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 }
 
 func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
+	cs.mods.Logger().Debugf("OnPropose: %v", proposal.Block)
+
 	block := proposal.Block
 
 	// ensure the block came from the leader.
@@ -185,9 +197,23 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 }
 
 func (cs *consensusBase) commit(block *Block) {
+	cs.mut.Lock()
+	// can't recurse due to requiring the mutex, so we use a helper instead.
+	cs.commitInner(block)
+	cs.mut.Unlock()
+
+	// prune the blockchain and handle forked blocks
+	forkedBlocks := cs.mods.BlockChain().PruneToHeight(block.View())
+	for _, block := range forkedBlocks {
+		cs.mods.ForkHandler().Fork(block.Command())
+	}
+}
+
+// recursive helper for commit
+func (cs *consensusBase) commitInner(block *Block) {
 	if cs.bExec.View() < block.View() {
 		if parent, ok := cs.mods.BlockChain().Get(block.Parent()); ok {
-			cs.commit(parent)
+			cs.commitInner(parent)
 		}
 		cs.mods.Logger().Debug("EXEC: ", block)
 		cs.mods.Executor().Exec(block.Command())

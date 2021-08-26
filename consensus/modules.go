@@ -27,6 +27,7 @@ type Modules struct {
 	leaderRotation LeaderRotation
 	crypto         Crypto
 	synchronizer   Synchronizer
+	forkHandler    ForkHandler
 }
 
 // Run starts both event loops using the provided context and returns when both event loops have exited.
@@ -111,6 +112,11 @@ func (mods *Modules) Synchronizer() Synchronizer {
 	return mods.synchronizer
 }
 
+// ForkHandler returns the module responsible for handling forked blocks.
+func (mods *Modules) ForkHandler() ForkHandler {
+	return mods.forkHandler
+}
+
 // Builder is a helper for constructing a HotStuff instance.
 type Builder struct {
 	baseBuilder modules.Builder
@@ -169,6 +175,9 @@ func (b *Builder) Register(mods ...interface{}) {
 		if m, ok := module.(Synchronizer); ok {
 			b.mods.synchronizer = m
 		}
+		if m, ok := module.(ForkHandler); ok {
+			b.mods.forkHandler = m
+		}
 		if m, ok := module.(Module); ok {
 			b.modules = append(b.modules, m)
 		}
@@ -221,6 +230,13 @@ type Acceptor interface {
 type Executor interface {
 	// Exec executes the given command.
 	Exec(Command)
+}
+
+// ForkHandler handles commands that do not get committed due to a forked blockchain.
+//
+// TODO: think of a better name/interface
+type ForkHandler interface {
+	Fork(Command)
 }
 
 // CryptoImpl implements only the cryptographic primitives that are needed for HotStuff.
@@ -278,6 +294,10 @@ type BlockChain interface {
 
 	// Extends checks if the given block extends the branch of the target hash.
 	Extends(block, target *Block) bool
+
+	// Prunes blocks from the in-memory tree up to the specified height.
+	// Returns a set of forked blocks (blocks that were on a different branch, and thus not committed).
+	PruneToHeight(height View) (forkedBlocks []*Block)
 }
 
 //go:generate mockgen -destination=../internal/mocks/replica_mock.go -package=mocks . Replica
@@ -326,6 +346,8 @@ type Consensus interface {
 	StopVoting(view View)
 	// Propose starts a new proposal. The command is fetched from the command queue.
 	Propose(cert SyncInfo)
+	// CommittedBlock returns the most recently committed block.
+	CommittedBlock() *Block
 }
 
 // LeaderRotation implements a leader rotation scheme.

@@ -34,6 +34,20 @@ func (m *MockConsensus) EXPECT() *MockConsensusMockRecorder {
 	return m.recorder
 }
 
+// CommittedBlock mocks base method.
+func (m *MockConsensus) CommittedBlock() *consensus.Block {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CommittedBlock")
+	ret0, _ := ret[0].(*consensus.Block)
+	return ret0
+}
+
+// CommittedBlock indicates an expected call of CommittedBlock.
+func (mr *MockConsensusMockRecorder) CommittedBlock() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CommittedBlock", reflect.TypeOf((*MockConsensus)(nil).CommittedBlock))
+}
+
 // Propose mocks base method.
 func (m *MockConsensus) Propose(arg0 consensus.SyncInfo) {
 	m.ctrl.T.Helper()

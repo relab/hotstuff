@@ -12,6 +12,8 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -20,7 +22,7 @@ type clientSrv struct {
 	mut          sync.Mutex
 	mods         *modules.Modules
 	srv          *gorums.Server
-	awaitingCmds map[cmdID]chan<- struct{}
+	awaitingCmds map[cmdID]chan<- error
 	cmdCache     *cmdCache
 	hash         hash.Hash
 }
@@ -28,7 +30,7 @@ type clientSrv struct {
 // newClientServer returns a new client server.
 func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv) {
 	srv = &clientSrv{
-		awaitingCmds: make(map[cmdID]chan<- struct{}),
+		awaitingCmds: make(map[cmdID]chan<- error),
 		srv:          gorums.NewServer(srvOpts...),
 		cmdCache:     newCmdCache(int(conf.BatchSize)),
 		hash:         sha256.New(),
@@ -68,15 +70,15 @@ func (srv *clientSrv) Stop() {
 func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*empty.Empty, error) {
 	id := cmdID{cmd.ClientID, cmd.SequenceNumber}
 
-	c := make(chan struct{})
+	c := make(chan error)
 	srv.mut.Lock()
 	srv.awaitingCmds[id] = c
 	srv.mut.Unlock()
 
 	srv.cmdCache.addCommand(cmd)
 	ctx.Release()
-	<-c
-	return &empty.Empty{}, nil
+	err := <-c
+	return &empty.Empty{}, err
 }
 
 func (srv *clientSrv) Exec(cmd consensus.Command) {
@@ -95,8 +97,29 @@ func (srv *clientSrv) Exec(cmd consensus.Command) {
 			log.Printf("Error writing data: %v\n", err)
 		}
 		srv.mut.Lock()
-		if done, ok := srv.awaitingCmds[cmdID{cmd.ClientID, cmd.SequenceNumber}]; ok {
-			close(done)
+		id := cmdID{cmd.GetClientID(), cmd.GetSequenceNumber()}
+		if done, ok := srv.awaitingCmds[id]; ok {
+			done <- nil
+			delete(srv.awaitingCmds, id)
+		}
+		srv.mut.Unlock()
+	}
+}
+
+func (srv *clientSrv) Fork(cmd consensus.Command) {
+	batch := new(clientpb.Batch)
+	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
+	if err != nil {
+		log.Printf("Failed to unmarshal command: %v\n", err)
+		return
+	}
+
+	for _, cmd := range batch.GetCommands() {
+		srv.mut.Lock()
+		id := cmdID{cmd.GetClientID(), cmd.GetSequenceNumber()}
+		if done, ok := srv.awaitingCmds[id]; ok {
+			done <- status.Error(codes.Aborted, "blockchain was forked")
+			delete(srv.awaitingCmds, id)
 		}
 		srv.mut.Unlock()
 	}

@@ -2,7 +2,6 @@
 package blockchain
 
 import (
-	"container/list"
 	"context"
 	"sync"
 
@@ -12,46 +11,30 @@ import (
 // blockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type blockChain struct {
-	mods *consensus.Modules
-
-	mut          sync.Mutex
-	maxSize      int
-	blocks       map[consensus.Hash]*list.Element
-	pendingFetch map[consensus.Hash]context.CancelFunc // allows a pending fetch operation to be cancelled
-	accessOrder  list.List
+	mods          *consensus.Modules
+	mut           sync.Mutex
+	pruneHeight   consensus.View
+	blocks        map[consensus.Hash]*consensus.Block
+	blockAtHeight map[consensus.View]*consensus.Block
+	pendingFetch  map[consensus.Hash]context.CancelFunc // allows a pending fetch operation to be cancelled
 }
 
 // InitConsensusModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
 func (chain *blockChain) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
 	chain.mods = mods
-
-	chain.mods.EventLoop().RegisterAsyncObserver(consensus.ProposeMsg{}, func(event interface{}) {
-		proposal := event.(consensus.ProposeMsg)
-		chain.Store(proposal.Block)
-	})
 }
 
 // New creates a new blockChain with a maximum size.
 // Blocks are dropped in least recently used order.
-func New(maxSize int) consensus.BlockChain {
+func New() consensus.BlockChain {
 	bc := &blockChain{
-		maxSize:      maxSize,
-		blocks:       make(map[consensus.Hash]*list.Element),
-		pendingFetch: make(map[consensus.Hash]context.CancelFunc),
+		blocks:        make(map[consensus.Hash]*consensus.Block),
+		blockAtHeight: make(map[consensus.View]*consensus.Block),
+		pendingFetch:  make(map[consensus.Hash]context.CancelFunc),
 	}
 	bc.Store(consensus.GetGenesis())
 	return bc
-}
-
-func (chain *blockChain) makeSpace() {
-	if len(chain.blocks) < chain.maxSize {
-		return
-	}
-	elem := chain.accessOrder.Back()
-	block := elem.Value.(*consensus.Block)
-	delete(chain.blocks, block.Hash())
-	chain.accessOrder.Remove(elem)
 }
 
 // Store stores a block in the blockchain
@@ -59,10 +42,8 @@ func (chain *blockChain) Store(block *consensus.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
-	chain.makeSpace()
-
-	elem := chain.accessOrder.PushFront(block)
-	chain.blocks[block.Hash()] = elem
+	chain.blocks[block.Hash()] = block
+	chain.blockAtHeight[block.View()] = block
 
 	// cancel any pending fetch operations
 	if cancel, ok := chain.pendingFetch[block.Hash()]; ok {
@@ -75,14 +56,12 @@ func (chain *blockChain) LocalGet(hash consensus.Hash) (*consensus.Block, bool) 
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
-	elem, ok := chain.blocks[hash]
+	block, ok := chain.blocks[hash]
 	if !ok {
 		return nil, false
 	}
 
-	chain.accessOrder.MoveToFront(elem)
-
-	return elem.Value.(*consensus.Block), true
+	return block, true
 }
 
 // Get retrieves a block given its hash. Get will try to find the block locally.
@@ -95,7 +74,7 @@ func (chain *blockChain) Get(hash consensus.Hash) (block *consensus.Block, ok bo
 	)
 
 	chain.mut.Lock()
-	elem, ok := chain.blocks[hash]
+	block, ok = chain.blocks[hash]
 	if ok {
 		goto done
 	}
@@ -111,15 +90,14 @@ func (chain *blockChain) Get(hash consensus.Hash) (block *consensus.Block, ok bo
 	delete(chain.pendingFetch, hash)
 	if !ok {
 		// check again in case the block arrived while we we fetching
-		elem, ok = chain.blocks[hash]
+		block, ok = chain.blocks[hash]
 		goto done
 	}
 
 	chain.mods.Logger().Debugf("Successfully fetched block: %.8s", hash)
 
-	chain.makeSpace()
-	elem = chain.accessOrder.PushFront(block)
-	chain.blocks[hash] = elem
+	chain.blocks[hash] = block
+	chain.blockAtHeight[block.View()] = block
 
 done:
 	defer chain.mut.Unlock()
@@ -128,8 +106,7 @@ done:
 		return nil, false
 	}
 
-	chain.accessOrder.MoveToFront(elem)
-	return elem.Value.(*consensus.Block), true
+	return block, true
 }
 
 // Extends checks if the given block extends the branch of the target block.
@@ -140,6 +117,40 @@ func (chain *blockChain) Extends(block, target *consensus.Block) bool {
 		current, ok = chain.Get(current.Parent())
 	}
 	return ok && current.Hash() == target.Hash()
+}
+
+func (chain *blockChain) PruneToHeight(height consensus.View) (forkedBlocks []*consensus.Block) {
+	chain.mut.Lock()
+	defer chain.mut.Unlock()
+
+	committedHeight := chain.mods.Consensus().CommittedBlock().View()
+	committedViews := make(map[consensus.View]bool)
+	committedViews[committedHeight] = true
+	for h := committedHeight; h >= chain.pruneHeight; {
+		block, ok := chain.blockAtHeight[h]
+		if !ok {
+			break
+		}
+		parent, ok := chain.blocks[block.Parent()]
+		if !ok || parent.View() < chain.pruneHeight {
+			break
+		}
+		h = parent.View()
+		committedViews[h] = true
+	}
+
+	for h := height; h > chain.pruneHeight; h-- {
+		if !committedViews[h] {
+			block, ok := chain.blockAtHeight[h]
+			if ok {
+				chain.mods.Logger().Debugf("PruneToHeight: found forked block: %v", block)
+				forkedBlocks = append(forkedBlocks, block)
+			}
+		}
+		delete(chain.blockAtHeight, h)
+	}
+	chain.pruneHeight = height
+	return forkedBlocks
 }
 
 var _ consensus.BlockChain = (*blockChain)(nil)

@@ -213,7 +213,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		leaderRotation,
 		sync,
 		w.metricsLogger,
-		blockchain.New(int(opts.GetBlockCacheSize())),
+		blockchain.New(),
 	)
 
 	if w.measurementInterval > 0 {

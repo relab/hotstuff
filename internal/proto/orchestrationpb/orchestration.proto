@@ -43,8 +43,6 @@ message ReplicaOpts {
   // The number that the old view duration should be multiplied by when a new
   // timeout happens.
   float TimeoutMultiplier = 14;
-  // The size of the replica's block cache.
-  uint32 BlockCacheSize = 15;
   // The byzantine strategy to use. If empty, the replica will act normally.
   string ByzantineStrategy = 18;
 }

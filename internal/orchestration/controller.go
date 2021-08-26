@@ -116,7 +116,6 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 			opts.Consensus = e.Consensus
 			opts.LeaderRotation = e.LeaderRotation
 			opts.BatchSize = uint32(e.BatchSize)
-			opts.BlockCacheSize = uint32(5 * e.NumReplicas)
 			opts.InitialTimeout = float32(e.ViewTimeout) / float32(time.Millisecond)
 			opts.TimeoutSamples = uint32(e.TimoutSamples)
 			opts.TimeoutMultiplier = e.TimeoutMultiplier

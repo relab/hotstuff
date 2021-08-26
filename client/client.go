@@ -131,13 +131,13 @@ func (c *Client) Run(ctx context.Context) {
 	}()
 	c.mods.Logger().Info("Starting to send commands")
 	go c.handleCommands(ctx)
-	err := c.sendCommands(ctx)
+	num, err := c.sendCommands(ctx)
 	if err != nil && !errors.Is(err, io.EOF) {
 		c.mods.Logger().Panicf("Failed to send commands: %v", err)
 	}
 	c.close()
 
-	c.mods.Logger().Info("Done sending commands")
+	c.mods.Logger().Infof("Done sending commands (total %d)", num)
 	<-eventLoopDone
 }
 
@@ -163,7 +163,7 @@ func (c *Client) close() {
 	}
 }
 
-func (c *Client) sendCommands(ctx context.Context) error {
+func (c *Client) sendCommands(ctx context.Context) (uint64, error) {
 	var (
 		num         uint64 = 1
 		lastCommand uint64 = math.MaxUint64
@@ -184,7 +184,7 @@ func (c *Client) sendCommands(ctx context.Context) error {
 
 		err := c.limiter.Wait(ctx)
 		if err != nil && !errors.Is(err, context.Canceled) {
-			return err
+			return 0, err
 		}
 
 		// annoyingly, we need a mutex here to prevent the data race detector from complaining.
@@ -200,7 +200,7 @@ func (c *Client) sendCommands(ctx context.Context) error {
 		n, err := c.reader.Read(data)
 		if err != nil && err != io.EOF {
 			// if we get an error other than EOF
-			return err
+			return 0, err
 		} else if err == io.EOF && n == 0 && lastCommand > num {
 			lastCommand = num
 			c.mods.Logger().Info("Reached end of file. Sending empty commands until last command is executed...")
@@ -222,7 +222,7 @@ func (c *Client) sendCommands(ctx context.Context) error {
 		}
 
 	}
-	return nil
+	return num, nil
 }
 
 // handleCommands will get pending commands from the pendingCmds channel and then
