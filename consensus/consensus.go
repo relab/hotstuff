@@ -143,6 +143,7 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 		// NOTE: for simplicity, we require that the highQC found in the AggregateQC equals the QC embedded in the block.
 		if !block.QuorumCert().Equals(highQC) {
 			cs.mods.Logger().Warn("OnPropose: block QC does not equal highQC")
+			return
 		}
 	}
 
