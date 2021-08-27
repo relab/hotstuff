@@ -130,14 +130,25 @@ func (c *Client) Run(ctx context.Context) {
 		close(eventLoopDone)
 	}()
 	c.mods.Logger().Info("Starting to send commands")
-	go c.handleCommands(ctx)
-	num, err := c.sendCommands(ctx)
+
+	commandStatsChan := make(chan struct{ executed, failed int })
+	// start the command handler
+	go func() {
+		executed, failed := c.handleCommands(ctx)
+		commandStatsChan <- struct {
+			executed int
+			failed   int
+		}{executed, failed}
+	}()
+
+	err := c.sendCommands(ctx)
 	if err != nil && !errors.Is(err, io.EOF) {
 		c.mods.Logger().Panicf("Failed to send commands: %v", err)
 	}
 	c.close()
 
-	c.mods.Logger().Infof("Done sending commands (total %d)", num)
+	stats := <-commandStatsChan
+	c.mods.Logger().Infof("Done sending commands (executed: %d, failed: %d)", stats.executed, stats.failed)
 	<-eventLoopDone
 }
 
@@ -163,7 +174,7 @@ func (c *Client) close() {
 	}
 }
 
-func (c *Client) sendCommands(ctx context.Context) (uint64, error) {
+func (c *Client) sendCommands(ctx context.Context) error {
 	var (
 		num         uint64 = 1
 		lastCommand uint64 = math.MaxUint64
@@ -184,7 +195,7 @@ func (c *Client) sendCommands(ctx context.Context) (uint64, error) {
 
 		err := c.limiter.Wait(ctx)
 		if err != nil && !errors.Is(err, context.Canceled) {
-			return 0, err
+			return err
 		}
 
 		// annoyingly, we need a mutex here to prevent the data race detector from complaining.
@@ -200,7 +211,7 @@ func (c *Client) sendCommands(ctx context.Context) (uint64, error) {
 		n, err := c.reader.Read(data)
 		if err != nil && err != io.EOF {
 			// if we get an error other than EOF
-			return 0, err
+			return err
 		} else if err == io.EOF && n == 0 && lastCommand > num {
 			lastCommand = num
 			c.mods.Logger().Info("Reached end of file. Sending empty commands until last command is executed...")
@@ -222,13 +233,13 @@ func (c *Client) sendCommands(ctx context.Context) (uint64, error) {
 		}
 
 	}
-	return num, nil
+	return nil
 }
 
 // handleCommands will get pending commands from the pendingCmds channel and then
 // handle them as they become acknowledged by the replicas. We expect the commands to be
 // acknowledged in the order that they were sent.
-func (c *Client) handleCommands(ctx context.Context) {
+func (c *Client) handleCommands(ctx context.Context) (executed, failed int) {
 	for {
 		var (
 			cmd pendingCmd
@@ -246,8 +257,11 @@ func (c *Client) handleCommands(ctx context.Context) {
 		if err != nil {
 			qcError, ok := err.(gorums.QuorumCallError)
 			if !ok || qcError.Reason != context.Canceled.Error() {
-				c.mods.Logger().Warnf("Did not get enough replies for command: %v\n", err)
+				c.mods.Logger().Debugf("Did not get enough replies for command: %v\n", err)
+				failed++
 			}
+		} else {
+			executed++
 		}
 		c.mut.Lock()
 		if cmd.sequenceNumber > c.highestCommitted {
