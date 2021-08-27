@@ -3,7 +3,6 @@ package replica
 import (
 	"crypto/sha256"
 	"hash"
-	"log"
 	"net"
 	"sync"
 
@@ -85,7 +84,7 @@ func (srv *clientSrv) Exec(cmd consensus.Command) {
 	batch := new(clientpb.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {
-		log.Printf("Failed to unmarshal command: %v\n", err)
+		srv.mods.Logger().Errorf("Failed to unmarshal command: %v", err)
 		return
 	}
 
@@ -94,7 +93,7 @@ func (srv *clientSrv) Exec(cmd consensus.Command) {
 	for _, cmd := range batch.GetCommands() {
 		_, _ = srv.hash.Write(cmd.Data)
 		if err != nil {
-			log.Printf("Error writing data: %v\n", err)
+			srv.mods.Logger().Errorf("Error writing data: %v", err)
 		}
 		srv.mut.Lock()
 		id := cmdID{cmd.GetClientID(), cmd.GetSequenceNumber()}
@@ -110,7 +109,7 @@ func (srv *clientSrv) Fork(cmd consensus.Command) {
 	batch := new(clientpb.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {
-		log.Printf("Failed to unmarshal command: %v\n", err)
+		srv.mods.Logger().Errorf("Failed to unmarshal command: %v", err)
 		return
 	}
 
