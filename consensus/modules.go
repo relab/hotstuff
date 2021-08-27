@@ -62,7 +62,7 @@ func (mods *Modules) Options() *Options {
 //
 // This event loop should be used by components that participate in the consensus protocol.
 // Events related to data collection should instead use the secondary event loop,
-// which is accessible using the DataEventLoop() method.
+// which is accessible using the MetricsEventLoop() method.
 func (mods *Modules) EventLoop() *eventloop.EventLoop {
 	return mods.eventLoop
 }
@@ -215,7 +215,7 @@ type CommandQueue interface {
 
 //go:generate mockgen -destination=../internal/mocks/acceptor_mock.go -package=mocks . Acceptor
 
-// Acceptor decides is a replica should accept a command.
+// Acceptor decides if a replica should accept a command.
 type Acceptor interface {
 	// Accept returns true if the replica should accept the command, false otherwise.
 	Accept(Command) bool

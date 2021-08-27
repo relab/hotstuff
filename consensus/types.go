@@ -304,6 +304,8 @@ func (tc TimeoutCert) String() string {
 }
 
 // AggregateQC is a set of QCs extracted from timeout messages and an aggregate signature of the timeout signatures.
+//
+// This is used by the Fast-HotStuff consensus protocol.
 type AggregateQC struct {
 	qcs  map[hotstuff.ID]QuorumCert
 	sig  ThresholdSignature
