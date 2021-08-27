@@ -1,4 +1,4 @@
-// Package replica implements the networking and client code that is needed to run a replica.
+// Package replica provides the required code for starting and running a replica and handling client requests.
 package replica
 
 import (

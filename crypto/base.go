@@ -1,4 +1,4 @@
-// Package crypto provides a base for the crypto implementations.
+// Package crypto provides implementations of the Crypto interface.
 package crypto
 
 import (

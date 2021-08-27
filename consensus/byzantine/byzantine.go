@@ -1,3 +1,4 @@
+// Package byzantine contiains byzantine behaviors that can be applied to the consensus protocols.
 package byzantine
 
 import "github.com/relab/hotstuff/consensus"

@@ -1,3 +1,11 @@
+// Package consensus defines the types and interfaces that are used to implement consensus.
+//
+// In particular, this package defines the module system that allows the different components in a consensus protocol
+// to interact with each other.
+//
+// This package also provides a default implementation of the Consensus interface that can be used by
+// implementors of the Rules interface. This results in a clean and simple way to implement a new consensus protocol
+// while sharing a lot of the code.
 package consensus
 
 import "sync"

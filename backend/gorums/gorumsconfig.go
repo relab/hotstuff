@@ -1,4 +1,7 @@
-// Package gorums implements a backend for HotStuff using the gorums framework.
+// Package gorums implements a networking backend for HotStuff using the gorums framework.
+//
+// In particular, this package implements the Configuration and Replica interfaces which are used to send messages.
+// This package also receives messages from other replicas and posts them to the event loop.
 package gorums
 
 import (

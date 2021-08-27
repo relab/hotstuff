@@ -1,3 +1,4 @@
+// Package simplehotstuff implements a simplified version of the three-chain HotStuff protocol.
 package simplehotstuff
 
 import "github.com/relab/hotstuff/consensus"

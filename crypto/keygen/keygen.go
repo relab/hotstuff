@@ -1,3 +1,5 @@
+// Package keygen provides helper methods for generating, serializing,
+// and deserializing public keys, private keys and certificates.
 package keygen
 
 import (
