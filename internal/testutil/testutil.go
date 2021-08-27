@@ -133,7 +133,7 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...consen
 			ConfigAddReplica(t, config, replica)
 		}
 		config.EXPECT().Len().AnyTimes().Return(len(replicas))
-		config.EXPECT().QuorumSize().AnyTimes().Return(consensus.QuorumSize(len(replicas)))
+		config.EXPECT().QuorumSize().AnyTimes().Return(hotstuff.QuorumSize(len(replicas)))
 		config.EXPECT().Replicas().AnyTimes().DoAndReturn(func() map[hotstuff.ID]consensus.Replica {
 			m := make(map[hotstuff.ID]consensus.Replica)
 			for _, replica := range replicas {
@@ -161,7 +161,7 @@ func CreateMockConfigurationWithReplicas(t *testing.T, ctrl *gomock.Controller, 
 		ConfigAddReplica(t, cfg, replicas[i])
 	}
 	cfg.EXPECT().Len().AnyTimes().Return(len(replicas))
-	cfg.EXPECT().QuorumSize().AnyTimes().Return(consensus.QuorumSize(len(replicas)))
+	cfg.EXPECT().QuorumSize().AnyTimes().Return(hotstuff.QuorumSize(len(replicas)))
 	return cfg, replicas
 }
 

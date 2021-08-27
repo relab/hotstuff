@@ -17,7 +17,6 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/config"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
@@ -114,7 +113,7 @@ func (c *Client) Connect(replicaConfig *config.ReplicaConfig) (err error) {
 	for _, r := range replicaConfig.Replicas {
 		nodes[r.Address] = uint32(r.ID)
 	}
-	c.gorumsConfig, err = c.mgr.NewConfiguration(&qspec{faulty: consensus.NumFaulty(len(replicaConfig.Replicas))}, gorums.WithNodeMap(nodes))
+	c.gorumsConfig, err = c.mgr.NewConfiguration(&qspec{faulty: hotstuff.NumFaulty(len(replicaConfig.Replicas))}, gorums.WithNodeMap(nodes))
 	if err != nil {
 		c.mgr.Close()
 		return err

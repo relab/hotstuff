@@ -152,7 +152,7 @@ func (cfg *Config) Len() int {
 
 // QuorumSize returns the size of a quorum
 func (cfg *Config) QuorumSize() int {
-	return consensus.QuorumSize(cfg.Len())
+	return hotstuff.QuorumSize(cfg.Len())
 }
 
 // Propose sends the block to all replicas in the configuration
