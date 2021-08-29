@@ -1,8 +1,10 @@
 package plotting
 
 import (
+	"encoding/csv"
 	"fmt"
 	"image/color"
+	"os"
 	"time"
 
 	"github.com/relab/hotstuff/metrics/types"
@@ -164,4 +166,27 @@ func (xy xyer) Len() int {
 func (xy xyer) XY(i int) (x float64, y float64) {
 	p := xy[i]
 	return p.x, p.y
+}
+
+// CSVPlot writes to a CSV file.
+func CSVPlot(filename string, headers []string, plot func() plotter.XYer) error {
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	wr := csv.NewWriter(f)
+	err = wr.Write(headers)
+	if err != nil {
+		return err
+	}
+	xyer := plot()
+	for i := 0; i < xyer.Len(); i++ {
+		x, y := xyer.XY(i)
+		err = wr.Write([]string{fmt.Sprint(x), fmt.Sprint(y)})
+		if err != nil {
+			return err
+		}
+	}
+	wr.Flush()
+	return f.Close()
 }

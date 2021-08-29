@@ -2,6 +2,7 @@ package plotting
 
 import (
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/relab/hotstuff/metrics/types"
@@ -43,7 +44,16 @@ func (p *ClientLatencyPlot) Add(measurement interface{}) {
 
 // PlotAverage plots the average latency of all clients within each measurement interval.
 func (p *ClientLatencyPlot) PlotAverage(filename string, measurementInterval time.Duration) (err error) {
-	return GonumPlot(filename, "Time (seconds)", "Latency (ms)", func(plt *plot.Plot) error {
+	const (
+		xlabel = "Time (seconds)"
+		ylabel = "Latency (ms)"
+	)
+	if path.Ext(filename) == ".csv" {
+		return CSVPlot(filename, []string{xlabel, ylabel}, func() plotter.XYer {
+			return avgLatency(p, measurementInterval)
+		})
+	}
+	return GonumPlot(filename, xlabel, ylabel, func(plt *plot.Plot) error {
 		// TODO: error bars
 		if err := plotutil.AddLinePoints(plt, avgLatency(p, measurementInterval)); err != nil {
 			return fmt.Errorf("failed to add line plot: %w", err)

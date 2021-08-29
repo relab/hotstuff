@@ -2,6 +2,7 @@ package plotting
 
 import (
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/relab/hotstuff/metrics/types"
@@ -53,7 +54,16 @@ func (p *ThroughputVSLatencyPlot) Add(measurement interface{}) {
 
 // PlotAverage plots the average throughput of all replicas at specified time intervals.
 func (p *ThroughputVSLatencyPlot) PlotAverage(filename string, measurementInterval time.Duration) (err error) {
-	return GonumPlot(filename, "Throughput (commands/second)", "Latency (ms)", func(plt *plot.Plot) error {
+	const (
+		xlabel = "Throughput (commands/second)"
+		ylabel = "Latency (ms)"
+	)
+	if path.Ext(filename) == ".csv" {
+		return CSVPlot(filename, []string{xlabel, ylabel}, func() plotter.XYer {
+			return avgThroughputVSAvgLatency(p, measurementInterval)
+		})
+	}
+	return GonumPlot(filename, xlabel, ylabel, func(plt *plot.Plot) error {
 		if err := plotutil.AddScatters(plt, avgThroughputVSAvgLatency(p, measurementInterval)); err != nil {
 			return fmt.Errorf("failed to add scatter plot: %w", err)
 		}

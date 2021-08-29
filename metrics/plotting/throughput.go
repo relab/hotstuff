@@ -2,6 +2,7 @@ package plotting
 
 import (
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/relab/hotstuff/metrics/types"
@@ -44,7 +45,16 @@ func (p *ThroughputPlot) Add(measurement interface{}) {
 
 // PlotAverage plots the average throughput of all replicas at specified time intervals.
 func (p *ThroughputPlot) PlotAverage(filename string, measurementInterval time.Duration) (err error) {
-	return GonumPlot(filename, "Time (seconds)", "Throughput (commands/second)", func(plt *plot.Plot) error {
+	const (
+		xlabel = "Time (seconds)"
+		ylabel = "Throughput (commands/second)"
+	)
+	if path.Ext(filename) == ".csv" {
+		return CSVPlot(filename, []string{xlabel, ylabel}, func() plotter.XYer {
+			return avgThroughput(p, measurementInterval)
+		})
+	}
+	return GonumPlot(filename, xlabel, ylabel, func(plt *plot.Plot) error {
 		if err := plotutil.AddLinePoints(plt, avgThroughput(p, measurementInterval)); err != nil {
 			return fmt.Errorf("failed to add line plot: %w", err)
 		}

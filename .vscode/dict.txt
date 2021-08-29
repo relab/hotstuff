@@ -71,3 +71,6 @@ unittests
 unmarshals
 wcfg
 wrfs
+xlabel
+xyer
+ylabel
