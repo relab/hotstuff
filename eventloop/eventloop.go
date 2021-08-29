@@ -1,3 +1,18 @@
+// Package eventloop provides an event loop which is widely used by modules.
+//
+// The event loop allows for flexible handling of events through the concept of observers and handlers.
+// An observer is a function that is able to view an event before it is handled.
+// Thus, there can be multiple observers for each event type.
+// A handler is a function that processes the event. There can only be one handler for each event type.
+//
+// The event loop also allows observers/handlers to run at two different times:
+//
+// 1. When an event is added (concurrent with the event loop).
+// 2. When an event has passed through the event queue.
+//
+// The former allows for concurrent handling of events, as multiple goroutines can be adding events concurrently,
+// which means that the observers or handlers can run concurrently.
+// The latter makes it possible to write handlers that will run on the same goroutine, one at a time.
 package eventloop
 
 import (
