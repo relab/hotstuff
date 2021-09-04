@@ -3,27 +3,79 @@ package twins
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 )
 
+type NodeID struct {
+	ReplicaID hotstuff.ID
+	NetworkID uint32
+}
+
 type Node struct {
-	NodeID  uint32
+	ID      NodeID
 	Modules *consensus.Modules
 }
 
 type Network struct {
-	Nodes map[uint32]*Node
+	Nodes map[NodeID]*Node
 	// Maps a replica ID to a replica and its twins.
 	Replicas map[hotstuff.ID][]*Node
 	// For each view (starting at 1), contains the list of partitions for that view.
-	ViewPartitions [][]nodeSet
+	Partitions [][]NodeSet
+
+	mut sync.Mutex
+	// The view in which the last timeout occurred for a node.
+	lastTimeouts map[NodeID]consensus.View
+	// hungNodes the set of nodes which have
+	hungNodes NodeSet
+
+	allHung chan struct{}
+}
+
+func NewNetwork(partitions [][]NodeSet) *Network {
+	return &Network{
+		Nodes:        make(map[NodeID]*Node),
+		Replicas:     make(map[hotstuff.ID][]*Node),
+		Partitions:   partitions,
+		lastTimeouts: make(map[NodeID]consensus.View),
+		hungNodes:    make(NodeSet),
+		allHung:      make(chan struct{}),
+	}
+}
+
+func (n *Network) WaitUntilHung() {
+	<-n.allHung
+}
+
+func (n *Network) timeout(node NodeID, view consensus.View) {
+	n.mut.Lock()
+	defer n.mut.Unlock()
+
+	lastTimeoutView, ok := n.lastTimeouts[node]
+
+	if ok && lastTimeoutView == view {
+		n.hungNodes.Add(node)
+		if len(n.hungNodes) == len(n.Nodes) {
+			close(n.allHung)
+		}
+		return
+	}
+
+	if lastTimeoutView > view {
+		// strange, but we'll ignore it
+		return
+	}
+
+	n.lastTimeouts[node] = view
+	delete(n.hungNodes, node)
 }
 
 // ShouldDrop decides if the sender should drop the message, based on the current view of the sender and the
 // partitions configured for that view.
-func (n *Network) ShouldDrop(sender, receiver uint32) bool {
+func (n *Network) ShouldDrop(sender, receiver NodeID) bool {
 	node, ok := n.Nodes[sender]
 	if !ok {
 		panic(fmt.Errorf("node matching sender id %d was not found", sender))
@@ -33,11 +85,11 @@ func (n *Network) ShouldDrop(sender, receiver uint32) bool {
 	i := int(node.Modules.Synchronizer().View() - 1)
 
 	// will default to dropping all messages from views that don't have any specified partitions.
-	if i >= len(n.ViewPartitions) {
+	if i >= len(n.Partitions) {
 		return true
 	}
 
-	partitions := n.ViewPartitions[i]
+	partitions := n.Partitions[i]
 	for _, partition := range partitions {
 		if partition.Contains(sender) && partition.Contains(receiver) {
 			return false
@@ -64,7 +116,7 @@ func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
 		panic(fmt.Errorf("attempt to send message to replica %d, but this replica does not exist", id))
 	}
 	for _, node := range nodes {
-		if c.shouldDrop(node.NodeID) {
+		if c.shouldDrop(node.ID) {
 			continue
 		}
 		node.Modules.EventLoop().AddEvent(message)
@@ -72,9 +124,9 @@ func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
 }
 
 // shouldDrop checks if a message to the node identified by id should be dropped.
-func (c *configuration) shouldDrop(id uint32) bool {
+func (c *configuration) shouldDrop(id NodeID) bool {
 	// retrieve the drop config for this node.
-	return c.network.ShouldDrop(c.node.NodeID, id)
+	return c.network.ShouldDrop(c.node.ID, id)
 }
 
 // Replicas returns all of the replicas in the configuration.
@@ -124,7 +176,7 @@ func (c *configuration) Timeout(msg consensus.TimeoutMsg) {
 func (c *configuration) Fetch(_ context.Context, hash consensus.Hash) (block *consensus.Block, ok bool) {
 	for _, replica := range c.network.Replicas {
 		for _, node := range replica {
-			if c.shouldDrop(node.NodeID) {
+			if c.shouldDrop(node.ID) {
 				continue
 			}
 			block, ok = node.Modules.BlockChain().LocalGet(hash)
@@ -145,12 +197,12 @@ type replica struct {
 
 // ID returns the replica's id.
 func (r *replica) ID() hotstuff.ID {
-	return r.config.node.Modules.ID()
+	return r.config.network.Replicas[r.id][0].ID.ReplicaID
 }
 
 // PublicKey returns the replica's public key.
 func (r *replica) PublicKey() consensus.PublicKey {
-	return r.config.node.Modules.PrivateKey().Public()
+	return r.config.network.Replicas[r.id][0].Modules.PrivateKey().Public()
 }
 
 // Vote sends the partial certificate to the other replica.
@@ -169,13 +221,13 @@ func (r *replica) NewView(si consensus.SyncInfo) {
 	})
 }
 
-type nodeSet map[uint32]struct{}
+type NodeSet map[NodeID]struct{}
 
-func (s nodeSet) Add(v uint32) {
+func (s NodeSet) Add(v NodeID) {
 	s[v] = struct{}{}
 }
 
-func (s nodeSet) Contains(v uint32) bool {
+func (s NodeSet) Contains(v NodeID) bool {
 	_, ok := s[v]
 	return ok
 }
