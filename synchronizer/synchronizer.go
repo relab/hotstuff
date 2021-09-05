@@ -91,6 +91,11 @@ func (s *Synchronizer) Start(ctx context.Context) {
 		<-ctx.Done()
 		s.timer.Stop()
 	}()
+
+	// start the initial proposal
+	if s.currentView == 1 && s.mods.LeaderRotation().GetLeader(s.currentView) == s.mods.ID() {
+		s.mods.Consensus().Propose(s.SyncInfo())
+	}
 }
 
 // HighQC returns the highest known QC.
