@@ -15,8 +15,9 @@ type NodeID struct {
 }
 
 type Node struct {
-	ID      NodeID
-	Modules *consensus.Modules
+	ID             NodeID
+	Modules        *consensus.Modules
+	ExecutedBlocks []*consensus.Block
 }
 
 type Network struct {
@@ -33,6 +34,7 @@ type Network struct {
 	hungNodes NodeSet
 
 	allHung chan struct{}
+	done    chan struct{}
 }
 
 func NewNetwork(partitions [][]NodeSet) *Network {
@@ -43,11 +45,28 @@ func NewNetwork(partitions [][]NodeSet) *Network {
 		lastTimeouts: make(map[NodeID]consensus.View),
 		hungNodes:    make(NodeSet),
 		allHung:      make(chan struct{}),
+		done:         make(chan struct{}),
+	}
+}
+
+func (n *Network) StartNodes(ctx context.Context) {
+	for _, node := range n.Nodes {
+		go func(node *Node) {
+			node.Modules.Synchronizer().Start(ctx)
+			node.Modules.Run(ctx)
+			n.done <- struct{}{}
+		}(node)
 	}
 }
 
 func (n *Network) WaitUntilHung() {
 	<-n.allHung
+}
+
+func (n *Network) WaitUntilDone() {
+	for range n.Nodes {
+		<-n.done
+	}
 }
 
 func (n *Network) timeout(node NodeID, view consensus.View) {
@@ -169,6 +188,7 @@ func (c *configuration) Propose(proposal consensus.ProposeMsg) {
 
 // Timeout sends the timeout message to all replicas.
 func (c *configuration) Timeout(msg consensus.TimeoutMsg) {
+	c.network.timeout(c.node.ID, msg.View)
 	c.broadcastMessage(msg)
 }
 
