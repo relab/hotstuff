@@ -23,11 +23,11 @@ type Modules struct {
 	commandQueue   CommandQueue
 	config         Configuration
 	consensus      Consensus
-	executor       Executor
+	executor       ExecutorExt
 	leaderRotation LeaderRotation
 	crypto         Crypto
 	synchronizer   Synchronizer
-	forkHandler    ForkHandler
+	forkHandler    ForkHandlerExt
 }
 
 // Run starts both event loops using the provided context and returns when both event loops have exited.
@@ -93,7 +93,7 @@ func (mods *Modules) Consensus() Consensus {
 }
 
 // Executor returns the executor.
-func (mods *Modules) Executor() Executor {
+func (mods *Modules) Executor() ExecutorExt {
 	return mods.executor
 }
 
@@ -113,7 +113,7 @@ func (mods *Modules) Synchronizer() Synchronizer {
 }
 
 // ForkHandler returns the module responsible for handling forked blocks.
-func (mods *Modules) ForkHandler() ForkHandler {
+func (mods *Modules) ForkHandler() ForkHandlerExt {
 	return mods.forkHandler
 }
 
@@ -163,8 +163,11 @@ func (b *Builder) Register(mods ...interface{}) {
 		if m, ok := module.(Consensus); ok {
 			b.mods.consensus = m
 		}
-		if m, ok := module.(Executor); ok {
+		if m, ok := module.(ExecutorExt); ok {
 			b.mods.executor = m
+		}
+		if m, ok := module.(Executor); ok {
+			b.mods.executor = executorWrapper{m}
 		}
 		if m, ok := module.(LeaderRotation); ok {
 			b.mods.leaderRotation = m
@@ -175,8 +178,11 @@ func (b *Builder) Register(mods ...interface{}) {
 		if m, ok := module.(Synchronizer); ok {
 			b.mods.synchronizer = m
 		}
-		if m, ok := module.(ForkHandler); ok {
+		if m, ok := module.(ForkHandlerExt); ok {
 			b.mods.forkHandler = m
+		}
+		if m, ok := module.(ForkHandler); ok {
+			b.mods.forkHandler = forkHandlerWrapper{m}
 		}
 		if m, ok := module.(Module); ok {
 			b.modules = append(b.modules, m)
@@ -228,15 +234,33 @@ type Acceptor interface {
 
 // Executor is responsible for executing the commands that are committed by the consensus protocol.
 type Executor interface {
-	// Exec executes the given command.
-	Exec(Command)
+	// Exec executes the command.
+	Exec(cmd Command)
+}
+
+// ExecutorExt is responsible for executing the commands that are committed by the consensus protocol.
+//
+// This interface is similar to the Executor interface, except it takes a block as an argument, instead of a command,
+// making it more flexible than the alternative interface.
+type ExecutorExt interface {
+	// Exec executes the command in the block.
+	Exec(block *Block)
 }
 
 // ForkHandler handles commands that do not get committed due to a forked blockchain.
 //
 // TODO: think of a better name/interface
 type ForkHandler interface {
-	Fork(Command)
+	// Fork handles the command from a forked block.
+	Fork(cmd Command)
+}
+
+// ForkHandlerExt handles blocks that do not get committed due to a fork of the blockchain.
+//
+// This interface is similar to the ForkHandler interface, except it takes a block as an argument, instead of a command.
+type ForkHandlerExt interface {
+	// Fork handles the forked block.
+	Fork(block *Block)
 }
 
 // CryptoImpl implements only the cryptographic primitives that are needed for HotStuff.
@@ -375,4 +399,20 @@ type Synchronizer interface {
 	LeafBlock() *Block
 	// Start starts the synchronizer with the given context.
 	Start(context.Context)
+}
+
+type executorWrapper struct {
+	executor Executor
+}
+
+func (ew executorWrapper) Exec(block *Block) {
+	ew.executor.Exec(block.cmd)
+}
+
+type forkHandlerWrapper struct {
+	forkHandler ForkHandler
+}
+
+func (fhw forkHandlerWrapper) Fork(block *Block) {
+	fhw.forkHandler.Fork(block.cmd)
 }

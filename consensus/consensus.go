@@ -207,7 +207,7 @@ func (cs *consensusBase) commit(block *Block) {
 	// prune the blockchain and handle forked blocks
 	forkedBlocks := cs.mods.BlockChain().PruneToHeight(block.View())
 	for _, block := range forkedBlocks {
-		cs.mods.ForkHandler().Fork(block.Command())
+		cs.mods.ForkHandler().Fork(block)
 	}
 }
 
@@ -218,7 +218,7 @@ func (cs *consensusBase) commitInner(block *Block) {
 			cs.commitInner(parent)
 		}
 		cs.mods.Logger().Debug("EXEC: ", block)
-		cs.mods.Executor().Exec(block.Command())
+		cs.mods.Executor().Exec(block)
 		cs.bExec = block
 	}
 }
