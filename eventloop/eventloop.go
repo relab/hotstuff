@@ -4,15 +4,6 @@
 // An observer is a function that is able to view an event before it is handled.
 // Thus, there can be multiple observers for each event type.
 // A handler is a function that processes the event. There can only be one handler for each event type.
-//
-// The event loop also allows observers/handlers to run at two different times:
-//
-// 1. When an event is added (concurrent with the event loop).
-// 2. When an event has passed through the event queue.
-//
-// The former allows for concurrent handling of events, as multiple goroutines can be adding events concurrently,
-// which means that the observers or handlers can run concurrently.
-// The latter makes it possible to write handlers that will run on the same goroutine, one at a time.
 package eventloop
 
 import (
@@ -24,11 +15,6 @@ import (
 
 // EventHandler processes an event.
 type EventHandler func(event interface{})
-
-type handlerDesc struct {
-	async  bool
-	handle EventHandler
-}
 
 // EventLoop accepts events of any type and executes relevant event handlers.
 // It supports registering both observers and handlers based on the type of event that they accept.
@@ -42,8 +28,8 @@ type EventLoop struct {
 	eventQ        chan interface{}
 	waitingEvents map[interface{}][]interface{}
 
-	handlers  map[reflect.Type]handlerDesc
-	observers map[reflect.Type][]handlerDesc
+	handlers  map[reflect.Type]EventHandler
+	observers map[reflect.Type][]EventHandler
 
 	tickers  map[int]*ticker
 	tickerID int
@@ -54,8 +40,8 @@ func New(bufferSize uint) *EventLoop {
 	el := &EventLoop{
 		eventQ:        make(chan interface{}, bufferSize),
 		waitingEvents: make(map[interface{}][]interface{}),
-		handlers:      make(map[reflect.Type]handlerDesc),
-		observers:     make(map[reflect.Type][]handlerDesc),
+		handlers:      make(map[reflect.Type]EventHandler),
+		observers:     make(map[reflect.Type][]EventHandler),
 		tickers:       make(map[int]*ticker),
 	}
 	return el
@@ -64,62 +50,22 @@ func New(bufferSize uint) *EventLoop {
 // RegisterHandler registers a handler for events with the same type as the 'eventType' argument.
 // The handler is executed synchronously. There can be only one handler per event type.
 func (el *EventLoop) RegisterHandler(eventType interface{}, handler EventHandler) {
-	el.handlers[reflect.TypeOf(eventType)] = handlerDesc{
-		async:  false,
-		handle: handler,
-	}
-}
-
-// RegisterAsyncHandler registers a handler for events with the same type as the 'eventType' argument.
-// The handler is executed asynchronously, immediately after a new event arrives.
-// The handler consumes the event, which means that it will not be observed by synchronous observers.
-// There can be only one handler per event type.
-func (el *EventLoop) RegisterAsyncHandler(eventType interface{}, handler EventHandler) {
-	el.handlers[reflect.TypeOf(eventType)] = handlerDesc{
-		async:  true,
-		handle: handler,
-	}
+	el.handlers[reflect.TypeOf(eventType)] = handler
 }
 
 // RegisterObserver registers an observer for events with the same type as the 'eventType' argument.
 // The observer is executed synchronously before any registered handler.
 func (el *EventLoop) RegisterObserver(eventType interface{}, observer EventHandler) {
 	t := reflect.TypeOf(eventType)
-	el.observers[t] = append(el.observers[t], handlerDesc{
-		async:  false,
-		handle: observer,
-	})
-}
-
-// RegisterAsyncObserver registers an observer for events with the same type as the 'eventType' argument.
-// The observer is executed asynchronously before any registered handler.
-func (el *EventLoop) RegisterAsyncObserver(eventType interface{}, observer EventHandler) {
-	t := reflect.TypeOf(eventType)
-	el.observers[t] = append(el.observers[t], handlerDesc{
-		async:  true,
-		handle: observer,
-	})
+	el.observers[t] = append(el.observers[t], observer)
 }
 
 // AddEvent adds an event to the event queue.
 //
-// The event may be processed or consumed by an async handler before it enters the queue.
 // It is not safe to call this function from the the event loop goroutine.
 // If you need to send add an event from a handler, use a goroutine:
 //  go EventLoop.AddEvent(...)
 func (el *EventLoop) AddEvent(event interface{}) {
-	t := reflect.TypeOf(event)
-	// run async observers
-	for _, observer := range el.observers[t] {
-		if observer.async {
-			observer.handle(event)
-		}
-	}
-	// run async handler
-	if handler, ok := el.handlers[t]; ok && handler.async {
-		handler.handle(event)
-		return
-	}
 	el.eventQ <- event
 }
 
@@ -158,13 +104,11 @@ func (el *EventLoop) processEvent(event interface{}) {
 
 	// run observers
 	for _, observer := range el.observers[t] {
-		if !observer.async {
-			observer.handle(event)
-		}
+		observer(event)
 	}
 
-	if handler, ok := el.handlers[t]; ok && !handler.async {
-		handler.handle(event)
+	if handler, ok := el.handlers[t]; ok {
+		handler(event)
 	}
 }
 
