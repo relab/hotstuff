@@ -2,6 +2,7 @@ package twins
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"sync"
 
@@ -11,10 +12,12 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
+// Scenario specifies the nodes, partitions and leaders for a twins scenario.
 type Scenario struct {
 	Replicas      []hotstuff.ID
 	Leaders       []hotstuff.ID
@@ -26,8 +29,9 @@ type Scenario struct {
 	ViewTimeout   float64
 }
 
+// ExecuteScenario executes a twins scenario.
 func ExecuteScenario(scenario Scenario) (safe bool, commits int, err error) {
-	network := NewNetwork(scenario.Partitions)
+	network := newNetwork(scenario.Partitions)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -37,10 +41,10 @@ func ExecuteScenario(scenario Scenario) (safe bool, commits int, err error) {
 		return false, 0, err
 	}
 
-	network.StartNodes(ctx)
-	network.WaitUntilHung()
+	network.startNodes(ctx)
+	network.waitUntilHung()
 	cancel()
-	network.WaitUntilDone()
+	network.waitUntilDone()
 
 	// check if the majority of replicas have committed the same blocks
 	// TODO
@@ -49,7 +53,7 @@ func ExecuteScenario(scenario Scenario) (safe bool, commits int, err error) {
 	return safe, commits, nil
 }
 
-func createNodes(scenario Scenario, network *Network) error {
+func createNodes(scenario Scenario, network *network) error {
 	cg := &commandGenerator{}
 	keys := make(map[hotstuff.ID]consensus.PrivateKey)
 	for _, nodeID := range scenario.Nodes {
@@ -62,30 +66,31 @@ func createNodes(scenario Scenario, network *Network) error {
 			}
 			keys[nodeID.ReplicaID] = pk
 		}
-		node := Node{
+		n := node{
 			ID: nodeID,
 		}
 		builder := consensus.NewBuilder(nodeID.ReplicaID, pk)
 		builder.Register(
+			logging.New(fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			blockchain.New(),
 			scenario.ConsensusCtor(),
 			crypto.NewCache(ecdsa.New(), 100),
 			synchronizer.New(testutil.FixedTimeout(scenario.ViewTimeout)),
 			&configuration{
-				node:    &node,
+				node:    &n,
 				network: network,
 			},
 			leaderRotation(scenario.Leaders),
-			commandModule{commandGenerator: cg, node: &node},
+			commandModule{commandGenerator: cg, node: &n},
 		)
-		node.Modules = builder.Build()
-		network.Nodes[nodeID] = &node
-		network.Replicas[nodeID.ReplicaID] = append(network.Replicas[nodeID.ReplicaID], &node)
+		n.Modules = builder.Build()
+		network.Nodes[nodeID] = &n
+		network.Replicas[nodeID.ReplicaID] = append(network.Replicas[nodeID.ReplicaID], &n)
 	}
 	return nil
 }
 
-func checkCommits(network *Network) (safe bool, commits int) {
+func checkCommits(network *network) (safe bool, commits int) {
 	i := 0
 	for {
 		noCommits := true
@@ -101,15 +106,16 @@ func checkCommits(network *Network) (safe bool, commits int) {
 			commitCount[replica[0].ExecutedBlocks[i].Hash()]++
 			noCommits = false
 		}
+
+		if noCommits {
+			break
+		}
+
 		// if all correct replicas have executed the same blocks, then there should be only one entry in commitCount
 		// the number of replicas that committed the block could be smaller, if some correct replicas happened to
 		// be in a different partition at the time when the test ended.
 		if len(commitCount) != 1 {
 			return false, i
-		}
-
-		if noCommits {
-			break
 		}
 
 		i++
@@ -145,7 +151,7 @@ func (cg *commandGenerator) next() consensus.Command {
 
 type commandModule struct {
 	commandGenerator *commandGenerator
-	node             *Node
+	node             *node
 }
 
 // Accept returns true if the replica should accept the command, false otherwise.

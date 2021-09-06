@@ -9,21 +9,25 @@ import (
 	"github.com/relab/hotstuff/consensus"
 )
 
+// NodeID is an ID that is unique to a node in the network.
+// The ReplicaID is the ID that the node uses when taking part in the consensus protocol,
+// while the NetworkID is used to distinguish nodes on the network.
 type NodeID struct {
 	ReplicaID hotstuff.ID
 	NetworkID uint32
 }
 
-type Node struct {
+type node struct {
 	ID             NodeID
 	Modules        *consensus.Modules
 	ExecutedBlocks []*consensus.Block
 }
 
-type Network struct {
-	Nodes map[NodeID]*Node
+// Network is a simulated network that supports twins.
+type network struct {
+	Nodes map[NodeID]*node
 	// Maps a replica ID to a replica and its twins.
-	Replicas map[hotstuff.ID][]*Node
+	Replicas map[hotstuff.ID][]*node
 	// For each view (starting at 1), contains the list of partitions for that view.
 	Partitions [][]NodeSet
 
@@ -33,14 +37,17 @@ type Network struct {
 	// hungNodes the set of nodes which have
 	hungNodes NodeSet
 
-	allHung chan struct{}
-	done    chan struct{}
+	allHung       chan struct{}
+	allHungClosed bool
+	done          chan struct{}
 }
 
-func NewNetwork(partitions [][]NodeSet) *Network {
-	return &Network{
-		Nodes:        make(map[NodeID]*Node),
-		Replicas:     make(map[hotstuff.ID][]*Node),
+// newNetwork creates a new Network with the specified partitions.
+// partitions specifies the network partitions for each view.
+func newNetwork(partitions [][]NodeSet) *network {
+	return &network{
+		Nodes:        make(map[NodeID]*node),
+		Replicas:     make(map[hotstuff.ID][]*node),
 		Partitions:   partitions,
 		lastTimeouts: make(map[NodeID]consensus.View),
 		hungNodes:    make(NodeSet),
@@ -49,27 +56,28 @@ func NewNetwork(partitions [][]NodeSet) *Network {
 	}
 }
 
-func (n *Network) StartNodes(ctx context.Context) {
-	for _, node := range n.Nodes {
-		go func(node *Node) {
-			node.Modules.Synchronizer().Start(ctx)
-			node.Modules.Run(ctx)
+// startNodes starts all nodes.
+func (n *network) startNodes(ctx context.Context) {
+	for _, no := range n.Nodes {
+		go func(no *node) {
+			no.Modules.Synchronizer().Start(ctx)
+			no.Modules.Run(ctx)
 			n.done <- struct{}{}
-		}(node)
+		}(no)
 	}
 }
 
-func (n *Network) WaitUntilHung() {
+func (n *network) waitUntilHung() {
 	<-n.allHung
 }
 
-func (n *Network) WaitUntilDone() {
+func (n *network) waitUntilDone() {
 	for range n.Nodes {
 		<-n.done
 	}
 }
 
-func (n *Network) timeout(node NodeID, view consensus.View) {
+func (n *network) timeout(node NodeID, view consensus.View) {
 	n.mut.Lock()
 	defer n.mut.Unlock()
 
@@ -77,7 +85,8 @@ func (n *Network) timeout(node NodeID, view consensus.View) {
 
 	if ok && lastTimeoutView == view {
 		n.hungNodes.Add(node)
-		if len(n.hungNodes) == len(n.Nodes) {
+		if len(n.hungNodes) == len(n.Nodes) && !n.allHungClosed {
+			n.allHungClosed = true
 			close(n.allHung)
 		}
 		return
@@ -92,9 +101,9 @@ func (n *Network) timeout(node NodeID, view consensus.View) {
 	delete(n.hungNodes, node)
 }
 
-// ShouldDrop decides if the sender should drop the message, based on the current view of the sender and the
+// shouldDrop decides if the sender should drop the message, based on the current view of the sender and the
 // partitions configured for that view.
-func (n *Network) ShouldDrop(sender, receiver NodeID) bool {
+func (n *network) shouldDrop(sender, receiver NodeID) bool {
 	node, ok := n.Nodes[sender]
 	if !ok {
 		panic(fmt.Errorf("node matching sender id %d was not found", sender))
@@ -119,12 +128,16 @@ func (n *Network) ShouldDrop(sender, receiver NodeID) bool {
 }
 
 type configuration struct {
-	node    *Node
-	network *Network
+	node    *node
+	network *network
 }
 
 func (c *configuration) broadcastMessage(message interface{}) {
 	for id := range c.network.Replicas {
+		if id == c.node.ID.ReplicaID {
+			// do not send message to self or twin
+			continue
+		}
 		c.sendMessage(id, message)
 	}
 }
@@ -145,7 +158,7 @@ func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
 // shouldDrop checks if a message to the node identified by id should be dropped.
 func (c *configuration) shouldDrop(id NodeID) bool {
 	// retrieve the drop config for this node.
-	return c.network.ShouldDrop(c.node.ID, id)
+	return c.network.shouldDrop(c.node.ID, id)
 }
 
 // Replicas returns all of the replicas in the configuration.
@@ -241,12 +254,15 @@ func (r *replica) NewView(si consensus.SyncInfo) {
 	})
 }
 
+// NodeSet is a set of NodeIDs.
 type NodeSet map[NodeID]struct{}
 
+// Add adds a NodeID to the set.
 func (s NodeSet) Add(v NodeID) {
 	s[v] = struct{}{}
 }
 
+// Contains returns true if the set contains the NodeID, false otherwise.
 func (s NodeSet) Contains(v NodeID) bool {
 	_, ok := s[v]
 	return ok
