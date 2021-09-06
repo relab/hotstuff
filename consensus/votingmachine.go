@@ -22,10 +22,7 @@ func NewVotingMachine() *VotingMachine {
 // It also allows the module to set module options using the OptionsBuilder.
 func (vm *VotingMachine) InitConsensusModule(mods *Modules, _ *OptionsBuilder) {
 	vm.mods = mods
-	vm.mods.EventLoop().RegisterAsyncHandler(VoteMsg{}, func(event interface{}) {
-		vote := event.(VoteMsg)
-		go vm.OnVote(vote)
-	})
+	vm.mods.EventLoop().RegisterHandler(VoteMsg{}, func(event interface{}) { vm.OnVote(event.(VoteMsg)) })
 }
 
 // OnVote handles an incoming vote.
@@ -63,6 +60,10 @@ func (vm *VotingMachine) OnVote(vote VoteMsg) {
 		return
 	}
 
+	go vm.verifyCert(cert, block)
+}
+
+func (vm *VotingMachine) verifyCert(cert PartialCert, block *Block) {
 	if !vm.mods.Crypto().VerifyPartialCert(cert) {
 		vm.mods.Logger().Info("OnVote: Vote could not be verified!")
 		return
