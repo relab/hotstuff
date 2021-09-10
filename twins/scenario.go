@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/relab/hotstuff"
@@ -24,9 +25,25 @@ type Scenario struct {
 	Nodes         []NodeID
 	Partitions    [][]NodeSet
 	Rounds        int
-	Byzantine     int
 	ConsensusCtor func() consensus.Consensus
 	ViewTimeout   float64
+}
+
+func (s Scenario) String() string {
+	var sb strings.Builder
+	for i := 0; i < s.Rounds; i++ {
+		sb.WriteString(fmt.Sprintf("leader: %d, partitions: ", s.Leaders[i]))
+		for _, partition := range s.Partitions[i] {
+			sb.WriteString("[ ")
+			for id := range partition {
+				sb.WriteString(fmt.Sprint(id))
+				sb.WriteString(" ")
+			}
+			sb.WriteString("] ")
+		}
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 // ExecuteScenario executes a twins scenario.

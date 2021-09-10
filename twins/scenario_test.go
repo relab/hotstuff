@@ -18,8 +18,7 @@ func TestBasicScenario(t *testing.T) {
 			{3, 3},
 			{4, 4},
 		},
-		Rounds:    4,
-		Byzantine: 0,
+		Rounds: 4,
 		ConsensusCtor: func() consensus.Consensus {
 			return consensus.New(chainedhotstuff.New())
 		},
