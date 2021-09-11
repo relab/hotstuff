@@ -16,6 +16,7 @@ type leaderPartitions struct {
 type Generator struct {
 	rounds            uint8
 	indices           []int
+	offsets           []int
 	partitions        int
 	leadersPartitions []leaderPartitions
 	consensusCtor     func() consensus.Consensus
@@ -32,6 +33,7 @@ func NewGenerator(replicas, twins, partitions, rounds uint8, consensus func() co
 		rounds:        rounds,
 		partitions:    int(partitions),
 		indices:       make([]int, rounds),
+		offsets:       make([]int, rounds),
 		replicas:      make([]hotstuff.ID, 0, replicas),
 		nodes:         make([]NodeID, 0, replicas+twins),
 		consensusCtor: consensus,
@@ -75,14 +77,22 @@ func (g *Generator) Shuffle() {
 	rand.Shuffle(len(g.leadersPartitions), func(i, j int) {
 		g.leadersPartitions[i], g.leadersPartitions[j] = g.leadersPartitions[j], g.leadersPartitions[i]
 	})
+	for i := range g.offsets {
+		g.offsets[i] = rand.Intn(len(g.leadersPartitions))
+	}
 }
 
 // NextScenario generates the next scenario.
 func (g *Generator) NextScenario() (s Scenario, ok bool) {
 	// This is basically computing the cartesian product of leadersPartitions with itself "round" times.
 	p := make([]leaderPartitions, g.rounds)
+again:
 	for i, ii := range g.indices {
-		p[i] = g.leadersPartitions[ii]
+		index := ii + g.offsets[i]
+		if index >= len(g.leadersPartitions) {
+			index -= len(g.leadersPartitions)
+		}
+		p[i] = g.leadersPartitions[index]
 	}
 	for i := int(g.rounds) - 1; i >= 0; i-- {
 		g.indices[i]++
@@ -102,6 +112,9 @@ func (g *Generator) NextScenario() (s Scenario, ok bool) {
 		ConsensusCtor: g.consensusCtor,
 		ViewTimeout:   10,
 	}
+
+	majorityPartitions := 0
+
 	for _, partition := range p {
 		s.Leaders = append(s.Leaders, g.replicas[partition.leader])
 		partitions := make([]NodeSet, g.partitions)
@@ -111,8 +124,20 @@ func (g *Generator) NextScenario() (s Scenario, ok bool) {
 			}
 			partitions[partitionNo].Add(g.nodes[i])
 		}
+		// detect whether any partition has a majority of the nodes.
+		for _, partition := range partitions {
+			if len(partition) >= hotstuff.QuorumSize(len(g.replicas)) {
+				majorityPartitions++
+			}
+		}
 		s.Partitions = append(s.Partitions, partitions)
 	}
+
+	// require scenarios to have several rounds with large enough paritions.
+	if majorityPartitions < int(g.rounds)/2 {
+		goto again
+	}
+
 	return s, true
 }
 
@@ -122,9 +147,10 @@ func (g *Generator) NextScenario() (s Scenario, ok bool) {
 // algorithm based on:
 // https://stackoverflow.com/questions/30893292/generate-all-partitions-of-a-set
 type partGen struct {
-	p []uint8
-	m []uint8
-	k uint8
+	p    []uint8
+	m    []uint8
+	k    uint8
+	done bool
 }
 
 func newPartGen(n, k uint8) partGen {
@@ -150,7 +176,12 @@ func (g *partGen) nextPartitions() (partitionNumbers []uint8) {
 	}
 
 	if !found {
-		return nil
+		if g.done {
+			return nil
+		} else {
+			// return the last value one time
+			g.done = true
+		}
 	}
 
 	// copy and return new state
