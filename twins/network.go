@@ -7,6 +7,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/synchronizer"
 )
 
 // NodeID is an ID that is unique to a node in the network.
@@ -59,6 +60,12 @@ func newNetwork(partitions [][]NodeSet) *network {
 // startNodes starts all nodes.
 func (n *network) startNodes(ctx context.Context) {
 	for _, no := range n.Nodes {
+		no.Modules.EventLoop().RegisterObserver(synchronizer.ViewChangeEvent{}, func(event interface{}) {
+			// we clear the "hung" status whenever a view change happens
+			n.mut.Lock()
+			delete(n.hungNodes, no.ID)
+			n.mut.Unlock()
+		})
 		go func(no *node) {
 			no.Modules.Synchronizer().Start(ctx)
 			no.Modules.Run(ctx)
