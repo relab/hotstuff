@@ -87,7 +87,6 @@ func (g *Generator) Shuffle() {
 func (g *Generator) NextScenario() (s Scenario, ok bool) {
 	// This is basically computing the cartesian product of leadersPartitions with itself "round" times.
 	p := make([]leaderPartitions, g.rounds)
-again:
 	for i, ii := range g.indices {
 		index := ii + g.offsets[i]
 		if index >= len(g.leadersPartitions) {
@@ -111,10 +110,8 @@ again:
 		Nodes:         g.nodes,
 		Rounds:        int(g.rounds),
 		ConsensusCtor: g.consensusCtor,
-		ViewTimeout:   10,
+		ViewTimeout:   5,
 	}
-
-	majorityPartitions := 0
 
 	for _, partition := range p {
 		s.Leaders = append(s.Leaders, g.replicas[partition.leader])
@@ -125,18 +122,7 @@ again:
 			}
 			partitions[partitionNo].Add(g.nodes[i])
 		}
-		// detect whether any partition has a majority of the nodes.
-		for _, partition := range partitions {
-			if len(partition) >= hotstuff.QuorumSize(len(g.replicas)) {
-				majorityPartitions++
-			}
-		}
 		s.Partitions = append(s.Partitions, partitions)
-	}
-
-	// require scenarios to have several rounds with large enough paritions.
-	if majorityPartitions < int(g.rounds)/2 {
-		goto again
 	}
 
 	return s, true
@@ -163,6 +149,7 @@ func newPartGen(n, k uint8) partGen {
 }
 
 func (g *partGen) nextPartitions() (partitionNumbers []uint8) {
+start:
 	found := false
 	// calculate next state
 	for i := len(g.p) - 1; i >= 0; i-- {
@@ -179,10 +166,25 @@ func (g *partGen) nextPartitions() (partitionNumbers []uint8) {
 	if !found {
 		if g.done {
 			return nil
-		} else {
-			// return the last value one time
-			g.done = true
 		}
+		// return the last value one time
+		g.done = true
+	}
+
+	partitionSizes := make(map[uint8]uint8)
+	for _, partitionNumber := range g.p {
+		partitionSizes[partitionNumber]++
+	}
+
+	majority := false
+	for _, partitionSize := range partitionSizes {
+		majority = partitionSize >= uint8(hotstuff.QuorumSize(len(g.p)))
+	}
+
+	// if there is no partition with at least 2f+1 nodes, the synchronizer will not be able to advance,
+	// and thus there is no point in generating these scenarios.
+	if !majority {
+		goto start
 	}
 
 	// copy and return new state

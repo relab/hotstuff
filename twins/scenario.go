@@ -64,7 +64,6 @@ func ExecuteScenario(scenario Scenario) (safe bool, commits int, err error) {
 	network.waitUntilDone()
 
 	// check if the majority of replicas have committed the same blocks
-	// TODO
 	safe, commits = checkCommits(network)
 
 	return safe, commits, nil
