@@ -64,6 +64,7 @@ func NewGenerator(replicas, twins, partitions, rounds uint8, consensus func() co
 				ReplicaID: replicaID,
 				NetworkID: networkID,
 			})
+			remainingTwins--
 			networkID++
 		}
 		replicaID++
