@@ -22,6 +22,8 @@ It also provides a tool for deploying and running experiments on multiple server
 
 ## Running Experiments
 
+See the [experimentation documentation](docs/experimentation.md) for details.
+
 The `hotstuff` command line utility can be used to run experiments locally, or on remote servers using SSH.
 For a list of options, run `./hotstuff help run`.
 
