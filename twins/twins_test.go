@@ -2,6 +2,7 @@ package twins_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/chainedhotstuff"
@@ -9,12 +10,15 @@ import (
 )
 
 func TestTwins(t *testing.T) {
-	g := twins.NewGenerator(4, 1, 2, 8, func() consensus.Consensus {
+	g := twins.NewGenerator(4, 1, 2, 30, 10*time.Millisecond, func() consensus.Consensus {
 		return consensus.New(chainedhotstuff.New())
 	})
-	g.Shuffle()
+	g.Shuffle(time.Now().Unix())
 
-	for i := 0; i < 100; i++ {
+	scenarios := 1
+	totalCommits := 0
+
+	for i := 0; i < scenarios; i++ {
 		s, ok := g.NextScenario()
 		if !ok {
 			break
@@ -23,13 +27,16 @@ func TestTwins(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		t.Log(safe, commits)
+		t.Log(s)
 		if !safe {
 			t.Logf("Scenario not safe: %v", s)
 			continue
 		}
 		if commits > 0 {
-			t.Logf("Scenario did commit: %v", s)
-			continue
+			totalCommits += commits
 		}
 	}
+
+	t.Logf("Average %f commits per scenario.", float64(totalCommits)/float64(scenarios))
 }

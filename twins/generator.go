@@ -2,6 +2,7 @@ package twins
 
 import (
 	"math/rand"
+	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
@@ -20,13 +21,14 @@ type Generator struct {
 	partitions        int
 	leadersPartitions []leaderPartitions
 	consensusCtor     func() consensus.Consensus
+	viewTimeout       time.Duration
 
 	replicas []hotstuff.ID
 	nodes    []NodeID
 }
 
 // NewGenerator creates a new generator.
-func NewGenerator(replicas, twins, partitions, rounds uint8, consensus func() consensus.Consensus) *Generator {
+func NewGenerator(replicas, twins, partitions, rounds uint8, viewTimeout time.Duration, consensus func() consensus.Consensus) *Generator {
 	pg := newPartGen(replicas+twins, partitions)
 
 	g := &Generator{
@@ -37,6 +39,7 @@ func NewGenerator(replicas, twins, partitions, rounds uint8, consensus func() co
 		replicas:      make([]hotstuff.ID, 0, replicas),
 		nodes:         make([]NodeID, 0, replicas+twins),
 		consensusCtor: consensus,
+		viewTimeout:   viewTimeout,
 	}
 
 	for p := pg.nextPartitions(); p != nil; p = pg.nextPartitions() {
@@ -74,12 +77,13 @@ func NewGenerator(replicas, twins, partitions, rounds uint8, consensus func() co
 }
 
 // Shuffle shuffles the list of leaders and partitions.
-func (g *Generator) Shuffle() {
-	rand.Shuffle(len(g.leadersPartitions), func(i, j int) {
+func (g *Generator) Shuffle(seed int64) {
+	r := rand.New(rand.NewSource(seed))
+	r.Shuffle(len(g.leadersPartitions), func(i, j int) {
 		g.leadersPartitions[i], g.leadersPartitions[j] = g.leadersPartitions[j], g.leadersPartitions[i]
 	})
 	for i := range g.offsets {
-		g.offsets[i] = rand.Intn(len(g.leadersPartitions))
+		g.offsets[i] = r.Intn(len(g.leadersPartitions))
 	}
 }
 
@@ -110,7 +114,7 @@ func (g *Generator) NextScenario() (s Scenario, ok bool) {
 		Nodes:         g.nodes,
 		Rounds:        int(g.rounds),
 		ConsensusCtor: g.consensusCtor,
-		ViewTimeout:   5,
+		ViewTimeout:   g.viewTimeout,
 	}
 
 	for _, partition := range p {

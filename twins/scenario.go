@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
@@ -26,7 +27,7 @@ type Scenario struct {
 	Partitions    [][]NodeSet
 	Rounds        int
 	ConsensusCtor func() consensus.Consensus
-	ViewTimeout   float64
+	ViewTimeout   time.Duration
 }
 
 func (s Scenario) String() string {

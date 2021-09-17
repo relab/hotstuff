@@ -348,8 +348,8 @@ func NewLeaderRotation(t *testing.T, order ...hotstuff.ID) consensus.LeaderRotat
 }
 
 // FixedTimeout returns an ExponentialTimeout with a max exponent of 0.
-func FixedTimeout(timeout float64) synchronizer.ViewDuration {
-	return fixedDuration{time.Duration(timeout * float64(time.Millisecond))}
+func FixedTimeout(timeout time.Duration) synchronizer.ViewDuration {
+	return fixedDuration{timeout}
 }
 
 type fixedDuration struct {
