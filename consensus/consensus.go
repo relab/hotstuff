@@ -129,11 +129,6 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 		return
 	}
 
-	if block.View() <= cs.lastVote {
-		cs.mods.Logger().Info("OnPropose: block view too old")
-		return
-	}
-
 	if cs.mods.Options().ShouldUseAggQC() && proposal.AggregateQC != nil {
 		ok, highQC := cs.mods.Crypto().VerifyAggregateQC(*proposal.AggregateQC)
 		if !ok {
@@ -165,7 +160,22 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 		return
 	}
 
+	// block is safe and was accepted
 	cs.mods.BlockChain().Store(block)
+
+	// we defer the following in order to speed up voting
+	defer func() {
+		cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
+
+		if b := cs.impl.CommitRule(block); b != nil {
+			cs.commit(b)
+		}
+	}()
+
+	if block.View() <= cs.lastVote {
+		cs.mods.Logger().Info("OnPropose: block view too old")
+		return
+	}
 
 	pc, err := cs.mods.Crypto().CreatePartialCert(block)
 	if err != nil {
@@ -174,14 +184,6 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 	}
 
 	cs.lastVote = block.View()
-
-	defer func() {
-		if b := cs.impl.CommitRule(block); b != nil {
-			cs.commit(b)
-		}
-	}()
-
-	defer cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
 
 	leaderID := cs.mods.LeaderRotation().GetLeader(cs.lastVote + 1)
 	if leaderID == cs.mods.ID() {

@@ -101,7 +101,7 @@ func (vm *VotingMachine) verifyCert(cert PartialCert, block *Block) {
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
 
-	// signal the synchronizer
-	// because votes are handled asynchronously, we can safely use AddEvent without starting a goroutine.
+	// Signal the synchronizer. We cannot simply call AdvanceView because it is not guaranteed to be thread safe.
+	// However, because votes are handled asynchronously, we can safely use AddEvent without starting a goroutine.
 	vm.mods.EventLoop().AddEvent(NewViewMsg{ID: vm.mods.ID(), SyncInfo: NewSyncInfo().WithQC(qc)})
 }

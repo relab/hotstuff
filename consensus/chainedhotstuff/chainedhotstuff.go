@@ -36,13 +36,13 @@ func (hs *ChainedHotStuff) qcRef(qc consensus.QuorumCert) (*consensus.Block, boo
 
 // CommitRule decides whether an ancestor of the block should be committed.
 func (hs *ChainedHotStuff) CommitRule(block *consensus.Block) *consensus.Block {
-	hs.mods.Synchronizer().UpdateHighQC(block.QuorumCert())
-
 	block1, ok := hs.qcRef(block.QuorumCert())
 	if !ok {
 		return nil
 	}
 
+	// Note that we do not call UpdateHighQC here.
+	// This is done through AdvanceView, which the Consensus implementation will call.
 	hs.mods.Logger().Debug("PRE_COMMIT: ", block1)
 
 	block2, ok := hs.qcRef(block1.QuorumCert())
