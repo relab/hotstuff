@@ -391,8 +391,6 @@ type Synchronizer interface {
 	View() View
 	// ViewContext returns a context that is cancelled at the end of the view.
 	ViewContext() context.Context
-	// UpdateHighQC updates the highest known QC.
-	UpdateHighQC(QuorumCert)
 	// HighQC returns the highest known QC.
 	HighQC() QuorumCert
 	// LeafBlock returns the current leaf block.
