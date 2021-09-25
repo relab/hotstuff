@@ -26,7 +26,7 @@ type EventLoop struct {
 	mut sync.Mutex
 
 	eventQ        chan interface{}
-	waitingEvents map[interface{}][]interface{}
+	waitingEvents map[reflect.Type][]interface{}
 
 	handlers  map[reflect.Type]EventHandler
 	observers map[reflect.Type][]EventHandler
@@ -39,7 +39,7 @@ type EventLoop struct {
 func New(bufferSize uint) *EventLoop {
 	el := &EventLoop{
 		eventQ:        make(chan interface{}, bufferSize),
-		waitingEvents: make(map[interface{}][]interface{}),
+		waitingEvents: make(map[reflect.Type][]interface{}),
 		handlers:      make(map[reflect.Type]EventHandler),
 		observers:     make(map[reflect.Type][]EventHandler),
 		tickers:       make(map[int]*ticker),
@@ -132,9 +132,10 @@ func (el *EventLoop) dispatchDelayedEvents(t reflect.Type) {
 // of that event type. The event parameter is the event that will be delayed.
 func (el *EventLoop) DelayUntil(eventType, event interface{}) {
 	el.mut.Lock()
-	v := el.waitingEvents[eventType]
+	t := reflect.TypeOf(eventType)
+	v := el.waitingEvents[t]
 	v = append(v, event)
-	el.waitingEvents[eventType] = v
+	el.waitingEvents[t] = v
 	el.mut.Unlock()
 }
 
