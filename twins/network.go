@@ -3,6 +3,7 @@ package twins
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 
 	"github.com/relab/hotstuff"
@@ -32,6 +33,8 @@ type network struct {
 	// For each view (starting at 1), contains the list of partitions for that view.
 	Partitions [][]NodeSet
 
+	dropTypes map[reflect.Type]struct{}
+
 	mut sync.Mutex
 	// The view in which the last timeout occurred for a node.
 	lastTimeouts map[NodeID]consensus.View
@@ -45,16 +48,21 @@ type network struct {
 
 // newNetwork creates a new Network with the specified partitions.
 // partitions specifies the network partitions for each view.
-func newNetwork(partitions [][]NodeSet) *network {
-	return &network{
+func newNetwork(partitions [][]NodeSet, dropTypes ...interface{}) *network {
+	n := &network{
 		Nodes:        make(map[NodeID]*node),
 		Replicas:     make(map[hotstuff.ID][]*node),
 		Partitions:   partitions,
+		dropTypes:    make(map[reflect.Type]struct{}),
 		lastTimeouts: make(map[NodeID]consensus.View),
 		hungNodes:    make(NodeSet),
 		allHung:      make(chan struct{}),
 		done:         make(chan struct{}),
 	}
+	for _, t := range dropTypes {
+		n.dropTypes[reflect.TypeOf(t)] = struct{}{}
+	}
+	return n
 }
 
 // startNodes starts all nodes.
@@ -110,7 +118,7 @@ func (n *network) timeout(node NodeID, view consensus.View) {
 
 // shouldDrop decides if the sender should drop the message, based on the current view of the sender and the
 // partitions configured for that view.
-func (n *network) shouldDrop(sender, receiver NodeID) bool {
+func (n *network) shouldDrop(sender, receiver NodeID, message interface{}) bool {
 	node, ok := n.Nodes[sender]
 	if !ok {
 		panic(fmt.Errorf("node matching sender id %d was not found", sender))
@@ -131,7 +139,9 @@ func (n *network) shouldDrop(sender, receiver NodeID) bool {
 		}
 	}
 
-	return true
+	_, ok = n.dropTypes[reflect.TypeOf(message)]
+
+	return ok
 }
 
 type configuration struct {
@@ -155,7 +165,7 @@ func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
 		panic(fmt.Errorf("attempt to send message to replica %d, but this replica does not exist", id))
 	}
 	for _, node := range nodes {
-		if c.shouldDrop(node.ID) {
+		if c.shouldDrop(node.ID, message) {
 			continue
 		}
 		node.Modules.EventLoop().AddEvent(message)
@@ -163,9 +173,9 @@ func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
 }
 
 // shouldDrop checks if a message to the node identified by id should be dropped.
-func (c *configuration) shouldDrop(id NodeID) bool {
+func (c *configuration) shouldDrop(id NodeID, message interface{}) bool {
 	// retrieve the drop config for this node.
-	return c.network.shouldDrop(c.node.ID, id)
+	return c.network.shouldDrop(c.node.ID, id, message)
 }
 
 // Replicas returns all of the replicas in the configuration.
@@ -216,7 +226,7 @@ func (c *configuration) Timeout(msg consensus.TimeoutMsg) {
 func (c *configuration) Fetch(_ context.Context, hash consensus.Hash) (block *consensus.Block, ok bool) {
 	for _, replica := range c.network.Replicas {
 		for _, node := range replica {
-			if c.shouldDrop(node.ID) {
+			if c.shouldDrop(node.ID, hash) {
 				continue
 			}
 			block, ok = node.Modules.BlockChain().LocalGet(hash)

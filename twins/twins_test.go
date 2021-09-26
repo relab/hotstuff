@@ -15,7 +15,7 @@ func TestTwins(t *testing.T) {
 	})
 	g.Shuffle(time.Now().Unix())
 
-	scenarios := 1
+	scenarios := 10
 	totalCommits := 0
 
 	for i := 0; i < scenarios; i++ {

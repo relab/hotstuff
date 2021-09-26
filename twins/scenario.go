@@ -49,7 +49,9 @@ func (s Scenario) String() string {
 
 // ExecuteScenario executes a twins scenario.
 func ExecuteScenario(scenario Scenario) (safe bool, commits int, err error) {
-	network := newNetwork(scenario.Partitions)
+	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
+	// Timeout and NewView messages are permitted.
+	network := newNetwork(scenario.Partitions, consensus.ProposeMsg{}, consensus.VoteMsg{}, consensus.Hash{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 
