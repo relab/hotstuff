@@ -7,21 +7,22 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
 // TestVote checks that a leader can collect votes on a proposal to form a QC
 func TestVote(t *testing.T) {
-	// TODO: fix
-	t.Skip("Broken for some reason")
-
 	const n = 4
 	ctrl := gomock.NewController(t)
 	bl := testutil.CreateBuilders(t, ctrl, n)
-	bl[0].Register(synchronizer.New(testutil.FixedTimeout(1000)))
+	cs := mocks.NewMockConsensus(ctrl)
+	bl[0].Register(synchronizer.New(testutil.FixedTimeout(1000)), cs)
 	hl := bl.Build()
 	hs := hl[0]
+
+	cs.EXPECT().Propose(gomock.AssignableToTypeOf(consensus.NewSyncInfo()))
 
 	ok := false
 	ctx, cancel := context.WithCancel(context.Background())
