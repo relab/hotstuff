@@ -199,6 +199,9 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	case "fixed":
 		// TODO: consider making this configurable.
 		leaderRotation = leaderrotation.NewFixed(1)
+	case "rep":
+		fmt.Println(" I AM DOING REP")
+		leaderRotation = leaderrotation.NewRepBased()
 	default:
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
