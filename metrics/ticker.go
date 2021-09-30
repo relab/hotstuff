@@ -7,7 +7,7 @@ import (
 	"github.com/relab/hotstuff/modules"
 )
 
-// Ticker emits TickEvents on the data event loop.
+// Ticker emits TickEvents on the metrics event loop.
 type Ticker struct {
 	mods     *modules.Modules
 	tickerID int
