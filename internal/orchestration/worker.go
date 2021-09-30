@@ -17,16 +17,10 @@ import (
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/byzantine"
-	"github.com/relab/hotstuff/consensus/chainedhotstuff"
-	"github.com/relab/hotstuff/consensus/fasthotstuff"
-	"github.com/relab/hotstuff/consensus/simplehotstuff"
 	"github.com/relab/hotstuff/crypto"
-	"github.com/relab/hotstuff/crypto/bls12"
-	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
-	"github.com/relab/hotstuff/leaderrotation"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
@@ -36,6 +30,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+
+	// imported modules
+	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
+	_ "github.com/relab/hotstuff/consensus/fasthotstuff"
+	_ "github.com/relab/hotstuff/consensus/simplehotstuff"
+	_ "github.com/relab/hotstuff/crypto/bls12"
+	_ "github.com/relab/hotstuff/crypto/ecdsa"
+	_ "github.com/relab/hotstuff/leaderrotation"
 )
 
 // Worker starts and runs clients and replicas based on commands from the controller.
@@ -161,45 +163,24 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	builder := consensus.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 
 	var consensusRules consensus.Rules
-	switch opts.GetConsensus() {
-	case "chainedhotstuff":
-		consensusRules = chainedhotstuff.New()
-	case "fasthotstuff":
-		consensusRules = fasthotstuff.New()
-	case "simplehotstuff":
-		consensusRules = simplehotstuff.New()
-	default:
+	if !modules.GetModule(opts.GetConsensus(), &consensusRules) {
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
 	}
 
-	switch opts.GetByzantineStrategy() {
-	case "silence":
-		consensusRules = byzantine.NewSilence(consensusRules)
-	case "fork":
-		consensusRules = byzantine.NewFork(consensusRules)
-	case "":
-	default:
+	var byz byzantine.Byzantine
+	if modules.GetModule(opts.GetByzantineStrategy(), &byz) {
+		consensusRules = byz.Wrap(consensusRules)
+	} else if opts.GetByzantineStrategy() != "" {
 		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
 	}
 
 	var cryptoImpl consensus.CryptoImpl
-	switch opts.GetCrypto() {
-	case "ecdsa":
-		cryptoImpl = ecdsa.New()
-	case "bls12":
-		cryptoImpl = bls12.New()
-	default:
+	if !modules.GetModule(opts.GetCrypto(), &cryptoImpl) {
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
 	}
 
 	var leaderRotation consensus.LeaderRotation
-	switch opts.GetLeaderRotation() {
-	case "round-robin":
-		leaderRotation = leaderrotation.NewRoundRobin()
-	case "fixed":
-		// TODO: consider making this configurable.
-		leaderRotation = leaderrotation.NewFixed(1)
-	default:
+	if !modules.GetModule(opts.GetLeaderRotation(), &leaderRotation) {
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
 
