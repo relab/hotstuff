@@ -325,6 +325,8 @@ func GenerateKeyChain(id hotstuff.ID, validFor []string, crypto string, ca *x509
 		if err != nil {
 			return KeyChain{}, fmt.Errorf("failed to generate bls12-381 private key: %w", err)
 		}
+	default:
+		return KeyChain{}, fmt.Errorf("unknown crypto implementation: %s", crypto)
 	}
 
 	privateKeyPEM, err := PrivateKeyToPEM(privateKey)
