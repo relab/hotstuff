@@ -11,8 +11,15 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
+	"github.com/relab/hotstuff/modules"
 	"go.uber.org/multierr"
 )
+
+func init() {
+	modules.RegisterModule("bls12", func() consensus.CryptoImpl {
+		return New()
+	})
+}
 
 const (
 	// PrivateKeyFileType is the PEM type for a private key.

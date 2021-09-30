@@ -1,7 +1,16 @@
 // Package simplehotstuff implements a simplified version of the three-chain HotStuff protocol.
 package simplehotstuff
 
-import "github.com/relab/hotstuff/consensus"
+import (
+	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/modules"
+)
+
+func init() {
+	modules.RegisterModule("simplehotstuff", func() consensus.Rules {
+		return New()
+	})
+}
 
 // SimpleHotStuff implements a simplified version of the HotStuff algorithm.
 //

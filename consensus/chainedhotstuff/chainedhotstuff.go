@@ -3,7 +3,14 @@ package chainedhotstuff
 
 import (
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/modules"
 )
+
+func init() {
+	modules.RegisterModule("chainedhotstuff", func() consensus.Rules {
+		return New()
+	})
+}
 
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {

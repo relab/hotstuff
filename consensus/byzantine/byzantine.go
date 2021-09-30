@@ -3,6 +3,12 @@ package byzantine
 
 import "github.com/relab/hotstuff/consensus"
 
+// Byzantine wraps a consensus rules implementation and alters its behavior.
+type Byzantine interface {
+	// Wrap wraps the rules and returns an altered rules implementation.
+	Wrap(consensus.Rules) consensus.Rules
+}
+
 type silence struct {
 	consensus.Rules
 }
@@ -17,6 +23,11 @@ func (s *silence) InitConsensusModule(mods *consensus.Modules, opts *consensus.O
 
 func (s *silence) ProposeRule(_ consensus.SyncInfo, _ consensus.Command) (consensus.ProposeMsg, bool) {
 	return consensus.ProposeMsg{}, false
+}
+
+func (s *silence) Wrap(rules consensus.Rules) consensus.Rules {
+	s.Rules = rules
+	return s
 }
 
 // NewSilence returns a byzantine replica that will never propose.
@@ -67,4 +78,9 @@ func (f *fork) ProposeRule(cert consensus.SyncInfo, cmd consensus.Command) (prop
 // NewFork returns a byzantine replica that will try to fork the chain.
 func NewFork(rules consensus.Rules) consensus.Rules {
 	return &fork{Rules: rules}
+}
+
+func (f *fork) Wrap(rules consensus.Rules) consensus.Rules {
+	f.Rules = rules
+	return f
 }

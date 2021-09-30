@@ -3,7 +3,14 @@ package leaderrotation
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/modules"
 )
+
+func init() {
+	modules.RegisterModule("fixed", func() consensus.LeaderRotation {
+		return NewFixed(1)
+	})
+}
 
 type fixed struct {
 	leader hotstuff.ID

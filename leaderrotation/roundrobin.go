@@ -3,7 +3,14 @@ package leaderrotation
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/modules"
 )
+
+func init() {
+	modules.RegisterModule("round-robin", func() consensus.LeaderRotation {
+		return NewRoundRobin()
+	})
+}
 
 type roundRobin struct {
 	mods *consensus.Modules

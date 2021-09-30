@@ -3,7 +3,14 @@ package fasthotstuff
 
 import (
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/modules"
 )
+
+func init() {
+	modules.RegisterModule("fasthotstuff", func() consensus.Rules {
+		return New()
+	})
+}
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {
