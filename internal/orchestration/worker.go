@@ -195,12 +195,15 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	var leaderRotation consensus.LeaderRotation
 	switch opts.GetLeaderRotation() {
 	case "round-robin":
+		fmt.Println("USING ROUND ROBIN")
 		leaderRotation = leaderrotation.NewRoundRobin()
 	case "fixed":
+		fmt.Println("INITIATE FIXED LEADR")
 		// TODO: consider making this configurable.
 		leaderRotation = leaderrotation.NewFixed(1)
 	case "rep":
 		fmt.Println(" I AM DOING REP")
+
 		leaderRotation = leaderrotation.NewRepBased()
 	default:
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())

@@ -55,7 +55,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 		logging.New(fmt.Sprintf("hs%d", id)),
 		blockchain.New(),
 		mocks.NewMockConsensus(ctrl),
-		leaderrotation.NewFixed(1),
+		leaderrotation.NewRepBased(),
 		synchronizer,
 		config,
 		signer,
