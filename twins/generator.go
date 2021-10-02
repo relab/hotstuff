@@ -203,3 +203,45 @@ func max(a, b uint8) uint8 {
 	}
 	return b
 }
+
+func min(a, b uint8) uint8 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func genPartitionSizes(n, k uint8) (sizes [][]uint8) {
+	s := make([]uint8, k)
+	genPartitionSizesRecursive(0, n, s, &sizes)
+	return
+}
+
+func genPartitionSizesRecursive(i, n uint8, state []uint8, sizes *[][]uint8) {
+	s := make([]uint8, len(state))
+	copy(s, state)
+
+	s[i] = n
+
+	// if s[i] <= s[i-1], we have found a new valid state
+	if i == 0 || (i > 0 && s[i-1] >= n) {
+		// must make a new copy of the state to avoid overwriting it
+		c := make([]uint8, len(s))
+		copy(c, s)
+		*sizes = append(*sizes, c)
+	}
+
+	// find the next valid size for the current index
+	j := n - 1
+	if i > 0 {
+		j = min(j, s[i-1])
+	}
+
+	if int(i+1) < len(s) {
+		// decrement the current index and recurse
+		for ; j > 0; j-- {
+			s[i] = j
+			genPartitionSizesRecursive(i+1, n-j, s, sizes)
+		}
+	}
+}
