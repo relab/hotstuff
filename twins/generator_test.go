@@ -35,7 +35,7 @@ func TestPartitionSizes(t *testing.T) {
 		{2, 2, 2, 0},
 		{2, 2, 1, 1},
 	}
-	got := genPartitionSizes(6, 4)
+	got := genPartitionSizes(6, 4, 1)
 
 	if !reflect.DeepEqual(got, want) {
 		for i := range got {

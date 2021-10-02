@@ -211,13 +211,13 @@ func min(a, b uint8) uint8 {
 	return b
 }
 
-func genPartitionSizes(n, k uint8) (sizes [][]uint8) {
+func genPartitionSizes(n, k, min uint8) (sizes [][]uint8) {
 	s := make([]uint8, k)
-	genPartitionSizesRecursive(0, n, s, &sizes)
+	genPartitionSizesRecursive(0, n, min, s, &sizes)
 	return
 }
 
-func genPartitionSizesRecursive(i, n uint8, state []uint8, sizes *[][]uint8) {
+func genPartitionSizesRecursive(i, n, minSize uint8, state []uint8, sizes *[][]uint8) {
 	s := make([]uint8, len(state))
 	copy(s, state)
 
@@ -232,16 +232,18 @@ func genPartitionSizesRecursive(i, n uint8, state []uint8, sizes *[][]uint8) {
 	}
 
 	// find the next valid size for the current index
-	j := n - 1
+	m := n - 1
 	if i > 0 {
-		j = min(j, s[i-1])
+		m = min(m, s[i-1])
 	}
 
 	if int(i+1) < len(s) {
-		// decrement the current index and recurse
-		for ; j > 0; j-- {
-			s[i] = j
-			genPartitionSizesRecursive(i+1, n-j, s, sizes)
+		// decrement the current partition and recurse
+		// for the first partition, we want to ensure that its size is at least 'minSize',
+		// for the other partitions, we will allow it to go down to a size of 1.
+		for ; (i == 0 && m >= minSize) || (i != 0 && m > 0); m-- {
+			s[i] = m
+			genPartitionSizesRecursive(i+1, n-m, minSize, s, sizes)
 		}
 	}
 }
