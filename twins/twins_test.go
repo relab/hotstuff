@@ -10,7 +10,7 @@ import (
 )
 
 func TestTwins(t *testing.T) {
-	g := twins.NewGenerator(4, 1, 2, 30, 10*time.Millisecond, func() consensus.Consensus {
+	g := twins.NewGenerator(4, 1, 2, 7, 10*time.Millisecond, func() consensus.Consensus {
 		return consensus.New(chainedhotstuff.New())
 	})
 	g.Shuffle(time.Now().Unix())

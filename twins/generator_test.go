@@ -9,9 +9,9 @@ import (
 )
 
 func TestPartitionsGenerator(t *testing.T) {
-	pg := newPartGen(8, 3)
-	for p := pg.nextPartitions(); p != nil; p = pg.nextPartitions() {
-		t.Log(p)
+	partitions := genPartitions([]NodeID{NodeID{1, 1}, NodeID{1, 2}}, []NodeID{NodeID{2, 3}, NodeID{3, 4}, NodeID{4, 5}}, 3, 1)
+	for p := range partitions {
+		t.Log(partitions[p])
 	}
 }
 
