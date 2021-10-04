@@ -73,12 +73,8 @@ func NewGenerator(replicas, numTwins, partitions, rounds uint8, viewTimeout time
 		replicaID++
 	}
 
-	for _, n := range twins {
-		g.allNodes = append(g.allNodes, n)
-	}
-	for _, n := range nodes {
-		g.allNodes = append(g.allNodes, n)
-	}
+	g.allNodes = append(g.allNodes, twins...)
+	g.allNodes = append(g.allNodes, nodes...)
 
 	partitionSets := genPartitions(twins, nodes, partitions, 1)
 
