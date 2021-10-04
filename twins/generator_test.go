@@ -9,7 +9,7 @@ import (
 )
 
 func TestPartitionsGenerator(t *testing.T) {
-	partitions := genPartitions([]NodeID{NodeID{1, 1}, NodeID{1, 2}}, []NodeID{NodeID{2, 3}, NodeID{3, 4}, NodeID{4, 5}}, 3, 1)
+	partitions := genPartitions([]NodeID{{1, 1}, {1, 2}}, []NodeID{{2, 3}, {3, 4}, {4, 5}}, 3, 1)
 	for p := range partitions {
 		t.Log(partitions[p])
 	}
@@ -18,9 +18,7 @@ func TestPartitionsGenerator(t *testing.T) {
 func TestGenerator(t *testing.T) {
 	g := NewGenerator(4, 1, 3, 8, 10*time.Millisecond, func() consensus.Consensus { return nil })
 	g.Shuffle(time.Now().Unix())
-	for i := 0; i < 1000; i++ {
-		t.Log(g.NextScenario())
-	}
+	t.Log(g.NextScenario())
 }
 
 func TestPartitionSizes(t *testing.T) {

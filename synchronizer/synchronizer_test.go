@@ -42,7 +42,7 @@ func TestLocalTimeout(t *testing.T) {
 			if !mods.Crypto().Verify(msg.ViewSignature, msg.View.ToHash()) {
 				t.Error("failed to verify signature")
 			}
-			close(c)
+			c <- struct{}{}
 		}).AnyTimes()
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {

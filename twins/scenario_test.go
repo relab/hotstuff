@@ -2,6 +2,7 @@ package twins
 
 import (
 	"testing"
+	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
@@ -22,7 +23,7 @@ func TestBasicScenario(t *testing.T) {
 		ConsensusCtor: func() consensus.Consensus {
 			return consensus.New(chainedhotstuff.New())
 		},
-		ViewTimeout: 100,
+		ViewTimeout: 100 * time.Millisecond,
 	}
 	allNodesSet := make(NodeSet)
 	for _, node := range s.Nodes {
