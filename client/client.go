@@ -149,6 +149,7 @@ func (c *Client) Run(ctx context.Context) {
 	stats := <-commandStatsChan
 	c.mods.Logger().Infof("Done sending commands (executed: %d, failed: %d)", stats.executed, stats.failed)
 	<-eventLoopDone
+	close(c.done)
 }
 
 // Start starts the client.
@@ -156,7 +157,6 @@ func (c *Client) Start() {
 	var ctx context.Context
 	ctx, c.cancel = context.WithCancel(context.Background())
 	go c.Run(ctx)
-	close(c.done)
 }
 
 // Stop stops the client.
@@ -225,7 +225,11 @@ func (c *Client) sendCommands(ctx context.Context) error {
 		promise := c.gorumsConfig.ExecCommand(ctx, cmd)
 
 		num++
-		c.pendingCmds <- pendingCmd{sequenceNumber: num, sendTime: time.Now(), promise: promise}
+		select {
+		case c.pendingCmds <- pendingCmd{sequenceNumber: num, sendTime: time.Now(), promise: promise}:
+		case <-ctx.Done():
+			break
+		}
 
 		if num%100 == 0 {
 			c.mods.Logger().Infof("%d commands sent", num)
