@@ -39,6 +39,7 @@ func NewGenerator(replicas, numTwins, partitions, rounds uint8, viewTimeout time
 		viewTimeout:   viewTimeout,
 	}
 
+	// needed for partitions generation
 	var (
 		twins []NodeID
 		nodes []NodeID
@@ -159,7 +160,7 @@ func genPartitionSizesRecursive(i, n, minSize uint8, state []uint8, sizes *[][]u
 	s[i] = n
 
 	// if s[i] <= s[i-1], we have found a new valid state
-	if i == 0 || (i > 0 && s[i-1] >= n) {
+	if i == 0 || s[i-1] >= n {
 		// must make a new copy of the state to avoid overwriting it
 		c := make([]uint8, len(s))
 		copy(c, s)
