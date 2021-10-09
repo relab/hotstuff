@@ -180,6 +180,7 @@ func (c *Client) sendCommands(ctx context.Context) error {
 		lastStep           = time.Now()
 	)
 
+loop:
 	for {
 		if ctx.Err() != nil {
 			break
@@ -228,7 +229,7 @@ func (c *Client) sendCommands(ctx context.Context) error {
 		select {
 		case c.pendingCmds <- pendingCmd{sequenceNumber: num, sendTime: time.Now(), promise: promise}:
 		case <-ctx.Done():
-			break
+			break loop
 		}
 
 		if num%100 == 0 {
