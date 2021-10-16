@@ -16,6 +16,7 @@ import (
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/testutil"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -26,7 +27,7 @@ type Scenario struct {
 	Nodes         []NodeID
 	Partitions    [][]NodeSet
 	Rounds        int
-	ConsensusCtor func() consensus.Consensus
+	ConsensusName string
 	ViewTimeout   time.Duration
 }
 
@@ -89,10 +90,14 @@ func createNodes(scenario Scenario, network *network) error {
 			ID: nodeID,
 		}
 		builder := consensus.NewBuilder(nodeID.ReplicaID, pk)
+		var consensusModule consensus.Rules
+		if !modules.GetModule(scenario.ConsensusName, &consensusModule) {
+			return fmt.Errorf("unknown consensus module: '%s'", scenario.ConsensusName)
+		}
 		builder.Register(
 			logging.New(fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			blockchain.New(),
-			scenario.ConsensusCtor(),
+			consensus.New(consensusModule),
 			crypto.NewCache(ecdsa.New(), 100),
 			synchronizer.New(testutil.FixedTimeout(scenario.ViewTimeout)),
 			&configuration{

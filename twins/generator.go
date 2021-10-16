@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 )
 
 type leaderPartitions struct {
@@ -22,12 +21,12 @@ type Generator struct {
 	offsets           []int
 	partitions        int
 	leadersPartitions []leaderPartitions
-	consensusCtor     func() consensus.Consensus
+	consensusName     string
 	viewTimeout       time.Duration
 }
 
 // NewGenerator creates a new generator.
-func NewGenerator(replicas, numTwins, partitions, rounds uint8, viewTimeout time.Duration, consensus func() consensus.Consensus) *Generator {
+func NewGenerator(replicas, numTwins, partitions, rounds uint8, viewTimeout time.Duration, consensusName string) *Generator {
 	g := &Generator{
 		allNodes:      make([]NodeID, 0, replicas),
 		replicas:      make([]hotstuff.ID, 0, replicas),
@@ -35,7 +34,7 @@ func NewGenerator(replicas, numTwins, partitions, rounds uint8, viewTimeout time
 		partitions:    int(partitions),
 		indices:       make([]int, rounds),
 		offsets:       make([]int, rounds),
-		consensusCtor: consensus,
+		consensusName: consensusName,
 		viewTimeout:   viewTimeout,
 	}
 
@@ -128,7 +127,7 @@ func (g *Generator) NextScenario() (s Scenario, ok bool) {
 		Replicas:      g.replicas,
 		Nodes:         g.allNodes,
 		Rounds:        int(g.rounds),
-		ConsensusCtor: g.consensusCtor,
+		ConsensusName: g.consensusName,
 		ViewTimeout:   g.viewTimeout,
 	}
 

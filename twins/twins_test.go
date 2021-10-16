@@ -4,15 +4,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/consensus/chainedhotstuff"
+	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
 	"github.com/relab/hotstuff/twins"
 )
 
 func TestTwins(t *testing.T) {
-	g := twins.NewGenerator(4, 1, 2, 7, 10*time.Millisecond, func() consensus.Consensus {
-		return consensus.New(chainedhotstuff.New())
-	})
+	g := twins.NewGenerator(4, 1, 2, 7, 10*time.Millisecond, "chainedhotstuff")
 	g.Shuffle(time.Now().Unix())
 
 	scenarios := 10

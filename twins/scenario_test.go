@@ -5,8 +5,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/consensus/chainedhotstuff"
+	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
 )
 
 func TestBasicScenario(t *testing.T) {
@@ -19,11 +18,9 @@ func TestBasicScenario(t *testing.T) {
 			{3, 3},
 			{4, 4},
 		},
-		Rounds: 4,
-		ConsensusCtor: func() consensus.Consensus {
-			return consensus.New(chainedhotstuff.New())
-		},
-		ViewTimeout: 100 * time.Millisecond,
+		Rounds:        4,
+		ConsensusName: "chainedhotstuff",
+		ViewTimeout:   100 * time.Millisecond,
 	}
 	allNodesSet := make(NodeSet)
 	for _, node := range s.Nodes {
