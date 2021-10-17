@@ -31,7 +31,7 @@ type network struct {
 	// Maps a replica ID to a replica and its twins.
 	Replicas map[hotstuff.ID][]*node
 	// For each view (starting at 1), contains the list of partitions for that view.
-	Partitions [][]NodeSet
+	Views []View
 
 	dropTypes map[reflect.Type]struct{}
 
@@ -48,11 +48,11 @@ type network struct {
 
 // newNetwork creates a new Network with the specified partitions.
 // partitions specifies the network partitions for each view.
-func newNetwork(partitions [][]NodeSet, dropTypes ...interface{}) *network {
+func newNetwork(rounds []View, dropTypes ...interface{}) *network {
 	n := &network{
 		Nodes:        make(map[NodeID]*node),
 		Replicas:     make(map[hotstuff.ID][]*node),
-		Partitions:   partitions,
+		Views:        rounds,
 		dropTypes:    make(map[reflect.Type]struct{}),
 		lastTimeouts: make(map[NodeID]consensus.View),
 		hungNodes:    make(NodeSet),
@@ -128,11 +128,11 @@ func (n *network) shouldDrop(sender, receiver NodeID, message interface{}) bool 
 	i := int(node.Modules.Synchronizer().View() - 1)
 
 	// will default to dropping all messages from views that don't have any specified partitions.
-	if i >= len(n.Partitions) {
+	if i >= len(n.Views) {
 		return true
 	}
 
-	partitions := n.Partitions[i]
+	partitions := n.Views[i].PartitionScenario
 	for _, partition := range partitions {
 		if partition.Contains(sender) && partition.Contains(receiver) {
 			return false

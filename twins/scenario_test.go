@@ -4,13 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/relab/hotstuff"
 	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
 )
 
 func TestBasicScenario(t *testing.T) {
 	s := Scenario{
-		Leaders: []hotstuff.ID{1, 2, 3, 4},
 		Nodes: []NodeID{
 			{1, 1},
 			{2, 2},
@@ -22,10 +20,10 @@ func TestBasicScenario(t *testing.T) {
 	for _, node := range s.Nodes {
 		allNodesSet.Add(node)
 	}
-	s.PartitionScenarios = append(s.PartitionScenarios, []NodeSet{allNodesSet})
-	s.PartitionScenarios = append(s.PartitionScenarios, []NodeSet{allNodesSet})
-	s.PartitionScenarios = append(s.PartitionScenarios, []NodeSet{allNodesSet})
-	s.PartitionScenarios = append(s.PartitionScenarios, []NodeSet{allNodesSet})
+	s.Views = append(s.Views, View{Leader: 1, PartitionScenario: []NodeSet{allNodesSet}})
+	s.Views = append(s.Views, View{Leader: 1, PartitionScenario: []NodeSet{allNodesSet}})
+	s.Views = append(s.Views, View{Leader: 1, PartitionScenario: []NodeSet{allNodesSet}})
+	s.Views = append(s.Views, View{Leader: 1, PartitionScenario: []NodeSet{allNodesSet}})
 
 	safe, commits, err := ExecuteScenario(s, "chainedhotstuff", 10*time.Millisecond)
 	if err != nil {

@@ -20,18 +20,23 @@ import (
 	"github.com/relab/hotstuff/synchronizer"
 )
 
+// View specifies the leader id an the partition scenario for a single round of consensus.
+type View struct {
+	Leader            hotstuff.ID
+	PartitionScenario []NodeSet
+}
+
 // Scenario specifies the nodes, partitions and leaders for a twins scenario.
 type Scenario struct {
-	Leaders            []hotstuff.ID
-	Nodes              []NodeID
-	PartitionScenarios [][]NodeSet
+	Nodes []NodeID
+	Views []View
 }
 
 func (s Scenario) String() string {
 	var sb strings.Builder
-	for i := 0; i < len(s.PartitionScenarios); i++ {
-		sb.WriteString(fmt.Sprintf("leader: %d, partitions: ", s.Leaders[i]))
-		for _, partition := range s.PartitionScenarios[i] {
+	for i := 0; i < len(s.Views); i++ {
+		sb.WriteString(fmt.Sprintf("leader: %d, partitions: ", s.Views[i].Leader))
+		for _, partition := range s.Views[i].PartitionScenario {
 			sb.WriteString("[ ")
 			for id := range partition {
 				sb.WriteString(fmt.Sprint(id))
@@ -48,7 +53,7 @@ func (s Scenario) String() string {
 func ExecuteScenario(scenario Scenario, consensusName string, viewTimeout time.Duration) (safe bool, commits int, err error) {
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
-	network := newNetwork(scenario.PartitionScenarios, consensus.ProposeMsg{}, consensus.VoteMsg{}, consensus.Hash{})
+	network := newNetwork(scenario.Views, consensus.ProposeMsg{}, consensus.VoteMsg{}, consensus.Hash{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -100,7 +105,7 @@ func createNodes(scenario Scenario, network *network, consensusName string, view
 				node:    &n,
 				network: network,
 			},
-			leaderRotation(scenario.Leaders),
+			leaderRotation(scenario.Views),
 			commandModule{commandGenerator: cg, node: &n},
 		)
 		n.Modules = builder.Build()
@@ -143,14 +148,14 @@ func checkCommits(network *network) (safe bool, commits int) {
 	return true, i
 }
 
-type leaderRotation []hotstuff.ID
+type leaderRotation []View
 
 // GetLeader returns the id of the leader in the given view.
 func (lr leaderRotation) GetLeader(view consensus.View) hotstuff.ID {
 	// we start at view 1
 	v := int(view) - 1
 	if v >= 0 && v < len(lr) {
-		return lr[v]
+		return lr[v].Leader
 	}
 	// default to 0 (which is an invalid id)
 	return 0
