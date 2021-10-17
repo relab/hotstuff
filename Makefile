@@ -28,7 +28,6 @@ tools: download
 
 test:
 	@go test -v ./...
-	@(cd scripts; bash deploy_test.sh)
 
 clean:
 	@rm -fv $(binaries)
