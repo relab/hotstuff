@@ -14,7 +14,6 @@ type leaderPartitions struct {
 // Generator generates twins scenarios.
 type Generator struct {
 	allNodes          []NodeID
-	replicas          []hotstuff.ID
 	rounds            uint8
 	partitions        uint8
 	indices           []int
@@ -26,7 +25,6 @@ type Generator struct {
 func NewGenerator(replicas, numTwins, partitions, rounds uint8) *Generator {
 	g := &Generator{
 		allNodes:   make([]NodeID, 0, replicas+numTwins),
-		replicas:   make([]hotstuff.ID, 0, replicas),
 		rounds:     rounds,
 		partitions: partitions,
 		indices:    make([]int, rounds),
@@ -35,8 +33,9 @@ func NewGenerator(replicas, numTwins, partitions, rounds uint8) *Generator {
 
 	// needed for partitions generation
 	var (
-		twins []NodeID
-		nodes []NodeID
+		twins      []NodeID
+		nodes      []NodeID
+		replicaIDs []hotstuff.ID
 	)
 
 	replicaID := hotstuff.ID(1)
@@ -45,7 +44,7 @@ func NewGenerator(replicas, numTwins, partitions, rounds uint8) *Generator {
 
 	// assign IDs to nodes
 	for i := 0; i < int(replicas); i++ {
-		g.replicas = append(g.replicas, replicaID)
+		replicaIDs = append(replicaIDs, replicaID)
 		if remainingTwins > 0 {
 			twins = append(twins, NodeID{
 				ReplicaID: replicaID,
@@ -74,7 +73,7 @@ func NewGenerator(replicas, numTwins, partitions, rounds uint8) *Generator {
 
 	// assign each replica as leader to each partition scenario
 	for _, p := range partitionScenarios {
-		for _, id := range g.replicas {
+		for _, id := range replicaIDs {
 			g.leadersPartitions = append(g.leadersPartitions, leaderPartitions{
 				leader:            id,
 				partitionScenario: p,
@@ -124,14 +123,12 @@ func (g *Generator) NextScenario() (s Scenario, ok bool) {
 	}
 
 	s = Scenario{
-		Replicas: g.replicas,
-		Nodes:    g.allNodes,
-		Rounds:   int(g.rounds),
+		Nodes: g.allNodes,
 	}
 
 	for _, partition := range p {
 		s.Leaders = append(s.Leaders, partition.leader)
-		s.Partitions = append(s.Partitions, partition.partitionScenario)
+		s.PartitionScenarios = append(s.PartitionScenarios, partition.partitionScenario)
 	}
 
 	return s, true

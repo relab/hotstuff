@@ -22,18 +22,16 @@ import (
 
 // Scenario specifies the nodes, partitions and leaders for a twins scenario.
 type Scenario struct {
-	Replicas   []hotstuff.ID
-	Leaders    []hotstuff.ID
-	Nodes      []NodeID
-	Partitions [][]NodeSet
-	Rounds     int
+	Leaders            []hotstuff.ID
+	Nodes              []NodeID
+	PartitionScenarios [][]NodeSet
 }
 
 func (s Scenario) String() string {
 	var sb strings.Builder
-	for i := 0; i < s.Rounds; i++ {
+	for i := 0; i < len(s.PartitionScenarios); i++ {
 		sb.WriteString(fmt.Sprintf("leader: %d, partitions: ", s.Leaders[i]))
-		for _, partition := range s.Partitions[i] {
+		for _, partition := range s.PartitionScenarios[i] {
 			sb.WriteString("[ ")
 			for id := range partition {
 				sb.WriteString(fmt.Sprint(id))
@@ -50,7 +48,7 @@ func (s Scenario) String() string {
 func ExecuteScenario(scenario Scenario, consensusName string, viewTimeout time.Duration) (safe bool, commits int, err error) {
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
-	network := newNetwork(scenario.Partitions, consensus.ProposeMsg{}, consensus.VoteMsg{}, consensus.Hash{})
+	network := newNetwork(scenario.PartitionScenarios, consensus.ProposeMsg{}, consensus.VoteMsg{}, consensus.Hash{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 
