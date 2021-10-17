@@ -74,6 +74,10 @@ func TestOrchestration(t *testing.T) {
 }
 
 func TestDeployment(t *testing.T) {
+	if os.Getenv("GITHUB_ACTIONS") != "" && runtime.GOOS == "darwin" {
+		t.Skip("Docker is not enabled on Github Actions macOS runners.")
+	}
+
 	experiment := &orchestration.Experiment{
 		NumReplicas: 4,
 		NumClients:  2,
