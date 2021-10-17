@@ -7,14 +7,14 @@ import (
 )
 
 func TestPartitionsGenerator(t *testing.T) {
-	partitions := genPartitions([]NodeID{{1, 1}, {1, 2}}, []NodeID{{2, 3}, {3, 4}, {4, 5}}, 3, 1)
+	partitions := genPartitionScenarios([]NodeID{{1, 1}, {1, 2}}, []NodeID{{2, 3}, {3, 4}, {4, 5}}, 3, 1)
 	for p := range partitions {
 		t.Log(partitions[p])
 	}
 }
 
 func TestGenerator(t *testing.T) {
-	g := NewGenerator(4, 1, 3, 8, 10*time.Millisecond, "chainedhotstuff")
+	g := NewGenerator(4, 1, 3, 8)
 	g.Shuffle(time.Now().Unix())
 	t.Log(g.NextScenario())
 }

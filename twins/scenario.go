@@ -22,13 +22,11 @@ import (
 
 // Scenario specifies the nodes, partitions and leaders for a twins scenario.
 type Scenario struct {
-	Replicas      []hotstuff.ID
-	Leaders       []hotstuff.ID
-	Nodes         []NodeID
-	Partitions    [][]NodeSet
-	Rounds        int
-	ConsensusName string
-	ViewTimeout   time.Duration
+	Replicas   []hotstuff.ID
+	Leaders    []hotstuff.ID
+	Nodes      []NodeID
+	Partitions [][]NodeSet
+	Rounds     int
 }
 
 func (s Scenario) String() string {
@@ -49,14 +47,14 @@ func (s Scenario) String() string {
 }
 
 // ExecuteScenario executes a twins scenario.
-func ExecuteScenario(scenario Scenario) (safe bool, commits int, err error) {
+func ExecuteScenario(scenario Scenario, consensusName string, viewTimeout time.Duration) (safe bool, commits int, err error) {
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
 	network := newNetwork(scenario.Partitions, consensus.ProposeMsg{}, consensus.VoteMsg{}, consensus.Hash{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	err = createNodes(scenario, network)
+	err = createNodes(scenario, network, consensusName, viewTimeout)
 	if err != nil {
 		cancel()
 		return false, 0, err
@@ -73,7 +71,7 @@ func ExecuteScenario(scenario Scenario) (safe bool, commits int, err error) {
 	return safe, commits, nil
 }
 
-func createNodes(scenario Scenario, network *network) error {
+func createNodes(scenario Scenario, network *network, consensusName string, viewTimeout time.Duration) error {
 	cg := &commandGenerator{}
 	keys := make(map[hotstuff.ID]consensus.PrivateKey)
 	for _, nodeID := range scenario.Nodes {
@@ -91,15 +89,15 @@ func createNodes(scenario Scenario, network *network) error {
 		}
 		builder := consensus.NewBuilder(nodeID.ReplicaID, pk)
 		var consensusModule consensus.Rules
-		if !modules.GetModule(scenario.ConsensusName, &consensusModule) {
-			return fmt.Errorf("unknown consensus module: '%s'", scenario.ConsensusName)
+		if !modules.GetModule(consensusName, &consensusModule) {
+			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
 		builder.Register(
 			logging.New(fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			blockchain.New(),
 			consensus.New(consensusModule),
 			crypto.NewCache(ecdsa.New(), 100),
-			synchronizer.New(testutil.FixedTimeout(scenario.ViewTimeout)),
+			synchronizer.New(testutil.FixedTimeout(viewTimeout)),
 			&configuration{
 				node:    &n,
 				network: network,

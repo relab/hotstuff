@@ -18,9 +18,7 @@ func TestBasicScenario(t *testing.T) {
 			{3, 3},
 			{4, 4},
 		},
-		Rounds:        4,
-		ConsensusName: "chainedhotstuff",
-		ViewTimeout:   100 * time.Millisecond,
+		Rounds: 4,
 	}
 	allNodesSet := make(NodeSet)
 	for _, node := range s.Nodes {
@@ -31,7 +29,7 @@ func TestBasicScenario(t *testing.T) {
 	s.Partitions = append(s.Partitions, []NodeSet{allNodesSet})
 	s.Partitions = append(s.Partitions, []NodeSet{allNodesSet})
 
-	safe, commits, err := ExecuteScenario(s)
+	safe, commits, err := ExecuteScenario(s, "chainedhotstuff", 10*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}
