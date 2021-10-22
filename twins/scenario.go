@@ -22,8 +22,8 @@ import (
 
 // View specifies the leader id an the partition scenario for a single round of consensus.
 type View struct {
-	Leader            hotstuff.ID
-	PartitionScenario []NodeSet
+	Leader     hotstuff.ID
+	Partitions []NodeSet
 }
 
 // Scenario specifies the nodes, partitions and leaders for a twins scenario.
@@ -36,7 +36,7 @@ func (s Scenario) String() string {
 	var sb strings.Builder
 	for i := 0; i < len(s.Views); i++ {
 		sb.WriteString(fmt.Sprintf("leader: %d, partitions: ", s.Views[i].Leader))
-		for _, partition := range s.Views[i].PartitionScenario {
+		for _, partition := range s.Views[i].Partitions {
 			sb.WriteString("[ ")
 			for id := range partition {
 				sb.WriteString(fmt.Sprint(id))

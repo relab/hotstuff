@@ -70,8 +70,8 @@ func NewGenerator(replicas, numTwins, partitions, rounds uint8) *Generator {
 	for _, p := range partitionScenarios {
 		for _, id := range replicaIDs {
 			g.leadersPartitions = append(g.leadersPartitions, View{
-				Leader:            id,
-				PartitionScenario: p,
+				Leader:     id,
+				Partitions: p,
 			})
 		}
 	}

@@ -33,3 +33,5 @@ scripts/known_hosts
 
 measurements.json
 *.pdf
+
+twins.json

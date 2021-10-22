@@ -20,10 +20,10 @@ func TestBasicScenario(t *testing.T) {
 	for _, node := range s.Nodes {
 		allNodesSet.Add(node)
 	}
-	s.Views = append(s.Views, View{Leader: 1, PartitionScenario: []NodeSet{allNodesSet}})
-	s.Views = append(s.Views, View{Leader: 1, PartitionScenario: []NodeSet{allNodesSet}})
-	s.Views = append(s.Views, View{Leader: 1, PartitionScenario: []NodeSet{allNodesSet}})
-	s.Views = append(s.Views, View{Leader: 1, PartitionScenario: []NodeSet{allNodesSet}})
+	s.Views = append(s.Views, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
+	s.Views = append(s.Views, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
+	s.Views = append(s.Views, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
+	s.Views = append(s.Views, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 
 	safe, commits, err := ExecuteScenario(s, "chainedhotstuff", 10*time.Millisecond)
 	if err != nil {

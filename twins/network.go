@@ -132,7 +132,7 @@ func (n *network) shouldDrop(sender, receiver NodeID, message interface{}) bool 
 		return true
 	}
 
-	partitions := n.Views[i].PartitionScenario
+	partitions := n.Views[i].Partitions
 	for _, partition := range partitions {
 		if partition.Contains(sender) && partition.Contains(receiver) {
 			return false
