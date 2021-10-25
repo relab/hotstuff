@@ -3,7 +3,9 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/relab/hotstuff/internal/logging"
 	"github.com/spf13/cobra"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -48,6 +50,8 @@ func init() {
 
 	rootCmd.PersistentFlags().String("log-level", "info", "sets the log level (debug, info, warn, error")
 	cobra.CheckErr(viper.BindPFlag("log-level", rootCmd.PersistentFlags().Lookup("log-level")))
+	rootCmd.PersistentFlags().StringSlice("log-pkgs", []string{}, "set the log level on a per-package basis.")
+	cobra.CheckErr(viper.BindPFlag("log-pkgs", rootCmd.PersistentFlags().Lookup("log-pkgs")))
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -76,10 +80,16 @@ func initConfig() {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
 
-	logLevel := viper.GetString("log-level")
-	err := os.Setenv("HOTSTUFF_LOG", logLevel)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+	logging.SetLogLevel(viper.GetString("log-level"))
+
+	packageLevels := viper.GetStringSlice("log-pkgs")
+
+	for _, packageLevel := range packageLevels {
+		parts := strings.Split(packageLevel, ":")
+		if len(parts) != 2 {
+			fmt.Println("log-pkgs flag must be a comma-separated list of package:level strings")
+			os.Exit(1)
+		}
+		logging.SetPackageLogLevel(parts[0], parts[1])
 	}
 }
