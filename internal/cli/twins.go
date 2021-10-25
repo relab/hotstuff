@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/relab/hotstuff/internal/logging"
@@ -12,6 +13,7 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/twins"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -33,6 +35,18 @@ var twinsCmd = &cobra.Command{
 	Use:   "twins [run|generate]",
 	Short: "Generate and execute Twins scenarios.",
 	Long:  `The twins command allows for generating and executing twins scenarios.`,
+
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// set the log-level for the consensus package to error by default, unless it was changed.
+		flag := viper.GetStringSlice("log-pkgs")
+		for _, v := range flag {
+			if strings.Contains(v, "consensus") {
+				return
+			}
+		}
+		logging.SetPackageLogLevel("consensus", "error")
+	},
+
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			err := cmd.Usage()
