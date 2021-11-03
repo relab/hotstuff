@@ -10,7 +10,7 @@ require (
 	github.com/mattn/go-isatty v0.0.12
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/relab/gorums v0.5.1-0.20210629194217-9811e4f219ca
-	github.com/relab/iago v0.0.0-20211017141755-a25715884f6f
+	github.com/relab/iago v0.0.0-20211103145729-e624a69d542c
 	github.com/relab/wrfs v0.0.0-20210628111300-b51570396aec
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.8.1

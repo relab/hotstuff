@@ -132,7 +132,7 @@ func TestDeployment(t *testing.T) {
 func findProjectRoot(t *testing.T) string {
 	// The path to the parent folder of this file.
 	// Will need to be updated if the package is ever moved.
-	const packagePath = "internal/orchestration"
+	var packagePath = filepath.Join("internal", "orchestration")
 
 	_, curFile, _, ok := runtime.Caller(0)
 	if !ok {
