@@ -75,7 +75,7 @@ func Deploy(g iago.Group, cfg DeployConfig) (workers map[string]WorkerSession, e
 			if err != nil {
 				return err
 			}
-			host.SetVar("exe", dest)
+			host.SetVar("exe", dest.String())
 			src, err := iago.NewPathFromAbs(exe)
 			if err != nil {
 				return err
