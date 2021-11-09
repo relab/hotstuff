@@ -247,26 +247,36 @@ func (s *Synchronizer) OnNewView(newView consensus.NewViewMsg) {
 // AdvanceView attempts to advance to the next view using the given QC.
 // qc must be either a regular quorum certificate, or a timeout certificate.
 func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
-	var v consensus.View
+	v := consensus.View(0)
 	timeout := false
+
+	// check for a TC
 	if tc, ok := syncInfo.TC(); ok {
 		if !s.mods.Crypto().VerifyTimeoutCert(tc) {
 			s.mods.Logger().Info("Timeout Certificate could not be verified!")
 			return
 		}
-		v = tc.View()
 		if v > s.highTC.View() {
 			s.highTC = tc
 		}
+
+		v = tc.View()
 		timeout = true
-	} else if qc, ok := syncInfo.QC(); ok {
+	}
+
+	// check for a QC.
+	if qc, ok := syncInfo.QC(); ok {
 		if !s.mods.Crypto().VerifyQuorumCert(qc) {
 			s.mods.Logger().Info("Quorum Certificate could not be verified!")
 			return
 		}
 		s.updateHighQC(qc)
-		v = qc.View()
-		s.duration.ViewSucceeded()
+
+		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
+		if qc.View() >= v {
+			v = qc.View()
+			timeout = false
+		}
 	}
 
 	if v < s.currentView {
@@ -274,6 +284,10 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 	}
 
 	s.timer.Stop()
+
+	if !timeout {
+		s.duration.ViewSucceeded()
+	}
 
 	s.currentView = v + 1
 	s.lastTimeout = nil
