@@ -123,12 +123,6 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 
 	block := proposal.Block
 
-	// ensure the block came from the leader.
-	if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.View()) {
-		cs.mods.Logger().Info("OnPropose: block was not proposed by the expected leader")
-		return
-	}
-
 	if cs.mods.Options().ShouldUseAggQC() && proposal.AggregateQC != nil {
 		ok, highQC := cs.mods.Crypto().VerifyAggregateQC(*proposal.AggregateQC)
 		if !ok {
@@ -144,6 +138,14 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 
 	if !cs.mods.Crypto().VerifyQuorumCert(block.QuorumCert()) {
 		cs.mods.Logger().Info("OnPropose: invalid QC")
+		return
+	}
+
+	cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
+
+	// ensure the block came from the leader.
+	if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.View()) {
+		cs.mods.Logger().Info("OnPropose: block was not proposed by the expected leader")
 		return
 	}
 
@@ -165,8 +167,6 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 
 	// we defer the following in order to speed up voting
 	defer func() {
-		cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
-
 		if b := cs.impl.CommitRule(block); b != nil {
 			cs.commit(b)
 		}
