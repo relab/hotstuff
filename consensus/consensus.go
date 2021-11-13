@@ -141,7 +141,7 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 		return
 	}
 
-	cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
+	cs.mods.synchronizer.UpdateHighQC(block.QuorumCert())
 
 	// ensure the block came from the leader.
 	if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.View()) {
@@ -170,6 +170,7 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 		if b := cs.impl.CommitRule(block); b != nil {
 			cs.commit(b)
 		}
+		cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
 	}()
 
 	if block.View() <= cs.lastVote {

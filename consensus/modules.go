@@ -387,6 +387,8 @@ type Synchronizer interface {
 	// AdvanceView attempts to advance to the next view using the given QC.
 	// qc must be either a regular quorum certificate, or a timeout certificate.
 	AdvanceView(SyncInfo)
+	// UpdateHighQC attempts to update HighQC using the given QC.
+	UpdateHighQC(QuorumCert)
 	// View returns the current view.
 	View() View
 	// ViewContext returns a context that is cancelled at the end of the view.
