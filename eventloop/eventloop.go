@@ -63,7 +63,7 @@ func (el *EventLoop) RegisterObserver(eventType interface{}, observer EventHandl
 // AddEvent adds an event to the event queue.
 //
 // It is not safe to call this function from the the event loop goroutine.
-// If you need to send add an event from a handler, use a goroutine:
+// If you need to add an event from a handler, use a goroutine:
 //  go EventLoop.AddEvent(...)
 func (el *EventLoop) AddEvent(event interface{}) {
 	el.eventQ <- event
