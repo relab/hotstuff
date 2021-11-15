@@ -14,6 +14,7 @@ func (f fixed) GetLeader(_ consensus.View) hotstuff.ID {
 	return f.leader
 }
 
+
 // NewFixed returns a new fixed-leader leader rotation implementation.
 func NewFixed(leader hotstuff.ID) consensus.LeaderRotation {
 	return fixed{leader}

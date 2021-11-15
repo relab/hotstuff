@@ -1,8 +1,6 @@
 package leaderrotation
 
 import (
-	"fmt"
-
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 )
@@ -20,7 +18,6 @@ func (r *repBased) InitConsensusModule(mods *consensus.Modules, _ *consensus.Opt
 //GetLeader returns the id of the leader in the given view
 func (r repBased) GetLeader(view consensus.View) hotstuff.ID {
 	//assume IDS start at 1'
-	fmt.Println("The leader now is: ", hotstuff.ID(view%consensus.View(r.mods.Configuration().Len())+1))
 	return hotstuff.ID(view%consensus.View(r.mods.Configuration().Len()) + 1)
 }
 

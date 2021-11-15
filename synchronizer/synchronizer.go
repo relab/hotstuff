@@ -60,6 +60,7 @@ func (s *Synchronizer) InitConsensusModule(mods *consensus.Modules, opts *consen
 	if err != nil {
 		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
 	}
+
 }
 
 // New creates a new Synchronizer.
@@ -286,12 +287,18 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 
 	s.mods.MetricsEventLoop().AddEvent(ViewChangeEvent{View: s.currentView, Timeout: timeout})
 
+	// leader <- choose_leader()
 	leader := s.mods.LeaderRotation().GetLeader(s.currentView)
+
 	if leader == s.mods.ID() {
 		s.mods.Consensus().Propose(syncInfo)
 	} else if replica, ok := s.mods.Configuration().Replica(leader); ok {
 		replica.NewView(syncInfo)
 	}
+	//B <- LBR(r, leader)
+	//if commit_head -> B:
+	// commit B
+	// commit_head <- B
 }
 
 // UpdateHighQC updates HighQC if the given qc is higher than the old HighQC.

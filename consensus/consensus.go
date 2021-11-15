@@ -1,6 +1,9 @@
 package consensus
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 // Rules is the minimum interface that a consensus implementations must implement.
 // Implementations of this interface can be wrapped in the ConsensusBase struct.
@@ -82,6 +85,7 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 	}
 
 	cmd, ok := cs.mods.CommandQueue().Get(cs.mods.Synchronizer().ViewContext())
+	//fmt.Println("Command", cmd, "Bool", ok)
 	if !ok {
 		cs.mods.Logger().Debug("Propose: No command")
 		return
@@ -106,10 +110,13 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 			),
 		}
 
+
 		if aggQC, ok := cert.AggQC(); ok && cs.mods.Options().ShouldUseAggQC() {
 			proposal.AggregateQC = &aggQC
 		}
 	}
+
+	fmt.Println("The proposal: ", proposal)
 
 	cs.mods.BlockChain().Store(proposal.Block)
 
@@ -123,16 +130,6 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 
 	block := proposal.Block
 
-	// ensure the block came from the leader.
-	if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.View()) {
-		cs.mods.Logger().Info("OnPropose: block was not proposed by the expected leader")
-		return
-	}
-
-	if block.View() <= cs.lastVote {
-		cs.mods.Logger().Info("OnPropose: block view too old")
-		return
-	}
 
 	if cs.mods.Options().ShouldUseAggQC() && proposal.AggregateQC != nil {
 		ok, highQC := cs.mods.Crypto().VerifyAggregateQC(*proposal.AggregateQC)
@@ -152,11 +149,24 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 		return
 	}
 
+	defer cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
+	// ensure the block came from the leader.
+	fmt.Println("ID vs Leader", proposal.ID, cs.mods.LeaderRotation().GetLeader((block.view)))
+	if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.View()) {
+
+		cs.mods.Logger().Info("OnPropose: block was not proposed by the expected leader")
+		return
+	}
+
 	if !cs.impl.VoteRule(proposal) {
+		cs.mods.Logger().Info("OnPropose: Block not voted for")
 		return
 	}
 
 	if qcBlock, ok := cs.mods.BlockChain().Get(block.QuorumCert().BlockHash()); ok {
+		if !ok{
+			cs.mods.Logger().Info("OnPropose: Failed fetching blockhash")
+		}
 		cs.mods.Acceptor().Proposed(qcBlock.Command())
 	}
 
@@ -167,6 +177,19 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 
 	cs.mods.BlockChain().Store(block)
 
+
+	defer func() {
+		if b := cs.impl.CommitRule(block); b != nil {
+			fmt.Println("Block was committed")
+			cs.commit(b)
+		}
+	}()
+
+	if block.View() <= cs.lastVote {
+		cs.mods.Logger().Info("OnPropose: block view too old")
+		return
+	}
+
 	pc, err := cs.mods.Crypto().CreatePartialCert(block)
 	if err != nil {
 		cs.mods.Logger().Error("OnPropose: failed to sign vote: ", err)
@@ -175,18 +198,12 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 
 	cs.lastVote = block.View()
 
-	defer func() {
-		if b := cs.impl.CommitRule(block); b != nil {
-			cs.commit(b)
-		}
-	}()
-
-	defer cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
-
 	leaderID := cs.mods.LeaderRotation().GetLeader(cs.lastVote + 1)
 	if leaderID == cs.mods.ID() {
 		go cs.mods.EventLoop().AddEvent(VoteMsg{ID: cs.mods.ID(), PartialCert: pc})
 		return
+	} else {
+		cs.mods.Logger().Info("LeaderID is NOT cs.mods.ID")
 	}
 
 	leader, ok := cs.mods.Configuration().Replica(leaderID)
