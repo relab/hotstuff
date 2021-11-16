@@ -110,7 +110,6 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 			),
 		}
 
-
 		if aggQC, ok := cert.AggQC(); ok && cs.mods.Options().ShouldUseAggQC() {
 			proposal.AggregateQC = &aggQC
 		}
@@ -127,9 +126,8 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 
 func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 	cs.mods.Logger().Debugf("OnPropose: %v", proposal.Block)
-
+	
 	block := proposal.Block
-
 
 	if cs.mods.Options().ShouldUseAggQC() && proposal.AggregateQC != nil {
 		ok, highQC := cs.mods.Crypto().VerifyAggregateQC(*proposal.AggregateQC)
@@ -151,8 +149,8 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 
 	defer cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
 	// ensure the block came from the leader.
-	fmt.Println("ID vs Leader", proposal.ID, cs.mods.LeaderRotation().GetLeader((block.view)))
-	if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.View()) {
+	fmt.Println("ID vs Leader", proposal.ID, cs.mods.LeaderRotation().GetLeader(block.View())) 
+	if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.View()) {                       
 
 		cs.mods.Logger().Info("OnPropose: block was not proposed by the expected leader")
 		return
@@ -164,7 +162,7 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 	}
 
 	if qcBlock, ok := cs.mods.BlockChain().Get(block.QuorumCert().BlockHash()); ok {
-		if !ok{
+		if !ok {
 			cs.mods.Logger().Info("OnPropose: Failed fetching blockhash")
 		}
 		cs.mods.Acceptor().Proposed(qcBlock.Command())
@@ -176,7 +174,6 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 	}
 
 	cs.mods.BlockChain().Store(block)
-
 
 	defer func() {
 		if b := cs.impl.CommitRule(block); b != nil {
@@ -198,13 +195,13 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 
 	cs.lastVote = block.View()
 
-	leaderID := cs.mods.LeaderRotation().GetLeader(cs.lastVote + 1)
+	leaderID := cs.mods.LeaderRotation().GetLeader(cs.lastVote + 1) //removed +1, no difference. Added -1
 	if leaderID == cs.mods.ID() {
 		go cs.mods.EventLoop().AddEvent(VoteMsg{ID: cs.mods.ID(), PartialCert: pc})
 		return
-	} else {
-		cs.mods.Logger().Info("LeaderID is NOT cs.mods.ID")
-	}
+	} // else {
+	//	cs.mods.Logger().Info("LeaderID is NOT cs.mods.ID")
+	//}
 
 	leader, ok := cs.mods.Configuration().Replica(leaderID)
 	if !ok {

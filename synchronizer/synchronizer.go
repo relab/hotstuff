@@ -269,6 +269,7 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 		v = qc.View()
 		s.duration.ViewSucceeded()
 	}
+	
 
 	if v < s.currentView {
 		return
@@ -289,6 +290,7 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 
 	// leader <- choose_leader()
 	leader := s.mods.LeaderRotation().GetLeader(s.currentView)
+
 
 	if leader == s.mods.ID() {
 		s.mods.Consensus().Propose(syncInfo)
