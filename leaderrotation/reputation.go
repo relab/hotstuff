@@ -20,15 +20,23 @@ func (r *repBased) InitConsensusModule(mods *consensus.Modules, _ *consensus.Opt
 
 //GetLeader returns the id of the leader in the given view
 func (r repBased) GetLeader(view consensus.View) hotstuff.ID {
-	//assume IDS start at 1'
-	theReplica, ok := r.mods.Configuration().Replica(r.mods.ID())
-	if !ok {
-		fmt.Println(ok)
+	commit_head := r.mods.Consensus().CommittedBlock() //fetch previous comitted block
+	if int(view) <= r.mods.Configuration().Len()+10 {
+		return hotstuff.ID(view%consensus.View(r.mods.Configuration().Len()) + 1)
+
 	}
-	fmt.Println("the rep is", theReplica.GetRep())
-	theRep := theReplica.GetRep()
-	theReplica.UpdateRep(1)
-	fmt.Println("the rep now is: :", theReplica.ID(),  theRep)
+	voters := commit_head.QuorumCert().Signature().Participants()
+	voters.ForEach(func(voterID hotstuff.ID){
+		currentVoter, ok := r.mods.Configuration().Replica(voterID)
+		if !ok {
+			r.mods.Logger().Info("Failed fetching replica", currentVoter)
+		}
+		thisValue := uint64(1)
+		currentVoter.UpdateRep(thisValue)
+		fmt.Println("the rep for ID ", currentVoter.ID()," is now:", currentVoter.GetRep())
+
+	})
+	fmt.Println("the voters were ", voters)
 	return hotstuff.ID(view%consensus.View(r.mods.Configuration().Len()) + 1)
 }
 
