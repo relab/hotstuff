@@ -2,6 +2,7 @@ package leaderrotation
 
 import (
 	"fmt"
+	"hash/fnv"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
@@ -21,22 +22,34 @@ func (r *repBased) InitConsensusModule(mods *consensus.Modules, _ *consensus.Opt
 //GetLeader returns the id of the leader in the given view
 func (r repBased) GetLeader(view consensus.View) hotstuff.ID {
 	commit_head := r.mods.Consensus().CommittedBlock() //fetch previous comitted block
-	if int(view) <= r.mods.Configuration().Len()+10 {
-		return hotstuff.ID(view%consensus.View(r.mods.Configuration().Len()) + 1)
+	numReplicas := r.mods.Configuration().Len() 
+	blockHash := r.mods.Consensus().CommittedBlock().Hash().String()
+	h := fnv.New32a()
+	h.Write([]byte(blockHash))
+	hashInt := h.Sum32()
 
+	fmt.Println("the block hash", hashInt)
+	if int(view) <= numReplicas+10 {
+		return hotstuff.ID(view%consensus.View(numReplicas) + 1)
 	}
 	voters := commit_head.QuorumCert().Signature().Participants()
-	voters.ForEach(func(voterID hotstuff.ID){
+	numVotes := 1.0 //is 1 because leader counts as a vote
+	voters.ForEach(func(hotstuff.ID) {
+		numVotes += 1.0
+	})
+	frac := float64((2.0/3.0)*float64(numReplicas))
+	reputation := ((numVotes - frac) / frac)
+	fmt.Println("the reputation is", reputation)
+	voters.ForEach(func(voterID hotstuff.ID) {
+
 		currentVoter, ok := r.mods.Configuration().Replica(voterID)
 		if !ok {
 			r.mods.Logger().Info("Failed fetching replica", currentVoter)
 		}
-		thisValue := uint64(1)
-		currentVoter.UpdateRep(thisValue)
-		fmt.Println("the rep for ID ", currentVoter.ID()," is now:", currentVoter.GetRep())
+		currentVoter.UpdateRep(reputation)
+		fmt.Println("the rep for ID ", currentVoter.ID(), " is now:", currentVoter.GetRep())
 
 	})
-	fmt.Println("the voters were ", voters)
 	return hotstuff.ID(view%consensus.View(r.mods.Configuration().Len()) + 1)
 }
 

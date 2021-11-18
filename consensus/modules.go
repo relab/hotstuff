@@ -338,9 +338,9 @@ type Replica interface {
 	// NewView sends the quorum certificate to the other replica.
 	NewView(SyncInfo)
 	// Rep returns the replicas reputation
-	GetRep() uint64
+	GetRep() float64
 	//Updates the reputation
-	UpdateRep(uint64)
+	UpdateRep(float64)
 }
 
 //go:generate mockgen -destination=../internal/mocks/configuration_mock.go -package=mocks . Configuration
