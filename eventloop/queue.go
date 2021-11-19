@@ -92,9 +92,5 @@ func (q *queue) len() int {
 }
 
 func (q *queue) ready() <-chan struct{} {
-	// technically it should be fine to not lock the mutex here,
-	// but I suspect the data race detector will trip if I don't.
-	q.mut.Lock()
-	defer q.mut.Unlock()
 	return q.readyChan
 }
