@@ -25,7 +25,7 @@ type EventHandler func(event interface{})
 type EventLoop struct {
 	mut sync.Mutex
 
-	eventQ        chan interface{}
+	eventQ        queue
 	waitingEvents map[reflect.Type][]interface{}
 
 	handlers  map[reflect.Type]EventHandler
@@ -38,7 +38,7 @@ type EventLoop struct {
 // New returns a new event loop with the requested buffer size.
 func New(bufferSize uint) *EventLoop {
 	el := &EventLoop{
-		eventQ:        make(chan interface{}, bufferSize),
+		eventQ:        newQueue(bufferSize),
 		waitingEvents: make(map[reflect.Type][]interface{}),
 		handlers:      make(map[reflect.Type]EventHandler),
 		observers:     make(map[reflect.Type][]EventHandler),
@@ -61,35 +61,52 @@ func (el *EventLoop) RegisterObserver(eventType interface{}, observer EventHandl
 }
 
 // AddEvent adds an event to the event queue.
-//
-// It is not safe to call this function from the the event loop goroutine.
-// If you need to add an event from a handler, use a goroutine:
-//  go EventLoop.AddEvent(...)
 func (el *EventLoop) AddEvent(event interface{}) {
-	el.eventQ <- event
+	el.eventQ.push(event)
 }
 
 // Run runs the event loop. A context object can be provided to stop the event loop.
 func (el *EventLoop) Run(ctx context.Context) {
+loop:
 	for {
-		select {
-		case event := <-el.eventQ:
-			if e, ok := event.(startTickerEvent); ok {
-				el.startTicker(ctx, e.tickerID)
-				break
+		event, ok := el.eventQ.pop()
+		if !ok {
+			select {
+			case <-el.eventQ.ready():
+				continue loop
+			case <-ctx.Done():
+				break loop
 			}
-			el.processEvent(event)
-		case <-ctx.Done():
-			goto cancelled
 		}
+		if e, ok := event.(startTickerEvent); ok {
+			el.startTicker(ctx, e.tickerID)
+			continue
+		}
+		el.processEvent(event)
 	}
 
-cancelled:
 	// HACK: when we get cancelled, we will handle the events that were in the queue at that time before quitting.
-	l := len(el.eventQ)
+	l := el.eventQ.len()
 	for i := 0; i < l; i++ {
-		el.processEvent(<-el.eventQ)
+		event, _ := el.eventQ.pop()
+		el.processEvent(event)
 	}
+}
+
+// Tick processes a single event. Returns true if an event was handled.
+func (el *EventLoop) Tick() bool {
+	event, ok := el.eventQ.pop()
+	if !ok {
+		return false
+	}
+
+	if e, ok := event.(startTickerEvent); ok {
+		el.startTicker(context.Background(), e.tickerID)
+	} else {
+		el.processEvent(event)
+	}
+
+	return true
 }
 
 // processEvent dispatches the event to the correct handler.
@@ -113,15 +130,11 @@ func (el *EventLoop) processEvent(event interface{}) {
 }
 
 func (el *EventLoop) dispatchDelayedEvents(t reflect.Type) {
-
 	el.mut.Lock()
 	if delayed, ok := el.waitingEvents[t]; ok {
-		// must use a goroutine to avoid deadlock
-		go func(events []interface{}) {
-			for _, event := range delayed {
-				el.AddEvent(event)
-			}
-		}(delayed)
+		for _, event := range delayed {
+			el.AddEvent(event)
+		}
 		delete(el.waitingEvents, t)
 	}
 	el.mut.Unlock()
@@ -168,7 +181,7 @@ func (el *EventLoop) AddTicker(interval time.Duration, callback func(tick time.T
 
 	el.mut.Unlock()
 
-	el.eventQ <- startTickerEvent{id}
+	el.eventQ.push(startTickerEvent{id})
 
 	return id
 }
