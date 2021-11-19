@@ -60,7 +60,11 @@ func (vm *VotingMachine) OnVote(vote VoteMsg) {
 		return
 	}
 
-	go vm.verifyCert(cert, block)
+	if vm.mods.Options().ShouldVerifyVotesSync() {
+		vm.verifyCert(cert, block)
+	} else {
+		go vm.verifyCert(cert, block)
+	}
 }
 
 func (vm *VotingMachine) verifyCert(cert PartialCert, block *Block) {
