@@ -47,8 +47,10 @@ func (q *queue) push(entry interface{}) {
 		q.head = pos
 	}
 
-	close(q.readyChan)
-	q.readyChan = make(chan struct{})
+	select {
+	case q.readyChan <- struct{}{}:
+	default:
+	}
 }
 
 func (q *queue) pop() (entry interface{}, ok bool) {
