@@ -38,7 +38,7 @@ func TestPushAndThenLen(t *testing.T) {
 	}
 }
 
-func TestPushAndPopTwice(t *testing.T) {
+func TestPushAndThenPopTwice(t *testing.T) {
 	q := newQueue(1)
 	q.push("hello")
 
@@ -53,7 +53,7 @@ func TestPushAndPopTwice(t *testing.T) {
 	}
 }
 
-func TestPushTwiceThenPopWithCapacity1(t *testing.T) {
+func TestPushWhenFull(t *testing.T) {
 	q := newQueue(1)
 	q.push("hello")
 	q.push("world")
@@ -64,7 +64,7 @@ func TestPushTwiceThenPopWithCapacity1(t *testing.T) {
 	}
 }
 
-func TestPushTwiceThenPopTwiceWithCapacity2(t *testing.T) {
+func TestPushMultiple(t *testing.T) {
 	q := newQueue(2)
 	q.push("hello")
 	q.push("world")
@@ -80,7 +80,7 @@ func TestPushTwiceThenPopTwiceWithCapacity2(t *testing.T) {
 	}
 }
 
-func TestPushTwiceThenPopThenPushAndThenLenWithCapacity2(t *testing.T) {
+func TestLenWhenTailInFrontOfHead(t *testing.T) {
 	q := newQueue(2)
 
 	q.push("hello")
@@ -93,7 +93,7 @@ func TestPushTwiceThenPopThenPushAndThenLenWithCapacity2(t *testing.T) {
 	}
 }
 
-func TestPushTwiceThenPopThenPushThenPopWithCapacity2(t *testing.T) {
+func TestPopWhenTailInFrontOfHead(t *testing.T) {
 	q := newQueue(2)
 
 	q.push("hello")
