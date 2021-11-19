@@ -20,7 +20,7 @@ func TestTwins(t *testing.T) {
 		if !ok {
 			break
 		}
-		safe, commits, err := twins.ExecuteScenario(s, "chainedhotstuff", 10*time.Millisecond)
+		safe, commits, err := twins.ExecuteScenario(s, "chainedhotstuff")
 		if err != nil {
 			t.Fatal(err)
 		}

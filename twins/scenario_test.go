@@ -2,7 +2,6 @@ package twins
 
 import (
 	"testing"
-	"time"
 
 	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
 )
@@ -25,13 +24,13 @@ func TestBasicScenario(t *testing.T) {
 	s.Views = append(s.Views, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s.Views = append(s.Views, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 
-	safe, commits, err := ExecuteScenario(s, "chainedhotstuff", 10*time.Millisecond)
+	safe, commits, err := ExecuteScenario(s, "chainedhotstuff")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if !safe {
-		t.Errorf("Expected scenario no safety violations")
+		t.Errorf("Expected no safety violations")
 	}
 
 	if commits != 1 {

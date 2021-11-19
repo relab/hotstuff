@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
@@ -50,23 +49,17 @@ func (s Scenario) String() string {
 }
 
 // ExecuteScenario executes a twins scenario.
-func ExecuteScenario(scenario Scenario, consensusName string, viewTimeout time.Duration) (safe bool, commits int, err error) {
+func ExecuteScenario(scenario Scenario, consensusName string) (safe bool, commits int, err error) {
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
 	network := newNetwork(scenario.Views, consensus.ProposeMsg{}, consensus.VoteMsg{}, consensus.Hash{})
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	err = createNodes(scenario, network, consensusName, viewTimeout)
+	err = createNodes(scenario, network, consensusName)
 	if err != nil {
-		cancel()
 		return false, 0, err
 	}
 
-	network.startNodes(ctx)
-	network.waitUntilHung()
-	cancel()
-	network.waitUntilDone()
+	network.run(len(scenario.Views))
 
 	// check if the majority of replicas have committed the same blocks
 	safe, commits = checkCommits(network)
@@ -74,7 +67,7 @@ func ExecuteScenario(scenario Scenario, consensusName string, viewTimeout time.D
 	return safe, commits, nil
 }
 
-func createNodes(scenario Scenario, network *network, consensusName string, viewTimeout time.Duration) error {
+func createNodes(scenario Scenario, network *network, consensusName string) error {
 	cg := &commandGenerator{}
 	keys := make(map[hotstuff.ID]consensus.PrivateKey)
 	for _, nodeID := range scenario.Nodes {
@@ -100,13 +93,14 @@ func createNodes(scenario Scenario, network *network, consensusName string, view
 			blockchain.New(),
 			consensus.New(consensusModule),
 			crypto.NewCache(ecdsa.New(), 100),
-			synchronizer.New(testutil.FixedTimeout(viewTimeout)),
+			synchronizer.New(testutil.FixedTimeout(0)),
 			&configuration{
 				node:    &n,
 				network: network,
 			},
 			leaderRotation(scenario.Views),
 			commandModule{commandGenerator: cg, node: &n},
+			twinsSettings{}, // sets runtime options
 		)
 		n.Modules = builder.Build()
 		network.Nodes[nodeID] = &n
@@ -201,3 +195,11 @@ func (cm commandModule) Exec(block *consensus.Block) {
 }
 
 func (commandModule) Fork(block *consensus.Block) {}
+
+// twinsSettings is a useless module that only exists to set some runtime options at initialization.
+type twinsSettings struct{}
+
+func (ts twinsSettings) InitConsensusModule(_ *consensus.Modules, opts *consensus.OptionsBuilder) {
+	// this makes the voting machine process votes synchronously, which is helpful for ticking the event loop.
+	opts.SetShouldVerifyVotesSync()
+}

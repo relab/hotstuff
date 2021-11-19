@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"sync"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
@@ -20,9 +19,10 @@ type NodeID struct {
 }
 
 type node struct {
-	ID             NodeID
-	Modules        *consensus.Modules
-	ExecutedBlocks []*consensus.Block
+	ID              NodeID
+	Modules         *consensus.Modules
+	ExecutedBlocks  []*consensus.Block
+	lastMessageView consensus.View
 }
 
 // Network is a simulated network that supports twins.
@@ -34,30 +34,16 @@ type network struct {
 	Views []View
 
 	dropTypes map[reflect.Type]struct{}
-
-	mut sync.Mutex
-	// The view in which the last timeout occurred for a node.
-	lastTimeouts map[NodeID]consensus.View
-	// hungNodes the set of nodes which have
-	hungNodes NodeSet
-
-	allHung       chan struct{}
-	allHungClosed bool
-	done          chan struct{}
 }
 
 // newNetwork creates a new Network with the specified partitions.
 // partitions specifies the network partitions for each view.
 func newNetwork(rounds []View, dropTypes ...interface{}) *network {
 	n := &network{
-		Nodes:        make(map[NodeID]*node),
-		Replicas:     make(map[hotstuff.ID][]*node),
-		Views:        rounds,
-		dropTypes:    make(map[reflect.Type]struct{}),
-		lastTimeouts: make(map[NodeID]consensus.View),
-		hungNodes:    make(NodeSet),
-		allHung:      make(chan struct{}),
-		done:         make(chan struct{}),
+		Nodes:     make(map[NodeID]*node),
+		Replicas:  make(map[hotstuff.ID][]*node),
+		Views:     rounds,
+		dropTypes: make(map[reflect.Type]struct{}),
 	}
 	for _, t := range dropTypes {
 		n.dropTypes[reflect.TypeOf(t)] = struct{}{}
@@ -65,55 +51,42 @@ func newNetwork(rounds []View, dropTypes ...interface{}) *network {
 	return n
 }
 
-// startNodes starts all nodes.
-func (n *network) startNodes(ctx context.Context) {
-	for _, no := range n.Nodes {
-		no.Modules.EventLoop().RegisterObserver(synchronizer.ViewChangeEvent{}, func(event interface{}) {
-			// we clear the "hung" status whenever a view change happens
-			n.mut.Lock()
-			delete(n.hungNodes, no.ID)
-			n.mut.Unlock()
-		})
-		go func(no *node) {
-			no.Modules.Synchronizer().Start(ctx)
-			no.Modules.Run(ctx)
-			n.done <- struct{}{}
-		}(no)
-	}
-}
-
-func (n *network) waitUntilHung() {
-	<-n.allHung
-}
-
-func (n *network) waitUntilDone() {
-	for range n.Nodes {
-		<-n.done
-	}
-}
-
-func (n *network) timeout(node NodeID, view consensus.View) {
-	n.mut.Lock()
-	defer n.mut.Unlock()
-
-	lastTimeoutView, ok := n.lastTimeouts[node]
-
-	if ok && lastTimeoutView == view {
-		n.hungNodes.Add(node)
-		if len(n.hungNodes) == len(n.Nodes) && !n.allHungClosed {
-			n.allHungClosed = true
-			close(n.allHung)
+func (n *network) run(rounds int) {
+	// kick off the initial proposal(s)
+	for _, node := range n.Nodes {
+		if node.Modules.LeaderRotation().GetLeader(1) == node.ID.ReplicaID {
+			node.Modules.Consensus().Propose(node.Modules.Synchronizer().(*synchronizer.Synchronizer).SyncInfo())
 		}
-		return
 	}
 
-	if lastTimeoutView > view {
-		// strange, but we'll ignore it
-		return
+	for view := consensus.View(0); view <= consensus.View(rounds); view++ {
+		n.round(view)
+	}
+}
+
+// round performs one round for each node
+func (n *network) round(view consensus.View) {
+	for _, node := range n.Nodes {
+		// run each event loop as long as it has events
+		for node.Modules.EventLoop().Tick() {
+		}
 	}
 
-	n.lastTimeouts[node] = view
-	delete(n.hungNodes, node)
+	// give the next leader the opportunity to process votes and propose a new block
+	for _, node := range n.Nodes {
+		if node.Modules.LeaderRotation().GetLeader(view+1) == node.Modules.ID() {
+			for node.Modules.EventLoop().Tick() {
+			}
+		}
+	}
+
+	for _, node := range n.Nodes {
+		// if the node did not send any messages this round, it should timeout
+		if node.lastMessageView < view {
+			// FIXME: should we add the OnLocalTimeout method to the Synchronizer interface?
+			node.Modules.Synchronizer().(*synchronizer.Synchronizer).OnLocalTimeout()
+		}
+	}
 }
 
 // shouldDrop decides if the sender should drop the message, based on the current view of the sender and the
@@ -170,6 +143,7 @@ func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
 		}
 		node.Modules.EventLoop().AddEvent(message)
 	}
+	c.node.lastMessageView = c.node.Modules.Synchronizer().View()
 }
 
 // shouldDrop checks if a message to the node identified by id should be dropped.
@@ -218,7 +192,6 @@ func (c *configuration) Propose(proposal consensus.ProposeMsg) {
 
 // Timeout sends the timeout message to all replicas.
 func (c *configuration) Timeout(msg consensus.TimeoutMsg) {
-	c.network.timeout(c.node.ID, msg.View)
 	c.broadcastMessage(msg)
 }
 

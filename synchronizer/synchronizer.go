@@ -84,7 +84,7 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	s.timer = time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
 		s.cancelCtx()
-		s.mods.EventLoop().AddEvent(s.onLocalTimeout)
+		s.mods.EventLoop().AddEvent(s.OnLocalTimeout)
 	})
 
 	go func() {
@@ -126,7 +126,8 @@ func (s *Synchronizer) SyncInfo() consensus.SyncInfo {
 	return consensus.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
 }
 
-func (s *Synchronizer) onLocalTimeout() {
+// OnLocalTimeout is called when a local timeout happens.
+func (s *Synchronizer) OnLocalTimeout() {
 	defer func() {
 		// Reset the timer and ctx here so that we can get a new timeout in the same view.
 		// I think this is necessary to ensure that we can keep sending the same timeout message

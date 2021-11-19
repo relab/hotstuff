@@ -6,15 +6,13 @@ import (
 	"log"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto/twinspb"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/twins"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 var (
@@ -27,7 +25,6 @@ var (
 	randSeed       int64
 	twinsDest      string
 	twinsConsensus string
-	twinsTimeout   time.Duration
 	logAll         bool
 )
 
@@ -44,7 +41,7 @@ var twinsCmd = &cobra.Command{
 				return
 			}
 		}
-		logging.SetPackageLogLevel("consensus", "error")
+		logging.SetPackageLogLevel("consensus", "panic")
 	},
 
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -80,14 +77,13 @@ func init() {
 	twinsCmd.Flags().Int64Var(&randSeed, "seed", 0, "Random seed (defaults to current timestamp).")
 	twinsCmd.Flags().StringVar(&twinsDest, "output", "twins.json", "File to write to.")
 	twinsCmd.Flags().StringVar(&twinsConsensus, "consensus", "chainedhotstuff", "The name of the consensus implementation to use.")
-	twinsCmd.Flags().DurationVar(&twinsTimeout, "timeout", 10*time.Millisecond, "View timeout.")
 	twinsCmd.Flags().BoolVar(&logAll, "log-all", false, "If true, all scenarios will be written to the output file when in \"run\" mode.")
 }
 
 func twinsRun() {
 	t, err := newInstance()
 	checkf("failed to create twins instance: %v", err)
-	defer func() { checkf("failed to close twins instance: %v", t.close()) }()
+	defer func() { checkf("failed to close twins instance: %v", t.closeOutput()) }()
 
 	for i := uint64(0); i < numScenarios; i++ {
 		if ok, err := t.generateAndExecuteScenario(); err != nil {
@@ -103,10 +99,12 @@ func twinsRun() {
 func twinsGenerate() {
 	t, err := newInstance()
 	checkf("failed to create twins instance: %v", err)
-	defer func() { checkf("failed to close twins instance: %v", t.close()) }()
+	defer func() { checkf("failed to close twins instance: %v", t.closeOutput()) }()
 
 	for i := uint64(0); i < numScenarios; i++ {
-		if !t.generateAndLogScenario() {
+		if ok, err := t.generateAndLogScenario(); err != nil {
+			checkf("failed to generate scenario: %v", err)
+		} else if !ok {
 			break
 		}
 	}
@@ -115,9 +113,10 @@ func twinsGenerate() {
 }
 
 type twinsInstance struct {
-	generator   *twins.Generator
-	mods        *modules.Modules
-	closeOutput func() error
+	generator    *twins.Generator
+	outputStream *protostream.Writer
+	logger       logging.Logger
+	closeOutput  func() error
 }
 
 func newInstance() (twinsInstance, error) {
@@ -133,33 +132,24 @@ func newInstance() (twinsInstance, error) {
 	}
 
 	wr := bufio.NewWriter(f)
-	jsonLogger, err := modules.NewJSONLogger(wr)
+	ps := protostream.NewWriter(wr)
+
+	err = ps.Write(&twinspb.GeneratorSettings{
+		Replicas:  uint32(numReplicas),
+		Twins:     uint32(numTwins),
+		Rounds:    uint32(numRounds),
+		Shuffle:   shuffle,
+		Seed:      randSeed,
+		Consensus: twinsConsensus,
+	})
 	if err != nil {
-		if cerr := f.Close(); err == nil {
-			return twinsInstance{}, cerr
-		}
 		return twinsInstance{}, err
 	}
 
-	jsonLogger.Log(&twinspb.GeneratorSettings{
-		Replicas:    uint32(numReplicas),
-		Twins:       uint32(numTwins),
-		Rounds:      uint32(numRounds),
-		Shuffle:     shuffle,
-		Seed:        randSeed,
-		Consensus:   twinsConsensus,
-		ViewTimeout: durationpb.New(twinsTimeout),
-	})
-
-	mods := modules.NewBuilder(0)
-	mods.Register(
-		logging.New("twins"),
-		jsonLogger,
-	)
-
 	return twinsInstance{
-		generator: gen,
-		mods:      mods.Build(),
+		generator:    gen,
+		outputStream: ps,
+		logger:       logging.New("twins"),
 		closeOutput: func() error {
 			err = wr.Flush()
 			if cerr := f.Close(); err == nil {
@@ -170,23 +160,18 @@ func newInstance() (twinsInstance, error) {
 	}, nil
 }
 
-func (ti twinsInstance) close() error {
-	err := ti.mods.MetricsLogger().Close()
-	if cerr := ti.closeOutput(); err == nil {
-		err = cerr
-	}
-	return err
-}
-
-func (ti twinsInstance) generateAndLogScenario() bool {
+func (ti twinsInstance) generateAndLogScenario() (bool, error) {
 	scenario, ok := ti.generator.NextScenario()
 	if !ok {
-		return false
+		return false, nil
 	}
 
-	ti.mods.MetricsLogger().Log(twins.ScenarioToProto(&scenario))
+	err := ti.outputStream.Write(twins.ScenarioToProto(&scenario))
+	if err != nil {
+		return false, err
+	}
 
-	return true
+	return true, nil
 }
 
 func (ti twinsInstance) generateAndExecuteScenario() (bool, error) {
@@ -195,21 +180,24 @@ func (ti twinsInstance) generateAndExecuteScenario() (bool, error) {
 		return false, nil
 	}
 
-	safe, commits, err := twins.ExecuteScenario(scenario, twinsConsensus, twinsTimeout)
+	safe, commits, err := twins.ExecuteScenario(scenario, twinsConsensus)
 	if err != nil {
 		return false, err
 	}
 
 	if !safe {
-		ti.mods.Logger().Info("Found unsafe scenario: %v", scenario)
+		ti.logger.Info("Found unsafe scenario: %v", scenario)
 	}
 
 	if !safe || logAll {
-		ti.mods.MetricsLogger().Log(&twinspb.Result{
+		err = ti.outputStream.Write(&twinspb.Result{
 			Safe:     safe,
 			Commits:  uint32(commits),
 			Scenario: twins.ScenarioToProto(&scenario),
 		})
+		if err != nil {
+			return false, err
+		}
 	}
 
 	return true, nil

@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package twins;
 
-import "google/protobuf/duration.proto";
-
 option go_package = "github.com/relab/hotstuff/internal/proto/twinspb";
 
 message NodeID {
@@ -32,7 +30,6 @@ message GeneratorSettings {
   bool Shuffle = 4;
   int64 Seed = 5;
   string Consensus = 6;
-  google.protobuf.Duration ViewTimeout = 7;
 }
 
 message Result {
