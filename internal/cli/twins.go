@@ -79,10 +79,10 @@ func init() {
 	twinsCmd.Flags().Uint64Var(&numScenarios, "scenarios", 100, "Number of scenarios to generate.")
 	twinsCmd.Flags().BoolVar(&shuffle, "shuffle", false, "Shuffle the order in which scenarios are generated.")
 	twinsCmd.Flags().Int64Var(&randSeed, "seed", 0, "Random seed (defaults to current timestamp).")
-	twinsCmd.Flags().StringVar(&twinsDest, "output", "twins.json", "File to write to.")
+	twinsCmd.Flags().StringVar(&twinsDest, "output", "twins.out", "File to write to.")
 	twinsCmd.Flags().StringVar(&twinsConsensus, "consensus", "chainedhotstuff", "The name of the consensus implementation to use.")
 	twinsCmd.Flags().BoolVar(&logAll, "log-all", false, "If true, all scenarios will be written to the output file when in \"run\" mode.")
-	twinsCmd.Flags().UintVar(&concurrency, "concurrency", 1, "Number of worker goroutines to use for executing scenarios. If set to 0, it will create one goroutine for each CPU.")
+	twinsCmd.Flags().UintVar(&concurrency, "concurrency", 1, "Number of goroutines to use. If set to 0, the number of CPUs will be used.")
 }
 
 func twinsRun() {
@@ -146,12 +146,6 @@ func newInstance() (twinsInstance, error) {
 		return twinsInstance{}, err
 	}
 
-	gen := twins.NewGenerator(numReplicas, numTwins, numPartitions, numRounds)
-
-	if shuffle {
-		gen.Shuffle(randSeed)
-	}
-
 	wr := bufio.NewWriter(f)
 	ps := protostream.NewWriter(wr)
 
@@ -165,6 +159,12 @@ func newInstance() (twinsInstance, error) {
 	})
 	if err != nil {
 		return twinsInstance{}, err
+	}
+
+	gen := twins.NewGenerator(numReplicas, numTwins, numPartitions, numRounds)
+
+	if shuffle {
+		gen.Shuffle(randSeed)
 	}
 
 	return twinsInstance{

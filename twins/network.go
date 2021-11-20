@@ -19,19 +19,19 @@ type NodeID struct {
 }
 
 type node struct {
-	ID              NodeID
-	Modules         *consensus.Modules
-	ExecutedBlocks  []*consensus.Block
+	id              NodeID
+	modules         *consensus.Modules
+	executedBlocks  []*consensus.Block
 	lastMessageView consensus.View
 }
 
 // Network is a simulated network that supports twins.
 type network struct {
-	Nodes map[NodeID]*node
+	nodes map[NodeID]*node
 	// Maps a replica ID to a replica and its twins.
-	Replicas map[hotstuff.ID][]*node
+	replicas map[hotstuff.ID][]*node
 	// For each view (starting at 1), contains the list of partitions for that view.
-	Views []View
+	views []View
 
 	dropTypes map[reflect.Type]struct{}
 }
@@ -40,9 +40,9 @@ type network struct {
 // partitions specifies the network partitions for each view.
 func newNetwork(rounds []View, dropTypes ...interface{}) *network {
 	n := &network{
-		Nodes:     make(map[NodeID]*node),
-		Replicas:  make(map[hotstuff.ID][]*node),
-		Views:     rounds,
+		nodes:     make(map[NodeID]*node),
+		replicas:  make(map[hotstuff.ID][]*node),
+		views:     rounds,
 		dropTypes: make(map[reflect.Type]struct{}),
 	}
 	for _, t := range dropTypes {
@@ -53,9 +53,9 @@ func newNetwork(rounds []View, dropTypes ...interface{}) *network {
 
 func (n *network) run(rounds int) {
 	// kick off the initial proposal(s)
-	for _, node := range n.Nodes {
-		if node.Modules.LeaderRotation().GetLeader(1) == node.ID.ReplicaID {
-			node.Modules.Consensus().Propose(node.Modules.Synchronizer().(*synchronizer.Synchronizer).SyncInfo())
+	for _, node := range n.nodes {
+		if node.modules.LeaderRotation().GetLeader(1) == node.id.ReplicaID {
+			node.modules.Consensus().Propose(node.modules.Synchronizer().(*synchronizer.Synchronizer).SyncInfo())
 		}
 	}
 
@@ -66,25 +66,25 @@ func (n *network) run(rounds int) {
 
 // round performs one round for each node
 func (n *network) round(view consensus.View) {
-	for _, node := range n.Nodes {
+	for _, node := range n.nodes {
 		// run each event loop as long as it has events
-		for node.Modules.EventLoop().Tick() {
+		for node.modules.EventLoop().Tick() {
 		}
 	}
 
 	// give the next leader the opportunity to process votes and propose a new block
-	for _, node := range n.Nodes {
-		if node.Modules.LeaderRotation().GetLeader(view+1) == node.Modules.ID() {
-			for node.Modules.EventLoop().Tick() {
+	for _, node := range n.nodes {
+		if node.modules.LeaderRotation().GetLeader(view+1) == node.modules.ID() {
+			for node.modules.EventLoop().Tick() {
 			}
 		}
 	}
 
-	for _, node := range n.Nodes {
+	for _, node := range n.nodes {
 		// if the node did not send any messages this round, it should timeout
 		if node.lastMessageView < view {
 			// FIXME: should we add the OnLocalTimeout method to the Synchronizer interface?
-			node.Modules.Synchronizer().(*synchronizer.Synchronizer).OnLocalTimeout()
+			node.modules.Synchronizer().(*synchronizer.Synchronizer).OnLocalTimeout()
 		}
 	}
 }
@@ -92,20 +92,20 @@ func (n *network) round(view consensus.View) {
 // shouldDrop decides if the sender should drop the message, based on the current view of the sender and the
 // partitions configured for that view.
 func (n *network) shouldDrop(sender, receiver NodeID, message interface{}) bool {
-	node, ok := n.Nodes[sender]
+	node, ok := n.nodes[sender]
 	if !ok {
 		panic(fmt.Errorf("node matching sender id %d was not found", sender))
 	}
 
 	// Index into viewPartitions.
-	i := int(node.Modules.Synchronizer().View() - 1)
+	i := int(node.modules.Synchronizer().View() - 1)
 
 	// will default to dropping all messages from views that don't have any specified partitions.
-	if i >= len(n.Views) {
+	if i >= len(n.views) {
 		return true
 	}
 
-	partitions := n.Views[i].Partitions
+	partitions := n.views[i].Partitions
 	for _, partition := range partitions {
 		if partition.Contains(sender) && partition.Contains(receiver) {
 			return false
@@ -123,8 +123,8 @@ type configuration struct {
 }
 
 func (c *configuration) broadcastMessage(message interface{}) {
-	for id := range c.network.Replicas {
-		if id == c.node.ID.ReplicaID {
+	for id := range c.network.replicas {
+		if id == c.node.id.ReplicaID {
 			// do not send message to self or twin
 			continue
 		}
@@ -133,29 +133,29 @@ func (c *configuration) broadcastMessage(message interface{}) {
 }
 
 func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
-	nodes, ok := c.network.Replicas[id]
+	nodes, ok := c.network.replicas[id]
 	if !ok {
 		panic(fmt.Errorf("attempt to send message to replica %d, but this replica does not exist", id))
 	}
 	for _, node := range nodes {
-		if c.shouldDrop(node.ID, message) {
+		if c.shouldDrop(node.id, message) {
 			continue
 		}
-		node.Modules.EventLoop().AddEvent(message)
+		node.modules.EventLoop().AddEvent(message)
 	}
-	c.node.lastMessageView = c.node.Modules.Synchronizer().View()
+	c.node.lastMessageView = c.node.modules.Synchronizer().View()
 }
 
 // shouldDrop checks if a message to the node identified by id should be dropped.
 func (c *configuration) shouldDrop(id NodeID, message interface{}) bool {
 	// retrieve the drop config for this node.
-	return c.network.shouldDrop(c.node.ID, id, message)
+	return c.network.shouldDrop(c.node.id, id, message)
 }
 
 // Replicas returns all of the replicas in the configuration.
 func (c *configuration) Replicas() map[hotstuff.ID]consensus.Replica {
 	m := make(map[hotstuff.ID]consensus.Replica)
-	for id := range c.network.Replicas {
+	for id := range c.network.replicas {
 		m[id] = &replica{
 			config: c,
 			id:     id,
@@ -166,7 +166,7 @@ func (c *configuration) Replicas() map[hotstuff.ID]consensus.Replica {
 
 // Replica returns a replica if present in the configuration.
 func (c *configuration) Replica(id hotstuff.ID) (r consensus.Replica, ok bool) {
-	if _, ok = c.network.Replicas[id]; ok {
+	if _, ok = c.network.replicas[id]; ok {
 		return &replica{
 			config: c,
 			id:     id,
@@ -177,7 +177,7 @@ func (c *configuration) Replica(id hotstuff.ID) (r consensus.Replica, ok bool) {
 
 // Len returns the number of replicas in the configuration.
 func (c *configuration) Len() int {
-	return len(c.network.Replicas)
+	return len(c.network.replicas)
 }
 
 // QuorumSize returns the size of a quorum.
@@ -197,12 +197,12 @@ func (c *configuration) Timeout(msg consensus.TimeoutMsg) {
 
 // Fetch requests a block from all the replicas in the configuration.
 func (c *configuration) Fetch(_ context.Context, hash consensus.Hash) (block *consensus.Block, ok bool) {
-	for _, replica := range c.network.Replicas {
+	for _, replica := range c.network.replicas {
 		for _, node := range replica {
-			if c.shouldDrop(node.ID, hash) {
+			if c.shouldDrop(node.id, hash) {
 				continue
 			}
-			block, ok = node.Modules.BlockChain().LocalGet(hash)
+			block, ok = node.modules.BlockChain().LocalGet(hash)
 			if ok {
 				return block, true
 			}
@@ -220,18 +220,18 @@ type replica struct {
 
 // ID returns the replica's id.
 func (r *replica) ID() hotstuff.ID {
-	return r.config.network.Replicas[r.id][0].ID.ReplicaID
+	return r.config.network.replicas[r.id][0].id.ReplicaID
 }
 
 // PublicKey returns the replica's public key.
 func (r *replica) PublicKey() consensus.PublicKey {
-	return r.config.network.Replicas[r.id][0].Modules.PrivateKey().Public()
+	return r.config.network.replicas[r.id][0].modules.PrivateKey().Public()
 }
 
 // Vote sends the partial certificate to the other replica.
 func (r *replica) Vote(cert consensus.PartialCert) {
 	r.config.sendMessage(r.id, consensus.VoteMsg{
-		ID:          r.config.node.Modules.ID(),
+		ID:          r.config.node.modules.ID(),
 		PartialCert: cert,
 	})
 }
@@ -239,7 +239,7 @@ func (r *replica) Vote(cert consensus.PartialCert) {
 // NewView sends the quorum certificate to the other replica.
 func (r *replica) NewView(si consensus.SyncInfo) {
 	r.config.sendMessage(r.id, consensus.NewViewMsg{
-		ID:       r.config.node.Modules.ID(),
+		ID:       r.config.node.modules.ID(),
 		SyncInfo: si,
 	})
 }

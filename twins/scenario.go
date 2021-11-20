@@ -81,7 +81,7 @@ func createNodes(scenario Scenario, network *network, consensusName string) erro
 			keys[nodeID.ReplicaID] = pk
 		}
 		n := node{
-			ID: nodeID,
+			id: nodeID,
 		}
 		builder := consensus.NewBuilder(nodeID.ReplicaID, pk)
 		var consensusModule consensus.Rules
@@ -102,9 +102,9 @@ func createNodes(scenario Scenario, network *network, consensusName string) erro
 			commandModule{commandGenerator: cg, node: &n},
 			twinsSettings{}, // sets runtime options
 		)
-		n.Modules = builder.Build()
-		network.Nodes[nodeID] = &n
-		network.Replicas[nodeID.ReplicaID] = append(network.Replicas[nodeID.ReplicaID], &n)
+		n.modules = builder.Build()
+		network.nodes[nodeID] = &n
+		network.replicas[nodeID.ReplicaID] = append(network.replicas[nodeID.ReplicaID], &n)
 	}
 	return nil
 }
@@ -114,15 +114,15 @@ func checkCommits(network *network) (safe bool, commits int) {
 	for {
 		noCommits := true
 		commitCount := make(map[consensus.Hash]int)
-		for _, replica := range network.Replicas {
+		for _, replica := range network.replicas {
 			if len(replica) != 1 {
 				// TODO: should we be skipping replicas with twins?
 				continue
 			}
-			if len(replica[0].ExecutedBlocks) <= i {
+			if len(replica[0].executedBlocks) <= i {
 				continue
 			}
-			commitCount[replica[0].ExecutedBlocks[i].Hash()]++
+			commitCount[replica[0].executedBlocks[i].Hash()]++
 			noCommits = false
 		}
 
@@ -191,7 +191,7 @@ func (cm commandModule) Get(_ context.Context) (cmd consensus.Command, ok bool) 
 
 // Exec executes the given command.
 func (cm commandModule) Exec(block *consensus.Block) {
-	cm.node.ExecutedBlocks = append(cm.node.ExecutedBlocks, block)
+	cm.node.executedBlocks = append(cm.node.executedBlocks, block)
 }
 
 func (commandModule) Fork(block *consensus.Block) {}
