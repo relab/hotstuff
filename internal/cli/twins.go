@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/proto/twinspb"
@@ -26,6 +29,7 @@ var (
 	twinsDest      string
 	twinsConsensus string
 	logAll         bool
+	concurrency    uint
 )
 
 var twinsCmd = &cobra.Command{
@@ -78,6 +82,7 @@ func init() {
 	twinsCmd.Flags().StringVar(&twinsDest, "output", "twins.json", "File to write to.")
 	twinsCmd.Flags().StringVar(&twinsConsensus, "consensus", "chainedhotstuff", "The name of the consensus implementation to use.")
 	twinsCmd.Flags().BoolVar(&logAll, "log-all", false, "If true, all scenarios will be written to the output file when in \"run\" mode.")
+	twinsCmd.Flags().UintVar(&concurrency, "concurrency", 1, "Number of worker goroutines to use for executing scenarios. If set to 0, it will create one goroutine for each CPU.")
 }
 
 func twinsRun() {
@@ -85,13 +90,29 @@ func twinsRun() {
 	checkf("failed to create twins instance: %v", err)
 	defer func() { checkf("failed to close twins instance: %v", t.closeOutput()) }()
 
-	for i := uint64(0); i < numScenarios; i++ {
-		if ok, err := t.generateAndExecuteScenario(); err != nil {
-			checkf("failed to execute scenario: %v", err)
-		} else if !ok {
-			break
-		}
+	var wg sync.WaitGroup
+
+	numWorkers := concurrency
+	if concurrency == 0 {
+		numWorkers = uint(runtime.NumCPU())
 	}
+
+	wg.Add(int(numWorkers))
+
+	for i := 0; i < int(numWorkers); i++ {
+		go func() {
+			for i := uint64(0); i < numScenarios/uint64(numWorkers); i++ {
+				if ok, err := t.generateAndExecuteScenario(); err != nil {
+					checkf("failed to execute scenario: %v", err)
+				} else if !ok {
+					break
+				}
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
 
 	log.Println("done")
 }
@@ -180,10 +201,14 @@ func (ti twinsInstance) generateAndExecuteScenario() (bool, error) {
 		return false, nil
 	}
 
+	t := time.Now()
+
 	safe, commits, err := twins.ExecuteScenario(scenario, twinsConsensus)
 	if err != nil {
 		return false, err
 	}
+
+	ti.logger.Debugf("%d commits, duration: %s", commits, time.Since(t).String())
 
 	if !safe {
 		ti.logger.Info("Found unsafe scenario: %v", scenario)

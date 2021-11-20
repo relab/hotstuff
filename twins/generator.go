@@ -2,12 +2,14 @@ package twins
 
 import (
 	"math/rand"
+	"sync"
 
 	"github.com/relab/hotstuff"
 )
 
 // Generator generates twins scenarios.
 type Generator struct {
+	mut               sync.Mutex
 	allNodes          []NodeID
 	rounds            uint8
 	partitions        uint8
@@ -92,6 +94,9 @@ func (g *Generator) Shuffle(seed int64) {
 
 // NextScenario generates the next scenario.
 func (g *Generator) NextScenario() (s Scenario, ok bool) {
+	g.mut.Lock()
+	defer g.mut.Unlock()
+
 	p := make([]View, g.rounds)
 	// get the partition scenarios for this scenario
 	for i, ii := range g.indices {
