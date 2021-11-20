@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"io"
 	"os"
 	"runtime"
 	"strings"
@@ -202,7 +203,7 @@ func (wr *wrapper) Warnf(template string, args ...interface{}) {
 	wr.inner.Warnf(template, args...)
 }
 
-// New returns a new logger with the given name.
+// New returns a new logger for stderr with the given name.
 func New(name string) Logger {
 	var config zap.Config
 	if strings.ToLower(os.Getenv("HOTSTUFF_LOG_TYPE")) == "json" {
@@ -221,4 +222,12 @@ func New(name string) Logger {
 		panic(err)
 	}
 	return &wrapper{inner: l.Sugar().Named(name), level: config.Level}
+}
+
+// NewWithDest returns a new logger for the given destination with the given name.
+func NewWithDest(dest io.Writer, name string) Logger {
+	atom := zap.NewAtomicLevelAt(logLevel)
+	core := zapcore.NewCore(zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()), zapcore.AddSync(dest), atom)
+	l := zap.New(core, zap.AddCallerSkip(1))
+	return &wrapper{inner: l.Sugar().Named(name), level: atom}
 }
