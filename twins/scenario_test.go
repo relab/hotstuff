@@ -7,24 +7,17 @@ import (
 )
 
 func TestBasicScenario(t *testing.T) {
-	s := Scenario{
-		Nodes: []NodeID{
-			{1, 1},
-			{2, 2},
-			{3, 3},
-			{4, 4},
-		},
-	}
+	s := Scenario{}
 	allNodesSet := make(NodeSet)
-	for _, node := range s.Nodes {
-		allNodesSet.Add(node)
+	for i := 1; i <= 4; i++ {
+		allNodesSet.Add(uint32(i))
 	}
-	s.Views = append(s.Views, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
-	s.Views = append(s.Views, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
-	s.Views = append(s.Views, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
-	s.Views = append(s.Views, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
+	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
+	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
+	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
+	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 
-	safe, commits, err := ExecuteScenario(s, "chainedhotstuff")
+	safe, commits, err := ExecuteScenario(s, 4, 0, "chainedhotstuff")
 	if err != nil {
 		t.Fatal(err)
 	}

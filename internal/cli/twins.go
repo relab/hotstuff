@@ -11,8 +11,6 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/internal/logging"
-	"github.com/relab/hotstuff/internal/proto/twinspb"
-	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/twins"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -135,7 +133,7 @@ func twinsGenerate() {
 
 type twinsInstance struct {
 	generator    *twins.Generator
-	outputStream *protostream.Writer
+	outputStream *twins.JSONWriter
 	logger       logging.Logger
 	closeOutput  func() error
 }
@@ -146,33 +144,31 @@ func newInstance() (twinsInstance, error) {
 		return twinsInstance{}, err
 	}
 
-	wr := bufio.NewWriter(f)
-	ps := protostream.NewWriter(wr)
-
-	err = ps.Write(&twinspb.GeneratorSettings{
-		Replicas:  uint32(numReplicas),
-		Twins:     uint32(numTwins),
-		Rounds:    uint32(numRounds),
-		Shuffle:   shuffle,
-		Seed:      randSeed,
-		Consensus: twinsConsensus,
-	})
-	if err != nil {
-		return twinsInstance{}, err
-	}
-
 	gen := twins.NewGenerator(numReplicas, numTwins, numPartitions, numRounds)
 
 	if shuffle {
 		gen.Shuffle(randSeed)
 	}
 
+	wr := bufio.NewWriter(f)
+	js, err := twins.ToJSON(gen.Settings(), wr)
+	if err != nil {
+		return twinsInstance{}, err
+	}
+
+	if err != nil {
+		return twinsInstance{}, err
+	}
+
 	return twinsInstance{
 		generator:    gen,
-		outputStream: ps,
+		outputStream: js,
 		logger:       logging.New("twins"),
 		closeOutput: func() error {
-			err = wr.Flush()
+			err = js.Close()
+			if ferr := wr.Flush(); err == nil {
+				err = ferr
+			}
 			if cerr := f.Close(); err == nil {
 				err = cerr
 			}
@@ -187,7 +183,7 @@ func (ti twinsInstance) generateAndLogScenario() (bool, error) {
 		return false, nil
 	}
 
-	err := ti.outputStream.Write(twins.ScenarioToProto(&scenario))
+	err := ti.outputStream.WriteScenario(scenario)
 	if err != nil {
 		return false, err
 	}
@@ -203,7 +199,7 @@ func (ti twinsInstance) generateAndExecuteScenario() (bool, error) {
 
 	t := time.Now()
 
-	safe, commits, err := twins.ExecuteScenario(scenario, twinsConsensus)
+	safe, commits, err := twins.ExecuteScenario(scenario, numReplicas, numTwins, twinsConsensus)
 	if err != nil {
 		return false, err
 	}
@@ -215,11 +211,7 @@ func (ti twinsInstance) generateAndExecuteScenario() (bool, error) {
 	}
 
 	if !safe || logAll {
-		err = ti.outputStream.Write(&twinspb.Result{
-			Safe:     safe,
-			Commits:  uint32(commits),
-			Scenario: twins.ScenarioToProto(&scenario),
-		})
+		err := ti.outputStream.WriteScenario(scenario)
 		if err != nil {
 			return false, err
 		}

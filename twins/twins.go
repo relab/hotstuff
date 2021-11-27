@@ -1,0 +1,130 @@
+package twins
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"sync"
+)
+
+// ScenarioSource is a source of twins scenarios to execute.
+type ScenarioSource interface {
+	Settings() Settings
+	NextScenario() (Scenario, error)
+}
+
+type twinsJSON struct {
+	NumNodes   uint8           `json:"num_nodes"`
+	NumTwins   uint8           `json:"num_twins"`
+	Partitions uint8           `json:"partitions"`
+	Rounds     uint8           `json:"rounds"`
+	Shuffle    bool            `json:"shuffle"`
+	Seed       uint64          `json:"seed"`
+	Scenarios  json.RawMessage `json:"scenarios"`
+
+	dec *json.Decoder
+}
+
+func (t twinsJSON) Settings() Settings {
+	return Settings{
+		NumNodes:   t.NumNodes,
+		NumTwins:   t.NumTwins,
+		Partitions: t.Partitions,
+		Rounds:     t.Rounds,
+		Shuffle:    t.Shuffle,
+		Seed:       t.Seed,
+	}
+}
+
+func (t twinsJSON) NextScenario() (Scenario, error) {
+	var s Scenario
+	err := t.dec.Decode(&s)
+	return s, err
+}
+
+// FromJSON returns a scenario source that reads from the given reader.
+func FromJSON(rd io.Reader) (ScenarioSource, error) {
+	var root twinsJSON
+	dec := json.NewDecoder(rd)
+	err := dec.Decode(&root)
+	if err != nil {
+		return nil, err
+	}
+
+	root.dec = json.NewDecoder(bytes.NewReader(root.Scenarios))
+	return root, nil
+}
+
+// Settings contains the settings used with the scenario generator.
+type Settings struct {
+	NumNodes   uint8
+	NumTwins   uint8
+	Partitions uint8
+	Rounds     uint8
+	Shuffle    bool
+	Seed       uint64
+}
+
+// JSONWriter writes scenarios to JSON.
+type JSONWriter struct {
+	mut   sync.Mutex
+	wr    io.Writer
+	first bool
+}
+
+// WriteScenario writes a single scenario to the JSON stream.
+func (jwr *JSONWriter) WriteScenario(s Scenario) error {
+	buf, err := json.Marshal(s)
+	if err != nil {
+		return err
+	}
+	jwr.mut.Lock()
+	defer jwr.mut.Unlock()
+	if jwr.first {
+		_, err = io.WriteString(jwr.wr, "\n\t\t")
+		jwr.first = false
+		log.Println("EEER")
+	} else {
+		_, err = io.WriteString(jwr.wr, ",\n\t\t")
+		log.Println("REEE")
+	}
+	if err != nil {
+		return err
+	}
+	_, err = jwr.wr.Write(buf)
+	return err
+}
+
+// Close closes the JSON stream.
+func (jwr *JSONWriter) Close() error {
+	tail := "\n\t]\n}"
+	_, err := io.WriteString(jwr.wr, tail)
+	return err
+}
+
+// ToJSON returns a JSONWriter that can be used to write scenarios as JSON.
+func ToJSON(settings Settings, wr io.Writer) (*JSONWriter, error) {
+	head := fmt.Sprintf(`{
+	"num_nodes": %d,
+	"num_twins": %d,
+	"partitions": %d,
+	"rounds": %d,
+	"shuffle": %t,
+	"seed": %d,
+	"scenarios": [`,
+		settings.NumNodes,
+		settings.NumTwins,
+		settings.Partitions,
+		settings.Rounds,
+		settings.Shuffle,
+		settings.Seed,
+	)
+
+	_, err := io.WriteString(wr, head)
+	if err != nil {
+		return nil, err
+	}
+	return &JSONWriter{wr: wr, first: true}, nil
+}

@@ -2,8 +2,10 @@ package twins
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
@@ -27,7 +29,7 @@ type node struct {
 
 // Network is a simulated network that supports twins.
 type network struct {
-	nodes map[NodeID]*node
+	nodes map[uint32]*node
 	// Maps a replica ID to a replica and its twins.
 	replicas map[hotstuff.ID][]*node
 	// For each view (starting at 1), contains the list of partitions for that view.
@@ -40,7 +42,7 @@ type network struct {
 // partitions specifies the network partitions for each view.
 func newNetwork(rounds []View, dropTypes ...interface{}) *network {
 	n := &network{
-		nodes:     make(map[NodeID]*node),
+		nodes:     make(map[uint32]*node),
 		replicas:  make(map[hotstuff.ID][]*node),
 		views:     rounds,
 		dropTypes: make(map[reflect.Type]struct{}),
@@ -91,7 +93,7 @@ func (n *network) round(view consensus.View) {
 
 // shouldDrop decides if the sender should drop the message, based on the current view of the sender and the
 // partitions configured for that view.
-func (n *network) shouldDrop(sender, receiver NodeID, message interface{}) bool {
+func (n *network) shouldDrop(sender, receiver uint32, message interface{}) bool {
 	node, ok := n.nodes[sender]
 	if !ok {
 		panic(fmt.Errorf("node matching sender id %d was not found", sender))
@@ -149,7 +151,7 @@ func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
 // shouldDrop checks if a message to the node identified by id should be dropped.
 func (c *configuration) shouldDrop(id NodeID, message interface{}) bool {
 	// retrieve the drop config for this node.
-	return c.network.shouldDrop(c.node.id, id, message)
+	return c.network.shouldDrop(c.node.id.NetworkID, id.NetworkID, message)
 }
 
 // Replicas returns all of the replicas in the configuration.
@@ -244,16 +246,41 @@ func (r *replica) NewView(si consensus.SyncInfo) {
 	})
 }
 
-// NodeSet is a set of NodeIDs.
-type NodeSet map[NodeID]struct{}
+// NodeSet is a set of network ids.
+type NodeSet map[uint32]struct{}
 
 // Add adds a NodeID to the set.
-func (s NodeSet) Add(v NodeID) {
+func (s NodeSet) Add(v uint32) {
 	s[v] = struct{}{}
 }
 
 // Contains returns true if the set contains the NodeID, false otherwise.
-func (s NodeSet) Contains(v NodeID) bool {
+func (s NodeSet) Contains(v uint32) bool {
 	_, ok := s[v]
 	return ok
+}
+
+// MarshalJSON returns a JSON representation of the node set.
+func (s NodeSet) MarshalJSON() ([]byte, error) {
+	nodes := make([]uint32, 0, len(s))
+	for node := range s {
+		i := sort.Search(len(nodes), func(i int) bool { return node < nodes[i] })
+		nodes = append(nodes, 0)
+		copy(nodes[i+1:], nodes[i:])
+		nodes[i] = node
+	}
+	return json.Marshal(nodes)
+}
+
+// UnmarshalJSON restores the node set from JSON.
+func (s NodeSet) UnmarshalJSON(data []byte) error {
+	var nodes []uint32
+	err := json.Unmarshal(data, &nodes)
+	if err != nil {
+		return err
+	}
+	for _, node := range nodes {
+		s.Add(node)
+	}
+	return nil
 }

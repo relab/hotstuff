@@ -9,7 +9,12 @@ import (
 )
 
 func TestTwins(t *testing.T) {
-	g := twins.NewGenerator(4, 1, 2, 7)
+	const (
+		numNodes = 4
+		numTwins = 1
+	)
+
+	g := twins.NewGenerator(numNodes, numTwins, 2, 7)
 	g.Shuffle(time.Now().Unix())
 
 	scenarios := 10
@@ -20,7 +25,7 @@ func TestTwins(t *testing.T) {
 		if !ok {
 			break
 		}
-		safe, commits, err := twins.ExecuteScenario(s, "chainedhotstuff")
+		safe, commits, err := twins.ExecuteScenario(s, numNodes, numTwins, "chainedhotstuff")
 		if err != nil {
 			t.Fatal(err)
 		}

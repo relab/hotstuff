@@ -21,21 +21,18 @@ import (
 
 // View specifies the leader id an the partition scenario for a single round of consensus.
 type View struct {
-	Leader     hotstuff.ID
-	Partitions []NodeSet
+	Leader     hotstuff.ID `json:"leader"`
+	Partitions []NodeSet   `json:"partitions"`
 }
 
 // Scenario specifies the nodes, partitions and leaders for a twins scenario.
-type Scenario struct {
-	Nodes []NodeID
-	Views []View
-}
+type Scenario []View
 
 func (s Scenario) String() string {
 	var sb strings.Builder
-	for i := 0; i < len(s.Views); i++ {
-		sb.WriteString(fmt.Sprintf("leader: %d, partitions: ", s.Views[i].Leader))
-		for _, partition := range s.Views[i].Partitions {
+	for i := 0; i < len(s); i++ {
+		sb.WriteString(fmt.Sprintf("leader: %d, partitions: ", s[i].Leader))
+		for _, partition := range s[i].Partitions {
 			sb.WriteString("[ ")
 			for id := range partition {
 				sb.WriteString(fmt.Sprint(id))
@@ -49,17 +46,20 @@ func (s Scenario) String() string {
 }
 
 // ExecuteScenario executes a twins scenario.
-func ExecuteScenario(scenario Scenario, consensusName string) (safe bool, commits int, err error) {
+func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, consensusName string) (safe bool, commits int, err error) {
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
-	network := newNetwork(scenario.Views, consensus.ProposeMsg{}, consensus.VoteMsg{}, consensus.Hash{})
+	network := newNetwork(scenario, consensus.ProposeMsg{}, consensus.VoteMsg{}, consensus.Hash{})
 
-	err = createNodes(scenario, network, consensusName)
+	nodes, twins := assignNodeIDs(numNodes, numTwins)
+	nodes = append(nodes, twins...)
+
+	err = createNodes(nodes, scenario, network, consensusName)
 	if err != nil {
 		return false, 0, err
 	}
 
-	network.run(len(scenario.Views))
+	network.run(len(scenario))
 
 	// check if the majority of replicas have committed the same blocks
 	safe, commits = checkCommits(network)
@@ -67,10 +67,10 @@ func ExecuteScenario(scenario Scenario, consensusName string) (safe bool, commit
 	return safe, commits, nil
 }
 
-func createNodes(scenario Scenario, network *network, consensusName string) error {
+func createNodes(nodes []NodeID, scenario Scenario, network *network, consensusName string) error {
 	cg := &commandGenerator{}
 	keys := make(map[hotstuff.ID]consensus.PrivateKey)
-	for _, nodeID := range scenario.Nodes {
+	for _, nodeID := range nodes {
 		pk, ok := keys[nodeID.ReplicaID]
 		if !ok {
 			var err error
@@ -98,12 +98,12 @@ func createNodes(scenario Scenario, network *network, consensusName string) erro
 				node:    &n,
 				network: network,
 			},
-			leaderRotation(scenario.Views),
+			leaderRotation(scenario),
 			commandModule{commandGenerator: cg, node: &n},
 			twinsSettings{}, // sets runtime options
 		)
 		n.modules = builder.Build()
-		network.nodes[nodeID] = &n
+		network.nodes[nodeID.NetworkID] = &n
 		network.replicas[nodeID.ReplicaID] = append(network.replicas[nodeID.ReplicaID], &n)
 	}
 	return nil
