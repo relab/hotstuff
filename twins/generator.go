@@ -18,30 +18,13 @@ type Generator struct {
 	leadersPartitions []View
 }
 
-// NewGenerator creates a new generator.
-func NewGenerator(replicas, numTwins, partitions, rounds uint8) *Generator {
-	g := &Generator{
-		allNodes:   make([]NodeID, 0, replicas+numTwins),
-		rounds:     rounds,
-		partitions: partitions,
-		indices:    make([]int, rounds),
-		offsets:    make([]int, rounds),
-	}
-
-	// needed for partitions generation
-	var (
-		twins      []NodeID
-		nodes      []NodeID
-		replicaIDs []hotstuff.ID
-	)
-
+func assignNodeIDs(numNodes, numTwins uint8) (nodes, twins []NodeID) {
 	replicaID := hotstuff.ID(1)
 	networkID := uint32(1)
 	remainingTwins := numTwins
 
 	// assign IDs to nodes
-	for i := 0; i < int(replicas); i++ {
-		replicaIDs = append(replicaIDs, replicaID)
+	for i := uint8(0); i < numNodes; i++ {
 		if remainingTwins > 0 {
 			twins = append(twins, NodeID{
 				ReplicaID: replicaID,
@@ -63,6 +46,22 @@ func NewGenerator(replicas, numTwins, partitions, rounds uint8) *Generator {
 		replicaID++
 	}
 
+	return
+}
+
+// NewGenerator creates a new generator.
+func NewGenerator(replicas, numTwins, partitions, rounds uint8) *Generator {
+	g := &Generator{
+		allNodes:   make([]NodeID, 0, replicas+numTwins),
+		rounds:     rounds,
+		partitions: partitions,
+		indices:    make([]int, rounds),
+		offsets:    make([]int, rounds),
+	}
+
+	// needed for partitions generation
+	nodes, twins := assignNodeIDs(replicas, numTwins)
+
 	g.allNodes = append(g.allNodes, twins...)
 	g.allNodes = append(g.allNodes, nodes...)
 
@@ -70,9 +69,9 @@ func NewGenerator(replicas, numTwins, partitions, rounds uint8) *Generator {
 
 	// assign each replica as leader to each partition scenario
 	for _, p := range partitionScenarios {
-		for _, id := range replicaIDs {
+		for _, node := range nodes {
 			g.leadersPartitions = append(g.leadersPartitions, View{
-				Leader:     id,
+				Leader:     node.ReplicaID,
 				Partitions: p,
 			})
 		}
