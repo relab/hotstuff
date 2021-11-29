@@ -1,6 +1,7 @@
 package twins
 
 import (
+	"io"
 	"math/rand"
 	"sync"
 
@@ -105,7 +106,7 @@ func (g *Generator) Shuffle(seed int64) {
 }
 
 // NextScenario generates the next scenario.
-func (g *Generator) NextScenario() (s Scenario, ok bool) {
+func (g *Generator) NextScenario() (s Scenario, err error) {
 	g.mut.Lock()
 	defer g.mut.Unlock()
 
@@ -130,11 +131,11 @@ func (g *Generator) NextScenario() (s Scenario, ok bool) {
 		g.indices[i] = 0
 		if i <= 0 {
 			g.indices = g.indices[0:0]
-			return s, false
+			return s, io.EOF
 		}
 	}
 
-	return p, true
+	return p, nil
 }
 
 func min(a, b uint8) uint8 {

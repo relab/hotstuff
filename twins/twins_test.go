@@ -21,8 +21,8 @@ func TestTwins(t *testing.T) {
 	totalCommits := 0
 
 	for i := 0; i < scenarios; i++ {
-		s, ok := g.NextScenario()
-		if !ok {
+		s, err := g.NextScenario()
+		if err != nil {
 			break
 		}
 		safe, commits, err := twins.ExecuteScenario(s, numNodes, numTwins, "chainedhotstuff")

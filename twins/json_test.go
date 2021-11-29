@@ -66,7 +66,10 @@ func TestToJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wr.WriteScenario(scenarioWant)
+	err = wr.WriteScenario(scenarioWant)
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = wr.Close()
 	if err != nil {
 		t.Fatal(err)

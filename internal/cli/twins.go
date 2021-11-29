@@ -2,7 +2,9 @@ package cli
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"runtime"
@@ -25,6 +27,7 @@ var (
 	shuffle        bool
 	randSeed       int64
 	twinsDest      string
+	twinsSrc       string
 	twinsConsensus string
 	logAll         bool
 	concurrency    uint
@@ -77,14 +80,29 @@ func init() {
 	twinsCmd.Flags().Uint64Var(&numScenarios, "scenarios", 100, "Number of scenarios to generate.")
 	twinsCmd.Flags().BoolVar(&shuffle, "shuffle", false, "Shuffle the order in which scenarios are generated.")
 	twinsCmd.Flags().Int64Var(&randSeed, "seed", time.Now().Unix(), "Random seed (defaults to current timestamp).")
-	twinsCmd.Flags().StringVar(&twinsDest, "output", "twins.out", "File to write to.")
+	twinsCmd.Flags().StringVar(&twinsDest, "output", "", "File to write to.")
+	twinsCmd.Flags().StringVar(&twinsSrc, "input", "", "File to read scenarios from.")
 	twinsCmd.Flags().StringVar(&twinsConsensus, "consensus", "chainedhotstuff", "The name of the consensus implementation to use.")
 	twinsCmd.Flags().BoolVar(&logAll, "log-all", false, "If true, all scenarios will be written to the output file when in \"run\" mode.")
 	twinsCmd.Flags().UintVar(&concurrency, "concurrency", 1, "Number of goroutines to use. If set to 0, the number of CPUs will be used.")
 }
 
 func twinsRun() {
-	t, err := newInstance()
+	var (
+		source twins.ScenarioSource
+		err    error
+	)
+	if twinsSrc == "" {
+		source = newGen()
+	} else {
+		f, err := os.Open(twinsSrc)
+		checkf("failed to open source file: %v", err)
+
+		source, err = twins.FromJSON(f)
+		checkf("failed to read JSON file: %v", err)
+	}
+
+	t, err := newInstance(source)
 	checkf("failed to create twins instance: %v", err)
 	defer func() { checkf("failed to close twins instance: %v", t.closeOutput()) }()
 
@@ -116,15 +134,16 @@ func twinsRun() {
 }
 
 func twinsGenerate() {
-	t, err := newInstance()
+	t, err := newInstance(newGen())
 	checkf("failed to create twins instance: %v", err)
 	defer func() { checkf("failed to close twins instance: %v", t.closeOutput()) }()
 
 	for i := uint64(0); i < numScenarios; i++ {
-		if ok, err := t.generateAndLogScenario(); err != nil {
+		if err := t.generateAndLogScenario(); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
 			checkf("failed to generate scenario: %v", err)
-		} else if !ok {
-			break
 		}
 	}
 
@@ -132,26 +151,47 @@ func twinsGenerate() {
 }
 
 type twinsInstance struct {
-	generator    *twins.Generator
+	source       twins.ScenarioSource
 	outputStream *twins.JSONWriter
 	logger       logging.Logger
 	closeOutput  func() error
 }
 
-func newInstance() (twinsInstance, error) {
-	f, err := os.OpenFile(twinsDest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		return twinsInstance{}, err
-	}
-
+func newGen() *twins.Generator {
 	gen := twins.NewGenerator(numReplicas, numTwins, numPartitions, numRounds)
 
 	if shuffle {
 		gen.Shuffle(randSeed)
 	}
 
-	wr := bufio.NewWriter(f)
-	js, err := twins.ToJSON(gen.Settings(), wr)
+	return gen
+}
+
+func newInstance(scenarioSource twins.ScenarioSource) (twinsInstance, error) {
+	var output io.Writer
+	var closeOutput func() error
+	if twinsDest != "" {
+		f, err := os.OpenFile(twinsDest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		if err != nil {
+			return twinsInstance{}, err
+		}
+		wr := bufio.NewWriter(f)
+		output = wr
+		closeOutput = func() error {
+			if ferr := wr.Flush(); err == nil {
+				err = ferr
+			}
+			if cerr := f.Close(); err == nil {
+				err = cerr
+			}
+			return err
+		}
+	} else {
+		output = io.Discard
+		closeOutput = func() error { return nil }
+	}
+
+	js, err := twins.ToJSON(scenarioSource.Settings(), output)
 	if err != nil {
 		return twinsInstance{}, err
 	}
@@ -161,15 +201,12 @@ func newInstance() (twinsInstance, error) {
 	}
 
 	return twinsInstance{
-		generator:    gen,
+		source:       scenarioSource,
 		outputStream: js,
 		logger:       logging.New("twins"),
 		closeOutput: func() error {
 			err = js.Close()
-			if ferr := wr.Flush(); err == nil {
-				err = ferr
-			}
-			if cerr := f.Close(); err == nil {
+			if cerr := closeOutput(); err == nil {
 				err = cerr
 			}
 			return err
@@ -177,23 +214,23 @@ func newInstance() (twinsInstance, error) {
 	}, nil
 }
 
-func (ti twinsInstance) generateAndLogScenario() (bool, error) {
-	scenario, ok := ti.generator.NextScenario()
-	if !ok {
-		return false, nil
-	}
-
-	err := ti.outputStream.WriteScenario(scenario)
+func (ti twinsInstance) generateAndLogScenario() error {
+	scenario, err := ti.source.NextScenario()
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return true, nil
+	err = ti.outputStream.WriteScenario(scenario)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (ti twinsInstance) generateAndExecuteScenario() (bool, error) {
-	scenario, ok := ti.generator.NextScenario()
-	if !ok {
+	scenario, err := ti.source.NextScenario()
+	if err != nil {
 		return false, nil
 	}
 
