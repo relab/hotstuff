@@ -273,7 +273,10 @@ func (s NodeSet) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON restores the node set from JSON.
-func (s NodeSet) UnmarshalJSON(data []byte) error {
+func (s *NodeSet) UnmarshalJSON(data []byte) error {
+	if *s == nil {
+		*s = make(NodeSet)
+	}
 	var nodes []uint32
 	err := json.Unmarshal(data, &nodes)
 	if err != nil {

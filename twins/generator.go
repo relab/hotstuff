@@ -92,6 +92,9 @@ func (g *Generator) Settings() Settings {
 
 // Shuffle shuffles the list of leaders and partitions.
 func (g *Generator) Shuffle(seed int64) {
+	g.settings.Shuffle = true
+	g.settings.Seed = seed
+
 	r := rand.New(rand.NewSource(seed))
 	r.Shuffle(len(g.leadersPartitions), func(i, j int) {
 		g.leadersPartitions[i], g.leadersPartitions[j] = g.leadersPartitions[j], g.leadersPartitions[i]

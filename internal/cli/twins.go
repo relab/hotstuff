@@ -76,7 +76,7 @@ func init() {
 	twinsCmd.Flags().Uint8Var(&numRounds, "rounds", 7, "Number of rounds in each scenario.")
 	twinsCmd.Flags().Uint64Var(&numScenarios, "scenarios", 100, "Number of scenarios to generate.")
 	twinsCmd.Flags().BoolVar(&shuffle, "shuffle", false, "Shuffle the order in which scenarios are generated.")
-	twinsCmd.Flags().Int64Var(&randSeed, "seed", 0, "Random seed (defaults to current timestamp).")
+	twinsCmd.Flags().Int64Var(&randSeed, "seed", time.Now().Unix(), "Random seed (defaults to current timestamp).")
 	twinsCmd.Flags().StringVar(&twinsDest, "output", "twins.out", "File to write to.")
 	twinsCmd.Flags().StringVar(&twinsConsensus, "consensus", "chainedhotstuff", "The name of the consensus implementation to use.")
 	twinsCmd.Flags().BoolVar(&logAll, "log-all", false, "If true, all scenarios will be written to the output file when in \"run\" mode.")

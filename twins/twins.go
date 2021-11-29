@@ -1,11 +1,9 @@
 package twins
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"sync"
 )
 
@@ -16,15 +14,15 @@ type ScenarioSource interface {
 }
 
 type twinsJSON struct {
-	NumNodes   uint8           `json:"num_nodes"`
-	NumTwins   uint8           `json:"num_twins"`
-	Partitions uint8           `json:"partitions"`
-	Rounds     uint8           `json:"rounds"`
-	Shuffle    bool            `json:"shuffle"`
-	Seed       uint64          `json:"seed"`
-	Scenarios  json.RawMessage `json:"scenarios"`
+	NumNodes   uint8             `json:"num_nodes"`
+	NumTwins   uint8             `json:"num_twins"`
+	Partitions uint8             `json:"partitions"`
+	Rounds     uint8             `json:"rounds"`
+	Shuffle    bool              `json:"shuffle"`
+	Seed       int64             `json:"seed"`
+	Scenarios  []json.RawMessage `json:"scenarios"`
 
-	dec *json.Decoder
+	scenario int
 }
 
 func (t twinsJSON) Settings() Settings {
@@ -38,9 +36,10 @@ func (t twinsJSON) Settings() Settings {
 	}
 }
 
-func (t twinsJSON) NextScenario() (Scenario, error) {
+func (t *twinsJSON) NextScenario() (Scenario, error) {
 	var s Scenario
-	err := t.dec.Decode(&s)
+	err := json.Unmarshal(t.Scenarios[t.scenario], &s)
+	t.scenario++
 	return s, err
 }
 
@@ -53,8 +52,7 @@ func FromJSON(rd io.Reader) (ScenarioSource, error) {
 		return nil, err
 	}
 
-	root.dec = json.NewDecoder(bytes.NewReader(root.Scenarios))
-	return root, nil
+	return &root, nil
 }
 
 // Settings contains the settings used with the scenario generator.
@@ -64,7 +62,7 @@ type Settings struct {
 	Partitions uint8
 	Rounds     uint8
 	Shuffle    bool
-	Seed       uint64
+	Seed       int64
 }
 
 // JSONWriter writes scenarios to JSON.
@@ -85,10 +83,8 @@ func (jwr *JSONWriter) WriteScenario(s Scenario) error {
 	if jwr.first {
 		_, err = io.WriteString(jwr.wr, "\n\t\t")
 		jwr.first = false
-		log.Println("EEER")
 	} else {
 		_, err = io.WriteString(jwr.wr, ",\n\t\t")
-		log.Println("REEE")
 	}
 	if err != nil {
 		return err
