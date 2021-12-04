@@ -6,7 +6,6 @@ package gorums
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/relab/gorums"
@@ -184,8 +183,12 @@ func (cfg *Config) Timeout(msg consensus.TimeoutMsg) {
 // Fetch requests a block from all the replicas in the configuration
 func (cfg *Config) Fetch(ctx context.Context, hash consensus.Hash) (*consensus.Block, bool) {
 	protoBlock, err := cfg.cfg.Fetch(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
-	if err != nil && !errors.Is(err, context.Canceled) {
-		cfg.mods.Logger().Infof("Failed to fetch block: %v", err)
+	if err != nil {
+		qcErr, ok := err.(gorums.QuorumCallError)
+		// filter out context errors
+		if !ok || (qcErr.Reason != context.Canceled.Error() && qcErr.Reason != context.DeadlineExceeded.Error()) {
+			cfg.mods.Logger().Infof("Failed to fetch block: %v", err)
+		}
 		return nil, false
 	}
 	return hotstuffpb.BlockFromProto(protoBlock), true

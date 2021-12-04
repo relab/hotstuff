@@ -135,7 +135,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 		//
 		// TODO: figure out the best way to handle this context and timeout.
 		if s.viewCtx.Err() != nil {
-			s.newCtx()
+			s.newCtx(s.duration.Duration())
 		}
 		s.timer.Reset(s.duration.Duration())
 	}()
@@ -294,10 +294,10 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 	s.lastTimeout = nil
 	s.duration.ViewStarted()
 
+	duration := s.duration.Duration()
 	// cancel the old view context and set up the next one
-	s.newCtx()
-
-	s.timer.Reset(s.duration.Duration())
+	s.newCtx(duration)
+	s.timer.Reset(duration)
 
 	s.mods.MetricsEventLoop().AddEvent(ViewChangeEvent{View: s.currentView, Timeout: timeout})
 
@@ -335,9 +335,9 @@ func (s *Synchronizer) UpdateHighQC(qc consensus.QuorumCert) {
 	}
 }
 
-func (s *Synchronizer) newCtx() {
+func (s *Synchronizer) newCtx(duration time.Duration) {
 	s.cancelCtx()
-	s.viewCtx, s.cancelCtx = context.WithTimeout(context.Background(), s.duration.Duration())
+	s.viewCtx, s.cancelCtx = context.WithTimeout(context.Background(), duration)
 }
 
 var _ consensus.Synchronizer = (*Synchronizer)(nil)
