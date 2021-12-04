@@ -11,6 +11,7 @@ import (
 type ScenarioSource interface {
 	Settings() Settings
 	NextScenario() (Scenario, error)
+	Remaining() int64
 }
 
 type twinsJSON struct {
@@ -41,6 +42,10 @@ func (t *twinsJSON) NextScenario() (Scenario, error) {
 	err := json.Unmarshal(t.Scenarios[t.scenario], &s)
 	t.scenario++
 	return s, err
+}
+
+func (t *twinsJSON) Remaining() int64 {
+	return int64(len(t.Scenarios) - t.scenario)
 }
 
 // FromJSON returns a scenario source that reads from the given reader.

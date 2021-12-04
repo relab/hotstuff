@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/relab/hotstuff/internal/logging"
 )
 
 func TestPartitionsGenerator(t *testing.T) {
@@ -14,7 +16,7 @@ func TestPartitionsGenerator(t *testing.T) {
 }
 
 func TestGenerator(t *testing.T) {
-	g := NewGenerator(4, 1, 3, 8)
+	g := NewGenerator(logging.New(""), 4, 1, 3, 8)
 	g.Shuffle(time.Now().Unix())
 	t.Log(g.NextScenario())
 }

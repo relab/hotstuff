@@ -2,15 +2,19 @@ package twins
 
 import (
 	"io"
+	"math"
 	"math/rand"
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/logging"
 )
 
 // Generator generates twins scenarios.
 type Generator struct {
 	mut               sync.Mutex
+	logger            logging.Logger
+	remaining         int64
 	allNodes          []NodeID
 	indices           []int
 	offsets           []int
@@ -50,13 +54,14 @@ func assignNodeIDs(numNodes, numTwins uint8) (nodes, twins []NodeID) {
 }
 
 // NewGenerator creates a new generator.
-func NewGenerator(replicas, numTwins, partitions, rounds uint8) *Generator {
+func NewGenerator(logger logging.Logger, numNodes, numTwins, partitions, rounds uint8) *Generator {
 	g := &Generator{
-		allNodes: make([]NodeID, 0, replicas+numTwins),
+		logger:   logger,
+		allNodes: make([]NodeID, 0, numNodes+numTwins),
 		indices:  make([]int, rounds),
 		offsets:  make([]int, rounds),
 		settings: Settings{
-			NumNodes:   replicas,
+			NumNodes:   numNodes,
 			NumTwins:   numTwins,
 			Partitions: partitions,
 			Rounds:     rounds,
@@ -66,7 +71,7 @@ func NewGenerator(replicas, numTwins, partitions, rounds uint8) *Generator {
 	}
 
 	// needed for partitions generation
-	nodes, twins := assignNodeIDs(replicas, numTwins)
+	nodes, twins := assignNodeIDs(numNodes, numTwins)
 
 	g.allNodes = append(g.allNodes, twins...)
 	g.allNodes = append(g.allNodes, nodes...)
@@ -82,6 +87,13 @@ func NewGenerator(replicas, numTwins, partitions, rounds uint8) *Generator {
 			})
 		}
 	}
+
+	g.remaining = int64(math.Pow(float64(len(g.leadersPartitions)), float64(g.settings.Rounds)))
+
+	g.logger.Infof(
+		"%.d scenarios can be generated with current settings.",
+		g.remaining,
+	)
 
 	return g
 }
@@ -103,6 +115,13 @@ func (g *Generator) Shuffle(seed int64) {
 	for i := range g.offsets {
 		g.offsets[i] = r.Intn(len(g.leadersPartitions))
 	}
+}
+
+// Remaining returns the number of scenarios remaining to be generated.
+func (g *Generator) Remaining() int64 {
+	g.mut.Lock()
+	defer g.mut.Unlock()
+	return g.remaining
 }
 
 // NextScenario generates the next scenario.
@@ -134,6 +153,8 @@ func (g *Generator) NextScenario() (s Scenario, err error) {
 			return s, io.EOF
 		}
 	}
+
+	g.remaining--
 
 	return p, nil
 }

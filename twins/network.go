@@ -6,9 +6,17 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/crypto"
+	"github.com/relab/hotstuff/crypto/ecdsa"
+	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/internal/logging"
+	"github.com/relab/hotstuff/internal/testutil"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -20,11 +28,16 @@ type NodeID struct {
 	NetworkID uint32
 }
 
+func (id NodeID) String() string {
+	return fmt.Sprintf("r%dn%d", id.ReplicaID, id.NetworkID)
+}
+
 type node struct {
 	id              NodeID
 	modules         *consensus.Modules
 	executedBlocks  []*consensus.Block
 	lastMessageView consensus.View
+	log             strings.Builder
 }
 
 // Network is a simulated network that supports twins.
@@ -36,6 +49,10 @@ type network struct {
 	views []View
 
 	dropTypes map[reflect.Type]struct{}
+
+	logger logging.Logger
+
+	log strings.Builder
 }
 
 // newNetwork creates a new Network with the specified partitions.
@@ -47,10 +64,53 @@ func newNetwork(rounds []View, dropTypes ...interface{}) *network {
 		views:     rounds,
 		dropTypes: make(map[reflect.Type]struct{}),
 	}
+	n.logger = logging.NewWithDest(&n.log, "network")
 	for _, t := range dropTypes {
 		n.dropTypes[reflect.TypeOf(t)] = struct{}{}
 	}
 	return n
+}
+
+func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName string) error {
+	cg := &commandGenerator{}
+	keys := make(map[hotstuff.ID]consensus.PrivateKey)
+	for _, nodeID := range nodes {
+		pk, ok := keys[nodeID.ReplicaID]
+		if !ok {
+			var err error
+			pk, err = keygen.GenerateECDSAPrivateKey()
+			if err != nil {
+				return err
+			}
+			keys[nodeID.ReplicaID] = pk
+		}
+		node := node{
+			id: nodeID,
+		}
+		builder := consensus.NewBuilder(nodeID.ReplicaID, pk)
+		var consensusModule consensus.Rules
+		if !modules.GetModule(consensusName, &consensusModule) {
+			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
+		}
+		builder.Register(
+			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
+			blockchain.New(),
+			consensus.New(consensusModule),
+			crypto.NewCache(ecdsa.New(), 100),
+			synchronizer.New(testutil.FixedTimeout(0)),
+			&configuration{
+				node:    &node,
+				network: n,
+			},
+			leaderRotation(scenario),
+			commandModule{commandGenerator: cg, node: &node},
+			twinsSettings{}, // sets runtime options
+		)
+		node.modules = builder.Build()
+		n.nodes[nodeID.NetworkID] = &node
+		n.replicas[nodeID.ReplicaID] = append(n.replicas[nodeID.ReplicaID], &node)
+	}
+	return nil
 }
 
 func (n *network) run(rounds int) {
@@ -68,6 +128,8 @@ func (n *network) run(rounds int) {
 
 // round performs one round for each node
 func (n *network) round(view consensus.View) {
+	n.logger.Infof("Starting round %d", view)
+
 	for _, node := range n.nodes {
 		// run each event loop as long as it has events
 		for node.modules.EventLoop().Tick() {
@@ -143,6 +205,7 @@ func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
 		if c.shouldDrop(node.id, message) {
 			continue
 		}
+		c.network.logger.Infof("node %v -> node %v: %T(%v)", c.node.id, node.id, message, message)
 		node.modules.EventLoop().AddEvent(message)
 	}
 	c.node.lastMessageView = c.node.modules.Synchronizer().View()

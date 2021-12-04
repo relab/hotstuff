@@ -8,15 +8,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/crypto"
-	"github.com/relab/hotstuff/crypto/ecdsa"
-	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/internal/logging"
-	"github.com/relab/hotstuff/internal/testutil"
-	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/synchronizer"
 )
 
 // View specifies the leader id an the partition scenario for a single round of consensus.
@@ -45,8 +37,16 @@ func (s Scenario) String() string {
 	return sb.String()
 }
 
+// ScenarioResult contains the result and logs from executing a scenario.
+type ScenarioResult struct {
+	Safe       bool
+	Commits    int
+	NetworkLog string
+	NodeLogs   map[NodeID]string
+}
+
 // ExecuteScenario executes a twins scenario.
-func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, consensusName string) (safe bool, commits int, err error) {
+func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, consensusName string) (result ScenarioResult, err error) {
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
 	network := newNetwork(scenario, consensus.ProposeMsg{}, consensus.VoteMsg{}, consensus.Hash{})
@@ -54,59 +54,27 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, consensusName 
 	nodes, twins := assignNodeIDs(numNodes, numTwins)
 	nodes = append(nodes, twins...)
 
-	err = createNodes(nodes, scenario, network, consensusName)
+	err = network.createNodes(nodes, scenario, consensusName)
 	if err != nil {
-		return false, 0, err
+		return ScenarioResult{}, err
 	}
 
 	network.run(len(scenario))
 
-	// check if the majority of replicas have committed the same blocks
-	safe, commits = checkCommits(network)
-
-	return safe, commits, nil
-}
-
-func createNodes(nodes []NodeID, scenario Scenario, network *network, consensusName string) error {
-	cg := &commandGenerator{}
-	keys := make(map[hotstuff.ID]consensus.PrivateKey)
-	for _, nodeID := range nodes {
-		pk, ok := keys[nodeID.ReplicaID]
-		if !ok {
-			var err error
-			pk, err = keygen.GenerateECDSAPrivateKey()
-			if err != nil {
-				return err
-			}
-			keys[nodeID.ReplicaID] = pk
-		}
-		n := node{
-			id: nodeID,
-		}
-		builder := consensus.NewBuilder(nodeID.ReplicaID, pk)
-		var consensusModule consensus.Rules
-		if !modules.GetModule(consensusName, &consensusModule) {
-			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
-		}
-		builder.Register(
-			logging.New(fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
-			blockchain.New(),
-			consensus.New(consensusModule),
-			crypto.NewCache(ecdsa.New(), 100),
-			synchronizer.New(testutil.FixedTimeout(0)),
-			&configuration{
-				node:    &n,
-				network: network,
-			},
-			leaderRotation(scenario),
-			commandModule{commandGenerator: cg, node: &n},
-			twinsSettings{}, // sets runtime options
-		)
-		n.modules = builder.Build()
-		network.nodes[nodeID.NetworkID] = &n
-		network.replicas[nodeID.ReplicaID] = append(network.replicas[nodeID.ReplicaID], &n)
+	nodeLogs := make(map[NodeID]string)
+	for _, node := range network.nodes {
+		nodeLogs[node.id] = node.log.String()
 	}
-	return nil
+
+	// check if the majority of replicas have committed the same blocks
+	safe, commits := checkCommits(network)
+
+	return ScenarioResult{
+		Safe:       safe,
+		Commits:    commits,
+		NetworkLog: network.log.String(),
+		NodeLogs:   nodeLogs,
+	}, nil
 }
 
 func checkCommits(network *network) (safe bool, commits int) {

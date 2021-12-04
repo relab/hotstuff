@@ -5,6 +5,7 @@ import (
 	"time"
 
 	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
+	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/twins"
 )
 
@@ -14,7 +15,7 @@ func TestTwins(t *testing.T) {
 		numTwins = 1
 	)
 
-	g := twins.NewGenerator(numNodes, numTwins, 2, 7)
+	g := twins.NewGenerator(logging.New(""), numNodes, numTwins, 2, 7)
 	g.Shuffle(time.Now().Unix())
 
 	scenarios := 10
@@ -25,18 +26,18 @@ func TestTwins(t *testing.T) {
 		if err != nil {
 			break
 		}
-		safe, commits, err := twins.ExecuteScenario(s, numNodes, numTwins, "chainedhotstuff")
+		result, err := twins.ExecuteScenario(s, numNodes, numTwins, "chainedhotstuff")
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Log(safe, commits)
+		t.Log(result.Safe, result.Commits)
 		t.Log(s)
-		if !safe {
+		if !result.Safe {
 			t.Logf("Scenario not safe: %v", s)
 			continue
 		}
-		if commits > 0 {
-			totalCommits += commits
+		if result.Commits > 0 {
+			totalCommits += result.Commits
 		}
 	}
 

@@ -77,7 +77,7 @@ func init() {
 	twinsCmd.Flags().Uint8Var(&numTwins, "twins", 1, "Number of \"evil\" twins.")
 	twinsCmd.Flags().Uint8Var(&numPartitions, "partitions", 2, "Number of network partitions.")
 	twinsCmd.Flags().Uint8Var(&numRounds, "rounds", 7, "Number of rounds in each scenario.")
-	twinsCmd.Flags().Uint64Var(&numScenarios, "scenarios", 100, "Number of scenarios to generate.")
+	twinsCmd.Flags().Uint64Var(&numScenarios, "scenarios", 0, "Number of scenarios to generate.")
 	twinsCmd.Flags().BoolVar(&shuffle, "shuffle", false, "Shuffle the order in which scenarios are generated.")
 	twinsCmd.Flags().Int64Var(&randSeed, "seed", time.Now().Unix(), "Random seed (defaults to current timestamp).")
 	twinsCmd.Flags().StringVar(&twinsDest, "output", "", "File to write to.")
@@ -93,7 +93,7 @@ func twinsRun() {
 		err    error
 	)
 	if twinsSrc == "" {
-		source = newGen()
+		source = newGen(logging.New(""))
 	} else {
 		f, err := os.Open(twinsSrc)
 		checkf("failed to open source file: %v", err)
@@ -105,6 +105,10 @@ func twinsRun() {
 	t, err := newInstance(source)
 	checkf("failed to create twins instance: %v", err)
 	defer func() { checkf("failed to close twins instance: %v", t.closeOutput()) }()
+
+	if numScenarios == 0 {
+		numScenarios = uint64(t.source.Remaining())
+	}
 
 	var wg sync.WaitGroup
 
@@ -134,9 +138,13 @@ func twinsRun() {
 }
 
 func twinsGenerate() {
-	t, err := newInstance(newGen())
+	t, err := newInstance(newGen(logging.New("")))
 	checkf("failed to create twins instance: %v", err)
 	defer func() { checkf("failed to close twins instance: %v", t.closeOutput()) }()
+
+	if numScenarios == 0 {
+		numScenarios = uint64(t.source.Remaining())
+	}
 
 	for i := uint64(0); i < numScenarios; i++ {
 		if err := t.generateAndLogScenario(); err != nil {
@@ -157,8 +165,8 @@ type twinsInstance struct {
 	closeOutput  func() error
 }
 
-func newGen() *twins.Generator {
-	gen := twins.NewGenerator(numReplicas, numTwins, numPartitions, numRounds)
+func newGen(logger logging.Logger) *twins.Generator {
+	gen := twins.NewGenerator(logger, numReplicas, numTwins, numPartitions, numRounds)
 
 	if shuffle {
 		gen.Shuffle(randSeed)
@@ -236,18 +244,26 @@ func (ti twinsInstance) generateAndExecuteScenario() (bool, error) {
 
 	t := time.Now()
 
-	safe, commits, err := twins.ExecuteScenario(scenario, numReplicas, numTwins, twinsConsensus)
+	result, err := twins.ExecuteScenario(scenario, numReplicas, numTwins, twinsConsensus)
 	if err != nil {
 		return false, err
 	}
 
-	ti.logger.Debugf("%d commits, duration: %s", commits, time.Since(t).String())
+	ti.logger.Debugf("%d commits, duration: %s", result.Commits, time.Since(t).String())
 
-	if !safe {
+	if !result.Safe {
 		ti.logger.Info("Found unsafe scenario: %v", scenario)
+		fmt.Fprintln(os.Stderr, "================ Network Logs ================")
+		fmt.Fprintln(os.Stderr, result.NetworkLog)
+
+		for id, log := range result.NodeLogs {
+
+			fmt.Fprintf(os.Stderr, "================ Node %v Logs ================\n", id)
+			fmt.Fprintln(os.Stderr, log)
+		}
 	}
 
-	if !safe || logAll {
+	if !result.Safe || logAll {
 		err := ti.outputStream.WriteScenario(scenario)
 		if err != nil {
 			return false, err
