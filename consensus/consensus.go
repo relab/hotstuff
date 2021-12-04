@@ -219,6 +219,9 @@ func (cs *consensusBase) commitInner(block *Block) {
 	if cs.bExec.View() < block.View() {
 		if parent, ok := cs.mods.BlockChain().Get(block.Parent()); ok {
 			cs.commitInner(parent)
+		} else {
+			cs.mods.Logger().Warn("Refusing to commit because parent block could not be retrieved.")
+			return
 		}
 		cs.mods.Logger().Debug("EXEC: ", block)
 		cs.mods.Executor().Exec(block)
