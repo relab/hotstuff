@@ -7,7 +7,9 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -19,18 +21,19 @@ import (
 )
 
 var (
-	numReplicas    uint8
-	numTwins       uint8
-	numPartitions  uint8
-	numRounds      uint8
-	numScenarios   uint64
-	shuffle        bool
-	randSeed       int64
-	twinsDest      string
-	twinsSrc       string
-	twinsConsensus string
-	logAll         bool
-	concurrency    uint
+	numReplicas         uint8
+	numTwins            uint8
+	numPartitions       uint8
+	numRounds           uint8
+	numScenarios        uint64
+	numScenariosPerFile uint64
+	shuffle             bool
+	randSeed            int64
+	twinsDest           string
+	twinsSrc            string
+	twinsConsensus      string
+	logAll              bool
+	concurrency         uint
 )
 
 var twinsCmd = &cobra.Command{
@@ -78,9 +81,10 @@ func init() {
 	twinsCmd.Flags().Uint8Var(&numPartitions, "partitions", 2, "Number of network partitions.")
 	twinsCmd.Flags().Uint8Var(&numRounds, "rounds", 7, "Number of rounds in each scenario.")
 	twinsCmd.Flags().Uint64Var(&numScenarios, "scenarios", 0, "Number of scenarios to generate.")
+	twinsCmd.Flags().Uint64Var(&numScenariosPerFile, "scenarios-per-file", 0, "Number of scenarios to write to a single file.\nIf set to 0, all scenarios will be written to a single file.")
 	twinsCmd.Flags().BoolVar(&shuffle, "shuffle", false, "Shuffle the order in which scenarios are generated.")
 	twinsCmd.Flags().Int64Var(&randSeed, "seed", time.Now().Unix(), "Random seed (defaults to current timestamp).")
-	twinsCmd.Flags().StringVar(&twinsDest, "output", "", "File to write to.")
+	twinsCmd.Flags().StringVar(&twinsDest, "output", "", "If scenarios-per-file is 0, this specifies the file to write to.\nOtherwise this specifies the directory to write files to.")
 	twinsCmd.Flags().StringVar(&twinsSrc, "input", "", "File to read scenarios from.")
 	twinsCmd.Flags().StringVar(&twinsConsensus, "consensus", "chainedhotstuff", "The name of the consensus implementation to use.")
 	twinsCmd.Flags().BoolVar(&logAll, "log-all", false, "If true, all scenarios will be written to the output file when in \"run\" mode.")
@@ -160,7 +164,7 @@ func twinsGenerate() {
 
 type twinsInstance struct {
 	source       twins.ScenarioSource
-	outputStream *twins.JSONWriter
+	outputStream scenarioWriter
 	logger       logging.Logger
 	closeOutput  func() error
 }
@@ -176,44 +180,59 @@ func newGen(logger logging.Logger) *twins.Generator {
 }
 
 func newInstance(scenarioSource twins.ScenarioSource) (twinsInstance, error) {
-	var output io.Writer
-	var closeOutput func() error
+	var (
+		output      scenarioWriter
+		closeOutput func() error
+		err         error
+	)
 	if twinsDest != "" {
-		f, err := os.OpenFile(twinsDest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		if numScenariosPerFile == 0 {
+			f, err := os.OpenFile(twinsDest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+			if err != nil {
+				return twinsInstance{}, err
+			}
+			wr := bufio.NewWriter(f)
+			output, err = twins.ToJSON(scenarioSource.Settings(), wr)
+			if err != nil {
+				_ = f.Close()
+				return twinsInstance{}, err
+			}
+			closeOutput = func() error {
+				err := output.Close()
+				if ferr := wr.Flush(); err == nil {
+					err = ferr
+				}
+				if cerr := f.Close(); err == nil {
+					err = cerr
+				}
+				return err
+			}
+		} else {
+			err := os.MkdirAll(twinsDest, 0755)
+			if err != nil {
+				return twinsInstance{}, err
+			}
+			output = &dirWriter{
+				settings: scenarioSource.Settings(),
+				dir:      twinsDest,
+			}
+
+			closeOutput = output.Close
+		}
+	} else {
+		output, err = twins.ToJSON(scenarioSource.Settings(), io.Discard)
 		if err != nil {
 			return twinsInstance{}, err
 		}
-		wr := bufio.NewWriter(f)
-		output = wr
-		closeOutput = func() error {
-			if ferr := wr.Flush(); err == nil {
-				err = ferr
-			}
-			if cerr := f.Close(); err == nil {
-				err = cerr
-			}
-			return err
-		}
-	} else {
-		output = io.Discard
+
 		closeOutput = func() error { return nil }
-	}
-
-	js, err := twins.ToJSON(scenarioSource.Settings(), output)
-	if err != nil {
-		return twinsInstance{}, err
-	}
-
-	if err != nil {
-		return twinsInstance{}, err
 	}
 
 	return twinsInstance{
 		source:       scenarioSource,
-		outputStream: js,
+		outputStream: output,
 		logger:       logging.New("twins"),
 		closeOutput: func() error {
-			err = js.Close()
 			if cerr := closeOutput(); err == nil {
 				err = cerr
 			}
@@ -271,4 +290,91 @@ func (ti twinsInstance) generateAndExecuteScenario() (bool, error) {
 	}
 
 	return true, nil
+}
+
+type scenarioWriter interface {
+	WriteScenario(scenario twins.Scenario) error
+	Close() error
+}
+
+type dirWriter struct {
+	mut           sync.Mutex
+	dir           string
+	scenarioCount int
+	fileCount     int
+	closeFile     func() error
+	settings      twins.Settings
+	writer        *twins.JSONWriter
+}
+
+func (dw *dirWriter) openNewFile() error {
+	f, err := os.OpenFile(filepath.Join(dw.dir, strconv.Itoa(dw.fileCount)+".json"), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	wr := bufio.NewWriter(f)
+	dw.closeFile = func() error {
+		err := wr.Flush()
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+		return err
+	}
+	dw.writer, err = twins.ToJSON(dw.settings, wr)
+	if err != nil {
+		_ = dw.closeFile()
+	}
+	dw.fileCount++
+	return nil
+}
+
+func (dw *dirWriter) Close() error {
+	dw.mut.Lock()
+	defer dw.mut.Unlock()
+	return dw.closeInner()
+}
+
+func (dw *dirWriter) closeInner() error {
+	if dw.writer != nil {
+		err := dw.writer.Close()
+		dw.writer = nil
+		if dw.closeFile != nil {
+			if cerr := dw.closeFile(); err == nil {
+				err = cerr
+			}
+		}
+		dw.closeFile = nil
+		return err
+	}
+	return nil
+}
+
+func (dw *dirWriter) WriteScenario(scenario twins.Scenario) error {
+	dw.mut.Lock()
+	defer dw.mut.Unlock()
+
+	if dw.writer == nil {
+		err := dw.openNewFile()
+		if err != nil {
+			return err
+		}
+	}
+
+	err := dw.writer.WriteScenario(scenario)
+	if err != nil {
+		// I guess we'll just close the file if the write fails
+		_ = dw.closeInner()
+		return err
+	}
+
+	dw.scenarioCount++
+	if dw.scenarioCount == int(numScenariosPerFile) {
+		dw.scenarioCount = 0
+		err = dw.closeInner()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
