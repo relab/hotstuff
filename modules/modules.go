@@ -38,7 +38,7 @@ package modules
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/internal/logging"
+	"github.com/relab/hotstuff/logging"
 )
 
 // Module is an interface for modules that need access to a client.

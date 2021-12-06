@@ -14,7 +14,7 @@ import (
 	backend "github.com/relab/hotstuff/backend/gorums"
 	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/internal/logging"
+	"github.com/relab/hotstuff/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )

@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/internal/logging"
+	"github.com/relab/hotstuff/logging"
 )
 
 // Generator generates twins scenarios.

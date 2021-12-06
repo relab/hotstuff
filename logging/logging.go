@@ -1,3 +1,5 @@
+// Package logging defines the Logger interface which is used by the module system.
+// It also includes functions for setting the global log level and a per-package log level.
 package logging
 
 import (
@@ -33,7 +35,7 @@ func parseLevel(level string) zapcore.Level {
 	case "fatal":
 		return zap.FatalLevel
 	default:
-		return zap.InfoLevel
+		panic("invalid log level '" + level + "'")
 	}
 }
 

@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/relab/hotstuff/internal/logging"
+	"github.com/relab/hotstuff/logging"
 	"github.com/spf13/cobra"
 
 	homedir "github.com/mitchellh/go-homedir"

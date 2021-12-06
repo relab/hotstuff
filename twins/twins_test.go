@@ -5,7 +5,7 @@ import (
 	"time"
 
 	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
-	"github.com/relab/hotstuff/internal/logging"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/twins"
 )
 

@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/relab/hotstuff/internal/logging"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/twins"
 	"github.com/spf13/cobra"
 )

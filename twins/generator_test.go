@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/relab/hotstuff/internal/logging"
+	"github.com/relab/hotstuff/logging"
 )
 
 func TestPartitionsGenerator(t *testing.T) {

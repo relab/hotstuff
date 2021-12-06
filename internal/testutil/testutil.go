@@ -16,9 +16,9 @@ import (
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/internal/logging"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/leaderrotation"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
