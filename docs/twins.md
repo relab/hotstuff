@@ -4,7 +4,57 @@ Twins [1] is a strategy for testing byzantine consensus protocols for safety and
 Twins emulates attacks from byzantine replicas by running two copies (twins) of the same replica.
 Both twins share the same private key, and are thus indistinguishable from a single replica that is behaving oddly.
 
-Twins is implement by two main components: a *scenario generator* and a *scenario executor*.
+## Using the CLI
+
+The HotStuff CLI includes support for generating and executing scenarios. This is done through the `twins` subcommand.
+To see the list of available options, run `./hotstuff help twins`.
+
+### Generating Scenarios
+
+Scenarios can either be generated ahead of time and written to a file,
+or they can be generated on the fly while executing them.
+To generate scenarios ahead of time, use the command `./hotstuff twins generate`.
+The generated scenarios will then be written in JSON format to one or multiple files.
+The `--scenarios-per-file` flag controls how many scenarios will be written to each file,
+and the `--output` flag controls where they will be written.
+If the `--scenarios-per-file` flag is `0` (that is the default), the `--output` specifies the file to write to.
+Otherwise, the `--output` flag specifies the directory in which multiple output files should be created.
+
+The `--scenarios` flag controls how many scenarios will be generated.
+If this flag is unspecified, the generator will generate all possible scenarios.
+Note that this will likely result in several hundreds of megabytes of scenarios,
+as the number of possible scenarios is quite large.
+Hence it could be useful to specify the `--scenarios-per-file` flag if generating a large number of scenarios.
+
+The `--replicas`, `--twins`, `--partitions`, and `--rounds` flags are the inputs for the scenario generator.
+The `--replicas` flag specifies how many replicas to create.
+The `--twins` flag specifies how many of the replicas should have a twin.
+The `--partitions` flag specifies how many network partitions the replicas and twins should be divided into.
+The `--rounds` flag specifies how many rounds or views to run.
+
+The generator will always generate the same scenarios if given the same input parameters.
+That is, unless the `--shuffle` flag is given, in which case the order of scenarios is randomized.
+The `--seed` flag may be used to reproduce the same randomized order again.
+
+The generator settings will be written to the head of each output file.
+
+### Executing Scenarios
+
+To execute scenarios, use the command `./hotstuff twins run`.
+This command can either read scenarios from a JSON file, if the `--input` flag is given,
+or generate scenarios on the fly,
+in which case the flags described in the previous section may be used to configure the generator.
+
+The consensus implementation is chosen by the `--consensus` flag.
+
+The scenario executor also uses the `--output` and `--scenarios-per-file` flags,
+but it only writes failed scenarios unless the `--log-all` flag is given.
+
+To speed up execution, set the `--concurrency` flag to `0` to make use of all available CPUs.
+
+## Implementation
+
+Twins is implemented by two main components: a *scenario generator* and a *scenario executor*.
 We have implemented the scenario executor by writing implementations of the `Configuration` and `Replica` interfaces from the `consensus` package.
 These implementations allow us to control which messages are sent and which messages are dropped among replicas.
 The scenario generator is responsible for generating scenarios for the scenario executor to execute.
@@ -38,7 +88,7 @@ Now, consider the following scenario:
 The behavior of this scenario differs from the previous two because one of the twins have moved.
 In general, we only want to generate the scenarios that differ in terms of the partition sizes and the positions of the twins.
 
-## Partition Scenario Algorithm
+### Partition Scenario Algorithm
 
 The first part of generating the partition scenarios is to determine the possible sizes of partitions.
 For n=5 nodes and k=3 partitions, we can have the following partition sizes:
