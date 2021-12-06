@@ -2,10 +2,10 @@
 
 This document explains how to use the `hotstuff` cli tool to deploy and run experiments locally and on remote hosts.
 
-## Table of contents
+## Contents
 
 - [Experimentation](#experimentation)
-  - [Table of contents](#table-of-contents)
+  - [Contents](#contents)
   - [Metrics collection](#metrics-collection)
     - [Create a Protobuf message describing a measurement](#create-a-protobuf-message-describing-a-measurement)
     - [Emitting events from other modules](#emitting-events-from-other-modules)

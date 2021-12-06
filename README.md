@@ -9,16 +9,63 @@
 It provides a set of modules and interfaces that make it easy to test different algorithms.
 It also provides a tool for deploying and running experiments on multiple servers via SSH.
 
+## Contents
+
+- [hotstuff](#hotstuff)
+  - [Contents](#contents)
+  - [Build Dependencies](#build-dependencies)
+  - [Getting Started](#getting-started)
+    - [Linux and macOS](#linux-and-macos)
+    - [Windows](#windows)
+  - [Running Experiments](#running-experiments)
+  - [Safety Testing with Twins](#safety-testing-with-twins)
+  - [Modules](#modules)
+  - [Consensus Interfaces](#consensus-interfaces)
+  - [Crypto Interfaces](#crypto-interfaces)
+  - [References](#references)
+
 ## Build Dependencies
 
-* Go (at least version 1.16)
-* Protobuf compiler
-* Make
+- [Go](https://go.dev) (at least version 1.16)
+
+If you modify any of the protobuf files, you will need the following to compile them:
+
+- [Protobuf compiler](https://github.com/protocolbuffers/protobuf) (at least version 3.15)
+
+- The gRPC and gorums plugins for protobuf.
+  - Linux and macOS users can run `make tools` to install these.
+  - Windows users must do the following:
+    - Ensure dependencies are downloaded: `go mod download`
+    - `go install github.com/relab/gorums/cmd/protoc-gen-gorums`
+    - `go install google.golang.org/protobuf/cmd/protoc-gen-go`
 
 ## Getting Started
 
-* Install required go tools by running `make tools`.
-* Compile command line utilities by running `make`.
+### Linux and macOS
+
+- Compile command line utilities by running `make`.
+
+### Windows
+
+- Run `go build -o ./hotstuff.exe ./cmd/hotstuff`
+- Run `go build -o ./plot.exe ./cmd/plot`
+
+**NOTE**: you should use `./hotstuff.exe` instead of `./hotstuff` when running commands.
+
+**NOTE**: these commands will not recompile the protobuf files if they have changed.
+You could try to run `make`, but it might not work on Windows. Instead, you can do it manually like this:
+
+1. Get the path to the `gorums` module:
+
+  ```text
+  go list -m -f '{{.Dir}}' github.com/relab/gorums
+  ```
+
+2. Run `protoc` (replace `PATH_TO_GORUMS` with the output from the previous step):
+
+  ```text
+  protoc -I=PATH_TO_GORUMS:. --go_out=paths=source_relative:. --gorums_out=paths=source_relative:. PATH_TO_CHANGED_PROTO_FILE
+  ```
 
 ## Running Experiments
 
@@ -30,32 +77,37 @@ For a list of options, run `./hotstuff help run`.
 The `plot` command line utility can be used to create graphs from measurements.
 Run `./plot --help` for a list of options.
 
+## Safety Testing with Twins
+
+We have implemented the Twins strategy [6] for testing the safety of the consensus implementations.
+See the [twins documentation](docs/twins.md) for details.
+
 ## Modules
 
 The following components are modular:
 
-* Consensus
-  * The "core" of the consensus protocol, which decides when a replica should vote for a proposal,
+- Consensus
+  - The "core" of the consensus protocol, which decides when a replica should vote for a proposal,
     and when a block should be committed.
-  * 3 implementations:
-    * `chainedhotstuff`: The three-phase pipelined HotStuff protocol presented in the HotStuff paper [1].
-    * `fasthotstuff`: A two-chain version of HotStuff designed to prevent forking attacks [3].
-    * `simplehotstuff`: A simplified version of chainedhotstuff [4].
-* Crypto
-  * Implements the cryptographic primitives used by HotStuff, namely quorum certificates.
-  * 2 implementations:
-    * `ecdsa`: A very simple implementation where quorum certificates are represented by arrays of ECDSA signatures.
-    * `bls12`: An implementation of threshold signatures based on BLS12-381 aggregated signatures.
-* Synchronizer
-  * Implements a view-synchronization algorithm. It is responsible for synchronizing replicas to the same view number.
-  * Current implementation based on [DiemBFT's RoundState](https://github.com/diem/diem/tree/main/consensus/src/liveness) [5].
-* Blockchain
-  * Implements storage for the block chain. Currently we have an in-memory cache of a fixed size.
-* Leader rotation
-  * Decides which replica should be the leader of a view.
-  * Currently either a fixed leader or round-robin.
-* Networking/Backend
-  * Using [Gorums](https://github.com/relab/gorums) [2]
+  - 3 implementations:
+    - `chainedhotstuff`: The three-phase pipelined HotStuff protocol presented in the HotStuff paper [1].
+    - `fasthotstuff`: A two-chain version of HotStuff designed to prevent forking attacks [3].
+    - `simplehotstuff`: A simplified version of chainedhotstuff [4].
+- Crypto
+  - Implements the cryptographic primitives used by HotStuff, namely quorum certificates.
+  - 2 implementations:
+    - `ecdsa`: A very simple implementation where quorum certificates are represented by arrays of ECDSA signatures.
+    - `bls12`: An implementation of threshold signatures based on BLS12-381 aggregated signatures.
+- Synchronizer
+  - Implements a view-synchronization algorithm. It is responsible for synchronizing replicas to the same view number.
+  - Current implementation based on [DiemBFT's RoundState](https://github.com/diem/diem/tree/main/consensus/src/liveness) [5].
+- Blockchain
+  - Implements storage for the block chain. Currently we have an in-memory cache of a fixed size.
+- Leader rotation
+  - Decides which replica should be the leader of a view.
+  - Currently either a fixed leader or round-robin.
+- Networking/Backend
+  - Using [Gorums](https://github.com/relab/gorums) [2]
 
 These modules are designed to be interchangeable and simple to implement.
 It is also possible to add custom modules that can interact with the modules we listed above.
@@ -96,3 +148,5 @@ to implement quorum certificates.
 [4] Leander Jehl. Formal Verification of HotStuff, Jun 2021.
 
 [5] Baudet, Mathieu, et al. "State machine replication in the libra blockchain." The Libra Assn., Tech. Rep (2019).
+
+[6]: S. Bano, A. Sonnino, A. Chursin, D. Perelman, en D. Malkhi, “Twins: White-Glove Approach for BFT Testing”, 2020.

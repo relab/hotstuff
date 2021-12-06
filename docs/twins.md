@@ -4,6 +4,17 @@ Twins [1] is a strategy for testing byzantine consensus protocols for safety and
 Twins emulates attacks from byzantine replicas by running two copies (twins) of the same replica.
 Both twins share the same private key, and are thus indistinguishable from a single replica that is behaving oddly.
 
+## Contents
+
+- [Twins](#twins)
+  - [Contents](#contents)
+  - [Using the CLI](#using-the-cli)
+    - [Generating Scenarios](#generating-scenarios)
+    - [Executing Scenarios](#executing-scenarios)
+  - [Implementation](#implementation)
+    - [Partition Scenario Algorithm](#partition-scenario-algorithm)
+  - [References](#references)
+
 ## Using the CLI
 
 The HotStuff CLI includes support for generating and executing scenarios. This is done through the `twins` subcommand.
