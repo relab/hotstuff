@@ -299,7 +299,7 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 	s.newCtx(duration)
 	s.timer.Reset(duration)
 
-	s.mods.MetricsEventLoop().AddEvent(ViewChangeEvent{View: s.currentView, Timeout: timeout})
+	s.mods.EventLoop().AddEvent(ViewChangeEvent{View: s.currentView, Timeout: timeout})
 
 	leader := s.mods.LeaderRotation().GetLeader(s.currentView)
 	if leader == s.mods.ID() {

@@ -25,11 +25,11 @@ type Throughput struct {
 // InitModule gives the module access to the other modules.
 func (t *Throughput) InitModule(mods *modules.Modules) {
 	t.mods = mods
-	t.mods.MetricsEventLoop().RegisterHandler(consensus.CommitEvent{}, func(event interface{}) {
+	t.mods.EventLoop().RegisterHandler(consensus.CommitEvent{}, func(event interface{}) {
 		commitEvent := event.(consensus.CommitEvent)
 		t.recordCommit(commitEvent.Commands)
 	})
-	t.mods.MetricsEventLoop().RegisterObserver(types.TickEvent{}, func(event interface{}) {
+	t.mods.EventLoop().RegisterObserver(types.TickEvent{}, func(event interface{}) {
 		t.tick(event.(types.TickEvent))
 	})
 	t.mods.Logger().Info("Throughput metric enabled")
