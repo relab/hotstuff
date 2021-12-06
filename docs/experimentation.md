@@ -132,6 +132,9 @@ For the full list of flags, run `./hotstuff help run`.
 
 - `--config` the path to the config file to read.
 - `--log-level` sets the lowest logging level. Valid values are `debug`, `info`, `warn`, and `error`. Defaults to `info`.
+- `--log-pkgs` sets the logging level on a per-package basis, overriding the value set by `--log-level`. For example,
+  passing `--log-pkgs="consensus:info,synchronizer:warn"` will set the log level for the `consensus` package to `info`
+  and the `synchronizer` package to `warn`. Note that using this option will increase the overhead of logging somewhat.
 - `--connect-timeout` how long to wait for the initial connection attempt.
 - `--clients` the number of clients to run.
 - `--replicas` the number of replicas to run.
