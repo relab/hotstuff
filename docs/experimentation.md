@@ -49,13 +49,17 @@ message LatencyMeasurement {
 
 When creating a new metric, you will likely find it necessary to emit a new event type from some other module.
 The preferred way to do this is to define the event type in that module's package, and then add that event to the
-`MetricsEventLoop` when and where it is relevant to do so. For example, the throughput measurement receives `CommitEvent`
+event loop when and where it is relevant to do so. For example, the throughput measurement receives `CommitEvent`
 events from the `Executor` module. The event type should not be defined in the metric's package,
 as that would require the other module to import the metrics module.
 
 ```go
-srv.mods.MetricsEventLoop().AddEvent(consensus.CommitEvent{Commands: len(batch.GetCommands())}
+srv.mods.EventLoop().AddEvent(consensus.CommitEvent{Commands: len(batch.GetCommands())}
 ```
+
+**NOTE:** In earlier versions, we used a separate event loop for metrics.
+This is no longer the case, and though the method `MetricsEventLoop()` remains,
+it now returns the same event loop as the `EventLoop()` method.
 
 ### Create a module for your metric
 
@@ -64,12 +68,7 @@ or `consensus.Module` interfaces. The former should be preferred unless you need
 modules directly. In the `InitModule` or `InitConsensusModule` functions you should add an observer or handler for
 the events that you want to receive.
 
-The `MetricsEventLoop` is a dedicated event loop events related to metrics collection.
-The reason we need this secondary event loop is because it is not safe to call the `AddEvent` method of the event loop
-from the goroutine that is executing that event loop, because it can cause a deadlock.
-Additionally, this design allows us to offload some work from the main event loop goroutine.
-
-You should also add an observer for the `types.TickEvent` type on the `MetricsEventLoop`.
+You should also add an observer for the `types.TickEvent` type on the `EventLoop`.
 This event is sent at a configured interval such that each metric can periodically log its measurement.
 The example below shows a complete initialization function for the throughput metric module.
 
@@ -80,14 +79,14 @@ func (t *Throughput) InitModule(mods *modules.Modules) {
     t.mods = mods
 
     // register handlers/observers for relevant events
-    t.mods.MetricsEventLoop().RegisterHandler(consensus.CommitEvent{}, func(event interface{}) {
+    t.mods.EventLoop().RegisterHandler(consensus.CommitEvent{}, func(event interface{}) {
         // The event loop will only call the handler with events of the specified type, so this assertion is safe.
         commitEvent := event.(consensus.CommitEvent)
         t.recordCommit(commitEvent.Commands)
     })
 
     // register observer for tick events
-    t.mods.MetricsEventLoop().RegisterObserver(types.TickEvent{}, func(event interface{}) {
+    t.mods.EventLoop().RegisterObserver(types.TickEvent{}, func(event interface{}) {
         t.tick(event.(types.TickEvent))
     })
 
