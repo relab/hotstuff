@@ -101,7 +101,7 @@ func TestDeployment(t *testing.T) {
 	}
 
 	exe := compileBinary(t)
-	g := iagotest.CreateSSHGroup(t, 4)
+	g := iagotest.CreateSSHGroup(t, 4, true)
 
 	sessions, err := orchestration.Deploy(g, orchestration.DeployConfig{
 		ExePath:  exe,
