@@ -53,45 +53,52 @@ type Modules struct {
 	id            hotstuff.ID
 	logger        logging.Logger
 	metricsLogger MetricsLogger
-	dataEventLoop *eventloop.EventLoop
+	eventLoop     *eventloop.EventLoop
 }
 
 // ID returns the id of this client.
-func (mod Modules) ID() hotstuff.ID {
-	return mod.id
+func (mods Modules) ID() hotstuff.ID {
+	return mods.id
 }
 
 // Logger returns the logger.
-func (mod Modules) Logger() logging.Logger {
-	return mod.logger
+func (mods Modules) Logger() logging.Logger {
+	return mods.logger
 }
 
 // MetricsLogger returns the metrics logger.
-func (mod Modules) MetricsLogger() MetricsLogger {
-	if mod.metricsLogger == nil {
+func (mods Modules) MetricsLogger() MetricsLogger {
+	if mods.metricsLogger == nil {
 		return NopLogger()
 	}
-	return mod.metricsLogger
+	return mods.metricsLogger
+}
+
+// EventLoop returns the event loop.
+func (mods Modules) EventLoop() *eventloop.EventLoop {
+	return mods.eventLoop
 }
 
 // MetricsEventLoop returns the metrics event loop.
 // The metrics event loop is used for processing of measurement data.
-func (mod Modules) MetricsEventLoop() *eventloop.EventLoop {
-	return mod.dataEventLoop
+//
+// Deprecated: The metrics event loop is no longer separate from the main event loop. Use EventLoop() instead.
+func (mods Modules) MetricsEventLoop() *eventloop.EventLoop {
+	return mods.EventLoop()
 }
 
 // Builder is a helper for setting up client modules.
 type Builder struct {
-	mod     Modules
+	mods    Modules
 	modules []Module
 }
 
 // NewBuilder returns a new builder.
 func NewBuilder(id hotstuff.ID) Builder {
-	bl := Builder{mod: Modules{
-		id:            id,
-		logger:        logging.New(""),
-		dataEventLoop: eventloop.New(100),
+	bl := Builder{mods: Modules{
+		id:        id,
+		logger:    logging.New(""),
+		eventLoop: eventloop.New(1000),
 	}}
 	return bl
 }
@@ -100,10 +107,10 @@ func NewBuilder(id hotstuff.ID) Builder {
 func (b *Builder) Register(modules ...interface{}) {
 	for _, module := range modules {
 		if m, ok := module.(logging.Logger); ok {
-			b.mod.logger = m
+			b.mods.logger = m
 		}
 		if m, ok := module.(MetricsLogger); ok {
-			b.mod.metricsLogger = m
+			b.mods.metricsLogger = m
 		}
 		if m, ok := module.(Module); ok {
 			b.modules = append(b.modules, m)
@@ -114,7 +121,7 @@ func (b *Builder) Register(modules ...interface{}) {
 // Build initializes all registered modules and returns the Modules object.
 func (b *Builder) Build() *Modules {
 	for _, module := range b.modules {
-		module.InitModule(&b.mod)
+		module.InitModule(&b.mods)
 	}
-	return &b.mod
+	return &b.mods
 }
