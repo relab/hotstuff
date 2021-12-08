@@ -403,6 +403,12 @@ type Synchronizer interface {
 	LeafBlock() *Block
 	// Start starts the synchronizer with the given context.
 	Start(context.Context)
+
+	MostRep() float64
+
+	NewLeader() hotstuff.ID
+	//update values of reputation and leader
+	UpdateValues(hotstuff.ID, float64)
 }
 
 type executorWrapper struct {
