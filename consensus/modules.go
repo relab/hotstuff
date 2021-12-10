@@ -110,9 +110,6 @@ func NewBuilder(id hotstuff.ID, privateKey PrivateKey) Builder {
 			votingMachine: NewVotingMachine(),
 		},
 	}
-	// Get an initial pointer to the base module system.
-	// I think it should be fine to build it twice.
-	bl.mods.Modules = bl.baseBuilder.Build()
 	// some of the default modules need to be registered
 	bl.Register(bl.mods.votingMachine)
 	return bl
@@ -170,13 +167,11 @@ func (b *Builder) Register(mods ...interface{}) {
 
 // Build initializes all modules and returns the HotStuff object.
 func (b *Builder) Build() *Modules {
+	b.mods.Modules = b.baseBuilder.Build()
 	for _, module := range b.modules {
 		module.InitConsensusModule(b.mods, &b.cfg)
 	}
 	b.mods.opts = b.cfg.opts
-	// Update the base module system.
-	// We already got the pointer by calling Build earlier.
-	b.baseBuilder.Build()
 	return b.mods
 }
 
