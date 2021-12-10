@@ -128,6 +128,7 @@ func (cfg *Config) Connect(replicaCfg *config.ReplicaConfig) (err error) {
 			pubKey:        replica.PubKey,
 			newviewCancel: func() {},
 			voteCancel:    func() {},
+			reputation: 1.0,
 		}
 		if replica.ID != replicaCfg.ID {
 			idMapping[replica.Address] = uint32(replica.ID)
@@ -143,7 +144,6 @@ func (cfg *Config) Connect(replicaCfg *config.ReplicaConfig) (err error) {
 		id := hotstuff.ID(node.ID())
 		replica := cfg.replicas[id].(*gorumsReplica)
 		replica.node = node
-		//reputation := uint64(0)
 	}
 
 	return nil

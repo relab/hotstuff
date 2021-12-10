@@ -126,7 +126,7 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 
 func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 	cs.mods.Logger().Debugf("OnPropose: %v", proposal.Block)
-	
+
 	block := proposal.Block
 
 	if cs.mods.Options().ShouldUseAggQC() && proposal.AggregateQC != nil {
@@ -149,8 +149,7 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 
 	defer cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
 	// ensure the block came from the leader.
-	fmt.Println("ID vs Leader", proposal.ID, cs.mods.LeaderRotation().GetLeader(block.View())) 
-	if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.View()) {                       
+	if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.View()) {
 
 		cs.mods.Logger().Info("OnPropose: block was not proposed by the expected leader")
 		return
@@ -195,13 +194,13 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 
 	cs.lastVote = block.View()
 
-	leaderID := cs.mods.LeaderRotation().GetLeader(cs.lastVote + 1) //removed +1, no difference. Added -1
+	leaderID := cs.mods.LeaderRotation().GetLeader(cs.lastVote) //removed +1, no difference. Added -1
 	if leaderID == cs.mods.ID() {
 		go cs.mods.EventLoop().AddEvent(VoteMsg{ID: cs.mods.ID(), PartialCert: pc})
 		return
-	} // else {
-	//	cs.mods.Logger().Info("LeaderID is NOT cs.mods.ID")
-	//}
+	} else {
+		cs.mods.Logger().Info("LeaderID is NOT cs.mods.ID")
+	}
 
 	leader, ok := cs.mods.Configuration().Replica(leaderID)
 	if !ok {
