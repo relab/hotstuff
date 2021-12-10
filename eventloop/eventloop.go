@@ -28,8 +28,8 @@ type EventLoop struct {
 	eventQ        queue
 	waitingEvents map[reflect.Type][]interface{}
 
-	handlers  map[reflect.Type]EventHandler
-	observers map[reflect.Type][]EventHandler
+	handlers  map[reflect.Type]interface{}
+	observers map[reflect.Type][]interface{}
 
 	tickers  map[int]*ticker
 	tickerID int
@@ -40,8 +40,8 @@ func New(bufferSize uint) *EventLoop {
 	el := &EventLoop{
 		eventQ:        newQueue(bufferSize),
 		waitingEvents: make(map[reflect.Type][]interface{}),
-		handlers:      make(map[reflect.Type]EventHandler),
-		observers:     make(map[reflect.Type][]EventHandler),
+		handlers:      make(map[reflect.Type]interface{}),
+		observers:     make(map[reflect.Type][]interface{}),
 		tickers:       make(map[int]*ticker),
 	}
 	return el
@@ -53,11 +53,39 @@ func (el *EventLoop) RegisterHandler(eventType interface{}, handler EventHandler
 	el.handlers[reflect.TypeOf(eventType)] = handler
 }
 
+// RegisterHandlerFunc registers a handler for events based on the handler func's type.
+// fn must be a function that accepts one argument and returns nothing.
+// The type of the argument determines the type of events that the handler will receive.
+func (el *EventLoop) RegisterHandlerFunc(fn interface{}) {
+	fnType := reflect.TypeOf(fn)
+
+	if fnType.Kind() != reflect.Func && fnType.NumIn() != 1 && fnType.NumOut() != 0 {
+		panic("invalid argument: argument must be a function taking a single argument and no return value")
+	}
+
+	eventType := fnType.In(0)
+	el.handlers[eventType] = fn
+}
+
 // RegisterObserver registers an observer for events with the same type as the 'eventType' argument.
 // The observer is executed synchronously before any registered handler.
 func (el *EventLoop) RegisterObserver(eventType interface{}, observer EventHandler) {
 	t := reflect.TypeOf(eventType)
 	el.observers[t] = append(el.observers[t], observer)
+}
+
+// RegisterObserverFunc registers an observer for events based on the observer func's type.
+// fn must be a function that accepts one argument and returns nothing.
+// The type of the argument determines the type of events that the handler will receive.
+func (el *EventLoop) RegisterObserverFunc(fn interface{}) {
+	fnType := reflect.TypeOf(fn)
+
+	if fnType.Kind() != reflect.Func && fnType.NumIn() != 1 && fnType.NumOut() != 0 {
+		panic("invalid argument: argument must be a function taking a single argument and no return value")
+	}
+
+	eventType := fnType.In(0)
+	el.observers[eventType] = append(el.observers[eventType], fn)
 }
 
 // AddEvent adds an event to the event queue.
@@ -121,12 +149,27 @@ func (el *EventLoop) processEvent(event interface{}) {
 
 	// run observers
 	for _, observer := range el.observers[t] {
-		observer(event)
+		callFn(observer, event)
 	}
 
 	if handler, ok := el.handlers[t]; ok {
-		handler(event)
+		callFn(handler, event)
 	}
+}
+
+func callFn(fn interface{}, arg interface{}) {
+	if fn, ok := fn.(EventHandler); ok {
+		fn(arg)
+		return
+	}
+
+	fnType := reflect.TypeOf(fn)
+
+	if fnType.Kind() != reflect.Func && fnType.NumIn() != 1 && fnType.NumOut() != 0 {
+		panic("invalid argument: argument must be a function taking a single argument and no return value")
+	}
+
+	reflect.ValueOf(fn).Call([]reflect.Value{reflect.ValueOf(arg)})
 }
 
 func (el *EventLoop) dispatchDelayedEvents(t reflect.Type) {

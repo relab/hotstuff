@@ -22,7 +22,7 @@ func NewVotingMachine() *VotingMachine {
 // It also allows the module to set module options using the OptionsBuilder.
 func (vm *VotingMachine) InitConsensusModule(mods *Modules, _ *OptionsBuilder) {
 	vm.mods = mods
-	vm.mods.EventLoop().RegisterHandler(VoteMsg{}, func(event interface{}) { vm.OnVote(event.(VoteMsg)) })
+	vm.mods.EventLoop().RegisterHandlerFunc(vm.OnVote)
 }
 
 // OnVote handles an incoming vote.

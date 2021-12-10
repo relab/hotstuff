@@ -41,15 +41,9 @@ func (s *Synchronizer) InitConsensusModule(mods *consensus.Modules, opts *consen
 	}
 	s.mods = mods
 
-	s.mods.EventLoop().RegisterHandler(consensus.NewViewMsg{}, func(event interface{}) {
-		newViewMsg := event.(consensus.NewViewMsg)
-		s.OnNewView(newViewMsg)
-	})
+	s.mods.EventLoop().RegisterHandlerFunc(s.OnNewView)
 
-	s.mods.EventLoop().RegisterHandler(consensus.TimeoutMsg{}, func(event interface{}) {
-		timeoutMsg := event.(consensus.TimeoutMsg)
-		s.OnRemoteTimeout(timeoutMsg)
-	})
+	s.mods.EventLoop().RegisterHandlerFunc(s.OnRemoteTimeout)
 
 	var err error
 	s.highQC, err = s.mods.Crypto().CreateQuorumCert(consensus.GetGenesis(), []consensus.PartialCert{})

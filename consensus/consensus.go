@@ -54,9 +54,7 @@ func (cs *consensusBase) InitConsensusModule(mods *Modules, opts *OptionsBuilder
 	if mod, ok := cs.impl.(Module); ok {
 		mod.InitConsensusModule(mods, opts)
 	}
-	cs.mods.EventLoop().RegisterHandler(ProposeMsg{}, func(event interface{}) {
-		cs.OnPropose(event.(ProposeMsg))
-	})
+	cs.mods.EventLoop().RegisterHandlerFunc(cs.OnPropose)
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.

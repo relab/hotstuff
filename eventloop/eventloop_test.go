@@ -49,7 +49,7 @@ func TestObserver(t *testing.T) {
 	}
 
 	el := eventloop.New(10)
-	c := make(chan eventData)
+	c := make(chan eventData, 2)
 	el.RegisterHandler(testEvent(0), func(event interface{}) {
 		c <- eventData{event: event, handler: true}
 	})
@@ -57,20 +57,12 @@ func TestObserver(t *testing.T) {
 		c <- eventData{event: event, handler: false}
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	go el.Run(ctx)
-
 	want := testEvent(42)
 	el.AddEvent(want)
+	el.Tick()
 
 	for i := 0; i < 2; i++ {
-		var data eventData
-		select {
-		case <-ctx.Done():
-			t.Fatal("timed out")
-		case data = <-c:
-		}
+		data := <-c
 
 		if i == 0 && data.handler {
 			t.Fatalf("expected observer to run first")
@@ -154,5 +146,33 @@ func TestDelayedEvent(t *testing.T) {
 		case <-ctx.Done():
 			t.Fatalf("timed out")
 		}
+	}
+}
+
+func BenchmarkHandler(b *testing.B) {
+	el := eventloop.New(1)
+	el.RegisterHandler(testEvent(0), func(event interface{}) {
+		if event.(testEvent) != 1 {
+			panic("wrong value")
+		}
+	})
+
+	for i := 0; i < b.N; i++ {
+		el.AddEvent(testEvent(1))
+		el.Tick()
+	}
+}
+
+func BenchmarkHandlerReflect(b *testing.B) {
+	el := eventloop.New(1)
+	el.RegisterHandlerFunc(func(event testEvent) {
+		if event != 1 {
+			panic("wrong value")
+		}
+	})
+
+	for i := 0; i < b.N; i++ {
+		el.AddEvent(testEvent(1))
+		el.Tick()
 	}
 }
