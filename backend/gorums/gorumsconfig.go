@@ -128,7 +128,7 @@ func (cfg *Config) Connect(replicaCfg *config.ReplicaConfig) (err error) {
 			pubKey:        replica.PubKey,
 			newviewCancel: func() {},
 			voteCancel:    func() {},
-			reputation: 1.0,
+			reputation: 	float64(replica.ID),
 		}
 		if replica.ID != replicaCfg.ID {
 			idMapping[replica.Address] = uint32(replica.ID)

@@ -150,7 +150,7 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 	defer cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
 	// ensure the block came from the leader.
 	if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.View()) {
-
+		fmt.Println("proposal.ID", proposal.ID, "cs.GetLeader(block.View())", cs.mods.LeaderRotation().GetLeader(block.View()))
 		cs.mods.Logger().Info("OnPropose: block was not proposed by the expected leader")
 		return
 	}
@@ -198,9 +198,9 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 	if leaderID == cs.mods.ID() {
 		go cs.mods.EventLoop().AddEvent(VoteMsg{ID: cs.mods.ID(), PartialCert: pc})
 		return
-	} else {
+	} /* else {
 		cs.mods.Logger().Info("LeaderID is NOT cs.mods.ID")
-	}
+	} */
 
 	leader, ok := cs.mods.Configuration().Replica(leaderID)
 	if !ok {

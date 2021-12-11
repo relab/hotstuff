@@ -32,9 +32,8 @@ func (r repBased) GetLeader(view consensus.View) hotstuff.ID {
 	h := fnv.New32a()
 	h.Write([]byte(blockHash))
 	hashInt := h.Sum32()
-	rand.Seed(int64(hashInt))
-	
-	//fmt.Println("view", view, "my id",myId,  "commitQC", commit_head.QuorumCert())
+	//rand.Seed(int64(hashInt))
+
 	if int(view) <= numReplicas+10 {
 		return hotstuff.ID(view%consensus.View(numReplicas) + 1)
 	}
@@ -46,32 +45,26 @@ func (r repBased) GetLeader(view consensus.View) hotstuff.ID {
 	})
 	frac := float64((2.0 / 3.0) * float64(numReplicas))
 	reputation := ((numVotes - frac) / frac)
+
 	voters.ForEach(func(voterID hotstuff.ID) {
-		
 		currentVoter, ok := r.mods.Configuration().Replica(voterID)
 		if !ok {
 			r.mods.Logger().Info("Failed fetching current replica", currentVoter)
 		}
 		if currentVoter.ID() == voterID {
-			
-/* 			if int(r.mods.ID()) == 2 {
-				fmt.Println("updating rep", voterID, " in view", view, " iam ", r.mods.ID())
-			}
-			fmt.Println("should?", shouldUpdate) */
 				currentVoter.UpdateRep(reputation)
-			
 		} 
-		//fmt.Println("before", candidate.ID(), candidate.GetRep())
 		r.replicaList = append(r.replicaList, wr.Choice{Item: strconv.Itoa(int(currentVoter.ID())), Weight: uint(currentVoter.GetRep()*10)}) 
 	})
-	//fmt.Println("choices", r.replicaList)
+	//fmt.Println("the list", r.replicaList)
 	chooser, err := wr.NewChooser(r.replicaList...)
 	if err != nil {
 		fmt.Println(err)
 	}
-	resultLeader := chooser.Pick().(string)
+	rs := rand.New(rand.NewSource(int64(hashInt)))
+	resultLeader := chooser.PickSource(rs).(string)
 	intLeader, _ := strconv.Atoi(resultLeader)
-
+	fmt.Println("picked leader", intLeader, "with seed", hashInt, "from",  r.mods.ID())
 	return hotstuff.ID(intLeader)
 }
 
