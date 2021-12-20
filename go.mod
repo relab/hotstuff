@@ -9,6 +9,7 @@ require (
 	github.com/kilic/bls12-381 v0.1.1-0.20210208205449-6045b0235e36
 	github.com/mattn/go-isatty v0.0.12
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/mroth/weightedrand v0.4.1
 	github.com/relab/gorums v0.5.1-0.20210629194217-9811e4f219ca
 	github.com/relab/iago v0.0.0-20211206120654-269f053c74ad
 	github.com/relab/wrfs v0.0.0-20210628111300-b51570396aec
@@ -18,6 +19,7 @@ require (
 	go.uber.org/multierr v1.7.0
 	go.uber.org/zap v1.17.0
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
+	golang.org/x/tools v0.1.8-0.20211028023602-8de2a7fd1736 // indirect
 	gonum.org/v1/plot v0.8.1
 	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c
 	google.golang.org/grpc v1.38.0

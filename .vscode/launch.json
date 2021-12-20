@@ -9,9 +9,11 @@
 			"type": "go",
 			"request": "launch",
 			"mode": "debug",
-			"program": "${workspaceRoot}/main.go",
+			"program": "${workspaceRoot}/cmd/hotstuff/main.go",
 			"cwd": "${workspaceRoot}",
-			"args": ["run"]
+			"args": [
+				"run"
+			]
 		},
 		{
 			"name": "Deploy to Docker container",
@@ -20,7 +22,13 @@
 			"mode": "debug",
 			"program": "${workspaceRoot}/hotstuff-cli/main.go",
 			"cwd": "${workspaceRoot}",
-			"args": ["run", "--hosts=localhost", "--ssh-config=scripts/ssh_config.local", "--output=foo", "--cpu-profile"]
+			"args": [
+				"run",
+				"--hosts=localhost",
+				"--ssh-config=scripts/ssh_config.local",
+				"--output=foo",
+				"--cpu-profile"
+			]
 		},
 		{
 			"name": "Attach to Process",

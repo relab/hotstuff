@@ -1,6 +1,9 @@
 package consensus
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 // Rules is the minimum interface that a consensus implementations must implement.
 // Implementations of this interface can be wrapped in the ConsensusBase struct.
@@ -82,6 +85,7 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 	}
 
 	cmd, ok := cs.mods.CommandQueue().Get(cs.mods.Synchronizer().ViewContext())
+	//fmt.Println("Command", cmd, "Bool", ok)
 	if !ok {
 		cs.mods.Logger().Debug("Propose: No command")
 		return
@@ -110,6 +114,8 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 			proposal.AggregateQC = &aggQC
 		}
 	}
+
+	fmt.Println("The proposal: ", proposal)
 
 	cs.mods.BlockChain().Store(proposal.Block)
 
@@ -150,10 +156,14 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 	}
 
 	if !cs.impl.VoteRule(proposal) {
+		cs.mods.Logger().Info("OnPropose: Block not voted for")
 		return
 	}
 
 	if qcBlock, ok := cs.mods.BlockChain().Get(block.QuorumCert().BlockHash()); ok {
+		if !ok {
+			cs.mods.Logger().Info("OnPropose: Failed fetching blockhash")
+		}
 		cs.mods.Acceptor().Proposed(qcBlock.Command())
 	}
 

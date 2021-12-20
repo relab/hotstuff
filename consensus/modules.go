@@ -312,6 +312,10 @@ type Replica interface {
 	Vote(cert PartialCert)
 	// NewView sends the quorum certificate to the other replica.
 	NewView(SyncInfo)
+	// Rep returns the replicas reputation
+	GetRep() float64
+	//Updates the reputation
+	UpdateRep(float64)
 }
 
 //go:generate mockgen -destination=../internal/mocks/configuration_mock.go -package=mocks . Configuration
@@ -374,6 +378,12 @@ type Synchronizer interface {
 	LeafBlock() *Block
 	// Start starts the synchronizer with the given context.
 	Start(context.Context)
+
+	MostRep() float64
+
+	NewLeader() hotstuff.ID
+	//update values of reputation and leader
+	UpdateValues(hotstuff.ID, float64)
 }
 
 type executorWrapper struct {

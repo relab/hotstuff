@@ -24,6 +24,7 @@ type gorumsReplica struct {
 	pubKey        consensus.PublicKey
 	voteCancel    context.CancelFunc
 	newviewCancel context.CancelFunc
+	reputation    float64
 }
 
 // ID returns the replica's ID.
@@ -57,6 +58,16 @@ func (r *gorumsReplica) NewView(msg consensus.SyncInfo) {
 	r.newviewCancel()
 	ctx, r.newviewCancel = context.WithCancel(context.Background())
 	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(msg), gorums.WithNoSendWaiting())
+}
+
+func (r *gorumsReplica) UpdateRep(rep float64) {
+	prevRep := r.GetRep()
+	updated := prevRep + rep
+	r.reputation = updated
+}
+
+func (r *gorumsReplica) GetRep() float64 {
+	return r.reputation
 }
 
 // Config holds information about the current configuration of replicas that participate in the protocol,
@@ -116,6 +127,7 @@ func (cfg *Config) Connect(replicaCfg *config.ReplicaConfig) (err error) {
 			pubKey:        replica.PubKey,
 			newviewCancel: func() {},
 			voteCancel:    func() {},
+			reputation: 	float64(replica.ID),
 		}
 		if replica.ID != replicaCfg.ID {
 			idMapping[replica.Address] = uint32(replica.ID)
