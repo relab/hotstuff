@@ -29,10 +29,6 @@ type Synchronizer struct {
 	viewCtx   context.Context // a context that is cancelled at the end of the current view
 	cancelCtx context.CancelFunc
 
-	//test
-	mostValue  float64
-	nextLeader hotstuff.ID
-
 	// map of collected timeout messages per view
 	timeouts map[consensus.View]map[hotstuff.ID]consensus.TimeoutMsg
 }
@@ -74,10 +70,8 @@ func New(viewDuration ViewDuration) consensus.Synchronizer {
 		leafBlock:   consensus.GetGenesis(),
 		currentView: 1,
 
-		viewCtx:    ctx,
-		cancelCtx:  cancel,
-		mostValue:  0.0,
-		nextLeader: 0,
+		viewCtx:   ctx,
+		cancelCtx: cancel,
 
 		duration: viewDuration,
 		timer:    time.AfterFunc(0, func() {}), // dummy timer that will be replaced after start() is called
@@ -123,21 +117,6 @@ func (s *Synchronizer) View() consensus.View {
 // ViewContext returns a context that is cancelled at the end of the view.
 func (s *Synchronizer) ViewContext() context.Context {
 	return s.viewCtx
-}
-
-//Return mostvalue rep
-func (s *Synchronizer) MostRep() float64 {
-	return s.mostValue
-}
-
-//return nextLeader
-func (s *Synchronizer) NewLeader() hotstuff.ID {
-	return s.nextLeader
-}
-//update mostvalue and newleader
-func (s *Synchronizer) UpdateValues(newleader hotstuff.ID, newvalue float64){
-	s.nextLeader = newleader
-	s.mostValue = newvalue
 }
 
 // SyncInfo returns the highest known QC or TC.
@@ -324,7 +303,6 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 	s.mods.EventLoop().AddEvent(ViewChangeEvent{View: s.currentView, Timeout: timeout})
 
 	leader := s.mods.LeaderRotation().GetLeader(s.currentView)
-
 	if leader == s.mods.ID() {
 		s.mods.Consensus().Propose(syncInfo)
 	} else if replica, ok := s.mods.Configuration().Replica(leader); ok {

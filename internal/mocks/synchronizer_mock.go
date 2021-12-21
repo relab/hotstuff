@@ -87,6 +87,18 @@ func (mr *MockSynchronizerMockRecorder) Start(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockSynchronizer)(nil).Start), arg0)
 }
 
+// UpdateHighQC mocks base method.
+func (m *MockSynchronizer) UpdateHighQC(arg0 consensus.QuorumCert) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "UpdateHighQC", arg0)
+}
+
+// UpdateHighQC indicates an expected call of UpdateHighQC.
+func (mr *MockSynchronizerMockRecorder) UpdateHighQC(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHighQC", reflect.TypeOf((*MockSynchronizer)(nil).UpdateHighQC), arg0)
+}
+
 // View mocks base method.
 func (m *MockSynchronizer) View() consensus.View {
 	m.ctrl.T.Helper()

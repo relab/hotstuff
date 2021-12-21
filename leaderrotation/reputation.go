@@ -1,74 +1,101 @@
 package leaderrotation
 
 import (
-	"fmt"
-	"hash/fnv"
+	"encoding/binary"
 	"math/rand"
-	"strconv"
 
 	wr "github.com/mroth/weightedrand"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/modules"
 )
 
-type repBased struct {
-	mods        *consensus.Modules
-	replicaList []wr.Choice
+func init() {
+	modules.RegisterModule("reputation", func() consensus.LeaderRotation {
+		return NewRepBased()
+	})
 }
 
-//InitConsensusModule gives the module a reference to the Modules object.
-//It also allows the module to set module options using the OptionsBuilder
+type reputationsMap map[hotstuff.ID]float64
+
+type repBased struct {
+	mods           *consensus.Modules
+	prevCommitHead *consensus.Block
+	reputations    reputationsMap // latest reputations
+}
+
+// InitConsensusModule gives the module a reference to the Modules object.
+// It also allows the module to set module options using the OptionsBuilder
 func (r *repBased) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
 	r.mods = mods
-	r.replicaList = []wr.Choice{}
 }
 
-//GetLeader returns the id of the leader in the given view
-func (r repBased) GetLeader(view consensus.View) hotstuff.ID {
-	commit_head := r.mods.Consensus().CommittedBlock() //fetch previous comitted block
+// TODO: should GetLeader be thread-safe?
+
+// GetLeader returns the id of the leader in the given view
+func (r *repBased) GetLeader(view consensus.View) hotstuff.ID {
+	block := r.mods.Consensus().CommittedBlock()
+	for block.View() > view-3 {
+		// TODO: it could be possible to lookup leaders for older views if we
+		// store a copy of the reputations in a metadata field of each block.
+		r.mods.Logger().Error("looking up leaders of old views is not supported")
+		return 0
+	}
+
 	numReplicas := r.mods.Configuration().Len()
-	blockHash := r.mods.Consensus().CommittedBlock().Hash().String()
-	h := fnv.New32a()
-	h.Write([]byte(blockHash))
-	hashInt := h.Sum32()
-	//rand.Seed(int64(hashInt))
-
-	if int(view) <= numReplicas+10 {
-		return hotstuff.ID(view%consensus.View(numReplicas) + 1)
+	// use round-robin for the first few views until we get a signature
+	if block.QuorumCert().Signature() == nil {
+		return chooseRoundRobin(view, numReplicas)
 	}
 
-	voters := commit_head.QuorumCert().Signature().Participants()
-	numVotes := 1.0 //is 1 because leader counts as a vote
+	voters := block.QuorumCert().Signature().Participants()
+	numVotes := 0
 	voters.ForEach(func(hotstuff.ID) {
-		numVotes += 1.0
+		numVotes++
 	})
-	frac := float64((2.0 / 3.0) * float64(numReplicas))
-	reputation := ((numVotes - frac) / frac)
 
+	frac := float64((2.0 / 3.0) * float64(numReplicas))
+	reputation := ((float64(numVotes) - frac) / frac)
+
+	weights := make([]wr.Choice, 0, numVotes)
 	voters.ForEach(func(voterID hotstuff.ID) {
-		currentVoter, ok := r.mods.Configuration().Replica(voterID)
-		if !ok {
-			r.mods.Logger().Info("Failed fetching current replica", currentVoter)
+		// we should only update the reputations once for each commit head.
+		if r.prevCommitHead.View() < block.View() {
+			r.reputations[voterID] += reputation
 		}
-		if currentVoter.ID() == voterID {
-				currentVoter.UpdateRep(reputation)
-		} 
-		r.replicaList = append(r.replicaList, wr.Choice{Item: strconv.Itoa(int(currentVoter.ID())), Weight: uint(currentVoter.GetRep()*10)}) 
+		weights = append(weights, wr.Choice{
+			Item:   voterID,
+			Weight: uint(r.reputations[voterID] * 10),
+		})
 	})
-	//fmt.Println("the list", r.replicaList)
-	chooser, err := wr.NewChooser(r.replicaList...)
-	if err != nil {
-		fmt.Println(err)
+
+	if r.prevCommitHead.View() < block.View() {
+		r.prevCommitHead = block
 	}
-	rs := rand.New(rand.NewSource(int64(hashInt)))
-	resultLeader := chooser.PickSource(rs).(string)
-	intLeader, _ := strconv.Atoi(resultLeader)
-	fmt.Println("picked leader", intLeader, "with seed", hashInt, "from",  r.mods.ID())
-	return hotstuff.ID(intLeader)
+
+	r.mods.Logger().Debug(weights)
+
+	chooser, err := wr.NewChooser(weights...)
+	if err != nil {
+		r.mods.Logger().Error("weightedrand error: ", err)
+		return 0
+	}
+
+	hash := block.Hash()
+	seed := int64(binary.LittleEndian.Uint64(hash[:])) // use the first 8 bytes of the hash as a seed
+	rnd := rand.New(rand.NewSource(seed))
+
+	leader := chooser.PickSource(rnd).(hotstuff.ID)
+	r.mods.Logger().Debugf("picked leader %d for view %d using seed %d", leader, view, seed)
+
+	return leader
 }
 
-//NewRepBased returns a new random reputation-based leader rotation implementation
+// NewRepBased returns a new random reputation-based leader rotation implementation
 func NewRepBased() consensus.LeaderRotation {
-	return &repBased{}
+	return &repBased{
+		reputations:    make(reputationsMap),
+		prevCommitHead: consensus.GetGenesis(),
+	}
 }

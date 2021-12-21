@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -85,7 +84,6 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 	}
 
 	cmd, ok := cs.mods.CommandQueue().Get(cs.mods.Synchronizer().ViewContext())
-	//fmt.Println("Command", cmd, "Bool", ok)
 	if !ok {
 		cs.mods.Logger().Debug("Propose: No command")
 		return
@@ -114,8 +112,6 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 			proposal.AggregateQC = &aggQC
 		}
 	}
-
-	fmt.Println("The proposal: ", proposal)
 
 	cs.mods.BlockChain().Store(proposal.Block)
 
@@ -161,10 +157,9 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 	}
 
 	if qcBlock, ok := cs.mods.BlockChain().Get(block.QuorumCert().BlockHash()); ok {
-		if !ok {
-			cs.mods.Logger().Info("OnPropose: Failed fetching blockhash")
-		}
 		cs.mods.Acceptor().Proposed(qcBlock.Command())
+	} else {
+		cs.mods.Logger().Info("OnPropose: Failed to fetch qcBlock")
 	}
 
 	if !cs.mods.Acceptor().Accept(block.Command()) {

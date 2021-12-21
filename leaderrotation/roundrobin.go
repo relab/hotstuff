@@ -1,9 +1,6 @@
 package leaderrotation
 
 import (
-	"fmt"
-	"hash/fnv"
-
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
@@ -29,16 +26,14 @@ func (rr *roundRobin) InitConsensusModule(mods *consensus.Modules, _ *consensus.
 func (rr roundRobin) GetLeader(view consensus.View) hotstuff.ID {
 	// TODO: does not support reconfiguration
 	// assume IDs start at 1
-	blockHash := rr.mods.Consensus().CommittedBlock().Hash().String()
-	h := fnv.New32a()
-	h.Write([]byte(blockHash))
-	hashInt := h.Sum32()
-
-	fmt.Println("the block hash", hashInt)
-	return hotstuff.ID(view%consensus.View(rr.mods.Configuration().Len()) + 1)
+	return chooseRoundRobin(view, rr.mods.Configuration().Len())
 }
 
 // NewRoundRobin returns a new round-robin leader rotation implementation.
 func NewRoundRobin() consensus.LeaderRotation {
 	return &roundRobin{}
+}
+
+func chooseRoundRobin(view consensus.View, numReplicas int) hotstuff.ID {
+	return hotstuff.ID(view%consensus.View(numReplicas) + 1)
 }

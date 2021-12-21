@@ -45,8 +45,6 @@ type Config struct {
 	ReplicaServerOptions []gorums.ServerOption
 	// Options for the replica manager.
 	ManagerOptions []gorums.ManagerOption
-	//Reputation of the replica.
-	Reputation float64
 }
 
 // Replica is a participant in the consensus protocol.
@@ -59,8 +57,6 @@ type Replica struct {
 	execHandlers map[cmdID]func(*empty.Empty, error)
 	cancel       context.CancelFunc
 	done         chan struct{}
-
-	Reputation float64
 }
 
 // New returns a new replica.
@@ -161,16 +157,4 @@ func (srv *Replica) Close() {
 // GetHash returns the hash of all executed commands.
 func (srv *Replica) GetHash() (b []byte) {
 	return srv.clientSrv.hash.Sum(b)
-}
-
-//GET replica reputation
-func (srv *Replica) GetRep() float64 {
-	return srv.Reputation
-}
-
-//Update Reputation
-func (srv *Replica) UpdateRep(rep float64) {
-	prevRep := srv.GetRep()
-	updated := prevRep + rep
-	srv.Reputation = updated
 }

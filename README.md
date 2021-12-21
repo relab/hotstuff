@@ -1,18 +1,13 @@
-# Dat650 Project - Leader election schemes in Hotstuff
+# hotstuff
 
-This project was extended from the `relab` framework, and focuses on new leader election schemes in hotstuff. https://pkg.go.dev/github.com/relab/hotstuff
-Included in this project, we used the package `weightedrand`, https://pkg.go.dev/github.com/mroth/weightedrand@v0.4.1 
+[![Go Reference](https://pkg.go.dev/badge/github.com/relab/consensus.svg)](https://pkg.go.dev/github.com/relab/hotstuff)
+![Test](https://github.com/relab/hotstuff/workflows/Test/badge.svg)
+![golangci-lint](https://github.com/relab/hotstuff/workflows/golangci-lint/badge.svg)
+[![codecov](https://codecov.io/gh/relab/hotstuff/branch/master/graph/badge.svg?token=IYZ7WD6ZAH)](https://codecov.io/gh/relab/hotstuff)
 
-To run the project from `~/hotstuff`
-
-
-First 
-build: `go build -o ./hotstuff.exe ./cmd/hotstuff`
-
-* Running Carousel algorithm: 
-`./hotstuff.exe run --leader-rotation car`
-* Running rep-based algorithm: 
-`./hostuff.exe run --leader-rotation rep`
+`relab/hotstuff` is a framework for experimenting with HotStuff and similar consensus protocols.
+It provides a set of modules and interfaces that make it easy to test different algorithms.
+It also provides a tool for deploying and running experiments on multiple servers via SSH.
 
 ## Contents
 

@@ -56,8 +56,7 @@ func init() {
 	runCmd.Flags().Float32("timeout-multiplier", 1.2, "number to multiply the view duration by in case of a timeout")
 	runCmd.Flags().String("consensus", "chainedhotstuff", "name of the consensus implementation")
 	runCmd.Flags().String("crypto", "ecdsa", "name of the crypto implementation")
-	runCmd.Flags().String("leader-rotation", "rep", "name of the leader rotation algorithm")
-	
+	runCmd.Flags().String("leader-rotation", "round-robin", "name of the leader rotation algorithm")
 
 	runCmd.Flags().Bool("worker", false, "run a local worker")
 	runCmd.Flags().StringSlice("hosts", nil, "the remote hosts to run the experiment on via ssh")

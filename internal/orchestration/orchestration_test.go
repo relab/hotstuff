@@ -43,7 +43,7 @@ func TestOrchestration(t *testing.T) {
 				TimeoutMultiplier: 1.2,
 				Consensus:         consensusImpl,
 				Crypto:            crypto,
-				LeaderRotation:    "car",
+				LeaderRotation:    "round-robin",
 			},
 			Duration: 1 * time.Second,
 			Hosts:    map[string]orchestration.RemoteWorker{"127.0.0.1": workerProxy},

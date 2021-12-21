@@ -147,7 +147,7 @@ func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
 		})
 	}
 
-	cfg := config.NewConfig(1, keys[0], nil,1) 
+	cfg := config.NewConfig(1, keys[0], nil)
 	for _, replica := range replicas {
 		cfg.Replicas[replica.ID] = replica
 	}
