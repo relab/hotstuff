@@ -7,9 +7,7 @@ import (
 )
 
 func init() {
-	modules.RegisterModule("chainedhotstuff", func() consensus.Rules {
-		return New()
-	})
+	modules.RegisterModule("chainedhotstuff", New)
 }
 
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.

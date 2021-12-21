@@ -7,9 +7,7 @@ import (
 )
 
 func init() {
-	modules.RegisterModule("round-robin", func() consensus.LeaderRotation {
-		return NewRoundRobin()
-	})
+	modules.RegisterModule("round-robin", NewRoundRobin)
 }
 
 type roundRobin struct {

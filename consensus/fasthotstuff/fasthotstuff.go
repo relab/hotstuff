@@ -7,9 +7,7 @@ import (
 )
 
 func init() {
-	modules.RegisterModule("fasthotstuff", func() consensus.Rules {
-		return New()
-	})
+	modules.RegisterModule("fasthotstuff", New)
 }
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.

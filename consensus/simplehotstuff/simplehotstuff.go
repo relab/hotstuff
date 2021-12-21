@@ -7,9 +7,7 @@ import (
 )
 
 func init() {
-	modules.RegisterModule("simplehotstuff", func() consensus.Rules {
-		return New()
-	})
+	modules.RegisterModule("simplehotstuff", New)
 }
 
 // SimpleHotStuff implements a simplified version of the HotStuff algorithm.

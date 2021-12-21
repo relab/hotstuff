@@ -12,9 +12,7 @@ import (
 )
 
 func init() {
-	modules.RegisterModule("reputation", func() consensus.LeaderRotation {
-		return NewRepBased()
-	})
+	modules.RegisterModule("reputation", NewRepBased)
 }
 
 type reputationsMap map[hotstuff.ID]float64

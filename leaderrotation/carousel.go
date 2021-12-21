@@ -7,7 +7,12 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/modules"
 )
+
+func init() {
+	modules.RegisterModule("carousel", NewCarousel)
+}
 
 type carousel struct {
 	mods *consensus.Modules

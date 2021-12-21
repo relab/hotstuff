@@ -16,9 +16,7 @@ import (
 )
 
 func init() {
-	modules.RegisterModule("bls12", func() consensus.CryptoImpl {
-		return New()
-	})
+	modules.RegisterModule("bls12", New)
 }
 
 const (
