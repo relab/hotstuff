@@ -3,6 +3,7 @@ package leaderrotation
 import (
 	"encoding/binary"
 	"math/rand"
+	"sort"
 
 	wr "github.com/mroth/weightedrand"
 
@@ -62,10 +63,12 @@ func (r *repBased) GetLeader(view consensus.View) hotstuff.ID {
 		if r.prevCommitHead.View() < block.View() {
 			r.reputations[voterID] += reputation
 		}
-		weights = append(weights, wr.Choice{
+		i := sort.Search(len(weights), func(i int) bool { return weights[i].Item.(hotstuff.ID) >= voterID })
+		weights = append(weights[:i+1], weights[i:]...)
+		weights[i] = wr.Choice{
 			Item:   voterID,
 			Weight: uint(r.reputations[voterID] * 10),
-		})
+		}
 	})
 
 	if r.prevCommitHead.View() < block.View() {

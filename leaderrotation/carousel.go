@@ -2,6 +2,7 @@ package leaderrotation
 
 import (
 	"math/rand"
+	"sort"
 	"time"
 
 	"github.com/relab/hotstuff"
@@ -53,9 +54,11 @@ func (c carousel) GetLeader(round consensus.View) hotstuff.ID {
 
 	candidates := make([]hotstuff.ID, 0, c.mods.Configuration().Len()-f)
 
-	commitHead.QuorumCert().Signature().Participants().ForEach(func(i hotstuff.ID) {
-		if !lastAuthors.Contains(i) {
-			candidates = append(candidates, i)
+	commitHead.QuorumCert().Signature().Participants().ForEach(func(id hotstuff.ID) {
+		if !lastAuthors.Contains(id) {
+			i := sort.Search(len(candidates), func(i int) bool { return candidates[i] >= id })
+			candidates = append(candidates[:i+1], candidates[i:]...)
+			candidates[i] = id
 		}
 	})
 
