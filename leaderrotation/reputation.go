@@ -34,7 +34,7 @@ func (r *repBased) InitConsensusModule(mods *consensus.Modules, _ *consensus.Opt
 // GetLeader returns the id of the leader in the given view
 func (r *repBased) GetLeader(view consensus.View) hotstuff.ID {
 	block := r.mods.Consensus().CommittedBlock()
-	for block.View() > view-3 {
+	for block.View() > view-consensus.View(r.mods.Consensus().ChainLength()) {
 		// TODO: it could be possible to lookup leaders for older views if we
 		// store a copy of the reputations in a metadata field of each block.
 		r.mods.Logger().Error("looking up leaders of old views is not supported")
@@ -84,6 +84,7 @@ func (r *repBased) GetLeader(view consensus.View) hotstuff.ID {
 	seed := int64(binary.LittleEndian.Uint64(hash[:])) // use the first 8 bytes of the hash as a seed
 	rnd := rand.New(rand.NewSource(seed))
 
+	// TODO: could it be possible for a byzantine leader to "craft" blocks that give it a higher chance of being elected?
 	leader := chooser.PickSource(rnd).(hotstuff.ID)
 	r.mods.Logger().Debugf("picked leader %d for view %d using seed %d", leader, view, seed)
 

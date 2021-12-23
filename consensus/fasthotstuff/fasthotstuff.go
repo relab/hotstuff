@@ -64,3 +64,8 @@ func (fhs *FastHotStuff) VoteRule(proposal consensus.ProposeMsg) bool {
 	return proposal.Block.View() >= fhs.mods.Synchronizer().View() &&
 		proposal.Block.View() == proposal.Block.QuorumCert().View()+1
 }
+
+// ChainLength returns the number of blocks that need to be chained together in order to commit.
+func (fhs *FastHotStuff) ChainLength() int {
+	return 2
+}

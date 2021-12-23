@@ -347,6 +347,8 @@ type Consensus interface {
 	Propose(cert SyncInfo)
 	// CommittedBlock returns the most recently committed block.
 	CommittedBlock() *Block
+	// ChainLength returns the number of blocks that need to be chained together in order to commit.
+	ChainLength() int
 }
 
 // LeaderRotation implements a leader rotation scheme.

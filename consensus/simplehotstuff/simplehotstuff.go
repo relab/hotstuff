@@ -83,3 +83,8 @@ func (hs *SimpleHotStuff) CommitRule(block *consensus.Block) *consensus.Block {
 	}
 	return nil
 }
+
+// ChainLength returns the number of blocks that need to be chained together in order to commit.
+func (hs *SimpleHotStuff) ChainLength() int {
+	return 3
+}

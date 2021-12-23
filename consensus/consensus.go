@@ -15,6 +15,8 @@ type Rules interface {
 	// CommitRule decides whether any ancestor of the block can be committed.
 	// Returns the youngest ancestor of the block that can be committed.
 	CommitRule(*Block) *Block
+	// ChainLength returns the number of blocks that need to be chained together in order to commit.
+	ChainLength() int
 }
 
 // ProposeRuler is an optional interface that adds a ProposeRule method.
@@ -232,4 +234,9 @@ func (cs *consensusBase) commitInner(block *Block) {
 		cs.mods.Executor().Exec(block)
 		cs.bExec = block
 	}
+}
+
+// ChainLength returns the number of blocks that need to be chained together in order to commit.
+func (cs *consensusBase) ChainLength() int {
+	return cs.impl.ChainLength()
 }

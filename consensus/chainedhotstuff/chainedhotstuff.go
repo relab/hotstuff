@@ -94,3 +94,8 @@ func (hs *ChainedHotStuff) VoteRule(proposal consensus.ProposeMsg) bool {
 
 	return safe
 }
+
+// ChainLength returns the number of blocks that need to be chained together in order to commit.
+func (hs *ChainedHotStuff) ChainLength() int {
+	return 3
+}
