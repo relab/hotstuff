@@ -34,6 +34,20 @@ func (m *MockConsensus) EXPECT() *MockConsensusMockRecorder {
 	return m.recorder
 }
 
+// ChainLength mocks base method.
+func (m *MockConsensus) ChainLength() int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ChainLength")
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// ChainLength indicates an expected call of ChainLength.
+func (mr *MockConsensusMockRecorder) ChainLength() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChainLength", reflect.TypeOf((*MockConsensus)(nil).ChainLength))
+}
+
 // CommittedBlock mocks base method.
 func (m *MockConsensus) CommittedBlock() *consensus.Block {
 	m.ctrl.T.Helper()
