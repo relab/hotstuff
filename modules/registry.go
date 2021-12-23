@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"fmt"
 	"reflect"
 	"sync"
 )
@@ -65,4 +66,22 @@ func GetModule(name string, out interface{}) bool {
 
 	reflect.ValueOf(out).Elem().Set(reflect.ValueOf(ctor).Call([]reflect.Value{})[0])
 	return true
+}
+
+// ListModules returns a map of interface names to module names.
+func ListModules() map[string][]string {
+	modules := make(map[string][]string)
+
+	registryMut.Lock()
+	defer registryMut.Unlock()
+
+	for t, m := range registry {
+		names := make([]string, 0, len(m))
+		for name := range m {
+			names = append(names, name)
+		}
+		modules[fmt.Sprintf("(%s).%s", t.PkgPath(), t.Name())] = names
+	}
+
+	return modules
 }

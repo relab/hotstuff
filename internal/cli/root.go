@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/modules"
 	"github.com/spf13/cobra"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -14,7 +15,8 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var (
-	cfgFile string
+	listModules bool
+	cfgFile     string
 
 	rootCmd = &cobra.Command{
 		Use:   "hotstuff",
@@ -27,6 +29,19 @@ run the experiment, and fetch the experiment results.
 To run an experiment, use the 'hotstuff run' command.
 By default, this command will run a small configuration of replicas locally.
 use 'hotstuff help run' to view all possible parameters for this command.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !listModules {
+				return cmd.Usage()
+			}
+			mods := modules.ListModules()
+			for k, v := range mods {
+				fmt.Println(k, ":")
+				for _, n := range v {
+					fmt.Println("\t", n)
+				}
+			}
+			return nil
+		},
 	}
 )
 
@@ -45,6 +60,8 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
+
+	rootCmd.Flags().BoolVar(&listModules, "list-modules", false, "list available modules")
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.hotstuff.yaml)")
 
