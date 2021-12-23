@@ -1,7 +1,6 @@
 package leaderrotation
 
 import (
-	"fmt"
 	"math/rand"
 	"time"
 
@@ -16,74 +15,59 @@ func init() {
 
 type carousel struct {
 	mods *consensus.Modules
+	rnd  *rand.Rand
 }
 
 func (c *carousel) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
 	c.mods = mods
 }
 
-func RemoveActive(active []hotstuff.ID, last []hotstuff.ID) []hotstuff.ID {
-	for _, ID := range last {
-		for index, IDa := range active {
-			if ID == IDa {
-				remove(active, index)
-			}
-		}
-
-	}
-	return active
-}
-
-func remove(active []hotstuff.ID, IDIndex int) []hotstuff.ID {
-	active[IDIndex] = active[len(active)-1]
-	return active[:len(active)-1]
-}
-
-func getActiveID(actives consensus.IDSet) []hotstuff.ID {
-	myActives := []hotstuff.ID{}
-	actives.ForEach(func(i hotstuff.ID) {
-		myActives = append(myActives, i)
-	})
-	return myActives
-}
-
 func (c carousel) GetLeader(round consensus.View) hotstuff.ID {
-	commit_head := c.mods.Consensus().CommittedBlock()
-	if round <= 10 { //roundrobin first x views so that "particpants" is not empty
-		fmt.Println("Carousel Startup")
-		return hotstuff.ID(round%consensus.View(c.mods.Configuration().Len()) + 1)
-	}
-	endorsers := commit_head.QuorumCert().Signature().Participants()
-	last_authors := []hotstuff.ID{}
-	//current view vs nextRound-1
-	//a blocks round must be larger than of its parent
-	c.mods.Logger().Info(c.mods.Synchronizer().HighQC().View(), round-1)
-	if c.mods.Synchronizer().HighQC().View() != round-1 {
-		c.mods.Logger().Info("Carousel: Fallback to RoundRobin")
-		return hotstuff.ID(round%consensus.View(c.mods.Configuration().Len()) + 1) //Fallback to Roundrobin
-	}
-	c.mods.Logger().Info(" -------------- Continued PAST RR ---------------")
-	active := getActiveID(endorsers) //endorsers = voters that participated
-	block := commit_head
-	bc := c.mods.BlockChain()
+	commitHead := c.mods.Consensus().CommittedBlock()
 
-	f := hotstuff.NumFaulty(c.mods.Configuration().Len())
-	for len(last_authors) < f && block != consensus.GetGenesis() {
-		last_authors = append(last_authors, block.Proposer())
-		block, _ = bc.Get(block.Parent())
+	if commitHead.QuorumCert().Signature() == nil {
+		c.mods.Logger().Debug("in startup; using round-robin")
+		return chooseRoundRobin(round, c.mods.Configuration().Len())
 	}
 
-	last_wo_active := RemoveActive(active, last_authors[:]) //active instead of 0.
-	leader_candidates := last_wo_active
+	if commitHead.View() != round-consensus.View(c.mods.Consensus().ChainLength()) {
+		c.mods.Logger().Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.View())
+		return chooseRoundRobin(round, c.mods.Configuration().Len())
+	}
 
-	s := rand.NewSource(time.Now().Unix())
-	r := rand.New(s)
-	n := r.Int() % len(leader_candidates)
-	//fmt.Println("leader_candidates", leader_candidates)
-	//fmt.Println("new leader", leader_candidates[n])
-	return leader_candidates[n]
+	c.mods.Logger().Debug("proceeding with carousel")
+
+	var (
+		block       = commitHead
+		f           = hotstuff.NumFaulty(c.mods.Configuration().Len())
+		i           = 0
+		lastAuthors = consensus.NewIDSet()
+		ok          = true
+	)
+
+	for ok && i < f && block != consensus.GetGenesis() {
+		lastAuthors.Add(block.Proposer())
+		block, ok = c.mods.BlockChain().Get(block.Parent())
+		i++
+	}
+
+	candidates := make([]hotstuff.ID, 0, c.mods.Configuration().Len()-f)
+
+	commitHead.QuorumCert().Signature().Participants().ForEach(func(i hotstuff.ID) {
+		if !lastAuthors.Contains(i) {
+			candidates = append(candidates, i)
+		}
+	})
+
+	leader := candidates[c.rnd.Int()%len(candidates)]
+	c.mods.Logger().Debugf("chose id %d", leader)
+
+	return leader
 }
 
+// NewCarousel returns a new instance of the Carousel leader-election algorithm.
 func NewCarousel() consensus.LeaderRotation {
-	return &carousel{}
+	return &carousel{
+		rnd: rand.New(rand.NewSource(time.Now().Unix())),
+	}
 }

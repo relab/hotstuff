@@ -300,6 +300,7 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 	s.newCtx(duration)
 	s.timer.Reset(duration)
 
+	s.mods.Logger().Debugf("advanced to view %d", s.currentView)
 	s.mods.EventLoop().AddEvent(ViewChangeEvent{View: s.currentView, Timeout: timeout})
 
 	leader := s.mods.LeaderRotation().GetLeader(s.currentView)
