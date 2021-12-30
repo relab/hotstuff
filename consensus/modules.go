@@ -26,6 +26,7 @@ type Modules struct {
 	crypto         Crypto
 	synchronizer   Synchronizer
 	forkHandler    ForkHandlerExt
+	handel         Handel
 }
 
 // Run starts both event loops using the provided context and returns when both event loops have exited.
@@ -91,6 +92,11 @@ func (mods *Modules) Synchronizer() Synchronizer {
 // ForkHandler returns the module responsible for handling forked blocks.
 func (mods *Modules) ForkHandler() ForkHandlerExt {
 	return mods.forkHandler
+}
+
+// Handel returns the Handel implementation.
+func (mods *Modules) Handel() Handel {
+	return mods.handel
 }
 
 // Builder is a helper for constructing a HotStuff instance.
@@ -161,6 +167,9 @@ func (b *Builder) Register(mods ...interface{}) { //nolint:gocyclo
 		}
 		if m, ok := module.(ForkHandler); ok {
 			b.mods.forkHandler = forkHandlerWrapper{m}
+		}
+		if m, ok := module.(Handel); ok {
+			b.mods.handel = m
 		}
 		if m, ok := module.(Module); ok {
 			b.modules = append(b.modules, m)
@@ -346,6 +355,12 @@ type Synchronizer interface {
 	LeafBlock() *Block
 	// Start starts the synchronizer with the given context.
 	Start(context.Context)
+}
+
+// Handel is an implementation of the Handel signature aggregation protocol.
+type Handel interface {
+	// Begin commissions the aggregation of a new signature.
+	Begin(ctx context.Context, s PartialCert)
 }
 
 type executorWrapper struct {
