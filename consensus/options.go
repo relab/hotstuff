@@ -3,6 +3,7 @@ package consensus
 // Options stores runtime configuration settings.
 type Options struct {
 	shouldUseAggQC        bool
+	shouldUseHandel       bool
 	shouldVerifyVotesSync bool
 
 	sharedRandomSeed   int64
@@ -13,6 +14,11 @@ type Options struct {
 // This is true for Fast-Hotstuff: https://arxiv.org/abs/2010.11454
 func (c Options) ShouldUseAggQC() bool {
 	return c.shouldUseAggQC
+}
+
+// ShouldUseHandel returns true if the Handel signature aggregation protocol should be used.
+func (c Options) ShouldUseHandel() bool {
+	return c.shouldUseHandel
 }
 
 // ShouldVerifyVotesSync returns true if votes should be verified synchronously.
@@ -39,6 +45,11 @@ type OptionsBuilder struct {
 // SetShouldUseAggQC sets the ShouldUseAggQC setting to true.
 func (builder *OptionsBuilder) SetShouldUseAggQC() {
 	builder.opts.shouldUseAggQC = true
+}
+
+// SetShouldUseHandel sets the ShouldUseHandel setting to true.
+func (builder *OptionsBuilder) SetShouldUseHandel() {
+	builder.opts.shouldUseHandel = true
 }
 
 // SetShouldVerifyVotesSync sets the ShouldVerifyVotesSync setting to true.
