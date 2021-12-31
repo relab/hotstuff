@@ -162,6 +162,11 @@ func readMetadata(md metadata.MD) map[string]string {
 	return m
 }
 
+// GetRawConfiguration returns the underlying gorums RawConfiguration.
+func (cfg *Config) GetRawConfiguration() gorums.RawConfiguration {
+	return cfg.cfg.RawConfiguration
+}
+
 // ReplicaInfo holds information about a replica.
 type ReplicaInfo struct {
 	ID      hotstuff.ID
