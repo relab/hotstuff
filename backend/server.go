@@ -44,6 +44,11 @@ func NewServer(opts ...gorums.ServerOption) *Server {
 	return srv
 }
 
+// GetGorumsServer returns the underlying gorums Server.
+func (srv *Server) GetGorumsServer() *gorums.Server {
+	return srv.gorumsSrv
+}
+
 // Start creates a listener on the configured address and starts the server.
 func (srv *Server) Start(addr string) error {
 	lis, err := net.Listen("tcp", addr)
