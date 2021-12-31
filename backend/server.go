@@ -1,4 +1,4 @@
-package gorums
+package backend
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// Server is the server-side of the gorums backend.
+// Server is the Server-side of the gorums backend.
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
 	mods      *consensus.Modules
@@ -41,7 +41,7 @@ func NewServer(opts ...gorums.ServerOption) *Server {
 
 	srv.gorumsSrv = gorums.NewServer(opts...)
 
-	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, srv)
+	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, &serviceImpl{srv})
 	return srv
 }
 
@@ -55,7 +55,7 @@ func (srv *Server) Start(addr string) error {
 	return nil
 }
 
-// StartOnListener starts the server on the given listener.
+// StartOnListener starts the server with the given listener.
 func (srv *Server) StartOnListener(listener net.Listener) {
 	go func() {
 		err := srv.gorumsSrv.Serve(listener)
@@ -111,11 +111,16 @@ func (srv *Server) Stop() {
 	srv.gorumsSrv.Stop()
 }
 
+// serviceImpl provides the implementation of the HotStuff gorums service.
+type serviceImpl struct {
+	srv *Server
+}
+
 // Propose handles a replica's response to the Propose QC from the leader.
-func (srv *Server) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
-	id, err := srv.getClientID(ctx)
+func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
+	id, err := impl.srv.getClientID(ctx)
 	if err != nil {
-		srv.mods.Logger().Infof("Failed to get client ID: %v", err)
+		impl.srv.mods.Logger().Infof("Failed to get client ID: %v", err)
 		return
 	}
 
@@ -123,59 +128,59 @@ func (srv *Server) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) 
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
 
-	srv.mods.EventLoop().AddEvent(proposeMsg)
+	impl.srv.mods.EventLoop().AddEvent(proposeMsg)
 }
 
 // Vote handles an incoming vote message.
-func (srv *Server) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
-	id, err := srv.getClientID(ctx)
+func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
+	id, err := impl.srv.getClientID(ctx)
 	if err != nil {
-		srv.mods.Logger().Infof("Failed to get client ID: %v", err)
+		impl.srv.mods.Logger().Infof("Failed to get client ID: %v", err)
 		return
 	}
 
-	srv.mods.EventLoop().AddEvent(consensus.VoteMsg{
+	impl.srv.mods.EventLoop().AddEvent(consensus.VoteMsg{
 		ID:          id,
 		PartialCert: hotstuffpb.PartialCertFromProto(cert),
 	})
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
-func (srv *Server) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo) {
-	id, err := srv.getClientID(ctx)
+func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo) {
+	id, err := impl.srv.getClientID(ctx)
 	if err != nil {
-		srv.mods.Logger().Infof("Failed to get client ID: %v", err)
+		impl.srv.mods.Logger().Infof("Failed to get client ID: %v", err)
 		return
 	}
 
-	srv.mods.EventLoop().AddEvent(consensus.NewViewMsg{
+	impl.srv.mods.EventLoop().AddEvent(consensus.NewViewMsg{
 		ID:       id,
 		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
 	})
 }
 
 // Fetch handles an incoming fetch request.
-func (srv *Server) Fetch(ctx gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*hotstuffpb.Block, error) {
+func (impl *serviceImpl) Fetch(ctx gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*hotstuffpb.Block, error) {
 	var hash consensus.Hash
 	copy(hash[:], pb.GetHash())
 
-	block, ok := srv.mods.BlockChain().LocalGet(hash)
+	block, ok := impl.srv.mods.BlockChain().LocalGet(hash)
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "requested block was not found")
 	}
 
-	srv.mods.Logger().Debugf("OnFetch: %.8s", hash)
+	impl.srv.mods.Logger().Debugf("OnFetch: %.8s", hash)
 
 	return hotstuffpb.BlockToProto(block), nil
 }
 
 // Timeout handles an incoming TimeoutMsg.
-func (srv *Server) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
+func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
 	var err error
 	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
-	timeoutMsg.ID, err = srv.getClientID(ctx)
+	timeoutMsg.ID, err = impl.srv.getClientID(ctx)
 	if err != nil {
-		srv.mods.Logger().Infof("Could not get ID of replica: %v", err)
+		impl.srv.mods.Logger().Infof("Could not get ID of replica: %v", err)
 	}
-	srv.mods.EventLoop().AddEvent(timeoutMsg)
+	impl.srv.mods.EventLoop().AddEvent(timeoutMsg)
 }

@@ -11,8 +11,7 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	backend "github.com/relab/hotstuff/backend/gorums"
-	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/logging"
 	"google.golang.org/grpc"
@@ -99,7 +98,7 @@ func New(conf Config, builder consensus.Builder) (replica *Replica) {
 			Certificates: []tls.Certificate{*conf.Certificate},
 		})
 	}
-	srv.cfg = backend.NewConfig(conf.ID, creds, managerOpts...)
+	srv.cfg = backend.NewConfig(creds, managerOpts...)
 
 	builder.Register(
 		srv.cfg,                // configuration
@@ -120,7 +119,7 @@ func (srv *Replica) StartServers(replicaListen, clientListen net.Listener) {
 }
 
 // Connect connects to the other replicas.
-func (srv *Replica) Connect(replicas *config.ReplicaConfig) error {
+func (srv *Replica) Connect(replicas []backend.ReplicaInfo) error {
 	return srv.cfg.Connect(replicas)
 }
 

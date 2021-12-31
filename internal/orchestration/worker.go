@@ -12,9 +12,9 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/client"
-	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/byzantine"
 	"github.com/relab/hotstuff/crypto"
@@ -228,7 +228,7 @@ func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orche
 		if !ok {
 			return nil, status.Errorf(codes.NotFound, "The replica with ID %d was not found.", id)
 		}
-		cfg, err := getConfiguration(hotstuff.ID(id), req.GetConfiguration(), false)
+		cfg, err := getConfiguration(req.GetConfiguration(), false)
 		if err != nil {
 			return nil, err
 		}
@@ -292,7 +292,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 
 		mods.Register(w.metricsLogger)
 		cli := client.New(c, mods)
-		cfg, err := getConfiguration(hotstuff.ID(opts.GetID()), req.GetConfiguration(), true)
+		cfg, err := getConfiguration(req.GetConfiguration(), true)
 		if err != nil {
 			return nil, err
 		}
@@ -318,9 +318,8 @@ func (w *Worker) stopClients(req *orchestrationpb.StopClientRequest) (*orchestra
 	return &orchestrationpb.StopClientResponse{}, nil
 }
 
-func getConfiguration(id hotstuff.ID, conf map[uint32]*orchestrationpb.ReplicaInfo, client bool) (*config.ReplicaConfig, error) {
-	cfg := &config.ReplicaConfig{ID: id, Replicas: make(map[hotstuff.ID]*config.ReplicaInfo)}
-
+func getConfiguration(conf map[uint32]*orchestrationpb.ReplicaInfo, client bool) ([]backend.ReplicaInfo, error) {
+	replicas := make([]backend.ReplicaInfo, 0, len(conf))
 	for _, replica := range conf {
 		pubKey, err := keygen.ParsePublicKey(replica.GetPublicKey())
 		if err != nil {
@@ -332,13 +331,13 @@ func getConfiguration(id hotstuff.ID, conf map[uint32]*orchestrationpb.ReplicaIn
 		} else {
 			addr = net.JoinHostPort(replica.GetAddress(), strconv.Itoa(int(replica.GetReplicaPort())))
 		}
-		cfg.Replicas[hotstuff.ID(replica.GetID())] = &config.ReplicaInfo{
+		replicas = append(replicas, backend.ReplicaInfo{
 			ID:      hotstuff.ID(replica.GetID()),
 			Address: addr,
 			PubKey:  pubKey,
-		}
+		})
 	}
-	return cfg, nil
+	return replicas, nil
 }
 
 func getPort(lis net.Listener) (uint32, error) {

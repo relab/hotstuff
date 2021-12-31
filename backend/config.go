@@ -1,8 +1,5 @@
-// Package gorums implements a networking backend for HotStuff using the gorums framework.
-//
-// In particular, this package implements the Configuration and Replica interfaces which are used to send messages.
-// This package also receives messages from other replicas and posts them to the event loop.
-package gorums
+// Package backend implements the networking backend for hotstuff using the Gorums framework.
+package backend
 
 import (
 	"context"
@@ -10,15 +7,16 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 )
 
-type gorumsReplica struct {
+// Replica provides methods used by hotstuff to send messages to replicas.
+type Replica struct {
 	node          *hotstuffpb.Node
 	id            hotstuff.ID
 	pubKey        consensus.PublicKey
@@ -27,17 +25,17 @@ type gorumsReplica struct {
 }
 
 // ID returns the replica's ID.
-func (r *gorumsReplica) ID() hotstuff.ID {
+func (r *Replica) ID() hotstuff.ID {
 	return r.id
 }
 
 // PublicKey returns the replica's public key.
-func (r *gorumsReplica) PublicKey() consensus.PublicKey {
+func (r *Replica) PublicKey() consensus.PublicKey {
 	return r.pubKey
 }
 
 // Vote sends the partial certificate to the other replica.
-func (r *gorumsReplica) Vote(cert consensus.PartialCert) {
+func (r *Replica) Vote(cert consensus.PartialCert) {
 	if r.node == nil {
 		return
 	}
@@ -49,7 +47,7 @@ func (r *gorumsReplica) Vote(cert consensus.PartialCert) {
 }
 
 // NewView sends the quorum certificate to the other replica.
-func (r *gorumsReplica) NewView(msg consensus.SyncInfo) {
+func (r *Replica) NewView(msg consensus.SyncInfo) {
 	if r.node == nil {
 		return
 	}
@@ -62,7 +60,8 @@ func (r *gorumsReplica) NewView(msg consensus.SyncInfo) {
 // Config holds information about the current configuration of replicas that participate in the protocol,
 // and some information about the local replica. It also provides methods to send messages to the other replicas.
 type Config struct {
-	mods *consensus.Modules
+	mods    *consensus.Modules
+	optsPtr *[]gorums.ManagerOption // using a pointer so that options can be GCed after initialization
 
 	mgr           *hotstuffpb.Manager
 	cfg           *hotstuffpb.Configuration
@@ -75,61 +74,79 @@ type Config struct {
 // It also allows the module to set module options using the OptionsBuilder.
 func (cfg *Config) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
 	cfg.mods = mods
-}
 
-// NewConfig creates a new configuration.
-func NewConfig(id hotstuff.ID, creds credentials.TransportCredentials, opts ...gorums.ManagerOption) *Config {
-	cfg := &Config{
-		replicas:      make(map[hotstuff.ID]consensus.Replica),
-		proposeCancel: func() {},
-		timeoutCancel: func() {},
-	}
+	opts := *cfg.optsPtr
+	cfg.optsPtr = nil // we don't need to keep the options around beyond this point, so we'll allow them to be GCed.
+
 	// embed own ID to allow other replicas to identify messages from this replica
 	md := metadata.New(map[string]string{
-		"id": fmt.Sprintf("%d", id),
+		"id": fmt.Sprintf("%d", cfg.mods.ID()),
 	})
 
 	opts = append(opts, gorums.WithMetadata(md))
+
+	cfg.mgr = hotstuffpb.NewManager(opts...)
+}
+
+// NewConfig creates a new configuration.
+func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOption) *Config {
+	if creds == nil {
+		creds = insecure.NewCredentials()
+	}
 	grpcOpts := []grpc.DialOption{
 		grpc.WithBlock(),
 		grpc.WithReturnConnectionError(),
+		grpc.WithTransportCredentials(creds),
 	}
-
-	if creds == nil {
-		grpcOpts = append(grpcOpts, grpc.WithInsecure())
-	} else {
-		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(creds))
-	}
-
 	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
 
-	cfg.mgr = hotstuffpb.NewManager(opts...)
+	// initialization will be finished by InitConsensusModule
+	cfg := &Config{
+		replicas:      make(map[hotstuff.ID]consensus.Replica),
+		optsPtr:       &opts,
+		proposeCancel: func() {},
+		timeoutCancel: func() {},
+	}
 	return cfg
 }
 
+// ReplicaInfo holds information about a replica.
+type ReplicaInfo struct {
+	ID      hotstuff.ID
+	Address string
+	PubKey  consensus.PublicKey
+}
+
 // Connect opens connections to the replicas in the configuration.
-func (cfg *Config) Connect(replicaCfg *config.ReplicaConfig) (err error) {
-	idMapping := make(map[string]uint32, len(replicaCfg.Replicas)-1)
-	for _, replica := range replicaCfg.Replicas {
-		cfg.replicas[replica.ID] = &gorumsReplica{
+func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
+	// set up an ID mapping to give to gorums
+	idMapping := make(map[string]uint32, len(replicas))
+	for _, replica := range replicas {
+		// also initialize Replica structures
+		cfg.replicas[replica.ID] = &Replica{
 			id:            replica.ID,
 			pubKey:        replica.PubKey,
 			newviewCancel: func() {},
 			voteCancel:    func() {},
 		}
-		if replica.ID != replicaCfg.ID {
+		// we do not want to connect to ourself
+		if replica.ID != cfg.mods.ID() {
 			idMapping[replica.Address] = uint32(replica.ID)
 		}
 	}
 
+	// this will connect to the replicas
 	cfg.cfg, err = cfg.mgr.NewConfiguration(qspec{}, gorums.WithNodeMap(idMapping))
 	if err != nil {
 		return fmt.Errorf("failed to create configuration: %w", err)
 	}
 
+	// now we need to update the "node" field of each replica we connected to
 	for _, node := range cfg.cfg.Nodes() {
+		// the node ID should correspond with the replica ID
+		// because we already configured an ID mapping for gorums to use.
 		id := hotstuff.ID(node.ID())
-		replica := cfg.replicas[id].(*gorumsReplica)
+		replica := cfg.replicas[id].(*Replica)
 		replica.node = node
 	}
 

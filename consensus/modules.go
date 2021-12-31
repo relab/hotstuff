@@ -120,7 +120,7 @@ func NewBuilder(id hotstuff.ID, privateKey PrivateKey) Builder {
 // If only the Module interface is implemented, the InitModule function will be called, but
 // the HotStuff object will not save a reference to the module.
 // Register will overwrite existing modules if the same type is registered twice.
-func (b *Builder) Register(mods ...interface{}) {
+func (b *Builder) Register(mods ...interface{}) { //nolint:gocyclo
 	for _, module := range mods {
 		b.baseBuilder.Register(module)
 		if m, ok := module.(Acceptor); ok {

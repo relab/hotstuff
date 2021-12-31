@@ -16,13 +16,14 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/config"
+	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type qspec struct {
@@ -93,11 +94,13 @@ func New(conf Config, builder modules.Builder) (client *Client) {
 
 	grpcOpts := []grpc.DialOption{grpc.WithBlock()}
 
+	var creds credentials.TransportCredentials
 	if conf.TLS {
-		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(conf.RootCAs, "")))
+		creds = credentials.NewClientTLSFromCert(conf.RootCAs, "")
 	} else {
-		grpcOpts = append(grpcOpts, grpc.WithInsecure())
+		creds = insecure.NewCredentials()
 	}
+	grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(creds))
 
 	opts := conf.ManagerOptions
 	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
@@ -108,12 +111,12 @@ func New(conf Config, builder modules.Builder) (client *Client) {
 }
 
 // Connect connects the client to the replicas.
-func (c *Client) Connect(replicaConfig *config.ReplicaConfig) (err error) {
-	nodes := make(map[string]uint32, len(replicaConfig.Replicas))
-	for _, r := range replicaConfig.Replicas {
+func (c *Client) Connect(replicas []backend.ReplicaInfo) (err error) {
+	nodes := make(map[string]uint32, len(replicas))
+	for _, r := range replicas {
 		nodes[r.Address] = uint32(r.ID)
 	}
-	c.gorumsConfig, err = c.mgr.NewConfiguration(&qspec{faulty: hotstuff.NumFaulty(len(replicaConfig.Replicas))}, gorums.WithNodeMap(nodes))
+	c.gorumsConfig, err = c.mgr.NewConfiguration(&qspec{faulty: hotstuff.NumFaulty(len(replicas))}, gorums.WithNodeMap(nodes))
 	if err != nil {
 		c.mgr.Close()
 		return err

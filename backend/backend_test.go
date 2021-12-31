@@ -1,4 +1,4 @@
-package gorums
+package backend
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/config"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/eventloop"
@@ -32,12 +31,12 @@ func TestConnect(t *testing.T) {
 		defer teardown()
 		td.builders.Build()
 
-		cfg := NewConfig(td.cfg.ID, td.cfg.Creds, gorums.WithDialTimeout(time.Second))
+		cfg := NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
 
 		builder.Register(cfg)
 		builder.Build()
 
-		err := cfg.Connect(&td.cfg)
+		err := cfg.Connect(td.replicas)
 
 		if err != nil {
 			t.Error(err)
@@ -52,10 +51,19 @@ func testBase(t *testing.T, typ interface{}, send func(consensus.Configuration),
 		const n = 4
 		ctrl := gomock.NewController(t)
 		td := setup(t, ctrl, n)
-		cfg, teardown := createConfig(t, td, ctrl)
-		defer teardown()
+
+		serverTeardown := createServers(t, td, ctrl)
+		defer serverTeardown()
+
+		cfg := NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
 		td.builders[0].Register(cfg)
 		hl := td.builders.Build()
+
+		err := cfg.Connect(td.replicas)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer cfg.Close()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		for _, hs := range hl[1:] {
@@ -121,7 +129,8 @@ func TestTimeout(t *testing.T) {
 
 type testData struct {
 	n         int
-	cfg       config.ReplicaConfig
+	creds     credentials.TransportCredentials
+	replicas  []ReplicaInfo
 	listeners []net.Listener
 	keys      []consensus.PrivateKey
 	builders  testutil.BuilderList
@@ -134,25 +143,27 @@ func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
 
 	listeners := make([]net.Listener, n)
 	keys := make([]consensus.PrivateKey, 0, n)
-	replicas := make([]*config.ReplicaInfo, 0, n)
+	replicas := make([]ReplicaInfo, 0, n)
 
 	// generate keys and replicaInfo
 	for i := 0; i < n; i++ {
 		listeners[i] = testutil.CreateTCPListener(t)
 		keys = append(keys, testutil.GenerateECDSAKey(t))
-		replicas = append(replicas, &config.ReplicaInfo{
+		replicas = append(replicas, ReplicaInfo{
 			ID:      hotstuff.ID(i) + 1,
 			Address: listeners[i].Addr().String(),
 			PubKey:  keys[i].Public(),
 		})
 	}
 
-	cfg := config.NewConfig(1, keys[0], nil)
-	for _, replica := range replicas {
-		cfg.Replicas[replica.ID] = replica
+	return testData{
+		n:         n,
+		creds:     nil,
+		replicas:  replicas,
+		listeners: listeners,
+		keys:      keys,
+		builders:  testutil.CreateBuilders(t, ctrl, n, keys...),
 	}
-
-	return testData{n, *cfg, listeners, keys, testutil.CreateBuilders(t, ctrl, n, keys...)}
 }
 
 func setupTLS(t *testing.T, ctrl *gomock.Controller, n int) testData {
@@ -172,7 +183,7 @@ func setupTLS(t *testing.T, ctrl *gomock.Controller, n int) testData {
 			hotstuff.ID(i)+1,
 			[]string{"localhost", "127.0.0.1"},
 			ca,
-			td.cfg.Replicas[hotstuff.ID(i)+1].PubKey.(*ecdsa.PublicKey),
+			td.replicas[i].PubKey.(*ecdsa.PublicKey),
 			caPK.(*ecdsa.PrivateKey),
 		)
 		if err != nil {
@@ -190,7 +201,7 @@ func setupTLS(t *testing.T, ctrl *gomock.Controller, n int) testData {
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 	})
 
-	td.cfg.Creds = creds
+	td.creds = creds
 	return td
 }
 
@@ -204,10 +215,7 @@ func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (teardown
 	t.Helper()
 	servers := make([]*Server, td.n)
 	for i := range servers {
-		cfg := td.cfg
-		cfg.ID = hotstuff.ID(i + 1)
-		cfg.PrivateKey = td.keys[i]
-		servers[i] = NewServer(gorums.WithGRPCServerOptions(grpc.Creds(cfg.Creds)))
+		servers[i] = NewServer(gorums.WithGRPCServerOptions(grpc.Creds(td.creds)))
 		servers[i].StartOnListener(td.listeners[i])
 		td.builders[i].Register(servers[i])
 	}
@@ -215,19 +223,5 @@ func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (teardown
 		for _, srv := range servers {
 			srv.Stop()
 		}
-	}
-}
-
-func createConfig(t *testing.T, td testData, ctrl *gomock.Controller) (cfg *Config, teardown func()) {
-	t.Helper()
-	serverTeardown := createServers(t, td, ctrl)
-	cfg = NewConfig(td.cfg.ID, td.cfg.Creds, gorums.WithDialTimeout(time.Second))
-	err := cfg.Connect(&td.cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return cfg, func() {
-		cfg.Close()
-		serverTeardown()
 	}
 }
