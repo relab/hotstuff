@@ -65,42 +65,43 @@ func (srv *Server) StartOnListener(listener net.Listener) {
 	}()
 }
 
-func (srv *Server) getClientID(ctx context.Context) (hotstuff.ID, error) {
+// GetPeerIDFromContext extracts the ID of the peer from the context.
+func GetPeerIDFromContext(ctx context.Context, cfg consensus.Configuration) (hotstuff.ID, error) {
 	peerInfo, ok := peer.FromContext(ctx)
 	if !ok {
-		return 0, fmt.Errorf("getClientID: peerInfo not available")
+		return 0, fmt.Errorf("peerInfo not available")
 	}
 
 	if peerInfo.AuthInfo != nil && peerInfo.AuthInfo.AuthType() == "tls" {
 		tlsInfo, ok := peerInfo.AuthInfo.(credentials.TLSInfo)
 		if !ok {
-			return 0, fmt.Errorf("getClientID: authInfo of wrong type: %T", peerInfo.AuthInfo)
+			return 0, fmt.Errorf("authInfo of wrong type: %T", peerInfo.AuthInfo)
 		}
 		if len(tlsInfo.State.PeerCertificates) > 0 {
 			cert := tlsInfo.State.PeerCertificates[0]
-			for replicaID := range srv.mods.Configuration().Replicas() {
+			for replicaID := range cfg.Replicas() {
 				if subject, err := strconv.Atoi(cert.Subject.CommonName); err == nil && hotstuff.ID(subject) == replicaID {
 					return replicaID, nil
 				}
 			}
 		}
-		return 0, fmt.Errorf("getClientID: could not find matching certificate")
+		return 0, fmt.Errorf("could not find matching certificate")
 	}
 
 	// If we're not using TLS, we'll fallback to checking the metadata
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return 0, fmt.Errorf("getClientID: metadata not available")
+		return 0, fmt.Errorf("metadata not available")
 	}
 
 	v := md.Get("id")
 	if len(v) < 1 {
-		return 0, fmt.Errorf("getClientID: id field not present")
+		return 0, fmt.Errorf("id field not present")
 	}
 
 	id, err := strconv.Atoi(v[0])
 	if err != nil {
-		return 0, fmt.Errorf("getClientID: cannot parse ID field: %w", err)
+		return 0, fmt.Errorf("cannot parse ID field: %w", err)
 	}
 
 	return hotstuff.ID(id), nil
@@ -118,7 +119,7 @@ type serviceImpl struct {
 
 // Propose handles a replica's response to the Propose QC from the leader.
 func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
-	id, err := impl.srv.getClientID(ctx)
+	id, err := GetPeerIDFromContext(ctx, impl.srv.mods.Configuration())
 	if err != nil {
 		impl.srv.mods.Logger().Infof("Failed to get client ID: %v", err)
 		return
@@ -133,7 +134,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 
 // Vote handles an incoming vote message.
 func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
-	id, err := impl.srv.getClientID(ctx)
+	id, err := GetPeerIDFromContext(ctx, impl.srv.mods.Configuration())
 	if err != nil {
 		impl.srv.mods.Logger().Infof("Failed to get client ID: %v", err)
 		return
@@ -147,7 +148,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
 func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo) {
-	id, err := impl.srv.getClientID(ctx)
+	id, err := GetPeerIDFromContext(ctx, impl.srv.mods.Configuration())
 	if err != nil {
 		impl.srv.mods.Logger().Infof("Failed to get client ID: %v", err)
 		return
@@ -178,7 +179,7 @@ func (impl *serviceImpl) Fetch(ctx gorums.ServerCtx, pb *hotstuffpb.BlockHash) (
 func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
 	var err error
 	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
-	timeoutMsg.ID, err = impl.srv.getClientID(ctx)
+	timeoutMsg.ID, err = GetPeerIDFromContext(ctx, impl.srv.mods.Configuration())
 	if err != nil {
 		impl.srv.mods.Logger().Infof("Could not get ID of replica: %v", err)
 	}
