@@ -36,6 +36,8 @@
 package modules
 
 import (
+	"reflect"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
@@ -54,6 +56,7 @@ type Modules struct {
 	logger        logging.Logger
 	metricsLogger MetricsLogger
 	eventLoop     *eventloop.EventLoop
+	modulesByType map[reflect.Type]interface{}
 }
 
 // ID returns the id of this client.
@@ -87,6 +90,27 @@ func (mods Modules) MetricsEventLoop() *eventloop.EventLoop {
 	return mods.EventLoop()
 }
 
+// GetModuleByType makes it possible to get a module based on its real type.
+// This is useful for getting modules that do not implement any known module interface.
+// The method returns true if a module was found, false otherwise.
+//
+// NOTE: dest MUST be a pointer to a variable of the desired type.
+// For example:
+//  var module MyModule
+//  if mods.GetModuleByType(&module) { ... }
+func (mods Modules) GetModuleByType(dest interface{}) bool {
+	outType := reflect.TypeOf(dest)
+	if outType.Kind() != reflect.Ptr {
+		panic("invalid argument: out must be a non-nil pointer to an interface variable")
+	}
+	targetType := outType.Elem()
+	if m, ok := mods.modulesByType[targetType]; ok {
+		reflect.ValueOf(dest).Elem().Set(reflect.ValueOf(m))
+		return true
+	}
+	return false
+}
+
 // Builder is a helper for setting up client modules.
 type Builder struct {
 	mods    Modules
@@ -96,9 +120,10 @@ type Builder struct {
 // NewBuilder returns a new builder.
 func NewBuilder(id hotstuff.ID) Builder {
 	bl := Builder{mods: Modules{
-		id:        id,
-		logger:    logging.New(""),
-		eventLoop: eventloop.New(1000),
+		id:            id,
+		logger:        logging.New(""),
+		eventLoop:     eventloop.New(1000),
+		modulesByType: make(map[reflect.Type]interface{}),
 	}}
 	return bl
 }
@@ -115,6 +140,7 @@ func (b *Builder) Register(modules ...interface{}) {
 		if m, ok := module.(Module); ok {
 			b.modules = append(b.modules, m)
 		}
+		b.mods.modulesByType[reflect.TypeOf(module)] = module
 	}
 }
 
