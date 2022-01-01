@@ -200,6 +200,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		blockchain.New(),
 	)
 
+	builder.OptionsBuilder().SetSharedRandomSeed(opts.GetSharedSeed())
+
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
 		builder.Register(replicaMetrics...)

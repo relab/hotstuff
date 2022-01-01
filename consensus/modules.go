@@ -110,6 +110,8 @@ func NewBuilder(id hotstuff.ID, privateKey PrivateKey) Builder {
 			votingMachine: NewVotingMachine(),
 		},
 	}
+	// using a pointer here will allow settings to be readable within InitConsensusModule
+	bl.cfg.opts = &bl.mods.opts
 	// some of the default modules need to be registered
 	bl.Register(bl.mods.votingMachine)
 	return bl
@@ -177,7 +179,6 @@ func (b *Builder) Build() *Modules {
 	for _, module := range b.modules {
 		module.InitConsensusModule(b.mods, &b.cfg)
 	}
-	b.mods.opts = b.cfg.opts
 	return b.mods
 }
 

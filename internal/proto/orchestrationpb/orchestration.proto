@@ -47,6 +47,8 @@ message ReplicaOpts {
   float TimeoutMultiplier = 14;
   // The byzantine strategy to use. If empty, the replica will act normally.
   string ByzantineStrategy = 18;
+  // A shared random number for seeding random number generators.
+  int64 SharedSeed = 20;
 }
 
 // ReplicaInfo is the information that the replicas need about each other.
