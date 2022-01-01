@@ -165,6 +165,12 @@ func (b *Builder) Register(mods ...interface{}) { //nolint:gocyclo
 	}
 }
 
+// OptionsBuilder returns a pointer to the options builder.
+// This can be used to configure runtime options.
+func (b *Builder) OptionsBuilder() *OptionsBuilder {
+	return &b.cfg
+}
+
 // Build initializes all modules and returns the HotStuff object.
 func (b *Builder) Build() *Modules {
 	b.mods.Modules = b.baseBuilder.Build()

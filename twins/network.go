@@ -104,8 +104,8 @@ func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName s
 			},
 			leaderRotation(scenario),
 			commandModule{commandGenerator: cg, node: &node},
-			twinsSettings{}, // sets runtime options
 		)
+		builder.OptionsBuilder().SetShouldVerifyVotesSync()
 		node.modules = builder.Build()
 		n.nodes[nodeID.NetworkID] = &node
 		n.replicas[nodeID.ReplicaID] = append(n.replicas[nodeID.ReplicaID], &node)

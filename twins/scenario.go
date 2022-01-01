@@ -163,11 +163,3 @@ func (cm commandModule) Exec(block *consensus.Block) {
 }
 
 func (commandModule) Fork(block *consensus.Block) {}
-
-// twinsSettings is a useless module that only exists to set some runtime options at initialization.
-type twinsSettings struct{}
-
-func (ts twinsSettings) InitConsensusModule(_ *consensus.Modules, opts *consensus.OptionsBuilder) {
-	// this makes the voting machine process votes synchronously, which is helpful for ticking the event loop.
-	opts.SetShouldVerifyVotesSync()
-}
