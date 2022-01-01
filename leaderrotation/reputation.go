@@ -1,7 +1,6 @@
 package leaderrotation
 
 import (
-	"encoding/binary"
 	"math/rand"
 	"sort"
 
@@ -83,11 +82,9 @@ func (r *repBased) GetLeader(view consensus.View) hotstuff.ID {
 		return 0
 	}
 
-	hash := block.Hash()
-	seed := int64(binary.LittleEndian.Uint64(hash[:])) // use the first 8 bytes of the hash as a seed
+	seed := r.mods.Options().SharedRandomSeed() + int64(view)
 	rnd := rand.New(rand.NewSource(seed))
 
-	// TODO: could it be possible for a byzantine leader to "craft" blocks that give it a higher chance of being elected?
 	leader := chooser.PickSource(rnd).(hotstuff.ID)
 	r.mods.Logger().Debugf("picked leader %d for view %d using seed %d", leader, view, seed)
 

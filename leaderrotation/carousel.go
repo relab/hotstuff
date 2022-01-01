@@ -3,7 +3,6 @@ package leaderrotation
 import (
 	"math/rand"
 	"sort"
-	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
@@ -16,7 +15,6 @@ func init() {
 
 type carousel struct {
 	mods *consensus.Modules
-	rnd  *rand.Rand
 }
 
 func (c *carousel) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
@@ -62,7 +60,10 @@ func (c carousel) GetLeader(round consensus.View) hotstuff.ID {
 		}
 	})
 
-	leader := candidates[c.rnd.Int()%len(candidates)]
+	seed := c.mods.Options().SharedRandomSeed() + int64(round)
+	rnd := rand.New(rand.NewSource(seed))
+
+	leader := candidates[rnd.Int()%len(candidates)]
 	c.mods.Logger().Debugf("chose id %d", leader)
 
 	return leader
@@ -70,7 +71,5 @@ func (c carousel) GetLeader(round consensus.View) hotstuff.ID {
 
 // NewCarousel returns a new instance of the Carousel leader-election algorithm.
 func NewCarousel() consensus.LeaderRotation {
-	return &carousel{
-		rnd: rand.New(rand.NewSource(time.Now().Unix())),
-	}
+	return &carousel{}
 }
