@@ -155,6 +155,15 @@ func (agg AggregateSignature) Bitfield() crypto.Bitfield {
 	return agg.participants
 }
 
+// AddSignatures adds additional signatures to the aggregate.
+func (agg *AggregateSignature) AddSignatures(signatures map[hotstuff.ID]*Signature) {
+	g2 := bls12.NewG2()
+	for id, s := range signatures {
+		g2.Add(&agg.sig, &agg.sig, s.s)
+		agg.participants.Add(id)
+	}
+}
+
 // bls12Crypto is a Signer/Verifier implementation that uses bls12-381 aggregate signatures.
 type bls12Crypto struct {
 	mods *consensus.Modules
@@ -188,7 +197,8 @@ func (bc *bls12Crypto) Sign(hash consensus.Hash) (sig consensus.Signature, err e
 	return &Signature{signer: bc.mods.ID(), s: p}, nil
 }
 
-func (bc *bls12Crypto) aggregateSignatures(signatures map[hotstuff.ID]*Signature) *AggregateSignature {
+// AggregateSignatures aggregates the signatures to form a single aggregated signature.
+func AggregateSignatures(signatures map[hotstuff.ID]*Signature) *AggregateSignature {
 	if len(signatures) == 0 {
 		return nil
 	}
@@ -313,7 +323,7 @@ func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []consensus.Si
 	if len(sigs) < bc.mods.Configuration().QuorumSize() {
 		return nil, multierr.Combine(crypto.ErrNotAQuorum, err)
 	}
-	return bc.aggregateSignatures(sigs), nil
+	return AggregateSignatures(sigs), nil
 }
 
 // CreateThresholdSignatureForMessageSet creates a threshold signature where each partial signature has signed a
