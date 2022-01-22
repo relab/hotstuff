@@ -289,4 +289,27 @@ func (ec *ecdsaCrypto) VerifyThresholdSignatureForMessageSet(signature consensus
 	return numVerified >= ec.mods.Configuration().QuorumSize()
 }
 
+// Combine combines multiple signatures into a single threshold signature.
+// Arguments can be singular signatures or threshold signatures.
+//
+// As opposed to the CreateThresholdSignature methods,
+// this method does not check whether the resulting
+// signature meets the quorum size.
+func (ec *ecdsaCrypto) Combine(signatures ...interface{}) consensus.ThresholdSignature {
+	ts := make(ThresholdSignature)
+
+	for _, sig := range signatures {
+		switch sig := sig.(type) {
+		case *Signature:
+			ts[sig.signer] = sig
+		case ThresholdSignature:
+			for _, s := range sig {
+				ts[s.signer] = s
+			}
+		}
+	}
+
+	return ts
+}
+
 var _ consensus.CryptoImpl = (*ecdsaCrypto)(nil)

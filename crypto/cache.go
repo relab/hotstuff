@@ -160,3 +160,14 @@ func (cache *cache) VerifyThresholdSignatureForMessageSet(signature consensus.Th
 	}
 	return false
 }
+
+// Combine combines multiple signatures into a single threshold signature.
+// Arguments can be singular signatures or threshold signatures.
+//
+// As opposed to the CreateThresholdSignature methods,
+// this method does not check whether the resulting
+// signature meets the quorum size.
+func (cache *cache) Combine(signatures ...interface{}) consensus.ThresholdSignature {
+	// we don't cache the result of this operation, because it is not guaranteed to be valid.
+	return cache.impl.Combine(signatures...)
+}

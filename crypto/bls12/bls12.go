@@ -332,3 +332,26 @@ func (bc *bls12Crypto) CreateThresholdSignatureForMessageSet(partialSignatures [
 	// Don't care about the hashes for signature aggregation.
 	return bc.CreateThresholdSignature(partialSignatures, consensus.Hash{})
 }
+
+// Combine combines multiple signatures into a single threshold signature.
+// Arguments can be singular signatures or threshold signatures.
+//
+// As opposed to the CreateThresholdSignature methods,
+// this method does not check whether the resulting
+// signature meets the quorum size.
+func (bc *bls12Crypto) Combine(signatures ...interface{}) consensus.ThresholdSignature {
+	g2 := bls12.NewG2()
+	agg := bls12.PointG2{}
+	var participants crypto.Bitfield
+	for _, sig := range signatures {
+		switch sig := sig.(type) {
+		case *Signature:
+			participants.Add(sig.signer)
+			g2.Add(&agg, &agg, sig.s)
+		case *AggregateSignature:
+			sig.participants.ForEach(participants.Add)
+			g2.Add(&agg, &agg, &sig.sig)
+		}
+	}
+	return &AggregateSignature{sig: agg, participants: participants}
+}

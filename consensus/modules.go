@@ -261,6 +261,13 @@ type CryptoImpl interface {
 	VerifyThresholdSignature(signature ThresholdSignature, hash Hash) bool
 	// VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
 	VerifyThresholdSignatureForMessageSet(signature ThresholdSignature, hashes map[hotstuff.ID]Hash) bool
+	// Combine combines multiple signatures into a single threshold signature.
+	// Arguments can be singular signatures or threshold signatures.
+	//
+	// As opposed to the CreateThresholdSignature methods,
+	// this method does not check whether the resulting
+	// signature meets the quorum size.
+	Combine(signatures ...interface{}) ThresholdSignature
 }
 
 // Crypto implements the methods required to create and verify signatures and certificates.
