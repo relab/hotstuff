@@ -60,3 +60,11 @@ func (bm *Bitfield) ForEach(f func(hotstuff.ID)) {
 		}
 	}
 }
+
+// Len returns the number of entries in the set.
+func (bm *Bitfield) Len() int {
+	// TODO: slow
+	l := 0
+	bm.ForEach(func(_ hotstuff.ID) { l++ })
+	return l
+}

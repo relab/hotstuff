@@ -117,6 +117,11 @@ func (sig ThresholdSignature) ForEach(f func(hotstuff.ID)) {
 	}
 }
 
+// Len returns the number of entries in the set.
+func (sig ThresholdSignature) Len() int {
+	return len(sig)
+}
+
 var _ consensus.ThresholdSignature = (*ThresholdSignature)(nil)
 var _ consensus.IDSet = (*ThresholdSignature)(nil)
 

@@ -20,6 +20,8 @@ type IDSet interface {
 	Contains(id hotstuff.ID) bool
 	// ForEach calls f for each ID in the set.
 	ForEach(f func(hotstuff.ID))
+	// Len returns the number of entries in the set.
+	Len() int
 }
 
 // idSetMap implements IDSet using a map.
@@ -46,6 +48,11 @@ func (s idSetMap) ForEach(f func(hotstuff.ID)) {
 	for id := range s {
 		f(id)
 	}
+}
+
+// Len returns the number of entries in the set.
+func (s idSetMap) Len() int {
+	return len(s)
 }
 
 // View is a number that uniquely identifies a view.
