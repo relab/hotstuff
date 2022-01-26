@@ -92,9 +92,6 @@ func (srv *clientSrv) Exec(cmd consensus.Command) {
 
 	for _, cmd := range batch.GetCommands() {
 		_, _ = srv.hash.Write(cmd.Data)
-		if err != nil {
-			srv.mods.Logger().Errorf("Error writing data: %v", err)
-		}
 		srv.mut.Lock()
 		id := cmdID{cmd.GetClientID(), cmd.GetSequenceNumber()}
 		if done, ok := srv.awaitingCmds[id]; ok {
@@ -103,6 +100,8 @@ func (srv *clientSrv) Exec(cmd consensus.Command) {
 		}
 		srv.mut.Unlock()
 	}
+
+	srv.mods.Logger().Debugf("Hash: %.8x", srv.hash.Sum(nil))
 }
 
 func (srv *clientSrv) Fork(cmd consensus.Command) {

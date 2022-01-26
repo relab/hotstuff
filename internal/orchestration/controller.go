@@ -12,6 +12,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
+	"github.com/relab/hotstuff/logging"
 	"go.uber.org/multierr"
 	"google.golang.org/protobuf/proto"
 )
@@ -26,6 +27,8 @@ type HostConfig struct {
 type Experiment struct {
 	*orchestrationpb.ReplicaOpts
 	*orchestrationpb.ClientOpts
+
+	Logger logging.Logger
 
 	NumReplicas int
 	NumClients  int
@@ -58,16 +61,19 @@ func (e *Experiment) Run() (err error) {
 		return err
 	}
 
+	e.Logger.Info("Creating replicas...")
 	cfg, err := e.createReplicas()
 	if err != nil {
 		return fmt.Errorf("failed to create replicas: %w", err)
 	}
 
+	e.Logger.Info("Starting replicas...")
 	err = e.startReplicas(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to start replicas: %w", err)
 	}
 
+	e.Logger.Info("Starting clients...")
 	err = e.startClients(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to start clients: %w", err)
@@ -75,11 +81,18 @@ func (e *Experiment) Run() (err error) {
 
 	time.Sleep(e.Duration)
 
+	e.Logger.Info("Stopping clients...")
 	err = e.stopClients()
 	if err != nil {
 		return fmt.Errorf("failed to stop clients: %w", err)
 	}
 
+	wait := 5 * e.ReplicaOpts.GetInitialTimeout().AsDuration()
+	e.Logger.Infof("Waiting %s for replicas to finish.", wait)
+	// give the replicas some time to commit the last batch
+	time.Sleep(wait)
+
+	e.Logger.Info("Stopping replicas...")
 	err = e.stopReplicas()
 	if err != nil {
 		return fmt.Errorf("failed to stop replicas: %w", err)

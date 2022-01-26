@@ -16,6 +16,7 @@ import (
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/iago"
 	"github.com/spf13/cobra"
@@ -94,6 +95,7 @@ func runController() {
 	}
 
 	experiment := orchestration.Experiment{
+		Logger:      logging.New("ctrl"),
 		NumReplicas: viper.GetInt("replicas"),
 		NumClients:  viper.GetInt("clients"),
 		Duration:    viper.GetDuration("duration"),
