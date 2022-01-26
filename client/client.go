@@ -87,6 +87,7 @@ func New(conf Config, builder modules.Builder) (client *Client) {
 		highestCommitted: 1,
 		done:             make(chan struct{}),
 		reader:           conf.Input,
+		payloadSize:      conf.PayloadSize,
 		limiter:          rate.NewLimiter(rate.Limit(conf.RateLimit), 1),
 		stepUp:           conf.RateStep,
 		stepUpInterval:   conf.RateStepInterval,
