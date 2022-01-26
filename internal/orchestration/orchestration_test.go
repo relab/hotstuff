@@ -81,6 +81,7 @@ func TestDeployment(t *testing.T) {
 	}
 
 	experiment := &orchestration.Experiment{
+		Logger:      logging.New("ctrl"),
 		NumReplicas: 4,
 		NumClients:  2,
 		ClientOpts: &orchestrationpb.ClientOpts{
