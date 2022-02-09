@@ -11,3 +11,7 @@ type contribution struct {
 	single    bool
 	signature consensus.ThresholdSignature
 }
+
+func (c contribution) isIndividual() bool {
+	return c.signature.Participants().Len() == 1
+}
