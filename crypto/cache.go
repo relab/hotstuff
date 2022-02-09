@@ -9,11 +9,20 @@ import (
 	"github.com/relab/hotstuff/consensus"
 )
 
+// key is used to identify a cached signature.
+// hash should be a hash of the message hash and signature together,
+// and threshold should be true if the entry was created/verified as a valid threshold signature.
+// This is to distinguish between valid aggregated signatures and valid threshold signatures.
+type key struct {
+	hash      consensus.Hash
+	threshold bool
+}
+
 type cache struct {
 	impl        consensus.CryptoImpl
 	mut         sync.Mutex
 	capacity    int
-	entries     map[consensus.Hash]*list.Element
+	entries     map[key]*list.Element
 	accessOrder list.List
 }
 
@@ -23,7 +32,7 @@ func NewCache(impl consensus.CryptoImpl, capacity int) consensus.Crypto {
 	return New(&cache{
 		impl:     impl,
 		capacity: capacity,
-		entries:  make(map[consensus.Hash]*list.Element, capacity),
+		entries:  make(map[key]*list.Element, capacity),
 	})
 }
 
@@ -35,9 +44,10 @@ func (cache *cache) InitConsensusModule(mods *consensus.Modules, cfg *consensus.
 	}
 }
 
-func (cache *cache) insert(key consensus.Hash) {
+func (cache *cache) insert(hash consensus.Hash, threshold bool) {
 	cache.mut.Lock()
 	defer cache.mut.Unlock()
+	key := key{hash, threshold}
 	elem, ok := cache.entries[key]
 	if ok {
 		cache.accessOrder.MoveToFront(elem)
@@ -48,10 +58,10 @@ func (cache *cache) insert(key consensus.Hash) {
 	cache.entries[key] = elem
 }
 
-func (cache *cache) check(key consensus.Hash) bool {
+func (cache *cache) check(hash consensus.Hash, threshold bool) bool {
 	cache.mut.Lock()
 	defer cache.mut.Unlock()
-	elem, ok := cache.entries[key]
+	elem, ok := cache.entries[key{hash, threshold}]
 	if !ok {
 		return false
 	}
@@ -63,7 +73,7 @@ func (cache *cache) evict() {
 	if len(cache.entries) < cache.capacity {
 		return
 	}
-	key := cache.accessOrder.Remove(cache.accessOrder.Back()).(consensus.Hash)
+	key := cache.accessOrder.Remove(cache.accessOrder.Back()).(key)
 	delete(cache.entries, key)
 }
 
@@ -74,7 +84,7 @@ func (cache *cache) Sign(hash consensus.Hash) (sig consensus.Signature, err erro
 		return nil, err
 	}
 	key := sha256.Sum256(append(hash[:], sig.ToBytes()...))
-	cache.insert(key)
+	cache.insert(key, false)
 	return sig, nil
 }
 
@@ -84,11 +94,27 @@ func (cache *cache) Verify(sig consensus.Signature, hash consensus.Hash) bool {
 		return false
 	}
 	key := sha256.Sum256(append(hash[:], sig.ToBytes()...))
-	if cache.check(key) {
+	if cache.check(key, false) {
 		return true
 	}
 	if cache.impl.Verify(sig, hash) {
-		cache.insert(key)
+		cache.insert(key, false)
+		return true
+	}
+	return false
+}
+
+// VerifyThresholdSignature verifies a threshold signature.
+func (cache *cache) VerifyAggregateSignature(signature consensus.ThresholdSignature, hash consensus.Hash) bool {
+	if signature == nil {
+		return false
+	}
+	key := sha256.Sum256(append(hash[:], signature.ToBytes()...))
+	if cache.check(key, false) {
+		return true
+	}
+	if cache.impl.VerifyAggregateSignature(signature, hash) {
+		cache.insert(key, false)
 		return true
 	}
 	return false
@@ -101,7 +127,7 @@ func (cache *cache) CreateThresholdSignature(partialSignatures []consensus.Signa
 		return nil, err
 	}
 	key := sha256.Sum256(append(hash[:], sig.ToBytes()...))
-	cache.insert(key)
+	cache.insert(key, true)
 	return sig, nil
 }
 
@@ -111,11 +137,11 @@ func (cache *cache) VerifyThresholdSignature(signature consensus.ThresholdSignat
 		return false
 	}
 	key := sha256.Sum256(append(hash[:], signature.ToBytes()...))
-	if cache.check(key) {
+	if cache.check(key, true) {
 		return true
 	}
 	if cache.impl.VerifyThresholdSignature(signature, hash) {
-		cache.insert(key)
+		cache.insert(key, true)
 		return true
 	}
 	return false
@@ -135,7 +161,7 @@ func (cache *cache) CreateThresholdSignatureForMessageSet(partialSignatures []co
 	}
 	hash.Write(signature.ToBytes())
 	hash.Sum(key[:0])
-	cache.insert(key)
+	cache.insert(key, true)
 	return signature, nil
 }
 
@@ -151,11 +177,11 @@ func (cache *cache) VerifyThresholdSignatureForMessageSet(signature consensus.Th
 	}
 	hash.Write(signature.ToBytes())
 	hash.Sum(key[:0])
-	if cache.check(key) {
+	if cache.check(key, true) {
 		return true
 	}
 	if cache.impl.VerifyThresholdSignatureForMessageSet(signature, hashes) {
-		cache.insert(key)
+		cache.insert(key, true)
 		return true
 	}
 	return false

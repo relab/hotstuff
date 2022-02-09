@@ -230,11 +230,39 @@ func (bc *bls12Crypto) Verify(sig consensus.Signature, hash consensus.Hash) bool
 	return engine.Result().IsOne()
 }
 
+// VerifyAggregateSignature verifies an aggregated signature.
+// It does not check whether the aggregated signature contains a quorum of signatures.
+func (bc *bls12Crypto) VerifyAggregateSignature(agg consensus.ThresholdSignature, hash consensus.Hash) bool {
+	sig, ok := agg.(*AggregateSignature)
+	if !ok {
+		return false
+	}
+	pubKeys := make([]*PublicKey, 0)
+	sig.participants.ForEach(func(id hotstuff.ID) {
+		replica, ok := bc.mods.Configuration().Replica(id)
+		if !ok {
+			return
+		}
+		pubKeys = append(pubKeys, replica.PublicKey().(*PublicKey))
+	})
+	ps, err := bls12.NewG2().HashToCurve(hash[:], domain)
+	if err != nil {
+		bc.mods.Logger().Error(err)
+		return false
+	}
+	engine := bls12.NewEngine()
+	engine.AddPairInv(&bls12.G1One, &sig.sig)
+	for _, pub := range pubKeys {
+		engine.AddPair(pub.p, ps)
+	}
+	return engine.Result().IsOne()
+}
+
 // TODO: I'm not sure to what extent we are vulnerable to a rogue public key attack here.
 // As far as I can tell, this is not a problem right now because we do not yet support reconfiguration,
 // and all public keys are known by all replicas.
 
-// VerifyThresholdSignature verifies an aggregate signature.
+// VerifyThresholdSignature verifies a threshold signature.
 func (bc *bls12Crypto) VerifyThresholdSignature(signature consensus.ThresholdSignature, hash consensus.Hash) bool {
 	sig, ok := signature.(*AggregateSignature)
 	if !ok {

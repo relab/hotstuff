@@ -174,6 +174,28 @@ func (ec *ecdsaCrypto) Verify(sig consensus.Signature, hash consensus.Hash) bool
 	return ecdsa.Verify(pk, hash[:], _sig.R(), _sig.S())
 }
 
+// VerifyAggregateSignature verifies an aggregated signature.
+// It does not check whether the aggregated signature contains a quorum of signatures.
+func (ec *ecdsaCrypto) VerifyAggregateSignature(agg consensus.ThresholdSignature, hash consensus.Hash) bool {
+	sig, ok := agg.(ThresholdSignature)
+	if !ok {
+		return false
+	}
+	results := make(chan bool)
+	for _, pSig := range sig {
+		go func(sig *Signature) {
+			results <- ec.mods.Crypto().Verify(sig, hash)
+		}(pSig)
+	}
+	valid := true
+	for range sig {
+		if <-results {
+			valid = false
+		}
+	}
+	return valid
+}
+
 // CreateThresholdSignature creates a threshold signature from the given partial signatures.
 func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []consensus.Signature, hash consensus.Hash) (_ consensus.ThresholdSignature, err error) {
 	thrSig := make(ThresholdSignature)

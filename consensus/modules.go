@@ -252,6 +252,9 @@ type CryptoImpl interface {
 	Sign(hash Hash) (sig Signature, err error)
 	// Verify verifies a signature given a hash.
 	Verify(sig Signature, hash Hash) bool
+	// VerifyAggregateSignature verifies an aggregated signature.
+	// It does not check whether the aggregated signature contains a quorum of signatures.
+	VerifyAggregateSignature(agg ThresholdSignature, hash Hash) bool
 	// CreateThresholdSignature creates a threshold signature from the given partial signatures.
 	CreateThresholdSignature(partialSignatures []Signature, hash Hash) (ThresholdSignature, error)
 	// CreateThresholdSignatureForMessageSet creates a threshold signature where each partial signature has signed a
