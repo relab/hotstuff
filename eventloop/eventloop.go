@@ -62,7 +62,9 @@ func (el *EventLoop) RegisterObserver(eventType interface{}, observer EventHandl
 
 // AddEvent adds an event to the event queue.
 func (el *EventLoop) AddEvent(event interface{}) {
-	el.eventQ.push(event)
+	if event != nil {
+		el.eventQ.push(event)
+	}
 }
 
 // Run runs the event loop. A context object can be provided to stop the event loop.
@@ -144,6 +146,9 @@ func (el *EventLoop) dispatchDelayedEvents(t reflect.Type) {
 // The eventType parameter decides the type of event to wait for, and it should be the zero value
 // of that event type. The event parameter is the event that will be delayed.
 func (el *EventLoop) DelayUntil(eventType, event interface{}) {
+	if eventType == nil || event == nil {
+		return
+	}
 	el.mut.Lock()
 	t := reflect.TypeOf(eventType)
 	v := el.waitingEvents[t]
@@ -181,6 +186,8 @@ func (el *EventLoop) AddTicker(interval time.Duration, callback func(tick time.T
 
 	el.mut.Unlock()
 
+	// We want the ticker to inherit the context of the event loop,
+	// so we need to start the ticker from the run loop.
 	el.eventQ.push(startTickerEvent{id})
 
 	return id
