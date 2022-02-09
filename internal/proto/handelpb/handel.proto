@@ -17,9 +17,7 @@ service Handel {
 message Contribution {
   uint32 ID = 1;
   uint32 Level = 2;
-  oneof Contribution {
-    hotstuffpb.Signature Signature = 3;
-    hotstuffpb.QuorumSignature MultiSignature = 4;
-  }
+  hotstuffpb.QuorumSignature Signature = 3;
+  hotstuffpb.QuorumSignature Individual = 4;
   bytes Hash = 5;
 }

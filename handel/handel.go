@@ -4,13 +4,10 @@ import (
 	"context"
 	"errors"
 	"math"
-	"time"
 
 	"github.com/relab/gorums"
-	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/internal/proto/handelpb"
 )
 
@@ -54,16 +51,6 @@ func (h *Handel) Begin(ctx context.Context, s consensus.PartialCert) {
 	// this makes it easier to work with.
 	ts := h.mods.Crypto().Combine(s)
 
-}
-
-type level struct {
-	vp        map[hotstuff.ID]int
-	cp        map[hotstuff.ID]int
-	in        consensus.ThresholdSignature
-	out       consensus.ThresholdSignature
-	pending   map[hotstuff.ID]bls12.AggregateSignature
-	startTime time.Time
-	window    int
 }
 
 type serviceImpl struct {
