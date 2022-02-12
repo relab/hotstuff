@@ -8,7 +8,8 @@ import (
 
 var (
 	registryMut sync.Mutex
-	registry    = make(map[reflect.Type]map[string]interface{})
+	byInterface = make(map[reflect.Type]map[string]interface{})
+	byName      = make(map[string]interface{})
 )
 
 // RegisterModule registers a module implementation with the specified name.
@@ -27,10 +28,15 @@ func RegisterModule(name string, constructor interface{}) {
 	registryMut.Lock()
 	defer registryMut.Unlock()
 
-	moduleRegistry, ok := registry[ifaceType]
+	if _, ok := byName[name]; ok {
+		panic(fmt.Sprintf("a module with name %s already exists", name))
+	}
+	byName[name] = constructor
+
+	moduleRegistry, ok := byInterface[ifaceType]
 	if !ok {
 		moduleRegistry = make(map[string]interface{})
-		registry[ifaceType] = moduleRegistry
+		byInterface[ifaceType] = moduleRegistry
 	}
 
 	moduleRegistry[name] = constructor
@@ -54,7 +60,7 @@ func GetModule(name string, out interface{}) bool {
 	registryMut.Lock()
 	defer registryMut.Unlock()
 
-	modules, ok := registry[targetType]
+	modules, ok := byInterface[targetType]
 	if !ok {
 		return false
 	}
@@ -68,6 +74,21 @@ func GetModule(name string, out interface{}) bool {
 	return true
 }
 
+// GetModuleUntyped returns a new instance of the named module, if it exists.
+func GetModuleUntyped(name string) (v interface{}, ok bool) {
+	registryMut.Lock()
+	defer registryMut.Unlock()
+
+	ctor, ok := byName[name]
+	if !ok {
+		return nil, false
+	}
+
+	reflect.ValueOf(&v).Elem().Set(reflect.ValueOf(ctor).Call([]reflect.Value{})[0])
+
+	return v, ok
+}
+
 // ListModules returns a map of interface names to module names.
 func ListModules() map[string][]string {
 	modules := make(map[string][]string)
@@ -75,7 +96,7 @@ func ListModules() map[string][]string {
 	registryMut.Lock()
 	defer registryMut.Unlock()
 
-	for t, m := range registry {
+	for t, m := range byInterface {
 		names := make([]string, 0, len(m))
 		for name := range m {
 			names = append(names, name)
