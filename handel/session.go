@@ -159,6 +159,7 @@ type session struct {
 	newContributions   chan struct{}
 	levelActivate      chan struct{}
 	disseminate        chan struct{}
+	done               chan consensus.ThresholdSignature
 }
 
 func (h *Handel) newSession(hash consensus.Hash, in consensus.ThresholdSignature) *session {
@@ -170,6 +171,7 @@ func (h *Handel) newSession(hash consensus.Hash, in consensus.ThresholdSignature
 		verifiedSignatures: make(chan contribution),
 		levelActivate:      make(chan struct{}),
 		disseminate:        make(chan struct{}),
+		done:               make(chan consensus.ThresholdSignature),
 	}
 
 	// Get a sorted list of IDs for all replicas.
@@ -431,6 +433,10 @@ func (s *session) verifyContribution(ctx context.Context, level *level) {
 		s.verifiedSignatures <- contribution{
 			level:     c.level,
 			signature: agg,
+		}
+
+		if agg.Participants().Len() >= s.h.mods.Configuration().QuorumSize() {
+			s.done <- agg
 		}
 	} else {
 		level.mut.Lock()

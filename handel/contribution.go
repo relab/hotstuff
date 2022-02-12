@@ -8,7 +8,6 @@ import (
 type contribution struct {
 	sender    hotstuff.ID
 	level     int
-	single    bool
 	signature consensus.ThresholdSignature
 }
 
