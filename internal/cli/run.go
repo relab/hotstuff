@@ -59,6 +59,7 @@ func init() {
 	runCmd.Flags().String("crypto", "ecdsa", "name of the crypto implementation")
 	runCmd.Flags().String("leader-rotation", "round-robin", "name of the leader rotation algorithm")
 	runCmd.Flags().Int64("shared-seed", 0, "Shared random number generator seed")
+	runCmd.Flags().StringSlice("modules", nil, "Name additional modules to be loaded.")
 
 	runCmd.Flags().Bool("worker", false, "run a local worker")
 	runCmd.Flags().StringSlice("hosts", nil, "the remote hosts to run the experiment on via ssh")
@@ -111,6 +112,7 @@ func runController() {
 			TimeoutSamples:    viper.GetUint32("duration-samples"),
 			MaxTimeout:        durationpb.New(viper.GetDuration("max-timeout")),
 			SharedSeed:        viper.GetInt64("shared-seed"),
+			Modules:           viper.GetStringSlice("modules"),
 		},
 		ClientOpts: &orchestrationpb.ClientOpts{
 			UseTLS:           true,

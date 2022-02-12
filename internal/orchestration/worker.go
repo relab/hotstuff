@@ -208,6 +208,14 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		builder.Register(metrics.NewTicker(w.measurementInterval))
 	}
 
+	for _, n := range opts.GetModules() {
+		m, ok := modules.GetModuleUntyped(n)
+		if !ok {
+			return nil, fmt.Errorf("no module named '%s'", n)
+		}
+		builder.Register(m)
+	}
+
 	c := replica.Config{
 		ID:          hotstuff.ID(opts.GetID()),
 		PrivateKey:  privKey,

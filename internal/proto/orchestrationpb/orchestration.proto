@@ -49,6 +49,8 @@ message ReplicaOpts {
   string ByzantineStrategy = 18;
   // A shared random number for seeding random number generators.
   int64 SharedSeed = 20;
+  // A list of modules to load.
+  repeated string Modules = 21;
 }
 
 // ReplicaInfo is the information that the replicas need about each other.
