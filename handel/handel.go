@@ -11,8 +11,14 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/handelpb"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
+	"github.com/relab/hotstuff/modules"
 )
 
+func init() {
+	modules.RegisterModule("handel", New)
+}
+
+// Handel implements a signature aggregation protocol.
 type Handel struct {
 	mut      sync.Mutex
 	mods     *consensus.Modules
@@ -21,10 +27,16 @@ type Handel struct {
 	sessions map[consensus.Hash]*session
 }
 
+// New returns a new instance of the Handel module.
+func New() consensus.Handel {
+	return &Handel{}
+}
+
 // InitConsensusModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (h *Handel) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (h *Handel) InitConsensusModule(mods *consensus.Modules, opts *consensus.OptionsBuilder) {
 	h.mods = mods
+	opts.SetShouldUseHandel()
 }
 
 func (h *Handel) Init() error {
