@@ -360,7 +360,7 @@ type Synchronizer interface {
 // Handel is an implementation of the Handel signature aggregation protocol.
 type Handel interface {
 	// Begin commissions the aggregation of a new signature.
-	Begin(ctx context.Context, s PartialCert)
+	Begin(s PartialCert)
 }
 
 type executorWrapper struct {

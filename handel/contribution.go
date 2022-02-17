@@ -6,9 +6,11 @@ import (
 )
 
 type contribution struct {
+	hash      consensus.Hash
 	sender    hotstuff.ID
 	level     int
 	signature consensus.ThresholdSignature
+	verified  bool
 }
 
 func (c contribution) isIndividual() bool {

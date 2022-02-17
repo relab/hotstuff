@@ -203,7 +203,7 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) { //nolint:gocyclo
 		// TODO: we could instead
 		cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
 		didAdvanceView = true
-		cs.mods.Handel().Begin(cs.mods.synchronizer.ViewContext(), pc)
+		cs.mods.Handel().Begin(pc)
 		return
 	}
 

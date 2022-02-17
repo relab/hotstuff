@@ -109,6 +109,11 @@ func New(conf Config, builder consensus.Builder) (replica *Replica) {
 	return srv
 }
 
+// Modules returns the Modules object of this replica.
+func (srv *Replica) Modules() *consensus.Modules {
+	return srv.hs
+}
+
 // StartServers starts the client and replica servers.
 func (srv *Replica) StartServers(replicaListen, clientListen net.Listener) {
 	srv.hsSrv.StartOnListener(replicaListen)

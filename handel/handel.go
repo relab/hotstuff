@@ -1,10 +1,10 @@
 package handel
 
 import (
-	"context"
 	"errors"
 	"math"
 	"sync"
+	"time"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/backend"
@@ -37,9 +37,16 @@ func New() consensus.Handel {
 func (h *Handel) InitConsensusModule(mods *consensus.Modules, opts *consensus.OptionsBuilder) {
 	h.mods = mods
 	opts.SetShouldUseHandel()
+
+	// the rest of the setup is deferred to the Init method.
+	// FIXME: it could be possible to handle the Init stuff automatically
+	// if the Configuration module were to send an event upon connecting.
 }
 
+// Init initializes the Handel module.
 func (h *Handel) Init() error {
+	h.mods.Logger().Info("Handel: Initializing")
+
 	h.sessions = make(map[consensus.Hash]*session)
 
 	var cfg *backend.Config
@@ -57,37 +64,52 @@ func (h *Handel) Init() error {
 
 	h.maxLevel = int(math.Ceil(math.Log2(float64(h.mods.Configuration().Len()))))
 
+	h.mods.EventLoop().RegisterHandler(contribution{}, func(event interface{}) {
+		c := event.(contribution)
+
+		if s, ok := h.sessions[c.hash]; ok {
+			s.handleContribution(c)
+		}
+	})
+
+	h.mods.EventLoop().RegisterHandler(disseminateEvent{}, func(_ interface{}) {
+		for _, s := range h.sessions {
+			s.sendContributions(s.h.mods.Synchronizer().ViewContext())
+		}
+	})
+
+	h.mods.EventLoop().RegisterHandler(levelActivateEvent{}, func(_ interface{}) {
+		for _, s := range h.sessions {
+			s.activateLevel()
+		}
+	})
+
+	h.mods.EventLoop().RegisterHandler(sessionDoneEvent{}, func(event interface{}) {
+		e := event.(sessionDoneEvent)
+		delete(h.sessions, e.hash)
+	})
+
+	h.mods.EventLoop().AddTicker(disseminationPeriod, func(_ time.Time) (_ interface{}) {
+		return disseminateEvent{}
+	})
+
+	h.mods.EventLoop().AddTicker(levelActivateInterval, func(_ time.Time) (_ interface{}) {
+		return levelActivateEvent{}
+	})
+
 	return nil
 }
 
 // Begin commissions the aggregation of a new signature.
-func (h *Handel) Begin(ctx context.Context, s consensus.PartialCert) {
+func (h *Handel) Begin(s consensus.PartialCert) {
 	// turn the single signature into a threshold signature,
 	// this makes it easier to work with.
-	ts := h.mods.Crypto().Combine(s)
+	ts := h.mods.Crypto().Combine(s.Signature())
+
 	session := h.newSession(s.BlockHash(), ts)
-
-	h.mut.Lock()
 	h.sessions[s.BlockHash()] = session
-	h.mut.Unlock()
 
-	newCtx, cancel := context.WithCancel(ctx)
-
-	go session.run(newCtx)
-
-	go func() {
-		select {
-		case sig := <-session.done:
-			cancel()
-			h.mods.Synchronizer().AdvanceView(consensus.NewSyncInfo().WithQC(
-				consensus.NewQuorumCert(sig, h.mods.Synchronizer().View(), session.hash),
-			))
-			h.mut.Lock()
-			delete(h.sessions, session.hash)
-			h.mut.Unlock()
-		case <-ctx.Done():
-		}
-	}()
+	go session.verifyContributions(h.mods.Synchronizer().ViewContext())
 }
 
 type serviceImpl struct {
@@ -103,23 +125,31 @@ func (impl serviceImpl) Contribute(ctx gorums.ServerCtx, msg *handelpb.Contribut
 		impl.h.mods.Logger().Error(err)
 	}
 
-	impl.h.mut.Lock()
-	s, ok := impl.h.sessions[hash]
-	impl.h.mut.Unlock()
-	if !ok {
-		impl.h.mods.Logger().Warnf("No session for block %v", hash)
-		return
+	if sig := hotstuffpb.ThresholdSignatureFromProto(msg.GetIndividual()); sig != nil {
+		impl.h.mods.EventLoop().AddEvent(contribution{
+			hash:      hash,
+			sender:    id,
+			level:     int(msg.GetLevel()),
+			signature: sig,
+			verified:  false,
+		})
 	}
 
-	s.contributions <- contribution{
-		sender:    id,
-		level:     int(msg.GetLevel()),
-		signature: hotstuffpb.ThresholdSignatureFromProto(msg.GetIndividual()),
+	if sig := hotstuffpb.ThresholdSignatureFromProto(msg.GetAggregate()); sig != nil {
+		impl.h.mods.EventLoop().AddEvent(contribution{
+			hash:      hash,
+			sender:    id,
+			level:     int(msg.GetLevel()),
+			signature: sig,
+			verified:  false,
+		})
 	}
+}
 
-	s.contributions <- contribution{
-		sender:    id,
-		level:     int(msg.GetLevel()),
-		signature: hotstuffpb.ThresholdSignatureFromProto(msg.GetAggregate()),
-	}
+type disseminateEvent struct{}
+
+type levelActivateEvent struct{}
+
+type sessionDoneEvent struct {
+	hash consensus.Hash
 }

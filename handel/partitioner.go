@@ -55,6 +55,6 @@ func (p partitioner) rangeLevel(level int) (min int, max int) {
 }
 
 func (p partitioner) size(level int) int {
-	max, min := p.rangeLevel(level)
+	min, max := p.rangeLevel(level)
 	return (max - min) + 1
 }
