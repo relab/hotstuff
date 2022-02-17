@@ -1,18 +1,29 @@
 package handel
 
-// func TestRangeLevel(t *testing.T) {
-// 	ids := []hotstuff.ID{1, 2, 3, 4, 5, 6, 7, 8}
-// 	self := hotstuff.ID(6)
+import (
+	"testing"
 
-// 	if min, max := rangeLevel(ids, self, 3); min != 0 || max != 3 {
-// 		t.Errorf("expected (min, max) to be (0, 3), but was (%d, %d)", min, max)
-// 	}
+	"github.com/relab/hotstuff"
+)
 
-// 	if min, max := rangeLevel(ids, self, 2); min != 6 || max != 7 {
-// 		t.Errorf("expected (min, max) to be (6, 7), but was (%d, %d)", min, max)
-// 	}
+func TestRangeLevel(t *testing.T) {
+	ids := []hotstuff.ID{1, 2, 3, 4, 5, 6, 7, 8}
+	// self := hotstuff.ID(6)
 
-// 	if min, max := rangeLevel(ids, self, 1); min != 4 || max != 4 {
-// 		t.Errorf("expected (min, max) to be (4, 4), but was (%d, %d)", min, max)
-// 	}
-// }
+	part := partitioner{
+		ids:       ids,
+		selfIndex: 5,
+	}
+
+	if min, max := part.rangeLevel(3); min != 0 || max != 3 {
+		t.Errorf("expected (min, max) to be (0, 3), but was (%d, %d)", min, max)
+	}
+
+	if min, max := part.rangeLevel(2); min != 6 || max != 7 {
+		t.Errorf("expected (min, max) to be (6, 7), but was (%d, %d)", min, max)
+	}
+
+	if min, max := part.rangeLevel(1); min != 4 || max != 4 {
+		t.Errorf("expected (min, max) to be (4, 4), but was (%d, %d)", min, max)
+	}
+}
