@@ -1,7 +1,15 @@
 // Package byzantine contiains byzantine behaviors that can be applied to the consensus protocols.
 package byzantine
 
-import "github.com/relab/hotstuff/consensus"
+import (
+	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/modules"
+)
+
+func init() {
+	modules.RegisterModule("silence", func() Byzantine { return &silence{} })
+	modules.RegisterModule("fork", func() Byzantine { return &fork{} })
+}
 
 // Byzantine wraps a consensus rules implementation and alters its behavior.
 type Byzantine interface {
