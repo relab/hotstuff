@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	levelActivateInterval = 500 * time.Millisecond
-	disseminationPeriod   = 200 * time.Millisecond
+	levelActivateInterval = 50 * time.Millisecond
+	disseminationPeriod   = 20 * time.Millisecond
 )
 
 // verificationPriority returns a pseudorandom permutation of 0..n-1 where n is the number of nodes,
@@ -64,11 +64,15 @@ func contributionPriority(ids []hotstuff.ID, seed int64, self hotstuff.ID, level
 	return cp
 }
 
-func canMergeContributions(a, b consensus.IDSet) bool {
+func canMergeContributions(a, b consensus.ThresholdSignature) bool {
 	canMerge := true
 
-	a.RangeWhile(func(i hotstuff.ID) bool {
-		b.RangeWhile(func(j hotstuff.ID) bool {
+	if a == nil || b == nil {
+		return false
+	}
+
+	a.Participants().RangeWhile(func(i hotstuff.ID) bool {
+		b.Participants().RangeWhile(func(j hotstuff.ID) bool {
 			// cannot merge a and b if they both contain a contribution from the same ID.
 			if i == j {
 				canMerge = false
@@ -88,9 +92,13 @@ func (s *session) score(contribution contribution) int {
 	}
 
 	level := &s.levels[contribution.level]
-	need := s.part.size(int(contribution.level))
 
-	curBest := level.out
+	need := s.part.size(int(contribution.level))
+	if contribution.level == s.h.maxLevel {
+		need = s.h.mods.Configuration().QuorumSize()
+	}
+
+	curBest := level.outgoing
 
 	if curBest != nil && curBest.Participants().Len() >= need {
 		// level is completed, no need for this signature.
@@ -124,7 +132,7 @@ func (s *session) score(contribution contribution) int {
 	if curBest == nil {
 		total = withIndiv
 		added = total
-	} else if canMergeContributions(contribution.signature.Participants(), curBest.Participants()) {
+	} else if canMergeContributions(contribution.signature, curBest) {
 		curBest.Participants().ForEach(finalParticipants.Add)
 		total = finalParticipants.Len()
 		added = total - curBest.Participants().Len()
@@ -187,10 +195,13 @@ func (h *Handel) newSession(hash consensus.Hash, in consensus.ThresholdSignature
 	s.levels = make([]level, h.maxLevel+1)
 	for i := range s.levels {
 		s.levels[i] = s.newLevel(i)
+
+		min, max := s.part.rangeLevel(i)
+		h.mods.Logger().Debugf("level %d: %v", i, s.part.ids[min:max+1])
 	}
 
 	s.levels[0].individual[h.mods.ID()] = in
-	s.levels[0].out = in
+	s.levels[0].outgoing = in
 
 	return s
 }
@@ -199,7 +210,6 @@ func (s *session) newLevel(i int) level {
 	return level{
 		vp:         verificationPriority(s.part.ids, s.seed, s.h.mods.ID(), i),
 		cp:         contributionPriority(s.part.ids, s.seed, s.h.mods.ID(), i),
-		sent:       consensus.NewIDSet(),
 		individual: make(map[hotstuff.ID]consensus.ThresholdSignature),
 		window: window{
 			window:         s.h.mods.Configuration().Len(),
@@ -213,11 +223,10 @@ func (s *session) newLevel(i int) level {
 
 type level struct {
 	activated  bool
-	done       bool
 	vp         map[hotstuff.ID]int
 	cp         map[hotstuff.ID]int
-	sent       consensus.IDSet
-	out        consensus.ThresholdSignature
+	incoming   consensus.ThresholdSignature
+	outgoing   consensus.ThresholdSignature
 	individual map[hotstuff.ID]consensus.ThresholdSignature
 	pending    []contribution
 	pendingMut sync.Mutex
@@ -227,7 +236,7 @@ type level struct {
 
 func (s *session) handleContribution(c contribution) {
 	if c.verified {
-		s.updateLevel(c)
+		s.updateIncoming(c)
 	} else {
 		s.insertPending(c)
 	}
@@ -269,7 +278,7 @@ func (s *session) insertPending(c contribution) {
 	}
 }
 
-func (s *session) updateLevel(c contribution) {
+func (s *session) updateIncoming(c contribution) {
 	level := &s.levels[c.level]
 
 	if c.isIndividual() {
@@ -277,25 +286,57 @@ func (s *session) updateLevel(c contribution) {
 		level.individual[c.sender] = c.signature
 	}
 
-	if level.out == nil || c.signature.Participants().Len() > level.out.Participants().Len() {
-		s.h.mods.Logger().Debugf("New aggregate signature for level %d with length %d", c.level, c.signature.Participants().Len())
-		level.out = c.signature
+	if level.incoming == nil || c.signature.Participants().Len() > level.incoming.Participants().Len() {
+		s.h.mods.Logger().Debugf("New incoming aggregate signature for level %d with length %d", c.level, c.signature.Participants().Len())
+		level.incoming = c.signature
 	}
 
-	if c.signature.Participants().Len() >= s.part.size(c.level) {
-		s.h.mods.Logger().Debugf("Done with level %d", c.level)
-		level.done = true
-		if c.level == s.h.maxLevel {
-			s.h.mods.EventLoop().AddEvent(sessionDoneEvent{s.hash})
+	for i := c.level; i <= s.h.maxLevel-1; i++ {
+		level := &s.levels[i]
+		if canMergeContributions(level.incoming, level.outgoing) {
+			agg := s.h.mods.Crypto().Combine(level.incoming, level.outgoing)
+			s.updateOutgoing(contribution{
+				hash:      c.hash,
+				level:     c.level + 1,
+				signature: agg,
+				verified:  true,
+			})
+		} else {
+			s.updateOutgoing(contribution{
+				hash:      c.hash,
+				level:     c.level + 1,
+				signature: level.incoming,
+				verified:  true,
+			})
+		}
+	}
+
+	maxLevel := &s.levels[s.h.maxLevel]
+	if canMergeContributions(maxLevel.incoming, maxLevel.outgoing) {
+		if maxLevel.incoming.Participants().Len()+maxLevel.outgoing.Participants().Len() >= s.h.mods.Configuration().QuorumSize() {
+			s.h.mods.Logger().Panicf("Done with session: %.8s", s.hash)
+
+			// send another round of messages before we quit this session.
+			s.h.mods.EventLoop().DelayUntil(disseminateEvent{}, sessionDoneEvent{s.hash})
 
 			s.h.mods.EventLoop().AddEvent(consensus.NewViewMsg{
 				SyncInfo: consensus.NewSyncInfo().WithQC(consensus.NewQuorumCert(
-					c.signature,
+					s.h.mods.Crypto().Combine(maxLevel.incoming, maxLevel.outgoing),
 					s.h.mods.Synchronizer().View(),
 					s.hash,
 				)),
 			})
 		}
+	}
+
+}
+
+func (s *session) updateOutgoing(c contribution) {
+	level := &s.levels[c.level]
+
+	if level.outgoing == nil || c.signature.Participants().Len() > level.outgoing.Participants().Len() {
+		s.h.mods.Logger().Debugf("New outgoing aggregate signature for level %d with length %d", c.level, c.signature.Participants().Len())
+		level.outgoing = c.signature
 	}
 }
 
@@ -320,11 +361,11 @@ func (s *session) sendContributions(ctx context.Context) {
 		prevLevel := &s.levels[i-1]
 		level := &s.levels[i]
 
-		if !level.activated || level.done {
+		if !level.activated {
 			continue
 		}
 
-		in := prevLevel.out
+		in := prevLevel.outgoing
 
 		if in == nil {
 			continue
@@ -338,7 +379,7 @@ func (s *session) sendContributions(ctx context.Context) {
 
 		for _, i := range part {
 			cp := level.cp[i]
-			if cp < bestCP && !level.sent.Contains(i) {
+			if cp < bestCP {
 				bestCP = cp
 				id = i
 			}
@@ -351,33 +392,30 @@ func (s *session) sendContributions(ctx context.Context) {
 					ID:         uint32(s.h.mods.ID()),
 					Level:      uint32(i),
 					Aggregate:  hotstuffpb.ThresholdSignatureToProto(in),
-					Individual: hotstuffpb.ThresholdSignatureToProto(s.levels[0].out),
+					Individual: hotstuffpb.ThresholdSignatureToProto(s.levels[0].outgoing),
 					Hash:       s.hash[:],
 				}, gorums.WithNoSendWaiting())
 			}
 		}
 
 		// ensure we don't send to the same node each time
-		level.sent.Add(id)
+		level.cp[id] += len(s.part.ids)
 	}
 }
 
 func (s *session) verifyContributions(ctx context.Context) {
-	s.h.mods.Logger().Debug("verifyContributions: started")
-	defer s.h.mods.Logger().Debug("verifyContributions: quitting")
-
 	for ctx.Err() == nil {
 		pending := 0
 
 		for i := 1; i <= s.h.maxLevel; i++ {
 			level := &s.levels[i]
 			level.pendingMut.Lock()
-			if level.activated && !level.done {
+			if level.activated {
 				l := len(level.pending)
 				pending += l
 				level.pendingMut.Unlock()
 				if l > 0 {
-					s.verifyContribution(ctx, level)
+					s.verifyContribution(level)
 				}
 			} else {
 				level.pendingMut.Unlock()
@@ -395,7 +433,7 @@ func (s *session) verifyContributions(ctx context.Context) {
 
 }
 
-func (s *session) verifyContribution(ctx context.Context, level *level) {
+func (s *session) verifyContribution(level *level) {
 	level.pendingMut.Lock()
 	if len(level.pending) == 0 {
 		level.pendingMut.Unlock()
@@ -409,6 +447,7 @@ func (s *session) verifyContribution(ctx context.Context, level *level) {
 	for i := 1; i < len(level.pending); i++ {
 		score := s.score(level.pending[i])
 		if i < level.window.get() && score > bestScore {
+			newPending = append(newPending, c)
 			c = level.pending[i]
 			bestScore = score
 		} else if score > 0 {
@@ -422,26 +461,26 @@ func (s *session) verifyContribution(ctx context.Context, level *level) {
 
 	level.pending = newPending
 
-	s.h.mods.Logger().Debug("checking contribution: ", c)
-
 	// combine with the current best signature, if possible
 	agg := c.signature
-	if level.out != nil && canMergeContributions(agg.Participants(), level.out.Participants()) {
-		agg = s.h.mods.Crypto().Combine(agg, level.out)
+	if level.outgoing != nil && canMergeContributions(agg, level.outgoing) {
+		agg = s.h.mods.Crypto().Combine(agg, level.outgoing)
 	}
 
 	// add any individual signature, if possible
 	for _, indiv := range level.individual {
-		if canMergeContributions(agg.Participants(), indiv.Participants()) {
+		if canMergeContributions(agg, indiv) {
 			agg = s.h.mods.Crypto().Combine(agg, indiv)
 		}
 	}
 
 	level.pendingMut.Unlock()
 
+	indivVerified := false
 	// If the contribution is individual, we want to verify it separately
 	if c.isIndividual() {
 		if s.h.mods.Crypto().VerifyAggregateSignature(c.signature, s.hash) {
+			indivVerified = true
 			s.h.mods.EventLoop().AddEvent(contribution{
 				hash:      c.hash,
 				sender:    c.sender,
@@ -452,7 +491,9 @@ func (s *session) verifyContribution(ctx context.Context, level *level) {
 		}
 	}
 
+	aggVerified := false
 	if s.h.mods.Crypto().VerifyAggregateSignature(agg, s.hash) {
+		aggVerified = true
 		s.h.mods.EventLoop().AddEvent(contribution{
 			hash:      c.hash,
 			sender:    c.sender,
@@ -460,9 +501,15 @@ func (s *session) verifyContribution(ctx context.Context, level *level) {
 			signature: agg,
 			verified:  true,
 		})
+	}
 
+	indivOk := (!c.isIndividual() || indivVerified)
+
+	if indivOk && aggVerified {
+		s.h.mods.Logger().Debug("window increased")
 		level.window.increase()
 	} else {
+		s.h.mods.Logger().Debugf("window decreased (indiv: %v, agg: %v)", indivOk, aggVerified)
 		level.window.decrease()
 	}
 }
@@ -496,7 +543,7 @@ func (w *window) decrease() {
 	}
 }
 
-func (w window) get() int {
+func (w *window) get() int {
 	w.mut.Lock()
 	defer w.mut.Unlock()
 
