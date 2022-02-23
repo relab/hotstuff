@@ -232,7 +232,7 @@ func (bc *bls12Crypto) Verify(sig consensus.Signature, hash consensus.Hash) bool
 
 // VerifyAggregateSignature verifies an aggregated signature.
 // It does not check whether the aggregated signature contains a quorum of signatures.
-func (bc *bls12Crypto) VerifyAggregateSignature(agg consensus.ThresholdSignature, hash consensus.Hash) bool {
+func (bc *bls12Crypto) VerifyAggregateSignature(agg consensus.QuorumSignature, hash consensus.Hash) bool {
 	sig, ok := agg.(*AggregateSignature)
 	if !ok {
 		return false
@@ -263,7 +263,7 @@ func (bc *bls12Crypto) VerifyAggregateSignature(agg consensus.ThresholdSignature
 // and all public keys are known by all replicas.
 
 // VerifyThresholdSignature verifies a threshold signature.
-func (bc *bls12Crypto) VerifyThresholdSignature(signature consensus.ThresholdSignature, hash consensus.Hash) bool {
+func (bc *bls12Crypto) VerifyThresholdSignature(signature consensus.QuorumSignature, hash consensus.Hash) bool {
 	sig, ok := signature.(*AggregateSignature)
 	if !ok {
 		return false
@@ -293,7 +293,7 @@ func (bc *bls12Crypto) VerifyThresholdSignature(signature consensus.ThresholdSig
 }
 
 // VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
-func (bc *bls12Crypto) VerifyThresholdSignatureForMessageSet(signature consensus.ThresholdSignature, hashes map[hotstuff.ID]consensus.Hash) bool {
+func (bc *bls12Crypto) VerifyThresholdSignatureForMessageSet(signature consensus.QuorumSignature, hashes map[hotstuff.ID]consensus.Hash) bool {
 	sig, ok := signature.(*AggregateSignature)
 	if !ok {
 		return false
@@ -331,7 +331,7 @@ func (bc *bls12Crypto) VerifyThresholdSignatureForMessageSet(signature consensus
 // TODO: should we check each signature's validity before aggregating?
 
 // CreateThresholdSignature creates a threshold signature from the given partial signatures.
-func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []consensus.Signature, _ consensus.Hash) (_ consensus.ThresholdSignature, err error) {
+func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []consensus.Signature, _ consensus.Hash) (_ consensus.QuorumSignature, err error) {
 	if len(partialSignatures) < bc.mods.Configuration().QuorumSize() {
 		return nil, crypto.ErrNotAQuorum
 	}
@@ -356,7 +356,7 @@ func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []consensus.Si
 
 // CreateThresholdSignatureForMessageSet creates a threshold signature where each partial signature has signed a
 // different message hash.
-func (bc *bls12Crypto) CreateThresholdSignatureForMessageSet(partialSignatures []consensus.Signature, hashes map[hotstuff.ID]consensus.Hash) (consensus.ThresholdSignature, error) {
+func (bc *bls12Crypto) CreateThresholdSignatureForMessageSet(partialSignatures []consensus.Signature, hashes map[hotstuff.ID]consensus.Hash) (consensus.QuorumSignature, error) {
 	// Don't care about the hashes for signature aggregation.
 	return bc.CreateThresholdSignature(partialSignatures, consensus.Hash{})
 }
@@ -367,7 +367,7 @@ func (bc *bls12Crypto) CreateThresholdSignatureForMessageSet(partialSignatures [
 // As opposed to the CreateThresholdSignature methods,
 // this method does not check whether the resulting
 // signature meets the quorum size.
-func (bc *bls12Crypto) Combine(signatures ...interface{}) consensus.ThresholdSignature {
+func (bc *bls12Crypto) Combine(signatures ...interface{}) consensus.QuorumSignature {
 	g2 := bls12.NewG2()
 	agg := bls12.PointG2{}
 	var participants crypto.Bitfield

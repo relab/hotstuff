@@ -254,23 +254,23 @@ type CryptoImpl interface {
 	Verify(sig Signature, hash Hash) bool
 	// VerifyAggregateSignature verifies an aggregated signature.
 	// It does not check whether the aggregated signature contains a quorum of signatures.
-	VerifyAggregateSignature(agg ThresholdSignature, hash Hash) bool
+	VerifyAggregateSignature(agg QuorumSignature, hash Hash) bool
 	// CreateThresholdSignature creates a threshold signature from the given partial signatures.
-	CreateThresholdSignature(partialSignatures []Signature, hash Hash) (ThresholdSignature, error)
+	CreateThresholdSignature(partialSignatures []Signature, hash Hash) (QuorumSignature, error)
 	// CreateThresholdSignatureForMessageSet creates a threshold signature where each partial signature has signed a
 	// different message hash.
-	CreateThresholdSignatureForMessageSet(partialSignatures []Signature, hashes map[hotstuff.ID]Hash) (ThresholdSignature, error)
+	CreateThresholdSignatureForMessageSet(partialSignatures []Signature, hashes map[hotstuff.ID]Hash) (QuorumSignature, error)
 	// VerifyThresholdSignature verifies a threshold signature.
-	VerifyThresholdSignature(signature ThresholdSignature, hash Hash) bool
+	VerifyThresholdSignature(signature QuorumSignature, hash Hash) bool
 	// VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
-	VerifyThresholdSignatureForMessageSet(signature ThresholdSignature, hashes map[hotstuff.ID]Hash) bool
+	VerifyThresholdSignatureForMessageSet(signature QuorumSignature, hashes map[hotstuff.ID]Hash) bool
 	// Combine combines multiple signatures into a single threshold signature.
 	// Arguments can be singular signatures or threshold signatures.
 	//
 	// As opposed to the CreateThresholdSignature methods,
 	// this method does not check whether the resulting
 	// signature meets the quorum size.
-	Combine(signatures ...interface{}) ThresholdSignature
+	Combine(signatures ...interface{}) QuorumSignature
 }
 
 // Crypto implements the methods required to create and verify signatures and certificates.

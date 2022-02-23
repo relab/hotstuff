@@ -49,7 +49,7 @@ func SignatureFromProto(sig *Signature) consensus.Signature {
 }
 
 // ThresholdSignatureToProto converts a threshold signature to a protocol buffers message.
-func ThresholdSignatureToProto(sig consensus.ThresholdSignature) *ThresholdSignature {
+func ThresholdSignatureToProto(sig consensus.QuorumSignature) *ThresholdSignature {
 	signature := &ThresholdSignature{}
 	switch s := sig.(type) {
 	case ecdsa.ThresholdSignature:
@@ -74,7 +74,7 @@ func ThresholdSignatureToProto(sig consensus.ThresholdSignature) *ThresholdSigna
 }
 
 // ThresholdSignatureFromProto converts a protocol buffers message to a threshold signature.
-func ThresholdSignatureFromProto(sig *ThresholdSignature) consensus.ThresholdSignature {
+func ThresholdSignatureFromProto(sig *ThresholdSignature) consensus.QuorumSignature {
 	if signature := sig.GetECDSASigs(); signature != nil {
 		sigs := make([]*ecdsa.Signature, len(signature.GetSigs()))
 		for i, sig := range signature.GetSigs() {

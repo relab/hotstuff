@@ -131,7 +131,7 @@ func (sig ThresholdSignature) Len() int {
 	return len(sig)
 }
 
-var _ consensus.ThresholdSignature = (*ThresholdSignature)(nil)
+var _ consensus.QuorumSignature = (*ThresholdSignature)(nil)
 var _ consensus.IDSet = (*ThresholdSignature)(nil)
 
 type ecdsaCrypto struct {
@@ -185,7 +185,7 @@ func (ec *ecdsaCrypto) Verify(sig consensus.Signature, hash consensus.Hash) bool
 
 // VerifyAggregateSignature verifies an aggregated signature.
 // It does not check whether the aggregated signature contains a quorum of signatures.
-func (ec *ecdsaCrypto) VerifyAggregateSignature(agg consensus.ThresholdSignature, hash consensus.Hash) bool {
+func (ec *ecdsaCrypto) VerifyAggregateSignature(agg consensus.QuorumSignature, hash consensus.Hash) bool {
 	sig, ok := agg.(ThresholdSignature)
 	if !ok {
 		return false
@@ -206,7 +206,7 @@ func (ec *ecdsaCrypto) VerifyAggregateSignature(agg consensus.ThresholdSignature
 }
 
 // CreateThresholdSignature creates a threshold signature from the given partial signatures.
-func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []consensus.Signature, hash consensus.Hash) (_ consensus.ThresholdSignature, err error) {
+func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []consensus.Signature, hash consensus.Hash) (_ consensus.QuorumSignature, err error) {
 	thrSig := make(ThresholdSignature)
 	for _, s := range partialSignatures {
 		if thrSig.Participants().Contains(s.Signer()) {
@@ -236,7 +236,7 @@ func (ec *ecdsaCrypto) CreateThresholdSignature(partialSignatures []consensus.Si
 
 // CreateThresholdSignatureForMessageSet creates a ThresholdSignature of partial signatures where each partialSignature
 // has signed a different message hash.
-func (ec *ecdsaCrypto) CreateThresholdSignatureForMessageSet(partialSignatures []consensus.Signature, hashes map[hotstuff.ID]consensus.Hash) (_ consensus.ThresholdSignature, err error) {
+func (ec *ecdsaCrypto) CreateThresholdSignatureForMessageSet(partialSignatures []consensus.Signature, hashes map[hotstuff.ID]consensus.Hash) (_ consensus.QuorumSignature, err error) {
 	ec.mods.Logger().Debug(hashes)
 	thrSig := make(ThresholdSignature)
 	for _, s := range partialSignatures {
@@ -271,7 +271,7 @@ func (ec *ecdsaCrypto) CreateThresholdSignatureForMessageSet(partialSignatures [
 }
 
 // VerifyThresholdSignature verifies a threshold signature.
-func (ec *ecdsaCrypto) VerifyThresholdSignature(signature consensus.ThresholdSignature, hash consensus.Hash) bool {
+func (ec *ecdsaCrypto) VerifyThresholdSignature(signature consensus.QuorumSignature, hash consensus.Hash) bool {
 	sig, ok := signature.(ThresholdSignature)
 	if !ok {
 		return false
@@ -295,7 +295,7 @@ func (ec *ecdsaCrypto) VerifyThresholdSignature(signature consensus.ThresholdSig
 }
 
 // VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
-func (ec *ecdsaCrypto) VerifyThresholdSignatureForMessageSet(signature consensus.ThresholdSignature, hashes map[hotstuff.ID]consensus.Hash) bool {
+func (ec *ecdsaCrypto) VerifyThresholdSignatureForMessageSet(signature consensus.QuorumSignature, hashes map[hotstuff.ID]consensus.Hash) bool {
 	ec.mods.Logger().Debug(hashes)
 	sig, ok := signature.(ThresholdSignature)
 	if !ok {
@@ -331,7 +331,7 @@ func (ec *ecdsaCrypto) VerifyThresholdSignatureForMessageSet(signature consensus
 // As opposed to the CreateThresholdSignature methods,
 // this method does not check whether the resulting
 // signature meets the quorum size.
-func (ec *ecdsaCrypto) Combine(signatures ...interface{}) consensus.ThresholdSignature {
+func (ec *ecdsaCrypto) Combine(signatures ...interface{}) consensus.QuorumSignature {
 	ts := make(ThresholdSignature)
 
 	for _, sig := range signatures {

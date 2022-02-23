@@ -117,12 +117,17 @@ type Signature interface {
 	Signer() hotstuff.ID
 }
 
-// ThresholdSignature is a signature that is only valid when it contains the signatures of a quorum of replicas.
-type ThresholdSignature interface {
+// QuorumSignature is a signature that is only valid when it contains the signatures of a quorum of replicas.
+type QuorumSignature interface {
 	ToBytes
 	// Participants returns the IDs of replicas who participated in the threshold signature.
 	Participants() IDSet
 }
+
+// ThresholdSignature is a signature that is only valid when it contains the signatures of a quorum of replicas.
+//
+// Deprecated: renamed to QuorumSignature
+type ThresholdSignature = QuorumSignature
 
 // PartialCert is a signed block hash.
 type PartialCert struct {
@@ -222,13 +227,13 @@ func (si SyncInfo) String() string {
 
 // QuorumCert (QC) is a certificate for a Block created by a quorum of partial certificates.
 type QuorumCert struct {
-	signature ThresholdSignature
+	signature QuorumSignature
 	view      View
 	hash      Hash
 }
 
 // NewQuorumCert creates a new quorum cert from the given values.
-func NewQuorumCert(signature ThresholdSignature, view View, hash Hash) QuorumCert {
+func NewQuorumCert(signature QuorumSignature, view View, hash Hash) QuorumCert {
 	return QuorumCert{signature, view, hash}
 }
 
@@ -243,7 +248,7 @@ func (qc QuorumCert) ToBytes() []byte {
 }
 
 // Signature returns the threshold signature.
-func (qc QuorumCert) Signature() ThresholdSignature {
+func (qc QuorumCert) Signature() QuorumSignature {
 	return qc.signature
 }
 
@@ -284,12 +289,12 @@ func (qc QuorumCert) String() string {
 
 // TimeoutCert (TC) is a certificate created by a quorum of timeout messages.
 type TimeoutCert struct {
-	signature ThresholdSignature
+	signature QuorumSignature
 	view      View
 }
 
 // NewTimeoutCert returns a new timeout certificate.
-func NewTimeoutCert(signature ThresholdSignature, view View) TimeoutCert {
+func NewTimeoutCert(signature QuorumSignature, view View) TimeoutCert {
 	return TimeoutCert{signature, view}
 }
 
@@ -301,7 +306,7 @@ func (tc TimeoutCert) ToBytes() []byte {
 }
 
 // Signature returns the threshold signature.
-func (tc TimeoutCert) Signature() ThresholdSignature {
+func (tc TimeoutCert) Signature() QuorumSignature {
 	return tc.signature
 }
 
@@ -326,12 +331,12 @@ func (tc TimeoutCert) String() string {
 // This is used by the Fast-HotStuff consensus protocol.
 type AggregateQC struct {
 	qcs  map[hotstuff.ID]QuorumCert
-	sig  ThresholdSignature
+	sig  QuorumSignature
 	view View
 }
 
 // NewAggregateQC returns a new AggregateQC from the QC map and the threshold signature.
-func NewAggregateQC(qcs map[hotstuff.ID]QuorumCert, sig ThresholdSignature, view View) AggregateQC {
+func NewAggregateQC(qcs map[hotstuff.ID]QuorumCert, sig QuorumSignature, view View) AggregateQC {
 	return AggregateQC{qcs, sig, view}
 }
 
@@ -341,7 +346,7 @@ func (aggQC AggregateQC) QCs() map[hotstuff.ID]QuorumCert {
 }
 
 // Sig returns the threshold signature in the AggregateQC.
-func (aggQC AggregateQC) Sig() ThresholdSignature {
+func (aggQC AggregateQC) Sig() QuorumSignature {
 	return aggQC.sig
 }
 
