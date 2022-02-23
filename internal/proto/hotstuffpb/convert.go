@@ -52,7 +52,7 @@ func SignatureFromProto(sig *Signature) consensus.Signature {
 func ThresholdSignatureToProto(sig consensus.QuorumSignature) *ThresholdSignature {
 	signature := &ThresholdSignature{}
 	switch s := sig.(type) {
-	case ecdsa.ThresholdSignature:
+	case ecdsa.MultiSignature:
 		sigs := make([]*ECDSASignature, 0, len(s))
 		for _, p := range s {
 			sigs = append(sigs, &ECDSASignature{
@@ -84,7 +84,7 @@ func ThresholdSignatureFromProto(sig *ThresholdSignature) consensus.QuorumSignat
 			s.SetBytes(sig.GetS())
 			sigs[i] = ecdsa.RestoreSignature(r, s, hotstuff.ID(sig.GetSigner()))
 		}
-		return ecdsa.RestoreThresholdSignature(sigs)
+		return ecdsa.RestoreMultiSignature(sigs)
 	}
 	if signature := sig.GetBLS12Sig(); signature != nil {
 		aggSig, err := bls12.RestoreAggregateSignature(signature.GetSig(), crypto.BitfieldFromBytes(signature.GetParticipants()))
