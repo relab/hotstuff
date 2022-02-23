@@ -5,6 +5,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 )
@@ -66,7 +67,7 @@ func ThresholdSignatureToProto(sig consensus.ThresholdSignature) *ThresholdSigna
 	case *bls12.AggregateSignature:
 		signature.AggSig = &ThresholdSignature_BLS12Sig{BLS12Sig: &BLS12AggregateSignature{
 			Sig:          s.ToBytes(),
-			Participants: s.Bitfield(),
+			Participants: s.Bitfield().Bytes(),
 		}}
 	}
 	return signature
@@ -86,7 +87,7 @@ func ThresholdSignatureFromProto(sig *ThresholdSignature) consensus.ThresholdSig
 		return ecdsa.RestoreThresholdSignature(sigs)
 	}
 	if signature := sig.GetBLS12Sig(); signature != nil {
-		aggSig, err := bls12.RestoreAggregateSignature(signature.GetSig(), signature.GetParticipants())
+		aggSig, err := bls12.RestoreAggregateSignature(signature.GetSig(), crypto.BitfieldFromBytes(signature.GetParticipants()))
 		if err != nil {
 			return nil
 		}

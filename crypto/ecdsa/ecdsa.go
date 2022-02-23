@@ -117,6 +117,15 @@ func (sig ThresholdSignature) ForEach(f func(hotstuff.ID)) {
 	}
 }
 
+// RangeWhile calls f for each ID in the set until f returns false.
+func (sig ThresholdSignature) RangeWhile(f func(hotstuff.ID) bool) {
+	for id := range sig {
+		if !f(id) {
+			break
+		}
+	}
+}
+
 // Len returns the number of entries in the set.
 func (sig ThresholdSignature) Len() int {
 	return len(sig)

@@ -20,6 +20,8 @@ type IDSet interface {
 	Contains(id hotstuff.ID) bool
 	// ForEach calls f for each ID in the set.
 	ForEach(f func(hotstuff.ID))
+	// RangeWhile calls f for each ID in the set until f returns false.
+	RangeWhile(f func(hotstuff.ID) bool)
 	// Len returns the number of entries in the set.
 	Len() int
 }
@@ -47,6 +49,15 @@ func (s idSetMap) Contains(id hotstuff.ID) bool {
 func (s idSetMap) ForEach(f func(hotstuff.ID)) {
 	for id := range s {
 		f(id)
+	}
+}
+
+// RangeWhile calls f for each ID in the set until f returns false.
+func (s idSetMap) RangeWhile(f func(hotstuff.ID) bool) {
+	for id := range s {
+		if !f(id) {
+			break
+		}
 	}
 }
 

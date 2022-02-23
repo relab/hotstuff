@@ -17,14 +17,14 @@ func TestBitfieldAdd(t *testing.T) {
 	var bm Bitfield
 
 	// initial length should be 0
-	if len(bm) != 0 {
-		t.Errorf("Unexpected length: got: %v, want: %v", len(bm), 0)
+	if len(bm.data) != 0 {
+		t.Errorf("Unexpected length: got: %v, want: %v", len(bm.data), 0)
 	}
 
 	for _, testCase := range testCases {
 		bm.Add(testCase.id)
-		if len(bm) != testCase.len {
-			t.Errorf("Unexpected length: got: %v, want: %v", len(bm), testCase.len)
+		if len(bm.data) != testCase.len {
+			t.Errorf("Unexpected length: got: %v, want: %v", len(bm.data), testCase.len)
 		}
 	}
 }
