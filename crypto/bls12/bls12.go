@@ -12,7 +12,6 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/modules"
-	"go.uber.org/multierr"
 )
 
 func init() {
@@ -155,228 +154,127 @@ func (agg AggregateSignature) Bitfield() crypto.Bitfield {
 	return agg.participants
 }
 
-// AddSignatures adds additional signatures to the aggregate.
-func (agg *AggregateSignature) AddSignatures(signatures map[hotstuff.ID]*Signature) {
-	g2 := bls12.NewG2()
-	for id, s := range signatures {
-		g2.Add(&agg.sig, &agg.sig, s.s)
-		agg.participants.Add(id)
-	}
-}
-
-// bls12Crypto is a Signer/Verifier implementation that uses bls12-381 aggregate signatures.
-type bls12Crypto struct {
+type bls12Base struct {
 	mods *consensus.Modules
 }
 
-// New returns a new bls12-381 signer and verifier.
-func New() consensus.CryptoImpl {
-	bc := &bls12Crypto{}
-	return bc
-}
-
-func (bc *bls12Crypto) getPrivateKey() *PrivateKey {
-	pk := bc.mods.PrivateKey()
-	return pk.(*PrivateKey)
+// New returns a new instance of the BLS12 CryptoBase implementation.
+func New() consensus.CryptoBase {
+	return &bls12Base{}
 }
 
 // InitConsensusModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (bc *bls12Crypto) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
-	bc.mods = mods
+func (bls *bls12Base) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+	bls.mods = mods
 }
 
-// Sign signs a hash.
-func (bc *bls12Crypto) Sign(hash consensus.Hash) (sig consensus.Signature, err error) {
+func (bls *bls12Base) getPrivateKey() *PrivateKey {
+	pk := bls.mods.PrivateKey()
+	return pk.(*PrivateKey)
+}
+
+// Sign creates a cryptographic signature of the given hash.
+func (bls *bls12Base) Sign(hash consensus.Hash) (signature consensus.QuorumSignature, err error) {
 	p, err := bls12.NewG2().HashToCurve(hash[:], domain)
 	if err != nil {
 		return nil, fmt.Errorf("bls12: hash to curve failed: %w", err)
 	}
-	pk := bc.getPrivateKey()
+	pk := bls.getPrivateKey()
 	bls12.NewG2().MulScalarBig(p, p, pk.p)
-	return &Signature{signer: bc.mods.ID(), s: p}, nil
+	var bf crypto.Bitfield
+	bf.Add(bls.mods.ID())
+	return &AggregateSignature{sig: *p, participants: bf}, nil
 }
 
-// AggregateSignatures aggregates the signatures to form a single aggregated signature.
-func AggregateSignatures(signatures map[hotstuff.ID]*Signature) *AggregateSignature {
-	if len(signatures) == 0 {
-		return nil
-	}
-	g2 := bls12.NewG2()
-	sig := bls12.PointG2{}
-	var participants crypto.Bitfield
-	for id, s := range signatures {
-		g2.Add(&sig, &sig, s.s)
-		participants.Add(id)
-	}
-	return &AggregateSignature{sig: sig, participants: participants}
-}
-
-// Verify verifies a signature given a hash.
-func (bc *bls12Crypto) Verify(sig consensus.Signature, hash consensus.Hash) bool {
-	s := sig.(*Signature)
-	replica, ok := bc.mods.Configuration().Replica(sig.Signer())
-	if !ok {
-		bc.mods.Logger().Infof("bls12Crypto: got signature from replica whose ID (%d) was not in the config", sig.Signer())
-	}
-	pk := replica.PublicKey().(*PublicKey)
-	p, err := bls12.NewG2().HashToCurve(hash[:], domain)
-	if err != nil {
-		return false
-	}
-	engine := bls12.NewEngine()
-	engine.AddPairInv(&bls12.G1One, s.s)
-	engine.AddPair(pk.p, p)
-	return engine.Result().IsOne()
-}
-
-// VerifyAggregateSignature verifies an aggregated signature.
-// It does not check whether the aggregated signature contains a quorum of signatures.
-func (bc *bls12Crypto) VerifyAggregateSignature(agg consensus.QuorumSignature, hash consensus.Hash) bool {
-	sig, ok := agg.(*AggregateSignature)
-	if !ok {
-		return false
-	}
-	pubKeys := make([]*PublicKey, 0)
-	sig.participants.ForEach(func(id hotstuff.ID) {
-		replica, ok := bc.mods.Configuration().Replica(id)
-		if !ok {
-			return
-		}
-		pubKeys = append(pubKeys, replica.PublicKey().(*PublicKey))
-	})
-	ps, err := bls12.NewG2().HashToCurve(hash[:], domain)
-	if err != nil {
-		bc.mods.Logger().Error(err)
-		return false
-	}
-	engine := bls12.NewEngine()
-	engine.AddPairInv(&bls12.G1One, &sig.sig)
-	for _, pub := range pubKeys {
-		engine.AddPair(pub.p, ps)
-	}
-	return engine.Result().IsOne()
-}
-
-// TODO: I'm not sure to what extent we are vulnerable to a rogue public key attack here.
-// As far as I can tell, this is not a problem right now because we do not yet support reconfiguration,
-// and all public keys are known by all replicas.
-
-// VerifyThresholdSignature verifies a threshold signature.
-func (bc *bls12Crypto) VerifyThresholdSignature(signature consensus.QuorumSignature, hash consensus.Hash) bool {
+// Verify verifies the given cryptographic signature according to the specified options.
+// NOTE: One of either VerifyHash or VerifyHashes MUST be specified,
+// otherwise this function will have nothing to verify the signature against.
+func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...consensus.VerifyOption) bool {
 	sig, ok := signature.(*AggregateSignature)
 	if !ok {
-		return false
+		panic(fmt.Sprintf("cannot verify signature of incompatible type %T (expected %T", signature, sig))
 	}
-	pubKeys := make([]*PublicKey, 0)
-	sig.participants.ForEach(func(id hotstuff.ID) {
-		replica, ok := bc.mods.Configuration().Replica(id)
-		if !ok {
-			return
-		}
-		pubKeys = append(pubKeys, replica.PublicKey().(*PublicKey))
-	})
-	ps, err := bls12.NewG2().HashToCurve(hash[:], domain)
-	if err != nil {
-		bc.mods.Logger().Error(err)
-		return false
-	}
-	if len(pubKeys) < bc.mods.Configuration().QuorumSize() {
-		return false
-	}
-	engine := bls12.NewEngine()
-	engine.AddPairInv(&bls12.G1One, &sig.sig)
-	for _, pub := range pubKeys {
-		engine.AddPair(pub.p, ps)
-	}
-	return engine.Result().IsOne()
-}
 
-// VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
-func (bc *bls12Crypto) VerifyThresholdSignatureForMessageSet(signature consensus.QuorumSignature, hashes map[hotstuff.ID]consensus.Hash) bool {
-	sig, ok := signature.(*AggregateSignature)
-	if !ok {
-		return false
+	var opts consensus.VerifyOptions
+	for _, opt := range options {
+		opt(&opts)
 	}
-	hashSet := make(map[consensus.Hash]struct{})
+
+	if !opts.UseHashMap && opts.Hash == nil {
+		panic(fmt.Sprintf("no hash(es) to verify the signature against: you must specify one of the VerifyHash or VerifyHashes options"))
+	}
+
 	engine := bls12.NewEngine()
 	engine.AddPairInv(&bls12.G1One, &sig.sig)
-	for id, hash := range hashes {
-		if _, ok := hashSet[hash]; ok {
-			continue
-		}
-		hashSet[hash] = struct{}{}
-		replica, ok := bc.mods.Configuration().Replica(id)
-		if !ok {
-			return false
-		}
-		pk, ok := replica.PublicKey().(*PublicKey)
-		if !ok {
-			return false
-		}
-		p2, err := bls12.NewG2().HashToCurve(hash[:], domain)
+
+	var (
+		ps  *bls12.PointG2
+		err error
+	)
+	if !opts.UseHashMap {
+		ps, err = bls12.NewG2().HashToCurve((*opts.Hash)[:], domain)
 		if err != nil {
+			bls.mods.Logger().Errorf("HashToCurve failed: %v", err)
 			return false
 		}
-		engine.AddPair(pk.p, p2)
 	}
+
+	valid := true
+
+	sig.participants.RangeWhile(func(i hotstuff.ID) bool {
+		replica, ok := bls.mods.Configuration().Replica(i)
+		if !ok {
+			valid = false
+			return false
+		}
+
+		pk := replica.PublicKey().(*PublicKey)
+
+		var (
+			p2  *bls12.PointG2
+			err error
+		)
+		if opts.UseHashMap {
+			hash, ok := opts.HashMap[i]
+			if !ok {
+				valid = false
+				return false
+			}
+
+			p2, err = bls12.NewG2().HashToCurve(hash[:], domain)
+			if err != nil {
+				bls.mods.Logger().Errorf("HashToCurve failed: %v", err)
+				valid = false
+				return false
+			}
+		} else {
+			p2 = ps
+		}
+
+		engine.AddPair(pk.p, p2)
+
+		return true
+	})
+
+	if !valid {
+		return false
+	}
+
 	if !engine.Result().IsOne() {
 		return false
 	}
-	// if we managed to verify the aggregate signature, we just need to make sure that the number of verified signatures
-	// is a quorum.
-	return len(hashSet) >= bc.mods.Configuration().QuorumSize()
+
+	return signature.Participants().Len() >= opts.Threshold
 }
 
-// TODO: should we check each signature's validity before aggregating?
-
-// CreateThresholdSignature creates a threshold signature from the given partial signatures.
-func (bc *bls12Crypto) CreateThresholdSignature(partialSignatures []consensus.Signature, _ consensus.Hash) (_ consensus.QuorumSignature, err error) {
-	if len(partialSignatures) < bc.mods.Configuration().QuorumSize() {
-		return nil, crypto.ErrNotAQuorum
-	}
-	sigs := make(map[hotstuff.ID]*Signature, len(partialSignatures))
-	for _, sig := range partialSignatures {
-		if _, ok := sigs[sig.Signer()]; ok {
-			err = multierr.Append(err, crypto.ErrPartialDuplicate)
-			continue
-		}
-		s, ok := sig.(*Signature)
-		if !ok {
-			err = multierr.Append(err, fmt.Errorf("%w: %T", crypto.ErrWrongType, s))
-			continue
-		}
-		sigs[sig.Signer()] = s
-	}
-	if len(sigs) < bc.mods.Configuration().QuorumSize() {
-		return nil, multierr.Combine(crypto.ErrNotAQuorum, err)
-	}
-	return AggregateSignatures(sigs), nil
-}
-
-// CreateThresholdSignatureForMessageSet creates a threshold signature where each partial signature has signed a
-// different message hash.
-func (bc *bls12Crypto) CreateThresholdSignatureForMessageSet(partialSignatures []consensus.Signature, hashes map[hotstuff.ID]consensus.Hash) (consensus.QuorumSignature, error) {
-	// Don't care about the hashes for signature aggregation.
-	return bc.CreateThresholdSignature(partialSignatures, consensus.Hash{})
-}
-
-// Combine combines multiple signatures into a single threshold signature.
-// Arguments can be singular signatures or threshold signatures.
-//
-// As opposed to the CreateThresholdSignature methods,
-// this method does not check whether the resulting
-// signature meets the quorum size.
-func (bc *bls12Crypto) Combine(signatures ...interface{}) consensus.QuorumSignature {
+// Combine combines multiple signatures into a single signature.
+func (bls *bls12Base) Combine(signatures ...consensus.QuorumSignature) consensus.QuorumSignature {
 	g2 := bls12.NewG2()
 	agg := bls12.PointG2{}
 	var participants crypto.Bitfield
 	for _, sig := range signatures {
-		switch sig := sig.(type) {
-		case *Signature:
-			participants.Add(sig.signer)
-			g2.Add(&agg, &agg, sig.s)
-		case *AggregateSignature:
+		if sig, ok := sig.(*AggregateSignature); ok {
 			sig.participants.ForEach(participants.Add)
 			g2.Add(&agg, &agg, &sig.sig)
 		}
