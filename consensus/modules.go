@@ -245,56 +245,6 @@ type ForkHandlerExt interface {
 	Fork(block *Block)
 }
 
-// CryptoImpl implements only the cryptographic primitives that are needed for HotStuff.
-// This interface is implemented by the ecdsa and bls12 packages.
-type CryptoImpl interface {
-	// Sign signs a hash.
-	Sign(hash Hash) (sig Signature, err error)
-	// Verify verifies a signature given a hash.
-	Verify(sig Signature, hash Hash) bool
-	// VerifyAggregateSignature verifies an aggregated signature.
-	// It does not check whether the aggregated signature contains a quorum of signatures.
-	VerifyAggregateSignature(agg QuorumSignature, hash Hash) bool
-	// CreateThresholdSignature creates a threshold signature from the given partial signatures.
-	CreateThresholdSignature(partialSignatures []Signature, hash Hash) (QuorumSignature, error)
-	// CreateThresholdSignatureForMessageSet creates a threshold signature where each partial signature has signed a
-	// different message hash.
-	CreateThresholdSignatureForMessageSet(partialSignatures []Signature, hashes map[hotstuff.ID]Hash) (QuorumSignature, error)
-	// VerifyThresholdSignature verifies a threshold signature.
-	VerifyThresholdSignature(signature QuorumSignature, hash Hash) bool
-	// VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
-	VerifyThresholdSignatureForMessageSet(signature QuorumSignature, hashes map[hotstuff.ID]Hash) bool
-	// Combine combines multiple signatures into a single threshold signature.
-	// Arguments can be singular signatures or threshold signatures.
-	//
-	// As opposed to the CreateThresholdSignature methods,
-	// this method does not check whether the resulting
-	// signature meets the quorum size.
-	Combine(signatures ...interface{}) QuorumSignature
-}
-
-// Crypto implements the methods required to create and verify signatures and certificates.
-// This is a higher level interface that is implemented by the crypto package itself.
-type Crypto interface {
-	CryptoImpl
-	// CreatePartialCert signs a single block and returns the partial certificate.
-	CreatePartialCert(block *Block) (cert PartialCert, err error)
-	// CreateQuorumCert creates a quorum certificate from a list of partial certificates.
-	CreateQuorumCert(block *Block, signatures []PartialCert) (cert QuorumCert, err error)
-	// CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
-	CreateTimeoutCert(view View, timeouts []TimeoutMsg) (cert TimeoutCert, err error)
-	// CreateAggregateQC creates an AggregateQC from the given timeout messages.
-	CreateAggregateQC(view View, timeouts []TimeoutMsg) (aggQC AggregateQC, err error)
-	// VerifyPartialCert verifies a single partial certificate.
-	VerifyPartialCert(cert PartialCert) bool
-	// VerifyQuorumCert verifies a quorum certificate.
-	VerifyQuorumCert(qc QuorumCert) bool
-	// VerifyTimeoutCert verifies a timeout certificate.
-	VerifyTimeoutCert(tc TimeoutCert) bool
-	// VerifyAggregateQC verifies an AggregateQC.
-	VerifyAggregateQC(aggQC AggregateQC) (ok bool, highQC QuorumCert)
-}
-
 // BlockChain is a datastructure that stores a chain of blocks.
 // It is not required that a block is stored forever,
 // but a block must be stored until at least one of its children have been committed.
