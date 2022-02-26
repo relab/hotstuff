@@ -10,44 +10,6 @@ import (
 	"github.com/relab/hotstuff/crypto/ecdsa"
 )
 
-// SignatureToProto converts a consensus.Signature to a hotstuffpb.Signature.
-func SignatureToProto(sig consensus.Signature) *Signature {
-	signature := &Signature{}
-	switch s := sig.(type) {
-	case *ecdsa.Signature:
-		signature.Sig = &Signature_ECDSASig{ECDSASig: &ECDSASignature{
-			Signer: uint32(s.Signer()),
-			R:      s.R().Bytes(),
-			S:      s.S().Bytes(),
-		}}
-	case *bls12.Signature:
-		signature.Sig = &Signature_BLS12Sig{BLS12Sig: &BLS12Signature{
-			Sig: s.ToBytes(),
-		}}
-	}
-	return signature
-}
-
-// SignatureFromProto converts a hotstuffpb.Signature to an ecdsa.Signature.
-func SignatureFromProto(sig *Signature) consensus.Signature {
-	if signature := sig.GetECDSASig(); signature != nil {
-		r := new(big.Int)
-		r.SetBytes(signature.GetR())
-		s := new(big.Int)
-		s.SetBytes(signature.GetS())
-		return ecdsa.RestoreSignature(r, s, hotstuff.ID(signature.GetSigner()))
-	}
-	if signature := sig.GetBLS12Sig(); signature != nil {
-		s := &bls12.Signature{}
-		err := s.FromBytes(signature.GetSig())
-		if err != nil {
-			return nil
-		}
-		return s
-	}
-	return nil
-}
-
 // QuorumSignatureToProto converts a threshold signature to a protocol buffers message.
 func QuorumSignatureToProto(sig consensus.QuorumSignature) *QuorumSignature {
 	signature := &QuorumSignature{}

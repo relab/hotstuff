@@ -110,13 +110,6 @@ type PrivateKey interface {
 	Public() PublicKey
 }
 
-// Signature is a cryptographic signature of a block.
-type Signature interface {
-	ToBytes
-	// Signer returns the ID of the replica that created the signature.
-	Signer() hotstuff.ID
-}
-
 // QuorumSignature is a signature that is only valid when it contains the signatures of a quorum of replicas.
 type QuorumSignature interface {
 	ToBytes

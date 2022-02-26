@@ -59,8 +59,6 @@ func (sig Signature) ToBytes() []byte {
 	return b
 }
 
-var _ consensus.Signature = (*Signature)(nil)
-
 // MultiSignature is a set of (partial) signatures.
 type MultiSignature map[hotstuff.ID]*Signature
 
