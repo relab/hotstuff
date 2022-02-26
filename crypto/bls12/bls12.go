@@ -205,6 +205,10 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 		panic(fmt.Sprintf("no hash(es) to verify the signature against: you must specify one of the VerifyHash or VerifyHashes options"))
 	}
 
+	if signature.Participants().Len() < opts.Threshold {
+		return false
+	}
+
 	engine := bls12.NewEngine()
 	engine.AddPairInv(&bls12.G1One, &sig.sig)
 
@@ -261,15 +265,11 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 		return false
 	}
 
-	if !engine.Result().IsOne() {
-		return false
-	}
-
-	return signature.Participants().Len() >= opts.Threshold
+	return engine.Result().IsOne()
 }
 
 // Combine combines multiple signatures into a single signature.
-func (bls *bls12Base) Combine(signatures ...consensus.QuorumSignature) consensus.QuorumSignature {
+func (bls *bls12Base) Combine(signatures ...consensus.QuorumSignature) (consensus.QuorumSignature, error) {
 	g2 := bls12.NewG2()
 	agg := bls12.PointG2{}
 	var participants crypto.Bitfield
@@ -279,5 +279,5 @@ func (bls *bls12Base) Combine(signatures ...consensus.QuorumSignature) consensus
 			g2.Add(&agg, &agg, &sig.sig)
 		}
 	}
-	return &AggregateSignature{sig: agg, participants: participants}
+	return &AggregateSignature{sig: agg, participants: participants}, nil
 }
