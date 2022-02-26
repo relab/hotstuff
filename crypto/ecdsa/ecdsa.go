@@ -181,6 +181,10 @@ func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, options ...cons
 		panic(fmt.Sprintf("no hash(es) to verify the signature against: you must specify one of the VerifyHash or VerifyHashes options"))
 	}
 
+	if signature.Participants().Len() < opts.Threshold {
+		return false
+	}
+
 	results := make(chan bool)
 	for _, pSig := range sig {
 		var hash consensus.Hash
@@ -192,7 +196,7 @@ func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, options ...cons
 		}
 
 		go func(sig *Signature, hash consensus.Hash) {
-			results <- ec.mods.Crypto().Verify(MultiSignature{sig.signer: sig}, consensus.VerifyHash(hash))
+			results <- ec.verifySingle(sig, hash)
 		}(pSig, hash)
 	}
 
@@ -203,20 +207,30 @@ func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, options ...cons
 		}
 	}
 
-	return valid && signature.Participants().Len() >= opts.Threshold
+	return valid
+}
+
+func (ec *ecdsaBase) verifySingle(sig *Signature, hash consensus.Hash) bool {
+	replica, ok := ec.mods.Configuration().Replica(sig.Signer())
+	if !ok {
+		ec.mods.Logger().Infof("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
+		return false
+	}
+	pk := replica.PublicKey().(*ecdsa.PublicKey)
+	return ecdsa.Verify(pk, hash[:], sig.R(), sig.S())
 }
 
 // Combine combines multiple signatures into a single signature.
-func (ec *ecdsaBase) Combine(signatures ...consensus.QuorumSignature) consensus.QuorumSignature {
+func (ec *ecdsaBase) Combine(signatures ...consensus.QuorumSignature) (consensus.QuorumSignature, error) {
 	ts := make(MultiSignature)
 
 	for _, sig := range signatures {
 		if sig, ok := sig.(MultiSignature); ok {
-			for _, s := range sig {
-				ts[s.signer] = s
+			for id, s := range sig {
+				ts[id] = s
 			}
 		}
 	}
 
-	return ts
+	return ts, nil
 }
