@@ -193,7 +193,7 @@ func (bls *bls12Base) Sign(hash consensus.Hash) (signature consensus.QuorumSigna
 func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...consensus.VerifyOption) bool {
 	sig, ok := signature.(*AggregateSignature)
 	if !ok {
-		panic(fmt.Sprintf("cannot verify signature of incompatible type %T (expected %T", signature, sig))
+		panic(fmt.Sprintf("cannot verify signature of incompatible type %T (expected %T)", signature, sig))
 	}
 
 	var opts consensus.VerifyOptions
@@ -202,7 +202,7 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 	}
 
 	if !opts.UseHashMap && opts.Hash == nil {
-		panic(fmt.Sprintf("no hash(es) to verify the signature against: you must specify one of the VerifyHash or VerifyHashes options"))
+		panic("no hash(es) to verify the signature against: you must specify one of the VerifyHash or VerifyHashes options")
 	}
 
 	if signature.Participants().Len() < opts.Threshold {

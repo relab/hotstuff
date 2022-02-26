@@ -167,7 +167,7 @@ func (ec *ecdsaBase) Sign(hash consensus.Hash) (signature consensus.QuorumSignat
 func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, options ...consensus.VerifyOption) bool {
 	sig, ok := signature.(MultiSignature)
 	if !ok {
-		panic(fmt.Sprintf("cannot verify signature of incompatible type %T (expected %T", signature, sig))
+		panic(fmt.Sprintf("cannot verify signature of incompatible type %T (expected %T)", signature, sig))
 	}
 
 	var opts consensus.VerifyOptions
@@ -176,7 +176,7 @@ func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, options ...cons
 	}
 
 	if !opts.UseHashMap && opts.Hash == nil {
-		panic(fmt.Sprintf("no hash(es) to verify the signature against: you must specify one of the VerifyHash or VerifyHashes options"))
+		panic("no hash(es) to verify the signature against: you must specify one of the VerifyHash or VerifyHashes options")
 	}
 
 	if signature.Participants().Len() < opts.Threshold {
