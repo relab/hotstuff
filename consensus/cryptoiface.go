@@ -80,33 +80,3 @@ type Crypto interface {
 	// VerifyAggregateQC verifies an AggregateQC.
 	VerifyAggregateQC(aggQC AggregateQC) (ok bool, highQC QuorumCert)
 }
-
-// CryptoImpl implements only the cryptographic primitives that are needed for HotStuff.
-// This interface is implemented by the ecdsa and bls12 packages.
-//
-// Deprecated: Use CryptoBase instead.
-type CryptoImpl interface {
-	// Sign signs a hash.
-	Sign(hash Hash) (sig Signature, err error)
-	// Verify verifies a signature given a hash.
-	Verify(sig Signature, hash Hash) bool
-	// VerifyAggregateSignature verifies an aggregated signature.
-	// It does not check whether the aggregated signature contains a quorum of signatures.
-	VerifyAggregateSignature(agg QuorumSignature, hash Hash) bool
-	// CreateThresholdSignature creates a threshold signature from the given partial signatures.
-	CreateThresholdSignature(partialSignatures []Signature, hash Hash) (QuorumSignature, error)
-	// CreateThresholdSignatureForMessageSet creates a threshold signature where each partial signature has signed a
-	// different message hash.
-	CreateThresholdSignatureForMessageSet(partialSignatures []Signature, hashes map[hotstuff.ID]Hash) (QuorumSignature, error)
-	// VerifyThresholdSignature verifies a threshold signature.
-	VerifyThresholdSignature(signature QuorumSignature, hash Hash) bool
-	// VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
-	VerifyThresholdSignatureForMessageSet(signature QuorumSignature, hashes map[hotstuff.ID]Hash) bool
-	// Combine combines multiple signatures into a single threshold signature.
-	// Arguments can be singular signatures or threshold signatures.
-	//
-	// As opposed to the CreateThresholdSignature methods,
-	// this method does not check whether the resulting
-	// signature meets the quorum size.
-	Combine(signatures ...interface{}) QuorumSignature
-}
