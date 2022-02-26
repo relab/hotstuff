@@ -13,7 +13,7 @@ type CryptoBase interface {
 	// otherwise this function will have nothing to verify the signature against.
 	Verify(signature QuorumSignature, options ...VerifyOption) bool
 	// Combine combines multiple signatures into a single signature.
-	Combine(signatures ...QuorumSignature) QuorumSignature
+	Combine(signatures ...QuorumSignature) (signature QuorumSignature, err error)
 }
 
 // VerifyOption sets options for the Verify function in the CryptoBase interface.
