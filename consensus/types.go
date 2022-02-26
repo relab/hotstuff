@@ -131,17 +131,29 @@ type ThresholdSignature = QuorumSignature
 
 // PartialCert is a signed block hash.
 type PartialCert struct {
-	signature Signature
+	// shortcut to the signer of the signature
+	signer    hotstuff.ID
+	signature QuorumSignature
 	blockHash Hash
 }
 
 // NewPartialCert returns a new partial certificate.
-func NewPartialCert(signature Signature, blockHash Hash) PartialCert {
-	return PartialCert{signature, blockHash}
+func NewPartialCert(signature QuorumSignature, blockHash Hash) PartialCert {
+	var signer hotstuff.ID
+	signature.Participants().RangeWhile(func(i hotstuff.ID) bool {
+		signer = i
+		return false
+	})
+	return PartialCert{signer, signature, blockHash}
+}
+
+// Signer returns the ID of the replica that created the certificate.
+func (pc PartialCert) Signer() hotstuff.ID {
+	return pc.signer
 }
 
 // Signature returns the signature.
-func (pc PartialCert) Signature() Signature {
+func (pc PartialCert) Signature() QuorumSignature {
 	return pc.signature
 }
 

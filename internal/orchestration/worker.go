@@ -175,7 +175,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
 	}
 
-	var cryptoImpl consensus.CryptoImpl
+	var cryptoImpl consensus.CryptoBase
 	if !modules.GetModule(opts.GetCrypto(), &cryptoImpl) {
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
 	}

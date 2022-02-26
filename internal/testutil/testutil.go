@@ -206,7 +206,7 @@ func CreateTCPListener(t *testing.T) net.Listener {
 }
 
 // Sign creates a signature using the given signer.
-func Sign(t *testing.T, hash consensus.Hash, signer consensus.Crypto) consensus.Signature {
+func Sign(t *testing.T, hash consensus.Hash, signer consensus.Crypto) consensus.QuorumSignature {
 	t.Helper()
 	sig, err := signer.Sign(hash)
 	if err != nil {
@@ -216,13 +216,22 @@ func Sign(t *testing.T, hash consensus.Hash, signer consensus.Crypto) consensus.
 }
 
 // CreateSignatures creates partial certificates from multiple signers.
-func CreateSignatures(t *testing.T, hash consensus.Hash, signers []consensus.Crypto) []consensus.Signature {
+func CreateSignatures(t *testing.T, hash consensus.Hash, signers []consensus.Crypto) []consensus.QuorumSignature {
 	t.Helper()
-	sigs := make([]consensus.Signature, 0, len(signers))
+	sigs := make([]consensus.QuorumSignature, 0, len(signers))
 	for _, signer := range signers {
 		sigs = append(sigs, Sign(t, hash, signer))
 	}
 	return sigs
+}
+
+func signer(s consensus.QuorumSignature) hotstuff.ID {
+	var signer hotstuff.ID
+	s.Participants().RangeWhile(func(i hotstuff.ID) bool {
+		signer = i
+		return false
+	})
+	return signer
 }
 
 // CreateTimeouts creates a set of TimeoutMsg messages from the given signers.
@@ -232,7 +241,7 @@ func CreateTimeouts(t *testing.T, view consensus.View, signers []consensus.Crypt
 	viewSigs := CreateSignatures(t, view.ToHash(), signers)
 	for _, sig := range viewSigs {
 		timeouts = append(timeouts, consensus.TimeoutMsg{
-			ID:            sig.Signer(),
+			ID:            signer(sig),
 			View:          view,
 			ViewSignature: sig,
 			SyncInfo:      consensus.NewSyncInfo().WithQC(consensus.NewQuorumCert(nil, 0, consensus.GetGenesis().Hash())),
