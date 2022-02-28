@@ -294,7 +294,7 @@ func (s *session) insertPending(c contribution) {
 
 func (s *session) updateIncoming(c contribution) {
 	s.mut.Lock()
-	s.mut.Unlock()
+	defer s.mut.Unlock()
 
 	if c.isIndividual() {
 		s.h.mods.Logger().Debugf("New individual signature from %d for level %d", c.sender, c.level)

@@ -28,7 +28,6 @@ package handel
 import (
 	"errors"
 	"math"
-	"sync"
 	"time"
 
 	"github.com/relab/gorums"
@@ -45,7 +44,6 @@ func init() {
 
 // Handel implements a signature aggregation protocol.
 type Handel struct {
-	mut      sync.Mutex
 	mods     *consensus.Modules
 	cfg      *handelpb.Configuration
 	maxLevel int
