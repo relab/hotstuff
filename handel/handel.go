@@ -80,7 +80,7 @@ func (h *Handel) Init() error {
 
 	h.mods.EventLoop().RegisterHandler(levelActivateEvent{}, func(_ interface{}) {
 		for _, s := range h.sessions {
-			s.activateLevel()
+			s.advanceLevel()
 		}
 	})
 
