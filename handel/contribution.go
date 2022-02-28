@@ -9,7 +9,7 @@ type contribution struct {
 	hash      consensus.Hash
 	sender    hotstuff.ID
 	level     int
-	signature consensus.ThresholdSignature
+	signature consensus.QuorumSignature
 	verified  bool
 }
 
