@@ -1,6 +1,7 @@
 package handel
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/relab/hotstuff"
@@ -26,7 +27,7 @@ func (p partitioner) rangeLevel(level int) (min int, max int) {
 	maxLevel := int(math.Ceil(math.Log2(float64(len(p.ids)))))
 
 	if level < 0 || level > maxLevel {
-		panic("handel: invalid level")
+		panic(fmt.Sprintf("handel: invalid level %d", level))
 	}
 
 	max = len(p.ids) - 1
@@ -52,6 +53,11 @@ func (p partitioner) rangeLevel(level int) (min int, max int) {
 	}
 
 	return min, max
+}
+
+func (p partitioner) partition(level int) []hotstuff.ID {
+	min, max := p.rangeLevel(level)
+	return p.ids[min : max+1]
 }
 
 func (p partitioner) size(level int) int {

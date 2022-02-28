@@ -3,6 +3,7 @@ package handel
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -91,16 +92,13 @@ func (s *session) score(contribution contribution) int {
 		return 0
 	}
 
-	level := &s.levels[contribution.level]
-
-	need := s.part.size(int(contribution.level))
+	need := s.part.size(s.activeLevelIndex)
 	if contribution.level == s.h.maxLevel {
 		need = s.h.mods.Configuration().QuorumSize()
 	}
 
-	curBest := level.outgoing
-
-	if curBest != nil && curBest.Participants().Len() >= need {
+	curBest := s.activeLevel.incoming
+	if curBest.Participants().Len() >= need {
 		// level is completed, no need for this signature.
 		return 0
 	}
@@ -118,7 +116,7 @@ func (s *session) score(contribution contribution) int {
 
 	indivAdded := 0
 
-	for id := range level.individual {
+	for id := range s.activeLevel.individual {
 		if !finalParticipants.Contains(id) {
 			finalParticipants.Add(id)
 			indivAdded++
@@ -127,12 +125,8 @@ func (s *session) score(contribution contribution) int {
 
 	total := 0
 	added := 0
-	withIndiv := finalParticipants.Len()
 
-	if curBest == nil {
-		total = withIndiv
-		added = total
-	} else if canMergeContributions(contribution.signature, curBest) {
+	if canMergeContributions(contribution.signature, curBest) {
 		curBest.Participants().ForEach(finalParticipants.Add)
 		total = finalParticipants.Len()
 		added = total - curBest.Participants().Len()
@@ -159,6 +153,9 @@ func (s *session) score(contribution contribution) int {
 
 // session
 type session struct {
+	// mutex is needed because pending and activeLevel.incoming
+	// are accessed by verifyContributions in a separate goroutine
+
 	mut sync.Mutex
 	h   *Handel
 
@@ -180,10 +177,10 @@ type session struct {
 
 func (h *Handel) newSession(hash consensus.Hash, in consensus.QuorumSignature) *session {
 	s := &session{
-		h:                h,
-		hash:             hash,
-		seed:             h.mods.Options().SharedRandomSeed() + int64(binary.LittleEndian.Uint64(hash[:])),
-		newContributions: make(chan struct{}),
+		h:    h,
+		hash: hash,
+		seed: h.mods.Options().SharedRandomSeed() + int64(binary.LittleEndian.Uint64(hash[:])),
+
 		window: window{
 			window:         h.mods.Configuration().Len(),
 			max:            h.mods.Configuration().Len(),
@@ -191,6 +188,7 @@ func (h *Handel) newSession(hash consensus.Hash, in consensus.QuorumSignature) *
 			increaseFactor: 2,
 			decreaseFactor: 4,
 		},
+		newContributions: make(chan struct{}),
 	}
 
 	// Get a sorted list of IDs for all replicas.
@@ -219,14 +217,27 @@ func (h *Handel) newSession(hash consensus.Hash, in consensus.QuorumSignature) *
 
 	s.levels[0].individual[h.mods.ID()] = in
 	s.levels[0].outgoing = in
+	s.activeLevel = &s.levels[0]
+
+	s.advanceLevel()
 
 	return s
 }
 
 func (s *session) newLevel(i int) level {
+	// HACK: create an empty signature as a placeholder
+	emptySig, err := s.h.mods.Crypto().Combine()
+	if err != nil {
+		panic(fmt.Sprintf("failed to create empty signature using Combine(): %v", err))
+	}
+
 	return level{
-		vp:         verificationPriority(s.part.ids, s.seed, s.h.mods.ID(), i),
-		cp:         contributionPriority(s.part.ids, s.seed, s.h.mods.ID(), i),
+		vp: verificationPriority(s.part.ids, s.seed, s.h.mods.ID(), i),
+		cp: contributionPriority(s.part.ids, s.seed, s.h.mods.ID(), i),
+
+		// HACK: creating empty signatures to avoid dealing with nil pointers
+		incoming:   emptySig,
+		outgoing:   emptySig,
 		individual: make(map[hotstuff.ID]consensus.QuorumSignature),
 	}
 }
@@ -283,50 +294,74 @@ func (s *session) insertPending(c contribution) {
 }
 
 func (s *session) updateIncoming(c contribution) {
-	level := &s.levels[c.level]
+	s.mut.Lock()
+	s.mut.Unlock()
 
 	if c.isIndividual() {
 		s.h.mods.Logger().Debugf("New individual signature from %d for level %d", c.sender, c.level)
-		level.individual[c.sender] = c.signature
+		s.activeLevel.individual[c.sender] = c.signature
 	}
 
-	if level.incoming == nil || c.signature.Participants().Len() > level.incoming.Participants().Len() {
+	if c.signature.Participants().Len() > s.activeLevel.incoming.Participants().Len() {
 		s.h.mods.Logger().Debugf("New incoming aggregate signature for level %d with length %d", c.level, c.signature.Participants().Len())
-		level.incoming = c.signature
+		s.activeLevel.incoming = c.signature
 	}
 
-	if s.activeLevel.incoming.Participants().Len()+s.activeLevel.outgoing.Participants().Len() >= s.h.mods.Configuration().QuorumSize() {
-		s.h.mods.Logger().Panicf("Done with session: %.8s", s.hash)
+	// check if the level is complete
+	// complete := true
+	// partition := s.part.partition(s.activeLevelIndex)
+	// for _, id := range partition {
+	// 	if !c.signature.Participants().Contains(id) {
+	// 		complete = false
+	// 	}
+	// }
 
-		// send another round of messages before we quit this session.
-		s.h.mods.EventLoop().DelayUntil(disseminateEvent{}, sessionDoneEvent{s.hash})
+	// if complete {
+	// 	s.sendFastPath()
+	// }
+
+	// check if we have enough signers for a quorum
+	if s.activeLevel.incoming.Participants().Len()+s.activeLevel.outgoing.Participants().Len() >= s.h.mods.Configuration().QuorumSize() {
+
+		sig, err := s.h.mods.Crypto().Combine(s.activeLevel.incoming, s.activeLevel.outgoing)
+		if err != nil {
+			s.h.mods.Logger().Errorf("Failed to combine signatures: %v", err)
+			return
+		}
+
+		s.h.mods.Logger().Debugf("Done with session: %.8s", s.hash)
 
 		s.h.mods.EventLoop().AddEvent(consensus.NewViewMsg{
 			SyncInfo: consensus.NewSyncInfo().WithQC(consensus.NewQuorumCert(
-				s.combine(s.activeLevel.incoming, s.activeLevel.outgoing),
+				sig,
 				s.h.mods.Synchronizer().View(),
 				s.hash,
 			)),
 		})
+
+		s.h.mods.EventLoop().AddEvent(sessionDoneEvent{s.hash})
 	}
 }
 
 func (s *session) advanceLevel() {
-	if s.activeLevelIndex > s.h.maxLevel {
+	if s.activeLevelIndex+1 > s.h.maxLevel {
 		return
 	}
 
-	out := s.combine(s.activeLevel.outgoing, s.activeLevel.outgoing)
+	out, err := s.h.mods.Crypto().Combine(s.activeLevel.outgoing, s.activeLevel.incoming)
+	if err != nil {
+		s.h.mods.Logger().Errorf("Failed to combine signatures: %v", err)
+		return
+	}
 
-	s.activeLevel = &s.levels[s.activeLevelIndex]
 	s.activeLevelIndex++
+	s.activeLevel = &s.levels[s.activeLevelIndex]
 
 	s.activeLevel.outgoing = out
 }
 
 func (s *session) sendContributions(ctx context.Context) {
-	min, max := s.part.rangeLevel(s.activeLevelIndex)
-	part := s.part.ids[min : max+1]
+	part := s.part.partition(s.activeLevelIndex)
 
 	id := part[0]
 	bestCP := s.activeLevel.cp[id]
@@ -401,14 +436,24 @@ func (s *session) chooseContribution() (cont contribution, combi consensus.Quoru
 
 	// combine with the current best signature, if possible
 	sigCombi := c.signature
-	if s.activeLevel.incoming != nil && canMergeContributions(sigCombi, s.activeLevel.incoming) {
-		sigCombi = s.combine(sigCombi, s.activeLevel.incoming)
+	if canMergeContributions(sigCombi, s.activeLevel.incoming) {
+		sig, err := s.h.mods.Crypto().Combine(sigCombi, s.activeLevel.incoming)
+		if err == nil {
+			sigCombi = sig
+		} else {
+			s.h.mods.Logger().Errorf("Failed to combine signatures: %v", err)
+		}
 	}
 
 	// add any individual signature, if possible
 	for _, indiv := range s.activeLevel.individual {
 		if canMergeContributions(sigCombi, indiv) {
-			sigCombi = s.combine(sigCombi, indiv)
+			sig, err := s.h.mods.Crypto().Combine(sigCombi, indiv)
+			if err == nil {
+				sigCombi = sig
+			} else {
+				s.h.mods.Logger().Errorf("Failed to combine signatures: %v", err)
+			}
 		}
 	}
 
@@ -452,15 +497,6 @@ func (s *session) verifyContribution(c contribution, sig consensus.QuorumSignatu
 		s.h.mods.Logger().Debugf("window decreased (indiv: %v, agg: %v)", indivOk, aggVerified)
 		s.window.decrease()
 	}
-}
-
-func (s *session) combine(signatures ...consensus.QuorumSignature) consensus.QuorumSignature {
-	signature, err := s.h.mods.Crypto().Combine()
-	if err != nil {
-		s.h.mods.Logger().Errorf("Failed to combine signatures: %v", err)
-		return nil
-	}
-	return signature
 }
 
 type window struct {
