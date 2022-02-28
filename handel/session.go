@@ -86,72 +86,6 @@ func canMergeContributions(a, b consensus.QuorumSignature) bool {
 	return canMerge
 }
 
-func (s *session) score(contribution contribution) int {
-	if contribution.level < 1 || int(contribution.level) > s.h.maxLevel {
-		// invalid level
-		return 0
-	}
-
-	need := s.part.size(s.activeLevelIndex)
-	if contribution.level == s.h.maxLevel {
-		need = s.h.mods.Configuration().QuorumSize()
-	}
-
-	curBest := s.activeLevel.incoming
-	if curBest.Participants().Len() >= need {
-		// level is completed, no need for this signature.
-		return 0
-	}
-
-	// scoring priority (based on reference implementation):
-	// 1. Completed level (prioritize first levels)
-	// 2. Added value to level (prioritize old levels)
-	// 3. Individual signatures
-	//
-	// Signatures that add no value to a level are simply ignored.
-
-	// copy the set of participants and add all individual signatures
-	finalParticipants := consensus.NewIDSet()
-	contribution.signature.Participants().ForEach(finalParticipants.Add)
-
-	indivAdded := 0
-
-	for id := range s.activeLevel.individual {
-		if !finalParticipants.Contains(id) {
-			finalParticipants.Add(id)
-			indivAdded++
-		}
-	}
-
-	total := 0
-	added := 0
-
-	if canMergeContributions(contribution.signature, curBest) {
-		curBest.Participants().ForEach(finalParticipants.Add)
-		total = finalParticipants.Len()
-		added = total - curBest.Participants().Len()
-	} else {
-		total = finalParticipants.Len()
-		added = total - curBest.Participants().Len()
-	}
-
-	s.h.mods.Logger().Debugf("level: %d, need: %d, added: %d, total: %d", contribution.level, need, added, total)
-
-	if added <= 0 {
-		if contribution.isIndividual() {
-			return 1
-		}
-		return 0
-	}
-
-	if total == need {
-		return 1000000 - contribution.level*10 - indivAdded
-	}
-
-	return 100000 - contribution.level*100 + added*10 - indivAdded
-}
-
-// session
 type session struct {
 	// mutex is needed because pending and activeLevel.incoming
 	// are accessed by verifyContributions in a separate goroutine
@@ -224,6 +158,14 @@ func (h *Handel) newSession(hash consensus.Hash, in consensus.QuorumSignature) *
 	return s
 }
 
+type level struct {
+	vp         map[hotstuff.ID]int
+	cp         map[hotstuff.ID]int
+	incoming   consensus.QuorumSignature
+	outgoing   consensus.QuorumSignature
+	individual map[hotstuff.ID]consensus.QuorumSignature
+}
+
 func (s *session) newLevel(i int) level {
 	// HACK: create an empty signature as a placeholder
 	emptySig, err := s.h.mods.Crypto().Combine()
@@ -242,12 +184,69 @@ func (s *session) newLevel(i int) level {
 	}
 }
 
-type level struct {
-	vp         map[hotstuff.ID]int
-	cp         map[hotstuff.ID]int
-	incoming   consensus.QuorumSignature
-	outgoing   consensus.QuorumSignature
-	individual map[hotstuff.ID]consensus.QuorumSignature
+func (s *session) score(contribution contribution) int {
+	if contribution.level < 1 || int(contribution.level) > s.h.maxLevel {
+		// invalid level
+		return 0
+	}
+
+	need := s.part.size(s.activeLevelIndex)
+	if contribution.level == s.h.maxLevel {
+		need = s.h.mods.Configuration().QuorumSize()
+	}
+
+	curBest := s.activeLevel.incoming
+	if curBest.Participants().Len() >= need {
+		// level is completed, no need for this signature.
+		return 0
+	}
+
+	// scoring priority (based on reference implementation):
+	// 1. Completed level (prioritize first levels)
+	// 2. Added value to level (prioritize old levels)
+	// 3. Individual signatures
+	//
+	// Signatures that add no value to a level are simply ignored.
+
+	// copy the set of participants and add all individual signatures
+	finalParticipants := consensus.NewIDSet()
+	contribution.signature.Participants().ForEach(finalParticipants.Add)
+
+	indivAdded := 0
+
+	for id := range s.activeLevel.individual {
+		if !finalParticipants.Contains(id) {
+			finalParticipants.Add(id)
+			indivAdded++
+		}
+	}
+
+	total := 0
+	added := 0
+
+	if canMergeContributions(contribution.signature, curBest) {
+		curBest.Participants().ForEach(finalParticipants.Add)
+		total = finalParticipants.Len()
+		added = total - curBest.Participants().Len()
+	} else {
+		total = finalParticipants.Len()
+		added = total - curBest.Participants().Len()
+	}
+
+	s.h.mods.Logger().Debugf("level: %d, need: %d, added: %d, total: %d", contribution.level, need, added, total)
+
+	if added <= 0 {
+		if contribution.isIndividual() {
+			return 1
+		}
+		return 0
+	}
+
+	if total == need {
+		return 1000000 - contribution.level*10 - indivAdded
+	}
+
+	return 100000 - contribution.level*100 + added*10 - indivAdded
 }
 
 func (s *session) handleContribution(c contribution) {

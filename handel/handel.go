@@ -1,3 +1,28 @@
+// Package handel provides signature aggregation through a peer-to-peer protocol.
+// This could help reduce the load on the leader in very large configurations of replicas.
+// This package implements the `Handel` interface defined in the consensus package.
+// The following gives an overview of how this module works:
+//
+// Enabling Handel from the CLI.
+//
+// Handel can be enabled through the `--modules` flag:
+//  ./hotstuff run --modules="handel"
+//
+// Initialization.
+//
+// Handel requires an extra initialization step, because it needs to access the `Configuration`
+// module after it has connected to the other replicas. In order to facilitate this, the
+// orchestration runtime will check if a Handel module is present, after the Configuration has
+// been connected, and then call the `Init` function of the Handel module.
+//
+// API.
+//
+// The Handel module exports only the `Begin` method. This method is used to start the aggregation process.
+// When called, the `Begin` method will create a new Handel session. The Handel module forwards relevant
+// events from the event loop to the active sessions.
+//
+// When a session has managed to assemble a valid quorum certificate, it will send a NewView event on the
+// event loop.
 package handel
 
 import (
