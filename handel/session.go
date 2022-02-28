@@ -294,7 +294,7 @@ func (s *session) updateIncoming(c contribution) {
 	for i := c.level; i <= s.h.maxLevel-1; i++ {
 		level := &s.levels[i]
 		if canMergeContributions(level.incoming, level.outgoing) {
-			agg := s.h.mods.Crypto().Combine(level.incoming, level.outgoing)
+			agg := s.combine(level.incoming, level.outgoing)
 			s.updateOutgoing(contribution{
 				hash:      c.hash,
 				level:     c.level + 1,
@@ -321,7 +321,7 @@ func (s *session) updateIncoming(c contribution) {
 
 			s.h.mods.EventLoop().AddEvent(consensus.NewViewMsg{
 				SyncInfo: consensus.NewSyncInfo().WithQC(consensus.NewQuorumCert(
-					s.h.mods.Crypto().Combine(maxLevel.incoming, maxLevel.outgoing),
+					s.combine(maxLevel.incoming, maxLevel.outgoing),
 					s.h.mods.Synchronizer().View(),
 					s.hash,
 				)),
@@ -391,8 +391,8 @@ func (s *session) sendContributions(ctx context.Context) {
 				node.Contribute(ctx, &handelpb.Contribution{
 					ID:         uint32(s.h.mods.ID()),
 					Level:      uint32(i),
-					Aggregate:  hotstuffpb.ThresholdSignatureToProto(in),
-					Individual: hotstuffpb.ThresholdSignatureToProto(s.levels[0].outgoing),
+					Signature:  hotstuffpb.QuorumSignatureToProto(in),
+					Individual: hotstuffpb.QuorumSignatureToProto(s.levels[0].outgoing),
 					Hash:       s.hash[:],
 				}, gorums.WithNoSendWaiting())
 			}
@@ -464,13 +464,13 @@ func (s *session) verifyContribution(level *level) {
 	// combine with the current best signature, if possible
 	agg := c.signature
 	if level.outgoing != nil && canMergeContributions(agg, level.outgoing) {
-		agg = s.h.mods.Crypto().Combine(agg, level.outgoing)
+		agg = s.combine(agg, level.outgoing)
 	}
 
 	// add any individual signature, if possible
 	for _, indiv := range level.individual {
 		if canMergeContributions(agg, indiv) {
-			agg = s.h.mods.Crypto().Combine(agg, indiv)
+			agg = s.combine(agg, indiv)
 		}
 	}
 
@@ -479,7 +479,7 @@ func (s *session) verifyContribution(level *level) {
 	indivVerified := false
 	// If the contribution is individual, we want to verify it separately
 	if c.isIndividual() {
-		if s.h.mods.Crypto().VerifyAggregateSignature(c.signature, s.hash) {
+		if s.h.mods.Crypto().Verify(c.signature, consensus.VerifyHash(s.hash)) {
 			indivVerified = true
 			s.h.mods.EventLoop().AddEvent(contribution{
 				hash:      c.hash,
@@ -492,7 +492,7 @@ func (s *session) verifyContribution(level *level) {
 	}
 
 	aggVerified := false
-	if s.h.mods.Crypto().VerifyAggregateSignature(agg, s.hash) {
+	if s.h.mods.Crypto().Verify(agg, consensus.VerifyHash(s.hash)) {
 		aggVerified = true
 		s.h.mods.EventLoop().AddEvent(contribution{
 			hash:      c.hash,
@@ -512,6 +512,14 @@ func (s *session) verifyContribution(level *level) {
 		s.h.mods.Logger().Debugf("window decreased (indiv: %v, agg: %v)", indivOk, aggVerified)
 		level.window.decrease()
 	}
+}
+
+func (s *session) combine(signatures ...consensus.QuorumSignature) consensus.QuorumSignature {
+	signature, err := s.h.mods.Crypto().Combine()
+	if err != nil {
+		s.h.mods.Logger().Errorf("Failed to combine signatures: %v", err)
+	}
+	return signature
 }
 
 type window struct {

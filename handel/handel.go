@@ -104,9 +104,7 @@ func (h *Handel) Init() error {
 func (h *Handel) Begin(s consensus.PartialCert) {
 	// turn the single signature into a threshold signature,
 	// this makes it easier to work with.
-	ts := h.mods.Crypto().Combine(s.Signature())
-
-	session := h.newSession(s.BlockHash(), ts)
+	session := h.newSession(s.BlockHash(), s.Signature())
 	h.sessions[s.BlockHash()] = session
 
 	go session.verifyContributions(h.mods.Synchronizer().ViewContext())
@@ -125,7 +123,7 @@ func (impl serviceImpl) Contribute(ctx gorums.ServerCtx, msg *handelpb.Contribut
 		impl.h.mods.Logger().Error(err)
 	}
 
-	if sig := hotstuffpb.ThresholdSignatureFromProto(msg.GetIndividual()); sig != nil {
+	if sig := hotstuffpb.QuorumSignatureFromProto(msg.GetIndividual()); sig != nil {
 		impl.h.mods.EventLoop().AddEvent(contribution{
 			hash:      hash,
 			sender:    id,
@@ -135,7 +133,7 @@ func (impl serviceImpl) Contribute(ctx gorums.ServerCtx, msg *handelpb.Contribut
 		})
 	}
 
-	if sig := hotstuffpb.ThresholdSignatureFromProto(msg.GetAggregate()); sig != nil {
+	if sig := hotstuffpb.QuorumSignatureFromProto(msg.GetSignature()); sig != nil {
 		impl.h.mods.EventLoop().AddEvent(contribution{
 			hash:      hash,
 			sender:    id,
