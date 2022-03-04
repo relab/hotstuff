@@ -5,7 +5,8 @@ type Options struct {
 	shouldUseAggQC        bool
 	shouldVerifyVotesSync bool
 
-	sharedRandomSeed int64
+	sharedRandomSeed   int64
+	connectionMetadata map[string]string
 }
 
 // ShouldUseAggQC returns true if aggregated quorum certificates should be used.
@@ -23,6 +24,11 @@ func (c Options) ShouldVerifyVotesSync() bool {
 // SharedRandomSeed returns a random number that is shared between all replicas.
 func (c Options) SharedRandomSeed() int64 {
 	return c.sharedRandomSeed
+}
+
+// ConnectionMetadata returns the metadata map that is sent when connecting to other replicas.
+func (c Options) ConnectionMetadata() map[string]string {
+	return c.connectionMetadata
 }
 
 // OptionsBuilder is used to set the values of immutable configuration settings.
@@ -43,4 +49,9 @@ func (builder *OptionsBuilder) SetShouldVerifyVotesSync() {
 // SetSharedRandomSeed sets the shared random seed.
 func (builder *OptionsBuilder) SetSharedRandomSeed(seed int64) {
 	builder.opts.sharedRandomSeed = seed
+}
+
+// SetConnectionMetadata sets the value of a key in the connection metadata map.
+func (builder *OptionsBuilder) SetConnectionMetadata(key string, value string) {
+	builder.opts.connectionMetadata[key] = value
 }

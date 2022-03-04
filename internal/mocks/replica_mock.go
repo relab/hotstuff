@@ -50,6 +50,20 @@ func (mr *MockReplicaMockRecorder) ID() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ID", reflect.TypeOf((*MockReplica)(nil).ID))
 }
 
+// Metadata mocks base method.
+func (m *MockReplica) Metadata() map[string]string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Metadata")
+	ret0, _ := ret[0].(map[string]string)
+	return ret0
+}
+
+// Metadata indicates an expected call of Metadata.
+func (mr *MockReplicaMockRecorder) Metadata() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Metadata", reflect.TypeOf((*MockReplica)(nil).Metadata))
+}
+
 // NewView mocks base method.
 func (m *MockReplica) NewView(arg0 consensus.SyncInfo) {
 	m.ctrl.T.Helper()

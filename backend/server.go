@@ -10,7 +10,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
@@ -35,9 +34,11 @@ func (srv *Server) InitConsensusModule(mods *consensus.Modules, _ *consensus.Opt
 func NewServer(opts ...gorums.ServerOption) *Server {
 	srv := &Server{}
 
-	grpcServerOpts := []grpc.ServerOption{}
-
-	opts = append(opts, gorums.WithGRPCServerOptions(grpcServerOpts...))
+	// grpcServerOpts := []grpc.ServerOption{}
+	// opts = append(opts, gorums.WithGRPCServerOptions(grpcServerOpts...))
+	opts = append(opts, gorums.WithConnectCallback(func(ctx context.Context) {
+		srv.mods.EventLoop().AddEvent(replicaConnected{ctx})
+	}))
 
 	srv.gorumsSrv = gorums.NewServer(opts...)
 
@@ -184,4 +185,8 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 		impl.srv.mods.Logger().Infof("Could not get ID of replica: %v", err)
 	}
 	impl.srv.mods.EventLoop().AddEvent(timeoutMsg)
+}
+
+type replicaConnected struct {
+	ctx context.Context
 }

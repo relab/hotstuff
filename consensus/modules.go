@@ -112,6 +112,7 @@ func NewBuilder(id hotstuff.ID, privateKey PrivateKey) Builder {
 	}
 	// using a pointer here will allow settings to be readable within InitConsensusModule
 	bl.cfg.opts = &bl.mods.opts
+	bl.cfg.opts.connectionMetadata = make(map[string]string)
 	// some of the default modules need to be registered
 	bl.Register(bl.mods.votingMachine)
 	return bl
@@ -279,6 +280,8 @@ type Replica interface {
 	Vote(cert PartialCert)
 	// NewView sends the quorum certificate to the other replica.
 	NewView(SyncInfo)
+	// Metadata returns the connection metadata sent by this replica.
+	Metadata() map[string]string
 }
 
 //go:generate mockgen -destination=../internal/mocks/configuration_mock.go -package=mocks . Configuration

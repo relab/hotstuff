@@ -309,6 +309,10 @@ func (r *replica) NewView(si consensus.SyncInfo) {
 	})
 }
 
+func (r *replica) Metadata() map[string]string {
+	return r.config.network.replicas[r.id][0].modules.Options().ConnectionMetadata()
+}
+
 // NodeSet is a set of network ids.
 type NodeSet map[uint32]struct{}
 
