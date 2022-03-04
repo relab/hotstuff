@@ -3,7 +3,6 @@ package bls12
 
 import (
 	"crypto/rand"
-	"encoding/binary"
 	"fmt"
 	"math/big"
 
@@ -24,12 +23,17 @@ const (
 
 	// PublicKeyFileType is the PEM type for a public key.
 	PublicKeyFileType = "BLS12-381 PUBLIC KEY"
+
+	popMetadataKey = "bls12-pop"
 )
 
-var domain = []byte("BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_")
+var (
+	domain    = []byte("BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_")
+	domainPOP = []byte("BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_")
 
-// the order r of G1
-var curveOrder, _ = new(big.Int).SetString("73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001", 16)
+	// the order r of G1
+	curveOrder, _ = new(big.Int).SetString("73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001", 16)
+)
 
 // PublicKey is a bls12-381 public key.
 type PublicKey struct {
@@ -85,35 +89,6 @@ func (priv *PrivateKey) Public() consensus.PublicKey {
 	return &PublicKey{p: bls12.NewG1().MulScalarBig(p, &bls12.G1One, priv.p)}
 }
 
-// Signature is a bls12-381 signature.
-type Signature struct {
-	signer hotstuff.ID
-	s      *bls12.PointG2
-}
-
-// ToBytes returns the object as bytes.
-func (s *Signature) ToBytes() []byte {
-	var idBytes [4]byte
-	binary.LittleEndian.PutUint32(idBytes[:], uint32(s.signer))
-	// not sure if it is better to use compressed or uncompressed here.
-	return append(idBytes[:], bls12.NewG2().ToCompressed(s.s)...)
-}
-
-// FromBytes unmarshals a signature from a byte slice.
-func (s *Signature) FromBytes(b []byte) (err error) {
-	s.signer = hotstuff.ID(binary.LittleEndian.Uint32(b))
-	s.s, err = bls12.NewG2().FromCompressed(b[4:])
-	if err != nil {
-		return fmt.Errorf("bls12: failed to decompress signature: %w", err)
-	}
-	return nil
-}
-
-// Signer returns the ID of the replica that generated the signature.
-func (s *Signature) Signer() hotstuff.ID {
-	return s.signer
-}
-
 // AggregateSignature is a bls12-381 aggregate signature. The participants map contains the IDs of the replicas who
 // participated in the creation of the signature. This allows us to build an aggregated public key to verify the
 // signature.
@@ -165,8 +140,12 @@ func New() consensus.CryptoBase {
 
 // InitConsensusModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (bls *bls12Base) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (bls *bls12Base) InitConsensusModule(mods *consensus.Modules, opts *consensus.OptionsBuilder) {
 	bls.mods = mods
+
+	pop := bls.popProve()
+	b := bls12.NewG2().ToCompressed(pop)
+	opts.SetConnectionMetadata(popMetadataKey, string(b))
 }
 
 func (bls *bls12Base) getPrivateKey() *PrivateKey {
@@ -174,15 +153,73 @@ func (bls *bls12Base) getPrivateKey() *PrivateKey {
 	return pk.(*PrivateKey)
 }
 
+func (bls *bls12Base) subgroupCheck(point *bls12.PointG2) bool {
+	var p bls12.PointG2
+	g2 := bls12.NewG2()
+	g2.MulScalarBig(&p, point, curveOrder)
+	return g2.IsZero(&p)
+}
+
+func (bls *bls12Base) coreSign(message []byte, domainTag []byte) (*bls12.PointG2, error) {
+	pk := bls.getPrivateKey()
+	g2 := bls12.NewG2()
+	point, err := g2.HashToCurve(message, domainTag)
+	if err != nil {
+		return nil, err
+	}
+	// multiply the point by the secret key, storing the result in the same point variable
+	g2.MulScalarBig(point, point, pk.p)
+	return point, nil
+}
+
+func (bls *bls12Base) coreVerify(pubKey *PublicKey, message []byte, signature *bls12.PointG2, domainTag []byte) bool {
+	if !bls.subgroupCheck(signature) {
+		return false
+	}
+	g2 := bls12.NewG2()
+	messagePoint, err := g2.HashToCurve(message, domainTag)
+	if err != nil {
+		return false
+	}
+	engine := bls12.NewEngine()
+	engine.AddPairInv(&bls12.G1One, signature)
+	engine.AddPair(pubKey.p, messagePoint)
+	return engine.Result().IsOne()
+}
+
+func (bls *bls12Base) popProve() *bls12.PointG2 {
+	pubKey := bls.getPrivateKey().Public().(*PublicKey)
+	proof, err := bls.coreSign(pubKey.ToBytes(), domainPOP)
+	if err != nil {
+		bls.mods.Logger().Panicf("failed to generate proof of possession: %v", err)
+	}
+	return proof
+}
+
+func (bls *bls12Base) popVerify(pubKey *PublicKey, proof *bls12.PointG2) bool {
+	return bls.coreVerify(pubKey, pubKey.ToBytes(), proof, domainPOP)
+}
+
+func (bls *bls12Base) checkPop(replica consensus.Replica) bool {
+	b, ok := replica.Metadata()[popMetadataKey]
+	if !ok {
+		return false
+	}
+	p, err := bls12.NewG2().FromCompressed([]byte(b))
+	if err != nil {
+		return false
+	}
+	return bls.popVerify(replica.PublicKey().(*PublicKey), p)
+}
+
 // Sign creates a cryptographic signature of the given hash.
 func (bls *bls12Base) Sign(hash consensus.Hash) (signature consensus.QuorumSignature, err error) {
-	p, err := bls12.NewG2().HashToCurve(hash[:], domain)
+	// TODO: consider passing message to this function instead of hash
+	p, err := bls.coreSign(hash[:], domain)
 	if err != nil {
-		return nil, fmt.Errorf("bls12: hash to curve failed: %w", err)
+		return nil, fmt.Errorf("bls12: coreSign failed: %w", err)
 	}
-	pk := bls.getPrivateKey()
-	bls12.NewG2().MulScalarBig(p, p, pk.p)
-	var bf crypto.Bitfield
+	bf := crypto.Bitfield{}
 	bf.Add(bls.mods.ID())
 	return &AggregateSignature{sig: *p, participants: bf}, nil
 }
@@ -233,6 +270,10 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 			return false
 		}
 
+		if !bls.checkPop(replica) {
+			valid = false
+			return false
+		}
 		pk := replica.PublicKey().(*PublicKey)
 
 		var (
