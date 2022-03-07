@@ -17,7 +17,7 @@ func TestLocalTimeout(t *testing.T) {
 	qc := consensus.NewQuorumCert(nil, 0, consensus.GetGenesis().Hash())
 	key := testutil.GenerateECDSAKey(t)
 	builder := consensus.NewBuilder(2, key)
-	testutil.TestModules(t, ctrl, 2, key, builder)
+	testutil.TestModules(t, ctrl, 2, key, &builder)
 	hs := mocks.NewMockConsensus(ctrl)
 	s := New(testutil.FixedTimeout(10))
 	builder.Register(hs, s)

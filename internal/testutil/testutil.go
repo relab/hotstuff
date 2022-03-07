@@ -24,7 +24,7 @@ import (
 )
 
 // TestModules registers default modules for testing to the given builder.
-func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey consensus.PrivateKey, builder consensus.Builder) {
+func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey consensus.PrivateKey, builder *consensus.Builder) {
 	t.Helper()
 
 	acceptor := mocks.NewMockAcceptor(ctrl)
@@ -122,7 +122,7 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...consen
 		}
 
 		builder := network.GetNodeBuilder(twins.NodeID{ReplicaID: id, NetworkID: uint32(id)}, key)
-		TestModules(t, ctrl, id, key, builder)
+		TestModules(t, ctrl, id, key, &builder)
 		builder.Register(network.NewConfiguration())
 		builders[i] = &builder
 	}

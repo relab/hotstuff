@@ -38,6 +38,7 @@ func TestOrchestration(t *testing.T) {
 				MaxConcurrent:  250,
 				PayloadSize:    100,
 				RateLimit:      math.Inf(1),
+				Timeout:        durationpb.New(500 * time.Millisecond),
 			},
 			ReplicaOpts: &orchestrationpb.ReplicaOpts{
 				BatchSize:         100,
