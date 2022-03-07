@@ -84,6 +84,8 @@ message ClientOpts {
   double RateStep = 12;
   // How often to increase the rate limit.
   google.protobuf.Duration RateStepInterval = 13;
+  // The timeout for a command.
+  google.protobuf.Duration Timeout = 14;
 }
 
 // ReplicaConfiguration is a configuration of replicas.

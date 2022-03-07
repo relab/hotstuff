@@ -280,7 +280,6 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		w.metricsLogger.Log(opts)
 
 		c := client.Config{
-			ID:            hotstuff.ID(opts.GetID()),
 			TLS:           opts.GetUseTLS(),
 			RootCAs:       cp,
 			MaxConcurrent: opts.GetMaxConcurrent(),
@@ -293,8 +292,9 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateLimit:        opts.GetRateLimit(),
 			RateStep:         opts.GetRateStep(),
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
+			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		mods := modules.NewBuilder(c.ID)
+		mods := modules.NewBuilder(hotstuff.ID(opts.GetID()))
 
 		if w.measurementInterval > 0 {
 			clientMetrics := metrics.GetClientMetrics(w.metrics...)
@@ -303,7 +303,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		}
 
 		mods.Register(w.metricsLogger)
-		mods.Register(logging.New("cli" + strconv.Itoa(int(c.ID))))
+		mods.Register(logging.New("cli" + strconv.Itoa(int(opts.GetID()))))
 		cli := client.New(c, mods)
 		cfg, err := getConfiguration(req.GetConfiguration(), true)
 		if err != nil {
@@ -314,7 +314,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			return nil, err
 		}
 		cli.Start()
-		w.metricsLogger.Log(&types.StartEvent{Event: types.NewClientEvent(uint32(c.ID), time.Now())})
+		w.metricsLogger.Log(&types.StartEvent{Event: types.NewClientEvent(opts.GetID(), time.Now())})
 		w.clients[hotstuff.ID(opts.GetID())] = cli
 	}
 	return &orchestrationpb.StartClientResponse{}, nil

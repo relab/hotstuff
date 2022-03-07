@@ -49,6 +49,7 @@ func init() {
 	runCmd.Flags().Int("batch-size", 1, "number of commands to batch together in each block")
 	runCmd.Flags().Int("payload-size", 0, "size in bytes of the command payload")
 	runCmd.Flags().Int("max-concurrent", 4, "maximum number of conccurrent commands per client")
+	runCmd.Flags().Duration("client-timeout", 500*time.Millisecond, "Client timeout.")
 	runCmd.Flags().Duration("duration", 10*time.Second, "duration of the experiment")
 	runCmd.Flags().Duration("connect-timeout", 5*time.Second, "duration of the initial connection timeout")
 	runCmd.Flags().Duration("view-timeout", 100*time.Millisecond, "duration of the first view")
@@ -122,6 +123,7 @@ func runController() {
 			RateLimit:        viper.GetFloat64("rate-limit"),
 			RateStep:         viper.GetFloat64("rate-step"),
 			RateStepInterval: durationpb.New(viper.GetDuration("rate-step-interval")),
+			Timeout:          durationpb.New(viper.GetDuration("client-timeout")),
 		},
 	}
 
