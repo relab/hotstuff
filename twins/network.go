@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
@@ -14,7 +15,6 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
@@ -41,7 +41,7 @@ type node struct {
 }
 
 // Network is a simulated network that supports twins.
-type network struct {
+type Network struct {
 	nodes map[uint32]*node
 	// Maps a replica ID to a replica and its twins.
 	replicas map[hotstuff.ID][]*node
@@ -55,10 +55,19 @@ type network struct {
 	log strings.Builder
 }
 
-// newNetwork creates a new Network with the specified partitions.
+// NewSimpleNetwork creates a simple network.
+func NewSimpleNetwork() *Network {
+	return &Network{
+		nodes:     make(map[uint32]*node),
+		replicas:  make(map[hotstuff.ID][]*node),
+		dropTypes: make(map[reflect.Type]struct{}),
+	}
+}
+
+// NewPartitionedNetwork creates a new Network with the specified partitions.
 // partitions specifies the network partitions for each view.
-func newNetwork(rounds []View, dropTypes ...interface{}) *network {
-	n := &network{
+func NewPartitionedNetwork(rounds []View, dropTypes ...interface{}) *Network {
+	n := &Network{
 		nodes:     make(map[uint32]*node),
 		replicas:  make(map[hotstuff.ID][]*node),
 		views:     rounds,
@@ -71,23 +80,32 @@ func newNetwork(rounds []View, dropTypes ...interface{}) *network {
 	return n
 }
 
-func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName string) error {
+// GetNodeBuilder returns a consensus.Builder instance for a node in the network.
+func (n *Network) GetNodeBuilder(id NodeID, pk consensus.PrivateKey) consensus.Builder {
+	node := node{
+		id: id,
+	}
+	n.nodes[id.NetworkID] = &node
+	n.replicas[id.ReplicaID] = append(n.replicas[id.ReplicaID], &node)
+	builder := consensus.NewBuilder(id.ReplicaID, pk)
+	// register node as an anonymous module because that allows configuration to obtain it.
+	builder.Register(&node)
+	return builder
+}
+
+func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusName string) error {
 	cg := &commandGenerator{}
-	keys := make(map[hotstuff.ID]consensus.PrivateKey)
 	for _, nodeID := range nodes {
-		pk, ok := keys[nodeID.ReplicaID]
-		if !ok {
-			var err error
-			pk, err = keygen.GenerateECDSAPrivateKey()
-			if err != nil {
-				return err
-			}
-			keys[nodeID.ReplicaID] = pk
+
+		var err error
+		pk, err := keygen.GenerateECDSAPrivateKey()
+		if err != nil {
+			return err
 		}
-		node := node{
-			id: nodeID,
-		}
-		builder := consensus.NewBuilder(nodeID.ReplicaID, pk)
+
+		builder := n.GetNodeBuilder(nodeID, pk)
+		node := n.nodes[nodeID.NetworkID]
+
 		var consensusModule consensus.Rules
 		if !modules.GetModule(consensusName, &consensusModule) {
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
@@ -97,23 +115,19 @@ func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName s
 			blockchain.New(),
 			consensus.New(consensusModule),
 			crypto.NewCache(ecdsa.New(), 100),
-			synchronizer.New(testutil.FixedTimeout(0)),
-			&configuration{
-				node:    &node,
-				network: n,
-			},
+			synchronizer.New(FixedTimeout(0)),
+			n.NewConfiguration(),
 			leaderRotation(scenario),
-			commandModule{commandGenerator: cg, node: &node},
+			commandModule{commandGenerator: cg, node: node},
 		)
 		builder.OptionsBuilder().SetShouldVerifyVotesSync()
 		node.modules = builder.Build()
-		n.nodes[nodeID.NetworkID] = &node
-		n.replicas[nodeID.ReplicaID] = append(n.replicas[nodeID.ReplicaID], &node)
 	}
 	return nil
 }
 
-func (n *network) run(rounds int) {
+// Run runs the nodes for the specified number of rounds.
+func (n *Network) Run(rounds int) {
 	// kick off the initial proposal(s)
 	for _, node := range n.nodes {
 		if node.modules.LeaderRotation().GetLeader(1) == node.id.ReplicaID {
@@ -122,12 +136,12 @@ func (n *network) run(rounds int) {
 	}
 
 	for view := consensus.View(0); view <= consensus.View(rounds); view++ {
-		n.round(view)
+		n.Round(view)
 	}
 }
 
-// round performs one round for each node
-func (n *network) round(view consensus.View) {
+// Round performs one round for each node.
+func (n *Network) Round(view consensus.View) {
 	n.logger.Infof("Starting round %d", view)
 
 	for _, node := range n.nodes {
@@ -155,7 +169,12 @@ func (n *network) round(view consensus.View) {
 
 // shouldDrop decides if the sender should drop the message, based on the current view of the sender and the
 // partitions configured for that view.
-func (n *network) shouldDrop(sender, receiver uint32, message interface{}) bool {
+func (n *Network) shouldDrop(sender, receiver uint32, message interface{}) bool {
+	// if no partitions are specified for any view, we will allow all messages
+	if n.views == nil {
+		return false
+	}
+
 	node, ok := n.nodes[sender]
 	if !ok {
 		panic(fmt.Errorf("node matching sender id %d was not found", sender))
@@ -181,9 +200,22 @@ func (n *network) shouldDrop(sender, receiver uint32, message interface{}) bool 
 	return ok
 }
 
+// NewConfiguration returns a new Configuration module for this network.
+func (n *Network) NewConfiguration() consensus.Configuration {
+	return &configuration{network: n}
+}
+
 type configuration struct {
 	node    *node
-	network *network
+	network *Network
+}
+
+// alternative way to get a pointer to the node.
+func (c *configuration) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+	if c.node == nil {
+		mods.GetModuleByType(&c.node)
+		c.node.modules = mods
+	}
 }
 
 func (c *configuration) broadcastMessage(message interface{}) {
@@ -354,3 +386,17 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 	}
 	return nil
 }
+
+// FixedTimeout returns an ExponentialTimeout with a max exponent of 0.
+func FixedTimeout(timeout time.Duration) synchronizer.ViewDuration {
+	return fixedDuration{timeout}
+}
+
+type fixedDuration struct {
+	timeout time.Duration
+}
+
+func (d fixedDuration) Duration() time.Duration { return d.timeout }
+func (d fixedDuration) ViewStarted()            {}
+func (d fixedDuration) ViewSucceeded()          {}
+func (d fixedDuration) ViewTimeout()            {}

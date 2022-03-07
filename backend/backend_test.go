@@ -26,7 +26,8 @@ func TestConnect(t *testing.T) {
 		const n = 4
 		ctrl := gomock.NewController(t)
 		td := setup(t, ctrl, n)
-		builder := testutil.TestModules(t, ctrl, 1, td.keys[0])
+		builder := consensus.NewBuilder(1, td.keys[0])
+		testutil.TestModules(t, ctrl, 1, td.keys[0], builder)
 		teardown := createServers(t, td, ctrl)
 		defer teardown()
 		td.builders.Build()

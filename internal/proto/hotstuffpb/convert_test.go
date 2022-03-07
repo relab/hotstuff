@@ -14,7 +14,9 @@ import (
 func TestConvertPartialCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	builder := testutil.TestModules(t, ctrl, 1, testutil.GenerateECDSAKey(t))
+	key := testutil.GenerateECDSAKey(t)
+	builder := consensus.NewBuilder(1, key)
+	testutil.TestModules(t, ctrl, 1, key, builder)
 	hs := builder.Build()
 	signer := hs.Crypto()
 
