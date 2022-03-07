@@ -21,6 +21,7 @@ import (
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
@@ -198,6 +199,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		sync,
 		w.metricsLogger,
 		blockchain.New(),
+		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
 
 	builder.OptionsBuilder().SetSharedRandomSeed(opts.GetSharedSeed())
@@ -301,6 +303,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		}
 
 		mods.Register(w.metricsLogger)
+		mods.Register(logging.New("cli" + strconv.Itoa(int(c.ID))))
 		cli := client.New(c, mods)
 		cfg, err := getConfiguration(req.GetConfiguration(), true)
 		if err != nil {

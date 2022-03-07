@@ -9,7 +9,6 @@ import (
 	"errors"
 	"io"
 	"math"
-	"strconv"
 	"sync"
 	"time"
 
@@ -18,7 +17,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
@@ -77,7 +75,6 @@ type Client struct {
 
 // New returns a new Client.
 func New(conf Config, builder modules.Builder) (client *Client) {
-	builder.Register(logging.New("cli" + strconv.Itoa(int(conf.ID))))
 	mods := builder.Build()
 
 	client = &Client{
