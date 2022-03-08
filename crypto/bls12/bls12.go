@@ -2,9 +2,12 @@
 package bls12
 
 import (
+	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
 	"math/big"
+	"sync"
 
 	bls12 "github.com/kilic/bls12-381"
 	"github.com/relab/hotstuff"
@@ -131,11 +134,16 @@ func (agg AggregateSignature) Bitfield() crypto.Bitfield {
 
 type bls12Base struct {
 	mods *consensus.Modules
+
+	mut      sync.RWMutex
+	popCache map[consensus.Hash]bool
 }
 
 // New returns a new instance of the BLS12 CryptoBase implementation.
 func New() consensus.CryptoBase {
-	return &bls12Base{}
+	return &bls12Base{
+		popCache: make(map[consensus.Hash]bool),
+	}
 }
 
 // InitConsensusModule gives the module a reference to the Modules object.
@@ -200,17 +208,43 @@ func (bls *bls12Base) popVerify(pubKey *PublicKey, proof *bls12.PointG2) bool {
 	return bls.coreVerify(pubKey, pubKey.ToBytes(), proof, domainPOP)
 }
 
-func (bls *bls12Base) checkPop(replica consensus.Replica) bool {
+func (bls *bls12Base) checkPop(replica consensus.Replica) (valid bool) {
+	defer func() {
+		if !valid {
+			bls.mods.Logger().Debugf("Invalid proof-of-possession for replica %d", replica.ID())
+		}
+	}()
+
 	b, ok := replica.Metadata()[popMetadataKey]
 	if !ok {
 		bls.mods.Logger().Debugf("Missing proof-of-possession for replica: %d", replica.ID())
 		return false
 	}
+
+	var buf bytes.Buffer
+	buf.WriteString(b)
+	_, _ = buf.Write(replica.PublicKey().(*PublicKey).ToBytes())
+	hash := sha256.Sum256(buf.Bytes())
+
+	bls.mut.RLock()
+	valid, ok = bls.popCache[hash]
+	bls.mut.RUnlock()
+	if ok {
+		return valid
+	}
+
 	p, err := bls12.NewG2().FromCompressed([]byte(b))
 	if err != nil {
 		return false
 	}
-	return bls.popVerify(replica.PublicKey().(*PublicKey), p)
+
+	valid = bls.popVerify(replica.PublicKey().(*PublicKey), p)
+
+	bls.mut.Lock()
+	bls.popCache[hash] = valid
+	bls.mut.Unlock()
+
+	return valid
 }
 
 // Sign creates a cryptographic signature of the given hash.
