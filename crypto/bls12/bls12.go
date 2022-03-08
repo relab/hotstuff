@@ -203,6 +203,7 @@ func (bls *bls12Base) popVerify(pubKey *PublicKey, proof *bls12.PointG2) bool {
 func (bls *bls12Base) checkPop(replica consensus.Replica) bool {
 	b, ok := replica.Metadata()[popMetadataKey]
 	if !ok {
+		bls.mods.Logger().Debugf("Missing proof-of-possession for replica: %d", replica.ID())
 		return false
 	}
 	p, err := bls12.NewG2().FromCompressed([]byte(b))
@@ -270,7 +271,7 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 			return false
 		}
 
-		if !bls.checkPop(replica) {
+		if replica.ID() != bls.mods.ID() && !bls.checkPop(replica) {
 			valid = false
 			return false
 		}
