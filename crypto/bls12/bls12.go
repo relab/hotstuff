@@ -2,11 +2,10 @@
 package bls12
 
 import (
-	"bytes"
 	"crypto/rand"
-	"crypto/sha256"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 
 	bls12 "github.com/kilic/bls12-381"
@@ -136,13 +135,13 @@ type bls12Base struct {
 	mods *consensus.Modules
 
 	mut      sync.RWMutex
-	popCache map[consensus.Hash]bool
+	popCache map[string]bool
 }
 
 // New returns a new instance of the BLS12 CryptoBase implementation.
 func New() consensus.CryptoBase {
 	return &bls12Base{
-		popCache: make(map[consensus.Hash]bool),
+		popCache: make(map[string]bool),
 	}
 }
 
@@ -221,13 +220,12 @@ func (bls *bls12Base) checkPop(replica consensus.Replica) (valid bool) {
 		return false
 	}
 
-	var buf bytes.Buffer
-	buf.WriteString(b)
-	_, _ = buf.Write(replica.PublicKey().(*PublicKey).ToBytes())
-	hash := sha256.Sum256(buf.Bytes())
+	var key strings.Builder
+	key.WriteString(b)
+	_, _ = key.Write(replica.PublicKey().(*PublicKey).ToBytes())
 
 	bls.mut.RLock()
-	valid, ok = bls.popCache[hash]
+	valid, ok = bls.popCache[key.String()]
 	bls.mut.RUnlock()
 	if ok {
 		return valid
@@ -241,7 +239,7 @@ func (bls *bls12Base) checkPop(replica consensus.Replica) (valid bool) {
 	valid = bls.popVerify(replica.PublicKey().(*PublicKey), p)
 
 	bls.mut.Lock()
-	bls.popCache[hash] = valid
+	bls.popCache[key.String()] = valid
 	bls.mut.Unlock()
 
 	return valid
