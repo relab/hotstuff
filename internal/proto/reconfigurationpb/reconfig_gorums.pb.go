@@ -2,14 +2,15 @@
 // versions:
 // 	protoc-gen-gorums v0.7.0-devel
 // 	protoc            v3.17.3
-// source: internal/proto/hotstuffpb/hotstuff.proto
+// source: internal/proto/reconfigurationpb/reconfig.proto
 
-package hotstuffpb
+package reconfigurationpb
 
 import (
 	context "context"
 	fmt "fmt"
 	gorums "github.com/relab/gorums"
+	hotstuffpb "github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	orchestrationpb "github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	encoding "google.golang.org/grpc/encoding"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -148,194 +149,72 @@ type Node struct {
 // Reference imports to suppress errors if they are not otherwise used.
 var _ emptypb.Empty
 
-// Propose is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (c *Configuration) Propose(ctx context.Context, in *Proposal, opts ...gorums.CallOption) {
-	cd := gorums.QuorumCallData{
-		Message: in,
-		Method:  "hotstuffpb.Hotstuff.Propose",
-	}
-
-	c.RawConfiguration.Multicast(ctx, cd, opts...)
-}
-
-// Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
-
-// Timeout is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (c *Configuration) Timeout(ctx context.Context, in *TimeoutMsg, opts ...gorums.CallOption) {
-	cd := gorums.QuorumCallData{
-		Message: in,
-		Method:  "hotstuffpb.Hotstuff.Timeout",
-	}
-
-	c.RawConfiguration.Multicast(ctx, cd, opts...)
-}
-
-// Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
-
 // ReconfigureStart RPC is called by the orchestrator on replicas to start participating in the proposal.
 // ReconfigureReport contains the highest QC and View from the previous configuration
-func (c *Configuration) ReconfigureRestart(ctx context.Context, in *SyncInfo, opts ...gorums.CallOption) {
+func (c *Configuration) ReconfigureStart(ctx context.Context, in *hotstuffpb.SyncInfo, opts ...gorums.CallOption) {
 	cd := gorums.QuorumCallData{
 		Message: in,
-		Method:  "hotstuffpb.Hotstuff.ReconfigureRestart",
+		Method:  "reconfigurationpb.Reconfiguration.ReconfigureStart",
 	}
 
 	c.RawConfiguration.Multicast(ctx, cd, opts...)
 }
 
-// QuorumSpec is the interface of quorum functions for Hotstuff.
+// QuorumSpec is the interface of quorum functions for Reconfiguration.
 type QuorumSpec interface {
 	gorums.ConfigOption
 
-	// FetchQF is the quorum function for the Fetch
+	// ReconfigureQF is the quorum function for the Reconfigure
 	// quorum call method. The in parameter is the request object
-	// supplied to the Fetch method at call time, and may or may not
-	// be used by the quorum function. If the in parameter is not needed
-	// you should implement your quorum function with '_ *BlockHash'.
-	FetchQF(in *BlockHash, replies map[uint32]*Block) (*Block, bool)
-
-	// ReconfigureStartQF is the quorum function for the ReconfigureStart
-	// quorum call method. The in parameter is the request object
-	// supplied to the ReconfigureStart method at call time, and may or may not
+	// supplied to the Reconfigure method at call time, and may or may not
 	// be used by the quorum function. If the in parameter is not needed
 	// you should implement your quorum function with '_ *orchestrationpb.ReconfigurationRequest'.
-	ReconfigureStartQF(in *orchestrationpb.ReconfigurationRequest, replies map[uint32]*SyncInfo) (*SyncInfo, bool)
-}
-
-// Fetch is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (c *Configuration) Fetch(ctx context.Context, in *BlockHash) (resp *Block, err error) {
-	cd := gorums.QuorumCallData{
-		Message: in,
-		Method:  "hotstuffpb.Hotstuff.Fetch",
-	}
-	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
-		r := make(map[uint32]*Block, len(replies))
-		for k, v := range replies {
-			r[k] = v.(*Block)
-		}
-		return c.qspec.FetchQF(req.(*BlockHash), r)
-	}
-
-	res, err := c.RawConfiguration.QuorumCall(ctx, cd)
-	if err != nil {
-		return nil, err
-	}
-	return res.(*Block), err
+	ReconfigureQF(in *orchestrationpb.ReconfigurationRequest, replies map[uint32]*hotstuffpb.SyncInfo) (*hotstuffpb.SyncInfo, bool)
 }
 
 // Reconfigure RPC is the rpc called by the Orcchestrator to the replicas.
-func (c *Configuration) ReconfigureStart(ctx context.Context, in *orchestrationpb.ReconfigurationRequest) (resp *SyncInfo, err error) {
+func (c *Configuration) Reconfigure(ctx context.Context, in *orchestrationpb.ReconfigurationRequest) (resp *hotstuffpb.SyncInfo, err error) {
 	cd := gorums.QuorumCallData{
 		Message: in,
-		Method:  "hotstuffpb.Hotstuff.ReconfigureStart",
+		Method:  "reconfigurationpb.Reconfiguration.Reconfigure",
 	}
 	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
-		r := make(map[uint32]*SyncInfo, len(replies))
+		r := make(map[uint32]*hotstuffpb.SyncInfo, len(replies))
 		for k, v := range replies {
-			r[k] = v.(*SyncInfo)
+			r[k] = v.(*hotstuffpb.SyncInfo)
 		}
-		return c.qspec.ReconfigureStartQF(req.(*orchestrationpb.ReconfigurationRequest), r)
+		return c.qspec.ReconfigureQF(req.(*orchestrationpb.ReconfigurationRequest), r)
 	}
 
 	res, err := c.RawConfiguration.QuorumCall(ctx, cd)
 	if err != nil {
 		return nil, err
 	}
-	return res.(*SyncInfo), err
+	return res.(*hotstuffpb.SyncInfo), err
 }
 
-// Hotstuff is the server-side API for the Hotstuff Service
-type Hotstuff interface {
-	Propose(ctx gorums.ServerCtx, request *Proposal)
-	Vote(ctx gorums.ServerCtx, request *PartialCert)
-	Timeout(ctx gorums.ServerCtx, request *TimeoutMsg)
-	NewView(ctx gorums.ServerCtx, request *SyncInfo)
-	Fetch(ctx gorums.ServerCtx, request *BlockHash) (response *Block, err error)
-	ReconfigureStart(ctx gorums.ServerCtx, request *orchestrationpb.ReconfigurationRequest) (response *SyncInfo, err error)
-	ReconfigureRestart(ctx gorums.ServerCtx, request *SyncInfo)
+// Reconfiguration is the server-side API for the Reconfiguration Service
+type Reconfiguration interface {
+	Reconfigure(ctx gorums.ServerCtx, request *orchestrationpb.ReconfigurationRequest) (response *hotstuffpb.SyncInfo, err error)
+	ReconfigureStart(ctx gorums.ServerCtx, request *hotstuffpb.SyncInfo)
 }
 
-func RegisterHotstuffServer(srv *gorums.Server, impl Hotstuff) {
-	srv.RegisterHandler("hotstuffpb.Hotstuff.Propose", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*Proposal)
-		defer ctx.Release()
-		impl.Propose(ctx, req)
-	})
-	srv.RegisterHandler("hotstuffpb.Hotstuff.Vote", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*PartialCert)
-		defer ctx.Release()
-		impl.Vote(ctx, req)
-	})
-	srv.RegisterHandler("hotstuffpb.Hotstuff.Timeout", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*TimeoutMsg)
-		defer ctx.Release()
-		impl.Timeout(ctx, req)
-	})
-	srv.RegisterHandler("hotstuffpb.Hotstuff.NewView", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*SyncInfo)
-		defer ctx.Release()
-		impl.NewView(ctx, req)
-	})
-	srv.RegisterHandler("hotstuffpb.Hotstuff.Fetch", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
-		req := in.Message.(*BlockHash)
-		defer ctx.Release()
-		resp, err := impl.Fetch(ctx, req)
-		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
-	})
-	srv.RegisterHandler("hotstuffpb.Hotstuff.ReconfigureStart", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
+func RegisterReconfigurationServer(srv *gorums.Server, impl Reconfiguration) {
+	srv.RegisterHandler("reconfigurationpb.Reconfiguration.Reconfigure", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*orchestrationpb.ReconfigurationRequest)
 		defer ctx.Release()
-		resp, err := impl.ReconfigureStart(ctx, req)
+		resp, err := impl.Reconfigure(ctx, req)
 		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
 	})
-	srv.RegisterHandler("hotstuffpb.Hotstuff.ReconfigureRestart", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*SyncInfo)
+	srv.RegisterHandler("reconfigurationpb.Reconfiguration.ReconfigureStart", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
+		req := in.Message.(*hotstuffpb.SyncInfo)
 		defer ctx.Release()
-		impl.ReconfigureRestart(ctx, req)
+		impl.ReconfigureStart(ctx, req)
 	})
-}
-
-type internalBlock struct {
-	nid   uint32
-	reply *Block
-	err   error
 }
 
 type internalSyncInfo struct {
 	nid   uint32
-	reply *SyncInfo
+	reply *hotstuffpb.SyncInfo
 	err   error
-}
-
-// Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
-
-// Vote is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (n *Node) Vote(ctx context.Context, in *PartialCert, opts ...gorums.CallOption) {
-	cd := gorums.CallData{
-		Message: in,
-		Method:  "hotstuffpb.Hotstuff.Vote",
-	}
-
-	n.RawNode.Unicast(ctx, cd, opts...)
-}
-
-// Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
-
-// NewView is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (n *Node) NewView(ctx context.Context, in *SyncInfo, opts ...gorums.CallOption) {
-	cd := gorums.CallData{
-		Message: in,
-		Method:  "hotstuffpb.Hotstuff.NewView",
-	}
-
-	n.RawNode.Unicast(ctx, cd, opts...)
 }

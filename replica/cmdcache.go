@@ -7,6 +7,7 @@ import (
 
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	orchpb "github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/modules"
 	"google.golang.org/protobuf/proto"
 )
@@ -52,6 +53,13 @@ func (c *cmdCache) addCommand(cmd *clientpb.Command) {
 		default:
 		}
 	}
+}
+
+func (c *cmdCache) addReconfigCommand(req *orchpb.ReconfigurationRequest) {
+	c.mut.Lock()
+	defer c.mut.Unlock()
+	c.cache.PushBack(req)
+	// No need to send command as the get is not invoked until the event is processed.
 }
 
 // Get returns a batch of commands to propose.

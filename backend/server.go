@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
+	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -42,6 +43,7 @@ func NewServer(opts ...gorums.ServerOption) *Server {
 	srv.gorumsSrv = gorums.NewServer(opts...)
 
 	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, &serviceImpl{srv})
+
 	return srv
 }
 
@@ -184,4 +186,26 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 		impl.srv.mods.Logger().Infof("Could not get ID of replica: %v", err)
 	}
 	impl.srv.mods.EventLoop().AddEvent(timeoutMsg)
+}
+
+func (impl *serviceImpl) ReconfigureStart(ctx gorums.ServerCtx,
+	request *orchestrationpb.ReconfigurationRequest) (response *hotstuffpb.SyncInfo, err error) {
+	/*for id, state := range request.Replicas {
+		if id == uint32(impl.srv.mods.ID()) {
+			replica, ok := impl.srv.mods.Configuration().Replica(impl.srv.mods.ID())
+			if ok {
+				replica.SetReplicaState(hotstuff.ReplicaState(state))
+			} else {
+				return nil, status.Error(codes.NotFound, "Replica is not available in any configuration")
+			}
+			break
+		}
+	}*/
+	impl.srv.mods.Synchronizer().Stop()
+	impl.srv.mods.Configuration().UpdateConfigurations(request.Replicas)
+	return hotstuffpb.SyncInfoToProto(impl.srv.mods.Synchronizer().SyncInfo()), nil
+}
+
+func (impl *serviceImpl) ReconfigureRestart(ctx gorums.ServerCtx, request *hotstuffpb.SyncInfo) {
+	impl.srv.mods.Synchronizer().OnRestart(hotstuffpb.SyncInfoFromProto(request))
 }

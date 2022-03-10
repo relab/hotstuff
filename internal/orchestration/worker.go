@@ -109,7 +109,6 @@ func (w *Worker) createReplicas(req *orchestrationpb.CreateReplicaRequest) (*orc
 		if err != nil {
 			return nil, fmt.Errorf("failed to create replica: %w", err)
 		}
-
 		// set up listeners and get the ports
 		replicaListener, err := net.Listen("tcp", ":0")
 		if err != nil {
@@ -136,12 +135,14 @@ func (w *Worker) createReplicas(req *orchestrationpb.CreateReplicaRequest) (*orc
 			PublicKey:   cfg.GetPublicKey(),
 			ReplicaPort: replicaPort,
 			ClientPort:  clientPort,
+			State:       cfg.State,
 		}
 	}
 	return resp, nil
 }
 
-func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Replica, error) {
+func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts,
+) (*replica.Replica, error) {
 	w.metricsLogger.Log(opts)
 
 	// get private key and certificates
@@ -179,18 +180,20 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
 	}
 
-	var leaderRotation consensus.LeaderRotation
-	if !modules.GetModule(opts.GetLeaderRotation(), &leaderRotation) {
-		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
-	}
-
 	sync := synchronizer.New(synchronizer.NewViewDuration(
 		uint64(opts.GetTimeoutSamples()),
 		float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
 		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
 		float64(opts.GetTimeoutMultiplier()),
 	))
-
+	// TODO(hanish): only fixed type is supported for orchestrators
+	var leaderRotation consensus.LeaderRotation
+	if hotstuff.ReplicaState(opts.State) == hotstuff.Orchestrator {
+		modules.GetModule("fixed", &leaderRotation)
+		sync = synchronizer.NewOrchSynchronizer()
+	} else if !modules.GetModule(opts.GetLeaderRotation(), &leaderRotation) {
+		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
+	}
 	builder.Register(
 		consensus.New(consensusRules),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
@@ -219,8 +222,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 			gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
 		},
+		State: hotstuff.ReplicaState(opts.GetState()),
 	}
-
 	return replica.New(c, builder), nil
 }
 
@@ -230,7 +233,8 @@ func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orche
 		if !ok {
 			return nil, status.Errorf(codes.NotFound, "The replica with ID %d was not found.", id)
 		}
-		cfg, err := getConfiguration(req.GetConfiguration(), false)
+		cfg, err := GetConfiguration(req.GetConfiguration(), false)
+
 		if err != nil {
 			return nil, err
 		}
@@ -266,9 +270,10 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 	ca := req.GetCertificateAuthority()
 	cp := x509.NewCertPool()
 	cp.AppendCertsFromPEM(ca)
+	replicas, _ := GetConfiguration(req.GetConfiguration(), true)
+
 	for _, opts := range req.GetClients() {
 		w.metricsLogger.Log(opts)
-
 		c := client.Config{
 			ID:            hotstuff.ID(opts.GetID()),
 			TLS:           opts.GetUseTLS(),
@@ -283,6 +288,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateLimit:        opts.GetRateLimit(),
 			RateStep:         opts.GetRateStep(),
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
+			Replicas:         replicas,
 		}
 		mods := modules.NewBuilder(c.ID)
 
@@ -294,11 +300,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 
 		mods.Register(w.metricsLogger)
 		cli := client.New(c, mods)
-		cfg, err := getConfiguration(req.GetConfiguration(), true)
-		if err != nil {
-			return nil, err
-		}
-		err = cli.Connect(cfg)
+		err := cli.Connect()
 		if err != nil {
 			return nil, err
 		}
@@ -320,8 +322,8 @@ func (w *Worker) stopClients(req *orchestrationpb.StopClientRequest) (*orchestra
 	return &orchestrationpb.StopClientResponse{}, nil
 }
 
-func getConfiguration(conf map[uint32]*orchestrationpb.ReplicaInfo, client bool) ([]backend.ReplicaInfo, error) {
-	replicas := make([]backend.ReplicaInfo, 0, len(conf))
+func GetConfiguration(conf map[uint32]*orchestrationpb.ReplicaInfo, client bool) ([]backend.ReplicaInfo, error) {
+	replicas := make([]backend.ReplicaInfo, 0)
 	for _, replica := range conf {
 		pubKey, err := keygen.ParsePublicKey(replica.GetPublicKey())
 		if err != nil {
@@ -334,9 +336,10 @@ func getConfiguration(conf map[uint32]*orchestrationpb.ReplicaInfo, client bool)
 			addr = net.JoinHostPort(replica.GetAddress(), strconv.Itoa(int(replica.GetReplicaPort())))
 		}
 		replicas = append(replicas, backend.ReplicaInfo{
-			ID:      hotstuff.ID(replica.GetID()),
-			Address: addr,
-			PubKey:  pubKey,
+			ID:        hotstuff.ID(replica.GetID()),
+			Address:   addr,
+			PubKey:    pubKey,
+			NodeState: hotstuff.ReplicaState(replica.State),
 		})
 	}
 	return replicas, nil

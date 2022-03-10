@@ -30,6 +30,18 @@ type TimeoutMsg struct {
 	SyncInfo      SyncInfo    // The highest QC/TC known to the sender.
 }
 
+type ReconfigurationEvent struct {
+	Replicas map[hotstuff.ID]hotstuff.ReplicaState
+}
+
+type ReconfigurationStartEvent struct {
+	Replicas map[hotstuff.ID]hotstuff.ReplicaState
+}
+
+type ReconfigurationRestartEvent struct {
+	SyncInfo SyncInfo
+}
+
 // Hash returns a hash of the timeout message.
 func (timeout TimeoutMsg) Hash() Hash {
 	var h Hash

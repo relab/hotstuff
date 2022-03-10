@@ -8,8 +8,10 @@ import (
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	orchpb "github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/modules"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -44,6 +46,15 @@ func (srv *clientSrv) InitModule(mods *modules.Modules) {
 	srv.cmdCache.InitModule(mods)
 }
 
+func (srv *clientSrv) ReconfigureRequest(ctx gorums.ServerCtx,
+	req *orchpb.ReconfigurationRequest) {
+	replicas := make(map[hotstuff.ID]hotstuff.ReplicaState)
+	for id, state := range req.Replicas {
+		replicas[hotstuff.ID(id)] = hotstuff.ReplicaState(state)
+	}
+	srv.cmdCache.addReconfigCommand(req)
+	srv.mods.EventLoop().AddEvent(consensus.ReconfigurationEvent{Replicas: replicas})
+}
 func (srv *clientSrv) Start(addr string) error {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {

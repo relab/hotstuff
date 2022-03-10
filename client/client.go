@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"math"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -18,6 +19,8 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
+	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"golang.org/x/time/rate"
@@ -55,24 +58,27 @@ type Config struct {
 	RateLimit        float64       // initial rate limit
 	RateStep         float64       // rate limit step up
 	RateStepInterval time.Duration // step up interval
+	Replicas         []backend.ReplicaInfo
 }
 
 // Client is a hotstuff client.
 type Client struct {
-	mut              sync.Mutex
-	id               hotstuff.ID
-	mods             *modules.Modules
-	mgr              *clientpb.Manager
-	gorumsConfig     *clientpb.Configuration
-	payloadSize      uint32
-	highestCommitted uint64 // highest sequence number acknowledged by the replicas
-	pendingCmds      chan pendingCmd
-	cancel           context.CancelFunc
-	done             chan struct{}
-	reader           io.ReadCloser
-	limiter          *rate.Limiter
-	stepUp           float64
-	stepUpInterval   time.Duration
+	mut                sync.Mutex
+	id                 hotstuff.ID
+	mods               *modules.Modules
+	nodeMgr            *clientpb.Manager
+	activeNodeConfig   *clientpb.Configuration
+	payloadSize        uint32
+	highestCommitted   uint64 // highest sequence number acknowledged by the replicas
+	pendingCmds        chan pendingCmd
+	cancel             context.CancelFunc
+	done               chan struct{}
+	reader             io.ReadCloser
+	limiter            *rate.Limiter
+	stepUp             float64
+	stepUpInterval     time.Duration
+	orchestratorConfig *clientpb.Configuration
+	replicas           []backend.ReplicaInfo
 }
 
 // New returns a new Client.
@@ -91,6 +97,7 @@ func New(conf Config, builder modules.Builder) (client *Client) {
 		limiter:          rate.NewLimiter(rate.Limit(conf.RateLimit), 1),
 		stepUp:           conf.RateStep,
 		stepUpInterval:   conf.RateStepInterval,
+		replicas:         conf.Replicas,
 	}
 
 	grpcOpts := []grpc.DialOption{grpc.WithBlock()}
@@ -106,20 +113,30 @@ func New(conf Config, builder modules.Builder) (client *Client) {
 	opts := conf.ManagerOptions
 	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
 
-	client.mgr = clientpb.NewManager(opts...)
+	client.nodeMgr = clientpb.NewManager(opts...)
 
 	return client
 }
 
 // Connect connects the client to the replicas.
-func (c *Client) Connect(replicas []backend.ReplicaInfo) (err error) {
-	nodes := make(map[string]uint32, len(replicas))
-	for _, r := range replicas {
-		nodes[r.Address] = uint32(r.ID)
+func (c *Client) Connect() (err error) {
+	activeNodes := make(map[string]uint32)
+	orchestrators := make(map[string]uint32)
+	for _, r := range c.replicas {
+		if r.NodeState == hotstuff.Active {
+			activeNodes[r.Address] = uint32(r.ID)
+		} else if r.NodeState == hotstuff.Orchestrator {
+			orchestrators[r.Address] = uint32(r.ID)
+		}
 	}
-	c.gorumsConfig, err = c.mgr.NewConfiguration(&qspec{faulty: hotstuff.NumFaulty(len(replicas))}, gorums.WithNodeMap(nodes))
+	c.activeNodeConfig, err = c.nodeMgr.NewConfiguration(&qspec{faulty: hotstuff.NumFaulty(len(activeNodes))}, gorums.WithNodeMap(activeNodes))
 	if err != nil {
-		c.mgr.Close()
+		c.nodeMgr.Close()
+		return err
+	}
+	c.orchestratorConfig, err = c.nodeMgr.NewConfiguration(&qspec{faulty: hotstuff.NumFaulty(len(orchestrators))}, gorums.WithNodeMap(orchestrators))
+	if err != nil {
+		c.nodeMgr.Close()
 		return err
 	}
 	return nil
@@ -142,6 +159,17 @@ func (c *Client) Run(ctx context.Context) {
 			executed int
 			failed   int
 		}{executed, failed}
+	}()
+
+	// TODO(hanish) Make it readable from the config/const
+	ticker := time.NewTicker(1 * time.Second)
+	go func() {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			c.performReconfiguration(ctx)
+		}
 	}()
 
 	err := c.sendCommands(ctx)
@@ -170,11 +198,54 @@ func (c *Client) Stop() {
 }
 
 func (c *Client) close() {
-	c.mgr.Close()
+	c.nodeMgr.Close()
 	err := c.reader.Close()
 	if err != nil {
 		c.mods.Logger().Warn("Failed to close reader: ", err)
 	}
+}
+
+func (c *Client) findLeastIdNode(NodeType hotstuff.ReplicaState) uint32 {
+	nodeIDList := make([]uint32, 0)
+	for _, replica := range c.replicas {
+		if replica.NodeState == NodeType {
+			nodeIDList = append(nodeIDList, uint32(replica.ID))
+		}
+	}
+	sort.Slice(nodeIDList, func(i int, j int) bool {
+		return nodeIDList[i] < nodeIDList[j]
+	})
+	return nodeIDList[0]
+}
+
+// performReconfiguration issues the reconfiguration request to the orchestrators.
+func (c *Client) performReconfiguration(ctx context.Context) error {
+	// Move least active replica to read mode and move least learn node to active mode
+	// this is the policy but can be changed in future.
+	leastActiveNode := c.findLeastIdNode(hotstuff.Active)
+	leastLearnNode := c.findLeastIdNode(hotstuff.Learn)
+	leastReadNode := c.findLeastIdNode(hotstuff.Read)
+	replicas := make(map[uint32]orchestrationpb.ReplicaState)
+	for _, replica := range c.replicas {
+		switch uint32(replica.ID) {
+		case leastActiveNode:
+			replica.NodeState = hotstuff.Read
+		case leastLearnNode:
+			replica.NodeState = hotstuff.Active
+		case leastReadNode:
+			replica.NodeState = hotstuff.Learn
+		}
+		replicas[uint32(replica.ID)] = orchestrationpb.ReplicaState(replica.NodeState)
+	}
+	req := orchestrationpb.ReconfigurationRequest{Replicas: replicas}
+	c.orchestratorConfig.ReconfigureRequest(ctx, &req, gorums.WithNoSendWaiting())
+	return nil
+}
+
+func (q qspec) ReconfigureQF(in *orchestrationpb.ReconfigurationRequest,
+	replies map[uint32]*hotstuffpb.SyncInfo) (*hotstuffpb.SyncInfo, bool) {
+
+	return nil, false
 }
 
 func (c *Client) sendCommands(ctx context.Context) error {
@@ -227,7 +298,7 @@ loop:
 			Data:           data[:n],
 		}
 
-		promise := c.gorumsConfig.ExecCommand(ctx, cmd)
+		promise := c.activeNodeConfig.ExecCommand(ctx, cmd)
 
 		num++
 		select {

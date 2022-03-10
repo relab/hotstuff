@@ -31,6 +31,8 @@ type Synchronizer struct {
 
 	// map of collected timeout messages per view
 	timeouts map[consensus.View]map[hotstuff.ID]consensus.TimeoutMsg
+	// isReconfigInProcess to indicate the reconfiguration is in progress
+	isReconfigInProcess bool
 }
 
 // InitConsensusModule gives the module a reference to the Modules object.
@@ -40,17 +42,14 @@ func (s *Synchronizer) InitConsensusModule(mods *consensus.Modules, opts *consen
 		duration.InitConsensusModule(mods, opts)
 	}
 	s.mods = mods
-
 	s.mods.EventLoop().RegisterHandler(consensus.NewViewMsg{}, func(event interface{}) {
 		newViewMsg := event.(consensus.NewViewMsg)
 		s.OnNewView(newViewMsg)
 	})
-
 	s.mods.EventLoop().RegisterHandler(consensus.TimeoutMsg{}, func(event interface{}) {
 		timeoutMsg := event.(consensus.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
 	})
-
 	var err error
 	s.highQC, err = s.mods.Crypto().CreateQuorumCert(consensus.GetGenesis(), []consensus.PartialCert{})
 	if err != nil {
@@ -60,7 +59,6 @@ func (s *Synchronizer) InitConsensusModule(mods *consensus.Modules, opts *consen
 	if err != nil {
 		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
 	}
-
 }
 
 // New creates a new Synchronizer.
@@ -78,6 +76,11 @@ func New(viewDuration ViewDuration) consensus.Synchronizer {
 
 		timeouts: make(map[consensus.View]map[hotstuff.ID]consensus.TimeoutMsg),
 	}
+}
+
+func (s *Synchronizer) Stop() {
+	s.cancelCtx()
+	s.isReconfigInProcess = true
 }
 
 // Start starts the synchronizer with the given context.
@@ -119,6 +122,33 @@ func (s *Synchronizer) ViewContext() context.Context {
 	return s.viewCtx
 }
 
+// restart the synchronizer
+func (s *Synchronizer) OnRestart(syncInfo consensus.SyncInfo) {
+	qc, _ := syncInfo.QC()
+	highestView := qc.View()
+	s.highQC = qc
+	tc, ok := syncInfo.TC()
+	if ok && highestView < tc.View() {
+		s.currentView = tc.View()
+		s.highTC = tc
+	} else {
+		s.currentView = highestView
+	}
+	// TODO(hanish) set s.leafBlock this has to the carried from the request-response
+	s.isReconfigInProcess = false
+	if replica, ok := s.mods.Configuration().Replica(s.mods.ID()); !(ok && replica.IsActive()) {
+		return
+	}
+	s.timer = time.AfterFunc(s.duration.Duration(), func() {
+		// The event loop will execute onLocalTimeout for us.
+		s.cancelCtx()
+		s.mods.EventLoop().AddEvent(s.OnLocalTimeout)
+	})
+	if s.mods.LeaderRotation().GetLeader(s.currentView+1) == s.mods.ID() {
+		s.mods.Consensus().Propose(s.SyncInfo())
+	}
+}
+
 // SyncInfo returns the highest known QC or TC.
 func (s *Synchronizer) SyncInfo() consensus.SyncInfo {
 	if s.highQC.View() >= s.highTC.View() {
@@ -129,6 +159,9 @@ func (s *Synchronizer) SyncInfo() consensus.SyncInfo {
 
 // OnLocalTimeout is called when a local timeout happens.
 func (s *Synchronizer) OnLocalTimeout() {
+	if s.isReconfigInProcess {
+		return
+	}
 	defer func() {
 		// Reset the timer and ctx here so that we can get a new timeout in the same view.
 		// I think this is necessary to ensure that we can keep sending the same timeout message
@@ -148,8 +181,6 @@ func (s *Synchronizer) OnLocalTimeout() {
 
 	s.duration.ViewTimeout() // increase the duration of the next view
 	view := s.currentView
-	s.mods.Logger().Debugf("OnLocalTimeout: %v", view)
-
 	sig, err := s.mods.Crypto().Sign(view.ToHash())
 	if err != nil {
 		s.mods.Logger().Warnf("Failed to sign view: %v", err)
@@ -173,7 +204,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	}
 	s.lastTimeout = &timeoutMsg
 	// stop voting for current view
-	s.mods.Consensus().StopVoting(s.currentView)
+	s.mods.Consensus().StopVoting(s.currentView, false)
 
 	s.mods.Configuration().Timeout(timeoutMsg)
 	s.OnRemoteTimeout(timeoutMsg)
@@ -181,6 +212,13 @@ func (s *Synchronizer) OnLocalTimeout() {
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
 func (s *Synchronizer) OnRemoteTimeout(timeout consensus.TimeoutMsg) {
+	if s.isReconfigInProcess {
+		return
+	}
+	replica, ok := s.mods.Configuration().Replica(s.mods.ID())
+	if !(ok && replica.IsActive()) {
+		return
+	}
 	defer func() {
 		// cleanup old timeouts
 		for view := range s.timeouts {
@@ -194,8 +232,6 @@ func (s *Synchronizer) OnRemoteTimeout(timeout consensus.TimeoutMsg) {
 	if !verifier.Verify(timeout.ViewSignature, timeout.View.ToHash()) {
 		return
 	}
-	s.mods.Logger().Debug("OnRemoteTimeout: ", timeout)
-
 	s.AdvanceView(timeout.SyncInfo)
 
 	timeouts, ok := s.timeouts[timeout.View]
@@ -243,6 +279,9 @@ func (s *Synchronizer) OnRemoteTimeout(timeout consensus.TimeoutMsg) {
 
 // OnNewView handles an incoming consensus.NewViewMsg
 func (s *Synchronizer) OnNewView(newView consensus.NewViewMsg) {
+	if s.isReconfigInProcess {
+		return
+	}
 	s.AdvanceView(newView.SyncInfo)
 }
 

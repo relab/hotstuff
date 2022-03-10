@@ -73,3 +73,8 @@ func (c carousel) GetLeader(round consensus.View) hotstuff.ID {
 func NewCarousel() consensus.LeaderRotation {
 	return &carousel{}
 }
+
+// TODO(Hanish) Not Supported if reconfiguration enabled
+func (c *carousel) GetOrchestratorLeader(view consensus.View) hotstuff.ID {
+	return hotstuff.ID(1)
+}

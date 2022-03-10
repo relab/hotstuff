@@ -24,7 +24,14 @@ func (rr *roundRobin) InitConsensusModule(mods *consensus.Modules, _ *consensus.
 func (rr roundRobin) GetLeader(view consensus.View) hotstuff.ID {
 	// TODO: does not support reconfiguration
 	// assume IDs start at 1
-	return chooseRoundRobin(view, rr.mods.Configuration().Len())
+	replica, ok := rr.mods.Configuration().Replica(rr.mods.ID())
+	if ok && replica.IsOrchestrator() {
+		return rr.GetOrchestratorLeader(view)
+	}
+	if view == 1 {
+		return rr.mods.Configuration().GetLowestActiveId()
+	}
+	return rr.mods.Configuration().ActiveReplicaForIndex(int(view))
 }
 
 // NewRoundRobin returns a new round-robin leader rotation implementation.
@@ -33,5 +40,10 @@ func NewRoundRobin() consensus.LeaderRotation {
 }
 
 func chooseRoundRobin(view consensus.View, numReplicas int) hotstuff.ID {
-	return hotstuff.ID(view%consensus.View(numReplicas) + 1)
+	return NewRoundRobin().GetLeader(view)
+}
+
+// GetOrchestratorLeader returns the leader for the view
+func (rr roundRobin) GetOrchestratorLeader(view consensus.View) hotstuff.ID {
+	return rr.mods.Configuration().OrchestratorForIndex(int(view))
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -319,6 +320,18 @@ type Replica interface {
 	Vote(cert PartialCert)
 	// NewView sends the quorum certificate to the other replica.
 	NewView(SyncInfo)
+	// IsActive returns true if the replica is in active configuration
+	IsActive() bool
+	// IsRead returns true if the replica is in read configuration
+	IsRead() bool
+	// IsLearn returns true if the replica is in learn configuration
+	IsLearn() bool
+	// IsOrchestrator returns true if the replica is in orchestrator configuration
+	IsOrchestrator() bool
+	// SetReplicaState sets the ReplicaState for the replica
+	SetReplicaState(hotstuff.ReplicaState)
+	// GetAddress returns the address of the replica
+	GetAddress() string
 }
 
 //go:generate mockgen -destination=../internal/mocks/configuration_mock.go -package=mocks . Configuration
@@ -326,20 +339,32 @@ type Replica interface {
 // Configuration holds information about the current configuration of replicas that participate in the protocol,
 // It provides methods to send messages to the other replicas.
 type Configuration interface {
-	// Replicas returns all of the replicas in the configuration.
+	// Replicas returns all of the replicas in the active configuration.
 	Replicas() map[hotstuff.ID]Replica
-	// Replica returns a replica if present in the configuration.
+	// Replica returns a replica if present in the active configuration.
 	Replica(hotstuff.ID) (replica Replica, ok bool)
-	// Len returns the number of replicas in the configuration.
+	// Len returns the number of replicas in the active configuration.
 	Len() int
-	// QuorumSize returns the size of a quorum.
+	// QuorumSize returns the size of the active quorum.
 	QuorumSize() int
-	// Propose sends the block to all replicas in the configuration.
+	// Propose sends the block to all active replicas in the configuration.
 	Propose(proposal ProposeMsg)
 	// Timeout sends the timeout message to all replicas.
 	Timeout(msg TimeoutMsg)
 	// Fetch requests a block from all the replicas in the configuration.
 	Fetch(ctx context.Context, hash Hash) (block *Block, ok bool)
+	// GetLowestActiveId returns the replica with lowest ID in the active configuration
+	GetLowestActiveId() hotstuff.ID
+	// ActiveReplicaIndex returns the lowest ID replica for the view.
+	ActiveReplicaForIndex(viewIndex int) hotstuff.ID
+	// GetOrchestratorReplicas returns the list of orchestrator replicas
+	GetOrchestratorReplicas() map[hotstuff.ID]Replica
+	// GetLowestOrchestratorID returns the lowest ID in the orchestrator configuration.
+	GetLowestOrchestratorID() hotstuff.ID
+	// OrchestratorForIndex Orchestrator as Leader for the view
+	OrchestratorForIndex(viewIndex int) hotstuff.ID
+	// UpdateConfigurations updates the configurations in a reconfiguration event
+	UpdateConfigurations(map[uint32]orchestrationpb.ReplicaState) error
 }
 
 //go:generate mockgen -destination=../internal/mocks/consensus_mock.go -package=mocks . Consensus
@@ -349,7 +374,7 @@ type Configuration interface {
 // The methods OnPropose, OnVote, OnNewView, and OnDeliver should be called upon receiving a corresponding message.
 type Consensus interface {
 	// StopVoting ensures that no voting happens in a view earlier than `view`.
-	StopVoting(view View)
+	StopVoting(view View, isReconfig bool)
 	// Propose starts a new proposal. The command is fetched from the command queue.
 	Propose(cert SyncInfo)
 	// CommittedBlock returns the most recently committed block.
@@ -383,6 +408,12 @@ type Synchronizer interface {
 	LeafBlock() *Block
 	// Start starts the synchronizer with the given context.
 	Start(context.Context)
+	// Stop stops the synchronizer to progress, for reconfiguration purpose
+	Stop()
+	// SyncInfo returns the highest known QC or TC.
+	SyncInfo() SyncInfo
+	// Restarts the synchronizer with the latest view and TC.
+	OnRestart(SyncInfo)
 }
 
 type executorWrapper struct {

@@ -2,11 +2,12 @@ proto_include := $(shell go list -m -f {{.Dir}} github.com/relab/gorums)
 proto_src := internal/proto/clientpb/client.proto          \
 		internal/proto/hotstuffpb/hotstuff.proto           \
 		internal/proto/orchestrationpb/orchestration.proto \
+		internal/proto/reconfigurationpb/reconfig.proto    \
 		metrics/types/types.proto
 proto_go := $(proto_src:%.proto=%.pb.go)
 gorums_go := internal/proto/clientpb/client_gorums.pb.go \
 		internal/proto/hotstuffpb/hotstuff_gorums.pb.go  \
-
+		internal/proto/reconfigurationpb/reconfig_gorums.pb.go
 binaries := hotstuff plot
 
 .PHONY: all debug clean protos download tools $(binaries)
@@ -36,5 +37,7 @@ clean:
 %.pb.go %_gorums.pb.go : %.proto
 	protoc -I=$(proto_include):. \
 		--go_out=paths=source_relative:. \
+		--proto_path=internal/proto/hotstuffpb/ \
+		--proto_path=internal/proto/orchestrationpb/ \
 		--gorums_out=paths=source_relative:. \
 		$<

@@ -98,3 +98,8 @@ func NewRepBased() consensus.LeaderRotation {
 		prevCommitHead: consensus.GetGenesis(),
 	}
 }
+
+// TODO(Hanish) Not Supported if reconfiguration enabled
+func (r *repBased) GetOrchestratorLeader(view consensus.View) hotstuff.ID {
+	return hotstuff.ID(1)
+}

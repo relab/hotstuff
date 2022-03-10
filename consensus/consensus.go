@@ -29,13 +29,12 @@ type ProposeRuler interface {
 // consensusBase provides a default implementation of the Consensus interface
 // for implementations of the ConsensusImpl interface.
 type consensusBase struct {
-	impl Rules
-	mods *Modules
-
-	lastVote View
-
-	mut   sync.Mutex
-	bExec *Block
+	impl            Rules
+	mods            *Modules
+	lastVote        View
+	votingSuspended bool
+	mut             sync.Mutex
+	bExec           *Block
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
@@ -64,9 +63,12 @@ func (cs *consensusBase) InitConsensusModule(mods *Modules, opts *OptionsBuilder
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
-func (cs *consensusBase) StopVoting(view View) {
+func (cs *consensusBase) StopVoting(view View, isReconfig bool) {
 	if cs.lastVote < view {
 		cs.lastVote = view
+	}
+	if isReconfig {
+		cs.votingSuspended = true
 	}
 }
 

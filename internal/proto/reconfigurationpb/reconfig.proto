@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package reconfigurationpb;
+
+import "gorums.proto";
+
+option go_package = "github.com/relab/hotstuff/internal/proto/reconfigurationpb";
+
+import "hotstuff.proto";
+
+import "orchestration.proto";
+
+import "google/protobuf/empty.proto";
+
+service Reconfiguration {
+    // Reconfigure RPC is the rpc called by the Orcchestrator to the replicas.
+    rpc Reconfigure(orchestrationpb.ReconfigurationRequest) returns (hotstuffpb.SyncInfo) {
+        option (gorums.quorumcall) = true;
+    }
+
+    // ReconfigureStart RPC is called by the orchestrator on replicas to start participating in the proposal.
+    // ReconfigureReport contains the highest QC and View from the previous configuration
+    rpc ReconfigureStart(hotstuffpb.SyncInfo) returns (google.protobuf.Empty) {
+        option (gorums.multicast) = true;
+    }
+}

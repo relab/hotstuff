@@ -6,6 +6,8 @@ import "gorums.proto";
 
 import "google/protobuf/empty.proto";
 
+import "orchestration.proto";
+
 option go_package = "github.com/relab/hotstuff/internal/proto/hotstuffpb";
 
 service Hotstuff {
@@ -26,6 +28,17 @@ service Hotstuff {
   }
 
   rpc Fetch(BlockHash) returns (Block) { option (gorums.quorumcall) = true; }
+
+  // Reconfigure RPC is the rpc called by the Orcchestrator to the replicas.
+  rpc ReconfigureStart(orchestrationpb.ReconfigurationRequest) returns (hotstuffpb.SyncInfo) {
+    option (gorums.quorumcall) = true;
+  }
+
+  // ReconfigureStart RPC is called by the orchestrator on replicas to start participating in the proposal.
+  // ReconfigureReport contains the highest QC and View from the previous configuration
+  rpc ReconfigureRestart(hotstuffpb.SyncInfo) returns (google.protobuf.Empty) {
+    option (gorums.multicast) = true;
+  }
 }
 
 message Proposal {

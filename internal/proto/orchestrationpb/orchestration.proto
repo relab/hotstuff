@@ -6,6 +6,14 @@ option go_package = "github.com/relab/hotstuff/internal/proto/orchestrationpb";
 
 import "google/protobuf/duration.proto";
 
+enum ReplicaState {
+  LEARN = 0;
+  ACTIVE = 1;
+  READ = 2;
+  STOP = 3;
+  ORCHESTRATOR = 4;
+}
+
 /* -------------------------------------------------------------------------- */
 /*                              General messages                              */
 /* -------------------------------------------------------------------------- */
@@ -49,6 +57,8 @@ message ReplicaOpts {
   string ByzantineStrategy = 18;
   // A shared random number for seeding random number generators.
   int64 SharedSeed = 20;
+  // ReplicaState represents the  
+  ReplicaState State = 21;
 }
 
 // ReplicaInfo is the information that the replicas need about each other.
@@ -63,6 +73,8 @@ message ReplicaInfo {
   uint32 ReplicaPort = 4;
   // The port that clients should connect to.
   uint32 ClientPort = 5;
+
+  ReplicaState State = 6;
 }
 
 message ClientOpts {
@@ -137,4 +149,6 @@ message StopClientResponse {}
 
 message QuitRequest {}
 
-/* -------------------------------------------------------------------------- */
+message ReconfigurationRequest {
+  map<uint32, ReplicaState> replicas = 1;
+}

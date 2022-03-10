@@ -44,15 +44,16 @@ type Config struct {
 	ReplicaServerOptions []gorums.ServerOption
 	// Options for the replica manager.
 	ManagerOptions []gorums.ManagerOption
+	// State maintains the state of the replica.
+	State hotstuff.ReplicaState
 }
 
 // Replica is a participant in the consensus protocol.
 type Replica struct {
-	clientSrv *clientSrv
-	cfg       *backend.Config
-	hsSrv     *backend.Server
-	hs        *consensus.Modules
-
+	clientSrv    *clientSrv
+	cfg          *backend.Config
+	hsSrv        *backend.Server
+	hs           *consensus.Modules
 	execHandlers map[cmdID]func(*empty.Empty, error)
 	cancel       context.CancelFunc
 	done         chan struct{}

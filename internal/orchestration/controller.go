@@ -27,24 +27,20 @@ type HostConfig struct {
 type Experiment struct {
 	*orchestrationpb.ReplicaOpts
 	*orchestrationpb.ClientOpts
-
-	Logger logging.Logger
-
-	NumReplicas int
-	NumClients  int
-	Duration    time.Duration
-
-	Hosts       map[string]RemoteWorker
-	HostConfigs map[string]HostConfig
-	Byzantine   map[string]int // number of replicas to assign to each byzantine strategy
-
-	// the host associated with each replica.
-	hostsToReplicas map[string][]hotstuff.ID
-	// the host associated with each client.
-	replicaOpts    map[hotstuff.ID]*orchestrationpb.ReplicaOpts
-	hostsToClients map[string][]hotstuff.ID
-	caKey          *ecdsa.PrivateKey
-	ca             *x509.Certificate
+	Logger            logging.Logger
+	NumReplicas       int
+	NumClients        int
+	Duration          time.Duration
+	Hosts             map[string]RemoteWorker
+	HostConfigs       map[string]HostConfig
+	Byzantine         map[string]int                               // number of replicas to assign to each byzantine strategy
+	hostsToReplicas   map[string][]hotstuff.ID                     // the host associated with each replica.
+	replicaOpts       map[hotstuff.ID]*orchestrationpb.ReplicaOpts // the host associated with each client.
+	hostsToClients    map[string][]hotstuff.ID
+	caKey             *ecdsa.PrivateKey
+	ca                *x509.Certificate
+	isReconfigEnabled bool // TODO(hanish): Read from the command line in future
+	overLoadFactor    int  // This factor used for create more replicas for each host pending for reconfiguration.
 }
 
 // Run runs the experiment.
@@ -240,10 +236,32 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 			replicaOpts := proto.Clone(e.ReplicaOpts).(*orchestrationpb.ReplicaOpts)
 			replicaOpts.ID = uint32(nextReplicaID)
 			replicaOpts.ByzantineStrategy = byzantineStrategy
-
+			replicaOpts.State = orchestrationpb.ReplicaState_ACTIVE
 			e.hostsToReplicas[host] = append(e.hostsToReplicas[host], nextReplicaID)
 			e.replicaOpts[nextReplicaID] = replicaOpts
 			log.Printf("replica %d assigned to host %s", nextReplicaID, host)
+			nextReplicaID++
+		}
+		if e.isReconfigEnabled {
+			if e.overLoadFactor*numReplicas > 1 {
+				numLearnReplicas := int(e.overLoadFactor * numReplicas)
+				for index := 0; index < numLearnReplicas; index++ {
+					replicaOpts := proto.Clone(e.ReplicaOpts).(*orchestrationpb.ReplicaOpts)
+					replicaOpts.ID = uint32(nextReplicaID)
+					replicaOpts.State = orchestrationpb.ReplicaState_LEARN
+					e.hostsToReplicas[host] = append(e.hostsToReplicas[host], nextReplicaID)
+					e.replicaOpts[nextReplicaID] = replicaOpts
+					log.Printf("Learn replica %d assigned to host %s", nextReplicaID, host)
+					nextReplicaID++
+				}
+			}
+
+			replicaOpts := proto.Clone(e.ReplicaOpts).(*orchestrationpb.ReplicaOpts)
+			replicaOpts.ID = uint32(nextReplicaID)
+			replicaOpts.State = orchestrationpb.ReplicaState_ORCHESTRATOR
+			e.hostsToReplicas[host] = append(e.hostsToReplicas[host], nextReplicaID)
+			e.replicaOpts[nextReplicaID] = replicaOpts
+			log.Printf("Orchestrator replica %d assigned to host %s", nextReplicaID, host)
 			nextReplicaID++
 		}
 

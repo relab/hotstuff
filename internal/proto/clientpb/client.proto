@@ -3,6 +3,7 @@ syntax = "proto3";
 package clientpb;
 
 import "gorums.proto";
+import "orchestration.proto";
 import "google/protobuf/empty.proto";
 
 option go_package = "github.com/relab/hotstuff/internal/proto/clientpb";
@@ -14,6 +15,10 @@ service Client {
   rpc ExecCommand(Command) returns (google.protobuf.Empty) {
     option (gorums.quorumcall) = true;
     option (gorums.async) = true;
+  }
+
+  rpc ReconfigureRequest(orchestrationpb.ReconfigurationRequest) returns  (google.protobuf.Empty) {
+    option (gorums.multicast) = true;
   }
 }
 
@@ -27,3 +32,4 @@ message Command {
 
 // Batch is a list of commands to be executed
 message Batch { repeated Command Commands = 1; }
+

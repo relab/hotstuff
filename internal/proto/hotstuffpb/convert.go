@@ -7,6 +7,7 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
+	orchestrationpb "github.com/relab/hotstuff/internal/proto/orchestrationpb"
 )
 
 // SignatureToProto converts a consensus.Signature to a hotstuffpb.Signature.
@@ -259,4 +260,13 @@ func SyncInfoToProto(syncInfo consensus.SyncInfo) *SyncInfo {
 		m.AggQC = AggregateQCToProto(aggQC)
 	}
 	return m
+}
+
+func ReplicaStatusConvertToProto(
+	replicas map[hotstuff.ID]hotstuff.ReplicaState) map[uint32]orchestrationpb.ReplicaState {
+	convertedReq := make(map[uint32]orchestrationpb.ReplicaState)
+	for replicaID, state := range replicas {
+		convertedReq[uint32(replicaID)] = orchestrationpb.ReplicaState(state)
+	}
+	return convertedReq
 }
