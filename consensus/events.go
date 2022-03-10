@@ -1,7 +1,7 @@
 package consensus
 
 import (
-	"crypto/sha256"
+	"bytes"
 	"fmt"
 
 	"github.com/relab/hotstuff"
@@ -30,18 +30,15 @@ type TimeoutMsg struct {
 	SyncInfo      SyncInfo        // The highest QC/TC known to the sender.
 }
 
-// Hash returns a hash of the timeout message.
-func (timeout TimeoutMsg) Hash() Hash {
-	var h Hash
-	hash := sha256.New()
-	hash.Write(timeout.View.ToBytes())
+// ToBytes returns a byte form of the timeout message.
+func (timeout TimeoutMsg) ToBytes() []byte {
+	var b bytes.Buffer
+	_, _ = b.Write(timeout.ID.ToBytes())
+	_, _ = b.Write(timeout.View.ToBytes())
 	if qc, ok := timeout.SyncInfo.QC(); ok {
-		h := qc.BlockHash()
-		hash.Write(h[:])
+		_, _ = b.Write(qc.ToBytes())
 	}
-	hash.Write(timeout.ID.ToBytes())
-	hash.Sum(h[:0])
-	return h
+	return b.Bytes()
 }
 
 func (timeout TimeoutMsg) String() string {

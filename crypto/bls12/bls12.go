@@ -286,10 +286,10 @@ func (bls *bls12Base) fastAggregateVerify(publicKeys []*PublicKey, message []byt
 	return bls.coreVerify(&PublicKey{p: &aggregate}, message, signature, domain)
 }
 
-// Sign creates a cryptographic signature of the given hash.
-func (bls *bls12Base) Sign(hash consensus.Hash) (signature consensus.QuorumSignature, err error) {
+// Sign creates a cryptographic signature of the given messsage.
+func (bls *bls12Base) Sign(message []byte) (signature consensus.QuorumSignature, err error) {
 	// TODO: consider passing message to this function instead of hash
-	p, err := bls.coreSign(hash[:], domain)
+	p, err := bls.coreSign(message, domain)
 	if err != nil {
 		return nil, fmt.Errorf("bls12: coreSign failed: %w", err)
 	}
@@ -299,7 +299,7 @@ func (bls *bls12Base) Sign(hash consensus.Hash) (signature consensus.QuorumSigna
 }
 
 // Verify verifies the given cryptographic signature according to the specified options.
-// NOTE: One of either VerifyHash or VerifyHashes MUST be specified,
+// NOTE: One of either VerifySingle or VerifyMulti options MUST be specified,
 // otherwise this function will have nothing to verify the signature against.
 func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...consensus.VerifyOption) bool {
 	sig, ok := signature.(*AggregateSignature)
@@ -312,7 +312,7 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 		opt(&opts)
 	}
 
-	if !opts.UseHashMap && opts.Hash == nil {
+	if !opts.MultipleMessages && opts.Message == nil {
 		panic("no hash(es) to verify the signature against: you must specify one of the VerifyHash or VerifyHashes options")
 	}
 
@@ -328,6 +328,7 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 		valid      = true
 	)
 
+	// get all public keys and messages to verify
 	sig.participants.RangeWhile(func(i hotstuff.ID) bool {
 		replica, ok := bls.mods.Configuration().Replica(i)
 		if !ok {
@@ -341,14 +342,14 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 		}
 		publicKeys = append(publicKeys, replica.PublicKey().(*PublicKey))
 
-		if opts.UseHashMap {
-			hash, ok := opts.HashMap[i]
+		if opts.MultipleMessages {
+			message, ok := opts.MessageMap[i]
 			if !ok {
 				valid = false
 				return false
 			}
 
-			messages = append(messages, hash[:])
+			messages = append(messages, message)
 		}
 
 		return true
@@ -359,15 +360,15 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 	}
 
 	if l == 1 {
-		message := opts.Hash[:]
-		if opts.UseHashMap {
+		message := *opts.Message
+		if opts.MultipleMessages {
 			message = messages[0]
 		}
 		return bls.coreVerify(publicKeys[0], message, &sig.sig, domain)
-	} else if opts.UseHashMap {
+	} else if opts.MultipleMessages {
 		return bls.aggregateVerify(publicKeys, messages, &sig.sig)
 	} else {
-		return bls.fastAggregateVerify(publicKeys, opts.Hash[:], &sig.sig)
+		return bls.fastAggregateVerify(publicKeys, *opts.Message, &sig.sig)
 	}
 }
 

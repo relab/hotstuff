@@ -7,18 +7,20 @@ import (
 )
 
 type crypto struct {
+	mods *consensus.Modules
 	consensus.CryptoBase
 }
 
 // New returns a new implementation of the Crypto interface. It will use the given CryptoBase to create and verify
 // signatures.
 func New(impl consensus.CryptoBase) consensus.Crypto {
-	return crypto{CryptoBase: impl}
+	return &crypto{CryptoBase: impl}
 }
 
 // InitConsensusModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (c crypto) InitConsensusModule(mods *consensus.Modules, cfg *consensus.OptionsBuilder) {
+func (c *crypto) InitConsensusModule(mods *consensus.Modules, cfg *consensus.OptionsBuilder) {
+	c.mods = mods
 	if mod, ok := c.CryptoBase.(consensus.Module); ok {
 		mod.InitConsensusModule(mods, cfg)
 	}
@@ -26,7 +28,7 @@ func (c crypto) InitConsensusModule(mods *consensus.Modules, cfg *consensus.Opti
 
 // CreatePartialCert signs a single block and returns the partial certificate.
 func (c crypto) CreatePartialCert(block *consensus.Block) (cert consensus.PartialCert, err error) {
-	sig, err := c.Sign(block.Hash())
+	sig, err := c.Sign(block.ToBytes())
 	if err != nil {
 		return consensus.PartialCert{}, err
 	}
@@ -87,7 +89,11 @@ func (c crypto) CreateAggregateQC(view consensus.View, timeouts []consensus.Time
 
 // VerifyPartialCert verifies a single partial certificate.
 func (c crypto) VerifyPartialCert(cert consensus.PartialCert) bool {
-	return c.Verify(cert.Signature(), consensus.VerifyHash(cert.BlockHash()))
+	block, ok := c.mods.BlockChain().Get(cert.BlockHash())
+	if !ok {
+		return false
+	}
+	return c.Verify(cert.Signature(), consensus.VerifySingle(block.ToBytes()))
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
@@ -95,7 +101,11 @@ func (c crypto) VerifyQuorumCert(qc consensus.QuorumCert) bool {
 	if qc.BlockHash() == consensus.GetGenesis().Hash() {
 		return true
 	}
-	return c.Verify(qc.Signature(), consensus.VerifyHash(qc.BlockHash()))
+	block, ok := c.mods.BlockChain().Get(qc.BlockHash())
+	if !ok {
+		return false
+	}
+	return c.Verify(qc.Signature(), consensus.VerifySingle(block.ToBytes()))
 }
 
 // VerifyTimeoutCert verifies a timeout certificate.
@@ -103,13 +113,13 @@ func (c crypto) VerifyTimeoutCert(tc consensus.TimeoutCert) bool {
 	if tc.View() == 0 {
 		return true
 	}
-	return c.Verify(tc.Signature(), consensus.VerifyHash(tc.View().ToHash()))
+	return c.Verify(tc.Signature(), consensus.VerifySingle(tc.View().ToBytes()))
 }
 
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
 func (c crypto) VerifyAggregateQC(aggQC consensus.AggregateQC) (bool, consensus.QuorumCert) {
 	var highQC *consensus.QuorumCert
-	hashes := make(map[hotstuff.ID]consensus.Hash)
+	messages := make(map[hotstuff.ID][]byte)
 	for id, qc := range aggQC.QCs() {
 		if highQC == nil {
 			highQC = new(consensus.QuorumCert)
@@ -119,13 +129,13 @@ func (c crypto) VerifyAggregateQC(aggQC consensus.AggregateQC) (bool, consensus.
 		}
 
 		// reconstruct the TimeoutMsg to get the hash
-		hashes[id] = consensus.TimeoutMsg{
+		messages[id] = consensus.TimeoutMsg{
 			ID:       id,
 			View:     aggQC.View(),
 			SyncInfo: consensus.NewSyncInfo().WithQC(qc),
-		}.Hash()
+		}.ToBytes()
 	}
-	ok := c.Verify(aggQC.Sig(), consensus.VerifyHashes(hashes))
+	ok := c.Verify(aggQC.Sig(), consensus.VerifyMulti(messages))
 	if !ok {
 		return false, consensus.QuorumCert{}
 	}

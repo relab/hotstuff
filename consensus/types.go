@@ -76,13 +76,6 @@ func (v View) ToBytes() []byte {
 	return viewBytes[:]
 }
 
-// ToHash converts the view to a Hash type. It does not actually hash the view.
-func (v View) ToHash() Hash {
-	h := Hash{}
-	binary.LittleEndian.PutUint64(h[:8], uint64(v))
-	return h
-}
-
 // Hash is a SHA256 hash
 type Hash [32]byte
 

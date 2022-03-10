@@ -190,9 +190,9 @@ func CreateTCPListener(t *testing.T) net.Listener {
 }
 
 // Sign creates a signature using the given signer.
-func Sign(t *testing.T, hash consensus.Hash, signer consensus.Crypto) consensus.QuorumSignature {
+func Sign(t *testing.T, message []byte, signer consensus.Crypto) consensus.QuorumSignature {
 	t.Helper()
-	sig, err := signer.Sign(hash)
+	sig, err := signer.Sign(message)
 	if err != nil {
 		t.Fatalf("Failed to sign block: %v", err)
 	}
@@ -200,11 +200,11 @@ func Sign(t *testing.T, hash consensus.Hash, signer consensus.Crypto) consensus.
 }
 
 // CreateSignatures creates partial certificates from multiple signers.
-func CreateSignatures(t *testing.T, hash consensus.Hash, signers []consensus.Crypto) []consensus.QuorumSignature {
+func CreateSignatures(t *testing.T, message []byte, signers []consensus.Crypto) []consensus.QuorumSignature {
 	t.Helper()
 	sigs := make([]consensus.QuorumSignature, 0, len(signers))
 	for _, signer := range signers {
-		sigs = append(sigs, Sign(t, hash, signer))
+		sigs = append(sigs, Sign(t, message, signer))
 	}
 	return sigs
 }
@@ -222,7 +222,7 @@ func signer(s consensus.QuorumSignature) hotstuff.ID {
 func CreateTimeouts(t *testing.T, view consensus.View, signers []consensus.Crypto) (timeouts []consensus.TimeoutMsg) {
 	t.Helper()
 	timeouts = make([]consensus.TimeoutMsg, 0, len(signers))
-	viewSigs := CreateSignatures(t, view.ToHash(), signers)
+	viewSigs := CreateSignatures(t, view.ToBytes(), signers)
 	for _, sig := range viewSigs {
 		timeouts = append(timeouts, consensus.TimeoutMsg{
 			ID:            signer(sig),
@@ -232,7 +232,7 @@ func CreateTimeouts(t *testing.T, view consensus.View, signers []consensus.Crypt
 		})
 	}
 	for i := range timeouts {
-		timeouts[i].MsgSignature = Sign(t, timeouts[i].Hash(), signers[i])
+		timeouts[i].MsgSignature = Sign(t, timeouts[i].ToBytes(), signers[i])
 	}
 	return timeouts
 }

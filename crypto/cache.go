@@ -67,13 +67,14 @@ func (cache *cache) evict() {
 	delete(cache.entries, key)
 }
 
-// Sign signs a hash.
-func (cache *cache) Sign(hash consensus.Hash) (sig consensus.QuorumSignature, err error) {
-	sig, err = cache.impl.Sign(hash)
+// Sign signs a message.
+func (cache *cache) Sign(message []byte) (sig consensus.QuorumSignature, err error) {
+	sig, err = cache.impl.Sign(message)
 	if err != nil {
 		return nil, err
 	}
 	var key strings.Builder
+	hash := sha256.Sum256(message)
 	_, _ = key.Write(hash[:])
 	_, _ = key.Write(sig.ToBytes())
 	cache.insert(key.String())
@@ -97,14 +98,14 @@ func (cache *cache) Verify(sig consensus.QuorumSignature, options ...consensus.V
 
 	var hash consensus.Hash
 	// if we have multiple messages, we will hash them all together.
-	if opts.UseHashMap {
+	if opts.MultipleMessages {
 		hasher := sha256.New()
-		for _, h := range opts.HashMap {
-			_, _ = hasher.Write(h[:])
+		for _, m := range opts.MessageMap {
+			_, _ = hasher.Write(m)
 		}
 		hasher.Sum(hash[:])
 	} else {
-		hash = *opts.Hash
+		hash = sha256.Sum256(*opts.Message)
 	}
 
 	var key strings.Builder

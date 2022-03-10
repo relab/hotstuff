@@ -6,10 +6,10 @@ import (
 
 // CryptoBase provides the basic cryptographic methods needed to create, verify, and combine signatures.
 type CryptoBase interface {
-	// Sign creates a cryptographic signature of the given hash.
-	Sign(hash Hash) (signature QuorumSignature, err error)
+	// Sign creates a cryptographic signature of the given message.
+	Sign(message []byte) (signature QuorumSignature, err error)
 	// Verify verifies the given cryptographic signature according to the specified options.
-	// NOTE: One of either VerifyHash or VerifyHashes MUST be specified,
+	// NOTE: One of either VerifySingle or VerifyMulti options MUST be specified,
 	// otherwise this function will have nothing to verify the signature against.
 	Verify(signature QuorumSignature, options ...VerifyOption) bool
 	// Combine combines multiple signatures into a single signature.
@@ -27,36 +27,36 @@ func VerifyThreshold(threshold int) VerifyOption {
 	}
 }
 
-// VerifyHash verifies the signature against the given hash.
+// VerifySingle verifies the signature against the given message.
 //
-// NOTE: VerifyHash and VerifyHashes cannot be used together,
+// NOTE: VerifySingle and VerifyMulti cannot be used together,
 // and whichever option is specified last will be the effective one.
-func VerifyHash(hash Hash) VerifyOption {
+func VerifySingle(message []byte) VerifyOption {
 	return func(o *VerifyOptions) {
-		o.UseHashMap = false
-		o.Hash = &hash
+		o.MultipleMessages = false
+		o.Message = &message
 	}
 }
 
-// VerifyHashes verifies the signature against the hashes present in the given map.
+// VerifyMulti verifies the signature against the multiple messages present in the given map.
 //
-// NOTE: VerifyHash and VerifyHashes cannot be used together,
+// NOTE: VerifySingle and VerifyMulti cannot be used together,
 // and whichever option is specified last will be the effective one.
-func VerifyHashes(hashMap map[hotstuff.ID]Hash) VerifyOption {
+func VerifyMulti(messages map[hotstuff.ID][]byte) VerifyOption {
 	return func(o *VerifyOptions) {
-		o.UseHashMap = true
-		o.HashMap = hashMap
+		o.MultipleMessages = true
+		o.MessageMap = messages
 	}
 }
 
 // VerifyOptions specify options for the Verify function in the CryptoBase interface.
 type VerifyOptions struct {
-	// using a pointer for the Hash such that we can tell if it is unspecified
+	// using a pointer for the Message such that we can tell if it is unspecified
 
-	Hash       *Hash
-	HashMap    map[hotstuff.ID]Hash
-	UseHashMap bool // true if `HashMap` should be used instead of `Hash`
-	Threshold  int
+	Message          *[]byte
+	MessageMap       map[hotstuff.ID][]byte
+	MultipleMessages bool // true if `MessageMap` should be used instead of `Message`
+	Threshold        int
 }
 
 // Crypto implements the methods required to create and verify signatures and certificates.

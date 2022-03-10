@@ -4,6 +4,7 @@ package ecdsa
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
 	"math/big"
 	"sort"
@@ -148,8 +149,9 @@ func (ec *ecdsaBase) InitConsensusModule(mods *consensus.Modules, _ *consensus.O
 	ec.mods = mods
 }
 
-// Sign creates a cryptographic signature of the given hash.
-func (ec *ecdsaBase) Sign(hash consensus.Hash) (signature consensus.QuorumSignature, err error) {
+// Sign creates a cryptographic signature of the given message.
+func (ec *ecdsaBase) Sign(message []byte) (signature consensus.QuorumSignature, err error) {
+	hash := sha256.Sum256(message)
 	r, s, err := ecdsa.Sign(rand.Reader, ec.getPrivateKey(), hash[:])
 	if err != nil {
 		return nil, fmt.Errorf("ecdsa: sign failed: %w", err)
@@ -162,7 +164,7 @@ func (ec *ecdsaBase) Sign(hash consensus.Hash) (signature consensus.QuorumSignat
 }
 
 // Verify verifies the given cryptographic signature according to the specified options.
-// NOTE: One of either VerifyHash or VerifyHashes MUST be specified,
+// NOTE: One of either VerifySingle or VerifyMulti options MUST be specified,
 // otherwise this function will have nothing to verify the signature against.
 func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, options ...consensus.VerifyOption) bool {
 	sig, ok := signature.(MultiSignature)
@@ -175,8 +177,8 @@ func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, options ...cons
 		opt(&opts)
 	}
 
-	if !opts.UseHashMap && opts.Hash == nil {
-		panic("no hash(es) to verify the signature against: you must specify one of the VerifyHash or VerifyHashes options")
+	if !opts.MultipleMessages && opts.Message == nil {
+		panic("no message(s) to verify the signature against: you must specify one of the VerifySingle or VerifyMulti options")
 	}
 
 	if signature.Participants().Len() < opts.Threshold {
@@ -187,10 +189,10 @@ func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, options ...cons
 	for _, pSig := range sig {
 		var hash consensus.Hash
 
-		if opts.UseHashMap {
-			hash = opts.HashMap[pSig.signer]
+		if opts.MultipleMessages {
+			hash = sha256.Sum256(opts.MessageMap[pSig.signer])
 		} else {
-			hash = *opts.Hash
+			hash = sha256.Sum256(*opts.Message)
 		}
 
 		go func(sig *Signature, hash consensus.Hash) {

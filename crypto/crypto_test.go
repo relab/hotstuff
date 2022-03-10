@@ -218,10 +218,15 @@ func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() co
 		builder.Register(signer)
 	}
 	hl := bl.Build()
+	block := createBlock(t, hl[0].Crypto())
+
+	for _, mods := range hl {
+		mods.BlockChain().Store(block)
+	}
 
 	return testData{
 		signers:   hl.Signers(),
 		verifiers: hl.Verifiers(),
-		block:     createBlock(t, hl[0].Crypto()),
+		block:     block,
 	}
 }
