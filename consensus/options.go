@@ -52,6 +52,10 @@ func (builder *OptionsBuilder) SetSharedRandomSeed(seed int64) {
 }
 
 // SetConnectionMetadata sets the value of a key in the connection metadata map.
+//
+// NOTE: if the value contains binary data, the key must have the "-bin" suffix.
+// This is to make it compatible with GRPC metadata.
+// See: https://github.com/grpc/grpc-go/blob/master/Documentation/grpc-metadata.md#storing-binary-data-in-metadata
 func (builder *OptionsBuilder) SetConnectionMetadata(key string, value string) {
 	builder.opts.connectionMetadata[key] = value
 }

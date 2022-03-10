@@ -27,7 +27,7 @@ const (
 	// PublicKeyFileType is the PEM type for a public key.
 	PublicKeyFileType = "BLS12-381 PUBLIC KEY"
 
-	popMetadataKey = "bls12-pop"
+	popMetadataKey = "bls12-pop-bin"
 )
 
 var (
