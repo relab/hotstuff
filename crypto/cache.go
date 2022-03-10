@@ -3,6 +3,7 @@ package crypto
 import (
 	"container/list"
 	"crypto/sha256"
+	"strings"
 	"sync"
 
 	"github.com/relab/hotstuff/consensus"
@@ -12,7 +13,7 @@ type cache struct {
 	impl        consensus.CryptoBase
 	mut         sync.Mutex
 	capacity    int
-	entries     map[consensus.Hash]*list.Element
+	entries     map[string]*list.Element
 	accessOrder list.List
 }
 
@@ -22,7 +23,7 @@ func NewCache(impl consensus.CryptoBase, capacity int) consensus.Crypto {
 	return New(&cache{
 		impl:     impl,
 		capacity: capacity,
-		entries:  make(map[consensus.Hash]*list.Element, capacity),
+		entries:  make(map[string]*list.Element, capacity),
 	})
 }
 
@@ -34,23 +35,23 @@ func (cache *cache) InitConsensusModule(mods *consensus.Modules, cfg *consensus.
 	}
 }
 
-func (cache *cache) insert(hash consensus.Hash) {
+func (cache *cache) insert(key string) {
 	cache.mut.Lock()
 	defer cache.mut.Unlock()
-	elem, ok := cache.entries[hash]
+	elem, ok := cache.entries[key]
 	if ok {
 		cache.accessOrder.MoveToFront(elem)
 		return
 	}
 	cache.evict()
-	elem = cache.accessOrder.PushFront(hash)
-	cache.entries[hash] = elem
+	elem = cache.accessOrder.PushFront(key)
+	cache.entries[key] = elem
 }
 
-func (cache *cache) check(hash consensus.Hash) bool {
+func (cache *cache) check(key string) bool {
 	cache.mut.Lock()
 	defer cache.mut.Unlock()
-	elem, ok := cache.entries[hash]
+	elem, ok := cache.entries[key]
 	if !ok {
 		return false
 	}
@@ -62,7 +63,7 @@ func (cache *cache) evict() {
 	if len(cache.entries) < cache.capacity {
 		return
 	}
-	key := cache.accessOrder.Remove(cache.accessOrder.Back()).(consensus.Hash)
+	key := cache.accessOrder.Remove(cache.accessOrder.Back()).(string)
 	delete(cache.entries, key)
 }
 
@@ -72,8 +73,10 @@ func (cache *cache) Sign(hash consensus.Hash) (sig consensus.QuorumSignature, er
 	if err != nil {
 		return nil, err
 	}
-	key := sha256.Sum256(append(hash[:], sig.ToBytes()...))
-	cache.insert(key)
+	var key strings.Builder
+	_, _ = key.Write(hash[:])
+	_, _ = key.Write(sig.ToBytes())
+	cache.insert(key.String())
 	return sig, nil
 }
 
@@ -92,24 +95,28 @@ func (cache *cache) Verify(sig consensus.QuorumSignature, options ...consensus.V
 		return false
 	}
 
-	var key consensus.Hash
-	hash := sha256.New()
+	var hash consensus.Hash
+	// if we have multiple messages, we will hash them all together.
 	if opts.UseHashMap {
+		hasher := sha256.New()
 		for _, h := range opts.HashMap {
-			hash.Write(h[:])
+			_, _ = hasher.Write(h[:])
 		}
+		hasher.Sum(hash[:])
 	} else {
-		hash.Write(opts.Hash[:])
+		hash = *opts.Hash
 	}
-	hash.Write(sig.ToBytes())
-	hash.Sum(key[:0])
 
-	if cache.check(key) {
+	var key strings.Builder
+	_, _ = key.Write(hash[:])
+	_, _ = key.Write(sig.ToBytes())
+
+	if cache.check(key.String()) {
 		return true
 	}
 
 	if cache.impl.Verify(sig, options...) {
-		cache.insert(key)
+		cache.insert(key.String())
 		return true
 	}
 
