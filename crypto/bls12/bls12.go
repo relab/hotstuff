@@ -247,6 +247,47 @@ func (bls *bls12Base) checkPop(replica consensus.Replica) (valid bool) {
 	return valid
 }
 
+func (bls *bls12Base) coreAggregateVerify(publicKeys []*PublicKey, messages [][]byte, signature *bls12.PointG2) bool {
+	n := len(publicKeys)
+	if n != len(messages) && n <= 1 {
+		return false
+	}
+
+	if !bls.subgroupCheck(signature) {
+		return false
+	}
+
+	engine := bls12.NewEngine()
+
+	for i := 0; i < n; i++ {
+		q, err := engine.G2.HashToCurve(messages[i], domain)
+		if err != nil {
+			return false
+		}
+		engine.AddPair(publicKeys[i].p, q)
+	}
+
+	engine.AddPairInv(&bls12.G1One, signature)
+	return engine.Result().IsOne()
+}
+
+func (bls *bls12Base) aggregateVerify(publicKeys []*PublicKey, messages [][]byte, signature *bls12.PointG2) bool {
+	set := make(map[string]struct{})
+	for _, m := range messages {
+		set[string(m)] = struct{}{}
+	}
+	return len(messages) == len(set) && bls.coreAggregateVerify(publicKeys, messages, signature)
+}
+
+func (bls *bls12Base) fastAggregateVerify(publicKeys []*PublicKey, message []byte, signature *bls12.PointG2) bool {
+	engine := bls12.NewEngine()
+	var aggregate bls12.PointG1
+	for _, pk := range publicKeys {
+		engine.G1.Add(&aggregate, &aggregate, pk.p)
+	}
+	return bls.coreVerify(&PublicKey{p: &aggregate}, message, signature, domain)
+}
+
 // Sign creates a cryptographic signature of the given hash.
 func (bls *bls12Base) Sign(hash consensus.Hash) (signature consensus.QuorumSignature, err error) {
 	// TODO: consider passing message to this function instead of hash
@@ -277,26 +318,17 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 		panic("no hash(es) to verify the signature against: you must specify one of the VerifyHash or VerifyHashes options")
 	}
 
-	if signature.Participants().Len() < opts.Threshold {
+	l := sig.Participants().Len()
+
+	if l < opts.Threshold {
 		return false
 	}
 
-	engine := bls12.NewEngine()
-	engine.AddPairInv(&bls12.G1One, &sig.sig)
-
 	var (
-		ps  *bls12.PointG2
-		err error
+		publicKeys = make([]*PublicKey, 0, l)
+		messages   = make([][]byte, 0, l)
+		valid      = true
 	)
-	if !opts.UseHashMap {
-		ps, err = bls12.NewG2().HashToCurve((*opts.Hash)[:], domain)
-		if err != nil {
-			bls.mods.Logger().Errorf("HashToCurve failed: %v", err)
-			return false
-		}
-	}
-
-	valid := true
 
 	sig.participants.RangeWhile(func(i hotstuff.ID) bool {
 		replica, ok := bls.mods.Configuration().Replica(i)
@@ -309,12 +341,8 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 			valid = false
 			return false
 		}
-		pk := replica.PublicKey().(*PublicKey)
+		publicKeys = append(publicKeys, replica.PublicKey().(*PublicKey))
 
-		var (
-			p2  *bls12.PointG2
-			err error
-		)
 		if opts.UseHashMap {
 			hash, ok := opts.HashMap[i]
 			if !ok {
@@ -322,17 +350,8 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 				return false
 			}
 
-			p2, err = bls12.NewG2().HashToCurve(hash[:], domain)
-			if err != nil {
-				bls.mods.Logger().Errorf("HashToCurve failed: %v", err)
-				valid = false
-				return false
-			}
-		} else {
-			p2 = ps
+			messages = append(messages, hash[:])
 		}
-
-		engine.AddPair(pk.p, p2)
 
 		return true
 	})
@@ -341,7 +360,17 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 		return false
 	}
 
-	return engine.Result().IsOne()
+	if l == 1 {
+		message := opts.Hash[:]
+		if opts.UseHashMap {
+			message = messages[0]
+		}
+		return bls.coreVerify(publicKeys[0], message, &sig.sig, domain)
+	} else if opts.UseHashMap {
+		return bls.aggregateVerify(publicKeys, messages, &sig.sig)
+	} else {
+		return bls.fastAggregateVerify(publicKeys, opts.Hash[:], &sig.sig)
+	}
 }
 
 // Combine combines multiple signatures into a single signature.
