@@ -460,10 +460,15 @@ func (s *session) chooseContribution() (cont contribution, combi consensus.Quoru
 }
 
 func (s *session) verifyContribution(c contribution, sig consensus.QuorumSignature) {
+	block, ok := s.h.mods.BlockChain().Get(s.hash)
+	if !ok {
+		return
+	}
+
 	indivVerified := false
 	// If the contribution is individual, we want to verify it separately
 	if c.isIndividual() {
-		if s.h.mods.Crypto().Verify(c.signature, consensus.VerifyHash(s.hash)) {
+		if s.h.mods.Crypto().Verify(c.signature, consensus.VerifySingle(block.ToBytes())) {
 			indivVerified = true
 			s.h.mods.EventLoop().AddEvent(contribution{
 				hash:      c.hash,
@@ -476,7 +481,7 @@ func (s *session) verifyContribution(c contribution, sig consensus.QuorumSignatu
 	}
 
 	aggVerified := false
-	if s.h.mods.Crypto().Verify(sig, consensus.VerifyHash(s.hash)) {
+	if s.h.mods.Crypto().Verify(sig, consensus.VerifySingle(block.ToBytes())) {
 		aggVerified = true
 		s.h.mods.EventLoop().AddEvent(contribution{
 			hash:      c.hash,
