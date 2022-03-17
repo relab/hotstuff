@@ -89,8 +89,7 @@ func (cfg *Config) InitConsensusModule(mods *consensus.Modules, _ *consensus.Opt
 			cfg.mods.EventLoop().DelayUntil(connected{}, event)
 			return
 		}
-		c := event.(replicaConnected)
-		cfg.replicaConnected(c)
+		cfg.replicaConnected(event.(replicaConnected))
 	})
 }
 

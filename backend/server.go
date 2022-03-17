@@ -34,8 +34,6 @@ func (srv *Server) InitConsensusModule(mods *consensus.Modules, _ *consensus.Opt
 func NewServer(opts ...gorums.ServerOption) *Server {
 	srv := &Server{}
 
-	// grpcServerOpts := []grpc.ServerOption{}
-	// opts = append(opts, gorums.WithGRPCServerOptions(grpcServerOpts...))
 	opts = append(opts, gorums.WithConnectCallback(func(ctx context.Context) {
 		srv.mods.EventLoop().AddEvent(replicaConnected{ctx})
 	}))
