@@ -269,8 +269,7 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 			s.mods.Logger().Info("Quorum Certificate could not be verified!")
 			return
 		}
-		s.UpdateHighQC(qc)
-
+		s.updateHighQC(qc)
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
 		if qc.View() >= v {
 			v = qc.View()
@@ -316,6 +315,13 @@ func (s *Synchronizer) UpdateHighQC(qc consensus.QuorumCert) {
 		return
 	}
 
+	s.updateHighQC(qc)
+}
+
+// updateHighQC attempts to update the highQC, but does not verify the qc first.
+// This method is meant to be used instead of the exported UpdateHighQC internally
+// in this package when the qc has already been verified.
+func (s *Synchronizer) updateHighQC(qc consensus.QuorumCert) {
 	newBlock, ok := s.mods.BlockChain().Get(qc.BlockHash())
 	if !ok {
 		s.mods.Logger().Info("updateHighQC: Could not find block referenced by new QC!")
@@ -328,9 +334,9 @@ func (s *Synchronizer) UpdateHighQC(qc consensus.QuorumCert) {
 	}
 
 	if newBlock.View() > oldBlock.View() {
-		s.mods.Logger().Debug("HighQC updated")
 		s.highQC = qc
 		s.leafBlock = newBlock
+		s.mods.Logger().Debug("HighQC updated")
 	}
 }
 
