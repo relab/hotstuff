@@ -258,10 +258,7 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 			s.mods.Logger().Info("Timeout Certificate could not be verified!")
 			return
 		}
-		if v > s.highTC.View() {
-			s.highTC = tc
-		}
-
+		s.updateHighTC(tc)
 		v = tc.View()
 		timeout = true
 	}
@@ -334,6 +331,14 @@ func (s *Synchronizer) UpdateHighQC(qc consensus.QuorumCert) {
 		s.mods.Logger().Debug("HighQC updated")
 		s.highQC = qc
 		s.leafBlock = newBlock
+	}
+}
+
+// updateHighTC attempts to update the highTC, but does not verify the tc first.
+func (s *Synchronizer) updateHighTC(tc consensus.TimeoutCert) {
+	if tc.View() > s.highTC.View() {
+		s.highTC = tc
+		s.mods.Logger().Debug("HighTC updated")
 	}
 }
 
