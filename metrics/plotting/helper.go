@@ -17,10 +17,7 @@ import (
 
 // GonumPlot sets up a gonum/plot and calls f to add data.
 func GonumPlot(filename, xlabel, ylabel string, f func(plt *plot.Plot) error) error {
-	plt, err := plot.New()
-	if err != nil {
-		return fmt.Errorf("failed to create plot: %w", err)
-	}
+	plt := plot.New()
 
 	grid := plotter.NewGrid()
 	grid.Horizontal.Color = color.Gray{Y: 200}
@@ -34,7 +31,7 @@ func GonumPlot(filename, xlabel, ylabel string, f func(plt *plot.Plot) error) er
 	plt.Y.Label.Text = ylabel
 	plt.Y.Tick.Marker = hplot.Ticks{N: 10}
 
-	if err = f(plt); err != nil {
+	if err := f(plt); err != nil {
 		return err
 	}
 

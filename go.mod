@@ -15,12 +15,12 @@ require (
 	github.com/relab/wrfs v0.0.0-20210628111300-b51570396aec
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.8.1
-	go-hep.org/x/hep v0.28.6
+	go-hep.org/x/hep v0.31.0
 	go.uber.org/multierr v1.7.0
 	go.uber.org/zap v1.17.0
+	golang.org/x/exp v0.0.0-20220323204016-c86f0da35e87 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
-	golang.org/x/tools v0.1.8-0.20211028023602-8de2a7fd1736 // indirect
-	gonum.org/v1/plot v0.8.1
+	gonum.org/v1/plot v0.11.0
 	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c
 	google.golang.org/grpc v1.38.0
 	google.golang.org/protobuf v1.26.0
