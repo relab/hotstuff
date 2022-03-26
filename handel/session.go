@@ -201,6 +201,7 @@ func (s *session) canMergeContributions(a, b consensus.QuorumSignature) bool {
 	return canMerge
 }
 
+// the lock should be held when calling score.
 func (s *session) score(contribution contribution) int {
 	if contribution.level < 1 || int(contribution.level) > s.h.maxLevel {
 		// invalid level
@@ -252,10 +253,8 @@ func (s *session) score(contribution contribution) int {
 
 	var score int
 	if added <= 0 {
-		s.mut.Lock()
 		_, haveIndiv := s.levels[contribution.level].individual[contribution.sender]
-		s.mut.Unlock()
-		if contribution.isIndividual() && !haveIndiv {
+		if !haveIndiv {
 			score = 1
 		} else {
 			score = 0
@@ -290,13 +289,13 @@ func (s *session) insertPending(c contribution) {
 		return
 	}
 
+	s.mut.Lock()
+	defer s.mut.Unlock()
+
 	score := s.score(c)
 	if score < 0 {
 		return
 	}
-
-	s.mut.Lock()
-	defer s.mut.Unlock()
 
 	i := sort.Search(len(s.pending), func(i int) bool {
 		other := s.pending[i]
@@ -323,7 +322,7 @@ func (s *session) updateIncoming(c contribution) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
 
-	if c.isIndividual() {
+	if _, ok := s.levels[c.level].individual[c.sender]; !ok {
 		s.h.mods.Logger().Debugf("New individual signature from %d for level %d", c.sender, c.level)
 		s.levels[c.level].individual[c.sender] = c.signature
 	}
@@ -506,15 +505,22 @@ func (s *session) chooseContribution() (cont contribution, combi consensus.Quoru
 	}
 
 	// add any individual signature, if possible
-	for _, indiv := range s.activeLevel.individual {
+	for id, indiv := range s.activeLevel.individual {
 		if s.canMergeContributions(sigCombi, indiv) {
 			sig, err := s.h.mods.Crypto().Combine(sigCombi, indiv)
 			if err == nil {
 				sigCombi = sig
+				s.h.mods.Logger().Debugf("Added individual signature from %d", id)
 			} else {
 				s.h.mods.Logger().Errorf("Failed to combine signatures: %v", err)
 			}
+		} else {
+			s.h.mods.Logger().Debugf("Cannot add individual signature from %d", id)
 		}
+	}
+
+	if len(s.activeLevel.individual) == 0 {
+		s.h.mods.Logger().Debug("No individual signatures to add")
 	}
 
 	_, verifyIndiv = s.levels[best.level].individual[best.sender]
@@ -522,38 +528,31 @@ func (s *session) chooseContribution() (cont contribution, combi consensus.Quoru
 	return best, sigCombi, verifyIndiv, true
 }
 
-func (s *session) verifyContribution(best contribution, sig consensus.QuorumSignature, verifyIndiv bool) {
+func (s *session) verifyContribution(c contribution, sig consensus.QuorumSignature, verifyIndiv bool) {
 	block, ok := s.h.mods.BlockChain().Get(s.hash)
 	if !ok {
 		return
 	}
 
-	s.h.mods.Logger().Debugf("verifying: %v", sig.Participants())
+	s.h.mods.Logger().Debugf("verifying: %v (= %d)", sig.Participants(), sig.Participants().Len())
 
 	aggVerified := false
 	if s.h.mods.Crypto().Verify(sig, consensus.VerifySingle(block.ToBytes())) {
 		aggVerified = true
-		s.h.mods.EventLoop().AddEvent(contribution{
-			hash:      s.hash,
-			sender:    best.sender,
-			level:     best.level,
-			signature: sig,
-			verified:  true,
-		})
 	} else {
 		s.h.mods.Logger().Debug("failed to verify aggregate signature")
 	}
 
 	indivVerified := false
 	// If the contribution is individual, we want to verify it separately
-	if verifyIndiv && best.isIndividual() {
-		if s.h.mods.Crypto().Verify(best.signature, consensus.VerifySingle(block.ToBytes())) {
+	if verifyIndiv {
+		if s.h.mods.Crypto().Verify(c.individual, consensus.VerifySingle(block.ToBytes())) {
 			indivVerified = true
 			s.h.mods.EventLoop().AddEvent(contribution{
 				hash:      s.hash,
-				sender:    best.sender,
-				level:     best.level,
-				signature: best.signature,
+				sender:    c.sender,
+				level:     c.level,
+				signature: c.signature,
 				verified:  true,
 			})
 		} else {
@@ -561,9 +560,18 @@ func (s *session) verifyContribution(best contribution, sig consensus.QuorumSign
 		}
 	}
 
-	indivOk := (!best.isIndividual() || indivVerified || !verifyIndiv)
+	indivOk := (indivVerified || !verifyIndiv)
 
 	if indivOk && aggVerified {
+		s.h.mods.EventLoop().AddEvent(contribution{
+			hash:       s.hash,
+			sender:     c.sender,
+			level:      c.level,
+			signature:  sig,
+			individual: c.individual,
+			verified:   true,
+		})
+
 		s.h.mods.Logger().Debug("window increased")
 		s.window.increase()
 	} else {
