@@ -11,6 +11,8 @@ type contribution struct {
 	level     int
 	signature consensus.QuorumSignature
 	verified  bool
+	deferred  bool
+	score     int
 }
 
 func (c contribution) isIndividual() bool {

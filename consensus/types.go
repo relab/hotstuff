@@ -66,6 +66,22 @@ func (s idSetMap) Len() int {
 	return len(s)
 }
 
+func (s idSetMap) String() string {
+	return IDSetToString(s)
+}
+
+// IDSetToString formats an IDSet as a string.
+func IDSetToString(set IDSet) string {
+	var sb strings.Builder
+	sb.WriteString("[ ")
+	set.ForEach(func(i hotstuff.ID) {
+		sb.WriteString(strconv.Itoa(int(i)))
+		sb.WriteString(" ")
+	})
+	sb.WriteString("]")
+	return sb.String()
+}
+
 // View is a number that uniquely identifies a view.
 type View uint64
 

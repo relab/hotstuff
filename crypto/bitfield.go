@@ -1,6 +1,9 @@
 package crypto
 
-import "github.com/relab/hotstuff"
+import (
+	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/consensus"
+)
 
 // Bitfield is an IDSet implemented by a bitfield. To check if an ID 'i' is present in the set, we simply check
 // if the bit at i-1 is set (because IDs start at 1). This scales poorly if IDs are not sequential.
@@ -99,4 +102,8 @@ func (bf Bitfield) RangeWhile(f func(hotstuff.ID) bool) {
 // Len returns the number of entries in the set.
 func (bf Bitfield) Len() int {
 	return bf.len
+}
+
+func (bm Bitfield) String() string {
+	return consensus.IDSetToString(&bm)
 }

@@ -28,7 +28,6 @@ package handel
 import (
 	"errors"
 	"math"
-	"time"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/backend"
@@ -89,20 +88,22 @@ func (h *Handel) Init() error {
 
 	h.mods.EventLoop().RegisterHandler(contribution{}, func(event interface{}) {
 		c := event.(contribution)
-
 		if s, ok := h.sessions[c.hash]; ok {
 			s.handleContribution(c)
+		} else if !c.deferred {
+			c.deferred = true
+			h.mods.EventLoop().DelayUntil(consensus.ProposeMsg{}, c)
 		}
 	})
 
-	h.mods.EventLoop().RegisterHandler(disseminateEvent{}, func(_ interface{}) {
-		for _, s := range h.sessions {
+	h.mods.EventLoop().RegisterHandler(disseminateEvent{}, func(e interface{}) {
+		if s, ok := h.sessions[e.(disseminateEvent).sessionID]; ok {
 			s.sendContributions(s.h.mods.Synchronizer().ViewContext())
 		}
 	})
 
-	h.mods.EventLoop().RegisterHandler(levelActivateEvent{}, func(_ interface{}) {
-		for _, s := range h.sessions {
+	h.mods.EventLoop().RegisterHandler(levelActivateEvent{}, func(e interface{}) {
+		if s, ok := h.sessions[e.(levelActivateEvent).sessionID]; ok {
 			s.advanceLevel()
 		}
 	})
@@ -110,14 +111,6 @@ func (h *Handel) Init() error {
 	h.mods.EventLoop().RegisterHandler(sessionDoneEvent{}, func(event interface{}) {
 		e := event.(sessionDoneEvent)
 		delete(h.sessions, e.hash)
-	})
-
-	h.mods.EventLoop().AddTicker(disseminationPeriod, func(_ time.Time) (_ interface{}) {
-		return disseminateEvent{}
-	})
-
-	h.mods.EventLoop().AddTicker(levelActivateInterval, func(_ time.Time) (_ interface{}) {
-		return levelActivateEvent{}
 	})
 
 	return nil
@@ -167,9 +160,13 @@ func (impl serviceImpl) Contribute(ctx gorums.ServerCtx, msg *handelpb.Contribut
 	}
 }
 
-type disseminateEvent struct{}
+type disseminateEvent struct {
+	sessionID consensus.Hash
+}
 
-type levelActivateEvent struct{}
+type levelActivateEvent struct {
+	sessionID consensus.Hash
+}
 
 type sessionDoneEvent struct {
 	hash consensus.Hash
