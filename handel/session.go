@@ -153,7 +153,6 @@ type level struct {
 	incoming   consensus.QuorumSignature
 	outgoing   consensus.QuorumSignature
 	individual map[hotstuff.ID]consensus.QuorumSignature
-	done       bool
 }
 
 func (s *session) newLevel(i int) level {
@@ -434,7 +433,7 @@ func (s *session) sendContributions(ctx context.Context) {
 
 func (s *session) verifyContributions(ctx context.Context) {
 	for ctx.Err() == nil {
-		c, sig, indiv, ok := s.chooseContribution()
+		c, verifyIndiv, ok := s.chooseContribution()
 		if !ok {
 			select {
 			case <-ctx.Done():
@@ -443,7 +442,8 @@ func (s *session) verifyContributions(ctx context.Context) {
 			}
 			continue
 		}
-		s.verifyContribution(c, sig, indiv)
+		sig := s.improveSignature(c.signature)
+		s.verifyContribution(c, sig, verifyIndiv)
 	}
 
 	s.h.mods.EventLoop().RemoveTicker(s.disseminateTimerID)
@@ -451,11 +451,16 @@ func (s *session) verifyContributions(ctx context.Context) {
 
 }
 
-func (s *session) chooseContribution() (cont contribution, combi consensus.QuorumSignature, verifyIndiv, ok bool) {
+// chooseContribution chooses the next contribution to verify.
+// The return parameter verifyIndiv is set to true if the
+// individual signature in the chosen contribution should be verified.
+// The return parameter ok is set to true if a contribution was chosen,
+// false if no contribution was chosen.
+func (s *session) chooseContribution() (cont contribution, verifyIndiv, ok bool) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
 	if len(s.pending) == 0 {
-		return contribution{}, nil, false, false
+		return contribution{}, false, false
 	}
 
 	bestIndex := 0
@@ -481,18 +486,25 @@ func (s *session) chooseContribution() (cont contribution, combi consensus.Quoru
 	}
 
 	if best.score == 0 {
-		return contribution{}, nil, false, false
+		return contribution{}, false, false
 	}
 
 	s.pending = newPending
 
-	// combine with the current best signature, if possible
+	_, verifyIndiv = s.levels[best.level].individual[best.sender]
+
+	return best, verifyIndiv, true
+}
+
+// improveSignature attempts to improve the signature by merging it with the current best signature, if possible,
+// and adding individual signatures, if possible.
+func (s *session) improveSignature(sig consensus.QuorumSignature) consensus.QuorumSignature {
 
 	// this creates a clone of the signature
-	sigCombi, err := s.h.mods.Crypto().Combine(best.signature)
+	sigCombi, err := s.h.mods.Crypto().Combine(sig)
 	if err != nil {
 		s.h.mods.Logger().Error("Failed to clone signature using Combine: %v", err)
-		return
+		return nil
 	}
 
 	if s.canMergeContributions(sigCombi, s.activeLevel.incoming) {
@@ -505,27 +517,18 @@ func (s *session) chooseContribution() (cont contribution, combi consensus.Quoru
 	}
 
 	// add any individual signature, if possible
-	for id, indiv := range s.activeLevel.individual {
+	for _, indiv := range s.activeLevel.individual {
 		if s.canMergeContributions(sigCombi, indiv) {
 			sig, err := s.h.mods.Crypto().Combine(sigCombi, indiv)
 			if err == nil {
 				sigCombi = sig
-				s.h.mods.Logger().Debugf("Added individual signature from %d", id)
 			} else {
 				s.h.mods.Logger().Errorf("Failed to combine signatures: %v", err)
 			}
-		} else {
-			s.h.mods.Logger().Debugf("Cannot add individual signature from %d", id)
 		}
 	}
 
-	if len(s.activeLevel.individual) == 0 {
-		s.h.mods.Logger().Debug("No individual signatures to add")
-	}
-
-	_, verifyIndiv = s.levels[best.level].individual[best.sender]
-
-	return best, sigCombi, verifyIndiv, true
+	return sigCombi
 }
 
 func (s *session) verifyContribution(c contribution, sig consensus.QuorumSignature, verifyIndiv bool) {
