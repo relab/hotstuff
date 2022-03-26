@@ -84,7 +84,6 @@ type session struct {
 
 	// verification
 	window           window
-	pending          []contribution
 	newContributions chan struct{}
 
 	// timers
@@ -153,6 +152,8 @@ type level struct {
 	incoming   consensus.QuorumSignature
 	outgoing   consensus.QuorumSignature
 	individual map[hotstuff.ID]consensus.QuorumSignature
+	pending    []contribution
+	done       bool
 }
 
 func (s *session) newLevel(i int) level {
@@ -288,6 +289,8 @@ func (s *session) insertPending(c contribution) {
 		return
 	}
 
+	level := &s.levels[c.level]
+
 	s.mut.Lock()
 	defer s.mut.Unlock()
 
@@ -296,17 +299,17 @@ func (s *session) insertPending(c contribution) {
 		return
 	}
 
-	i := sort.Search(len(s.pending), func(i int) bool {
-		other := s.pending[i]
-		return s.activeLevel.vp[other.sender] <= s.activeLevel.vp[c.sender]
+	i := sort.Search(len(level.pending), func(i int) bool {
+		other := level.pending[i]
+		return level.vp[other.sender] <= level.vp[c.sender]
 	})
 
 	// either replace or insert a new contribution at index i
-	if len(s.pending) == i || s.pending[i].sender != c.sender {
-		s.pending = append(s.pending, contribution{})
-		copy(s.pending[i+1:], s.pending[i:])
+	if len(level.pending) == i || level.pending[i].sender != c.sender {
+		level.pending = append(level.pending, contribution{})
+		copy(level.pending[i+1:], level.pending[i:])
 	}
-	s.pending[i] = c
+	level.pending[i] = c
 
 	s.h.mods.Logger().Debugf("pending contribution at level %d with score %d from sender %d", c.level, score, c.sender)
 
@@ -459,41 +462,93 @@ func (s *session) verifyContributions(ctx context.Context) {
 func (s *session) chooseContribution() (cont contribution, verifyIndiv, ok bool) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
-	if len(s.pending) == 0 {
+
+	var choices []contribution
+
+	// choose one contribution from each active level
+	for levelIndex := 0; levelIndex <= s.activeLevelIndex; levelIndex++ {
+		if s.levels[levelIndex].done {
+			continue
+		}
+		c, ok := s.chooseContributionFromLevel(levelIndex)
+		if ok {
+			choices = append(choices, c)
+		}
+	}
+
+	if len(choices) == 0 {
 		return contribution{}, false, false
 	}
 
-	bestIndex := 0
-	s.pending[bestIndex].score = s.score(s.pending[bestIndex])
+	// choose the best contribution among the chosen for each level
+	bestChoiceIndex := 0
+	for i := range choices {
+		if choices[i].score > choices[bestChoiceIndex].score {
+			bestChoiceIndex = i
+		}
+	}
 
-	for i := 1; i < len(s.pending); i++ {
-		score := s.score(s.pending[i])
-		s.pending[i].score = score
-		if i < s.window.get() && score > s.pending[bestIndex].score {
+	// put the other choices back
+	for choiceIndex := range choices {
+		if choiceIndex == bestChoiceIndex {
+			continue
+		}
+
+		level := &s.levels[choiceIndex]
+
+		// put the choice back into its level
+		pos := sort.Search(len(level.pending), func(i int) bool {
+			other := level.pending[i]
+			return level.vp[other.sender] < level.vp[choices[choiceIndex].sender]
+		})
+		level.pending = append(level.pending, contribution{})
+		copy(level.pending[pos+1:], level.pending[pos:])
+		level.pending[pos] = choices[choiceIndex]
+	}
+
+	best := choices[bestChoiceIndex]
+	s.h.mods.Logger().Debugf("Chose: %v", best.signature.Participants())
+
+	_, verifyIndiv = s.levels[best.level].individual[best.sender]
+
+	return best, verifyIndiv, true
+}
+
+func (s *session) chooseContributionFromLevel(levelIndex int) (cont contribution, ok bool) {
+	level := &s.levels[levelIndex]
+
+	if len(level.pending) == 0 {
+		return contribution{}, false
+	}
+
+	bestIndex := 0
+	level.pending[bestIndex].score = s.score(level.pending[bestIndex])
+
+	for i := 1; i < len(level.pending); i++ {
+		score := s.score(level.pending[i])
+		level.pending[i].score = score
+		if i < s.window.get() && score > level.pending[bestIndex].score {
 			bestIndex = i
 		}
 	}
 
-	best := s.pending[bestIndex]
-	s.h.mods.Logger().Debugf("Chose: %v", best.signature.Participants())
+	best := level.pending[bestIndex]
 
 	var newPending []contribution
-	for i, c := range s.pending {
+	for i, c := range level.pending {
 		if c.score > 0 && i != bestIndex {
 			newPending = append(newPending, c)
 			s.h.mods.Logger().Debugf("In pending: %v", c.signature.Participants())
 		}
 	}
 
+	level.pending = newPending
+
 	if best.score == 0 {
-		return contribution{}, false, false
+		return contribution{}, false
 	}
 
-	s.pending = newPending
-
-	_, verifyIndiv = s.levels[best.level].individual[best.sender]
-
-	return best, verifyIndiv, true
+	return best, true
 }
 
 // improveSignature attempts to improve the signature by merging it with the current best signature, if possible,
