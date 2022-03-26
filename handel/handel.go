@@ -139,24 +139,20 @@ func (impl serviceImpl) Contribute(ctx gorums.ServerCtx, msg *handelpb.Contribut
 		impl.h.mods.Logger().Error(err)
 	}
 
-	if sig := hotstuffpb.QuorumSignatureFromProto(msg.GetIndividual()); sig != nil {
-		impl.h.mods.EventLoop().AddEvent(contribution{
-			hash:      hash,
-			sender:    id,
-			level:     int(msg.GetLevel()),
-			signature: sig,
-			verified:  false,
-		})
-	}
+	sig := hotstuffpb.QuorumSignatureFromProto(msg.GetSignature())
+	indiv := hotstuffpb.QuorumSignatureFromProto(msg.GetIndividual())
 
-	if sig := hotstuffpb.QuorumSignatureFromProto(msg.GetSignature()); sig != nil {
+	if sig != nil && indiv != nil {
 		impl.h.mods.EventLoop().AddEvent(contribution{
-			hash:      hash,
-			sender:    id,
-			level:     int(msg.GetLevel()),
-			signature: sig,
-			verified:  false,
+			hash:       hash,
+			sender:     id,
+			level:      int(msg.GetLevel()),
+			signature:  sig,
+			individual: indiv,
+			verified:   false,
 		})
+	} else {
+		impl.h.mods.Logger().Warnf("contribution received with invalid signatures: %v, %v", sig, indiv)
 	}
 }
 
