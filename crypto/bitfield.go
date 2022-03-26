@@ -104,6 +104,6 @@ func (bf Bitfield) Len() int {
 	return bf.len
 }
 
-func (bm Bitfield) String() string {
-	return consensus.IDSetToString(&bm)
+func (bf Bitfield) String() string {
+	return consensus.IDSetToString(&bf)
 }
