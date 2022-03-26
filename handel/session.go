@@ -324,61 +324,83 @@ func (s *session) updateIncoming(c contribution) {
 	s.mut.Lock()
 	defer s.mut.Unlock()
 
-	if _, ok := s.levels[c.level].individual[c.sender]; !ok {
+	level := &s.levels[c.level]
+
+	// check if there is a new individual signature
+	if _, ok := level.individual[c.sender]; !ok {
 		s.h.mods.Logger().Debugf("New individual signature from %d for level %d", c.sender, c.level)
-		s.levels[c.level].individual[c.sender] = c.signature
+		level.individual[c.sender] = c.signature
 	}
 
-	if c.signature.Participants().Len() > s.activeLevel.incoming.Participants().Len() {
-		s.h.mods.Logger().Debugf("New incoming aggregate signature for level %d with length %d", c.level, c.signature.Participants().Len())
-		s.activeLevel.incoming = c.signature
+	// check if the multisignature is an improvement
+	if c.signature.Participants().Len() <= level.incoming.Participants().Len() {
+		return
 	}
 
-	// // check if the level is complete
-	// complete := true
-	// partition := s.part.partition(s.activeLevelIndex)
-	// for _, id := range partition {
-	// 	if !c.signature.Participants().Contains(id) {
-	// 		complete = false
-	// 	}
-	// }
+	s.h.mods.Logger().Debugf("New incoming aggregate signature for level %d with length %d", c.level, c.signature.Participants().Len())
+	level.incoming = c.signature
 
-	// if complete {
-	// 	s.sendFastPath()
-	// }
+	if s.isLevelComplete(c.level) {
+		level.done = true
+		// s.sendFastPath()
+		s.advanceLevel()
+	}
 
-	bestSig := s.activeLevel.incoming
-	bestLen := s.activeLevel.incoming.Participants().Len()
+	s.updateOutgoing(c.level + 1)
+}
 
-	if s.canMergeContributions(s.activeLevel.incoming, s.activeLevel.outgoing) {
-		var err error
-		bestSig, err = s.h.mods.Crypto().Combine(s.activeLevel.incoming, s.activeLevel.outgoing)
-		if err != nil {
-			s.h.mods.Logger().Errorf("Failed to combine signatures: %v", err)
-			return
+// updateOutgoing updates the outgoing signature for the specified level,
+// and bubbles up the update to the highest level.
+// The lock must be held when calling this method.
+func (s *session) updateOutgoing(levelIndex int) {
+	if levelIndex == 0 {
+		panic("cannot update the outgoing signature for level 0")
+	}
+
+	prevLevel := &s.levels[levelIndex-1]
+
+	outgoing, err := s.h.mods.Crypto().Combine(prevLevel.incoming, prevLevel.outgoing)
+	if err != nil {
+		s.h.mods.Logger().Errorf("Failed to combine incoming and outgoing for level %d: %v", levelIndex, err)
+		return
+	}
+
+	if levelIndex > s.h.maxLevel {
+		if outgoing.Participants().Len() >= s.h.mods.Configuration().QuorumSize() {
+			s.h.mods.Logger().Debugf("Done with session: %.8s", s.hash)
+
+			s.h.mods.EventLoop().AddEvent(consensus.NewViewMsg{
+				SyncInfo: consensus.NewSyncInfo().WithQC(consensus.NewQuorumCert(
+					outgoing,
+					s.h.mods.Synchronizer().View(),
+					s.hash,
+				)),
+			})
+
+			s.h.mods.EventLoop().AddEvent(sessionDoneEvent{s.hash})
 		}
+	} else {
+		level := &s.levels[levelIndex]
 
-		bestLen = bestSig.Participants().Len()
+		level.outgoing = outgoing
+
+		if levelIndex <= s.h.maxLevel {
+			s.updateOutgoing(levelIndex + 1)
+		}
 	}
+}
 
-	s.h.mods.Logger().Debugf("updateIncoming: best length %d for level %d", bestLen, s.activeLevelIndex)
-	s.h.mods.Logger().Debugf("updateIncoming: incoming: %v, outgoing: %v", s.activeLevel.incoming.Participants(), s.activeLevel.outgoing.Participants())
-
-	// check if we have enough signers for a quorum
-	if bestLen >= s.h.mods.Configuration().QuorumSize() {
-
-		s.h.mods.Logger().Debugf("Done with session: %.8s", s.hash)
-
-		s.h.mods.EventLoop().AddEvent(consensus.NewViewMsg{
-			SyncInfo: consensus.NewSyncInfo().WithQC(consensus.NewQuorumCert(
-				bestSig,
-				s.h.mods.Synchronizer().View(),
-				s.hash,
-			)),
-		})
-
-		s.h.mods.EventLoop().AddEvent(sessionDoneEvent{s.hash})
+func (s *session) isLevelComplete(levelIndex int) bool {
+	level := s.levels[levelIndex]
+	// check if the level is complete
+	complete := true
+	partition := s.part.partition(levelIndex)
+	for _, id := range partition {
+		if !level.incoming.Participants().Contains(id) {
+			complete = false
+		}
 	}
+	return complete
 }
 
 func (s *session) advanceLevel() {
