@@ -30,6 +30,7 @@ import (
 	"math"
 
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/handelpb"
@@ -154,6 +155,17 @@ func (impl serviceImpl) Contribute(ctx gorums.ServerCtx, msg *handelpb.Contribut
 	} else {
 		impl.h.mods.Logger().Warnf("contribution received with invalid signatures: %v, %v", sig, indiv)
 	}
+}
+
+type contribution struct {
+	hash       consensus.Hash
+	sender     hotstuff.ID
+	level      int
+	signature  consensus.QuorumSignature
+	individual consensus.QuorumSignature
+	verified   bool
+	deferred   bool
+	score      int
 }
 
 type disseminateEvent struct {
