@@ -338,8 +338,10 @@ func (s *session) updateIncoming(c contribution) {
 
 	if s.isLevelComplete(c.level) {
 		level.done = true
-		// TODO: s.sendFastPath()
 		s.advanceLevel()
+		if c.level+1 <= s.h.maxLevel {
+			s.sendFastPath(s.h.mods.Synchronizer().ViewContext(), c.level+1)
+		}
 	}
 
 	s.updateOutgoing(c.level + 1)
@@ -416,11 +418,23 @@ func (s *session) sendContributions(ctx context.Context) {
 		if s.levels[i].done {
 			continue
 		}
-		s.sendContributionsToLevel(ctx, i)
+		s.sendContributionToLevel(ctx, i)
 	}
 }
 
-func (s *session) sendContributionsToLevel(ctx context.Context, levelIndex int) {
+func (s *session) sendFastPath(ctx context.Context, levelIndex int) {
+	s.h.mods.Logger().Debug("fast path activated")
+
+	n := s.part.size(levelIndex)
+	if n > 10 {
+		n = 10
+	}
+	for i := 0; i < n; i++ {
+		s.sendContributionToLevel(ctx, levelIndex)
+	}
+}
+
+func (s *session) sendContributionToLevel(ctx context.Context, levelIndex int) {
 	level := &s.levels[levelIndex]
 
 	part := s.part.partition(levelIndex)
