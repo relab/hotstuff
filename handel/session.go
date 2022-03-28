@@ -79,7 +79,6 @@ type session struct {
 
 	// levels
 	levels           []level
-	activeLevel      *level
 	activeLevelIndex int
 
 	// verification
@@ -132,8 +131,9 @@ func (h *Handel) newSession(hash consensus.Hash, in consensus.QuorumSignature) *
 	}
 
 	s.levels[0].individual[h.mods.ID()] = in
-	s.levels[0].outgoing = in
-	s.activeLevel = &s.levels[0]
+	s.levels[0].incoming = in
+
+	s.updateOutgoing(1)
 
 	s.disseminateTimerID = h.mods.EventLoop().AddTicker(disseminationPeriod, func(_ time.Time) (event interface{}) {
 		return disseminateEvent{s.hash}
@@ -192,12 +192,6 @@ func (s *session) canMergeContributions(a, b consensus.QuorumSignature) bool {
 		return canMerge
 	})
 
-	// if canMerge {
-	// 	s.h.mods.Logger().Debugf("Can merge %v and %v", a.Participants(), b.Participants())
-	// } else {
-	// 	s.h.mods.Logger().Debugf("Can not merge %v and %v", a.Participants(), b.Participants())
-	// }
-
 	return canMerge
 }
 
@@ -208,12 +202,14 @@ func (s *session) score(contribution contribution) int {
 		return 0
 	}
 
-	need := s.part.size(s.activeLevelIndex)
+	level := &s.levels[contribution.level]
+
+	need := s.part.size(contribution.level)
 	if contribution.level == s.h.maxLevel {
 		need = s.h.mods.Configuration().QuorumSize()
 	}
 
-	curBest := s.activeLevel.incoming
+	curBest := level.incoming
 	if curBest.Participants().Len() >= need {
 		// level is completed, no need for this signature.
 		return 0
@@ -232,7 +228,7 @@ func (s *session) score(contribution contribution) int {
 
 	indivAdded := 0
 
-	for id := range s.activeLevel.individual {
+	for id := range level.individual {
 		if !finalParticipants.Contains(id) {
 			finalParticipants.Add(id)
 			indivAdded++
@@ -342,7 +338,7 @@ func (s *session) updateIncoming(c contribution) {
 
 	if s.isLevelComplete(c.level) {
 		level.done = true
-		// s.sendFastPath()
+		// TODO: s.sendFastPath()
 		s.advanceLevel()
 	}
 
@@ -384,6 +380,8 @@ func (s *session) updateOutgoing(levelIndex int) {
 
 		level.outgoing = outgoing
 
+		s.h.mods.Logger().Debugf("Updated outgoing for level %d: %v", levelIndex, outgoing.Participants())
+
 		if levelIndex <= s.h.maxLevel {
 			s.updateOutgoing(levelIndex + 1)
 		}
@@ -391,7 +389,7 @@ func (s *session) updateOutgoing(levelIndex int) {
 }
 
 func (s *session) isLevelComplete(levelIndex int) bool {
-	level := s.levels[levelIndex]
+	level := &s.levels[levelIndex]
 	// check if the level is complete
 	complete := true
 	partition := s.part.partition(levelIndex)
@@ -408,31 +406,30 @@ func (s *session) advanceLevel() {
 		return
 	}
 
-	out, err := s.h.mods.Crypto().Combine(s.activeLevel.outgoing, s.activeLevel.incoming)
-	if err != nil {
-		s.h.mods.Logger().Errorf("Failed to combine signatures: %v", err)
-		return
-	}
-
 	s.activeLevelIndex++
-	s.activeLevel = &s.levels[s.activeLevelIndex]
-	s.activeLevel.outgoing = out
 
 	s.h.mods.Logger().Debugf("advanced to level %d", s.activeLevelIndex)
 }
 
 func (s *session) sendContributions(ctx context.Context) {
-	if s.activeLevelIndex == 0 {
-		return
+	for i := 1; i <= s.activeLevelIndex; i++ {
+		if s.levels[i].done {
+			continue
+		}
+		s.sendContributionsToLevel(ctx, i)
 	}
+}
 
-	part := s.part.partition(s.activeLevelIndex)
+func (s *session) sendContributionsToLevel(ctx context.Context, levelIndex int) {
+	level := &s.levels[levelIndex]
+
+	part := s.part.partition(levelIndex)
 
 	id := part[0]
-	bestCP := s.activeLevel.cp[id]
+	bestCP := level.cp[id]
 
 	for _, i := range part {
-		cp := s.activeLevel.cp[i]
+		cp := level.cp[i]
 		if cp < bestCP {
 			bestCP = cp
 			id = i
@@ -444,8 +441,8 @@ func (s *session) sendContributions(ctx context.Context) {
 		if node.ID() == uint32(id) {
 			node.Contribute(ctx, &handelpb.Contribution{
 				ID:         uint32(s.h.mods.ID()),
-				Level:      uint32(s.activeLevelIndex),
-				Signature:  hotstuffpb.QuorumSignatureToProto(s.activeLevel.outgoing),
+				Level:      uint32(levelIndex),
+				Signature:  hotstuffpb.QuorumSignatureToProto(level.outgoing),
 				Individual: hotstuffpb.QuorumSignatureToProto(s.levels[0].outgoing),
 				Hash:       s.hash[:],
 			}, gorums.WithNoSendWaiting())
@@ -453,7 +450,7 @@ func (s *session) sendContributions(ctx context.Context) {
 	}
 
 	// ensure we don't send to the same node each time
-	s.activeLevel.cp[id] += len(s.part.ids)
+	level.cp[id] += len(s.part.ids)
 }
 
 func (s *session) verifyContributions(ctx context.Context) {
@@ -467,7 +464,7 @@ func (s *session) verifyContributions(ctx context.Context) {
 			}
 			continue
 		}
-		sig := s.improveSignature(c.signature)
+		sig := s.improveSignature(c)
 		s.verifyContribution(c, sig, verifyIndiv)
 	}
 
@@ -488,7 +485,7 @@ func (s *session) chooseContribution() (cont contribution, verifyIndiv, ok bool)
 	var choices []contribution
 
 	// choose one contribution from each active level
-	for levelIndex := 0; levelIndex <= s.activeLevelIndex; levelIndex++ {
+	for levelIndex := 1; levelIndex <= s.activeLevelIndex; levelIndex++ {
 		if s.levels[levelIndex].done {
 			continue
 		}
@@ -539,7 +536,7 @@ func (s *session) chooseContribution() (cont contribution, verifyIndiv, ok bool)
 func (s *session) chooseContributionFromLevel(levelIndex int) (cont contribution, ok bool) {
 	level := &s.levels[levelIndex]
 
-	if len(level.pending) == 0 {
+	if len(level.pending) == 0 || level.done {
 		return contribution{}, false
 	}
 
@@ -560,7 +557,6 @@ func (s *session) chooseContributionFromLevel(levelIndex int) (cont contribution
 	for i, c := range level.pending {
 		if c.score > 0 && i != bestIndex {
 			newPending = append(newPending, c)
-			s.h.mods.Logger().Debugf("In pending: %v", c.signature.Participants())
 		}
 	}
 
@@ -575,17 +571,18 @@ func (s *session) chooseContributionFromLevel(levelIndex int) (cont contribution
 
 // improveSignature attempts to improve the signature by merging it with the current best signature, if possible,
 // and adding individual signatures, if possible.
-func (s *session) improveSignature(sig consensus.QuorumSignature) consensus.QuorumSignature {
+func (s *session) improveSignature(contribution contribution) consensus.QuorumSignature {
+	level := &s.levels[contribution.level]
 
 	// this creates a clone of the signature
-	sigCombi, err := s.h.mods.Crypto().Combine(sig)
+	sigCombi, err := s.h.mods.Crypto().Combine(contribution.signature)
 	if err != nil {
 		s.h.mods.Logger().Error("Failed to clone signature using Combine: %v", err)
 		return nil
 	}
 
-	if s.canMergeContributions(sigCombi, s.activeLevel.incoming) {
-		sig, err := s.h.mods.Crypto().Combine(sigCombi, s.activeLevel.incoming)
+	if s.canMergeContributions(sigCombi, level.incoming) {
+		sig, err := s.h.mods.Crypto().Combine(sigCombi, level.incoming)
 		if err == nil {
 			sigCombi = sig
 		} else {
@@ -594,7 +591,7 @@ func (s *session) improveSignature(sig consensus.QuorumSignature) consensus.Quor
 	}
 
 	// add any individual signature, if possible
-	for _, indiv := range s.activeLevel.individual {
+	for _, indiv := range level.individual {
 		if s.canMergeContributions(sigCombi, indiv) {
 			sig, err := s.h.mods.Crypto().Combine(sigCombi, indiv)
 			if err == nil {
@@ -628,13 +625,6 @@ func (s *session) verifyContribution(c contribution, sig consensus.QuorumSignatu
 	if verifyIndiv {
 		if s.h.mods.Crypto().Verify(c.individual, consensus.VerifySingle(block.ToBytes())) {
 			indivVerified = true
-			s.h.mods.EventLoop().AddEvent(contribution{
-				hash:      s.hash,
-				sender:    c.sender,
-				level:     c.level,
-				signature: c.signature,
-				verified:  true,
-			})
 		} else {
 			s.h.mods.Logger().Debug("failed to verify individual signature")
 		}
