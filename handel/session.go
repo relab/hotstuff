@@ -436,17 +436,14 @@ func (s *session) sendContributionsToLevel(ctx context.Context, levelIndex int) 
 		}
 	}
 
-	// TODO: can we replace this search with a map lookup instead?
-	for _, node := range s.h.cfg.Nodes() {
-		if node.ID() == uint32(id) {
-			node.Contribute(ctx, &handelpb.Contribution{
-				ID:         uint32(s.h.mods.ID()),
-				Level:      uint32(levelIndex),
-				Signature:  hotstuffpb.QuorumSignatureToProto(level.outgoing),
-				Individual: hotstuffpb.QuorumSignatureToProto(s.levels[0].outgoing),
-				Hash:       s.hash[:],
-			}, gorums.WithNoSendWaiting())
-		}
+	if node, ok := s.h.nodes[id]; ok {
+		node.Contribute(ctx, &handelpb.Contribution{
+			ID:         uint32(s.h.mods.ID()),
+			Level:      uint32(levelIndex),
+			Signature:  hotstuffpb.QuorumSignatureToProto(level.outgoing),
+			Individual: hotstuffpb.QuorumSignatureToProto(s.levels[0].outgoing),
+			Hash:       s.hash[:],
+		}, gorums.WithNoSendWaiting())
 	}
 
 	// ensure we don't send to the same node each time

@@ -45,14 +45,16 @@ func init() {
 // Handel implements a signature aggregation protocol.
 type Handel struct {
 	mods     *consensus.Modules
-	cfg      *handelpb.Configuration
+	nodes    map[hotstuff.ID]*handelpb.Node
 	maxLevel int
 	sessions map[consensus.Hash]*session
 }
 
 // New returns a new instance of the Handel module.
 func New() consensus.Handel {
-	return &Handel{}
+	return &Handel{
+		nodes: make(map[hotstuff.ID]*handelpb.Node),
+	}
 }
 
 // InitConsensusModule gives the module a reference to the Modules object.
@@ -83,7 +85,11 @@ func (h *Handel) Init() error {
 	}
 
 	handelpb.RegisterHandelServer(srv.GetGorumsServer(), serviceImpl{h})
-	h.cfg = handelpb.ConfigurationFromRaw(cfg.GetRawConfiguration(), nil)
+	handelCfg := handelpb.ConfigurationFromRaw(cfg.GetRawConfiguration(), nil)
+
+	for _, n := range handelCfg.Nodes() {
+		h.nodes[hotstuff.ID(n.ID())] = n
+	}
 
 	h.maxLevel = int(math.Ceil(math.Log2(float64(h.mods.Configuration().Len()))))
 
