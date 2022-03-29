@@ -82,7 +82,7 @@ func (c crypto) CreateAggregateQC(view consensus.View, timeouts []consensus.Time
 	}
 	sig, err := c.Combine(sigs...)
 	if err != nil {
-		return aggQC, err
+		return consensus.AggregateQC{}, err
 	}
 	return consensus.NewAggregateQC(qcs, sig, view), nil
 }
@@ -98,6 +98,7 @@ func (c crypto) VerifyPartialCert(cert consensus.PartialCert) bool {
 
 // VerifyQuorumCert verifies a quorum certificate.
 func (c crypto) VerifyQuorumCert(qc consensus.QuorumCert) bool {
+	// genesis QC is always valid.
 	if qc.BlockHash() == consensus.GetGenesis().Hash() {
 		return true
 	}
@@ -110,6 +111,7 @@ func (c crypto) VerifyQuorumCert(qc consensus.QuorumCert) bool {
 
 // VerifyTimeoutCert verifies a timeout certificate.
 func (c crypto) VerifyTimeoutCert(tc consensus.TimeoutCert) bool {
+	// view 0 TC is always valid.
 	if tc.View() == 0 {
 		return true
 	}

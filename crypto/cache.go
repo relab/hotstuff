@@ -17,7 +17,7 @@ type cache struct {
 	accessOrder list.List
 }
 
-// NewCache returns a new Crypto implementation that caches the results of the operations of the given CryptoImpl
+// NewCache returns a new Crypto implementation that caches the results of the operations of the given CryptoBase
 // implementation.
 func NewCache(impl consensus.CryptoBase, capacity int) consensus.Crypto {
 	return New(&cache{
@@ -67,7 +67,7 @@ func (cache *cache) evict() {
 	delete(cache.entries, key)
 }
 
-// Sign signs a message.
+// Sign signs a message and adds it to the cache for use during verification.
 func (cache *cache) Sign(message []byte) (sig consensus.QuorumSignature, err error) {
 	sig, err = cache.impl.Sign(message)
 	if err != nil {
@@ -124,14 +124,8 @@ func (cache *cache) Verify(sig consensus.QuorumSignature, options ...consensus.V
 	return false
 }
 
-// Combine combines multiple signatures into a single threshold signature.
-// Arguments can be singular signatures or threshold signatures.
-//
-// As opposed to the CreateThresholdSignature methods,
-// this method does not check whether the resulting
-// signature meets the quorum size.
+// Combine combines multiple signatures together into a single signature.
 func (cache *cache) Combine(signatures ...consensus.QuorumSignature) (consensus.QuorumSignature, error) {
 	// we don't cache the result of this operation, because it is not guaranteed to be valid.
-	sig, err := cache.impl.Combine(signatures...)
-	return sig, err
+	return cache.impl.Combine(signatures...)
 }

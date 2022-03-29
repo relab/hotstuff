@@ -91,8 +91,8 @@ func (priv *PrivateKey) Public() consensus.PublicKey {
 	return &PublicKey{p: bls12.NewG1().MulScalarBig(p, &bls12.G1One, priv.p)}
 }
 
-// AggregateSignature is a bls12-381 aggregate signature. The participants map contains the IDs of the replicas who
-// participated in the creation of the signature. This allows us to build an aggregated public key to verify the
+// AggregateSignature is a bls12-381 aggregate signature. The participants bitmap contains the IDs of the replicas that
+// participated signature creation. This allows us to build an aggregated public key to verify the
 // signature.
 type AggregateSignature struct {
 	sig          bls12.PointG2
@@ -134,7 +134,8 @@ func (agg AggregateSignature) Bitfield() crypto.Bitfield {
 type bls12Base struct {
 	mods *consensus.Modules
 
-	mut      sync.RWMutex
+	mut sync.RWMutex
+	// popCache caches the results of popVerify for each public key.
 	popCache map[string]bool
 }
 
@@ -155,7 +156,7 @@ func (bls *bls12Base) InitConsensusModule(mods *consensus.Modules, opts *consens
 	opts.SetConnectionMetadata(popMetadataKey, string(b))
 }
 
-func (bls *bls12Base) getPrivateKey() *PrivateKey {
+func (bls *bls12Base) privateKey() *PrivateKey {
 	pk := bls.mods.PrivateKey()
 	return pk.(*PrivateKey)
 }
@@ -168,7 +169,7 @@ func (bls *bls12Base) subgroupCheck(point *bls12.PointG2) bool {
 }
 
 func (bls *bls12Base) coreSign(message []byte, domainTag []byte) (*bls12.PointG2, error) {
-	pk := bls.getPrivateKey()
+	pk := bls.privateKey()
 	g2 := bls12.NewG2()
 	point, err := g2.HashToCurve(message, domainTag)
 	if err != nil {
@@ -195,10 +196,10 @@ func (bls *bls12Base) coreVerify(pubKey *PublicKey, message []byte, signature *b
 }
 
 func (bls *bls12Base) popProve() *bls12.PointG2 {
-	pubKey := bls.getPrivateKey().Public().(*PublicKey)
+	pubKey := bls.privateKey().Public().(*PublicKey)
 	proof, err := bls.coreSign(pubKey.ToBytes(), domainPOP)
 	if err != nil {
-		bls.mods.Logger().Panicf("failed to generate proof of possession: %v", err)
+		bls.mods.Logger().Panicf("Failed to generate proof of possession: %v", err)
 	}
 	return proof
 }
@@ -214,14 +215,14 @@ func (bls *bls12Base) checkPop(replica consensus.Replica) (valid bool) {
 		}
 	}()
 
-	b, ok := replica.Metadata()[popMetadataKey]
+	popBytes, ok := replica.Metadata()[popMetadataKey]
 	if !ok {
 		bls.mods.Logger().Debugf("Missing proof-of-possession for replica: %d", replica.ID())
 		return false
 	}
 
 	var key strings.Builder
-	key.WriteString(b)
+	key.WriteString(popBytes)
 	_, _ = key.Write(replica.PublicKey().(*PublicKey).ToBytes())
 
 	bls.mut.RLock()
@@ -231,12 +232,12 @@ func (bls *bls12Base) checkPop(replica consensus.Replica) (valid bool) {
 		return valid
 	}
 
-	p, err := bls12.NewG2().FromCompressed([]byte(b))
+	proof, err := bls12.NewG2().FromCompressed([]byte(popBytes))
 	if err != nil {
 		return false
 	}
 
-	valid = bls.popVerify(replica.PublicKey().(*PublicKey), p)
+	valid = bls.popVerify(replica.PublicKey().(*PublicKey), proof)
 
 	bls.mut.Lock()
 	bls.popCache[key.String()] = valid
@@ -247,7 +248,13 @@ func (bls *bls12Base) checkPop(replica consensus.Replica) (valid bool) {
 
 func (bls *bls12Base) coreAggregateVerify(publicKeys []*PublicKey, messages [][]byte, signature *bls12.PointG2) bool {
 	n := len(publicKeys)
-	if n != len(messages) && n <= 1 {
+	// validate input
+	if n != len(messages) {
+		return false
+	}
+
+	// precondition n >= 1
+	if n < 1 {
 		return false
 	}
 
@@ -288,7 +295,6 @@ func (bls *bls12Base) fastAggregateVerify(publicKeys []*PublicKey, message []byt
 
 // Sign creates a cryptographic signature of the given messsage.
 func (bls *bls12Base) Sign(message []byte) (signature consensus.QuorumSignature, err error) {
-	// TODO: consider passing message to this function instead of hash
 	p, err := bls.coreSign(message, domain)
 	if err != nil {
 		return nil, fmt.Errorf("bls12: coreSign failed: %w", err)

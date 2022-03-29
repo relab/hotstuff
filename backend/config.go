@@ -23,7 +23,7 @@ type Replica struct {
 	id            hotstuff.ID
 	pubKey        consensus.PublicKey
 	voteCancel    context.CancelFunc
-	newviewCancel context.CancelFunc
+	newViewCancel context.CancelFunc
 	md            map[string]string
 }
 
@@ -55,8 +55,8 @@ func (r *Replica) NewView(msg consensus.SyncInfo) {
 		return
 	}
 	var ctx context.Context
-	r.newviewCancel()
-	ctx, r.newviewCancel = context.WithCancel(context.Background())
+	r.newViewCancel()
+	ctx, r.newViewCancel = context.WithCancel(context.Background())
 	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(msg), gorums.WithNoSendWaiting())
 }
 
@@ -69,7 +69,7 @@ func (r *Replica) Metadata() map[string]string {
 // and some information about the local replica. It also provides methods to send messages to the other replicas.
 type Config struct {
 	mods      *consensus.Modules
-	optsPtr   *[]gorums.ManagerOption // using a pointer so that options can be GCed after initialization
+	opts      []gorums.ManagerOption // using a pointer so that options can be GCed after initialization
 	connected bool
 
 	mgr           *hotstuffpb.Manager
@@ -84,6 +84,9 @@ type Config struct {
 func (cfg *Config) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
 	cfg.mods = mods
 
+	// This receives `replicaConnected` events from the server.
+	// We can only process these events after the configuration has been connected,
+	// so therefore the `replicaConnected` events are delayed until the `connected` event has occurred.
 	cfg.mods.EventLoop().RegisterHandler(replicaConnected{}, func(event interface{}) {
 		if !cfg.connected {
 			cfg.mods.EventLoop().DelayUntil(connected{}, event)
@@ -108,7 +111,7 @@ func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOpt
 	// initialization will be finished by InitConsensusModule
 	cfg := &Config{
 		replicas:      make(map[hotstuff.ID]consensus.Replica),
-		optsPtr:       &opts,
+		opts:          opts,
 		proposeCancel: func() {},
 		timeoutCancel: func() {},
 	}
@@ -141,7 +144,7 @@ func (cfg *Config) replicaConnected(c replicaConnected) {
 
 const keyPrefix = "hotstuff-"
 
-func convertMetadata(m map[string]string) metadata.MD {
+func mapToMetadata(m map[string]string) metadata.MD {
 	md := metadata.New(nil)
 	for k, v := range m {
 		md.Set(keyPrefix+k, v)
@@ -168,10 +171,10 @@ type ReplicaInfo struct {
 
 // Connect opens connections to the replicas in the configuration.
 func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
-	opts := *cfg.optsPtr
-	cfg.optsPtr = nil // we don't need to keep the options around beyond this point, so we'll allow them to be GCed.
+	opts := cfg.opts
+	cfg.opts = nil // we don't need to keep the options around beyond this point, so we'll allow them to be GCed.
 
-	md := convertMetadata(cfg.mods.Options().ConnectionMetadata())
+	md := mapToMetadata(cfg.mods.Options().ConnectionMetadata())
 
 	// embed own ID to allow other replicas to identify messages from this replica
 	md.Set("id", fmt.Sprintf("%d", cfg.mods.ID()))
@@ -187,7 +190,7 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 		cfg.replicas[replica.ID] = &Replica{
 			id:            replica.ID,
 			pubKey:        replica.PubKey,
-			newviewCancel: func() {},
+			newViewCancel: func() {},
 			voteCancel:    func() {},
 			md:            make(map[string]string),
 		}
@@ -213,6 +216,8 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 	}
 
 	cfg.connected = true
+
+	// this event is sent so that any delayed `replicaConnected` events can be processed.
 	cfg.mods.EventLoop().AddEvent(connected{})
 
 	return nil
