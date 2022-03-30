@@ -177,7 +177,7 @@ func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, options ...cons
 		opt(&opts)
 	}
 
-	if !opts.MultipleMessages && opts.Message == nil {
+	if len(opts.Messages) == 0 {
 		panic("no message(s) to verify the signature against: you must specify one of the VerifySingle or VerifyMulti options")
 	}
 
@@ -189,10 +189,10 @@ func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, options ...cons
 	for _, pSig := range sig {
 		var hash consensus.Hash
 
-		if opts.MultipleMessages {
-			hash = sha256.Sum256(opts.MessageMap[pSig.signer])
+		if len(opts.Messages) == 1 {
+			hash = sha256.Sum256(opts.Messages[0])
 		} else {
-			hash = sha256.Sum256(*opts.Message)
+			hash = sha256.Sum256(opts.Messages[pSig.signer])
 		}
 
 		go func(sig *Signature, hash consensus.Hash) {

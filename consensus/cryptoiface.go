@@ -33,8 +33,7 @@ func VerifyThreshold(threshold int) VerifyOption {
 // and whichever option is specified last will be the effective one.
 func VerifySingle(message []byte) VerifyOption {
 	return func(o *VerifyOptions) {
-		o.MultipleMessages = false
-		o.Message = &message
+		o.Messages = map[hotstuff.ID][]byte{0: message}
 	}
 }
 
@@ -44,19 +43,14 @@ func VerifySingle(message []byte) VerifyOption {
 // and whichever option is specified last will be the effective one.
 func VerifyMulti(messages map[hotstuff.ID][]byte) VerifyOption {
 	return func(o *VerifyOptions) {
-		o.MultipleMessages = true
-		o.MessageMap = messages
+		o.Messages = messages
 	}
 }
 
 // VerifyOptions specify options for the Verify function in the CryptoBase interface.
 type VerifyOptions struct {
-	// using a pointer for the Message such that we can tell if it is unspecified
-
-	Message          *[]byte
-	MessageMap       map[hotstuff.ID][]byte
-	MultipleMessages bool // true if `MessageMap` should be used instead of `Message`
-	Threshold        int
+	Messages  map[hotstuff.ID][]byte
+	Threshold int
 }
 
 // Crypto implements the methods required to create and verify signatures and certificates.

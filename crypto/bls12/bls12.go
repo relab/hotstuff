@@ -318,11 +318,15 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 		opt(&opts)
 	}
 
-	if !opts.MultipleMessages && opts.Message == nil {
-		panic("no hash(es) to verify the signature against: you must specify one of the VerifyHash or VerifyHashes options")
+	if len(opts.Messages) == 0 {
+		panic("no message(s) to verify the signature against: you must specify one of the VerifyHash or VerifyHashes options")
 	}
 
 	l := sig.Participants().Len()
+
+	if numMessages := len(opts.Messages); numMessages > 1 && numMessages != l {
+		return false
+	}
 
 	if l < opts.Threshold {
 		return false
@@ -335,21 +339,22 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 	)
 
 	// get all public keys and messages to verify
-	sig.participants.RangeWhile(func(i hotstuff.ID) bool {
-		replica, ok := bls.mods.Configuration().Replica(i)
+	sig.participants.RangeWhile(func(id hotstuff.ID) bool {
+		replica, ok := bls.mods.Configuration().Replica(id)
 		if !ok {
 			valid = false
 			return false
 		}
 
+		// check proof-of-possession for other replicas
 		if replica.ID() != bls.mods.ID() && !bls.checkPop(replica) {
 			valid = false
 			return false
 		}
 		publicKeys = append(publicKeys, replica.PublicKey().(*PublicKey))
 
-		if opts.MultipleMessages {
-			message, ok := opts.MessageMap[i]
+		if len(opts.Messages) > 1 {
+			message, ok := opts.Messages[id]
 			if !ok {
 				valid = false
 				return false
@@ -366,15 +371,11 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...con
 	}
 
 	if l == 1 {
-		message := *opts.Message
-		if opts.MultipleMessages {
-			message = messages[0]
-		}
-		return bls.coreVerify(publicKeys[0], message, &sig.sig, domain)
-	} else if opts.MultipleMessages {
+		return bls.coreVerify(publicKeys[0], opts.Messages[0], &sig.sig, domain)
+	} else if len(opts.Messages) > 1 {
 		return bls.aggregateVerify(publicKeys, messages, &sig.sig)
 	} else {
-		return bls.fastAggregateVerify(publicKeys, *opts.Message, &sig.sig)
+		return bls.fastAggregateVerify(publicKeys, opts.Messages[0], &sig.sig)
 	}
 }
 

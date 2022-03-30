@@ -3,9 +3,11 @@ package crypto
 import (
 	"container/list"
 	"crypto/sha256"
+	"sort"
 	"strings"
 	"sync"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 )
 
@@ -96,17 +98,25 @@ func (cache *cache) Verify(sig consensus.QuorumSignature, options ...consensus.V
 		return false
 	}
 
-	var hash consensus.Hash
-	// if we have multiple messages, we will hash them all together.
-	if opts.MultipleMessages {
-		hasher := sha256.New()
-		for _, m := range opts.MessageMap {
-			_, _ = hasher.Write(m)
-		}
-		hasher.Sum(hash[:])
-	} else {
-		hash = sha256.Sum256(*opts.Message)
+	// get a sorted list of the ids in the Messages map
+	ids := make([]hotstuff.ID, 0, len(opts.Messages))
+	for id := range opts.Messages {
+		i := sort.Search(len(ids), func(i int) bool {
+			return ids[i] < id
+		})
+		ids = append(ids, 0)
+		copy(ids[i+1:], ids[i:])
+		ids[i] = id
 	}
+
+	var hash consensus.Hash
+	hasher := sha256.New()
+	// then hash the messages in sorted order
+	for _, id := range ids {
+		m := opts.Messages[id]
+		_, _ = hasher.Write(m)
+	}
+	hasher.Sum(hash[:])
 
 	var key strings.Builder
 	_, _ = key.Write(hash[:])
