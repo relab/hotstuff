@@ -238,11 +238,27 @@ these additional flags are used:
 - `--worker` runs a worker locally, in addition to the remote hosts specified. Use this if you want the local machine
   to participate in the experiment.
 
+Additionally, it is possible to specify an *internal address* for each host.
+The internal address is used by replicas instead of the address used by the controller.
+This is useful if the controller is connecting to the remote hosts using a global address,
+whereas the hosts can communicate using local addresses.
+The internal address is configured through the configuration file (loaded by the `--config` flag):
+
+```toml
+[[hosts-config]]
+name = "hotstuff_worker_1"
+internal-address = "192.168.10.2"
+
+[[hosts-config]]
+name = "hotstuff_worker_1"
+internal-address = "192.168.10.3"
+```
+
 ### Manual assignment of clients and replicas
 
 By default, the controller (the local machine) will divide clients and replicas as evenly as possible among all workers
 (the remote hosts). You can override this behavior by specifying how many clients and replicas should be assigned to
-each host individually. This can only be done through a configuration file, not through command-line flags.
+each host individually. This can only be done through the configuration file, not through command-line flags.
 The following shows a configuration file that customizes the client and replica assignment for one of the hosts:
 
 ```toml

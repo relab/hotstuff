@@ -19,8 +19,9 @@ import (
 
 // HostConfig specifies the number of replicas and clients that should be started on a specific host.
 type HostConfig struct {
-	Replicas int
-	Clients  int
+	Replicas        int
+	Clients         int
+	InternalAddress string
 }
 
 // Experiment holds variables for an experiment.
@@ -110,18 +111,27 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 	cfg = &orchestrationpb.ReplicaConfiguration{Replicas: make(map[uint32]*orchestrationpb.ReplicaInfo)}
 
 	for host, worker := range e.Hosts {
+		internalAddr := e.HostConfigs[host].InternalAddress
+
 		req := &orchestrationpb.CreateReplicaRequest{Replicas: make(map[uint32]*orchestrationpb.ReplicaOpts)}
 		for _, id := range e.hostsToReplicas[host] {
 			opts := e.replicaOpts[id]
 			opts.CertificateAuthority = keygen.CertToPEM(e.ca)
 
 			// the generated certificate should be valid for the hostname and its ip addresses.
-			validFor := []string{host}
+			validFor := []string{"localhost", "127.0.0.1", host}
 			ips, err := net.LookupIP(host)
 			if err == nil {
 				for _, ip := range ips {
-					validFor = append(validFor, ip.String())
+					if ipStr := ip.String(); ipStr != host && ipStr != internalAddr {
+						validFor = append(validFor, ipStr)
+					}
 				}
+			}
+
+			// add the internal address as well
+			if internalAddr != "" {
+				validFor = append(validFor, internalAddr)
 			}
 
 			keyChain, err := keygen.GenerateKeyChain(id, validFor, e.Crypto, e.ca, e.caKey)
@@ -141,7 +151,11 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 		}
 
 		for id, replicaCfg := range wcfg.GetReplicas() {
-			replicaCfg.Address = host
+			if internalAddr != "" {
+				replicaCfg.Address = host
+			} else {
+				replicaCfg.Address = internalAddr
+			}
 			cfg.Replicas[id] = replicaCfg
 		}
 	}
@@ -169,6 +183,10 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 	// determine how many replicas should be assigned automatically
 	for _, hostCfg := range e.HostConfigs {
 		// TODO: ensure that this host is part of e.Hosts
+		if hostCfg.Clients|hostCfg.Replicas == 0 {
+			// if both are zero, we'll autoconfigure this host.
+			continue
+		}
 		remainingReplicas -= hostCfg.Replicas
 		remainingClients -= hostCfg.Clients
 		autoConfig--
@@ -207,7 +225,7 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 			numReplicas int
 			numClients  int
 		)
-		if hostCfg, ok := e.HostConfigs[host]; ok {
+		if hostCfg, ok := e.HostConfigs[host]; ok && hostCfg.Clients|hostCfg.Replicas != 0 {
 			numReplicas = hostCfg.Replicas
 			numClients = hostCfg.Clients
 		} else {
