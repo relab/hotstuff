@@ -173,17 +173,13 @@ func runController() {
 
 	experiment.HostConfigs = make(map[string]orchestration.HostConfig)
 
-	var hostConfigs []struct {
-		Name     string
-		Clients  int
-		Replicas int
-	}
+	var hostConfigs []orchestration.HostConfig
 
 	err = viper.UnmarshalKey("hosts-config", &hostConfigs)
 	checkf("failed to unmarshal hosts-config: %v", err)
 
 	for _, cfg := range hostConfigs {
-		experiment.HostConfigs[cfg.Name] = orchestration.HostConfig{Replicas: cfg.Replicas, Clients: cfg.Clients}
+		experiment.HostConfigs[cfg.Name] = cfg
 	}
 
 	err = experiment.Run()

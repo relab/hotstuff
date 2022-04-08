@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/x509"
 	"fmt"
-	"log"
 	"net"
 	"time"
 
@@ -19,9 +18,10 @@ import (
 
 // HostConfig specifies the number of replicas and clients that should be started on a specific host.
 type HostConfig struct {
-	Replicas        int
+	Name            string
 	Clients         int
-	InternalAddress string
+	Replicas        int
+	InternalAddress string `mapstructure:"internal-address"`
 }
 
 // Experiment holds variables for an experiment.
@@ -152,10 +152,11 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 
 		for id, replicaCfg := range wcfg.GetReplicas() {
 			if internalAddr != "" {
-				replicaCfg.Address = host
-			} else {
 				replicaCfg.Address = internalAddr
+			} else {
+				replicaCfg.Address = host
 			}
+			e.Logger.Debugf("Address for replica %d: %s", id, replicaCfg.Address)
 			cfg.Replicas[id] = replicaCfg
 		}
 	}
@@ -261,13 +262,13 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 
 			e.hostsToReplicas[host] = append(e.hostsToReplicas[host], nextReplicaID)
 			e.replicaOpts[nextReplicaID] = replicaOpts
-			log.Printf("replica %d assigned to host %s", nextReplicaID, host)
+			e.Logger.Infof("replica %d assigned to host %s", nextReplicaID, host)
 			nextReplicaID++
 		}
 
 		for i := 0; i < numClients; i++ {
 			e.hostsToClients[host] = append(e.hostsToClients[host], nextClientID)
-			log.Printf("client %d assigned to host %s", nextClientID, host)
+			e.Logger.Infof("client %d assigned to host %s", nextClientID, host)
 			nextClientID++
 		}
 	}
