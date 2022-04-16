@@ -106,7 +106,7 @@ func FetchData(g iago.Group, dest string) (err error) {
 	if dest != "" {
 		g.Run("Download test data",
 			func(ctx context.Context, host iago.Host) (err error) {
-				src, err := iago.NewPathFromAbs(iago.GetStringVar(host, "data-dir")) // assuming the dir variable was set earlier
+				src, err := iago.NewPath("/", iago.GetStringVar(host, "data-dir")) // assuming the dir variable was set earlier
 				if err != nil {
 					return err
 				}
