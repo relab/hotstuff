@@ -56,10 +56,9 @@ func Deploy(g iago.Group, cfg DeployConfig) (workers map[string]WorkerSession, e
 		panic(err)
 	}
 
-	tmpDir := "hotstuff." + randString(8)
-
 	g.Run("Create temporary directory",
 		func(ctx context.Context, host iago.Host) (err error) {
+			tmpDir := "hotstuff." + randString(8)
 			testDir := strings.TrimPrefix(tempDirPath(host, tmpDir), "/")
 			dataDir := testDir + "/data"
 			host.SetVar("test-dir", testDir)
