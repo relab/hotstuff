@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/relab/hotstuff/hs"
 	"net"
 
 	"github.com/golang/protobuf/ptypes/empty"
@@ -28,7 +27,7 @@ type Config struct {
 	// The id of the replica.
 	ID hotstuff.ID
 	// The private key of the replica.
-	PrivateKey hs.PrivateKey
+	PrivateKey consensus.PrivateKey
 	// Controls whether TLS is used.
 	TLS bool
 	// The TLS certificate.

@@ -3,7 +3,6 @@ package chainedhotstuff
 
 import (
 	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/hs"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -17,13 +16,13 @@ type ChainedHotStuff struct {
 
 	// protocol variables
 
-	bLock *hs.Block // the currently locked block
+	bLock *consensus.Block // the currently locked block
 }
 
 // New returns a new chainedhotstuff instance.
 func New() consensus.Rules {
 	return &ChainedHotStuff{
-		bLock: hs.GetGenesis(),
+		bLock: consensus.GetGenesis(),
 	}
 }
 
@@ -33,15 +32,15 @@ func (hs *ChainedHotStuff) InitConsensusModule(mods *consensus.Modules, _ *conse
 	hs.mods = mods
 }
 
-func (hs *ChainedHotStuff) qcRef(qc hs.QuorumCert) (*hs.Block, bool) {
-	if (hs.Hash{}) == qc.BlockHash() {
+func (hs *ChainedHotStuff) qcRef(qc consensus.QuorumCert) (*consensus.Block, bool) {
+	if (consensus.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
 	return hs.mods.BlockChain().Get(qc.BlockHash())
 }
 
 // CommitRule decides whether an ancestor of the block should be committed.
-func (hs *ChainedHotStuff) CommitRule(block *hs.Block) *hs.Block {
+func (hs *ChainedHotStuff) CommitRule(block *consensus.Block) *consensus.Block {
 	block1, ok := hs.qcRef(block.QuorumCert())
 	if !ok {
 		return nil
@@ -75,7 +74,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hs.Block) *hs.Block {
 }
 
 // VoteRule decides whether to vote for the proposal or not.
-func (hs *ChainedHotStuff) VoteRule(proposal hs.ProposeMsg) bool {
+func (hs *ChainedHotStuff) VoteRule(proposal consensus.ProposeMsg) bool {
 	block := proposal.Block
 
 	qcBlock, haveQCBlock := hs.mods.BlockChain().Get(block.QuorumCert().BlockHash())

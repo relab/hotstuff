@@ -6,7 +6,6 @@ package mocks
 
 import (
 	context "context"
-	"github.com/relab/hotstuff/hs"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -38,10 +37,10 @@ func (m *MockConfiguration) EXPECT() *MockConfigurationMockRecorder {
 }
 
 // Fetch mocks base method.
-func (m *MockConfiguration) Fetch(arg0 context.Context, arg1 hs.Hash) (*hs.Block, bool) {
+func (m *MockConfiguration) Fetch(arg0 context.Context, arg1 consensus.Hash) (*consensus.Block, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Fetch", arg0, arg1)
-	ret0, _ := ret[0].(*hs.Block)
+	ret0, _ := ret[0].(*consensus.Block)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
@@ -67,7 +66,7 @@ func (mr *MockConfigurationMockRecorder) Len() *gomock.Call {
 }
 
 // Propose mocks base method.
-func (m *MockConfiguration) Propose(arg0 hs.ProposeMsg) {
+func (m *MockConfiguration) Propose(arg0 consensus.ProposeMsg) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Propose", arg0)
 }
@@ -122,7 +121,7 @@ func (mr *MockConfigurationMockRecorder) Replicas() *gomock.Call {
 }
 
 // Timeout mocks base method.
-func (m *MockConfiguration) Timeout(arg0 hs.TimeoutMsg) {
+func (m *MockConfiguration) Timeout(arg0 consensus.TimeoutMsg) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Timeout", arg0)
 }

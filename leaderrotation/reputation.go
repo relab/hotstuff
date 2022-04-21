@@ -1,7 +1,6 @@
 package leaderrotation
 
 import (
-	"github.com/relab/hotstuff/hs"
 	"math/rand"
 	"sort"
 
@@ -20,7 +19,7 @@ type reputationsMap map[hotstuff.ID]float64
 
 type repBased struct {
 	mods           *consensus.Modules
-	prevCommitHead *hs.Block
+	prevCommitHead *consensus.Block
 	reputations    reputationsMap // latest reputations
 }
 
@@ -33,9 +32,9 @@ func (r *repBased) InitConsensusModule(mods *consensus.Modules, _ *consensus.Opt
 // TODO: should GetLeader be thread-safe?
 
 // GetLeader returns the id of the leader in the given view
-func (r *repBased) GetLeader(view hs.View) hotstuff.ID {
+func (r *repBased) GetLeader(view consensus.View) hotstuff.ID {
 	block := r.mods.Consensus().CommittedBlock()
-	if block.View() > view-hs.View(r.mods.Consensus().ChainLength()) {
+	if block.View() > view-consensus.View(r.mods.Consensus().ChainLength()) {
 		// TODO: it could be possible to lookup leaders for older views if we
 		// store a copy of the reputations in a metadata field of each block.
 		r.mods.Logger().Error("looking up leaders of old views is not supported")
@@ -96,6 +95,6 @@ func (r *repBased) GetLeader(view hs.View) hotstuff.ID {
 func NewRepBased() consensus.LeaderRotation {
 	return &repBased{
 		reputations:    make(reputationsMap),
-		prevCommitHead: hs.GetGenesis(),
+		prevCommitHead: consensus.GetGenesis(),
 	}
 }

@@ -3,7 +3,6 @@ package leaderrotation
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/hs"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -18,9 +17,10 @@ type fixed struct {
 }
 
 // GetLeader returns the id of the leader in the given view
-func (f fixed) GetLeader(_ hs.View) hotstuff.ID {
+func (f fixed) GetLeader(_ consensus.View) hotstuff.ID {
 	return f.leader
 }
+
 
 // NewFixed returns a new fixed-leader leader rotation implementation.
 func NewFixed(leader hotstuff.ID) consensus.LeaderRotation {

@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"github.com/relab/hotstuff/hs"
 	"sync"
 )
 
@@ -9,13 +8,13 @@ import (
 type VotingMachine struct {
 	mut           sync.Mutex
 	mods          *Modules
-	verifiedVotes map[hs.Hash][]hs.PartialCert // verified votes that could become a QC
+	verifiedVotes map[Hash][]PartialCert // verified votes that could become a QC
 }
 
 // NewVotingMachine returns a new VotingMachine.
 func NewVotingMachine() *VotingMachine {
 	return &VotingMachine{
-		verifiedVotes: make(map[hs.Hash][]hs.PartialCert),
+		verifiedVotes: make(map[Hash][]PartialCert),
 	}
 }
 
@@ -23,16 +22,16 @@ func NewVotingMachine() *VotingMachine {
 // It also allows the module to set module options using the OptionsBuilder.
 func (vm *VotingMachine) InitConsensusModule(mods *Modules, _ *OptionsBuilder) {
 	vm.mods = mods
-	vm.mods.EventLoop().RegisterHandler(hs.VoteMsg{}, func(event interface{}) { vm.OnVote(event.(hs.VoteMsg)) })
+	vm.mods.EventLoop().RegisterHandler(VoteMsg{}, func(event interface{}) { vm.OnVote(event.(VoteMsg)) })
 }
 
 // OnVote handles an incoming vote.
-func (vm *VotingMachine) OnVote(vote hs.VoteMsg) {
+func (vm *VotingMachine) OnVote(vote VoteMsg) {
 	cert := vote.PartialCert
 	vm.mods.Logger().Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
 
 	var (
-		block *hs.Block
+		block *Block
 		ok    bool
 	)
 
@@ -44,7 +43,7 @@ func (vm *VotingMachine) OnVote(vote hs.VoteMsg) {
 			// hopefully, the block has arrived by then.
 			vm.mods.Logger().Debugf("Local cache miss for block: %.8s", cert.BlockHash())
 			vote.Deferred = true
-			vm.mods.EventLoop().DelayUntil(hs.ProposeMsg{}, vote)
+			vm.mods.EventLoop().DelayUntil(ProposeMsg{}, vote)
 			return
 		}
 	} else {
@@ -68,7 +67,7 @@ func (vm *VotingMachine) OnVote(vote hs.VoteMsg) {
 	}
 }
 
-func (vm *VotingMachine) verifyCert(cert hs.PartialCert, block *hs.Block) {
+func (vm *VotingMachine) verifyCert(cert PartialCert, block *Block) {
 	if !vm.mods.Crypto().VerifyPartialCert(cert) {
 		vm.mods.Logger().Info("OnVote: Vote could not be verified!")
 		return
@@ -106,5 +105,5 @@ func (vm *VotingMachine) verifyCert(cert hs.PartialCert, block *hs.Block) {
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
 
-	vm.mods.EventLoop().AddEvent(hs.NewViewMsg{ID: vm.mods.ID(), SyncInfo: hs.NewSyncInfo().WithQC(qc)})
+	vm.mods.EventLoop().AddEvent(NewViewMsg{ID: vm.mods.ID(), SyncInfo: NewSyncInfo().WithQC(qc)})
 }

@@ -6,10 +6,10 @@ package mocks
 
 import (
 	context "context"
-	"github.com/relab/hotstuff/hs"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	consensus "github.com/relab/hotstuff/consensus"
 )
 
 // MockSynchronizer is a mock of Synchronizer interface.
@@ -36,7 +36,7 @@ func (m *MockSynchronizer) EXPECT() *MockSynchronizerMockRecorder {
 }
 
 // AdvanceView mocks base method.
-func (m *MockSynchronizer) AdvanceView(arg0 hs.SyncInfo) {
+func (m *MockSynchronizer) AdvanceView(arg0 consensus.SyncInfo) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AdvanceView", arg0)
 }
@@ -48,10 +48,10 @@ func (mr *MockSynchronizerMockRecorder) AdvanceView(arg0 interface{}) *gomock.Ca
 }
 
 // HighQC mocks base method.
-func (m *MockSynchronizer) HighQC() hs.QuorumCert {
+func (m *MockSynchronizer) HighQC() consensus.QuorumCert {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HighQC")
-	ret0, _ := ret[0].(hs.QuorumCert)
+	ret0, _ := ret[0].(consensus.QuorumCert)
 	return ret0
 }
 
@@ -62,10 +62,10 @@ func (mr *MockSynchronizerMockRecorder) HighQC() *gomock.Call {
 }
 
 // LeafBlock mocks base method.
-func (m *MockSynchronizer) LeafBlock() *hs.Block {
+func (m *MockSynchronizer) LeafBlock() *consensus.Block {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "LeafBlock")
-	ret0, _ := ret[0].(*hs.Block)
+	ret0, _ := ret[0].(*consensus.Block)
 	return ret0
 }
 
@@ -88,7 +88,7 @@ func (mr *MockSynchronizerMockRecorder) Start(arg0 interface{}) *gomock.Call {
 }
 
 // UpdateHighQC mocks base method.
-func (m *MockSynchronizer) UpdateHighQC(arg0 hs.QuorumCert) {
+func (m *MockSynchronizer) UpdateHighQC(arg0 consensus.QuorumCert) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "UpdateHighQC", arg0)
 }
@@ -100,10 +100,10 @@ func (mr *MockSynchronizerMockRecorder) UpdateHighQC(arg0 interface{}) *gomock.C
 }
 
 // View mocks base method.
-func (m *MockSynchronizer) View() hs.View {
+func (m *MockSynchronizer) View() consensus.View {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "View")
-	ret0, _ := ret[0].(hs.View)
+	ret0, _ := ret[0].(consensus.View)
 	return ret0
 }
 

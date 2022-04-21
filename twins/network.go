@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/relab/hotstuff/hs"
 	"reflect"
 	"sort"
 	"strings"
@@ -36,8 +35,8 @@ func (id NodeID) String() string {
 type node struct {
 	id              NodeID
 	modules         *consensus.Modules
-	executedBlocks  []*hs.Block
-	lastMessageView hs.View
+	executedBlocks  []*consensus.Block
+	lastMessageView consensus.View
 	log             strings.Builder
 }
 
@@ -74,7 +73,7 @@ func newNetwork(rounds []View, dropTypes ...interface{}) *network {
 
 func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName string) error {
 	cg := &commandGenerator{}
-	keys := make(map[hotstuff.ID]hs.PrivateKey)
+	keys := make(map[hotstuff.ID]consensus.PrivateKey)
 	for _, nodeID := range nodes {
 		pk, ok := keys[nodeID.ReplicaID]
 		if !ok {
@@ -122,13 +121,13 @@ func (n *network) run(rounds int) {
 		}
 	}
 
-	for view := hs.View(0); view <= hs.View(rounds); view++ {
+	for view := consensus.View(0); view <= consensus.View(rounds); view++ {
 		n.round(view)
 	}
 }
 
 // round performs one round for each node
-func (n *network) round(view hs.View) {
+func (n *network) round(view consensus.View) {
 	n.logger.Infof("Starting round %d", view)
 
 	for _, node := range n.nodes {
@@ -252,17 +251,17 @@ func (c *configuration) QuorumSize() int {
 }
 
 // Propose sends the block to all replicas in the configuration.
-func (c *configuration) Propose(proposal hs.ProposeMsg) {
+func (c *configuration) Propose(proposal consensus.ProposeMsg) {
 	c.broadcastMessage(proposal)
 }
 
 // Timeout sends the timeout message to all replicas.
-func (c *configuration) Timeout(msg hs.TimeoutMsg) {
+func (c *configuration) Timeout(msg consensus.TimeoutMsg) {
 	c.broadcastMessage(msg)
 }
 
 // Fetch requests a block from all the replicas in the configuration.
-func (c *configuration) Fetch(_ context.Context, hash hs.Hash) (block *hs.Block, ok bool) {
+func (c *configuration) Fetch(_ context.Context, hash consensus.Hash) (block *consensus.Block, ok bool) {
 	for _, replica := range c.network.replicas {
 		for _, node := range replica {
 			if c.shouldDrop(node.id, hash) {
@@ -290,21 +289,21 @@ func (r *replica) ID() hotstuff.ID {
 }
 
 // PublicKey returns the replica's public key.
-func (r *replica) PublicKey() hs.PublicKey {
+func (r *replica) PublicKey() consensus.PublicKey {
 	return r.config.network.replicas[r.id][0].modules.PrivateKey().Public()
 }
 
 // Vote sends the partial certificate to the other replica.
-func (r *replica) Vote(cert hs.PartialCert) {
-	r.config.sendMessage(r.id, hs.VoteMsg{
+func (r *replica) Vote(cert consensus.PartialCert) {
+	r.config.sendMessage(r.id, consensus.VoteMsg{
 		ID:          r.config.node.modules.ID(),
 		PartialCert: cert,
 	})
 }
 
 // NewView sends the quorum certificate to the other replica.
-func (r *replica) NewView(si hs.SyncInfo) {
-	r.config.sendMessage(r.id, hs.NewViewMsg{
+func (r *replica) NewView(si consensus.SyncInfo) {
+	r.config.sendMessage(r.id, consensus.NewViewMsg{
 		ID:       r.config.node.modules.ID(),
 		SyncInfo: si,
 	})

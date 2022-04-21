@@ -1,7 +1,6 @@
 package crypto_test
 
 import (
-	"github.com/relab/hotstuff/hs"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -82,7 +81,7 @@ func TestCreateTimeoutCert(t *testing.T) {
 			t.Fatalf("Failed to create QC: %v", err)
 		}
 
-		if tc.View() != hs.View(1) {
+		if tc.View() != consensus.View(1) {
 			t.Error("Timeout certificate view does not match original view.")
 		}
 	}
@@ -95,7 +94,7 @@ func TestVerifyGenesisQC(t *testing.T) {
 
 		td := setup(t, ctrl, 4)
 
-		genesisQC, err := td.signers[0].CreateQuorumCert(hs.GetGenesis(), []hs.PartialCert{})
+		genesisQC, err := td.signers[0].CreateQuorumCert(consensus.GetGenesis(), []consensus.PartialCert{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -156,7 +155,7 @@ func TestVerifyAggregateQC(t *testing.T) {
 			t.Fatal("AggregateQC was not verified")
 		}
 
-		if highQC.BlockHash() != hs.GetGenesis().Hash() {
+		if highQC.BlockHash() != consensus.GetGenesis().Hash() {
 			t.Fatal("Wrong hash for highQC")
 		}
 	}
@@ -171,19 +170,19 @@ func runAll(t *testing.T, run func(*testing.T, setupFunc)) {
 	t.Run("Cache+BLS12-381", func(t *testing.T) { run(t, setup(NewCache(bls12.New), testutil.GenerateBLS12Key)) })
 }
 
-func createBlock(t *testing.T, signer consensus.Crypto) *hs.Block {
+func createBlock(t *testing.T, signer consensus.Crypto) *consensus.Block {
 	t.Helper()
 
-	qc, err := signer.CreateQuorumCert(hs.GetGenesis(), []hs.PartialCert{})
+	qc, err := signer.CreateQuorumCert(consensus.GetGenesis(), []consensus.PartialCert{})
 	if err != nil {
 		t.Errorf("Could not create empty QC for genesis: %v", err)
 	}
 
-	b := hs.NewBlock(hs.GetGenesis().Hash(), qc, "foo", 42, 1)
+	b := consensus.NewBlock(consensus.GetGenesis().Hash(), qc, "foo", 42, 1)
 	return b
 }
 
-type keyFunc func(t *testing.T) hs.PrivateKey
+type keyFunc func(t *testing.T) consensus.PrivateKey
 type setupFunc func(*testing.T, *gomock.Controller, int) testData
 
 func setup(newFunc func() consensus.Crypto, keyFunc keyFunc) setupFunc {
@@ -207,7 +206,7 @@ func NewBase(impl func() consensus.CryptoImpl) func() consensus.Crypto {
 type testData struct {
 	signers   []consensus.Crypto
 	verifiers []consensus.Crypto
-	block     *hs.Block
+	block     *consensus.Block
 }
 
 func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() consensus.Crypto, keyFunc keyFunc) testData {
