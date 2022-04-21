@@ -256,8 +256,8 @@ func (c *configuration) Propose(proposal consensus.ProposeMsg) {
 }
 
 // Timeout sends the timeout message to all replicas.
-func (c *configuration) Timeout(msg consensus.TimeoutMsg) {
-	c.broadcastMessage(msg)
+func (c *configuration) Timeout(toMsg consensus.TimeoutMsg) {
+	c.broadcastMessage(toMsg)
 }
 
 // Fetch requests a block from all the replicas in the configuration.

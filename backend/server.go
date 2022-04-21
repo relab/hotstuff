@@ -147,7 +147,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
-func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo) {
+func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, syncMsg *hotstuffpb.SyncInfo) {
 	id, err := GetPeerIDFromContext(ctx, impl.srv.mods.Configuration())
 	if err != nil {
 		impl.srv.mods.Logger().Infof("Failed to get client ID: %v", err)
@@ -156,7 +156,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 
 	impl.srv.mods.EventLoop().AddEvent(consensus.NewViewMsg{
 		ID:       id,
-		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
+		SyncInfo: hotstuffpb.SyncInfoFromProto(syncMsg),
 	})
 }
 
@@ -176,9 +176,9 @@ func (impl *serviceImpl) Fetch(ctx gorums.ServerCtx, pb *hotstuffpb.BlockHash) (
 }
 
 // Timeout handles an incoming TimeoutMsg.
-func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
+func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, toMsg *hotstuffpb.TimeoutMsg) {
 	var err error
-	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
+	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(toMsg)
 	timeoutMsg.ID, err = GetPeerIDFromContext(ctx, impl.srv.mods.Configuration())
 	if err != nil {
 		impl.srv.mods.Logger().Infof("Could not get ID of replica: %v", err)

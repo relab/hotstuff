@@ -29,17 +29,17 @@ func TestLocalTimeout(t *testing.T) {
 	cfg.
 		EXPECT().
 		Timeout(gomock.AssignableToTypeOf(consensus.TimeoutMsg{})).
-		Do(func(msg consensus.TimeoutMsg) {
-			if msg.View != 1 {
-				t.Errorf("wrong view. got: %v, want: %v", msg.View, 1)
+		Do(func(timeoutMsg consensus.TimeoutMsg) {
+			if timeoutMsg.View != 1 {
+				t.Errorf("wrong view. got: %v, want: %v", timeoutMsg.View, 1)
 			}
-			if msg.ID != 2 {
-				t.Errorf("wrong ID. got: %v, want: %v", msg.ID, 2)
+			if timeoutMsg.ID != 2 {
+				t.Errorf("wrong ID. got: %v, want: %v", timeoutMsg.ID, 2)
 			}
-			if msgQC, ok := msg.SyncInfo.QC(); ok && !bytes.Equal(msgQC.ToBytes(), qc.ToBytes()) {
+			if msgQC, ok := timeoutMsg.SyncInfo.QC(); ok && !bytes.Equal(msgQC.ToBytes(), qc.ToBytes()) {
 				t.Errorf("wrong QC. got: %v, want: %v", msgQC, qc)
 			}
-			if !mods.Crypto().Verify(msg.ViewSignature, msg.View.ToHash()) {
+			if !mods.Crypto().Verify(timeoutMsg.ViewSignature, timeoutMsg.View.ToHash()) {
 				t.Error("failed to verify signature")
 			}
 			c <- struct{}{}
