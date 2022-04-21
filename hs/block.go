@@ -1,14 +1,13 @@
-package consensus
+package hs
 
 import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
-
 	"github.com/relab/hotstuff"
 )
 
-// Block contains a propsed "command", metadata for the protocol, and a link to the "parent" block.
+// Block contains a proposed "command", metadata for the protocol, and a link to the "parent" block.
 type Block struct {
 	// keep a copy of the hash to avoid hashing multiple times
 	hash     Hash

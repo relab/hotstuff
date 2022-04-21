@@ -3,6 +3,7 @@ package replica
 import (
 	"container/list"
 	"context"
+	"github.com/relab/hotstuff/hs"
 	"sync"
 
 	"github.com/relab/hotstuff/consensus"
@@ -55,7 +56,7 @@ func (c *cmdCache) addCommand(cmd *clientpb.Command) {
 }
 
 // Get returns a batch of commands to propose.
-func (c *cmdCache) Get(ctx context.Context) (cmd consensus.Command, ok bool) {
+func (c *cmdCache) Get(ctx context.Context) (cmd hs.Command, ok bool) {
 	batch := new(clientpb.Batch)
 
 	c.mut.Lock()
@@ -102,12 +103,12 @@ awaitBatch:
 		return "", false
 	}
 
-	cmd = consensus.Command(b)
+	cmd = hs.Command(b)
 	return cmd, true
 }
 
 // Accept returns true if the replica can accept the batch.
-func (c *cmdCache) Accept(cmd consensus.Command) bool {
+func (c *cmdCache) Accept(cmd hs.Command) bool {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -129,7 +130,7 @@ func (c *cmdCache) Accept(cmd consensus.Command) bool {
 }
 
 // Proposed updates the serial numbers such that we will not accept the given batch again.
-func (c *cmdCache) Proposed(cmd consensus.Command) {
+func (c *cmdCache) Proposed(cmd hs.Command) {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {

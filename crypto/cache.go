@@ -3,6 +3,7 @@ package crypto
 import (
 	"container/list"
 	"crypto/sha256"
+	"github.com/relab/hotstuff/hs"
 	"sync"
 
 	"github.com/relab/hotstuff"
@@ -14,7 +15,7 @@ import (
 // and threshold should be true if the entry was created/verified as a valid threshold signature.
 // This is to distinguish between valid aggregated signatures and valid threshold signatures.
 type key struct {
-	hash      consensus.Hash
+	hash      hs.Hash
 	threshold bool
 }
 
@@ -44,7 +45,7 @@ func (cache *cache) InitConsensusModule(mods *consensus.Modules, cfg *consensus.
 	}
 }
 
-func (cache *cache) insert(hash consensus.Hash, threshold bool) {
+func (cache *cache) insert(hash hs.Hash, threshold bool) {
 	cache.mut.Lock()
 	defer cache.mut.Unlock()
 	key := key{hash, threshold}
@@ -58,7 +59,7 @@ func (cache *cache) insert(hash consensus.Hash, threshold bool) {
 	cache.entries[key] = elem
 }
 
-func (cache *cache) check(hash consensus.Hash, threshold bool) bool {
+func (cache *cache) check(hash hs.Hash, threshold bool) bool {
 	cache.mut.Lock()
 	defer cache.mut.Unlock()
 	elem, ok := cache.entries[key{hash, threshold}]
@@ -78,7 +79,7 @@ func (cache *cache) evict() {
 }
 
 // Sign signs a hash.
-func (cache *cache) Sign(hash consensus.Hash) (sig consensus.Signature, err error) {
+func (cache *cache) Sign(hash hs.Hash) (sig hs.Signature, err error) {
 	sig, err = cache.impl.Sign(hash)
 	if err != nil {
 		return nil, err
@@ -89,7 +90,7 @@ func (cache *cache) Sign(hash consensus.Hash) (sig consensus.Signature, err erro
 }
 
 // Verify verifies a signature given a hash.
-func (cache *cache) Verify(sig consensus.Signature, hash consensus.Hash) bool {
+func (cache *cache) Verify(sig hs.Signature, hash hs.Hash) bool {
 	if sig == nil {
 		return false
 	}
@@ -105,7 +106,7 @@ func (cache *cache) Verify(sig consensus.Signature, hash consensus.Hash) bool {
 }
 
 // VerifyThresholdSignature verifies a threshold signature.
-func (cache *cache) VerifyAggregateSignature(signature consensus.ThresholdSignature, hash consensus.Hash) bool {
+func (cache *cache) VerifyAggregateSignature(signature hs.ThresholdSignature, hash hs.Hash) bool {
 	if signature == nil {
 		return false
 	}
@@ -121,7 +122,7 @@ func (cache *cache) VerifyAggregateSignature(signature consensus.ThresholdSignat
 }
 
 // CreateThresholdSignature creates a threshold signature from the given partial signatures.
-func (cache *cache) CreateThresholdSignature(partialSignatures []consensus.Signature, hash consensus.Hash) (sig consensus.ThresholdSignature, err error) {
+func (cache *cache) CreateThresholdSignature(partialSignatures []hs.Signature, hash hs.Hash) (sig hs.ThresholdSignature, err error) {
 	sig, err = cache.impl.CreateThresholdSignature(partialSignatures, hash)
 	if err != nil {
 		return nil, err
@@ -132,7 +133,7 @@ func (cache *cache) CreateThresholdSignature(partialSignatures []consensus.Signa
 }
 
 // VerifyThresholdSignature verifies a threshold signature.
-func (cache *cache) VerifyThresholdSignature(signature consensus.ThresholdSignature, hash consensus.Hash) bool {
+func (cache *cache) VerifyThresholdSignature(signature hs.ThresholdSignature, hash hs.Hash) bool {
 	if signature == nil {
 		return false
 	}
@@ -149,12 +150,12 @@ func (cache *cache) VerifyThresholdSignature(signature consensus.ThresholdSignat
 
 // CreateThresholdSignatureForMessageSet creates a threshold signature where each partial signature has signed a
 // different message hash.
-func (cache *cache) CreateThresholdSignatureForMessageSet(partialSignatures []consensus.Signature, hashes map[hotstuff.ID]consensus.Hash) (consensus.ThresholdSignature, error) {
+func (cache *cache) CreateThresholdSignatureForMessageSet(partialSignatures []hs.Signature, hashes map[hotstuff.ID]hs.Hash) (hs.ThresholdSignature, error) {
 	signature, err := cache.impl.CreateThresholdSignatureForMessageSet(partialSignatures, hashes)
 	if err != nil {
 		return nil, err
 	}
-	var key consensus.Hash
+	var key hs.Hash
 	hash := sha256.New()
 	for _, h := range hashes {
 		hash.Write(h[:])
@@ -166,11 +167,11 @@ func (cache *cache) CreateThresholdSignatureForMessageSet(partialSignatures []co
 }
 
 // VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
-func (cache *cache) VerifyThresholdSignatureForMessageSet(signature consensus.ThresholdSignature, hashes map[hotstuff.ID]consensus.Hash) bool {
+func (cache *cache) VerifyThresholdSignatureForMessageSet(signature hs.ThresholdSignature, hashes map[hotstuff.ID]hs.Hash) bool {
 	if signature == nil {
 		return false
 	}
-	var key consensus.Hash
+	var key hs.Hash
 	hash := sha256.New()
 	for _, h := range hashes {
 		hash.Write(h[:])
@@ -193,7 +194,7 @@ func (cache *cache) VerifyThresholdSignatureForMessageSet(signature consensus.Th
 // As opposed to the CreateThresholdSignature methods,
 // this method does not check whether the resulting
 // signature meets the quorum size.
-func (cache *cache) Combine(signatures ...interface{}) consensus.ThresholdSignature {
+func (cache *cache) Combine(signatures ...interface{}) hs.ThresholdSignature {
 	// we don't cache the result of this operation, because it is not guaranteed to be valid.
 	return cache.impl.Combine(signatures...)
 }

@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/tls"
 	"crypto/x509"
+	"github.com/relab/hotstuff/hs"
 	"net"
 	"sync"
 	"testing"
@@ -78,11 +79,11 @@ func testBase(t *testing.T, typ interface{}, send func(consensus.Configuration),
 
 func TestPropose(t *testing.T) {
 	var wg sync.WaitGroup
-	want := consensus.ProposeMsg{
+	want := hs.ProposeMsg{
 		ID: 1,
-		Block: consensus.NewBlock(
-			consensus.GetGenesis().Hash(),
-			consensus.NewQuorumCert(nil, 0, consensus.GetGenesis().Hash()),
+		Block: hs.NewBlock(
+			hs.GetGenesis().Hash(),
+			hs.NewQuorumCert(nil, 0, hs.GetGenesis().Hash()),
 			"foo", 1, 1,
 		),
 	}
@@ -91,7 +92,7 @@ func TestPropose(t *testing.T) {
 		cfg.Propose(want)
 		wg.Wait()
 	}, func(event interface{}) {
-		got := event.(consensus.ProposeMsg)
+		got := event.(hs.ProposeMsg)
 		if got.ID != want.ID {
 			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
 		}
@@ -104,18 +105,18 @@ func TestPropose(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	var wg sync.WaitGroup
-	want := consensus.TimeoutMsg{
+	want := hs.TimeoutMsg{
 		ID:            1,
 		View:          1,
 		ViewSignature: nil,
-		SyncInfo:      consensus.NewSyncInfo(),
+		SyncInfo:      hs.NewSyncInfo(),
 	}
 	testBase(t, want, func(cfg consensus.Configuration) {
 		wg.Add(3)
 		cfg.Timeout(want)
 		wg.Wait()
 	}, func(event interface{}) {
-		got := event.(consensus.TimeoutMsg)
+		got := event.(hs.TimeoutMsg)
 		if got.ID != want.ID {
 			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
 		}
@@ -132,7 +133,7 @@ type testData struct {
 	creds     credentials.TransportCredentials
 	replicas  []ReplicaInfo
 	listeners []net.Listener
-	keys      []consensus.PrivateKey
+	keys      []hs.PrivateKey
 	builders  testutil.BuilderList
 }
 
@@ -142,7 +143,7 @@ func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
 	t.Helper()
 
 	listeners := make([]net.Listener, n)
-	keys := make([]consensus.PrivateKey, 0, n)
+	keys := make([]hs.PrivateKey, 0, n)
 	replicas := make([]ReplicaInfo, 0, n)
 
 	// generate keys and replicaInfo
