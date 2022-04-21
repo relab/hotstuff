@@ -3,6 +3,7 @@ package blockchain
 
 import (
 	"context"
+	"github.com/relab/hotstuff/msg"
 	"sync"
 
 	"github.com/relab/hotstuff/consensus"
@@ -13,10 +14,10 @@ import (
 type blockChain struct {
 	mods          *consensus.Modules
 	mut           sync.Mutex
-	pruneHeight   consensus.View
-	blocks        map[consensus.Hash]*consensus.Block
-	blockAtHeight map[consensus.View]*consensus.Block
-	pendingFetch  map[consensus.Hash]context.CancelFunc // allows a pending fetch operation to be cancelled
+	pruneHeight   msg.View
+	blocks        map[msg.Hash]*msg.Block
+	blockAtHeight map[msg.View]*msg.Block
+	pendingFetch  map[msg.Hash]context.CancelFunc // allows a pending fetch operation to be cancelled
 }
 
 // InitConsensusModule gives the module a reference to the Modules object.
@@ -29,16 +30,16 @@ func (chain *blockChain) InitConsensusModule(mods *consensus.Modules, _ *consens
 // Blocks are dropped in least recently used order.
 func New() consensus.BlockChain {
 	bc := &blockChain{
-		blocks:        make(map[consensus.Hash]*consensus.Block),
-		blockAtHeight: make(map[consensus.View]*consensus.Block),
-		pendingFetch:  make(map[consensus.Hash]context.CancelFunc),
+		blocks:        make(map[msg.Hash]*msg.Block),
+		blockAtHeight: make(map[msg.View]*msg.Block),
+		pendingFetch:  make(map[msg.Hash]context.CancelFunc),
 	}
-	bc.Store(consensus.GetGenesis())
+	bc.Store(msg.GetGenesis())
 	return bc
 }
 
 // Store stores a block in the blockchain
-func (chain *blockChain) Store(block *consensus.Block) {
+func (chain *blockChain) Store(block *msg.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
@@ -52,7 +53,7 @@ func (chain *blockChain) Store(block *consensus.Block) {
 }
 
 // Get retrieves a block given its hash. It will only try the local cache.
-func (chain *blockChain) LocalGet(hash consensus.Hash) (*consensus.Block, bool) {
+func (chain *blockChain) LocalGet(hash msg.Hash) (*msg.Block, bool) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
@@ -66,7 +67,7 @@ func (chain *blockChain) LocalGet(hash consensus.Hash) (*consensus.Block, bool) 
 
 // Get retrieves a block given its hash. Get will try to find the block locally.
 // If it is not available locally, it will try to fetch the block.
-func (chain *blockChain) Get(hash consensus.Hash) (block *consensus.Block, ok bool) {
+func (chain *blockChain) Get(hash msg.Hash) (block *msg.Block, ok bool) {
 	// need to declare vars early, or else we won't be able to use goto
 	var (
 		ctx    context.Context
@@ -110,7 +111,7 @@ done:
 }
 
 // Extends checks if the given block extends the branch of the target block.
-func (chain *blockChain) Extends(block, target *consensus.Block) bool {
+func (chain *blockChain) Extends(block, target *msg.Block) bool {
 	current := block
 	ok := true
 	for ok && current.View() > target.View() {
@@ -119,12 +120,12 @@ func (chain *blockChain) Extends(block, target *consensus.Block) bool {
 	return ok && current.Hash() == target.Hash()
 }
 
-func (chain *blockChain) PruneToHeight(height consensus.View) (forkedBlocks []*consensus.Block) {
+func (chain *blockChain) PruneToHeight(height msg.View) (forkedBlocks []*msg.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
 	committedHeight := chain.mods.Consensus().CommittedBlock().View()
-	committedViews := make(map[consensus.View]bool)
+	committedViews := make(map[msg.View]bool)
 	committedViews[committedHeight] = true
 	for h := committedHeight; h >= chain.pruneHeight; {
 		block, ok := chain.blockAtHeight[h]

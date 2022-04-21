@@ -4,6 +4,7 @@ package simplehotstuff
 import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
 )
 
 func init() {
@@ -17,13 +18,13 @@ func init() {
 type SimpleHotStuff struct {
 	mods *consensus.Modules
 
-	locked *consensus.Block
+	locked *msg.Block
 }
 
 // New returns a new SimpleHotStuff instance.
 func New() consensus.Rules {
 	return &SimpleHotStuff{
-		locked: consensus.GetGenesis(),
+		locked: msg.GetGenesis(),
 	}
 }
 
@@ -34,7 +35,7 @@ func (hs *SimpleHotStuff) InitConsensusModule(mods *consensus.Modules, _ *consen
 }
 
 // VoteRule decides if the replica should vote for the given block.
-func (hs *SimpleHotStuff) VoteRule(proposal consensus.ProposeMsg) bool {
+func (hs *SimpleHotStuff) VoteRule(proposal msg.ProposeMsg) bool {
 	block := proposal.Block
 
 	// Rule 1: can only vote in increasing rounds
@@ -59,7 +60,7 @@ func (hs *SimpleHotStuff) VoteRule(proposal consensus.ProposeMsg) bool {
 }
 
 // CommitRule decides if an ancestor of the block can be committed, and returns the ancestor, otherwise returns nil.
-func (hs *SimpleHotStuff) CommitRule(block *consensus.Block) *consensus.Block {
+func (hs *SimpleHotStuff) CommitRule(block *msg.Block) *msg.Block {
 	// will consider if the great-grandparent of the new block can be committed.
 	p, ok := hs.mods.BlockChain().Get(block.QuorumCert().BlockHash())
 	if !ok {

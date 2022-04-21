@@ -1,9 +1,9 @@
 package metrics
 
 import (
+	"github.com/relab/hotstuff/msg"
 	"time"
 
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -25,8 +25,8 @@ type Throughput struct {
 // InitModule gives the module access to the other modules.
 func (t *Throughput) InitModule(mods *modules.Modules) {
 	t.mods = mods
-	t.mods.EventLoop().RegisterHandler(consensus.CommitEvent{}, func(event interface{}) {
-		commitEvent := event.(consensus.CommitEvent)
+	t.mods.EventLoop().RegisterHandler(msg.CommitEvent{}, func(event interface{}) {
+		commitEvent := event.(msg.CommitEvent)
 		t.recordCommit(commitEvent.Commands)
 	})
 	t.mods.EventLoop().RegisterObserver(types.TickEvent{}, func(event interface{}) {

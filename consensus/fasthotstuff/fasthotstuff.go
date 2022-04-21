@@ -4,6 +4,7 @@ package fasthotstuff
 import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
 )
 
 func init() {
@@ -27,15 +28,15 @@ func (fhs *FastHotStuff) InitConsensusModule(mods *consensus.Modules, opts *cons
 	opts.SetShouldUseAggQC()
 }
 
-func (fhs *FastHotStuff) qcRef(qc consensus.QuorumCert) (*consensus.Block, bool) {
-	if (consensus.Hash{}) == qc.BlockHash() {
+func (fhs *FastHotStuff) qcRef(qc msg.QuorumCert) (*msg.Block, bool) {
+	if (msg.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
 	return fhs.mods.BlockChain().Get(qc.BlockHash())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.
-func (fhs *FastHotStuff) CommitRule(block *consensus.Block) *consensus.Block {
+func (fhs *FastHotStuff) CommitRule(block *msg.Block) *msg.Block {
 	parent, ok := fhs.qcRef(block.QuorumCert())
 	if !ok {
 		return nil
@@ -54,7 +55,7 @@ func (fhs *FastHotStuff) CommitRule(block *consensus.Block) *consensus.Block {
 }
 
 // VoteRule decides whether to vote for the proposal or not.
-func (fhs *FastHotStuff) VoteRule(proposal consensus.ProposeMsg) bool {
+func (fhs *FastHotStuff) VoteRule(proposal msg.ProposeMsg) bool {
 	// The base implementation verifies both regular QCs and AggregateQCs, and asserts that the QC embedded in the
 	// block is the same as the highQC found in the aggregateQC.
 	if proposal.AggregateQC != nil {

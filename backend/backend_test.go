@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/tls"
 	"crypto/x509"
+	"github.com/relab/hotstuff/msg"
 	"net"
 	"sync"
 	"testing"
@@ -78,11 +79,11 @@ func testBase(t *testing.T, typ interface{}, send func(consensus.Configuration),
 
 func TestPropose(t *testing.T) {
 	var wg sync.WaitGroup
-	want := consensus.ProposeMsg{
+	want := msg.ProposeMsg{
 		ID: 1,
-		Block: consensus.NewBlock(
-			consensus.GetGenesis().Hash(),
-			consensus.NewQuorumCert(nil, 0, consensus.GetGenesis().Hash()),
+		Block: msg.NewBlock(
+			msg.GetGenesis().Hash(),
+			msg.NewQuorumCert(nil, 0, msg.GetGenesis().Hash()),
 			"foo", 1, 1,
 		),
 	}
@@ -91,7 +92,7 @@ func TestPropose(t *testing.T) {
 		cfg.Propose(want)
 		wg.Wait()
 	}, func(event interface{}) {
-		got := event.(consensus.ProposeMsg)
+		got := event.(msg.ProposeMsg)
 		if got.ID != want.ID {
 			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
 		}
@@ -104,18 +105,18 @@ func TestPropose(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	var wg sync.WaitGroup
-	want := consensus.TimeoutMsg{
+	want := msg.TimeoutMsg{
 		ID:            1,
 		View:          1,
 		ViewSignature: nil,
-		SyncInfo:      consensus.NewSyncInfo(),
+		SyncInfo:      msg.NewSyncInfo(),
 	}
 	testBase(t, want, func(cfg consensus.Configuration) {
 		wg.Add(3)
 		cfg.Timeout(want)
 		wg.Wait()
 	}, func(event interface{}) {
-		got := event.(consensus.TimeoutMsg)
+		got := event.(msg.TimeoutMsg)
 		if got.ID != want.ID {
 			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
 		}
@@ -132,7 +133,7 @@ type testData struct {
 	creds     credentials.TransportCredentials
 	replicas  []ReplicaInfo
 	listeners []net.Listener
-	keys      []consensus.PrivateKey
+	keys      []msg.PrivateKey
 	builders  testutil.BuilderList
 }
 
@@ -142,7 +143,7 @@ func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
 	t.Helper()
 
 	listeners := make([]net.Listener, n)
-	keys := make([]consensus.PrivateKey, 0, n)
+	keys := make([]msg.PrivateKey, 0, n)
 	replicas := make([]ReplicaInfo, 0, n)
 
 	// generate keys and replicaInfo

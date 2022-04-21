@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	consensus "github.com/relab/hotstuff/consensus"
+	msg "github.com/relab/hotstuff/msg"
 )
 
 // MockSynchronizer is a mock of Synchronizer interface.
@@ -36,7 +36,7 @@ func (m *MockSynchronizer) EXPECT() *MockSynchronizerMockRecorder {
 }
 
 // AdvanceView mocks base method.
-func (m *MockSynchronizer) AdvanceView(arg0 consensus.SyncInfo) {
+func (m *MockSynchronizer) AdvanceView(arg0 msg.SyncInfo) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AdvanceView", arg0)
 }
@@ -48,10 +48,10 @@ func (mr *MockSynchronizerMockRecorder) AdvanceView(arg0 interface{}) *gomock.Ca
 }
 
 // HighQC mocks base method.
-func (m *MockSynchronizer) HighQC() consensus.QuorumCert {
+func (m *MockSynchronizer) HighQC() msg.QuorumCert {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HighQC")
-	ret0, _ := ret[0].(consensus.QuorumCert)
+	ret0, _ := ret[0].(msg.QuorumCert)
 	return ret0
 }
 
@@ -62,10 +62,10 @@ func (mr *MockSynchronizerMockRecorder) HighQC() *gomock.Call {
 }
 
 // LeafBlock mocks base method.
-func (m *MockSynchronizer) LeafBlock() *consensus.Block {
+func (m *MockSynchronizer) LeafBlock() *msg.Block {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "LeafBlock")
-	ret0, _ := ret[0].(*consensus.Block)
+	ret0, _ := ret[0].(*msg.Block)
 	return ret0
 }
 
@@ -88,7 +88,7 @@ func (mr *MockSynchronizerMockRecorder) Start(arg0 interface{}) *gomock.Call {
 }
 
 // UpdateHighQC mocks base method.
-func (m *MockSynchronizer) UpdateHighQC(arg0 consensus.QuorumCert) {
+func (m *MockSynchronizer) UpdateHighQC(arg0 msg.QuorumCert) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "UpdateHighQC", arg0)
 }
@@ -100,10 +100,10 @@ func (mr *MockSynchronizerMockRecorder) UpdateHighQC(arg0 interface{}) *gomock.C
 }
 
 // View mocks base method.
-func (m *MockSynchronizer) View() consensus.View {
+func (m *MockSynchronizer) View() msg.View {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "View")
-	ret0, _ := ret[0].(consensus.View)
+	ret0, _ := ret[0].(msg.View)
 	return ret0
 }
 
