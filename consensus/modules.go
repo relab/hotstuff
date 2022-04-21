@@ -400,7 +400,7 @@ type executorWrapper struct {
 }
 
 func (ew executorWrapper) Exec(block *Block) {
-	ew.executor.Exec(block.cmd)
+	ew.executor.Exec(block.Command())
 }
 
 type forkHandlerWrapper struct {
@@ -408,5 +408,5 @@ type forkHandlerWrapper struct {
 }
 
 func (fhw forkHandlerWrapper) Fork(block *Block) {
-	fhw.forkHandler.Fork(block.cmd)
+	fhw.forkHandler.Fork(block.Command())
 }
