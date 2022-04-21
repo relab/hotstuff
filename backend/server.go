@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/relab/hotstuff/hs"
 	"net"
 	"strconv"
 
@@ -141,7 +140,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		return
 	}
 
-	impl.srv.mods.EventLoop().AddEvent(hs.VoteMsg{
+	impl.srv.mods.EventLoop().AddEvent(consensus.VoteMsg{
 		ID:          id,
 		PartialCert: hotstuffpb.PartialCertFromProto(cert),
 	})
@@ -155,7 +154,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		return
 	}
 
-	impl.srv.mods.EventLoop().AddEvent(hs.NewViewMsg{
+	impl.srv.mods.EventLoop().AddEvent(consensus.NewViewMsg{
 		ID:       id,
 		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
 	})
@@ -163,7 +162,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 
 // Fetch handles an incoming fetch request.
 func (impl *serviceImpl) Fetch(ctx gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*hotstuffpb.Block, error) {
-	var hash hs.Hash
+	var hash consensus.Hash
 	copy(hash[:], pb.GetHash())
 
 	block, ok := impl.srv.mods.BlockChain().LocalGet(hash)

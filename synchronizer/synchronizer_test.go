@@ -3,10 +3,10 @@ package synchronizer_test
 import (
 	"bytes"
 	"context"
-	hs2 "github.com/relab/hotstuff/hs"
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 	. "github.com/relab/hotstuff/synchronizer"
@@ -14,7 +14,7 @@ import (
 
 func TestLocalTimeout(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	qc := hs2.NewQuorumCert(nil, 0, hs2.GetGenesis().Hash())
+	qc := consensus.NewQuorumCert(nil, 0, consensus.GetGenesis().Hash())
 	builder := testutil.TestModules(t, ctrl, 2, testutil.GenerateECDSAKey(t))
 	hs := mocks.NewMockConsensus(ctrl)
 	s := New(testutil.FixedTimeout(10))
@@ -25,11 +25,11 @@ func TestLocalTimeout(t *testing.T) {
 	testutil.ConfigAddReplica(t, cfg, leader)
 
 	c := make(chan struct{})
-	hs.EXPECT().StopVoting(hs2.View(1)).AnyTimes()
+	hs.EXPECT().StopVoting(consensus.View(1)).AnyTimes()
 	cfg.
 		EXPECT().
-		Timeout(gomock.AssignableToTypeOf(hs2.TimeoutMsg{})).
-		Do(func(msg hs2.TimeoutMsg) {
+		Timeout(gomock.AssignableToTypeOf(consensus.TimeoutMsg{})).
+		Do(func(msg consensus.TimeoutMsg) {
 			if msg.View != 1 {
 				t.Errorf("wrong view. got: %v, want: %v", msg.View, 1)
 			}
@@ -64,9 +64,9 @@ func TestAdvanceViewQC(t *testing.T) {
 	hl := builders.Build()
 	signers := hl.Signers()
 
-	block := hs2.NewBlock(
-		hs2.GetGenesis().Hash(),
-		hs2.NewQuorumCert(nil, 0, hs2.GetGenesis().Hash()),
+	block := consensus.NewBlock(
+		consensus.GetGenesis().Hash(),
+		consensus.NewQuorumCert(nil, 0, consensus.GetGenesis().Hash()),
 		"foo",
 		1,
 		2,
@@ -74,9 +74,9 @@ func TestAdvanceViewQC(t *testing.T) {
 	hl[0].BlockChain().Store(block)
 	qc := testutil.CreateQC(t, block, signers)
 	// synchronizer should tell hotstuff to propose
-	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hs2.NewSyncInfo()))
+	hs.EXPECT().Propose(gomock.AssignableToTypeOf(consensus.NewSyncInfo()))
 
-	s.AdvanceView(hs2.NewSyncInfo().WithQC(qc))
+	s.AdvanceView(consensus.NewSyncInfo().WithQC(qc))
 
 	if s.View() != 2 {
 		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())
@@ -97,9 +97,9 @@ func TestAdvanceViewTC(t *testing.T) {
 	tc := testutil.CreateTC(t, 1, signers)
 
 	// synchronizer should tell hotstuff to propose
-	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hs2.NewSyncInfo()))
+	hs.EXPECT().Propose(gomock.AssignableToTypeOf(consensus.NewSyncInfo()))
 
-	s.AdvanceView(hs2.NewSyncInfo().WithTC(tc))
+	s.AdvanceView(consensus.NewSyncInfo().WithTC(tc))
 
 	if s.View() != 2 {
 		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())

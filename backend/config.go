@@ -4,7 +4,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/relab/hotstuff/hs"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -20,7 +19,7 @@ import (
 type Replica struct {
 	node          *hotstuffpb.Node
 	id            hotstuff.ID
-	pubKey        hs.PublicKey
+	pubKey        consensus.PublicKey
 	voteCancel    context.CancelFunc
 	newviewCancel context.CancelFunc
 }
@@ -31,12 +30,12 @@ func (r *Replica) ID() hotstuff.ID {
 }
 
 // PublicKey returns the replica's public key.
-func (r *Replica) PublicKey() hs.PublicKey {
+func (r *Replica) PublicKey() consensus.PublicKey {
 	return r.pubKey
 }
 
 // Vote sends the partial certificate to the other replica.
-func (r *Replica) Vote(cert hs.PartialCert) {
+func (r *Replica) Vote(cert consensus.PartialCert) {
 	if r.node == nil {
 		return
 	}
@@ -48,7 +47,7 @@ func (r *Replica) Vote(cert hs.PartialCert) {
 }
 
 // NewView sends the quorum certificate to the other replica.
-func (r *Replica) NewView(msg hs.SyncInfo) {
+func (r *Replica) NewView(msg consensus.SyncInfo) {
 	if r.node == nil {
 		return
 	}
@@ -115,7 +114,7 @@ func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOpt
 type ReplicaInfo struct {
 	ID      hotstuff.ID
 	Address string
-	PubKey  hs.PublicKey
+	PubKey  consensus.PublicKey
 }
 
 // Connect opens connections to the replicas in the configuration.
@@ -176,7 +175,7 @@ func (cfg *Config) QuorumSize() int {
 }
 
 // Propose sends the block to all replicas in the configuration
-func (cfg *Config) Propose(proposal hs.ProposeMsg) {
+func (cfg *Config) Propose(proposal consensus.ProposeMsg) {
 	if cfg.cfg == nil {
 		return
 	}
@@ -188,7 +187,7 @@ func (cfg *Config) Propose(proposal hs.ProposeMsg) {
 }
 
 // Timeout sends the timeout message to all replicas.
-func (cfg *Config) Timeout(msg hs.TimeoutMsg) {
+func (cfg *Config) Timeout(msg consensus.TimeoutMsg) {
 	if cfg.cfg == nil {
 		return
 	}
@@ -199,7 +198,7 @@ func (cfg *Config) Timeout(msg hs.TimeoutMsg) {
 }
 
 // Fetch requests a block from all the replicas in the configuration
-func (cfg *Config) Fetch(ctx context.Context, hash hs.Hash) (*hs.Block, bool) {
+func (cfg *Config) Fetch(ctx context.Context, hash consensus.Hash) (*consensus.Block, bool) {
 	protoBlock, err := cfg.cfg.Fetch(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
 	if err != nil {
 		qcErr, ok := err.(gorums.QuorumCallError)
@@ -224,7 +223,7 @@ type qspec struct{}
 // FetchQF is the quorum function for the Fetch quorum call method.
 // It simply returns true if one of the replies matches the requested block.
 func (q qspec) FetchQF(in *hotstuffpb.BlockHash, replies map[uint32]*hotstuffpb.Block) (*hotstuffpb.Block, bool) {
-	var h hs.Hash
+	var h consensus.Hash
 	copy(h[:], in.GetHash())
 	for _, b := range replies {
 		block := hotstuffpb.BlockFromProto(b)

@@ -1,8 +1,9 @@
-package hs
+package consensus
 
 import (
 	"crypto/sha256"
 	"fmt"
+
 	"github.com/relab/hotstuff"
 )
 

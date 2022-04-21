@@ -2,10 +2,10 @@ package hotstuffpb
 
 import (
 	"bytes"
-	"github.com/relab/hotstuff/hs"
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/internal/testutil"
@@ -18,7 +18,7 @@ func TestConvertPartialCert(t *testing.T) {
 	hs := builder.Build()
 	signer := hs.Crypto()
 
-	want, err := signer.CreatePartialCert(hs.GetGenesis())
+	want, err := signer.CreatePartialCert(consensus.GetGenesis())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestConvertQuorumCert(t *testing.T) {
 	builders := testutil.CreateBuilders(t, ctrl, 4)
 	hl := builders.Build()
 
-	b1 := hs.NewBlock(hs.GetGenesis().Hash(), hs.NewQuorumCert(nil, 0, hs.GetGenesis().Hash()), "", 1, 1)
+	b1 := consensus.NewBlock(consensus.GetGenesis().Hash(), consensus.NewQuorumCert(nil, 0, consensus.GetGenesis().Hash()), "", 1, 1)
 
 	signatures := testutil.CreatePCs(t, b1, hl.Signers())
 
@@ -55,8 +55,8 @@ func TestConvertQuorumCert(t *testing.T) {
 }
 
 func TestConvertBlock(t *testing.T) {
-	qc := hs.NewQuorumCert(nil, 0, hs.Hash{})
-	want := hs.NewBlock(hs.GetGenesis().Hash(), qc, "", 1, 1)
+	qc := consensus.NewQuorumCert(nil, 0, consensus.Hash{})
+	want := consensus.NewBlock(consensus.GetGenesis().Hash(), qc, "", 1, 1)
 	pb := BlockToProto(want)
 	got := BlockFromProto(pb)
 

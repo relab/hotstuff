@@ -5,10 +5,10 @@
 package mocks
 
 import (
-	"github.com/relab/hotstuff/hs"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	consensus "github.com/relab/hotstuff/consensus"
 )
 
 // MockExecutor is a mock of Executor interface.
@@ -35,7 +35,7 @@ func (m *MockExecutor) EXPECT() *MockExecutorMockRecorder {
 }
 
 // Exec mocks base method.
-func (m *MockExecutor) Exec(arg0 hs.Command) {
+func (m *MockExecutor) Exec(arg0 consensus.Command) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Exec", arg0)
 }

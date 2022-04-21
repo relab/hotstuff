@@ -1,7 +1,6 @@
 package leaderrotation
 
 import (
-	"github.com/relab/hotstuff/hs"
 	"math/rand"
 	"sort"
 
@@ -22,7 +21,7 @@ func (c *carousel) InitConsensusModule(mods *consensus.Modules, _ *consensus.Opt
 	c.mods = mods
 }
 
-func (c carousel) GetLeader(round hs.View) hotstuff.ID {
+func (c carousel) GetLeader(round consensus.View) hotstuff.ID {
 	commitHead := c.mods.Consensus().CommittedBlock()
 
 	if commitHead.QuorumCert().Signature() == nil {
@@ -30,7 +29,7 @@ func (c carousel) GetLeader(round hs.View) hotstuff.ID {
 		return chooseRoundRobin(round, c.mods.Configuration().Len())
 	}
 
-	if commitHead.View() != round-hs.View(c.mods.Consensus().ChainLength()) {
+	if commitHead.View() != round-consensus.View(c.mods.Consensus().ChainLength()) {
 		c.mods.Logger().Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.View())
 		return chooseRoundRobin(round, c.mods.Configuration().Len())
 	}
@@ -45,7 +44,7 @@ func (c carousel) GetLeader(round hs.View) hotstuff.ID {
 		ok          = true
 	)
 
-	for ok && i < f && block != hs.GetGenesis() {
+	for ok && i < f && block != consensus.GetGenesis() {
 		lastAuthors.Add(block.Proposer())
 		block, ok = c.mods.BlockChain().Get(block.Parent())
 		i++
