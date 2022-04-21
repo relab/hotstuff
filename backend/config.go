@@ -47,14 +47,14 @@ func (r *Replica) Vote(cert consensus.PartialCert) {
 }
 
 // NewView sends the quorum certificate to the other replica.
-func (r *Replica) NewView(msg consensus.SyncInfo) {
+func (r *Replica) NewView(syncMsg consensus.SyncInfo) {
 	if r.node == nil {
 		return
 	}
 	var ctx context.Context
 	r.newviewCancel()
 	ctx, r.newviewCancel = context.WithCancel(context.Background())
-	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(msg), gorums.WithNoSendWaiting())
+	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(syncMsg), gorums.WithNoSendWaiting())
 }
 
 // Config holds information about the current configuration of replicas that participate in the protocol,
@@ -187,14 +187,14 @@ func (cfg *Config) Propose(proposal consensus.ProposeMsg) {
 }
 
 // Timeout sends the timeout message to all replicas.
-func (cfg *Config) Timeout(msg consensus.TimeoutMsg) {
+func (cfg *Config) Timeout(timeoutMsg consensus.TimeoutMsg) {
 	if cfg.cfg == nil {
 		return
 	}
 	var ctx context.Context
 	cfg.timeoutCancel()
 	ctx, cfg.timeoutCancel = context.WithCancel(context.Background())
-	cfg.cfg.Timeout(ctx, hotstuffpb.TimeoutMsgToProto(msg), gorums.WithNoSendWaiting())
+	cfg.cfg.Timeout(ctx, hotstuffpb.TimeoutMsgToProto(timeoutMsg), gorums.WithNoSendWaiting())
 }
 
 // Fetch requests a block from all the replicas in the configuration

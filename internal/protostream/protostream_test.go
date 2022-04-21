@@ -10,13 +10,13 @@ import (
 )
 
 func TestProtostream(t *testing.T) {
-	var buf bytes.Buffer                                   // in-memory stream
-	msg := hotstuffpb.BlockToProto(consensus.GetGenesis()) // test message
+	var buf bytes.Buffer                                      // in-memory stream
+	genMsg := hotstuffpb.BlockToProto(consensus.GetGenesis()) // test message
 
 	writer := protostream.NewWriter(&buf)
 	reader := protostream.NewReader(&buf)
 
-	err := writer.WriteAny(msg)
+	err := writer.WriteAny(genMsg)
 	if err != nil {
 		t.Fatalf("WriteAny failed: %v", err)
 	}
@@ -28,7 +28,7 @@ func TestProtostream(t *testing.T) {
 
 	got, ok := gotMsg.(*hotstuffpb.Block)
 	if !ok {
-		t.Fatalf("wrong message type returned: got: %T, want: %T", got, msg)
+		t.Fatalf("wrong message type returned: got: %T, want: %T", got, genMsg)
 	}
 
 	gotBlock := hotstuffpb.BlockFromProto(got)

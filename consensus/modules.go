@@ -347,7 +347,7 @@ type Configuration interface {
 	// Propose sends the block to all replicas in the configuration.
 	Propose(proposal ProposeMsg)
 	// Timeout sends the timeout message to all replicas.
-	Timeout(msg TimeoutMsg)
+	Timeout(TimeoutMsg)
 	// Fetch requests a block from all the replicas in the configuration.
 	Fetch(ctx context.Context, hash Hash) (block *Block, ok bool)
 }
