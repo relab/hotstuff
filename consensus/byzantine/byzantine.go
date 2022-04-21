@@ -3,6 +3,7 @@ package byzantine
 
 import (
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/hs"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -29,8 +30,8 @@ func (s *silence) InitConsensusModule(mods *consensus.Modules, opts *consensus.O
 	}
 }
 
-func (s *silence) ProposeRule(_ consensus.SyncInfo, _ consensus.Command) (consensus.ProposeMsg, bool) {
-	return consensus.ProposeMsg{}, false
+func (s *silence) ProposeRule(_ hs.SyncInfo, _ hs.Command) (hs.ProposeMsg, bool) {
+	return hs.ProposeMsg{}, false
 }
 
 func (s *silence) Wrap(rules consensus.Rules) consensus.Rules {
@@ -57,7 +58,7 @@ func (f *fork) InitConsensusModule(mods *consensus.Modules, opts *consensus.Opti
 	}
 }
 
-func (f *fork) ProposeRule(cert consensus.SyncInfo, cmd consensus.Command) (proposal consensus.ProposeMsg, ok bool) {
+func (f *fork) ProposeRule(cert hs.SyncInfo, cmd hs.Command) (proposal hs.ProposeMsg, ok bool) {
 	parent, ok := f.mods.BlockChain().Get(f.mods.Synchronizer().LeafBlock().Parent())
 	if !ok {
 		return proposal, false
@@ -67,9 +68,9 @@ func (f *fork) ProposeRule(cert consensus.SyncInfo, cmd consensus.Command) (prop
 		return proposal, false
 	}
 
-	proposal = consensus.ProposeMsg{
+	proposal = hs.ProposeMsg{
 		ID: f.mods.ID(),
-		Block: consensus.NewBlock(
+		Block: hs.NewBlock(
 			grandparent.Hash(),
 			grandparent.QuorumCert(),
 			cmd,

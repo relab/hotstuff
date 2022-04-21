@@ -6,10 +6,10 @@ package mocks
 
 import (
 	context "context"
+	"github.com/relab/hotstuff/hs"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	consensus "github.com/relab/hotstuff/consensus"
 )
 
 // MockCommandQueue is a mock of CommandQueue interface.
@@ -36,10 +36,10 @@ func (m *MockCommandQueue) EXPECT() *MockCommandQueueMockRecorder {
 }
 
 // Get mocks base method.
-func (m *MockCommandQueue) Get(arg0 context.Context) (consensus.Command, bool) {
+func (m *MockCommandQueue) Get(arg0 context.Context) (hs.Command, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", arg0)
-	ret0, _ := ret[0].(consensus.Command)
+	ret0, _ := ret[0].(hs.Command)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }

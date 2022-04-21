@@ -6,11 +6,11 @@ package mocks
 
 import (
 	crypto "crypto"
+	"github.com/relab/hotstuff/hs"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
 	hotstuff "github.com/relab/hotstuff"
-	consensus "github.com/relab/hotstuff/consensus"
 )
 
 // MockReplica is a mock of Replica interface.
@@ -51,7 +51,7 @@ func (mr *MockReplicaMockRecorder) ID() *gomock.Call {
 }
 
 // NewView mocks base method.
-func (m *MockReplica) NewView(arg0 consensus.SyncInfo) {
+func (m *MockReplica) NewView(arg0 hs.SyncInfo) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "NewView", arg0)
 }
@@ -77,7 +77,7 @@ func (mr *MockReplicaMockRecorder) PublicKey() *gomock.Call {
 }
 
 // Vote mocks base method.
-func (m *MockReplica) Vote(arg0 consensus.PartialCert) {
+func (m *MockReplica) Vote(arg0 hs.PartialCert) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Vote", arg0)
 }

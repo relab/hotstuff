@@ -10,13 +10,13 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"github.com/relab/hotstuff/hs"
 	"math/big"
 	"net"
 	"os"
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto/bls12"
 	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
 )
@@ -89,7 +89,7 @@ func GenerateTLSCert(id hotstuff.ID, hosts []string, parent *x509.Certificate, s
 }
 
 // PrivateKeyToPEM encodes the private key in PEM format.
-func PrivateKeyToPEM(key consensus.PrivateKey) ([]byte, error) {
+func PrivateKeyToPEM(key hs.PrivateKey) ([]byte, error) {
 	var (
 		marshalled []byte
 		keyType    string
@@ -114,7 +114,7 @@ func PrivateKeyToPEM(key consensus.PrivateKey) ([]byte, error) {
 }
 
 // WritePrivateKeyFile writes a private key to the specified file.
-func WritePrivateKeyFile(key consensus.PrivateKey, filePath string) (err error) {
+func WritePrivateKeyFile(key hs.PrivateKey, filePath string) (err error) {
 	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return
@@ -135,7 +135,7 @@ func WritePrivateKeyFile(key consensus.PrivateKey, filePath string) (err error) 
 }
 
 // PublicKeyToPEM encodes the public key in PEM format.
-func PublicKeyToPEM(key consensus.PublicKey) ([]byte, error) {
+func PublicKeyToPEM(key hs.PublicKey) ([]byte, error) {
 	var (
 		marshalled []byte
 		keyType    string
@@ -162,7 +162,7 @@ func PublicKeyToPEM(key consensus.PublicKey) ([]byte, error) {
 }
 
 // WritePublicKeyFile writes a public key to the specified file.
-func WritePublicKeyFile(key consensus.PublicKey, filePath string) (err error) {
+func WritePublicKeyFile(key hs.PublicKey, filePath string) (err error) {
 	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return
@@ -205,7 +205,7 @@ func WriteCertFile(cert *x509.Certificate, file string) (err error) {
 }
 
 // ParsePrivateKey parses a PEM encoded private key.
-func ParsePrivateKey(buf []byte) (key consensus.PrivateKey, err error) {
+func ParsePrivateKey(buf []byte) (key hs.PrivateKey, err error) {
 	b, _ := pem.Decode(buf)
 	switch b.Type {
 	case ecdsacrypto.PrivateKeyFileType:
@@ -224,7 +224,7 @@ func ParsePrivateKey(buf []byte) (key consensus.PrivateKey, err error) {
 }
 
 // ReadPrivateKeyFile reads a private key from the specified file.
-func ReadPrivateKeyFile(keyFile string) (key consensus.PrivateKey, err error) {
+func ReadPrivateKeyFile(keyFile string) (key hs.PrivateKey, err error) {
 	b, err := os.ReadFile(keyFile)
 	if err != nil {
 		return nil, err
@@ -233,7 +233,7 @@ func ReadPrivateKeyFile(keyFile string) (key consensus.PrivateKey, err error) {
 }
 
 // ParsePublicKey parses a PEM encoded public key
-func ParsePublicKey(buf []byte) (key consensus.PublicKey, err error) {
+func ParsePublicKey(buf []byte) (key hs.PublicKey, err error) {
 	b, _ := pem.Decode(buf)
 	if b == nil {
 		return nil, fmt.Errorf("failed to decode PEM block")
@@ -258,7 +258,7 @@ func ParsePublicKey(buf []byte) (key consensus.PublicKey, err error) {
 }
 
 // ReadPublicKeyFile reads a public key from the specified file.
-func ReadPublicKeyFile(keyFile string) (key consensus.PublicKey, err error) {
+func ReadPublicKeyFile(keyFile string) (key hs.PublicKey, err error) {
 	b, err := os.ReadFile(keyFile)
 	if err != nil {
 		return nil, err
@@ -316,7 +316,7 @@ func GenerateKeyChain(id hotstuff.ID, validFor []string, crypto string, ca *x509
 
 	certPEM := CertToPEM(cert)
 
-	var privateKey consensus.PrivateKey
+	var privateKey hs.PrivateKey
 	switch crypto {
 	case "ecdsa":
 		privateKey = ecdsaKey

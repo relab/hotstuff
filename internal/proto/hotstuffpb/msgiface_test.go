@@ -1,9 +1,9 @@
 package hotstuffpb_test
 
 import (
+	"github.com/relab/hotstuff/hs"
 	"testing"
 
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 )
 
@@ -28,7 +28,7 @@ func proposeMsgStruct() *hotstuffpb.Proposal {
 
 var (
 	blockField  *hotstuffpb.Block
-	cBlockField *consensus.Block
+	cBlockField *hs.Block
 )
 
 func BenchmarkTranslationProto2C(b *testing.B) {
