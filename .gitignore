@@ -21,9 +21,11 @@ __debug_bin
 /hotstuff
 /plot
 
-
 # other
 *.in
+
+# GoLand project details (ignore these; at least for now)
+.idea
 
 rr/
 
@@ -35,3 +37,4 @@ measurements.json
 *.pdf
 
 twins.json
+bench.txt
