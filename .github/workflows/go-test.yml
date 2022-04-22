@@ -1,5 +1,11 @@
-on: [push, pull_request]
 name: Test
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 jobs:
   test:
     strategy:
