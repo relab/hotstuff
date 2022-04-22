@@ -17,7 +17,7 @@ require (
 	go-hep.org/x/hep v0.31.1
 	go.uber.org/multierr v1.8.0
 	go.uber.org/zap v1.21.0
-	golang.org/x/time v0.0.0-20220411224347-583f2d630306
+	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	gonum.org/v1/plot v0.11.0
 	google.golang.org/genproto v0.0.0-20220421151946-72621c1f0bd3
 	google.golang.org/grpc v1.45.0
