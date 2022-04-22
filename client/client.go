@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
@@ -22,17 +21,18 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type qspec struct {
 	faulty int
 }
 
-func (q *qspec) ExecCommandQF(_ *clientpb.Command, signatures map[uint32]*empty.Empty) (*empty.Empty, bool) {
+func (q *qspec) ExecCommandQF(_ *clientpb.Command, signatures map[uint32]*emptypb.Empty) (*emptypb.Empty, bool) {
 	if len(signatures) < q.faulty+1 {
 		return nil, false
 	}
-	return &empty.Empty{}, true
+	return &emptypb.Empty{}, true
 }
 
 type pendingCmd struct {

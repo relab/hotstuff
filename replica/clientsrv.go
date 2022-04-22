@@ -6,7 +6,6 @@ import (
 	"net"
 	"sync"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
@@ -14,6 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // clientSrv serves a client.
@@ -66,7 +66,7 @@ func (srv *clientSrv) Stop() {
 	srv.srv.Stop()
 }
 
-func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*empty.Empty, error) {
+func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*emptypb.Empty, error) {
 	id := cmdID{cmd.ClientID, cmd.SequenceNumber}
 
 	c := make(chan error)
@@ -77,7 +77,7 @@ func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (
 	srv.cmdCache.addCommand(cmd)
 	ctx.Release()
 	err := <-c
-	return &empty.Empty{}, err
+	return &emptypb.Empty{}, err
 }
 
 func (srv *clientSrv) Exec(cmd consensus.Command) {
