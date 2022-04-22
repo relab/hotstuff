@@ -1,23 +1,26 @@
 name: golangci-lint
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 jobs:
   golangci:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.16.x
+          go-version: 1.18
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
+        uses: golangci/golangci-lint-action@v3
         with:
-          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-          version: v1.42
-          skip-go-installation: true
-          # Optional: working directory, useful for monorepos
-          # working-directory: somedir
-          # Optional: golangci-lint command line arguments.
-          # args: --issues-exit-code=0
+          version: latest
+          # skip-pkg-cache: true
+          # skip-build-cache: true
+          # args: --disable errcheck --timeout 5m
           # Optional: show only new issues if it's a pull request. The default value is `false`.
           # only-new-issues: true

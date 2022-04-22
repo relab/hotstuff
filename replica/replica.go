@@ -7,13 +7,13 @@ import (
 	"crypto/x509"
 	"net"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/consensus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // cmdID is a unique identifier for a command
@@ -51,7 +51,7 @@ type Replica struct {
 	hsSrv     *backend.Server
 	hs        *consensus.Modules
 
-	execHandlers map[cmdID]func(*empty.Empty, error)
+	execHandlers map[cmdID]func(*emptypb.Empty, error)
 	cancel       context.CancelFunc
 	done         chan struct{}
 }
@@ -70,7 +70,7 @@ func New(conf Config, builder consensus.Builder) (replica *Replica) {
 
 	srv := &Replica{
 		clientSrv:    clientSrv,
-		execHandlers: make(map[cmdID]func(*empty.Empty, error)),
+		execHandlers: make(map[cmdID]func(*emptypb.Empty, error)),
 		cancel:       func() {},
 		done:         make(chan struct{}),
 	}
