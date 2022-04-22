@@ -2,6 +2,7 @@ package orchestration_test
 
 import (
 	"io"
+	"math"
 	"net"
 	"os"
 	"os/exec"
@@ -36,6 +37,7 @@ func TestOrchestration(t *testing.T) {
 				ConnectTimeout: durationpb.New(time.Second),
 				MaxConcurrent:  250,
 				PayloadSize:    100,
+				RateLimit:      math.Inf(1),
 			},
 			ReplicaOpts: &orchestrationpb.ReplicaOpts{
 				BatchSize:         100,
@@ -88,6 +90,7 @@ func TestDeployment(t *testing.T) {
 			ConnectTimeout: durationpb.New(time.Second),
 			MaxConcurrent:  250,
 			PayloadSize:    100,
+			RateLimit:      math.Inf(1),
 		},
 		ReplicaOpts: &orchestrationpb.ReplicaOpts{
 			BatchSize:         100,
@@ -135,7 +138,7 @@ func TestDeployment(t *testing.T) {
 func findProjectRoot(t *testing.T) string {
 	// The path to the parent folder of this file.
 	// Will need to be updated if the package is ever moved.
-	var packagePath = filepath.Join("internal", "orchestration")
+	packagePath := filepath.Join("internal", "orchestration")
 
 	_, curFile, _, ok := runtime.Caller(0)
 	if !ok {
