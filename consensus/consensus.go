@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -211,8 +212,13 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 func (cs *consensusBase) commit(block *Block) {
 	cs.mut.Lock()
 	// can't recurse due to requiring the mutex, so we use a helper instead.
-	cs.commitInner(block)
+	err := cs.commitInner(block)
 	cs.mut.Unlock()
+
+	if err != nil {
+		cs.mods.Logger().Warnf("failed to commit: %v", err)
+		return
+	}
 
 	// prune the blockchain and handle forked blocks
 	forkedBlocks := cs.mods.BlockChain().PruneToHeight(block.View())
@@ -222,18 +228,22 @@ func (cs *consensusBase) commit(block *Block) {
 }
 
 // recursive helper for commit
-func (cs *consensusBase) commitInner(block *Block) {
-	if cs.bExec.View() < block.View() {
-		if parent, ok := cs.mods.BlockChain().Get(block.Parent()); ok {
-			cs.commitInner(parent)
-		} else {
-			cs.mods.Logger().Warn("Refusing to commit because parent block could not be retrieved.")
-			return
-		}
-		cs.mods.Logger().Debug("EXEC: ", block)
-		cs.mods.Executor().Exec(block)
-		cs.bExec = block
+func (cs *consensusBase) commitInner(block *Block) error {
+	if cs.bExec.View() >= block.View() {
+		return nil
 	}
+	if parent, ok := cs.mods.BlockChain().Get(block.Parent()); ok {
+		err := cs.commitInner(parent)
+		if err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("failed to locate block: %s", block.Parent())
+	}
+	cs.mods.Logger().Debug("EXEC: ", block)
+	cs.mods.Executor().Exec(block)
+	cs.bExec = block
+	return nil
 }
 
 // ChainLength returns the number of blocks that need to be chained together in order to commit.
