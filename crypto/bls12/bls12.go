@@ -131,6 +131,15 @@ func (agg AggregateSignature) Bitfield() crypto.Bitfield {
 	return agg.participants
 }
 
+func firstParticipant(participants consensus.IDSet) hotstuff.ID {
+	id := hotstuff.ID(0)
+	participants.RangeWhile(func(i hotstuff.ID) bool {
+		id = i
+		return false
+	})
+	return id
+}
+
 type bls12Base struct {
 	mods *consensus.Modules
 
@@ -159,6 +168,20 @@ func (bls *bls12Base) InitConsensusModule(mods *consensus.Modules, opts *consens
 func (bls *bls12Base) privateKey() *PrivateKey {
 	pk := bls.mods.PrivateKey()
 	return pk.(*PrivateKey)
+}
+
+func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *PublicKey, ok bool) {
+	if replica, ok := bls.mods.Configuration().Replica(id); ok {
+		if replica.ID() != bls.mods.ID() && !bls.checkPop(replica) {
+			bls.mods.Logger().Warnf("Invalid POP for replica %d", id)
+			return nil, false
+		}
+		if pubKey, ok = replica.PublicKey().(*PublicKey); ok {
+			return pubKey, true
+		}
+		bls.mods.Logger().Errorf("Unsupported public key type: %T", replica.PublicKey())
+	}
+	return nil, false
 }
 
 func (bls *bls12Base) subgroupCheck(point *bls12.PointG2) bool {
@@ -304,81 +327,6 @@ func (bls *bls12Base) Sign(message []byte) (signature consensus.QuorumSignature,
 	return &AggregateSignature{sig: *p, participants: bf}, nil
 }
 
-// Verify verifies the given cryptographic signature according to the specified options.
-// NOTE: One of either VerifySingle or VerifyMulti options MUST be specified,
-// otherwise this function will have nothing to verify the signature against.
-func (bls *bls12Base) Verify(signature consensus.QuorumSignature, options ...consensus.VerifyOption) bool {
-	sig, ok := signature.(*AggregateSignature)
-	if !ok {
-		panic(fmt.Sprintf("cannot verify signature of incompatible type %T (expected %T)", signature, sig))
-	}
-
-	var opts consensus.VerifyOptions
-	for _, opt := range options {
-		opt(&opts)
-	}
-
-	if len(opts.Messages) == 0 {
-		panic("no message(s) to verify the signature against: you must specify one of the VerifyHash or VerifyHashes options")
-	}
-
-	l := sig.Participants().Len()
-
-	if numMessages := len(opts.Messages); numMessages > 1 && numMessages != l {
-		return false
-	}
-
-	if l < opts.Threshold {
-		return false
-	}
-
-	var (
-		publicKeys = make([]*PublicKey, 0, l)
-		messages   = make([][]byte, 0, l)
-		valid      = true
-	)
-
-	// get all public keys and messages to verify
-	sig.participants.RangeWhile(func(id hotstuff.ID) bool {
-		replica, ok := bls.mods.Configuration().Replica(id)
-		if !ok {
-			valid = false
-			return false
-		}
-
-		// check proof-of-possession for other replicas
-		if replica.ID() != bls.mods.ID() && !bls.checkPop(replica) {
-			valid = false
-			return false
-		}
-		publicKeys = append(publicKeys, replica.PublicKey().(*PublicKey))
-
-		if len(opts.Messages) > 1 {
-			message, ok := opts.Messages[id]
-			if !ok {
-				valid = false
-				return false
-			}
-
-			messages = append(messages, message)
-		}
-
-		return true
-	})
-
-	if !valid {
-		return false
-	}
-
-	if l == 1 {
-		return bls.coreVerify(publicKeys[0], opts.Messages[0], &sig.sig, domain)
-	} else if len(opts.Messages) > 1 {
-		return bls.aggregateVerify(publicKeys, messages, &sig.sig)
-	} else {
-		return bls.fastAggregateVerify(publicKeys, opts.Messages[0], &sig.sig)
-	}
-}
-
 // Combine combines multiple signatures into a single signature.
 func (bls *bls12Base) Combine(signatures ...consensus.QuorumSignature) (consensus.QuorumSignature, error) {
 	g2 := bls12.NewG2()
@@ -391,4 +339,70 @@ func (bls *bls12Base) Combine(signatures ...consensus.QuorumSignature) (consensu
 		}
 	}
 	return &AggregateSignature{sig: agg, participants: participants}, nil
+}
+
+// Verify verifies the given quorum signature against the message.
+func (bls *bls12Base) Verify(signature consensus.QuorumSignature, message []byte) bool {
+	s, ok := signature.(*AggregateSignature)
+	if !ok {
+		bls.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+	}
+
+	l := s.Participants().Len()
+
+	if l == 1 {
+		id := firstParticipant(s.Participants())
+		pk, ok := bls.publicKey(id)
+		if !ok {
+			bls.mods.Logger().Warnf("Missing public key for ID %d", id)
+			return false
+		}
+		return bls.coreVerify(pk, message, &s.sig, domain)
+	}
+
+	// else:
+	pks := make([]*PublicKey, 0, l)
+	s.Participants().ForEach(func(id hotstuff.ID) {
+		pk, ok := bls.publicKey(id)
+		if ok {
+			pks = append(pks, pk)
+		} else {
+			bls.mods.Logger().Warnf("Missing public key for ID %d", id)
+		}
+	})
+	if len(pks) != l {
+		return false
+	}
+	return bls.fastAggregateVerify(pks, message, &s.sig)
+}
+
+// BatchVerify verifies the given quorum signature against the batch of messages.
+func (bls *bls12Base) BatchVerify(signature consensus.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
+	s, ok := signature.(*AggregateSignature)
+	if !ok {
+		bls.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+	}
+
+	if s.Participants().Len() != len(batch) {
+		return false
+	}
+
+	pks := make([]*PublicKey, 0, len(batch))
+	msgs := make([][]byte, 0, len(batch))
+
+	for id, msg := range batch {
+		msgs = append(msgs, msg)
+		pk, ok := bls.publicKey(id)
+		if !ok {
+			bls.mods.Logger().Warnf("Missing public key for ID %d", id)
+			return false
+		}
+		pks = append(pks, pk)
+	}
+
+	if len(batch) == 1 {
+		return bls.coreVerify(pks[0], msgs[0], &s.sig, domain)
+	}
+
+	return bls.aggregateVerify(pks, msgs, &s.sig)
 }

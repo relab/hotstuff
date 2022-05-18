@@ -93,7 +93,7 @@ func (c crypto) VerifyPartialCert(cert consensus.PartialCert) bool {
 	if !ok {
 		return false
 	}
-	return c.Verify(cert.Signature(), consensus.VerifySingle(block.ToBytes()))
+	return c.Verify(cert.Signature(), block.ToBytes())
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
@@ -102,11 +102,14 @@ func (c crypto) VerifyQuorumCert(qc consensus.QuorumCert) bool {
 	if qc.BlockHash() == consensus.GetGenesis().Hash() {
 		return true
 	}
+	if qc.Signature().Participants().Len() < c.mods.Configuration().QuorumSize() {
+		return false
+	}
 	block, ok := c.mods.BlockChain().Get(qc.BlockHash())
 	if !ok {
 		return false
 	}
-	return c.Verify(qc.Signature(), consensus.VerifySingle(block.ToBytes()))
+	return c.Verify(qc.Signature(), block.ToBytes())
 }
 
 // VerifyTimeoutCert verifies a timeout certificate.
@@ -115,7 +118,10 @@ func (c crypto) VerifyTimeoutCert(tc consensus.TimeoutCert) bool {
 	if tc.View() == 0 {
 		return true
 	}
-	return c.Verify(tc.Signature(), consensus.VerifySingle(tc.View().ToBytes()))
+	if tc.Signature().Participants().Len() < c.mods.Configuration().QuorumSize() {
+		return false
+	}
+	return c.Verify(tc.Signature(), tc.View().ToBytes())
 }
 
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
@@ -137,7 +143,10 @@ func (c crypto) VerifyAggregateQC(aggQC consensus.AggregateQC) (bool, consensus.
 			SyncInfo: consensus.NewSyncInfo().WithQC(qc),
 		}.ToBytes()
 	}
-	ok := c.Verify(aggQC.Sig(), consensus.VerifyMulti(messages))
+	if aggQC.Sig().Participants().Len() < c.mods.Configuration().QuorumSize() {
+		return false, consensus.QuorumCert{}
+	}
+	ok := c.BatchVerify(aggQC.Sig(), messages)
 	if !ok {
 		return false, consensus.QuorumCert{}
 	}

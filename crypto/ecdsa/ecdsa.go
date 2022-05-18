@@ -163,63 +163,6 @@ func (ec *ecdsaBase) Sign(message []byte) (signature consensus.QuorumSignature, 
 	}}, nil
 }
 
-// Verify verifies the given cryptographic signature according to the specified options.
-// NOTE: One of either VerifySingle or VerifyMulti options MUST be specified,
-// otherwise this function will have nothing to verify the signature against.
-func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, options ...consensus.VerifyOption) bool {
-	sig, ok := signature.(MultiSignature)
-	if !ok {
-		panic(fmt.Sprintf("cannot verify signature of incompatible type %T (expected %T)", signature, sig))
-	}
-
-	var opts consensus.VerifyOptions
-	for _, opt := range options {
-		opt(&opts)
-	}
-
-	if len(opts.Messages) == 0 {
-		panic("no message(s) to verify the signature against: you must specify one of the VerifySingle or VerifyMulti options")
-	}
-
-	if signature.Participants().Len() < opts.Threshold {
-		return false
-	}
-
-	results := make(chan bool)
-	for _, pSig := range sig {
-		var hash consensus.Hash
-
-		if len(opts.Messages) == 1 {
-			hash = sha256.Sum256(opts.Messages[0])
-		} else {
-			hash = sha256.Sum256(opts.Messages[pSig.signer])
-		}
-
-		go func(sig *Signature, hash consensus.Hash) {
-			results <- ec.verifySingle(sig, hash)
-		}(pSig, hash)
-	}
-
-	valid := true
-	for range sig {
-		if !<-results {
-			valid = false
-		}
-	}
-
-	return valid
-}
-
-func (ec *ecdsaBase) verifySingle(sig *Signature, hash consensus.Hash) bool {
-	replica, ok := ec.mods.Configuration().Replica(sig.Signer())
-	if !ok {
-		ec.mods.Logger().Infof("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
-		return false
-	}
-	pk := replica.PublicKey().(*ecdsa.PublicKey)
-	return ecdsa.Verify(pk, hash[:], sig.R(), sig.S())
-}
-
 // Combine combines multiple signatures into a single signature.
 func (ec *ecdsaBase) Combine(signatures ...consensus.QuorumSignature) (consensus.QuorumSignature, error) {
 	ts := make(MultiSignature)
@@ -233,4 +176,83 @@ func (ec *ecdsaBase) Combine(signatures ...consensus.QuorumSignature) (consensus
 	}
 
 	return ts, nil
+}
+
+// Verify verifies the given quorum signature against the message.
+func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, message []byte) bool {
+	s, ok := signature.(MultiSignature)
+	if !ok {
+		ec.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+	}
+
+	l := signature.Participants().Len()
+	if l == 0 {
+		return false
+	}
+
+	results := make(chan bool, l)
+	hash := sha256.Sum256(message)
+
+	for _, sig := range s {
+		go func(sig *Signature, hash consensus.Hash) {
+			results <- ec.verifySingle(sig, hash)
+		}(sig, hash)
+	}
+
+	valid := true
+	for range s {
+		if !<-results {
+			valid = false
+		}
+	}
+
+	return valid
+}
+
+// BatchVerify verifies the given quorum signature against the batch of messages.
+func (ec *ecdsaBase) BatchVerify(signature consensus.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
+	s, ok := signature.(MultiSignature)
+	if !ok {
+		ec.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+	}
+
+	l := signature.Participants().Len()
+	if l == 0 {
+		return false
+	}
+
+	results := make(chan bool, l)
+
+	set := make(map[string]struct{})
+	for id, sig := range s {
+		message, ok := batch[id]
+		if !ok {
+			return false
+		}
+		set[string(message)] = struct{}{}
+		hash := sha256.Sum256(message)
+		go func(sig *Signature, hash consensus.Hash) {
+			results <- ec.verifySingle(sig, hash)
+		}(sig, hash)
+	}
+
+	valid := true
+	for range s {
+		if !<-results {
+			valid = false
+		}
+	}
+
+	// valid if all partial signatures are valid and there are no duplicate messages
+	return valid && len(set) == len(batch)
+}
+
+func (ec *ecdsaBase) verifySingle(sig *Signature, hash consensus.Hash) bool {
+	replica, ok := ec.mods.Configuration().Replica(sig.Signer())
+	if !ok {
+		ec.mods.Logger().Warnf("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
+		return false
+	}
+	pk := replica.PublicKey().(*ecdsa.PublicKey)
+	return ecdsa.Verify(pk, hash[:], sig.R(), sig.S())
 }

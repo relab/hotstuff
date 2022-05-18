@@ -191,7 +191,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout consensus.TimeoutMsg) {
 	}()
 
 	verifier := s.mods.Crypto()
-	if !verifier.Verify(timeout.ViewSignature, consensus.VerifySingle(timeout.View.ToBytes())) {
+	if !verifier.Verify(timeout.ViewSignature, timeout.View.ToBytes()) {
 		return
 	}
 	s.mods.Logger().Debug("OnRemoteTimeout: ", timeout)

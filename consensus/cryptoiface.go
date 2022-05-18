@@ -8,49 +8,12 @@ import (
 type CryptoBase interface {
 	// Sign creates a cryptographic signature of the given message.
 	Sign(message []byte) (signature QuorumSignature, err error)
-	// Verify verifies the given cryptographic signature according to the specified options.
-	// NOTE: One of either VerifySingle or VerifyMulti options MUST be specified,
-	// otherwise this function will have nothing to verify the signature against.
-	Verify(signature QuorumSignature, options ...VerifyOption) bool
 	// Combine combines multiple signatures into a single signature.
 	Combine(signatures ...QuorumSignature) (signature QuorumSignature, err error)
-}
-
-// VerifyOption sets options for the Verify function in the CryptoBase interface.
-type VerifyOption func(o *VerifyOptions)
-
-// VerifyThreshold specifies the number of signers that must have participated
-// in the signing of the signature in order for Verify to return true.
-func VerifyThreshold(threshold int) VerifyOption {
-	return func(o *VerifyOptions) {
-		o.Threshold = threshold
-	}
-}
-
-// VerifySingle verifies the signature against the given message.
-//
-// NOTE: VerifySingle and VerifyMulti cannot be used together,
-// and whichever option is specified last will be the effective one.
-func VerifySingle(message []byte) VerifyOption {
-	return func(o *VerifyOptions) {
-		o.Messages = map[hotstuff.ID][]byte{0: message}
-	}
-}
-
-// VerifyMulti verifies the signature against the multiple messages present in the given map.
-//
-// NOTE: VerifySingle and VerifyMulti cannot be used together,
-// and whichever option is specified last will be the effective one.
-func VerifyMulti(messages map[hotstuff.ID][]byte) VerifyOption {
-	return func(o *VerifyOptions) {
-		o.Messages = messages
-	}
-}
-
-// VerifyOptions specify options for the Verify function in the CryptoBase interface.
-type VerifyOptions struct {
-	Messages  map[hotstuff.ID][]byte
-	Threshold int
+	// Verify verifies the given quorum signature against the message.
+	Verify(signature QuorumSignature, message []byte) bool
+	// BatchVerify verifies the given quorum signature against the batch of messages.
+	BatchVerify(signature QuorumSignature, batch map[hotstuff.ID][]byte) bool
 }
 
 // Crypto implements the methods required to create and verify signatures and certificates.
