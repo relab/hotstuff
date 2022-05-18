@@ -625,7 +625,7 @@ func (s *session) verifyContribution(c contribution, sig consensus.QuorumSignatu
 	s.h.mods.Logger().Debugf("verifying: %v (= %d)", sig.Participants(), sig.Participants().Len())
 
 	aggVerified := false
-	if s.h.mods.Crypto().Verify(sig, consensus.VerifySingle(block.ToBytes())) {
+	if s.h.mods.Crypto().Verify(sig, block.ToBytes()) {
 		aggVerified = true
 	} else {
 		s.h.mods.Logger().Debug("failed to verify aggregate signature")
@@ -634,7 +634,7 @@ func (s *session) verifyContribution(c contribution, sig consensus.QuorumSignatu
 	indivVerified := false
 	// If the contribution is individual, we want to verify it separately
 	if verifyIndiv {
-		if s.h.mods.Crypto().Verify(c.individual, consensus.VerifySingle(block.ToBytes())) {
+		if s.h.mods.Crypto().Verify(c.individual, block.ToBytes()) {
 			indivVerified = true
 		} else {
 			s.h.mods.Logger().Debug("failed to verify individual signature")
