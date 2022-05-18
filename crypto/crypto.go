@@ -128,7 +128,7 @@ func (c crypto) VerifyTimeoutCert(tc consensus.TimeoutCert) bool {
 func (c crypto) VerifyAggregateQC(aggQC consensus.AggregateQC) (highQC consensus.QuorumCert, ok bool) {
 	messages := make(map[hotstuff.ID][]byte)
 	for id, qc := range aggQC.QCs() {
-		if highQC.View() < qc.View() {
+		if highQC.View() < qc.View() || highQC == (consensus.QuorumCert{}) {
 			highQC = qc
 		}
 		// reconstruct the TimeoutMsg to get the hash
