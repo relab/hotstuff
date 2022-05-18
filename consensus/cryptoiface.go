@@ -35,5 +35,5 @@ type Crypto interface {
 	// VerifyTimeoutCert verifies a timeout certificate.
 	VerifyTimeoutCert(tc TimeoutCert) bool
 	// VerifyAggregateQC verifies an AggregateQC.
-	VerifyAggregateQC(aggQC AggregateQC) (ok bool, highQC QuorumCert)
+	VerifyAggregateQC(aggQC AggregateQC) (highQC QuorumCert, ok bool)
 }

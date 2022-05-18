@@ -125,17 +125,12 @@ func (c crypto) VerifyTimeoutCert(tc consensus.TimeoutCert) bool {
 }
 
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
-func (c crypto) VerifyAggregateQC(aggQC consensus.AggregateQC) (bool, consensus.QuorumCert) {
-	var highQC *consensus.QuorumCert
+func (c crypto) VerifyAggregateQC(aggQC consensus.AggregateQC) (highQC consensus.QuorumCert, ok bool) {
 	messages := make(map[hotstuff.ID][]byte)
 	for id, qc := range aggQC.QCs() {
-		if highQC == nil {
-			highQC = new(consensus.QuorumCert)
-			*highQC = qc
-		} else if highQC.View() < qc.View() {
-			*highQC = qc
+		if highQC.View() < qc.View() {
+			highQC = qc
 		}
-
 		// reconstruct the TimeoutMsg to get the hash
 		messages[id] = consensus.TimeoutMsg{
 			ID:       id,
@@ -144,14 +139,14 @@ func (c crypto) VerifyAggregateQC(aggQC consensus.AggregateQC) (bool, consensus.
 		}.ToBytes()
 	}
 	if aggQC.Sig().Participants().Len() < c.mods.Configuration().QuorumSize() {
-		return false, consensus.QuorumCert{}
+		return consensus.QuorumCert{}, false
 	}
-	ok := c.BatchVerify(aggQC.Sig(), messages)
+	ok = c.BatchVerify(aggQC.Sig(), messages)
 	if !ok {
-		return false, consensus.QuorumCert{}
+		return consensus.QuorumCert{}, false
 	}
-	if c.VerifyQuorumCert(*highQC) {
-		return true, *highQC
+	if c.VerifyQuorumCert(highQC) {
+		return highQC, true
 	}
-	return false, consensus.QuorumCert{}
+	return consensus.QuorumCert{}, false
 }

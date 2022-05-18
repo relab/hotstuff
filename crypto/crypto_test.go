@@ -150,7 +150,7 @@ func TestVerifyAggregateQC(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ok, highQC := td.signers[0].VerifyAggregateQC(aggQC)
+		highQC, ok := td.signers[0].VerifyAggregateQC(aggQC)
 		if !ok {
 			t.Fatal("AggregateQC was not verified")
 		}
