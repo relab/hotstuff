@@ -69,6 +69,7 @@ func (c crypto) CreateTimeoutCert(view consensus.View, timeouts []consensus.Time
 	return consensus.NewTimeoutCert(sig, view), nil
 }
 
+// CreateAggregateQC creates an AggregateQC from the given timeout messages.
 func (c crypto) CreateAggregateQC(view consensus.View, timeouts []consensus.TimeoutMsg) (aggQC consensus.AggregateQC, err error) {
 	qcs := make(map[hotstuff.ID]consensus.QuorumCert)
 	sigs := make([]consensus.QuorumSignature, 0, len(timeouts))
