@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/relab/hotstuff"
@@ -38,12 +41,13 @@ type Experiment struct {
 	Hosts       map[string]RemoteWorker
 	HostConfigs map[string]HostConfig
 	Byzantine   map[string]int // number of replicas to assign to each byzantine strategy
+	Output      string         // path to output folder
 
 	// the host associated with each replica.
 	hostsToReplicas map[string][]hotstuff.ID
 	// the host associated with each client.
-	replicaOpts    map[hotstuff.ID]*orchestrationpb.ReplicaOpts
 	hostsToClients map[string][]hotstuff.ID
+	replicaOpts    map[hotstuff.ID]*orchestrationpb.ReplicaOpts
 	caKey          *ecdsa.PrivateKey
 	ca             *x509.Certificate
 }
@@ -60,6 +64,13 @@ func (e *Experiment) Run() (err error) {
 	err = e.assignReplicasAndClients()
 	if err != nil {
 		return err
+	}
+
+	if e.Output != "" {
+		err = e.writeAssignmentsFile()
+		if err != nil {
+			return err
+		}
 	}
 
 	e.Logger.Info("Creating replicas...")
@@ -272,8 +283,34 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 			nextClientID++
 		}
 	}
+
 	// TODO: warn if not all clients/replicas were assigned
 	return nil
+}
+
+type assignmentsFileContents struct {
+	// the host associated with each replica.
+	HostsToReplicas map[string][]hotstuff.ID
+	// the host associated with each client.
+	HostsToClients map[string][]hotstuff.ID
+}
+
+func (e *Experiment) writeAssignmentsFile() (err error) {
+	f, err := os.OpenFile(filepath.Join(e.Output, "hosts.json"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+	}()
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "\t")
+	return enc.Encode(assignmentsFileContents{
+		HostsToReplicas: e.hostsToReplicas,
+		HostsToClients:  e.hostsToClients,
+	})
 }
 
 func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration) (err error) {

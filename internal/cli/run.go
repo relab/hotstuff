@@ -101,6 +101,7 @@ func runController() {
 		NumReplicas: viper.GetInt("replicas"),
 		NumClients:  viper.GetInt("clients"),
 		Duration:    viper.GetDuration("duration"),
+		Output:      outputDir,
 		ReplicaOpts: &orchestrationpb.ReplicaOpts{
 			UseTLS:            true,
 			BatchSize:         viper.GetUint32("batch-size"),
