@@ -18,10 +18,8 @@ type EventHandler func(event interface{})
 
 // EventLoop accepts events of any type and executes relevant event handlers.
 // It supports registering both observers and handlers based on the type of event that they accept.
-// The difference between them is that there can be many observers per event type, but only one handler.
-// Handlers and observers can either be executed asynchronously, immediately after AddEvent() is called,
-// or synchronously, after the event has passed through the event queue.
-// An asynchronous handler consumes events, which means that synchronous observers will not be notified of them.
+// The difference between them is that there can be many observers per event type, but only one handler,
+// and the handler is executed last.
 type EventLoop struct {
 	mut sync.Mutex
 
@@ -48,13 +46,13 @@ func New(bufferSize uint) *EventLoop {
 }
 
 // RegisterHandler registers a handler for events with the same type as the 'eventType' argument.
-// The handler is executed synchronously. There can be only one handler per event type.
+// There can be only one handler per event type, and the handler is executed after any observers.
 func (el *EventLoop) RegisterHandler(eventType interface{}, handler EventHandler) {
 	el.handlers[reflect.TypeOf(eventType)] = handler
 }
 
 // RegisterObserver registers an observer for events with the same type as the 'eventType' argument.
-// The observer is executed synchronously before any registered handler.
+// The observers are executed before the handler.
 func (el *EventLoop) RegisterObserver(eventType interface{}, observer EventHandler) {
 	t := reflect.TypeOf(eventType)
 	el.observers[t] = append(el.observers[t], observer)
