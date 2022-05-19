@@ -78,12 +78,11 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 	qc, ok := cert.QC()
 	if ok {
 		// tell the acceptor that the previous proposal succeeded.
-		qcBlock, ok := cs.mods.BlockChain().Get(qc.BlockHash())
-		if !ok {
+		if qcBlock, ok := cs.mods.BlockChain().Get(qc.BlockHash()); ok {
+			cs.mods.Acceptor().Proposed(qcBlock.Command())
+		} else {
 			cs.mods.Logger().Errorf("Could not find block for QC: %s", qc)
-			return
 		}
-		cs.mods.Acceptor().Proposed(qcBlock.Command())
 	}
 
 	cmd, ok := cs.mods.CommandQueue().Get(cs.mods.Synchronizer().ViewContext())
@@ -188,7 +187,7 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 
 	pc, err := cs.mods.Crypto().CreatePartialCert(block)
 	if err != nil {
-		cs.mods.Logger().Error("OnPropose: failed to sign vote: ", err)
+		cs.mods.Logger().Error("OnPropose: failed to sign block: ", err)
 		return
 	}
 
