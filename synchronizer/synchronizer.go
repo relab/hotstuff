@@ -263,12 +263,29 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 		timeout = true
 	}
 
-	// check for a QC.
-	if qc, ok := syncInfo.QC(); ok {
+	var (
+		haveQC bool
+		qc     consensus.QuorumCert
+		aggQC  consensus.AggregateQC
+	)
+
+	// check for an AggQC or QC
+	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.mods.Options().ShouldUseAggQC() {
+		ok, highQC := s.mods.Crypto().VerifyAggregateQC(aggQC)
+		if !ok {
+			s.mods.Logger().Info("Aggregated Quorum Certificate could not be verified")
+		}
+		// ensure that the true highQC is the one stored in the syncInfo
+		syncInfo = syncInfo.WithQC(highQC)
+		qc = highQC
+	} else if qc, haveQC = syncInfo.QC(); haveQC {
 		if !s.mods.Crypto().VerifyQuorumCert(qc) {
 			s.mods.Logger().Info("Quorum Certificate could not be verified!")
 			return
 		}
+	}
+
+	if haveQC {
 		s.updateHighQC(qc)
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
 		if qc.View() >= v {
