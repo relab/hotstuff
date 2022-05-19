@@ -55,7 +55,7 @@ type Modules struct {
 	id            hotstuff.ID
 	logger        logging.Logger
 	metricsLogger MetricsLogger
-	eventLoop     *eventloop.EventLoop
+	eventLoop     eventloop.EventLoop
 	modulesByType map[reflect.Type]interface{}
 }
 
@@ -78,7 +78,7 @@ func (mods Modules) MetricsLogger() MetricsLogger {
 }
 
 // EventLoop returns the event loop.
-func (mods Modules) EventLoop() *eventloop.EventLoop {
+func (mods Modules) EventLoop() eventloop.EventLoop {
 	return mods.eventLoop
 }
 
@@ -86,7 +86,7 @@ func (mods Modules) EventLoop() *eventloop.EventLoop {
 // The metrics event loop is used for processing of measurement data.
 //
 // Deprecated: The metrics event loop is no longer separate from the main event loop. Use EventLoop() instead.
-func (mods Modules) MetricsEventLoop() *eventloop.EventLoop {
+func (mods Modules) MetricsEventLoop() eventloop.EventLoop {
 	return mods.EventLoop()
 }
 
@@ -133,6 +133,9 @@ func (b *Builder) Register(modules ...interface{}) {
 	for _, module := range modules {
 		if m, ok := module.(logging.Logger); ok {
 			b.mods.logger = m
+		}
+		if m, ok := module.(eventloop.EventLoop); ok {
+			b.mods.eventLoop = m
 		}
 		if m, ok := module.(MetricsLogger); ok {
 			b.mods.metricsLogger = m
