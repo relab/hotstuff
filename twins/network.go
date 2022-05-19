@@ -14,6 +14,7 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -203,9 +204,10 @@ func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
 	}
 	for _, node := range nodes {
 		if c.shouldDrop(node.id, message) {
+			c.network.logger.Infof("node %v -> node %v: DROP %T(%v)", c.node.id, node.id, message, message)
 			continue
 		}
-		c.network.logger.Infof("node %v -> node %v: %T(%v)", c.node.id, node.id, message, message)
+		c.network.logger.Infof("node %v -> node %v: SEND %T(%v)", c.node.id, node.id, message, message)
 		node.modules.EventLoop().AddEvent(message)
 	}
 	c.node.lastMessageView = c.node.modules.Synchronizer().View()
@@ -350,3 +352,31 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 	}
 	return nil
 }
+
+type eventLoop struct {
+	mods *consensus.Modules
+	view consensus.View
+
+	eventloop.EventLoop
+}
+
+func (el *eventLoop) setView(view consensus.View) {
+	el.view = view
+}
+
+// InitConsensusModule gives the module a reference to the Modules object.
+// It also allows the module to set module options using the OptionsBuilder.
+func (el *eventLoop) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+	el.mods = mods
+}
+
+func (el *eventLoop) AddEvent(event any) {
+	if _, ok := event.(nextRound); !ok && el.mods.Synchronizer().View() > el.view {
+		el.DelayUntil(nextRound{}, event)
+		return
+	}
+	el.EventLoop.AddEvent(event)
+}
+
+type nextRound struct{}
+
