@@ -173,13 +173,11 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 	// block is safe and was accepted
 	cs.mods.BlockChain().Store(block)
 
-	// we defer the following in order to speed up voting
-	defer func() {
-		if b := cs.impl.CommitRule(block); b != nil {
-			cs.commit(b)
-		}
-		cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
-	}()
+	if b := cs.impl.CommitRule(block); b != nil {
+		cs.commit(b)
+	}
+
+	cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
 
 	if block.View() <= cs.lastVote {
 		cs.mods.Logger().Info("OnPropose: block view too old")
