@@ -14,11 +14,19 @@ type ProposeMsg struct {
 	AggregateQC *AggregateQC // Optional AggregateQC
 }
 
+func (p ProposeMsg) String() string {
+	return fmt.Sprintf("ID %d, %s, AggQC: %v", p.ID, p.Block, p.AggregateQC != nil)
+}
+
 // VoteMsg is sent to the leader by replicas voting on a proposal.
 type VoteMsg struct {
 	ID          hotstuff.ID // the ID of the replica who sent the message.
 	PartialCert PartialCert // The partial certificate.
 	Deferred    bool
+}
+
+func (v VoteMsg) String() string {
+	return fmt.Sprintf("ID %d", v.ID)
 }
 
 // TimeoutMsg is broadcast whenever a replica has a local timeout.
@@ -45,7 +53,7 @@ func (timeout TimeoutMsg) Hash() Hash {
 }
 
 func (timeout TimeoutMsg) String() string {
-	return fmt.Sprintf("TimeoutMsg{ ID: %d, View: %d, SyncInfo: %v }", timeout.ID, timeout.View, timeout.SyncInfo)
+	return fmt.Sprintf("ID: %d, View: %d, SyncInfo: %v", timeout.ID, timeout.View, timeout.SyncInfo)
 }
 
 // NewViewMsg is sent to the leader whenever a replica decides to advance to the next view.

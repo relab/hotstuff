@@ -211,13 +211,19 @@ func (si SyncInfo) AggQC() (_ AggregateQC, _ bool) {
 }
 
 func (si SyncInfo) String() string {
-	var cert interface{}
-	if si.qc != nil {
-		cert = si.qc
-	} else if si.tc != nil {
-		cert = si.tc
+	var sb strings.Builder
+	sb.WriteString("{ ")
+	if si.tc != nil {
+		fmt.Fprintf(&sb, "%s ", si.tc)
 	}
-	return fmt.Sprint(cert)
+	if si.qc != nil {
+		fmt.Fprintf(&sb, "%s ", si.qc)
+	}
+	if si.aggQC != nil {
+		fmt.Fprintf(&sb, "%s ", si.aggQC)
+	}
+	sb.WriteRune('}')
+	return sb.String()
 }
 
 // QuorumCert (QC) is a certificate for a Block created by a quorum of partial certificates.
@@ -348,4 +354,15 @@ func (aggQC AggregateQC) Sig() ThresholdSignature {
 // View returns the view in which the AggregateQC was created.
 func (aggQC AggregateQC) View() View {
 	return aggQC.view
+}
+
+func (aggQC AggregateQC) String() string {
+	var sb strings.Builder
+	if aggQC.sig != nil {
+		aggQC.sig.Participants().ForEach(func(id hotstuff.ID) {
+			sb.WriteString(strconv.FormatUint(uint64(id), 10))
+			sb.WriteByte(' ')
+		})
+	}
+	return fmt.Sprintf("AggQC{ view: %d, IDs: [ %s] }", aggQC.view, &sb)
 }
