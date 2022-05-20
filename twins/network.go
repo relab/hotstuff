@@ -183,8 +183,9 @@ func (n *network) shouldDrop(sender, receiver uint32, message interface{}) bool 
 }
 
 type configuration struct {
-	node    *node
-	network *network
+	node      *node
+	network   *network
+	subConfig consensus.IDSet
 }
 
 func (c *configuration) broadcastMessage(message interface{}) {
@@ -192,8 +193,9 @@ func (c *configuration) broadcastMessage(message interface{}) {
 		if id == c.node.id.ReplicaID {
 			// do not send message to self or twin
 			continue
+		} else if c.subConfig == nil || c.subConfig.Contains(id) {
+			c.sendMessage(id, message)
 		}
-		c.sendMessage(id, message)
 	}
 }
 
@@ -239,6 +241,19 @@ func (c *configuration) Replica(id hotstuff.ID) (r consensus.Replica, ok bool) {
 		}, true
 	}
 	return nil, false
+}
+
+// SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
+func (c *configuration) SubConfig(ids []hotstuff.ID) (sub consensus.Configuration, err error) {
+	subConfig := consensus.NewIDSet()
+	for _, id := range ids {
+		subConfig.Add(id)
+	}
+	return &configuration{
+		node:      c.node,
+		network:   c.network,
+		subConfig: subConfig,
+	}, nil
 }
 
 // Len returns the number of replicas in the configuration.
