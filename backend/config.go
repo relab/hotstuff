@@ -3,6 +3,7 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/relab/gorums"
@@ -60,14 +61,16 @@ func (r *Replica) NewView(msg consensus.SyncInfo) {
 // Config holds information about the current configuration of replicas that participate in the protocol,
 // and some information about the local replica. It also provides methods to send messages to the other replicas.
 type Config struct {
-	mods    *consensus.Modules
 	optsPtr *[]gorums.ManagerOption // using a pointer so that options can be GCed after initialization
 
-	mgr           *hotstuffpb.Manager
-	cfg           *hotstuffpb.Configuration
-	replicas      map[hotstuff.ID]consensus.Replica
-	proposeCancel context.CancelFunc
-	timeoutCancel context.CancelFunc
+	mgr *hotstuffpb.Manager
+	subConfig
+}
+
+type subConfig struct {
+	mods     *consensus.Modules
+	cfg      *hotstuffpb.Configuration
+	replicas map[hotstuff.ID]consensus.Replica
 }
 
 // InitConsensusModule gives the module a reference to the Modules object.
@@ -102,10 +105,10 @@ func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOpt
 
 	// initialization will be finished by InitConsensusModule
 	cfg := &Config{
-		replicas:      make(map[hotstuff.ID]consensus.Replica),
-		optsPtr:       &opts,
-		proposeCancel: func() {},
-		timeoutCancel: func() {},
+		subConfig: subConfig{
+			replicas: make(map[hotstuff.ID]consensus.Replica),
+		},
+		optsPtr: &opts,
 	}
 	return cfg
 }
@@ -154,51 +157,75 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 }
 
 // Replicas returns all of the replicas in the configuration.
-func (cfg *Config) Replicas() map[hotstuff.ID]consensus.Replica {
+func (cfg *subConfig) Replicas() map[hotstuff.ID]consensus.Replica {
 	return cfg.replicas
 }
 
 // Replica returns a replica if it is present in the configuration.
-func (cfg *Config) Replica(id hotstuff.ID) (replica consensus.Replica, ok bool) {
+func (cfg *subConfig) Replica(id hotstuff.ID) (replica consensus.Replica, ok bool) {
 	replica, ok = cfg.replicas[id]
 	return
 }
 
+// SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
+func (cfg *Config) SubConfig(ids []hotstuff.ID) (sub consensus.Configuration, err error) {
+	replicas := make(map[hotstuff.ID]consensus.Replica)
+	nids := make([]uint32, len(ids))
+	for i, id := range ids {
+		nids[i] = uint32(id)
+		replicas[id] = cfg.replicas[id]
+	}
+	newCfg, err := cfg.mgr.NewConfiguration(gorums.WithNodeIDs(nids))
+	if err != nil {
+		return nil, err
+	}
+	return &subConfig{
+		mods:     cfg.mods,
+		cfg:      newCfg,
+		replicas: replicas,
+	}, nil
+}
+
+func (cfg *subConfig) SubConfig(_ []hotstuff.ID) (_ consensus.Configuration, err error) {
+	return nil, errors.New("not supported")
+}
+
 // Len returns the number of replicas in the configuration.
-func (cfg *Config) Len() int {
+func (cfg *subConfig) Len() int {
 	return len(cfg.replicas)
 }
 
 // QuorumSize returns the size of a quorum
-func (cfg *Config) QuorumSize() int {
+func (cfg *subConfig) QuorumSize() int {
 	return hotstuff.QuorumSize(cfg.Len())
 }
 
 // Propose sends the block to all replicas in the configuration
-func (cfg *Config) Propose(proposal consensus.ProposeMsg) {
+func (cfg *subConfig) Propose(proposal consensus.ProposeMsg) {
 	if cfg.cfg == nil {
 		return
 	}
-	var ctx context.Context
-	cfg.proposeCancel()
-	ctx, cfg.proposeCancel = context.WithCancel(context.Background())
-	p := hotstuffpb.ProposalToProto(proposal)
-	cfg.cfg.Propose(ctx, p, gorums.WithNoSendWaiting())
+	cfg.cfg.Propose(
+		cfg.mods.Synchronizer().ViewContext(),
+		hotstuffpb.ProposalToProto(proposal),
+		gorums.WithNoSendWaiting(),
+	)
 }
 
 // Timeout sends the timeout message to all replicas.
-func (cfg *Config) Timeout(msg consensus.TimeoutMsg) {
+func (cfg *subConfig) Timeout(msg consensus.TimeoutMsg) {
 	if cfg.cfg == nil {
 		return
 	}
-	var ctx context.Context
-	cfg.timeoutCancel()
-	ctx, cfg.timeoutCancel = context.WithCancel(context.Background())
-	cfg.cfg.Timeout(ctx, hotstuffpb.TimeoutMsgToProto(msg), gorums.WithNoSendWaiting())
+	cfg.cfg.Timeout(
+		cfg.mods.Synchronizer().ViewContext(),
+		hotstuffpb.TimeoutMsgToProto(msg),
+		gorums.WithNoSendWaiting(),
+	)
 }
 
 // Fetch requests a block from all the replicas in the configuration
-func (cfg *Config) Fetch(ctx context.Context, hash consensus.Hash) (*consensus.Block, bool) {
+func (cfg *subConfig) Fetch(ctx context.Context, hash consensus.Hash) (*consensus.Block, bool) {
 	protoBlock, err := cfg.cfg.Fetch(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
 	if err != nil {
 		qcErr, ok := err.(gorums.QuorumCallError)
