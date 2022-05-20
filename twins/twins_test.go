@@ -26,7 +26,7 @@ func TestTwins(t *testing.T) {
 		if err != nil {
 			break
 		}
-		result, err := twins.ExecuteScenario(s, numNodes, numTwins, "chainedhotstuff")
+		result, err := twins.ExecuteScenario(s, numNodes, numTwins, "chainedhotstuff", 5*time.Millisecond, 50*time.Millisecond, 500*time.Millisecond)
 		if err != nil {
 			t.Fatal(err)
 		}

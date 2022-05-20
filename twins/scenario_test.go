@@ -2,6 +2,7 @@ package twins
 
 import (
 	"testing"
+	"time"
 
 	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
 )
@@ -17,7 +18,7 @@ func TestBasicScenario(t *testing.T) {
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 
-	result, err := ExecuteScenario(s, 4, 0, "chainedhotstuff")
+	result, err := ExecuteScenario(s, 4, 0, "chainedhotstuff", 5*time.Millisecond, 50*time.Millisecond, 500*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
@@ -34,11 +35,10 @@ func (id NodeID) String() string {
 }
 
 type node struct {
-	id              NodeID
-	modules         *consensus.Modules
-	executedBlocks  []*consensus.Block
-	lastMessageView consensus.View
-	log             strings.Builder
+	id             NodeID
+	modules        *consensus.Modules
+	executedBlocks []*consensus.Block
+	log            strings.Builder
 }
 
 // Network is a simulated network that supports twins.
@@ -48,17 +48,17 @@ type network struct {
 	replicas map[hotstuff.ID][]*node
 	// For each view (starting at 1), contains the list of partitions for that view.
 	views []View
+	delay time.Duration
 
 	dropTypes map[reflect.Type]struct{}
 
 	logger logging.Logger
-
-	log strings.Builder
+	log    strings.Builder
 }
 
 // newNetwork creates a new Network with the specified partitions.
 // partitions specifies the network partitions for each view.
-func newNetwork(rounds []View, dropTypes ...interface{}) *network {
+func newNetwork(rounds []View, delay time.Duration, dropTypes ...interface{}) *network {
 	n := &network{
 		nodes:     make(map[uint32]*node),
 		replicas:  make(map[hotstuff.ID][]*node),
@@ -72,7 +72,7 @@ func newNetwork(rounds []View, dropTypes ...interface{}) *network {
 	return n
 }
 
-func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName string) error {
+func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName string, timeout time.Duration) error {
 	cg := &commandGenerator{}
 	keys := make(map[hotstuff.ID]consensus.PrivateKey)
 	for _, nodeID := range nodes {
@@ -93,18 +93,24 @@ func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName s
 		if !modules.GetModule(consensusName, &consensusModule) {
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
+
+		sync := synchronizer.New(testutil.FixedTimeout(timeout))
+		sync.(*synchronizer.Synchronizer).SetBroadcast(false)
+		sync.(*synchronizer.Synchronizer).SetStrict(false)
+
 		builder.Register(
 			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			blockchain.New(),
 			consensus.New(consensusModule),
 			crypto.NewCache(ecdsa.New(), 100),
-			synchronizer.New(testutil.FixedTimeout(0)),
 			&configuration{
 				node:    &node,
 				network: n,
 			},
-			leaderRotation(scenario),
+			leaderRotation{n},
 			commandModule{commandGenerator: cg, node: &node},
+			eventloop.New(1000),
+			sync,
 		)
 		builder.OptionsBuilder().SetShouldVerifyVotesSync()
 		node.modules = builder.Build()
@@ -114,56 +120,30 @@ func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName s
 	return nil
 }
 
-func (n *network) run(rounds int) {
-	// kick off the initial proposal(s)
-	for _, node := range n.nodes {
-		if node.modules.LeaderRotation().GetLeader(1) == node.id.ReplicaID {
-			node.modules.Consensus().Propose(node.modules.Synchronizer().(*synchronizer.Synchronizer).SyncInfo())
-		}
+func (n *network) run(duration time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	defer cancel()
+	for _, n := range n.nodes {
+		n.modules.Synchronizer().Start(ctx)
+		go n.modules.EventLoop().Run(ctx)
 	}
-
-	for view := consensus.View(0); view <= consensus.View(rounds); view++ {
-		n.round(view)
-	}
-}
-
-// round performs one round for each node
-func (n *network) round(view consensus.View) {
-	n.logger.Infof("Starting round %d", view)
-
-	for _, node := range n.nodes {
-		// run each event loop as long as it has events
-		for node.modules.EventLoop().Tick() {
-		}
-	}
-
-	// give the next leader the opportunity to process votes and propose a new block
-	for _, node := range n.nodes {
-		if node.modules.LeaderRotation().GetLeader(view+1) == node.modules.ID() {
-			for node.modules.EventLoop().Tick() {
-			}
-		}
-	}
-
-	for _, node := range n.nodes {
-		// if the node did not send any messages this round, it should timeout
-		if node.lastMessageView < view {
-			// FIXME: should we add the OnLocalTimeout method to the Synchronizer interface?
-			node.modules.Synchronizer().(*synchronizer.Synchronizer).OnLocalTimeout()
-		}
-	}
+	<-ctx.Done()
 }
 
 // shouldDrop decides if the sender should drop the message, based on the current view of the sender and the
 // partitions configured for that view.
-func (n *network) shouldDrop(sender, receiver uint32, message interface{}) bool {
+func (n *network) shouldDrop(sender, receiver uint32, message interface{}) (ok bool) {
 	node, ok := n.nodes[sender]
 	if !ok {
 		panic(fmt.Errorf("node matching sender id %d was not found", sender))
 	}
 
 	// Index into viewPartitions.
-	i := int(node.modules.Synchronizer().View() - 1)
+	i := int(node.modules.Synchronizer().View()) - 1
+
+	if i < 0 {
+		return false
+	}
 
 	// will default to dropping all messages from views that don't have any specified partitions.
 	if i >= len(n.views) {
@@ -208,9 +188,8 @@ func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
 			continue
 		}
 		c.network.logger.Infof("node %v -> node %v: SEND %T(%v)", c.node.id, node.id, message, message)
-		node.modules.EventLoop().AddEvent(message)
+		time.AfterFunc(c.network.delay, func() { node.modules.EventLoop().AddEvent(message) })
 	}
-	c.node.lastMessageView = c.node.modules.Synchronizer().View()
 }
 
 // shouldDrop checks if a message to the node identified by id should be dropped.
@@ -353,30 +332,16 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type eventLoop struct {
-	mods *consensus.Modules
-	view consensus.View
-
-	eventloop.EventLoop
+type leaderRotation struct {
+	n *network
 }
 
-func (el *eventLoop) setView(view consensus.View) {
-	el.view = view
-}
-
-// InitConsensusModule gives the module a reference to the Modules object.
-// It also allows the module to set module options using the OptionsBuilder.
-func (el *eventLoop) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
-	el.mods = mods
-}
-
-func (el *eventLoop) AddEvent(event any) {
-	if _, ok := event.(nextRound); !ok && el.mods.Synchronizer().View() > el.view {
-		el.DelayUntil(nextRound{}, event)
-		return
+// GetLeader returns the id of the leader in the given view.
+func (lr leaderRotation) GetLeader(view consensus.View) hotstuff.ID {
+	// we start at view 1
+	v := int(view - 1)
+	if v >= 0 && v < len(lr.n.views) {
+		return lr.n.views[v].Leader
 	}
-	el.EventLoop.AddEvent(event)
+	return 0
 }
-
-type nextRound struct{}
-
