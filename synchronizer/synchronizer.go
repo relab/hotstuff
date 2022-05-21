@@ -174,9 +174,6 @@ func (s *Synchronizer) ViewContext() context.Context {
 
 // SyncInfo returns the highest known QC or TC.
 func (s *Synchronizer) SyncInfo() consensus.SyncInfo {
-	if s.highQC.View() >= s.highTC.View() {
-		return consensus.NewSyncInfo().WithQC(s.highQC)
-	}
 	return consensus.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
 }
 
