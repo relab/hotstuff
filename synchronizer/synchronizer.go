@@ -45,6 +45,13 @@ func (s *Synchronizer) InitConsensusModule(mods *consensus.Modules, opts *consen
 	}
 	s.mods = mods
 
+	s.mods.EventLoop().RegisterHandler(localTimeout{}, func(event interface{}) {
+		timeoutView := event.(localTimeout).view
+		if s.currentView == timeoutView {
+			s.OnLocalTimeout()
+		}
+	})
+
 	s.mods.EventLoop().RegisterHandler(consensus.NewViewMsg{}, func(event interface{}) {
 		newViewMsg := event.(consensus.NewViewMsg)
 		s.OnNewView(newViewMsg)
@@ -131,7 +138,7 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	s.timer = time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
 		s.cancelCtx()
-		s.mods.EventLoop().AddEvent(s.OnLocalTimeout)
+		s.mods.EventLoop().AddEvent(localTimeout{s.currentView})
 	})
 
 	go func() {
@@ -228,6 +235,10 @@ func (s *Synchronizer) OnLocalTimeout() {
 	// stop voting for current view
 	s.mods.Consensus().StopVoting(s.currentView)
 
+	if !s.strict {
+		s.switchView(s.currentView+1, true)
+	}
+
 send:
 	if s.broadcast {
 		s.mods.Configuration().Timeout(timeoutMsg)
@@ -242,9 +253,6 @@ send:
 		subCfg.Timeout(timeoutMsg)
 	}
 
-	if !s.strict {
-		s.switchView(s.currentView+1, true)
-	}
 }
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
@@ -373,6 +381,8 @@ func (s *Synchronizer) propose(syncInfo consensus.SyncInfo) {
 // AdvanceView attempts to advance to the next view using the given QC.
 // qc must be either a regular quorum certificate, or a timeout certificate.
 func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
+	s.mods.Logger().Debugf("AdvanceView: %v", syncInfo)
+
 	var (
 		v       consensus.View
 		timeout bool
@@ -387,11 +397,11 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 		update = update || (qc.View() == v && s.updateHighQC(qc))
 	}
 
-	if v < s.currentView {
-		return
+	if v == s.currentView {
+		s.switchView(v+1, timeout)
 	}
 
-	s.switchView(v+1, timeout)
+	s.mods.Logger().Debugf("AdvanceView update: %v", update)
 
 	if update {
 		leader := s.mods.LeaderRotation().GetLeader(s.currentView)
@@ -480,4 +490,8 @@ var _ consensus.Synchronizer = (*Synchronizer)(nil)
 type ViewChangeEvent struct {
 	View    consensus.View
 	Timeout bool
+}
+
+type localTimeout struct {
+	view consensus.View
 }
