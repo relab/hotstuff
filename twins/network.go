@@ -64,6 +64,7 @@ func newNetwork(rounds []View, delay time.Duration, dropTypes ...interface{}) *n
 		replicas:  make(map[hotstuff.ID][]*node),
 		views:     rounds,
 		dropTypes: make(map[reflect.Type]struct{}),
+		delay:     delay,
 	}
 	n.logger = logging.NewWithDest(&n.log, "network")
 	for _, t := range dropTypes {
