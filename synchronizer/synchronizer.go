@@ -381,21 +381,10 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 
 	update := false
 	if tc, ok := syncInfo.TC(); ok {
-		update = update || s.updateHighTC(tc)
+		update = update || (tc.View() == v && s.updateHighTC(tc))
 	}
 	if qc, ok := syncInfo.QC(); ok {
-		update = update || s.updateHighQC(qc)
-	}
-
-	if update {
-		defer func() {
-			leader := s.mods.LeaderRotation().GetLeader(s.currentView)
-			if leader == s.mods.ID() {
-				s.propose(syncInfo)
-				// } else if replica, ok := s.mods.Configuration().Replica(leader); ok {
-				// 	replica.NewView(syncInfo)
-			}
-		}()
+		update = update || (qc.View() == v && s.updateHighQC(qc))
 	}
 
 	if v < s.currentView {
@@ -403,6 +392,15 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 	}
 
 	s.switchView(v+1, timeout)
+
+	if update {
+		leader := s.mods.LeaderRotation().GetLeader(s.currentView)
+		if leader == s.mods.ID() {
+			s.propose(syncInfo)
+		} else if replica, ok := s.mods.Configuration().Replica(leader); ok {
+			replica.NewView(syncInfo)
+		}
+	}
 }
 
 func (s *Synchronizer) switchView(v consensus.View, timeout bool) {
