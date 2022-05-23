@@ -145,14 +145,11 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 		return
 	}
 
-	// TODO: Not sure if it is necessary to check which replica the block came from
-	// cs.mods.synchronizer.UpdateHighQC(block.QuorumCert())
-
-	// // ensure the block came from the leader.
-	// if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.View()) {
-	// 	cs.mods.Logger().Info("OnPropose: block was not proposed by the expected leader")
-	// 	return
-	// }
+	// ensure the block came from the leader.
+	if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.View()) {
+		cs.mods.Logger().Info("OnPropose: block was not proposed by the expected leader")
+		return
+	}
 
 	if !cs.impl.VoteRule(proposal) {
 		cs.mods.Logger().Info("OnPropose: Block not voted for")
