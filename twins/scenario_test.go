@@ -18,7 +18,14 @@ func TestBasicScenario(t *testing.T) {
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 
-	result, err := ExecuteScenario(s, 4, 0, "chainedhotstuff", 5*time.Millisecond, 50*time.Millisecond, 500*time.Millisecond)
+	result, err := ExecuteScenario(s, ScenarioOptions{
+		NumNodes:  4,
+		NumTwins:  0,
+		Consensus: "chainedhotstuff",
+		Delay:     20 * time.Millisecond,
+		Timeout:   100 * time.Millisecond,
+		Duration:  1500 * time.Millisecond,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

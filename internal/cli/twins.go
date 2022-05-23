@@ -30,6 +30,9 @@ var (
 	twinsDest           string
 	twinsSrc            string
 	twinsConsensus      string
+	twinsDelay          time.Duration
+	twinsTimeout        time.Duration
+	twinsDuration       time.Duration
 	logAll              bool
 	concurrency         uint
 )
@@ -74,6 +77,9 @@ func init() {
 	twinsCmd.Flags().StringVar(&twinsDest, "output", "", "If scenarios-per-file is 0, this specifies the file to write to.\nOtherwise this specifies the directory to write files to.")
 	twinsCmd.Flags().StringVar(&twinsSrc, "input", "", "File to read scenarios from.")
 	twinsCmd.Flags().StringVar(&twinsConsensus, "consensus", "chainedhotstuff", "The name of the consensus implementation to use.")
+	twinsCmd.Flags().DurationVar(&twinsDelay, "delay", 4*time.Millisecond, "The message transmission delay.")
+	twinsCmd.Flags().DurationVar(&twinsTimeout, "timeout", 10*time.Millisecond, "The view timeout.")
+	twinsCmd.Flags().DurationVar(&twinsDuration, "duration", 200*time.Millisecond, "Run time of each scenario.")
 	twinsCmd.Flags().BoolVar(&logAll, "log-all", false, "If true, all scenarios will be written to the output file when in \"run\" mode.")
 	twinsCmd.Flags().UintVar(&concurrency, "concurrency", 1, "Number of goroutines to use. If set to 0, the number of CPUs will be used.")
 }
@@ -113,7 +119,7 @@ func twinsRun() {
 	for i := 0; i < int(numWorkers); i++ {
 		go func() {
 			for i := uint64(0); i < numScenarios/uint64(numWorkers); i++ {
-				if ok, err := t.generateAndExecuteScenario(); err != nil {
+				if ok, err := t.executeScenario(); err != nil {
 					checkf("failed to execute scenario: %v", err)
 				} else if !ok {
 					break
@@ -138,7 +144,7 @@ func twinsGenerate() {
 	}
 
 	for i := uint64(0); i < numScenarios; i++ {
-		if err := t.generateAndLogScenario(); err != nil {
+		if err := t.generateScenario(); err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}
@@ -228,7 +234,7 @@ func newInstance(scenarioSource twins.ScenarioSource) (twinsInstance, error) {
 	}, nil
 }
 
-func (ti twinsInstance) generateAndLogScenario() error {
+func (ti twinsInstance) generateScenario() error {
 	scenario, err := ti.source.NextScenario()
 	if err != nil {
 		return err
@@ -242,16 +248,25 @@ func (ti twinsInstance) generateAndLogScenario() error {
 	return nil
 }
 
-func (ti twinsInstance) generateAndExecuteScenario() (bool, error) {
+func (ti twinsInstance) executeScenario() (bool, error) {
 	scenario, err := ti.source.NextScenario()
 	if err != nil {
 		return false, nil
 	}
 
+	settings := ti.source.Settings()
+
 	t := time.Now()
 
 	// TODO: make timeouts configurable
-	result, err := twins.ExecuteScenario(scenario, numReplicas, numTwins, twinsConsensus, 5*time.Millisecond, 50*time.Millisecond, 500*time.Millisecond)
+	result, err := twins.ExecuteScenario(scenario, twins.ScenarioOptions{
+		NumNodes:  settings.NumNodes,
+		NumTwins:  settings.NumTwins,
+		Consensus: twinsConsensus,
+		Delay:     twinsDelay,
+		Timeout:   twinsTimeout,
+		Duration:  twinsDuration,
+	})
 	if err != nil {
 		return false, err
 	}

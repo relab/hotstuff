@@ -38,6 +38,16 @@ func (s Scenario) String() string {
 	return sb.String()
 }
 
+// ScenarioOptions contains options for a scenario.
+type ScenarioOptions struct {
+	NumNodes  uint8
+	NumTwins  uint8
+	Consensus string
+	Delay     time.Duration
+	Timeout   time.Duration
+	Duration  time.Duration
+}
+
 // ScenarioResult contains the result and logs from executing a scenario.
 type ScenarioResult struct {
 	Safe        bool
@@ -48,12 +58,12 @@ type ScenarioResult struct {
 }
 
 // ExecuteScenario executes a twins scenario.
-func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, consensusName string, delay, timeout, duration time.Duration) (result ScenarioResult, err error) {
+func ExecuteScenario(scenario Scenario, options ScenarioOptions) (result ScenarioResult, err error) {
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
 	network := newNetwork(
 		scenario,
-		delay,
+		options.Delay,
 		consensus.ProposeMsg{},
 		consensus.VoteMsg{},
 		consensus.Hash{},
@@ -61,15 +71,15 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, consensusName 
 		consensus.TimeoutMsg{},
 	)
 
-	nodes, twins := assignNodeIDs(numNodes, numTwins)
+	nodes, twins := assignNodeIDs(options.NumNodes, options.NumTwins)
 	nodes = append(nodes, twins...)
 
-	err = network.createNodes(nodes, scenario, consensusName, timeout)
+	err = network.createNodes(nodes, scenario, options.Consensus, options.Timeout)
 	if err != nil {
 		return ScenarioResult{}, err
 	}
 
-	network.run(duration)
+	network.run(options.Duration)
 
 	nodeLogs := make(map[NodeID]string)
 	for _, node := range network.nodes {

@@ -105,13 +105,16 @@ func TestFHSBug(t *testing.T) {
 
 	settings := src.Settings()
 
-	res, err := twins.ExecuteScenario(scenario, settings.NumNodes, settings.NumTwins, vulnerableModule, 10*time.Millisecond, 100*time.Millisecond, 1000*time.Millisecond)
+	res, err := twins.ExecuteScenario(scenario, twins.ScenarioOptions{
+		NumNodes:  settings.NumNodes,
+		NumTwins:  settings.NumTwins,
+		Consensus: vulnerableModule,
+		Delay:     20 * time.Millisecond,
+		Timeout:   100 * time.Millisecond,
+		Duration:  1500 * time.Millisecond,
+	})
 	if err != nil {
 		t.Fatalf("failed to execute scenario: %v", err)
-	}
-
-	if res.Safe {
-		t.Error("expected scenario to be unsafe")
 	}
 
 	for id, blocks := range res.NodeCommits {
@@ -123,10 +126,14 @@ func TestFHSBug(t *testing.T) {
 		t.Log(sb.String())
 	}
 
-	t.Logf("Network log:\n%s", res.NetworkLog)
+	if res.Safe {
+		t.Error("expected scenario to be unsafe")
 
-	for id, log := range res.NodeLogs {
-		t.Logf("Node %v log:\n%s", id, log)
+		t.Logf("Network log:\n%s", res.NetworkLog)
+
+		for id, log := range res.NodeLogs {
+			t.Logf("Node %v log:\n%s", id, log)
+		}
 	}
 }
 
