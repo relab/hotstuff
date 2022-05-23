@@ -89,6 +89,7 @@ const fhsBugScenario = `
 `
 
 var logLevel = flag.String("log-level", "info", "set the log level")
+var logAll = flag.Bool("log-all", false, "print all logs on success")
 
 func TestFHSBug(t *testing.T) {
 	logging.SetLogLevel(*logLevel)
@@ -128,7 +129,9 @@ func TestFHSBug(t *testing.T) {
 
 	if res.Safe {
 		t.Error("expected scenario to be unsafe")
+	}
 
+	if res.Safe || *logAll {
 		t.Logf("Network log:\n%s", res.NetworkLog)
 
 		for id, log := range res.NodeLogs {
