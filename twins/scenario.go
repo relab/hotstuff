@@ -50,7 +50,13 @@ type ScenarioResult struct {
 func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, consensusName string) (result ScenarioResult, err error) {
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
-	network := newNetwork(scenario, consensus.ProposeMsg{}, consensus.VoteMsg{}, consensus.Hash{})
+	network := newNetwork(scenario,
+		consensus.ProposeMsg{},
+		consensus.VoteMsg{},
+		consensus.Hash{},
+		consensus.NewViewMsg{},
+		consensus.TimeoutMsg{},
+	)
 
 	nodes, twins := assignNodeIDs(numNodes, numTwins)
 	nodes = append(nodes, twins...)
@@ -60,7 +66,7 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, consensusName 
 		return ScenarioResult{}, err
 	}
 
-	network.run(len(scenario))
+	network.run(100)
 
 	nodeLogs := make(map[NodeID]string)
 	for _, node := range network.nodes {

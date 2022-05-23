@@ -14,7 +14,6 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -34,12 +33,16 @@ func (id NodeID) String() string {
 }
 
 type node struct {
-	id              NodeID
-	mods            *consensus.Modules
-	executedBlocks  []*consensus.Block
-	lastMessageView consensus.View
-	effectiveView   consensus.View
-	log             strings.Builder
+	id             NodeID
+	mods           *consensus.Modules
+	executedBlocks []*consensus.Block
+	effectiveView  consensus.View
+	log            strings.Builder
+}
+
+type pendingMessage struct {
+	message  interface{}
+	receiver uint32
 }
 
 // Network is a simulated network that supports twins.
@@ -50,10 +53,13 @@ type network struct {
 	// For each view (starting at 1), contains the list of partitions for that view.
 	views []View
 
+	// the message types to drop
 	dropTypes map[reflect.Type]struct{}
 
-	logger logging.Logger
+	pendingMessages []pendingMessage
 
+	logger logging.Logger
+	// the destination of the logger
 	log strings.Builder
 }
 
@@ -104,7 +110,7 @@ func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName s
 			&configuration{network: n, node: &node},
 			leaderRotation(n.views),
 			commandModule{commandGenerator: cg, node: &node},
-			&node, // allowing the node to set up event handlers
+			&timeoutManager{network: n, node: &node, timeout: 5},
 		)
 		builder.OptionsBuilder().SetShouldVerifyVotesSync()
 		node.mods = builder.Build()
@@ -122,34 +128,22 @@ func (n *network) run(rounds int) {
 		}
 	}
 
-	for view := consensus.View(0); view <= consensus.View(rounds); view++ {
-		n.round(view)
+	for round := 0; round < rounds; round++ {
+		n.round(round)
 	}
 }
 
 // round performs one round for each node
-func (n *network) round(view consensus.View) {
-	n.logger.Infof("Starting round %d", view)
+func (n *network) round(round int) {
+	for _, msg := range n.pendingMessages {
+		n.nodes[msg.receiver].mods.EventLoop().AddEvent(msg.message)
+	}
+	n.pendingMessages = nil
 
 	for _, node := range n.nodes {
+		node.mods.EventLoop().AddEvent(nextRound{})
 		// run each event loop as long as it has events
 		for node.mods.EventLoop().Tick() {
-		}
-	}
-
-	// give the next leader the opportunity to process votes and propose a new block
-	for _, node := range n.nodes {
-		if node.mods.LeaderRotation().GetLeader(view+1) == node.mods.ID() {
-			for node.mods.EventLoop().Tick() {
-			}
-		}
-	}
-
-	for _, node := range n.nodes {
-		// if the node did not send any messages this round, it should timeout
-		if node.lastMessageView < view {
-			// FIXME: should we add the OnLocalTimeout method to the Synchronizer interface?
-			node.mods.Synchronizer().(*synchronizer.Synchronizer).OnLocalTimeout()
 		}
 	}
 }
@@ -217,9 +211,14 @@ func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
 			continue
 		}
 		c.network.logger.Infof("node %v -> node %v: SEND %T(%v)", c.node.id, node.id, message, message)
-		node.mods.EventLoop().AddEvent(message)
+		c.network.pendingMessages = append(
+			c.network.pendingMessages,
+			pendingMessage{
+				receiver: uint32(node.id.NetworkID),
+				message:  message,
+			},
+		)
 	}
-	c.node.lastMessageView = c.node.mods.Synchronizer().View()
 }
 
 // shouldDrop checks if a message to the node identified by id should be dropped.
@@ -362,29 +361,46 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type eventLoop struct {
-	mods *consensus.Modules
-	view consensus.View
+type nextRound struct{}
 
-	eventloop.EventLoop
+type timeoutManager struct {
+	mods      *consensus.Modules
+	node      *node
+	network   *network
+	countdown int
+	timeout   int
 }
 
-func (el *eventLoop) setView(view consensus.View) {
-	el.view = view
+func (tm *timeoutManager) advance() {
+	tm.countdown--
+	if tm.countdown == 0 {
+		view := tm.mods.Synchronizer().View()
+		tm.mods.EventLoop().AddEvent(synchronizer.TimeoutEvent{View: view})
+		tm.countdown = tm.timeout
+		if tm.node.effectiveView <= view {
+			tm.node.effectiveView = view + 1
+			tm.network.logger.Infof("node %v effective view is %d due to timeout", tm.node.id, tm.node.effectiveView)
+		}
+	}
+}
+
+func (tm *timeoutManager) viewChange(event synchronizer.ViewChangeEvent) {
+	tm.countdown = tm.timeout
+	if event.Timeout {
+		tm.network.logger.Infof("node %v entered view %d after timeout", tm.node.id, event.View)
+	} else {
+		tm.network.logger.Infof("node %v entered view %d after voting", tm.node.id, event.View)
+	}
 }
 
 // InitConsensusModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (el *eventLoop) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
-	el.mods = mods
+func (tm *timeoutManager) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+	tm.mods = mods
+	tm.mods.EventLoop().RegisterObserver(nextRound{}, func(event any) {
+		tm.advance()
+	})
+	tm.mods.EventLoop().RegisterObserver(synchronizer.ViewChangeEvent{}, func(event any) {
+		tm.viewChange(event.(synchronizer.ViewChangeEvent))
+	})
 }
-
-func (el *eventLoop) AddEvent(event any) {
-	if _, ok := event.(nextRound); !ok && el.mods.Synchronizer().View() > el.view {
-		el.DelayUntil(nextRound{}, event)
-		return
-	}
-	el.EventLoop.AddEvent(event)
-}
-
-type nextRound struct{}
