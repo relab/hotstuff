@@ -109,15 +109,11 @@ func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName s
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
 
-		sync := synchronizer.New(testutil.FixedTimeout(timeout))
-		sync.(*synchronizer.Synchronizer).SetBroadcast(true)
-		sync.(*synchronizer.Synchronizer).SetStrict(true)
-
 		builder.Register(
 			blockchain.New(),
 			consensus.New(consensusModule),
 			crypto.NewCache(ecdsa.New(), 100),
-			sync,
+			synchronizer.New(testutil.FixedTimeout(timeout)),
 			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			// twins-specific:
 			&configuration{network: n, node: &node},
