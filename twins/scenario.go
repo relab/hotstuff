@@ -11,7 +11,7 @@ import (
 	"github.com/relab/hotstuff/consensus"
 )
 
-// View specifies the leader id an the partition scenario for a single round of consensus.
+// View specifies the leader id and the partition scenario for a single view.
 type View struct {
 	Leader     hotstuff.ID `json:"leader"`
 	Partitions []NodeSet   `json:"partitions"`
@@ -47,7 +47,7 @@ type ScenarioResult struct {
 }
 
 // ExecuteScenario executes a twins scenario.
-func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, consensusName string) (result ScenarioResult, err error) {
+func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, consensusName string) (result ScenarioResult, err error) {
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
 	network := newNetwork(scenario,
@@ -66,7 +66,7 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, consensusName 
 		return ScenarioResult{}, err
 	}
 
-	network.run(100)
+	network.run(numTicks)
 
 	nodeLogs := make(map[NodeID]string)
 	for _, node := range network.nodes {

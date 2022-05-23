@@ -24,63 +24,63 @@ const fhsBugScenario = `
 	"num_nodes": 4,
 	"num_twins": 0,
 	"partitions": 2,
-	"rounds": 11,
+	"views": 11,
 	"scenarios": [
 		[
 			{
 				"leader": 1,
 				"partitions": [ [1, 2, 3, 4], [] ],
-				"comment": "round 1"
+				"comment": "view 1"
 			},
 			{
 				"leader": 1,
 				"partitions": [ [1, 2, 3, 4], [] ],
-				"comment": "round 2"
+				"comment": "view 2"
 			},
 			{
 				"leader": 1,
 				"partitions": [ [1, 2, 3, 4], [] ],
-				"comment": "round 3"
+				"comment": "view 3"
 			},
 			{
 				"leader": 1,
 				"partitions": [ [1, 2, 3, 4], [] ],
-				"comment": "round 4. replicas time out in this view"
+				"comment": "view 4. replicas time out in this view"
 			},
 			{
 				"leader": 2,
 				"partitions": [ [1, 3, 4], [2] ],
-				"comment": "round 5."
+				"comment": "view 5."
 			},
 			{
 				"leader": 1,
 				"partitions": [ [1, 3, 4], [2] ],
-				"comment": "round 6"
+				"comment": "view 6"
 			},
 			{
 				"leader": 3,
 				"partitions": [ [1, 2, 4], [3] ],
-				"comment": "round 7"
+				"comment": "view 7"
 			},
 			{
 				"leader": 2,
 				"partitions": [ [1, 2, 4], [3] ],
-				"comment": "round 8"
+				"comment": "view 8"
 			},
 			{
 				"leader": 2,
 				"partitions": [ [1, 3, 4], [2] ],
-				"comment": "round 9"
+				"comment": "view 9"
 			},
 			{
 				"leader": 3,
 				"partitions": [ [1, 3, 4], [2] ],
-				"comment": "round 10"
+				"comment": "view 10"
 			},
 			{
 				"leader": 3,
 				"partitions": [ [1, 3, 4], [2] ],
-				"comment": "round 11"
+				"comment": "view 11"
 			}
 		]
 	]
@@ -105,7 +105,7 @@ func TestFHSBug(t *testing.T) {
 
 	settings := src.Settings()
 
-	res, err := twins.ExecuteScenario(scenario, settings.NumNodes, settings.NumTwins, vulnerableModule)
+	res, err := twins.ExecuteScenario(scenario, settings.NumNodes, settings.NumTwins, 100, vulnerableModule)
 	if err != nil {
 		t.Fatalf("failed to execute scenario: %v", err)
 	}

@@ -65,11 +65,11 @@ type network struct {
 
 // newNetwork creates a new Network with the specified partitions.
 // partitions specifies the network partitions for each view.
-func newNetwork(rounds []View, dropTypes ...interface{}) *network {
+func newNetwork(views []View, dropTypes ...interface{}) *network {
 	n := &network{
 		nodes:     make(map[uint32]*node),
 		replicas:  make(map[hotstuff.ID][]*node),
-		views:     rounds,
+		views:     views,
 		dropTypes: make(map[reflect.Type]struct{}),
 	}
 	n.logger = logging.NewWithDest(&n.log, "network")
@@ -120,7 +120,7 @@ func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName s
 	return nil
 }
 
-func (n *network) run(rounds int) {
+func (n *network) run(ticks int) {
 	// kick off the initial proposal(s)
 	for _, node := range n.nodes {
 		if node.mods.LeaderRotation().GetLeader(1) == node.id.ReplicaID {
@@ -128,20 +128,20 @@ func (n *network) run(rounds int) {
 		}
 	}
 
-	for round := 0; round < rounds; round++ {
-		n.round(round)
+	for tick := 0; tick < ticks; tick++ {
+		n.tick()
 	}
 }
 
-// round performs one round for each node
-func (n *network) round(round int) {
+// tick performs one tick for each node
+func (n *network) tick() {
 	for _, msg := range n.pendingMessages {
 		n.nodes[msg.receiver].mods.EventLoop().AddEvent(msg.message)
 	}
 	n.pendingMessages = nil
 
 	for _, node := range n.nodes {
-		node.mods.EventLoop().AddEvent(nextRound{})
+		node.mods.EventLoop().AddEvent(tick{})
 		// run each event loop as long as it has events
 		for node.mods.EventLoop().Tick() {
 		}
@@ -361,7 +361,7 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type nextRound struct{}
+type tick struct{}
 
 type timeoutManager struct {
 	mods      *consensus.Modules
@@ -397,7 +397,7 @@ func (tm *timeoutManager) viewChange(event synchronizer.ViewChangeEvent) {
 // It also allows the module to set module options using the OptionsBuilder.
 func (tm *timeoutManager) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
 	tm.mods = mods
-	tm.mods.EventLoop().RegisterObserver(nextRound{}, func(event any) {
+	tm.mods.EventLoop().RegisterObserver(tick{}, func(event any) {
 		tm.advance()
 	})
 	tm.mods.EventLoop().RegisterObserver(synchronizer.ViewChangeEvent{}, func(event any) {

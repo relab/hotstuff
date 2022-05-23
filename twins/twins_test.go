@@ -15,7 +15,12 @@ func TestTwins(t *testing.T) {
 		numTwins = 1
 	)
 
-	g := twins.NewGenerator(logging.New(""), numNodes, numTwins, 2, 7)
+	g := twins.NewGenerator(logging.New(""), twins.Settings{
+		NumNodes:   numNodes,
+		NumTwins:   numTwins,
+		Partitions: 2,
+		Views:      8,
+	})
 	g.Shuffle(time.Now().Unix())
 
 	scenarios := 10
@@ -26,7 +31,7 @@ func TestTwins(t *testing.T) {
 		if err != nil {
 			break
 		}
-		result, err := twins.ExecuteScenario(s, numNodes, numTwins, "chainedhotstuff")
+		result, err := twins.ExecuteScenario(s, numNodes, numTwins, 100, "chainedhotstuff")
 		if err != nil {
 			t.Fatal(err)
 		}
