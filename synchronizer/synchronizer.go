@@ -332,17 +332,6 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 	}
 }
 
-// UpdateHighQC updates HighQC if the given qc is higher than the old HighQC.
-func (s *Synchronizer) UpdateHighQC(qc consensus.QuorumCert) {
-	s.mods.Logger().Debugf("updateHighQC: %v", qc)
-	if !s.mods.Crypto().VerifyQuorumCert(qc) {
-		s.mods.Logger().Info("updateHighQC: QC could not be verified!")
-		return
-	}
-
-	s.updateHighQC(qc)
-}
-
 // updateHighQC attempts to update the highQC, but does not verify the qc first.
 // This method is meant to be used instead of the exported UpdateHighQC internally
 // in this package when the qc has already been verified.
