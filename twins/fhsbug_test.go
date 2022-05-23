@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/fasthotstuff"
@@ -106,7 +105,7 @@ func TestFHSBug(t *testing.T) {
 
 	settings := src.Settings()
 
-	res, err := twins.ExecuteScenario(scenario, settings.NumNodes, settings.NumTwins, vulnerableModule, 10*time.Millisecond, 100*time.Millisecond, 1000*time.Millisecond)
+	res, err := twins.ExecuteScenario(scenario, settings.NumNodes, settings.NumTwins, vulnerableModule)
 	if err != nil {
 		t.Fatalf("failed to execute scenario: %v", err)
 	}

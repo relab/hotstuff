@@ -250,8 +250,7 @@ func (ti twinsInstance) generateAndExecuteScenario() (bool, error) {
 
 	t := time.Now()
 
-	// TODO: make timeouts configurable
-	result, err := twins.ExecuteScenario(scenario, numReplicas, numTwins, twinsConsensus, 5*time.Millisecond, 50*time.Millisecond, 500*time.Millisecond)
+	result, err := twins.ExecuteScenario(scenario, numReplicas, numTwins, twinsConsensus)
 	if err != nil {
 		return false, err
 	}

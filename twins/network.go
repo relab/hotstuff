@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
@@ -15,6 +14,7 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -34,25 +34,12 @@ func (id NodeID) String() string {
 }
 
 type node struct {
-	id             NodeID
-	mods           *consensus.Modules
-	executedBlocks []*consensus.Block
-	log            strings.Builder
-	effectiveView  consensus.View
-}
-
-// InitConsensusModule gives the module a reference to the Modules object.
-// It also allows the module to set module options using the OptionsBuilder.
-func (n *node) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
-	n.mods = mods
-	// If a node timeouts, we will allow it to enter the next view in the network,
-	// in order to avoid the node getting "stuck" in its own view.
-	n.mods.EventLoop().RegisterObserver(synchronizer.TimeoutEvent{}, func(event any) {
-		timeout := event.(synchronizer.TimeoutEvent)
-		if n.effectiveView <= timeout.View {
-			n.effectiveView = timeout.View + 1
-		}
-	})
+	id              NodeID
+	mods            *consensus.Modules
+	executedBlocks  []*consensus.Block
+	lastMessageView consensus.View
+	effectiveView   consensus.View
+	log             strings.Builder
 }
 
 // Network is a simulated network that supports twins.
@@ -62,23 +49,22 @@ type network struct {
 	replicas map[hotstuff.ID][]*node
 	// For each view (starting at 1), contains the list of partitions for that view.
 	views []View
-	delay time.Duration
 
 	dropTypes map[reflect.Type]struct{}
 
 	logger logging.Logger
-	log    strings.Builder
+
+	log strings.Builder
 }
 
 // newNetwork creates a new Network with the specified partitions.
 // partitions specifies the network partitions for each view.
-func newNetwork(rounds []View, delay time.Duration, dropTypes ...interface{}) *network {
+func newNetwork(rounds []View, dropTypes ...interface{}) *network {
 	n := &network{
 		nodes:     make(map[uint32]*node),
 		replicas:  make(map[hotstuff.ID][]*node),
 		views:     rounds,
 		dropTypes: make(map[reflect.Type]struct{}),
-		delay:     delay,
 	}
 	n.logger = logging.NewWithDest(&n.log, "network")
 	for _, t := range dropTypes {
@@ -87,7 +73,7 @@ func newNetwork(rounds []View, delay time.Duration, dropTypes ...interface{}) *n
 	return n
 }
 
-func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName string, timeout time.Duration) error {
+func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName string) error {
 	cg := &commandGenerator{}
 	keys := make(map[hotstuff.ID]consensus.PrivateKey)
 	for _, nodeID := range nodes {
@@ -108,16 +94,15 @@ func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName s
 		if !modules.GetModule(consensusName, &consensusModule) {
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
-
 		builder.Register(
 			blockchain.New(),
 			consensus.New(consensusModule),
 			crypto.NewCache(ecdsa.New(), 100),
-			synchronizer.New(testutil.FixedTimeout(timeout)),
+			synchronizer.New(testutil.FixedTimeout(0)),
 			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			// twins-specific:
 			&configuration{network: n, node: &node},
-			leaderRotation{network: n},
+			leaderRotation(n.views),
 			commandModule{commandGenerator: cg, node: &node},
 			&node, // allowing the node to set up event handlers
 		)
@@ -129,19 +114,49 @@ func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName s
 	return nil
 }
 
-func (n *network) run(duration time.Duration) {
-	ctx, cancel := context.WithTimeout(context.Background(), duration)
-	defer cancel()
-	for _, n := range n.nodes {
-		n.mods.Synchronizer().Start(ctx)
-		go n.mods.EventLoop().Run(ctx)
+func (n *network) run(rounds int) {
+	// kick off the initial proposal(s)
+	for _, node := range n.nodes {
+		if node.mods.LeaderRotation().GetLeader(1) == node.id.ReplicaID {
+			node.mods.Consensus().Propose(node.mods.Synchronizer().(*synchronizer.Synchronizer).SyncInfo())
+		}
 	}
-	<-ctx.Done()
+
+	for view := consensus.View(0); view <= consensus.View(rounds); view++ {
+		n.round(view)
+	}
+}
+
+// round performs one round for each node
+func (n *network) round(view consensus.View) {
+	n.logger.Infof("Starting round %d", view)
+
+	for _, node := range n.nodes {
+		// run each event loop as long as it has events
+		for node.mods.EventLoop().Tick() {
+		}
+	}
+
+	// give the next leader the opportunity to process votes and propose a new block
+	for _, node := range n.nodes {
+		if node.mods.LeaderRotation().GetLeader(view+1) == node.mods.ID() {
+			for node.mods.EventLoop().Tick() {
+			}
+		}
+	}
+
+	for _, node := range n.nodes {
+		// if the node did not send any messages this round, it should timeout
+		if node.lastMessageView < view {
+			// FIXME: should we add the OnLocalTimeout method to the Synchronizer interface?
+			node.mods.Synchronizer().(*synchronizer.Synchronizer).OnLocalTimeout()
+		}
+	}
 }
 
 // shouldDrop decides if the sender should drop the message, based on the current view of the sender and the
 // partitions configured for that view.
-func (n *network) shouldDrop(sender, receiver uint32, message interface{}) (ok bool) {
+func (n *network) shouldDrop(sender, receiver uint32, message interface{}) bool {
 	node, ok := n.nodes[sender]
 	if !ok {
 		panic(fmt.Errorf("node matching sender id %d was not found", sender))
@@ -202,8 +217,9 @@ func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
 			continue
 		}
 		c.network.logger.Infof("node %v -> node %v: SEND %T(%v)", c.node.id, node.id, message, message)
-		time.AfterFunc(c.network.delay, func() { node.mods.EventLoop().AddEvent(message) })
+		node.mods.EventLoop().AddEvent(message)
 	}
+	c.node.lastMessageView = c.node.mods.Synchronizer().View()
 }
 
 // shouldDrop checks if a message to the node identified by id should be dropped.
@@ -346,16 +362,29 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type leaderRotation struct {
-	network *network
+type eventLoop struct {
+	mods *consensus.Modules
+	view consensus.View
+
+	eventloop.EventLoop
 }
 
-// GetLeader returns the id of the leader in the given view.
-func (lr leaderRotation) GetLeader(view consensus.View) hotstuff.ID {
-	// we start at view 1
-	v := int(view - 1)
-	if v >= 0 && v < len(lr.network.views) {
-		return lr.network.views[v].Leader
-	}
-	return 0
+func (el *eventLoop) setView(view consensus.View) {
+	el.view = view
 }
+
+// InitConsensusModule gives the module a reference to the Modules object.
+// It also allows the module to set module options using the OptionsBuilder.
+func (el *eventLoop) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+	el.mods = mods
+}
+
+func (el *eventLoop) AddEvent(event any) {
+	if _, ok := event.(nextRound); !ok && el.mods.Synchronizer().View() > el.view {
+		el.DelayUntil(nextRound{}, event)
+		return
+	}
+	el.EventLoop.AddEvent(event)
+}
+
+type nextRound struct{}

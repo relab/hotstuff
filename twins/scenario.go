@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
@@ -48,28 +47,20 @@ type ScenarioResult struct {
 }
 
 // ExecuteScenario executes a twins scenario.
-func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, consensusName string, delay, timeout, duration time.Duration) (result ScenarioResult, err error) {
+func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, consensusName string) (result ScenarioResult, err error) {
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
-	network := newNetwork(
-		scenario,
-		delay,
-		consensus.ProposeMsg{},
-		consensus.VoteMsg{},
-		consensus.Hash{},
-		consensus.NewViewMsg{},
-		consensus.TimeoutMsg{},
-	)
+	network := newNetwork(scenario, consensus.ProposeMsg{}, consensus.VoteMsg{}, consensus.Hash{})
 
 	nodes, twins := assignNodeIDs(numNodes, numTwins)
 	nodes = append(nodes, twins...)
 
-	err = network.createNodes(nodes, scenario, consensusName, timeout)
+	err = network.createNodes(nodes, scenario, consensusName)
 	if err != nil {
 		return ScenarioResult{}, err
 	}
 
-	network.run(duration)
+	network.run(len(scenario))
 
 	nodeLogs := make(map[NodeID]string)
 	for _, node := range network.nodes {
@@ -119,6 +110,19 @@ func checkCommits(network *network) (safe bool, commits int) {
 		i++
 	}
 	return true, i
+}
+
+type leaderRotation []View
+
+// GetLeader returns the id of the leader in the given view.
+func (lr leaderRotation) GetLeader(view consensus.View) hotstuff.ID {
+	// we start at view 1
+	v := int(view) - 1
+	if v >= 0 && v < len(lr) {
+		return lr[v].Leader
+	}
+	// default to 0 (which is an invalid id)
+	return 0
 }
 
 func getBlocks(network *network) map[NodeID][]*consensus.Block {
