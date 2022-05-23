@@ -45,8 +45,8 @@ func (s *Synchronizer) InitConsensusModule(mods *consensus.Modules, opts *consen
 	}
 	s.mods = mods
 
-	s.mods.EventLoop().RegisterHandler(localTimeout{}, func(event interface{}) {
-		timeoutView := event.(localTimeout).view
+	s.mods.EventLoop().RegisterHandler(TimeoutEvent{}, func(event interface{}) {
+		timeoutView := event.(TimeoutEvent).View
 		if s.currentView == timeoutView {
 			s.OnLocalTimeout()
 		}
@@ -138,7 +138,7 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	s.timer = time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
 		s.cancelCtx()
-		s.mods.EventLoop().AddEvent(localTimeout{s.currentView})
+		s.mods.EventLoop().AddEvent(TimeoutEvent{s.currentView})
 	})
 
 	go func() {
@@ -249,7 +249,6 @@ send:
 		}
 		subCfg.Timeout(timeoutMsg)
 	}
-
 }
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
@@ -483,12 +482,13 @@ func (s *Synchronizer) newCtx(duration time.Duration) {
 
 var _ consensus.Synchronizer = (*Synchronizer)(nil)
 
-// ViewChangeEvent is sent on the metrics event loop whenever a view change occurs.
+// ViewChangeEvent is sent on the eventloop whenever a view change occurs.
 type ViewChangeEvent struct {
 	View    consensus.View
 	Timeout bool
 }
 
-type localTimeout struct {
-	view consensus.View
+// TimeoutEvent is sent on the eventloop when a local timeout occurs.
+type TimeoutEvent struct {
+	View consensus.View
 }

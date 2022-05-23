@@ -15,7 +15,6 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -36,9 +35,24 @@ func (id NodeID) String() string {
 
 type node struct {
 	id             NodeID
-	modules        *consensus.Modules
+	mods           *consensus.Modules
 	executedBlocks []*consensus.Block
 	log            strings.Builder
+	effectiveView  consensus.View
+}
+
+// InitConsensusModule gives the module a reference to the Modules object.
+// It also allows the module to set module options using the OptionsBuilder.
+func (n *node) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+	n.mods = mods
+	// If a node timeouts, we will allow it to enter the next view in the network,
+	// in order to avoid the node getting "stuck" in its own view.
+	n.mods.EventLoop().RegisterObserver(synchronizer.TimeoutEvent{}, func(event any) {
+		timeout := event.(synchronizer.TimeoutEvent)
+		if n.effectiveView <= timeout.View {
+			n.effectiveView = timeout.View + 1
+		}
+	})
 }
 
 // Network is a simulated network that supports twins.
@@ -96,25 +110,23 @@ func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName s
 		}
 
 		sync := synchronizer.New(testutil.FixedTimeout(timeout))
-		sync.(*synchronizer.Synchronizer).SetBroadcast(false)
-		sync.(*synchronizer.Synchronizer).SetStrict(false)
+		sync.(*synchronizer.Synchronizer).SetBroadcast(true)
+		sync.(*synchronizer.Synchronizer).SetStrict(true)
 
 		builder.Register(
-			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			blockchain.New(),
 			consensus.New(consensusModule),
 			crypto.NewCache(ecdsa.New(), 100),
-			&configuration{
-				node:    &node,
-				network: n,
-			},
-			leaderRotation{n},
-			commandModule{commandGenerator: cg, node: &node},
-			eventloop.New(1000),
 			sync,
+			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
+			// twins-specific:
+			&configuration{network: n, node: &node},
+			leaderRotation{network: n},
+			commandModule{commandGenerator: cg, node: &node},
+			&node, // allowing the node to set up event handlers
 		)
 		builder.OptionsBuilder().SetShouldVerifyVotesSync()
-		node.modules = builder.Build()
+		node.mods = builder.Build()
 		n.nodes[nodeID.NetworkID] = &node
 		n.replicas[nodeID.ReplicaID] = append(n.replicas[nodeID.ReplicaID], &node)
 	}
@@ -125,8 +137,8 @@ func (n *network) run(duration time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 	for _, n := range n.nodes {
-		n.modules.Synchronizer().Start(ctx)
-		go n.modules.EventLoop().Run(ctx)
+		n.mods.Synchronizer().Start(ctx)
+		go n.mods.EventLoop().Run(ctx)
 	}
 	<-ctx.Done()
 }
@@ -140,7 +152,12 @@ func (n *network) shouldDrop(sender, receiver uint32, message interface{}) (ok b
 	}
 
 	// Index into viewPartitions.
-	i := int(node.modules.Synchronizer().View()) - 1
+	i := -1
+	if node.effectiveView > node.mods.Synchronizer().View() {
+		i += int(node.effectiveView)
+	} else {
+		i += int(node.mods.Synchronizer().View())
+	}
 
 	if i < 0 {
 		return false
@@ -189,7 +206,7 @@ func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
 			continue
 		}
 		c.network.logger.Infof("node %v -> node %v: SEND %T(%v)", c.node.id, node.id, message, message)
-		time.AfterFunc(c.network.delay, func() { node.modules.EventLoop().AddEvent(message) })
+		time.AfterFunc(c.network.delay, func() { node.mods.EventLoop().AddEvent(message) })
 	}
 }
 
@@ -249,7 +266,7 @@ func (c *configuration) Fetch(_ context.Context, hash consensus.Hash) (block *co
 			if c.shouldDrop(node.id, hash) {
 				continue
 			}
-			block, ok = node.modules.BlockChain().LocalGet(hash)
+			block, ok = node.mods.BlockChain().LocalGet(hash)
 			if ok {
 				return block, true
 			}
@@ -272,13 +289,13 @@ func (r *replica) ID() hotstuff.ID {
 
 // PublicKey returns the replica's public key.
 func (r *replica) PublicKey() consensus.PublicKey {
-	return r.config.network.replicas[r.id][0].modules.PrivateKey().Public()
+	return r.config.network.replicas[r.id][0].mods.PrivateKey().Public()
 }
 
 // Vote sends the partial certificate to the other replica.
 func (r *replica) Vote(cert consensus.PartialCert) {
 	r.config.sendMessage(r.id, consensus.VoteMsg{
-		ID:          r.config.node.modules.ID(),
+		ID:          r.config.node.mods.ID(),
 		PartialCert: cert,
 	})
 }
@@ -286,7 +303,7 @@ func (r *replica) Vote(cert consensus.PartialCert) {
 // NewView sends the quorum certificate to the other replica.
 func (r *replica) NewView(si consensus.SyncInfo) {
 	r.config.sendMessage(r.id, consensus.NewViewMsg{
-		ID:       r.config.node.modules.ID(),
+		ID:       r.config.node.mods.ID(),
 		SyncInfo: si,
 	})
 }
@@ -334,15 +351,15 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 }
 
 type leaderRotation struct {
-	n *network
+	network *network
 }
 
 // GetLeader returns the id of the leader in the given view.
 func (lr leaderRotation) GetLeader(view consensus.View) hotstuff.ID {
 	// we start at view 1
 	v := int(view - 1)
-	if v >= 0 && v < len(lr.n.views) {
-		return lr.n.views[v].Leader
+	if v >= 0 && v < len(lr.network.views) {
+		return lr.network.views[v].Leader
 	}
 	return 0
 }
