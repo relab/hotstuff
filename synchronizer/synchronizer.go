@@ -278,6 +278,7 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 		ok, highQC := s.mods.Crypto().VerifyAggregateQC(aggQC)
 		if !ok {
 			s.mods.Logger().Info("Aggregated Quorum Certificate could not be verified")
+			return
 		}
 		if aggQC.View() >= v {
 			v = aggQC.View()
