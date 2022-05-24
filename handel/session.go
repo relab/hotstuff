@@ -354,8 +354,13 @@ func (s *session) updateOutgoing(levelIndex int) {
 		err      error
 	)
 
+	// At level 0, there is no outgoing, so we can only use incoming.
+	// However, at higher levels there may be no incoming, so we have to use outgoing.
+	// It is not possible for both to be nil.
 	if prevLevel.outgoing == nil {
 		outgoing = prevLevel.incoming
+	} else if prevLevel.incoming == nil {
+		outgoing = prevLevel.outgoing
 	} else {
 		outgoing, err = s.h.mods.Crypto().Combine(prevLevel.incoming, prevLevel.outgoing)
 		if err != nil {
@@ -589,17 +594,12 @@ func (s *session) chooseContributionFromLevel(levelIndex int) (cont contribution
 func (s *session) improveSignature(contribution contribution) consensus.QuorumSignature {
 	level := &s.levels[contribution.level]
 
-	// this creates a clone of the signature
-	sigCombi, err := s.h.mods.Crypto().Combine(contribution.signature)
-	if err != nil {
-		s.h.mods.Logger().Error("Failed to clone signature using Combine: %v", err)
-		return nil
-	}
+	signature := contribution.signature
 
-	if s.canMergeContributions(sigCombi, level.incoming) {
-		sig, err := s.h.mods.Crypto().Combine(sigCombi, level.incoming)
+	if s.canMergeContributions(signature, level.incoming) {
+		new, err := s.h.mods.Crypto().Combine(signature, level.incoming)
 		if err == nil {
-			sigCombi = sig
+			signature = new
 		} else {
 			s.h.mods.Logger().Errorf("Failed to combine signatures: %v", err)
 		}
@@ -607,17 +607,17 @@ func (s *session) improveSignature(contribution contribution) consensus.QuorumSi
 
 	// add any individual signature, if possible
 	for _, indiv := range level.individual {
-		if s.canMergeContributions(sigCombi, indiv) {
-			sig, err := s.h.mods.Crypto().Combine(sigCombi, indiv)
+		if s.canMergeContributions(signature, indiv) {
+			new, err := s.h.mods.Crypto().Combine(signature, indiv)
 			if err == nil {
-				sigCombi = sig
+				signature = new
 			} else {
 				s.h.mods.Logger().Errorf("Failed to combine signatures: %v", err)
 			}
 		}
 	}
 
-	return sigCombi
+	return signature
 }
 
 func (s *session) verifyContribution(c contribution, sig consensus.QuorumSignature, verifyIndiv bool) {
