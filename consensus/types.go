@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
-	"strconv"
+	"io"
 	"strings"
 
 	"github.com/relab/hotstuff"
@@ -280,10 +280,7 @@ func (qc QuorumCert) Equals(other QuorumCert) bool {
 func (qc QuorumCert) String() string {
 	var sb strings.Builder
 	if qc.signature != nil {
-		qc.signature.Participants().ForEach(func(id hotstuff.ID) {
-			sb.WriteString(strconv.FormatUint(uint64(id), 10))
-			sb.WriteByte(' ')
-		})
+		_ = writeParticipants(&sb, qc.Signature().Participants())
 	}
 	return fmt.Sprintf("QC{ hash: %.6s, IDs: [ %s] }", qc.hash, &sb)
 }
@@ -319,10 +316,7 @@ func (tc TimeoutCert) View() View {
 func (tc TimeoutCert) String() string {
 	var sb strings.Builder
 	if tc.signature != nil {
-		tc.signature.Participants().ForEach(func(id hotstuff.ID) {
-			sb.WriteString(strconv.FormatUint(uint64(id), 10))
-			sb.WriteByte(' ')
-		})
+		_ = writeParticipants(&sb, tc.Signature().Participants())
 	}
 	return fmt.Sprintf("TC{ view: %d, IDs: [ %s] }", tc.view, &sb)
 }
@@ -359,10 +353,15 @@ func (aggQC AggregateQC) View() View {
 func (aggQC AggregateQC) String() string {
 	var sb strings.Builder
 	if aggQC.sig != nil {
-		aggQC.sig.Participants().ForEach(func(id hotstuff.ID) {
-			sb.WriteString(strconv.FormatUint(uint64(id), 10))
-			sb.WriteByte(' ')
-		})
+		_ = writeParticipants(&sb, aggQC.sig.Participants())
 	}
 	return fmt.Sprintf("AggQC{ view: %d, IDs: [ %s] }", aggQC.view, &sb)
+}
+
+func writeParticipants(wr io.Writer, participants IDSet) (err error) {
+	participants.RangeWhile(func(id hotstuff.ID) bool {
+		_, err = fmt.Fprintf(wr, "%d ", id)
+		return err == nil
+	})
+	return err
 }
