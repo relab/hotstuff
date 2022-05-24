@@ -11,6 +11,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -165,13 +166,22 @@ func (ec *ecdsaBase) Sign(message []byte) (signature consensus.QuorumSignature, 
 
 // Combine combines multiple signatures into a single signature.
 func (ec *ecdsaBase) Combine(signatures ...consensus.QuorumSignature) (consensus.QuorumSignature, error) {
+	if len(signatures) < 2 {
+		return nil, crypto.ErrCombineMultiple
+	}
+
 	ts := make(MultiSignature)
 
-	for _, sig := range signatures {
-		if sig, ok := sig.(MultiSignature); ok {
-			for id, s := range sig {
+	for _, sig1 := range signatures {
+		if sig2, ok := sig1.(MultiSignature); ok {
+			for id, s := range sig2 {
+				if _, ok := ts[id]; ok {
+					return nil, crypto.ErrCombineOverlap
+				}
 				ts[id] = s
 			}
+		} else {
+			ec.mods.Logger().Panicf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
 		}
 	}
 

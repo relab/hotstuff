@@ -328,14 +328,30 @@ func (bls *bls12Base) Sign(message []byte) (signature consensus.QuorumSignature,
 }
 
 // Combine combines multiple signatures into a single signature.
-func (bls *bls12Base) Combine(signatures ...consensus.QuorumSignature) (consensus.QuorumSignature, error) {
+func (bls *bls12Base) Combine(signatures ...consensus.QuorumSignature) (combined consensus.QuorumSignature, err error) {
+	if len(signatures) < 2 {
+		return nil, crypto.ErrCombineMultiple
+	}
+
 	g2 := bls12.NewG2()
 	agg := bls12.PointG2{}
 	var participants crypto.Bitfield
-	for _, sig := range signatures {
-		if sig, ok := sig.(*AggregateSignature); ok {
-			sig.participants.ForEach(participants.Add)
-			g2.Add(&agg, &agg, &sig.sig)
+	for _, sig1 := range signatures {
+		if sig2, ok := sig1.(*AggregateSignature); ok {
+			sig2.participants.RangeWhile(func(id hotstuff.ID) bool {
+				if participants.Contains(id) {
+					err = crypto.ErrCombineOverlap
+					return false
+				}
+				participants.Add(id)
+				return true
+			})
+			if err != nil {
+				return nil, err
+			}
+			g2.Add(&agg, &agg, &sig2.sig)
+		} else {
+			bls.mods.Logger().Panicf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
 		}
 	}
 	return &AggregateSignature{sig: agg, participants: participants}, nil
