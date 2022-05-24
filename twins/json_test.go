@@ -12,6 +12,7 @@ const jsonWant = `{
 	"num_twins": 1,
 	"partitions": 2,
 	"views": 7,
+	"ticks": 100,
 	"shuffle": false,
 	"seed": 0,
 	"scenarios": [
@@ -24,6 +25,7 @@ var settingsWant = twins.Settings{
 	NumTwins:   1,
 	Partitions: 2,
 	Views:      7,
+	Ticks:      100,
 	Shuffle:    false,
 	Seed:       0,
 }

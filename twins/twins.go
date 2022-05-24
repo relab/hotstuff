@@ -19,6 +19,7 @@ type twinsJSON struct {
 	NumTwins   uint8             `json:"num_twins"`
 	Partitions uint8             `json:"partitions"`
 	Views      uint8             `json:"views"`
+	Ticks      int               `json:"ticks"`
 	Shuffle    bool              `json:"shuffle"`
 	Seed       int64             `json:"seed"`
 	Scenarios  []json.RawMessage `json:"scenarios"`
@@ -32,6 +33,7 @@ func (t twinsJSON) Settings() Settings {
 		NumTwins:   t.NumTwins,
 		Partitions: t.Partitions,
 		Views:      t.Views,
+		Ticks:      t.Ticks,
 		Shuffle:    t.Shuffle,
 		Seed:       t.Seed,
 	}
@@ -113,6 +115,7 @@ func ToJSON(settings Settings, wr io.Writer) (*JSONWriter, error) {
 	"num_twins": %d,
 	"partitions": %d,
 	"views": %d,
+	"ticks": %d,
 	"shuffle": %t,
 	"seed": %d,
 	"scenarios": [`,
@@ -120,6 +123,7 @@ func ToJSON(settings Settings, wr io.Writer) (*JSONWriter, error) {
 		settings.NumTwins,
 		settings.Partitions,
 		settings.Views,
+		settings.Ticks,
 		settings.Shuffle,
 		settings.Seed,
 	)
