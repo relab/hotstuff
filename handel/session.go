@@ -3,7 +3,6 @@ package handel
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -157,19 +156,9 @@ type level struct {
 }
 
 func (s *session) newLevel(i int) level {
-	// HACK: create an empty signature as a placeholder
-	emptySig, err := s.h.mods.Crypto().Combine()
-	if err != nil {
-		panic(fmt.Sprintf("failed to create empty signature using Combine(): %v", err))
-	}
-
 	return level{
-		vp: verificationPriority(s.part.ids, s.seed, s.h.mods.ID(), i),
-		cp: contributionPriority(s.part.ids, s.seed, s.h.mods.ID(), i),
-
-		// HACK: creating empty signatures to avoid dealing with nil pointers
-		incoming:   emptySig,
-		outgoing:   emptySig,
+		vp:         verificationPriority(s.part.ids, s.seed, s.h.mods.ID(), i),
+		cp:         contributionPriority(s.part.ids, s.seed, s.h.mods.ID(), i),
 		individual: make(map[hotstuff.ID]consensus.QuorumSignature),
 	}
 }
@@ -210,7 +199,7 @@ func (s *session) score(contribution contribution) int {
 	}
 
 	curBest := level.incoming
-	if curBest.Participants().Len() >= need {
+	if curBest != nil && curBest.Participants().Len() >= need {
 		// level is completed, no need for this signature.
 		return 0
 	}
@@ -238,7 +227,10 @@ func (s *session) score(contribution contribution) int {
 	total := 0
 	added := 0
 
-	if s.canMergeContributions(contribution.signature, curBest) {
+	if curBest == nil {
+		total = finalParticipants.Len()
+		added = total
+	} else if s.canMergeContributions(contribution.signature, curBest) {
 		curBest.Participants().ForEach(finalParticipants.Add)
 		total = finalParticipants.Len()
 		added = total - curBest.Participants().Len()
@@ -329,7 +321,7 @@ func (s *session) updateIncoming(c contribution) {
 	}
 
 	// check if the multisignature is an improvement
-	if c.signature.Participants().Len() <= level.incoming.Participants().Len() {
+	if level.incoming != nil && c.signature.Participants().Len() <= level.incoming.Participants().Len() {
 		return
 	}
 
@@ -357,10 +349,19 @@ func (s *session) updateOutgoing(levelIndex int) {
 
 	prevLevel := &s.levels[levelIndex-1]
 
-	outgoing, err := s.h.mods.Crypto().Combine(prevLevel.incoming, prevLevel.outgoing)
-	if err != nil {
-		s.h.mods.Logger().Errorf("Failed to combine incoming and outgoing for level %d: %v", levelIndex, err)
-		return
+	var (
+		outgoing consensus.QuorumSignature
+		err      error
+	)
+
+	if prevLevel.outgoing == nil {
+		outgoing = prevLevel.incoming
+	} else {
+		outgoing, err = s.h.mods.Crypto().Combine(prevLevel.incoming, prevLevel.outgoing)
+		if err != nil {
+			s.h.mods.Logger().Errorf("Failed to combine incoming and outgoing for level %d: %v", levelIndex, err)
+			return
+		}
 	}
 
 	if levelIndex > s.h.maxLevel {
@@ -436,6 +437,9 @@ func (s *session) sendFastPath(ctx context.Context, levelIndex int) {
 
 func (s *session) sendContributionToLevel(ctx context.Context, levelIndex int) {
 	level := &s.levels[levelIndex]
+	if level.outgoing == nil {
+		return
+	}
 
 	part := s.part.partition(levelIndex)
 
@@ -455,7 +459,7 @@ func (s *session) sendContributionToLevel(ctx context.Context, levelIndex int) {
 			ID:         uint32(s.h.mods.ID()),
 			Level:      uint32(levelIndex),
 			Signature:  hotstuffpb.QuorumSignatureToProto(level.outgoing),
-			Individual: hotstuffpb.QuorumSignatureToProto(s.levels[0].outgoing),
+			Individual: hotstuffpb.QuorumSignatureToProto(s.levels[0].incoming),
 			Hash:       s.hash[:],
 		}, gorums.WithNoSendWaiting())
 	}
