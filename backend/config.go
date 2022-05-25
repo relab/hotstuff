@@ -155,8 +155,8 @@ func mapToMetadata(m map[string]string) metadata.MD {
 func readMetadata(md metadata.MD) map[string]string {
 	m := make(map[string]string)
 	for k, values := range md {
-		if strings.HasPrefix(k, keyPrefix) && len(values) > 0 {
-			m[strings.TrimPrefix(k, keyPrefix)] = values[0]
+		if _, key, ok := strings.Cut(k, keyPrefix); ok {
+			m[key] = values[0]
 		}
 	}
 	return m
