@@ -264,11 +264,13 @@ func tempDirPath(host iago.Host, dirName string) string {
 	return path.Join(tmp, dirName)
 }
 
+var rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
+
 func randString(n int) string {
 	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 	s := make([]rune, n)
 	for i := range s {
-		s[i] = letters[rand.Intn(len(letters))]
+		s[i] = letters[rnd.Intn(len(letters))]
 	}
 	return string(s)
 }
