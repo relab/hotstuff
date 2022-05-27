@@ -4,14 +4,13 @@ import (
 	"math/big"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 )
 
 // QuorumSignatureToProto converts a threshold signature to a protocol buffers message.
-func QuorumSignatureToProto(sig consensus.QuorumSignature) *QuorumSignature {
+func QuorumSignatureToProto(sig hotstuff.QuorumSignature) *QuorumSignature {
 	signature := &QuorumSignature{}
 	switch s := sig.(type) {
 	case ecdsa.MultiSignature:
@@ -36,7 +35,7 @@ func QuorumSignatureToProto(sig consensus.QuorumSignature) *QuorumSignature {
 }
 
 // QuorumSignatureFromProto converts a protocol buffers message to a threshold signature.
-func QuorumSignatureFromProto(sig *QuorumSignature) consensus.QuorumSignature {
+func QuorumSignatureFromProto(sig *QuorumSignature) hotstuff.QuorumSignature {
 	if signature := sig.GetECDSASigs(); signature != nil {
 		sigs := make([]*ecdsa.Signature, len(signature.GetSigs()))
 		for i, sig := range signature.GetSigs() {
@@ -59,7 +58,7 @@ func QuorumSignatureFromProto(sig *QuorumSignature) consensus.QuorumSignature {
 }
 
 // PartialCertToProto converts a consensus.PartialCert to a hotstuffpb.Partialcert.
-func PartialCertToProto(cert consensus.PartialCert) *PartialCert {
+func PartialCertToProto(cert hotstuff.PartialCert) *PartialCert {
 	hash := cert.BlockHash()
 	return &PartialCert{
 		Sig:  QuorumSignatureToProto(cert.Signature()),
@@ -68,14 +67,14 @@ func PartialCertToProto(cert consensus.PartialCert) *PartialCert {
 }
 
 // PartialCertFromProto converts a hotstuffpb.PartialCert to an ecdsa.PartialCert.
-func PartialCertFromProto(cert *PartialCert) consensus.PartialCert {
-	var h consensus.Hash
+func PartialCertFromProto(cert *PartialCert) hotstuff.PartialCert {
+	var h hotstuff.Hash
 	copy(h[:], cert.GetHash())
-	return consensus.NewPartialCert(QuorumSignatureFromProto(cert.GetSig()), h)
+	return hotstuff.NewPartialCert(QuorumSignatureFromProto(cert.GetSig()), h)
 }
 
 // QuorumCertToProto converts a consensus.QuorumCert to a hotstuffpb.QuorumCert.
-func QuorumCertToProto(qc consensus.QuorumCert) *QuorumCert {
+func QuorumCertToProto(qc hotstuff.QuorumCert) *QuorumCert {
 	hash := qc.BlockHash()
 	return &QuorumCert{
 		Sig:  QuorumSignatureToProto(qc.Signature()),
@@ -85,14 +84,14 @@ func QuorumCertToProto(qc consensus.QuorumCert) *QuorumCert {
 }
 
 // QuorumCertFromProto converts a hotstuffpb.QuorumCert to an ecdsa.QuorumCert.
-func QuorumCertFromProto(qc *QuorumCert) consensus.QuorumCert {
-	var h consensus.Hash
+func QuorumCertFromProto(qc *QuorumCert) hotstuff.QuorumCert {
+	var h hotstuff.Hash
 	copy(h[:], qc.GetHash())
-	return consensus.NewQuorumCert(QuorumSignatureFromProto(qc.GetSig()), consensus.View(qc.GetView()), h)
+	return hotstuff.NewQuorumCert(QuorumSignatureFromProto(qc.GetSig()), hotstuff.View(qc.GetView()), h)
 }
 
 // ProposalToProto converts a ProposeMsg to a protobuf message.
-func ProposalToProto(proposal consensus.ProposeMsg) *Proposal {
+func ProposalToProto(proposal hotstuff.ProposeMsg) *Proposal {
 	p := &Proposal{
 		Block: BlockToProto(proposal.Block),
 	}
@@ -103,7 +102,7 @@ func ProposalToProto(proposal consensus.ProposeMsg) *Proposal {
 }
 
 // ProposalFromProto converts a protobuf message to a ProposeMsg.
-func ProposalFromProto(p *Proposal) (proposal consensus.ProposeMsg) {
+func ProposalFromProto(p *Proposal) (proposal hotstuff.ProposeMsg) {
 	proposal.Block = BlockFromProto(p.GetBlock())
 	if p.GetAggQC() != nil {
 		aggQC := AggregateQCFromProto(p.GetAggQC())
@@ -113,7 +112,7 @@ func ProposalFromProto(p *Proposal) (proposal consensus.ProposeMsg) {
 }
 
 // BlockToProto converts a consensus.Block to a hotstuffpb.Block.
-func BlockToProto(block *consensus.Block) *Block {
+func BlockToProto(block *hotstuff.Block) *Block {
 	parentHash := block.Parent()
 	return &Block{
 		Parent:   parentHash[:],
@@ -125,22 +124,22 @@ func BlockToProto(block *consensus.Block) *Block {
 }
 
 // BlockFromProto converts a hotstuffpb.Block to a consensus.Block.
-func BlockFromProto(block *Block) *consensus.Block {
-	var p consensus.Hash
+func BlockFromProto(block *Block) *hotstuff.Block {
+	var p hotstuff.Hash
 	copy(p[:], block.GetParent())
-	return consensus.NewBlock(
+	return hotstuff.NewBlock(
 		p,
 		QuorumCertFromProto(block.GetQC()),
-		consensus.Command(block.GetCommand()),
-		consensus.View(block.GetView()),
+		hotstuff.Command(block.GetCommand()),
+		hotstuff.View(block.GetView()),
 		hotstuff.ID(block.GetProposer()),
 	)
 }
 
 // TimeoutMsgFromProto converts a TimeoutMsg proto to the hotstuff type.
-func TimeoutMsgFromProto(m *TimeoutMsg) consensus.TimeoutMsg {
-	timeoutMsg := consensus.TimeoutMsg{
-		View:          consensus.View(m.GetView()),
+func TimeoutMsgFromProto(m *TimeoutMsg) hotstuff.TimeoutMsg {
+	timeoutMsg := hotstuff.TimeoutMsg{
+		View:          hotstuff.View(m.GetView()),
 		SyncInfo:      SyncInfoFromProto(m.GetSyncInfo()),
 		ViewSignature: QuorumSignatureFromProto(m.GetViewSig()),
 	}
@@ -151,7 +150,7 @@ func TimeoutMsgFromProto(m *TimeoutMsg) consensus.TimeoutMsg {
 }
 
 // TimeoutMsgToProto converts a TimeoutMsg to the protobuf type.
-func TimeoutMsgToProto(timeoutMsg consensus.TimeoutMsg) *TimeoutMsg {
+func TimeoutMsgToProto(timeoutMsg hotstuff.TimeoutMsg) *TimeoutMsg {
 	tm := &TimeoutMsg{
 		View:     uint64(timeoutMsg.View),
 		SyncInfo: SyncInfoToProto(timeoutMsg.SyncInfo),
@@ -164,12 +163,12 @@ func TimeoutMsgToProto(timeoutMsg consensus.TimeoutMsg) *TimeoutMsg {
 }
 
 // TimeoutCertFromProto converts a timeout certificate from the protobuf type to the hotstuff type.
-func TimeoutCertFromProto(m *TimeoutCert) consensus.TimeoutCert {
-	return consensus.NewTimeoutCert(QuorumSignatureFromProto(m.GetSig()), consensus.View(m.GetView()))
+func TimeoutCertFromProto(m *TimeoutCert) hotstuff.TimeoutCert {
+	return hotstuff.NewTimeoutCert(QuorumSignatureFromProto(m.GetSig()), hotstuff.View(m.GetView()))
 }
 
 // TimeoutCertToProto converts a timeout certificate from the hotstuff type to the protobuf type.
-func TimeoutCertToProto(timeoutCert consensus.TimeoutCert) *TimeoutCert {
+func TimeoutCertToProto(timeoutCert hotstuff.TimeoutCert) *TimeoutCert {
 	return &TimeoutCert{
 		View: uint64(timeoutCert.View()),
 		Sig:  QuorumSignatureToProto(timeoutCert.Signature()),
@@ -177,16 +176,16 @@ func TimeoutCertToProto(timeoutCert consensus.TimeoutCert) *TimeoutCert {
 }
 
 // AggregateQCFromProto converts an AggregateQC from the protobuf type to the hotstuff type.
-func AggregateQCFromProto(m *AggQC) consensus.AggregateQC {
-	qcs := make(map[hotstuff.ID]consensus.QuorumCert)
+func AggregateQCFromProto(m *AggQC) hotstuff.AggregateQC {
+	qcs := make(map[hotstuff.ID]hotstuff.QuorumCert)
 	for id, pQC := range m.GetQCs() {
 		qcs[hotstuff.ID(id)] = QuorumCertFromProto(pQC)
 	}
-	return consensus.NewAggregateQC(qcs, QuorumSignatureFromProto(m.GetSig()), consensus.View(m.GetView()))
+	return hotstuff.NewAggregateQC(qcs, QuorumSignatureFromProto(m.GetSig()), hotstuff.View(m.GetView()))
 }
 
 // AggregateQCToProto converts an AggregateQC from the hotstuff type to the protobuf type.
-func AggregateQCToProto(aggQC consensus.AggregateQC) *AggQC {
+func AggregateQCToProto(aggQC hotstuff.AggregateQC) *AggQC {
 	pQCs := make(map[uint32]*QuorumCert, len(aggQC.QCs()))
 	for id, qc := range aggQC.QCs() {
 		pQCs[uint32(id)] = QuorumCertToProto(qc)
@@ -195,8 +194,8 @@ func AggregateQCToProto(aggQC consensus.AggregateQC) *AggQC {
 }
 
 // SyncInfoFromProto converts a SyncInfo struct from the protobuf type to the hotstuff type.
-func SyncInfoFromProto(m *SyncInfo) consensus.SyncInfo {
-	si := consensus.NewSyncInfo()
+func SyncInfoFromProto(m *SyncInfo) hotstuff.SyncInfo {
+	si := hotstuff.NewSyncInfo()
 	if qc := m.GetQC(); qc != nil {
 		si = si.WithQC(QuorumCertFromProto(qc))
 	}
@@ -210,7 +209,7 @@ func SyncInfoFromProto(m *SyncInfo) consensus.SyncInfo {
 }
 
 // SyncInfoToProto converts a SyncInfo struct from the hotstuff type to the protobuf type.
-func SyncInfoToProto(syncInfo consensus.SyncInfo) *SyncInfo {
+func SyncInfoToProto(syncInfo hotstuff.SyncInfo) *SyncInfo {
 	m := &SyncInfo{}
 	if qc, ok := syncInfo.QC(); ok {
 		m.QC = QuorumCertToProto(qc)

@@ -5,12 +5,12 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"github.com/relab/hotstuff/modules"
 	"net"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
-	"github.com/relab/hotstuff/consensus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -27,7 +27,7 @@ type Config struct {
 	// The id of the replica.
 	ID hotstuff.ID
 	// The private key of the replica.
-	PrivateKey consensus.PrivateKey
+	PrivateKey hotstuff.PrivateKey
 	// Controls whether TLS is used.
 	TLS bool
 	// The TLS certificate.
@@ -49,7 +49,7 @@ type Replica struct {
 	clientSrv *clientSrv
 	cfg       *backend.Config
 	hsSrv     *backend.Server
-	hs        *consensus.Modules
+	hs        *modules.ConsensusCore
 
 	execHandlers map[cmdID]func(*emptypb.Empty, error)
 	cancel       context.CancelFunc
@@ -57,7 +57,7 @@ type Replica struct {
 }
 
 // New returns a new replica.
-func New(conf Config, builder consensus.Builder) (replica *Replica) {
+func New(conf Config, builder modules.ConsensusBuilder) (replica *Replica) {
 	clientSrvOpts := conf.ClientServerOptions
 
 	if conf.TLS {
@@ -110,7 +110,7 @@ func New(conf Config, builder consensus.Builder) (replica *Replica) {
 }
 
 // Modules returns the Modules object of this replica.
-func (srv *Replica) Modules() *consensus.Modules {
+func (srv *Replica) Modules() *modules.ConsensusCore {
 	return srv.hs
 }
 

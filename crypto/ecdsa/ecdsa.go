@@ -9,7 +9,6 @@ import (
 	"math/big"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/modules"
 	"golang.org/x/exp/slices"
@@ -89,7 +88,7 @@ func (sig MultiSignature) ToBytes() []byte {
 }
 
 // Participants returns the IDs of replicas who participated in the threshold signature.
-func (sig MultiSignature) Participants() consensus.IDSet {
+func (sig MultiSignature) Participants() hotstuff.IDSet {
 	return sig
 }
 
@@ -126,18 +125,18 @@ func (sig MultiSignature) Len() int {
 }
 
 func (sig MultiSignature) String() string {
-	return consensus.IDSetToString(sig)
+	return hotstuff.IDSetToString(sig)
 }
 
-var _ consensus.QuorumSignature = (*MultiSignature)(nil)
-var _ consensus.IDSet = (*MultiSignature)(nil)
+var _ hotstuff.QuorumSignature = (*MultiSignature)(nil)
+var _ hotstuff.IDSet = (*MultiSignature)(nil)
 
 type ecdsaBase struct {
-	mods *consensus.Modules
+	mods *modules.ConsensusCore
 }
 
 // New returns a new instance of the ECDSA CryptoBase implementation.
-func New() consensus.CryptoBase {
+func New() modules.CryptoBase {
 	return &ecdsaBase{}
 }
 
@@ -146,14 +145,14 @@ func (ec *ecdsaBase) getPrivateKey() *ecdsa.PrivateKey {
 	return pk.(*ecdsa.PrivateKey)
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitConsensusModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (ec *ecdsaBase) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (ec *ecdsaBase) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	ec.mods = mods
 }
 
 // Sign creates a cryptographic signature of the given message.
-func (ec *ecdsaBase) Sign(message []byte) (signature consensus.QuorumSignature, err error) {
+func (ec *ecdsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
 	hash := sha256.Sum256(message)
 	r, s, err := ecdsa.Sign(rand.Reader, ec.getPrivateKey(), hash[:])
 	if err != nil {
@@ -167,7 +166,7 @@ func (ec *ecdsaBase) Sign(message []byte) (signature consensus.QuorumSignature, 
 }
 
 // Combine combines multiple signatures into a single signature.
-func (ec *ecdsaBase) Combine(signatures ...consensus.QuorumSignature) (consensus.QuorumSignature, error) {
+func (ec *ecdsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
 	if len(signatures) < 2 {
 		return nil, crypto.ErrCombineMultiple
 	}
@@ -191,7 +190,7 @@ func (ec *ecdsaBase) Combine(signatures ...consensus.QuorumSignature) (consensus
 }
 
 // Verify verifies the given quorum signature against the message.
-func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, message []byte) bool {
+func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
 	s, ok := signature.(MultiSignature)
 	if !ok {
 		ec.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
@@ -206,7 +205,7 @@ func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, message []byte)
 	hash := sha256.Sum256(message)
 
 	for _, sig := range s {
-		go func(sig *Signature, hash consensus.Hash) {
+		go func(sig *Signature, hash hotstuff.Hash) {
 			results <- ec.verifySingle(sig, hash)
 		}(sig, hash)
 	}
@@ -222,7 +221,7 @@ func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, message []byte)
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
-func (ec *ecdsaBase) BatchVerify(signature consensus.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
+func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
 	s, ok := signature.(MultiSignature)
 	if !ok {
 		ec.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
@@ -234,7 +233,7 @@ func (ec *ecdsaBase) BatchVerify(signature consensus.QuorumSignature, batch map[
 	}
 
 	results := make(chan bool, n)
-	set := make(map[consensus.Hash]struct{})
+	set := make(map[hotstuff.Hash]struct{})
 	for id, sig := range s {
 		message, ok := batch[id]
 		if !ok {
@@ -242,7 +241,7 @@ func (ec *ecdsaBase) BatchVerify(signature consensus.QuorumSignature, batch map[
 		}
 		hash := sha256.Sum256(message)
 		set[hash] = struct{}{}
-		go func(sig *Signature, hash consensus.Hash) {
+		go func(sig *Signature, hash hotstuff.Hash) {
 			results <- ec.verifySingle(sig, hash)
 		}(sig, hash)
 	}
@@ -258,7 +257,7 @@ func (ec *ecdsaBase) BatchVerify(signature consensus.QuorumSignature, batch map[
 	return valid && len(set) == len(batch)
 }
 
-func (ec *ecdsaBase) verifySingle(sig *Signature, hash consensus.Hash) bool {
+func (ec *ecdsaBase) verifySingle(sig *Signature, hash hotstuff.Hash) bool {
 	replica, ok := ec.mods.Configuration().Replica(sig.Signer())
 	if !ok {
 		ec.mods.Logger().Warnf("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())

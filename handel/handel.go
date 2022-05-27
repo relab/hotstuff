@@ -32,7 +32,6 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/handelpb"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/modules"
@@ -44,22 +43,22 @@ func init() {
 
 // Handel implements a signature aggregation protocol.
 type Handel struct {
-	mods     *consensus.Modules
+	mods     *modules.ConsensusCore
 	nodes    map[hotstuff.ID]*handelpb.Node
 	maxLevel int
-	sessions map[consensus.Hash]*session
+	sessions map[hotstuff.Hash]*session
 }
 
 // New returns a new instance of the Handel module.
-func New() consensus.Handel {
+func New() modules.Handel {
 	return &Handel{
 		nodes: make(map[hotstuff.ID]*handelpb.Node),
 	}
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitConsensusModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (h *Handel) InitConsensusModule(mods *consensus.Modules, opts *consensus.OptionsBuilder) {
+func (h *Handel) InitConsensusModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
 	h.mods = mods
 	opts.SetShouldUseHandel()
 
@@ -72,7 +71,7 @@ func (h *Handel) InitConsensusModule(mods *consensus.Modules, opts *consensus.Op
 func (h *Handel) Init() error {
 	h.mods.Logger().Info("Handel: Initializing")
 
-	h.sessions = make(map[consensus.Hash]*session)
+	h.sessions = make(map[hotstuff.Hash]*session)
 
 	var cfg *backend.Config
 	var srv *backend.Server
@@ -99,7 +98,7 @@ func (h *Handel) Init() error {
 			s.handleContribution(c)
 		} else if !c.deferred {
 			c.deferred = true
-			h.mods.EventLoop().DelayUntil(consensus.ProposeMsg{}, c)
+			h.mods.EventLoop().DelayUntil(hotstuff.ProposeMsg{}, c)
 		}
 	})
 
@@ -124,7 +123,7 @@ func (h *Handel) Init() error {
 }
 
 // Begin commissions the aggregation of a new signature.
-func (h *Handel) Begin(s consensus.PartialCert) {
+func (h *Handel) Begin(s hotstuff.PartialCert) {
 	// turn the single signature into a threshold signature,
 	// this makes it easier to work with.
 	session := h.newSession(s.BlockHash(), s.Signature())
@@ -138,7 +137,7 @@ type serviceImpl struct {
 }
 
 func (impl serviceImpl) Contribute(ctx gorums.ServerCtx, msg *handelpb.Contribution) {
-	var hash consensus.Hash
+	var hash hotstuff.Hash
 	copy(hash[:], msg.GetHash())
 
 	id, err := backend.GetPeerIDFromContext(ctx, impl.h.mods.Configuration())
@@ -164,24 +163,24 @@ func (impl serviceImpl) Contribute(ctx gorums.ServerCtx, msg *handelpb.Contribut
 }
 
 type contribution struct {
-	hash       consensus.Hash
+	hash       hotstuff.Hash
 	sender     hotstuff.ID
 	level      int
-	signature  consensus.QuorumSignature
-	individual consensus.QuorumSignature
+	signature  hotstuff.QuorumSignature
+	individual hotstuff.QuorumSignature
 	verified   bool
 	deferred   bool
 	score      int
 }
 
 type disseminateEvent struct {
-	sessionID consensus.Hash
+	sessionID hotstuff.Hash
 }
 
 type levelActivateEvent struct {
-	sessionID consensus.Hash
+	sessionID hotstuff.Hash
 }
 
 type sessionDoneEvent struct {
-	hash consensus.Hash
+	hash hotstuff.Hash
 }

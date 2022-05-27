@@ -3,12 +3,12 @@ package backend
 import (
 	"context"
 	"fmt"
+	"github.com/relab/hotstuff/modules"
 	"net"
 	"strconv"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -20,13 +20,13 @@ import (
 // Server is the Server-side of the gorums backend.
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
-	mods      *consensus.Modules
+	mods      *modules.ConsensusCore
 	gorumsSrv *gorums.Server
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitConsensusModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (srv *Server) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (srv *Server) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	srv.mods = mods
 }
 
@@ -70,7 +70,7 @@ func (srv *Server) StartOnListener(listener net.Listener) {
 }
 
 // GetPeerIDFromContext extracts the ID of the peer from the context.
-func GetPeerIDFromContext(ctx context.Context, cfg consensus.Configuration) (hotstuff.ID, error) {
+func GetPeerIDFromContext(ctx context.Context, cfg modules.Configuration) (hotstuff.ID, error) {
 	peerInfo, ok := peer.FromContext(ctx)
 	if !ok {
 		return 0, fmt.Errorf("peerInfo not available")
@@ -144,7 +144,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		return
 	}
 
-	impl.srv.mods.EventLoop().AddEvent(consensus.VoteMsg{
+	impl.srv.mods.EventLoop().AddEvent(hotstuff.VoteMsg{
 		ID:          id,
 		PartialCert: hotstuffpb.PartialCertFromProto(cert),
 	})
@@ -158,7 +158,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		return
 	}
 
-	impl.srv.mods.EventLoop().AddEvent(consensus.NewViewMsg{
+	impl.srv.mods.EventLoop().AddEvent(hotstuff.NewViewMsg{
 		ID:       id,
 		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
 	})
@@ -166,7 +166,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 
 // Fetch handles an incoming fetch request.
 func (impl *serviceImpl) Fetch(ctx gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*hotstuffpb.Block, error) {
-	var hash consensus.Hash
+	var hash hotstuff.Hash
 	copy(hash[:], pb.GetHash())
 
 	block, ok := impl.srv.mods.BlockChain().LocalGet(hash)

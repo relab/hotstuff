@@ -59,7 +59,7 @@ type Config struct {
 // Client is a hotstuff client.
 type Client struct {
 	mut              sync.Mutex
-	mods             *modules.Modules
+	mods             *modules.Core
 	mgr              *clientpb.Manager
 	gorumsConfig     *clientpb.Configuration
 	payloadSize      uint32
@@ -75,7 +75,7 @@ type Client struct {
 }
 
 // New returns a new Client.
-func New(conf Config, builder modules.Builder) (client *Client) {
+func New(conf Config, builder modules.CoreBuilder) (client *Client) {
 	mods := builder.Build()
 
 	client = &Client{

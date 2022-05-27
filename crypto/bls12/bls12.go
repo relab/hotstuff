@@ -10,7 +10,6 @@ import (
 
 	bls12 "github.com/kilic/bls12-381"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/modules"
 )
@@ -85,7 +84,7 @@ func GeneratePrivateKey() (*PrivateKey, error) {
 }
 
 // Public returns the public key associated with this private key.
-func (priv *PrivateKey) Public() consensus.PublicKey {
+func (priv *PrivateKey) Public() hotstuff.PublicKey {
 	p := &bls12.PointG1{}
 	// The public key is the secret key multiplied by the generator G1
 	return &PublicKey{p: bls12.NewG1().MulScalarBig(p, &bls12.G1One, priv.p)}
@@ -121,7 +120,7 @@ func (agg *AggregateSignature) ToBytes() []byte {
 }
 
 // Participants returns the IDs of replicas who participated in the threshold signature.
-func (agg AggregateSignature) Participants() consensus.IDSet {
+func (agg AggregateSignature) Participants() hotstuff.IDSet {
 	return &agg.participants
 }
 
@@ -130,7 +129,7 @@ func (agg AggregateSignature) Bitfield() crypto.Bitfield {
 	return agg.participants
 }
 
-func firstParticipant(participants consensus.IDSet) hotstuff.ID {
+func firstParticipant(participants hotstuff.IDSet) hotstuff.ID {
 	id := hotstuff.ID(0)
 	participants.RangeWhile(func(i hotstuff.ID) bool {
 		id = i
@@ -140,7 +139,7 @@ func firstParticipant(participants consensus.IDSet) hotstuff.ID {
 }
 
 type bls12Base struct {
-	mods *consensus.Modules
+	mods *modules.ConsensusCore
 
 	mut sync.RWMutex
 	// popCache caches the proof-of-possession results of popVerify for each public key.
@@ -148,15 +147,15 @@ type bls12Base struct {
 }
 
 // New returns a new instance of the BLS12 CryptoBase implementation.
-func New() consensus.CryptoBase {
+func New() modules.CryptoBase {
 	return &bls12Base{
 		popCache: make(map[string]bool),
 	}
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitConsensusModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (bls *bls12Base) InitConsensusModule(mods *consensus.Modules, opts *consensus.OptionsBuilder) {
+func (bls *bls12Base) InitConsensusModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
 	bls.mods = mods
 
 	pop := bls.popProve()
@@ -230,7 +229,7 @@ func (bls *bls12Base) popVerify(pubKey *PublicKey, proof *bls12.PointG2) bool {
 	return bls.coreVerify(pubKey, pubKey.ToBytes(), proof, domainPOP)
 }
 
-func (bls *bls12Base) checkPop(replica consensus.Replica) (valid bool) {
+func (bls *bls12Base) checkPop(replica modules.Replica) (valid bool) {
 	defer func() {
 		if !valid {
 			bls.mods.Logger().Warnf("Invalid proof-of-possession for replica %d", replica.ID())
@@ -316,7 +315,7 @@ func (bls *bls12Base) fastAggregateVerify(publicKeys []*PublicKey, message []byt
 }
 
 // Sign creates a cryptographic signature of the given messsage.
-func (bls *bls12Base) Sign(message []byte) (signature consensus.QuorumSignature, err error) {
+func (bls *bls12Base) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
 	p, err := bls.coreSign(message, domain)
 	if err != nil {
 		return nil, fmt.Errorf("bls12: coreSign failed: %w", err)
@@ -327,7 +326,7 @@ func (bls *bls12Base) Sign(message []byte) (signature consensus.QuorumSignature,
 }
 
 // Combine combines multiple signatures into a single signature.
-func (bls *bls12Base) Combine(signatures ...consensus.QuorumSignature) (combined consensus.QuorumSignature, err error) {
+func (bls *bls12Base) Combine(signatures ...hotstuff.QuorumSignature) (combined hotstuff.QuorumSignature, err error) {
 	if len(signatures) < 2 {
 		return nil, crypto.ErrCombineMultiple
 	}
@@ -357,7 +356,7 @@ func (bls *bls12Base) Combine(signatures ...consensus.QuorumSignature) (combined
 }
 
 // Verify verifies the given quorum signature against the message.
-func (bls *bls12Base) Verify(signature consensus.QuorumSignature, message []byte) bool {
+func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
 	s, ok := signature.(*AggregateSignature)
 	if !ok {
 		bls.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
@@ -393,7 +392,7 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, message []byte
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
-func (bls *bls12Base) BatchVerify(signature consensus.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
+func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
 	s, ok := signature.(*AggregateSignature)
 	if !ok {
 		bls.mods.Logger().Panicf("cannot verify incompatible signature type %T (expected %T)", signature, s)

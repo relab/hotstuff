@@ -7,7 +7,6 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -18,23 +17,23 @@ func init() {
 type reputationsMap map[hotstuff.ID]float64
 
 type repBased struct {
-	mods           *consensus.Modules
-	prevCommitHead *consensus.Block
+	mods           *modules.ConsensusCore
+	prevCommitHead *hotstuff.Block
 	reputations    reputationsMap // latest reputations
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitConsensusModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder
-func (r *repBased) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (r *repBased) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	r.mods = mods
 }
 
 // TODO: should GetLeader be thread-safe?
 
 // GetLeader returns the id of the leader in the given view
-func (r *repBased) GetLeader(view consensus.View) hotstuff.ID {
+func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 	block := r.mods.Consensus().CommittedBlock()
-	if block.View() > view-consensus.View(r.mods.Consensus().ChainLength()) {
+	if block.View() > view-hotstuff.View(r.mods.Consensus().ChainLength()) {
 		// TODO: it could be possible to lookup leaders for older views if we
 		// store a copy of the reputations in a metadata field of each block.
 		r.mods.Logger().Error("looking up leaders of old views is not supported")
@@ -94,9 +93,9 @@ func (r *repBased) GetLeader(view consensus.View) hotstuff.ID {
 }
 
 // NewRepBased returns a new random reputation-based leader rotation implementation
-func NewRepBased() consensus.LeaderRotation {
+func NewRepBased() modules.LeaderRotation {
 	return &repBased{
 		reputations:    make(reputationsMap),
-		prevCommitHead: consensus.GetGenesis(),
+		prevCommitHead: hotstuff.GetGenesis(),
 	}
 }

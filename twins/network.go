@@ -35,9 +35,9 @@ func (id NodeID) String() string {
 
 type node struct {
 	id             NodeID
-	mods           *consensus.Modules
-	executedBlocks []*consensus.Block
-	effectiveView  consensus.View
+	mods           *modules.ConsensusCore
+	executedBlocks []*hotstuff.Block
+	effectiveView  hotstuff.View
 	log            strings.Builder
 }
 
@@ -89,14 +89,14 @@ func NewPartitionedNetwork(views []View, dropTypes ...interface{}) *Network {
 	return n
 }
 
-// GetNodeBuilder returns a consensus.Builder instance for a node in the network.
-func (n *Network) GetNodeBuilder(id NodeID, pk consensus.PrivateKey) consensus.Builder {
+// GetNodeBuilder returns a consensus.ConsensusBuilder instance for a node in the network.
+func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) modules.ConsensusBuilder {
 	node := node{
 		id: id,
 	}
 	n.nodes[id.NetworkID] = &node
 	n.replicas[id.ReplicaID] = append(n.replicas[id.ReplicaID], &node)
-	builder := consensus.NewBuilder(id.ReplicaID, pk)
+	builder := modules.NewConsensusBuilder(id.ReplicaID, pk)
 	// register node as an anonymous module because that allows configuration to obtain it.
 	builder.Register(&node)
 	return builder
@@ -122,6 +122,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusN
 		builder.Register(
 			blockchain.New(),
 			consensus.New(consensusModule),
+			consensus.NewVotingMachine(),
 			crypto.NewCache(ecdsa.New(), 100),
 			synchronizer.New(FixedTimeout(0)),
 			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
@@ -203,18 +204,18 @@ func (n *Network) shouldDrop(sender, receiver uint32, message interface{}) bool 
 }
 
 // NewConfiguration returns a new Configuration module for this network.
-func (n *Network) NewConfiguration() consensus.Configuration {
+func (n *Network) NewConfiguration() modules.Configuration {
 	return &configuration{network: n}
 }
 
 type configuration struct {
 	node      *node
 	network   *Network
-	subConfig consensus.IDSet
+	subConfig hotstuff.IDSet
 }
 
 // alternative way to get a pointer to the node.
-func (c *configuration) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (c *configuration) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	if c.node == nil {
 		mods.GetModuleByType(&c.node)
 		c.node.mods = mods
@@ -260,8 +261,8 @@ func (c *configuration) shouldDrop(id NodeID, message interface{}) bool {
 }
 
 // Replicas returns all of the replicas in the configuration.
-func (c *configuration) Replicas() map[hotstuff.ID]consensus.Replica {
-	m := make(map[hotstuff.ID]consensus.Replica)
+func (c *configuration) Replicas() map[hotstuff.ID]modules.Replica {
+	m := make(map[hotstuff.ID]modules.Replica)
 	for id := range c.network.replicas {
 		m[id] = &replica{
 			config: c,
@@ -272,7 +273,7 @@ func (c *configuration) Replicas() map[hotstuff.ID]consensus.Replica {
 }
 
 // Replica returns a replica if present in the configuration.
-func (c *configuration) Replica(id hotstuff.ID) (r consensus.Replica, ok bool) {
+func (c *configuration) Replica(id hotstuff.ID) (r modules.Replica, ok bool) {
 	if _, ok = c.network.replicas[id]; ok {
 		return &replica{
 			config: c,
@@ -283,8 +284,8 @@ func (c *configuration) Replica(id hotstuff.ID) (r consensus.Replica, ok bool) {
 }
 
 // SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
-func (c *configuration) SubConfig(ids []hotstuff.ID) (sub consensus.Configuration, err error) {
-	subConfig := consensus.NewIDSet()
+func (c *configuration) SubConfig(ids []hotstuff.ID) (sub modules.Configuration, err error) {
+	subConfig := hotstuff.NewIDSet()
 	for _, id := range ids {
 		subConfig.Add(id)
 	}
@@ -306,17 +307,17 @@ func (c *configuration) QuorumSize() int {
 }
 
 // Propose sends the block to all replicas in the configuration.
-func (c *configuration) Propose(proposal consensus.ProposeMsg) {
+func (c *configuration) Propose(proposal hotstuff.ProposeMsg) {
 	c.broadcastMessage(proposal)
 }
 
 // Timeout sends the timeout message to all replicas.
-func (c *configuration) Timeout(msg consensus.TimeoutMsg) {
+func (c *configuration) Timeout(msg hotstuff.TimeoutMsg) {
 	c.broadcastMessage(msg)
 }
 
 // Fetch requests a block from all the replicas in the configuration.
-func (c *configuration) Fetch(_ context.Context, hash consensus.Hash) (block *consensus.Block, ok bool) {
+func (c *configuration) Fetch(_ context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
 	for _, replica := range c.network.replicas {
 		for _, node := range replica {
 			if c.shouldDrop(node.id, hash) {
@@ -344,21 +345,21 @@ func (r *replica) ID() hotstuff.ID {
 }
 
 // PublicKey returns the replica's public key.
-func (r *replica) PublicKey() consensus.PublicKey {
+func (r *replica) PublicKey() hotstuff.PublicKey {
 	return r.config.network.replicas[r.id][0].mods.PrivateKey().Public()
 }
 
 // Vote sends the partial certificate to the other replica.
-func (r *replica) Vote(cert consensus.PartialCert) {
-	r.config.sendMessage(r.id, consensus.VoteMsg{
+func (r *replica) Vote(cert hotstuff.PartialCert) {
+	r.config.sendMessage(r.id, hotstuff.VoteMsg{
 		ID:          r.config.node.mods.ID(),
 		PartialCert: cert,
 	})
 }
 
 // NewView sends the quorum certificate to the other replica.
-func (r *replica) NewView(si consensus.SyncInfo) {
-	r.config.sendMessage(r.id, consensus.NewViewMsg{
+func (r *replica) NewView(si hotstuff.SyncInfo) {
+	r.config.sendMessage(r.id, hotstuff.NewViewMsg{
 		ID:       r.config.node.mods.ID(),
 		SyncInfo: si,
 	})
@@ -408,7 +409,7 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 type tick struct{}
 
 type timeoutManager struct {
-	mods      *consensus.Modules
+	mods      *modules.ConsensusCore
 	node      *node
 	network   *Network
 	countdown int
@@ -439,7 +440,7 @@ func (tm *timeoutManager) viewChange(event synchronizer.ViewChangeEvent) {
 
 // InitConsensusModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (tm *timeoutManager) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (tm *timeoutManager) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	tm.mods = mods
 	tm.mods.EventLoop().RegisterObserver(tick{}, func(event any) {
 		tm.advance()

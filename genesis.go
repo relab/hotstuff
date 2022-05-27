@@ -1,4 +1,4 @@
-package consensus
+package hotstuff
 
 var genesisBlock = NewBlock(Hash{}, QuorumCert{}, "", 0, 0)
 

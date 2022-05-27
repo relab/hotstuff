@@ -2,6 +2,7 @@
 package fasthotstuff
 
 import (
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
 )
@@ -12,7 +13,7 @@ func init() {
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {
-	mods *consensus.Modules
+	mods *modules.ConsensusCore
 }
 
 // New returns a new FastHotStuff instance.
@@ -20,22 +21,22 @@ func New() consensus.Rules {
 	return &FastHotStuff{}
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitConsensusModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (fhs *FastHotStuff) InitConsensusModule(mods *consensus.Modules, opts *consensus.OptionsBuilder) {
+func (fhs *FastHotStuff) InitConsensusModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
 	fhs.mods = mods
 	opts.SetShouldUseAggQC()
 }
 
-func (fhs *FastHotStuff) qcRef(qc consensus.QuorumCert) (*consensus.Block, bool) {
-	if (consensus.Hash{}) == qc.BlockHash() {
+func (fhs *FastHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
+	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
 	return fhs.mods.BlockChain().Get(qc.BlockHash())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.
-func (fhs *FastHotStuff) CommitRule(block *consensus.Block) *consensus.Block {
+func (fhs *FastHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	parent, ok := fhs.qcRef(block.QuorumCert())
 	if !ok {
 		return nil
@@ -54,7 +55,7 @@ func (fhs *FastHotStuff) CommitRule(block *consensus.Block) *consensus.Block {
 }
 
 // VoteRule decides whether to vote for the proposal or not.
-func (fhs *FastHotStuff) VoteRule(proposal consensus.ProposeMsg) bool {
+func (fhs *FastHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
 	// The base implementation verifies both regular QCs and AggregateQCs, and asserts that the QC embedded in the
 	// block is the same as the highQC found in the aggregateQC.
 	if proposal.AggregateQC != nil {

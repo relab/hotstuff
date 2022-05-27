@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 )
 
 // View specifies the leader id and the partition scenario for a single view.
@@ -43,7 +42,7 @@ type ScenarioResult struct {
 	Commits     int
 	NetworkLog  string
 	NodeLogs    map[NodeID]string
-	NodeCommits map[NodeID][]*consensus.Block
+	NodeCommits map[NodeID][]*hotstuff.Block
 }
 
 // ExecuteScenario executes a twins scenario.
@@ -51,11 +50,11 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, 
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
 	network := NewPartitionedNetwork(scenario,
-		consensus.ProposeMsg{},
-		consensus.VoteMsg{},
-		consensus.Hash{},
-		consensus.NewViewMsg{},
-		consensus.TimeoutMsg{},
+		hotstuff.ProposeMsg{},
+		hotstuff.VoteMsg{},
+		hotstuff.Hash{},
+		hotstuff.NewViewMsg{},
+		hotstuff.TimeoutMsg{},
 	)
 
 	nodes, twins := assignNodeIDs(numNodes, numTwins)
@@ -89,7 +88,7 @@ func checkCommits(network *Network) (safe bool, commits int) {
 	i := 0
 	for {
 		noCommits := true
-		commitCount := make(map[consensus.Hash]int)
+		commitCount := make(map[hotstuff.Hash]int)
 		for _, replica := range network.replicas {
 			if len(replica) != 1 {
 				// TODO: should we be skipping replicas with twins?
@@ -121,7 +120,7 @@ func checkCommits(network *Network) (safe bool, commits int) {
 type leaderRotation []View
 
 // GetLeader returns the id of the leader in the given view.
-func (lr leaderRotation) GetLeader(view consensus.View) hotstuff.ID {
+func (lr leaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
 	// we start at view 1
 	v := int(view) - 1
 	if v >= 0 && v < len(lr) {
@@ -131,8 +130,8 @@ func (lr leaderRotation) GetLeader(view consensus.View) hotstuff.ID {
 	return 0
 }
 
-func getBlocks(network *Network) map[NodeID][]*consensus.Block {
-	m := make(map[NodeID][]*consensus.Block)
+func getBlocks(network *Network) map[NodeID][]*hotstuff.Block {
+	m := make(map[NodeID][]*hotstuff.Block)
 	for _, node := range network.nodes {
 		m[node.id] = node.executedBlocks
 	}
@@ -144,10 +143,10 @@ type commandGenerator struct {
 	nextCmd uint64
 }
 
-func (cg *commandGenerator) next() consensus.Command {
+func (cg *commandGenerator) next() hotstuff.Command {
 	cg.mut.Lock()
 	defer cg.mut.Unlock()
-	cmd := consensus.Command(strconv.FormatUint(cg.nextCmd, 10))
+	cmd := hotstuff.Command(strconv.FormatUint(cg.nextCmd, 10))
 	cg.nextCmd++
 	return cmd
 }
@@ -158,24 +157,24 @@ type commandModule struct {
 }
 
 // Accept returns true if the replica should accept the command, false otherwise.
-func (commandModule) Accept(_ consensus.Command) bool {
+func (commandModule) Accept(_ hotstuff.Command) bool {
 	return true
 }
 
 // Proposed tells the acceptor that the propose phase for the given command succeeded, and it should no longer be
 // accepted in the future.
-func (commandModule) Proposed(_ consensus.Command) {}
+func (commandModule) Proposed(_ hotstuff.Command) {}
 
 // Get returns the next command to be proposed.
 // It may run until the context is cancelled.
 // If no command is available, the 'ok' return value should be false.
-func (cm commandModule) Get(_ context.Context) (cmd consensus.Command, ok bool) {
+func (cm commandModule) Get(_ context.Context) (cmd hotstuff.Command, ok bool) {
 	return cm.commandGenerator.next(), true
 }
 
 // Exec executes the given command.
-func (cm commandModule) Exec(block *consensus.Block) {
+func (cm commandModule) Exec(block *hotstuff.Block) {
 	cm.node.executedBlocks = append(cm.node.executedBlocks, block)
 }
 
-func (commandModule) Fork(block *consensus.Block) {}
+func (commandModule) Fork(block *hotstuff.Block) {}

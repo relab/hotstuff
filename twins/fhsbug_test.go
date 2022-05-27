@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/fasthotstuff"
 	"github.com/relab/hotstuff/logging"
@@ -134,31 +135,31 @@ func TestFHSBug(t *testing.T) {
 
 // A wrapper around the FHS rules that swaps the commit rule for a vulnerable version
 type vulnerableFHS struct {
-	mods  *consensus.Modules
+	mods  *modules.ConsensusCore
 	inner fasthotstuff.FastHotStuff
 }
 
 // InitConsensusModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (fhs *vulnerableFHS) InitConsensusModule(mods *consensus.Modules, opts *consensus.OptionsBuilder) {
+func (fhs *vulnerableFHS) InitConsensusModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
 	fhs.mods = mods
 	fhs.inner.InitConsensusModule(mods, opts)
 }
 
 // VoteRule decides whether to vote for the block.
-func (fhs *vulnerableFHS) VoteRule(proposal consensus.ProposeMsg) bool {
+func (fhs *vulnerableFHS) VoteRule(proposal hotstuff.ProposeMsg) bool {
 	return fhs.inner.VoteRule(proposal)
 }
 
-func (fhs *vulnerableFHS) qcRef(qc consensus.QuorumCert) (*consensus.Block, bool) {
-	if (consensus.Hash{}) == qc.BlockHash() {
+func (fhs *vulnerableFHS) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
+	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
 	return fhs.mods.BlockChain().Get(qc.BlockHash())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.
-func (fhs *vulnerableFHS) CommitRule(block *consensus.Block) *consensus.Block {
+func (fhs *vulnerableFHS) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	parent, ok := fhs.qcRef(block.QuorumCert())
 	if !ok {
 		return nil

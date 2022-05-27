@@ -11,7 +11,6 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/handelpb"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 )
@@ -72,7 +71,7 @@ type session struct {
 	h   *Handel
 
 	// static data
-	hash consensus.Hash
+	hash hotstuff.Hash
 	seed int64
 	part partitioner
 
@@ -89,7 +88,7 @@ type session struct {
 	disseminateTimerID   int
 }
 
-func (h *Handel) newSession(hash consensus.Hash, in consensus.QuorumSignature) *session {
+func (h *Handel) newSession(hash hotstuff.Hash, in hotstuff.QuorumSignature) *session {
 	s := &session{
 		h:    h,
 		hash: hash,
@@ -148,9 +147,9 @@ func (h *Handel) newSession(hash consensus.Hash, in consensus.QuorumSignature) *
 type level struct {
 	vp         map[hotstuff.ID]int
 	cp         map[hotstuff.ID]int
-	incoming   consensus.QuorumSignature
-	outgoing   consensus.QuorumSignature
-	individual map[hotstuff.ID]consensus.QuorumSignature
+	incoming   hotstuff.QuorumSignature
+	outgoing   hotstuff.QuorumSignature
+	individual map[hotstuff.ID]hotstuff.QuorumSignature
 	pending    []contribution
 	done       bool
 }
@@ -159,11 +158,11 @@ func (s *session) newLevel(i int) level {
 	return level{
 		vp:         verificationPriority(s.part.ids, s.seed, s.h.mods.ID(), i),
 		cp:         contributionPriority(s.part.ids, s.seed, s.h.mods.ID(), i),
-		individual: make(map[hotstuff.ID]consensus.QuorumSignature),
+		individual: make(map[hotstuff.ID]hotstuff.QuorumSignature),
 	}
 }
 
-func (s *session) canMergeContributions(a, b consensus.QuorumSignature) bool {
+func (s *session) canMergeContributions(a, b hotstuff.QuorumSignature) bool {
 	canMerge := true
 
 	if a == nil || b == nil {
@@ -212,7 +211,7 @@ func (s *session) score(contribution contribution) int {
 	// Signatures that add no value to a level are simply ignored.
 
 	// copy the set of participants and add all individual signatures
-	finalParticipants := consensus.NewIDSet()
+	finalParticipants := hotstuff.NewIDSet()
 	contribution.signature.Participants().ForEach(finalParticipants.Add)
 
 	indivAdded := 0
@@ -350,7 +349,7 @@ func (s *session) updateOutgoing(levelIndex int) {
 	prevLevel := &s.levels[levelIndex-1]
 
 	var (
-		outgoing consensus.QuorumSignature
+		outgoing hotstuff.QuorumSignature
 		err      error
 	)
 
@@ -373,8 +372,8 @@ func (s *session) updateOutgoing(levelIndex int) {
 		if outgoing.Participants().Len() >= s.h.mods.Configuration().QuorumSize() {
 			s.h.mods.Logger().Debugf("Done with session: %.8s", s.hash)
 
-			s.h.mods.EventLoop().AddEvent(consensus.NewViewMsg{
-				SyncInfo: consensus.NewSyncInfo().WithQC(consensus.NewQuorumCert(
+			s.h.mods.EventLoop().AddEvent(hotstuff.NewViewMsg{
+				SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(
 					outgoing,
 					s.h.mods.Synchronizer().View(),
 					s.hash,
@@ -591,7 +590,7 @@ func (s *session) chooseContributionFromLevel(levelIndex int) (cont contribution
 
 // improveSignature attempts to improve the signature by merging it with the current best signature, if possible,
 // and adding individual signatures, if possible.
-func (s *session) improveSignature(contribution contribution) consensus.QuorumSignature {
+func (s *session) improveSignature(contribution contribution) hotstuff.QuorumSignature {
 	level := &s.levels[contribution.level]
 
 	signature := contribution.signature
@@ -620,7 +619,7 @@ func (s *session) improveSignature(contribution contribution) consensus.QuorumSi
 	return signature
 }
 
-func (s *session) verifyContribution(c contribution, sig consensus.QuorumSignature, verifyIndiv bool) {
+func (s *session) verifyContribution(c contribution, sig hotstuff.QuorumSignature, verifyIndiv bool) {
 	block, ok := s.h.mods.BlockChain().Get(s.hash)
 	if !ok {
 		return

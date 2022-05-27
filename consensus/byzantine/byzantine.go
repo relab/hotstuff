@@ -2,6 +2,7 @@
 package byzantine
 
 import (
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
 )
@@ -21,16 +22,16 @@ type silence struct {
 	consensus.Rules
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitConsensusModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (s *silence) InitConsensusModule(mods *consensus.Modules, opts *consensus.OptionsBuilder) {
-	if mod, ok := s.Rules.(consensus.Module); ok {
+func (s *silence) InitConsensusModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
+	if mod, ok := s.Rules.(modules.Module); ok {
 		mod.InitConsensusModule(mods, opts)
 	}
 }
 
-func (s *silence) ProposeRule(_ consensus.SyncInfo, _ consensus.Command) (consensus.ProposeMsg, bool) {
-	return consensus.ProposeMsg{}, false
+func (s *silence) ProposeRule(_ hotstuff.SyncInfo, _ hotstuff.Command) (hotstuff.ProposeMsg, bool) {
+	return hotstuff.ProposeMsg{}, false
 }
 
 func (s *silence) Wrap(rules consensus.Rules) consensus.Rules {
@@ -44,20 +45,20 @@ func NewSilence(c consensus.Rules) consensus.Rules {
 }
 
 type fork struct {
-	mods *consensus.Modules
+	mods *modules.ConsensusCore
 	consensus.Rules
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitConsensusModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (f *fork) InitConsensusModule(mods *consensus.Modules, opts *consensus.OptionsBuilder) {
+func (f *fork) InitConsensusModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
 	f.mods = mods
-	if mod, ok := f.Rules.(consensus.Module); ok {
+	if mod, ok := f.Rules.(modules.Module); ok {
 		mod.InitConsensusModule(mods, opts)
 	}
 }
 
-func (f *fork) ProposeRule(cert consensus.SyncInfo, cmd consensus.Command) (proposal consensus.ProposeMsg, ok bool) {
+func (f *fork) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
 	parent, ok := f.mods.BlockChain().Get(f.mods.Synchronizer().LeafBlock().Parent())
 	if !ok {
 		return proposal, false
@@ -67,9 +68,9 @@ func (f *fork) ProposeRule(cert consensus.SyncInfo, cmd consensus.Command) (prop
 		return proposal, false
 	}
 
-	proposal = consensus.ProposeMsg{
+	proposal = hotstuff.ProposeMsg{
 		ID: f.mods.ID(),
-		Block: consensus.NewBlock(
+		Block: hotstuff.NewBlock(
 			grandparent.Hash(),
 			grandparent.QuorumCert(),
 			cmd,
