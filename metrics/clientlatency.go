@@ -16,12 +16,12 @@ func init() {
 
 // ClientLatency processes LatencyMeasurementEvents, and writes LatencyMeasurements to the metrics logger.
 type ClientLatency struct {
-	mods *modules.Modules
+	mods *modules.Core
 	wf   Welford
 }
 
 // InitModule gives the module access to the other modules.
-func (lr *ClientLatency) InitModule(mods *modules.Modules) {
+func (lr *ClientLatency) InitModule(mods *modules.Core) {
 	lr.mods = mods
 
 	lr.mods.EventLoop().RegisterHandler(client.LatencyMeasurementEvent{}, func(event interface{}) {

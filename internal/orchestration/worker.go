@@ -163,7 +163,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 	}
 	// prepare modules
-	builder := consensus.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
+	builder := modules.NewConsensusBuilder(hotstuff.ID(opts.GetID()), privKey)
 
 	var consensusRules consensus.Rules
 	if !modules.GetModule(opts.GetConsensus(), &consensusRules) {
@@ -177,12 +177,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
 	}
 
-	var cryptoImpl consensus.CryptoBase
+	var cryptoImpl modules.CryptoBase
 	if !modules.GetModule(opts.GetCrypto(), &cryptoImpl) {
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
 	}
 
-	var leaderRotation consensus.LeaderRotation
+	var leaderRotation modules.LeaderRotation
 	if !modules.GetModule(opts.GetLeaderRotation(), &leaderRotation) {
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
@@ -196,6 +196,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 
 	builder.Register(
 		consensus.New(consensusRules),
+		consensus.NewVotingMachine(),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		leaderRotation,
 		sync,
@@ -306,7 +307,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		mods := modules.NewBuilder(hotstuff.ID(opts.GetID()))
+		mods := modules.NewCoreBuilder(hotstuff.ID(opts.GetID()))
 
 		if w.measurementInterval > 0 {
 			clientMetrics := metrics.GetClientMetrics(w.metrics...)

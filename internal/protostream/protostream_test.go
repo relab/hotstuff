@@ -2,16 +2,16 @@ package protostream_test
 
 import (
 	"bytes"
+	"github.com/relab/hotstuff"
 	"testing"
 
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/protostream"
 )
 
 func TestProtostream(t *testing.T) {
-	var buf bytes.Buffer                                   // in-memory stream
-	msg := hotstuffpb.BlockToProto(consensus.GetGenesis()) // test message
+	var buf bytes.Buffer                                  // in-memory stream
+	msg := hotstuffpb.BlockToProto(hotstuff.GetGenesis()) // test message
 
 	writer := protostream.NewWriter(&buf)
 	reader := protostream.NewReader(&buf)
@@ -32,7 +32,7 @@ func TestProtostream(t *testing.T) {
 	}
 
 	gotBlock := hotstuffpb.BlockFromProto(got)
-	if gotBlock.Hash() != consensus.GetGenesis().Hash() {
+	if gotBlock.Hash() != hotstuff.GetGenesis().Hash() {
 		t.Fatalf("message hash did not match")
 	}
 }

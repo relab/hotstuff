@@ -1,37 +1,39 @@
 package consensus
 
 import (
+	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/modules"
 	"sync"
 )
 
 // VotingMachine collects votes.
 type VotingMachine struct {
 	mut           sync.Mutex
-	mods          *Modules
-	verifiedVotes map[Hash][]PartialCert // verified votes that could become a QC
+	mods          *modules.ConsensusCore
+	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
 }
 
 // NewVotingMachine returns a new VotingMachine.
 func NewVotingMachine() *VotingMachine {
 	return &VotingMachine{
-		verifiedVotes: make(map[Hash][]PartialCert),
+		verifiedVotes: make(map[hotstuff.Hash][]hotstuff.PartialCert),
 	}
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitConsensusModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (vm *VotingMachine) InitConsensusModule(mods *Modules, _ *OptionsBuilder) {
+func (vm *VotingMachine) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	vm.mods = mods
-	vm.mods.EventLoop().RegisterHandler(VoteMsg{}, func(event interface{}) { vm.OnVote(event.(VoteMsg)) })
+	vm.mods.EventLoop().RegisterHandler(hotstuff.VoteMsg{}, func(event interface{}) { vm.OnVote(event.(hotstuff.VoteMsg)) })
 }
 
 // OnVote handles an incoming vote.
-func (vm *VotingMachine) OnVote(vote VoteMsg) {
+func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 	cert := vote.PartialCert
 	vm.mods.Logger().Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
 
 	var (
-		block *Block
+		block *hotstuff.Block
 		ok    bool
 	)
 
@@ -43,7 +45,7 @@ func (vm *VotingMachine) OnVote(vote VoteMsg) {
 			// hopefully, the block has arrived by then.
 			vm.mods.Logger().Debugf("Local cache miss for block: %.8s", cert.BlockHash())
 			vote.Deferred = true
-			vm.mods.EventLoop().DelayUntil(ProposeMsg{}, vote)
+			vm.mods.EventLoop().DelayUntil(hotstuff.ProposeMsg{}, vote)
 			return
 		}
 	} else {
@@ -67,7 +69,7 @@ func (vm *VotingMachine) OnVote(vote VoteMsg) {
 	}
 }
 
-func (vm *VotingMachine) verifyCert(cert PartialCert, block *Block) {
+func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
 	if !vm.mods.Crypto().VerifyPartialCert(cert) {
 		vm.mods.Logger().Info("OnVote: Vote could not be verified!")
 		return
@@ -105,5 +107,5 @@ func (vm *VotingMachine) verifyCert(cert PartialCert, block *Block) {
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
 
-	vm.mods.EventLoop().AddEvent(NewViewMsg{ID: vm.mods.ID(), SyncInfo: NewSyncInfo().WithQC(qc)})
+	vm.mods.EventLoop().AddEvent(hotstuff.NewViewMsg{ID: vm.mods.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
 }

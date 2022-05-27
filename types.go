@@ -1,4 +1,4 @@
-package consensus
+package hotstuff
 
 import (
 	"bytes"
@@ -8,26 +8,24 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/relab/hotstuff"
 )
 
 // IDSet implements a set of replica IDs. It is used to show which replicas participated in some event.
 type IDSet interface {
 	// Add adds an ID to the set.
-	Add(id hotstuff.ID)
+	Add(id ID)
 	// Contains returns true if the set contains the ID.
-	Contains(id hotstuff.ID) bool
+	Contains(id ID) bool
 	// ForEach calls f for each ID in the set.
-	ForEach(f func(hotstuff.ID))
+	ForEach(f func(ID))
 	// RangeWhile calls f for each ID in the set until f returns false.
-	RangeWhile(f func(hotstuff.ID) bool)
+	RangeWhile(f func(ID) bool)
 	// Len returns the number of entries in the set.
 	Len() int
 }
 
 // idSetMap implements IDSet using a map.
-type idSetMap map[hotstuff.ID]struct{}
+type idSetMap map[ID]struct{}
 
 // NewIDSet returns a new IDSet using the default implementation.
 func NewIDSet() IDSet {
@@ -35,25 +33,25 @@ func NewIDSet() IDSet {
 }
 
 // Add adds an ID to the set.
-func (s idSetMap) Add(id hotstuff.ID) {
+func (s idSetMap) Add(id ID) {
 	s[id] = struct{}{}
 }
 
 // Contains returns true if the set contains the given ID.
-func (s idSetMap) Contains(id hotstuff.ID) bool {
+func (s idSetMap) Contains(id ID) bool {
 	_, ok := s[id]
 	return ok
 }
 
 // ForEach calls f for each ID in the set.
-func (s idSetMap) ForEach(f func(hotstuff.ID)) {
+func (s idSetMap) ForEach(f func(ID)) {
 	for id := range s {
 		f(id)
 	}
 }
 
 // RangeWhile calls f for each ID in the set until f returns false.
-func (s idSetMap) RangeWhile(f func(hotstuff.ID) bool) {
+func (s idSetMap) RangeWhile(f func(ID) bool) {
 	for id := range s {
 		if !f(id) {
 			break
@@ -74,7 +72,7 @@ func (s idSetMap) String() string {
 func IDSetToString(set IDSet) string {
 	var sb strings.Builder
 	sb.WriteString("[ ")
-	set.ForEach(func(i hotstuff.ID) {
+	set.ForEach(func(i ID) {
 		sb.WriteString(strconv.Itoa(int(i)))
 		sb.WriteString(" ")
 	})
@@ -134,15 +132,15 @@ type ThresholdSignature = QuorumSignature
 // PartialCert is a signed block hash.
 type PartialCert struct {
 	// shortcut to the signer of the signature
-	signer    hotstuff.ID
+	signer    ID
 	signature QuorumSignature
 	blockHash Hash
 }
 
 // NewPartialCert returns a new partial certificate.
 func NewPartialCert(signature QuorumSignature, blockHash Hash) PartialCert {
-	var signer hotstuff.ID
-	signature.Participants().RangeWhile(func(i hotstuff.ID) bool {
+	var signer ID
+	signature.Participants().RangeWhile(func(i ID) bool {
 		signer = i
 		return false
 	})
@@ -150,7 +148,7 @@ func NewPartialCert(signature QuorumSignature, blockHash Hash) PartialCert {
 }
 
 // Signer returns the ID of the replica that created the certificate.
-func (pc PartialCert) Signer() hotstuff.ID {
+func (pc PartialCert) Signer() ID {
 	return pc.signer
 }
 
@@ -293,7 +291,7 @@ func (qc QuorumCert) Equals(other QuorumCert) bool {
 func (qc QuorumCert) String() string {
 	var sb strings.Builder
 	if qc.signature != nil {
-		qc.signature.Participants().ForEach(func(id hotstuff.ID) {
+		qc.signature.Participants().ForEach(func(id ID) {
 			sb.WriteString(strconv.FormatUint(uint64(id), 10))
 			sb.WriteByte(' ')
 		})
@@ -332,7 +330,7 @@ func (tc TimeoutCert) View() View {
 func (tc TimeoutCert) String() string {
 	var sb strings.Builder
 	if tc.signature != nil {
-		tc.signature.Participants().ForEach(func(id hotstuff.ID) {
+		tc.signature.Participants().ForEach(func(id ID) {
 			sb.WriteString(strconv.FormatUint(uint64(id), 10))
 			sb.WriteByte(' ')
 		})
@@ -344,18 +342,18 @@ func (tc TimeoutCert) String() string {
 //
 // This is used by the Fast-HotStuff consensus protocol.
 type AggregateQC struct {
-	qcs  map[hotstuff.ID]QuorumCert
+	qcs  map[ID]QuorumCert
 	sig  QuorumSignature
 	view View
 }
 
 // NewAggregateQC returns a new AggregateQC from the QC map and the threshold signature.
-func NewAggregateQC(qcs map[hotstuff.ID]QuorumCert, sig QuorumSignature, view View) AggregateQC {
+func NewAggregateQC(qcs map[ID]QuorumCert, sig QuorumSignature, view View) AggregateQC {
 	return AggregateQC{qcs, sig, view}
 }
 
 // QCs returns the quorum certificates in the AggregateQC.
-func (aggQC AggregateQC) QCs() map[hotstuff.ID]QuorumCert {
+func (aggQC AggregateQC) QCs() map[ID]QuorumCert {
 	return aggQC.qcs
 }
 

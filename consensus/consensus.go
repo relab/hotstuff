@@ -2,6 +2,8 @@ package consensus
 
 import (
 	"fmt"
+	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/modules"
 	"sync"
 )
 
@@ -12,10 +14,10 @@ import (
 // as this is handled by the ConsensusBase struct.
 type Rules interface {
 	// VoteRule decides whether to vote for the block.
-	VoteRule(proposal ProposeMsg) bool
+	VoteRule(proposal hotstuff.ProposeMsg) bool
 	// CommitRule decides whether any ancestor of the block can be committed.
 	// Returns the youngest ancestor of the block that can be committed.
-	CommitRule(*Block) *Block
+	CommitRule(*hotstuff.Block) *hotstuff.Block
 	// ChainLength returns the number of blocks that need to be chained together in order to commit.
 	ChainLength() int
 }
@@ -24,55 +26,55 @@ type Rules interface {
 // This allows implementors to specify how new blocks are created.
 type ProposeRuler interface {
 	// ProposeRule creates a new proposal.
-	ProposeRule(cert SyncInfo, cmd Command) (proposal ProposeMsg, ok bool)
+	ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool)
 }
 
 // consensusBase provides a default implementation of the Consensus interface
 // for implementations of the ConsensusImpl interface.
 type consensusBase struct {
 	impl Rules
-	mods *Modules
+	mods *modules.ConsensusCore
 
-	lastVote View
+	lastVote hotstuff.View
 
 	mut   sync.Mutex
-	bExec *Block
+	bExec *hotstuff.Block
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
-func New(impl Rules) Consensus {
+func New(impl Rules) modules.Consensus {
 	return &consensusBase{
 		impl:     impl,
 		lastVote: 0,
-		bExec:    GetGenesis(),
+		bExec:    hotstuff.GetGenesis(),
 	}
 }
 
-func (cs *consensusBase) CommittedBlock() *Block {
+func (cs *consensusBase) CommittedBlock() *hotstuff.Block {
 	cs.mut.Lock()
 	defer cs.mut.Unlock()
 	return cs.bExec
 }
 
-func (cs *consensusBase) InitConsensusModule(mods *Modules, opts *OptionsBuilder) {
+func (cs *consensusBase) InitConsensusModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
 	cs.mods = mods
-	if mod, ok := cs.impl.(Module); ok {
+	if mod, ok := cs.impl.(modules.Module); ok {
 		mod.InitConsensusModule(mods, opts)
 	}
-	cs.mods.EventLoop().RegisterHandler(ProposeMsg{}, func(event interface{}) {
-		cs.OnPropose(event.(ProposeMsg))
+	cs.mods.EventLoop().RegisterHandler(hotstuff.ProposeMsg{}, func(event interface{}) {
+		cs.OnPropose(event.(hotstuff.ProposeMsg))
 	})
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
-func (cs *consensusBase) StopVoting(view View) {
+func (cs *consensusBase) StopVoting(view hotstuff.View) {
 	if cs.lastVote < view {
 		cs.lastVote = view
 	}
 }
 
 // Propose creates a new proposal.
-func (cs *consensusBase) Propose(cert SyncInfo) {
+func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 	cs.mods.Logger().Debug("Propose")
 
 	qc, ok := cert.QC()
@@ -92,7 +94,7 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 		return
 	}
 
-	var proposal ProposeMsg
+	var proposal hotstuff.ProposeMsg
 	if proposer, ok := cs.impl.(ProposeRuler); ok {
 		proposal, ok = proposer.ProposeRule(cert, cmd)
 		if !ok {
@@ -100,9 +102,9 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 			return
 		}
 	} else {
-		proposal = ProposeMsg{
+		proposal = hotstuff.ProposeMsg{
 			ID: cs.mods.ID(),
-			Block: NewBlock(
+			Block: hotstuff.NewBlock(
 				cs.mods.Synchronizer().LeafBlock().Hash(),
 				qc,
 				cmd,
@@ -123,7 +125,7 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 	cs.OnPropose(proposal)
 }
 
-func (cs *consensusBase) OnPropose(proposal ProposeMsg) { //nolint:gocyclo
+func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocyclo
 	// TODO: extract parts of this method into helper functions maybe?
 	cs.mods.Logger().Debugf("OnPropose: %v", proposal.Block)
 
@@ -147,7 +149,7 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) { //nolint:gocyclo
 		return
 	}
 
-	cs.mods.synchronizer.UpdateHighQC(block.QuorumCert())
+	cs.mods.Synchronizer().UpdateHighQC(block.QuorumCert())
 
 	// ensure the block came from the leader.
 	if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.View()) {
@@ -181,7 +183,7 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) { //nolint:gocyclo
 			cs.commit(b)
 		}
 		if !didAdvanceView {
-			cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
+			cs.mods.Synchronizer().AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 		}
 	}()
 
@@ -201,7 +203,7 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) { //nolint:gocyclo
 	if cs.mods.Options().ShouldUseHandel() {
 		// Need to call advanceview such that the view context will be fresh.
 		// TODO: we could instead
-		cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
+		cs.mods.Synchronizer().AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 		didAdvanceView = true
 		cs.mods.Handel().Begin(pc)
 		return
@@ -209,7 +211,7 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) { //nolint:gocyclo
 
 	leaderID := cs.mods.LeaderRotation().GetLeader(cs.lastVote + 1)
 	if leaderID == cs.mods.ID() {
-		cs.mods.EventLoop().AddEvent(VoteMsg{ID: cs.mods.ID(), PartialCert: pc})
+		cs.mods.EventLoop().AddEvent(hotstuff.VoteMsg{ID: cs.mods.ID(), PartialCert: pc})
 		return
 	}
 
@@ -222,7 +224,7 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) { //nolint:gocyclo
 	leader.Vote(pc)
 }
 
-func (cs *consensusBase) commit(block *Block) {
+func (cs *consensusBase) commit(block *hotstuff.Block) {
 	cs.mut.Lock()
 	// can't recurse due to requiring the mutex, so we use a helper instead.
 	err := cs.commitInner(block)
@@ -241,7 +243,7 @@ func (cs *consensusBase) commit(block *Block) {
 }
 
 // recursive helper for commit
-func (cs *consensusBase) commitInner(block *Block) error {
+func (cs *consensusBase) commitInner(block *hotstuff.Block) error {
 	if cs.bExec.View() >= block.View() {
 		return nil
 	}

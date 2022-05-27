@@ -3,9 +3,9 @@ package replica
 import (
 	"container/list"
 	"context"
+	"github.com/relab/hotstuff"
 	"sync"
 
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"google.golang.org/protobuf/proto"
@@ -13,7 +13,7 @@ import (
 
 type cmdCache struct {
 	mut           sync.Mutex
-	mods          *modules.Modules
+	mods          *modules.Core
 	c             chan struct{}
 	batchSize     int
 	serialNumbers map[uint32]uint64 // highest proposed serial number per client ID
@@ -33,7 +33,7 @@ func newCmdCache(batchSize int) *cmdCache {
 }
 
 // InitModule gives the module access to the other modules.
-func (c *cmdCache) InitModule(mods *modules.Modules) {
+func (c *cmdCache) InitModule(mods *modules.Core) {
 	c.mods = mods
 }
 
@@ -55,7 +55,7 @@ func (c *cmdCache) addCommand(cmd *clientpb.Command) {
 }
 
 // Get returns a batch of commands to propose.
-func (c *cmdCache) Get(ctx context.Context) (cmd consensus.Command, ok bool) {
+func (c *cmdCache) Get(ctx context.Context) (cmd hotstuff.Command, ok bool) {
 	batch := new(clientpb.Batch)
 
 	c.mut.Lock()
@@ -102,12 +102,12 @@ awaitBatch:
 		return "", false
 	}
 
-	cmd = consensus.Command(b)
+	cmd = hotstuff.Command(b)
 	return cmd, true
 }
 
 // Accept returns true if the replica can accept the batch.
-func (c *cmdCache) Accept(cmd consensus.Command) bool {
+func (c *cmdCache) Accept(cmd hotstuff.Command) bool {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -129,7 +129,7 @@ func (c *cmdCache) Accept(cmd consensus.Command) bool {
 }
 
 // Proposed updates the serial numbers such that we will not accept the given batch again.
-func (c *cmdCache) Proposed(cmd consensus.Command) {
+func (c *cmdCache) Proposed(cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -147,4 +147,4 @@ func (c *cmdCache) Proposed(cmd consensus.Command) {
 	}
 }
 
-var _ consensus.Acceptor = (*cmdCache)(nil)
+var _ modules.Acceptor = (*cmdCache)(nil)
