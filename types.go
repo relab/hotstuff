@@ -228,7 +228,7 @@ func (si SyncInfo) AggQC() (_ AggregateQC, _ bool) {
 }
 
 func (si SyncInfo) String() string {
-	var cert interface{}
+	var cert any
 	if si.qc != nil {
 		cert = si.qc
 	} else if si.tc != nil {

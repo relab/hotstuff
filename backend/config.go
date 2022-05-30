@@ -4,8 +4,9 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/relab/hotstuff/modules"
 	"strings"
+
+	"github.com/relab/hotstuff/modules"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -87,7 +88,7 @@ func (cfg *Config) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.O
 	// This receives `replicaConnected` events from the server.
 	// We can only process these events after the configuration has been connected,
 	// so therefore the `replicaConnected` events are delayed until the `connected` event has occurred.
-	cfg.mods.EventLoop().RegisterHandler(replicaConnected{}, func(event interface{}) {
+	cfg.mods.EventLoop().RegisterHandler(replicaConnected{}, func(event any) {
 		if !cfg.connected {
 			cfg.mods.EventLoop().DelayUntil(connected{}, event)
 			return

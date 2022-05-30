@@ -8,15 +8,15 @@ import (
 
 var (
 	registryMut sync.Mutex
-	byInterface = make(map[reflect.Type]map[string]interface{})
-	byName      = make(map[string]interface{})
+	byInterface = make(map[reflect.Type]map[string]any)
+	byName      = make(map[string]any)
 )
 
 // RegisterModule registers a module implementation with the specified name.
 // constructor must be a function returning the interface of the module.
 // For example:
 //  RegisterModule("chainedhotstuff", func() consensus.Rules { return chainedhotstuff.New() })
-func RegisterModule(name string, constructor interface{}) {
+func RegisterModule(name string, constructor any) {
 	ctorType := reflect.TypeOf(constructor)
 
 	if ctorType.Kind() != reflect.Func && ctorType.NumOut() != 1 && ctorType.Out(0).Kind() != reflect.Interface {
@@ -35,7 +35,7 @@ func RegisterModule(name string, constructor interface{}) {
 
 	moduleRegistry, ok := byInterface[ifaceType]
 	if !ok {
-		moduleRegistry = make(map[string]interface{})
+		moduleRegistry = make(map[string]any)
 		byInterface[ifaceType] = moduleRegistry
 	}
 
@@ -48,7 +48,7 @@ func RegisterModule(name string, constructor interface{}) {
 // For example:
 //  var rules consensus.Rules
 //  GetModule("chainedhotstuff", &rules)
-func GetModule(name string, out interface{}) bool {
+func GetModule(name string, out any) bool {
 	outType := reflect.TypeOf(out)
 
 	if outType.Kind() != reflect.Ptr {
@@ -75,7 +75,7 @@ func GetModule(name string, out interface{}) bool {
 }
 
 // GetModuleUntyped returns a new instance of the named module, if it exists.
-func GetModuleUntyped(name string) (v interface{}, ok bool) {
+func GetModuleUntyped(name string) (v any, ok bool) {
 	registryMut.Lock()
 	defer registryMut.Unlock()
 

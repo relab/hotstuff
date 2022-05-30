@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	RegisterReplicaMetric("timeouts", func() interface{} {
+	RegisterReplicaMetric("timeouts", func() any {
 		return &ViewTimeouts{}
 	})
 }
@@ -27,11 +27,11 @@ func (vt *ViewTimeouts) InitModule(mods *modules.Core) {
 
 	vt.mods.Logger().Info("ViewTimeouts metric enabled.")
 
-	vt.mods.EventLoop().RegisterHandler(synchronizer.ViewChangeEvent{}, func(event interface{}) {
+	vt.mods.EventLoop().RegisterHandler(synchronizer.ViewChangeEvent{}, func(event any) {
 		vt.viewChange(event.(synchronizer.ViewChangeEvent))
 	})
 
-	vt.mods.EventLoop().RegisterObserver(types.TickEvent{}, func(event interface{}) {
+	vt.mods.EventLoop().RegisterObserver(types.TickEvent{}, func(event any) {
 		vt.tick(event.(types.TickEvent))
 	})
 }

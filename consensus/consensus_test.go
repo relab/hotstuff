@@ -25,7 +25,7 @@ func TestVote(t *testing.T) {
 
 	ok := false
 	ctx, cancel := context.WithCancel(context.Background())
-	hs.EventLoop().RegisterObserver(hotstuff.NewViewMsg{}, func(event interface{}) {
+	hs.EventLoop().RegisterObserver(hotstuff.NewViewMsg{}, func(event any) {
 		ok = true
 		cancel()
 	})

@@ -205,7 +205,7 @@ func runController() {
 	checkf("failed to close ssh connections: %v", err)
 }
 
-func checkf(format string, args ...interface{}) {
+func checkf(format string, args ...any) {
 	for _, arg := range args {
 		if err, _ := arg.(error); err != nil {
 			log.Fatalf(format, args...)

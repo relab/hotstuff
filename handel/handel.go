@@ -92,7 +92,7 @@ func (h *Handel) Init() error {
 
 	h.maxLevel = int(math.Ceil(math.Log2(float64(h.mods.Configuration().Len()))))
 
-	h.mods.EventLoop().RegisterHandler(contribution{}, func(event interface{}) {
+	h.mods.EventLoop().RegisterHandler(contribution{}, func(event any) {
 		c := event.(contribution)
 		if s, ok := h.sessions[c.hash]; ok {
 			s.handleContribution(c)
@@ -102,19 +102,19 @@ func (h *Handel) Init() error {
 		}
 	})
 
-	h.mods.EventLoop().RegisterHandler(disseminateEvent{}, func(e interface{}) {
+	h.mods.EventLoop().RegisterHandler(disseminateEvent{}, func(e any) {
 		if s, ok := h.sessions[e.(disseminateEvent).sessionID]; ok {
 			s.sendContributions(s.h.mods.Synchronizer().ViewContext())
 		}
 	})
 
-	h.mods.EventLoop().RegisterHandler(levelActivateEvent{}, func(e interface{}) {
+	h.mods.EventLoop().RegisterHandler(levelActivateEvent{}, func(e any) {
 		if s, ok := h.sessions[e.(levelActivateEvent).sessionID]; ok {
 			s.advanceLevel()
 		}
 	})
 
-	h.mods.EventLoop().RegisterHandler(sessionDoneEvent{}, func(event interface{}) {
+	h.mods.EventLoop().RegisterHandler(sessionDoneEvent{}, func(event any) {
 		e := event.(sessionDoneEvent)
 		delete(h.sessions, e.hash)
 	})

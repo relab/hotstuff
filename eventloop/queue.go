@@ -6,7 +6,7 @@ import "sync"
 // If an entry is pushed to the queue when it is full, the oldest entry will be dropped.
 type queue struct {
 	mut       sync.Mutex
-	entries   []interface{}
+	entries   []any
 	head      int
 	tail      int
 	readyChan chan struct{}
@@ -14,14 +14,14 @@ type queue struct {
 
 func newQueue(capacity uint) queue {
 	return queue{
-		entries:   make([]interface{}, capacity),
+		entries:   make([]any, capacity),
 		head:      -1,
 		tail:      -1,
 		readyChan: make(chan struct{}),
 	}
 }
 
-func (q *queue) push(entry interface{}) {
+func (q *queue) push(entry any) {
 	q.mut.Lock()
 	defer q.mut.Unlock()
 
@@ -53,7 +53,7 @@ func (q *queue) push(entry interface{}) {
 	}
 }
 
-func (q *queue) pop() (entry interface{}, ok bool) {
+func (q *queue) pop() (entry any, ok bool) {
 	q.mut.Lock()
 	defer q.mut.Unlock()
 

@@ -57,20 +57,20 @@ func SetPackageLogLevel(packageName, levelStr string) {
 
 // Logger is the logging interface used by consensus. It is based on zap.SugaredLogger
 type Logger interface {
-	DPanic(args ...interface{})
-	DPanicf(template string, args ...interface{})
-	Debug(args ...interface{})
-	Debugf(template string, args ...interface{})
-	Error(args ...interface{})
-	Errorf(template string, args ...interface{})
-	Fatal(args ...interface{})
-	Fatalf(template string, args ...interface{})
-	Info(args ...interface{})
-	Infof(template string, args ...interface{})
-	Panic(args ...interface{})
-	Panicf(template string, args ...interface{})
-	Warn(args ...interface{})
-	Warnf(template string, args ...interface{})
+	DPanic(args ...any)
+	DPanicf(template string, args ...any)
+	Debug(args ...any)
+	Debugf(template string, args ...any)
+	Error(args ...any)
+	Errorf(template string, args ...any)
+	Fatal(args ...any)
+	Fatalf(template string, args ...any)
+	Info(args ...any)
+	Infof(template string, args ...any)
+	Panic(args ...any)
+	Panicf(template string, args ...any)
+	Warn(args ...any)
+	Warnf(template string, args ...any)
 }
 
 type wrapper struct {
@@ -107,98 +107,98 @@ func (wr *wrapper) updateLevel() {
 	wr.level.SetLevel(logLevel)
 }
 
-func (wr *wrapper) DPanic(args ...interface{}) {
+func (wr *wrapper) DPanic(args ...any) {
 	wr.mut.Lock()
 	defer wr.mut.Unlock()
 	wr.updateLevel()
 	wr.inner.DPanic(args...)
 }
 
-func (wr *wrapper) DPanicf(template string, args ...interface{}) {
+func (wr *wrapper) DPanicf(template string, args ...any) {
 	wr.mut.Lock()
 	defer wr.mut.Unlock()
 	wr.updateLevel()
 	wr.inner.DPanicf(template, args...)
 }
 
-func (wr *wrapper) Debug(args ...interface{}) {
+func (wr *wrapper) Debug(args ...any) {
 	wr.mut.Lock()
 	defer wr.mut.Unlock()
 	wr.updateLevel()
 	wr.inner.Debug(args...)
 }
 
-func (wr *wrapper) Debugf(template string, args ...interface{}) {
+func (wr *wrapper) Debugf(template string, args ...any) {
 	wr.mut.Lock()
 	defer wr.mut.Unlock()
 	wr.updateLevel()
 	wr.inner.Debugf(template, args...)
 }
 
-func (wr *wrapper) Error(args ...interface{}) {
+func (wr *wrapper) Error(args ...any) {
 	wr.mut.Lock()
 	defer wr.mut.Unlock()
 	wr.updateLevel()
 	wr.inner.Error(args...)
 }
 
-func (wr *wrapper) Errorf(template string, args ...interface{}) {
+func (wr *wrapper) Errorf(template string, args ...any) {
 	wr.mut.Lock()
 	defer wr.mut.Unlock()
 	wr.updateLevel()
 	wr.inner.Errorf(template, args...)
 }
 
-func (wr *wrapper) Fatal(args ...interface{}) {
+func (wr *wrapper) Fatal(args ...any) {
 	wr.mut.Lock()
 	defer wr.mut.Unlock()
 	wr.updateLevel()
 	wr.inner.Fatal(args...)
 }
 
-func (wr *wrapper) Fatalf(template string, args ...interface{}) {
+func (wr *wrapper) Fatalf(template string, args ...any) {
 	wr.mut.Lock()
 	defer wr.mut.Unlock()
 	wr.updateLevel()
 	wr.inner.Fatalf(template, args...)
 }
 
-func (wr *wrapper) Info(args ...interface{}) {
+func (wr *wrapper) Info(args ...any) {
 	wr.mut.Lock()
 	defer wr.mut.Unlock()
 	wr.updateLevel()
 	wr.inner.Info(args...)
 }
 
-func (wr *wrapper) Infof(template string, args ...interface{}) {
+func (wr *wrapper) Infof(template string, args ...any) {
 	wr.mut.Lock()
 	defer wr.mut.Unlock()
 	wr.updateLevel()
 	wr.inner.Infof(template, args...)
 }
 
-func (wr *wrapper) Panic(args ...interface{}) {
+func (wr *wrapper) Panic(args ...any) {
 	wr.mut.Lock()
 	defer wr.mut.Unlock()
 	wr.updateLevel()
 	wr.inner.Panic(args...)
 }
 
-func (wr *wrapper) Panicf(template string, args ...interface{}) {
+func (wr *wrapper) Panicf(template string, args ...any) {
 	wr.mut.Lock()
 	defer wr.mut.Unlock()
 	wr.updateLevel()
 	wr.inner.Panicf(template, args...)
 }
 
-func (wr *wrapper) Warn(args ...interface{}) {
+func (wr *wrapper) Warn(args ...any) {
 	wr.mut.Lock()
 	defer wr.mut.Unlock()
 	wr.updateLevel()
 	wr.inner.Warn(args...)
 }
 
-func (wr *wrapper) Warnf(template string, args ...interface{}) {
+func (wr *wrapper) Warnf(template string, args ...any) {
 	wr.mut.Lock()
 	defer wr.mut.Unlock()
 	wr.updateLevel()

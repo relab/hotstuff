@@ -2,9 +2,10 @@ package consensus
 
 import (
 	"fmt"
+	"sync"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
-	"sync"
 )
 
 // Rules is the minimum interface that a consensus implementations must implement.
@@ -61,7 +62,7 @@ func (cs *consensusBase) InitConsensusModule(mods *modules.ConsensusCore, opts *
 	if mod, ok := cs.impl.(modules.Module); ok {
 		mod.InitConsensusModule(mods, opts)
 	}
-	cs.mods.EventLoop().RegisterHandler(hotstuff.ProposeMsg{}, func(event interface{}) {
+	cs.mods.EventLoop().RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.OnPropose(event.(hotstuff.ProposeMsg))
 	})
 }
