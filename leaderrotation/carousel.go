@@ -16,7 +16,7 @@ type carousel struct {
 	mods *modules.ConsensusCore
 }
 
-func (c *carousel) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
+func (c *carousel) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	c.mods = mods
 }
 

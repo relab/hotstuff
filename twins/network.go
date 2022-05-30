@@ -215,7 +215,7 @@ type configuration struct {
 }
 
 // alternative way to get a pointer to the node.
-func (c *configuration) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
+func (c *configuration) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	if c.node == nil {
 		mods.GetModuleByType(&c.node)
 		c.node.mods = mods
@@ -438,9 +438,9 @@ func (tm *timeoutManager) viewChange(event synchronizer.ViewChangeEvent) {
 	}
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (tm *timeoutManager) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
+func (tm *timeoutManager) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	tm.mods = mods
 	tm.mods.EventLoop().RegisterObserver(tick{}, func(event any) {
 		tm.advance()

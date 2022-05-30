@@ -24,9 +24,9 @@ type Server struct {
 	gorumsSrv *gorums.Server
 }
 
-// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (srv *Server) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
+func (srv *Server) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	srv.mods = mods
 }
 

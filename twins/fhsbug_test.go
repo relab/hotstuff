@@ -139,11 +139,11 @@ type vulnerableFHS struct {
 	inner fasthotstuff.FastHotStuff
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (fhs *vulnerableFHS) InitConsensusModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
+func (fhs *vulnerableFHS) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
 	fhs.mods = mods
-	fhs.inner.InitConsensusModule(mods, opts)
+	fhs.inner.InitModule(mods, opts)
 }
 
 // VoteRule decides whether to vote for the block.

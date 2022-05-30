@@ -17,12 +17,12 @@ func New(impl modules.CryptoBase) modules.Crypto {
 	return &crypto{CryptoBase: impl}
 }
 
-// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (c *crypto) InitConsensusModule(mods *modules.ConsensusCore, cfg *modules.OptionsBuilder) {
+func (c *crypto) InitModule(mods *modules.ConsensusCore, cfg *modules.OptionsBuilder) {
 	c.mods = mods
-	if mod, ok := c.CryptoBase.(modules.Module); ok {
-		mod.InitConsensusModule(mods, cfg)
+	if mod, ok := c.CryptoBase.(modules.ConsensusModule); ok {
+		mod.InitModule(mods, cfg)
 	}
 }
 

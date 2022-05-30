@@ -101,7 +101,7 @@ type ConsensusBuilder struct {
 	baseBuilder CoreBuilder
 	mods        *ConsensusCore
 	cfg         OptionsBuilder
-	modules     []Module
+	modules     []ConsensusModule
 }
 
 // NewConsensusBuilder creates a new ConsensusBuilder.
@@ -112,7 +112,7 @@ func NewConsensusBuilder(id hotstuff.ID, privateKey hotstuff.PrivateKey) Consens
 			privateKey: privateKey,
 		},
 	}
-	// using a pointer here will allow settings to be readable within InitConsensusModule
+	// using a pointer here will allow settings to be readable within InitModule
 	bl.cfg.opts = &bl.mods.opts
 	bl.cfg.opts.connectionMetadata = make(map[string]string)
 	return bl
@@ -165,7 +165,7 @@ func (b *ConsensusBuilder) Register(mods ...any) { //nolint:gocyclo
 		if m, ok := module.(Handel); ok {
 			b.mods.handel = m
 		}
-		if m, ok := module.(Module); ok {
+		if m, ok := module.(ConsensusModule); ok {
 			b.modules = append(b.modules, m)
 		}
 	}
@@ -181,18 +181,18 @@ func (b *ConsensusBuilder) OptionsBuilder() *OptionsBuilder {
 func (b *ConsensusBuilder) Build() *ConsensusCore {
 	b.mods.Core = b.baseBuilder.Build()
 	for _, module := range b.modules {
-		module.InitConsensusModule(b.mods, &b.cfg)
+		module.InitModule(b.mods, &b.cfg)
 	}
 	return b.mods
 }
 
 // Module interfaces
 
-// Module is an interface that can be implemented by types that need access to other consensus modules.
-type Module interface {
-	// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// ConsensusModule is an interface that can be implemented by types that need access to other consensus modules.
+type ConsensusModule interface {
+	// InitModule gives the module a reference to the ConsensusCore object.
 	// It also allows the module to set module options using the OptionsBuilder.
-	InitConsensusModule(mods *ConsensusCore, _ *OptionsBuilder)
+	InitModule(mods *ConsensusCore, _ *OptionsBuilder)
 }
 
 //go:generate mockgen -destination=../internal/mocks/cmdqueue_mock.go -package=mocks . CommandQueue

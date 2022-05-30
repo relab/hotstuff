@@ -83,9 +83,9 @@ type subConfig struct {
 	replicas map[hotstuff.ID]modules.Replica
 }
 
-// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (cfg *Config) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
+func (cfg *Config) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	cfg.mods = mods
 
 	// We delay processing `replicaConnected` events until after the configurations `connected` event has occurred.
@@ -110,7 +110,7 @@ func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOpt
 	}
 	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
 
-	// initialization will be finished by InitConsensusModule
+	// initialization will be finished by InitModule
 	cfg := &Config{
 		subConfig: subConfig{
 			replicas: make(map[hotstuff.ID]modules.Replica),

@@ -63,9 +63,9 @@ it now returns the same event loop as the `EventLoop()` method.
 
 ### Create a module for your metric
 
-To be able to interact with the event loop and other modules, you must implement either the `modules.Module`
-or `consensus.Module` interfaces. The former should be preferred unless you need to access any of the consensus
-modules directly. In the `InitModule` or `InitConsensusModule` functions you should add an observer or handler for
+To be able to interact with the event loop and other modules, you must implement either the `modules.CoreModule`
+or `modules.ConsensusModule` interfaces. The former should be preferred unless you need to access any of the consensus
+modules directly. In the `InitModule` functions you should add an observer or handler for
 the events that you want to receive.
 
 You should also add an observer for the `types.TickEvent` type on the `EventLoop`.

@@ -145,9 +145,9 @@ func (ec *ecdsaBase) getPrivateKey() *ecdsa.PrivateKey {
 	return pk.(*ecdsa.PrivateKey)
 }
 
-// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (ec *ecdsaBase) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
+func (ec *ecdsaBase) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	ec.mods = mods
 }
 

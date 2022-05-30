@@ -13,9 +13,9 @@ type roundRobin struct {
 	mods *modules.ConsensusCore
 }
 
-// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (rr *roundRobin) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
+func (rr *roundRobin) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	rr.mods = mods
 }
 

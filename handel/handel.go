@@ -56,9 +56,9 @@ func New() modules.Handel {
 	}
 }
 
-// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (h *Handel) InitConsensusModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
+func (h *Handel) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
 	h.mods = mods
 	opts.SetShouldUseHandel()
 

@@ -34,11 +34,11 @@ type Synchronizer struct {
 	timeouts map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
 }
 
-// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (s *Synchronizer) InitConsensusModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
-	if duration, ok := s.duration.(modules.Module); ok {
-		duration.InitConsensusModule(mods, opts)
+func (s *Synchronizer) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
+	if duration, ok := s.duration.(modules.ConsensusModule); ok {
+		duration.InitModule(mods, opts)
 	}
 	s.mods = mods
 

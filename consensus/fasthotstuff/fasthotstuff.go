@@ -21,9 +21,9 @@ func New() consensus.Rules {
 	return &FastHotStuff{}
 }
 
-// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (fhs *FastHotStuff) InitConsensusModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
+func (fhs *FastHotStuff) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
 	fhs.mods = mods
 	opts.SetShouldUseAggQC()
 }
