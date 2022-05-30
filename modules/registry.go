@@ -16,7 +16,8 @@ var (
 // For example:
 //  RegisterModule("chainedhotstuff", func() consensus.Rules { return chainedhotstuff.New() })
 func RegisterModule[T any](name string, constructor func() T) {
-	moduleType := reflect.TypeOf(constructor).Out(0)
+	var t T
+	moduleType := reflect.TypeOf(t)
 
 	registryMut.Lock()
 	defer registryMut.Unlock()
@@ -38,26 +39,24 @@ func RegisterModule[T any](name string, constructor func() T) {
 // GetModule constructs a new instance of the module with the specified name.
 // GetModule returns true if the module is found, false otherwise.
 // For example:
-//  var rules consensus.Rules
-//  GetModule("chainedhotstuff", &rules)
-func GetModule[T any](name string, out *T) bool {
-	targetType := reflect.TypeOf(out).Elem()
+//  rules, ok := GetModule[consensus.Rules]("chainedhotstuff")
+func GetModule[T any](name string) (out T, ok bool) {
+	targetType := reflect.TypeOf(out)
 
 	registryMut.Lock()
 	defer registryMut.Unlock()
 
 	modules, ok := byInterface[targetType]
 	if !ok {
-		return false
+		return out, false
 	}
 
 	ctor, ok := modules[name]
 	if !ok {
-		return false
+		return out, false
 	}
 
-	reflect.ValueOf(out).Elem().Set(reflect.ValueOf(ctor).Call([]reflect.Value{})[0])
-	return true
+	return ctor.(func() T)(), true
 }
 
 // GetModuleUntyped returns a new instance of the named module, if it exists.
