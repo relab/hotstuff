@@ -154,9 +154,9 @@ func New() modules.CryptoBase {
 	}
 }
 
-// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (bls *bls12Base) InitConsensusModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
+func (bls *bls12Base) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
 	bls.mods = mods
 
 	pop := bls.popProve()

@@ -80,9 +80,9 @@ type Config struct {
 	timeoutCancel context.CancelFunc
 }
 
-// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (cfg *Config) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
+func (cfg *Config) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	cfg.mods = mods
 
 	// This receives `replicaConnected` events from the server.
@@ -109,7 +109,7 @@ func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOpt
 	}
 	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
 
-	// initialization will be finished by InitConsensusModule
+	// initialization will be finished by InitModule
 	cfg := &Config{
 		replicas:      make(map[hotstuff.ID]modules.Replica),
 		opts:          opts,

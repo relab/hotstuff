@@ -57,10 +57,10 @@ func (cs *consensusBase) CommittedBlock() *hotstuff.Block {
 	return cs.bExec
 }
 
-func (cs *consensusBase) InitConsensusModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
+func (cs *consensusBase) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
 	cs.mods = mods
-	if mod, ok := cs.impl.(modules.Module); ok {
-		mod.InitConsensusModule(mods, opts)
+	if mod, ok := cs.impl.(modules.ConsensusModule); ok {
+		mod.InitModule(mods, opts)
 	}
 	cs.mods.EventLoop().RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.OnPropose(event.(hotstuff.ProposeMsg))

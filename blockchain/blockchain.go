@@ -19,9 +19,9 @@ type blockChain struct {
 	pendingFetch  map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be cancelled
 }
 
-// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (chain *blockChain) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
+func (chain *blockChain) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	chain.mods = mods
 }
 

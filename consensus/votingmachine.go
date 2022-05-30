@@ -21,9 +21,9 @@ func NewVotingMachine() *VotingMachine {
 	}
 }
 
-// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (vm *VotingMachine) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
+func (vm *VotingMachine) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	vm.mods = mods
 	vm.mods.EventLoop().RegisterHandler(hotstuff.VoteMsg{}, func(event any) { vm.OnVote(event.(hotstuff.VoteMsg)) })
 }

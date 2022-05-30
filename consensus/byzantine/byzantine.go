@@ -22,11 +22,11 @@ type silence struct {
 	consensus.Rules
 }
 
-// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (s *silence) InitConsensusModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
-	if mod, ok := s.Rules.(modules.Module); ok {
-		mod.InitConsensusModule(mods, opts)
+func (s *silence) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
+	if mod, ok := s.Rules.(modules.ConsensusModule); ok {
+		mod.InitModule(mods, opts)
 	}
 }
 
@@ -49,12 +49,12 @@ type fork struct {
 	consensus.Rules
 }
 
-// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (f *fork) InitConsensusModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
+func (f *fork) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
 	f.mods = mods
-	if mod, ok := f.Rules.(modules.Module); ok {
-		mod.InitConsensusModule(mods, opts)
+	if mod, ok := f.Rules.(modules.ConsensusModule); ok {
+		mod.InitModule(mods, opts)
 	}
 }
 

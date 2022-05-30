@@ -46,9 +46,9 @@ type viewDuration struct {
 	max       float64   // upper bound on view timeout
 }
 
-// InitConsensusModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (v *viewDuration) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
+func (v *viewDuration) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	v.mods = mods
 }
 

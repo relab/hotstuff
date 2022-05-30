@@ -212,7 +212,7 @@ type configuration struct {
 }
 
 // alternative way to get a pointer to the node.
-func (c *configuration) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
+func (c *configuration) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	if c.node == nil {
 		mods.GetModuleByType(&c.node)
 		c.node.modules = mods
