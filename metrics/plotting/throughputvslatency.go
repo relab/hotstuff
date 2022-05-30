@@ -26,7 +26,7 @@ func NewThroughputVSLatencyPlot() ThroughputVSLatencyPlot {
 }
 
 // Add adds a measurement to the plotter.
-func (p *ThroughputVSLatencyPlot) Add(measurement interface{}) {
+func (p *ThroughputVSLatencyPlot) Add(measurement any) {
 	p.startTimes.Add(measurement)
 
 	m, ok := measurement.(Measurement)

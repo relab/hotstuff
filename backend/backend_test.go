@@ -5,11 +5,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/relab/hotstuff/modules"
 	"net"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/relab/hotstuff/modules"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/gorums"
@@ -47,7 +48,7 @@ func TestConnect(t *testing.T) {
 }
 
 // testBase is a generic test for a unicast/multicast call
-func testBase(t *testing.T, typ interface{}, send func(modules.Configuration), handle eventloop.EventHandler) {
+func testBase(t *testing.T, typ any, send func(modules.Configuration), handle eventloop.EventHandler) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		ctrl := gomock.NewController(t)
@@ -91,7 +92,7 @@ func TestPropose(t *testing.T) {
 		wg.Add(3)
 		cfg.Propose(want)
 		wg.Wait()
-	}, func(event interface{}) {
+	}, func(event any) {
 		got := event.(hotstuff.ProposeMsg)
 		if got.ID != want.ID {
 			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
@@ -115,7 +116,7 @@ func TestTimeout(t *testing.T) {
 		wg.Add(3)
 		cfg.Timeout(want)
 		wg.Wait()
-	}, func(event interface{}) {
+	}, func(event any) {
 		got := event.(hotstuff.TimeoutMsg)
 		if got.ID != want.ID {
 			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)

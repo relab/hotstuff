@@ -13,8 +13,8 @@ type testEvent int
 
 func TestHandler(t *testing.T) {
 	el := eventloop.New(10)
-	c := make(chan interface{})
-	el.RegisterHandler(testEvent(0), func(event interface{}) {
+	c := make(chan any)
+	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- event
 	})
 
@@ -25,7 +25,7 @@ func TestHandler(t *testing.T) {
 	want := testEvent(42)
 	el.AddEvent(want)
 
-	var event interface{}
+	var event any
 	select {
 	case <-ctx.Done():
 		t.Fatal("timed out")
@@ -44,16 +44,16 @@ func TestHandler(t *testing.T) {
 
 func TestObserver(t *testing.T) {
 	type eventData struct {
-		event   interface{}
+		event   any
 		handler bool
 	}
 
 	el := eventloop.New(10)
 	c := make(chan eventData)
-	el.RegisterHandler(testEvent(0), func(event interface{}) {
+	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- eventData{event: event, handler: true}
 	})
-	el.RegisterObserver(testEvent(0), func(event interface{}) {
+	el.RegisterObserver(testEvent(0), func(event any) {
 		c <- eventData{event: event, handler: false}
 	})
 
@@ -99,7 +99,7 @@ func TestTicker(t *testing.T) {
 
 	el := eventloop.New(10)
 	count := 0
-	el.RegisterHandler(testEvent(0), func(event interface{}) {
+	el.RegisterHandler(testEvent(0), func(event any) {
 		count += int(event.(testEvent))
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -107,7 +107,7 @@ func TestTicker(t *testing.T) {
 	go el.Run(ctx)
 
 	rate := 100 * time.Millisecond
-	id := el.AddTicker(rate, func(tick time.Time) (event interface{}) { return testEvent(1) })
+	id := el.AddTicker(rate, func(tick time.Time) (event any) { return testEvent(1) })
 
 	// sleep a little less than 1 second to ensure we get the expected amount of ticks
 	time.Sleep(time.Second - rate/4)
@@ -131,7 +131,7 @@ func TestDelayedEvent(t *testing.T) {
 	el := eventloop.New(10)
 	c := make(chan testEvent)
 
-	el.RegisterHandler(testEvent(0), func(event interface{}) {
+	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- event.(testEvent)
 	})
 

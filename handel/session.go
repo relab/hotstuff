@@ -133,11 +133,11 @@ func (h *Handel) newSession(hash hotstuff.Hash, in hotstuff.QuorumSignature) *se
 
 	s.updateOutgoing(1)
 
-	s.disseminateTimerID = h.mods.EventLoop().AddTicker(disseminationPeriod, func(_ time.Time) (event interface{}) {
+	s.disseminateTimerID = h.mods.EventLoop().AddTicker(disseminationPeriod, func(_ time.Time) (event any) {
 		return disseminateEvent{s.hash}
 	})
 
-	s.levelActivateTimerID = h.mods.EventLoop().AddTicker(levelActivateInterval, func(_ time.Time) (event interface{}) {
+	s.levelActivateTimerID = h.mods.EventLoop().AddTicker(levelActivateInterval, func(_ time.Time) (event any) {
 		return levelActivateEvent{s.hash}
 	})
 

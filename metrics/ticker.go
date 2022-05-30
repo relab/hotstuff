@@ -26,8 +26,8 @@ func (t *Ticker) InitModule(mods *modules.Core) {
 	t.tickerID = t.mods.EventLoop().AddTicker(t.interval, t.tick)
 }
 
-func (t *Ticker) tick(tickTime time.Time) interface{} {
-	var event interface{}
+func (t *Ticker) tick(tickTime time.Time) any {
+	var event any
 	if !t.lastTick.IsZero() {
 		event = types.TickEvent{
 			LastTick: t.lastTick,

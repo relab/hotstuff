@@ -123,7 +123,7 @@ func NewConsensusBuilder(id hotstuff.ID, privateKey hotstuff.PrivateKey) Consens
 // If only the Module interface is implemented, the InitModule function will be called, but
 // the HotStuff object will not save a reference to the module.
 // Register will overwrite existing modules if the same type is registered twice.
-func (b *ConsensusBuilder) Register(mods ...interface{}) { //nolint:gocyclo
+func (b *ConsensusBuilder) Register(mods ...any) { //nolint:gocyclo
 	for _, module := range mods {
 		b.baseBuilder.Register(module)
 		if m, ok := module.(Acceptor); ok {

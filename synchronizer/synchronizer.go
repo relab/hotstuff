@@ -42,19 +42,19 @@ func (s *Synchronizer) InitConsensusModule(mods *modules.ConsensusCore, opts *mo
 	}
 	s.mods = mods
 
-	s.mods.EventLoop().RegisterHandler(TimeoutEvent{}, func(event interface{}) {
+	s.mods.EventLoop().RegisterHandler(TimeoutEvent{}, func(event any) {
 		timeoutView := event.(TimeoutEvent).View
 		if s.currentView == timeoutView {
 			s.OnLocalTimeout()
 		}
 	})
 
-	s.mods.EventLoop().RegisterHandler(hotstuff.NewViewMsg{}, func(event interface{}) {
+	s.mods.EventLoop().RegisterHandler(hotstuff.NewViewMsg{}, func(event any) {
 		newViewMsg := event.(hotstuff.NewViewMsg)
 		s.OnNewView(newViewMsg)
 	})
 
-	s.mods.EventLoop().RegisterHandler(hotstuff.TimeoutMsg{}, func(event interface{}) {
+	s.mods.EventLoop().RegisterHandler(hotstuff.TimeoutMsg{}, func(event any) {
 		timeoutMsg := event.(hotstuff.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
 	})

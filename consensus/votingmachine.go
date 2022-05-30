@@ -1,9 +1,10 @@
 package consensus
 
 import (
+	"sync"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
-	"sync"
 )
 
 // VotingMachine collects votes.
@@ -24,7 +25,7 @@ func NewVotingMachine() *VotingMachine {
 // It also allows the module to set module options using the OptionsBuilder.
 func (vm *VotingMachine) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	vm.mods = mods
-	vm.mods.EventLoop().RegisterHandler(hotstuff.VoteMsg{}, func(event interface{}) { vm.OnVote(event.(hotstuff.VoteMsg)) })
+	vm.mods.EventLoop().RegisterHandler(hotstuff.VoteMsg{}, func(event any) { vm.OnVote(event.(hotstuff.VoteMsg)) })
 }
 
 // OnVote handles an incoming vote.

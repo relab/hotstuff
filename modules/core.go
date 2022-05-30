@@ -125,7 +125,7 @@ func NewCoreBuilder(id hotstuff.ID) CoreBuilder {
 		id:            id,
 		logger:        logging.New(""),
 		eventLoop:     eventloop.New(1000),
-		modulesByType: make(map[reflect.Type]interface{}),
+		modulesByType: make(map[reflect.Type]any),
 	}}
 	return bl
 }

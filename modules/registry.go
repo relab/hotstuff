@@ -8,8 +8,8 @@ import (
 
 var (
 	registryMut sync.Mutex
-	byInterface = make(map[reflect.Type]map[string]interface{})
-	byName      = make(map[string]interface{})
+	byInterface = make(map[reflect.Type]map[string]any)
+	byName      = make(map[string]any)
 )
 
 // RegisterModule registers a constructor for a module implementation with the specified name.
@@ -29,7 +29,7 @@ func RegisterModule[T any](name string, constructor func() T) {
 
 	moduleRegistry, ok := byInterface[moduleType]
 	if !ok {
-		moduleRegistry = make(map[string]interface{})
+		moduleRegistry = make(map[string]any)
 		byInterface[moduleType] = moduleRegistry
 	}
 

@@ -62,7 +62,7 @@ func (cs *consensusBase) InitConsensusModule(mods *modules.ConsensusCore, opts *
 	if mod, ok := cs.impl.(modules.Module); ok {
 		mod.InitConsensusModule(mods, opts)
 	}
-	cs.mods.EventLoop().RegisterHandler(hotstuff.ProposeMsg{}, func(event interface{}) {
+	cs.mods.EventLoop().RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.OnPropose(event.(hotstuff.ProposeMsg))
 	})
 }

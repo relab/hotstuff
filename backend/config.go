@@ -89,7 +89,7 @@ func (cfg *Config) InitConsensusModule(mods *modules.ConsensusCore, _ *modules.O
 	cfg.mods = mods
 
 	// We delay processing `replicaConnected` events until after the configurations `connected` event has occurred.
-	cfg.mods.EventLoop().RegisterHandler(replicaConnected{}, func(event interface{}) {
+	cfg.mods.EventLoop().RegisterHandler(replicaConnected{}, func(event any) {
 		if !cfg.connected {
 			cfg.mods.EventLoop().DelayUntil(connected{}, event)
 			return

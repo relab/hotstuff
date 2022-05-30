@@ -26,7 +26,7 @@ func NewClientLatencyPlot() ClientLatencyPlot {
 }
 
 // Add adds a measurement to the plot.
-func (p *ClientLatencyPlot) Add(measurement interface{}) {
+func (p *ClientLatencyPlot) Add(measurement any) {
 	p.startTimes.Add(measurement)
 
 	latency, ok := measurement.(*types.LatencyMeasurement)

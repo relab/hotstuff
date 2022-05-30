@@ -42,7 +42,7 @@ type node struct {
 }
 
 type pendingMessage struct {
-	message  interface{}
+	message  any
 	receiver uint32
 }
 
@@ -75,7 +75,7 @@ func NewSimpleNetwork() *Network {
 
 // NewPartitionedNetwork creates a new Network with the specified partitions.
 // partitions specifies the network partitions for each view.
-func NewPartitionedNetwork(views []View, dropTypes ...interface{}) *Network {
+func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 	n := &Network{
 		nodes:     make(map[uint32]*node),
 		replicas:  make(map[hotstuff.ID][]*node),
@@ -168,7 +168,7 @@ func (n *Network) tick() {
 
 // shouldDrop decides if the sender should drop the message, based on the current view of the sender and the
 // partitions configured for that view.
-func (n *Network) shouldDrop(sender, receiver uint32, message interface{}) bool {
+func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 	node, ok := n.nodes[sender]
 	if !ok {
 		panic(fmt.Errorf("node matching sender id %d was not found", sender))
@@ -222,7 +222,7 @@ func (c *configuration) InitConsensusModule(mods *modules.ConsensusCore, _ *modu
 	}
 }
 
-func (c *configuration) broadcastMessage(message interface{}) {
+func (c *configuration) broadcastMessage(message any) {
 	for id := range c.network.replicas {
 		if id == c.node.id.ReplicaID {
 			// do not send message to self or twin
@@ -233,7 +233,7 @@ func (c *configuration) broadcastMessage(message interface{}) {
 	}
 }
 
-func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
+func (c *configuration) sendMessage(id hotstuff.ID, message any) {
 	nodes, ok := c.network.replicas[id]
 	if !ok {
 		panic(fmt.Errorf("attempt to send message to replica %d, but this replica does not exist", id))
@@ -255,7 +255,7 @@ func (c *configuration) sendMessage(id hotstuff.ID, message interface{}) {
 }
 
 // shouldDrop checks if a message to the node identified by id should be dropped.
-func (c *configuration) shouldDrop(id NodeID, message interface{}) bool {
+func (c *configuration) shouldDrop(id NodeID, message any) bool {
 	// retrieve the drop config for this node.
 	return c.network.shouldDrop(c.node.id.NetworkID, id.NetworkID, message)
 }
