@@ -30,7 +30,11 @@ func (c *CPUMemStat) InitModule(mods *modules.Modules) {
 		c.tick(event.(types.TickEvent))
 	})
 	c.mods.Logger().Info("CPU-Memory stats metric enabled")
-	cpu.Percent(0, false)
+	// Percent with 0 interval returns 0 usage when called first time.
+	_, err := cpu.Percent(0, false)
+	if err != nil {
+		c.mods.Logger().Info("Unable to fetch the CPU usage")
+	}
 }
 
 func (c *CPUMemStat) getCPUsage() (float64, uint32) {
@@ -41,9 +45,8 @@ func (c *CPUMemStat) getCPUsage() (float64, uint32) {
 	usage, err := cpu.Percent(0, false)
 	if err != nil {
 		return 0, uint32(cores)
-	} else {
-		return usage[0], uint32(cores)
 	}
+	return usage[0], uint32(cores)
 }
 
 func (c *CPUMemStat) getMemoryPercentage() (uint64, float64) {
