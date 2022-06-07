@@ -57,16 +57,16 @@ func (c *CPUMemStat) getMemoryPercentage() (uint64, float64) {
 	return v.Available, v.UsedPercent
 }
 
-func (c *CPUMemStat) tick(tick types.TickEvent) {
+func (c *CPUMemStat) tick(_ types.TickEvent) {
 	now := time.Now()
 	cpusage, cores := c.getCPUsage()
 	availablemem, memusage := c.getMemoryPercentage()
 	event := &types.CPUMemoryStats{
 		Event:                 types.NewReplicaEvent(uint32(c.mods.ID()), now),
 		CPUsagePercentage:     cpusage,
-		NumCores:              uint32(cores),
+		Cores:                 uint32(cores),
 		MemoryUsagePercentage: memusage,
-		AvailMemory:           availablemem,
+		AvailableMemory:       availablemem,
 	}
 	c.mods.MetricsLogger().Log(event)
 }
