@@ -9,6 +9,12 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 )
 
+// CPUMem metics measures the percentage of cpu and memory utilization on the node.
+// If multiple replicas are run on the same node, then the data may be duplicated.
+// This is not enabled by default, to enable this metric add "cpumem" string to --metrics option.
+// Since it can interfere with the performance of the protocol, do not enable this metics unless required.
+// Interval for measuring the cpu and memory utilization should be above 100 milliseconds, for valid data collection.
+// This limitation is due to the gopsutil package.
 func init() {
 	RegisterReplicaMetric("cpumem", func() interface{} {
 		return &CPUMemStat{}
@@ -37,8 +43,11 @@ func (c *CPUMemStat) InitModule(mods *modules.Modules) {
 	}
 }
 
+// getCPUsage Method returns the average CPU per core and the number of cores, including logical ones.
 func (c *CPUMemStat) getCPUsage() (float64, uint32) {
-	cores, err := cpu.Counts(false)
+	// Counts return the number of cores as our bbchain cluster has hyper-threading enabled,
+	// logical parameter is set to true.
+	cores, err := cpu.Counts(true)
 	if err != nil {
 		return 0, 0
 	}
@@ -49,6 +58,7 @@ func (c *CPUMemStat) getCPUsage() (float64, uint32) {
 	return usage[0], uint32(cores)
 }
 
+// getMemoryPercentage returns total memory available on the node and the currently utilized percentage.
 func (c *CPUMemStat) getMemoryPercentage() (uint64, float64) {
 	v, err := mem.VirtualMemory()
 	if err != nil {
@@ -57,6 +67,7 @@ func (c *CPUMemStat) getMemoryPercentage() (uint64, float64) {
 	return v.Available, v.UsedPercent
 }
 
+// tick method is invoked periodically based on the configured measuring interval of metrics
 func (c *CPUMemStat) tick(_ types.TickEvent) {
 	now := time.Now()
 	cpusage, cores := c.getCPUsage()
