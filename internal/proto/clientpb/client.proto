@@ -26,4 +26,8 @@ message Command {
 }
 
 // Batch is a list of commands to be executed
-message Batch { repeated Command Commands = 1; }
+message Batch {
+    repeated Command Commands = 1;
+    bool IsCheckPointRequest = 2;
+    uint64 CheckPointViewNumber = 3;
+}

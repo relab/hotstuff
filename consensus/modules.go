@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -199,6 +200,8 @@ type CommandQueue interface {
 	// It may run until the context is cancelled.
 	// If no command is available, the 'ok' return value should be false.
 	Get(ctx context.Context) (cmd Command, ok bool)
+
+	AddCommand(*clientpb.Command)
 }
 
 //go:generate mockgen -destination=../internal/mocks/acceptor_mock.go -package=mocks . Acceptor
@@ -210,6 +213,9 @@ type Acceptor interface {
 	// Proposed tells the acceptor that the propose phase for the given command succeeded, and it should no longer be
 	// accepted in the future.
 	Proposed(Command)
+	// Should we create a new interface for this?
+	// GetHighestCheckPointedView returns the view in which the checkpoint is performed
+	GetHighestCheckPointedView() View
 }
 
 //go:generate mockgen -destination=../internal/mocks/executor_mock.go -package=mocks . Executor
@@ -314,6 +320,9 @@ type BlockChain interface {
 	// Prunes blocks from the in-memory tree up to the specified height.
 	// Returns a set of forked blocks (blocks that were on a different branch, and thus not committed).
 	PruneToHeight(height View) (forkedBlocks []*Block)
+
+	// CreateSnapShot invokes the application to create the snapshot of the application
+	CreateSnapShot()
 }
 
 //go:generate mockgen -destination=../internal/mocks/replica_mock.go -package=mocks . Replica

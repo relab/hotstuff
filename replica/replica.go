@@ -46,11 +46,10 @@ type Config struct {
 
 // Replica is a participant in the consensus protocol.
 type Replica struct {
-	clientSrv *clientSrv
-	cfg       *backend.Config
-	hsSrv     *backend.Server
-	hs        *consensus.Modules
-
+	clientSrv    *clientSrv
+	cfg          *backend.Config
+	hsSrv        *backend.Server
+	hs           *consensus.Modules
 	execHandlers map[cmdID]func(*emptypb.Empty, error)
 	cancel       context.CancelFunc
 	done         chan struct{}
@@ -99,13 +98,13 @@ func New(conf Config, builder consensus.Builder) (replica *Replica) {
 	srv.cfg = backend.NewConfig(creds, managerOpts...)
 
 	builder.Register(
-		srv.cfg,                // configuration
-		srv.hsSrv,              // event handling
-		srv.clientSrv,          // executor
-		srv.clientSrv.cmdCache, // acceptor and command queue
+		srv.cfg,       // configuration
+		srv.hsSrv,     // event handling
+		srv.clientSrv, // executor
+		//srv.clientSrv.cmdCache, // acceptor and command queue
 	)
 	srv.hs = builder.Build()
-
+	srv.clientSrv.SetConsensusModules(srv.hs)
 	return srv
 }
 
