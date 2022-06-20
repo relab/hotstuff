@@ -52,7 +52,7 @@ func (c *checkPointCmdCache) Get(ctx context.Context) (cmd consensus.Command, ok
 func (c *checkPointCmdCache) Accept(cmd consensus.Command) bool {
 	batch, ok := c.cmdCache.unmarshalCommand(cmd)
 	if !ok {
-		c.mods.Logger().Info("Returning accept false")
+		c.mods.Logger().Info("Failed to unmarshal a command to batch")
 		return false
 	}
 	if batch.IsCheckPointRequest && batch.CheckPointViewNumber > c.highestCheckPointViewIndex {

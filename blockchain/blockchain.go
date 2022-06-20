@@ -40,6 +40,8 @@ func New() consensus.BlockChain {
 	return bc
 }
 
+// CreateSnapShot is invoked to indicate the application to create a snapshot for the current
+// committed blocks. This is a sample implementation and a placeholder.
 func (chain *blockChain) CreateSnapShot() {
 	currentCommittedView := chain.mods.Consensus().CommittedBlock().View()
 	for h := chain.previousCheckPointedView; h < currentCommittedView; h++ {
@@ -50,6 +52,7 @@ func (chain *blockChain) CreateSnapShot() {
 		chain.mods.MetricsLogger().Log(hotstuffpb.BlockToProto(chain.blockAtHeight[h]))
 	}
 	chain.mods.Logger().Info("Checkpoint completed until View ", currentCommittedView)
+	chain.previousCheckPointedView = currentCommittedView
 }
 
 // Store stores a block in the blockchain
