@@ -11,8 +11,8 @@ func TestModuleRegistry(t *testing.T) {
 		return module{}
 	})
 
-	var frobulator moduleIface
-	if !modules.GetModule("frobulator", &frobulator) {
+	frobulator, ok := modules.GetModule[moduleIface]("frobulator")
+	if !ok {
 		t.Fatal("module was not found")
 	}
 

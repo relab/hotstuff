@@ -88,8 +88,8 @@ func (n *network) createNodes(nodes []NodeID, scenario Scenario, consensusName s
 			id: nodeID,
 		}
 		builder := consensus.NewBuilder(nodeID.ReplicaID, pk)
-		var consensusModule consensus.Rules
-		if !modules.GetModule(consensusName, &consensusModule) {
+		consensusModule, ok := modules.GetModule[consensus.Rules](consensusName)
+		if !ok {
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
 		builder.Register(
