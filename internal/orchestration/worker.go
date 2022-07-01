@@ -168,10 +168,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
 	}
 
-	if byz, ok := modules.GetModule[byzantine.Byzantine](opts.GetByzantineStrategy()); ok {
-		consensusRules = byz.Wrap(consensusRules)
-	} else if opts.GetByzantineStrategy() != "" {
-		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
+	if opts.GetByzantineStrategy() != "" {
+		if byz, ok := modules.GetModule[byzantine.Byzantine](opts.GetByzantineStrategy()); ok {
+			consensusRules = byz.Wrap(consensusRules)
+		} else {
+			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
+		}
 	}
 
 	cryptoImpl, ok := modules.GetModule[consensus.CryptoImpl](opts.GetCrypto())
