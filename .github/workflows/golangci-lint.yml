@@ -19,8 +19,8 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
+          args: --timeout 5m
           # skip-pkg-cache: true
           # skip-build-cache: true
-          # args: --disable errcheck --timeout 5m
           # Optional: show only new issues if it's a pull request. The default value is `false`.
           # only-new-issues: true
