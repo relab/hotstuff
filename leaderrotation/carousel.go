@@ -2,11 +2,11 @@ package leaderrotation
 
 import (
 	"math/rand"
-	"sort"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
+	"golang.org/x/exp/slices"
 )
 
 func init() {
@@ -53,12 +53,9 @@ func (c carousel) GetLeader(round consensus.View) hotstuff.ID {
 	candidates := make([]hotstuff.ID, 0, c.mods.Configuration().Len()-f)
 
 	commitHead.QuorumCert().Signature().Participants().ForEach(func(id hotstuff.ID) {
-		if !lastAuthors.Contains(id) {
-			i := sort.Search(len(candidates), func(i int) bool { return candidates[i] >= id })
-			candidates = append(candidates[:i+1], candidates[i:]...)
-			candidates[i] = id
-		}
+		candidates = append(candidates, id)
 	})
+	slices.Sort(candidates)
 
 	seed := c.mods.Options().SharedRandomSeed() + int64(round)
 	rnd := rand.New(rand.NewSource(seed))
