@@ -91,9 +91,8 @@ func (priv *PrivateKey) Public() consensus.PublicKey {
 	return &PublicKey{p: bls12.NewG1().MulScalarBig(p, &bls12.G1One, priv.p)}
 }
 
-// AggregateSignature is a bls12-381 aggregate signature. The participants bitmap contains the IDs of the replicas that
-// participated signature creation. This allows us to build an aggregated public key to verify the
-// signature.
+// AggregateSignature is a bls12-381 aggregate signature. The participants field contains the IDs of the replicas that
+// participated in signature creation. This allows us to build an aggregated public key to verify the signature.
 type AggregateSignature struct {
 	sig          bls12.PointG2
 	participants crypto.Bitfield // The ids of the replicas who submitted signatures.
@@ -144,7 +143,7 @@ type bls12Base struct {
 	mods *consensus.Modules
 
 	mut sync.RWMutex
-	// popCache caches the results of popVerify for each public key.
+	// popCache caches the proof-of-possession results of popVerify for each public key.
 	popCache map[string]bool
 }
 
@@ -222,7 +221,7 @@ func (bls *bls12Base) popProve() *bls12.PointG2 {
 	pubKey := bls.privateKey().Public().(*PublicKey)
 	proof, err := bls.coreSign(pubKey.ToBytes(), domainPOP)
 	if err != nil {
-		bls.mods.Logger().Panicf("Failed to generate proof of possession: %v", err)
+		bls.mods.Logger().Panicf("Failed to generate proof-of-possession: %v", err)
 	}
 	return proof
 }
@@ -234,13 +233,13 @@ func (bls *bls12Base) popVerify(pubKey *PublicKey, proof *bls12.PointG2) bool {
 func (bls *bls12Base) checkPop(replica consensus.Replica) (valid bool) {
 	defer func() {
 		if !valid {
-			bls.mods.Logger().Debugf("Invalid proof-of-possession for replica %d", replica.ID())
+			bls.mods.Logger().Warnf("Invalid proof-of-possession for replica %d", replica.ID())
 		}
 	}()
 
 	popBytes, ok := replica.Metadata()[popMetadataKey]
 	if !ok {
-		bls.mods.Logger().Debugf("Missing proof-of-possession for replica: %d", replica.ID())
+		bls.mods.Logger().Warnf("Missing proof-of-possession for replica: %d", replica.ID())
 		return false
 	}
 
@@ -351,7 +350,7 @@ func (bls *bls12Base) Combine(signatures ...consensus.QuorumSignature) (combined
 			}
 			g2.Add(&agg, &agg, &sig2.sig)
 		} else {
-			bls.mods.Logger().Panicf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
+			bls.mods.Logger().Panicf("cannot combine incompatible signature type %T (expected %T)", sig1, sig2)
 		}
 	}
 	return &AggregateSignature{sig: agg, participants: participants}, nil
@@ -364,9 +363,9 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, message []byte
 		bls.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 
-	l := s.Participants().Len()
+	n := s.Participants().Len()
 
-	if l == 1 {
+	if n == 1 {
 		id := firstParticipant(s.Participants())
 		pk, ok := bls.publicKey(id)
 		if !ok {
@@ -376,17 +375,18 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, message []byte
 		return bls.coreVerify(pk, message, &s.sig, domain)
 	}
 
-	// else:
-	pks := make([]*PublicKey, 0, l)
-	s.Participants().ForEach(func(id hotstuff.ID) {
+	// else if l > 1:
+	pks := make([]*PublicKey, 0, n)
+	s.Participants().RangeWhile(func(id hotstuff.ID) bool {
 		pk, ok := bls.publicKey(id)
 		if ok {
 			pks = append(pks, pk)
-		} else {
-			bls.mods.Logger().Warnf("Missing public key for ID %d", id)
+			return true
 		}
+		bls.mods.Logger().Warnf("Missing public key for ID %d", id)
+		return false
 	})
-	if len(pks) != l {
+	if len(pks) != n {
 		return false
 	}
 	return bls.fastAggregateVerify(pks, message, &s.sig)
@@ -396,7 +396,7 @@ func (bls *bls12Base) Verify(signature consensus.QuorumSignature, message []byte
 func (bls *bls12Base) BatchVerify(signature consensus.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
 	s, ok := signature.(*AggregateSignature)
 	if !ok {
-		bls.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		bls.mods.Logger().Panicf("cannot verify incompatible signature type %T (expected %T)", signature, s)
 	}
 
 	if s.Participants().Len() != len(batch) {

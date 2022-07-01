@@ -69,7 +69,7 @@ func (r *Replica) Metadata() map[string]string {
 // and some information about the local replica. It also provides methods to send messages to the other replicas.
 type Config struct {
 	mods      *consensus.Modules
-	opts      []gorums.ManagerOption // using a pointer so that options can be GCed after initialization
+	opts      []gorums.ManagerOption
 	connected bool
 
 	mgr           *hotstuffpb.Manager
@@ -84,9 +84,7 @@ type Config struct {
 func (cfg *Config) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
 	cfg.mods = mods
 
-	// This receives `replicaConnected` events from the server.
-	// We can only process these events after the configuration has been connected,
-	// so therefore the `replicaConnected` events are delayed until the `connected` event has occurred.
+	// We delay processing `replicaConnected` events until after the configurations `connected` event has occurred.
 	cfg.mods.EventLoop().RegisterHandler(replicaConnected{}, func(event interface{}) {
 		if !cfg.connected {
 			cfg.mods.EventLoop().DelayUntil(connected{}, event)
@@ -172,7 +170,7 @@ type ReplicaInfo struct {
 // Connect opens connections to the replicas in the configuration.
 func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 	opts := cfg.opts
-	cfg.opts = nil // we don't need to keep the options around beyond this point, so we'll allow them to be GCed.
+	cfg.opts = nil // options are not needed beyond this point, so we delete them.
 
 	md := mapToMetadata(cfg.mods.Options().ConnectionMetadata())
 

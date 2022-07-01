@@ -195,12 +195,12 @@ func (ec *ecdsaBase) Verify(signature consensus.QuorumSignature, message []byte)
 		ec.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 
-	l := signature.Participants().Len()
-	if l == 0 {
+	n := signature.Participants().Len()
+	if n == 0 {
 		return false
 	}
 
-	results := make(chan bool, l)
+	results := make(chan bool, n)
 	hash := sha256.Sum256(message)
 
 	for _, sig := range s {
@@ -226,21 +226,21 @@ func (ec *ecdsaBase) BatchVerify(signature consensus.QuorumSignature, batch map[
 		ec.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 
-	l := signature.Participants().Len()
-	if l == 0 {
+	n := signature.Participants().Len()
+	if n == 0 {
 		return false
 	}
 
-	results := make(chan bool, l)
+	results := make(chan bool, n)
 
-	set := make(map[string]struct{})
+	set := make(map[consensus.Hash]struct{})
 	for id, sig := range s {
 		message, ok := batch[id]
 		if !ok {
 			return false
 		}
-		set[string(message)] = struct{}{}
 		hash := sha256.Sum256(message)
+		set[hash] = struct{}{}
 		go func(sig *Signature, hash consensus.Hash) {
 			results <- ec.verifySingle(sig, hash)
 		}(sig, hash)

@@ -142,11 +142,8 @@ func (c crypto) VerifyAggregateQC(aggQC consensus.AggregateQC) (highQC consensus
 	if aggQC.Sig().Participants().Len() < c.mods.Configuration().QuorumSize() {
 		return consensus.QuorumCert{}, false
 	}
-	ok = c.BatchVerify(aggQC.Sig(), messages)
-	if !ok {
-		return consensus.QuorumCert{}, false
-	}
-	if c.VerifyQuorumCert(highQC) {
+	// both the batched aggQC signatures and the highQC must be verified
+	if c.BatchVerify(aggQC.Sig(), messages) && c.VerifyQuorumCert(highQC) {
 		return highQC, true
 	}
 	return consensus.QuorumCert{}, false

@@ -3,12 +3,13 @@ package crypto
 import (
 	"container/list"
 	"crypto/sha256"
-	"sort"
 	"strings"
 	"sync"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 )
 
 type cache struct {
@@ -19,7 +20,7 @@ type cache struct {
 	accessOrder list.List
 }
 
-// NewCache returns a new Crypto implementation that caches the results of the operations of the given CryptoBase
+// NewCache returns a new Crypto instance that caches the results of the operations of the given CryptoBase.
 // implementation.
 func NewCache(impl consensus.CryptoBase, capacity int) consensus.Crypto {
 	return New(&cache{
@@ -104,23 +105,14 @@ func (cache *cache) Verify(signature consensus.QuorumSignature, message []byte) 
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
 func (cache *cache) BatchVerify(signature consensus.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
-	// get a sorted list of the ids in the Messages map
-	ids := make([]hotstuff.ID, 0, len(batch))
-	for id := range batch {
-		i := sort.Search(len(ids), func(i int) bool {
-			return ids[i] < id
-		})
-		ids = append(ids, 0)
-		copy(ids[i+1:], ids[i:])
-		ids[i] = id
-	}
-
+	// sort the list of ids from the batch map
+	ids := maps.Keys(batch)
+	slices.Sort(ids)
 	var hash consensus.Hash
 	hasher := sha256.New()
 	// then hash the messages in sorted order
 	for _, id := range ids {
-		m := batch[id]
-		_, _ = hasher.Write(m)
+		_, _ = hasher.Write(batch[id])
 	}
 	hasher.Sum(hash[:])
 
@@ -139,57 +131,6 @@ func (cache *cache) BatchVerify(signature consensus.QuorumSignature, batch map[h
 
 	return false
 }
-
-// Verify verifies a signature given a hash.
-// func (cache *cache) Verify(sig consensus.QuorumSignature, options ...consensus.VerifyOption) bool {
-// 	if sig == nil {
-// 		return false
-// 	}
-
-// 	var opts consensus.VerifyOptions
-// 	for _, opt := range options {
-// 		opt(&opts)
-// 	}
-
-// 	if sig.Participants().Len() < opts.Threshold {
-// 		return false
-// 	}
-
-// 	// get a sorted list of the ids in the Messages map
-// 	ids := make([]hotstuff.ID, 0, len(opts.Messages))
-// 	for id := range opts.Messages {
-// 		i := sort.Search(len(ids), func(i int) bool {
-// 			return ids[i] < id
-// 		})
-// 		ids = append(ids, 0)
-// 		copy(ids[i+1:], ids[i:])
-// 		ids[i] = id
-// 	}
-
-// 	var hash consensus.Hash
-// 	hasher := sha256.New()
-// 	// then hash the messages in sorted order
-// 	for _, id := range ids {
-// 		m := opts.Messages[id]
-// 		_, _ = hasher.Write(m)
-// 	}
-// 	hasher.Sum(hash[:])
-
-// 	var key strings.Builder
-// 	_, _ = key.Write(hash[:])
-// 	_, _ = key.Write(sig.ToBytes())
-
-// 	if cache.check(key.String()) {
-// 		return true
-// 	}
-
-// 	if cache.impl.Verify(sig, options...) {
-// 		cache.insert(key.String())
-// 		return true
-// 	}
-
-// 	return false
-// }
 
 // Combine combines multiple signatures together into a single signature.
 func (cache *cache) Combine(signatures ...consensus.QuorumSignature) (consensus.QuorumSignature, error) {
