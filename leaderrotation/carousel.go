@@ -53,7 +53,9 @@ func (c carousel) GetLeader(round consensus.View) hotstuff.ID {
 	candidates := make([]hotstuff.ID, 0, c.mods.Configuration().Len()-f)
 
 	commitHead.QuorumCert().Signature().Participants().ForEach(func(id hotstuff.ID) {
-		candidates = append(candidates, id)
+		if !lastAuthors.Contains(id) {
+			candidates = append(candidates, id)
+		}
 	})
 	slices.Sort(candidates)
 
