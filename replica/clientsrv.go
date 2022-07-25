@@ -18,12 +18,12 @@ import (
 
 // clientSrv serves a client.
 type clientSrv struct {
-	mut          sync.Mutex
-	mods         *modules.Modules
-	srv          *gorums.Server
-	awaitingCmds map[cmdID]chan<- error
-	cmdCache     *cmdCache
-	hash         hash.Hash
+	mut           sync.Mutex
+	mods          *modules.Modules
+	consensusMods *consensus.Modules
+	srv           *gorums.Server
+	awaitingCmds  map[cmdID]chan<- error
+	hash          hash.Hash
 }
 
 // newClientServer returns a new client server.
@@ -31,17 +31,19 @@ func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv
 	srv = &clientSrv{
 		awaitingCmds: make(map[cmdID]chan<- error),
 		srv:          gorums.NewServer(srvOpts...),
-		cmdCache:     newCmdCache(int(conf.BatchSize)),
 		hash:         sha256.New(),
 	}
 	clientpb.RegisterClientServer(srv.srv, srv)
 	return srv
 }
 
+func (srv *clientSrv) SetConsensusModules(consensusMods *consensus.Modules) {
+	srv.consensusMods = consensusMods
+}
+
 // InitModule gives the module access to the other modules.
 func (srv *clientSrv) InitModule(mods *modules.Modules) {
 	srv.mods = mods
-	srv.cmdCache.InitModule(mods)
 }
 
 func (srv *clientSrv) Start(addr string) error {
@@ -73,8 +75,7 @@ func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (
 	srv.mut.Lock()
 	srv.awaitingCmds[id] = c
 	srv.mut.Unlock()
-
-	srv.cmdCache.addCommand(cmd)
+	srv.consensusMods.CommandQueue().AddCommand(cmd)
 	ctx.Release()
 	err := <-c
 	return &emptypb.Empty{}, err

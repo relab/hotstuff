@@ -15,6 +15,7 @@ import (
 	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/client"
+	"github.com/relab/hotstuff/commandcache"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/byzantine"
 	"github.com/relab/hotstuff/crypto"
@@ -193,6 +194,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		float64(opts.GetTimeoutMultiplier()),
 	))
 
+	commandCache := commandcache.New(int(opts.BatchSize))
+	//checkpointCC := commandcache.NewCC(commandCache, 1000)
 	builder.Register(
 		consensus.New(consensusRules),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
@@ -200,6 +203,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		sync,
 		w.metricsLogger,
 		blockchain.New(),
+		commandCache,
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
 

@@ -6,17 +6,19 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 )
 
 // blockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type blockChain struct {
-	mods          *consensus.Modules
-	mut           sync.Mutex
-	pruneHeight   consensus.View
-	blocks        map[consensus.Hash]*consensus.Block
-	blockAtHeight map[consensus.View]*consensus.Block
-	pendingFetch  map[consensus.Hash]context.CancelFunc // allows a pending fetch operation to be cancelled
+	mods                     *consensus.Modules
+	mut                      sync.Mutex
+	pruneHeight              consensus.View
+	previousCheckPointedView consensus.View
+	blocks                   map[consensus.Hash]*consensus.Block
+	blockAtHeight            map[consensus.View]*consensus.Block
+	pendingFetch             map[consensus.Hash]context.CancelFunc // allows a pending fetch operation to be cancelled
 }
 
 // InitConsensusModule gives the module a reference to the Modules object.
@@ -29,12 +31,28 @@ func (chain *blockChain) InitConsensusModule(mods *consensus.Modules, _ *consens
 // Blocks are dropped in least recently used order.
 func New() consensus.BlockChain {
 	bc := &blockChain{
-		blocks:        make(map[consensus.Hash]*consensus.Block),
-		blockAtHeight: make(map[consensus.View]*consensus.Block),
-		pendingFetch:  make(map[consensus.Hash]context.CancelFunc),
+		blocks:                   make(map[consensus.Hash]*consensus.Block),
+		blockAtHeight:            make(map[consensus.View]*consensus.Block),
+		pendingFetch:             make(map[consensus.Hash]context.CancelFunc),
+		previousCheckPointedView: consensus.GetGenesis().View(),
 	}
 	bc.Store(consensus.GetGenesis())
 	return bc
+}
+
+// CreateSnapShot is invoked to indicate the application to create a snapshot for the current
+// committed blocks. This is a sample implementation and a placeholder.
+func (chain *blockChain) CreateSnapShot() {
+	currentCommittedView := chain.mods.Consensus().CommittedBlock().View()
+	for h := chain.previousCheckPointedView; h < currentCommittedView; h++ {
+		block := chain.blockAtHeight[h]
+		if block == nil {
+			continue
+		}
+		chain.mods.MetricsLogger().Log(hotstuffpb.BlockToProto(chain.blockAtHeight[h]))
+	}
+	chain.mods.Logger().Info("Checkpoint completed until View ", currentCommittedView)
+	chain.previousCheckPointedView = currentCommittedView
 }
 
 // Store stores a block in the blockchain

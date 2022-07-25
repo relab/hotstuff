@@ -169,7 +169,6 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 		cs.mods.Logger().Info("OnPropose: command not accepted")
 		return
 	}
-
 	// block is safe and was accepted
 	cs.mods.BlockChain().Store(block)
 

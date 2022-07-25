@@ -9,6 +9,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 )
 
 // View specifies the leader id an the partition scenario for a single round of consensus.
@@ -146,6 +147,10 @@ func (commandModule) Accept(_ consensus.Command) bool {
 	return true
 }
 
+func (commandModule) GetHighestCheckPointedView() consensus.View {
+	return consensus.View(0)
+}
+
 // Proposed tells the acceptor that the propose phase for the given command succeeded, and it should no longer be
 // accepted in the future.
 func (commandModule) Proposed(_ consensus.Command) {}
@@ -162,4 +167,8 @@ func (cm commandModule) Exec(block *consensus.Block) {
 	cm.node.executedBlocks = append(cm.node.executedBlocks, block)
 }
 
-func (commandModule) Fork(block *consensus.Block) {}
+func (commandModule) AddCommand(_ *clientpb.Command) {}
+func (commandModule) Fork(block *consensus.Block)    {}
+
+var _ consensus.Acceptor = (*commandModule)(nil)
+var _ consensus.CommandQueue = (*commandModule)(nil)
