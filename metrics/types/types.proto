@@ -42,8 +42,8 @@ message ViewTimeouts {
 
 message CPUMemoryStats {
   Event Event = 1;
-  double CPUsagePercentage = 2;
-  double MemoryUsagePercentage = 3;
+  double CPUPercentage = 2;
+  double MemoryPercentage = 3;
   uint32 Cores = 4;
   uint64 AvailableMemory = 5;
 }

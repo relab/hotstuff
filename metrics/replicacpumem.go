@@ -17,34 +17,35 @@ import (
 // This limitation is due to the gopsutil package.
 func init() {
 	RegisterReplicaMetric("cpumem", func() interface{} {
-		return &CPUMemStat{}
+		return &CPUMem{}
 	})
 	RegisterClientMetric("cpumem", func() interface{} {
-		return &CPUMemStat{}
+		return &CPUMem{}
 	})
 }
 
-// CPUMemStat measures CPU usage and Memory usage and record in the metric logs.
-type CPUMemStat struct {
+// CPUMem measures CPU usage and Memory usage and record in the metric logs.
+type CPUMem struct {
 	mods *modules.Modules
 }
 
 // InitModule gives the module access to the other modules.
-func (c *CPUMemStat) InitModule(mods *modules.Modules) {
+func (c *CPUMem) InitModule(mods *modules.Modules) {
 	c.mods = mods
 	c.mods.EventLoop().RegisterObserver(types.TickEvent{}, func(event interface{}) {
 		c.tick(event.(types.TickEvent))
 	})
 	c.mods.Logger().Info("CPU-Memory stats metric enabled")
-	// Percent with 0 interval returns 0 usage when called first time.
+	// The cpu.Percent function returns the CPU usage since the last call when called with an interval of 0.
+	// This initial call ensures that the first measurement of the CPU usage is nonzero.
 	_, err := cpu.Percent(0, false)
 	if err != nil {
 		c.mods.Logger().Info("Unable to fetch the CPU usage")
 	}
 }
 
-// getCPUsage Method returns the average CPU per core and the number of cores, including logical ones.
-func (c *CPUMemStat) getCPUsage() (float64, uint32) {
+// getCPUPercentage Method returns the average CPU per core and the number of cores, including logical ones.
+func (c *CPUMem) getCPUPercentage() (float64, uint32) {
 	// Counts return the number of cores as our bbchain cluster has hyper-threading enabled,
 	// logical parameter is set to true.
 	cores, err := cpu.Counts(true)
@@ -59,7 +60,7 @@ func (c *CPUMemStat) getCPUsage() (float64, uint32) {
 }
 
 // getMemoryPercentage returns total memory available on the node and the currently utilized percentage.
-func (c *CPUMemStat) getMemoryPercentage() (uint64, float64) {
+func (c *CPUMem) getMemoryPercentage() (uint64, float64) {
 	v, err := mem.VirtualMemory()
 	if err != nil {
 		return 0, 0
@@ -68,16 +69,16 @@ func (c *CPUMemStat) getMemoryPercentage() (uint64, float64) {
 }
 
 // tick method is invoked periodically based on the configured measuring interval of metrics
-func (c *CPUMemStat) tick(_ types.TickEvent) {
+func (c *CPUMem) tick(_ types.TickEvent) {
 	now := time.Now()
-	cpusage, cores := c.getCPUsage()
-	availablemem, memusage := c.getMemoryPercentage()
+	cpu, cores := c.getCPUPercentage()
+	availableMemory, memoryUsage := c.getMemoryPercentage()
 	event := &types.CPUMemoryStats{
-		Event:                 types.NewReplicaEvent(uint32(c.mods.ID()), now),
-		CPUsagePercentage:     cpusage,
-		Cores:                 uint32(cores),
-		MemoryUsagePercentage: memusage,
-		AvailableMemory:       availablemem,
+		Event:            types.NewReplicaEvent(uint32(c.mods.ID()), now),
+		CPUPercentage:    cpu,
+		Cores:            uint32(cores),
+		MemoryPercentage: memoryUsage,
+		AvailableMemory:  availableMemory,
 	}
 	c.mods.MetricsLogger().Log(event)
 }
