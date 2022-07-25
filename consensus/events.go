@@ -30,12 +30,6 @@ type TimeoutMsg struct {
 	SyncInfo      SyncInfo    // The highest QC/TC known to the sender.
 }
 
-type CommandMsg struct {
-	ClientID       hotstuff.ID
-	SequenceNumber uint64
-	Data           []byte
-}
-
 // Hash returns a hash of the timeout message.
 func (timeout TimeoutMsg) Hash() Hash {
 	var h Hash

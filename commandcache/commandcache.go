@@ -10,7 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type cmdCache struct {
+type CmdCache struct {
 	mut           sync.Mutex
 	mods          *consensus.Modules
 	c             chan struct{}
@@ -21,8 +21,8 @@ type cmdCache struct {
 	unmarshaler   proto.UnmarshalOptions
 }
 
-func New(batchSize int) *cmdCache {
-	return &cmdCache{
+func New(batchSize int) *CmdCache {
+	return &CmdCache{
 		c:             make(chan struct{}),
 		batchSize:     batchSize,
 		serialNumbers: make(map[uint32]uint64),
@@ -32,11 +32,11 @@ func New(batchSize int) *cmdCache {
 }
 
 // InitModule gives the module access to the other modules.
-func (c *cmdCache) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (c *CmdCache) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
 	c.mods = mods
 }
 
-func (c *cmdCache) AddCommand(cmd *clientpb.Command) {
+func (c *CmdCache) AddCommand(cmd *clientpb.Command) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
@@ -54,7 +54,7 @@ func (c *cmdCache) AddCommand(cmd *clientpb.Command) {
 }
 
 // getBatch: fetches the batch, available for processing
-func (c *cmdCache) getBatch(ctx context.Context) (batch *clientpb.Batch, ok bool) {
+func (c *CmdCache) getBatch(ctx context.Context) (batch *clientpb.Batch, ok bool) {
 
 	batch = new(clientpb.Batch)
 
@@ -97,13 +97,13 @@ awaitBatch:
 }
 
 // Get returns a batch of commands to propose.
-func (c *cmdCache) Get(ctx context.Context) (cmd consensus.Command, ok bool) {
+func (c *CmdCache) Get(ctx context.Context) (cmd consensus.Command, ok bool) {
 	batch, _ := c.getBatch(ctx)
 	return c.marshalBatch(batch)
 }
 
 // marshalBatch: Internal method used to marshal a batch of commands to a single command string.
-func (c *cmdCache) marshalBatch(batch *clientpb.Batch) (cmd consensus.Command, ok bool) {
+func (c *CmdCache) marshalBatch(batch *clientpb.Batch) (cmd consensus.Command, ok bool) {
 	// otherwise, we should have at least one command
 	b, err := c.marshaler.Marshal(batch)
 	if err != nil {
@@ -115,7 +115,7 @@ func (c *cmdCache) marshalBatch(batch *clientpb.Batch) (cmd consensus.Command, o
 }
 
 // unmarshalCommand: Internal method used to unmarshal a string of command to the underlying batch.
-func (c *cmdCache) unmarshalCommand(cmd consensus.Command) (batch *clientpb.Batch, ok bool) {
+func (c *CmdCache) unmarshalCommand(cmd consensus.Command) (batch *clientpb.Batch, ok bool) {
 	// otherwise, we should have at least one command
 	batch = new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
@@ -127,7 +127,7 @@ func (c *cmdCache) unmarshalCommand(cmd consensus.Command) (batch *clientpb.Batc
 }
 
 // Accept returns true if the replica can accept the batch.
-func (c *cmdCache) Accept(cmd consensus.Command) bool {
+func (c *CmdCache) Accept(cmd consensus.Command) bool {
 	batch, ok := c.unmarshalCommand(cmd)
 	if !ok {
 		return false
@@ -144,7 +144,7 @@ func (c *cmdCache) Accept(cmd consensus.Command) bool {
 }
 
 // Proposed updates the serial numbers such that we will not accept the given batch again.
-func (c *cmdCache) Proposed(cmd consensus.Command) {
+func (c *CmdCache) Proposed(cmd consensus.Command) {
 	batch, ok := c.unmarshalCommand(cmd)
 	if !ok {
 		return
@@ -159,9 +159,9 @@ func (c *cmdCache) Proposed(cmd consensus.Command) {
 	}
 }
 
-func (c *cmdCache) GetHighestCheckPointedView() consensus.View {
+func (c *CmdCache) GetHighestCheckPointedView() consensus.View {
 	return consensus.GetGenesis().View()
 }
 
-var _ consensus.Acceptor = (*cmdCache)(nil)
-var _ consensus.CommandQueue = (*cmdCache)(nil)
+var _ consensus.Acceptor = (*CmdCache)(nil)
+var _ consensus.CommandQueue = (*CmdCache)(nil)
