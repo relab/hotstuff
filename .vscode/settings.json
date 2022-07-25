@@ -1,4 +1,13 @@
 {
+	"protoc": {
+		
+        	"compile_on_save": false,
+	        "options": [
+				"--proto_path=${workspaceRoot}",
+	            "--proto_path=${workspaceRoot}/internal/proto/hotstuffpb/",
+        	    "--proto_path=`go list -m -f {{.Dir}} github.com/relab/gorums`",
+        	]
+    	},
 	"go.testFlags": [
 		"-count=1"
 	],

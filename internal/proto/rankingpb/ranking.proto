@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package rankingpb;
+
+option go_package = "github.com/relab/hotstuff/internal/proto/rankingpb";
+
+import "google/protobuf/empty.proto";
+
+import "hotstuff.proto";
+
+import "gorums.proto";
+
+message Complaint {
+    uint32 complaniant = 1;
+    uint32 complainee = 2;
+    ComplaintType type = 3;
+    bool isProofAvailable = 4;
+    oneof Proof{
+        hotstuffpb.Proposal invalidProposal = 5;
+        hotstuffpb.PartialCert invalidVote = 6;
+        hotstuffpb.SyncInfo invalidNewView = 7;
+        CurrentState invalidState = 8;
+        Complaint invalidComplaint = 9;
+    }
+}
+
+enum ComplaintType {
+    InvalidVote = 0;
+    InvalidProposal = 1;
+    OldProposal = 2;
+    SlowNode = 3;
+    NoShowToVote = 4;
+    InvalidState = 5;
+    InvalidComplaint = 6;
+}
+
+message CurrentState {
+    uint32 Sender = 1;
+    uint64 View = 2;
+    bytes Hash = 3;
+    hotstuffpb.Signature signature = 4;
+}
+
+service ComplaintLog {
+    rpc SendComplaint(Complaint) returns (google.protobuf.Empty) {
+        option (gorums.multicast) = true;
+    }
+}
