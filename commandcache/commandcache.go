@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// CmdCache caches the commands to be processed by the protocol.
 type CmdCache struct {
 	mut           sync.Mutex
 	mods          *consensus.Modules
@@ -21,6 +22,7 @@ type CmdCache struct {
 	unmarshaler   proto.UnmarshalOptions
 }
 
+// New returns the initialized command cache
 func New(batchSize int) *CmdCache {
 	return &CmdCache{
 		c:             make(chan struct{}),
@@ -31,11 +33,12 @@ func New(batchSize int) *CmdCache {
 	}
 }
 
-// InitModule gives the module access to the other modules.
+// InitConsensusModule gives the module access to the other modules.
 func (c *CmdCache) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
 	c.mods = mods
 }
 
+// AddCommand adds the commands to the cache.
 func (c *CmdCache) AddCommand(cmd *clientpb.Command) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
@@ -159,6 +162,7 @@ func (c *CmdCache) Proposed(cmd consensus.Command) {
 	}
 }
 
+// GetHighestCheckPointedView returns the View ID in which the checkpoint completed.
 func (c *CmdCache) GetHighestCheckPointedView() consensus.View {
 	return consensus.GetGenesis().View()
 }

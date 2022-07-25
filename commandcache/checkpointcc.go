@@ -16,6 +16,7 @@ type CheckPointCmdCache struct {
 	highestCheckPointViewIndex uint64
 }
 
+// NewCC initializes the checkpoint command cache.
 func NewCC(cc *CmdCache, checkPointIndex int) *CheckPointCmdCache {
 	return &CheckPointCmdCache{
 		cmdCache:                cc,
@@ -23,11 +24,12 @@ func NewCC(cc *CmdCache, checkPointIndex int) *CheckPointCmdCache {
 	}
 }
 
-// InitModule gives the module access to the other modules.
+// InitConsensusModule gives the module access to the other modules.
 func (c *CheckPointCmdCache) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
 	c.mods = mods
 }
 
+// AddCommand adds the command to the cache
 func (c *CheckPointCmdCache) AddCommand(cmd *clientpb.Command) {
 	c.cmdCache.AddCommand(cmd)
 }
@@ -67,6 +69,7 @@ func (c *CheckPointCmdCache) Proposed(cmd consensus.Command) {
 	c.cmdCache.Proposed(cmd)
 }
 
+// GetHighestCheckPointedView returns the view in which the checkpoint is completed.
 func (c *CheckPointCmdCache) GetHighestCheckPointedView() consensus.View {
 	return consensus.View(c.highestCheckPointViewIndex)
 }
