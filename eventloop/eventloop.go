@@ -47,6 +47,20 @@ func New(bufferSize uint) *EventLoop {
 
 // RegisterHandler registers a handler for events with the same type as the 'eventType' argument.
 // There can be only one handler per event type, and the handler is executed after any observers.
+func RegisterHandler[E any](eventloop *EventLoop, handler func(event E)) {
+	var zero E
+	eventloop.RegisterHandler(zero, func(event any) { handler(event.(E)) })
+}
+
+// RegisterObserver registers an observer for events with the same type as the 'eventType' argument.
+// The observers are executed before the handler.
+func RegisterObserver[E any](eventloop *EventLoop, handler func(event E)) {
+	var zero E
+	eventloop.RegisterObserver(zero, func(event any) { handler(event.(E)) })
+}
+
+// RegisterHandler registers a handler for events with the same type as the 'eventType' argument.
+// There can be only one handler per event type, and the handler is executed after any observers.
 func (el *EventLoop) RegisterHandler(eventType any, handler EventHandler) {
 	el.handlers[reflect.TypeOf(eventType)] = handler
 }
