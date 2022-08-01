@@ -1,20 +1,13 @@
 package crypto
 
-import "fmt"
+import (
+	"errors"
+)
 
 var (
-	// ErrHashMismatch is the error used when a partial certificate hash does not match the hash of a block.
-	ErrHashMismatch = fmt.Errorf("certificate hash does not match block hash")
+	// ErrCombineMultiple is used when Combine is called with less than two signatures.
+	ErrCombineMultiple = errors.New("must have at least two signatures")
 
-	// ErrPartialDuplicate is the error used when two or more signatures were created by the same replica.
-	ErrPartialDuplicate = fmt.Errorf("cannot add more than one signature per replica")
-
-	// ErrViewMismatch is the error used when timeouts have different views.
-	ErrViewMismatch = fmt.Errorf("timeout views do not match")
-
-	// ErrNotAQuorum is the error used when a quorum is not reached.
-	ErrNotAQuorum = fmt.Errorf("not a quorum")
-
-	// ErrWrongType is the error used when an incompatible type is encountered.
-	ErrWrongType = fmt.Errorf("incompatible type")
+	// ErrCombineOverlap is used when Combine is called with signatures that have overlapping participation.
+	ErrCombineOverlap = errors.New("overlapping signatures")
 )

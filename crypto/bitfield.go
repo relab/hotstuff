@@ -9,18 +9,21 @@ type Bitfield struct {
 	len  int
 }
 
-func (bm *Bitfield) extend(nBytes int) {
+func (bf *Bitfield) extend(nBytes int) {
 	// not sure if this is the most efficient way, but it was suggested here:
 	// https://github.com/golang/go/wiki/SliceTricks#extend
-	bm.data = append(bm.data, make([]byte, nBytes)...)
+	bf.data = append(bf.data, make([]byte, nBytes)...)
 }
 
-func (bm Bitfield) set(byteIdx, bitIdx int) {
-	bm.data[byteIdx] |= 1 << bitIdx
+func (bf *Bitfield) set(byteIdx, bitIdx int) {
+	if !bf.isSet(byteIdx, bitIdx) {
+		bf.len++
+	}
+	bf.data[byteIdx] |= 1 << bitIdx
 }
 
-func (bm Bitfield) isSet(byteIdx, bitIdx int) bool {
-	return bm.data[byteIdx]&(1<<bitIdx) != 0
+func (bf Bitfield) isSet(byteIdx, bitIdx int) bool {
+	return bf.data[byteIdx]&(1<<bitIdx) != 0
 }
 
 // index returns the byte index and the bit index to use based on the id.
@@ -50,41 +53,41 @@ func BitfieldFromBytes(b []byte) Bitfield {
 }
 
 // Bytes returns the raw byte slice containing the data of this bitfield.
-func (bm Bitfield) Bytes() []byte {
-	return bm.data
+func (bf Bitfield) Bytes() []byte {
+	return bf.data
 }
 
 // Add adds an ID to the set.
-func (bm *Bitfield) Add(id hotstuff.ID) {
+func (bf *Bitfield) Add(id hotstuff.ID) {
 	byteIdx, bitIdx := index(id)
-	if len(bm.data) <= byteIdx {
-		bm.extend(byteIdx + 1 - len(bm.data))
+	if len(bf.data) <= byteIdx {
+		bf.extend(byteIdx + 1 - len(bf.data))
 	}
-	bm.set(byteIdx, bitIdx)
+	bf.set(byteIdx, bitIdx)
 }
 
 // Contains returns true if the set contains the ID.
-func (bm Bitfield) Contains(id hotstuff.ID) bool {
+func (bf Bitfield) Contains(id hotstuff.ID) bool {
 	byteIdx, bitIdx := index(id)
-	if len(bm.data) <= byteIdx {
+	if len(bf.data) <= byteIdx {
 		return false
 	}
-	return bm.isSet(byteIdx, bitIdx)
+	return bf.isSet(byteIdx, bitIdx)
 }
 
 // ForEach calls f for each ID in the set.
-func (bm Bitfield) ForEach(f func(hotstuff.ID)) {
-	bm.RangeWhile(func(i hotstuff.ID) bool {
+func (bf Bitfield) ForEach(f func(hotstuff.ID)) {
+	bf.RangeWhile(func(i hotstuff.ID) bool {
 		f(i)
 		return true
 	})
 }
 
 // RangeWhile calls f for each ID in the set until f returns false.
-func (bm Bitfield) RangeWhile(f func(hotstuff.ID) bool) {
-	for byteIdx := range bm.data {
+func (bf Bitfield) RangeWhile(f func(hotstuff.ID) bool) {
+	for byteIdx := range bf.data {
 		for bitIdx := 0; bitIdx < 8; bitIdx++ {
-			if bm.isSet(byteIdx, bitIdx) {
+			if bf.isSet(byteIdx, bitIdx) {
 				if !f(id(byteIdx, bitIdx)) {
 					return
 				}
@@ -94,6 +97,6 @@ func (bm Bitfield) RangeWhile(f func(hotstuff.ID) bool) {
 }
 
 // Len returns the number of entries in the set.
-func (bm Bitfield) Len() int {
-	return bm.len
+func (bf Bitfield) Len() int {
+	return bf.len
 }

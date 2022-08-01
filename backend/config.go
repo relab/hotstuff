@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -14,6 +15,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 )
 
 // Replica provides methods used by hotstuff to send messages to replicas.
@@ -22,7 +24,8 @@ type Replica struct {
 	id            hotstuff.ID
 	pubKey        consensus.PublicKey
 	voteCancel    context.CancelFunc
-	newviewCancel context.CancelFunc
+	newViewCancel context.CancelFunc
+	md            map[string]string
 }
 
 // ID returns the replica's ID.
@@ -53,15 +56,21 @@ func (r *Replica) NewView(msg consensus.SyncInfo) {
 		return
 	}
 	var ctx context.Context
-	r.newviewCancel()
-	ctx, r.newviewCancel = context.WithCancel(context.Background())
+	r.newViewCancel()
+	ctx, r.newViewCancel = context.WithCancel(context.Background())
 	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(msg), gorums.WithNoSendWaiting())
+}
+
+// Metadata returns the gRPC metadata from this replica's connection.
+func (r *Replica) Metadata() map[string]string {
+	return r.md
 }
 
 // Config holds information about the current configuration of replicas that participate in the protocol,
 // and some information about the local replica. It also provides methods to send messages to the other replicas.
 type Config struct {
-	optsPtr *[]gorums.ManagerOption // using a pointer so that options can be GCed after initialization
+	opts      []gorums.ManagerOption
+	connected bool
 
 	mgr *hotstuffpb.Manager
 	subConfig
@@ -78,17 +87,14 @@ type subConfig struct {
 func (cfg *Config) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
 	cfg.mods = mods
 
-	opts := *cfg.optsPtr
-	cfg.optsPtr = nil // we don't need to keep the options around beyond this point, so we'll allow them to be GCed.
-
-	// embed own ID to allow other replicas to identify messages from this replica
-	md := metadata.New(map[string]string{
-		"id": fmt.Sprintf("%d", cfg.mods.ID()),
+	// We delay processing `replicaConnected` events until after the configurations `connected` event has occurred.
+	cfg.mods.EventLoop().RegisterHandler(replicaConnected{}, func(event interface{}) {
+		if !cfg.connected {
+			cfg.mods.EventLoop().DelayUntil(connected{}, event)
+			return
+		}
+		cfg.replicaConnected(event.(replicaConnected))
 	})
-
-	opts = append(opts, gorums.WithMetadata(md))
-
-	cfg.mgr = hotstuffpb.NewManager(opts...)
 }
 
 // NewConfig creates a new configuration.
@@ -108,9 +114,53 @@ func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOpt
 		subConfig: subConfig{
 			replicas: make(map[hotstuff.ID]consensus.Replica),
 		},
-		optsPtr: &opts,
+		opts: opts,
 	}
 	return cfg
+}
+
+func (cfg *Config) replicaConnected(c replicaConnected) {
+	info, peerok := peer.FromContext(c.ctx)
+	md, mdok := metadata.FromIncomingContext(c.ctx)
+	if !peerok || !mdok {
+		return
+	}
+
+	id, err := GetPeerIDFromContext(c.ctx, cfg)
+	if err != nil {
+		cfg.mods.Logger().Warnf("Failed to get id for %v: %v", info.Addr, err)
+		return
+	}
+
+	replica, ok := cfg.replicas[id]
+	if !ok {
+		cfg.mods.Logger().Warnf("Replica with id %d was not found", id)
+		return
+	}
+
+	replica.(*Replica).md = readMetadata(md)
+
+	cfg.mods.Logger().Debugf("Replica %d connected from address %v", id, info.Addr)
+}
+
+const keyPrefix = "hotstuff-"
+
+func mapToMetadata(m map[string]string) metadata.MD {
+	md := metadata.New(nil)
+	for k, v := range m {
+		md.Set(keyPrefix+k, v)
+	}
+	return md
+}
+
+func readMetadata(md metadata.MD) map[string]string {
+	m := make(map[string]string)
+	for k, values := range md {
+		if _, key, ok := strings.Cut(k, keyPrefix); ok {
+			m[key] = values[0]
+		}
+	}
+	return m
 }
 
 // ReplicaInfo holds information about a replica.
@@ -122,6 +172,18 @@ type ReplicaInfo struct {
 
 // Connect opens connections to the replicas in the configuration.
 func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
+	opts := cfg.opts
+	cfg.opts = nil // options are not needed beyond this point, so we delete them.
+
+	md := mapToMetadata(cfg.mods.Options().ConnectionMetadata())
+
+	// embed own ID to allow other replicas to identify messages from this replica
+	md.Set("id", fmt.Sprintf("%d", cfg.mods.ID()))
+
+	opts = append(opts, gorums.WithMetadata(md))
+
+	cfg.mgr = hotstuffpb.NewManager(opts...)
+
 	// set up an ID mapping to give to gorums
 	idMapping := make(map[string]uint32, len(replicas))
 	for _, replica := range replicas {
@@ -129,8 +191,9 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 		cfg.replicas[replica.ID] = &Replica{
 			id:            replica.ID,
 			pubKey:        replica.PubKey,
-			newviewCancel: func() {},
+			newViewCancel: func() {},
 			voteCancel:    func() {},
+			md:            make(map[string]string),
 		}
 		// we do not want to connect to ourself
 		if replica.ID != cfg.mods.ID() {
@@ -152,6 +215,11 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 		replica := cfg.replicas[id].(*Replica)
 		replica.node = node
 	}
+
+	cfg.connected = true
+
+	// this event is sent so that any delayed `replicaConnected` events can be processed.
+	cfg.mods.EventLoop().AddEvent(connected{})
 
 	return nil
 }
@@ -260,3 +328,5 @@ func (q qspec) FetchQF(in *hotstuffpb.BlockHash, replies map[uint32]*hotstuffpb.
 	}
 	return nil, false
 }
+
+type connected struct{}

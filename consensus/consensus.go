@@ -129,7 +129,7 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 	block := proposal.Block
 
 	if cs.mods.Options().ShouldUseAggQC() && proposal.AggregateQC != nil {
-		ok, highQC := cs.mods.Crypto().VerifyAggregateQC(*proposal.AggregateQC)
+		highQC, ok := cs.mods.Crypto().VerifyAggregateQC(*proposal.AggregateQC)
 		if !ok {
 			cs.mods.Logger().Warn("OnPropose: failed to verify aggregate QC")
 			return

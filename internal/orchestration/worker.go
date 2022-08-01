@@ -176,7 +176,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		}
 	}
 
-	cryptoImpl, ok := modules.GetModule[consensus.CryptoImpl](opts.GetCrypto())
+	cryptoImpl, ok := modules.GetModule[consensus.CryptoBase](opts.GetCrypto())
 	if !ok {
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
 	}

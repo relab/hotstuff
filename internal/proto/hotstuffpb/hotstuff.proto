@@ -59,40 +59,40 @@ message Signature {
 }
 
 message PartialCert {
-  Signature Sig = 1;
+  QuorumSignature Sig = 1;
   bytes Hash = 2;
 }
 
-message ECDSAThresholdSignature { repeated ECDSASignature Sigs = 1; }
+message ECDSAMultiSignature { repeated ECDSASignature Sigs = 1; }
 
 message BLS12AggregateSignature {
   bytes Sig = 1;
   bytes participants = 2;
 }
 
-message ThresholdSignature {
-  oneof AggSig {
-    ECDSAThresholdSignature ECDSASigs = 1;
+message QuorumSignature {
+  oneof Sig {
+    ECDSAMultiSignature ECDSASigs = 1;
     BLS12AggregateSignature BLS12Sig = 2;
   }
 }
 
 message QuorumCert {
-  ThresholdSignature Sig = 1;
+  QuorumSignature Sig = 1;
   uint64 View = 2;
   bytes Hash = 3;
 }
 
 message TimeoutCert {
-  ThresholdSignature Sig = 1;
+  QuorumSignature Sig = 1;
   uint64 View = 2;
 }
 
 message TimeoutMsg {
   uint64 View = 1;
   SyncInfo SyncInfo = 2;
-  Signature ViewSig = 3;
-  optional Signature MsgSig = 4;
+  QuorumSignature ViewSig = 3;
+  optional QuorumSignature MsgSig = 4;
 }
 
 message SyncInfo {
@@ -103,6 +103,6 @@ message SyncInfo {
 
 message AggQC {
   map<uint32, QuorumCert> QCs = 1;
-  ThresholdSignature Sig = 2;
+  QuorumSignature Sig = 2;
   uint64 View = 3;
 }
