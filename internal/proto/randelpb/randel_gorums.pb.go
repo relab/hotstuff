@@ -2,9 +2,9 @@
 // versions:
 // 	protoc-gen-gorums v0.7.0-devel
 // 	protoc            v3.19.4
-// source: internal/proto/handelpb/handel.proto
+// source: internal/proto/randelpb/randel.proto
 
-package handelpb
+package randelpb
 
 import (
 	context "context"
@@ -144,7 +144,7 @@ type Node struct {
 	*gorums.RawNode
 }
 
-// QuorumSpec is the interface of quorum functions for Handel.
+// QuorumSpec is the interface of quorum functions for Randel.
 type QuorumSpec interface {
 	gorums.ConfigOption
 
@@ -153,20 +153,20 @@ type QuorumSpec interface {
 	// supplied to the RequestContribution method at call time, and may or may not
 	// be used by the quorum function. If the in parameter is not needed
 	// you should implement your quorum function with '_ *emptypb.Empty'.
-	RequestContributionQF(in *emptypb.Empty, replies map[uint32]*Contribution) (*Contribution, bool)
+	RequestContributionQF(in *emptypb.Empty, replies map[uint32]*RContribution) (*RContribution, bool)
 }
 
 // RequestContribution is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (c *Configuration) RequestContribution(ctx context.Context, in *emptypb.Empty) (resp *Contribution, err error) {
+func (c *Configuration) RequestContribution(ctx context.Context, in *emptypb.Empty) (resp *RContribution, err error) {
 	cd := gorums.QuorumCallData{
 		Message: in,
-		Method:  "handelpb.Handel.RequestContribution",
+		Method:  "randelpb.Randel.RequestContribution",
 	}
 	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
-		r := make(map[uint32]*Contribution, len(replies))
+		r := make(map[uint32]*RContribution, len(replies))
 		for k, v := range replies {
-			r[k] = v.(*Contribution)
+			r[k] = v.(*RContribution)
 		}
 		return c.qspec.RequestContributionQF(req.(*emptypb.Empty), r)
 	}
@@ -175,22 +175,16 @@ func (c *Configuration) RequestContribution(ctx context.Context, in *emptypb.Emp
 	if err != nil {
 		return nil, err
 	}
-	return res.(*Contribution), err
+	return res.(*RContribution), err
 }
 
-// Handel is the server-side API for the Handel Service
-type Handel interface {
-	Contribute(ctx gorums.ServerCtx, request *Contribution)
-	RequestContribution(ctx gorums.ServerCtx, request *emptypb.Empty) (response *Contribution, err error)
+// Randel is the server-side API for the Randel Service
+type Randel interface {
+	RequestContribution(ctx gorums.ServerCtx, request *emptypb.Empty) (response *RContribution, err error)
 }
 
-func RegisterHandelServer(srv *gorums.Server, impl Handel) {
-	srv.RegisterHandler("handelpb.Handel.Contribute", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*Contribution)
-		defer ctx.Release()
-		impl.Contribute(ctx, req)
-	})
-	srv.RegisterHandler("handelpb.Handel.RequestContribution", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
+func RegisterRandelServer(srv *gorums.Server, impl Randel) {
+	srv.RegisterHandler("randelpb.Randel.RequestContribution", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
 		req := in.Message.(*emptypb.Empty)
 		defer ctx.Release()
 		resp, err := impl.RequestContribution(ctx, req)
@@ -198,22 +192,8 @@ func RegisterHandelServer(srv *gorums.Server, impl Handel) {
 	})
 }
 
-type internalContribution struct {
+type internalRContribution struct {
 	nid   uint32
-	reply *Contribution
+	reply *RContribution
 	err   error
-}
-
-// Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
-
-// Contribute is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (n *Node) Contribute(ctx context.Context, in *Contribution, opts ...gorums.CallOption) {
-	cd := gorums.CallData{
-		Message: in,
-		Method:  "handelpb.Handel.Contribute",
-	}
-
-	n.RawNode.Unicast(ctx, cd, opts...)
 }

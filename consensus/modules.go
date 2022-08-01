@@ -363,6 +363,9 @@ type Handel interface {
 	Begin(s PartialCert)
 }
 
+type Randel interface {
+	Begin(s PartialCert)
+}
 type executorWrapper struct {
 	executor Executor
 }

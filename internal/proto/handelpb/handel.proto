@@ -12,6 +12,10 @@ service Handel {
   rpc Contribute(Contribution) returns (google.protobuf.Empty) {
     option (gorums.unicast) = true;
   }
+
+  rpc RequestContribution(google.protobuf.Empty) returns (Contribution) {
+    option (gorums.quorumcall) = true;
+  }
 }
 
 message Contribution {

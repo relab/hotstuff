@@ -36,6 +36,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/handelpb"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/modules"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func init() {
@@ -135,6 +136,14 @@ func (h *Handel) Begin(s consensus.PartialCert) {
 
 type serviceImpl struct {
 	h *Handel
+}
+
+func (impl serviceImpl) RequestContribution(ctx gorums.ServerCtx,
+	in *emptypb.Empty) (resp *handelpb.Contribution, err error) {
+	// TODO(Hanish): It is a quorum function for handling the
+	// response from the sub configuration.
+	// Verify the contribution and send the response to the above level.
+	return nil, nil
 }
 
 func (impl serviceImpl) Contribute(ctx gorums.ServerCtx, msg *handelpb.Contribution) {

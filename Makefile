@@ -3,6 +3,7 @@ proto_src := internal/proto/clientpb/client.proto          \
 		internal/proto/hotstuffpb/hotstuff.proto           \
 		internal/proto/orchestrationpb/orchestration.proto \
 		internal/proto/handelpb/handel.proto               \
+		internal/proto/randelpb/randel.proto		\
 		metrics/types/types.proto
 proto_go := $(proto_src:%.proto=%.pb.go)
 gorums_go := internal/proto/clientpb/client_gorums.pb.go \
