@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -230,13 +231,19 @@ func (si SyncInfo) AggQC() (_ AggregateQC, _ bool) {
 }
 
 func (si SyncInfo) String() string {
-	var cert interface{}
-	if si.qc != nil {
-		cert = si.qc
-	} else if si.tc != nil {
-		cert = si.tc
+	var sb strings.Builder
+	sb.WriteString("{ ")
+	if si.tc != nil {
+		fmt.Fprintf(&sb, "%s ", si.tc)
 	}
-	return fmt.Sprint(cert)
+	if si.qc != nil {
+		fmt.Fprintf(&sb, "%s ", si.qc)
+	}
+	if si.aggQC != nil {
+		fmt.Fprintf(&sb, "%s ", si.aggQC)
+	}
+	sb.WriteRune('}')
+	return sb.String()
 }
 
 // QuorumCert (QC) is a certificate for a Block created by a quorum of partial certificates.
@@ -293,10 +300,7 @@ func (qc QuorumCert) Equals(other QuorumCert) bool {
 func (qc QuorumCert) String() string {
 	var sb strings.Builder
 	if qc.signature != nil {
-		qc.signature.Participants().ForEach(func(id hotstuff.ID) {
-			sb.WriteString(strconv.FormatUint(uint64(id), 10))
-			sb.WriteByte(' ')
-		})
+		_ = writeParticipants(&sb, qc.Signature().Participants())
 	}
 	return fmt.Sprintf("QC{ hash: %.6s, IDs: [ %s] }", qc.hash, &sb)
 }
@@ -332,10 +336,7 @@ func (tc TimeoutCert) View() View {
 func (tc TimeoutCert) String() string {
 	var sb strings.Builder
 	if tc.signature != nil {
-		tc.signature.Participants().ForEach(func(id hotstuff.ID) {
-			sb.WriteString(strconv.FormatUint(uint64(id), 10))
-			sb.WriteByte(' ')
-		})
+		_ = writeParticipants(&sb, tc.Signature().Participants())
 	}
 	return fmt.Sprintf("TC{ view: %d, IDs: [ %s] }", tc.view, &sb)
 }
@@ -367,4 +368,20 @@ func (aggQC AggregateQC) Sig() QuorumSignature {
 // View returns the view in which the AggregateQC was created.
 func (aggQC AggregateQC) View() View {
 	return aggQC.view
+}
+
+func (aggQC AggregateQC) String() string {
+	var sb strings.Builder
+	if aggQC.sig != nil {
+		_ = writeParticipants(&sb, aggQC.sig.Participants())
+	}
+	return fmt.Sprintf("AggQC{ view: %d, IDs: [ %s] }", aggQC.view, &sb)
+}
+
+func writeParticipants(wr io.Writer, participants IDSet) (err error) {
+	participants.RangeWhile(func(id hotstuff.ID) bool {
+		_, err = fmt.Fprintf(wr, "%d ", id)
+		return err == nil
+	})
+	return err
 }

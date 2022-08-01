@@ -17,7 +17,7 @@ func TestBasicScenario(t *testing.T) {
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 
-	result, err := ExecuteScenario(s, 4, 0, "chainedhotstuff")
+	result, err := ExecuteScenario(s, 4, 0, 100, "chainedhotstuff")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -41,6 +41,13 @@ func (s *Synchronizer) InitConsensusModule(mods *consensus.Modules, opts *consen
 	}
 	s.mods = mods
 
+	s.mods.EventLoop().RegisterHandler(TimeoutEvent{}, func(event interface{}) {
+		timeoutView := event.(TimeoutEvent).View
+		if s.currentView == timeoutView {
+			s.OnLocalTimeout()
+		}
+	})
+
 	s.mods.EventLoop().RegisterHandler(consensus.NewViewMsg{}, func(event interface{}) {
 		newViewMsg := event.(consensus.NewViewMsg)
 		s.OnNewView(newViewMsg)
@@ -85,7 +92,7 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	s.timer = time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
 		s.cancelCtx()
-		s.mods.EventLoop().AddEvent(s.OnLocalTimeout)
+		s.mods.EventLoop().AddEvent(TimeoutEvent{s.currentView})
 	})
 
 	go func() {
@@ -121,25 +128,20 @@ func (s *Synchronizer) ViewContext() context.Context {
 
 // SyncInfo returns the highest known QC or TC.
 func (s *Synchronizer) SyncInfo() consensus.SyncInfo {
-	if s.highQC.View() >= s.highTC.View() {
-		return consensus.NewSyncInfo().WithQC(s.highQC)
-	}
 	return consensus.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
 }
 
 // OnLocalTimeout is called when a local timeout happens.
 func (s *Synchronizer) OnLocalTimeout() {
-	defer func() {
-		// Reset the timer and ctx here so that we can get a new timeout in the same view.
-		// I think this is necessary to ensure that we can keep sending the same timeout message
-		// until we get a timeout certificate.
-		//
-		// TODO: figure out the best way to handle this context and timeout.
-		if s.viewCtx.Err() != nil {
-			s.newCtx(s.duration.Duration())
-		}
-		s.timer.Reset(s.duration.Duration())
-	}()
+	// Reset the timer and ctx here so that we can get a new timeout in the same view.
+	// I think this is necessary to ensure that we can keep sending the same timeout message
+	// until we get a timeout certificate.
+	//
+	// TODO: figure out the best way to handle this context and timeout.
+	if s.viewCtx.Err() != nil {
+		s.newCtx(s.duration.Duration())
+	}
+	s.timer.Reset(s.duration.Duration())
 
 	if s.lastTimeout != nil && s.lastTimeout.View == s.currentView {
 		s.mods.Configuration().Timeout(*s.lastTimeout)
@@ -263,12 +265,34 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 		timeout = true
 	}
 
-	// check for a QC.
-	if qc, ok := syncInfo.QC(); ok {
+	var (
+		haveQC bool
+		qc     consensus.QuorumCert
+		aggQC  consensus.AggregateQC
+	)
+
+	// check for an AggQC or QC
+	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.mods.Options().ShouldUseAggQC() {
+		highQC, ok := s.mods.Crypto().VerifyAggregateQC(aggQC)
+		if !ok {
+			s.mods.Logger().Info("Aggregated Quorum Certificate could not be verified")
+			return
+		}
+		if aggQC.View() >= v {
+			v = aggQC.View()
+			timeout = true
+		}
+		// ensure that the true highQC is the one stored in the syncInfo
+		syncInfo = syncInfo.WithQC(highQC)
+		qc = highQC
+	} else if qc, haveQC = syncInfo.QC(); haveQC {
 		if !s.mods.Crypto().VerifyQuorumCert(qc) {
 			s.mods.Logger().Info("Quorum Certificate could not be verified!")
 			return
 		}
+	}
+
+	if haveQC {
 		s.updateHighQC(qc)
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
 		if qc.View() >= v {
@@ -305,17 +329,6 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 	} else if replica, ok := s.mods.Configuration().Replica(leader); ok {
 		replica.NewView(syncInfo)
 	}
-}
-
-// UpdateHighQC updates HighQC if the given qc is higher than the old HighQC.
-func (s *Synchronizer) UpdateHighQC(qc consensus.QuorumCert) {
-	s.mods.Logger().Debugf("updateHighQC: %v", qc)
-	if !s.mods.Crypto().VerifyQuorumCert(qc) {
-		s.mods.Logger().Info("updateHighQC: QC could not be verified!")
-		return
-	}
-
-	s.updateHighQC(qc)
 }
 
 // updateHighQC attempts to update the highQC, but does not verify the qc first.
@@ -355,8 +368,13 @@ func (s *Synchronizer) newCtx(duration time.Duration) {
 
 var _ consensus.Synchronizer = (*Synchronizer)(nil)
 
-// ViewChangeEvent is sent on the metrics event loop whenever a view change occurs.
+// ViewChangeEvent is sent on the eventloop whenever a view change occurs.
 type ViewChangeEvent struct {
 	View    consensus.View
 	Timeout bool
+}
+
+// TimeoutEvent is sent on the eventloop when a local timeout occurs.
+type TimeoutEvent struct {
+	View consensus.View
 }

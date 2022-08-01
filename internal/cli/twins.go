@@ -22,9 +22,10 @@ var (
 	numReplicas         uint8
 	numTwins            uint8
 	numPartitions       uint8
-	numRounds           uint8
+	numViews            uint8
 	numScenarios        uint64
 	numScenariosPerFile uint64
+	numTicks            int
 	shuffle             bool
 	randSeed            int64
 	twinsDest           string
@@ -66,9 +67,10 @@ func init() {
 	twinsCmd.Flags().Uint8Var(&numReplicas, "replicas", 4, "Number of replicas.")
 	twinsCmd.Flags().Uint8Var(&numTwins, "twins", 1, "Number of \"evil\" twins.")
 	twinsCmd.Flags().Uint8Var(&numPartitions, "partitions", 2, "Number of network partitions.")
-	twinsCmd.Flags().Uint8Var(&numRounds, "rounds", 7, "Number of rounds in each scenario.")
+	twinsCmd.Flags().Uint8Var(&numViews, "views", 7, "Number of views in each scenario.")
 	twinsCmd.Flags().Uint64Var(&numScenarios, "scenarios", 0, "Number of scenarios to generate.")
 	twinsCmd.Flags().Uint64Var(&numScenariosPerFile, "scenarios-per-file", 0, "Number of scenarios to write to a single file.\nIf set to 0, all scenarios will be written to a single file.")
+	twinsCmd.Flags().IntVar(&numTicks, "ticks", 150, "The number of ticks the executor should run for.")
 	twinsCmd.Flags().BoolVar(&shuffle, "shuffle", false, "Shuffle the order in which scenarios are generated.")
 	twinsCmd.Flags().Int64Var(&randSeed, "seed", time.Now().Unix(), "Random seed (defaults to current timestamp).")
 	twinsCmd.Flags().StringVar(&twinsDest, "output", "", "If scenarios-per-file is 0, this specifies the file to write to.\nOtherwise this specifies the directory to write files to.")
@@ -157,7 +159,13 @@ type twinsInstance struct {
 }
 
 func newGen(logger logging.Logger) *twins.Generator {
-	gen := twins.NewGenerator(logger, numReplicas, numTwins, numPartitions, numRounds)
+	gen := twins.NewGenerator(logger, twins.Settings{
+		NumNodes:   numReplicas,
+		NumTwins:   numTwins,
+		Partitions: numPartitions,
+		Views:      numViews,
+		Ticks:      numTicks,
+	})
 
 	if shuffle {
 		gen.Shuffle(randSeed)
@@ -248,9 +256,11 @@ func (ti twinsInstance) generateAndExecuteScenario() (bool, error) {
 		return false, nil
 	}
 
+	settings := ti.source.Settings()
+
 	t := time.Now()
 
-	result, err := twins.ExecuteScenario(scenario, numReplicas, numTwins, twinsConsensus)
+	result, err := twins.ExecuteScenario(scenario, settings.NumNodes, settings.NumTwins, settings.Ticks, twinsConsensus)
 	if err != nil {
 		return false, err
 	}
