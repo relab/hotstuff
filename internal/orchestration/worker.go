@@ -163,25 +163,26 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	// prepare modules
 	builder := consensus.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 
-	var consensusRules consensus.Rules
-	if !modules.GetModule(opts.GetConsensus(), &consensusRules) {
+	consensusRules, ok := modules.GetModule[consensus.Rules](opts.GetConsensus())
+	if !ok {
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
 	}
 
-	var byz byzantine.Byzantine
-	if modules.GetModule(opts.GetByzantineStrategy(), &byz) {
-		consensusRules = byz.Wrap(consensusRules)
-	} else if opts.GetByzantineStrategy() != "" {
-		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
+	if opts.GetByzantineStrategy() != "" {
+		if byz, ok := modules.GetModule[byzantine.Byzantine](opts.GetByzantineStrategy()); ok {
+			consensusRules = byz.Wrap(consensusRules)
+		} else {
+			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
+		}
 	}
 
-	var cryptoImpl consensus.CryptoBase
-	if !modules.GetModule(opts.GetCrypto(), &cryptoImpl) {
+	cryptoImpl, ok := modules.GetModule[consensus.CryptoBase](opts.GetCrypto())
+	if !ok {
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
 	}
 
-	var leaderRotation consensus.LeaderRotation
-	if !modules.GetModule(opts.GetLeaderRotation(), &leaderRotation) {
+	leaderRotation, ok := modules.GetModule[consensus.LeaderRotation](opts.GetLeaderRotation())
+	if !ok {
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
 

@@ -7,12 +7,12 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
-	"sort"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/modules"
+	"golang.org/x/exp/slices"
 )
 
 func init() {
@@ -79,11 +79,9 @@ func (sig MultiSignature) ToBytes() []byte {
 	// sort by ID to make it deterministic
 	order := make([]hotstuff.ID, 0, len(sig))
 	for _, signature := range sig {
-		i := sort.Search(len(order), func(i int) bool { return signature.signer < order[i] })
-		order = append(order, 0)
-		copy(order[i+1:], order[i:])
-		order[i] = signature.signer
+		order = append(order, signature.signer)
 	}
+	slices.Sort(order)
 	for _, id := range order {
 		b = append(b, sig[id].ToBytes()...)
 	}
@@ -232,7 +230,6 @@ func (ec *ecdsaBase) BatchVerify(signature consensus.QuorumSignature, batch map[
 	}
 
 	results := make(chan bool, n)
-
 	set := make(map[consensus.Hash]struct{})
 	for id, sig := range s {
 		message, ok := batch[id]

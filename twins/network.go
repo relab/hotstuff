@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"sort"
 	"strings"
 	"time"
 
@@ -18,6 +17,8 @@ import (
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 )
 
 // NodeID is an ID that is unique to a node in the network.
@@ -106,8 +107,8 @@ func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusN
 		builder := n.GetNodeBuilder(nodeID, pk)
 		node := n.nodes[nodeID.NetworkID]
 
-		var consensusModule consensus.Rules
-		if !modules.GetModule(consensusName, &consensusModule) {
+		consensusModule, ok := modules.GetModule[consensus.Rules](consensusName)
+		if !ok {
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
 		builder.Register(
@@ -206,8 +207,9 @@ func (n *Network) NewConfiguration() consensus.Configuration {
 }
 
 type configuration struct {
-	node    *node
-	network *Network
+	node      *node
+	network   *Network
+	subConfig consensus.IDSet
 }
 
 // alternative way to get a pointer to the node.
@@ -223,8 +225,9 @@ func (c *configuration) broadcastMessage(message interface{}) {
 		if id == c.node.id.ReplicaID {
 			// do not send message to self or twin
 			continue
+		} else if c.subConfig == nil || c.subConfig.Contains(id) {
+			c.sendMessage(id, message)
 		}
-		c.sendMessage(id, message)
 	}
 }
 
@@ -270,6 +273,19 @@ func (c *configuration) Replica(id hotstuff.ID) (r consensus.Replica, ok bool) {
 		}, true
 	}
 	return nil, false
+}
+
+// SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
+func (c *configuration) SubConfig(ids []hotstuff.ID) (sub consensus.Configuration, err error) {
+	subConfig := consensus.NewIDSet()
+	for _, id := range ids {
+		subConfig.Add(id)
+	}
+	return &configuration{
+		node:      c.node,
+		network:   c.network,
+		subConfig: subConfig,
+	}, nil
 }
 
 // Len returns the number of replicas in the configuration.
@@ -361,14 +377,9 @@ func (s NodeSet) Contains(v uint32) bool {
 
 // MarshalJSON returns a JSON representation of the node set.
 func (s NodeSet) MarshalJSON() ([]byte, error) {
-	nodes := make([]uint32, 0, len(s))
-	for node := range s {
-		i := sort.Search(len(nodes), func(i int) bool { return node < nodes[i] })
-		nodes = append(nodes, 0)
-		copy(nodes[i+1:], nodes[i:])
-		nodes[i] = node
-	}
-	return json.Marshal(nodes)
+	ids := maps.Keys(s)
+	slices.Sort(ids)
+	return json.Marshal(ids)
 }
 
 // UnmarshalJSON restores the node set from JSON.

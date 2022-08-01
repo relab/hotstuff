@@ -120,6 +120,21 @@ func (mr *MockConfigurationMockRecorder) Replicas() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Replicas", reflect.TypeOf((*MockConfiguration)(nil).Replicas))
 }
 
+// SubConfig mocks base method.
+func (m *MockConfiguration) SubConfig(arg0 []hotstuff.ID) (consensus.Configuration, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SubConfig", arg0)
+	ret0, _ := ret[0].(consensus.Configuration)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SubConfig indicates an expected call of SubConfig.
+func (mr *MockConfigurationMockRecorder) SubConfig(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubConfig", reflect.TypeOf((*MockConfiguration)(nil).SubConfig), arg0)
+}
+
 // Timeout mocks base method.
 func (m *MockConfiguration) Timeout(arg0 consensus.TimeoutMsg) {
 	m.ctrl.T.Helper()

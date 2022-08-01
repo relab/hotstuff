@@ -2,9 +2,9 @@ package leaderrotation
 
 import (
 	"math/rand"
-	"sort"
 
 	wr "github.com/mroth/weightedrand"
+	"golang.org/x/exp/slices"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
@@ -62,12 +62,14 @@ func (r *repBased) GetLeader(view consensus.View) hotstuff.ID {
 		if r.prevCommitHead.View() < block.View() {
 			r.reputations[voterID] += reputation
 		}
-		i := sort.Search(len(weights), func(i int) bool { return weights[i].Item.(hotstuff.ID) >= voterID })
-		weights = append(weights[:i+1], weights[i:]...)
-		weights[i] = wr.Choice{
+		weights = append(weights, wr.Choice{
 			Item:   voterID,
 			Weight: uint(r.reputations[voterID] * 10),
-		}
+		})
+	})
+
+	slices.SortFunc(weights, func(a, b wr.Choice) bool {
+		return a.Item.(hotstuff.ID) >= b.Item.(hotstuff.ID)
 	})
 
 	if r.prevCommitHead.View() < block.View() {
