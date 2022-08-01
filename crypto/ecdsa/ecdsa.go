@@ -125,6 +125,10 @@ func (sig MultiSignature) Len() int {
 	return len(sig)
 }
 
+func (sig MultiSignature) String() string {
+	return consensus.IDSetToString(sig)
+}
+
 var _ consensus.QuorumSignature = (*MultiSignature)(nil)
 var _ consensus.IDSet = (*MultiSignature)(nil)
 

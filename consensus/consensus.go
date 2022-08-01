@@ -123,7 +123,8 @@ func (cs *consensusBase) Propose(cert SyncInfo) {
 	cs.OnPropose(proposal)
 }
 
-func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
+func (cs *consensusBase) OnPropose(proposal ProposeMsg) { //nolint:gocyclo
+	// TODO: extract parts of this method into helper functions maybe?
 	cs.mods.Logger().Debugf("OnPropose: %v", proposal.Block)
 
 	block := proposal.Block
@@ -173,12 +174,15 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 	// block is safe and was accepted
 	cs.mods.BlockChain().Store(block)
 
+	didAdvanceView := false
 	// we defer the following in order to speed up voting
 	defer func() {
 		if b := cs.impl.CommitRule(block); b != nil {
 			cs.commit(b)
 		}
-		cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
+		if !didAdvanceView {
+			cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
+		}
 	}()
 
 	if block.View() <= cs.lastVote {
@@ -193,6 +197,15 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) {
 	}
 
 	cs.lastVote = block.View()
+
+	if cs.mods.Options().ShouldUseHandel() {
+		// Need to call advanceview such that the view context will be fresh.
+		// TODO: we could instead
+		cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
+		didAdvanceView = true
+		cs.mods.Handel().Begin(pc)
+		return
+	}
 
 	leaderID := cs.mods.LeaderRotation().GetLeader(cs.lastVote + 1)
 	if leaderID == cs.mods.ID() {

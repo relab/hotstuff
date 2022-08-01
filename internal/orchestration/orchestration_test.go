@@ -23,7 +23,7 @@ import (
 )
 
 func TestOrchestration(t *testing.T) {
-	run := func(consensusImpl string, crypto string) {
+	run := func(consensusImpl string, crypto string, mods []string) {
 		controllerStream, workerStream := net.Pipe()
 
 		workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
@@ -49,6 +49,7 @@ func TestOrchestration(t *testing.T) {
 				Consensus:         consensusImpl,
 				Crypto:            crypto,
 				LeaderRotation:    "round-robin",
+				Modules:           mods,
 			},
 			Duration: 1 * time.Second,
 			Hosts:    map[string]orchestration.RemoteWorker{"127.0.0.1": workerProxy},
@@ -70,12 +71,21 @@ func TestOrchestration(t *testing.T) {
 		}
 	}
 
-	t.Run("ChainedHotStuff+ECDSA", func(t *testing.T) { run("chainedhotstuff", "ecdsa") })
-	t.Run("ChainedHotStuff+BLS12", func(t *testing.T) { run("chainedhotstuff", "bls12") })
-	t.Run("Fast-HotStuff+ECDSA", func(t *testing.T) { run("fasthotstuff", "ecdsa") })
-	t.Run("Fast-HotStuff+BLS12", func(t *testing.T) { run("fasthotstuff", "bls12") })
-	t.Run("Simple-HotStuff+ECDSA", func(t *testing.T) { run("simplehotstuff", "ecdsa") })
-	t.Run("Simple-HotStuff+BLS12", func(t *testing.T) { run("simplehotstuff", "bls12") })
+	t.Run("ChainedHotStuff+ECDSA", func(t *testing.T) { run("chainedhotstuff", "ecdsa", nil) })
+	t.Run("ChainedHotStuff+BLS12", func(t *testing.T) { run("chainedhotstuff", "bls12", nil) })
+	t.Run("Fast-HotStuff+ECDSA", func(t *testing.T) { run("fasthotstuff", "ecdsa", nil) })
+	t.Run("Fast-HotStuff+BLS12", func(t *testing.T) { run("fasthotstuff", "bls12", nil) })
+	t.Run("Simple-HotStuff+ECDSA", func(t *testing.T) { run("simplehotstuff", "ecdsa", nil) })
+	t.Run("Simple-HotStuff+BLS12", func(t *testing.T) { run("simplehotstuff", "bls12", nil) })
+
+	// handel
+	mods := []string{"handel"}
+	t.Run("ChainedHotStuff+ECDSA+Handel", func(t *testing.T) { run("chainedhotstuff", "ecdsa", mods) })
+	t.Run("ChainedHotStuff+BLS12+Handel", func(t *testing.T) { run("chainedhotstuff", "bls12", mods) })
+	t.Run("Fast-HotStuff+ECDSA+Handel", func(t *testing.T) { run("fasthotstuff", "ecdsa", mods) })
+	t.Run("Fast-HotStuff+BLS12+Handel", func(t *testing.T) { run("fasthotstuff", "bls12", mods) })
+	t.Run("Simple-HotStuff+ECDSA+Handel", func(t *testing.T) { run("simplehotstuff", "ecdsa", mods) })
+	t.Run("Simple-HotStuff+BLS12+Handel", func(t *testing.T) { run("simplehotstuff", "bls12", mods) })
 }
 
 func TestDeployment(t *testing.T) {

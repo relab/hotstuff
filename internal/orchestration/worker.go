@@ -19,6 +19,7 @@ import (
 	"github.com/relab/hotstuff/consensus/byzantine"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/handel"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/logging"
@@ -38,6 +39,7 @@ import (
 	_ "github.com/relab/hotstuff/consensus/simplehotstuff"
 	_ "github.com/relab/hotstuff/crypto/bls12"
 	_ "github.com/relab/hotstuff/crypto/ecdsa"
+	_ "github.com/relab/hotstuff/handel"
 	_ "github.com/relab/hotstuff/leaderrotation"
 )
 
@@ -249,6 +251,16 @@ func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orche
 		if err != nil {
 			return nil, err
 		}
+
+		// start Handel if enabled
+		var h *handel.Handel
+		if replica.Modules().GetModuleByType(&h) {
+			err = h.Init()
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		defer func(id uint32) {
 			w.metricsLogger.Log(&types.StartEvent{Event: types.NewReplicaEvent(id, time.Now())})
 			replica.Start()
