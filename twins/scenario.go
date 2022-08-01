@@ -50,7 +50,7 @@ type ScenarioResult struct {
 func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, consensusName string) (result ScenarioResult, err error) {
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
-	network := newNetwork(scenario,
+	network := NewPartitionedNetwork(scenario,
 		consensus.ProposeMsg{},
 		consensus.VoteMsg{},
 		consensus.Hash{},
@@ -61,7 +61,7 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, 
 	nodes, twins := assignNodeIDs(numNodes, numTwins)
 	nodes = append(nodes, twins...)
 
-	err = network.createNodes(nodes, scenario, consensusName)
+	err = network.createTwinsNodes(nodes, scenario, consensusName)
 	if err != nil {
 		return ScenarioResult{}, err
 	}
@@ -85,7 +85,7 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, 
 	}, nil
 }
 
-func checkCommits(network *network) (safe bool, commits int) {
+func checkCommits(network *Network) (safe bool, commits int) {
 	i := 0
 	for {
 		noCommits := true
@@ -131,7 +131,7 @@ func (lr leaderRotation) GetLeader(view consensus.View) hotstuff.ID {
 	return 0
 }
 
-func getBlocks(network *network) map[NodeID][]*consensus.Block {
+func getBlocks(network *Network) map[NodeID][]*consensus.Block {
 	m := make(map[NodeID][]*consensus.Block)
 	for _, node := range network.nodes {
 		m[node.id] = node.executedBlocks

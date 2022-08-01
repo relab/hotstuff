@@ -46,6 +46,7 @@ Mathieu
 Meling
 mitchellh
 orchestrationpb
+partitioner
 perr
 pflag
 pflags

@@ -27,7 +27,7 @@ func TestCreatePartialCert(t *testing.T) {
 			t.Error("Partial certificate hash does not match block hash!")
 		}
 
-		if signerID := partialCert.Signature().Signer(); signerID != hotstuff.ID(1) {
+		if signerID := partialCert.Signer(); signerID != hotstuff.ID(1) {
 			t.Errorf("Wrong ID for signer in partial certificate: got: %d, want: %d", signerID, hotstuff.ID(1))
 		}
 	}
@@ -150,7 +150,7 @@ func TestVerifyAggregateQC(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ok, highQC := td.signers[0].VerifyAggregateQC(aggQC)
+		highQC, ok := td.signers[0].VerifyAggregateQC(aggQC)
 		if !ok {
 			t.Fatal("AggregateQC was not verified")
 		}
@@ -191,13 +191,13 @@ func setup(newFunc func() consensus.Crypto, keyFunc keyFunc) setupFunc {
 	}
 }
 
-func NewCache(impl func() consensus.CryptoImpl) func() consensus.Crypto {
+func NewCache(impl func() consensus.CryptoBase) func() consensus.Crypto {
 	return func() consensus.Crypto {
 		return crypto.NewCache(impl(), 10)
 	}
 }
 
-func NewBase(impl func() consensus.CryptoImpl) func() consensus.Crypto {
+func NewBase(impl func() consensus.CryptoBase) func() consensus.Crypto {
 	return func() consensus.Crypto {
 		return crypto.New(impl())
 	}
@@ -218,10 +218,15 @@ func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() co
 		builder.Register(signer)
 	}
 	hl := bl.Build()
+	block := createBlock(t, hl[0].Crypto())
+
+	for _, mods := range hl {
+		mods.BlockChain().Store(block)
+	}
 
 	return testData{
 		signers:   hl.Signers(),
 		verifiers: hl.Verifiers(),
-		block:     createBlock(t, hl[0].Crypto()),
+		block:     block,
 	}
 }

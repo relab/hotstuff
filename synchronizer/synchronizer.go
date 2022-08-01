@@ -154,7 +154,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	view := s.currentView
 	s.mods.Logger().Debugf("OnLocalTimeout: %v", view)
 
-	sig, err := s.mods.Crypto().Sign(view.ToHash())
+	sig, err := s.mods.Crypto().Sign(view.ToBytes())
 	if err != nil {
 		s.mods.Logger().Warnf("Failed to sign view: %v", err)
 		return
@@ -168,7 +168,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 
 	if s.mods.Options().ShouldUseAggQC() {
 		// generate a second signature that will become part of the aggregateQC
-		sig, err := s.mods.Crypto().Sign(timeoutMsg.Hash())
+		sig, err := s.mods.Crypto().Sign(timeoutMsg.ToBytes())
 		if err != nil {
 			s.mods.Logger().Warnf("Failed to sign timeout message: %v", err)
 			return
@@ -195,7 +195,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout consensus.TimeoutMsg) {
 	}()
 
 	verifier := s.mods.Crypto()
-	if !verifier.Verify(timeout.ViewSignature, timeout.View.ToHash()) {
+	if !verifier.Verify(timeout.ViewSignature, timeout.View.ToBytes()) {
 		return
 	}
 	s.mods.Logger().Debug("OnRemoteTimeout: ", timeout)
@@ -275,7 +275,7 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 
 	// check for an AggQC or QC
 	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.mods.Options().ShouldUseAggQC() {
-		ok, highQC := s.mods.Crypto().VerifyAggregateQC(aggQC)
+		highQC, ok := s.mods.Crypto().VerifyAggregateQC(aggQC)
 		if !ok {
 			s.mods.Logger().Info("Aggregated Quorum Certificate could not be verified")
 			return

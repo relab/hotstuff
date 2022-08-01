@@ -84,7 +84,7 @@ func NewGenerator(logger logging.Logger, settings Settings) *Generator {
 	g.remaining = int64(math.Pow(float64(len(g.leadersPartitions)), float64(g.settings.Views)))
 
 	g.logger.Infof(
-		"%.d scenarios can be generated with current settings.",
+		"%d scenarios can be generated with current settings.",
 		g.remaining,
 	)
 
@@ -264,8 +264,10 @@ func genPartitionScenarios(twins, nodes []NodeID, k uint8, min uint8) (partition
 	sizes := genPartitionSizes(n, k, min)
 
 	for i := range sizes {
-		for j := range twinAssignments {
-			if !isValidTwinAssignment(twinAssignments[j], sizes[i]) {
+		j := 0
+		for ok := true; ok; ok = j < len(twinAssignments) {
+			if len(twinAssignments) > 0 && !isValidTwinAssignment(twinAssignments[j], sizes[i]) {
+				j++
 				continue
 			}
 
@@ -276,11 +278,13 @@ func genPartitionScenarios(twins, nodes []NodeID, k uint8, min uint8) (partition
 				}
 			}
 
-			twin := 0
-			for k := range twinAssignments[j] {
-				for _, t := range twinAssignments[j][k] {
-					partitions[t].Add(twins[twin].NetworkID)
-					twin++
+			if len(twinAssignments) > 0 {
+				twin := 0
+				for k := range twinAssignments[j] {
+					for _, t := range twinAssignments[j][k] {
+						partitions[t].Add(twins[twin].NetworkID)
+						twin++
+					}
 				}
 			}
 
@@ -293,6 +297,8 @@ func genPartitionScenarios(twins, nodes []NodeID, k uint8, min uint8) (partition
 			}
 
 			partitionScenarios = append(partitionScenarios, partitions)
+
+			j++
 		}
 	}
 	return

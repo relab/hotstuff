@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/internal/orchestration"
+	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/logging"
@@ -136,11 +137,11 @@ func runController() {
 	exePath := viper.GetString("exe")
 
 	g, err := iago.NewSSHGroup(hosts, viper.GetString("ssh-config"))
-	checkf("Failed to connect to remote hosts: %v", err)
+	checkf("failed to connect to remote hosts: %v", err)
 
 	if exePath == "" {
 		exePath, err = os.Executable()
-		checkf("Failed to get executable path: %v", err)
+		checkf("failed to get executable path: %v", err)
 	}
 
 	sessions, err := orchestration.Deploy(g, orchestration.DeployConfig{
@@ -153,7 +154,7 @@ func runController() {
 		Metrics:             viper.GetStringSlice("metrics"),
 		MeasurementInterval: viper.GetDuration("measurement-interval"),
 	})
-	checkf("Failed to deploy workers: %v", err)
+	checkf("failed to deploy workers: %v", err)
 
 	errors := make(chan error)
 
@@ -167,6 +168,7 @@ func runController() {
 	}
 
 	if worker || len(hosts) == 0 {
+
 		worker, wait := localWorker(outputDir, viper.GetStringSlice("metrics"), viper.GetDuration("measurement-interval"))
 		defer wait()
 		experiment.Hosts["localhost"] = worker
@@ -228,7 +230,19 @@ func parseByzantine() (map[string]int, error) {
 	return strategies, nil
 }
 
-func localWorker(output string, metrics []string, interval time.Duration) (worker orchestration.RemoteWorker, wait func()) {
+func localWorker(globalOutput string, metrics []string, interval time.Duration) (worker orchestration.RemoteWorker, wait func()) {
+	// set up an output dir
+	output := ""
+	if globalOutput != "" {
+		output = filepath.Join(globalOutput, "local")
+		err := os.MkdirAll(output, 0755)
+		checkf("failed to create local output directory: %v", err)
+	}
+
+	// start profiling
+	stopProfilers, err := startLocalProfiling(output)
+	checkf("failed to start local profiling: %v", err)
+
 	// set up a local worker
 	controllerPipe, workerPipe := net.Pipe()
 	c := make(chan struct{})
@@ -266,6 +280,7 @@ func localWorker(output string, metrics []string, interval time.Duration) (worke
 
 	wait = func() {
 		<-c
+		checkf("failed to stop local profilers: %v", stopProfilers())
 	}
 
 	return orchestration.NewRemoteWorker(
@@ -276,4 +291,36 @@ func localWorker(output string, metrics []string, interval time.Duration) (worke
 func stderrPipe(r io.Reader, errChan chan<- error) {
 	_, err := io.Copy(os.Stderr, r)
 	errChan <- err
+}
+
+func startLocalProfiling(output string) (stop func() error, err error) {
+	var (
+		cpuProfile    string
+		memProfile    string
+		trace         string
+		fgprofProfile string
+	)
+
+	if output == "" {
+		return func() error { return nil }, nil
+	}
+
+	if viper.GetBool("cpu-profile") {
+		cpuProfile = filepath.Join(output, "cpuprofile")
+	}
+
+	if viper.GetBool("mem-profile") {
+		memProfile = filepath.Join(output, "memprofile")
+	}
+
+	if viper.GetBool("trace") {
+		trace = filepath.Join(output, "trace")
+	}
+
+	if viper.GetBool("fgprof-profile") {
+		fgprofProfile = filepath.Join(output, "fgprofprofile")
+	}
+
+	stop, err = profiling.StartProfilers(cpuProfile, memProfile, trace, fgprofProfile)
+	return
 }
