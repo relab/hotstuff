@@ -133,17 +133,15 @@ func (s *Synchronizer) SyncInfo() consensus.SyncInfo {
 
 // OnLocalTimeout is called when a local timeout happens.
 func (s *Synchronizer) OnLocalTimeout() {
-	defer func() {
-		// Reset the timer and ctx here so that we can get a new timeout in the same view.
-		// I think this is necessary to ensure that we can keep sending the same timeout message
-		// until we get a timeout certificate.
-		//
-		// TODO: figure out the best way to handle this context and timeout.
-		if s.viewCtx.Err() != nil {
-			s.newCtx(s.duration.Duration())
-		}
-		s.timer.Reset(s.duration.Duration())
-	}()
+	// Reset the timer and ctx here so that we can get a new timeout in the same view.
+	// I think this is necessary to ensure that we can keep sending the same timeout message
+	// until we get a timeout certificate.
+	//
+	// TODO: figure out the best way to handle this context and timeout.
+	if s.viewCtx.Err() != nil {
+		s.newCtx(s.duration.Duration())
+	}
+	s.timer.Reset(s.duration.Duration())
 
 	if s.lastTimeout != nil && s.lastTimeout.View == s.currentView {
 		s.mods.Configuration().Timeout(*s.lastTimeout)
