@@ -26,7 +26,7 @@ It also provides a tool for deploying and running experiments on multiple server
 
 ## Build Dependencies
 
-- [Go](https://go.dev) (at least version 1.16)
+- [Go](https://go.dev) (at least version 1.18)
 
 If you modify any of the protobuf files, you will need the following to compile them:
 
