@@ -115,7 +115,7 @@ func init() {
 ## Running experiments locally
 
 First, compile the cli by running `make` from the project's root directory. If you get any errors, make sure that you
-have go version 1.16 or later, as well as a protobuf compiler installed. You might also need to run `make tools` to
+have go version 1.18 or later, as well as a protobuf compiler installed. You might also need to run `make tools` to
 install some additional tools. The next sections will assume that you have done this, and that you are running the cli
 from the project's root directory.
 
