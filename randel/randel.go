@@ -3,6 +3,7 @@ package randel
 import (
 	"errors"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/relab/gorums"
@@ -12,7 +13,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/proto/randelpb"
 	"github.com/relab/hotstuff/modules"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"golang.org/x/net/context"
 )
 
 func init() {
@@ -21,17 +22,26 @@ func init() {
 
 // Handel implements a signature aggregation protocol.
 type Randel struct {
+	sync.Mutex
 	mods                    *consensus.Modules
 	nodes                   map[hotstuff.ID]*randelpb.Node
-	isContributionCollected bool
-	aggregatedContribution  *randelpb.RContribution
+	initialTimeoutMilliSecs int
 	maxLevel                int
+	aggregatedContribution  *randelpb.RContribution
+	individualContribution  *randelpb.RContribution
+	level                   *Level
+	prevFailedNodeIDs       []hotstuff.ID
+	newFailedNodeIDs        []hotstuff.ID
+	blockHash               []byte
+	isAggregationCompleted  bool
+	isInitialized           bool
 }
 
 // New returns a new instance of the Handel module.
 func New() consensus.Randel {
 	return &Randel{
-		nodes: make(map[hotstuff.ID]*randelpb.Node),
+		nodes:             make(map[hotstuff.ID]*randelpb.Node),
+		prevFailedNodeIDs: make([]hotstuff.ID, 0),
 	}
 }
 
@@ -39,16 +49,12 @@ func New() consensus.Randel {
 // It also allows the module to set module options using the OptionsBuilder.
 func (r *Randel) InitConsensusModule(mods *consensus.Modules, opts *consensus.OptionsBuilder) {
 	r.mods = mods
-	opts.SetShouldUseHandel()
-
-	// the rest of the setup is deferred to the Init method.
-	// FIXME: it could be possible to handle the Init stuff automatically
-	// if the Configuration module were to send an event upon connecting.
+	opts.SetShouldUseRandel()
 }
 
 // Init initializes the Handel module.
 func (r *Randel) Init() error {
-	r.mods.Logger().Info("Handel: Initializing")
+	r.mods.Logger().Info("Randel: Initializing")
 
 	var cfg *backend.Config
 	var srv *backend.Server
@@ -60,33 +66,179 @@ func (r *Randel) Init() error {
 		return errors.New("could not get gorums configuration")
 	}
 
-	randelpb.RegisterRandelServer(srv.GetGorumsServer(), serviceImpl{r})
 	randelCfg := randelpb.ConfigurationFromRaw(cfg.GetRawConfiguration(), nil)
 
 	for _, n := range randelCfg.Nodes() {
 		r.nodes[hotstuff.ID(n.ID())] = n
 	}
-
+	r.level = r.assignLevel()
 	r.maxLevel = int(math.Ceil(math.Log2(float64(r.mods.Configuration().Len()))))
-
+	r.initialTimeoutMilliSecs = 2000
+	randelpb.RegisterRandelServer(srv.GetGorumsServer(), serviceImpl{r})
 	return nil
 }
 
 // Begin commissions the aggregation of a new signature.
-func (h *Randel) Begin(s consensus.PartialCert) {
-	level := h.assignLevel(s.BlockHash())
+func (r *Randel) Begin(s consensus.PartialCert) {
+
+	r.Lock()
+	defer r.Unlock()
+	r.mods.Logger().Info("Randel: object initializing")
+	r.reset()
 	var hash [32]byte = s.BlockHash()
+	copy(r.blockHash, hash[:])
 	sig := hotstuffpb.QuorumSignatureToProto(s.Signature())
-	h.aggregatedContribution = &randelpb.RContribution{
-		ID:        uint32(h.mods.ID()),
+	r.individualContribution = &randelpb.RContribution{
+		ID:        uint32(r.mods.ID()),
 		Signature: sig,
 		Hash:      hash[:],
 	}
-	for temp := 1; temp < level.getLevel(h.mods.ID()); temp++ {
-		subNodes := level.getSubNodesForNode(temp, h.mods.ID())
-		for _, id := range subNodes {
-			node := h.nodes[id]
+	r.mods.Logger().Info("My level is ", r.level.getLevel(r.mods.ID()))
+	if r.level.getLevel(r.mods.ID()) == 1 || r.level.getLevel(r.mods.ID()) == 0 {
+		r.aggregatedContribution = r.individualContribution
+	}
+	r.isInitialized = true
+	r.mods.Logger().Info("Initialization completed")
+	go r.fetchContributions()
+}
+
+func (r *Randel) reset() {
+	r.prevFailedNodeIDs = make([]hotstuff.ID, 0)
+	r.newFailedNodeIDs = make([]hotstuff.ID, 0)
+	r.blockHash = make([]byte, 32)
+	r.aggregatedContribution = nil
+	r.individualContribution = nil
+	r.isAggregationCompleted = false
+	r.isInitialized = false
+}
+
+func (r *Randel) canMergeContributions(a, b consensus.QuorumSignature) bool {
+	canMerge := true
+	if a == nil || b == nil {
+		r.mods.Logger().Info("one of it is nil")
+		return false
+	}
+	a.Participants().RangeWhile(func(i hotstuff.ID) bool {
+		b.Participants().RangeWhile(func(j hotstuff.ID) bool {
+			// cannot merge a and b if they both contain a contribution from the same ID.
+			if i == j {
+				r.mods.Logger().Info("one of it is same")
+				canMerge = false
+			}
+
+			return canMerge
+		})
+
+		return canMerge
+	})
+
+	return canMerge
+}
+
+func (r *Randel) verifyContribution(signature consensus.QuorumSignature, hash consensus.Hash) bool {
+	verified := false
+	block, ok := r.mods.BlockChain().Get(hash)
+	if !ok {
+		return verified
+	}
+	verified = r.mods.Crypto().Verify(signature, block.ToBytes())
+	return verified
+}
+func (r *Randel) mergeWithContribution(contribution *randelpb.RContribution) (bool, error) {
+	r.Lock()
+	defer r.Unlock()
+	if r.aggregatedContribution == nil {
+		r.aggregatedContribution = contribution
+		return false, nil
+	}
+	currentSignature := hotstuffpb.QuorumSignatureFromProto(contribution.Signature)
+	compiledSignature := hotstuffpb.QuorumSignatureFromProto(r.aggregatedContribution.Signature)
+	var blockHash consensus.Hash
+	copy(blockHash[:], r.blockHash)
+	isVerified := r.verifyContribution(currentSignature, blockHash)
+	if !isVerified {
+		r.mods.Logger().Info("contribution verification failed ")
+		return false, errors.New("unable to verify the contribution")
+	}
+	if r.canMergeContributions(currentSignature, compiledSignature) {
+		new, err := r.mods.Crypto().Combine(currentSignature, compiledSignature)
+		if err == nil {
+			r.mods.Logger().Info("combination done with length ", new.Participants().Len())
+			r.aggregatedContribution.Signature = hotstuffpb.QuorumSignatureToProto(new)
+			if new.Participants().Len() >= r.mods.Configuration().QuorumSize() {
+				r.mods.Logger().Info("sending the event to loop ")
+				var blockHash consensus.Hash
+				copy(blockHash[:], r.blockHash)
+				r.mods.EventLoop().AddEvent(consensus.NewViewMsg{
+					SyncInfo: consensus.NewSyncInfo().WithQC(consensus.NewQuorumCert(
+						new,
+						r.mods.Synchronizer().View(),
+						blockHash,
+					)),
+				})
+				return true, nil
+			}
+		} else {
+			r.mods.Logger().Info("Failed to combine signatures: %v", err)
+			return false, errors.New("unable to combine signature")
 		}
+	} else {
+		r.mods.Logger().Info("Failed to merge signatures")
+		return false, errors.New("unable to merge signature")
+	}
+	return false, nil
+}
+
+func (r *Randel) fetchContributionFromNode(nodeID hotstuff.ID, level int, isAldFailed bool) {
+	node := r.nodes[nodeID]
+	ctx, cancel := context.WithTimeout(context.Background(),
+		time.Duration((level*r.initialTimeoutMilliSecs))*time.Millisecond)
+	defer cancel()
+	contribution, err := node.RequestContribution(ctx, &randelpb.Request{NodeID: uint32(r.mods.ID()), View: uint64(r.mods.Synchronizer().View())})
+	if err != nil {
+		r.mods.Logger().Info("unable to fetch contribution from node:", nodeID, err)
+		r.newFailedNodeIDs = append(r.newFailedNodeIDs, nodeID)
+		return
+	}
+	if contribution.Signature == nil {
+		return
+	}
+
+	r.mergeWithContribution(contribution)
+	// TODO(hanish): We are assuming no incorrect contribution for implementation.
+	if !isAldFailed {
+		for _, fID := range contribution.FailedNodes {
+			if hotstuff.ID(fID) == r.mods.ID() {
+				continue
+			}
+			r.Lock()
+			r.prevFailedNodeIDs = append(r.prevFailedNodeIDs, hotstuff.ID(fID))
+			r.Unlock()
+		}
+	}
+}
+
+func (r *Randel) fetchContributions() {
+
+	subNodes := r.level.getAllSubNodes(r.mods.ID())
+	r.mods.Logger().Info("My sub nodes ", subNodes)
+
+	for _, nodeID := range subNodes {
+		r.fetchContributionFromNode(nodeID, r.level.getLevel(r.mods.ID()), false)
+	}
+	r.fetchFromFailedSubNodes()
+	r.Lock()
+	r.isAggregationCompleted = true
+	r.Unlock()
+	r.mods.Logger().Info("Completed the fetching ")
+}
+
+func (r *Randel) fetchFromFailedSubNodes() {
+	r.Lock()
+	defer r.Unlock()
+	myLevel := r.level.getLevel(r.mods.ID())
+	for _, nodeID := range r.prevFailedNodeIDs {
+		r.fetchContributionFromNode(nodeID, myLevel, true)
 	}
 }
 
@@ -94,44 +246,67 @@ type serviceImpl struct {
 	r *Randel
 }
 
-func (impl serviceImpl) RequestContribution(ctx gorums.ServerCtx,
-	in *emptypb.Empty) (resp *randelpb.RContribution, err error) {
-	// TODO(Hanish): It is a quorum function for handling the
-	// response from the sub configuration.
-	// Verify the contribution and send the response to the above level.
-	waitTime := 10 * time.Millisecond
-	for {
-		select {
-		case <-ctx.Done():
-			return impl.r.aggregatedContribution, ctx.Err()
-		case <-time.After(waitTime):
-			if impl.r.isContributionCollected == true {
-				return impl.r.aggregatedContribution, nil
+func (impl serviceImpl) sendContribution(request *randelpb.Request) (resp *randelpb.RContribution, err error) {
+	impl.r.Lock()
+	defer impl.r.Unlock()
+	if impl.r.isInitialized {
+		if impl.r.mods.Synchronizer().View() < consensus.View(request.View) {
+
+			impl.r.mods.Logger().Info("i am slow ", impl.r.mods.Synchronizer().View(), consensus.View(request.View))
+			return nil, errors.New("not updated yet")
+		}
+		if impl.r.mods.Synchronizer().View() > consensus.View(request.View) {
+			emptyContribution := &randelpb.RContribution{}
+			return emptyContribution, nil
+		}
+		myLevel := impl.r.level.getLevel(impl.r.mods.ID())
+		reqLevel := impl.r.level.getLevel(hotstuff.ID(request.NodeID))
+		if myLevel == 0 {
+			impl.r.mods.Logger().Info("lower request received")
+			return impl.r.individualContribution, nil
+		}
+		if myLevel > reqLevel {
+			impl.r.mods.Logger().Info("lower request received")
+			return impl.r.individualContribution, nil
+		}
+		if impl.r.isAggregationCompleted {
+			if impl.r.aggregatedContribution == nil {
+				if impl.r.individualContribution != nil {
+					impl.r.mods.Logger().Info("sending the individual contribution")
+					return impl.r.individualContribution, nil
+				}
+				return nil, errors.New("unable to collect the signatures")
 			}
+			for _, nodeID := range impl.r.newFailedNodeIDs {
+				impl.r.aggregatedContribution.FailedNodes = append(impl.r.aggregatedContribution.FailedNodes, uint32(nodeID))
+			}
+			impl.r.mods.Logger().Info("sending the aggregate contribution")
+			return impl.r.aggregatedContribution, nil
 		}
 	}
-	return nil, errors.New("Unable to collect the signature")
+	return nil, errors.New("not initialized yet")
 }
+func (impl serviceImpl) RequestContribution(ctx gorums.ServerCtx,
+	request *randelpb.Request) (resp *randelpb.RContribution, err error) {
+	emptyContribution := &randelpb.RContribution{}
+	impl.r.mods.Logger().Info("received contribution request")
 
-type contribution struct {
-	hash       consensus.Hash
-	sender     hotstuff.ID
-	level      int
-	signature  consensus.QuorumSignature
-	individual consensus.QuorumSignature
-	verified   bool
-	deferred   bool
-	score      int
-}
-
-type disseminateEvent struct {
-	sessionID consensus.Hash
-}
-
-type levelActivateEvent struct {
-	sessionID consensus.Hash
-}
-
-type sessionDoneEvent struct {
-	hash consensus.Hash
+	for {
+		impl.r.mods.Logger().Info("waiting for select ")
+		select {
+		case <-ctx.Done():
+			impl.r.mods.Logger().Info("context is complete, sending the aggregate contribution")
+			if impl.r.aggregatedContribution == nil {
+				return emptyContribution, ctx.Err()
+			}
+			return impl.r.aggregatedContribution, ctx.Err()
+		default:
+			contribution, err := impl.sendContribution(request)
+			if err != nil {
+				time.Sleep(200 * time.Millisecond)
+				continue
+			}
+			return contribution, err
+		}
+	}
 }

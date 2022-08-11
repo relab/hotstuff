@@ -4,6 +4,7 @@ package consensus
 type Options struct {
 	shouldUseAggQC        bool
 	shouldUseHandel       bool
+	shouldUseRandel       bool
 	shouldVerifyVotesSync bool
 
 	sharedRandomSeed   int64
@@ -19,6 +20,10 @@ func (c Options) ShouldUseAggQC() bool {
 // ShouldUseHandel returns true if the Handel signature aggregation protocol should be used.
 func (c Options) ShouldUseHandel() bool {
 	return c.shouldUseHandel
+}
+
+func (c Options) ShouldUseRandel() bool {
+	return c.shouldUseRandel
 }
 
 // ShouldVerifyVotesSync returns true if votes should be verified synchronously.
@@ -60,6 +65,10 @@ func (builder *OptionsBuilder) SetShouldVerifyVotesSync() {
 // SetSharedRandomSeed sets the shared random seed.
 func (builder *OptionsBuilder) SetSharedRandomSeed(seed int64) {
 	builder.opts.sharedRandomSeed = seed
+}
+
+func (builder *OptionsBuilder) SetShouldUseRandel() {
+	builder.opts.shouldUseRandel = true
 }
 
 // SetConnectionMetadata sets the value of a key in the connection metadata map.

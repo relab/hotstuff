@@ -165,7 +165,6 @@ func (s *session) newLevel(i int) level {
 
 func (s *session) canMergeContributions(a, b consensus.QuorumSignature) bool {
 	canMerge := true
-
 	if a == nil || b == nil {
 		return false
 	}

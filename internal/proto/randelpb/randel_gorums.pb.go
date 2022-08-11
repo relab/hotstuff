@@ -11,8 +11,6 @@ import (
 	fmt "fmt"
 	gorums "github.com/relab/gorums"
 	encoding "google.golang.org/grpc/encoding"
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -147,31 +145,17 @@ type Node struct {
 // QuorumSpec is the interface of quorum functions for Randel.
 type QuorumSpec interface {
 	gorums.ConfigOption
-
-	// RequestContributionQF is the quorum function for the RequestContribution
-	// quorum call method. The in parameter is the request object
-	// supplied to the RequestContribution method at call time, and may or may not
-	// be used by the quorum function. If the in parameter is not needed
-	// you should implement your quorum function with '_ *emptypb.Empty'.
-	RequestContributionQF(in *emptypb.Empty, replies map[uint32]*RContribution) (*RContribution, bool)
 }
 
 // RequestContribution is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (c *Configuration) RequestContribution(ctx context.Context, in *emptypb.Empty) (resp *RContribution, err error) {
-	cd := gorums.QuorumCallData{
+func (n *Node) RequestContribution(ctx context.Context, in *Request) (resp *RContribution, err error) {
+	cd := gorums.CallData{
 		Message: in,
 		Method:  "randelpb.Randel.RequestContribution",
 	}
-	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
-		r := make(map[uint32]*RContribution, len(replies))
-		for k, v := range replies {
-			r[k] = v.(*RContribution)
-		}
-		return c.qspec.RequestContributionQF(req.(*emptypb.Empty), r)
-	}
 
-	res, err := c.RawConfiguration.QuorumCall(ctx, cd)
+	res, err := n.RawNode.RPCCall(ctx, cd)
 	if err != nil {
 		return nil, err
 	}
@@ -180,20 +164,14 @@ func (c *Configuration) RequestContribution(ctx context.Context, in *emptypb.Emp
 
 // Randel is the server-side API for the Randel Service
 type Randel interface {
-	RequestContribution(ctx gorums.ServerCtx, request *emptypb.Empty) (response *RContribution, err error)
+	RequestContribution(ctx gorums.ServerCtx, request *Request) (response *RContribution, err error)
 }
 
 func RegisterRandelServer(srv *gorums.Server, impl Randel) {
 	srv.RegisterHandler("randelpb.Randel.RequestContribution", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
-		req := in.Message.(*emptypb.Empty)
+		req := in.Message.(*Request)
 		defer ctx.Release()
 		resp, err := impl.RequestContribution(ctx, req)
 		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
 	})
-}
-
-type internalRContribution struct {
-	nid   uint32
-	reply *RContribution
-	err   error
 }

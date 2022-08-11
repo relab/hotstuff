@@ -207,6 +207,15 @@ func (cs *consensusBase) OnPropose(proposal ProposeMsg) { //nolint:gocyclo
 		return
 	}
 
+	if cs.mods.Options().ShouldUseRandel() {
+		// Need to call advanceview such that the view context will be fresh.
+		// TODO: we could instead
+		//cs.mods.Synchronizer().AdvanceView(NewSyncInfo().WithQC(block.QuorumCert()))
+		//didAdvanceView = true
+		cs.mods.Randel().Begin(pc)
+		return
+	}
+
 	leaderID := cs.mods.LeaderRotation().GetLeader(cs.lastVote + 1)
 	if leaderID == cs.mods.ID() {
 		cs.mods.EventLoop().AddEvent(VoteMsg{ID: cs.mods.ID(), PartialCert: pc})

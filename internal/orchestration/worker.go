@@ -26,6 +26,7 @@ import (
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/randel"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc"
@@ -255,6 +256,14 @@ func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orche
 		var h *handel.Handel
 		if replica.Modules().GetModuleByType(&h) {
 			err = h.Init()
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		var r *randel.Randel
+		if replica.Modules().GetModuleByType(&r) {
+			err = r.Init()
 			if err != nil {
 				return nil, err
 			}

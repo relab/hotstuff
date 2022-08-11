@@ -4,19 +4,21 @@ package randelpb;
 
 import "gorums.proto";
 import "hotstuffpb/hotstuff.proto";
-import "google/protobuf/empty.proto";
 
 option go_package = "github.com/relab/hotstuff/internal/proto/randelpb";
 
 service Randel {
-  rpc RequestContribution(google.protobuf.Empty) returns (RContribution) {
-    option (gorums.quorumcall) = true;
+  rpc RequestContribution(Request) returns (RContribution) {
   }
 }
 
+message Request {
+  uint32 NodeID = 1;
+  uint64 View = 2;
+}
 message RContribution {
   uint32 ID = 1;
   hotstuffpb.QuorumSignature Signature = 2;
   bytes Hash = 3;
-  repeated uint32 participatingNodes = 4;
+  repeated uint32 failedNodes = 4;
 }

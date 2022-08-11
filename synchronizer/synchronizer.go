@@ -296,14 +296,16 @@ func (s *Synchronizer) AdvanceView(syncInfo consensus.SyncInfo) {
 	s.newCtx(duration)
 	s.timer.Reset(duration)
 
-	s.mods.Logger().Debugf("advanced to view %d", s.currentView)
+	s.mods.Logger().Infof("advanced to view %d", s.currentView)
 	s.mods.EventLoop().AddEvent(ViewChangeEvent{View: s.currentView, Timeout: timeout})
 
 	leader := s.mods.LeaderRotation().GetLeader(s.currentView)
 	if leader == s.mods.ID() {
 		s.mods.Consensus().Propose(syncInfo)
+		s.mods.Logger().Info("sent propose")
 	} else if replica, ok := s.mods.Configuration().Replica(leader); ok {
 		replica.NewView(syncInfo)
+		s.mods.Logger().Info("sent new view")
 	}
 }
 

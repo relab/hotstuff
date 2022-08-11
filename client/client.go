@@ -105,7 +105,6 @@ func New(conf Config, builder modules.Builder) (client *Client) {
 	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
 
 	client.mgr = clientpb.NewManager(opts...)
-
 	return client
 }
 
@@ -230,7 +229,6 @@ loop:
 			SequenceNumber: num,
 			Data:           data[:n],
 		}
-
 		ctx, cancel := context.WithTimeout(ctx, c.timeout)
 		promise := c.gorumsConfig.ExecCommand(ctx, cmd)
 		pending := pendingCmd{sequenceNumber: num, sendTime: time.Now(), promise: promise, cancelCtx: cancel}
@@ -271,10 +269,10 @@ func (c *Client) handleCommands(ctx context.Context) (executed, failed, timeout 
 		if err != nil {
 			qcError, ok := err.(gorums.QuorumCallError)
 			if ok && qcError.Reason == context.DeadlineExceeded.Error() {
-				c.mods.Logger().Debug("Command timed out.")
+				c.mods.Logger().Info("Command timed out.")
 				timeout++
 			} else if !ok || qcError.Reason != context.Canceled.Error() {
-				c.mods.Logger().Debugf("Did not get enough replies for command: %v\n", err)
+				c.mods.Logger().Info("Did not get enough replies for command: %v\n", err)
 				failed++
 			}
 		} else {

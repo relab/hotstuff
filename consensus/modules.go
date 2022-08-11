@@ -27,6 +27,7 @@ type Modules struct {
 	synchronizer   Synchronizer
 	forkHandler    ForkHandlerExt
 	handel         Handel
+	randel         Randel
 }
 
 // Run starts both event loops using the provided context and returns when both event loops have exited.
@@ -97,6 +98,9 @@ func (mods *Modules) ForkHandler() ForkHandlerExt {
 // Handel returns the Handel implementation.
 func (mods *Modules) Handel() Handel {
 	return mods.handel
+}
+func (mods *Modules) Randel() Randel {
+	return mods.randel
 }
 
 // Builder is a helper for constructing a HotStuff instance.
@@ -170,6 +174,9 @@ func (b *Builder) Register(mods ...interface{}) { //nolint:gocyclo
 		}
 		if m, ok := module.(Handel); ok {
 			b.mods.handel = m
+		}
+		if m, ok := module.(Randel); ok {
+			b.mods.randel = m
 		}
 		if m, ok := module.(Module); ok {
 			b.modules = append(b.modules, m)

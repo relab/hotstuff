@@ -1,25 +1,23 @@
 package randel
 
 import (
-	"encoding/binary"
 	"math"
 	"math/rand"
 	"reflect"
 	"sort"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 )
 
 type Level struct {
 	posMapping   map[int]hotstuff.ID
 	levelMapping map[hotstuff.ID]int
-	seed         int64
+	subNodes     map[hotstuff.ID][]hotstuff.ID
 }
 
-func (r *Randel) assignLevel(hash consensus.Hash) *Level {
+func (r *Randel) assignLevel() *Level {
 
-	seed := r.mods.Options().SharedRandomSeed() + int64(binary.LittleEndian.Uint64(hash[:]))
+	seed := r.mods.Options().SharedRandomSeed()
 	totalNodes := r.mods.Configuration().Len()
 	ids := make([]hotstuff.ID, 0, totalNodes)
 	for id := range r.mods.Configuration().Replicas() {
@@ -36,31 +34,68 @@ func (r *Randel) assignLevel(hash consensus.Hash) *Level {
 		posMapping[index] = id
 		levelMapping[id] = getLevelForIndex(index, maxLevel, totalNodes)
 	}
+	subNodes := assignSubNodes(posMapping, levelMapping)
 	return &Level{
 		posMapping:   posMapping,
-		seed:         seed,
 		levelMapping: levelMapping,
+		subNodes:     subNodes,
 	}
 }
 
 func (l *Level) getAllSubNodes(id hotstuff.ID) []hotstuff.ID {
-	pos := 0
-	for tempPos, tempID := range l.posMapping {
-		if tempID == id {
-			pos = tempPos
+	return l.subNodes[id]
+}
+
+func getNodeIDsForLevel(levelMapping map[hotstuff.ID]int, level int) []hotstuff.ID {
+	levelNodes := make([]hotstuff.ID, 0)
+	for id, l := range levelMapping {
+		if l == level {
+			levelNodes = append(levelNodes, id)
 		}
 	}
-	subNodes := make([]hotstuff.ID, 0)
-	level := l.levelMapping[id]
-	prevLevel := 0
-	for tempPos := 1; tempPos < len(l.posMapping); tempPos++ {
-		if tempPos > pos && l.levelMapping[l.posMapping[tempPos]] > prevLevel &&
-			l.levelMapping[l.posMapping[tempPos]] < level {
-			subNodes = append(subNodes, l.posMapping[tempPos])
-			prevLevel = l.levelMapping[l.posMapping[tempPos]]
+	sort.Slice(levelNodes, func(i, j int) bool {
+		return levelNodes[i] < levelNodes[j]
+	})
+	return levelNodes
+}
+
+func assignSubNodes(posMapping map[int]hotstuff.ID, levelMapping map[hotstuff.ID]int) map[hotstuff.ID][]hotstuff.ID {
+	subNodes := make(map[hotstuff.ID][]hotstuff.ID)
+	zeroProcess := posMapping[0]
+	highLevel := levelMapping[zeroProcess]
+	prevNodes := make([]hotstuff.ID, 0)
+	prevNodes = append(prevNodes, zeroProcess)
+	for highLevel > 1 {
+		nextLowLevelNodes := getNodeIDsForLevel(levelMapping, highLevel-1)
+		nextLevelAdded := make([]hotstuff.ID, 0)
+		tempPrevNodes := make([]hotstuff.ID, 0)
+		index := 0
+		for _, tempID := range prevNodes {
+			nextLevelAdded = append(nextLevelAdded, nextLowLevelNodes[index])
+			nextLevelAdded = append(nextLevelAdded, nextLowLevelNodes[index+1])
+			subNodes[tempID] = nextLevelAdded
+			index = index + 2
+			tempPrevNodes = append(tempPrevNodes, nextLevelAdded...)
+			nextLevelAdded = make([]hotstuff.ID, 0)
 		}
+		prevNodes = tempPrevNodes
+		highLevel -= 1
+	}
+	level1Nodes := getNodeIDsForLevel(levelMapping, 1)
+	for _, nodeID := range level1Nodes {
+		pos := getPosForNode(nodeID, posMapping)
+		subNodes[nodeID] = []hotstuff.ID{posMapping[pos-1]}
 	}
 	return subNodes
+}
+
+func getPosForNode(nodeID hotstuff.ID, posMapping map[int]hotstuff.ID) int {
+	for pos, tempNodeID := range posMapping {
+		if tempNodeID == nodeID {
+			return pos
+		}
+	}
+	return 0
 }
 
 func getLevelForIndex(index int, maxLevel int, totalNodes int) int {
@@ -68,10 +103,9 @@ func getLevelForIndex(index int, maxLevel int, totalNodes int) int {
 	if index == 0 {
 		return maxLevel
 	}
-	startSequence := make([]int, 0, totalNodes/2+(totalNodes%2))
-	for i := 1; i < totalNodes; {
+	startSequence := make([]int, 0)
+	for i := 1; i < totalNodes; i += 2 {
 		startSequence = append(startSequence, i)
-		i += 2
 	}
 	for level := 1; level <= maxLevel; level += 1 {
 		if isPresentInCurrentLevel(level, startSequence, index) {
@@ -91,36 +125,9 @@ func isPresentInCurrentLevel(level int, startSequence []int, element int) bool {
 	return false
 }
 
-func (l *Level) getAllNodesForLevel(level int) []hotstuff.ID {
-	nodes := make([]hotstuff.ID, 0)
-	for id, currentLevel := range l.levelMapping {
-		if level == currentLevel {
-			nodes = append(nodes, id)
-		}
-	}
-	return nodes
-}
-
-func (l *Level) getSubNodesForNode(level int, myID hotstuff.ID) []hotstuff.ID {
-	retNodes := make([]hotstuff.ID, 0)
-	subNodes := l.getAllSubNodes(myID)
-	for id, currentLevel := range l.levelMapping {
-		if currentLevel == level && isPresentInSlice(id, subNodes) {
-			retNodes = append(retNodes, id)
-		}
-	}
-	return retNodes
-}
-
-func isPresentInSlice(element hotstuff.ID, idSlice []hotstuff.ID) bool {
-	for _, id := range idSlice {
-		if element == id {
-			return true
-		}
-	}
-	return false
-}
-
 func (l *Level) getLevel(id hotstuff.ID) int {
+	if len(l.getAllSubNodes(id)) == 0 {
+		return 0
+	}
 	return l.levelMapping[id]
 }
