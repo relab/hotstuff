@@ -51,7 +51,18 @@ type CoreModule interface {
 }
 
 type Provider interface {
-	ProvideModule() (module any, moduleType any)
+	ProvideModule() (moduleType any)
+}
+
+type Implements[T any] struct {
+}
+
+func (p Implements[T]) ProvideModule() (moduleType any) {
+	return new(T)
+}
+
+func Provide[T any]() Provider {
+	return Implements[T]{}
 }
 
 // Core is the base of the module system.
@@ -154,6 +165,10 @@ type CoreBuilder struct {
 	modules []CoreModule
 }
 
+func NewBuilder() CoreBuilder {
+	return NewCoreBuilder(0)
+}
+
 // NewCoreBuilder returns a new builder.
 func NewCoreBuilder(id hotstuff.ID) CoreBuilder {
 	bl := CoreBuilder{mods: Core{
@@ -177,18 +192,22 @@ func (b *CoreBuilder) Provide(module any, types ...any) {
 		return
 	}
 
+	t := reflect.TypeOf(module)
+
 	for _, ptr := range types {
-		v := reflect.ValueOf(ptr)
-		if !v.IsValid() {
+		pt := reflect.TypeOf(ptr)
+		if pt == nil {
 			panic("nil value")
 		}
-		if v.Type().Kind() != reflect.Pointer {
+		if pt.Kind() != reflect.Pointer {
 			panic("only pointer values allowed in 'types'")
 		}
 
-		v.Elem().Set(reflect.ValueOf(module))
+		if !t.AssignableTo(pt.Elem()) {
+			panic(fmt.Sprintf("module of type %s is not assignable to type %s", t, pt))
+		}
 
-		b.mods.modulesByType[v.Type()] = ptr
+		b.mods.modulesByType[pt.Elem()] = module
 	}
 }
 
@@ -205,8 +224,8 @@ func (b *CoreBuilder) Add(modules ...any) {
 			b.modules = append(b.modules, m)
 		}
 		if p, ok := module.(Provider); ok {
-			pm, pt := p.ProvideModule()
-			b.Provide(pm, pt)
+			pt := p.ProvideModule()
+			b.Provide(module, pt)
 		}
 		// b.mods.modulesByType[reflect.TypeOf(module)] = module
 	}
