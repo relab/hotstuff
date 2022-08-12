@@ -6,7 +6,8 @@
 // Enabling Handel from the CLI.
 //
 // Handel can be enabled through the `--modules` flag:
-//  ./hotstuff run --modules="handel"
+//
+//	./hotstuff run --modules="handel"
 //
 // Initialization.
 //
@@ -76,10 +77,10 @@ func (h *Handel) Init() error {
 	var cfg *backend.Config
 	var srv *backend.Server
 
-	if !h.mods.GetModuleByType(&srv) {
+	if !h.mods.TryGet(&srv) {
 		return errors.New("could not get gorums server")
 	}
-	if !h.mods.GetModuleByType(&cfg) {
+	if !h.mods.TryGet(&cfg) {
 		return errors.New("could not get gorums configuration")
 	}
 

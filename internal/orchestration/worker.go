@@ -255,7 +255,7 @@ func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orche
 
 		// start Handel if enabled
 		var h *handel.Handel
-		if replica.Modules().GetModuleByType(&h) {
+		if replica.Modules().TryGet(&h) {
 			err = h.Init()
 			if err != nil {
 				return nil, err
@@ -312,12 +312,12 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 
 		if w.measurementInterval > 0 {
 			clientMetrics := metrics.GetClientMetrics(w.metrics...)
-			mods.Register(clientMetrics...)
-			mods.Register(metrics.NewTicker(w.measurementInterval))
+			mods.Add(clientMetrics...)
+			mods.Add(metrics.NewTicker(w.measurementInterval))
 		}
 
-		mods.Register(w.metricsLogger)
-		mods.Register(logging.New("cli" + strconv.Itoa(int(opts.GetID()))))
+		mods.Add(w.metricsLogger)
+		mods.Add(logging.New("cli" + strconv.Itoa(int(opts.GetID()))))
 		cli := client.New(c, mods)
 		cfg, err := getConfiguration(req.GetConfiguration(), true)
 		if err != nil {

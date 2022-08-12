@@ -217,7 +217,7 @@ type configuration struct {
 // alternative way to get a pointer to the node.
 func (c *configuration) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	if c.node == nil {
-		mods.GetModuleByType(&c.node)
+		mods.TryGet(&c.node)
 		c.node.mods = mods
 	}
 }

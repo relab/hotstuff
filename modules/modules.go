@@ -125,7 +125,7 @@ func NewConsensusBuilder(id hotstuff.ID, privateKey hotstuff.PrivateKey) Consens
 // Register will overwrite existing modules if the same type is registered twice.
 func (b *ConsensusBuilder) Register(mods ...any) { //nolint:gocyclo
 	for _, module := range mods {
-		b.baseBuilder.Register(module)
+		b.baseBuilder.Add(module)
 		if m, ok := module.(Acceptor); ok {
 			b.mods.acceptor = m
 		}

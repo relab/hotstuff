@@ -26,16 +26,17 @@
 // Finally, to set up the module system and its modules, you must create a CoreBuilder using the NewCoreBuilder function,
 // and then register all of the modules with the builder using the Register method. For example:
 //
-//  builder := NewCoreBuilder()
-//  // replace the logger
-//  builder.Register(logging.New("foo"))
-//  mods := builder.Build()
+//	builder := NewCoreBuilder()
+//	// replace the logger
+//	builder.Register(logging.New("foo"))
+//	mods := builder.Build()
 //
 // If two modules satisfy the same interface, then the one that was registered last will be returned by the module system,
 // though note that both modules will be initialized if they implement the CoreModule interface.
 package modules
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/relab/hotstuff"
@@ -47,6 +48,10 @@ import (
 type CoreModule interface {
 	// InitModule gives the module access to the other modules.
 	InitModule(mods *Core)
+}
+
+type Provider interface {
+	ProvideModule() (module any, moduleType any)
 }
 
 // Core is the base of the module system.
@@ -92,25 +97,55 @@ func (mods Core) MetricsEventLoop() *eventloop.EventLoop {
 	return mods.EventLoop()
 }
 
-// GetModuleByType makes it possible to get a module based on its real type.
-// This is useful for getting modules that do not implement any known module interface.
-// The method returns true if a module was found, false otherwise.
+// TryGet attempts to find a module for ptr.
+// TryGet returns true if a module was stored in ptr, false otherwise.
 //
-// NOTE: dest MUST be a pointer to a variable of the desired type.
-// For example:
-//  var module MyModule
-//  if mods.GetModuleByType(&module) { ... }
-func (mods Core) GetModuleByType(dest any) bool {
-	outType := reflect.TypeOf(dest)
-	if outType.Kind() != reflect.Ptr {
-		panic("invalid argument: out must be a non-nil pointer to an interface variable")
+// NOTE: ptr must be a pointer to a type that has been provided to the module system.
+//
+// Example:
+//
+//	builder := modules.New()
+//	builder.Provide(MyModuleImpl{}, new(MyModule))
+//	mods = builder.Build()
+//
+//	var module MyModule
+//	if mods.TryGet(&module) {
+//		// success
+//	}
+func (mods Core) TryGet(ptr any) bool {
+	v := reflect.ValueOf(ptr)
+	if !v.IsValid() {
+		panic("nil value given")
 	}
-	targetType := outType.Elem()
-	if m, ok := mods.modulesByType[targetType]; ok {
-		reflect.ValueOf(dest).Elem().Set(reflect.ValueOf(m))
+	pt := v.Type()
+	if pt.Kind() != reflect.Ptr {
+		panic("only pointer values allowed")
+	}
+
+	if m, ok := mods.modulesByType[pt.Elem()]; ok {
+		v.Elem().Set(reflect.ValueOf(m))
 		return true
 	}
 	return false
+}
+
+// Get finds a module for ptr.
+//
+// NOTE: ptr must be a pointer to a type that has been provided to the module system.
+// Get panics if ptr is not a pointer, or if a compatible module is not found.
+//
+// Example:
+//
+//	builder := modules.New()
+//	builder.Provide(MyModuleImpl{}, new(MyModule))
+//	mods = builder.Build()
+//
+//	var module MyModule
+//	mods.Get(&module)
+func (mods *Core) Get(ptr any) {
+	if !mods.TryGet(ptr) {
+		panic(fmt.Sprintf("module of type %s not found", reflect.TypeOf(ptr).Elem()))
+	}
 }
 
 // CoreBuilder is a helper for setting up client modules.
@@ -130,8 +165,35 @@ func NewCoreBuilder(id hotstuff.ID) CoreBuilder {
 	return bl
 }
 
-// Register registers the modules with the builder.
-func (b *CoreBuilder) Register(modules ...any) {
+// Provide registers module as a module provider.
+//
+// Example:
+//
+//	builder := modules.NewBuilder()
+//	builder.Provide(MyModuleImpl{}, new(MyModule))
+func (b *CoreBuilder) Provide(module any, types ...any) {
+	if len(types) == 0 {
+		b.mods.modulesByType[reflect.TypeOf(module)] = module
+		return
+	}
+
+	for _, ptr := range types {
+		v := reflect.ValueOf(ptr)
+		if !v.IsValid() {
+			panic("nil value")
+		}
+		if v.Type().Kind() != reflect.Pointer {
+			panic("only pointer values allowed in 'types'")
+		}
+
+		v.Elem().Set(reflect.ValueOf(module))
+
+		b.mods.modulesByType[v.Type()] = ptr
+	}
+}
+
+// Add adds modules to the builder.
+func (b *CoreBuilder) Add(modules ...any) {
 	for _, module := range modules {
 		if m, ok := module.(logging.Logger); ok {
 			b.mods.logger = m
@@ -142,11 +204,15 @@ func (b *CoreBuilder) Register(modules ...any) {
 		if m, ok := module.(CoreModule); ok {
 			b.modules = append(b.modules, m)
 		}
-		b.mods.modulesByType[reflect.TypeOf(module)] = module
+		if p, ok := module.(Provider); ok {
+			pm, pt := p.ProvideModule()
+			b.Provide(pm, pt)
+		}
+		// b.mods.modulesByType[reflect.TypeOf(module)] = module
 	}
 }
 
-// Build initializes all registered modules and returns the Core object.
+// Build initializes all added modules and returns the Core object.
 func (b *CoreBuilder) Build() *Core {
 	for _, module := range b.modules {
 		module.InitModule(&b.mods)
