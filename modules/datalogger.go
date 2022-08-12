@@ -18,7 +18,7 @@ type MetricsLogger interface {
 
 type jsonLogger struct {
 	mut   sync.Mutex
-	mods  *Modules
+	mods  *Core
 	wr    io.Writer
 	first bool
 }
@@ -33,7 +33,7 @@ func NewJSONLogger(wr io.Writer) (MetricsLogger, error) {
 }
 
 // InitModule initializes the metrics logger module.
-func (dl *jsonLogger) InitModule(mods *Modules) {
+func (dl *jsonLogger) InitModule(mods *Core) {
 	dl.mods = mods
 }
 

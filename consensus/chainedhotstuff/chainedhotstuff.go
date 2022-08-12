@@ -2,6 +2,7 @@
 package chainedhotstuff
 
 import (
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
 )
@@ -12,35 +13,35 @@ func init() {
 
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {
-	mods *consensus.Modules
+	mods *modules.ConsensusCore
 
 	// protocol variables
 
-	bLock *consensus.Block // the currently locked block
+	bLock *hotstuff.Block // the currently locked block
 }
 
 // New returns a new chainedhotstuff instance.
 func New() consensus.Rules {
 	return &ChainedHotStuff{
-		bLock: consensus.GetGenesis(),
+		bLock: hotstuff.GetGenesis(),
 	}
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (hs *ChainedHotStuff) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (hs *ChainedHotStuff) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	hs.mods = mods
 }
 
-func (hs *ChainedHotStuff) qcRef(qc consensus.QuorumCert) (*consensus.Block, bool) {
-	if (consensus.Hash{}) == qc.BlockHash() {
+func (hs *ChainedHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
+	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
 	return hs.mods.BlockChain().Get(qc.BlockHash())
 }
 
 // CommitRule decides whether an ancestor of the block should be committed.
-func (hs *ChainedHotStuff) CommitRule(block *consensus.Block) *consensus.Block {
+func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	block1, ok := hs.qcRef(block.QuorumCert())
 	if !ok {
 		return nil
@@ -74,7 +75,7 @@ func (hs *ChainedHotStuff) CommitRule(block *consensus.Block) *consensus.Block {
 }
 
 // VoteRule decides whether to vote for the proposal or not.
-func (hs *ChainedHotStuff) VoteRule(proposal consensus.ProposeMsg) bool {
+func (hs *ChainedHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
 	block := proposal.Block
 
 	qcBlock, haveQCBlock := hs.mods.BlockChain().Get(block.QuorumCert().BlockHash())

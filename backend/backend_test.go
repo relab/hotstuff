@@ -10,10 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relab/hotstuff/modules"
+
 	"github.com/golang/mock/gomock"
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/testutil"
@@ -26,7 +27,7 @@ func TestConnect(t *testing.T) {
 		const n = 4
 		ctrl := gomock.NewController(t)
 		td := setup(t, ctrl, n)
-		builder := consensus.NewBuilder(1, td.keys[0])
+		builder := modules.NewConsensusBuilder(1, td.keys[0])
 		testutil.TestModules(t, ctrl, 1, td.keys[0], &builder)
 		teardown := createServers(t, td, ctrl)
 		defer teardown()
@@ -47,7 +48,7 @@ func TestConnect(t *testing.T) {
 }
 
 // testBase is a generic test for a unicast/multicast call
-func testBase(t *testing.T, typ interface{}, send func(consensus.Configuration), handle eventloop.EventHandler) {
+func testBase(t *testing.T, typ any, send func(modules.Configuration), handle eventloop.EventHandler) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		ctrl := gomock.NewController(t)
@@ -79,20 +80,20 @@ func testBase(t *testing.T, typ interface{}, send func(consensus.Configuration),
 
 func TestPropose(t *testing.T) {
 	var wg sync.WaitGroup
-	want := consensus.ProposeMsg{
+	want := hotstuff.ProposeMsg{
 		ID: 1,
-		Block: consensus.NewBlock(
-			consensus.GetGenesis().Hash(),
-			consensus.NewQuorumCert(nil, 0, consensus.GetGenesis().Hash()),
+		Block: hotstuff.NewBlock(
+			hotstuff.GetGenesis().Hash(),
+			hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
 			"foo", 1, 1,
 		),
 	}
-	testBase(t, want, func(cfg consensus.Configuration) {
+	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)
 		cfg.Propose(want)
 		wg.Wait()
-	}, func(event interface{}) {
-		got := event.(consensus.ProposeMsg)
+	}, func(event any) {
+		got := event.(hotstuff.ProposeMsg)
 		if got.ID != want.ID {
 			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
 		}
@@ -105,18 +106,18 @@ func TestPropose(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	var wg sync.WaitGroup
-	want := consensus.TimeoutMsg{
+	want := hotstuff.TimeoutMsg{
 		ID:            1,
 		View:          1,
 		ViewSignature: nil,
-		SyncInfo:      consensus.NewSyncInfo(),
+		SyncInfo:      hotstuff.NewSyncInfo(),
 	}
-	testBase(t, want, func(cfg consensus.Configuration) {
+	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)
 		cfg.Timeout(want)
 		wg.Wait()
-	}, func(event interface{}) {
-		got := event.(consensus.TimeoutMsg)
+	}, func(event any) {
+		got := event.(hotstuff.TimeoutMsg)
 		if got.ID != want.ID {
 			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
 		}
@@ -133,7 +134,7 @@ type testData struct {
 	creds     credentials.TransportCredentials
 	replicas  []ReplicaInfo
 	listeners []net.Listener
-	keys      []consensus.PrivateKey
+	keys      []hotstuff.PrivateKey
 	builders  testutil.BuilderList
 }
 
@@ -143,7 +144,7 @@ func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
 	t.Helper()
 
 	listeners := make([]net.Listener, n)
-	keys := make([]consensus.PrivateKey, 0, n)
+	keys := make([]hotstuff.PrivateKey, 0, n)
 	replicas := make([]ReplicaInfo, 0, n)
 
 	// generate keys and replicaInfo

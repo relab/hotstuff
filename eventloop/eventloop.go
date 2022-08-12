@@ -14,7 +14,7 @@ import (
 )
 
 // EventHandler processes an event.
-type EventHandler func(event interface{})
+type EventHandler func(event any)
 
 // EventLoop accepts events of any type and executes relevant event handlers.
 // It supports registering both observers and handlers based on the type of event that they accept.
@@ -24,7 +24,7 @@ type EventLoop struct {
 	mut sync.Mutex
 
 	eventQ        queue
-	waitingEvents map[reflect.Type][]interface{}
+	waitingEvents map[reflect.Type][]any
 
 	handlers  map[reflect.Type]EventHandler
 	observers map[reflect.Type][]EventHandler
@@ -37,7 +37,7 @@ type EventLoop struct {
 func New(bufferSize uint) *EventLoop {
 	el := &EventLoop{
 		eventQ:        newQueue(bufferSize),
-		waitingEvents: make(map[reflect.Type][]interface{}),
+		waitingEvents: make(map[reflect.Type][]any),
 		handlers:      make(map[reflect.Type]EventHandler),
 		observers:     make(map[reflect.Type][]EventHandler),
 		tickers:       make(map[int]*ticker),
@@ -47,19 +47,19 @@ func New(bufferSize uint) *EventLoop {
 
 // RegisterHandler registers a handler for events with the same type as the 'eventType' argument.
 // There can be only one handler per event type, and the handler is executed after any observers.
-func (el *EventLoop) RegisterHandler(eventType interface{}, handler EventHandler) {
+func (el *EventLoop) RegisterHandler(eventType any, handler EventHandler) {
 	el.handlers[reflect.TypeOf(eventType)] = handler
 }
 
 // RegisterObserver registers an observer for events with the same type as the 'eventType' argument.
 // The observers are executed before the handler.
-func (el *EventLoop) RegisterObserver(eventType interface{}, observer EventHandler) {
+func (el *EventLoop) RegisterObserver(eventType any, observer EventHandler) {
 	t := reflect.TypeOf(eventType)
 	el.observers[t] = append(el.observers[t], observer)
 }
 
 // AddEvent adds an event to the event queue.
-func (el *EventLoop) AddEvent(event interface{}) {
+func (el *EventLoop) AddEvent(event any) {
 	if event != nil {
 		el.eventQ.push(event)
 	}
@@ -110,7 +110,7 @@ func (el *EventLoop) Tick() bool {
 }
 
 // processEvent dispatches the event to the correct handler.
-func (el *EventLoop) processEvent(event interface{}) {
+func (el *EventLoop) processEvent(event any) {
 	t := reflect.TypeOf(event)
 	defer el.dispatchDelayedEvents(t)
 
@@ -143,7 +143,7 @@ func (el *EventLoop) dispatchDelayedEvents(t reflect.Type) {
 // DelayUntil allows us to delay handling of an event until after another event has happened.
 // The eventType parameter decides the type of event to wait for, and it should be the zero value
 // of that event type. The event parameter is the event that will be delayed.
-func (el *EventLoop) DelayUntil(eventType, event interface{}) {
+func (el *EventLoop) DelayUntil(eventType, event any) {
 	if eventType == nil || event == nil {
 		return
 	}
@@ -157,7 +157,7 @@ func (el *EventLoop) DelayUntil(eventType, event interface{}) {
 
 type ticker struct {
 	interval time.Duration
-	callback func(time.Time) interface{}
+	callback func(time.Time) any
 	cancel   context.CancelFunc
 }
 
@@ -169,7 +169,7 @@ type startTickerEvent struct {
 // The ticker will send the specified event on the event loop at regular intervals.
 // The returned ticker id can be used to remove the ticker with RemoveTicker.
 // The ticker will not be started before the event loop is running.
-func (el *EventLoop) AddTicker(interval time.Duration, callback func(tick time.Time) (event interface{})) int {
+func (el *EventLoop) AddTicker(interval time.Duration, callback func(tick time.Time) (event any)) int {
 	el.mut.Lock()
 
 	id := el.tickerID

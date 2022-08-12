@@ -26,7 +26,7 @@ func NewThroughputPlot() ThroughputPlot {
 }
 
 // Add adds a measurement to the plotter.
-func (p *ThroughputPlot) Add(measurement interface{}) {
+func (p *ThroughputPlot) Add(measurement any) {
 	p.startTimes.Add(measurement)
 
 	throughput, ok := measurement.(*types.ThroughputMeasurement)

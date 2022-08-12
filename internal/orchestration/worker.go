@@ -163,7 +163,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 	}
 	// prepare modules
-	builder := consensus.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
+	builder := modules.NewConsensusBuilder(hotstuff.ID(opts.GetID()), privKey)
 
 	consensusRules, ok := modules.GetModule[consensus.Rules](opts.GetConsensus())
 	if !ok {
@@ -178,12 +178,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		}
 	}
 
-	cryptoImpl, ok := modules.GetModule[consensus.CryptoBase](opts.GetCrypto())
+	cryptoImpl, ok := modules.GetModule[modules.CryptoBase](opts.GetCrypto())
 	if !ok {
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
 	}
 
-	leaderRotation, ok := modules.GetModule[consensus.LeaderRotation](opts.GetLeaderRotation())
+	leaderRotation, ok := modules.GetModule[modules.LeaderRotation](opts.GetLeaderRotation())
 	if !ok {
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
@@ -197,6 +197,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 
 	builder.Register(
 		consensus.New(consensusRules),
+		consensus.NewVotingMachine(),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		leaderRotation,
 		sync,
@@ -307,7 +308,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		mods := modules.NewBuilder(hotstuff.ID(opts.GetID()))
+		mods := modules.NewCoreBuilder(hotstuff.ID(opts.GetID()))
 
 		if w.measurementInterval > 0 {
 			clientMetrics := metrics.GetClientMetrics(w.metrics...)

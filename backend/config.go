@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/relab/hotstuff/modules"
+
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -22,7 +23,7 @@ import (
 type Replica struct {
 	node          *hotstuffpb.Node
 	id            hotstuff.ID
-	pubKey        consensus.PublicKey
+	pubKey        hotstuff.PublicKey
 	voteCancel    context.CancelFunc
 	newViewCancel context.CancelFunc
 	md            map[string]string
@@ -34,12 +35,12 @@ func (r *Replica) ID() hotstuff.ID {
 }
 
 // PublicKey returns the replica's public key.
-func (r *Replica) PublicKey() consensus.PublicKey {
+func (r *Replica) PublicKey() hotstuff.PublicKey {
 	return r.pubKey
 }
 
 // Vote sends the partial certificate to the other replica.
-func (r *Replica) Vote(cert consensus.PartialCert) {
+func (r *Replica) Vote(cert hotstuff.PartialCert) {
 	if r.node == nil {
 		return
 	}
@@ -51,7 +52,7 @@ func (r *Replica) Vote(cert consensus.PartialCert) {
 }
 
 // NewView sends the quorum certificate to the other replica.
-func (r *Replica) NewView(msg consensus.SyncInfo) {
+func (r *Replica) NewView(msg hotstuff.SyncInfo) {
 	if r.node == nil {
 		return
 	}
@@ -77,18 +78,18 @@ type Config struct {
 }
 
 type subConfig struct {
-	mods     *consensus.Modules
+	mods     *modules.ConsensusCore
 	cfg      *hotstuffpb.Configuration
-	replicas map[hotstuff.ID]consensus.Replica
+	replicas map[hotstuff.ID]modules.Replica
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (cfg *Config) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (cfg *Config) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	cfg.mods = mods
 
 	// We delay processing `replicaConnected` events until after the configurations `connected` event has occurred.
-	cfg.mods.EventLoop().RegisterHandler(replicaConnected{}, func(event interface{}) {
+	cfg.mods.EventLoop().RegisterHandler(replicaConnected{}, func(event any) {
 		if !cfg.connected {
 			cfg.mods.EventLoop().DelayUntil(connected{}, event)
 			return
@@ -109,10 +110,10 @@ func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOpt
 	}
 	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
 
-	// initialization will be finished by InitConsensusModule
+	// initialization will be finished by InitModule
 	cfg := &Config{
 		subConfig: subConfig{
-			replicas: make(map[hotstuff.ID]consensus.Replica),
+			replicas: make(map[hotstuff.ID]modules.Replica),
 		},
 		opts: opts,
 	}
@@ -172,7 +173,7 @@ func (cfg *Config) GetRawConfiguration() gorums.RawConfiguration {
 type ReplicaInfo struct {
 	ID      hotstuff.ID
 	Address string
-	PubKey  consensus.PublicKey
+	PubKey  hotstuff.PublicKey
 }
 
 // Connect opens connections to the replicas in the configuration.
@@ -230,19 +231,19 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 }
 
 // Replicas returns all of the replicas in the configuration.
-func (cfg *subConfig) Replicas() map[hotstuff.ID]consensus.Replica {
+func (cfg *subConfig) Replicas() map[hotstuff.ID]modules.Replica {
 	return cfg.replicas
 }
 
 // Replica returns a replica if it is present in the configuration.
-func (cfg *subConfig) Replica(id hotstuff.ID) (replica consensus.Replica, ok bool) {
+func (cfg *subConfig) Replica(id hotstuff.ID) (replica modules.Replica, ok bool) {
 	replica, ok = cfg.replicas[id]
 	return
 }
 
 // SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
-func (cfg *Config) SubConfig(ids []hotstuff.ID) (sub consensus.Configuration, err error) {
-	replicas := make(map[hotstuff.ID]consensus.Replica)
+func (cfg *Config) SubConfig(ids []hotstuff.ID) (sub modules.Configuration, err error) {
+	replicas := make(map[hotstuff.ID]modules.Replica)
 	nids := make([]uint32, len(ids))
 	for i, id := range ids {
 		nids[i] = uint32(id)
@@ -259,7 +260,7 @@ func (cfg *Config) SubConfig(ids []hotstuff.ID) (sub consensus.Configuration, er
 	}, nil
 }
 
-func (cfg *subConfig) SubConfig(_ []hotstuff.ID) (_ consensus.Configuration, err error) {
+func (cfg *subConfig) SubConfig(_ []hotstuff.ID) (_ modules.Configuration, err error) {
 	return nil, errors.New("not supported")
 }
 
@@ -274,7 +275,7 @@ func (cfg *subConfig) QuorumSize() int {
 }
 
 // Propose sends the block to all replicas in the configuration
-func (cfg *subConfig) Propose(proposal consensus.ProposeMsg) {
+func (cfg *subConfig) Propose(proposal hotstuff.ProposeMsg) {
 	if cfg.cfg == nil {
 		return
 	}
@@ -286,7 +287,7 @@ func (cfg *subConfig) Propose(proposal consensus.ProposeMsg) {
 }
 
 // Timeout sends the timeout message to all replicas.
-func (cfg *subConfig) Timeout(msg consensus.TimeoutMsg) {
+func (cfg *subConfig) Timeout(msg hotstuff.TimeoutMsg) {
 	if cfg.cfg == nil {
 		return
 	}
@@ -298,7 +299,7 @@ func (cfg *subConfig) Timeout(msg consensus.TimeoutMsg) {
 }
 
 // Fetch requests a block from all the replicas in the configuration
-func (cfg *subConfig) Fetch(ctx context.Context, hash consensus.Hash) (*consensus.Block, bool) {
+func (cfg *subConfig) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	protoBlock, err := cfg.cfg.Fetch(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
 	if err != nil {
 		qcErr, ok := err.(gorums.QuorumCallError)
@@ -316,14 +317,14 @@ func (cfg *Config) Close() {
 	cfg.mgr.Close()
 }
 
-var _ consensus.Configuration = (*Config)(nil)
+var _ modules.Configuration = (*Config)(nil)
 
 type qspec struct{}
 
 // FetchQF is the quorum function for the Fetch quorum call method.
 // It simply returns true if one of the replies matches the requested block.
 func (q qspec) FetchQF(in *hotstuffpb.BlockHash, replies map[uint32]*hotstuffpb.Block) (*hotstuffpb.Block, bool) {
-	var h consensus.Hash
+	var h hotstuff.Hash
 	copy(h[:], in.GetHash())
 	for _, b := range replies {
 		block := hotstuffpb.BlockFromProto(b)

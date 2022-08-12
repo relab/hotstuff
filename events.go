@@ -1,15 +1,13 @@
-package consensus
+package hotstuff
 
 import (
 	"bytes"
 	"fmt"
-
-	"github.com/relab/hotstuff"
 )
 
 // ProposeMsg is broadcast when a leader makes a proposal.
 type ProposeMsg struct {
-	ID          hotstuff.ID  // The ID of the replica who sent the message.
+	ID          ID           // The ID of the replica who sent the message.
 	Block       *Block       // The block that is proposed.
 	AggregateQC *AggregateQC // Optional AggregateQC
 }
@@ -20,7 +18,7 @@ func (p ProposeMsg) String() string {
 
 // VoteMsg is sent to the leader by replicas voting on a proposal.
 type VoteMsg struct {
-	ID          hotstuff.ID // the ID of the replica who sent the message.
+	ID          ID          // the ID of the replica who sent the message.
 	PartialCert PartialCert // The partial certificate.
 	Deferred    bool
 }
@@ -31,7 +29,7 @@ func (v VoteMsg) String() string {
 
 // TimeoutMsg is broadcast whenever a replica has a local timeout.
 type TimeoutMsg struct {
-	ID            hotstuff.ID     // The ID of the replica who sent the message.
+	ID            ID              // The ID of the replica who sent the message.
 	View          View            // The view that the replica wants to enter.
 	ViewSignature QuorumSignature // A signature of the view
 	MsgSignature  QuorumSignature // A signature of the view, QC.BlockHash, and the replica ID
@@ -56,8 +54,8 @@ func (timeout TimeoutMsg) String() string {
 // NewViewMsg is sent to the leader whenever a replica decides to advance to the next view.
 // It contains the highest QC or TC known to the replica.
 type NewViewMsg struct {
-	ID       hotstuff.ID // The ID of the replica who sent the message.
-	SyncInfo SyncInfo    // The highest QC / TC.
+	ID       ID       // The ID of the replica who sent the message.
+	SyncInfo SyncInfo // The highest QC / TC.
 }
 
 // CommitEvent is raised whenever a block is committed,

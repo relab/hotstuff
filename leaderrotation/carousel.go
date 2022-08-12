@@ -4,7 +4,6 @@ import (
 	"math/rand"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
 	"golang.org/x/exp/slices"
 )
@@ -14,14 +13,14 @@ func init() {
 }
 
 type carousel struct {
-	mods *consensus.Modules
+	mods *modules.ConsensusCore
 }
 
-func (c *carousel) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (c *carousel) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	c.mods = mods
 }
 
-func (c carousel) GetLeader(round consensus.View) hotstuff.ID {
+func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 	commitHead := c.mods.Consensus().CommittedBlock()
 
 	if commitHead.QuorumCert().Signature() == nil {
@@ -29,7 +28,7 @@ func (c carousel) GetLeader(round consensus.View) hotstuff.ID {
 		return chooseRoundRobin(round, c.mods.Configuration().Len())
 	}
 
-	if commitHead.View() != round-consensus.View(c.mods.Consensus().ChainLength()) {
+	if commitHead.View() != round-hotstuff.View(c.mods.Consensus().ChainLength()) {
 		c.mods.Logger().Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.View())
 		return chooseRoundRobin(round, c.mods.Configuration().Len())
 	}
@@ -40,11 +39,11 @@ func (c carousel) GetLeader(round consensus.View) hotstuff.ID {
 		block       = commitHead
 		f           = hotstuff.NumFaulty(c.mods.Configuration().Len())
 		i           = 0
-		lastAuthors = consensus.NewIDSet()
+		lastAuthors = hotstuff.NewIDSet()
 		ok          = true
 	)
 
-	for ok && i < f && block != consensus.GetGenesis() {
+	for ok && i < f && block != hotstuff.GetGenesis() {
 		lastAuthors.Add(block.Proposer())
 		block, ok = c.mods.BlockChain().Get(block.Parent())
 		i++
@@ -69,6 +68,6 @@ func (c carousel) GetLeader(round consensus.View) hotstuff.ID {
 }
 
 // NewCarousel returns a new instance of the Carousel leader-election algorithm.
-func NewCarousel() consensus.LeaderRotation {
+func NewCarousel() modules.LeaderRotation {
 	return &carousel{}
 }
