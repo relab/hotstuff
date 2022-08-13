@@ -19,6 +19,7 @@ import (
 	"github.com/relab/hotstuff/consensus/byzantine"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/handel"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/logging"
@@ -38,6 +39,7 @@ import (
 	_ "github.com/relab/hotstuff/consensus/simplehotstuff"
 	_ "github.com/relab/hotstuff/crypto/bls12"
 	_ "github.com/relab/hotstuff/crypto/ecdsa"
+	_ "github.com/relab/hotstuff/handel"
 	_ "github.com/relab/hotstuff/leaderrotation"
 )
 
@@ -161,27 +163,28 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 	}
 	// prepare modules
-	builder := consensus.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
+	builder := modules.NewConsensusBuilder(hotstuff.ID(opts.GetID()), privKey)
 
-	var consensusRules consensus.Rules
-	if !modules.GetModule(opts.GetConsensus(), &consensusRules) {
+	consensusRules, ok := modules.GetModule[consensus.Rules](opts.GetConsensus())
+	if !ok {
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
 	}
 
-	var byz byzantine.Byzantine
-	if modules.GetModule(opts.GetByzantineStrategy(), &byz) {
-		consensusRules = byz.Wrap(consensusRules)
-	} else if opts.GetByzantineStrategy() != "" {
-		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
+	if opts.GetByzantineStrategy() != "" {
+		if byz, ok := modules.GetModule[byzantine.Byzantine](opts.GetByzantineStrategy()); ok {
+			consensusRules = byz.Wrap(consensusRules)
+		} else {
+			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
+		}
 	}
 
-	var cryptoImpl consensus.CryptoImpl
-	if !modules.GetModule(opts.GetCrypto(), &cryptoImpl) {
+	cryptoImpl, ok := modules.GetModule[modules.CryptoBase](opts.GetCrypto())
+	if !ok {
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
 	}
 
-	var leaderRotation consensus.LeaderRotation
-	if !modules.GetModule(opts.GetLeaderRotation(), &leaderRotation) {
+	leaderRotation, ok := modules.GetModule[modules.LeaderRotation](opts.GetLeaderRotation())
+	if !ok {
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
 
@@ -194,6 +197,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 
 	builder.Register(
 		consensus.New(consensusRules),
+		consensus.NewVotingMachine(),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		leaderRotation,
 		sync,
@@ -248,6 +252,16 @@ func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orche
 		if err != nil {
 			return nil, err
 		}
+
+		// start Handel if enabled
+		var h *handel.Handel
+		if replica.Modules().GetModuleByType(&h) {
+			err = h.Init()
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		defer func(id uint32) {
 			w.metricsLogger.Log(&types.StartEvent{Event: types.NewReplicaEvent(id, time.Now())})
 			replica.Start()
@@ -294,7 +308,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		mods := modules.NewBuilder(hotstuff.ID(opts.GetID()))
+		mods := modules.NewCoreBuilder(hotstuff.ID(opts.GetID()))
 
 		if w.measurementInterval > 0 {
 			clientMetrics := metrics.GetClientMetrics(w.metrics...)

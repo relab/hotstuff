@@ -3,16 +3,18 @@ package synchronizer
 import (
 	"context"
 	"fmt"
-	"github.com/relab/hotstuff/msg"
 	"time"
 
+	"github.com/relab/hotstuff/msg"
+
+	"github.com/relab/hotstuff/modules"
+
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 )
 
 // Synchronizer synchronizes replicas to the same view.
 type Synchronizer struct {
-	mods *consensus.Modules
+	mods *modules.ConsensusCore
 
 	currentView msg.View
 	highTC      msg.TimeoutCert
@@ -34,20 +36,27 @@ type Synchronizer struct {
 	timeouts map[msg.View]map[hotstuff.ID]msg.TimeoutMsg
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (s *Synchronizer) InitConsensusModule(mods *consensus.Modules, opts *consensus.OptionsBuilder) {
-	if duration, ok := s.duration.(consensus.Module); ok {
-		duration.InitConsensusModule(mods, opts)
+func (s *Synchronizer) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
+	if duration, ok := s.duration.(modules.ConsensusModule); ok {
+		duration.InitModule(mods, opts)
 	}
 	s.mods = mods
 
-	s.mods.EventLoop().RegisterHandler(msg.NewViewMsg{}, func(event interface{}) {
+	s.mods.EventLoop().RegisterHandler(TimeoutEvent{}, func(event any) {
+		timeoutView := event.(TimeoutEvent).View
+		if s.currentView == timeoutView {
+			s.OnLocalTimeout()
+		}
+	})
+
+	s.mods.EventLoop().RegisterHandler(msg.NewViewMsg{}, func(event any) {
 		newViewMsg := event.(msg.NewViewMsg)
 		s.OnNewView(newViewMsg)
 	})
 
-	s.mods.EventLoop().RegisterHandler(msg.TimeoutMsg{}, func(event interface{}) {
+	s.mods.EventLoop().RegisterHandler(msg.TimeoutMsg{}, func(event any) {
 		timeoutMsg := event.(msg.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
 	})
@@ -65,7 +74,7 @@ func (s *Synchronizer) InitConsensusModule(mods *consensus.Modules, opts *consen
 }
 
 // New creates a new Synchronizer.
-func New(viewDuration ViewDuration) consensus.Synchronizer {
+func New(viewDuration ViewDuration) modules.Synchronizer {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Synchronizer{
 		leafBlock:   msg.GetGenesis(),
@@ -86,7 +95,7 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	s.timer = time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
 		s.cancelCtx()
-		s.mods.EventLoop().AddEvent(s.OnLocalTimeout)
+		s.mods.EventLoop().AddEvent(TimeoutEvent{s.currentView})
 	})
 
 	go func() {
@@ -130,17 +139,15 @@ func (s *Synchronizer) SyncInfo() msg.SyncInfo {
 
 // OnLocalTimeout is called when a local timeout happens.
 func (s *Synchronizer) OnLocalTimeout() {
-	defer func() {
-		// Reset the timer and ctx here so that we can get a new timeout in the same view.
-		// I think this is necessary to ensure that we can keep sending the same timeout message
-		// until we get a timeout certificate.
-		//
-		// TODO: figure out the best way to handle this context and timeout.
-		if s.viewCtx.Err() != nil {
-			s.newCtx(s.duration.Duration())
-		}
-		s.timer.Reset(s.duration.Duration())
-	}()
+	// Reset the timer and ctx here so that we can get a new timeout in the same view.
+	// I think this is necessary to ensure that we can keep sending the same timeout message
+	// until we get a timeout certificate.
+	//
+	// TODO: figure out the best way to handle this context and timeout.
+	if s.viewCtx.Err() != nil {
+		s.newCtx(s.duration.Duration())
+	}
+	s.timer.Reset(s.duration.Duration())
 
 	if s.lastTimeout != nil && s.lastTimeout.View == s.currentView {
 		s.mods.Configuration().Timeout(*s.lastTimeout)
@@ -151,7 +158,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	view := s.currentView
 	s.mods.Logger().Debugf("OnLocalTimeout: %v", view)
 
-	sig, err := s.mods.Crypto().Sign(view.ToHash())
+	sig, err := s.mods.Crypto().Sign(view.ToBytes())
 	if err != nil {
 		s.mods.Logger().Warnf("Failed to sign view: %v", err)
 		return
@@ -165,7 +172,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 
 	if s.mods.Options().ShouldUseAggQC() {
 		// generate a second signature that will become part of the aggregateQC
-		sig, err := s.mods.Crypto().Sign(timeoutMsg.Hash())
+		sig, err := s.mods.Crypto().Sign(timeoutMsg.ToBytes())
 		if err != nil {
 			s.mods.Logger().Warnf("Failed to sign timeout message: %v", err)
 			return
@@ -192,7 +199,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout msg.TimeoutMsg) {
 	}()
 
 	verifier := s.mods.Crypto()
-	if !verifier.Verify(timeout.ViewSignature, timeout.View.ToHash()) {
+	if !verifier.Verify(timeout.ViewSignature, timeout.View.ToBytes()) {
 		return
 	}
 	s.mods.Logger().Debug("OnRemoteTimeout: ", timeout)
@@ -264,12 +271,34 @@ func (s *Synchronizer) AdvanceView(syncInfo msg.SyncInfo) {
 		timeout = true
 	}
 
-	// check for a QC.
-	if qc, ok := syncInfo.QC(); ok {
+	var (
+		haveQC bool
+		qc     msg.QuorumCert
+		aggQC  msg.AggregateQC
+	)
+
+	// check for an AggQC or QC
+	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.mods.Options().ShouldUseAggQC() {
+		highQC, ok := s.mods.Crypto().VerifyAggregateQC(aggQC)
+		if !ok {
+			s.mods.Logger().Info("Aggregated Quorum Certificate could not be verified")
+			return
+		}
+		if aggQC.View() >= v {
+			v = aggQC.View()
+			timeout = true
+		}
+		// ensure that the true highQC is the one stored in the syncInfo
+		syncInfo = syncInfo.WithQC(highQC)
+		qc = highQC
+	} else if qc, haveQC = syncInfo.QC(); haveQC {
 		if !s.mods.Crypto().VerifyQuorumCert(qc) {
 			s.mods.Logger().Info("Quorum Certificate could not be verified!")
 			return
 		}
+	}
+
+	if haveQC {
 		s.updateHighQC(qc)
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
 		if qc.View() >= v {
@@ -354,10 +383,15 @@ func (s *Synchronizer) newCtx(duration time.Duration) {
 	s.viewCtx, s.cancelCtx = context.WithTimeout(context.Background(), duration)
 }
 
-var _ consensus.Synchronizer = (*Synchronizer)(nil)
+var _ modules.Synchronizer = (*Synchronizer)(nil)
 
-// ViewChangeEvent is sent on the metrics event loop whenever a view change occurs.
+// ViewChangeEvent is sent on the eventloop whenever a view change occurs.
 type ViewChangeEvent struct {
 	View    msg.View
 	Timeout bool
+}
+
+// TimeoutEvent is sent on the eventloop when a local timeout occurs.
+type TimeoutEvent struct {
+	View msg.View
 }

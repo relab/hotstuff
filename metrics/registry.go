@@ -8,26 +8,26 @@ import "sync"
 
 var (
 	registryMut    sync.Mutex
-	clientMetrics  = map[string]func() interface{}{}
-	replicaMetrics = map[string]func() interface{}{}
+	clientMetrics  = map[string]func() any{}
+	replicaMetrics = map[string]func() any{}
 )
 
 // RegisterClientMetric registers the constructor of a client metric.
-func RegisterClientMetric(name string, constructor func() interface{}) {
+func RegisterClientMetric(name string, constructor func() any) {
 	registryMut.Lock()
 	defer registryMut.Unlock()
 	clientMetrics[name] = constructor
 }
 
 // RegisterReplicaMetric registers the constructor of a replica metric.
-func RegisterReplicaMetric(name string, constructor func() interface{}) {
+func RegisterReplicaMetric(name string, constructor func() any) {
 	registryMut.Lock()
 	defer registryMut.Unlock()
 	replicaMetrics[name] = constructor
 }
 
 // GetClientMetrics constructs a new instance of each named metric.
-func GetClientMetrics(names ...string) (metrics []interface{}) {
+func GetClientMetrics(names ...string) (metrics []any) {
 	registryMut.Lock()
 	defer registryMut.Unlock()
 
@@ -40,7 +40,7 @@ func GetClientMetrics(names ...string) (metrics []interface{}) {
 }
 
 // GetReplicaMetrics constructs a new instance of each named metric.
-func GetReplicaMetrics(names ...string) (metrics []interface{}) {
+func GetReplicaMetrics(names ...string) (metrics []any) {
 	registryMut.Lock()
 	defer registryMut.Unlock()
 

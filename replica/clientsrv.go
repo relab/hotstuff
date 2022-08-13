@@ -2,7 +2,11 @@ package replica
 
 import (
 	"crypto/sha256"
+<<<<<<< HEAD
 	"github.com/relab/hotstuff/msg"
+=======
+	"github.com/relab/hotstuff"
+>>>>>>> master
 	"hash"
 	"net"
 	"sync"
@@ -19,7 +23,7 @@ import (
 // clientSrv serves a client.
 type clientSrv struct {
 	mut          sync.Mutex
-	mods         *modules.Modules
+	mods         *modules.Core
 	srv          *gorums.Server
 	awaitingCmds map[cmdID]chan<- error
 	cmdCache     *cmdCache
@@ -39,7 +43,7 @@ func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv
 }
 
 // InitModule gives the module access to the other modules.
-func (srv *clientSrv) InitModule(mods *modules.Modules) {
+func (srv *clientSrv) InitModule(mods *modules.Core) {
 	srv.mods = mods
 	srv.cmdCache.InitModule(mods)
 }
@@ -80,7 +84,11 @@ func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (
 	return &emptypb.Empty{}, err
 }
 
+<<<<<<< HEAD
 func (srv *clientSrv) Exec(cmd msg.Command) {
+=======
+func (srv *clientSrv) Exec(cmd hotstuff.Command) {
+>>>>>>> master
 	batch := new(clientpb.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -88,7 +96,11 @@ func (srv *clientSrv) Exec(cmd msg.Command) {
 		return
 	}
 
+<<<<<<< HEAD
 	srv.mods.EventLoop().AddEvent(msg.CommitEvent{Commands: len(batch.GetCommands())})
+=======
+	srv.mods.EventLoop().AddEvent(hotstuff.CommitEvent{Commands: len(batch.GetCommands())})
+>>>>>>> master
 
 	for _, cmd := range batch.GetCommands() {
 		_, _ = srv.hash.Write(cmd.Data)
@@ -104,7 +116,11 @@ func (srv *clientSrv) Exec(cmd msg.Command) {
 	srv.mods.Logger().Debugf("Hash: %.8x", srv.hash.Sum(nil))
 }
 
+<<<<<<< HEAD
 func (srv *clientSrv) Fork(cmd msg.Command) {
+=======
+func (srv *clientSrv) Fork(cmd hotstuff.Command) {
+>>>>>>> master
 	batch := new(clientpb.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {

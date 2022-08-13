@@ -3,15 +3,16 @@ package twins
 import (
 	"context"
 	"fmt"
-	"github.com/relab/hotstuff/msg"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/relab/hotstuff/msg"
+
 	"github.com/relab/hotstuff"
 )
 
-// View specifies the leader id an the partition scenario for a single round of consensus.
+// View specifies the leader id and the partition scenario for a single view.
 type View struct {
 	Leader     hotstuff.ID `json:"leader"`
 	Partitions []NodeSet   `json:"partitions"`
@@ -39,27 +40,34 @@ func (s Scenario) String() string {
 
 // ScenarioResult contains the result and logs from executing a scenario.
 type ScenarioResult struct {
-	Safe       bool
-	Commits    int
-	NetworkLog string
-	NodeLogs   map[NodeID]string
+	Safe        bool
+	Commits     int
+	NetworkLog  string
+	NodeLogs    map[NodeID]string
+	NodeCommits map[NodeID][]*msg.Block
 }
 
 // ExecuteScenario executes a twins scenario.
-func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, consensusName string) (result ScenarioResult, err error) {
+func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, consensusName string) (result ScenarioResult, err error) {
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
-	network := newNetwork(scenario, msg.ProposeMsg{}, msg.VoteMsg{}, msg.Hash{})
+	network := NewPartitionedNetwork(scenario,
+		msg.ProposeMsg{},
+		msg.VoteMsg{},
+		msg.Hash{},
+		msg.NewViewMsg{},
+		msg.TimeoutMsg{},
+	)
 
 	nodes, twins := assignNodeIDs(numNodes, numTwins)
 	nodes = append(nodes, twins...)
 
-	err = network.createNodes(nodes, scenario, consensusName)
+	err = network.createTwinsNodes(nodes, scenario, consensusName)
 	if err != nil {
 		return ScenarioResult{}, err
 	}
 
-	network.run(len(scenario))
+	network.run(numTicks)
 
 	nodeLogs := make(map[NodeID]string)
 	for _, node := range network.nodes {
@@ -70,14 +78,15 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, consensusName 
 	safe, commits := checkCommits(network)
 
 	return ScenarioResult{
-		Safe:       safe,
-		Commits:    commits,
-		NetworkLog: network.log.String(),
-		NodeLogs:   nodeLogs,
+		Safe:        safe,
+		Commits:     commits,
+		NetworkLog:  network.log.String(),
+		NodeLogs:    nodeLogs,
+		NodeCommits: getBlocks(network),
 	}, nil
 }
 
-func checkCommits(network *network) (safe bool, commits int) {
+func checkCommits(network *Network) (safe bool, commits int) {
 	i := 0
 	for {
 		noCommits := true
@@ -121,6 +130,14 @@ func (lr leaderRotation) GetLeader(view msg.View) hotstuff.ID {
 	}
 	// default to 0 (which is an invalid id)
 	return 0
+}
+
+func getBlocks(network *Network) map[NodeID][]*msg.Block {
+	m := make(map[NodeID][]*msg.Block)
+	for _, node := range network.nodes {
+		m[node.id] = node.executedBlocks
+	}
+	return m
 }
 
 type commandGenerator struct {

@@ -1,6 +1,7 @@
 package msg
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"fmt"
 
@@ -23,11 +24,11 @@ type VoteMsg struct {
 
 // TimeoutMsg is broadcast whenever a replica has a local timeout.
 type TimeoutMsg struct {
-	ID            hotstuff.ID // The ID of the replica who sent the message.
-	View          View        // The view that the replica wants to enter.
-	ViewSignature Signature   // A signature of the view
-	MsgSignature  Signature   // A signature of the view, QC.BlockHash, and the replica ID
-	SyncInfo      SyncInfo    // The highest QC/TC known to the sender.
+	ID            hotstuff.ID     // The ID of the replica who sent the message.
+	View          View            // The view that the replica wants to enter.
+	ViewSignature QuorumSignature // A signature of the view
+	MsgSignature  QuorumSignature // A signature of the view, QC.BlockHash, and the replica ID
+	SyncInfo      SyncInfo        // The highest QC/TC known to the sender.
 }
 
 // Hash returns a hash of the timeout message.
@@ -46,6 +47,17 @@ func (timeout TimeoutMsg) Hash() Hash {
 
 func (timeout TimeoutMsg) String() string {
 	return fmt.Sprintf("TimeoutMsg{ ID: %d, View: %d, SyncInfo: %v }", timeout.ID, timeout.View, timeout.SyncInfo)
+}
+
+// ToBytes returns a byte form of the timeout message.
+func (timeout TimeoutMsg) ToBytes() []byte {
+	var b bytes.Buffer
+	_, _ = b.Write(timeout.ID.ToBytes())
+	_, _ = b.Write(timeout.View.ToBytes())
+	if qc, ok := timeout.SyncInfo.QC(); ok {
+		_, _ = b.Write(qc.ToBytes())
+	}
+	return b.Bytes()
 }
 
 // NewViewMsg is sent to the leader whenever a replica decides to advance to the next view.

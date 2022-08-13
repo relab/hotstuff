@@ -13,7 +13,7 @@ func init() {
 
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {
-	mods *consensus.Modules
+	mods *modules.ConsensusCore
 
 	// protocol variables
 
@@ -27,9 +27,9 @@ func New() consensus.Rules {
 	}
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (hs *ChainedHotStuff) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (hs *ChainedHotStuff) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	hs.mods = mods
 }
 

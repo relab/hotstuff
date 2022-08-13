@@ -3,16 +3,16 @@ package blockchain
 
 import (
 	"context"
-	"github.com/relab/hotstuff/msg"
 	"sync"
 
-	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
 )
 
 // blockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type blockChain struct {
-	mods          *consensus.Modules
+	mods          *modules.ConsensusCore
 	mut           sync.Mutex
 	pruneHeight   msg.View
 	blocks        map[msg.Hash]*msg.Block
@@ -20,15 +20,15 @@ type blockChain struct {
 	pendingFetch  map[msg.Hash]context.CancelFunc // allows a pending fetch operation to be cancelled
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (chain *blockChain) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (chain *blockChain) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	chain.mods = mods
 }
 
 // New creates a new blockChain with a maximum size.
 // Blocks are dropped in least recently used order.
-func New() consensus.BlockChain {
+func New() modules.BlockChain {
 	bc := &blockChain{
 		blocks:        make(map[msg.Hash]*msg.Block),
 		blockAtHeight: make(map[msg.View]*msg.Block),
@@ -154,4 +154,4 @@ func (chain *blockChain) PruneToHeight(height msg.View) (forkedBlocks []*msg.Blo
 	return forkedBlocks
 }
 
-var _ consensus.BlockChain = (*blockChain)(nil)
+var _ modules.BlockChain = (*blockChain)(nil)

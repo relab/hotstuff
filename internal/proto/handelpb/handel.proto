@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package handelpb;
+
+import "gorums.proto";
+import "hotstuffpb/hotstuff.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/relab/hotstuff/internal/proto/handelpb";
+
+service Handel {
+  rpc Contribute(Contribution) returns (google.protobuf.Empty) {
+    option (gorums.unicast) = true;
+  }
+}
+
+message Contribution {
+  uint32 ID = 1;
+  uint32 Level = 2;
+  hotstuffpb.QuorumSignature Signature = 3;
+  hotstuffpb.QuorumSignature Individual = 4;
+  bytes Hash = 5;
+}

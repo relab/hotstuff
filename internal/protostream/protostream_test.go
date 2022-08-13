@@ -2,8 +2,9 @@ package protostream_test
 
 import (
 	"bytes"
-	"github.com/relab/hotstuff/msg"
 	"testing"
+
+	"github.com/relab/hotstuff/msg"
 
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/protostream"

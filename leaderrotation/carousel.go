@@ -1,13 +1,13 @@
 package leaderrotation
 
 import (
-	"github.com/relab/hotstuff/msg"
 	"math/rand"
-	"sort"
+
+	"github.com/relab/hotstuff/msg"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
+	"golang.org/x/exp/slices"
 )
 
 func init() {
@@ -15,10 +15,10 @@ func init() {
 }
 
 type carousel struct {
-	mods *consensus.Modules
+	mods *modules.ConsensusCore
 }
 
-func (c *carousel) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (c *carousel) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	c.mods = mods
 }
 
@@ -55,11 +55,10 @@ func (c carousel) GetLeader(round msg.View) hotstuff.ID {
 
 	commitHead.QuorumCert().Signature().Participants().ForEach(func(id hotstuff.ID) {
 		if !lastAuthors.Contains(id) {
-			i := sort.Search(len(candidates), func(i int) bool { return candidates[i] >= id })
-			candidates = append(candidates[:i+1], candidates[i:]...)
-			candidates[i] = id
+			candidates = append(candidates, id)
 		}
 	})
+	slices.Sort(candidates)
 
 	seed := c.mods.Options().SharedRandomSeed() + int64(round)
 	rnd := rand.New(rand.NewSource(seed))
@@ -71,6 +70,6 @@ func (c carousel) GetLeader(round msg.View) hotstuff.ID {
 }
 
 // NewCarousel returns a new instance of the Carousel leader-election algorithm.
-func NewCarousel() consensus.LeaderRotation {
+func NewCarousel() modules.LeaderRotation {
 	return &carousel{}
 }

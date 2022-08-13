@@ -1,12 +1,13 @@
 package crypto_test
 
 import (
-	"github.com/relab/hotstuff/msg"
 	"testing"
+
+	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
@@ -28,7 +29,7 @@ func TestCreatePartialCert(t *testing.T) {
 			t.Error("Partial certificate hash does not match block hash!")
 		}
 
-		if signerID := partialCert.Signature().Signer(); signerID != hotstuff.ID(1) {
+		if signerID := partialCert.Signer(); signerID != hotstuff.ID(1) {
 			t.Errorf("Wrong ID for signer in partial certificate: got: %d, want: %d", signerID, hotstuff.ID(1))
 		}
 	}
@@ -151,7 +152,7 @@ func TestVerifyAggregateQC(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ok, highQC := td.signers[0].VerifyAggregateQC(aggQC)
+		highQC, ok := td.signers[0].VerifyAggregateQC(aggQC)
 		if !ok {
 			t.Fatal("AggregateQC was not verified")
 		}
@@ -171,7 +172,7 @@ func runAll(t *testing.T, run func(*testing.T, setupFunc)) {
 	t.Run("Cache+BLS12-381", func(t *testing.T) { run(t, setup(NewCache(bls12.New), testutil.GenerateBLS12Key)) })
 }
 
-func createBlock(t *testing.T, signer consensus.Crypto) *msg.Block {
+func createBlock(t *testing.T, signer modules.Crypto) *msg.Block {
 	t.Helper()
 
 	qc, err := signer.CreateQuorumCert(msg.GetGenesis(), []msg.PartialCert{})
@@ -186,31 +187,31 @@ func createBlock(t *testing.T, signer consensus.Crypto) *msg.Block {
 type keyFunc func(t *testing.T) msg.PrivateKey
 type setupFunc func(*testing.T, *gomock.Controller, int) testData
 
-func setup(newFunc func() consensus.Crypto, keyFunc keyFunc) setupFunc {
+func setup(newFunc func() modules.Crypto, keyFunc keyFunc) setupFunc {
 	return func(t *testing.T, ctrl *gomock.Controller, n int) testData {
 		return newTestData(t, ctrl, n, newFunc, keyFunc)
 	}
 }
 
-func NewCache(impl func() consensus.CryptoImpl) func() consensus.Crypto {
-	return func() consensus.Crypto {
+func NewCache(impl func() modules.CryptoBase) func() modules.Crypto {
+	return func() modules.Crypto {
 		return crypto.NewCache(impl(), 10)
 	}
 }
 
-func NewBase(impl func() consensus.CryptoImpl) func() consensus.Crypto {
-	return func() consensus.Crypto {
+func NewBase(impl func() modules.CryptoBase) func() modules.Crypto {
+	return func() modules.Crypto {
 		return crypto.New(impl())
 	}
 }
 
 type testData struct {
-	signers   []consensus.Crypto
-	verifiers []consensus.Crypto
+	signers   []modules.Crypto
+	verifiers []modules.Crypto
 	block     *msg.Block
 }
 
-func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() consensus.Crypto, keyFunc keyFunc) testData {
+func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() modules.Crypto, keyFunc keyFunc) testData {
 	t.Helper()
 
 	bl := testutil.CreateBuilders(t, ctrl, n, testutil.GenerateKeys(t, n, keyFunc)...)
@@ -219,10 +220,15 @@ func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() co
 		builder.Register(signer)
 	}
 	hl := bl.Build()
+	block := createBlock(t, hl[0].Crypto())
+
+	for _, mods := range hl {
+		mods.BlockChain().Store(block)
+	}
 
 	return testData{
 		signers:   hl.Signers(),
 		verifiers: hl.Verifiers(),
-		block:     createBlock(t, hl[0].Crypto()),
+		block:     block,
 	}
 }

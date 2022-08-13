@@ -3,52 +3,45 @@ package crypto
 import (
 	"container/list"
 	"crypto/sha256"
-	"github.com/relab/hotstuff/msg"
+	"strings"
 	"sync"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 )
 
-// key is used to identify a cached signature.
-// hash should be a hash of the message hash and signature together,
-// and threshold should be true if the entry was created/verified as a valid threshold signature.
-// This is to distinguish between valid aggregated signatures and valid threshold signatures.
-type key struct {
-	hash      msg.Hash
-	threshold bool
-}
-
 type cache struct {
-	impl        consensus.CryptoImpl
+	impl        modules.CryptoBase
 	mut         sync.Mutex
 	capacity    int
-	entries     map[key]*list.Element
+	entries     map[string]*list.Element
 	accessOrder list.List
 }
 
-// NewCache returns a new Crypto implementation that caches the results of the operations of the given CryptoImpl
+// NewCache returns a new Crypto instance that caches the results of the operations of the given CryptoBase.
 // implementation.
-func NewCache(impl consensus.CryptoImpl, capacity int) consensus.Crypto {
+func NewCache(impl modules.CryptoBase, capacity int) modules.Crypto {
 	return New(&cache{
 		impl:     impl,
 		capacity: capacity,
-		entries:  make(map[key]*list.Element, capacity),
+		entries:  make(map[string]*list.Element, capacity),
 	})
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (cache *cache) InitConsensusModule(mods *consensus.Modules, cfg *consensus.OptionsBuilder) {
-	if mod, ok := cache.impl.(consensus.Module); ok {
-		mod.InitConsensusModule(mods, cfg)
+func (cache *cache) InitModule(mods *modules.ConsensusCore, cfg *modules.OptionsBuilder) {
+	if mod, ok := cache.impl.(modules.ConsensusModule); ok {
+		mod.InitModule(mods, cfg)
 	}
 }
 
-func (cache *cache) insert(hash msg.Hash, threshold bool) {
+func (cache *cache) insert(key string) {
 	cache.mut.Lock()
 	defer cache.mut.Unlock()
-	key := key{hash, threshold}
 	elem, ok := cache.entries[key]
 	if ok {
 		cache.accessOrder.MoveToFront(elem)
@@ -59,10 +52,10 @@ func (cache *cache) insert(hash msg.Hash, threshold bool) {
 	cache.entries[key] = elem
 }
 
-func (cache *cache) check(hash msg.Hash, threshold bool) bool {
+func (cache *cache) check(key string) bool {
 	cache.mut.Lock()
 	defer cache.mut.Unlock()
-	elem, ok := cache.entries[key{hash, threshold}]
+	elem, ok := cache.entries[key]
 	if !ok {
 		return false
 	}
@@ -74,127 +67,74 @@ func (cache *cache) evict() {
 	if len(cache.entries) < cache.capacity {
 		return
 	}
-	key := cache.accessOrder.Remove(cache.accessOrder.Back()).(key)
+	key := cache.accessOrder.Remove(cache.accessOrder.Back()).(string)
 	delete(cache.entries, key)
 }
 
-// Sign signs a hash.
-func (cache *cache) Sign(hash msg.Hash) (sig msg.Signature, err error) {
-	sig, err = cache.impl.Sign(hash)
+// Sign signs a message and adds it to the cache for use during verification.
+func (cache *cache) Sign(message []byte) (sig msg.QuorumSignature, err error) {
+	sig, err = cache.impl.Sign(message)
 	if err != nil {
 		return nil, err
 	}
-	key := sha256.Sum256(append(hash[:], sig.ToBytes()...))
-	cache.insert(key, false)
+	var key strings.Builder
+	hash := sha256.Sum256(message)
+	_, _ = key.Write(hash[:])
+	_, _ = key.Write(sig.ToBytes())
+	cache.insert(key.String())
 	return sig, nil
 }
 
-// Verify verifies a signature given a hash.
-func (cache *cache) Verify(sig msg.Signature, hash msg.Hash) bool {
-	if sig == nil {
-		return false
-	}
-	key := sha256.Sum256(append(hash[:], sig.ToBytes()...))
-	if cache.check(key, false) {
+// Verify verifies the given quorum signature against the message.
+func (cache *cache) Verify(signature msg.QuorumSignature, message []byte) bool {
+	var key strings.Builder
+	hash := sha256.Sum256(message)
+	_, _ = key.Write(hash[:])
+	_, _ = key.Write(signature.ToBytes())
+
+	if cache.check(key.String()) {
 		return true
 	}
-	if cache.impl.Verify(sig, hash) {
-		cache.insert(key, false)
+
+	if cache.impl.Verify(signature, message) {
+		cache.insert(key.String())
 		return true
 	}
+
 	return false
 }
 
-// VerifyThresholdSignature verifies a threshold signature.
-func (cache *cache) VerifyAggregateSignature(signature msg.ThresholdSignature, hash msg.Hash) bool {
-	if signature == nil {
-		return false
+// BatchVerify verifies the given quorum signature against the batch of messages.
+func (cache *cache) BatchVerify(signature msg.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
+	// sort the list of ids from the batch map
+	ids := maps.Keys(batch)
+	slices.Sort(ids)
+	var hash msg.Hash
+	hasher := sha256.New()
+	// then hash the messages in sorted order
+	for _, id := range ids {
+		_, _ = hasher.Write(batch[id])
 	}
-	key := sha256.Sum256(append(hash[:], signature.ToBytes()...))
-	if cache.check(key, false) {
+	hasher.Sum(hash[:])
+
+	var key strings.Builder
+	_, _ = key.Write(hash[:])
+	_, _ = key.Write(signature.ToBytes())
+
+	if cache.check(key.String()) {
 		return true
 	}
-	if cache.impl.VerifyAggregateSignature(signature, hash) {
-		cache.insert(key, false)
+
+	if cache.impl.BatchVerify(signature, batch) {
+		cache.insert(key.String())
 		return true
 	}
+
 	return false
 }
 
-// CreateThresholdSignature creates a threshold signature from the given partial signatures.
-func (cache *cache) CreateThresholdSignature(partialSignatures []msg.Signature, hash msg.Hash) (sig msg.ThresholdSignature, err error) {
-	sig, err = cache.impl.CreateThresholdSignature(partialSignatures, hash)
-	if err != nil {
-		return nil, err
-	}
-	key := sha256.Sum256(append(hash[:], sig.ToBytes()...))
-	cache.insert(key, true)
-	return sig, nil
-}
-
-// VerifyThresholdSignature verifies a threshold signature.
-func (cache *cache) VerifyThresholdSignature(signature msg.ThresholdSignature, hash msg.Hash) bool {
-	if signature == nil {
-		return false
-	}
-	key := sha256.Sum256(append(hash[:], signature.ToBytes()...))
-	if cache.check(key, true) {
-		return true
-	}
-	if cache.impl.VerifyThresholdSignature(signature, hash) {
-		cache.insert(key, true)
-		return true
-	}
-	return false
-}
-
-// CreateThresholdSignatureForMessageSet creates a threshold signature where each partial signature has signed a
-// different message hash.
-func (cache *cache) CreateThresholdSignatureForMessageSet(partialSignatures []msg.Signature, hashes map[hotstuff.ID]msg.Hash) (msg.ThresholdSignature, error) {
-	signature, err := cache.impl.CreateThresholdSignatureForMessageSet(partialSignatures, hashes)
-	if err != nil {
-		return nil, err
-	}
-	var key msg.Hash
-	hash := sha256.New()
-	for _, h := range hashes {
-		hash.Write(h[:])
-	}
-	hash.Write(signature.ToBytes())
-	hash.Sum(key[:0])
-	cache.insert(key, true)
-	return signature, nil
-}
-
-// VerifyThresholdSignatureForMessageSet verifies a threshold signature against a set of message hashes.
-func (cache *cache) VerifyThresholdSignatureForMessageSet(signature msg.ThresholdSignature, hashes map[hotstuff.ID]msg.Hash) bool {
-	if signature == nil {
-		return false
-	}
-	var key msg.Hash
-	hash := sha256.New()
-	for _, h := range hashes {
-		hash.Write(h[:])
-	}
-	hash.Write(signature.ToBytes())
-	hash.Sum(key[:0])
-	if cache.check(key, true) {
-		return true
-	}
-	if cache.impl.VerifyThresholdSignatureForMessageSet(signature, hashes) {
-		cache.insert(key, true)
-		return true
-	}
-	return false
-}
-
-// Combine combines multiple signatures into a single threshold signature.
-// Arguments can be singular signatures or threshold signatures.
-//
-// As opposed to the CreateThresholdSignature methods,
-// this method does not check whether the resulting
-// signature meets the quorum size.
-func (cache *cache) Combine(signatures ...interface{}) msg.ThresholdSignature {
+// Combine combines multiple signatures together into a single signature.
+func (cache *cache) Combine(signatures ...msg.QuorumSignature) (msg.QuorumSignature, error) {
 	// we don't cache the result of this operation, because it is not guaranteed to be valid.
 	return cache.impl.Combine(signatures...)
 }

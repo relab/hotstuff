@@ -1,14 +1,17 @@
 package consensus
 
 import (
-	"github.com/relab/hotstuff/msg"
 	"sync"
+
+	"github.com/relab/hotstuff/msg"
+
+	"github.com/relab/hotstuff/modules"
 )
 
 // VotingMachine collects votes.
 type VotingMachine struct {
 	mut           sync.Mutex
-	mods          *Modules
+	mods          *modules.ConsensusCore
 	verifiedVotes map[msg.Hash][]msg.PartialCert // verified votes that could become a QC
 }
 
@@ -19,11 +22,11 @@ func NewVotingMachine() *VotingMachine {
 	}
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (vm *VotingMachine) InitConsensusModule(mods *Modules, _ *OptionsBuilder) {
+func (vm *VotingMachine) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	vm.mods = mods
-	vm.mods.EventLoop().RegisterHandler(msg.VoteMsg{}, func(event interface{}) { vm.OnVote(event.(msg.VoteMsg)) })
+	vm.mods.EventLoop().RegisterHandler(msg.VoteMsg{}, func(event any) { vm.OnVote(event.(msg.VoteMsg)) })
 }
 
 // OnVote handles an incoming vote.

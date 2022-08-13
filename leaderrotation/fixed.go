@@ -2,13 +2,12 @@ package leaderrotation
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/msg"
 )
 
 func init() {
-	modules.RegisterModule("fixed", func() consensus.LeaderRotation {
+	modules.RegisterModule("fixed", func() modules.LeaderRotation {
 		return NewFixed(1)
 	})
 }
@@ -23,6 +22,6 @@ func (f fixed) GetLeader(_ msg.View) hotstuff.ID {
 }
 
 // NewFixed returns a new fixed-leader leader rotation implementation.
-func NewFixed(leader hotstuff.ID) consensus.LeaderRotation {
+func NewFixed(leader hotstuff.ID) modules.LeaderRotation {
 	return fixed{leader}
 }

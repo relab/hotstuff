@@ -10,11 +10,12 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"github.com/relab/hotstuff/msg"
 	"math/big"
 	"net"
 	"os"
 	"time"
+
+	"github.com/relab/hotstuff/msg"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto/bls12"

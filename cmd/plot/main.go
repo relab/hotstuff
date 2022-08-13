@@ -20,11 +20,15 @@ var (
 )
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "usage: %s [flags] [path to measurements.json]\n", os.Args[0])
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 
 	srcPath := flag.Arg(0)
 	if srcPath == "" {
-		fmt.Fprintf(os.Stderr, "usage: %s [flags] [path to measurements]\n", os.Args[0])
+		flag.Usage()
 		os.Exit(1)
 	}
 

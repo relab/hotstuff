@@ -1,14 +1,14 @@
 package leaderrotation
 
 import (
-	"github.com/relab/hotstuff/msg"
 	"math/rand"
-	"sort"
+
+	"github.com/relab/hotstuff/msg"
 
 	wr "github.com/mroth/weightedrand"
+	"golang.org/x/exp/slices"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -19,14 +19,14 @@ func init() {
 type reputationsMap map[hotstuff.ID]float64
 
 type repBased struct {
-	mods           *consensus.Modules
+	mods           *modules.ConsensusCore
 	prevCommitHead *msg.Block
 	reputations    reputationsMap // latest reputations
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder
-func (r *repBased) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (r *repBased) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	r.mods = mods
 }
 
@@ -63,12 +63,14 @@ func (r *repBased) GetLeader(view msg.View) hotstuff.ID {
 		if r.prevCommitHead.View() < block.View() {
 			r.reputations[voterID] += reputation
 		}
-		i := sort.Search(len(weights), func(i int) bool { return weights[i].Item.(hotstuff.ID) >= voterID })
-		weights = append(weights[:i+1], weights[i:]...)
-		weights[i] = wr.Choice{
+		weights = append(weights, wr.Choice{
 			Item:   voterID,
 			Weight: uint(r.reputations[voterID] * 10),
-		}
+		})
+	})
+
+	slices.SortFunc(weights, func(a, b wr.Choice) bool {
+		return a.Item.(hotstuff.ID) >= b.Item.(hotstuff.ID)
 	})
 
 	if r.prevCommitHead.View() < block.View() {
@@ -93,7 +95,7 @@ func (r *repBased) GetLeader(view msg.View) hotstuff.ID {
 }
 
 // NewRepBased returns a new random reputation-based leader rotation implementation
-func NewRepBased() consensus.LeaderRotation {
+func NewRepBased() modules.LeaderRotation {
 	return &repBased{
 		reputations:    make(reputationsMap),
 		prevCommitHead: msg.GetGenesis(),

@@ -16,7 +16,12 @@ func TestPartitionsGenerator(t *testing.T) {
 }
 
 func TestGenerator(t *testing.T) {
-	g := NewGenerator(logging.New(""), 4, 1, 3, 8)
+	g := NewGenerator(logging.New(""), Settings{
+		NumNodes:   4,
+		NumTwins:   1,
+		Partitions: 3,
+		Views:      8,
+	})
 	g.Shuffle(time.Now().Unix())
 	t.Log(g.NextScenario())
 }

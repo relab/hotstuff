@@ -1,10 +1,9 @@
 package synchronizer
 
 import (
+	"github.com/relab/hotstuff/modules"
 	"math"
 	"time"
-
-	"github.com/relab/hotstuff/consensus"
 )
 
 // ViewDuration determines the duration of a view.
@@ -36,7 +35,7 @@ func NewViewDuration(sampleSize uint64, startTimeout, maxTimeout, multiplier flo
 // viewDuration uses statistics from previous views to guess a good value for the view duration.
 // It only takes a limited amount of measurements into account.
 type viewDuration struct {
-	mods      *consensus.Modules
+	mods      *modules.ConsensusCore
 	mul       float64   // on failed views, multiply the current mean by this number (should be > 1)
 	limit     uint64    // how many measurements should be included in mean
 	count     uint64    // total number of measurements
@@ -47,9 +46,9 @@ type viewDuration struct {
 	max       float64   // upper bound on view timeout
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (v *viewDuration) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (v *viewDuration) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	v.mods = mods
 }
 

@@ -1,8 +1,9 @@
 package metrics
 
 import (
-	"github.com/relab/hotstuff/msg"
 	"time"
+
+	"github.com/relab/hotstuff/msg"
 
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
@@ -10,26 +11,26 @@ import (
 )
 
 func init() {
-	RegisterReplicaMetric("throughput", func() interface{} {
+	RegisterReplicaMetric("throughput", func() any {
 		return &Throughput{}
 	})
 }
 
 // Throughput measures throughput in commits per second, and commands per second.
 type Throughput struct {
-	mods         *modules.Modules
+	mods         *modules.Core
 	commitCount  uint64
 	commandCount uint64
 }
 
 // InitModule gives the module access to the other modules.
-func (t *Throughput) InitModule(mods *modules.Modules) {
+func (t *Throughput) InitModule(mods *modules.Core) {
 	t.mods = mods
 	t.mods.EventLoop().RegisterHandler(msg.CommitEvent{}, func(event interface{}) {
 		commitEvent := event.(msg.CommitEvent)
 		t.recordCommit(commitEvent.Commands)
 	})
-	t.mods.EventLoop().RegisterObserver(types.TickEvent{}, func(event interface{}) {
+	t.mods.EventLoop().RegisterObserver(types.TickEvent{}, func(event any) {
 		t.tick(event.(types.TickEvent))
 	})
 	t.mods.Logger().Info("Throughput metric enabled")

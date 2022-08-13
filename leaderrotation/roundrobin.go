@@ -2,7 +2,6 @@ package leaderrotation
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/msg"
 )
@@ -12,12 +11,12 @@ func init() {
 }
 
 type roundRobin struct {
-	mods *consensus.Modules
+	mods *modules.ConsensusCore
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (rr *roundRobin) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (rr *roundRobin) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	rr.mods = mods
 }
 
@@ -29,7 +28,7 @@ func (rr roundRobin) GetLeader(view msg.View) hotstuff.ID {
 }
 
 // NewRoundRobin returns a new round-robin leader rotation implementation.
-func NewRoundRobin() consensus.LeaderRotation {
+func NewRoundRobin() modules.LeaderRotation {
 	return &roundRobin{}
 }
 

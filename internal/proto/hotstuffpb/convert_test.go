@@ -2,8 +2,10 @@ package hotstuffpb
 
 import (
 	"bytes"
-	"github.com/relab/hotstuff/msg"
 	"testing"
+
+	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff/crypto"
@@ -14,7 +16,9 @@ import (
 func TestConvertPartialCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	builder := testutil.TestModules(t, ctrl, 1, testutil.GenerateECDSAKey(t))
+	key := testutil.GenerateECDSAKey(t)
+	builder := modules.NewConsensusBuilder(1, key)
+	testutil.TestModules(t, ctrl, 1, key, &builder)
 	hs := builder.Build()
 	signer := hs.Crypto()
 

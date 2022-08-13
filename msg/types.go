@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -66,6 +67,22 @@ func (s idSetMap) Len() int {
 	return len(s)
 }
 
+func (s idSetMap) String() string {
+	return IDSetToString(s)
+}
+
+// IDSetToString formats an IDSet as a string.
+func IDSetToString(set IDSet) string {
+	var sb strings.Builder
+	sb.WriteString("[ ")
+	set.ForEach(func(i hotstuff.ID) {
+		sb.WriteString(strconv.Itoa(int(i)))
+		sb.WriteString(" ")
+	})
+	sb.WriteString("]")
+	return sb.String()
+}
+
 // View is a number that uniquely identifies a view.
 type View uint64
 
@@ -74,13 +91,6 @@ func (v View) ToBytes() []byte {
 	var viewBytes [8]byte
 	binary.LittleEndian.PutUint64(viewBytes[:], uint64(v))
 	return viewBytes[:]
-}
-
-// ToHash converts the view to a Hash type. It does not actually hash the view.
-func (v View) ToHash() Hash {
-	h := Hash{}
-	binary.LittleEndian.PutUint64(h[:8], uint64(v))
-	return h
 }
 
 // Hash is a SHA256 hash
@@ -110,33 +120,43 @@ type PrivateKey interface {
 	Public() PublicKey
 }
 
-// Signature is a cryptographic signature of a block.
-type Signature interface {
-	ToBytes
-	// Signer returns the ID of the replica that created the signature.
-	Signer() hotstuff.ID
-}
-
-// ThresholdSignature is a signature that is only valid when it contains the signatures of a quorum of replicas.
-type ThresholdSignature interface {
+// QuorumSignature is a signature that is only valid when it contains the signatures of a quorum of replicas.
+type QuorumSignature interface {
 	ToBytes
 	// Participants returns the IDs of replicas who participated in the threshold signature.
 	Participants() IDSet
 }
 
+// ThresholdSignature is a signature that is only valid when it contains the signatures of a quorum of replicas.
+//
+// Deprecated: renamed to QuorumSignature
+type ThresholdSignature = QuorumSignature
+
 // PartialCert is a signed block hash.
 type PartialCert struct {
-	signature Signature
+	// shortcut to the signer of the signature
+	signer    hotstuff.ID
+	signature QuorumSignature
 	blockHash Hash
 }
 
 // NewPartialCert returns a new partial certificate.
-func NewPartialCert(signature Signature, blockHash Hash) PartialCert {
-	return PartialCert{signature, blockHash}
+func NewPartialCert(signature QuorumSignature, blockHash Hash) PartialCert {
+	var signer hotstuff.ID
+	signature.Participants().RangeWhile(func(i hotstuff.ID) bool {
+		signer = i
+		return false
+	})
+	return PartialCert{signer, signature, blockHash}
+}
+
+// Signer returns the ID of the replica that created the certificate.
+func (pc PartialCert) Signer() hotstuff.ID {
+	return pc.signer
 }
 
 // Signature returns the signature.
-func (pc PartialCert) Signature() Signature {
+func (pc PartialCert) Signature() QuorumSignature {
 	return pc.signature
 }
 
@@ -211,24 +231,30 @@ func (si SyncInfo) AggQC() (_ AggregateQC, _ bool) {
 }
 
 func (si SyncInfo) String() string {
-	var cert interface{}
-	if si.qc != nil {
-		cert = si.qc
-	} else if si.tc != nil {
-		cert = si.tc
+	var sb strings.Builder
+	sb.WriteString("{ ")
+	if si.tc != nil {
+		fmt.Fprintf(&sb, "%s ", si.tc)
 	}
-	return fmt.Sprint(cert)
+	if si.qc != nil {
+		fmt.Fprintf(&sb, "%s ", si.qc)
+	}
+	if si.aggQC != nil {
+		fmt.Fprintf(&sb, "%s ", si.aggQC)
+	}
+	sb.WriteRune('}')
+	return sb.String()
 }
 
 // QuorumCert (QC) is a certificate for a Block created by a quorum of partial certificates.
 type QuorumCert struct {
-	signature ThresholdSignature
+	signature QuorumSignature
 	view      View
 	hash      Hash
 }
 
 // NewQuorumCert creates a new quorum cert from the given values.
-func NewQuorumCert(signature ThresholdSignature, view View, hash Hash) QuorumCert {
+func NewQuorumCert(signature QuorumSignature, view View, hash Hash) QuorumCert {
 	return QuorumCert{signature, view, hash}
 }
 
@@ -243,7 +269,7 @@ func (qc QuorumCert) ToBytes() []byte {
 }
 
 // Signature returns the threshold signature.
-func (qc QuorumCert) Signature() ThresholdSignature {
+func (qc QuorumCert) Signature() QuorumSignature {
 	return qc.signature
 }
 
@@ -274,22 +300,19 @@ func (qc QuorumCert) Equals(other QuorumCert) bool {
 func (qc QuorumCert) String() string {
 	var sb strings.Builder
 	if qc.signature != nil {
-		qc.signature.Participants().ForEach(func(id hotstuff.ID) {
-			sb.WriteString(strconv.FormatUint(uint64(id), 10))
-			sb.WriteByte(' ')
-		})
+		_ = writeParticipants(&sb, qc.Signature().Participants())
 	}
 	return fmt.Sprintf("QC{ hash: %.6s, IDs: [ %s] }", qc.hash, &sb)
 }
 
 // TimeoutCert (TC) is a certificate created by a quorum of timeout messages.
 type TimeoutCert struct {
-	signature ThresholdSignature
+	signature QuorumSignature
 	view      View
 }
 
 // NewTimeoutCert returns a new timeout certificate.
-func NewTimeoutCert(signature ThresholdSignature, view View) TimeoutCert {
+func NewTimeoutCert(signature QuorumSignature, view View) TimeoutCert {
 	return TimeoutCert{signature, view}
 }
 
@@ -301,7 +324,7 @@ func (tc TimeoutCert) ToBytes() []byte {
 }
 
 // Signature returns the threshold signature.
-func (tc TimeoutCert) Signature() ThresholdSignature {
+func (tc TimeoutCert) Signature() QuorumSignature {
 	return tc.signature
 }
 
@@ -313,10 +336,7 @@ func (tc TimeoutCert) View() View {
 func (tc TimeoutCert) String() string {
 	var sb strings.Builder
 	if tc.signature != nil {
-		tc.signature.Participants().ForEach(func(id hotstuff.ID) {
-			sb.WriteString(strconv.FormatUint(uint64(id), 10))
-			sb.WriteByte(' ')
-		})
+		_ = writeParticipants(&sb, tc.Signature().Participants())
 	}
 	return fmt.Sprintf("TC{ view: %d, IDs: [ %s] }", tc.view, &sb)
 }
@@ -326,12 +346,12 @@ func (tc TimeoutCert) String() string {
 // This is used by the Fast-HotStuff consensus protocol.
 type AggregateQC struct {
 	qcs  map[hotstuff.ID]QuorumCert
-	sig  ThresholdSignature
+	sig  QuorumSignature
 	view View
 }
 
 // NewAggregateQC returns a new AggregateQC from the QC map and the threshold signature.
-func NewAggregateQC(qcs map[hotstuff.ID]QuorumCert, sig ThresholdSignature, view View) AggregateQC {
+func NewAggregateQC(qcs map[hotstuff.ID]QuorumCert, sig QuorumSignature, view View) AggregateQC {
 	return AggregateQC{qcs, sig, view}
 }
 
@@ -341,11 +361,34 @@ func (aggQC AggregateQC) QCs() map[hotstuff.ID]QuorumCert {
 }
 
 // Sig returns the threshold signature in the AggregateQC.
-func (aggQC AggregateQC) Sig() ThresholdSignature {
+func (aggQC AggregateQC) Sig() QuorumSignature {
 	return aggQC.sig
 }
 
 // View returns the view in which the AggregateQC was created.
 func (aggQC AggregateQC) View() View {
 	return aggQC.view
+}
+
+func (aggQC AggregateQC) String() string {
+	var sb strings.Builder
+	if aggQC.sig != nil {
+		_ = writeParticipants(&sb, aggQC.sig.Participants())
+	}
+	return fmt.Sprintf("AggQC{ view: %d, IDs: [ %s] }", aggQC.view, &sb)
+}
+
+func writeParticipants(wr io.Writer, participants IDSet) (err error) {
+	participants.RangeWhile(func(id hotstuff.ID) bool {
+		_, err = fmt.Fprintf(wr, "%d ", id)
+		return err == nil
+	})
+	return err
+}
+
+// Signature is a cryptographic signature of a block.
+type Signature interface {
+	ToBytes
+	// Signer returns the ID of the replica that created the signature.
+	Signer() hotstuff.ID
 }

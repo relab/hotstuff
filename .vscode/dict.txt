@@ -50,6 +50,7 @@ mitchellh
 nolint
 oneof
 orchestrationpb
+partitioner
 perr
 pflag
 pflags

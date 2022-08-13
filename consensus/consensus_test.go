@@ -2,8 +2,9 @@ package consensus_test
 
 import (
 	"context"
-	"github.com/relab/hotstuff/msg"
 	"testing"
+
+	"github.com/relab/hotstuff/msg"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"

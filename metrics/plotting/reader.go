@@ -12,7 +12,7 @@ import (
 // Plotter processes measurements from a reader.
 type Plotter interface {
 	// Adds a measurement to the plotter.
-	Add(interface{})
+	Add(any)
 }
 
 // Reader reads measurements from JSON.

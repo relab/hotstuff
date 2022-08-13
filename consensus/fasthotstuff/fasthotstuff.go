@@ -13,7 +13,7 @@ func init() {
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {
-	mods *consensus.Modules
+	mods *modules.ConsensusCore
 }
 
 // New returns a new FastHotStuff instance.
@@ -21,9 +21,9 @@ func New() consensus.Rules {
 	return &FastHotStuff{}
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (fhs *FastHotStuff) InitConsensusModule(mods *consensus.Modules, opts *consensus.OptionsBuilder) {
+func (fhs *FastHotStuff) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
 	fhs.mods = mods
 	opts.SetShouldUseAggQC()
 }

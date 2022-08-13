@@ -37,11 +37,11 @@ Note that this will likely result in several hundreds of megabytes of scenarios,
 as the number of possible scenarios is quite large.
 Hence it could be useful to specify the `--scenarios-per-file` flag if generating a large number of scenarios.
 
-The `--replicas`, `--twins`, `--partitions`, and `--rounds` flags are the inputs for the scenario generator.
+The `--replicas`, `--twins`, `--partitions`, and `--views` flags are the inputs for the scenario generator.
 The `--replicas` flag specifies how many replicas to create.
 The `--twins` flag specifies how many of the replicas should have a twin.
 The `--partitions` flag specifies how many network partitions the replicas and twins should be divided into.
-The `--rounds` flag specifies how many rounds or views to run.
+The `--views` flag specifies how many views to run.
 
 The generator will always generate the same scenarios if given the same input parameters.
 That is, unless the `--shuffle` flag is given, in which case the order of scenarios is randomized.

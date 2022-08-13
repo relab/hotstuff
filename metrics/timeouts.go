@@ -9,29 +9,29 @@ import (
 )
 
 func init() {
-	RegisterReplicaMetric("timeouts", func() interface{} {
+	RegisterReplicaMetric("timeouts", func() any {
 		return &ViewTimeouts{}
 	})
 }
 
 // ViewTimeouts is a metric that measures the number of view timeouts that happen.
 type ViewTimeouts struct {
-	mods        *modules.Modules
+	mods        *modules.Core
 	numViews    uint64
 	numTimeouts uint64
 }
 
 // InitModule gives the module access to the other modules.
-func (vt *ViewTimeouts) InitModule(mods *modules.Modules) {
+func (vt *ViewTimeouts) InitModule(mods *modules.Core) {
 	vt.mods = mods
 
 	vt.mods.Logger().Info("ViewTimeouts metric enabled.")
 
-	vt.mods.EventLoop().RegisterHandler(synchronizer.ViewChangeEvent{}, func(event interface{}) {
+	vt.mods.EventLoop().RegisterHandler(synchronizer.ViewChangeEvent{}, func(event any) {
 		vt.viewChange(event.(synchronizer.ViewChangeEvent))
 	})
 
-	vt.mods.EventLoop().RegisterObserver(types.TickEvent{}, func(event interface{}) {
+	vt.mods.EventLoop().RegisterObserver(types.TickEvent{}, func(event any) {
 		vt.tick(event.(types.TickEvent))
 	})
 }

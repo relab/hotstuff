@@ -21,7 +21,7 @@ func NewStartTimes() StartTimes {
 }
 
 // Add adds an event.
-func (s *StartTimes) Add(msg interface{}) {
+func (s *StartTimes) Add(msg any) {
 	startTime, ok := msg.(*types.StartEvent)
 	if !ok {
 		return

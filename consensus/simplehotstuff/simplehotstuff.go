@@ -16,7 +16,7 @@ func init() {
 // Based on the simplified algorithm described in the paper
 // "Formal Verification of HotStuff" by Leander Jehl.
 type SimpleHotStuff struct {
-	mods *consensus.Modules
+	mods *modules.ConsensusCore
 
 	locked *msg.Block
 }
@@ -28,9 +28,9 @@ func New() consensus.Rules {
 	}
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (hs *SimpleHotStuff) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (hs *SimpleHotStuff) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	hs.mods = mods
 }
 

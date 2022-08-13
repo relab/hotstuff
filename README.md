@@ -26,7 +26,7 @@ It also provides a tool for deploying and running experiments on multiple server
 
 ## Build Dependencies
 
-- [Go](https://go.dev) (at least version 1.16)
+- [Go](https://go.dev) (at least version 1.18)
 
 If you modify any of the protobuf files, you will need the following to compile them:
 
@@ -34,8 +34,8 @@ If you modify any of the protobuf files, you will need the following to compile 
 
 - The gRPC and gorums plugins for protobuf.
   - Linux and macOS users can run `make tools` to install these.
-  - Windows users must do the following:
-    - Ensure dependencies are downloaded: `go mod download`
+  - The Windows build script downloads them automatically.
+  - They can also be installed manually:
     - `go install github.com/relab/gorums/cmd/protoc-gen-gorums`
     - `go install google.golang.org/protobuf/cmd/protoc-gen-go`
 
@@ -47,25 +47,9 @@ If you modify any of the protobuf files, you will need the following to compile 
 
 ### Windows
 
-- Run `go build -o ./hotstuff.exe ./cmd/hotstuff`
-- Run `go build -o ./plot.exe ./cmd/plot`
+- Run `.\build.ps1` with PowerShell.
 
 **NOTE**: you should use `./hotstuff.exe` instead of `./hotstuff` when running commands.
-
-**NOTE**: these commands will not recompile the protobuf files if they have changed.
-You could try to run `make`, but it might not work on Windows. Instead, you can do it manually like this:
-
-1. Get the path to the `gorums` module:
-
-  ```text
-  go list -m -f '{{.Dir}}' github.com/relab/gorums
-  ```
-
-2. Run `protoc` (replace `PATH_TO_GORUMS` with the output from the previous step):
-
-  ```text
-  protoc -I=PATH_TO_GORUMS:. --go_out=paths=source_relative:. --gorums_out=paths=source_relative:. PATH_TO_CHANGED_PROTO_FILE
-  ```
 
 ## Running Experiments
 

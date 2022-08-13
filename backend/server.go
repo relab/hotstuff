@@ -3,15 +3,15 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/relab/hotstuff/msg"
 	"net"
 	"strconv"
 
+	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
+
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
@@ -22,13 +22,13 @@ import (
 // Server is the Server-side of the gorums backend.
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
-	mods      *consensus.Modules
+	mods      *modules.ConsensusCore
 	gorumsSrv *gorums.Server
 }
 
-// InitConsensusModule gives the module a reference to the Modules object.
+// InitModule gives the module a reference to the ConsensusCore object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (srv *Server) InitConsensusModule(mods *consensus.Modules, _ *consensus.OptionsBuilder) {
+func (srv *Server) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	srv.mods = mods
 }
 
@@ -36,14 +36,19 @@ func (srv *Server) InitConsensusModule(mods *consensus.Modules, _ *consensus.Opt
 func NewServer(opts ...gorums.ServerOption) *Server {
 	srv := &Server{}
 
-	grpcServerOpts := []grpc.ServerOption{}
-
-	opts = append(opts, gorums.WithGRPCServerOptions(grpcServerOpts...))
+	opts = append(opts, gorums.WithConnectCallback(func(ctx context.Context) {
+		srv.mods.EventLoop().AddEvent(replicaConnected{ctx})
+	}))
 
 	srv.gorumsSrv = gorums.NewServer(opts...)
 
 	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, &serviceImpl{srv})
 	return srv
+}
+
+// GetGorumsServer returns the underlying gorums Server.
+func (srv *Server) GetGorumsServer() *gorums.Server {
+	return srv.gorumsSrv
 }
 
 // Start creates a listener on the configured address and starts the server.
@@ -67,7 +72,7 @@ func (srv *Server) StartOnListener(listener net.Listener) {
 }
 
 // GetPeerIDFromContext extracts the ID of the peer from the context.
-func GetPeerIDFromContext(ctx context.Context, cfg consensus.Configuration) (hotstuff.ID, error) {
+func GetPeerIDFromContext(ctx context.Context, cfg modules.Configuration) (hotstuff.ID, error) {
 	peerInfo, ok := peer.FromContext(ctx)
 	if !ok {
 		return 0, fmt.Errorf("peerInfo not available")
@@ -185,4 +190,8 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, toMsg *hotstuffpb.Timeout
 		impl.srv.mods.Logger().Infof("Could not get ID of replica: %v", err)
 	}
 	impl.srv.mods.EventLoop().AddEvent(timeoutMsg)
+}
+
+type replicaConnected struct {
+	ctx context.Context
 }
