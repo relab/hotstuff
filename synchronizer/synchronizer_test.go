@@ -43,7 +43,7 @@ func TestLocalTimeout(t *testing.T) {
 			if msgQC, ok := timeoutMsg.SyncInfo.QC(); ok && !bytes.Equal(msgQC.ToBytes(), qc.ToBytes()) {
 				t.Errorf("wrong QC. got: %v, want: %v", msgQC, qc)
 			}
-			if !mods.Crypto().Verify(timeoutMsg.ViewSignature, timeoutMsg.View.ToHash()) {
+			if !mods.Crypto().Verify(timeoutMsg.ViewSignature, timeoutMsg.View.ToBytes()) {
 				t.Error("failed to verify signature")
 			}
 			c <- struct{}{}

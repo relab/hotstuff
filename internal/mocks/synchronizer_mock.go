@@ -9,11 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-<<<<<<< HEAD
 	msg "github.com/relab/hotstuff/msg"
-=======
-	hotstuff "github.com/relab/hotstuff"
->>>>>>> master
 )
 
 // MockSynchronizer is a mock of Synchronizer interface.
@@ -40,11 +36,7 @@ func (m *MockSynchronizer) EXPECT() *MockSynchronizerMockRecorder {
 }
 
 // AdvanceView mocks base method.
-<<<<<<< HEAD
 func (m *MockSynchronizer) AdvanceView(arg0 msg.SyncInfo) {
-=======
-func (m *MockSynchronizer) AdvanceView(arg0 hotstuff.SyncInfo) {
->>>>>>> master
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AdvanceView", arg0)
 }
@@ -56,17 +48,10 @@ func (mr *MockSynchronizerMockRecorder) AdvanceView(arg0 interface{}) *gomock.Ca
 }
 
 // HighQC mocks base method.
-<<<<<<< HEAD
 func (m *MockSynchronizer) HighQC() msg.QuorumCert {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HighQC")
 	ret0, _ := ret[0].(msg.QuorumCert)
-=======
-func (m *MockSynchronizer) HighQC() hotstuff.QuorumCert {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HighQC")
-	ret0, _ := ret[0].(hotstuff.QuorumCert)
->>>>>>> master
 	return ret0
 }
 
@@ -77,17 +62,10 @@ func (mr *MockSynchronizerMockRecorder) HighQC() *gomock.Call {
 }
 
 // LeafBlock mocks base method.
-<<<<<<< HEAD
 func (m *MockSynchronizer) LeafBlock() *msg.Block {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "LeafBlock")
 	ret0, _ := ret[0].(*msg.Block)
-=======
-func (m *MockSynchronizer) LeafBlock() *hotstuff.Block {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LeafBlock")
-	ret0, _ := ret[0].(*hotstuff.Block)
->>>>>>> master
 	return ret0
 }
 
@@ -109,34 +87,11 @@ func (mr *MockSynchronizerMockRecorder) Start(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockSynchronizer)(nil).Start), arg0)
 }
 
-// UpdateHighQC mocks base method.
-<<<<<<< HEAD
-func (m *MockSynchronizer) UpdateHighQC(arg0 msg.QuorumCert) {
-=======
-func (m *MockSynchronizer) UpdateHighQC(arg0 hotstuff.QuorumCert) {
->>>>>>> master
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "UpdateHighQC", arg0)
-}
-
-// UpdateHighQC indicates an expected call of UpdateHighQC.
-func (mr *MockSynchronizerMockRecorder) UpdateHighQC(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHighQC", reflect.TypeOf((*MockSynchronizer)(nil).UpdateHighQC), arg0)
-}
-
 // View mocks base method.
-<<<<<<< HEAD
 func (m *MockSynchronizer) View() msg.View {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "View")
 	ret0, _ := ret[0].(msg.View)
-=======
-func (m *MockSynchronizer) View() hotstuff.View {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "View")
-	ret0, _ := ret[0].(hotstuff.View)
->>>>>>> master
 	return ret0
 }
 

@@ -8,11 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-<<<<<<< HEAD
 	msg "github.com/relab/hotstuff/msg"
-=======
-	hotstuff "github.com/relab/hotstuff"
->>>>>>> master
 )
 
 // MockConsensus is a mock of Consensus interface.
@@ -53,17 +49,10 @@ func (mr *MockConsensusMockRecorder) ChainLength() *gomock.Call {
 }
 
 // CommittedBlock mocks base method.
-<<<<<<< HEAD
 func (m *MockConsensus) CommittedBlock() *msg.Block {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CommittedBlock")
 	ret0, _ := ret[0].(*msg.Block)
-=======
-func (m *MockConsensus) CommittedBlock() *hotstuff.Block {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CommittedBlock")
-	ret0, _ := ret[0].(*hotstuff.Block)
->>>>>>> master
 	return ret0
 }
 
@@ -74,11 +63,7 @@ func (mr *MockConsensusMockRecorder) CommittedBlock() *gomock.Call {
 }
 
 // Propose mocks base method.
-<<<<<<< HEAD
 func (m *MockConsensus) Propose(arg0 msg.SyncInfo) {
-=======
-func (m *MockConsensus) Propose(arg0 hotstuff.SyncInfo) {
->>>>>>> master
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Propose", arg0)
 }
@@ -90,11 +75,7 @@ func (mr *MockConsensusMockRecorder) Propose(arg0 interface{}) *gomock.Call {
 }
 
 // StopVoting mocks base method.
-<<<<<<< HEAD
 func (m *MockConsensus) StopVoting(arg0 msg.View) {
-=======
-func (m *MockConsensus) StopVoting(arg0 hotstuff.View) {
->>>>>>> master
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "StopVoting", arg0)
 }
