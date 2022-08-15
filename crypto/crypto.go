@@ -57,7 +57,7 @@ func (c crypto) CreateQuorumCert(block *msg.Block, signatures []msg.PartialCert)
 func (c crypto) CreateTimeoutCert(view msg.View, timeouts []msg.TimeoutMsg) (cert msg.TimeoutCert, err error) {
 	// view 0 is always valid.
 	if view == 0 {
-		return msg.NewTimeoutCert(nil, 0), nil
+		return *msg.NewTimeoutCert(nil, 0), nil
 	}
 	sigs := make([]msg.QuorumSignature, 0, len(timeouts))
 	for _, timeout := range timeouts {
@@ -67,7 +67,7 @@ func (c crypto) CreateTimeoutCert(view msg.View, timeouts []msg.TimeoutMsg) (cer
 	if err != nil {
 		return msg.TimeoutCert{}, err
 	}
-	return msg.NewTimeoutCert(sig, view), nil
+	return *msg.NewTimeoutCert(sig, view), nil
 }
 
 // CreateAggregateQC creates an AggregateQC from the given timeout messages.

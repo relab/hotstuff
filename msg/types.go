@@ -304,8 +304,8 @@ type TimeoutCert struct {
 }
 
 // NewTimeoutCert returns a new timeout certificate.
-func NewTimeoutCert(signature QuorumSignature, view View) TimeoutCert {
-	return TimeoutCert{signature, view}
+func NewTimeoutCert(signature QuorumSignature, view View) *TimeoutCert {
+	return &TimeoutCert{signature, view}
 }
 
 // ToBytes returns a byte representation of the timeout certificate.
