@@ -54,7 +54,7 @@ func (timeout TimeoutMsg) Hash() Hash {
 	return h
 }
 
-func (timeout TimeoutMsg) String() string {
+func (timeout TimeoutMsg) TString() string {
 	return fmt.Sprintf("TimeoutMsg{ ID: %d, View: %d, SyncInfo: %v }", timeout.ID, timeout.View, timeout.SyncInfo)
 }
 

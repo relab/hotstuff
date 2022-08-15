@@ -225,17 +225,17 @@ func (si SyncInfo) AggQC() (_ AggregateQC, _ bool) {
 	return
 }
 
-func (si SyncInfo) String() string {
+func (si SyncInfo) SString() string {
 	var sb strings.Builder
 	sb.WriteString("{ ")
 	if si.TCert != nil {
-		fmt.Fprintf(&sb, "%s ", si.TCert)
+		fmt.Fprintf(&sb, "%s ", si.TCert.TCString())
 	}
 	if si.QCert != nil {
-		fmt.Fprintf(&sb, "%s ", si.QCert)
+		fmt.Fprintf(&sb, "%s ", si.QCert.QCString())
 	}
 	if si.AggQCert != nil {
-		fmt.Fprintf(&sb, "%s ", si.AggQCert)
+		fmt.Fprintf(&sb, "%s ", si.AggQCert.AQCString())
 	}
 	sb.WriteRune('}')
 	return sb.String()
@@ -328,7 +328,7 @@ func (tc TimeoutCert) View() View {
 	return tc.view
 }
 
-func (tc TimeoutCert) String() string {
+func (tc TimeoutCert) TCString() string {
 	var sb strings.Builder
 	if tc.signature != nil {
 		_ = writeParticipants(&sb, tc.Signature().Participants())
@@ -365,7 +365,7 @@ func (aggQC AggregateQC) View() View {
 	return aggQC.view
 }
 
-func (aggQC AggregateQC) String() string {
+func (aggQC AggregateQC) AQCString() string {
 	var sb strings.Builder
 	if aggQC.sig != nil {
 		_ = writeParticipants(&sb, aggQC.sig.Participants())
