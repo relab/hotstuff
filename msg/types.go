@@ -135,7 +135,7 @@ type PartialCert struct {
 
 // NewPartialCert returns a new partial certificate.
 func NewPartialCert(signature QuorumSignature, blockHash Hash) *PartialCert {
-	return &PartialCert{signature, blockHash}
+	return &PartialCert{Sig: signature, Hash: blockHash}
 }
 
 // Signer returns the ID of the replica that created the certificate.
@@ -247,7 +247,11 @@ type QuorumCert struct {
 
 // NewQuorumCert creates a new quorum cert from the given values.
 func NewQuorumCert(signature QuorumSignature, view View, hash Hash) *QuorumCert {
-	return &QuorumCert{signature, view, hash}
+	return &QuorumCert{
+		Sig:  signature,
+		View: view,
+		Hash: hash,
+	}
 }
 
 // ToBytes returns a byte representation of the quorum certificate.
@@ -305,7 +309,7 @@ type TimeoutCert struct {
 
 // NewTimeoutCert returns a new timeout certificate.
 func NewTimeoutCert(signature QuorumSignature, view View) *TimeoutCert {
-	return &TimeoutCert{signature, view}
+	return &TimeoutCert{Sig: signature, View: view}
 }
 
 // ToBytes returns a byte representation of the timeout certificate.
@@ -344,7 +348,11 @@ type AggregateQC struct {
 
 // NewAggregateQC returns a new AggregateQC from the QC map and the threshold signature.
 func NewAggregateQC(qcs map[hotstuff.ID]QuorumCert, sig QuorumSignature, view View) *AggregateQC {
-	return &AggregateQC{qcs, sig, view}
+	return &AggregateQC{
+		QCs:  qcs,
+		Sig:  sig,
+		View: view,
+	}
 }
 
 // QCerts returns the quorum certificates in the AggregateQC.
