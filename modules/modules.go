@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/msg"
 )
 
@@ -281,7 +282,7 @@ type Replica interface {
 	// PublicKey returns the replica's public key.
 	PublicKey() msg.PublicKey
 	// Vote sends the partial certificate to the other replica.
-	Vote(cert msg.PartialCert)
+	Vote(cert *hotstuffpb.PartialCert)
 	// NewView sends the quorum certificate to the other replica.
 	NewView(msg.SyncInfo)
 	// Metadata returns the connection metadata sent by this replica.
@@ -355,7 +356,7 @@ type Synchronizer interface {
 // Handel is an implementation of the Handel signature aggregation protocol.
 type Handel interface {
 	// Begin commissions the aggregation of a new signature.
-	Begin(s msg.PartialCert)
+	Begin(s hotstuffpb.PartialCert)
 }
 
 type executorWrapper struct {

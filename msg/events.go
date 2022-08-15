@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/msg/hotstuffpb"
 )
 
 // ProposeMsg is broadcast when a leader makes a proposal.
@@ -17,8 +18,8 @@ type ProposeMsg struct {
 
 // VoteMsg is sent to the leader by replicas voting on a proposal.
 type VoteMsg struct {
-	ID          hotstuff.ID // the ID of the replica who sent the message.
-	PartialCert PartialCert // The partial certificate.
+	ID          hotstuff.ID             // the ID of the replica who sent the message.
+	PartialCert *hotstuffpb.PartialCert // The partial certificate.
 	Deferred    bool
 }
 

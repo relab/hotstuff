@@ -41,15 +41,14 @@ func (r *Replica) PublicKey() msg.PublicKey {
 }
 
 // Vote sends the partial certificate to the other replica.
-func (r *Replica) Vote(cert msg.PartialCert) {
+func (r *Replica) Vote(cert *hotstuffpb.PartialCert) {
 	if r.node == nil {
 		return
 	}
 	var ctx context.Context
 	r.voteCancel()
 	ctx, r.voteCancel = context.WithCancel(context.Background())
-	pCert := hotstuffpb.PartialCertToProto(cert)
-	r.node.Vote(ctx, pCert, gorums.WithNoSendWaiting())
+	r.node.Vote(ctx, cert, gorums.WithNoSendWaiting())
 }
 
 // NewView sends the quorum certificate to the other replica.

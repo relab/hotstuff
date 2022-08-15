@@ -3,6 +3,7 @@ package crypto
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/msg"
 )
@@ -28,12 +29,12 @@ func (c *crypto) InitModule(mods *modules.ConsensusCore, cfg *modules.OptionsBui
 }
 
 // CreatePartialCert signs a single block and returns the partial certificate.
-func (c crypto) CreatePartialCert(block *msg.Block) (cert msg.PartialCert, err error) {
+func (c crypto) CreatePartialCert(block *msg.Block) (cert hotstuffpb.PartialCert, err error) {
 	sig, err := c.Sign(block.ToBytes())
 	if err != nil {
-		return msg.PartialCert{}, err
+		return hotstuffpb.PartialCert{}, err
 	}
-	return msg.NewPartialCert(sig, block.Hash()), nil
+	return hotstuffpb.PartialCert{Sig: sig, Hash: block.Hash()[:]}, nil
 }
 
 // CreateQuorumCert creates a quorum certificate from a list of partial certificates.

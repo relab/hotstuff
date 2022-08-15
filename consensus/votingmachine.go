@@ -3,6 +3,7 @@ package consensus
 import (
 	"sync"
 
+	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/msg"
 
 	"github.com/relab/hotstuff/modules"
@@ -12,13 +13,13 @@ import (
 type VotingMachine struct {
 	mut           sync.Mutex
 	mods          *modules.ConsensusCore
-	verifiedVotes map[msg.Hash][]msg.PartialCert // verified votes that could become a QC
+	verifiedVotes map[msg.Hash][]hotstuffpb.PartialCert // verified votes that could become a QC
 }
 
 // NewVotingMachine returns a new VotingMachine.
 func NewVotingMachine() *VotingMachine {
 	return &VotingMachine{
-		verifiedVotes: make(map[msg.Hash][]msg.PartialCert),
+		verifiedVotes: make(map[msg.Hash][]hotstuffpb.PartialCert),
 	}
 }
 
@@ -71,7 +72,7 @@ func (vm *VotingMachine) OnVote(vote msg.VoteMsg) {
 	}
 }
 
-func (vm *VotingMachine) verifyCert(cert msg.PartialCert, block *msg.Block) {
+func (vm *VotingMachine) verifyCert(cert hotstuffpb.PartialCert, block *msg.Block) {
 	if !vm.mods.Crypto().VerifyPartialCert(cert) {
 		vm.mods.Logger().Info("OnVote: Vote could not be verified!")
 		return
@@ -93,10 +94,11 @@ func (vm *VotingMachine) verifyCert(cert msg.PartialCert, block *msg.Block) {
 			}
 		}
 	}()
-
-	votes := vm.verifiedVotes[cert.BlockHash()]
+	var hash msg.Hash
+	copy(hash[:], cert.GetHash())
+	votes := vm.verifiedVotes[hash]
 	votes = append(votes, cert)
-	vm.verifiedVotes[cert.BlockHash()] = votes
+	vm.verifiedVotes[hash] = votes
 
 	if len(votes) < vm.mods.Configuration().QuorumSize() {
 		return
@@ -107,7 +109,7 @@ func (vm *VotingMachine) verifyCert(cert msg.PartialCert, block *msg.Block) {
 		vm.mods.Logger().Info("OnVote: could not create QC for block: ", err)
 		return
 	}
-	delete(vm.verifiedVotes, cert.BlockHash())
+	delete(vm.verifiedVotes, hash)
 
 	vm.mods.EventLoop().AddEvent(msg.NewViewMsg{ID: vm.mods.ID(), SyncInfo: msg.NewSyncInfo().WithQC(qc)})
 }

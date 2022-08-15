@@ -148,7 +148,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 
 	impl.srv.mods.EventLoop().AddEvent(msg.VoteMsg{
 		ID:          id,
-		PartialCert: hotstuffpb.PartialCertFromProto(cert),
+		PartialCert: cert,
 	})
 }
 

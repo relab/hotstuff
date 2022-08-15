@@ -219,7 +219,7 @@ func (cs *consensusBase) OnPropose(proposal msg.ProposeMsg) {
 		return
 	}
 
-	leader.Vote(pc)
+	leader.Vote(&pc)
 }
 
 func (cs *consensusBase) commit(block *msg.Block) {
