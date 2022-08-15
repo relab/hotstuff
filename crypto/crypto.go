@@ -86,7 +86,7 @@ func (c crypto) CreateAggregateQC(view msg.View, timeouts []msg.TimeoutMsg) (agg
 	if err != nil {
 		return msg.AggregateQC{}, err
 	}
-	return msg.NewAggregateQC(qcs, sig, view), nil
+	return *msg.NewAggregateQC(qcs, sig, view), nil
 }
 
 // VerifyPartialCert verifies a single partial certificate.

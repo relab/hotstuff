@@ -343,8 +343,8 @@ type AggregateQC struct {
 }
 
 // NewAggregateQC returns a new AggregateQC from the QC map and the threshold signature.
-func NewAggregateQC(qcs map[hotstuff.ID]QuorumCert, sig QuorumSignature, view View) AggregateQC {
-	return AggregateQC{qcs, sig, view}
+func NewAggregateQC(qcs map[hotstuff.ID]QuorumCert, sig QuorumSignature, view View) *AggregateQC {
+	return &AggregateQC{qcs, sig, view}
 }
 
 // QCerts returns the quorum certificates in the AggregateQC.

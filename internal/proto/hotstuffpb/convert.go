@@ -178,7 +178,7 @@ func AggregateQCFromProto(m *AggQC) msg.AggregateQC {
 	for id, pQC := range m.GetQCs() {
 		qcs[hotstuff.ID(id)] = QuorumCertFromProto(pQC)
 	}
-	return msg.NewAggregateQC(qcs, QuorumSignatureFromProto(m.GetSig()), msg.View(m.GetView()))
+	return *msg.NewAggregateQC(qcs, QuorumSignatureFromProto(m.GetSig()), msg.View(m.GetView()))
 }
 
 // AggregateQCToProto converts an AggregateQC from the hotstuff type to the protobuf type.
