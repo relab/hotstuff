@@ -33,7 +33,7 @@ func (c crypto) CreatePartialCert(block *msg.Block) (cert msg.PartialCert, err e
 	if err != nil {
 		return msg.PartialCert{}, err
 	}
-	return msg.NewPartialCert(sig, block.Hash()), nil
+	return *msg.NewPartialCert(sig, block.Hash()), nil
 }
 
 // CreateQuorumCert creates a quorum certificate from a list of partial certificates.

@@ -134,8 +134,8 @@ type PartialCert struct {
 }
 
 // NewPartialCert returns a new partial certificate.
-func NewPartialCert(signature QuorumSignature, blockHash Hash) PartialCert {
-	return PartialCert{signature, blockHash}
+func NewPartialCert(signature QuorumSignature, blockHash Hash) *PartialCert {
+	return &PartialCert{signature, blockHash}
 }
 
 // Signer returns the ID of the replica that created the certificate.

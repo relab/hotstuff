@@ -71,7 +71,7 @@ func PartialCertToProto(cert msg.PartialCert) *PartialCert {
 func PartialCertFromProto(cert *PartialCert) msg.PartialCert {
 	var h msg.Hash
 	copy(h[:], cert.GetHash())
-	return msg.NewPartialCert(QuorumSignatureFromProto(cert.GetSig()), h)
+	return *msg.NewPartialCert(QuorumSignatureFromProto(cert.GetSig()), h)
 }
 
 // QuorumCertToProto converts a consensus.QuorumCert to a hotstuffpb.QuorumCert.
