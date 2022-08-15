@@ -243,9 +243,9 @@ func (si SyncInfo) String() string {
 
 // QuorumCert (QC) is a certificate for a Block created by a quorum of partial certificates.
 type QuorumCert struct {
-	signature QuorumSignature
-	view      View
-	hash      Hash
+	Sig  QuorumSignature
+	View View
+	Hash Hash
 }
 
 // NewQuorumCert creates a new quorum cert from the given values.
@@ -255,49 +255,49 @@ func NewQuorumCert(signature QuorumSignature, view View, hash Hash) QuorumCert {
 
 // ToBytes returns a byte representation of the quorum certificate.
 func (qc QuorumCert) ToBytes() []byte {
-	b := qc.view.ToBytes()
-	b = append(b, qc.hash[:]...)
-	if qc.signature != nil {
-		b = append(b, qc.signature.ToBytes()...)
+	b := qc.View.ToBytes()
+	b = append(b, qc.Hash[:]...)
+	if qc.Sig != nil {
+		b = append(b, qc.Sig.ToBytes()...)
 	}
 	return b
 }
 
 // Signature returns the threshold signature.
 func (qc QuorumCert) Signature() QuorumSignature {
-	return qc.signature
+	return qc.Sig
 }
 
 // BlockHash returns the hash of the block that was signed.
 func (qc QuorumCert) BlockHash() Hash {
-	return qc.hash
+	return qc.Hash
 }
 
-// View returns the view in which the QC was created.
-func (qc QuorumCert) View() View {
-	return qc.view
+// QCView returns the view in which the QC was created.
+func (qc QuorumCert) QCView() View {
+	return qc.View
 }
 
 // Equals returns true if the other QC equals this QC.
 func (qc QuorumCert) Equals(other QuorumCert) bool {
-	if qc.view != other.view {
+	if qc.View != other.View {
 		return false
 	}
-	if qc.hash != other.hash {
+	if qc.Hash != other.Hash {
 		return false
 	}
-	if qc.signature == nil || other.signature == nil {
-		return qc.signature == other.signature
+	if qc.Sig == nil || other.Sig == nil {
+		return qc.Sig == other.Sig
 	}
-	return bytes.Equal(qc.signature.ToBytes(), other.signature.ToBytes())
+	return bytes.Equal(qc.Sig.ToBytes(), other.Sig.ToBytes())
 }
 
-func (qc QuorumCert) String() string {
+func (qc QuorumCert) QCString() string {
 	var sb strings.Builder
-	if qc.signature != nil {
+	if qc.Sig != nil {
 		_ = writeParticipants(&sb, qc.Signature().Participants())
 	}
-	return fmt.Sprintf("QC{ hash: %.6s, IDs: [ %s] }", qc.hash, &sb)
+	return fmt.Sprintf("QC{ hash: %.6s, IDs: [ %s] }", qc.Hash, &sb)
 }
 
 // TimeoutCert (TC) is a certificate created by a quorum of timeout messages.

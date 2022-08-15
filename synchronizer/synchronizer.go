@@ -130,7 +130,7 @@ func (s *Synchronizer) ViewContext() context.Context {
 
 // SyncInfo returns the highest known QC or TC.
 func (s *Synchronizer) SyncInfo() msg.SyncInfo {
-	if s.highQC.View() >= s.highTC.View() {
+	if s.highQC.QCView() >= s.highTC.View() {
 		return msg.NewSyncInfo().WithQC(s.highQC)
 	}
 	return msg.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
@@ -295,8 +295,8 @@ func (s *Synchronizer) AdvanceView(syncInfo msg.SyncInfo) {
 	if haveQC {
 		s.updateHighQC(qc)
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
-		if qc.View() >= v {
-			v = qc.View()
+		if qc.QCView() >= v {
+			v = qc.QCView()
 			timeout = false
 		}
 	}

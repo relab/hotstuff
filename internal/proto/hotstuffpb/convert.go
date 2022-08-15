@@ -80,7 +80,7 @@ func QuorumCertToProto(qc msg.QuorumCert) *QuorumCert {
 	return &QuorumCert{
 		Sig:  QuorumSignatureToProto(qc.Signature()),
 		Hash: hash[:],
-		View: uint64(qc.View()),
+		View: uint64(qc.QCView()),
 	}
 }
 
