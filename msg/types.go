@@ -170,9 +170,9 @@ func (pc PartialCert) ToBytes() []byte {
 // However, if highQC.View < highTC.View, we should still include highQC.
 // This can also hold an AggregateQC for Fast-Hotstuff.
 type SyncInfo struct {
-	qc    *QuorumCert
-	tc    *TimeoutCert
-	aggQC *AggregateQC
+	QCert    *QuorumCert
+	TCert    *TimeoutCert
+	AggQCert *AggregateQC
 }
 
 // NewSyncInfo returns a new SyncInfo struct.
@@ -182,45 +182,45 @@ func NewSyncInfo() SyncInfo {
 
 // WithQC returns a copy of the SyncInfo struct with the given QC.
 func (si SyncInfo) WithQC(qc QuorumCert) SyncInfo {
-	si.qc = new(QuorumCert)
-	*si.qc = qc
+	si.QCert = new(QuorumCert)
+	*si.QCert = qc
 	return si
 }
 
 // WithTC returns a copy of the SyncInfo struct with the given TC.
 func (si SyncInfo) WithTC(tc TimeoutCert) SyncInfo {
-	si.tc = new(TimeoutCert)
-	*si.tc = tc
+	si.TCert = new(TimeoutCert)
+	*si.TCert = tc
 	return si
 }
 
 // WithAggQC returns a copy of the SyncInfo struct with the given AggregateQC.
 func (si SyncInfo) WithAggQC(aggQC AggregateQC) SyncInfo {
-	si.aggQC = new(AggregateQC)
-	*si.aggQC = aggQC
+	si.AggQCert = new(AggregateQC)
+	*si.AggQCert = aggQC
 	return si
 }
 
 // QC returns the quorum certificate, if present.
 func (si SyncInfo) QC() (_ QuorumCert, _ bool) {
-	if si.qc != nil {
-		return *si.qc, true
+	if si.QCert != nil {
+		return *si.QCert, true
 	}
 	return
 }
 
 // TC returns the timeout certificate, if present.
 func (si SyncInfo) TC() (_ TimeoutCert, _ bool) {
-	if si.tc != nil {
-		return *si.tc, true
+	if si.TCert != nil {
+		return *si.TCert, true
 	}
 	return
 }
 
 // AggQC returns the AggregateQC, if present.
 func (si SyncInfo) AggQC() (_ AggregateQC, _ bool) {
-	if si.aggQC != nil {
-		return *si.aggQC, true
+	if si.AggQCert != nil {
+		return *si.AggQCert, true
 	}
 	return
 }
@@ -228,14 +228,14 @@ func (si SyncInfo) AggQC() (_ AggregateQC, _ bool) {
 func (si SyncInfo) String() string {
 	var sb strings.Builder
 	sb.WriteString("{ ")
-	if si.tc != nil {
-		fmt.Fprintf(&sb, "%s ", si.tc)
+	if si.TCert != nil {
+		fmt.Fprintf(&sb, "%s ", si.TCert)
 	}
-	if si.qc != nil {
-		fmt.Fprintf(&sb, "%s ", si.qc)
+	if si.QCert != nil {
+		fmt.Fprintf(&sb, "%s ", si.QCert)
 	}
-	if si.aggQC != nil {
-		fmt.Fprintf(&sb, "%s ", si.aggQC)
+	if si.AggQCert != nil {
+		fmt.Fprintf(&sb, "%s ", si.AggQCert)
 	}
 	sb.WriteRune('}')
 	return sb.String()

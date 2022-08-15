@@ -104,9 +104,9 @@ message TimeoutMsg {
 }
 
 message SyncInfo {
-    optional QuorumCert QC  = 1;
-    optional TimeoutCert TC = 2;
-    optional AggQC AggQC    = 3;
+    optional QuorumCert QCert  = 1;
+    optional TimeoutCert TCert = 2;
+    optional AggQC AggQCert    = 3;
 }
 
 message AggQC {
