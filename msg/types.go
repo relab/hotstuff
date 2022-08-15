@@ -302,8 +302,8 @@ func (qc QuorumCert) QCString() string {
 
 // TimeoutCert (TC) is a certificate created by a quorum of timeout messages.
 type TimeoutCert struct {
-	signature QuorumSignature
-	view      View
+	Sig  QuorumSignature
+	View View
 }
 
 // NewTimeoutCert returns a new timeout certificate.
@@ -314,26 +314,26 @@ func NewTimeoutCert(signature QuorumSignature, view View) TimeoutCert {
 // ToBytes returns a byte representation of the timeout certificate.
 func (tc TimeoutCert) ToBytes() []byte {
 	var viewBytes [8]byte
-	binary.LittleEndian.PutUint64(viewBytes[:], uint64(tc.view))
-	return append(viewBytes[:], tc.signature.ToBytes()...)
+	binary.LittleEndian.PutUint64(viewBytes[:], uint64(tc.View))
+	return append(viewBytes[:], tc.Sig.ToBytes()...)
 }
 
 // Signature returns the threshold signature.
 func (tc TimeoutCert) Signature() QuorumSignature {
-	return tc.signature
+	return tc.Sig
 }
 
-// View returns the view in which the timeouts occurred.
-func (tc TimeoutCert) View() View {
-	return tc.view
+// TCView returns the view in which the timeouts occurred.
+func (tc TimeoutCert) TCView() View {
+	return tc.View
 }
 
 func (tc TimeoutCert) TCString() string {
 	var sb strings.Builder
-	if tc.signature != nil {
+	if tc.Sig != nil {
 		_ = writeParticipants(&sb, tc.Signature().Participants())
 	}
-	return fmt.Sprintf("TC{ view: %d, IDs: [ %s] }", tc.view, &sb)
+	return fmt.Sprintf("TC{ view: %d, IDs: [ %s] }", tc.View, &sb)
 }
 
 // AggregateQC is a set of QCs extracted from timeout messages and an aggregate signature of the timeout signatures.

@@ -117,13 +117,13 @@ func (c crypto) VerifyQuorumCert(qc msg.QuorumCert) bool {
 // VerifyTimeoutCert verifies a timeout certificate.
 func (c crypto) VerifyTimeoutCert(tc msg.TimeoutCert) bool {
 	// view 0 TC is always valid.
-	if tc.View() == 0 {
+	if tc.TCView() == 0 {
 		return true
 	}
 	if tc.Signature().Participants().Len() < c.mods.Configuration().QuorumSize() {
 		return false
 	}
-	return c.Verify(tc.Signature(), tc.View().ToBytes())
+	return c.Verify(tc.Signature(), tc.TCView().ToBytes())
 }
 
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.

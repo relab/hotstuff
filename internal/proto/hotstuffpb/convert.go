@@ -167,7 +167,7 @@ func TimeoutCertFromProto(m *TimeoutCert) msg.TimeoutCert {
 // TimeoutCertToProto converts a timeout certificate from the hotstuff type to the protobuf type.
 func TimeoutCertToProto(timeoutCert msg.TimeoutCert) *TimeoutCert {
 	return &TimeoutCert{
-		View: uint64(timeoutCert.View()),
+		View: uint64(timeoutCert.TCView()),
 		Sig:  QuorumSignatureToProto(timeoutCert.Signature()),
 	}
 }

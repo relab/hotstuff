@@ -83,7 +83,7 @@ func TestCreateTimeoutCert(t *testing.T) {
 			t.Fatalf("Failed to create QC: %v", err)
 		}
 
-		if tc.View() != msg.View(1) {
+		if tc.TCView() != msg.View(1) {
 			t.Error("Timeout certificate view does not match original view.")
 		}
 	}
@@ -184,8 +184,10 @@ func createBlock(t *testing.T, signer modules.Crypto) *msg.Block {
 	return b
 }
 
-type keyFunc func(t *testing.T) msg.PrivateKey
-type setupFunc func(*testing.T, *gomock.Controller, int) testData
+type (
+	keyFunc   func(t *testing.T) msg.PrivateKey
+	setupFunc func(*testing.T, *gomock.Controller, int) testData
+)
 
 func setup(newFunc func() modules.Crypto, keyFunc keyFunc) setupFunc {
 	return func(t *testing.T, ctrl *gomock.Controller, n int) testData {

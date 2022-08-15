@@ -130,7 +130,7 @@ func (s *Synchronizer) ViewContext() context.Context {
 
 // SyncInfo returns the highest known QC or TC.
 func (s *Synchronizer) SyncInfo() msg.SyncInfo {
-	if s.highQC.QCView() >= s.highTC.View() {
+	if s.highQC.QCView() >= s.highTC.TCView() {
 		return msg.NewSyncInfo().WithQC(s.highQC)
 	}
 	return msg.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
@@ -261,7 +261,7 @@ func (s *Synchronizer) AdvanceView(syncInfo msg.SyncInfo) {
 			return
 		}
 		s.updateHighTC(tc)
-		v = tc.View()
+		v = tc.TCView()
 		timeout = true
 	}
 
@@ -366,7 +366,7 @@ func (s *Synchronizer) updateHighQC(qc msg.QuorumCert) {
 
 // updateHighTC attempts to update the highTC, but does not verify the tc first.
 func (s *Synchronizer) updateHighTC(tc msg.TimeoutCert) {
-	if tc.View() > s.highTC.View() {
+	if tc.TCView() > s.highTC.TCView() {
 		s.highTC = tc
 		s.mods.Logger().Debug("HighTC updated")
 	}
