@@ -114,13 +114,13 @@ func ProposalFromProto(p *Proposal) (proposal msg.ProposeMsg) {
 
 // BlockToProto converts a consensus.Block to a hotstuffpb.Block.
 func BlockToProto(block *msg.Block) *Block {
-	parentHash := block.Parent()
+	parentHash := block.ParentHash()
 	return &Block{
 		Parent:   parentHash[:],
-		Command:  []byte(block.Command()),
+		Command:  []byte(block.Cmd()),
 		QC:       QuorumCertToProto(block.QuorumCert()),
-		View:     uint64(block.View()),
-		Proposer: uint32(block.Proposer()),
+		View:     uint64(block.BView()),
+		Proposer: uint32(block.ProposerID()),
 	}
 }
 
@@ -139,11 +139,7 @@ func BlockFromProto(block *Block) *msg.Block {
 
 // TimeoutMsgFromProto converts a TimeoutMsg proto to the hotstuff type.
 func TimeoutMsgFromProto(m *TimeoutMsg) msg.TimeoutMsg {
-	timeoutMsg := msg.TimeoutMsg{
-		View:          msg.View(m.GetView()),
-		SyncInfo:      SyncInfoFromProto(m.GetSyncInfo()),
-		ViewSignature: QuorumSignatureFromProto(m.GetViewSig()),
-	}
+	timeoutMsg := msg.NewTimeoutMsg(0, msg.View(m.GetView()), SyncInfoFromProto(m.GetSyncInfo()), QuorumSignatureFromProto(m.GetViewSig()))
 	if m.GetViewSig() != nil {
 		timeoutMsg.MsgSignature = QuorumSignatureFromProto(m.GetMsgSig())
 	}

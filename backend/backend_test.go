@@ -41,7 +41,6 @@ func TestConnect(t *testing.T) {
 		builder.Build()
 
 		err := cfg.Connect(td.replicas)
-
 		if err != nil {
 			t.Error(err)
 		}
@@ -108,12 +107,7 @@ func TestPropose(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	var wg sync.WaitGroup
-	want := msg.TimeoutMsg{
-		ID:            1,
-		View:          1,
-		ViewSignature: nil,
-		SyncInfo:      msg.NewSyncInfo(),
-	}
+	want := msg.NewTimeoutMsg(1, 1, msg.NewSyncInfo(), nil)
 	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)
 		cfg.Timeout(want)
@@ -128,7 +122,6 @@ func TestTimeout(t *testing.T) {
 		}
 		wg.Done()
 	})
-
 }
 
 type testData struct {

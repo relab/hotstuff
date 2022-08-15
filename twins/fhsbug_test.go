@@ -88,8 +88,10 @@ const fhsBugScenario = `
 }
 `
 
-var logLevel = flag.String("log-level", "info", "set the log level")
-var logAll = flag.Bool("log-all", false, "print all logs on success")
+var (
+	logLevel = flag.String("log-level", "info", "set the log level")
+	logAll   = flag.Bool("log-all", false, "print all logs on success")
+)
 
 func TestFHSBug(t *testing.T) {
 	logging.SetLogLevel(*logLevel)
@@ -115,7 +117,7 @@ func TestFHSBug(t *testing.T) {
 		var sb strings.Builder
 		fmt.Fprintf(&sb, "Node %v commits: \n", id)
 		for _, block := range blocks {
-			fmt.Fprintf(&sb, "\t Proposer: %d, View: %d, Hash: %.6s\n", block.Proposer(), block.View(), block.Hash())
+			fmt.Fprintf(&sb, "\t Proposer: %d, View: %d, Hash: %.6s\n", block.ProposerID(), block.BView(), block.Hash())
 		}
 		t.Log(sb.String())
 	}
@@ -171,7 +173,7 @@ func (fhs *vulnerableFHS) CommitRule(block *msg.Block) *msg.Block {
 	}
 	// NOTE: this does check for a direct link between the block and the grandparent.
 	// This is what causes the safety violation.
-	if block.Parent() == parent.Hash() && parent.Parent() == grandparent.Hash() {
+	if block.ParentHash() == parent.Hash() && parent.ParentHash() == grandparent.Hash() {
 		fhs.mods.Logger().Debug("COMMIT(vulnerable): ", grandparent)
 		return grandparent
 	}

@@ -59,7 +59,7 @@ func (vm *VotingMachine) OnVote(vote msg.VoteMsg) {
 		}
 	}
 
-	if block.View() <= vm.mods.Synchronizer().LeafBlock().View() {
+	if block.BView() <= vm.mods.Synchronizer().LeafBlock().BView() {
 		// too old
 		return
 	}
@@ -85,7 +85,7 @@ func (vm *VotingMachine) verifyCert(cert msg.PartialCert, block *msg.Block) {
 		// delete any pending QCs with lower height than bLeaf
 		for k := range vm.verifiedVotes {
 			if block, ok := vm.mods.BlockChain().LocalGet(k); ok {
-				if block.View() <= vm.mods.Synchronizer().LeafBlock().View() {
+				if block.BView() <= vm.mods.Synchronizer().LeafBlock().BView() {
 					delete(vm.verifiedVotes, k)
 				}
 			} else {

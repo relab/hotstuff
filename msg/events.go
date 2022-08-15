@@ -31,6 +31,15 @@ type TimeoutMsg struct {
 	SyncInfo      SyncInfo        // The highest QC/TC known to the sender.
 }
 
+func NewTimeoutMsg(id hotstuff.ID, view View, syncInfo SyncInfo, sig QuorumSignature) TimeoutMsg {
+	return TimeoutMsg{
+		ID:            id,
+		View:          view,
+		SyncInfo:      syncInfo,
+		ViewSignature: sig,
+	}
+}
+
 // Hash returns a hash of the timeout message.
 func (timeout TimeoutMsg) Hash() Hash {
 	var h Hash

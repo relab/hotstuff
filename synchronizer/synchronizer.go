@@ -70,7 +70,6 @@ func (s *Synchronizer) InitModule(mods *modules.ConsensusCore, opts *modules.Opt
 	if err != nil {
 		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
 	}
-
 }
 
 // New creates a new Synchronizer.
@@ -163,12 +162,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 		s.mods.Logger().Warnf("Failed to sign view: %v", err)
 		return
 	}
-	timeoutMsg := msg.TimeoutMsg{
-		ID:            s.mods.ID(),
-		View:          view,
-		SyncInfo:      s.SyncInfo(),
-		ViewSignature: sig,
-	}
+	timeoutMsg := msg.NewTimeoutMsg(s.mods.ID(), view, s.SyncInfo(), sig)
 
 	if s.mods.Options().ShouldUseAggQC() {
 		// generate a second signature that will become part of the aggregateQC
@@ -363,7 +357,7 @@ func (s *Synchronizer) updateHighQC(qc msg.QuorumCert) {
 		s.mods.Logger().Panic("Block from the old highQC missing from chain")
 	}
 
-	if newBlock.View() > oldBlock.View() {
+	if newBlock.BView() > oldBlock.BView() {
 		s.highQC = qc
 		s.leafBlock = newBlock
 		s.mods.Logger().Debug("HighQC updated")

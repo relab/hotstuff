@@ -50,7 +50,7 @@ func (c crypto) CreateQuorumCert(block *msg.Block, signatures []msg.PartialCert)
 	if err != nil {
 		return msg.QuorumCert{}, err
 	}
-	return msg.NewQuorumCert(sig, block.View(), block.Hash()), nil
+	return msg.NewQuorumCert(sig, block.BView(), block.Hash()), nil
 }
 
 // CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
@@ -134,11 +134,7 @@ func (c crypto) VerifyAggregateQC(aggQC msg.AggregateQC) (highQC msg.QuorumCert,
 			highQC = qc
 		}
 		// reconstruct the TimeoutMsg to get the hash
-		messages[id] = msg.TimeoutMsg{
-			ID:       id,
-			View:     aggQC.View(),
-			SyncInfo: msg.NewSyncInfo().WithQC(qc),
-		}.ToBytes()
+		messages[id] = msg.NewTimeoutMsg(id, aggQC.View(), msg.NewSyncInfo().WithQC(qc), nil).ToBytes()
 	}
 	if aggQC.Sig().Participants().Len() < c.mods.Configuration().QuorumSize() {
 		return msg.QuorumCert{}, false

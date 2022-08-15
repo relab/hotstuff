@@ -83,7 +83,7 @@ func (cs *consensusBase) Propose(cert msg.SyncInfo) {
 	if ok {
 		// tell the acceptor that the previous proposal succeeded.
 		if qcBlock, ok := cs.mods.BlockChain().Get(qc.BlockHash()); ok {
-			cs.mods.Acceptor().Proposed(qcBlock.Command())
+			cs.mods.Acceptor().Proposed(qcBlock.Cmd())
 		} else {
 			cs.mods.Logger().Errorf("Could not find block for QC: %s", qc)
 		}
@@ -150,7 +150,7 @@ func (cs *consensusBase) OnPropose(proposal msg.ProposeMsg) {
 	}
 
 	// ensure the block came from the leader.
-	if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.View()) {
+	if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.BView()) {
 		cs.mods.Logger().Info("OnPropose: block was not proposed by the expected leader")
 		return
 	}
@@ -161,12 +161,12 @@ func (cs *consensusBase) OnPropose(proposal msg.ProposeMsg) {
 	}
 
 	if qcBlock, ok := cs.mods.BlockChain().Get(block.QuorumCert().BlockHash()); ok {
-		cs.mods.Acceptor().Proposed(qcBlock.Command())
+		cs.mods.Acceptor().Proposed(qcBlock.Cmd())
 	} else {
 		cs.mods.Logger().Info("OnPropose: Failed to fetch qcBlock")
 	}
 
-	if !cs.mods.Acceptor().Accept(block.Command()) {
+	if !cs.mods.Acceptor().Accept(block.Cmd()) {
 		cs.mods.Logger().Info("OnPropose: command not accepted")
 		return
 	}
@@ -185,7 +185,7 @@ func (cs *consensusBase) OnPropose(proposal msg.ProposeMsg) {
 		}
 	}()
 
-	if block.View() <= cs.lastVote {
+	if block.BView() <= cs.lastVote {
 		cs.mods.Logger().Info("OnPropose: block view too old")
 		return
 	}
@@ -196,7 +196,7 @@ func (cs *consensusBase) OnPropose(proposal msg.ProposeMsg) {
 		return
 	}
 
-	cs.lastVote = block.View()
+	cs.lastVote = block.BView()
 
 	if cs.mods.Options().ShouldUseHandel() {
 		// Need to call advanceview such that the view context will be fresh.
@@ -234,7 +234,7 @@ func (cs *consensusBase) commit(block *msg.Block) {
 	}
 
 	// prune the blockchain and handle forked blocks
-	forkedBlocks := cs.mods.BlockChain().PruneToHeight(block.View())
+	forkedBlocks := cs.mods.BlockChain().PruneToHeight(block.BView())
 	for _, block := range forkedBlocks {
 		cs.mods.ForkHandler().Fork(block)
 	}
@@ -242,16 +242,16 @@ func (cs *consensusBase) commit(block *msg.Block) {
 
 // recursive helper for commit
 func (cs *consensusBase) commitInner(block *msg.Block) error {
-	if cs.bExec.View() >= block.View() {
+	if cs.bExec.BView() >= block.BView() {
 		return nil
 	}
-	if parent, ok := cs.mods.BlockChain().Get(block.Parent()); ok {
+	if parent, ok := cs.mods.BlockChain().Get(block.ParentHash()); ok {
 		err := cs.commitInner(parent)
 		if err != nil {
 			return err
 		}
 	} else {
-		return fmt.Errorf("failed to locate block: %s", block.Parent())
+		return fmt.Errorf("failed to locate block: %s", block.ParentHash())
 	}
 	cs.mods.Logger().Debug("EXEC: ", block)
 	cs.mods.Executor().Exec(block)

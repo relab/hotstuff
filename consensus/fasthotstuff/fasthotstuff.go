@@ -46,8 +46,8 @@ func (fhs *FastHotStuff) CommitRule(block *msg.Block) *msg.Block {
 	if !ok {
 		return nil
 	}
-	if block.Parent() == parent.Hash() && block.View() == parent.View()+1 &&
-		parent.Parent() == grandparent.Hash() && parent.View() == grandparent.View()+1 {
+	if block.ParentHash() == parent.Hash() && block.BView() == parent.BView()+1 &&
+		parent.ParentHash() == grandparent.Hash() && parent.BView() == grandparent.BView()+1 {
 		fhs.mods.Logger().Debug("COMMIT: ", grandparent)
 		return grandparent
 	}
@@ -62,8 +62,8 @@ func (fhs *FastHotStuff) VoteRule(proposal msg.ProposeMsg) bool {
 		hqcBlock, ok := fhs.mods.BlockChain().Get(proposal.Block.QuorumCert().BlockHash())
 		return ok && fhs.mods.BlockChain().Extends(proposal.Block, hqcBlock)
 	}
-	return proposal.Block.View() >= fhs.mods.Synchronizer().View() &&
-		proposal.Block.View() == proposal.Block.QuorumCert().View()+1
+	return proposal.Block.BView() >= fhs.mods.Synchronizer().View() &&
+		proposal.Block.BView() == proposal.Block.QuorumCert().View()+1
 }
 
 // ChainLength returns the number of blocks that need to be chained together in order to commit.
