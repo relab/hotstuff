@@ -129,40 +129,37 @@ type QuorumSignature interface {
 
 // PartialCert is a signed block hash.
 type PartialCert struct {
-	// shortcut to the signer of the signature
-	signer    hotstuff.ID
-	signature QuorumSignature
-	blockHash Hash
+	Sig  QuorumSignature
+	Hash Hash
 }
 
 // NewPartialCert returns a new partial certificate.
 func NewPartialCert(signature QuorumSignature, blockHash Hash) PartialCert {
-	var signer hotstuff.ID
-	signature.Participants().RangeWhile(func(i hotstuff.ID) bool {
-		signer = i
-		return false
-	})
-	return PartialCert{signer, signature, blockHash}
+	return PartialCert{signature, blockHash}
 }
 
 // Signer returns the ID of the replica that created the certificate.
-func (pc PartialCert) Signer() hotstuff.ID {
-	return pc.signer
+func (pc PartialCert) Signer() (signer hotstuff.ID) {
+	pc.Sig.Participants().RangeWhile(func(i hotstuff.ID) bool {
+		signer = i
+		return false
+	})
+	return signer
 }
 
 // Signature returns the signature.
 func (pc PartialCert) Signature() QuorumSignature {
-	return pc.signature
+	return pc.Sig
 }
 
 // BlockHash returns the hash of the block that was signed.
 func (pc PartialCert) BlockHash() Hash {
-	return pc.blockHash
+	return pc.Hash
 }
 
 // ToBytes returns a byte representation of the partial certificate.
 func (pc PartialCert) ToBytes() []byte {
-	return append(pc.blockHash[:], pc.signature.ToBytes()...)
+	return append(pc.Hash[:], pc.Sig.ToBytes()...)
 }
 
 // SyncInfo holds the highest known QC or TC.
