@@ -127,11 +127,6 @@ type QuorumSignature interface {
 	Participants() IDSet
 }
 
-// ThresholdSignature is a signature that is only valid when it contains the signatures of a quorum of replicas.
-//
-// Deprecated: renamed to QuorumSignature
-type ThresholdSignature = QuorumSignature
-
 // PartialCert is a signed block hash.
 type PartialCert struct {
 	// shortcut to the signer of the signature
