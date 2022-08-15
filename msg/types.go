@@ -377,10 +377,3 @@ func writeParticipants(wr io.Writer, participants IDSet) (err error) {
 	})
 	return err
 }
-
-// Signature is a cryptographic signature of a block.
-type Signature interface {
-	ToBytes
-	// Signer returns the ID of the replica that created the signature.
-	Signer() hotstuff.ID
-}
