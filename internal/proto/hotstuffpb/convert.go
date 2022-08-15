@@ -143,7 +143,7 @@ func TimeoutMsgFromProto(m *TimeoutMsg) msg.TimeoutMsg {
 	if m.GetViewSig() != nil {
 		timeoutMsg.MsgSignature = QuorumSignatureFromProto(m.GetMsgSig())
 	}
-	return timeoutMsg
+	return *timeoutMsg
 }
 
 // TimeoutMsgToProto converts a TimeoutMsg to the protobuf type.

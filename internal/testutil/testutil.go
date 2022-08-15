@@ -228,7 +228,7 @@ func CreateTimeouts(t *testing.T, view msg.View, signers []modules.Crypto) (time
 	timeouts = make([]msg.TimeoutMsg, 0, len(signers))
 	viewSigs := CreateSignatures(t, view.ToBytes(), signers)
 	for _, sig := range viewSigs {
-		timeouts = append(timeouts, msg.NewTimeoutMsg(
+		timeouts = append(timeouts, *msg.NewTimeoutMsg(
 			signer(sig),
 			view,
 			*msg.NewSyncInfo().WithQC(*msg.NewQuorumCert(nil, 0, msg.GetGenesis().Hash())),

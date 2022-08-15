@@ -173,12 +173,12 @@ func (s *Synchronizer) OnLocalTimeout() {
 		}
 		timeoutMsg.MsgSignature = sig
 	}
-	s.lastTimeout = &timeoutMsg
+	s.lastTimeout = timeoutMsg
 	// stop voting for current view
 	s.mods.Consensus().StopVoting(s.currentView)
 
-	s.mods.Configuration().Timeout(timeoutMsg)
-	s.OnRemoteTimeout(timeoutMsg)
+	s.mods.Configuration().Timeout(*timeoutMsg)
+	s.OnRemoteTimeout(*timeoutMsg)
 }
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.

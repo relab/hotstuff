@@ -110,7 +110,7 @@ func TestTimeout(t *testing.T) {
 	want := msg.NewTimeoutMsg(1, 1, *msg.NewSyncInfo(), nil)
 	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)
-		cfg.Timeout(want)
+		cfg.Timeout(*want)
 		wg.Wait()
 	}, func(event any) {
 		got := event.(msg.TimeoutMsg)
