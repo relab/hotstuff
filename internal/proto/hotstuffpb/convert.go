@@ -183,11 +183,11 @@ func AggregateQCFromProto(m *AggQC) msg.AggregateQC {
 
 // AggregateQCToProto converts an AggregateQC from the hotstuff type to the protobuf type.
 func AggregateQCToProto(aggQC msg.AggregateQC) *AggQC {
-	pQCs := make(map[uint32]*QuorumCert, len(aggQC.QCs()))
-	for id, qc := range aggQC.QCs() {
+	pQCs := make(map[uint32]*QuorumCert, len(aggQC.QCerts()))
+	for id, qc := range aggQC.QCerts() {
 		pQCs[uint32(id)] = QuorumCertToProto(qc)
 	}
-	return &AggQC{QCs: pQCs, Sig: QuorumSignatureToProto(aggQC.Sig()), View: uint64(aggQC.View())}
+	return &AggQC{QCs: pQCs, Sig: QuorumSignatureToProto(aggQC.Signature()), View: uint64(aggQC.AQCView())}
 }
 
 // SyncInfoFromProto converts a SyncInfo struct from the protobuf type to the hotstuff type.

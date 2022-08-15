@@ -340,9 +340,9 @@ func (tc TimeoutCert) TCString() string {
 //
 // This is used by the Fast-HotStuff consensus protocol.
 type AggregateQC struct {
-	qcs  map[hotstuff.ID]QuorumCert
-	sig  QuorumSignature
-	view View
+	QCs  map[hotstuff.ID]QuorumCert
+	Sig  QuorumSignature
+	View View
 }
 
 // NewAggregateQC returns a new AggregateQC from the QC map and the threshold signature.
@@ -350,27 +350,27 @@ func NewAggregateQC(qcs map[hotstuff.ID]QuorumCert, sig QuorumSignature, view Vi
 	return AggregateQC{qcs, sig, view}
 }
 
-// QCs returns the quorum certificates in the AggregateQC.
-func (aggQC AggregateQC) QCs() map[hotstuff.ID]QuorumCert {
-	return aggQC.qcs
+// QCerts returns the quorum certificates in the AggregateQC.
+func (aggQC AggregateQC) QCerts() map[hotstuff.ID]QuorumCert {
+	return aggQC.QCs
 }
 
-// Sig returns the threshold signature in the AggregateQC.
-func (aggQC AggregateQC) Sig() QuorumSignature {
-	return aggQC.sig
+// Signature returns the threshold signature in the AggregateQC.
+func (aggQC AggregateQC) Signature() QuorumSignature {
+	return aggQC.Sig
 }
 
-// View returns the view in which the AggregateQC was created.
-func (aggQC AggregateQC) View() View {
-	return aggQC.view
+// AQCView returns the view in which the AggregateQC was created.
+func (aggQC AggregateQC) AQCView() View {
+	return aggQC.View
 }
 
 func (aggQC AggregateQC) AQCString() string {
 	var sb strings.Builder
-	if aggQC.sig != nil {
-		_ = writeParticipants(&sb, aggQC.sig.Participants())
+	if aggQC.Sig != nil {
+		_ = writeParticipants(&sb, aggQC.Sig.Participants())
 	}
-	return fmt.Sprintf("AggQC{ view: %d, IDs: [ %s] }", aggQC.view, &sb)
+	return fmt.Sprintf("AggQC{ view: %d, IDs: [ %s] }", aggQC.View, &sb)
 }
 
 func writeParticipants(wr io.Writer, participants IDSet) (err error) {

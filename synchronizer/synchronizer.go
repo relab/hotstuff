@@ -278,8 +278,8 @@ func (s *Synchronizer) AdvanceView(syncInfo msg.SyncInfo) {
 			s.mods.Logger().Info("Aggregated Quorum Certificate could not be verified")
 			return
 		}
-		if aggQC.View() >= v {
-			v = aggQC.View()
+		if aggQC.AQCView() >= v {
+			v = aggQC.AQCView()
 			timeout = true
 		}
 		// ensure that the true highQC is the one stored in the syncInfo

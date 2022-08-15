@@ -129,18 +129,18 @@ func (c crypto) VerifyTimeoutCert(tc msg.TimeoutCert) bool {
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
 func (c crypto) VerifyAggregateQC(aggQC msg.AggregateQC) (highQC msg.QuorumCert, ok bool) {
 	messages := make(map[hotstuff.ID][]byte)
-	for id, qc := range aggQC.QCs() {
+	for id, qc := range aggQC.QCerts() {
 		if highQC.QCView() < qc.QCView() || highQC == (msg.QuorumCert{}) {
 			highQC = qc
 		}
 		// reconstruct the TimeoutMsg to get the hash
-		messages[id] = msg.NewTimeoutMsg(id, aggQC.View(), msg.NewSyncInfo().WithQC(qc), nil).ToBytes()
+		messages[id] = msg.NewTimeoutMsg(id, aggQC.AQCView(), msg.NewSyncInfo().WithQC(qc), nil).ToBytes()
 	}
-	if aggQC.Sig().Participants().Len() < c.mods.Configuration().QuorumSize() {
+	if aggQC.Signature().Participants().Len() < c.mods.Configuration().QuorumSize() {
 		return msg.QuorumCert{}, false
 	}
 	// both the batched aggQC signatures and the highQC must be verified
-	if c.BatchVerify(aggQC.Sig(), messages) && c.VerifyQuorumCert(highQC) {
+	if c.BatchVerify(aggQC.Signature(), messages) && c.VerifyQuorumCert(highQC) {
 		return highQC, true
 	}
 	return msg.QuorumCert{}, false
