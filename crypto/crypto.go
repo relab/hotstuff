@@ -40,7 +40,7 @@ func (c crypto) CreatePartialCert(block *msg.Block) (cert msg.PartialCert, err e
 func (c crypto) CreateQuorumCert(block *msg.Block, signatures []msg.PartialCert) (cert msg.QuorumCert, err error) {
 	// genesis QC is always valid.
 	if block.Hash() == msg.GetGenesis().Hash() {
-		return msg.NewQuorumCert(nil, 0, msg.GetGenesis().Hash()), nil
+		return *msg.NewQuorumCert(nil, 0, msg.GetGenesis().Hash()), nil
 	}
 	sigs := make([]msg.QuorumSignature, 0, len(signatures))
 	for _, sig := range signatures {
@@ -50,7 +50,7 @@ func (c crypto) CreateQuorumCert(block *msg.Block, signatures []msg.PartialCert)
 	if err != nil {
 		return msg.QuorumCert{}, err
 	}
-	return msg.NewQuorumCert(sig, block.BView(), block.Hash()), nil
+	return *msg.NewQuorumCert(sig, block.BView(), block.Hash()), nil
 }
 
 // CreateTimeoutCert creates a timeout certificate from a list of timeout messages.

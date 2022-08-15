@@ -374,7 +374,7 @@ func (s *session) updateOutgoing(levelIndex int) {
 			s.h.mods.Logger().Debugf("Done with session: %.8s", s.hash)
 
 			s.h.mods.EventLoop().AddEvent(msg.NewViewMsg{
-				SyncInfo: *msg.NewSyncInfo().WithQC(msg.NewQuorumCert(
+				SyncInfo: *msg.NewSyncInfo().WithQC(*msg.NewQuorumCert(
 					outgoing,
 					s.h.mods.Synchronizer().View(),
 					s.hash,

@@ -88,7 +88,7 @@ func QuorumCertToProto(qc msg.QuorumCert) *QuorumCert {
 func QuorumCertFromProto(qc *QuorumCert) msg.QuorumCert {
 	var h msg.Hash
 	copy(h[:], qc.GetHash())
-	return msg.NewQuorumCert(QuorumSignatureFromProto(qc.GetSig()), msg.View(qc.GetView()), h)
+	return *msg.NewQuorumCert(QuorumSignatureFromProto(qc.GetSig()), msg.View(qc.GetView()), h)
 }
 
 // ProposalToProto converts a ProposeMsg to a protobuf message.

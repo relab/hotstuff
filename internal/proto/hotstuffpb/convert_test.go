@@ -41,7 +41,7 @@ func TestConvertQuorumCert(t *testing.T) {
 	builders := testutil.CreateBuilders(t, ctrl, 4)
 	hl := builders.Build()
 
-	b1 := msg.NewBlock(msg.GetGenesis().Hash(), msg.NewQuorumCert(nil, 0, msg.GetGenesis().Hash()), "", 1, 1)
+	b1 := msg.NewBlock(msg.GetGenesis().Hash(), *msg.NewQuorumCert(nil, 0, msg.GetGenesis().Hash()), "", 1, 1)
 
 	signatures := testutil.CreatePCs(t, b1, hl.Signers())
 
@@ -60,7 +60,7 @@ func TestConvertQuorumCert(t *testing.T) {
 
 func TestConvertBlock(t *testing.T) {
 	qc := msg.NewQuorumCert(nil, 0, msg.Hash{})
-	want := msg.NewBlock(msg.GetGenesis().Hash(), qc, "", 1, 1)
+	want := msg.NewBlock(msg.GetGenesis().Hash(), *qc, "", 1, 1)
 	pb := BlockToProto(want)
 	got := BlockFromProto(pb)
 

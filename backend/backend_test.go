@@ -85,7 +85,7 @@ func TestPropose(t *testing.T) {
 		ID: 1,
 		Block: msg.NewBlock(
 			msg.GetGenesis().Hash(),
-			msg.NewQuorumCert(nil, 0, msg.GetGenesis().Hash()),
+			*msg.NewQuorumCert(nil, 0, msg.GetGenesis().Hash()),
 			"foo", 1, 1,
 		),
 	}

@@ -246,8 +246,8 @@ type QuorumCert struct {
 }
 
 // NewQuorumCert creates a new quorum cert from the given values.
-func NewQuorumCert(signature QuorumSignature, view View, hash Hash) QuorumCert {
-	return QuorumCert{signature, view, hash}
+func NewQuorumCert(signature QuorumSignature, view View, hash Hash) *QuorumCert {
+	return &QuorumCert{signature, view, hash}
 }
 
 // ToBytes returns a byte representation of the quorum certificate.

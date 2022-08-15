@@ -34,7 +34,7 @@ func TestVote(t *testing.T) {
 
 	b := testutil.NewProposeMsg(
 		msg.GetGenesis().Hash(),
-		msg.NewQuorumCert(nil, 1, msg.GetGenesis().Hash()),
+		*msg.NewQuorumCert(nil, 1, msg.GetGenesis().Hash()),
 		"test", 1, 1,
 	)
 	hs.BlockChain().Store(b.Block)

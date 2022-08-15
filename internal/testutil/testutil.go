@@ -231,7 +231,7 @@ func CreateTimeouts(t *testing.T, view msg.View, signers []modules.Crypto) (time
 		timeouts = append(timeouts, msg.NewTimeoutMsg(
 			signer(sig),
 			view,
-			*msg.NewSyncInfo().WithQC(msg.NewQuorumCert(nil, 0, msg.GetGenesis().Hash())),
+			*msg.NewSyncInfo().WithQC(*msg.NewQuorumCert(nil, 0, msg.GetGenesis().Hash())),
 			sig,
 		))
 	}

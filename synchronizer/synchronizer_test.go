@@ -70,7 +70,7 @@ func TestAdvanceViewQC(t *testing.T) {
 
 	block := msg.NewBlock(
 		msg.GetGenesis().Hash(),
-		msg.NewQuorumCert(nil, 0, msg.GetGenesis().Hash()),
+		*msg.NewQuorumCert(nil, 0, msg.GetGenesis().Hash()),
 		"foo",
 		1,
 		2,
