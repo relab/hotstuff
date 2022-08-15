@@ -181,7 +181,7 @@ func (cs *consensusBase) OnPropose(proposal msg.ProposeMsg) {
 			cs.commit(b)
 		}
 		if !didAdvanceView {
-			cs.mods.Synchronizer().AdvanceView(msg.NewSyncInfo().WithQC(block.QuorumCert()))
+			cs.mods.Synchronizer().AdvanceView(*msg.NewSyncInfo().WithQC(block.QuorumCert()))
 		}
 	}()
 
@@ -201,7 +201,7 @@ func (cs *consensusBase) OnPropose(proposal msg.ProposeMsg) {
 	if cs.mods.Options().ShouldUseHandel() {
 		// Need to call advanceview such that the view context will be fresh.
 		// TODO: we could instead
-		cs.mods.Synchronizer().AdvanceView(msg.NewSyncInfo().WithQC(block.QuorumCert()))
+		cs.mods.Synchronizer().AdvanceView(*msg.NewSyncInfo().WithQC(block.QuorumCert()))
 		didAdvanceView = true
 		cs.mods.Handel().Begin(pc)
 		return

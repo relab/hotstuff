@@ -173,29 +173,29 @@ type SyncInfo struct {
 }
 
 // NewSyncInfo returns a new SyncInfo struct.
-func NewSyncInfo() SyncInfo {
-	return SyncInfo{}
+func NewSyncInfo() *SyncInfo {
+	return &SyncInfo{}
 }
 
 // WithQC returns a copy of the SyncInfo struct with the given QC.
-func (si SyncInfo) WithQC(qc QuorumCert) SyncInfo {
+func (si SyncInfo) WithQC(qc QuorumCert) *SyncInfo {
 	si.QCert = new(QuorumCert)
 	*si.QCert = qc
-	return si
+	return &si
 }
 
 // WithTC returns a copy of the SyncInfo struct with the given TC.
-func (si SyncInfo) WithTC(tc TimeoutCert) SyncInfo {
+func (si SyncInfo) WithTC(tc TimeoutCert) *SyncInfo {
 	si.TCert = new(TimeoutCert)
 	*si.TCert = tc
-	return si
+	return &si
 }
 
 // WithAggQC returns a copy of the SyncInfo struct with the given AggregateQC.
-func (si SyncInfo) WithAggQC(aggQC AggregateQC) SyncInfo {
+func (si SyncInfo) WithAggQC(aggQC AggregateQC) *SyncInfo {
 	si.AggQCert = new(AggregateQC)
 	*si.AggQCert = aggQC
-	return si
+	return &si
 }
 
 // QC returns the quorum certificate, if present.

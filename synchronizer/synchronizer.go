@@ -131,9 +131,9 @@ func (s *Synchronizer) ViewContext() context.Context {
 // SyncInfo returns the highest known QC or TC.
 func (s *Synchronizer) SyncInfo() msg.SyncInfo {
 	if s.highQC.QCView() >= s.highTC.TCView() {
-		return msg.NewSyncInfo().WithQC(s.highQC)
+		return *msg.NewSyncInfo().WithQC(s.highQC)
 	}
-	return msg.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
+	return *msg.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
 }
 
 // OnLocalTimeout is called when a local timeout happens.
@@ -240,7 +240,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout msg.TimeoutMsg) {
 
 	delete(s.timeouts, timeout.View)
 
-	s.AdvanceView(si)
+	s.AdvanceView(*si)
 }
 
 // OnNewView handles an incoming consensus.NewViewMsg
@@ -283,7 +283,7 @@ func (s *Synchronizer) AdvanceView(syncInfo msg.SyncInfo) {
 			timeout = true
 		}
 		// ensure that the true highQC is the one stored in the syncInfo
-		syncInfo = syncInfo.WithQC(highQC)
+		syncInfo = *syncInfo.WithQC(highQC)
 		qc = highQC
 	} else if qc, haveQC = syncInfo.QC(); haveQC {
 		if !s.mods.Crypto().VerifyQuorumCert(qc) {

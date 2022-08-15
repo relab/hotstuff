@@ -107,7 +107,7 @@ func TestPropose(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	var wg sync.WaitGroup
-	want := msg.NewTimeoutMsg(1, 1, msg.NewSyncInfo(), nil)
+	want := msg.NewTimeoutMsg(1, 1, *msg.NewSyncInfo(), nil)
 	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)
 		cfg.Timeout(want)

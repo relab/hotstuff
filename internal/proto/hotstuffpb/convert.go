@@ -202,7 +202,7 @@ func SyncInfoFromProto(m *SyncInfo) msg.SyncInfo {
 	if aggQC := m.GetAggQC(); aggQC != nil {
 		si = si.WithAggQC(AggregateQCFromProto(aggQC))
 	}
-	return si
+	return *si
 }
 
 // SyncInfoToProto converts a SyncInfo struct from the hotstuff type to the protobuf type.

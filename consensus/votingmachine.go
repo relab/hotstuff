@@ -109,5 +109,5 @@ func (vm *VotingMachine) verifyCert(cert msg.PartialCert, block *msg.Block) {
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
 
-	vm.mods.EventLoop().AddEvent(msg.NewViewMsg{ID: vm.mods.ID(), SyncInfo: msg.NewSyncInfo().WithQC(qc)})
+	vm.mods.EventLoop().AddEvent(msg.NewViewMsg{ID: vm.mods.ID(), SyncInfo: *msg.NewSyncInfo().WithQC(qc)})
 }

@@ -134,7 +134,7 @@ func (c crypto) VerifyAggregateQC(aggQC msg.AggregateQC) (highQC msg.QuorumCert,
 			highQC = qc
 		}
 		// reconstruct the TimeoutMsg to get the hash
-		messages[id] = msg.NewTimeoutMsg(id, aggQC.AQCView(), msg.NewSyncInfo().WithQC(qc), nil).ToBytes()
+		messages[id] = msg.NewTimeoutMsg(id, aggQC.AQCView(), *msg.NewSyncInfo().WithQC(qc), nil).ToBytes()
 	}
 	if aggQC.Signature().Participants().Len() < c.mods.Configuration().QuorumSize() {
 		return msg.QuorumCert{}, false

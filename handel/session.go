@@ -374,7 +374,7 @@ func (s *session) updateOutgoing(levelIndex int) {
 			s.h.mods.Logger().Debugf("Done with session: %.8s", s.hash)
 
 			s.h.mods.EventLoop().AddEvent(msg.NewViewMsg{
-				SyncInfo: msg.NewSyncInfo().WithQC(msg.NewQuorumCert(
+				SyncInfo: *msg.NewSyncInfo().WithQC(msg.NewQuorumCert(
 					outgoing,
 					s.h.mods.Synchronizer().View(),
 					s.hash,
@@ -490,7 +490,6 @@ func (s *session) verifyContributions(ctx context.Context) {
 
 	s.h.mods.EventLoop().RemoveTicker(s.disseminateTimerID)
 	s.h.mods.EventLoop().RemoveTicker(s.levelActivateTimerID)
-
 }
 
 // chooseContribution chooses the next contribution to verify.
