@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/synchronizer"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -23,12 +24,11 @@ import (
 
 // Replica provides methods used by hotstuff to send messages to replicas.
 type Replica struct {
-	node          *hotstuffpb.Node
-	id            hotstuff.ID
-	pubKey        hotstuff.PublicKey
-	voteCancel    context.CancelFunc
-	newViewCancel context.CancelFunc
-	md            map[string]string
+	eventLoop *eventloop.EventLoop
+	node      *hotstuffpb.Node
+	id        hotstuff.ID
+	pubKey    hotstuff.PublicKey
+	md        map[string]string
 }
 
 // ID returns the replica's ID.
@@ -46,11 +46,10 @@ func (r *Replica) Vote(cert hotstuff.PartialCert) {
 	if r.node == nil {
 		return
 	}
-	var ctx context.Context
-	r.voteCancel()
-	ctx, r.voteCancel = context.WithCancel(context.Background())
+	ctx, cancel := synchronizer.ViewContext(context.Background(), nil, r.eventLoop)
+	defer cancel()
 	pCert := hotstuffpb.PartialCertToProto(cert)
-	r.node.Vote(ctx, pCert, gorums.WithNoSendWaiting())
+	r.node.Vote(ctx, pCert)
 }
 
 // NewView sends the quorum certificate to the other replica.
@@ -58,10 +57,9 @@ func (r *Replica) NewView(msg hotstuff.SyncInfo) {
 	if r.node == nil {
 		return
 	}
-	var ctx context.Context
-	r.newViewCancel()
-	ctx, r.newViewCancel = context.WithCancel(context.Background())
-	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(msg), gorums.WithNoSendWaiting())
+	ctx, cancel := synchronizer.ViewContext(context.Background(), nil, r.eventLoop)
+	defer cancel()
+	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(msg))
 }
 
 // Metadata returns the gRPC metadata from this replica's connection.
@@ -205,11 +203,10 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 	for _, replica := range replicas {
 		// also initialize Replica structures
 		cfg.replicas[replica.ID] = &Replica{
-			id:            replica.ID,
-			pubKey:        replica.PubKey,
-			newViewCancel: func() {},
-			voteCancel:    func() {},
-			md:            make(map[string]string),
+			eventLoop: cfg.eventLoop,
+			id:        replica.ID,
+			pubKey:    replica.PubKey,
+			md:        make(map[string]string),
 		}
 		// we do not want to connect to ourself
 		if replica.ID != cfg.subConfig.opts.ID() {
@@ -292,10 +289,11 @@ func (cfg *subConfig) Propose(proposal hotstuff.ProposeMsg) {
 	if cfg.cfg == nil {
 		return
 	}
+	ctx, cancel := synchronizer.ViewContext(context.Background(), nil, cfg.eventLoop)
+	defer cancel()
 	cfg.cfg.Propose(
-		cfg.synchronizer.ViewContext(),
+		ctx,
 		hotstuffpb.ProposalToProto(proposal),
-		gorums.WithNoSendWaiting(),
 	)
 }
 
@@ -304,10 +302,13 @@ func (cfg *subConfig) Timeout(msg hotstuff.TimeoutMsg) {
 	if cfg.cfg == nil {
 		return
 	}
+
+	ctx, cancel := synchronizer.ViewContext(context.Background(), nil, cfg.eventLoop)
+	defer cancel()
+
 	cfg.cfg.Timeout(
-		cfg.synchronizer.ViewContext(),
+		ctx,
 		hotstuffpb.TimeoutMsgToProto(msg),
-		gorums.WithNoSendWaiting(),
 	)
 }
 
