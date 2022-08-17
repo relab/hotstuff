@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/msg"
 	"golang.org/x/exp/maps"
@@ -74,7 +73,7 @@ func (cache *cache) evict() {
 }
 
 // Sign signs a message and adds it to the cache for use during verification.
-func (cache *cache) Sign(message []byte) (sig *hotstuffpb.QuorumSignature, err error) {
+func (cache *cache) Sign(message []byte) (sig *msg.Signature, err error) {
 	sig, err = cache.impl.Sign(message)
 	if err != nil {
 		return nil, err
@@ -89,7 +88,7 @@ func (cache *cache) Sign(message []byte) (sig *hotstuffpb.QuorumSignature, err e
 }
 
 // Verify verifies the given quorum signature against the message.
-func (cache *cache) Verify(signature *hotstuffpb.QuorumSignature, message []byte) bool {
+func (cache *cache) Verify(signature *msg.ThresholdSignature, message []byte) bool {
 	var key strings.Builder
 	hash := sha256.Sum256(message)
 	_, _ = key.Write(hash[:])
@@ -109,7 +108,7 @@ func (cache *cache) Verify(signature *hotstuffpb.QuorumSignature, message []byte
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
-func (cache *cache) BatchVerify(signature *hotstuffpb.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
+func (cache *cache) BatchVerify(signature *msg.ThresholdSignature, batch map[hotstuff.ID][]byte) bool {
 	// sort the list of ids from the batch map
 	ids := maps.Keys(batch)
 	slices.Sort(ids)
@@ -139,7 +138,7 @@ func (cache *cache) BatchVerify(signature *hotstuffpb.QuorumSignature, batch map
 }
 
 // Combine combines multiple signatures together into a single signature.
-func (cache *cache) Combine(signatures ...*hotstuffpb.QuorumSignature) (*hotstuffpb.QuorumSignature, error) {
+func (cache *cache) Combine(signatures ...*msg.ThresholdSignature) (*msg.ThresholdSignature, error) {
 	// we don't cache the result of this operation, because it is not guaranteed to be valid.
 	return cache.impl.Combine(signatures...)
 }

@@ -10,7 +10,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
-	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/msg"
 )
@@ -147,53 +146,57 @@ func (ec *ecdsaBase) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsB
 }
 
 // Sign creates a cryptographic signature of the given message.
-func (ec *ecdsaBase) Sign(message []byte) (signature *hotstuffpb.QuorumSignature, err error) {
+func (ec *ecdsaBase) Sign(message []byte) (signature *msg.Signature, err error) {
 	hash := sha256.Sum256(message)
 	r, s, err := ecdsa.Sign(rand.Reader, ec.getPrivateKey(), hash[:])
 	if err != nil {
 		return nil, fmt.Errorf("ecdsa: sign failed: %w", err)
 	}
-	return &hotstuffpb.QuorumSignature{Sig: &hotstuffpb.QuorumSignature_ECDSASigs{
-		ECDSASigs: &hotstuffpb.ECDSAMultiSignature{
-			Sigs: []*hotstuffpb.ECDSASignature{
-				{
-					R:      r.Bytes(),
-					S:      s.Bytes(),
-					Signer: uint32(ec.mods.ID()),
-				},
+	return &msg.Signature{
+		ID: uint32(ec.mods.ID()),
+		Sig: &msg.Signature_ECDSASig{
+			ECDSASig: &msg.ECDSASignature{
+				Signer: uint32(ec.mods.ID()),
+				R:      r.Bytes(),
+				S:      s.Bytes(),
 			},
 		},
-	}}, nil
+	}, nil
 }
 
 // Combine combines multiple signatures into a single signature.
-func (ec *ecdsaBase) Combine(signatures ...*hotstuffpb.QuorumSignature) (*hotstuffpb.QuorumSignature, error) {
+func (ec *ecdsaBase) Combine(signatures ...*msg.ThresholdSignature) (*msg.ThresholdSignature, error) {
 	if len(signatures) < 2 {
 		return nil, crypto.ErrCombineMultiple
 	}
 
-	ts := make([]*hotstuffpb.ECDSASignature, 0)
+	ts := make([]*msg.ECDSASignature, 0)
 	signers := make(map[uint32]bool)
 	for _, sig1 := range signatures {
-		if sig2, ok := sig1.Sig.(*hotstuffpb.QuorumSignature_ECDSASigs); ok {
+		if sig2, ok := sig1.AggSig.(*msg.ThresholdSignature_ECDSASigs); ok {
 			for _, s := range sig2.ECDSASigs.Sigs {
 				signer := s.GetSigner()
 				if _, ok := signers[signer]; ok {
 					return nil, crypto.ErrCombineOverlap
 				}
 				signers[signer] = true
+				ts = append(ts, s)
 			}
 		} else {
 			ec.mods.Logger().Panicf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
 		}
 	}
-	return &hotstuffpb.QuorumSignature{Sig: &hotstuffpb.QuorumSignature_ECDSASigs{
-		ECDSASigs: &hotstuffpb.ECDSAMultiSignature{Sigs: ts}}}, nil
+	return &msg.ThresholdSignature{
+		AggSig: &msg.ThresholdSignature_ECDSASigs{
+			ECDSASigs: &msg.ECDSAThresholdSignature{
+				Sigs: ts,
+			},
+		}}, nil
 }
 
 // Verify verifies the given quorum signature against the message.
-func (ec *ecdsaBase) Verify(signature *hotstuffpb.QuorumSignature, message []byte) bool {
-	s, ok := signature.Sig.(*hotstuffpb.QuorumSignature_ECDSASigs)
+func (ec *ecdsaBase) Verify(signature *msg.ThresholdSignature, message []byte) bool {
+	s, ok := signature.AggSig.(*msg.ThresholdSignature_ECDSASigs)
 	if !ok {
 		ec.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
@@ -208,7 +211,7 @@ func (ec *ecdsaBase) Verify(signature *hotstuffpb.QuorumSignature, message []byt
 	hash := sha256.Sum256(message)
 
 	for _, sig := range sigs {
-		go func(sig *hotstuffpb.ECDSASignature, hash msg.Hash) {
+		go func(sig *msg.ECDSASignature, hash msg.Hash) {
 			results <- ec.verifySingle(sig, hash)
 		}(sig, hash)
 	}
@@ -224,8 +227,8 @@ func (ec *ecdsaBase) Verify(signature *hotstuffpb.QuorumSignature, message []byt
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
-func (ec *ecdsaBase) BatchVerify(signature *hotstuffpb.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
-	s, ok := signature.Sig.(*hotstuffpb.QuorumSignature_ECDSASigs)
+func (ec *ecdsaBase) BatchVerify(signature *msg.ThresholdSignature, batch map[hotstuff.ID][]byte) bool {
+	s, ok := signature.AggSig.(*msg.ThresholdSignature_ECDSASigs)
 	if !ok {
 		ec.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
@@ -244,7 +247,7 @@ func (ec *ecdsaBase) BatchVerify(signature *hotstuffpb.QuorumSignature, batch ma
 		}
 		hash := sha256.Sum256(message)
 		set[hash] = struct{}{}
-		go func(sig *hotstuffpb.ECDSASignature, hash msg.Hash) {
+		go func(sig *msg.ECDSASignature, hash msg.Hash) {
 			results <- ec.verifySingle(sig, hash)
 		}(sig, hash)
 	}
@@ -260,7 +263,7 @@ func (ec *ecdsaBase) BatchVerify(signature *hotstuffpb.QuorumSignature, batch ma
 	return valid && len(set) == len(batch)
 }
 
-func (ec *ecdsaBase) verifySingle(sig *hotstuffpb.ECDSASignature, hash msg.Hash) bool {
+func (ec *ecdsaBase) verifySingle(sig *msg.ECDSASignature, hash msg.Hash) bool {
 	replica, ok := ec.mods.Configuration().Replica(hotstuff.ID(sig.GetSigner()))
 	if !ok {
 		ec.mods.Logger().Warnf("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.GetSigner())

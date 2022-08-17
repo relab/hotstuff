@@ -43,11 +43,11 @@ func (chain *blockChain) Store(block *msg.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
-	chain.blocks[block.Hash()] = block
-	chain.blockAtHeight[block.View()] = block
+	chain.blocks[block.GetBlockHash()] = block
+	chain.blockAtHeight[block.BView()] = block
 
 	// cancel any pending fetch operations
-	if cancel, ok := chain.pendingFetch[block.Hash()]; ok {
+	if cancel, ok := chain.pendingFetch[block.GetBlockHash()]; ok {
 		cancel()
 	}
 }
@@ -98,7 +98,7 @@ func (chain *blockChain) Get(hash msg.Hash) (block *msg.Block, ok bool) {
 	chain.mods.Logger().Debugf("Successfully fetched block: %.8s", hash)
 
 	chain.blocks[hash] = block
-	chain.blockAtHeight[block.View()] = block
+	chain.blockAtHeight[block.BView()] = block
 
 done:
 	defer chain.mut.Unlock()
@@ -114,17 +114,17 @@ done:
 func (chain *blockChain) Extends(block, target *msg.Block) bool {
 	current := block
 	ok := true
-	for ok && current.View() > target.View() {
-		current, ok = chain.Get(current.Parent())
+	for ok && current.BView() > target.BView() {
+		current, ok = chain.Get(current.ParentHash())
 	}
-	return ok && current.Hash() == target.Hash()
+	return ok && current.GetBlockHash() == target.GetBlockHash()
 }
 
 func (chain *blockChain) PruneToHeight(height msg.View) (forkedBlocks []*msg.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
-	committedHeight := chain.mods.Consensus().CommittedBlock().View()
+	committedHeight := chain.mods.Consensus().CommittedBlock().BView()
 	committedViews := make(map[msg.View]bool)
 	committedViews[committedHeight] = true
 	for h := committedHeight; h >= chain.pruneHeight; {
@@ -132,11 +132,11 @@ func (chain *blockChain) PruneToHeight(height msg.View) (forkedBlocks []*msg.Blo
 		if !ok {
 			break
 		}
-		parent, ok := chain.blocks[block.Parent()]
-		if !ok || parent.View() < chain.pruneHeight {
+		parent, ok := chain.blocks[block.ParentHash()]
+		if !ok || parent.BView() < chain.pruneHeight {
 			break
 		}
-		h = parent.View()
+		h = parent.BView()
 		committedViews[h] = true
 	}
 

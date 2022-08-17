@@ -11,7 +11,6 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
@@ -42,7 +41,7 @@ func NewServer(opts ...gorums.ServerOption) *Server {
 
 	srv.gorumsSrv = gorums.NewServer(opts...)
 
-	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, &serviceImpl{srv})
+	msg.RegisterHotstuffServer(srv.gorumsSrv, &serviceImpl{srv})
 	return srv
 }
 
@@ -124,7 +123,7 @@ type serviceImpl struct {
 }
 
 // Propose handles a replica's response to the Propose QC from the leader.
-func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
+func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *msg.Proposal) {
 	id, err := GetPeerIDFromContext(ctx, impl.srv.mods.Configuration())
 	if err != nil {
 		impl.srv.mods.Logger().Infof("Failed to get client ID: %v", err)
@@ -132,14 +131,14 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	}
 
 	proposal.Block.Proposer = uint32(id)
-	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
-	proposeMsg.ID = id
+	//proposeMsg := hotstuffpb.ProposalFromProto(proposal)
+	//proposeMsg.ID = id
 
-	impl.srv.mods.EventLoop().AddEvent(proposeMsg)
+	impl.srv.mods.EventLoop().AddEvent(proposal)
 }
 
 // Vote handles an incoming vote message.
-func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
+func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *msg.PartialCert) {
 	id, err := GetPeerIDFromContext(ctx, impl.srv.mods.Configuration())
 	if err != nil {
 		impl.srv.mods.Logger().Infof("Failed to get client ID: %v", err)
@@ -153,7 +152,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
-func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, syncMsg *hotstuffpb.SyncInfo) {
+func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, syncMsg *msg.SyncInfo) {
 	id, err := GetPeerIDFromContext(ctx, impl.srv.mods.Configuration())
 	if err != nil {
 		impl.srv.mods.Logger().Infof("Failed to get client ID: %v", err)
@@ -162,12 +161,12 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, syncMsg *hotstuffpb.SyncI
 
 	impl.srv.mods.EventLoop().AddEvent(msg.NewViewMsg{
 		ID:       id,
-		SyncInfo: hotstuffpb.SyncInfoFromProto(syncMsg),
+		SyncInfo: syncMsg,
 	})
 }
 
 // Fetch handles an incoming fetch request.
-func (impl *serviceImpl) Fetch(ctx gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*hotstuffpb.Block, error) {
+func (impl *serviceImpl) Fetch(ctx gorums.ServerCtx, pb *msg.BlockHash) (*msg.Block, error) {
 	var hash msg.Hash
 	copy(hash[:], pb.GetHash())
 
@@ -178,18 +177,17 @@ func (impl *serviceImpl) Fetch(ctx gorums.ServerCtx, pb *hotstuffpb.BlockHash) (
 
 	impl.srv.mods.Logger().Debugf("OnFetch: %.8s", hash)
 
-	return hotstuffpb.BlockToProto(block), nil
+	return block, nil
 }
 
 // Timeout handles an incoming TimeoutMsg.
-func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, toMsg *hotstuffpb.TimeoutMsg) {
-	var err error
-	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(toMsg)
-	timeoutMsg.ID, err = GetPeerIDFromContext(ctx, impl.srv.mods.Configuration())
+func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, toMsg *msg.TimeoutMsg) {
+	id, err := GetPeerIDFromContext(ctx, impl.srv.mods.Configuration())
 	if err != nil {
 		impl.srv.mods.Logger().Infof("Could not get ID of replica: %v", err)
 	}
-	impl.srv.mods.EventLoop().AddEvent(timeoutMsg)
+	toMsg.ID = uint32(id)
+	impl.srv.mods.EventLoop().AddEvent(toMsg)
 }
 
 type replicaConnected struct {

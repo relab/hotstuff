@@ -8,19 +8,12 @@ protoc -I=.:/Users/2924108/go/pkg/mod/github.com/relab/gorums@v0.7.1-0.202203071
 protoc -I=.:/Users/2924108/go/pkg/mod/github.com/relab/gorums@v0.7.1-0.20220307181651-94a8af8e467c:internal/proto \
 		--go_out=paths=source_relative:. \
 		--gorums_out=paths=source_relative:. \
-		internal/proto/hotstuffpb/hotstuff.proto
-protoc -I=.:/Users/2924108/go/pkg/mod/github.com/relab/gorums@v0.7.1-0.20220307181651-94a8af8e467c:internal/proto \
-		--go_out=paths=source_relative:. \
-		--gorums_out=paths=source_relative:. \
-		msg/hotstuffpb/hotstuff.proto
+		msg/hotstuff.proto
 protoc -I=.:/Users/2924108/go/pkg/mod/github.com/relab/gorums@v0.7.1-0.20220307181651-94a8af8e467c:internal/proto \
 		--go_out=paths=source_relative:. \
 		--gorums_out=paths=source_relative:. \
 		internal/proto/orchestrationpb/orchestration.proto
-protoc -I=.:/Users/2924108/go/pkg/mod/github.com/relab/gorums@v0.7.1-0.20220307181651-94a8af8e467c:internal/proto \
-		--go_out=paths=source_relative:. \
-		--gorums_out=paths=source_relative:. \
-		internal/proto/handelpb/handel.proto
+ 
 protoc -I=.:/Users/2924108/go/pkg/mod/github.com/relab/gorums@v0.7.1-0.20220307181651-94a8af8e467c:internal/proto \
 		--go_out=paths=source_relative:. \
 		--gorums_out=paths=source_relative:. \

@@ -3,7 +3,6 @@ package consensus
 import (
 	"sync"
 
-	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/msg"
 
 	"github.com/relab/hotstuff/modules"
@@ -13,13 +12,13 @@ import (
 type VotingMachine struct {
 	mut           sync.Mutex
 	mods          *modules.ConsensusCore
-	verifiedVotes map[msg.Hash][]hotstuffpb.PartialCert // verified votes that could become a QC
+	verifiedVotes map[msg.Hash][]*msg.PartialCert // verified votes that could become a QC
 }
 
 // NewVotingMachine returns a new VotingMachine.
 func NewVotingMachine() *VotingMachine {
 	return &VotingMachine{
-		verifiedVotes: make(map[msg.Hash][]hotstuffpb.PartialCert),
+		verifiedVotes: make(map[msg.Hash][]*msg.PartialCert),
 	}
 }
 
@@ -33,34 +32,35 @@ func (vm *VotingMachine) InitModule(mods *modules.ConsensusCore, _ *modules.Opti
 // OnVote handles an incoming vote.
 func (vm *VotingMachine) OnVote(vote msg.VoteMsg) {
 	cert := vote.PartialCert
-	vm.mods.Logger().Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
+	vm.mods.Logger().Debugf("OnVote(%d): %.8s", vote.ID, string(cert.GetHash()))
 
 	var (
 		block *msg.Block
 		ok    bool
 	)
-
+	var hash msg.Hash
+	copy(hash[:], cert.GetHash())
 	if !vote.Deferred {
 		// first, try to get the block from the local cache
-		block, ok = vm.mods.BlockChain().LocalGet(cert.BlockHash())
+		block, ok = vm.mods.BlockChain().LocalGet(hash)
 		if !ok {
 			// if that does not work, we will try to handle this event later.
 			// hopefully, the block has arrived by then.
-			vm.mods.Logger().Debugf("Local cache miss for block: %.8s", cert.BlockHash())
+			vm.mods.Logger().Debugf("Local cache miss for block: %.8s", cert.GetHash())
 			vote.Deferred = true
-			vm.mods.EventLoop().DelayUntil(msg.ProposeMsg{}, vote)
+			vm.mods.EventLoop().DelayUntil(msg.Proposal{}, vote)
 			return
 		}
 	} else {
 		// if the block has not arrived at this point we will try to fetch it.
-		block, ok = vm.mods.BlockChain().Get(cert.BlockHash())
+		block, ok = vm.mods.BlockChain().Get(hash)
 		if !ok {
-			vm.mods.Logger().Debugf("Could not find block for vote: %.8s.", cert.BlockHash())
+			vm.mods.Logger().Debugf("Could not find block for vote: %.8s.", cert.GetHash())
 			return
 		}
 	}
 
-	if block.View() <= vm.mods.Synchronizer().LeafBlock().View() {
+	if block.BView() <= vm.mods.Synchronizer().LeafBlock().BView() {
 		// too old
 		return
 	}
@@ -72,7 +72,7 @@ func (vm *VotingMachine) OnVote(vote msg.VoteMsg) {
 	}
 }
 
-func (vm *VotingMachine) verifyCert(cert hotstuffpb.PartialCert, block *msg.Block) {
+func (vm *VotingMachine) verifyCert(cert *msg.PartialCert, block *msg.Block) {
 	if !vm.mods.Crypto().VerifyPartialCert(cert) {
 		vm.mods.Logger().Info("OnVote: Vote could not be verified!")
 		return
@@ -86,7 +86,7 @@ func (vm *VotingMachine) verifyCert(cert hotstuffpb.PartialCert, block *msg.Bloc
 		// delete any pending QCs with lower height than bLeaf
 		for k := range vm.verifiedVotes {
 			if block, ok := vm.mods.BlockChain().LocalGet(k); ok {
-				if block.View() <= vm.mods.Synchronizer().LeafBlock().View() {
+				if block.BView() <= vm.mods.Synchronizer().LeafBlock().BView() {
 					delete(vm.verifiedVotes, k)
 				}
 			} else {

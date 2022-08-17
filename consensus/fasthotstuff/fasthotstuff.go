@@ -28,7 +28,7 @@ func (fhs *FastHotStuff) InitModule(mods *modules.ConsensusCore, opts *modules.O
 	opts.SetShouldUseAggQC()
 }
 
-func (fhs *FastHotStuff) qcRef(qc msg.QuorumCert) (*msg.Block, bool) {
+func (fhs *FastHotStuff) qcRef(qc *msg.QuorumCert) (*msg.Block, bool) {
 	if (msg.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
@@ -46,8 +46,8 @@ func (fhs *FastHotStuff) CommitRule(block *msg.Block) *msg.Block {
 	if !ok {
 		return nil
 	}
-	if block.Parent() == parent.Hash() && block.View() == parent.View()+1 &&
-		parent.Parent() == grandparent.Hash() && parent.View() == grandparent.View()+1 {
+	if block.ParentHash() == parent.GetBlockHash() && block.BView() == parent.BView()+1 &&
+		parent.ParentHash() == grandparent.GetBlockHash() && parent.BView() == grandparent.BView()+1 {
 		fhs.mods.Logger().Debug("COMMIT: ", grandparent)
 		return grandparent
 	}
@@ -55,15 +55,15 @@ func (fhs *FastHotStuff) CommitRule(block *msg.Block) *msg.Block {
 }
 
 // VoteRule decides whether to vote for the proposal or not.
-func (fhs *FastHotStuff) VoteRule(proposal msg.ProposeMsg) bool {
+func (fhs *FastHotStuff) VoteRule(proposal *msg.Proposal) bool {
 	// The base implementation verifies both regular QCs and AggregateQCs, and asserts that the QC embedded in the
 	// block is the same as the highQC found in the aggregateQC.
-	if proposal.AggregateQC != nil {
+	if proposal.AggQC != nil {
 		hqcBlock, ok := fhs.mods.BlockChain().Get(proposal.Block.QuorumCert().BlockHash())
 		return ok && fhs.mods.BlockChain().Extends(proposal.Block, hqcBlock)
 	}
-	return proposal.Block.View() >= fhs.mods.Synchronizer().View() &&
-		proposal.Block.View() == proposal.Block.QuorumCert().View()+1
+	return proposal.Block.BView() >= fhs.mods.Synchronizer().View() &&
+		proposal.Block.BView() == proposal.Block.QuorumCert().QCView()+1
 }
 
 // ChainLength returns the number of blocks that need to be chained together in order to commit.

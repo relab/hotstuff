@@ -120,8 +120,9 @@ func (c *cmdCache) Accept(cmd msg.Command) bool {
 	defer c.mut.Unlock()
 
 	for _, cmd := range batch.GetCommands() {
-		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
+		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo > cmd.GetSequenceNumber() {
 			// command is too old, can't accept
+			c.mods.Logger().Info("command too old ", serialNo, cmd.GetSequenceNumber())
 			return false
 		}
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/msg"
 )
 
@@ -282,9 +281,9 @@ type Replica interface {
 	// PublicKey returns the replica's public key.
 	PublicKey() msg.PublicKey
 	// Vote sends the partial certificate to the other replica.
-	Vote(cert *hotstuffpb.PartialCert)
+	Vote(cert *msg.PartialCert)
 	// NewView sends the quorum certificate to the other replica.
-	NewView(msg.SyncInfo)
+	NewView(*msg.SyncInfo)
 	// Metadata returns the connection metadata sent by this replica.
 	Metadata() map[string]string
 }
@@ -303,9 +302,9 @@ type Configuration interface {
 	// QuorumSize returns the size of a quorum.
 	QuorumSize() int
 	// Propose sends the block to all replicas in the configuration.
-	Propose(proposal msg.ProposeMsg)
+	Propose(proposal *msg.Proposal)
 	// Timeout sends the timeout message to all replicas.
-	Timeout(msg msg.TimeoutMsg)
+	Timeout(msg *msg.TimeoutMsg)
 	// Fetch requests a block from all the replicas in the configuration.
 	Fetch(ctx context.Context, hash msg.Hash) (block *msg.Block, ok bool)
 	// SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
@@ -321,7 +320,7 @@ type Consensus interface {
 	// StopVoting ensures that no voting happens in a view earlier than `view`.
 	StopVoting(view msg.View)
 	// Propose starts a new proposal. The command is fetched from the command queue.
-	Propose(cert msg.SyncInfo)
+	Propose(cert *msg.SyncInfo)
 	// CommittedBlock returns the most recently committed block.
 	CommittedBlock() *msg.Block
 	// ChainLength returns the number of blocks that need to be chained together in order to commit.
@@ -340,13 +339,13 @@ type LeaderRotation interface {
 type Synchronizer interface {
 	// AdvanceView attempts to advance to the next view using the given QC.
 	// qc must be either a regular quorum certificate, or a timeout certificate.
-	AdvanceView(msg.SyncInfo)
+	AdvanceView(*msg.SyncInfo)
 	// View returns the current view.
 	View() msg.View
 	// ViewContext returns a context that is cancelled at the end of the view.
 	ViewContext() context.Context
 	// HighQC returns the highest known QC.
-	HighQC() msg.QuorumCert
+	HighQC() *msg.QuorumCert
 	// LeafBlock returns the current leaf block.
 	LeafBlock() *msg.Block
 	// Start starts the synchronizer with the given context.
@@ -356,7 +355,7 @@ type Synchronizer interface {
 // Handel is an implementation of the Handel signature aggregation protocol.
 type Handel interface {
 	// Begin commissions the aggregation of a new signature.
-	Begin(s hotstuffpb.PartialCert)
+	Begin(s *msg.PartialCert)
 }
 
 type executorWrapper struct {
@@ -364,7 +363,7 @@ type executorWrapper struct {
 }
 
 func (ew executorWrapper) Exec(block *msg.Block) {
-	ew.executor.Exec(block.Command())
+	ew.executor.Exec(block.Cmd())
 }
 
 type forkHandlerWrapper struct {
@@ -372,5 +371,5 @@ type forkHandlerWrapper struct {
 }
 
 func (fhw forkHandlerWrapper) Fork(block *msg.Block) {
-	fhw.forkHandler.Fork(block.Command())
+	fhw.forkHandler.Fork(block.Cmd())
 }

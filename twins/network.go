@@ -310,12 +310,12 @@ func (c *configuration) QuorumSize() int {
 }
 
 // Propose sends the block to all replicas in the configuration.
-func (c *configuration) Propose(proposal msg.ProposeMsg) {
+func (c *configuration) Propose(proposal *msg.Proposal) {
 	c.broadcastMessage(proposal)
 }
 
 // Timeout sends the timeout message to all replicas.
-func (c *configuration) Timeout(toMsg msg.TimeoutMsg) {
+func (c *configuration) Timeout(toMsg *msg.TimeoutMsg) {
 	c.broadcastMessage(toMsg)
 }
 
@@ -353,7 +353,7 @@ func (r *replica) PublicKey() msg.PublicKey {
 }
 
 // Vote sends the partial certificate to the other replica.
-func (r *replica) Vote(cert msg.PartialCert) {
+func (r *replica) Vote(cert *msg.PartialCert) {
 	r.config.sendMessage(r.id, msg.VoteMsg{
 		ID:          r.config.node.mods.ID(),
 		PartialCert: cert,
@@ -361,7 +361,7 @@ func (r *replica) Vote(cert msg.PartialCert) {
 }
 
 // NewView sends the quorum certificate to the other replica.
-func (r *replica) NewView(si msg.SyncInfo) {
+func (r *replica) NewView(si *msg.SyncInfo) {
 	r.config.sendMessage(r.id, msg.NewViewMsg{
 		ID:       r.config.node.mods.ID(),
 		SyncInfo: si,

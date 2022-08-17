@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-package hotstuffpb;
+package msg;
 
 import "gorums.proto";
 
 import "google/protobuf/empty.proto";
 
-option go_package = "github.com/relab/hotstuff/msg/hotstuffpb";
+option go_package = "github.com/relab/hotstuff/msg";
 
 service Hotstuff {
     rpc Propose(Proposal) returns (google.protobuf.Empty) {
@@ -58,9 +58,10 @@ message BLS12Signature {
 }
 
 message Signature {
+    uint32 ID = 1;
     oneof Sig {
-        ECDSASignature ECDSASig = 1;
-        BLS12Signature BLS12Sig = 2;
+        ECDSASignature ECDSASig = 2;
+        BLS12Signature BLS12Sig = 3;
     }
 }
 
@@ -101,12 +102,13 @@ message TimeoutMsg {
     SyncInfo SyncInfo         = 2;
     Signature ViewSig         = 3;
     optional Signature MsgSig = 4;
+    uint32 ID                 = 5;
 }
 
 message SyncInfo {
-    optional QuorumCert QC  = 1;
-    optional TimeoutCert TC = 2;
-    optional AggQC AggQC    = 3;
+    optional QuorumCert QCert  = 1;
+    optional TimeoutCert TCert = 2;
+    optional AggQC AggQCert    = 3;
 }
 
 message AggQC {

@@ -30,8 +30,8 @@ func (c carousel) GetLeader(round msg.View) hotstuff.ID {
 		return chooseRoundRobin(round, c.mods.Configuration().Len())
 	}
 
-	if commitHead.View() != round-msg.View(c.mods.Consensus().ChainLength()) {
-		c.mods.Logger().Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.View())
+	if commitHead.BView() != round-msg.View(c.mods.Consensus().ChainLength()) {
+		c.mods.Logger().Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.BView())
 		return chooseRoundRobin(round, c.mods.Configuration().Len())
 	}
 
@@ -46,8 +46,8 @@ func (c carousel) GetLeader(round msg.View) hotstuff.ID {
 	)
 
 	for ok && i < f && block != msg.GetGenesis() {
-		lastAuthors.Add(block.Proposer())
-		block, ok = c.mods.BlockChain().Get(block.Parent())
+		lastAuthors.Add(block.ProposerID())
+		block, ok = c.mods.BlockChain().Get(block.ParentHash())
 		i++
 	}
 

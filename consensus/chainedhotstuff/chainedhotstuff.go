@@ -33,7 +33,7 @@ func (hs *ChainedHotStuff) InitModule(mods *modules.ConsensusCore, _ *modules.Op
 	hs.mods = mods
 }
 
-func (hs *ChainedHotStuff) qcRef(qc msg.QuorumCert) (*msg.Block, bool) {
+func (hs *ChainedHotStuff) qcRef(qc *msg.QuorumCert) (*msg.Block, bool) {
 	if (msg.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
@@ -56,7 +56,7 @@ func (hs *ChainedHotStuff) CommitRule(block *msg.Block) *msg.Block {
 		return nil
 	}
 
-	if block2.View() > hs.bLock.View() {
+	if block2.BView() > hs.bLock.BView() {
 		hs.mods.Logger().Debug("COMMIT: ", block2)
 		hs.bLock = block2
 	}
@@ -66,7 +66,7 @@ func (hs *ChainedHotStuff) CommitRule(block *msg.Block) *msg.Block {
 		return nil
 	}
 
-	if block1.Parent() == block2.Hash() && block2.Parent() == block3.Hash() {
+	if block1.ParentHash() == block2.GetBlockHash() && block2.ParentHash() == block3.GetBlockHash() {
 		hs.mods.Logger().Debug("DECIDE: ", block3)
 		return block3
 	}
@@ -75,13 +75,13 @@ func (hs *ChainedHotStuff) CommitRule(block *msg.Block) *msg.Block {
 }
 
 // VoteRule decides whether to vote for the proposal or not.
-func (hs *ChainedHotStuff) VoteRule(proposal msg.ProposeMsg) bool {
+func (hs *ChainedHotStuff) VoteRule(proposal *msg.Proposal) bool {
 	block := proposal.Block
 
 	qcBlock, haveQCBlock := hs.mods.BlockChain().Get(block.QuorumCert().BlockHash())
 
 	safe := false
-	if haveQCBlock && qcBlock.View() > hs.bLock.View() {
+	if haveQCBlock && qcBlock.BView() > hs.bLock.BView() {
 		safe = true
 	} else {
 		hs.mods.Logger().Debug("OnPropose: liveness condition failed")

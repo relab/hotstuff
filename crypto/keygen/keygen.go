@@ -18,7 +18,6 @@ import (
 	"github.com/relab/hotstuff/msg"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/crypto/bls12"
 	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
 )
 
@@ -103,9 +102,9 @@ func PrivateKeyToPEM(key msg.PrivateKey) ([]byte, error) {
 			return nil, err
 		}
 		keyType = ecdsacrypto.PrivateKeyFileType
-	case *bls12.PrivateKey:
-		marshalled = k.ToBytes()
-		keyType = bls12.PrivateKeyFileType
+		// case *bls12.PrivateKey:
+		// 	marshalled = k.ToBytes()
+		// 	keyType = bls12.PrivateKeyFileType
 	}
 	b := &pem.Block{
 		Type:  keyType,
@@ -149,9 +148,9 @@ func PublicKeyToPEM(key msg.PublicKey) ([]byte, error) {
 			return nil, err
 		}
 		keyType = ecdsacrypto.PublicKeyFileType
-	case *bls12.PublicKey:
-		marshalled = k.ToBytes()
-		keyType = bls12.PublicKeyFileType
+		// case *bls12.PublicKey:
+		// 	marshalled = k.ToBytes()
+		// 	keyType = bls12.PublicKeyFileType
 	}
 
 	b := &pem.Block{
@@ -211,10 +210,10 @@ func ParsePrivateKey(buf []byte) (key msg.PrivateKey, err error) {
 	switch b.Type {
 	case ecdsacrypto.PrivateKeyFileType:
 		key, err = x509.ParseECPrivateKey(b.Bytes)
-	case bls12.PrivateKeyFileType:
-		k := &bls12.PrivateKey{}
-		k.FromBytes(b.Bytes)
-		key = k
+	// case bls12.PrivateKeyFileType:
+	// 	k := &bls12.PrivateKey{}
+	// 	k.FromBytes(b.Bytes)
+	// 	key = k
 	default:
 		return nil, fmt.Errorf("file type did not match any known types")
 	}
@@ -242,13 +241,13 @@ func ParsePublicKey(buf []byte) (key msg.PublicKey, err error) {
 	switch b.Type {
 	case ecdsacrypto.PublicKeyFileType:
 		key, err = x509.ParsePKIXPublicKey(b.Bytes)
-	case bls12.PublicKeyFileType:
-		k := &bls12.PublicKey{}
-		err = k.FromBytes(b.Bytes)
-		if err != nil {
-			return nil, err
-		}
-		key = k
+	// case bls12.PublicKeyFileType:
+	// 	k := &bls12.PublicKey{}
+	// 	err = k.FromBytes(b.Bytes)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	key = k
 	default:
 		return nil, fmt.Errorf("file type did not match any known types")
 	}
@@ -321,11 +320,11 @@ func GenerateKeyChain(id hotstuff.ID, validFor []string, crypto string, ca *x509
 	switch crypto {
 	case "ecdsa":
 		privateKey = ecdsaKey
-	case "bls12":
-		privateKey, err = bls12.GeneratePrivateKey()
-		if err != nil {
-			return KeyChain{}, fmt.Errorf("failed to generate bls12-381 private key: %w", err)
-		}
+	// case "bls12":
+	// 	privateKey, err = bls12.GeneratePrivateKey()
+	// 	if err != nil {
+	// 		return KeyChain{}, fmt.Errorf("failed to generate bls12-381 private key: %w", err)
+	// 	}
 	default:
 		return KeyChain{}, fmt.Errorf("unknown crypto implementation: %s", crypto)
 	}

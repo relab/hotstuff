@@ -52,7 +52,7 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, 
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
 	network := NewPartitionedNetwork(scenario,
-		msg.ProposeMsg{},
+		msg.Proposal{},
 		msg.VoteMsg{},
 		msg.Hash{},
 		msg.NewViewMsg{},
@@ -99,7 +99,7 @@ func checkCommits(network *Network) (safe bool, commits int) {
 			if len(replica[0].executedBlocks) <= i {
 				continue
 			}
-			commitCount[replica[0].executedBlocks[i].Hash()]++
+			commitCount[replica[0].executedBlocks[i].GetBlockHash()]++
 			noCommits = false
 		}
 

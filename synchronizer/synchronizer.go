@@ -17,8 +17,8 @@ type Synchronizer struct {
 	mods *modules.ConsensusCore
 
 	currentView msg.View
-	highTC      msg.TimeoutCert
-	highQC      msg.QuorumCert
+	highTC      *msg.TimeoutCert
+	highQC      *msg.QuorumCert
 	leafBlock   *msg.Block
 
 	// A pointer to the last timeout message that we sent.
@@ -33,7 +33,7 @@ type Synchronizer struct {
 	cancelCtx context.CancelFunc
 
 	// map of collected timeout messages per view
-	timeouts map[msg.View]map[hotstuff.ID]msg.TimeoutMsg
+	timeouts map[msg.View]map[hotstuff.ID]*msg.TimeoutMsg
 }
 
 // InitModule gives the module a reference to the ConsensusCore object.
@@ -56,21 +56,20 @@ func (s *Synchronizer) InitModule(mods *modules.ConsensusCore, opts *modules.Opt
 		s.OnNewView(newViewMsg)
 	})
 
-	s.mods.EventLoop().RegisterHandler(msg.TimeoutMsg{}, func(event any) {
-		timeoutMsg := event.(msg.TimeoutMsg)
+	s.mods.EventLoop().RegisterHandler(&msg.TimeoutMsg{}, func(event any) {
+		timeoutMsg := event.(*msg.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
 	})
 
 	var err error
-	s.highQC, err = s.mods.Crypto().CreateQuorumCert(msg.GetGenesis(), []msg.PartialCert{})
+	s.highQC, err = s.mods.Crypto().CreateQuorumCert(msg.GetGenesis(), []*msg.PartialCert{})
 	if err != nil {
 		panic(fmt.Errorf("unable to create empty quorum cert for genesis block: %v", err))
 	}
-	s.highTC, err = s.mods.Crypto().CreateTimeoutCert(msg.View(0), []msg.TimeoutMsg{})
+	s.highTC, err = s.mods.Crypto().CreateTimeoutCert(msg.View(0), []*msg.TimeoutMsg{})
 	if err != nil {
 		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
 	}
-
 }
 
 // New creates a new Synchronizer.
@@ -86,7 +85,7 @@ func New(viewDuration ViewDuration) modules.Synchronizer {
 		duration: viewDuration,
 		timer:    time.AfterFunc(0, func() {}), // dummy timer that will be replaced after start() is called
 
-		timeouts: make(map[msg.View]map[hotstuff.ID]msg.TimeoutMsg),
+		timeouts: make(map[msg.View]map[hotstuff.ID]*msg.TimeoutMsg),
 	}
 }
 
@@ -110,7 +109,7 @@ func (s *Synchronizer) Start(ctx context.Context) {
 }
 
 // HighQC returns the highest known QC.
-func (s *Synchronizer) HighQC() msg.QuorumCert {
+func (s *Synchronizer) HighQC() *msg.QuorumCert {
 	return s.highQC
 }
 
@@ -130,8 +129,8 @@ func (s *Synchronizer) ViewContext() context.Context {
 }
 
 // SyncInfo returns the highest known QC or TC.
-func (s *Synchronizer) SyncInfo() msg.SyncInfo {
-	if s.highQC.View() >= s.highTC.View() {
+func (s *Synchronizer) SyncInfo() *msg.SyncInfo {
+	if s.highQC.QCView() >= s.highTC.TCView() {
 		return msg.NewSyncInfo().WithQC(s.highQC)
 	}
 	return msg.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
@@ -149,8 +148,8 @@ func (s *Synchronizer) OnLocalTimeout() {
 	}
 	s.timer.Reset(s.duration.Duration())
 
-	if s.lastTimeout != nil && s.lastTimeout.View == s.currentView {
-		s.mods.Configuration().Timeout(*s.lastTimeout)
+	if s.lastTimeout != nil && s.lastTimeout.View == uint64(s.currentView) {
+		s.mods.Configuration().Timeout(s.lastTimeout)
 		return
 	}
 
@@ -163,12 +162,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 		s.mods.Logger().Warnf("Failed to sign view: %v", err)
 		return
 	}
-	timeoutMsg := msg.TimeoutMsg{
-		ID:            s.mods.ID(),
-		View:          view,
-		SyncInfo:      s.SyncInfo(),
-		ViewSignature: sig,
-	}
+	timeoutMsg := msg.NewTimeoutMsg(s.mods.ID(), view, s.SyncInfo(), sig)
 
 	if s.mods.Options().ShouldUseAggQC() {
 		// generate a second signature that will become part of the aggregateQC
@@ -177,9 +171,9 @@ func (s *Synchronizer) OnLocalTimeout() {
 			s.mods.Logger().Warnf("Failed to sign timeout message: %v", err)
 			return
 		}
-		timeoutMsg.MsgSignature = sig
+		timeoutMsg.MsgSig = sig
 	}
-	s.lastTimeout = &timeoutMsg
+	s.lastTimeout = timeoutMsg
 	// stop voting for current view
 	s.mods.Consensus().StopVoting(s.currentView)
 
@@ -188,7 +182,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 }
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
-func (s *Synchronizer) OnRemoteTimeout(timeout msg.TimeoutMsg) {
+func (s *Synchronizer) OnRemoteTimeout(timeout *msg.TimeoutMsg) {
 	defer func() {
 		// cleanup old timeouts
 		for view := range s.timeouts {
@@ -199,21 +193,21 @@ func (s *Synchronizer) OnRemoteTimeout(timeout msg.TimeoutMsg) {
 	}()
 
 	verifier := s.mods.Crypto()
-	if !verifier.Verify(timeout.ViewSignature, timeout.View.ToBytes()) {
+	if !verifier.Verify(timeout.ViewSig.CreateThresholdSignature(), msg.ViewToBytes(timeout.View)) {
 		return
 	}
 	s.mods.Logger().Debug("OnRemoteTimeout: ", timeout)
 
 	s.AdvanceView(timeout.SyncInfo)
 
-	timeouts, ok := s.timeouts[timeout.View]
+	timeouts, ok := s.timeouts[msg.View(timeout.View)]
 	if !ok {
-		timeouts = make(map[hotstuff.ID]msg.TimeoutMsg)
-		s.timeouts[timeout.View] = timeouts
+		timeouts = make(map[hotstuff.ID]*msg.TimeoutMsg)
+		s.timeouts[msg.View(timeout.View)] = timeouts
 	}
 
-	if _, ok := timeouts[timeout.ID]; !ok {
-		timeouts[timeout.ID] = timeout
+	if _, ok := timeouts[hotstuff.ID(timeout.ID)]; !ok {
+		timeouts[hotstuff.ID(timeout.ID)] = timeout
 	}
 
 	if len(timeouts) < s.mods.Configuration().QuorumSize() {
@@ -222,12 +216,12 @@ func (s *Synchronizer) OnRemoteTimeout(timeout msg.TimeoutMsg) {
 
 	// TODO: should probably change CreateTimeoutCert and maybe also CreateQuorumCert
 	// to use maps instead of slices
-	timeoutList := make([]msg.TimeoutMsg, 0, len(timeouts))
+	timeoutList := make([]*msg.TimeoutMsg, 0, len(timeouts))
 	for _, t := range timeouts {
 		timeoutList = append(timeoutList, t)
 	}
 
-	tc, err := s.mods.Crypto().CreateTimeoutCert(timeout.View, timeoutList)
+	tc, err := s.mods.Crypto().CreateTimeoutCert(msg.View(timeout.View), timeoutList)
 	if err != nil {
 		s.mods.Logger().Debugf("Failed to create timeout certificate: %v", err)
 		return
@@ -244,7 +238,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout msg.TimeoutMsg) {
 		}
 	}
 
-	delete(s.timeouts, timeout.View)
+	delete(s.timeouts, msg.View(timeout.View))
 
 	s.AdvanceView(si)
 }
@@ -256,7 +250,7 @@ func (s *Synchronizer) OnNewView(newView msg.NewViewMsg) {
 
 // AdvanceView attempts to advance to the next view using the given QC.
 // qc must be either a regular quorum certificate, or a timeout certificate.
-func (s *Synchronizer) AdvanceView(syncInfo msg.SyncInfo) {
+func (s *Synchronizer) AdvanceView(syncInfo *msg.SyncInfo) {
 	v := msg.View(0)
 	timeout := false
 
@@ -267,14 +261,14 @@ func (s *Synchronizer) AdvanceView(syncInfo msg.SyncInfo) {
 			return
 		}
 		s.updateHighTC(tc)
-		v = tc.View()
+		v = tc.TCView()
 		timeout = true
 	}
 
 	var (
 		haveQC bool
-		qc     msg.QuorumCert
-		aggQC  msg.AggregateQC
+		qc     *msg.QuorumCert
+		aggQC  *msg.AggQC
 	)
 
 	// check for an AggQC or QC
@@ -284,8 +278,8 @@ func (s *Synchronizer) AdvanceView(syncInfo msg.SyncInfo) {
 			s.mods.Logger().Info("Aggregated Quorum Certificate could not be verified")
 			return
 		}
-		if aggQC.View() >= v {
-			v = aggQC.View()
+		if msg.View(aggQC.View) >= v {
+			v = msg.View(aggQC.View)
 			timeout = true
 		}
 		// ensure that the true highQC is the one stored in the syncInfo
@@ -301,8 +295,8 @@ func (s *Synchronizer) AdvanceView(syncInfo msg.SyncInfo) {
 	if haveQC {
 		s.updateHighQC(qc)
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
-		if qc.View() >= v {
-			v = qc.View()
+		if qc.QCView() >= v {
+			v = qc.QCView()
 			timeout = false
 		}
 	}
@@ -338,7 +332,7 @@ func (s *Synchronizer) AdvanceView(syncInfo msg.SyncInfo) {
 }
 
 // UpdateHighQC updates HighQC if the given qc is higher than the old HighQC.
-func (s *Synchronizer) UpdateHighQC(qc msg.QuorumCert) {
+func (s *Synchronizer) UpdateHighQC(qc *msg.QuorumCert) {
 	s.mods.Logger().Debugf("updateHighQC: %v", qc)
 	if !s.mods.Crypto().VerifyQuorumCert(qc) {
 		s.mods.Logger().Info("updateHighQC: QC could not be verified!")
@@ -351,7 +345,7 @@ func (s *Synchronizer) UpdateHighQC(qc msg.QuorumCert) {
 // updateHighQC attempts to update the highQC, but does not verify the qc first.
 // This method is meant to be used instead of the exported UpdateHighQC internally
 // in this package when the qc has already been verified.
-func (s *Synchronizer) updateHighQC(qc msg.QuorumCert) {
+func (s *Synchronizer) updateHighQC(qc *msg.QuorumCert) {
 	newBlock, ok := s.mods.BlockChain().Get(qc.BlockHash())
 	if !ok {
 		s.mods.Logger().Info("updateHighQC: Could not find block referenced by new QC!")
@@ -363,7 +357,7 @@ func (s *Synchronizer) updateHighQC(qc msg.QuorumCert) {
 		s.mods.Logger().Panic("Block from the old highQC missing from chain")
 	}
 
-	if newBlock.View() > oldBlock.View() {
+	if newBlock.BView() > oldBlock.BView() {
 		s.highQC = qc
 		s.leafBlock = newBlock
 		s.mods.Logger().Debug("HighQC updated")
@@ -371,8 +365,8 @@ func (s *Synchronizer) updateHighQC(qc msg.QuorumCert) {
 }
 
 // updateHighTC attempts to update the highTC, but does not verify the tc first.
-func (s *Synchronizer) updateHighTC(tc msg.TimeoutCert) {
-	if tc.View() > s.highTC.View() {
+func (s *Synchronizer) updateHighTC(tc *msg.TimeoutCert) {
+	if tc.TCView() > s.highTC.TCView() {
 		s.highTC = tc
 		s.mods.Logger().Debug("HighTC updated")
 	}

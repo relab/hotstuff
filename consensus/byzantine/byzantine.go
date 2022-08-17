@@ -30,8 +30,8 @@ func (s *silence) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsB
 	}
 }
 
-func (s *silence) ProposeRule(_ msg.SyncInfo, _ msg.Command) (msg.ProposeMsg, bool) {
-	return msg.ProposeMsg{}, false
+func (s *silence) ProposeRule(_ *msg.SyncInfo, _ msg.Command) (*msg.Proposal, bool) {
+	return &msg.Proposal{}, false
 }
 
 func (s *silence) Wrap(rules consensus.Rules) consensus.Rules {
@@ -58,20 +58,19 @@ func (f *fork) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuil
 	}
 }
 
-func (f *fork) ProposeRule(cert msg.SyncInfo, cmd msg.Command) (proposal msg.ProposeMsg, ok bool) {
-	parent, ok := f.mods.BlockChain().Get(f.mods.Synchronizer().LeafBlock().Parent())
+func (f *fork) ProposeRule(cert *msg.SyncInfo, cmd msg.Command) (proposal *msg.Proposal, ok bool) {
+	parent, ok := f.mods.BlockChain().Get(f.mods.Synchronizer().LeafBlock().ParentHash())
 	if !ok {
 		return proposal, false
 	}
-	grandparent, ok := f.mods.BlockChain().Get(parent.Hash())
+	grandparent, ok := f.mods.BlockChain().Get(parent.GetBlockHash())
 	if !ok {
 		return proposal, false
 	}
 
-	proposal = msg.ProposeMsg{
-		ID: f.mods.ID(),
+	proposal = &msg.Proposal{
 		Block: msg.NewBlock(
-			grandparent.Hash(),
+			grandparent.GetBlockHash(),
 			grandparent.QuorumCert(),
 			cmd,
 			f.mods.Synchronizer().View(),
@@ -79,7 +78,7 @@ func (f *fork) ProposeRule(cert msg.SyncInfo, cmd msg.Command) (proposal msg.Pro
 		),
 	}
 	if aggQC, ok := cert.AggQC(); f.mods.Options().ShouldUseAggQC() && ok {
-		proposal.AggregateQC = &aggQC
+		proposal.AggQC = aggQC
 	}
 	return proposal, true
 }

@@ -35,7 +35,7 @@ func (r *repBased) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBui
 // GetLeader returns the id of the leader in the given view
 func (r *repBased) GetLeader(view msg.View) hotstuff.ID {
 	block := r.mods.Consensus().CommittedBlock()
-	if block.View() > view-msg.View(r.mods.Consensus().ChainLength()) {
+	if block.BView() > view-msg.View(r.mods.Consensus().ChainLength()) {
 		// TODO: it could be possible to lookup leaders for older views if we
 		// store a copy of the reputations in a metadata field of each block.
 		r.mods.Logger().Error("looking up leaders of old views is not supported")
@@ -60,7 +60,7 @@ func (r *repBased) GetLeader(view msg.View) hotstuff.ID {
 	weights := make([]wr.Choice, 0, numVotes)
 	voters.ForEach(func(voterID hotstuff.ID) {
 		// we should only update the reputations once for each commit head.
-		if r.prevCommitHead.View() < block.View() {
+		if r.prevCommitHead.BView() < block.BView() {
 			r.reputations[voterID] += reputation
 		}
 		weights = append(weights, wr.Choice{
@@ -73,7 +73,7 @@ func (r *repBased) GetLeader(view msg.View) hotstuff.ID {
 		return a.Item.(hotstuff.ID) >= b.Item.(hotstuff.ID)
 	})
 
-	if r.prevCommitHead.View() < block.View() {
+	if r.prevCommitHead.BView() < block.BView() {
 		r.prevCommitHead = block
 	}
 

@@ -16,7 +16,7 @@ import (
 
 func TestLocalTimeout(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	qc := msg.NewQuorumCert(nil, 0, msg.GetGenesis().Hash())
+	qc := msg.NewQuorumCert(nil, 0, msg.GetGenesis().GetBlockHash())
 	key := testutil.GenerateECDSAKey(t)
 	builder := modules.NewConsensusBuilder(2, key)
 	testutil.TestModules(t, ctrl, 2, key, &builder)
@@ -43,7 +43,7 @@ func TestLocalTimeout(t *testing.T) {
 			if msgQC, ok := timeoutMsg.SyncInfo.QC(); ok && !bytes.Equal(msgQC.ToBytes(), qc.ToBytes()) {
 				t.Errorf("wrong QC. got: %v, want: %v", msgQC, qc)
 			}
-			if !mods.Crypto().Verify(timeoutMsg.ViewSignature, timeoutMsg.View.ToBytes()) {
+			if !mods.Crypto().Verify(timeoutMsg.ViewSig.CreateThresholdSignature(timeoutMsg.ID), msg.ViewToBytes(timeoutMsg.View)) {
 				t.Error("failed to verify signature")
 			}
 			c <- struct{}{}
@@ -69,8 +69,8 @@ func TestAdvanceViewQC(t *testing.T) {
 	signers := hl.Signers()
 
 	block := msg.NewBlock(
-		msg.GetGenesis().Hash(),
-		msg.NewQuorumCert(nil, 0, msg.GetGenesis().Hash()),
+		msg.GetGenesis().GetBlockHash(),
+		msg.NewQuorumCert(nil, 0, msg.GetGenesis().GetBlockHash()),
 		"foo",
 		1,
 		2,

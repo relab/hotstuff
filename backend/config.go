@@ -2,6 +2,7 @@
 package backend
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -22,7 +22,7 @@ import (
 
 // Replica provides methods used by hotstuff to send messages to replicas.
 type Replica struct {
-	node          *hotstuffpb.Node
+	node          *msg.Node
 	id            hotstuff.ID
 	pubKey        msg.PublicKey
 	voteCancel    context.CancelFunc
@@ -41,7 +41,7 @@ func (r *Replica) PublicKey() msg.PublicKey {
 }
 
 // Vote sends the partial certificate to the other replica.
-func (r *Replica) Vote(cert *hotstuffpb.PartialCert) {
+func (r *Replica) Vote(cert *msg.PartialCert) {
 	if r.node == nil {
 		return
 	}
@@ -52,14 +52,14 @@ func (r *Replica) Vote(cert *hotstuffpb.PartialCert) {
 }
 
 // NewView sends the quorum certificate to the other replica.
-func (r *Replica) NewView(syncMsg msg.SyncInfo) {
+func (r *Replica) NewView(syncMsg *msg.SyncInfo) {
 	if r.node == nil {
 		return
 	}
 	var ctx context.Context
 	r.newViewCancel()
 	ctx, r.newViewCancel = context.WithCancel(context.Background())
-	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(syncMsg), gorums.WithNoSendWaiting())
+	r.node.NewView(ctx, syncMsg, gorums.WithNoSendWaiting())
 }
 
 // Metadata returns the gRPC metadata from this replica's connection.
@@ -73,13 +73,13 @@ type Config struct {
 	opts      []gorums.ManagerOption
 	connected bool
 
-	mgr *hotstuffpb.Manager
+	mgr *msg.Manager
 	subConfig
 }
 
 type subConfig struct {
 	mods     *modules.ConsensusCore
-	cfg      *hotstuffpb.Configuration
+	cfg      *msg.Configuration
 	replicas map[hotstuff.ID]modules.Replica
 }
 
@@ -188,7 +188,7 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 
 	opts = append(opts, gorums.WithMetadata(md))
 
-	cfg.mgr = hotstuffpb.NewManager(opts...)
+	cfg.mgr = msg.NewManager(opts...)
 
 	// set up an ID mapping to give to gorums
 	idMapping := make(map[string]uint32, len(replicas))
@@ -275,32 +275,32 @@ func (cfg *subConfig) QuorumSize() int {
 }
 
 // Propose sends the block to all replicas in the configuration
-func (cfg *subConfig) Propose(proposal msg.ProposeMsg) {
+func (cfg *subConfig) Propose(proposal *msg.Proposal) {
 	if cfg.cfg == nil {
 		return
 	}
 	cfg.cfg.Propose(
 		cfg.mods.Synchronizer().ViewContext(),
-		hotstuffpb.ProposalToProto(proposal),
+		proposal,
 		gorums.WithNoSendWaiting(),
 	)
 }
 
 // Timeout sends the timeout message to all replicas.
-func (cfg *subConfig) Timeout(msg msg.TimeoutMsg) {
+func (cfg *subConfig) Timeout(msg *msg.TimeoutMsg) {
 	if cfg.cfg == nil {
 		return
 	}
 	cfg.cfg.Timeout(
 		cfg.mods.Synchronizer().ViewContext(),
-		hotstuffpb.TimeoutMsgToProto(msg),
+		msg,
 		gorums.WithNoSendWaiting(),
 	)
 }
 
 // Fetch requests a block from all the replicas in the configuration
 func (cfg *subConfig) Fetch(ctx context.Context, hash msg.Hash) (*msg.Block, bool) {
-	protoBlock, err := cfg.cfg.Fetch(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
+	protoBlock, err := cfg.cfg.Fetch(ctx, &msg.BlockHash{Hash: hash[:]})
 	if err != nil {
 		qcErr, ok := err.(gorums.QuorumCallError)
 		// filter out context errors
@@ -309,7 +309,7 @@ func (cfg *subConfig) Fetch(ctx context.Context, hash msg.Hash) (*msg.Block, boo
 		}
 		return nil, false
 	}
-	return hotstuffpb.BlockFromProto(protoBlock), true
+	return protoBlock, true
 }
 
 // Close closes all connections made by this configuration.
@@ -323,12 +323,9 @@ type qspec struct{}
 
 // FetchQF is the quorum function for the Fetch quorum call method.
 // It simply returns true if one of the replies matches the requested block.
-func (q qspec) FetchQF(in *hotstuffpb.BlockHash, replies map[uint32]*hotstuffpb.Block) (*hotstuffpb.Block, bool) {
-	var h msg.Hash
-	copy(h[:], in.GetHash())
+func (q qspec) FetchQF(in *msg.BlockHash, replies map[uint32]*msg.Block) (*msg.Block, bool) {
 	for _, b := range replies {
-		block := hotstuffpb.BlockFromProto(b)
-		if h == block.Hash() {
+		if bytes.Equal(in.Hash, b.GetHashBytes()) {
 			return b, true
 		}
 	}

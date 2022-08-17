@@ -16,7 +16,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/crypto"
-	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/mocks"
@@ -48,7 +47,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 
 	replica := CreateMockReplica(t, ctrl, id, privkey.Public())
 	ConfigAddReplica(t, config, replica)
-	config.EXPECT().Replicas().AnyTimes().Return((map[hotstuff.ID]modules.Replica{1: replica}))
+	// config.EXPECT().Replicas().AnyTimes().Return((map[hotstuff.ID]modules.Replica{1: replica}))
 
 	synchronizer := mocks.NewMockSynchronizer(ctrl)
 	synchronizer.EXPECT().Start(gomock.Any()).AnyTimes()
@@ -194,7 +193,7 @@ func CreateTCPListener(t *testing.T) net.Listener {
 }
 
 // Sign creates a signature using the given signer.
-func Sign(t *testing.T, message []byte, signer modules.Crypto) msg.QuorumSignature {
+func Sign(t *testing.T, message []byte, signer modules.Crypto) *msg.Signature {
 	t.Helper()
 	sig, err := signer.Sign(message)
 	if err != nil {
@@ -204,45 +203,36 @@ func Sign(t *testing.T, message []byte, signer modules.Crypto) msg.QuorumSignatu
 }
 
 // CreateSignatures creates partial certificates from multiple signers.
-func CreateSignatures(t *testing.T, message []byte, signers []modules.Crypto) []msg.QuorumSignature {
+func CreateSignatures(t *testing.T, message []byte, signers []modules.Crypto) []*msg.Signature {
 	t.Helper()
-	sigs := make([]msg.QuorumSignature, 0, len(signers))
+	sigs := make([]*msg.Signature, 0, len(signers))
 	for _, signer := range signers {
 		sigs = append(sigs, Sign(t, message, signer))
 	}
 	return sigs
 }
 
-func signer(s msg.QuorumSignature) hotstuff.ID {
-	var signer hotstuff.ID
-	s.Participants().RangeWhile(func(i hotstuff.ID) bool {
-		signer = i
-		return false
-	})
-	return signer
-}
-
 // CreateTimeouts creates a set of TimeoutMsg messages from the given signers.
-func CreateTimeouts(t *testing.T, view msg.View, signers []modules.Crypto) (timeouts []msg.TimeoutMsg) {
+func CreateTimeouts(t *testing.T, view msg.View, signers []modules.Crypto) (timeouts []*msg.TimeoutMsg) {
 	t.Helper()
-	timeouts = make([]msg.TimeoutMsg, 0, len(signers))
+	timeouts = make([]*msg.TimeoutMsg, 0, len(signers))
 	viewSigs := CreateSignatures(t, view.ToBytes(), signers)
 	for _, sig := range viewSigs {
-		timeouts = append(timeouts, msg.TimeoutMsg{
-			ID:            signer(sig),
-			View:          view,
-			ViewSignature: sig,
-			SyncInfo:      msg.NewSyncInfo().WithQC(msg.NewQuorumCert(nil, 0, msg.GetGenesis().Hash())),
-		})
+		timeouts = append(timeouts, msg.NewTimeoutMsg(
+			hotstuff.ID(1),
+			view,
+			msg.NewSyncInfo().WithQC(msg.NewQuorumCert(nil, 0, msg.GetGenesis().GetBlockHash())),
+			sig,
+		))
 	}
 	for i := range timeouts {
-		timeouts[i].MsgSignature = Sign(t, timeouts[i].ToBytes(), signers[i])
+		timeouts[i].MsgSig = Sign(t, timeouts[i].ToBytes(), signers[i])
 	}
 	return timeouts
 }
 
 // CreatePC creates a partial certificate using the given signer.
-func CreatePC(t *testing.T, block *msg.Block, signer modules.Crypto) msg.PartialCert {
+func CreatePC(t *testing.T, block *msg.Block, signer modules.Crypto) *msg.PartialCert {
 	t.Helper()
 	pc, err := signer.CreatePartialCert(block)
 	if err != nil {
@@ -252,9 +242,9 @@ func CreatePC(t *testing.T, block *msg.Block, signer modules.Crypto) msg.Partial
 }
 
 // CreatePCs creates one partial certificate using each of the given signers.
-func CreatePCs(t *testing.T, block *msg.Block, signers []modules.Crypto) []msg.PartialCert {
+func CreatePCs(t *testing.T, block *msg.Block, signers []modules.Crypto) []*msg.PartialCert {
 	t.Helper()
-	pcs := make([]msg.PartialCert, 0, len(signers))
+	pcs := make([]*msg.PartialCert, 0, len(signers))
 	for _, signer := range signers {
 		pcs = append(pcs, CreatePC(t, block, signer))
 	}
@@ -262,10 +252,10 @@ func CreatePCs(t *testing.T, block *msg.Block, signers []modules.Crypto) []msg.P
 }
 
 // CreateQC creates a QC using the given signers.
-func CreateQC(t *testing.T, block *msg.Block, signers []modules.Crypto) msg.QuorumCert {
+func CreateQC(t *testing.T, block *msg.Block, signers []modules.Crypto) *msg.QuorumCert {
 	t.Helper()
 	if len(signers) == 0 {
-		return msg.QuorumCert{}
+		return &msg.QuorumCert{}
 	}
 	qc, err := signers[0].CreateQuorumCert(block, CreatePCs(t, block, signers))
 	if err != nil {
@@ -275,10 +265,10 @@ func CreateQC(t *testing.T, block *msg.Block, signers []modules.Crypto) msg.Quor
 }
 
 // CreateTC generates a TC using the given signers.
-func CreateTC(t *testing.T, view msg.View, signers []modules.Crypto) msg.TimeoutCert {
+func CreateTC(t *testing.T, view msg.View, signers []modules.Crypto) *msg.TimeoutCert {
 	t.Helper()
 	if len(signers) == 0 {
-		return msg.TimeoutCert{}
+		return &msg.TimeoutCert{}
 	}
 	tc, err := signers[0].CreateTimeoutCert(view, CreateTimeouts(t, view, signers))
 	if err != nil {
@@ -297,15 +287,15 @@ func GenerateECDSAKey(t *testing.T) msg.PrivateKey {
 	return key
 }
 
-// GenerateBLS12Key generates a BLS12-381 private key for use in tests.
-func GenerateBLS12Key(t *testing.T) msg.PrivateKey {
-	t.Helper()
-	key, err := bls12.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("Failed to generate private key: %v", err)
-	}
-	return key
-}
+// // GenerateBLS12Key generates a BLS12-381 private key for use in tests.
+// func GenerateBLS12Key(t *testing.T) msg.PrivateKey {
+// 	t.Helper()
+// 	key, err := bls12.GeneratePrivateKey()
+// 	if err != nil {
+// 		t.Fatalf("Failed to generate private key: %v", err)
+// 	}
+// 	return key
+// }
 
 // GenerateKeys generates n keys.
 func GenerateKeys(t *testing.T, n int, keyFunc func(t *testing.T) msg.PrivateKey) (keys []msg.PrivateKey) {
@@ -316,9 +306,10 @@ func GenerateKeys(t *testing.T, n int, keyFunc func(t *testing.T) msg.PrivateKey
 	return keys
 }
 
-// NewProposeMsg wraps a new block in a ProposeMsg.
-func NewProposeMsg(parent msg.Hash, qc msg.QuorumCert, cmd msg.Command, view msg.View, id hotstuff.ID) msg.ProposeMsg {
-	return msg.ProposeMsg{ID: id, Block: msg.NewBlock(parent, qc, cmd, view, id)}
+func NewProposal(parent msg.Hash, qc *msg.QuorumCert, cmd msg.Command, view msg.View, id hotstuff.ID) *msg.Proposal {
+	return &msg.Proposal{
+		Block: msg.NewBlock(parent, qc, cmd, view, id),
+	}
 }
 
 type leaderRotation struct {
