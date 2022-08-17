@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/synchronizer"
 )
 
 // Rules is the minimum interface that a consensus implementations must implement.
@@ -122,7 +124,10 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 		}
 	}
 
-	cmd, ok := cs.commandQueue.Get(cs.synchronizer.ViewContext())
+	ctx, cancel := synchronizer.ViewContext(context.Background(), nil, cs.eventLoop)
+	defer cancel()
+
+	cmd, ok := cs.commandQueue.Get(ctx)
 	if !ok {
 		cs.logger.Debug("Propose: No command")
 		return

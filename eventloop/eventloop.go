@@ -11,6 +11,8 @@ import (
 	"reflect"
 	"sync"
 	"time"
+
+	"github.com/relab/hotstuff/util/gpool"
 )
 
 // EventHandler processes an event.
@@ -48,14 +50,51 @@ func New(bufferSize uint) *EventLoop {
 // RegisterHandler registers a handler for events with the same type as the 'eventType' argument.
 // There can be only one handler per event type, and the handler is executed after any observers.
 func (el *EventLoop) RegisterHandler(eventType any, handler EventHandler) {
+	el.mut.Lock()
+	defer el.mut.Unlock()
 	el.handlers[reflect.TypeOf(eventType)] = handler
+}
+
+func (el *EventLoop) UnregisterHandler(eventType any) {
+	el.mut.Lock()
+	defer el.mut.Unlock()
+	delete(el.handlers, reflect.TypeOf(eventType))
 }
 
 // RegisterObserver registers an observer for events with the same type as the 'eventType' argument.
 // The observers are executed before the handler.
-func (el *EventLoop) RegisterObserver(eventType any, observer EventHandler) {
+//
+// Returns an observer ID that can be used to remove the observer later.
+func (el *EventLoop) RegisterObserver(eventType any, observer EventHandler) int {
+	el.mut.Lock()
+	defer el.mut.Unlock()
 	t := reflect.TypeOf(eventType)
-	el.observers[t] = append(el.observers[t], observer)
+
+	observers := el.observers[t]
+
+	i := 0
+	for ; i < len(observers); i++ {
+		if observers[i] == nil {
+			break
+		}
+	}
+
+	if i == len(observers) {
+		observers = append(observers, observer)
+	} else {
+		observers[i] = observer
+	}
+
+	el.observers[t] = observers
+
+	return i
+}
+
+func (el *EventLoop) UnregisterObserver(eventType any, id int) {
+	el.mut.Lock()
+	defer el.mut.Unlock()
+	t := reflect.TypeOf(eventType)
+	el.observers[t][id] = nil
 }
 
 // AddEvent adds an event to the event queue.
@@ -109,6 +148,8 @@ func (el *EventLoop) Tick() bool {
 	return true
 }
 
+var handlerListPool = gpool.New(func() []EventHandler { return make([]EventHandler, 0, 10) })
+
 // processEvent dispatches the event to the correct handler.
 func (el *EventLoop) processEvent(event any) {
 	t := reflect.TypeOf(event)
@@ -119,14 +160,27 @@ func (el *EventLoop) processEvent(event any) {
 		return
 	}
 
-	// run observers
-	for _, observer := range el.observers[t] {
-		observer(event)
-	}
+	// Must copy handlers to a list so that they can be executed after unlocking the mutex.
+	// Use a pool to reduce memory allocations.
+	handlerList := handlerListPool.Get()
 
+	el.mut.Lock()
+	for _, observer := range el.observers[t] {
+		if observer != nil {
+			handlerList = append(handlerList, observer)
+		}
+	}
 	if handler, ok := el.handlers[t]; ok {
+		handlerList = append(handlerList, handler)
+	}
+	el.mut.Unlock()
+
+	for _, handler := range handlerList {
 		handler(event)
 	}
+
+	handlerList = handlerList[:0]
+	handlerListPool.Put(handlerList)
 }
 
 func (el *EventLoop) dispatchDelayedEvents(t reflect.Type) {
@@ -136,9 +190,12 @@ func (el *EventLoop) dispatchDelayedEvents(t reflect.Type) {
 			el.AddEvent(event)
 		}
 		delete(el.waitingEvents, t)
+		// delayListPool.Put(delayed[:0])
 	}
 	el.mut.Unlock()
 }
+
+// var delayListPool = gpool.New(func() []any { return make([]any, 0, 1) })
 
 // DelayUntil allows us to delay handling of an event until after another event has happened.
 // The eventType parameter decides the type of event to wait for, and it should be the zero value
@@ -150,6 +207,9 @@ func (el *EventLoop) DelayUntil(eventType, event any) {
 	el.mut.Lock()
 	t := reflect.TypeOf(eventType)
 	v := el.waitingEvents[t]
+	// if v == nil {
+	// 	v = delayListPool.Get()
+	// }
 	v = append(v, event)
 	el.waitingEvents[t] = v
 	el.mut.Unlock()
