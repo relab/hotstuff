@@ -27,6 +27,7 @@
 package handel
 
 import (
+	"context"
 	"math"
 
 	"github.com/relab/gorums"
@@ -37,6 +38,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/synchronizer"
 )
 
 func init() {
@@ -119,8 +121,10 @@ func (h *Handel) postInit() {
 
 	// now we can start handling timer events
 	h.eventLoop.RegisterHandler(disseminateEvent{}, func(e any) {
+		ctx, cancel := synchronizer.ViewContext(context.Background(), nil, h.eventLoop)
+		defer cancel()
 		if s, ok := h.sessions[e.(disseminateEvent).sessionID]; ok {
-			s.sendContributions(s.h.synchronizer.ViewContext())
+			s.sendContributions(ctx)
 		}
 	})
 
@@ -146,7 +150,8 @@ func (h *Handel) Begin(s hotstuff.PartialCert) {
 	session := h.newSession(s.BlockHash(), s.Signature())
 	h.sessions[s.BlockHash()] = session
 
-	go session.verifyContributions(h.synchronizer.ViewContext())
+	ctx, _ := synchronizer.ViewContext(context.Background(), nil, h.eventLoop)
+	go session.verifyContributions(ctx)
 }
 
 type serviceImpl struct {

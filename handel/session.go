@@ -13,6 +13,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/proto/handelpb"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
+	"github.com/relab/hotstuff/synchronizer"
 )
 
 const (
@@ -331,7 +332,9 @@ func (s *session) updateIncoming(c contribution) {
 		level.done = true
 		s.advanceLevel()
 		if c.level+1 <= s.h.maxLevel {
-			s.sendFastPath(s.h.synchronizer.ViewContext(), c.level+1)
+			ctx, cancel := synchronizer.ViewContext(context.Background(), nil, s.h.eventLoop)
+			defer cancel()
+			s.sendFastPath(ctx, c.level+1)
 		}
 	}
 
@@ -489,7 +492,6 @@ func (s *session) verifyContributions(ctx context.Context) {
 
 	s.h.eventLoop.RemoveTicker(s.disseminateTimerID)
 	s.h.eventLoop.RemoveTicker(s.levelActivateTimerID)
-
 }
 
 // chooseContribution chooses the next contribution to verify.
