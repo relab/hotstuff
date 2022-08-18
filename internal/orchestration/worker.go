@@ -196,6 +196,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		consensus.New(consensusRules),
 		consensus.NewVotingMachine(),
 		//cryptoImpl,
+		//crypto.New(cryptoImpl),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		leaderRotation,
 		sync,

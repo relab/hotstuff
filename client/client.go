@@ -152,7 +152,7 @@ func (c *Client) Run(ctx context.Context) {
 	c.close()
 
 	commandStats := <-commandStatsChan
-	c.mods.Logger().Infof(
+	c.mods.Logger().Errorf(
 		"Done sending commands (executed: %d, failed: %d, timeouts: %d)",
 		commandStats.executed, commandStats.failed, commandStats.timeout,
 	)
