@@ -42,9 +42,9 @@ func (c crypto) CreateQuorumCert(block *msg.Block, signatures []*msg.PartialCert
 	if block.GetBlockHash() == msg.GetGenesis().GetBlockHash() {
 		return msg.NewQuorumCert(nil, 0, msg.GetGenesis().GetBlockHash()), nil
 	}
-	sigs := make([]*msg.ThresholdSignature, 0, len(signatures))
+	sigs := make([]*msg.Signature, 0, len(signatures))
 	for _, pc := range signatures {
-		sigs = append(sigs, pc.Sig.CreateThresholdSignature())
+		sigs = append(sigs, pc.GetSig())
 	}
 	sig, err := c.Combine(sigs...)
 	if err != nil {
@@ -59,9 +59,9 @@ func (c crypto) CreateTimeoutCert(view msg.View, timeouts []*msg.TimeoutMsg) (ce
 	if view == 0 {
 		return msg.NewTimeoutCert(nil, 0), nil
 	}
-	sigs := make([]*msg.ThresholdSignature, 0, len(timeouts))
+	sigs := make([]*msg.Signature, 0, len(timeouts))
 	for _, pc := range timeouts {
-		sigs = append(sigs, pc.ViewSig.CreateThresholdSignature())
+		sigs = append(sigs, pc.GetViewSig())
 	}
 	sig, err := c.Combine(sigs...)
 	if err != nil {
@@ -73,13 +73,13 @@ func (c crypto) CreateTimeoutCert(view msg.View, timeouts []*msg.TimeoutMsg) (ce
 // CreateAggregateQC creates an AggregateQC from the given timeout messages.
 func (c crypto) CreateAggregateQC(view msg.View, timeouts []*msg.TimeoutMsg) (aggQC *msg.AggQC, err error) {
 	qcs := make(map[hotstuff.ID]*msg.QuorumCert)
-	sigs := make([]*msg.ThresholdSignature, 0, len(timeouts))
+	sigs := make([]*msg.Signature, 0, len(timeouts))
 	for _, timeout := range timeouts {
 		if qc, ok := timeout.SyncInfo.QC(); ok {
 			qcs[hotstuff.ID(timeout.ID)] = qc
 		}
 		if timeout.MsgSig != nil {
-			sigs = append(sigs, timeout.MsgSig.CreateThresholdSignature())
+			sigs = append(sigs, timeout.GetMsgSig())
 		}
 	}
 	sig, err := c.Combine(sigs...)

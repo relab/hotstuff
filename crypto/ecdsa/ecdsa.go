@@ -165,7 +165,7 @@ func (ec *ecdsaBase) Sign(message []byte) (signature *msg.Signature, err error) 
 }
 
 // Combine combines multiple signatures into a single signature.
-func (ec *ecdsaBase) Combine(signatures ...*msg.ThresholdSignature) (*msg.ThresholdSignature, error) {
+func (ec *ecdsaBase) Combine(signatures ...*msg.Signature) (*msg.ThresholdSignature, error) {
 	if len(signatures) < 2 {
 		return nil, crypto.ErrCombineMultiple
 	}
@@ -173,15 +173,14 @@ func (ec *ecdsaBase) Combine(signatures ...*msg.ThresholdSignature) (*msg.Thresh
 	ts := make([]*msg.ECDSASignature, 0)
 	signers := make(map[uint32]bool)
 	for _, sig1 := range signatures {
-		if sig2, ok := sig1.AggSig.(*msg.ThresholdSignature_ECDSASigs); ok {
-			for _, s := range sig2.ECDSASigs.Sigs {
-				signer := s.GetSigner()
-				if _, ok := signers[signer]; ok {
-					return nil, crypto.ErrCombineOverlap
-				}
-				signers[signer] = true
-				ts = append(ts, s)
+		if sig2, ok := sig1.Sig.(*msg.Signature_ECDSASig); ok {
+			signer := sig1.GetID()
+			if _, ok := signers[signer]; ok {
+				return nil, crypto.ErrCombineOverlap
 			}
+			signers[signer] = true
+			ts = append(ts, sig2.ECDSASig)
+
 		} else {
 			ec.mods.Logger().Panicf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
 		}

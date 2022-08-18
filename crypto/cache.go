@@ -138,7 +138,7 @@ func (cache *cache) BatchVerify(signature *msg.ThresholdSignature, batch map[hot
 }
 
 // Combine combines multiple signatures together into a single signature.
-func (cache *cache) Combine(signatures ...*msg.ThresholdSignature) (*msg.ThresholdSignature, error) {
+func (cache *cache) Combine(signatures ...*msg.Signature) (*msg.ThresholdSignature, error) {
 	// we don't cache the result of this operation, because it is not guaranteed to be valid.
 	return cache.impl.Combine(signatures...)
 }

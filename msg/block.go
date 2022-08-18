@@ -2,10 +2,10 @@ package msg
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 
 	"github.com/relab/hotstuff"
-	"google.golang.org/protobuf/proto"
 )
 
 // Block contains a proposed "command", metadata for the protocol, and a link to the "parent" block.
@@ -36,6 +36,7 @@ func NewBlock(parent Hash, cert *QuorumCert, cmd Command, view View, proposer ho
 		View:     uint64(view),
 		Proposer: uint32(proposer),
 	}
+	b.Hash = b.computeHash()
 	return b
 }
 
@@ -83,27 +84,41 @@ func (b *Block) BView() View {
 	return View(b.View)
 }
 
-// ToBytes returns the raw byte form of the Block, to be used for hashing, etc.
-func (b *Block) ToBytes() []byte {
-	buf, _ := proto.Marshal(b)
-	return buf
-}
+// // ToBytes returns the raw byte form of the Block, to be used for hashing, etc.
+// func (b *Block) ToBytes() []byte {
+// 	buf, _ := proto.Marshal(b)
+// 	return buf
+// }
 
 func (b *Block) GetHashBytes() []byte {
-	y, _ := proto.Marshal(b)
-	x := sha256.Sum256(y)
-	hash := make([]byte, 0)
-	//copy(hash, x[:])
-	for _, b := range x {
-		hash = append(hash, b)
+	return b.Hash
+}
+
+func (b *Block) GetBlockHash() Hash {
+	var hash Hash
+	copy(hash[:], b.Hash)
+	for i, b := range b.Hash {
+		hash[i] = b
 	}
 	return hash
 }
 
-func (b *Block) GetBlockHash() Hash {
-	y, _ := proto.Marshal(b)
-	x := sha256.Sum256(y)
-	var hash Hash
-	copy(hash[:], x[:])
+func (b *Block) computeHash() []byte {
+	hash := make([]byte, 0)
+	for _, b := range sha256.Sum256(b.ToBytes()) {
+		hash = append(hash, b)
+	}
 	return hash
+}
+func (b *Block) ToBytes() []byte {
+	buf := b.Parent[:]
+	var proposerBuf [4]byte
+	binary.LittleEndian.PutUint32(proposerBuf[:], uint32(b.Proposer))
+	buf = append(buf, proposerBuf[:]...)
+	var viewBuf [8]byte
+	binary.LittleEndian.PutUint64(viewBuf[:], uint64(b.View))
+	buf = append(buf, viewBuf[:]...)
+	buf = append(buf, []byte(b.Command)...)
+	buf = append(buf, b.QC.ToBytes()...)
+	return buf
 }

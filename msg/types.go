@@ -276,20 +276,21 @@ func NewQuorumCert(signature *ThresholdSignature, view View, hash Hash) *QuorumC
 
 // ToBytes returns a byte representation of the quorum certificate.
 func (qc *QuorumCert) ToBytes() []byte {
-	// b := qc.View.ToBytes()
-	// b = append(b, qc.Hash[:]...)
-	// if qc.Sig != nil {
-	// 	b = append(b, qc.Sig.ToBytes()...)
-	// }
+	b := ViewToBytes(qc.View)
+	b = append(b, qc.Hash[:]...)
+	if qc.Sig != nil {
+		b = append(b, qc.Sig.ToBytes()...)
+	}
+	return b
 	// return b
-	if qc == nil {
-		return nil
-	}
-	y, err := proto.Marshal(qc)
-	if err != nil {
-		return nil
-	}
-	return y
+	// if qc == nil {
+	// 	return nil
+	// }
+	// y, err := proto.Marshal(qc)
+	// if err != nil {
+	// 	return nil
+	// }
+	// return y
 }
 
 // Signature returns the threshold signature.

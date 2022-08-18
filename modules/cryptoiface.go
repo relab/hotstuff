@@ -10,7 +10,7 @@ type CryptoBase interface {
 	// Sign creates a cryptographic signature of the given message.
 	Sign(message []byte) (signature *msg.Signature, err error)
 	// Combine combines multiple signatures into a single signature.
-	Combine(signatures ...*msg.ThresholdSignature) (signature *msg.ThresholdSignature, err error)
+	Combine(signatures ...*msg.Signature) (signature *msg.ThresholdSignature, err error)
 	// Verify verifies the given quorum signature against the message.
 	Verify(signature *msg.ThresholdSignature, message []byte) bool
 	// BatchVerify verifies the given quorum signature against the batch of messages.
