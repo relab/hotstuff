@@ -103,18 +103,22 @@ func (h Hash) String() string {
 
 func (h Hash) ToBytes() []byte {
 
-	hash := make([]byte, 0)
-	for _, b := range h {
-		hash = append(hash, b)
-	}
-
-	return hash
+	// hash := make([]byte, 0)
+	// for _, b := range h {
+	// 	hash = append(hash, b)
+	// }
+	return h[:]
 }
 
 func ToHash(hash []byte) Hash {
-	var h Hash
-	copy(h[:], hash[:])
-	return h
+	// var h Hash
+	// copy(h[:], hash[:])
+	// return h
+	if len(hash) == 0 {
+		var h Hash
+		return h
+	}
+	return *(*[32]byte)(hash)
 }
 
 // Command is a client request to be executed by the consensus protocol.

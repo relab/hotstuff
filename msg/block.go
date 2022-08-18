@@ -95,12 +95,13 @@ func (b *Block) GetHashBytes() []byte {
 }
 
 func (b *Block) GetBlockHash() Hash {
-	var hash Hash
-	copy(hash[:], b.Hash)
-	for i, b := range b.Hash {
-		hash[i] = b
-	}
-	return hash
+	// var hash Hash
+	// copy(hash[:], b.Hash)
+	// for i, b := range b.Hash {
+	// 	hash[i] = b
+	// }
+	// return hash
+	return ToHash(b.Hash)
 }
 
 func (b *Block) computeHash() []byte {
@@ -110,6 +111,7 @@ func (b *Block) computeHash() []byte {
 	}
 	return hash
 }
+
 func (b *Block) ToBytes() []byte {
 	buf := b.Parent[:]
 	var proposerBuf [4]byte

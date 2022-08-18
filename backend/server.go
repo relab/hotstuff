@@ -167,15 +167,12 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, syncMsg *msg.SyncInfo) {
 
 // Fetch handles an incoming fetch request.
 func (impl *serviceImpl) Fetch(ctx gorums.ServerCtx, pb *msg.BlockHash) (*msg.Block, error) {
-	var hash msg.Hash
-	copy(hash[:], pb.GetHash())
-
-	block, ok := impl.srv.mods.BlockChain().LocalGet(hash)
+	block, ok := impl.srv.mods.BlockChain().LocalGet(msg.ToHash(pb.GetHash()))
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "requested block was not found")
 	}
 
-	impl.srv.mods.Logger().Debugf("OnFetch: %.8s", hash)
+	impl.srv.mods.Logger().Debugf("OnFetch: %.8s", msg.ToHash(pb.GetHash()))
 
 	return block, nil
 }

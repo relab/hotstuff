@@ -38,11 +38,10 @@ func (vm *VotingMachine) OnVote(vote msg.VoteMsg) {
 		block *msg.Block
 		ok    bool
 	)
-	var hash msg.Hash
-	copy(hash[:], cert.GetHash())
+
 	if !vote.Deferred {
 		// first, try to get the block from the local cache
-		block, ok = vm.mods.BlockChain().LocalGet(hash)
+		block, ok = vm.mods.BlockChain().LocalGet(msg.ToHash(cert.Hash))
 		if !ok {
 			// if that does not work, we will try to handle this event later.
 			// hopefully, the block has arrived by then.
@@ -53,7 +52,7 @@ func (vm *VotingMachine) OnVote(vote msg.VoteMsg) {
 		}
 	} else {
 		// if the block has not arrived at this point we will try to fetch it.
-		block, ok = vm.mods.BlockChain().Get(hash)
+		block, ok = vm.mods.BlockChain().Get(msg.ToHash(cert.Hash))
 		if !ok {
 			vm.mods.Logger().Debugf("Could not find block for vote: %.8s.", cert.GetHash())
 			return
@@ -94,8 +93,7 @@ func (vm *VotingMachine) verifyCert(cert *msg.PartialCert, block *msg.Block) {
 			}
 		}
 	}()
-	var hash msg.Hash
-	copy(hash[:], cert.GetHash())
+	hash := msg.ToHash(cert.Hash)
 	votes := vm.verifiedVotes[hash]
 	votes = append(votes, cert)
 	vm.verifiedVotes[hash] = votes

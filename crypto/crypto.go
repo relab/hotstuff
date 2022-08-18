@@ -91,9 +91,7 @@ func (c crypto) CreateAggregateQC(view msg.View, timeouts []*msg.TimeoutMsg) (ag
 
 // VerifyPartialCert verifies a single partial certificate.
 func (c crypto) VerifyPartialCert(cert *msg.PartialCert) bool {
-	var hash msg.Hash
-	copy(hash[:], cert.GetHash())
-	block, ok := c.mods.BlockChain().Get(hash)
+	block, ok := c.mods.BlockChain().Get(msg.ToHash(cert.Hash))
 	if !ok {
 		c.mods.Logger().Info("Block not found")
 		return false

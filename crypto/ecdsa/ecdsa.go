@@ -208,7 +208,9 @@ func (ec *ecdsaBase) Verify(signature *msg.ThresholdSignature, message []byte) b
 
 	results := make(chan bool, n)
 	hash := sha256.Sum256(message)
-
+	if n == 1 {
+		return ec.verifySingle(sigs[0], hash)
+	}
 	for _, sig := range sigs {
 		go func(sig *msg.ECDSASignature, hash msg.Hash) {
 			results <- ec.verifySingle(sig, hash)
