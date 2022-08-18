@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/relab/hotstuff/msg"
+
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/mocks"
@@ -21,18 +23,18 @@ func TestVote(t *testing.T) {
 	hl := bl.Build()
 	hs := hl[0]
 
-	cs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
+	cs.EXPECT().Propose(gomock.AssignableToTypeOf(msg.NewSyncInfo()))
 
 	ok := false
 	ctx, cancel := context.WithCancel(context.Background())
-	hs.EventLoop().RegisterObserver(hotstuff.NewViewMsg{}, func(event any) {
+	hs.EventLoop().RegisterObserver(msg.NewViewMsg{}, func(event interface{}) {
 		ok = true
 		cancel()
 	})
 
-	b := testutil.NewProposeMsg(
-		hotstuff.GetGenesis().Hash(),
-		hotstuff.NewQuorumCert(nil, 1, hotstuff.GetGenesis().Hash()),
+	b := testutil.NewProposal(
+		msg.GetGenesis().GetBlockHash(),
+		msg.NewQuorumCert(nil, 1, msg.GetGenesis().GetBlockHash()),
 		"test", 1, 1,
 	)
 	hs.BlockChain().Store(b.Block)
@@ -42,7 +44,7 @@ func TestVote(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create partial certificate: %v", err)
 		}
-		hs.EventLoop().AddEvent(hotstuff.VoteMsg{ID: hotstuff.ID(i + 1), PartialCert: pc})
+		hs.EventLoop().AddEvent(msg.VoteMsg{ID: hotstuff.ID(i + 1), PartialCert: pc})
 	}
 
 	hs.Run(ctx)

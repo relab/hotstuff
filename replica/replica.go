@@ -5,12 +5,13 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/relab/hotstuff/modules"
 	"net"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
+	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -27,7 +28,7 @@ type Config struct {
 	// The id of the replica.
 	ID hotstuff.ID
 	// The private key of the replica.
-	PrivateKey hotstuff.PrivateKey
+	PrivateKey msg.PrivateKey
 	// Controls whether TLS is used.
 	TLS bool
 	// The TLS certificate.

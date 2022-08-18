@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+package msg;
+
+import "gorums.proto";
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/relab/hotstuff/msg";
+
+service Hotstuff {
+    rpc Propose(Proposal) returns (google.protobuf.Empty) {
+        option (gorums.multicast) = true;
+    }
+
+    rpc Vote(PartialCert) returns (google.protobuf.Empty) {
+        option (gorums.unicast) = true;
+    }
+
+    rpc Timeout(TimeoutMsg) returns (google.protobuf.Empty) {
+        option (gorums.multicast) = true;
+    }
+
+    rpc NewView(SyncInfo) returns (google.protobuf.Empty) {
+        option (gorums.unicast) = true;
+    }
+
+    rpc Fetch(BlockHash) returns (Block) {
+        option (gorums.quorumcall) = true;
+    }
+}
+
+message Proposal {
+    Block Block          = 1;
+    optional AggQC AggQC = 2;
+}
+
+message BlockHash {
+    bytes Hash = 1;
+}
+
+message Block {
+    bytes Parent    = 1;
+    QuorumCert QC   = 2;
+    uint64 View     = 3;
+    bytes Command   = 4;
+    uint32 Proposer = 5;
+    bytes Hash  = 6;
+}
+
+message ECDSASignature {
+    uint32 Signer = 1;
+    bytes R       = 2;
+    bytes S       = 3;
+}
+
+message BLS12Signature {
+    bytes Sig = 1;
+}
+
+message Signature {
+    uint32 ID = 1;
+    oneof Sig {
+        ECDSASignature ECDSASig = 2;
+        BLS12Signature BLS12Sig = 3;
+    }
+}
+
+message PartialCert {
+    Signature Sig = 1;
+    bytes Hash    = 2;
+}
+
+message ECDSAThresholdSignature {
+    repeated ECDSASignature Sigs = 1;
+}
+
+message BLS12AggregateSignature {
+    bytes Sig          = 1;
+    bytes participants = 2;
+}
+
+message ThresholdSignature {
+    oneof AggSig {
+        ECDSAThresholdSignature ECDSASigs = 1;
+        BLS12AggregateSignature BLS12Sig  = 2;
+    }
+}
+
+message QuorumCert {
+    ThresholdSignature Sig = 1;
+    uint64 View            = 2;
+    bytes Hash             = 3;
+}
+
+message TimeoutCert {
+    ThresholdSignature Sig = 1;
+    uint64 View            = 2;
+}
+
+message TimeoutMsg {
+    uint64 View               = 1;
+    SyncInfo SyncInfo         = 2;
+    Signature ViewSig         = 3;
+    optional Signature MsgSig = 4;
+    uint32 ID                 = 5;
+}
+
+message SyncInfo {
+    optional QuorumCert QCert  = 1;
+    optional TimeoutCert TCert = 2;
+    optional AggQC AggQCert    = 3;
+}
+
+message AggQC {
+    map<uint32, QuorumCert> QCs = 1;
+    ThresholdSignature Sig      = 2;
+    uint64 View                 = 3;
+}

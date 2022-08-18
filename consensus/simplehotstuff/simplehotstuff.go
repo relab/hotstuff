@@ -2,9 +2,9 @@
 package simplehotstuff
 
 import (
-	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
 )
 
 func init() {
@@ -18,13 +18,13 @@ func init() {
 type SimpleHotStuff struct {
 	mods *modules.ConsensusCore
 
-	locked *hotstuff.Block
+	locked *msg.Block
 }
 
 // New returns a new SimpleHotStuff instance.
 func New() consensus.Rules {
 	return &SimpleHotStuff{
-		locked: hotstuff.GetGenesis(),
+		locked: msg.GetGenesis(),
 	}
 }
 
@@ -35,11 +35,11 @@ func (hs *SimpleHotStuff) InitModule(mods *modules.ConsensusCore, _ *modules.Opt
 }
 
 // VoteRule decides if the replica should vote for the given block.
-func (hs *SimpleHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
+func (hs *SimpleHotStuff) VoteRule(proposal *msg.Proposal) bool {
 	block := proposal.Block
 
 	// Rule 1: can only vote in increasing rounds
-	if block.View() < hs.mods.Synchronizer().View() {
+	if block.BView() < hs.mods.Synchronizer().View() {
 		hs.mods.Logger().Info("VoteRule: block view too low")
 		return false
 	}
@@ -51,7 +51,7 @@ func (hs *SimpleHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
 	}
 
 	// Rule 2: can only vote if parent's view is greater than or equal to locked block's view.
-	if parent.View() < hs.locked.View() {
+	if parent.BView() < hs.locked.BView() {
 		hs.mods.Logger().Info("OnPropose: parent too old")
 		return false
 	}
@@ -60,7 +60,7 @@ func (hs *SimpleHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
 }
 
 // CommitRule decides if an ancestor of the block can be committed, and returns the ancestor, otherwise returns nil.
-func (hs *SimpleHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
+func (hs *SimpleHotStuff) CommitRule(block *msg.Block) *msg.Block {
 	// will consider if the great-grandparent of the new block can be committed.
 	p, ok := hs.mods.BlockChain().Get(block.QuorumCert().BlockHash())
 	if !ok {
@@ -68,7 +68,7 @@ func (hs *SimpleHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	}
 
 	gp, ok := hs.mods.BlockChain().Get(p.QuorumCert().BlockHash())
-	if ok && gp.View() > hs.locked.View() {
+	if ok && gp.BView() > hs.locked.BView() {
 		hs.locked = gp
 		hs.mods.Logger().Debug("Locked: ", gp)
 	} else if !ok {
@@ -79,7 +79,7 @@ func (hs *SimpleHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	// we commit the great-grandparent of the block if its grandchild is certified,
 	// which we already know is true because the new block contains the grandchild's certificate,
 	// and if the great-grandparent's view + 2 equals the grandchild's view.
-	if ok && ggp.View()+2 == p.View() {
+	if ok && ggp.BView()+2 == p.BView() {
 		return ggp
 	}
 	return nil

@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/fasthotstuff"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
 	"github.com/relab/hotstuff/twins"
 )
 
@@ -88,8 +88,10 @@ const fhsBugScenario = `
 }
 `
 
-var logLevel = flag.String("log-level", "info", "set the log level")
-var logAll = flag.Bool("log-all", false, "print all logs on success")
+var (
+	logLevel = flag.String("log-level", "info", "set the log level")
+	logAll   = flag.Bool("log-all", false, "print all logs on success")
+)
 
 func TestFHSBug(t *testing.T) {
 	logging.SetLogLevel(*logLevel)
@@ -115,7 +117,7 @@ func TestFHSBug(t *testing.T) {
 		var sb strings.Builder
 		fmt.Fprintf(&sb, "Node %v commits: \n", id)
 		for _, block := range blocks {
-			fmt.Fprintf(&sb, "\t Proposer: %d, View: %d, Hash: %.6s\n", block.Proposer(), block.View(), block.Hash())
+			fmt.Fprintf(&sb, "\t Proposer: %d, View: %d, Hash: %.6s\n", block.ProposerID(), block.BView(), block.GetBlockHash())
 		}
 		t.Log(sb.String())
 	}
@@ -147,19 +149,19 @@ func (fhs *vulnerableFHS) InitModule(mods *modules.ConsensusCore, opts *modules.
 }
 
 // VoteRule decides whether to vote for the block.
-func (fhs *vulnerableFHS) VoteRule(proposal hotstuff.ProposeMsg) bool {
+func (fhs *vulnerableFHS) VoteRule(proposal *msg.Proposal) bool {
 	return fhs.inner.VoteRule(proposal)
 }
 
-func (fhs *vulnerableFHS) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
-	if (hotstuff.Hash{}) == qc.BlockHash() {
+func (fhs *vulnerableFHS) qcRef(qc *msg.QuorumCert) (*msg.Block, bool) {
+	if (msg.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
 	return fhs.mods.BlockChain().Get(qc.BlockHash())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.
-func (fhs *vulnerableFHS) CommitRule(block *hotstuff.Block) *hotstuff.Block {
+func (fhs *vulnerableFHS) CommitRule(block *msg.Block) *msg.Block {
 	parent, ok := fhs.qcRef(block.QuorumCert())
 	if !ok {
 		return nil
@@ -171,7 +173,7 @@ func (fhs *vulnerableFHS) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	}
 	// NOTE: this does check for a direct link between the block and the grandparent.
 	// This is what causes the safety violation.
-	if block.Parent() == parent.Hash() && parent.Parent() == grandparent.Hash() {
+	if block.ParentHash() == parent.GetBlockHash() && parent.ParentHash() == grandparent.GetBlockHash() {
 		fhs.mods.Logger().Debug("COMMIT(vulnerable): ", grandparent)
 		return grandparent
 	}

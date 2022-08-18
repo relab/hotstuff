@@ -3,7 +3,7 @@ package metrics
 import (
 	"time"
 
-	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/msg"
 
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
@@ -26,8 +26,8 @@ type Throughput struct {
 // InitModule gives the module access to the other modules.
 func (t *Throughput) InitModule(mods *modules.Core) {
 	t.mods = mods
-	t.mods.EventLoop().RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
-		commitEvent := event.(hotstuff.CommitEvent)
+	t.mods.EventLoop().RegisterHandler(msg.CommitEvent{}, func(event interface{}) {
+		commitEvent := event.(msg.CommitEvent)
 		t.recordCommit(commitEvent.Commands)
 	})
 	t.mods.EventLoop().RegisterObserver(types.TickEvent{}, func(event any) {

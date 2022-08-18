@@ -8,7 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	hotstuff "github.com/relab/hotstuff"
+	msg "github.com/relab/hotstuff/msg"
 )
 
 // MockAcceptor is a mock of Acceptor interface.
@@ -35,7 +35,7 @@ func (m *MockAcceptor) EXPECT() *MockAcceptorMockRecorder {
 }
 
 // Accept mocks base method.
-func (m *MockAcceptor) Accept(arg0 hotstuff.Command) bool {
+func (m *MockAcceptor) Accept(arg0 msg.Command) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Accept", arg0)
 	ret0, _ := ret[0].(bool)
@@ -49,7 +49,7 @@ func (mr *MockAcceptorMockRecorder) Accept(arg0 interface{}) *gomock.Call {
 }
 
 // Proposed mocks base method.
-func (m *MockAcceptor) Proposed(arg0 hotstuff.Command) {
+func (m *MockAcceptor) Proposed(arg0 msg.Command) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Proposed", arg0)
 }

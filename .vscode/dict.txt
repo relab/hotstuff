@@ -16,6 +16,7 @@ Debugf
 durationpb
 emptypb
 Erevik
+extendee
 Fangyu
 fasthotstuff
 felixge
@@ -35,6 +36,7 @@ HOTSTUFF
 hotstuffgorums
 hotstuffpb
 ICDCS
+Idxs
 iface
 Infof
 Jalalzai
@@ -45,6 +47,8 @@ Malkhi
 Mathieu
 Meling
 mitchellh
+nolint
+oneof
 orchestrationpb
 partitioner
 perr
@@ -55,6 +59,7 @@ propsed
 proto
 protobuf
 protoc
+protoimpl
 ptypes
 QC's
 qerr

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/relab/hotstuff/msg"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/consensus"
@@ -36,8 +38,8 @@ func (id NodeID) String() string {
 type node struct {
 	id             NodeID
 	mods           *modules.ConsensusCore
-	executedBlocks []*hotstuff.Block
-	effectiveView  hotstuff.View
+	executedBlocks []*msg.Block
+	effectiveView  msg.View
 	log            strings.Builder
 }
 
@@ -90,7 +92,7 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 }
 
 // GetNodeBuilder returns a consensus.ConsensusBuilder instance for a node in the network.
-func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) modules.ConsensusBuilder {
+func (n *Network) GetNodeBuilder(id NodeID, pk msg.PrivateKey) modules.ConsensusBuilder {
 	node := node{
 		id: id,
 	}
@@ -104,6 +106,7 @@ func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) modules.Cons
 
 func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusName string) error {
 	cg := &commandGenerator{}
+	//keys := make(map[hotstuff.ID]msg.PrivateKey)
 	for _, nodeID := range nodes {
 
 		var err error
@@ -211,7 +214,7 @@ func (n *Network) NewConfiguration() modules.Configuration {
 type configuration struct {
 	node      *node
 	network   *Network
-	subConfig hotstuff.IDSet
+	subConfig msg.IDSet
 }
 
 // alternative way to get a pointer to the node.
@@ -285,7 +288,7 @@ func (c *configuration) Replica(id hotstuff.ID) (r modules.Replica, ok bool) {
 
 // SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
 func (c *configuration) SubConfig(ids []hotstuff.ID) (sub modules.Configuration, err error) {
-	subConfig := hotstuff.NewIDSet()
+	subConfig := msg.NewIDSet()
 	for _, id := range ids {
 		subConfig.Add(id)
 	}
@@ -307,17 +310,17 @@ func (c *configuration) QuorumSize() int {
 }
 
 // Propose sends the block to all replicas in the configuration.
-func (c *configuration) Propose(proposal hotstuff.ProposeMsg) {
+func (c *configuration) Propose(proposal *msg.Proposal) {
 	c.broadcastMessage(proposal)
 }
 
 // Timeout sends the timeout message to all replicas.
-func (c *configuration) Timeout(msg hotstuff.TimeoutMsg) {
-	c.broadcastMessage(msg)
+func (c *configuration) Timeout(toMsg *msg.TimeoutMsg) {
+	c.broadcastMessage(toMsg)
 }
 
 // Fetch requests a block from all the replicas in the configuration.
-func (c *configuration) Fetch(_ context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
+func (c *configuration) Fetch(_ context.Context, hash msg.Hash) (block *msg.Block, ok bool) {
 	for _, replica := range c.network.replicas {
 		for _, node := range replica {
 			if c.shouldDrop(node.id, hash) {
@@ -345,21 +348,21 @@ func (r *replica) ID() hotstuff.ID {
 }
 
 // PublicKey returns the replica's public key.
-func (r *replica) PublicKey() hotstuff.PublicKey {
+func (r *replica) PublicKey() msg.PublicKey {
 	return r.config.network.replicas[r.id][0].mods.PrivateKey().Public()
 }
 
 // Vote sends the partial certificate to the other replica.
-func (r *replica) Vote(cert hotstuff.PartialCert) {
-	r.config.sendMessage(r.id, hotstuff.VoteMsg{
+func (r *replica) Vote(cert *msg.PartialCert) {
+	r.config.sendMessage(r.id, msg.VoteMsg{
 		ID:          r.config.node.mods.ID(),
 		PartialCert: cert,
 	})
 }
 
 // NewView sends the quorum certificate to the other replica.
-func (r *replica) NewView(si hotstuff.SyncInfo) {
-	r.config.sendMessage(r.id, hotstuff.NewViewMsg{
+func (r *replica) NewView(si *msg.SyncInfo) {
+	r.config.sendMessage(r.id, msg.NewViewMsg{
 		ID:       r.config.node.mods.ID(),
 		SyncInfo: si,
 	})

@@ -3,9 +3,10 @@ package synchronizer_test
 import (
 	"bytes"
 	"context"
-	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/modules"
 	"testing"
+
+	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff/internal/mocks"
@@ -15,7 +16,7 @@ import (
 
 func TestLocalTimeout(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	qc := hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
+	qc := msg.NewQuorumCert(nil, 0, msg.GetGenesis().GetBlockHash())
 	key := testutil.GenerateECDSAKey(t)
 	builder := modules.NewConsensusBuilder(2, key)
 	testutil.TestModules(t, ctrl, 2, key, &builder)
@@ -28,21 +29,21 @@ func TestLocalTimeout(t *testing.T) {
 	testutil.ConfigAddReplica(t, cfg, leader)
 
 	c := make(chan struct{})
-	hs.EXPECT().StopVoting(hotstuff.View(1)).AnyTimes()
+	hs.EXPECT().StopVoting(msg.View(1)).AnyTimes()
 	cfg.
 		EXPECT().
-		Timeout(gomock.AssignableToTypeOf(hotstuff.TimeoutMsg{})).
-		Do(func(msg hotstuff.TimeoutMsg) {
-			if msg.View != 1 {
-				t.Errorf("wrong view. got: %v, want: %v", msg.View, 1)
+		Timeout(gomock.AssignableToTypeOf(msg.TimeoutMsg{})).
+		Do(func(timeoutMsg msg.TimeoutMsg) {
+			if timeoutMsg.View != 1 {
+				t.Errorf("wrong view. got: %v, want: %v", timeoutMsg.View, 1)
 			}
-			if msg.ID != 2 {
-				t.Errorf("wrong ID. got: %v, want: %v", msg.ID, 2)
+			if timeoutMsg.ID != 2 {
+				t.Errorf("wrong ID. got: %v, want: %v", timeoutMsg.ID, 2)
 			}
-			if msgQC, ok := msg.SyncInfo.QC(); ok && !bytes.Equal(msgQC.ToBytes(), qc.ToBytes()) {
+			if msgQC, ok := timeoutMsg.SyncInfo.QC(); ok && !bytes.Equal(msgQC.ToBytes(), qc.ToBytes()) {
 				t.Errorf("wrong QC. got: %v, want: %v", msgQC, qc)
 			}
-			if !mods.Crypto().Verify(msg.ViewSignature, msg.View.ToBytes()) {
+			if !mods.Crypto().Verify(timeoutMsg.ViewSig.CreateThresholdSignature(timeoutMsg.ID), msg.ViewToBytes(timeoutMsg.View)) {
 				t.Error("failed to verify signature")
 			}
 			c <- struct{}{}
@@ -67,9 +68,9 @@ func TestAdvanceViewQC(t *testing.T) {
 	hl := builders.Build()
 	signers := hl.Signers()
 
-	block := hotstuff.NewBlock(
-		hotstuff.GetGenesis().Hash(),
-		hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
+	block := msg.NewBlock(
+		msg.GetGenesis().GetBlockHash(),
+		msg.NewQuorumCert(nil, 0, msg.GetGenesis().GetBlockHash()),
 		"foo",
 		1,
 		2,
@@ -77,9 +78,9 @@ func TestAdvanceViewQC(t *testing.T) {
 	hl[0].BlockChain().Store(block)
 	qc := testutil.CreateQC(t, block, signers)
 	// synchronizer should tell hotstuff to propose
-	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
+	hs.EXPECT().Propose(gomock.AssignableToTypeOf(msg.NewSyncInfo()))
 
-	s.AdvanceView(hotstuff.NewSyncInfo().WithQC(qc))
+	s.AdvanceView(msg.NewSyncInfo().WithQC(qc))
 
 	if s.View() != 2 {
 		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())
@@ -100,9 +101,9 @@ func TestAdvanceViewTC(t *testing.T) {
 	tc := testutil.CreateTC(t, 1, signers)
 
 	// synchronizer should tell hotstuff to propose
-	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
+	hs.EXPECT().Propose(gomock.AssignableToTypeOf(msg.NewSyncInfo()))
 
-	s.AdvanceView(hotstuff.NewSyncInfo().WithTC(tc))
+	s.AdvanceView(msg.NewSyncInfo().WithTC(tc))
 
 	if s.View() != 2 {
 		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/relab/hotstuff/msg"
+
 	"github.com/relab/hotstuff"
 )
 
@@ -42,7 +44,7 @@ type ScenarioResult struct {
 	Commits     int
 	NetworkLog  string
 	NodeLogs    map[NodeID]string
-	NodeCommits map[NodeID][]*hotstuff.Block
+	NodeCommits map[NodeID][]*msg.Block
 }
 
 // ExecuteScenario executes a twins scenario.
@@ -50,11 +52,11 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, 
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
 	network := NewPartitionedNetwork(scenario,
-		hotstuff.ProposeMsg{},
-		hotstuff.VoteMsg{},
-		hotstuff.Hash{},
-		hotstuff.NewViewMsg{},
-		hotstuff.TimeoutMsg{},
+		msg.Proposal{},
+		msg.VoteMsg{},
+		msg.Hash{},
+		msg.NewViewMsg{},
+		msg.TimeoutMsg{},
 	)
 
 	nodes, twins := assignNodeIDs(numNodes, numTwins)
@@ -88,7 +90,7 @@ func checkCommits(network *Network) (safe bool, commits int) {
 	i := 0
 	for {
 		noCommits := true
-		commitCount := make(map[hotstuff.Hash]int)
+		commitCount := make(map[msg.Hash]int)
 		for _, replica := range network.replicas {
 			if len(replica) != 1 {
 				// TODO: should we be skipping replicas with twins?
@@ -97,7 +99,7 @@ func checkCommits(network *Network) (safe bool, commits int) {
 			if len(replica[0].executedBlocks) <= i {
 				continue
 			}
-			commitCount[replica[0].executedBlocks[i].Hash()]++
+			commitCount[replica[0].executedBlocks[i].GetBlockHash()]++
 			noCommits = false
 		}
 
@@ -120,7 +122,7 @@ func checkCommits(network *Network) (safe bool, commits int) {
 type leaderRotation []View
 
 // GetLeader returns the id of the leader in the given view.
-func (lr leaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
+func (lr leaderRotation) GetLeader(view msg.View) hotstuff.ID {
 	// we start at view 1
 	v := int(view) - 1
 	if v >= 0 && v < len(lr) {
@@ -130,8 +132,8 @@ func (lr leaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
 	return 0
 }
 
-func getBlocks(network *Network) map[NodeID][]*hotstuff.Block {
-	m := make(map[NodeID][]*hotstuff.Block)
+func getBlocks(network *Network) map[NodeID][]*msg.Block {
+	m := make(map[NodeID][]*msg.Block)
 	for _, node := range network.nodes {
 		m[node.id] = node.executedBlocks
 	}
@@ -143,10 +145,10 @@ type commandGenerator struct {
 	nextCmd uint64
 }
 
-func (cg *commandGenerator) next() hotstuff.Command {
+func (cg *commandGenerator) next() msg.Command {
 	cg.mut.Lock()
 	defer cg.mut.Unlock()
-	cmd := hotstuff.Command(strconv.FormatUint(cg.nextCmd, 10))
+	cmd := msg.Command(strconv.FormatUint(cg.nextCmd, 10))
 	cg.nextCmd++
 	return cmd
 }
@@ -157,24 +159,24 @@ type commandModule struct {
 }
 
 // Accept returns true if the replica should accept the command, false otherwise.
-func (commandModule) Accept(_ hotstuff.Command) bool {
+func (commandModule) Accept(_ msg.Command) bool {
 	return true
 }
 
 // Proposed tells the acceptor that the propose phase for the given command succeeded, and it should no longer be
 // accepted in the future.
-func (commandModule) Proposed(_ hotstuff.Command) {}
+func (commandModule) Proposed(_ msg.Command) {}
 
 // Get returns the next command to be proposed.
 // It may run until the context is cancelled.
 // If no command is available, the 'ok' return value should be false.
-func (cm commandModule) Get(_ context.Context) (cmd hotstuff.Command, ok bool) {
+func (cm commandModule) Get(_ context.Context) (cmd msg.Command, ok bool) {
 	return cm.commandGenerator.next(), true
 }
 
 // Exec executes the given command.
-func (cm commandModule) Exec(block *hotstuff.Block) {
+func (cm commandModule) Exec(block *msg.Block) {
 	cm.node.executedBlocks = append(cm.node.executedBlocks, block)
 }
 
-func (commandModule) Fork(block *hotstuff.Block) {}
+func (commandModule) Fork(block *msg.Block) {}

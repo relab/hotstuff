@@ -4,6 +4,7 @@ package crypto
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
 )
 
 type crypto struct {
@@ -27,80 +28,81 @@ func (c *crypto) InitModule(mods *modules.ConsensusCore, cfg *modules.OptionsBui
 }
 
 // CreatePartialCert signs a single block and returns the partial certificate.
-func (c crypto) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
+func (c crypto) CreatePartialCert(block *msg.Block) (cert *msg.PartialCert, err error) {
 	sig, err := c.Sign(block.ToBytes())
 	if err != nil {
-		return hotstuff.PartialCert{}, err
+		return &msg.PartialCert{}, err
 	}
-	return hotstuff.NewPartialCert(sig, block.Hash()), nil
+	return &msg.PartialCert{Sig: sig, Hash: block.GetHashBytes()}, nil
 }
 
 // CreateQuorumCert creates a quorum certificate from a list of partial certificates.
-func (c crypto) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
+func (c crypto) CreateQuorumCert(block *msg.Block, signatures []*msg.PartialCert) (cert *msg.QuorumCert, err error) {
 	// genesis QC is always valid.
-	if block.Hash() == hotstuff.GetGenesis().Hash() {
-		return hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), nil
+	if block.GetBlockHash() == msg.GetGenesis().GetBlockHash() {
+		return msg.NewQuorumCert(nil, 0, msg.GetGenesis().GetBlockHash()), nil
 	}
-	sigs := make([]hotstuff.QuorumSignature, 0, len(signatures))
-	for _, sig := range signatures {
-		sigs = append(sigs, sig.Signature())
+	sigs := make([]*msg.Signature, 0, len(signatures))
+	for _, pc := range signatures {
+		sigs = append(sigs, pc.GetSig())
 	}
 	sig, err := c.Combine(sigs...)
 	if err != nil {
-		return hotstuff.QuorumCert{}, err
+		return &msg.QuorumCert{}, err
 	}
-	return hotstuff.NewQuorumCert(sig, block.View(), block.Hash()), nil
+	return msg.NewQuorumCert(sig, block.BView(), block.GetBlockHash()), nil
 }
 
 // CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
-func (c crypto) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (cert hotstuff.TimeoutCert, err error) {
+func (c crypto) CreateTimeoutCert(view msg.View, timeouts []*msg.TimeoutMsg) (cert *msg.TimeoutCert, err error) {
 	// view 0 is always valid.
 	if view == 0 {
-		return hotstuff.NewTimeoutCert(nil, 0), nil
+		return msg.NewTimeoutCert(nil, 0), nil
 	}
-	sigs := make([]hotstuff.QuorumSignature, 0, len(timeouts))
-	for _, timeout := range timeouts {
-		sigs = append(sigs, timeout.ViewSignature)
+	sigs := make([]*msg.Signature, 0, len(timeouts))
+	for _, pc := range timeouts {
+		sigs = append(sigs, pc.GetViewSig())
 	}
 	sig, err := c.Combine(sigs...)
 	if err != nil {
-		return hotstuff.TimeoutCert{}, err
+		return &msg.TimeoutCert{}, err
 	}
-	return hotstuff.NewTimeoutCert(sig, view), nil
+	return msg.NewTimeoutCert(sig, view), nil
 }
 
 // CreateAggregateQC creates an AggregateQC from the given timeout messages.
-func (c crypto) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (aggQC hotstuff.AggregateQC, err error) {
-	qcs := make(map[hotstuff.ID]hotstuff.QuorumCert)
-	sigs := make([]hotstuff.QuorumSignature, 0, len(timeouts))
+func (c crypto) CreateAggregateQC(view msg.View, timeouts []*msg.TimeoutMsg) (aggQC *msg.AggQC, err error) {
+	qcs := make(map[hotstuff.ID]*msg.QuorumCert)
+	sigs := make([]*msg.Signature, 0, len(timeouts))
 	for _, timeout := range timeouts {
 		if qc, ok := timeout.SyncInfo.QC(); ok {
-			qcs[timeout.ID] = qc
+			qcs[hotstuff.ID(timeout.ID)] = qc
 		}
-		if timeout.MsgSignature != nil {
-			sigs = append(sigs, timeout.MsgSignature)
+		if timeout.MsgSig != nil {
+			sigs = append(sigs, timeout.GetMsgSig())
 		}
 	}
 	sig, err := c.Combine(sigs...)
 	if err != nil {
-		return hotstuff.AggregateQC{}, err
+		return &msg.AggQC{}, err
 	}
-	return hotstuff.NewAggregateQC(qcs, sig, view), nil
+	return msg.NewAggregateQC(qcs, sig, view), nil
 }
 
 // VerifyPartialCert verifies a single partial certificate.
-func (c crypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
-	block, ok := c.mods.BlockChain().Get(cert.BlockHash())
+func (c crypto) VerifyPartialCert(cert *msg.PartialCert) bool {
+	block, ok := c.mods.BlockChain().Get(msg.ToHash(cert.Hash))
 	if !ok {
+		c.mods.Logger().Info("Block not found")
 		return false
 	}
-	return c.Verify(cert.Signature(), block.ToBytes())
+	return c.Verify(cert.GetSig().CreateThresholdSignature(), block.ToBytes())
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
-func (c crypto) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
+func (c crypto) VerifyQuorumCert(qc *msg.QuorumCert) bool {
 	// genesis QC is always valid.
-	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
+	if qc.BlockHash() == msg.GetGenesis().GetBlockHash() {
 		return true
 	}
 	if qc.Signature().Participants().Len() < c.mods.Configuration().QuorumSize() {
@@ -110,41 +112,38 @@ func (c crypto) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 	if !ok {
 		return false
 	}
-	return c.Verify(qc.Signature(), block.ToBytes())
+	return c.Verify(qc.GetSig(), block.ToBytes())
 }
 
 // VerifyTimeoutCert verifies a timeout certificate.
-func (c crypto) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
+func (c crypto) VerifyTimeoutCert(tc *msg.TimeoutCert) bool {
 	// view 0 TC is always valid.
-	if tc.View() == 0 {
+	if tc.TCView() == 0 {
 		return true
 	}
 	if tc.Signature().Participants().Len() < c.mods.Configuration().QuorumSize() {
 		return false
 	}
-	return c.Verify(tc.Signature(), tc.View().ToBytes())
+	return c.Verify(tc.GetSig(), tc.TCView().ToBytes())
 }
 
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
-func (c crypto) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, ok bool) {
+func (c crypto) VerifyAggregateQC(aggQC *msg.AggQC) (highQC *msg.QuorumCert, ok bool) {
 	messages := make(map[hotstuff.ID][]byte)
-	for id, qc := range aggQC.QCs() {
-		if highQC.View() < qc.View() || highQC == (hotstuff.QuorumCert{}) {
+	for id, qc := range aggQC.GetQCs() {
+		if highQC.QCView() < qc.QCView() || highQC == nil {
 			highQC = qc
 		}
 		// reconstruct the TimeoutMsg to get the hash
-		messages[id] = hotstuff.TimeoutMsg{
-			ID:       id,
-			View:     aggQC.View(),
-			SyncInfo: hotstuff.NewSyncInfo().WithQC(qc),
-		}.ToBytes()
+		messages[hotstuff.ID(id)] = msg.NewTimeoutMsg(hotstuff.ID(id),
+			msg.View(aggQC.GetView()), msg.NewSyncInfo().WithQC(qc), nil).ToBytes()
 	}
-	if aggQC.Sig().Participants().Len() < c.mods.Configuration().QuorumSize() {
-		return hotstuff.QuorumCert{}, false
+	if aggQC.GetSig().Participants().Len() < c.mods.Configuration().QuorumSize() {
+		return &msg.QuorumCert{}, false
 	}
 	// both the batched aggQC signatures and the highQC must be verified
-	if c.BatchVerify(aggQC.Sig(), messages) && c.VerifyQuorumCert(highQC) {
+	if c.BatchVerify(aggQC.GetSig(), messages) && c.VerifyQuorumCert(highQC) {
 		return highQC, true
 	}
-	return hotstuff.QuorumCert{}, false
+	return &msg.QuorumCert{}, false
 }

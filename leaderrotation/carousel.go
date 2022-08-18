@@ -3,6 +3,8 @@ package leaderrotation
 import (
 	"math/rand"
 
+	"github.com/relab/hotstuff/msg"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
 	"golang.org/x/exp/slices"
@@ -20,7 +22,7 @@ func (c *carousel) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBui
 	c.mods = mods
 }
 
-func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
+func (c carousel) GetLeader(round msg.View) hotstuff.ID {
 	commitHead := c.mods.Consensus().CommittedBlock()
 
 	if commitHead.QuorumCert().Signature() == nil {
@@ -28,8 +30,8 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 		return chooseRoundRobin(round, c.mods.Configuration().Len())
 	}
 
-	if commitHead.View() != round-hotstuff.View(c.mods.Consensus().ChainLength()) {
-		c.mods.Logger().Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.View())
+	if commitHead.BView() != round-msg.View(c.mods.Consensus().ChainLength()) {
+		c.mods.Logger().Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.BView())
 		return chooseRoundRobin(round, c.mods.Configuration().Len())
 	}
 
@@ -39,13 +41,13 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 		block       = commitHead
 		f           = hotstuff.NumFaulty(c.mods.Configuration().Len())
 		i           = 0
-		lastAuthors = hotstuff.NewIDSet()
+		lastAuthors = msg.NewIDSet()
 		ok          = true
 	)
 
-	for ok && i < f && block != hotstuff.GetGenesis() {
-		lastAuthors.Add(block.Proposer())
-		block, ok = c.mods.BlockChain().Get(block.Parent())
+	for ok && i < f && block != msg.GetGenesis() {
+		lastAuthors.Add(block.ProposerID())
+		block, ok = c.mods.BlockChain().Get(block.ParentHash())
 		i++
 	}
 

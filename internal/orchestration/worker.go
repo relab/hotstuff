@@ -19,7 +19,6 @@ import (
 	"github.com/relab/hotstuff/consensus/byzantine"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/handel"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/logging"
@@ -37,9 +36,7 @@ import (
 	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
 	_ "github.com/relab/hotstuff/consensus/fasthotstuff"
 	_ "github.com/relab/hotstuff/consensus/simplehotstuff"
-	_ "github.com/relab/hotstuff/crypto/bls12"
 	_ "github.com/relab/hotstuff/crypto/ecdsa"
-	_ "github.com/relab/hotstuff/handel"
 	_ "github.com/relab/hotstuff/leaderrotation"
 )
 
@@ -198,6 +195,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	builder.Register(
 		consensus.New(consensusRules),
 		consensus.NewVotingMachine(),
+		//cryptoImpl,
+		//crypto.New(cryptoImpl),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		leaderRotation,
 		sync,
@@ -253,14 +252,14 @@ func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orche
 			return nil, err
 		}
 
-		// start Handel if enabled
-		var h *handel.Handel
-		if replica.Modules().GetModuleByType(&h) {
-			err = h.Init()
-			if err != nil {
-				return nil, err
-			}
-		}
+		// // start Handel if enabled
+		// var h *handel.Handel
+		// if replica.Modules().GetModuleByType(&h) {
+		// 	err = h.Init()
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
+		// }
 
 		defer func(id uint32) {
 			w.metricsLogger.Log(&types.StartEvent{Event: types.NewReplicaEvent(id, time.Now())})

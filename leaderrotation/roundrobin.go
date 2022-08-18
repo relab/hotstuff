@@ -3,6 +3,7 @@ package leaderrotation
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
 )
 
 func init() {
@@ -20,7 +21,7 @@ func (rr *roundRobin) InitModule(mods *modules.ConsensusCore, _ *modules.Options
 }
 
 // GetLeader returns the id of the leader in the given view
-func (rr roundRobin) GetLeader(view hotstuff.View) hotstuff.ID {
+func (rr roundRobin) GetLeader(view msg.View) hotstuff.ID {
 	// TODO: does not support reconfiguration
 	// assume IDs start at 1
 	return chooseRoundRobin(view, rr.mods.Configuration().Len())
@@ -31,6 +32,6 @@ func NewRoundRobin() modules.LeaderRotation {
 	return &roundRobin{}
 }
 
-func chooseRoundRobin(view hotstuff.View, numReplicas int) hotstuff.ID {
-	return hotstuff.ID(view%hotstuff.View(numReplicas) + 1)
+func chooseRoundRobin(view msg.View, numReplicas int) hotstuff.ID {
+	return hotstuff.ID(view%msg.View(numReplicas) + 1)
 }

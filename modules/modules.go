@@ -4,13 +4,14 @@ import (
 	"context"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/msg"
 )
 
 // ConsensusCore contains the modules that together implement consensus.
 type ConsensusCore struct {
 	*Core
 
-	privateKey hotstuff.PrivateKey
+	privateKey msg.PrivateKey
 	opts       Options
 
 	acceptor       Acceptor
@@ -32,7 +33,7 @@ func (mods *ConsensusCore) Run(ctx context.Context) {
 }
 
 // PrivateKey returns the private key.
-func (mods *ConsensusCore) PrivateKey() hotstuff.PrivateKey {
+func (mods *ConsensusCore) PrivateKey() msg.PrivateKey {
 	return mods.privateKey
 }
 
@@ -105,7 +106,7 @@ type ConsensusBuilder struct {
 }
 
 // NewConsensusBuilder creates a new ConsensusBuilder.
-func NewConsensusBuilder(id hotstuff.ID, privateKey hotstuff.PrivateKey) ConsensusBuilder {
+func NewConsensusBuilder(id hotstuff.ID, privateKey msg.PrivateKey) ConsensusBuilder {
 	bl := ConsensusBuilder{
 		baseBuilder: NewCoreBuilder(id),
 		mods: &ConsensusCore{
@@ -202,7 +203,7 @@ type CommandQueue interface {
 	// Get returns the next command to be proposed.
 	// It may run until the context is cancelled.
 	// If no command is available, the 'ok' return value should be false.
-	Get(ctx context.Context) (cmd hotstuff.Command, ok bool)
+	Get(ctx context.Context) (cmd msg.Command, ok bool)
 }
 
 //go:generate mockgen -destination=../internal/mocks/acceptor_mock.go -package=mocks . Acceptor
@@ -210,10 +211,10 @@ type CommandQueue interface {
 // Acceptor decides if a replica should accept a command.
 type Acceptor interface {
 	// Accept returns true if the replica should accept the command, false otherwise.
-	Accept(hotstuff.Command) bool
+	Accept(msg.Command) bool
 	// Proposed tells the acceptor that the propose phase for the given command succeeded, and it should no longer be
 	// accepted in the future.
-	Proposed(hotstuff.Command)
+	Proposed(msg.Command)
 }
 
 //go:generate mockgen -destination=../internal/mocks/executor_mock.go -package=mocks . Executor
@@ -221,7 +222,7 @@ type Acceptor interface {
 // Executor is responsible for executing the commands that are committed by the consensus protocol.
 type Executor interface {
 	// Exec executes the command.
-	Exec(cmd hotstuff.Command)
+	Exec(cmd msg.Command)
 }
 
 // ExecutorExt is responsible for executing the commands that are committed by the consensus protocol.
@@ -230,7 +231,7 @@ type Executor interface {
 // making it more flexible than the alternative interface.
 type ExecutorExt interface {
 	// Exec executes the command in the block.
-	Exec(block *hotstuff.Block)
+	Exec(block *msg.Block)
 }
 
 // ForkHandler handles commands that do not get committed due to a forked blockchain.
@@ -238,7 +239,7 @@ type ExecutorExt interface {
 // TODO: think of a better name/interface
 type ForkHandler interface {
 	// Fork handles the command from a forked block.
-	Fork(cmd hotstuff.Command)
+	Fork(cmd msg.Command)
 }
 
 // ForkHandlerExt handles blocks that do not get committed due to a fork of the blockchain.
@@ -246,7 +247,7 @@ type ForkHandler interface {
 // This interface is similar to the ForkHandler interface, except it takes a block as an argument, instead of a command.
 type ForkHandlerExt interface {
 	// Fork handles the forked block.
-	Fork(block *hotstuff.Block)
+	Fork(block *msg.Block)
 }
 
 // BlockChain is a datastructure that stores a chain of blocks.
@@ -254,20 +255,20 @@ type ForkHandlerExt interface {
 // but a block must be stored until at least one of its children have been committed.
 type BlockChain interface {
 	// Store stores a block in the blockchain.
-	Store(*hotstuff.Block)
+	Store(*msg.Block)
 
 	// Get retrieves a block given its hash, attempting to fetching it from other replicas if necessary.
-	Get(hotstuff.Hash) (*hotstuff.Block, bool)
+	Get(msg.Hash) (*msg.Block, bool)
 
 	// LocalGet retrieves a block given its hash, without fetching it from other replicas.
-	LocalGet(hotstuff.Hash) (*hotstuff.Block, bool)
+	LocalGet(msg.Hash) (*msg.Block, bool)
 
 	// Extends checks if the given block extends the branch of the target hash.
-	Extends(block, target *hotstuff.Block) bool
+	Extends(block, target *msg.Block) bool
 
 	// Prunes blocks from the in-memory tree up to the specified height.
 	// Returns a set of forked blocks (blocks that were on a different branch, and thus not committed).
-	PruneToHeight(height hotstuff.View) (forkedBlocks []*hotstuff.Block)
+	PruneToHeight(height msg.View) (forkedBlocks []*msg.Block)
 }
 
 //go:generate mockgen -destination=../internal/mocks/replica_mock.go -package=mocks . Replica
@@ -278,11 +279,11 @@ type Replica interface {
 	// ID returns the replica's id.
 	ID() hotstuff.ID
 	// PublicKey returns the replica's public key.
-	PublicKey() hotstuff.PublicKey
+	PublicKey() msg.PublicKey
 	// Vote sends the partial certificate to the other replica.
-	Vote(cert hotstuff.PartialCert)
+	Vote(cert *msg.PartialCert)
 	// NewView sends the quorum certificate to the other replica.
-	NewView(hotstuff.SyncInfo)
+	NewView(*msg.SyncInfo)
 	// Metadata returns the connection metadata sent by this replica.
 	Metadata() map[string]string
 }
@@ -301,11 +302,11 @@ type Configuration interface {
 	// QuorumSize returns the size of a quorum.
 	QuorumSize() int
 	// Propose sends the block to all replicas in the configuration.
-	Propose(proposal hotstuff.ProposeMsg)
+	Propose(proposal *msg.Proposal)
 	// Timeout sends the timeout message to all replicas.
-	Timeout(msg hotstuff.TimeoutMsg)
+	Timeout(msg *msg.TimeoutMsg)
 	// Fetch requests a block from all the replicas in the configuration.
-	Fetch(ctx context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool)
+	Fetch(ctx context.Context, hash msg.Hash) (block *msg.Block, ok bool)
 	// SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
 	SubConfig(ids []hotstuff.ID) (sub Configuration, err error)
 }
@@ -317,11 +318,11 @@ type Configuration interface {
 // The methods OnPropose, OnVote, OnNewView, and OnDeliver should be called upon receiving a corresponding message.
 type Consensus interface {
 	// StopVoting ensures that no voting happens in a view earlier than `view`.
-	StopVoting(view hotstuff.View)
+	StopVoting(view msg.View)
 	// Propose starts a new proposal. The command is fetched from the command queue.
-	Propose(cert hotstuff.SyncInfo)
+	Propose(cert *msg.SyncInfo)
 	// CommittedBlock returns the most recently committed block.
-	CommittedBlock() *hotstuff.Block
+	CommittedBlock() *msg.Block
 	// ChainLength returns the number of blocks that need to be chained together in order to commit.
 	ChainLength() int
 }
@@ -329,7 +330,7 @@ type Consensus interface {
 // LeaderRotation implements a leader rotation scheme.
 type LeaderRotation interface {
 	// GetLeader returns the id of the leader in the given view.
-	GetLeader(hotstuff.View) hotstuff.ID
+	GetLeader(msg.View) hotstuff.ID
 }
 
 //go:generate mockgen -destination=../internal/mocks/synchronizer_mock.go -package=mocks . Synchronizer
@@ -338,15 +339,15 @@ type LeaderRotation interface {
 type Synchronizer interface {
 	// AdvanceView attempts to advance to the next view using the given QC.
 	// qc must be either a regular quorum certificate, or a timeout certificate.
-	AdvanceView(hotstuff.SyncInfo)
+	AdvanceView(*msg.SyncInfo)
 	// View returns the current view.
-	View() hotstuff.View
+	View() msg.View
 	// ViewContext returns a context that is cancelled at the end of the view.
 	ViewContext() context.Context
 	// HighQC returns the highest known QC.
-	HighQC() hotstuff.QuorumCert
+	HighQC() *msg.QuorumCert
 	// LeafBlock returns the current leaf block.
-	LeafBlock() *hotstuff.Block
+	LeafBlock() *msg.Block
 	// Start starts the synchronizer with the given context.
 	Start(context.Context)
 }
@@ -354,21 +355,21 @@ type Synchronizer interface {
 // Handel is an implementation of the Handel signature aggregation protocol.
 type Handel interface {
 	// Begin commissions the aggregation of a new signature.
-	Begin(s hotstuff.PartialCert)
+	Begin(s *msg.PartialCert)
 }
 
 type executorWrapper struct {
 	executor Executor
 }
 
-func (ew executorWrapper) Exec(block *hotstuff.Block) {
-	ew.executor.Exec(block.Command())
+func (ew executorWrapper) Exec(block *msg.Block) {
+	ew.executor.Exec(block.Cmd())
 }
 
 type forkHandlerWrapper struct {
 	forkHandler ForkHandler
 }
 
-func (fhw forkHandlerWrapper) Fork(block *hotstuff.Block) {
-	fhw.forkHandler.Fork(block.Command())
+func (fhw forkHandlerWrapper) Fork(block *msg.Block) {
+	fhw.forkHandler.Fork(block.Cmd())
 }

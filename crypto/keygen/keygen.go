@@ -15,8 +15,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/relab/hotstuff/msg"
+
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/crypto/bls12"
 	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
 )
 
@@ -88,7 +89,7 @@ func GenerateTLSCert(id hotstuff.ID, hosts []string, parent *x509.Certificate, s
 }
 
 // PrivateKeyToPEM encodes the private key in PEM format.
-func PrivateKeyToPEM(key hotstuff.PrivateKey) ([]byte, error) {
+func PrivateKeyToPEM(key msg.PrivateKey) ([]byte, error) {
 	var (
 		marshalled []byte
 		keyType    string
@@ -101,9 +102,9 @@ func PrivateKeyToPEM(key hotstuff.PrivateKey) ([]byte, error) {
 			return nil, err
 		}
 		keyType = ecdsacrypto.PrivateKeyFileType
-	case *bls12.PrivateKey:
-		marshalled = k.ToBytes()
-		keyType = bls12.PrivateKeyFileType
+		// case *bls12.PrivateKey:
+		// 	marshalled = k.ToBytes()
+		// 	keyType = bls12.PrivateKeyFileType
 	}
 	b := &pem.Block{
 		Type:  keyType,
@@ -113,7 +114,7 @@ func PrivateKeyToPEM(key hotstuff.PrivateKey) ([]byte, error) {
 }
 
 // WritePrivateKeyFile writes a private key to the specified file.
-func WritePrivateKeyFile(key hotstuff.PrivateKey, filePath string) (err error) {
+func WritePrivateKeyFile(key msg.PrivateKey, filePath string) (err error) {
 	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return
@@ -134,7 +135,7 @@ func WritePrivateKeyFile(key hotstuff.PrivateKey, filePath string) (err error) {
 }
 
 // PublicKeyToPEM encodes the public key in PEM format.
-func PublicKeyToPEM(key hotstuff.PublicKey) ([]byte, error) {
+func PublicKeyToPEM(key msg.PublicKey) ([]byte, error) {
 	var (
 		marshalled []byte
 		keyType    string
@@ -147,9 +148,9 @@ func PublicKeyToPEM(key hotstuff.PublicKey) ([]byte, error) {
 			return nil, err
 		}
 		keyType = ecdsacrypto.PublicKeyFileType
-	case *bls12.PublicKey:
-		marshalled = k.ToBytes()
-		keyType = bls12.PublicKeyFileType
+		// case *bls12.PublicKey:
+		// 	marshalled = k.ToBytes()
+		// 	keyType = bls12.PublicKeyFileType
 	}
 
 	b := &pem.Block{
@@ -161,7 +162,7 @@ func PublicKeyToPEM(key hotstuff.PublicKey) ([]byte, error) {
 }
 
 // WritePublicKeyFile writes a public key to the specified file.
-func WritePublicKeyFile(key hotstuff.PublicKey, filePath string) (err error) {
+func WritePublicKeyFile(key msg.PublicKey, filePath string) (err error) {
 	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return
@@ -204,15 +205,15 @@ func WriteCertFile(cert *x509.Certificate, file string) (err error) {
 }
 
 // ParsePrivateKey parses a PEM encoded private key.
-func ParsePrivateKey(buf []byte) (key hotstuff.PrivateKey, err error) {
+func ParsePrivateKey(buf []byte) (key msg.PrivateKey, err error) {
 	b, _ := pem.Decode(buf)
 	switch b.Type {
 	case ecdsacrypto.PrivateKeyFileType:
 		key, err = x509.ParseECPrivateKey(b.Bytes)
-	case bls12.PrivateKeyFileType:
-		k := &bls12.PrivateKey{}
-		k.FromBytes(b.Bytes)
-		key = k
+	// case bls12.PrivateKeyFileType:
+	// 	k := &bls12.PrivateKey{}
+	// 	k.FromBytes(b.Bytes)
+	// 	key = k
 	default:
 		return nil, fmt.Errorf("file type did not match any known types")
 	}
@@ -223,7 +224,7 @@ func ParsePrivateKey(buf []byte) (key hotstuff.PrivateKey, err error) {
 }
 
 // ReadPrivateKeyFile reads a private key from the specified file.
-func ReadPrivateKeyFile(keyFile string) (key hotstuff.PrivateKey, err error) {
+func ReadPrivateKeyFile(keyFile string) (key msg.PrivateKey, err error) {
 	b, err := os.ReadFile(keyFile)
 	if err != nil {
 		return nil, err
@@ -232,7 +233,7 @@ func ReadPrivateKeyFile(keyFile string) (key hotstuff.PrivateKey, err error) {
 }
 
 // ParsePublicKey parses a PEM encoded public key
-func ParsePublicKey(buf []byte) (key hotstuff.PublicKey, err error) {
+func ParsePublicKey(buf []byte) (key msg.PublicKey, err error) {
 	b, _ := pem.Decode(buf)
 	if b == nil {
 		return nil, fmt.Errorf("failed to decode PEM block")
@@ -240,13 +241,13 @@ func ParsePublicKey(buf []byte) (key hotstuff.PublicKey, err error) {
 	switch b.Type {
 	case ecdsacrypto.PublicKeyFileType:
 		key, err = x509.ParsePKIXPublicKey(b.Bytes)
-	case bls12.PublicKeyFileType:
-		k := &bls12.PublicKey{}
-		err = k.FromBytes(b.Bytes)
-		if err != nil {
-			return nil, err
-		}
-		key = k
+	// case bls12.PublicKeyFileType:
+	// 	k := &bls12.PublicKey{}
+	// 	err = k.FromBytes(b.Bytes)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	key = k
 	default:
 		return nil, fmt.Errorf("file type did not match any known types")
 	}
@@ -257,7 +258,7 @@ func ParsePublicKey(buf []byte) (key hotstuff.PublicKey, err error) {
 }
 
 // ReadPublicKeyFile reads a public key from the specified file.
-func ReadPublicKeyFile(keyFile string) (key hotstuff.PublicKey, err error) {
+func ReadPublicKeyFile(keyFile string) (key msg.PublicKey, err error) {
 	b, err := os.ReadFile(keyFile)
 	if err != nil {
 		return nil, err
@@ -315,15 +316,15 @@ func GenerateKeyChain(id hotstuff.ID, validFor []string, crypto string, ca *x509
 
 	certPEM := CertToPEM(cert)
 
-	var privateKey hotstuff.PrivateKey
+	var privateKey msg.PrivateKey
 	switch crypto {
 	case "ecdsa":
 		privateKey = ecdsaKey
-	case "bls12":
-		privateKey, err = bls12.GeneratePrivateKey()
-		if err != nil {
-			return KeyChain{}, fmt.Errorf("failed to generate bls12-381 private key: %w", err)
-		}
+	// case "bls12":
+	// 	privateKey, err = bls12.GeneratePrivateKey()
+	// 	if err != nil {
+	// 		return KeyChain{}, fmt.Errorf("failed to generate bls12-381 private key: %w", err)
+	// 	}
 	default:
 		return KeyChain{}, fmt.Errorf("unknown crypto implementation: %s", crypto)
 	}

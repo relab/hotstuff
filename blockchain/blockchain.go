@@ -3,9 +3,10 @@ package blockchain
 
 import (
 	"context"
-	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/modules"
 	"sync"
+
+	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
 )
 
 // blockChain stores a limited amount of blocks in a map.
@@ -13,10 +14,10 @@ import (
 type blockChain struct {
 	mods          *modules.ConsensusCore
 	mut           sync.Mutex
-	pruneHeight   hotstuff.View
-	blocks        map[hotstuff.Hash]*hotstuff.Block
-	blockAtHeight map[hotstuff.View]*hotstuff.Block
-	pendingFetch  map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be cancelled
+	pruneHeight   msg.View
+	blocks        map[msg.Hash]*msg.Block
+	blockAtHeight map[msg.View]*msg.Block
+	pendingFetch  map[msg.Hash]context.CancelFunc // allows a pending fetch operation to be cancelled
 }
 
 // InitModule gives the module a reference to the ConsensusCore object.
@@ -29,30 +30,30 @@ func (chain *blockChain) InitModule(mods *modules.ConsensusCore, _ *modules.Opti
 // Blocks are dropped in least recently used order.
 func New() modules.BlockChain {
 	bc := &blockChain{
-		blocks:        make(map[hotstuff.Hash]*hotstuff.Block),
-		blockAtHeight: make(map[hotstuff.View]*hotstuff.Block),
-		pendingFetch:  make(map[hotstuff.Hash]context.CancelFunc),
+		blocks:        make(map[msg.Hash]*msg.Block),
+		blockAtHeight: make(map[msg.View]*msg.Block),
+		pendingFetch:  make(map[msg.Hash]context.CancelFunc),
 	}
-	bc.Store(hotstuff.GetGenesis())
+	bc.Store(msg.GetGenesis())
 	return bc
 }
 
 // Store stores a block in the blockchain
-func (chain *blockChain) Store(block *hotstuff.Block) {
+func (chain *blockChain) Store(block *msg.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
-	chain.blocks[block.Hash()] = block
-	chain.blockAtHeight[block.View()] = block
+	chain.blocks[block.GetBlockHash()] = block
+	chain.blockAtHeight[block.BView()] = block
 
 	// cancel any pending fetch operations
-	if cancel, ok := chain.pendingFetch[block.Hash()]; ok {
+	if cancel, ok := chain.pendingFetch[block.GetBlockHash()]; ok {
 		cancel()
 	}
 }
 
 // Get retrieves a block given its hash. It will only try the local cache.
-func (chain *blockChain) LocalGet(hash hotstuff.Hash) (*hotstuff.Block, bool) {
+func (chain *blockChain) LocalGet(hash msg.Hash) (*msg.Block, bool) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
@@ -66,7 +67,7 @@ func (chain *blockChain) LocalGet(hash hotstuff.Hash) (*hotstuff.Block, bool) {
 
 // Get retrieves a block given its hash. Get will try to find the block locally.
 // If it is not available locally, it will try to fetch the block.
-func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
+func (chain *blockChain) Get(hash msg.Hash) (block *msg.Block, ok bool) {
 	// need to declare vars early, or else we won't be able to use goto
 	var (
 		ctx    context.Context
@@ -97,7 +98,7 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 	chain.mods.Logger().Debugf("Successfully fetched block: %.8s", hash)
 
 	chain.blocks[hash] = block
-	chain.blockAtHeight[block.View()] = block
+	chain.blockAtHeight[block.BView()] = block
 
 done:
 	defer chain.mut.Unlock()
@@ -110,32 +111,32 @@ done:
 }
 
 // Extends checks if the given block extends the branch of the target block.
-func (chain *blockChain) Extends(block, target *hotstuff.Block) bool {
+func (chain *blockChain) Extends(block, target *msg.Block) bool {
 	current := block
 	ok := true
-	for ok && current.View() > target.View() {
-		current, ok = chain.Get(current.Parent())
+	for ok && current.BView() > target.BView() {
+		current, ok = chain.Get(current.ParentHash())
 	}
-	return ok && current.Hash() == target.Hash()
+	return ok && current.GetBlockHash() == target.GetBlockHash()
 }
 
-func (chain *blockChain) PruneToHeight(height hotstuff.View) (forkedBlocks []*hotstuff.Block) {
+func (chain *blockChain) PruneToHeight(height msg.View) (forkedBlocks []*msg.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
-	committedHeight := chain.mods.Consensus().CommittedBlock().View()
-	committedViews := make(map[hotstuff.View]bool)
+	committedHeight := chain.mods.Consensus().CommittedBlock().BView()
+	committedViews := make(map[msg.View]bool)
 	committedViews[committedHeight] = true
 	for h := committedHeight; h >= chain.pruneHeight; {
 		block, ok := chain.blockAtHeight[h]
 		if !ok {
 			break
 		}
-		parent, ok := chain.blocks[block.Parent()]
-		if !ok || parent.View() < chain.pruneHeight {
+		parent, ok := chain.blocks[block.ParentHash()]
+		if !ok || parent.BView() < chain.pruneHeight {
 			break
 		}
-		h = parent.View()
+		h = parent.BView()
 		committedViews[h] = true
 	}
 

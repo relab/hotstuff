@@ -3,6 +3,7 @@ package leaderrotation
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
 )
 
 func init() {
@@ -16,7 +17,7 @@ type fixed struct {
 }
 
 // GetLeader returns the id of the leader in the given view
-func (f fixed) GetLeader(_ hotstuff.View) hotstuff.ID {
+func (f fixed) GetLeader(_ msg.View) hotstuff.ID {
 	return f.leader
 }
 

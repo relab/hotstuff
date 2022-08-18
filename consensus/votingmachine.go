@@ -3,7 +3,8 @@ package consensus
 import (
 	"sync"
 
-	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/msg"
+
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -11,13 +12,13 @@ import (
 type VotingMachine struct {
 	mut           sync.Mutex
 	mods          *modules.ConsensusCore
-	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
+	verifiedVotes map[msg.Hash][]*msg.PartialCert // verified votes that could become a QC
 }
 
 // NewVotingMachine returns a new VotingMachine.
 func NewVotingMachine() *VotingMachine {
 	return &VotingMachine{
-		verifiedVotes: make(map[hotstuff.Hash][]hotstuff.PartialCert),
+		verifiedVotes: make(map[msg.Hash][]*msg.PartialCert),
 	}
 }
 
@@ -25,40 +26,40 @@ func NewVotingMachine() *VotingMachine {
 // It also allows the module to set module options using the OptionsBuilder.
 func (vm *VotingMachine) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	vm.mods = mods
-	vm.mods.EventLoop().RegisterHandler(hotstuff.VoteMsg{}, func(event any) { vm.OnVote(event.(hotstuff.VoteMsg)) })
+	vm.mods.EventLoop().RegisterHandler(msg.VoteMsg{}, func(event any) { vm.OnVote(event.(msg.VoteMsg)) })
 }
 
 // OnVote handles an incoming vote.
-func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
+func (vm *VotingMachine) OnVote(vote msg.VoteMsg) {
 	cert := vote.PartialCert
-	vm.mods.Logger().Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
+	vm.mods.Logger().Debugf("OnVote(%d): %.8s", vote.ID, string(cert.GetHash()))
 
 	var (
-		block *hotstuff.Block
+		block *msg.Block
 		ok    bool
 	)
 
 	if !vote.Deferred {
 		// first, try to get the block from the local cache
-		block, ok = vm.mods.BlockChain().LocalGet(cert.BlockHash())
+		block, ok = vm.mods.BlockChain().LocalGet(msg.ToHash(cert.Hash))
 		if !ok {
 			// if that does not work, we will try to handle this event later.
 			// hopefully, the block has arrived by then.
-			vm.mods.Logger().Debugf("Local cache miss for block: %.8s", cert.BlockHash())
+			vm.mods.Logger().Debugf("Local cache miss for block: %.8s", cert.GetHash())
 			vote.Deferred = true
-			vm.mods.EventLoop().DelayUntil(hotstuff.ProposeMsg{}, vote)
+			vm.mods.EventLoop().DelayUntil(msg.Proposal{}, vote)
 			return
 		}
 	} else {
 		// if the block has not arrived at this point we will try to fetch it.
-		block, ok = vm.mods.BlockChain().Get(cert.BlockHash())
+		block, ok = vm.mods.BlockChain().Get(msg.ToHash(cert.Hash))
 		if !ok {
-			vm.mods.Logger().Debugf("Could not find block for vote: %.8s.", cert.BlockHash())
+			vm.mods.Logger().Debugf("Could not find block for vote: %.8s.", cert.GetHash())
 			return
 		}
 	}
 
-	if block.View() <= vm.mods.Synchronizer().LeafBlock().View() {
+	if block.BView() <= vm.mods.Synchronizer().LeafBlock().BView() {
 		// too old
 		return
 	}
@@ -70,7 +71,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 	}
 }
 
-func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
+func (vm *VotingMachine) verifyCert(cert *msg.PartialCert, block *msg.Block) {
 	if !vm.mods.Crypto().VerifyPartialCert(cert) {
 		vm.mods.Logger().Info("OnVote: Vote could not be verified!")
 		return
@@ -84,7 +85,7 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 		// delete any pending QCs with lower height than bLeaf
 		for k := range vm.verifiedVotes {
 			if block, ok := vm.mods.BlockChain().LocalGet(k); ok {
-				if block.View() <= vm.mods.Synchronizer().LeafBlock().View() {
+				if block.BView() <= vm.mods.Synchronizer().LeafBlock().BView() {
 					delete(vm.verifiedVotes, k)
 				}
 			} else {
@@ -92,10 +93,10 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 			}
 		}
 	}()
-
-	votes := vm.verifiedVotes[cert.BlockHash()]
+	hash := msg.ToHash(cert.Hash)
+	votes := vm.verifiedVotes[hash]
 	votes = append(votes, cert)
-	vm.verifiedVotes[cert.BlockHash()] = votes
+	vm.verifiedVotes[hash] = votes
 
 	if len(votes) < vm.mods.Configuration().QuorumSize() {
 		return
@@ -106,7 +107,7 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 		vm.mods.Logger().Info("OnVote: could not create QC for block: ", err)
 		return
 	}
-	delete(vm.verifiedVotes, cert.BlockHash())
+	delete(vm.verifiedVotes, hash)
 
-	vm.mods.EventLoop().AddEvent(hotstuff.NewViewMsg{ID: vm.mods.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
+	vm.mods.EventLoop().AddEvent(msg.NewViewMsg{ID: vm.mods.ID(), SyncInfo: msg.NewSyncInfo().WithQC(qc)})
 }

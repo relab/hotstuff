@@ -2,10 +2,11 @@ package replica
 
 import (
 	"crypto/sha256"
-	"github.com/relab/hotstuff"
 	"hash"
 	"net"
 	"sync"
+
+	"github.com/relab/hotstuff/msg"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
@@ -80,7 +81,7 @@ func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (
 	return &emptypb.Empty{}, err
 }
 
-func (srv *clientSrv) Exec(cmd hotstuff.Command) {
+func (srv *clientSrv) Exec(cmd msg.Command) {
 	batch := new(clientpb.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -88,7 +89,7 @@ func (srv *clientSrv) Exec(cmd hotstuff.Command) {
 		return
 	}
 
-	srv.mods.EventLoop().AddEvent(hotstuff.CommitEvent{Commands: len(batch.GetCommands())})
+	srv.mods.EventLoop().AddEvent(msg.CommitEvent{Commands: len(batch.GetCommands())})
 
 	for _, cmd := range batch.GetCommands() {
 		_, _ = srv.hash.Write(cmd.Data)
@@ -104,7 +105,7 @@ func (srv *clientSrv) Exec(cmd hotstuff.Command) {
 	srv.mods.Logger().Debugf("Hash: %.8x", srv.hash.Sum(nil))
 }
 
-func (srv *clientSrv) Fork(cmd hotstuff.Command) {
+func (srv *clientSrv) Fork(cmd msg.Command) {
 	batch := new(clientpb.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {

@@ -3,8 +3,9 @@ package replica
 import (
 	"container/list"
 	"context"
-	"github.com/relab/hotstuff"
 	"sync"
+
+	"github.com/relab/hotstuff/msg"
 
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
@@ -55,7 +56,7 @@ func (c *cmdCache) addCommand(cmd *clientpb.Command) {
 }
 
 // Get returns a batch of commands to propose.
-func (c *cmdCache) Get(ctx context.Context) (cmd hotstuff.Command, ok bool) {
+func (c *cmdCache) Get(ctx context.Context) (cmd msg.Command, ok bool) {
 	batch := new(clientpb.Batch)
 
 	c.mut.Lock()
@@ -102,12 +103,12 @@ awaitBatch:
 		return "", false
 	}
 
-	cmd = hotstuff.Command(b)
+	cmd = msg.Command(b)
 	return cmd, true
 }
 
 // Accept returns true if the replica can accept the batch.
-func (c *cmdCache) Accept(cmd hotstuff.Command) bool {
+func (c *cmdCache) Accept(cmd msg.Command) bool {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -119,8 +120,9 @@ func (c *cmdCache) Accept(cmd hotstuff.Command) bool {
 	defer c.mut.Unlock()
 
 	for _, cmd := range batch.GetCommands() {
-		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
+		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo > cmd.GetSequenceNumber() {
 			// command is too old, can't accept
+			c.mods.Logger().Info("command too old ", serialNo, cmd.GetSequenceNumber())
 			return false
 		}
 	}
@@ -129,7 +131,7 @@ func (c *cmdCache) Accept(cmd hotstuff.Command) bool {
 }
 
 // Proposed updates the serial numbers such that we will not accept the given batch again.
-func (c *cmdCache) Proposed(cmd hotstuff.Command) {
+func (c *cmdCache) Proposed(cmd msg.Command) {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {

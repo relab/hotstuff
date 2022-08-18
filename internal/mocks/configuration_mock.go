@@ -11,6 +11,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	hotstuff "github.com/relab/hotstuff"
 	modules "github.com/relab/hotstuff/modules"
+	msg "github.com/relab/hotstuff/msg"
 )
 
 // MockConfiguration is a mock of Configuration interface.
@@ -37,10 +38,10 @@ func (m *MockConfiguration) EXPECT() *MockConfigurationMockRecorder {
 }
 
 // Fetch mocks base method.
-func (m *MockConfiguration) Fetch(arg0 context.Context, arg1 hotstuff.Hash) (*hotstuff.Block, bool) {
+func (m *MockConfiguration) Fetch(arg0 context.Context, arg1 msg.Hash) (*msg.Block, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Fetch", arg0, arg1)
-	ret0, _ := ret[0].(*hotstuff.Block)
+	ret0, _ := ret[0].(*msg.Block)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
@@ -66,7 +67,7 @@ func (mr *MockConfigurationMockRecorder) Len() *gomock.Call {
 }
 
 // Propose mocks base method.
-func (m *MockConfiguration) Propose(arg0 hotstuff.ProposeMsg) {
+func (m *MockConfiguration) Propose(arg0 *msg.Proposal) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Propose", arg0)
 }
@@ -136,7 +137,7 @@ func (mr *MockConfigurationMockRecorder) SubConfig(arg0 interface{}) *gomock.Cal
 }
 
 // Timeout mocks base method.
-func (m *MockConfiguration) Timeout(arg0 hotstuff.TimeoutMsg) {
+func (m *MockConfiguration) Timeout(arg0 msg.TimeoutMsg) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Timeout", arg0)
 }

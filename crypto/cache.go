@@ -8,8 +8,10 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/msg"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
+	"google.golang.org/protobuf/proto"
 )
 
 type cache struct {
@@ -71,7 +73,7 @@ func (cache *cache) evict() {
 }
 
 // Sign signs a message and adds it to the cache for use during verification.
-func (cache *cache) Sign(message []byte) (sig hotstuff.QuorumSignature, err error) {
+func (cache *cache) Sign(message []byte) (sig *msg.Signature, err error) {
 	sig, err = cache.impl.Sign(message)
 	if err != nil {
 		return nil, err
@@ -79,17 +81,19 @@ func (cache *cache) Sign(message []byte) (sig hotstuff.QuorumSignature, err erro
 	var key strings.Builder
 	hash := sha256.Sum256(message)
 	_, _ = key.Write(hash[:])
-	_, _ = key.Write(sig.ToBytes())
+	pSig, _ := proto.Marshal(sig)
+	_, _ = key.Write(pSig)
 	cache.insert(key.String())
 	return sig, nil
 }
 
 // Verify verifies the given quorum signature against the message.
-func (cache *cache) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
+func (cache *cache) Verify(signature *msg.ThresholdSignature, message []byte) bool {
 	var key strings.Builder
 	hash := sha256.Sum256(message)
 	_, _ = key.Write(hash[:])
-	_, _ = key.Write(signature.ToBytes())
+	bSig, _ := proto.Marshal(signature)
+	_, _ = key.Write(bSig)
 
 	if cache.check(key.String()) {
 		return true
@@ -104,11 +108,11 @@ func (cache *cache) Verify(signature hotstuff.QuorumSignature, message []byte) b
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
-func (cache *cache) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
+func (cache *cache) BatchVerify(signature *msg.ThresholdSignature, batch map[hotstuff.ID][]byte) bool {
 	// sort the list of ids from the batch map
 	ids := maps.Keys(batch)
 	slices.Sort(ids)
-	var hash hotstuff.Hash
+	var hash msg.Hash
 	hasher := sha256.New()
 	// then hash the messages in sorted order
 	for _, id := range ids {
@@ -118,7 +122,8 @@ func (cache *cache) BatchVerify(signature hotstuff.QuorumSignature, batch map[ho
 
 	var key strings.Builder
 	_, _ = key.Write(hash[:])
-	_, _ = key.Write(signature.ToBytes())
+	bSig, _ := proto.Marshal(signature)
+	_, _ = key.Write(bSig)
 
 	if cache.check(key.String()) {
 		return true
@@ -133,7 +138,7 @@ func (cache *cache) BatchVerify(signature hotstuff.QuorumSignature, batch map[ho
 }
 
 // Combine combines multiple signatures together into a single signature.
-func (cache *cache) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
+func (cache *cache) Combine(signatures ...*msg.Signature) (*msg.ThresholdSignature, error) {
 	// we don't cache the result of this operation, because it is not guaranteed to be valid.
 	return cache.impl.Combine(signatures...)
 }

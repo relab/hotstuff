@@ -10,6 +10,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	hotstuff "github.com/relab/hotstuff"
+	msg "github.com/relab/hotstuff/msg"
 )
 
 // MockReplica is a mock of Replica interface.
@@ -64,7 +65,7 @@ func (mr *MockReplicaMockRecorder) Metadata() *gomock.Call {
 }
 
 // NewView mocks base method.
-func (m *MockReplica) NewView(arg0 hotstuff.SyncInfo) {
+func (m *MockReplica) NewView(arg0 msg.SyncInfo) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "NewView", arg0)
 }
@@ -90,7 +91,7 @@ func (mr *MockReplicaMockRecorder) PublicKey() *gomock.Call {
 }
 
 // Vote mocks base method.
-func (m *MockReplica) Vote(arg0 hotstuff.PartialCert) {
+func (m *MockReplica) Vote(arg0 msg.PartialCert) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Vote", arg0)
 }

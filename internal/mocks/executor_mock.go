@@ -8,7 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	hotstuff "github.com/relab/hotstuff"
+	msg "github.com/relab/hotstuff/msg"
 )
 
 // MockExecutor is a mock of Executor interface.
@@ -35,7 +35,7 @@ func (m *MockExecutor) EXPECT() *MockExecutorMockRecorder {
 }
 
 // Exec mocks base method.
-func (m *MockExecutor) Exec(arg0 hotstuff.Command) {
+func (m *MockExecutor) Exec(arg0 msg.Command) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Exec", arg0)
 }

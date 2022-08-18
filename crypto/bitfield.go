@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/msg"
 )
 
 // Bitfield is an IDSet implemented by a bitfield. To check if an ID 'i' is present in the set, we simply check
@@ -104,5 +105,5 @@ func (bf Bitfield) Len() int {
 }
 
 func (bf Bitfield) String() string {
-	return hotstuff.IDSetToString(&bf)
+	return msg.IDSetToString(&bf)
 }
