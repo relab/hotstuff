@@ -208,16 +208,10 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	// block is safe and was accepted
 	cs.blockChain.Store(block)
 
-	didAdvanceView := false
-	// we defer the following in order to speed up voting
-	defer func() {
-		if b := cs.impl.CommitRule(block); b != nil {
-			cs.commit(b)
-		}
-		if !didAdvanceView {
-			cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
-		}
-	}()
+	if b := cs.impl.CommitRule(block); b != nil {
+		cs.commit(b)
+	}
+	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 
 	if block.View() <= cs.lastVote {
 		cs.logger.Info("OnPropose: block view too old")
@@ -233,9 +227,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	cs.lastVote = block.View()
 
 	if cs.handel != nil {
-		// Need to call advanceview such that the view context will be fresh.
-		cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
-		didAdvanceView = true
+		// let Handel handle the voting
 		cs.handel.Begin(pc)
 		return
 	}
