@@ -1,6 +1,7 @@
 package handel
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"math/rand"
@@ -14,6 +15,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/handelpb"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/synchronizer"
+	"github.com/relab/hotstuff/util/gpool"
 )
 
 const (
@@ -624,16 +626,29 @@ func (s *session) improveSignature(contribution contribution) hotstuff.QuorumSig
 	return signature
 }
 
+var bufferPool gpool.Pool[bytes.Buffer]
+
 func (s *session) verifyContribution(c contribution, sig hotstuff.QuorumSignature, verifyIndiv bool) {
 	block, ok := s.h.blockChain.Get(s.hash)
 	if !ok {
 		return
 	}
 
+	buf := bufferPool.Get()
+	_, err := block.WriteTo(&buf)
+	if err != nil {
+		return
+	}
+
+	defer func() {
+		buf.Reset()
+		bufferPool.Put(buf)
+	}()
+
 	s.h.logger.Debugf("verifying: %v (= %d)", sig.Participants(), sig.Participants().Len())
 
 	aggVerified := false
-	if s.h.crypto.Verify(sig, block.ToBytes()) {
+	if s.h.crypto.Verify(sig, buf.Bytes()) {
 		aggVerified = true
 	} else {
 		s.h.logger.Debug("failed to verify aggregate signature")
@@ -642,7 +657,7 @@ func (s *session) verifyContribution(c contribution, sig hotstuff.QuorumSignatur
 	indivVerified := false
 	// If the contribution is individual, we want to verify it separately
 	if verifyIndiv {
-		if s.h.crypto.Verify(c.individual, block.ToBytes()) {
+		if s.h.crypto.Verify(c.individual, buf.Bytes()) {
 			indivVerified = true
 		} else {
 			s.h.logger.Debug("failed to verify individual signature")

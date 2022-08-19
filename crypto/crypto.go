@@ -2,8 +2,11 @@
 package crypto
 
 import (
+	"bytes"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/util/gpool"
 )
 
 type crypto struct {
@@ -32,9 +35,22 @@ func (c *crypto) InitModule(mods *modules.Core) {
 	}
 }
 
+var bufferPool gpool.Pool[bytes.Buffer]
+
 // CreatePartialCert signs a single block and returns the partial certificate.
 func (c crypto) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
-	sig, err := c.Sign(block.ToBytes())
+	buf := bufferPool.Get()
+	_, err = block.WriteTo(&buf)
+	if err != nil {
+		return cert, err
+	}
+
+	defer func() {
+		buf.Reset()
+		bufferPool.Put(buf)
+	}()
+
+	sig, err := c.Sign(buf.Bytes())
 	if err != nil {
 		return hotstuff.PartialCert{}, err
 	}
@@ -100,7 +116,19 @@ func (c crypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 	if !ok {
 		return false
 	}
-	return c.Verify(cert.Signature(), block.ToBytes())
+
+	buf := bufferPool.Get()
+	_, err := block.WriteTo(&buf)
+	if err != nil {
+		return false
+	}
+
+	defer func() {
+		buf.Reset()
+		bufferPool.Put(buf)
+	}()
+
+	return c.Verify(cert.Signature(), buf.Bytes())
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
@@ -116,7 +144,19 @@ func (c crypto) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 	if !ok {
 		return false
 	}
-	return c.Verify(qc.Signature(), block.ToBytes())
+
+	buf := bufferPool.Get()
+	_, err := block.WriteTo(&buf)
+	if err != nil {
+		return false
+	}
+
+	defer func() {
+		buf.Reset()
+		bufferPool.Put(buf)
+	}()
+
+	return c.Verify(qc.Signature(), buf.Bytes())
 }
 
 // VerifyTimeoutCert verifies a timeout certificate.

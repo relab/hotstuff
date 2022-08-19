@@ -6,12 +6,14 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"math/big"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/util"
 	"golang.org/x/exp/slices"
 )
 
@@ -61,6 +63,11 @@ func (sig Signature) ToBytes() []byte {
 	return b
 }
 
+// WriteTo writes the signature to the writer.
+func (sig Signature) WriteTo(writer io.Writer) (n int64, err error) {
+	return util.WriteAllTo(writer, sig.r, sig.s)
+}
+
 // MultiSignature is a set of (partial) signatures.
 type MultiSignature map[hotstuff.ID]*Signature
 
@@ -86,6 +93,25 @@ func (sig MultiSignature) ToBytes() []byte {
 		b = append(b, sig[id].ToBytes()...)
 	}
 	return b
+}
+
+// WriteTo writes the multi signature to the writer.
+func (sig MultiSignature) WriteTo(writer io.Writer) (n int64, err error) {
+	// sort by ID to make it deterministic
+	order := make([]hotstuff.ID, 0, len(sig))
+	for _, signature := range sig {
+		order = append(order, signature.signer)
+	}
+	slices.Sort(order)
+	var nn int64
+	for _, id := range order {
+		nn, err = sig[id].WriteTo(writer)
+		n += nn
+		if err != nil {
+			return n, err
+		}
+	}
+	return n, nil
 }
 
 // Participants returns the IDs of replicas who participated in the threshold signature.

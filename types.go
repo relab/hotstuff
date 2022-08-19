@@ -9,6 +9,8 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/relab/hotstuff/util"
 )
 
 // IDSet implements a set of replica IDs. It is used to show which replicas participated in some event.
@@ -101,7 +103,7 @@ func (h Hash) String() string {
 // Command is a client request to be executed by the consensus protocol.
 //
 // The string type is used because it is immutable and can hold arbitrary bytes of any length.
-type Command string
+type Command = string
 
 // ToBytes is an object that can be converted into bytes for the purposes of hashing, etc.
 type ToBytes interface {
@@ -254,6 +256,16 @@ type QuorumCert struct {
 // NewQuorumCert creates a new quorum cert from the given values.
 func NewQuorumCert(signature QuorumSignature, view View, hash Hash) QuorumCert {
 	return QuorumCert{signature, view, hash}
+}
+
+// WriteTo writes the quorum certificate to the writer.
+func (qc QuorumCert) WriteTo(writer io.Writer) (n int64, err error) {
+	return util.WriteAllTo(
+		writer,
+		qc.view.ToBytes(),
+		qc.hash[:],
+		qc.signature,
+	)
 }
 
 // ToBytes returns a byte representation of the quorum certificate.
