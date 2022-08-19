@@ -90,7 +90,7 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 		goto done
 	}
 
-	ctx, cancel = synchronizer.ViewContext(context.Background(), nil, chain.eventLoop)
+	ctx, cancel = synchronizer.TimeoutContext(chain.eventLoop.Context(), chain.eventLoop)
 	chain.pendingFetch[hash] = cancel
 
 	chain.mut.Unlock()

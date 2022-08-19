@@ -156,3 +156,33 @@ func TestDelayedEvent(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkEventLoopWithObservers(b *testing.B) {
+	el := eventloop.New(100)
+
+	for i := 0; i < 100; i++ {
+		el.RegisterObserver(testEvent(0), func(event any) {
+			if event.(testEvent) != 1 {
+				panic("Unexpected value observed")
+			}
+		})
+	}
+
+	for i := 0; i < b.N; i++ {
+		el.AddEvent(testEvent(1))
+		el.Tick(context.Background())
+	}
+}
+
+func BenchmarkDelay(b *testing.B) {
+	el := eventloop.New(100)
+
+	for i := 0; i < b.N; i++ {
+		el.DelayUntil(testEvent(0), testEvent(2))
+		el.DelayUntil(testEvent(0), testEvent(3))
+		el.AddEvent(testEvent(1))
+		el.Tick(context.Background())
+		el.Tick(context.Background())
+		el.Tick(context.Background())
+	}
+}

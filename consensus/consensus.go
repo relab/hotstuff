@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"context"
 	"fmt"
 	"sync"
 
@@ -124,7 +123,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 		}
 	}
 
-	ctx, cancel := synchronizer.ViewContext(context.Background(), nil, cs.eventLoop)
+	ctx, cancel := synchronizer.TimeoutContext(cs.eventLoop.Context(), cs.eventLoop)
 	defer cancel()
 
 	cmd, ok := cs.commandQueue.Get(ctx)

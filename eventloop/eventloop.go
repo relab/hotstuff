@@ -51,11 +51,12 @@ type handler struct {
 // The difference between them is that there can be many observers per event type, but only one handler,
 // and the handler is executed last.
 type EventLoop struct {
-	mut sync.Mutex
+	eventQ queue
 
-	ctx context.Context
+	mut sync.Mutex // protects the following:
 
-	eventQ        queue
+	ctx context.Context // set by Run
+
 	waitingEvents map[reflect.Type][]any
 
 	handlers map[reflect.Type][]handler
@@ -67,6 +68,7 @@ type EventLoop struct {
 // New returns a new event loop with the requested buffer size.
 func New(bufferSize uint) *EventLoop {
 	el := &EventLoop{
+		ctx:           context.Background(),
 		eventQ:        newQueue(bufferSize),
 		waitingEvents: make(map[reflect.Type][]any),
 		handlers:      make(map[reflect.Type][]handler),
@@ -157,6 +159,8 @@ func (el *EventLoop) setContext(ctx context.Context) {
 
 // Run runs the event loop. A context object can be provided to stop the event loop.
 func (el *EventLoop) Run(ctx context.Context) {
+	el.setContext(ctx)
+
 loop:
 	for {
 		event, ok := el.eventQ.pop()
@@ -184,7 +188,9 @@ loop:
 }
 
 // Tick processes a single event. Returns true if an event was handled.
-func (el *EventLoop) Tick() bool {
+func (el *EventLoop) Tick(ctx context.Context) bool {
+	el.setContext(ctx)
+
 	event, ok := el.eventQ.pop()
 	if !ok {
 		return false

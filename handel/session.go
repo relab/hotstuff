@@ -332,7 +332,7 @@ func (s *session) updateIncoming(c contribution) {
 		level.done = true
 		s.advanceLevel()
 		if c.level+1 <= s.h.maxLevel {
-			ctx, cancel := synchronizer.ViewContext(context.Background(), nil, s.h.eventLoop)
+			ctx, cancel := synchronizer.ViewContext(s.h.eventLoop.Context(), s.h.eventLoop, nil)
 			defer cancel()
 			s.sendFastPath(ctx, c.level+1)
 		}
@@ -475,7 +475,10 @@ func (s *session) sendContributionToLevel(ctx context.Context, levelIndex int) {
 	level.cp[id] += len(s.part.ids)
 }
 
-func (s *session) verifyContributions(ctx context.Context) {
+func (s *session) verifyContributions() {
+	ctx, cancel := synchronizer.ViewContext(s.h.eventLoop.Context(), s.h.eventLoop, nil)
+	defer cancel()
+
 	for ctx.Err() == nil {
 		c, verifyIndiv, ok := s.chooseContribution()
 		if !ok {

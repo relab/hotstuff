@@ -27,7 +27,6 @@
 package handel
 
 import (
-	"context"
 	"math"
 
 	"github.com/relab/gorums"
@@ -121,7 +120,7 @@ func (h *Handel) postInit() {
 
 	// now we can start handling timer events
 	h.eventLoop.RegisterHandler(disseminateEvent{}, func(e any) {
-		ctx, cancel := synchronizer.ViewContext(context.Background(), nil, h.eventLoop)
+		ctx, cancel := synchronizer.ViewContext(h.eventLoop.Context(), h.eventLoop, nil)
 		defer cancel()
 		if s, ok := h.sessions[e.(disseminateEvent).sessionID]; ok {
 			s.sendContributions(ctx)
@@ -150,8 +149,7 @@ func (h *Handel) Begin(s hotstuff.PartialCert) {
 	session := h.newSession(s.BlockHash(), s.Signature())
 	h.sessions[s.BlockHash()] = session
 
-	ctx, _ := synchronizer.ViewContext(context.Background(), nil, h.eventLoop)
-	go session.verifyContributions(ctx)
+	go session.verifyContributions()
 }
 
 type serviceImpl struct {
