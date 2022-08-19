@@ -2,6 +2,8 @@ package hotstuffpb
 
 import (
 	"math/big"
+	"reflect"
+	"unsafe"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
@@ -116,7 +118,7 @@ func BlockToProto(block *hotstuff.Block) *Block {
 	parentHash := block.Parent()
 	return &Block{
 		Parent:   parentHash[:],
-		Command:  []byte(block.Command()),
+		Command:  unsafeStringToBytes(block.Command()),
 		QC:       QuorumCertToProto(block.QuorumCert()),
 		View:     uint64(block.View()),
 		Proposer: uint32(block.Proposer()),
@@ -130,7 +132,7 @@ func BlockFromProto(block *Block) *hotstuff.Block {
 	return hotstuff.NewBlock(
 		p,
 		QuorumCertFromProto(block.GetQC()),
-		hotstuff.Command(block.GetCommand()),
+		unsafeBytesToString(block.GetCommand()),
 		hotstuff.View(block.GetView()),
 		hotstuff.ID(block.GetProposer()),
 	)
@@ -221,4 +223,19 @@ func SyncInfoToProto(syncInfo hotstuff.SyncInfo) *SyncInfo {
 		m.AggQC = AggregateQCToProto(aggQC)
 	}
 	return m
+}
+
+func unsafeStringToBytes(s string) []byte {
+	if s == "" {
+		return []byte{}
+	}
+	const max = 0x7fff0000
+	if len(s) > max {
+		panic("string too long")
+	}
+	return (*[max]byte)(unsafe.Pointer((*reflect.StringHeader)(unsafe.Pointer(&s)).Data))[:len(s):len(s)]
+}
+
+func unsafeBytesToString(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
 }
