@@ -2,6 +2,8 @@ package hotstuffpb
 
 import (
 	"bytes"
+	"crypto/rand"
+	"io"
 	"testing"
 
 	"github.com/relab/hotstuff"
@@ -94,4 +96,36 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 	if !signer.VerifyTimeoutCert(tc2) {
 		t.Fatal("Failed to verify timeout cert")
 	}
+}
+
+func BenchmarkConvertHash(b *testing.B) {
+	s := make([]byte, 32)
+	_, err := io.ReadFull(rand.Reader, s)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	var h hotstuff.Hash
+
+	for i := 0; i < b.N; i++ {
+		h = convertHash(s)
+	}
+
+	_ = h
+}
+
+func BenchmarkCopyHash(b *testing.B) {
+	s := make([]byte, 32)
+	_, err := io.ReadFull(rand.Reader, s)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	var h hotstuff.Hash
+
+	for i := 0; i < b.N; i++ {
+		copy(h[:], s)
+	}
+
+	_ = h
 }
