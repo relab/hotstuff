@@ -46,7 +46,7 @@ func (r *Replica) Vote(cert hotstuff.PartialCert) {
 	if r.node == nil {
 		return
 	}
-	ctx, cancel := synchronizer.ViewContext(context.Background(), nil, r.eventLoop)
+	ctx, cancel := synchronizer.TimeoutContext(r.eventLoop.Context(), r.eventLoop)
 	defer cancel()
 	pCert := hotstuffpb.PartialCertToProto(cert)
 	r.node.Vote(ctx, pCert)
@@ -57,7 +57,7 @@ func (r *Replica) NewView(msg hotstuff.SyncInfo) {
 	if r.node == nil {
 		return
 	}
-	ctx, cancel := synchronizer.ViewContext(context.Background(), nil, r.eventLoop)
+	ctx, cancel := synchronizer.TimeoutContext(r.eventLoop.Context(), r.eventLoop)
 	defer cancel()
 	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(msg))
 }
@@ -289,7 +289,7 @@ func (cfg *subConfig) Propose(proposal hotstuff.ProposeMsg) {
 	if cfg.cfg == nil {
 		return
 	}
-	ctx, cancel := synchronizer.ViewContext(context.Background(), nil, cfg.eventLoop)
+	ctx, cancel := synchronizer.TimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop)
 	defer cancel()
 	cfg.cfg.Propose(
 		ctx,
@@ -303,7 +303,8 @@ func (cfg *subConfig) Timeout(msg hotstuff.TimeoutMsg) {
 		return
 	}
 
-	ctx, cancel := synchronizer.ViewContext(context.Background(), nil, cfg.eventLoop)
+	// will wait until the second timeout before cancelling
+	ctx, cancel := synchronizer.TimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop)
 	defer cancel()
 
 	cfg.cfg.Timeout(

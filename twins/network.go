@@ -180,7 +180,7 @@ func (n *Network) tick() {
 	for _, node := range n.nodes {
 		node.eventLoop.AddEvent(tick{})
 		// process all events in the node's event queue
-		for node.eventLoop.Tick() { //revive:disable-line:empty-block
+		for node.eventLoop.Tick(context.Background()) { //revive:disable-line:empty-block
 		}
 	}
 }
