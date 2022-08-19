@@ -180,7 +180,7 @@ func (n *Network) tick() {
 	for _, node := range n.nodes {
 		node.eventLoop.AddEvent(tick{})
 		// run each event loop as long as it has events
-		for node.eventLoop.Tick() {
+		for node.eventLoop.Tick(context.Background()) {
 		}
 	}
 }
