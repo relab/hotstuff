@@ -47,65 +47,10 @@ type Module interface {
 	InitModule(mods *Core)
 }
 
-// Provider is an interface for specifying the type that a module provides.
-// In order to be available to other modules through the Get methods,
-// a module must provide an implementation of this interface.
-// Most modules can simply embed the Implements struct to become a Provider.
-type Provider interface {
-	ModuleType() any
-}
-
-type providedAs struct {
-	Provider
-	module any
-}
-
-func (p providedAs) InitModule(mods *Core) {
-	if m, ok := p.module.(Module); ok {
-		m.InitModule(mods)
-	}
-}
-
-func (p providedAs) Unwrap() any {
-	return p.module
-}
-
-// As makes the module a provider of type T.
-// This can for example be used with modules that cannot implement Provider themselves,
-// or modules that implement multiple interfaces.
-func As[T any](module any) Provider {
-	var zero T
-	tt := reflect.TypeOf(&zero).Elem()
-	if !reflect.TypeOf(module).AssignableTo(tt) {
-		panic(fmt.Sprintf("%T is not compatible with %s", module, tt))
-	}
-
-	return providedAs{
-		Provider: Implements[T]{},
-		module:   module,
-	}
-}
-
-// Implements is a Provider for type T.
-// By embedding this struct, a module can become a provider for T.
-//
-// For example:
-//
-//	type MyModule interface { ... }
-//
-//	type MyModuleImpl struct {
-//		modules.Implements[MyModule]
-//	}
-type Implements[T any] struct{}
-
-func (p Implements[T]) ModuleType() any {
-	return new(T)
-}
-
 // Core is the base of the module system.
 // It contains only a few core modules that are shared between replicas and clients.
 type Core struct {
-	modulesByType map[reflect.Type]any
+	modules []any
 }
 
 // TryGet attempts to find a module for ptr.
@@ -133,10 +78,14 @@ func (mods Core) TryGet(ptr any) bool {
 		panic("only pointer values allowed")
 	}
 
-	if m, ok := mods.modulesByType[pt.Elem()]; ok {
-		v.Elem().Set(reflect.ValueOf(m))
-		return true
+	for _, m := range mods.modules {
+		mv := reflect.ValueOf(m)
+		if mv.Type().AssignableTo(pt.Elem()) {
+			v.Elem().Set(mv)
+			return true
+		}
 	}
+
 	return false
 }
 
@@ -171,7 +120,7 @@ func (mods *Core) GetAll(pointers ...any) {
 
 // Builder is a helper for setting up client modules.
 type Builder struct {
-	mods    Core
+	core    Core
 	modules []Module
 	opts    *Options
 }
@@ -179,9 +128,6 @@ type Builder struct {
 // NewBuilder returns a new builder.
 func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey) Builder {
 	bl := Builder{
-		mods: Core{
-			modulesByType: make(map[reflect.Type]any),
-		},
 		opts: &Options{
 			id:                 id,
 			privateKey:         pk,
@@ -196,47 +142,10 @@ func (b *Builder) Options() *Options {
 	return b.opts
 }
 
-// Provide registers module as a module provider.
-//
-// Example:
-//
-//	builder := modules.NewBuilder()
-//	builder.Provide(MyModuleImpl{}, new(MyModule))
-func (b *Builder) Provide(module any, types ...any) {
-	if len(types) == 0 {
-		b.mods.modulesByType[reflect.TypeOf(module)] = module
-		return
-	}
-
-	t := reflect.TypeOf(module)
-
-	for _, ptr := range types {
-		pt := reflect.TypeOf(ptr)
-		if pt == nil {
-			panic("nil value")
-		}
-		if pt.Kind() != reflect.Pointer {
-			panic("only pointer values allowed in 'types'")
-		}
-
-		if !t.AssignableTo(pt.Elem()) {
-			panic(fmt.Sprintf("module of type %s is not assignable to type %s", t, pt))
-		}
-
-		b.mods.modulesByType[pt.Elem()] = module
-	}
-}
-
 // Add adds modules to the builder.
 func (b *Builder) Add(modules ...any) {
+	b.core.modules = append(b.core.modules, modules...)
 	for _, module := range modules {
-		if p, ok := module.(Provider); ok {
-			if pa, ok := p.(providedAs); ok {
-				b.Provide(pa.Unwrap(), p.ModuleType())
-			} else {
-				b.Provide(module, p.ModuleType())
-			}
-		}
 		if m, ok := module.(Module); ok {
 			b.modules = append(b.modules, m)
 		}
@@ -245,9 +154,14 @@ func (b *Builder) Add(modules ...any) {
 
 // Build initializes all added modules and returns the Core object.
 func (b *Builder) Build() *Core {
+	// reverse the order of the added modules so that TryGet will find the latest first.
+	for i, j := 0, len(b.core.modules)-1; i < j; i, j = i+1, j-1 {
+		b.core.modules[i], b.core.modules[j] = b.core.modules[j], b.core.modules[i]
+	}
+	// add the Options last so that it can be overridden by user.
 	b.Add(b.opts)
 	for _, module := range b.modules {
-		module.InitModule(&b.mods)
+		module.InitModule(&b.core)
 	}
-	return &b.mods
+	return &b.core
 }

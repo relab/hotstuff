@@ -14,8 +14,6 @@ import (
 
 // Synchronizer synchronizes replicas to the same view.
 type Synchronizer struct {
-	modules.Implements[modules.Synchronizer]
-
 	blockChain     modules.BlockChain
 	consensus      modules.Consensus
 	crypto         modules.Crypto

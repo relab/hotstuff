@@ -23,10 +23,6 @@ import (
 // Server is the Server-side of the gorums backend.
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
-	// needed by Handel
-	// TODO: consider a different interface / mechanism for exposing the GorumsServer.
-	modules.Implements[*Server]
-
 	blockChain    modules.BlockChain
 	configuration modules.Configuration
 	eventLoop     *eventloop.EventLoop

@@ -35,8 +35,6 @@ func (id NodeID) String() string {
 }
 
 type node struct {
-	modules.Implements[*node] // needed for the configuration below
-
 	blockChain     modules.BlockChain
 	consensus      modules.Consensus
 	eventLoop      *eventloop.EventLoop
@@ -139,7 +137,6 @@ func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusN
 		if !ok {
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
-		cm := commandModule{commandGenerator: cg, node: node}
 		builder.Add(
 			eventloop.New(100),
 			blockchain.New(),
@@ -151,11 +148,8 @@ func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusN
 			// twins-specific:
 			&configuration{network: n, node: node},
 			&timeoutManager{network: n, node: node, timeout: 5},
-			modules.As[modules.LeaderRotation](leaderRotation(n.views)),
-			modules.As[modules.Acceptor](&cm),
-			modules.As[modules.CommandQueue](&cm),
-			modules.As[modules.ExecutorExt](&cm),
-			modules.As[modules.ForkHandlerExt](&cm),
+			leaderRotation(n.views),
+			&commandModule{commandGenerator: cg, node: node},
 		)
 		builder.Options().SetShouldVerifyVotesSync()
 		builder.Build()
@@ -234,8 +228,6 @@ func (n *Network) NewConfiguration() modules.Configuration {
 }
 
 type configuration struct {
-	modules.Implements[modules.Configuration]
-
 	node      *node
 	network   *Network
 	subConfig hotstuff.IDSet

@@ -12,9 +12,6 @@ type Counter interface {
 }
 
 type counterImpl struct {
-	// Indicates that this struct provides the Counter interface
-	modules.Implements[Counter]
-
 	counters map[string]int
 }
 
@@ -32,9 +29,6 @@ type Greeter interface {
 }
 
 type greeterImpl struct {
-	// Indicates that this struct provides the Greeter interface
-	modules.Implements[Greeter]
-
 	// declares dependencies on other modules
 	counter Counter
 }

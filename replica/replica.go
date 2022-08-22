@@ -104,10 +104,10 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		srv.cfg,   // configuration
 		srv.hsSrv, // event handling
 
-		modules.As[modules.ExecutorExt](modules.ExtendedExecutor(srv.clientSrv)),
-		modules.As[modules.ForkHandlerExt](modules.ExtendedForkHandler(srv.clientSrv)),
-		modules.As[modules.CommandQueue](srv.clientSrv.cmdCache),
-		modules.As[modules.Acceptor](srv.clientSrv.cmdCache),
+		modules.ExtendedExecutor(srv.clientSrv),
+		modules.ExtendedForkHandler(srv.clientSrv),
+		srv.clientSrv.cmdCache,
+		srv.clientSrv.cmdCache,
 	)
 	srv.hs = builder.Build()
 

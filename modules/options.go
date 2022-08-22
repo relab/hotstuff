@@ -4,8 +4,6 @@ import "github.com/relab/hotstuff"
 
 // Options stores runtime configuration settings.
 type Options struct {
-	Implements[*Options]
-
 	id         hotstuff.ID
 	privateKey hotstuff.PrivateKey
 

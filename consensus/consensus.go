@@ -35,8 +35,6 @@ type ProposeRuler interface {
 // consensusBase provides a default implementation of the Consensus interface
 // for implementations of the ConsensusImpl interface.
 type consensusBase struct {
-	modules.Implements[modules.Consensus]
-
 	impl Rules
 
 	acceptor       modules.Acceptor
