@@ -5,8 +5,10 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/relab/hotstuff/modules"
 	"net"
+
+	"github.com/relab/hotstuff/eventloop"
+	"github.com/relab/hotstuff/modules"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -49,7 +51,7 @@ type Replica struct {
 	clientSrv *clientSrv
 	cfg       *backend.Config
 	hsSrv     *backend.Server
-	hs        *modules.ConsensusCore
+	hs        *modules.Core
 
 	execHandlers map[cmdID]func(*emptypb.Empty, error)
 	cancel       context.CancelFunc
@@ -57,7 +59,7 @@ type Replica struct {
 }
 
 // New returns a new replica.
-func New(conf Config, builder modules.ConsensusBuilder) (replica *Replica) {
+func New(conf Config, builder modules.Builder) (replica *Replica) {
 	clientSrvOpts := conf.ClientServerOptions
 
 	if conf.TLS {
@@ -98,11 +100,14 @@ func New(conf Config, builder modules.ConsensusBuilder) (replica *Replica) {
 	}
 	srv.cfg = backend.NewConfig(creds, managerOpts...)
 
-	builder.Register(
-		srv.cfg,                // configuration
-		srv.hsSrv,              // event handling
-		srv.clientSrv,          // executor
-		srv.clientSrv.cmdCache, // acceptor and command queue
+	builder.Add(
+		srv.cfg,   // configuration
+		srv.hsSrv, // event handling
+
+		modules.As[modules.ExecutorExt](modules.ExtendedExecutor(srv.clientSrv)),
+		modules.As[modules.ForkHandlerExt](modules.ExtendedForkHandler(srv.clientSrv)),
+		modules.As[modules.CommandQueue](srv.clientSrv.cmdCache),
+		modules.As[modules.Acceptor](srv.clientSrv.cmdCache),
 	)
 	srv.hs = builder.Build()
 
@@ -110,7 +115,7 @@ func New(conf Config, builder modules.ConsensusBuilder) (replica *Replica) {
 }
 
 // Modules returns the Modules object of this replica.
-func (srv *Replica) Modules() *modules.ConsensusCore {
+func (srv *Replica) Modules() *modules.Core {
 	return srv.hs
 }
 
@@ -144,8 +149,14 @@ func (srv *Replica) Stop() {
 
 // Run runs the replica until the context is cancelled.
 func (srv *Replica) Run(ctx context.Context) {
-	srv.hs.Synchronizer().Start(ctx)
-	srv.hs.Run(ctx)
+	var (
+		synchronizer modules.Synchronizer
+		eventLoop    *eventloop.EventLoop
+	)
+	srv.hs.GetAll(&synchronizer, &eventLoop)
+
+	synchronizer.Start(ctx)
+	eventLoop.Run(ctx)
 }
 
 // Close closes the connections and stops the servers used by the replica.

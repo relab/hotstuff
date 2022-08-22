@@ -53,7 +53,7 @@ func (g *greeterImpl) InitModule(mods *modules.Core) {
 }
 
 func TestModule(t *testing.T) {
-	builder := modules.NewBuilder()
+	builder := modules.NewBuilder(0, nil)
 	builder.Add(NewCounter(), NewGreeter())
 
 	mods := builder.Build()

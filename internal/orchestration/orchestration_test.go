@@ -17,7 +17,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/iago/iagotest"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
@@ -27,7 +27,7 @@ func TestOrchestration(t *testing.T) {
 		controllerStream, workerStream := net.Pipe()
 
 		workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
-		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), modules.NopLogger(), nil, 0)
+		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), metrics.NopLogger(), nil, 0)
 
 		experiment := &orchestration.Experiment{
 			Logger:      logging.New("ctrl"),

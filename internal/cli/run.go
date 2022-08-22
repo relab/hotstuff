@@ -18,7 +18,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/iago"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -230,7 +230,7 @@ func parseByzantine() (map[string]int, error) {
 	return strategies, nil
 }
 
-func localWorker(globalOutput string, metrics []string, interval time.Duration) (worker orchestration.RemoteWorker, wait func()) {
+func localWorker(globalOutput string, enableMetrics []string, interval time.Duration) (worker orchestration.RemoteWorker, wait func()) {
 	// set up an output dir
 	output := ""
 	if globalOutput != "" {
@@ -247,7 +247,7 @@ func localWorker(globalOutput string, metrics []string, interval time.Duration) 
 	controllerPipe, workerPipe := net.Pipe()
 	c := make(chan struct{})
 	go func() {
-		var logger modules.MetricsLogger
+		var logger metrics.Logger
 		if output != "" {
 			f, err := os.OpenFile(filepath.Join(output, "measurements.json"), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 			checkf("failed to create output file: %v", err)
@@ -256,18 +256,18 @@ func localWorker(globalOutput string, metrics []string, interval time.Duration) 
 			wr := bufio.NewWriter(f)
 			defer func() { checkf("failed to flush writer: %v", wr.Flush()) }()
 
-			logger, err = modules.NewJSONLogger(wr)
+			logger, err = metrics.NewJSONLogger(wr)
 			checkf("failed to create JSON logger: %v", err)
 			defer func() { checkf("failed to close logger: %v", logger.Close()) }()
 		} else {
-			logger = modules.NopLogger()
+			logger = metrics.NopLogger()
 		}
 
 		worker := orchestration.NewWorker(
 			protostream.NewWriter(workerPipe),
 			protostream.NewReader(workerPipe),
 			logger,
-			metrics,
+			enableMetrics,
 			interval,
 		)
 

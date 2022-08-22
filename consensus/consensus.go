@@ -5,6 +5,8 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/eventloop"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -33,8 +35,24 @@ type ProposeRuler interface {
 // consensusBase provides a default implementation of the Consensus interface
 // for implementations of the ConsensusImpl interface.
 type consensusBase struct {
+	modules.Implements[modules.Consensus]
+
 	impl Rules
-	mods *modules.ConsensusCore
+
+	acceptor       modules.Acceptor
+	blockChain     modules.BlockChain
+	commandQueue   modules.CommandQueue
+	configuration  modules.Configuration
+	crypto         modules.Crypto
+	eventLoop      *eventloop.EventLoop
+	executor       modules.ExecutorExt
+	forkHandler    modules.ForkHandlerExt
+	leaderRotation modules.LeaderRotation
+	logger         logging.Logger
+	opts           *modules.Options
+	synchronizer   modules.Synchronizer
+
+	handel modules.Handel
 
 	lastVote hotstuff.View
 
@@ -51,20 +69,38 @@ func New(impl Rules) modules.Consensus {
 	}
 }
 
+// InitModule initializes the module.
+func (cs *consensusBase) InitModule(mods *modules.Core) {
+	mods.GetAll(
+		&cs.acceptor,
+		&cs.blockChain,
+		&cs.commandQueue,
+		&cs.configuration,
+		&cs.crypto,
+		&cs.eventLoop,
+		&cs.executor,
+		&cs.forkHandler,
+		&cs.leaderRotation,
+		&cs.logger,
+		&cs.opts,
+		&cs.synchronizer,
+	)
+
+	mods.TryGet(&cs.handel)
+
+	if mod, ok := cs.impl.(modules.Module); ok {
+		mod.InitModule(mods)
+	}
+
+	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
+		cs.OnPropose(event.(hotstuff.ProposeMsg))
+	})
+}
+
 func (cs *consensusBase) CommittedBlock() *hotstuff.Block {
 	cs.mut.Lock()
 	defer cs.mut.Unlock()
 	return cs.bExec
-}
-
-func (cs *consensusBase) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
-	cs.mods = mods
-	if mod, ok := cs.impl.(modules.ConsensusModule); ok {
-		mod.InitModule(mods, opts)
-	}
-	cs.mods.EventLoop().RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
-		cs.OnPropose(event.(hotstuff.ProposeMsg))
-	})
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
@@ -76,21 +112,21 @@ func (cs *consensusBase) StopVoting(view hotstuff.View) {
 
 // Propose creates a new proposal.
 func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
-	cs.mods.Logger().Debug("Propose")
+	cs.logger.Debug("Propose")
 
 	qc, ok := cert.QC()
 	if ok {
 		// tell the acceptor that the previous proposal succeeded.
-		if qcBlock, ok := cs.mods.BlockChain().Get(qc.BlockHash()); ok {
-			cs.mods.Acceptor().Proposed(qcBlock.Command())
+		if qcBlock, ok := cs.blockChain.Get(qc.BlockHash()); ok {
+			cs.acceptor.Proposed(qcBlock.Command())
 		} else {
-			cs.mods.Logger().Errorf("Could not find block for QC: %s", qc)
+			cs.logger.Errorf("Could not find block for QC: %s", qc)
 		}
 	}
 
-	cmd, ok := cs.mods.CommandQueue().Get(cs.mods.Synchronizer().ViewContext())
+	cmd, ok := cs.commandQueue.Get(cs.synchronizer.ViewContext())
 	if !ok {
-		cs.mods.Logger().Debug("Propose: No command")
+		cs.logger.Debug("Propose: No command")
 		return
 	}
 
@@ -98,81 +134,81 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 	if proposer, ok := cs.impl.(ProposeRuler); ok {
 		proposal, ok = proposer.ProposeRule(cert, cmd)
 		if !ok {
-			cs.mods.Logger().Debug("Propose: No block")
+			cs.logger.Debug("Propose: No block")
 			return
 		}
 	} else {
 		proposal = hotstuff.ProposeMsg{
-			ID: cs.mods.ID(),
+			ID: cs.opts.ID(),
 			Block: hotstuff.NewBlock(
-				cs.mods.Synchronizer().LeafBlock().Hash(),
+				cs.synchronizer.LeafBlock().Hash(),
 				qc,
 				cmd,
-				cs.mods.Synchronizer().View(),
-				cs.mods.ID(),
+				cs.synchronizer.View(),
+				cs.opts.ID(),
 			),
 		}
 
-		if aggQC, ok := cert.AggQC(); ok && cs.mods.Options().ShouldUseAggQC() {
+		if aggQC, ok := cert.AggQC(); ok && cs.opts.ShouldUseAggQC() {
 			proposal.AggregateQC = &aggQC
 		}
 	}
 
-	cs.mods.BlockChain().Store(proposal.Block)
+	cs.blockChain.Store(proposal.Block)
 
-	cs.mods.Configuration().Propose(proposal)
+	cs.configuration.Propose(proposal)
 	// self vote
 	cs.OnPropose(proposal)
 }
 
 func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocyclo
 	// TODO: extract parts of this method into helper functions maybe?
-	cs.mods.Logger().Debugf("OnPropose: %v", proposal.Block)
+	cs.logger.Debugf("OnPropose: %v", proposal.Block)
 
 	block := proposal.Block
 
-	if cs.mods.Options().ShouldUseAggQC() && proposal.AggregateQC != nil {
-		highQC, ok := cs.mods.Crypto().VerifyAggregateQC(*proposal.AggregateQC)
+	if cs.opts.ShouldUseAggQC() && proposal.AggregateQC != nil {
+		highQC, ok := cs.crypto.VerifyAggregateQC(*proposal.AggregateQC)
 		if !ok {
-			cs.mods.Logger().Warn("OnPropose: failed to verify aggregate QC")
+			cs.logger.Warn("OnPropose: failed to verify aggregate QC")
 			return
 		}
 		// NOTE: for simplicity, we require that the highQC found in the AggregateQC equals the QC embedded in the block.
 		if !block.QuorumCert().Equals(highQC) {
-			cs.mods.Logger().Warn("OnPropose: block QC does not equal highQC")
+			cs.logger.Warn("OnPropose: block QC does not equal highQC")
 			return
 		}
 	}
 
-	if !cs.mods.Crypto().VerifyQuorumCert(block.QuorumCert()) {
-		cs.mods.Logger().Info("OnPropose: invalid QC")
+	if !cs.crypto.VerifyQuorumCert(block.QuorumCert()) {
+		cs.logger.Info("OnPropose: invalid QC")
 		return
 	}
 
 	// ensure the block came from the leader.
-	if proposal.ID != cs.mods.LeaderRotation().GetLeader(block.View()) {
-		cs.mods.Logger().Info("OnPropose: block was not proposed by the expected leader")
+	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
+		cs.logger.Info("OnPropose: block was not proposed by the expected leader")
 		return
 	}
 
 	if !cs.impl.VoteRule(proposal) {
-		cs.mods.Logger().Info("OnPropose: Block not voted for")
+		cs.logger.Info("OnPropose: Block not voted for")
 		return
 	}
 
-	if qcBlock, ok := cs.mods.BlockChain().Get(block.QuorumCert().BlockHash()); ok {
-		cs.mods.Acceptor().Proposed(qcBlock.Command())
+	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
+		cs.acceptor.Proposed(qcBlock.Command())
 	} else {
-		cs.mods.Logger().Info("OnPropose: Failed to fetch qcBlock")
+		cs.logger.Info("OnPropose: Failed to fetch qcBlock")
 	}
 
-	if !cs.mods.Acceptor().Accept(block.Command()) {
-		cs.mods.Logger().Info("OnPropose: command not accepted")
+	if !cs.acceptor.Accept(block.Command()) {
+		cs.logger.Info("OnPropose: command not accepted")
 		return
 	}
 
 	// block is safe and was accepted
-	cs.mods.BlockChain().Store(block)
+	cs.blockChain.Store(block)
 
 	didAdvanceView := false
 	// we defer the following in order to speed up voting
@@ -181,41 +217,40 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 			cs.commit(b)
 		}
 		if !didAdvanceView {
-			cs.mods.Synchronizer().AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+			cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 		}
 	}()
 
 	if block.View() <= cs.lastVote {
-		cs.mods.Logger().Info("OnPropose: block view too old")
+		cs.logger.Info("OnPropose: block view too old")
 		return
 	}
 
-	pc, err := cs.mods.Crypto().CreatePartialCert(block)
+	pc, err := cs.crypto.CreatePartialCert(block)
 	if err != nil {
-		cs.mods.Logger().Error("OnPropose: failed to sign block: ", err)
+		cs.logger.Error("OnPropose: failed to sign block: ", err)
 		return
 	}
 
 	cs.lastVote = block.View()
 
-	if cs.mods.Options().ShouldUseHandel() {
+	if cs.handel != nil {
 		// Need to call advanceview such that the view context will be fresh.
-		// TODO: we could instead
-		cs.mods.Synchronizer().AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+		cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 		didAdvanceView = true
-		cs.mods.Handel().Begin(pc)
+		cs.handel.Begin(pc)
 		return
 	}
 
-	leaderID := cs.mods.LeaderRotation().GetLeader(cs.lastVote + 1)
-	if leaderID == cs.mods.ID() {
-		cs.mods.EventLoop().AddEvent(hotstuff.VoteMsg{ID: cs.mods.ID(), PartialCert: pc})
+	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
+	if leaderID == cs.opts.ID() {
+		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})
 		return
 	}
 
-	leader, ok := cs.mods.Configuration().Replica(leaderID)
+	leader, ok := cs.configuration.Replica(leaderID)
 	if !ok {
-		cs.mods.Logger().Warnf("Replica with ID %d was not found!", leaderID)
+		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
 		return
 	}
 
@@ -229,14 +264,14 @@ func (cs *consensusBase) commit(block *hotstuff.Block) {
 	cs.mut.Unlock()
 
 	if err != nil {
-		cs.mods.Logger().Warnf("failed to commit: %v", err)
+		cs.logger.Warnf("failed to commit: %v", err)
 		return
 	}
 
 	// prune the blockchain and handle forked blocks
-	forkedBlocks := cs.mods.BlockChain().PruneToHeight(block.View())
+	forkedBlocks := cs.blockChain.PruneToHeight(block.View())
 	for _, block := range forkedBlocks {
-		cs.mods.ForkHandler().Fork(block)
+		cs.forkHandler.Fork(block)
 	}
 }
 
@@ -245,7 +280,7 @@ func (cs *consensusBase) commitInner(block *hotstuff.Block) error {
 	if cs.bExec.View() >= block.View() {
 		return nil
 	}
-	if parent, ok := cs.mods.BlockChain().Get(block.Parent()); ok {
+	if parent, ok := cs.blockChain.Get(block.Parent()); ok {
 		err := cs.commitInner(parent)
 		if err != nil {
 			return err
@@ -253,8 +288,8 @@ func (cs *consensusBase) commitInner(block *hotstuff.Block) error {
 	} else {
 		return fmt.Errorf("failed to locate block: %s", block.Parent())
 	}
-	cs.mods.Logger().Debug("EXEC: ", block)
-	cs.mods.Executor().Exec(block)
+	cs.logger.Debug("EXEC: ", block)
+	cs.executor.Exec(block)
 	cs.bExec = block
 	return nil
 }

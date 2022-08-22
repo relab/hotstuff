@@ -135,15 +135,18 @@ func TestFHSBug(t *testing.T) {
 
 // A wrapper around the FHS rules that swaps the commit rule for a vulnerable version
 type vulnerableFHS struct {
-	mods  *modules.ConsensusCore
-	inner fasthotstuff.FastHotStuff
+	logger     logging.Logger
+	blockChain modules.BlockChain
+	inner      fasthotstuff.FastHotStuff
 }
 
-// InitModule gives the module a reference to the Modules object.
-// It also allows the module to set module options using the OptionsBuilder.
-func (fhs *vulnerableFHS) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
-	fhs.mods = mods
-	fhs.inner.InitModule(mods, opts)
+func (fhs *vulnerableFHS) InitModule(mods *modules.Core) {
+	mods.GetAll(
+		&fhs.logger,
+		&fhs.blockChain,
+	)
+
+	fhs.inner.InitModule(mods)
 }
 
 // VoteRule decides whether to vote for the block.
@@ -155,7 +158,7 @@ func (fhs *vulnerableFHS) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) 
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return fhs.mods.BlockChain().Get(qc.BlockHash())
+	return fhs.blockChain.Get(qc.BlockHash())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.
@@ -164,7 +167,7 @@ func (fhs *vulnerableFHS) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	if !ok {
 		return nil
 	}
-	fhs.mods.Logger().Debug("PRECOMMIT: ", parent)
+	fhs.logger.Debug("PRECOMMIT: ", parent)
 	grandparent, ok := fhs.qcRef(parent.QuorumCert())
 	if !ok {
 		return nil
@@ -172,7 +175,7 @@ func (fhs *vulnerableFHS) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	// NOTE: this does check for a direct link between the block and the grandparent.
 	// This is what causes the safety violation.
 	if block.Parent() == parent.Hash() && parent.Parent() == grandparent.Hash() {
-		fhs.mods.Logger().Debug("COMMIT(vulnerable): ", grandparent)
+		fhs.logger.Debug("COMMIT(vulnerable): ", grandparent)
 		return grandparent
 	}
 	return nil

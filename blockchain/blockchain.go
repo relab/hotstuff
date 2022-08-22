@@ -3,15 +3,23 @@ package blockchain
 
 import (
 	"context"
-	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/modules"
 	"sync"
+
+	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/modules"
 )
 
 // blockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type blockChain struct {
-	mods          *modules.ConsensusCore
+	modules.Implements[modules.BlockChain]
+
+	configuration modules.Configuration
+	consensus     modules.Consensus
+	synchronizer  modules.Synchronizer
+	logger        logging.Logger
+
 	mut           sync.Mutex
 	pruneHeight   hotstuff.View
 	blocks        map[hotstuff.Hash]*hotstuff.Block
@@ -19,10 +27,13 @@ type blockChain struct {
 	pendingFetch  map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be cancelled
 }
 
-// InitModule gives the module a reference to the ConsensusCore object.
-// It also allows the module to set module options using the OptionsBuilder.
-func (chain *blockChain) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
-	chain.mods = mods
+func (chain *blockChain) InitModule(mods *modules.Core) {
+	mods.GetAll(
+		&chain.configuration,
+		&chain.consensus,
+		&chain.synchronizer,
+		&chain.logger,
+	)
 }
 
 // New creates a new blockChain with a maximum size.
@@ -79,12 +90,12 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 		goto done
 	}
 
-	ctx, cancel = context.WithCancel(chain.mods.Synchronizer().ViewContext())
+	ctx, cancel = context.WithCancel(chain.synchronizer.ViewContext())
 	chain.pendingFetch[hash] = cancel
 
 	chain.mut.Unlock()
-	chain.mods.Logger().Debugf("Attempting to fetch block: %.8s", hash)
-	block, ok = chain.mods.Configuration().Fetch(ctx, hash)
+	chain.logger.Debugf("Attempting to fetch block: %.8s", hash)
+	block, ok = chain.configuration.Fetch(ctx, hash)
 	chain.mut.Lock()
 
 	delete(chain.pendingFetch, hash)
@@ -94,7 +105,7 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 		goto done
 	}
 
-	chain.mods.Logger().Debugf("Successfully fetched block: %.8s", hash)
+	chain.logger.Debugf("Successfully fetched block: %.8s", hash)
 
 	chain.blocks[hash] = block
 	chain.blockAtHeight[block.View()] = block
@@ -123,7 +134,7 @@ func (chain *blockChain) PruneToHeight(height hotstuff.View) (forkedBlocks []*ho
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
-	committedHeight := chain.mods.Consensus().CommittedBlock().View()
+	committedHeight := chain.consensus.CommittedBlock().View()
 	committedViews := make(map[hotstuff.View]bool)
 	committedViews[committedHeight] = true
 	for h := committedHeight; h >= chain.pruneHeight; {
@@ -143,7 +154,7 @@ func (chain *blockChain) PruneToHeight(height hotstuff.View) (forkedBlocks []*ho
 		if !committedViews[h] {
 			block, ok := chain.blockAtHeight[h]
 			if ok {
-				chain.mods.Logger().Debugf("PruneToHeight: found forked block: %v", block)
+				chain.logger.Debugf("PruneToHeight: found forked block: %v", block)
 				forkedBlocks = append(forkedBlocks, block)
 			}
 		}

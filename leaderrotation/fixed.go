@@ -12,7 +12,13 @@ func init() {
 }
 
 type fixed struct {
+	modules.Implements[modules.LeaderRotation]
+
 	leader hotstuff.ID
+}
+
+func (*fixed) New() fixed {
+	return fixed{}
 }
 
 // GetLeader returns the id of the leader in the given view
@@ -22,5 +28,5 @@ func (f fixed) GetLeader(_ hotstuff.View) hotstuff.ID {
 
 // NewFixed returns a new fixed-leader leader rotation implementation.
 func NewFixed(leader hotstuff.ID) modules.LeaderRotation {
-	return fixed{leader}
+	return fixed{leader: leader}
 }

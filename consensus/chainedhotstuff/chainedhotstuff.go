@@ -4,6 +4,7 @@ package chainedhotstuff
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -13,7 +14,8 @@ func init() {
 
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {
-	mods *modules.ConsensusCore
+	blockChain modules.BlockChain
+	logger     logging.Logger
 
 	// protocol variables
 
@@ -27,17 +29,16 @@ func New() consensus.Rules {
 	}
 }
 
-// InitModule gives the module a reference to the ConsensusCore object.
-// It also allows the module to set module options using the OptionsBuilder.
-func (hs *ChainedHotStuff) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
-	hs.mods = mods
+// InitModule initializes the module.
+func (hs *ChainedHotStuff) InitModule(mods *modules.Core) {
+	mods.GetAll(&hs.blockChain, &hs.logger)
 }
 
 func (hs *ChainedHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return hs.mods.BlockChain().Get(qc.BlockHash())
+	return hs.blockChain.Get(qc.BlockHash())
 }
 
 // CommitRule decides whether an ancestor of the block should be committed.
@@ -49,7 +50,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 
 	// Note that we do not call UpdateHighQC here.
 	// This is done through AdvanceView, which the Consensus implementation will call.
-	hs.mods.Logger().Debug("PRE_COMMIT: ", block1)
+	hs.logger.Debug("PRE_COMMIT: ", block1)
 
 	block2, ok := hs.qcRef(block1.QuorumCert())
 	if !ok {
@@ -57,7 +58,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	}
 
 	if block2.View() > hs.bLock.View() {
-		hs.mods.Logger().Debug("COMMIT: ", block2)
+		hs.logger.Debug("COMMIT: ", block2)
 		hs.bLock = block2
 	}
 
@@ -67,7 +68,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	}
 
 	if block1.Parent() == block2.Hash() && block2.Parent() == block3.Hash() {
-		hs.mods.Logger().Debug("DECIDE: ", block3)
+		hs.logger.Debug("DECIDE: ", block3)
 		return block3
 	}
 
@@ -78,18 +79,18 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 func (hs *ChainedHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
 	block := proposal.Block
 
-	qcBlock, haveQCBlock := hs.mods.BlockChain().Get(block.QuorumCert().BlockHash())
+	qcBlock, haveQCBlock := hs.blockChain.Get(block.QuorumCert().BlockHash())
 
 	safe := false
 	if haveQCBlock && qcBlock.View() > hs.bLock.View() {
 		safe = true
 	} else {
-		hs.mods.Logger().Debug("OnPropose: liveness condition failed")
+		hs.logger.Debug("OnPropose: liveness condition failed")
 		// check if this block extends bLock
-		if hs.mods.BlockChain().Extends(block, hs.bLock) {
+		if hs.blockChain.Extends(block, hs.bLock) {
 			safe = true
 		} else {
-			hs.mods.Logger().Debug("OnPropose: safety condition failed")
+			hs.logger.Debug("OnPropose: safety condition failed")
 		}
 	}
 

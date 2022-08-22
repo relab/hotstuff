@@ -22,11 +22,9 @@ type silence struct {
 	consensus.Rules
 }
 
-// InitModule gives the module a reference to the ConsensusCore object.
-// It also allows the module to set module options using the OptionsBuilder.
-func (s *silence) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
-	if mod, ok := s.Rules.(modules.ConsensusModule); ok {
-		mod.InitModule(mods, opts)
+func (s *silence) InitModule(mods *modules.Core) {
+	if mod, ok := s.Rules.(modules.Module); ok {
+		mod.InitModule(mods)
 	}
 }
 
@@ -45,40 +43,45 @@ func NewSilence(c consensus.Rules) consensus.Rules {
 }
 
 type fork struct {
-	mods *modules.ConsensusCore
+	blockChain   modules.BlockChain
+	synchronizer modules.Synchronizer
+	opts         *modules.Options
 	consensus.Rules
 }
 
-// InitModule gives the module a reference to the ConsensusCore object.
-// It also allows the module to set module options using the OptionsBuilder.
-func (f *fork) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
-	f.mods = mods
-	if mod, ok := f.Rules.(modules.ConsensusModule); ok {
-		mod.InitModule(mods, opts)
+func (f *fork) InitModule(mods *modules.Core) {
+	mods.GetAll(
+		&f.blockChain,
+		&f.synchronizer,
+		&f.opts,
+	)
+
+	if mod, ok := f.Rules.(modules.Module); ok {
+		mod.InitModule(mods)
 	}
 }
 
 func (f *fork) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
-	parent, ok := f.mods.BlockChain().Get(f.mods.Synchronizer().LeafBlock().Parent())
+	parent, ok := f.blockChain.Get(f.synchronizer.LeafBlock().Parent())
 	if !ok {
 		return proposal, false
 	}
-	grandparent, ok := f.mods.BlockChain().Get(parent.Hash())
+	grandparent, ok := f.blockChain.Get(parent.Hash())
 	if !ok {
 		return proposal, false
 	}
 
 	proposal = hotstuff.ProposeMsg{
-		ID: f.mods.ID(),
+		ID: f.opts.ID(),
 		Block: hotstuff.NewBlock(
 			grandparent.Hash(),
 			grandparent.QuorumCert(),
 			cmd,
-			f.mods.Synchronizer().View(),
-			f.mods.ID(),
+			f.synchronizer.View(),
+			f.opts.ID(),
 		),
 	}
-	if aggQC, ok := cert.AggQC(); f.mods.Options().ShouldUseAggQC() && ok {
+	if aggQC, ok := cert.AggQC(); f.opts.ShouldUseAggQC() && ok {
 		proposal.AggregateQC = &aggQC
 	}
 	return proposal, true

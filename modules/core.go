@@ -23,12 +23,12 @@
 // In general you should create an interface for your module if it is possible that someone might want to write their
 // own version of it in the future.
 //
-// Finally, to set up the module system and its modules, you must create a CoreBuilder using the NewCoreBuilder function,
+// Finally, to set up the module system and its modules, you must create a CoreBuilder using the NewBuilder function,
 // and then register all of the modules with the builder using the Register method. For example:
 //
-//	builder := NewCoreBuilder()
+//	builder := NewBuilder()
 //	// replace the logger
-//	builder.Register(logging.New("foo"))
+//	builder.Add(logging.New("foo"))
 //	mods := builder.Build()
 //
 // If two modules satisfy the same interface, then the one that was registered last will be returned by the module system,
@@ -40,78 +40,78 @@ import (
 	"reflect"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/logging"
 )
 
-// CoreModule is an interface for modules that need access to a client.
-type CoreModule interface {
-	// InitModule gives the module access to the other modules.
+// Module is an interface for initializing modules.
+type Module interface {
 	InitModule(mods *Core)
 }
 
+// Provider is an interface for specifying the type that a module provides.
+// In order to be available to other modules through the Get methods,
+// a module must provide an implementation of this interface.
+// Most modules can simply embed the Implements struct to become a Provider.
 type Provider interface {
-	ProvideModule() (moduleType any)
+	ModuleType() any
 }
 
-type Implements[T any] struct {
+type providedAs struct {
+	Provider
+	module any
 }
 
-func (p Implements[T]) ProvideModule() (moduleType any) {
+func (p providedAs) InitModule(mods *Core) {
+	if m, ok := p.module.(Module); ok {
+		m.InitModule(mods)
+	}
+}
+
+func (p providedAs) Unwrap() any {
+	return p.module
+}
+
+// As makes the module a provider of type T.
+// This can for example be used with modules that cannot implement Provider themselves,
+// or modules that implement multiple interfaces.
+func As[T any](module any) Provider {
+	var zero T
+	tt := reflect.TypeOf(&zero).Elem()
+	if !reflect.TypeOf(module).AssignableTo(tt) {
+		panic(fmt.Sprintf("%T is not compatible with %s", module, tt))
+	}
+
+	return providedAs{
+		Provider: Implements[T]{},
+		module:   module,
+	}
+}
+
+// Implements is a Provider for type T.
+// By embedding this struct, a module can become a provider for T.
+//
+// For example:
+//
+//	type MyModule interface { ... }
+//
+//	type MyModuleImpl struct {
+//		modules.Implements[MyModule]
+//	}
+type Implements[T any] struct{}
+
+func (p Implements[T]) ModuleType() any {
 	return new(T)
-}
-
-func Provide[T any]() Provider {
-	return Implements[T]{}
 }
 
 // Core is the base of the module system.
 // It contains only a few core modules that are shared between replicas and clients.
 type Core struct {
-	id hotstuff.ID
-
-	logger        logging.Logger
-	metricsLogger MetricsLogger
-	eventLoop     *eventloop.EventLoop
-
 	modulesByType map[reflect.Type]any
-}
-
-// ID returns the id of this client.
-func (mods Core) ID() hotstuff.ID {
-	return mods.id
-}
-
-// Logger returns the logger.
-func (mods Core) Logger() logging.Logger {
-	return mods.logger
-}
-
-// MetricsLogger returns the metrics logger.
-func (mods Core) MetricsLogger() MetricsLogger {
-	if mods.metricsLogger == nil {
-		return NopLogger()
-	}
-	return mods.metricsLogger
-}
-
-// EventLoop returns the event loop.
-func (mods Core) EventLoop() *eventloop.EventLoop {
-	return mods.eventLoop
-}
-
-// MetricsEventLoop returns the metrics event loop.
-// The metrics event loop is used for processing of measurement data.
-//
-// Deprecated: The metrics event loop is no longer separate from the main event loop. Use EventLoop() instead.
-func (mods Core) MetricsEventLoop() *eventloop.EventLoop {
-	return mods.EventLoop()
 }
 
 // TryGet attempts to find a module for ptr.
 // TryGet returns true if a module was stored in ptr, false otherwise.
 //
-// NOTE: ptr must be a pointer to a type that has been provided to the module system.
+// NOTE: ptr must be a non-nil pointer to a type that has been provided to the module system.
 //
 // Example:
 //
@@ -142,7 +142,7 @@ func (mods Core) TryGet(ptr any) bool {
 
 // Get finds a module for ptr.
 //
-// NOTE: ptr must be a pointer to a type that has been provided to the module system.
+// NOTE: ptr must be a non-nil pointer to a type that has been provided to the module system.
 // Get panics if ptr is not a pointer, or if a compatible module is not found.
 //
 // Example:
@@ -159,25 +159,41 @@ func (mods *Core) Get(ptr any) {
 	}
 }
 
-// CoreBuilder is a helper for setting up client modules.
-type CoreBuilder struct {
+// GetAll finds a module for all the given pointers.
+//
+// NOTE: pointers must only contain non-nil pointers to types that have been provided to the module system.
+// GetAll panics if one of the given pointers is not a pointer, or if a compatible module is not found.
+func (mods *Core) GetAll(pointers ...any) {
+	for _, ptr := range pointers {
+		mods.Get(ptr)
+	}
+}
+
+// Builder is a helper for setting up client modules.
+type Builder struct {
 	mods    Core
-	modules []CoreModule
+	modules []Module
+	opts    *Options
 }
 
-func NewBuilder() CoreBuilder {
-	return NewCoreBuilder(0)
-}
-
-// NewCoreBuilder returns a new builder.
-func NewCoreBuilder(id hotstuff.ID) CoreBuilder {
-	bl := CoreBuilder{mods: Core{
-		id:            id,
-		logger:        logging.New(""),
-		eventLoop:     eventloop.New(1000),
-		modulesByType: make(map[reflect.Type]any),
-	}}
+// NewBuilder returns a new builder.
+func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey) Builder {
+	bl := Builder{
+		mods: Core{
+			modulesByType: make(map[reflect.Type]any),
+		},
+		opts: &Options{
+			id:                 id,
+			privateKey:         pk,
+			connectionMetadata: make(map[string]string),
+		},
+	}
 	return bl
+}
+
+// Options returns the options module.
+func (b *Builder) Options() *Options {
+	return b.opts
 }
 
 // Provide registers module as a module provider.
@@ -186,7 +202,7 @@ func NewCoreBuilder(id hotstuff.ID) CoreBuilder {
 //
 //	builder := modules.NewBuilder()
 //	builder.Provide(MyModuleImpl{}, new(MyModule))
-func (b *CoreBuilder) Provide(module any, types ...any) {
+func (b *Builder) Provide(module any, types ...any) {
 	if len(types) == 0 {
 		b.mods.modulesByType[reflect.TypeOf(module)] = module
 		return
@@ -212,27 +228,24 @@ func (b *CoreBuilder) Provide(module any, types ...any) {
 }
 
 // Add adds modules to the builder.
-func (b *CoreBuilder) Add(modules ...any) {
+func (b *Builder) Add(modules ...any) {
 	for _, module := range modules {
-		if m, ok := module.(logging.Logger); ok {
-			b.mods.logger = m
+		if p, ok := module.(Provider); ok {
+			if pa, ok := p.(providedAs); ok {
+				b.Provide(pa.Unwrap(), p.ModuleType())
+			} else {
+				b.Provide(module, p.ModuleType())
+			}
 		}
-		if m, ok := module.(MetricsLogger); ok {
-			b.mods.metricsLogger = m
-		}
-		if m, ok := module.(CoreModule); ok {
+		if m, ok := module.(Module); ok {
 			b.modules = append(b.modules, m)
 		}
-		if p, ok := module.(Provider); ok {
-			pt := p.ProvideModule()
-			b.Provide(module, pt)
-		}
-		// b.mods.modulesByType[reflect.TypeOf(module)] = module
 	}
 }
 
 // Build initializes all added modules and returns the Core object.
-func (b *CoreBuilder) Build() *Core {
+func (b *Builder) Build() *Core {
+	b.Add(b.opts)
 	for _, module := range b.modules {
 		module.InitModule(&b.mods)
 	}

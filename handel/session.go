@@ -92,11 +92,11 @@ func (h *Handel) newSession(hash hotstuff.Hash, in hotstuff.QuorumSignature) *se
 	s := &session{
 		h:    h,
 		hash: hash,
-		seed: h.mods.Options().SharedRandomSeed() + int64(binary.LittleEndian.Uint64(hash[:])),
+		seed: h.opts.SharedRandomSeed() + int64(binary.LittleEndian.Uint64(hash[:])),
 
 		window: window{
-			window:         h.mods.Configuration().Len(),
-			max:            h.mods.Configuration().Len(),
+			window:         h.configuration.Len(),
+			max:            h.configuration.Len(),
 			min:            2,
 			increaseFactor: 2,
 			decreaseFactor: 4,
@@ -106,8 +106,8 @@ func (h *Handel) newSession(hash hotstuff.Hash, in hotstuff.QuorumSignature) *se
 
 	// Get a sorted list of IDs for all replicas.
 	// The configuration should also contain our own ID.
-	ids := make([]hotstuff.ID, 0, h.mods.Configuration().Len())
-	for id := range h.mods.Configuration().Replicas() {
+	ids := make([]hotstuff.ID, 0, h.configuration.Len())
+	for id := range h.configuration.Replicas() {
 		ids = append(ids, id)
 	}
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
@@ -116,28 +116,28 @@ func (h *Handel) newSession(hash hotstuff.Hash, in hotstuff.QuorumSignature) *se
 	rnd := rand.New(rand.NewSource(s.seed))
 	rnd.Shuffle(len(ids), reflect.Swapper(ids))
 
-	h.mods.Logger().Debugf("Handel session ids: %v", ids)
+	h.logger.Debugf("Handel session ids: %v", ids)
 
-	s.part = newPartitioner(h.mods.ID(), ids)
+	s.part = newPartitioner(h.opts.ID(), ids)
 
 	s.levels = make([]level, h.maxLevel+1)
 	for i := range s.levels {
 		s.levels[i] = s.newLevel(i)
 
 		min, max := s.part.rangeLevel(i)
-		h.mods.Logger().Debugf("level %d: %v", i, s.part.ids[min:max+1])
+		h.logger.Debugf("level %d: %v", i, s.part.ids[min:max+1])
 	}
 
-	s.levels[0].individual[h.mods.ID()] = in
+	s.levels[0].individual[h.opts.ID()] = in
 	s.levels[0].incoming = in
 
 	s.updateOutgoing(1)
 
-	s.disseminateTimerID = h.mods.EventLoop().AddTicker(disseminationPeriod, func(_ time.Time) (event any) {
+	s.disseminateTimerID = h.eventLoop.AddTicker(disseminationPeriod, func(_ time.Time) (event any) {
 		return disseminateEvent{s.hash}
 	})
 
-	s.levelActivateTimerID = h.mods.EventLoop().AddTicker(levelActivateInterval, func(_ time.Time) (event any) {
+	s.levelActivateTimerID = h.eventLoop.AddTicker(levelActivateInterval, func(_ time.Time) (event any) {
 		return levelActivateEvent{s.hash}
 	})
 
@@ -156,8 +156,8 @@ type level struct {
 
 func (s *session) newLevel(i int) level {
 	return level{
-		vp:         verificationPriority(s.part.ids, s.seed, s.h.mods.ID(), i),
-		cp:         contributionPriority(s.part.ids, s.seed, s.h.mods.ID(), i),
+		vp:         verificationPriority(s.part.ids, s.seed, s.h.opts.ID(), i),
+		cp:         contributionPriority(s.part.ids, s.seed, s.h.opts.ID(), i),
 		individual: make(map[hotstuff.ID]hotstuff.QuorumSignature),
 	}
 }
@@ -194,7 +194,7 @@ func (s *session) score(contribution contribution) int {
 
 	need := s.part.size(contribution.level)
 	if contribution.level == s.h.maxLevel {
-		need = s.h.mods.Configuration().QuorumSize()
+		need = s.h.configuration.QuorumSize()
 	}
 
 	curBest := level.incoming
@@ -254,7 +254,7 @@ func (s *session) score(contribution contribution) int {
 		}
 	}
 
-	s.h.mods.Logger().Debugf("level: %d, need: %d, added: %d, total: %d, score: %d", contribution.level, need, added, total, score)
+	s.h.logger.Debugf("level: %d, need: %d, added: %d, total: %d, score: %d", contribution.level, need, added, total, score)
 
 	return score
 }
@@ -298,7 +298,7 @@ func (s *session) insertPending(c contribution) {
 	}
 	level.pending[i] = c
 
-	s.h.mods.Logger().Debugf("pending contribution at level %d with score %d from sender %d", c.level, score, c.sender)
+	s.h.logger.Debugf("pending contribution at level %d with score %d from sender %d", c.level, score, c.sender)
 
 	// notify verification goroutine
 	select {
@@ -315,7 +315,7 @@ func (s *session) updateIncoming(c contribution) {
 
 	// check if there is a new individual signature
 	if _, ok := level.individual[c.sender]; !ok {
-		s.h.mods.Logger().Debugf("New individual signature from %d for level %d", c.sender, c.level)
+		s.h.logger.Debugf("New individual signature from %d for level %d", c.sender, c.level)
 		level.individual[c.sender] = c.signature
 	}
 
@@ -324,14 +324,14 @@ func (s *session) updateIncoming(c contribution) {
 		return
 	}
 
-	s.h.mods.Logger().Debugf("New incoming aggregate signature for level %d with length %d", c.level, c.signature.Participants().Len())
+	s.h.logger.Debugf("New incoming aggregate signature for level %d with length %d", c.level, c.signature.Participants().Len())
 	level.incoming = c.signature
 
 	if s.isLevelComplete(c.level) {
 		level.done = true
 		s.advanceLevel()
 		if c.level+1 <= s.h.maxLevel {
-			s.sendFastPath(s.h.mods.Synchronizer().ViewContext(), c.level+1)
+			s.sendFastPath(s.h.synchronizer.ViewContext(), c.level+1)
 		}
 	}
 
@@ -361,33 +361,33 @@ func (s *session) updateOutgoing(levelIndex int) {
 	} else if prevLevel.incoming == nil {
 		outgoing = prevLevel.outgoing
 	} else {
-		outgoing, err = s.h.mods.Crypto().Combine(prevLevel.incoming, prevLevel.outgoing)
+		outgoing, err = s.h.crypto.Combine(prevLevel.incoming, prevLevel.outgoing)
 		if err != nil {
-			s.h.mods.Logger().Errorf("Failed to combine incoming and outgoing for level %d: %v", levelIndex, err)
+			s.h.logger.Errorf("Failed to combine incoming and outgoing for level %d: %v", levelIndex, err)
 			return
 		}
 	}
 
 	if levelIndex > s.h.maxLevel {
-		if outgoing.Participants().Len() >= s.h.mods.Configuration().QuorumSize() {
-			s.h.mods.Logger().Debugf("Done with session: %.8s", s.hash)
+		if outgoing.Participants().Len() >= s.h.configuration.QuorumSize() {
+			s.h.logger.Debugf("Done with session: %.8s", s.hash)
 
-			s.h.mods.EventLoop().AddEvent(hotstuff.NewViewMsg{
+			s.h.eventLoop.AddEvent(hotstuff.NewViewMsg{
 				SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(
 					outgoing,
-					s.h.mods.Synchronizer().View(),
+					s.h.synchronizer.View(),
 					s.hash,
 				)),
 			})
 
-			s.h.mods.EventLoop().AddEvent(sessionDoneEvent{s.hash})
+			s.h.eventLoop.AddEvent(sessionDoneEvent{s.hash})
 		}
 	} else {
 		level := &s.levels[levelIndex]
 
 		level.outgoing = outgoing
 
-		s.h.mods.Logger().Debugf("Updated outgoing for level %d: %v", levelIndex, outgoing.Participants())
+		s.h.logger.Debugf("Updated outgoing for level %d: %v", levelIndex, outgoing.Participants())
 
 		if levelIndex <= s.h.maxLevel {
 			s.updateOutgoing(levelIndex + 1)
@@ -415,7 +415,7 @@ func (s *session) advanceLevel() {
 
 	s.activeLevelIndex++
 
-	s.h.mods.Logger().Debugf("advanced to level %d", s.activeLevelIndex)
+	s.h.logger.Debugf("advanced to level %d", s.activeLevelIndex)
 }
 
 func (s *session) sendContributions(ctx context.Context) {
@@ -428,7 +428,7 @@ func (s *session) sendContributions(ctx context.Context) {
 }
 
 func (s *session) sendFastPath(ctx context.Context, levelIndex int) {
-	s.h.mods.Logger().Debug("fast path activated")
+	s.h.logger.Debug("fast path activated")
 
 	n := s.part.size(levelIndex)
 	if n > 10 {
@@ -460,7 +460,7 @@ func (s *session) sendContributionToLevel(ctx context.Context, levelIndex int) {
 
 	if node, ok := s.h.nodes[id]; ok {
 		node.Contribute(ctx, &handelpb.Contribution{
-			ID:         uint32(s.h.mods.ID()),
+			ID:         uint32(s.h.opts.ID()),
 			Level:      uint32(levelIndex),
 			Signature:  hotstuffpb.QuorumSignatureToProto(level.outgoing),
 			Individual: hotstuffpb.QuorumSignatureToProto(s.levels[0].incoming),
@@ -487,8 +487,8 @@ func (s *session) verifyContributions(ctx context.Context) {
 		s.verifyContribution(c, sig, verifyIndiv)
 	}
 
-	s.h.mods.EventLoop().RemoveTicker(s.disseminateTimerID)
-	s.h.mods.EventLoop().RemoveTicker(s.levelActivateTimerID)
+	s.h.eventLoop.RemoveTicker(s.disseminateTimerID)
+	s.h.eventLoop.RemoveTicker(s.levelActivateTimerID)
 
 }
 
@@ -545,7 +545,7 @@ func (s *session) chooseContribution() (cont contribution, verifyIndiv, ok bool)
 	}
 
 	best := choices[bestChoiceIndex]
-	s.h.mods.Logger().Debugf("Chose: %v", best.signature.Participants())
+	s.h.logger.Debugf("Chose: %v", best.signature.Participants())
 
 	_, verifyIndiv = s.levels[best.level].individual[best.sender]
 
@@ -596,22 +596,22 @@ func (s *session) improveSignature(contribution contribution) hotstuff.QuorumSig
 	signature := contribution.signature
 
 	if s.canMergeContributions(signature, level.incoming) {
-		new, err := s.h.mods.Crypto().Combine(signature, level.incoming)
+		new, err := s.h.crypto.Combine(signature, level.incoming)
 		if err == nil {
 			signature = new
 		} else {
-			s.h.mods.Logger().Errorf("Failed to combine signatures: %v", err)
+			s.h.logger.Errorf("Failed to combine signatures: %v", err)
 		}
 	}
 
 	// add any individual signature, if possible
 	for _, indiv := range level.individual {
 		if s.canMergeContributions(signature, indiv) {
-			new, err := s.h.mods.Crypto().Combine(signature, indiv)
+			new, err := s.h.crypto.Combine(signature, indiv)
 			if err == nil {
 				signature = new
 			} else {
-				s.h.mods.Logger().Errorf("Failed to combine signatures: %v", err)
+				s.h.logger.Errorf("Failed to combine signatures: %v", err)
 			}
 		}
 	}
@@ -620,34 +620,34 @@ func (s *session) improveSignature(contribution contribution) hotstuff.QuorumSig
 }
 
 func (s *session) verifyContribution(c contribution, sig hotstuff.QuorumSignature, verifyIndiv bool) {
-	block, ok := s.h.mods.BlockChain().Get(s.hash)
+	block, ok := s.h.blockChain.Get(s.hash)
 	if !ok {
 		return
 	}
 
-	s.h.mods.Logger().Debugf("verifying: %v (= %d)", sig.Participants(), sig.Participants().Len())
+	s.h.logger.Debugf("verifying: %v (= %d)", sig.Participants(), sig.Participants().Len())
 
 	aggVerified := false
-	if s.h.mods.Crypto().Verify(sig, block.ToBytes()) {
+	if s.h.crypto.Verify(sig, block.ToBytes()) {
 		aggVerified = true
 	} else {
-		s.h.mods.Logger().Debug("failed to verify aggregate signature")
+		s.h.logger.Debug("failed to verify aggregate signature")
 	}
 
 	indivVerified := false
 	// If the contribution is individual, we want to verify it separately
 	if verifyIndiv {
-		if s.h.mods.Crypto().Verify(c.individual, block.ToBytes()) {
+		if s.h.crypto.Verify(c.individual, block.ToBytes()) {
 			indivVerified = true
 		} else {
-			s.h.mods.Logger().Debug("failed to verify individual signature")
+			s.h.logger.Debug("failed to verify individual signature")
 		}
 	}
 
 	indivOk := (indivVerified || !verifyIndiv)
 
 	if indivOk && aggVerified {
-		s.h.mods.EventLoop().AddEvent(contribution{
+		s.h.eventLoop.AddEvent(contribution{
 			hash:       s.hash,
 			sender:     c.sender,
 			level:      c.level,
@@ -656,10 +656,10 @@ func (s *session) verifyContribution(c contribution, sig hotstuff.QuorumSignatur
 			verified:   true,
 		})
 
-		s.h.mods.Logger().Debug("window increased")
+		s.h.logger.Debug("window increased")
 		s.window.increase()
 	} else {
-		s.h.mods.Logger().Debugf("window decreased (indiv: %v, agg: %v)", indivOk, aggVerified)
+		s.h.logger.Debugf("window decreased (indiv: %v, agg: %v)", indivOk, aggVerified)
 		s.window.decrease()
 	}
 }

@@ -3,6 +3,8 @@ package metrics
 import (
 	"time"
 
+	"github.com/relab/hotstuff/eventloop"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
@@ -16,22 +18,34 @@ func init() {
 
 // ViewTimeouts is a metric that measures the number of view timeouts that happen.
 type ViewTimeouts struct {
-	mods        *modules.Core
+	metricsLogger Logger
+	opts          *modules.Options
+
 	numViews    uint64
 	numTimeouts uint64
 }
 
 // InitModule gives the module access to the other modules.
 func (vt *ViewTimeouts) InitModule(mods *modules.Core) {
-	vt.mods = mods
+	var (
+		eventLoop *eventloop.EventLoop
+		logger    logging.Logger
+	)
 
-	vt.mods.Logger().Info("ViewTimeouts metric enabled.")
+	mods.GetAll(
+		&vt.metricsLogger,
+		&vt.opts,
+		&eventLoop,
+		&logger,
+	)
 
-	vt.mods.EventLoop().RegisterHandler(synchronizer.ViewChangeEvent{}, func(event any) {
+	logger.Info("ViewTimeouts metric enabled.")
+
+	eventLoop.RegisterHandler(synchronizer.ViewChangeEvent{}, func(event any) {
 		vt.viewChange(event.(synchronizer.ViewChangeEvent))
 	})
 
-	vt.mods.EventLoop().RegisterObserver(types.TickEvent{}, func(event any) {
+	eventLoop.RegisterObserver(types.TickEvent{}, func(event any) {
 		vt.tick(event.(types.TickEvent))
 	})
 }
@@ -44,8 +58,8 @@ func (vt *ViewTimeouts) viewChange(event synchronizer.ViewChangeEvent) {
 }
 
 func (vt *ViewTimeouts) tick(event types.TickEvent) {
-	vt.mods.MetricsLogger().Log(&types.ViewTimeouts{
-		Event:    types.NewReplicaEvent(uint32(vt.mods.ID()), time.Now()),
+	vt.metricsLogger.Log(&types.ViewTimeouts{
+		Event:    types.NewReplicaEvent(uint32(vt.opts.ID()), time.Now()),
 		Views:    vt.numViews,
 		Timeouts: vt.numTimeouts,
 	})
