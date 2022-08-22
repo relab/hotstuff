@@ -174,12 +174,15 @@ if they implement the `Module` interface.
 
 But how does the module system know what interface a module implements?
 How does the `Get` method find the correct module to store in the pointer?
-We could simply check all registered modules to see if any of them "fit" in the pointer.
+Either the modules must explicitly declare what type they want to provide to other modules,
+or we could simply check all registered modules to see if any of them "fit" in the pointer.
 Go's `reflect` package supports this via a `Type.AssignableTo` method.
-However, this could cause unexpected behavior if one type happens to implement multiple interfaces,
-and another type implements the same interface.
-The safest way seems to be to make each module declare what kind of interface they implement to the module system.
-Therefore, we introduce a second interface:
+For now, this is what we have implemented, as it feels more natural in Go which already has implicit interfaces.
+However, an explicit version could work like this:
+
+
+
+A `Provider` interface has a single method called `ModuleType()`:
 
 ```go
 type Provider interface {
@@ -187,7 +190,6 @@ type Provider interface {
 }
 ```
 
-The `Provider` interface has a single method called `ModuleType()`.
 This method should return a pointer to the type (typically an interface) that the module provides to other modules.
 For a module implementing interface A, this method should simply return `new(A)`.
 Additionally, we can make it really easy to implement this interface by using generics:
@@ -230,24 +232,6 @@ This doesn't really look a lot better than the naive code, but note the followin
 
 - Circular dependencies are now supported.
 - We did not have to specify in the composition method that A1 depends on interface B.
-
-Of course, we have to add some code to the modules themselves for this to work itself out:
-
-```go
-type A interface { ... }
-
-type A1 struct {
-  modules.Implements[A]
-  b *B
-}
-
-func (a A1) InitModule(mods *modules.Core) {
-  mods.Get(&a.b)
-}
-```
-
-B1 and A2 similarly need to embed `modules.Implements[B]` and `modules.Implements[A]`, respectively.
-However, because B1 and A2 are both independent modules, they need not implement the `Module` interface.
 
 ### A Module Registry
 
