@@ -51,7 +51,7 @@ func TestOrchestration(t *testing.T) {
 				LeaderRotation:    "round-robin",
 				Modules:           mods,
 			},
-			Duration: 1 * time.Second,
+			Duration: 5 * time.Second,
 			Hosts:    map[string]orchestration.RemoteWorker{"127.0.0.1": workerProxy},
 		}
 
@@ -113,7 +113,7 @@ func TestDeployment(t *testing.T) {
 			Crypto:            "ecdsa",
 			LeaderRotation:    "round-robin",
 		},
-		Duration: 1 * time.Second,
+		Duration: 10 * time.Second,
 		Hosts:    make(map[string]orchestration.RemoteWorker),
 	}
 
