@@ -11,6 +11,7 @@ import (
 	bls12 "github.com/kilic/bls12-381"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -139,7 +140,9 @@ func firstParticipant(participants hotstuff.IDSet) hotstuff.ID {
 }
 
 type bls12Base struct {
-	mods *modules.ConsensusCore
+	configuration modules.Configuration
+	logger        logging.Logger
+	opts          *modules.Options
 
 	mut sync.RWMutex
 	// popCache caches the proof-of-possession results of popVerify for each public key.
@@ -153,31 +156,34 @@ func New() modules.CryptoBase {
 	}
 }
 
-// InitModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (bls *bls12Base) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
-	bls.mods = mods
+func (bls *bls12Base) InitModule(mods *modules.Core) {
+	mods.Get(
+		&bls.configuration,
+		&bls.logger,
+		&bls.opts,
+	)
 
 	pop := bls.popProve()
 	b := bls12.NewG2().ToCompressed(pop)
-	opts.SetConnectionMetadata(popMetadataKey, string(b))
+	bls.opts.SetConnectionMetadata(popMetadataKey, string(b))
 }
 
 func (bls *bls12Base) privateKey() *PrivateKey {
-	pk := bls.mods.PrivateKey()
-	return pk.(*PrivateKey)
+	return bls.opts.PrivateKey().(*PrivateKey)
 }
 
 func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *PublicKey, ok bool) {
-	if replica, ok := bls.mods.Configuration().Replica(id); ok {
-		if replica.ID() != bls.mods.ID() && !bls.checkPop(replica) {
-			bls.mods.Logger().Warnf("Invalid POP for replica %d", id)
+	if replica, ok := bls.configuration.Replica(id); ok {
+		if replica.ID() != bls.opts.ID() && !bls.checkPop(replica) {
+			bls.logger.Warnf("Invalid POP for replica %d", id)
 			return nil, false
 		}
 		if pubKey, ok = replica.PublicKey().(*PublicKey); ok {
 			return pubKey, true
 		}
-		bls.mods.Logger().Errorf("Unsupported public key type: %T", replica.PublicKey())
+		bls.logger.Errorf("Unsupported public key type: %T", replica.PublicKey())
 	}
 	return nil, false
 }
@@ -220,7 +226,7 @@ func (bls *bls12Base) popProve() *bls12.PointG2 {
 	pubKey := bls.privateKey().Public().(*PublicKey)
 	proof, err := bls.coreSign(pubKey.ToBytes(), domainPOP)
 	if err != nil {
-		bls.mods.Logger().Panicf("Failed to generate proof-of-possession: %v", err)
+		bls.logger.Panicf("Failed to generate proof-of-possession: %v", err)
 	}
 	return proof
 }
@@ -232,13 +238,13 @@ func (bls *bls12Base) popVerify(pubKey *PublicKey, proof *bls12.PointG2) bool {
 func (bls *bls12Base) checkPop(replica modules.Replica) (valid bool) {
 	defer func() {
 		if !valid {
-			bls.mods.Logger().Warnf("Invalid proof-of-possession for replica %d", replica.ID())
+			bls.logger.Warnf("Invalid proof-of-possession for replica %d", replica.ID())
 		}
 	}()
 
 	popBytes, ok := replica.Metadata()[popMetadataKey]
 	if !ok {
-		bls.mods.Logger().Warnf("Missing proof-of-possession for replica: %d", replica.ID())
+		bls.logger.Warnf("Missing proof-of-possession for replica: %d", replica.ID())
 		return false
 	}
 
@@ -321,7 +327,7 @@ func (bls *bls12Base) Sign(message []byte) (signature hotstuff.QuorumSignature, 
 		return nil, fmt.Errorf("bls12: coreSign failed: %w", err)
 	}
 	bf := crypto.Bitfield{}
-	bf.Add(bls.mods.ID())
+	bf.Add(bls.opts.ID())
 	return &AggregateSignature{sig: *p, participants: bf}, nil
 }
 
@@ -349,7 +355,7 @@ func (bls *bls12Base) Combine(signatures ...hotstuff.QuorumSignature) (combined 
 			}
 			g2.Add(&agg, &agg, &sig2.sig)
 		} else {
-			bls.mods.Logger().Panicf("cannot combine incompatible signature type %T (expected %T)", sig1, sig2)
+			bls.logger.Panicf("cannot combine incompatible signature type %T (expected %T)", sig1, sig2)
 		}
 	}
 	return &AggregateSignature{sig: agg, participants: participants}, nil
@@ -359,7 +365,7 @@ func (bls *bls12Base) Combine(signatures ...hotstuff.QuorumSignature) (combined 
 func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
 	s, ok := signature.(*AggregateSignature)
 	if !ok {
-		bls.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		bls.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 
 	n := s.Participants().Len()
@@ -368,7 +374,7 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 		id := firstParticipant(s.Participants())
 		pk, ok := bls.publicKey(id)
 		if !ok {
-			bls.mods.Logger().Warnf("Missing public key for ID %d", id)
+			bls.logger.Warnf("Missing public key for ID %d", id)
 			return false
 		}
 		return bls.coreVerify(pk, message, &s.sig, domain)
@@ -382,7 +388,7 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 			pks = append(pks, pk)
 			return true
 		}
-		bls.mods.Logger().Warnf("Missing public key for ID %d", id)
+		bls.logger.Warnf("Missing public key for ID %d", id)
 		return false
 	})
 	if len(pks) != n {
@@ -395,7 +401,7 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
 	s, ok := signature.(*AggregateSignature)
 	if !ok {
-		bls.mods.Logger().Panicf("cannot verify incompatible signature type %T (expected %T)", signature, s)
+		bls.logger.Panicf("cannot verify incompatible signature type %T (expected %T)", signature, s)
 	}
 
 	if s.Participants().Len() != len(batch) {
@@ -409,7 +415,7 @@ func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[
 		msgs = append(msgs, msg)
 		pk, ok := bls.publicKey(id)
 		if !ok {
-			bls.mods.Logger().Warnf("Missing public key for ID %d", id)
+			bls.logger.Warnf("Missing public key for ID %d", id)
 			return false
 		}
 		pks = append(pks, pk)

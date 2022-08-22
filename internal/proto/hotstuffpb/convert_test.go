@@ -2,9 +2,10 @@ package hotstuffpb
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
-	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff/crypto"
@@ -16,10 +17,12 @@ func TestConvertPartialCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	key := testutil.GenerateECDSAKey(t)
-	builder := modules.NewConsensusBuilder(1, key)
+	builder := modules.NewBuilder(1, key)
 	testutil.TestModules(t, ctrl, 1, key, &builder)
 	hs := builder.Build()
-	signer := hs.Crypto()
+
+	var signer modules.Crypto
+	hs.Get(&signer)
 
 	want, err := signer.CreatePartialCert(hotstuff.GetGenesis())
 	if err != nil {
@@ -44,7 +47,10 @@ func TestConvertQuorumCert(t *testing.T) {
 
 	signatures := testutil.CreatePCs(t, b1, hl.Signers())
 
-	want, err := hl[0].Crypto().CreateQuorumCert(b1, signatures)
+	var signer modules.Crypto
+	hl[0].Get(&signer)
+
+	want, err := signer.CreateQuorumCert(b1, signatures)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +79,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 
 	builders := testutil.CreateBuilders(t, ctrl, 4, testutil.GenerateKeys(t, 4, testutil.GenerateBLS12Key)...)
 	for i := range builders {
-		builders[i].Register(crypto.New(bls12.New()))
+		builders[i].Add(crypto.New(bls12.New()))
 	}
 	hl := builders.Build()
 
@@ -82,7 +88,10 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 	pb := TimeoutCertToProto(tc1)
 	tc2 := TimeoutCertFromProto(pb)
 
-	if !hl[0].Crypto().VerifyTimeoutCert(tc2) {
+	var signer modules.Crypto
+	hl[0].Get(&signer)
+
+	if !signer.VerifyTimeoutCert(tc2) {
 		t.Fatal("Failed to verify timeout cert")
 	}
 }

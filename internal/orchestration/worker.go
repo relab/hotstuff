@@ -19,7 +19,7 @@ import (
 	"github.com/relab/hotstuff/consensus/byzantine"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/handel"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/logging"
@@ -48,7 +48,7 @@ type Worker struct {
 	send *protostream.Writer
 	recv *protostream.Reader
 
-	metricsLogger       modules.MetricsLogger
+	metricsLogger       metrics.Logger
 	metrics             []string
 	measurementInterval time.Duration
 
@@ -93,7 +93,7 @@ func (w *Worker) Run() error {
 }
 
 // NewWorker returns a new worker.
-func NewWorker(send *protostream.Writer, recv *protostream.Reader, dl modules.MetricsLogger, metrics []string, measurementInterval time.Duration) Worker {
+func NewWorker(send *protostream.Writer, recv *protostream.Reader, dl metrics.Logger, metrics []string, measurementInterval time.Duration) Worker {
 	return Worker{
 		send:                send,
 		recv:                recv,
@@ -163,7 +163,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 	}
 	// prepare modules
-	builder := modules.NewConsensusBuilder(hotstuff.ID(opts.GetID()), privKey)
+	builder := modules.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 
 	consensusRules, ok := modules.GetModule[consensus.Rules](opts.GetConsensus())
 	if !ok {
@@ -195,7 +195,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		float64(opts.GetTimeoutMultiplier()),
 	))
 
-	builder.Register(
+	builder.Add(
+		eventloop.New(1000),
 		consensus.New(consensusRules),
 		consensus.NewVotingMachine(),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
@@ -206,12 +207,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
 
-	builder.OptionsBuilder().SetSharedRandomSeed(opts.GetSharedSeed())
+	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
 
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
-		builder.Register(replicaMetrics...)
-		builder.Register(metrics.NewTicker(w.measurementInterval))
+		builder.Add(replicaMetrics...)
+		builder.Add(metrics.NewTicker(w.measurementInterval))
 	}
 
 	for _, n := range opts.GetModules() {
@@ -219,7 +220,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		if !ok {
 			return nil, fmt.Errorf("no module named '%s'", n)
 		}
-		builder.Register(m)
+		builder.Add(m)
 	}
 
 	c := replica.Config{
@@ -251,15 +252,6 @@ func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orche
 		err = replica.Connect(cfg)
 		if err != nil {
 			return nil, err
-		}
-
-		// start Handel if enabled
-		var h *handel.Handel
-		if replica.Modules().TryGet(&h) {
-			err = h.Init()
-			if err != nil {
-				return nil, err
-			}
 		}
 
 		defer func(id uint32) {
@@ -308,7 +300,8 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		mods := modules.NewCoreBuilder(hotstuff.ID(opts.GetID()))
+		mods := modules.NewBuilder(hotstuff.ID(opts.GetID()), nil)
+		mods.Add(eventloop.New(1000))
 
 		if w.measurementInterval > 0 {
 			clientMetrics := metrics.GetClientMetrics(w.metrics...)

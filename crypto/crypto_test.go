@@ -1,8 +1,9 @@
 package crypto_test
 
 import (
-	"github.com/relab/hotstuff/modules"
 	"testing"
+
+	"github.com/relab/hotstuff/modules"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
@@ -215,13 +216,20 @@ func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() mo
 	bl := testutil.CreateBuilders(t, ctrl, n, testutil.GenerateKeys(t, n, keyFunc)...)
 	for _, builder := range bl {
 		signer := newFunc()
-		builder.Register(signer)
+		builder.Add(signer)
 	}
 	hl := bl.Build()
-	block := createBlock(t, hl[0].Crypto())
+
+	var signer modules.Crypto
+	hl[0].Get(&signer)
+
+	block := createBlock(t, signer)
 
 	for _, mods := range hl {
-		mods.BlockChain().Store(block)
+		var blockChain modules.BlockChain
+		mods.Get(&blockChain)
+
+		blockChain.Store(block)
 	}
 
 	return testData{

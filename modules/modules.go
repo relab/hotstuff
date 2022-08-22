@@ -6,194 +6,7 @@ import (
 	"github.com/relab/hotstuff"
 )
 
-// ConsensusCore contains the modules that together implement consensus.
-type ConsensusCore struct {
-	*Core
-
-	privateKey hotstuff.PrivateKey
-	opts       Options
-
-	acceptor       Acceptor
-	blockChain     BlockChain
-	commandQueue   CommandQueue
-	config         Configuration
-	consensus      Consensus
-	executor       ExecutorExt
-	leaderRotation LeaderRotation
-	crypto         Crypto
-	synchronizer   Synchronizer
-	forkHandler    ForkHandlerExt
-	handel         Handel
-}
-
-// Run starts both event loops using the provided context and returns when both event loops have exited.
-func (mods *ConsensusCore) Run(ctx context.Context) {
-	mods.EventLoop().Run(ctx)
-}
-
-// PrivateKey returns the private key.
-func (mods *ConsensusCore) PrivateKey() hotstuff.PrivateKey {
-	return mods.privateKey
-}
-
-// Options returns the current configuration settings.
-func (mods *ConsensusCore) Options() *Options {
-	return &mods.opts
-}
-
-// Acceptor returns the acceptor.
-func (mods *ConsensusCore) Acceptor() Acceptor {
-	return mods.acceptor
-}
-
-// BlockChain returns the block chain.
-func (mods *ConsensusCore) BlockChain() BlockChain {
-	return mods.blockChain
-}
-
-// CommandQueue returns the command queue.
-func (mods *ConsensusCore) CommandQueue() CommandQueue {
-	return mods.commandQueue
-}
-
-// Configuration returns the configuration of replicas.
-func (mods *ConsensusCore) Configuration() Configuration {
-	return mods.config
-}
-
-// Consensus returns the consensus implementation.
-func (mods *ConsensusCore) Consensus() Consensus {
-	return mods.consensus
-}
-
-// Executor returns the executor.
-func (mods *ConsensusCore) Executor() ExecutorExt {
-	return mods.executor
-}
-
-// LeaderRotation returns the leader rotation implementation.
-func (mods *ConsensusCore) LeaderRotation() LeaderRotation {
-	return mods.leaderRotation
-}
-
-// Crypto returns the cryptography implementation.
-func (mods *ConsensusCore) Crypto() Crypto {
-	return mods.crypto
-}
-
-// Synchronizer returns the view synchronizer implementation.
-func (mods *ConsensusCore) Synchronizer() Synchronizer {
-	return mods.synchronizer
-}
-
-// ForkHandler returns the module responsible for handling forked blocks.
-func (mods *ConsensusCore) ForkHandler() ForkHandlerExt {
-	return mods.forkHandler
-}
-
-// Handel returns the Handel implementation.
-func (mods *ConsensusCore) Handel() Handel {
-	return mods.handel
-}
-
-// ConsensusBuilder is a helper for constructing a ConsensusCore instance.
-type ConsensusBuilder struct {
-	baseBuilder CoreBuilder
-	mods        *ConsensusCore
-	cfg         OptionsBuilder
-	modules     []ConsensusModule
-}
-
-// NewConsensusBuilder creates a new ConsensusBuilder.
-func NewConsensusBuilder(id hotstuff.ID, privateKey hotstuff.PrivateKey) ConsensusBuilder {
-	bl := ConsensusBuilder{
-		baseBuilder: NewCoreBuilder(id),
-		mods: &ConsensusCore{
-			privateKey: privateKey,
-		},
-	}
-	// using a pointer here will allow settings to be readable within InitModule
-	bl.cfg.opts = &bl.mods.opts
-	bl.cfg.opts.connectionMetadata = make(map[string]string)
-	return bl
-}
-
-// Register adds modules to the HotStuff object and initializes them.
-// ConsensusCore are assigned to fields based on the interface they implement.
-// If only the Module interface is implemented, the InitModule function will be called, but
-// the HotStuff object will not save a reference to the module.
-// Register will overwrite existing modules if the same type is registered twice.
-func (b *ConsensusBuilder) Register(mods ...any) { //nolint:gocyclo
-	for _, module := range mods {
-		b.baseBuilder.Add(module)
-		if m, ok := module.(Acceptor); ok {
-			b.mods.acceptor = m
-		}
-		if m, ok := module.(BlockChain); ok {
-			b.mods.blockChain = m
-		}
-		if m, ok := module.(CommandQueue); ok {
-			b.mods.commandQueue = m
-		}
-		if m, ok := module.(Configuration); ok {
-			b.mods.config = m
-		}
-		if m, ok := module.(Consensus); ok {
-			b.mods.consensus = m
-		}
-		if m, ok := module.(ExecutorExt); ok {
-			b.mods.executor = m
-		}
-		if m, ok := module.(Executor); ok {
-			b.mods.executor = executorWrapper{m}
-		}
-		if m, ok := module.(LeaderRotation); ok {
-			b.mods.leaderRotation = m
-		}
-		if m, ok := module.(Crypto); ok {
-			b.mods.crypto = m
-		}
-		if m, ok := module.(Synchronizer); ok {
-			b.mods.synchronizer = m
-		}
-		if m, ok := module.(ForkHandlerExt); ok {
-			b.mods.forkHandler = m
-		}
-		if m, ok := module.(ForkHandler); ok {
-			b.mods.forkHandler = forkHandlerWrapper{m}
-		}
-		if m, ok := module.(Handel); ok {
-			b.mods.handel = m
-		}
-		if m, ok := module.(ConsensusModule); ok {
-			b.modules = append(b.modules, m)
-		}
-	}
-}
-
-// OptionsBuilder returns a pointer to the options builder.
-// This can be used to configure runtime options.
-func (b *ConsensusBuilder) OptionsBuilder() *OptionsBuilder {
-	return &b.cfg
-}
-
-// Build initializes all modules and returns the HotStuff object.
-func (b *ConsensusBuilder) Build() *ConsensusCore {
-	b.mods.Core = b.baseBuilder.Build()
-	for _, module := range b.modules {
-		module.InitModule(b.mods, &b.cfg)
-	}
-	return b.mods
-}
-
 // Module interfaces
-
-// ConsensusModule is an interface that can be implemented by types that need access to other consensus modules.
-type ConsensusModule interface {
-	// InitModule gives the module a reference to the ConsensusCore object.
-	// It also allows the module to set module options using the OptionsBuilder.
-	InitModule(mods *ConsensusCore, _ *OptionsBuilder)
-}
 
 //go:generate mockgen -destination=../internal/mocks/cmdqueue_mock.go -package=mocks . CommandQueue
 
@@ -232,6 +45,8 @@ type ExecutorExt interface {
 	// Exec executes the command in the block.
 	Exec(block *hotstuff.Block)
 }
+
+//go:generate mockgen -destination=../internal/mocks/forkhandler_mock.go -package=mocks . ForkHandler
 
 // ForkHandler handles commands that do not get committed due to a forked blockchain.
 //
@@ -357,16 +172,38 @@ type Handel interface {
 	Begin(s hotstuff.PartialCert)
 }
 
+// ExtendedExecutor turns the given Executor into an ExecutorExt.
+func ExtendedExecutor(executor Executor) ExecutorExt {
+	return executorWrapper{executor}
+}
+
 type executorWrapper struct {
 	executor Executor
+}
+
+func (ew executorWrapper) InitModule(mods *Core) {
+	if m, ok := ew.executor.(Module); ok {
+		m.InitModule(mods)
+	}
 }
 
 func (ew executorWrapper) Exec(block *hotstuff.Block) {
 	ew.executor.Exec(block.Command())
 }
 
+// ExtendedForkHandler turns the given ForkHandler into a ForkHandlerExt.
+func ExtendedForkHandler(forkHandler ForkHandler) ForkHandlerExt {
+	return forkHandlerWrapper{forkHandler}
+}
+
 type forkHandlerWrapper struct {
 	forkHandler ForkHandler
+}
+
+func (fhw forkHandlerWrapper) InitModule(mods *Core) {
+	if m, ok := fhw.forkHandler.(Module); ok {
+		m.InitModule(mods)
+	}
 }
 
 func (fhw forkHandlerWrapper) Fork(block *hotstuff.Block) {

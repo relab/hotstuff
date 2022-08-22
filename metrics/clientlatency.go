@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/client"
+	"github.com/relab/hotstuff/eventloop"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
 )
@@ -16,24 +18,36 @@ func init() {
 
 // ClientLatency processes LatencyMeasurementEvents, and writes LatencyMeasurements to the metrics logger.
 type ClientLatency struct {
-	mods *modules.Core
-	wf   Welford
+	metricsLogger Logger
+	opts          *modules.Options
+
+	wf Welford
 }
 
 // InitModule gives the module access to the other modules.
 func (lr *ClientLatency) InitModule(mods *modules.Core) {
-	lr.mods = mods
+	var (
+		eventLoop *eventloop.EventLoop
+		logger    logging.Logger
+	)
 
-	lr.mods.EventLoop().RegisterHandler(client.LatencyMeasurementEvent{}, func(event any) {
+	mods.Get(
+		&lr.metricsLogger,
+		&lr.opts,
+		&eventLoop,
+		&logger,
+	)
+
+	eventLoop.RegisterHandler(client.LatencyMeasurementEvent{}, func(event any) {
 		latencyEvent := event.(client.LatencyMeasurementEvent)
 		lr.addLatency(latencyEvent.Latency)
 	})
 
-	lr.mods.EventLoop().RegisterObserver(types.TickEvent{}, func(event any) {
+	eventLoop.RegisterObserver(types.TickEvent{}, func(event any) {
 		lr.tick(event.(types.TickEvent))
 	})
 
-	lr.mods.Logger().Info("Client Latency metric enabled")
+	logger.Info("Client Latency metric enabled")
 }
 
 // AddLatency adds a latency data point to the current measurement.
@@ -45,11 +59,11 @@ func (lr *ClientLatency) addLatency(latency time.Duration) {
 func (lr *ClientLatency) tick(tick types.TickEvent) {
 	mean, variance, count := lr.wf.Get()
 	event := &types.LatencyMeasurement{
-		Event:    types.NewClientEvent(uint32(lr.mods.ID()), time.Now()),
+		Event:    types.NewClientEvent(uint32(lr.opts.ID()), time.Now()),
 		Latency:  mean,
 		Variance: variance,
 		Count:    count,
 	}
-	lr.mods.MetricsLogger().Log(event)
+	lr.metricsLogger.Log(event)
 	lr.wf.Reset()
 }

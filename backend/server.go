@@ -3,9 +3,12 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/relab/hotstuff/modules"
 	"net"
 	"strconv"
+
+	"github.com/relab/hotstuff/eventloop"
+	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/modules"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -20,14 +23,26 @@ import (
 // Server is the Server-side of the gorums backend.
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
-	mods      *modules.ConsensusCore
+	// needed by Handel
+	// TODO: consider a different interface / mechanism for exposing the GorumsServer.
+	modules.Implements[*Server]
+
+	blockChain    modules.BlockChain
+	configuration modules.Configuration
+	eventLoop     *eventloop.EventLoop
+	logger        logging.Logger
+
 	gorumsSrv *gorums.Server
 }
 
-// InitModule gives the module a reference to the ConsensusCore object.
-// It also allows the module to set module options using the OptionsBuilder.
-func (srv *Server) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
-	srv.mods = mods
+// InitModule initializes the Server.
+func (srv *Server) InitModule(mods *modules.Core) {
+	mods.Get(
+		&srv.eventLoop,
+		&srv.configuration,
+		&srv.blockChain,
+		&srv.logger,
+	)
 }
 
 // NewServer creates a new Server.
@@ -35,7 +50,7 @@ func NewServer(opts ...gorums.ServerOption) *Server {
 	srv := &Server{}
 
 	opts = append(opts, gorums.WithConnectCallback(func(ctx context.Context) {
-		srv.mods.EventLoop().AddEvent(replicaConnected{ctx})
+		srv.eventLoop.AddEvent(replicaConnected{ctx})
 	}))
 
 	srv.gorumsSrv = gorums.NewServer(opts...)
@@ -64,7 +79,7 @@ func (srv *Server) StartOnListener(listener net.Listener) {
 	go func() {
 		err := srv.gorumsSrv.Serve(listener)
 		if err != nil {
-			srv.mods.Logger().Errorf("An error occurred while serving: %v", err)
+			srv.logger.Errorf("An error occurred while serving: %v", err)
 		}
 	}()
 }
@@ -123,9 +138,9 @@ type serviceImpl struct {
 
 // Propose handles a replica's response to the Propose QC from the leader.
 func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
-	id, err := GetPeerIDFromContext(ctx, impl.srv.mods.Configuration())
+	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
-		impl.srv.mods.Logger().Infof("Failed to get client ID: %v", err)
+		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
 
@@ -133,18 +148,18 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
 
-	impl.srv.mods.EventLoop().AddEvent(proposeMsg)
+	impl.srv.eventLoop.AddEvent(proposeMsg)
 }
 
 // Vote handles an incoming vote message.
 func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
-	id, err := GetPeerIDFromContext(ctx, impl.srv.mods.Configuration())
+	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
-		impl.srv.mods.Logger().Infof("Failed to get client ID: %v", err)
+		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
 
-	impl.srv.mods.EventLoop().AddEvent(hotstuff.VoteMsg{
+	impl.srv.eventLoop.AddEvent(hotstuff.VoteMsg{
 		ID:          id,
 		PartialCert: hotstuffpb.PartialCertFromProto(cert),
 	})
@@ -152,13 +167,13 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
 func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo) {
-	id, err := GetPeerIDFromContext(ctx, impl.srv.mods.Configuration())
+	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
-		impl.srv.mods.Logger().Infof("Failed to get client ID: %v", err)
+		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
 
-	impl.srv.mods.EventLoop().AddEvent(hotstuff.NewViewMsg{
+	impl.srv.eventLoop.AddEvent(hotstuff.NewViewMsg{
 		ID:       id,
 		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
 	})
@@ -169,12 +184,12 @@ func (impl *serviceImpl) Fetch(ctx gorums.ServerCtx, pb *hotstuffpb.BlockHash) (
 	var hash hotstuff.Hash
 	copy(hash[:], pb.GetHash())
 
-	block, ok := impl.srv.mods.BlockChain().LocalGet(hash)
+	block, ok := impl.srv.blockChain.LocalGet(hash)
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "requested block was not found")
 	}
 
-	impl.srv.mods.Logger().Debugf("OnFetch: %.8s", hash)
+	impl.srv.logger.Debugf("OnFetch: %.8s", hash)
 
 	return hotstuffpb.BlockToProto(block), nil
 }
@@ -183,11 +198,11 @@ func (impl *serviceImpl) Fetch(ctx gorums.ServerCtx, pb *hotstuffpb.BlockHash) (
 func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
 	var err error
 	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
-	timeoutMsg.ID, err = GetPeerIDFromContext(ctx, impl.srv.mods.Configuration())
+	timeoutMsg.ID, err = GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
-		impl.srv.mods.Logger().Infof("Could not get ID of replica: %v", err)
+		impl.srv.logger.Infof("Could not get ID of replica: %v", err)
 	}
-	impl.srv.mods.EventLoop().AddEvent(timeoutMsg)
+	impl.srv.eventLoop.AddEvent(timeoutMsg)
 }
 
 type replicaConnected struct {

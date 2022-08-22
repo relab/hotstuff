@@ -15,7 +15,9 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
@@ -58,8 +60,11 @@ type Config struct {
 
 // Client is a hotstuff client.
 type Client struct {
+	eventLoop *eventloop.EventLoop
+	logger    logging.Logger
+	opts      *modules.Options
+
 	mut              sync.Mutex
-	mods             *modules.Core
 	mgr              *clientpb.Manager
 	gorumsConfig     *clientpb.Configuration
 	payloadSize      uint32
@@ -74,12 +79,18 @@ type Client struct {
 	timeout          time.Duration
 }
 
-// New returns a new Client.
-func New(conf Config, builder modules.CoreBuilder) (client *Client) {
-	mods := builder.Build()
+// InitModule initializes the client.
+func (c *Client) InitModule(mods *modules.Core) {
+	mods.Get(
+		&c.eventLoop,
+		&c.logger,
+		&c.opts,
+	)
+}
 
+// New returns a new Client.
+func New(conf Config, builder modules.Builder) (client *Client) {
 	client = &Client{
-		mods:             mods,
 		pendingCmds:      make(chan pendingCmd, conf.MaxConcurrent),
 		highestCommitted: 1,
 		done:             make(chan struct{}),
@@ -90,6 +101,10 @@ func New(conf Config, builder modules.CoreBuilder) (client *Client) {
 		stepUpInterval:   conf.RateStepInterval,
 		timeout:          conf.Timeout,
 	}
+
+	builder.Add(client)
+
+	builder.Build()
 
 	grpcOpts := []grpc.DialOption{grpc.WithBlock()}
 
@@ -133,10 +148,10 @@ func (c *Client) Run(ctx context.Context) {
 
 	eventLoopDone := make(chan struct{})
 	go func() {
-		c.mods.EventLoop().Run(ctx)
+		c.eventLoop.Run(ctx)
 		close(eventLoopDone)
 	}()
-	c.mods.Logger().Info("Starting to send commands")
+	c.logger.Info("Starting to send commands")
 
 	commandStatsChan := make(chan stats)
 	// start the command handler
@@ -147,12 +162,12 @@ func (c *Client) Run(ctx context.Context) {
 
 	err := c.sendCommands(ctx)
 	if err != nil && !errors.Is(err, io.EOF) {
-		c.mods.Logger().Panicf("Failed to send commands: %v", err)
+		c.logger.Panicf("Failed to send commands: %v", err)
 	}
 	c.close()
 
 	commandStats := <-commandStatsChan
-	c.mods.Logger().Infof(
+	c.logger.Infof(
 		"Done sending commands (executed: %d, failed: %d, timeouts: %d)",
 		commandStats.executed, commandStats.failed, commandStats.timeout,
 	)
@@ -177,7 +192,7 @@ func (c *Client) close() {
 	c.mgr.Close()
 	err := c.reader.Close()
 	if err != nil {
-		c.mods.Logger().Warn("Failed to close reader: ", err)
+		c.logger.Warn("Failed to close reader: ", err)
 	}
 }
 
@@ -222,11 +237,11 @@ loop:
 			return err
 		} else if err == io.EOF && n == 0 && lastCommand > num {
 			lastCommand = num
-			c.mods.Logger().Info("Reached end of file. Sending empty commands until last command is executed...")
+			c.logger.Info("Reached end of file. Sending empty commands until last command is executed...")
 		}
 
 		cmd := &clientpb.Command{
-			ClientID:       uint32(c.mods.ID()),
+			ClientID:       uint32(c.opts.ID()),
 			SequenceNumber: num,
 			Data:           data[:n],
 		}
@@ -243,7 +258,7 @@ loop:
 		}
 
 		if num%100 == 0 {
-			c.mods.Logger().Infof("%d commands sent", num)
+			c.logger.Infof("%d commands sent", num)
 		}
 
 	}
@@ -271,10 +286,10 @@ func (c *Client) handleCommands(ctx context.Context) (executed, failed, timeout 
 		if err != nil {
 			qcError, ok := err.(gorums.QuorumCallError)
 			if ok && qcError.Reason == context.DeadlineExceeded.Error() {
-				c.mods.Logger().Debug("Command timed out.")
+				c.logger.Debug("Command timed out.")
 				timeout++
 			} else if !ok || qcError.Reason != context.Canceled.Error() {
-				c.mods.Logger().Debugf("Did not get enough replies for command: %v\n", err)
+				c.logger.Debugf("Did not get enough replies for command: %v\n", err)
 				failed++
 			}
 		} else {
@@ -287,7 +302,7 @@ func (c *Client) handleCommands(ctx context.Context) (executed, failed, timeout 
 		c.mut.Unlock()
 
 		duration := time.Since(cmd.sendTime)
-		c.mods.EventLoop().AddEvent(LatencyMeasurementEvent{Latency: duration})
+		c.eventLoop.AddEvent(LatencyMeasurementEvent{Latency: duration})
 	}
 }
 
