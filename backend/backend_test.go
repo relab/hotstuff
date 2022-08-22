@@ -27,7 +27,7 @@ func TestConnect(t *testing.T) {
 		const n = 4
 		ctrl := gomock.NewController(t)
 		td := setup(t, ctrl, n)
-		builder := modules.NewConsensusBuilder(1, td.keys[0])
+		builder := modules.NewBuilder(1, td.keys[0])
 		testutil.TestModules(t, ctrl, 1, td.keys[0], &builder)
 		teardown := createServers(t, td, ctrl)
 		defer teardown()
@@ -35,7 +35,7 @@ func TestConnect(t *testing.T) {
 
 		cfg := NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
 
-		builder.Register(cfg)
+		builder.Add(cfg)
 		builder.Build()
 
 		err := cfg.Connect(td.replicas)
@@ -58,7 +58,7 @@ func testBase(t *testing.T, typ any, send func(modules.Configuration), handle ev
 		defer serverTeardown()
 
 		cfg := NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
-		td.builders[0].Register(cfg)
+		td.builders[0].Add(cfg)
 		hl := td.builders.Build()
 
 		err := cfg.Connect(td.replicas)
@@ -69,8 +69,14 @@ func testBase(t *testing.T, typ any, send func(modules.Configuration), handle ev
 
 		ctx, cancel := context.WithCancel(context.Background())
 		for _, hs := range hl[1:] {
-			hs.EventLoop().RegisterHandler(typ, handle)
-			go hs.Run(ctx)
+			var (
+				eventLoop    *eventloop.EventLoop
+				synchronizer modules.Synchronizer
+			)
+			hs.GetAll(&eventLoop, &synchronizer)
+			eventLoop.RegisterHandler(typ, handle)
+			synchronizer.Start(ctx)
+			go eventLoop.Run(ctx)
 		}
 		send(cfg)
 		cancel()
@@ -219,7 +225,7 @@ func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (teardown
 	for i := range servers {
 		servers[i] = NewServer(gorums.WithGRPCServerOptions(grpc.Creds(td.creds)))
 		servers[i].StartOnListener(td.listeners[i])
-		td.builders[i].Register(servers[i])
+		td.builders[i].Add(servers[i])
 	}
 	return func() {
 		for _, srv := range servers {

@@ -23,133 +23,145 @@
 // In general you should create an interface for your module if it is possible that someone might want to write their
 // own version of it in the future.
 //
-// Finally, to set up the module system and its modules, you must create a CoreBuilder using the NewCoreBuilder function,
+// Finally, to set up the module system and its modules, you must create a CoreBuilder using the NewBuilder function,
 // and then register all of the modules with the builder using the Register method. For example:
 //
-//  builder := NewCoreBuilder()
-//  // replace the logger
-//  builder.Register(logging.New("foo"))
-//  mods := builder.Build()
+//	builder := NewBuilder()
+//	// replace the logger
+//	builder.Add(logging.New("foo"))
+//	mods := builder.Build()
 //
 // If two modules satisfy the same interface, then the one that was registered last will be returned by the module system,
 // though note that both modules will be initialized if they implement the CoreModule interface.
 package modules
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/logging"
 )
 
-// CoreModule is an interface for modules that need access to a client.
-type CoreModule interface {
-	// InitModule gives the module access to the other modules.
+// Module is an interface for initializing modules.
+type Module interface {
 	InitModule(mods *Core)
 }
 
 // Core is the base of the module system.
 // It contains only a few core modules that are shared between replicas and clients.
 type Core struct {
-	id hotstuff.ID
-
-	logger        logging.Logger
-	metricsLogger MetricsLogger
-	eventLoop     *eventloop.EventLoop
-
-	modulesByType map[reflect.Type]any
+	modules []any
 }
 
-// ID returns the id of this client.
-func (mods Core) ID() hotstuff.ID {
-	return mods.id
-}
-
-// Logger returns the logger.
-func (mods Core) Logger() logging.Logger {
-	return mods.logger
-}
-
-// MetricsLogger returns the metrics logger.
-func (mods Core) MetricsLogger() MetricsLogger {
-	if mods.metricsLogger == nil {
-		return NopLogger()
-	}
-	return mods.metricsLogger
-}
-
-// EventLoop returns the event loop.
-func (mods Core) EventLoop() *eventloop.EventLoop {
-	return mods.eventLoop
-}
-
-// MetricsEventLoop returns the metrics event loop.
-// The metrics event loop is used for processing of measurement data.
+// TryGet attempts to find a module for ptr.
+// TryGet returns true if a module was stored in ptr, false otherwise.
 //
-// Deprecated: The metrics event loop is no longer separate from the main event loop. Use EventLoop() instead.
-func (mods Core) MetricsEventLoop() *eventloop.EventLoop {
-	return mods.EventLoop()
-}
-
-// GetModuleByType makes it possible to get a module based on its real type.
-// This is useful for getting modules that do not implement any known module interface.
-// The method returns true if a module was found, false otherwise.
+// NOTE: ptr must be a non-nil pointer to a type that has been provided to the module system.
 //
-// NOTE: dest MUST be a pointer to a variable of the desired type.
-// For example:
-//  var module MyModule
-//  if mods.GetModuleByType(&module) { ... }
-func (mods Core) GetModuleByType(dest any) bool {
-	outType := reflect.TypeOf(dest)
-	if outType.Kind() != reflect.Ptr {
-		panic("invalid argument: out must be a non-nil pointer to an interface variable")
+// Example:
+//
+//	builder := modules.New()
+//	builder.Provide(MyModuleImpl{}, new(MyModule))
+//	mods = builder.Build()
+//
+//	var module MyModule
+//	if mods.TryGet(&module) {
+//		// success
+//	}
+func (mods Core) TryGet(ptr any) bool {
+	v := reflect.ValueOf(ptr)
+	if !v.IsValid() {
+		panic("nil value given")
 	}
-	targetType := outType.Elem()
-	if m, ok := mods.modulesByType[targetType]; ok {
-		reflect.ValueOf(dest).Elem().Set(reflect.ValueOf(m))
-		return true
+	pt := v.Type()
+	if pt.Kind() != reflect.Ptr {
+		panic("only pointer values allowed")
 	}
+
+	for _, m := range mods.modules {
+		mv := reflect.ValueOf(m)
+		if mv.Type().AssignableTo(pt.Elem()) {
+			v.Elem().Set(mv)
+			return true
+		}
+	}
+
 	return false
 }
 
-// CoreBuilder is a helper for setting up client modules.
-type CoreBuilder struct {
-	mods    Core
-	modules []CoreModule
+// Get finds a module for ptr.
+//
+// NOTE: ptr must be a non-nil pointer to a type that has been provided to the module system.
+// Get panics if ptr is not a pointer, or if a compatible module is not found.
+//
+// Example:
+//
+//	builder := modules.New()
+//	builder.Provide(MyModuleImpl{}, new(MyModule))
+//	mods = builder.Build()
+//
+//	var module MyModule
+//	mods.Get(&module)
+func (mods *Core) Get(ptr any) {
+	if !mods.TryGet(ptr) {
+		panic(fmt.Sprintf("module of type %s not found", reflect.TypeOf(ptr).Elem()))
+	}
 }
 
-// NewCoreBuilder returns a new builder.
-func NewCoreBuilder(id hotstuff.ID) CoreBuilder {
-	bl := CoreBuilder{mods: Core{
-		id:            id,
-		logger:        logging.New(""),
-		eventLoop:     eventloop.New(1000),
-		modulesByType: make(map[reflect.Type]any),
-	}}
+// GetAll finds a module for all the given pointers.
+//
+// NOTE: pointers must only contain non-nil pointers to types that have been provided to the module system.
+// GetAll panics if one of the given pointers is not a pointer, or if a compatible module is not found.
+func (mods *Core) GetAll(pointers ...any) {
+	for _, ptr := range pointers {
+		mods.Get(ptr)
+	}
+}
+
+// Builder is a helper for setting up client modules.
+type Builder struct {
+	core    Core
+	modules []Module
+	opts    *Options
+}
+
+// NewBuilder returns a new builder.
+func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey) Builder {
+	bl := Builder{
+		opts: &Options{
+			id:                 id,
+			privateKey:         pk,
+			connectionMetadata: make(map[string]string),
+		},
+	}
 	return bl
 }
 
-// Register registers the modules with the builder.
-func (b *CoreBuilder) Register(modules ...any) {
+// Options returns the options module.
+func (b *Builder) Options() *Options {
+	return b.opts
+}
+
+// Add adds modules to the builder.
+func (b *Builder) Add(modules ...any) {
+	b.core.modules = append(b.core.modules, modules...)
 	for _, module := range modules {
-		if m, ok := module.(logging.Logger); ok {
-			b.mods.logger = m
-		}
-		if m, ok := module.(MetricsLogger); ok {
-			b.mods.metricsLogger = m
-		}
-		if m, ok := module.(CoreModule); ok {
+		if m, ok := module.(Module); ok {
 			b.modules = append(b.modules, m)
 		}
-		b.mods.modulesByType[reflect.TypeOf(module)] = module
 	}
 }
 
-// Build initializes all registered modules and returns the Core object.
-func (b *CoreBuilder) Build() *Core {
-	for _, module := range b.modules {
-		module.InitModule(&b.mods)
+// Build initializes all added modules and returns the Core object.
+func (b *Builder) Build() *Core {
+	// reverse the order of the added modules so that TryGet will find the latest first.
+	for i, j := 0, len(b.core.modules)-1; i < j; i, j = i+1, j-1 {
+		b.core.modules[i], b.core.modules[j] = b.core.modules[j], b.core.modules[i]
 	}
-	return &b.mods
+	// add the Options last so that it can be overridden by user.
+	b.Add(b.opts)
+	for _, module := range b.modules {
+		module.InitModule(&b.core)
+	}
+	return &b.core
 }

@@ -4,6 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"io"
+
+	"github.com/relab/hotstuff/util"
 )
 
 // Block contains a propsed "command", metadata for the protocol, and a link to the "parent" block.
@@ -26,8 +29,13 @@ func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID)
 		view:     view,
 		proposer: proposer,
 	}
+	hasher := sha256.New()
+	_, err := b.WriteTo(hasher)
+	if err != nil {
+		panic("unexpected error: " + err.Error())
+	}
 	// cache the hash immediately because it is too racy to do it in Hash()
-	b.hash = sha256.Sum256(b.ToBytes())
+	hasher.Sum(b.hash[:0])
 	return b
 }
 
@@ -72,16 +80,19 @@ func (b *Block) View() View {
 	return b.view
 }
 
-// ToBytes returns the raw byte form of the Block, to be used for hashing, etc.
-func (b *Block) ToBytes() []byte {
-	buf := b.parent[:]
+// WriteTo writes the block data to the writer.
+func (b *Block) WriteTo(writer io.Writer) (n int64, err error) {
 	var proposerBuf [4]byte
 	binary.LittleEndian.PutUint32(proposerBuf[:], uint32(b.proposer))
-	buf = append(buf, proposerBuf[:]...)
+
 	var viewBuf [8]byte
 	binary.LittleEndian.PutUint64(viewBuf[:], uint64(b.view))
-	buf = append(buf, viewBuf[:]...)
-	buf = append(buf, []byte(b.cmd)...)
-	buf = append(buf, b.cert.ToBytes()...)
-	return buf
+
+	return util.WriteAllTo(
+		writer,
+		b.parent[:],
+		proposerBuf[:],
+		b.Command(),
+		b.cert,
+	)
 }

@@ -2,6 +2,8 @@ package hotstuffpb
 
 import (
 	"math/big"
+	"reflect"
+	"unsafe"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
@@ -68,9 +70,10 @@ func PartialCertToProto(cert hotstuff.PartialCert) *PartialCert {
 
 // PartialCertFromProto converts a hotstuffpb.PartialCert to an ecdsa.PartialCert.
 func PartialCertFromProto(cert *PartialCert) hotstuff.PartialCert {
-	var h hotstuff.Hash
-	copy(h[:], cert.GetHash())
-	return hotstuff.NewPartialCert(QuorumSignatureFromProto(cert.GetSig()), h)
+	return hotstuff.NewPartialCert(
+		QuorumSignatureFromProto(cert.GetSig()),
+		convertHash(cert.GetHash()),
+	)
 }
 
 // QuorumCertToProto converts a consensus.QuorumCert to a hotstuffpb.QuorumCert.
@@ -85,9 +88,11 @@ func QuorumCertToProto(qc hotstuff.QuorumCert) *QuorumCert {
 
 // QuorumCertFromProto converts a hotstuffpb.QuorumCert to an ecdsa.QuorumCert.
 func QuorumCertFromProto(qc *QuorumCert) hotstuff.QuorumCert {
-	var h hotstuff.Hash
-	copy(h[:], qc.GetHash())
-	return hotstuff.NewQuorumCert(QuorumSignatureFromProto(qc.GetSig()), hotstuff.View(qc.GetView()), h)
+	return hotstuff.NewQuorumCert(
+		QuorumSignatureFromProto(qc.GetSig()),
+		hotstuff.View(qc.GetView()),
+		convertHash(qc.GetHash()),
+	)
 }
 
 // ProposalToProto converts a ProposeMsg to a protobuf message.
@@ -116,7 +121,7 @@ func BlockToProto(block *hotstuff.Block) *Block {
 	parentHash := block.Parent()
 	return &Block{
 		Parent:   parentHash[:],
-		Command:  []byte(block.Command()),
+		Command:  unsafeStringToBytes(block.Command()),
 		QC:       QuorumCertToProto(block.QuorumCert()),
 		View:     uint64(block.View()),
 		Proposer: uint32(block.Proposer()),
@@ -125,12 +130,10 @@ func BlockToProto(block *hotstuff.Block) *Block {
 
 // BlockFromProto converts a hotstuffpb.Block to a consensus.Block.
 func BlockFromProto(block *Block) *hotstuff.Block {
-	var p hotstuff.Hash
-	copy(p[:], block.GetParent())
 	return hotstuff.NewBlock(
-		p,
+		convertHash(block.GetParent()),
 		QuorumCertFromProto(block.GetQC()),
-		hotstuff.Command(block.GetCommand()),
+		unsafeBytesToString(block.GetCommand()),
 		hotstuff.View(block.GetView()),
 		hotstuff.ID(block.GetProposer()),
 	)
@@ -221,4 +224,28 @@ func SyncInfoToProto(syncInfo hotstuff.SyncInfo) *SyncInfo {
 		m.AggQC = AggregateQCToProto(aggQC)
 	}
 	return m
+}
+
+func convertHash(b []byte) (h hotstuff.Hash) {
+	if len(b) < len(h) {
+		copy(h[:], b)
+	} else {
+		h = *(*hotstuff.Hash)(b)
+	}
+	return h
+}
+
+func unsafeStringToBytes(s string) []byte {
+	if s == "" {
+		return []byte{}
+	}
+	const max = 0x7fff0000
+	if len(s) > max {
+		panic("string too long")
+	}
+	return (*[max]byte)(unsafe.Pointer((*reflect.StringHeader)(unsafe.Pointer(&s)).Data))[:len(s):len(s)]
+}
+
+func unsafeBytesToString(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
 }

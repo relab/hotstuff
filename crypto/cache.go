@@ -30,11 +30,11 @@ func NewCache(impl modules.CryptoBase, capacity int) modules.Crypto {
 	})
 }
 
-// InitModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (cache *cache) InitModule(mods *modules.ConsensusCore, cfg *modules.OptionsBuilder) {
-	if mod, ok := cache.impl.(modules.ConsensusModule); ok {
-		mod.InitModule(mods, cfg)
+func (cache *cache) InitModule(mods *modules.Core) {
+	if mod, ok := cache.impl.(modules.Module); ok {
+		mod.InitModule(mods)
 	}
 }
 

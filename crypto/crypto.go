@@ -2,12 +2,17 @@
 package crypto
 
 import (
+	"bytes"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/util/gpool"
 )
 
 type crypto struct {
-	mods *modules.ConsensusCore
+	blockChain    modules.BlockChain
+	configuration modules.Configuration
+
 	modules.CryptoBase
 }
 
@@ -17,18 +22,35 @@ func New(impl modules.CryptoBase) modules.Crypto {
 	return &crypto{CryptoBase: impl}
 }
 
-// InitModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (c *crypto) InitModule(mods *modules.ConsensusCore, cfg *modules.OptionsBuilder) {
-	c.mods = mods
-	if mod, ok := c.CryptoBase.(modules.ConsensusModule); ok {
-		mod.InitModule(mods, cfg)
+func (c *crypto) InitModule(mods *modules.Core) {
+	mods.GetAll(
+		&c.blockChain,
+		&c.configuration,
+	)
+
+	if mod, ok := c.CryptoBase.(modules.Module); ok {
+		mod.InitModule(mods)
 	}
 }
 
+var bufferPool gpool.Pool[bytes.Buffer]
+
 // CreatePartialCert signs a single block and returns the partial certificate.
 func (c crypto) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
-	sig, err := c.Sign(block.ToBytes())
+	buf := bufferPool.Get()
+	_, err = block.WriteTo(&buf)
+	if err != nil {
+		return cert, err
+	}
+
+	defer func() {
+		buf.Reset()
+		bufferPool.Put(buf)
+	}()
+
+	sig, err := c.Sign(buf.Bytes())
 	if err != nil {
 		return hotstuff.PartialCert{}, err
 	}
@@ -90,11 +112,23 @@ func (c crypto) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.Timeou
 
 // VerifyPartialCert verifies a single partial certificate.
 func (c crypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
-	block, ok := c.mods.BlockChain().Get(cert.BlockHash())
+	block, ok := c.blockChain.Get(cert.BlockHash())
 	if !ok {
 		return false
 	}
-	return c.Verify(cert.Signature(), block.ToBytes())
+
+	buf := bufferPool.Get()
+	_, err := block.WriteTo(&buf)
+	if err != nil {
+		return false
+	}
+
+	defer func() {
+		buf.Reset()
+		bufferPool.Put(buf)
+	}()
+
+	return c.Verify(cert.Signature(), buf.Bytes())
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
@@ -103,14 +137,26 @@ func (c crypto) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
 		return true
 	}
-	if qc.Signature().Participants().Len() < c.mods.Configuration().QuorumSize() {
+	if qc.Signature().Participants().Len() < c.configuration.QuorumSize() {
 		return false
 	}
-	block, ok := c.mods.BlockChain().Get(qc.BlockHash())
+	block, ok := c.blockChain.Get(qc.BlockHash())
 	if !ok {
 		return false
 	}
-	return c.Verify(qc.Signature(), block.ToBytes())
+
+	buf := bufferPool.Get()
+	_, err := block.WriteTo(&buf)
+	if err != nil {
+		return false
+	}
+
+	defer func() {
+		buf.Reset()
+		bufferPool.Put(buf)
+	}()
+
+	return c.Verify(qc.Signature(), buf.Bytes())
 }
 
 // VerifyTimeoutCert verifies a timeout certificate.
@@ -119,7 +165,7 @@ func (c crypto) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
 	if tc.View() == 0 {
 		return true
 	}
-	if tc.Signature().Participants().Len() < c.mods.Configuration().QuorumSize() {
+	if tc.Signature().Participants().Len() < c.configuration.QuorumSize() {
 		return false
 	}
 	return c.Verify(tc.Signature(), tc.View().ToBytes())
@@ -139,7 +185,7 @@ func (c crypto) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.Q
 			SyncInfo: hotstuff.NewSyncInfo().WithQC(qc),
 		}.ToBytes()
 	}
-	if aggQC.Sig().Participants().Len() < c.mods.Configuration().QuorumSize() {
+	if aggQC.Sig().Participants().Len() < c.configuration.QuorumSize() {
 		return hotstuff.QuorumCert{}, false
 	}
 	// both the batched aggQC signatures and the highQC must be verified

@@ -17,7 +17,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/iago/iagotest"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
@@ -27,7 +27,7 @@ func TestOrchestration(t *testing.T) {
 		controllerStream, workerStream := net.Pipe()
 
 		workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
-		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), modules.NopLogger(), nil, 0)
+		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), metrics.NopLogger(), nil, 0)
 
 		experiment := &orchestration.Experiment{
 			Logger:      logging.New("ctrl"),
@@ -51,7 +51,7 @@ func TestOrchestration(t *testing.T) {
 				LeaderRotation:    "round-robin",
 				Modules:           mods,
 			},
-			Duration: 1 * time.Second,
+			Duration: 5 * time.Second,
 			Hosts:    map[string]orchestration.RemoteWorker{"127.0.0.1": workerProxy},
 		}
 
@@ -113,7 +113,7 @@ func TestDeployment(t *testing.T) {
 			Crypto:            "ecdsa",
 			LeaderRotation:    "round-robin",
 		},
-		Duration: 1 * time.Second,
+		Duration: 10 * time.Second,
 		Hosts:    make(map[string]orchestration.RemoteWorker),
 	}
 
