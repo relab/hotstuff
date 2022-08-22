@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/mattn/go-isatty"
-	"github.com/relab/hotstuff/modules"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -75,8 +74,6 @@ type Logger interface {
 }
 
 type wrapper struct {
-	modules.Implements[Logger]
-
 	inner Logger
 	level zap.AtomicLevel
 	mut   sync.Mutex

@@ -56,16 +56,16 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 		eventloop.New(100),
 		logging.New(fmt.Sprintf("hs%d", id)),
 		blockchain.New(),
-		modules.As[modules.Consensus](mocks.NewMockConsensus(ctrl)),
+		mocks.NewMockConsensus(ctrl),
 		consensus.NewVotingMachine(),
 		leaderrotation.NewFixed(1),
-		modules.As[modules.Synchronizer](synchronizer),
-		modules.As[modules.Configuration](config),
+		synchronizer,
+		config,
 		signer,
-		modules.As[modules.Acceptor](acceptor),
-		modules.As[modules.ExecutorExt](modules.ExtendedExecutor(executor)),
-		modules.As[modules.CommandQueue](commandQ),
-		modules.As[modules.ForkHandlerExt](modules.ExtendedForkHandler(forkHandler)),
+		acceptor,
+		modules.ExtendedExecutor(executor),
+		commandQ,
+		modules.ExtendedForkHandler(forkHandler),
 	)
 }
 

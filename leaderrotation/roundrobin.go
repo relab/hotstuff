@@ -10,8 +10,6 @@ func init() {
 }
 
 type roundRobin struct {
-	modules.Implements[modules.LeaderRotation]
-
 	configuration modules.Configuration
 }
 

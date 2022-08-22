@@ -19,8 +19,6 @@ type Logger interface {
 }
 
 type jsonLogger struct {
-	modules.Implements[Logger]
-
 	logger logging.Logger
 
 	mut   sync.Mutex
@@ -92,9 +90,7 @@ func (dl *jsonLogger) Close() error {
 	return err
 }
 
-type nopLogger struct {
-	modules.Implements[Logger]
-}
+type nopLogger struct{}
 
 func (nopLogger) Log(proto.Message) {}
 func (nopLogger) Close() error      { return nil }

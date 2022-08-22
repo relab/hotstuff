@@ -12,8 +12,6 @@ func init() {
 }
 
 type fixed struct {
-	modules.Implements[modules.LeaderRotation]
-
 	leader hotstuff.ID
 }
 

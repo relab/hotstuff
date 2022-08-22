@@ -7,8 +7,6 @@ import (
 )
 
 type crypto struct {
-	modules.Implements[modules.Crypto]
-
 	blockChain    modules.BlockChain
 	configuration modules.Configuration
 

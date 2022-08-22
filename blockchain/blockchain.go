@@ -13,8 +13,6 @@ import (
 // blockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type blockChain struct {
-	modules.Implements[modules.BlockChain]
-
 	configuration modules.Configuration
 	consensus     modules.Consensus
 	synchronizer  modules.Synchronizer

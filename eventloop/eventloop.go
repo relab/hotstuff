@@ -11,8 +11,6 @@ import (
 	"reflect"
 	"sync"
 	"time"
-
-	"github.com/relab/hotstuff/modules"
 )
 
 // EventHandler processes an event.
@@ -23,8 +21,6 @@ type EventHandler func(event any)
 // The difference between them is that there can be many observers per event type, but only one handler,
 // and the handler is executed last.
 type EventLoop struct {
-	modules.Implements[*EventLoop]
-
 	mut sync.Mutex
 
 	eventQ        queue

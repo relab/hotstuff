@@ -72,8 +72,6 @@ func (r *Replica) Metadata() map[string]string {
 // Config holds information about the current configuration of replicas that participate in the protocol,
 // and some information about the local replica. It also provides methods to send messages to the other replicas.
 type Config struct {
-	modules.Implements[modules.Configuration]
-
 	opts      []gorums.ManagerOption
 	connected bool
 
