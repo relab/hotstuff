@@ -58,6 +58,7 @@ type Handel struct {
 	nodes    map[hotstuff.ID]*handelpb.Node
 	maxLevel int
 	sessions map[hotstuff.Hash]*session
+	initDone bool
 }
 
 // New returns a new instance of the Handel module.
@@ -70,10 +71,8 @@ func New() modules.Handel {
 
 // InitModule initializes the Handel module.
 func (h *Handel) InitModule(mods *modules.Core) {
-	var config modules.Configuration
-
 	mods.Get(
-		&config,
+		&h.configuration,
 		&h.server,
 
 		&h.blockChain,
@@ -83,7 +82,6 @@ func (h *Handel) InitModule(mods *modules.Core) {
 		&h.opts,
 		&h.synchronizer,
 	)
-	h.configuration = config.(*backend.Config)
 
 	h.opts.SetShouldUseHandel()
 
@@ -98,18 +96,6 @@ func (h *Handel) InitModule(mods *modules.Core) {
 		} else if !c.deferred {
 			c.deferred = true
 			h.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, c)
-		}
-	})
-
-	h.eventLoop.RegisterHandler(disseminateEvent{}, func(e any) {
-		if s, ok := h.sessions[e.(disseminateEvent).sessionID]; ok {
-			s.sendContributions(s.h.synchronizer.ViewContext())
-		}
-	})
-
-	h.eventLoop.RegisterHandler(levelActivateEvent{}, func(e any) {
-		if s, ok := h.sessions[e.(levelActivateEvent).sessionID]; ok {
-			s.advanceLevel()
 		}
 	})
 
@@ -130,10 +116,31 @@ func (h *Handel) postInit() {
 	}
 
 	handelpb.RegisterHandelServer(h.server.GetGorumsServer(), serviceImpl{h})
+
+	// now we can start handling timer events
+	h.eventLoop.RegisterHandler(disseminateEvent{}, func(e any) {
+		if s, ok := h.sessions[e.(disseminateEvent).sessionID]; ok {
+			s.sendContributions(s.h.synchronizer.ViewContext())
+		}
+	})
+
+	h.eventLoop.RegisterHandler(levelActivateEvent{}, func(e any) {
+		if s, ok := h.sessions[e.(levelActivateEvent).sessionID]; ok {
+			s.advanceLevel()
+		}
+	})
+
+	h.initDone = true
 }
 
 // Begin commissions the aggregation of a new signature.
 func (h *Handel) Begin(s hotstuff.PartialCert) {
+	if !h.initDone {
+		// wait until initialization is done
+		h.eventLoop.DelayUntil(backend.ConnectedEvent{}, func() { h.Begin(s) })
+		return
+	}
+
 	// turn the single signature into a threshold signature,
 	// this makes it easier to work with.
 	session := h.newSession(s.BlockHash(), s.Signature())
