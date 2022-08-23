@@ -10,6 +10,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"golang.org/x/exp/slices"
 )
@@ -132,7 +133,9 @@ var _ hotstuff.QuorumSignature = (*MultiSignature)(nil)
 var _ hotstuff.IDSet = (*MultiSignature)(nil)
 
 type ecdsaBase struct {
-	mods *modules.ConsensusCore
+	configuration modules.Configuration
+	logger        logging.Logger
+	opts          *modules.Options
 }
 
 // New returns a new instance of the ECDSA CryptoBase implementation.
@@ -141,14 +144,17 @@ func New() modules.CryptoBase {
 }
 
 func (ec *ecdsaBase) getPrivateKey() *ecdsa.PrivateKey {
-	pk := ec.mods.PrivateKey()
-	return pk.(*ecdsa.PrivateKey)
+	return ec.opts.PrivateKey().(*ecdsa.PrivateKey)
 }
 
-// InitModule gives the module a reference to the ConsensusCore object.
+// InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (ec *ecdsaBase) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
-	ec.mods = mods
+func (ec *ecdsaBase) InitModule(mods *modules.Core) {
+	mods.Get(
+		&ec.configuration,
+		&ec.logger,
+		&ec.opts,
+	)
 }
 
 // Sign creates a cryptographic signature of the given message.
@@ -158,10 +164,10 @@ func (ec *ecdsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, e
 	if err != nil {
 		return nil, fmt.Errorf("ecdsa: sign failed: %w", err)
 	}
-	return MultiSignature{ec.mods.ID(): &Signature{
+	return MultiSignature{ec.opts.ID(): &Signature{
 		r:      r,
 		s:      s,
-		signer: ec.mods.ID(),
+		signer: ec.opts.ID(),
 	}}, nil
 }
 
@@ -182,7 +188,7 @@ func (ec *ecdsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Q
 				ts[id] = s
 			}
 		} else {
-			ec.mods.Logger().Panicf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
+			ec.logger.Panicf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
 		}
 	}
 
@@ -193,7 +199,7 @@ func (ec *ecdsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Q
 func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
 	s, ok := signature.(MultiSignature)
 	if !ok {
-		ec.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		ec.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 
 	n := signature.Participants().Len()
@@ -224,7 +230,7 @@ func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) 
 func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
 	s, ok := signature.(MultiSignature)
 	if !ok {
-		ec.mods.Logger().Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		ec.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 
 	n := signature.Participants().Len()
@@ -258,9 +264,9 @@ func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 }
 
 func (ec *ecdsaBase) verifySingle(sig *Signature, hash hotstuff.Hash) bool {
-	replica, ok := ec.mods.Configuration().Replica(sig.Signer())
+	replica, ok := ec.configuration.Replica(sig.Signer())
 	if !ok {
-		ec.mods.Logger().Warnf("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
+		ec.logger.Warnf("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
 		return false
 	}
 	pk := replica.PublicKey().(*ecdsa.PublicKey)

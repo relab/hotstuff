@@ -14,6 +14,7 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
@@ -34,11 +35,28 @@ func (id NodeID) String() string {
 }
 
 type node struct {
+	blockChain     modules.BlockChain
+	consensus      modules.Consensus
+	eventLoop      *eventloop.EventLoop
+	leaderRotation modules.LeaderRotation
+	synchronizer   modules.Synchronizer
+	opts           *modules.Options
+
 	id             NodeID
-	mods           *modules.ConsensusCore
 	executedBlocks []*hotstuff.Block
 	effectiveView  hotstuff.View
 	log            strings.Builder
+}
+
+func (n *node) InitModule(mods *modules.Core) {
+	mods.Get(
+		&n.blockChain,
+		&n.consensus,
+		&n.eventLoop,
+		&n.leaderRotation,
+		&n.synchronizer,
+		&n.opts,
+	)
 }
 
 type pendingMessage struct {
@@ -89,16 +107,16 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 	return n
 }
 
-// GetNodeBuilder returns a consensus.ConsensusBuilder instance for a node in the network.
-func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) modules.ConsensusBuilder {
+// GetNodeBuilder returns a consensus.Builder instance for a node in the network.
+func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) modules.Builder {
 	node := node{
 		id: id,
 	}
 	n.nodes[id.NetworkID] = &node
 	n.replicas[id.ReplicaID] = append(n.replicas[id.ReplicaID], &node)
-	builder := modules.NewConsensusBuilder(id.ReplicaID, pk)
+	builder := modules.NewBuilder(id.ReplicaID, pk)
 	// register node as an anonymous module because that allows configuration to obtain it.
-	builder.Register(&node)
+	builder.Add(&node)
 	return builder
 }
 
@@ -119,7 +137,8 @@ func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusN
 		if !ok {
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
-		builder.Register(
+		builder.Add(
+			eventloop.New(100),
 			blockchain.New(),
 			consensus.New(consensusModule),
 			consensus.NewVotingMachine(),
@@ -128,12 +147,12 @@ func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusN
 			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			// twins-specific:
 			&configuration{network: n, node: node},
-			leaderRotation(n.views),
-			commandModule{commandGenerator: cg, node: node},
 			&timeoutManager{network: n, node: node, timeout: 5},
+			leaderRotation(n.views),
+			&commandModule{commandGenerator: cg, node: node},
 		)
-		builder.OptionsBuilder().SetShouldVerifyVotesSync()
-		node.mods = builder.Build()
+		builder.Options().SetShouldVerifyVotesSync()
+		builder.Build()
 	}
 	return nil
 }
@@ -141,8 +160,8 @@ func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusN
 func (n *Network) run(ticks int) {
 	// kick off the initial proposal(s)
 	for _, node := range n.nodes {
-		if node.mods.LeaderRotation().GetLeader(1) == node.id.ReplicaID {
-			node.mods.Consensus().Propose(node.mods.Synchronizer().(*synchronizer.Synchronizer).SyncInfo())
+		if node.leaderRotation.GetLeader(1) == node.id.ReplicaID {
+			node.consensus.Propose(node.synchronizer.(*synchronizer.Synchronizer).SyncInfo())
 		}
 	}
 
@@ -154,14 +173,14 @@ func (n *Network) run(ticks int) {
 // tick performs one tick for each node
 func (n *Network) tick() {
 	for _, msg := range n.pendingMessages {
-		n.nodes[msg.receiver].mods.EventLoop().AddEvent(msg.message)
+		n.nodes[msg.receiver].eventLoop.AddEvent(msg.message)
 	}
 	n.pendingMessages = nil
 
 	for _, node := range n.nodes {
-		node.mods.EventLoop().AddEvent(tick{})
+		node.eventLoop.AddEvent(tick{})
 		// run each event loop as long as it has events
-		for node.mods.EventLoop().Tick() {
+		for node.eventLoop.Tick() {
 		}
 	}
 }
@@ -176,10 +195,10 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 
 	// Index into viewPartitions.
 	i := -1
-	if node.effectiveView > node.mods.Synchronizer().View() {
+	if node.effectiveView > node.synchronizer.View() {
 		i += int(node.effectiveView)
 	} else {
-		i += int(node.mods.Synchronizer().View())
+		i += int(node.synchronizer.View())
 	}
 
 	if i < 0 {
@@ -215,10 +234,9 @@ type configuration struct {
 }
 
 // alternative way to get a pointer to the node.
-func (c *configuration) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
+func (c *configuration) InitModule(mods *modules.Core) {
 	if c.node == nil {
-		mods.GetModuleByType(&c.node)
-		c.node.mods = mods
+		mods.TryGet(&c.node)
 	}
 }
 
@@ -323,7 +341,7 @@ func (c *configuration) Fetch(_ context.Context, hash hotstuff.Hash) (block *hot
 			if c.shouldDrop(node.id, hash) {
 				continue
 			}
-			block, ok = node.mods.BlockChain().LocalGet(hash)
+			block, ok = node.blockChain.LocalGet(hash)
 			if ok {
 				return block, true
 			}
@@ -346,13 +364,13 @@ func (r *replica) ID() hotstuff.ID {
 
 // PublicKey returns the replica's public key.
 func (r *replica) PublicKey() hotstuff.PublicKey {
-	return r.config.network.replicas[r.id][0].mods.PrivateKey().Public()
+	return r.config.network.replicas[r.id][0].opts.PrivateKey().Public()
 }
 
 // Vote sends the partial certificate to the other replica.
 func (r *replica) Vote(cert hotstuff.PartialCert) {
 	r.config.sendMessage(r.id, hotstuff.VoteMsg{
-		ID:          r.config.node.mods.ID(),
+		ID:          r.config.node.opts.ID(),
 		PartialCert: cert,
 	})
 }
@@ -360,13 +378,13 @@ func (r *replica) Vote(cert hotstuff.PartialCert) {
 // NewView sends the quorum certificate to the other replica.
 func (r *replica) NewView(si hotstuff.SyncInfo) {
 	r.config.sendMessage(r.id, hotstuff.NewViewMsg{
-		ID:       r.config.node.mods.ID(),
+		ID:       r.config.node.opts.ID(),
 		SyncInfo: si,
 	})
 }
 
 func (r *replica) Metadata() map[string]string {
-	return r.config.network.replicas[r.id][0].mods.Options().ConnectionMetadata()
+	return r.config.network.replicas[r.id][0].opts.ConnectionMetadata()
 }
 
 // NodeSet is a set of network ids.
@@ -409,7 +427,9 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 type tick struct{}
 
 type timeoutManager struct {
-	mods      *modules.ConsensusCore
+	synchronizer modules.Synchronizer
+	eventLoop    *eventloop.EventLoop
+
 	node      *node
 	network   *Network
 	countdown int
@@ -419,8 +439,8 @@ type timeoutManager struct {
 func (tm *timeoutManager) advance() {
 	tm.countdown--
 	if tm.countdown == 0 {
-		view := tm.mods.Synchronizer().View()
-		tm.mods.EventLoop().AddEvent(synchronizer.TimeoutEvent{View: view})
+		view := tm.synchronizer.View()
+		tm.eventLoop.AddEvent(synchronizer.TimeoutEvent{View: view})
 		tm.countdown = tm.timeout
 		if tm.node.effectiveView <= view {
 			tm.node.effectiveView = view + 1
@@ -440,12 +460,16 @@ func (tm *timeoutManager) viewChange(event synchronizer.ViewChangeEvent) {
 
 // InitModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (tm *timeoutManager) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
-	tm.mods = mods
-	tm.mods.EventLoop().RegisterObserver(tick{}, func(event any) {
+func (tm *timeoutManager) InitModule(mods *modules.Core) {
+	mods.Get(
+		&tm.synchronizer,
+		&tm.eventLoop,
+	)
+
+	tm.eventLoop.RegisterObserver(tick{}, func(event any) {
 		tm.advance()
 	})
-	tm.mods.EventLoop().RegisterObserver(synchronizer.ViewChangeEvent{}, func(event any) {
+	tm.eventLoop.RegisterObserver(synchronizer.ViewChangeEvent{}, func(event any) {
 		tm.viewChange(event.(synchronizer.ViewChangeEvent))
 	})
 }

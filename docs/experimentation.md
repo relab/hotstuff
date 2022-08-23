@@ -54,19 +54,13 @@ events from the `Executor` module. The event type should not be defined in the m
 as that would require the other module to import the metrics module.
 
 ```go
-srv.mods.EventLoop().AddEvent(consensus.CommitEvent{Commands: len(batch.GetCommands())}
+eventLoop.AddEvent(consensus.CommitEvent{Commands: len(batch.GetCommands())}
 ```
-
-**NOTE:** In earlier versions, we used a separate event loop for metrics.
-This is no longer the case, and though the method `MetricsEventLoop()` remains,
-it now returns the same event loop as the `EventLoop()` method.
 
 ### Create a module for your metric
 
-To be able to interact with the event loop and other modules, you must implement either the `modules.CoreModule`
-or `modules.ConsensusModule` interfaces. The former should be preferred unless you need to access any of the consensus
-modules directly. In the `InitModule` functions you should add an observer or handler for
-the events that you want to receive.
+To be able to interact with the event loop and other modules, you must implement the `modules.Module` interface.
+In the `InitModule` functions you should add an observer or handler for the events that you want to receive.
 
 You should also add an observer for the `types.TickEvent` type on the `EventLoop`.
 This event is sent at a configured interval such that each metric can periodically log its measurement.
@@ -74,23 +68,26 @@ The example below shows a complete initialization function for the throughput me
 
 ```go
 // InitModule implements the modules.Module interface
-func (t *Throughput) InitModule(mods *modules.Modules) {
-    // store reference to modules object if it needs to be used later
-    t.mods = mods
+func (t *Throughput) InitModule(mods *modules.Core) {
+    var (
+        eventLoop *eventloop.EventLoop
+        logger logging.Logger
+    )
+    mods.Get(&eventLoop, &logger)
 
     // register handlers/observers for relevant events
-    t.mods.EventLoop().RegisterHandler(consensus.CommitEvent{}, func(event interface{}) {
+    eventLoop.RegisterHandler(consensus.CommitEvent{}, func(event interface{}) {
         // The event loop will only call the handler with events of the specified type, so this assertion is safe.
         commitEvent := event.(consensus.CommitEvent)
         t.recordCommit(commitEvent.Commands)
     })
 
     // register observer for tick events
-    t.mods.EventLoop().RegisterObserver(types.TickEvent{}, func(event interface{}) {
+    eventLoop.RegisterObserver(types.TickEvent{}, func(event interface{}) {
         t.tick(event.(types.TickEvent))
     })
 
-    t.mods.Logger().Info("Throughput metric enabled")
+    logger.Info("Throughput metric enabled")
 }
 ```
 

@@ -10,20 +10,18 @@ func init() {
 }
 
 type roundRobin struct {
-	mods *modules.ConsensusCore
+	configuration modules.Configuration
 }
 
-// InitModule gives the module a reference to the ConsensusCore object.
-// It also allows the module to set module options using the OptionsBuilder.
-func (rr *roundRobin) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
-	rr.mods = mods
+func (rr *roundRobin) InitModule(mods *modules.Core) {
+	mods.Get(&rr.configuration)
 }
 
 // GetLeader returns the id of the leader in the given view
 func (rr roundRobin) GetLeader(view hotstuff.View) hotstuff.ID {
 	// TODO: does not support reconfiguration
 	// assume IDs start at 1
-	return chooseRoundRobin(view, rr.mods.Configuration().Len())
+	return chooseRoundRobin(view, rr.configuration.Len())
 }
 
 // NewRoundRobin returns a new round-robin leader rotation implementation.

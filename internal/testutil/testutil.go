@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/modules"
 
 	"github.com/golang/mock/gomock"
@@ -26,7 +27,7 @@ import (
 )
 
 // TestModules registers default modules for testing to the given builder.
-func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey hotstuff.PrivateKey, builder *modules.ConsensusBuilder) {
+func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey hotstuff.PrivateKey, builder *modules.Builder) {
 	t.Helper()
 
 	acceptor := mocks.NewMockAcceptor(ctrl)
@@ -35,6 +36,8 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 
 	executor := mocks.NewMockExecutor(ctrl)
 	executor.EXPECT().Exec(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes()
+
+	forkHandler := mocks.NewMockForkHandler(ctrl)
 
 	commandQ := mocks.NewMockCommandQueue(ctrl)
 	commandQ.EXPECT().Get(gomock.Any()).AnyTimes().Return(hotstuff.Command("foo"), true)
@@ -45,15 +48,12 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 	config.EXPECT().Len().AnyTimes().Return(1)
 	config.EXPECT().QuorumSize().AnyTimes().Return(3)
 
-	replica := CreateMockReplica(t, ctrl, id, privkey.Public())
-	ConfigAddReplica(t, config, replica)
-	config.EXPECT().Replicas().AnyTimes().Return((map[hotstuff.ID]modules.Replica{1: replica}))
-
 	synchronizer := mocks.NewMockSynchronizer(ctrl)
 	synchronizer.EXPECT().Start(gomock.Any()).AnyTimes()
 	synchronizer.EXPECT().ViewContext().AnyTimes().Return(context.Background())
 
-	builder.Register(
+	builder.Add(
+		eventloop.New(100),
 		logging.New(fmt.Sprintf("hs%d", id)),
 		blockchain.New(),
 		mocks.NewMockConsensus(ctrl),
@@ -63,16 +63,17 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey 
 		config,
 		signer,
 		acceptor,
-		executor,
+		modules.ExtendedExecutor(executor),
 		commandQ,
+		modules.ExtendedForkHandler(forkHandler),
 	)
 }
 
 // BuilderList is a helper type to perform actions on a set of builders.
-type BuilderList []*modules.ConsensusBuilder
+type BuilderList []*modules.Builder
 
 // HotStuffList is a helper type to perform actions on a set of HotStuff instances.
-type HotStuffList []*modules.ConsensusCore
+type HotStuffList []*modules.Core
 
 // Build calls Build() for all of the builders.
 func (bl BuilderList) Build() HotStuffList {
@@ -87,7 +88,7 @@ func (bl BuilderList) Build() HotStuffList {
 func (hl HotStuffList) Signers() (signers []modules.Crypto) {
 	signers = make([]modules.Crypto, len(hl))
 	for i, hs := range hl {
-		signers[i] = hs.Crypto()
+		hs.Get(&signers[i])
 	}
 	return signers
 }
@@ -96,7 +97,7 @@ func (hl HotStuffList) Signers() (signers []modules.Crypto) {
 func (hl HotStuffList) Verifiers() (verifiers []modules.Crypto) {
 	verifiers = make([]modules.Crypto, len(hl))
 	for i, hs := range hl {
-		verifiers[i] = hs.Crypto()
+		hs.Get(&verifiers[i])
 	}
 	return verifiers
 }
@@ -105,7 +106,9 @@ func (hl HotStuffList) Verifiers() (verifiers []modules.Crypto) {
 func (hl HotStuffList) Keys() (keys []hotstuff.PrivateKey) {
 	keys = make([]hotstuff.PrivateKey, len(hl))
 	for i, hs := range hl {
-		keys[i] = hs.PrivateKey()
+		var opts *modules.Options
+		hs.Get(&opts)
+		keys[i] = opts.PrivateKey()
 	}
 	return keys
 }
@@ -114,7 +117,7 @@ func (hl HotStuffList) Keys() (keys []hotstuff.PrivateKey) {
 func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstuff.PrivateKey) (builders BuilderList) {
 	t.Helper()
 	network := twins.NewSimpleNetwork()
-	builders = make([]*modules.ConsensusBuilder, n)
+	builders = make([]*modules.Builder, n)
 	for i := 0; i < n; i++ {
 		id := hotstuff.ID(i + 1)
 		var key hotstuff.PrivateKey
@@ -125,61 +128,12 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 		}
 
 		builder := network.GetNodeBuilder(twins.NodeID{ReplicaID: id, NetworkID: uint32(id)}, key)
+		builder.Add(network.NewConfiguration())
 		TestModules(t, ctrl, id, key, &builder)
-		builder.Register(network.NewConfiguration())
+		builder.Add(network.NewConfiguration())
 		builders[i] = &builder
 	}
 	return builders
-}
-
-// CreateMockConfigurationWithReplicas creates a configuration with n replicas.
-func CreateMockConfigurationWithReplicas(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstuff.PrivateKey) (*mocks.MockConfiguration, []*mocks.MockReplica) {
-	t.Helper()
-	cfg := mocks.NewMockConfiguration(ctrl)
-	replicas := make([]*mocks.MockReplica, n)
-	if len(keys) == 0 {
-		keys = make([]hotstuff.PrivateKey, 0, n)
-	}
-	for i := 0; i < n; i++ {
-		if len(keys) <= i {
-			keys = append(keys, GenerateECDSAKey(t))
-		}
-		replicas[i] = CreateMockReplica(t, ctrl, hotstuff.ID(i+1), keys[i].Public())
-		ConfigAddReplica(t, cfg, replicas[i])
-	}
-	cfg.EXPECT().Len().AnyTimes().Return(len(replicas))
-	cfg.EXPECT().QuorumSize().AnyTimes().Return(hotstuff.QuorumSize(len(replicas)))
-	return cfg, replicas
-}
-
-// CreateMockReplica returns a mock of a consensus.Replica.
-func CreateMockReplica(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, key hotstuff.PublicKey) *mocks.MockReplica {
-	t.Helper()
-
-	replica := mocks.NewMockReplica(ctrl)
-	replica.
-		EXPECT().
-		ID().
-		AnyTimes().
-		Return(id)
-	replica.
-		EXPECT().
-		PublicKey().
-		AnyTimes().
-		Return(key)
-
-	return replica
-}
-
-// ConfigAddReplica adds a mock replica to a mock configuration.
-func ConfigAddReplica(t *testing.T, cfg *mocks.MockConfiguration, replica *mocks.MockReplica) {
-	t.Helper()
-
-	cfg.
-		EXPECT().
-		Replica(replica.ID()).
-		AnyTimes().
-		Return(replica, true)
 }
 
 // CreateTCPListener creates a net.Listener on a random port.

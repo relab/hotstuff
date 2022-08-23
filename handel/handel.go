@@ -6,7 +6,8 @@
 // Enabling Handel from the CLI.
 //
 // Handel can be enabled through the `--modules` flag:
-//  ./hotstuff run --modules="handel"
+//
+//	./hotstuff run --modules="handel"
 //
 // Initialization.
 //
@@ -26,14 +27,15 @@
 package handel
 
 import (
-	"errors"
 	"math"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/handelpb"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -43,93 +45,108 @@ func init() {
 
 // Handel implements a signature aggregation protocol.
 type Handel struct {
-	mods     *modules.ConsensusCore
+	configuration *backend.Config
+	server        *backend.Server
+
+	blockChain   modules.BlockChain
+	crypto       modules.Crypto
+	eventLoop    *eventloop.EventLoop
+	logger       logging.Logger
+	opts         *modules.Options
+	synchronizer modules.Synchronizer
+
 	nodes    map[hotstuff.ID]*handelpb.Node
 	maxLevel int
 	sessions map[hotstuff.Hash]*session
+	initDone bool
 }
 
 // New returns a new instance of the Handel module.
 func New() modules.Handel {
 	return &Handel{
-		nodes: make(map[hotstuff.ID]*handelpb.Node),
+		nodes:    make(map[hotstuff.ID]*handelpb.Node),
+		sessions: make(map[hotstuff.Hash]*session),
 	}
 }
 
-// InitModule gives the module a reference to the ConsensusCore object.
-// It also allows the module to set module options using the OptionsBuilder.
-func (h *Handel) InitModule(mods *modules.ConsensusCore, opts *modules.OptionsBuilder) {
-	h.mods = mods
-	opts.SetShouldUseHandel()
+// InitModule initializes the Handel module.
+func (h *Handel) InitModule(mods *modules.Core) {
+	mods.Get(
+		&h.configuration,
+		&h.server,
 
-	// the rest of the setup is deferred to the Init method.
-	// FIXME: it could be possible to handle the Init stuff automatically
-	// if the Configuration module were to send an event upon connecting.
-}
+		&h.blockChain,
+		&h.crypto,
+		&h.eventLoop,
+		&h.logger,
+		&h.opts,
+		&h.synchronizer,
+	)
 
-// Init initializes the Handel module.
-func (h *Handel) Init() error {
-	h.mods.Logger().Info("Handel: Initializing")
+	h.opts.SetShouldUseHandel()
 
-	h.sessions = make(map[hotstuff.Hash]*session)
+	h.eventLoop.RegisterObserver(backend.ConnectedEvent{}, func(_ any) {
+		h.postInit()
+	})
 
-	var cfg *backend.Config
-	var srv *backend.Server
-
-	if !h.mods.GetModuleByType(&srv) {
-		return errors.New("could not get gorums server")
-	}
-	if !h.mods.GetModuleByType(&cfg) {
-		return errors.New("could not get gorums configuration")
-	}
-
-	handelpb.RegisterHandelServer(srv.GetGorumsServer(), serviceImpl{h})
-	handelCfg := handelpb.ConfigurationFromRaw(cfg.GetRawConfiguration(), nil)
-
-	for _, n := range handelCfg.Nodes() {
-		h.nodes[hotstuff.ID(n.ID())] = n
-	}
-
-	h.maxLevel = int(math.Ceil(math.Log2(float64(h.mods.Configuration().Len()))))
-
-	h.mods.EventLoop().RegisterHandler(contribution{}, func(event any) {
+	h.eventLoop.RegisterHandler(contribution{}, func(event any) {
 		c := event.(contribution)
 		if s, ok := h.sessions[c.hash]; ok {
 			s.handleContribution(c)
 		} else if !c.deferred {
 			c.deferred = true
-			h.mods.EventLoop().DelayUntil(hotstuff.ProposeMsg{}, c)
+			h.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, c)
 		}
 	})
 
-	h.mods.EventLoop().RegisterHandler(disseminateEvent{}, func(e any) {
+	h.eventLoop.RegisterHandler(sessionDoneEvent{}, func(event any) {
+		e := event.(sessionDoneEvent)
+		delete(h.sessions, e.hash)
+	})
+}
+
+func (h *Handel) postInit() {
+	h.logger.Info("Handel: Initializing")
+
+	h.maxLevel = int(math.Ceil(math.Log2(float64(h.configuration.Len()))))
+
+	handelCfg := handelpb.ConfigurationFromRaw(h.configuration.GetRawConfiguration(), nil)
+	for _, n := range handelCfg.Nodes() {
+		h.nodes[hotstuff.ID(n.ID())] = n
+	}
+
+	handelpb.RegisterHandelServer(h.server.GetGorumsServer(), serviceImpl{h})
+
+	// now we can start handling timer events
+	h.eventLoop.RegisterHandler(disseminateEvent{}, func(e any) {
 		if s, ok := h.sessions[e.(disseminateEvent).sessionID]; ok {
-			s.sendContributions(s.h.mods.Synchronizer().ViewContext())
+			s.sendContributions(s.h.synchronizer.ViewContext())
 		}
 	})
 
-	h.mods.EventLoop().RegisterHandler(levelActivateEvent{}, func(e any) {
+	h.eventLoop.RegisterHandler(levelActivateEvent{}, func(e any) {
 		if s, ok := h.sessions[e.(levelActivateEvent).sessionID]; ok {
 			s.advanceLevel()
 		}
 	})
 
-	h.mods.EventLoop().RegisterHandler(sessionDoneEvent{}, func(event any) {
-		e := event.(sessionDoneEvent)
-		delete(h.sessions, e.hash)
-	})
-
-	return nil
+	h.initDone = true
 }
 
 // Begin commissions the aggregation of a new signature.
 func (h *Handel) Begin(s hotstuff.PartialCert) {
+	if !h.initDone {
+		// wait until initialization is done
+		h.eventLoop.DelayUntil(backend.ConnectedEvent{}, func() { h.Begin(s) })
+		return
+	}
+
 	// turn the single signature into a threshold signature,
 	// this makes it easier to work with.
 	session := h.newSession(s.BlockHash(), s.Signature())
 	h.sessions[s.BlockHash()] = session
 
-	go session.verifyContributions(h.mods.Synchronizer().ViewContext())
+	go session.verifyContributions(h.synchronizer.ViewContext())
 }
 
 type serviceImpl struct {
@@ -140,16 +157,16 @@ func (impl serviceImpl) Contribute(ctx gorums.ServerCtx, msg *handelpb.Contribut
 	var hash hotstuff.Hash
 	copy(hash[:], msg.GetHash())
 
-	id, err := backend.GetPeerIDFromContext(ctx, impl.h.mods.Configuration())
+	id, err := backend.GetPeerIDFromContext(ctx, impl.h.configuration)
 	if err != nil {
-		impl.h.mods.Logger().Error(err)
+		impl.h.logger.Error(err)
 	}
 
 	sig := hotstuffpb.QuorumSignatureFromProto(msg.GetSignature())
 	indiv := hotstuffpb.QuorumSignatureFromProto(msg.GetIndividual())
 
 	if sig != nil && indiv != nil {
-		impl.h.mods.EventLoop().AddEvent(contribution{
+		impl.h.eventLoop.AddEvent(contribution{
 			hash:       hash,
 			sender:     id,
 			level:      int(msg.GetLevel()),
@@ -158,7 +175,7 @@ func (impl serviceImpl) Contribute(ctx gorums.ServerCtx, msg *handelpb.Contribut
 			verified:   false,
 		})
 	} else {
-		impl.h.mods.Logger().Warnf("contribution received with invalid signatures: %v, %v", sig, indiv)
+		impl.h.logger.Warnf("contribution received with invalid signatures: %v, %v", sig, indiv)
 	}
 }
 

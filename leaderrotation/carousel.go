@@ -4,6 +4,7 @@ import (
 	"math/rand"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"golang.org/x/exp/slices"
 )
@@ -13,31 +14,41 @@ func init() {
 }
 
 type carousel struct {
-	mods *modules.ConsensusCore
+	blockChain    modules.BlockChain
+	configuration modules.Configuration
+	consensus     modules.Consensus
+	opts          *modules.Options
+	logger        logging.Logger
 }
 
-func (c *carousel) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
-	c.mods = mods
+func (c *carousel) InitModule(mods *modules.Core) {
+	mods.Get(
+		&c.blockChain,
+		&c.configuration,
+		&c.consensus,
+		&c.opts,
+		&c.logger,
+	)
 }
 
 func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
-	commitHead := c.mods.Consensus().CommittedBlock()
+	commitHead := c.consensus.CommittedBlock()
 
 	if commitHead.QuorumCert().Signature() == nil {
-		c.mods.Logger().Debug("in startup; using round-robin")
-		return chooseRoundRobin(round, c.mods.Configuration().Len())
+		c.logger.Debug("in startup; using round-robin")
+		return chooseRoundRobin(round, c.configuration.Len())
 	}
 
-	if commitHead.View() != round-hotstuff.View(c.mods.Consensus().ChainLength()) {
-		c.mods.Logger().Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.View())
-		return chooseRoundRobin(round, c.mods.Configuration().Len())
+	if commitHead.View() != round-hotstuff.View(c.consensus.ChainLength()) {
+		c.logger.Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.View())
+		return chooseRoundRobin(round, c.configuration.Len())
 	}
 
-	c.mods.Logger().Debug("proceeding with carousel")
+	c.logger.Debug("proceeding with carousel")
 
 	var (
 		block       = commitHead
-		f           = hotstuff.NumFaulty(c.mods.Configuration().Len())
+		f           = hotstuff.NumFaulty(c.configuration.Len())
 		i           = 0
 		lastAuthors = hotstuff.NewIDSet()
 		ok          = true
@@ -45,11 +56,11 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 
 	for ok && i < f && block != hotstuff.GetGenesis() {
 		lastAuthors.Add(block.Proposer())
-		block, ok = c.mods.BlockChain().Get(block.Parent())
+		block, ok = c.blockChain.Get(block.Parent())
 		i++
 	}
 
-	candidates := make([]hotstuff.ID, 0, c.mods.Configuration().Len()-f)
+	candidates := make([]hotstuff.ID, 0, c.configuration.Len()-f)
 
 	commitHead.QuorumCert().Signature().Participants().ForEach(func(id hotstuff.ID) {
 		if !lastAuthors.Contains(id) {
@@ -58,11 +69,11 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 	})
 	slices.Sort(candidates)
 
-	seed := c.mods.Options().SharedRandomSeed() + int64(round)
+	seed := c.opts.SharedRandomSeed() + int64(round)
 	rnd := rand.New(rand.NewSource(seed))
 
 	leader := candidates[rnd.Int()%len(candidates)]
-	c.mods.Logger().Debugf("chose id %d", leader)
+	c.logger.Debugf("chose id %d", leader)
 
 	return leader
 }

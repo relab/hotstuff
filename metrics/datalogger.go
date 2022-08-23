@@ -1,30 +1,33 @@
-package modules
+package metrics
 
 import (
 	"fmt"
 	"io"
 	"sync"
 
+	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/modules"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// MetricsLogger logs data in protobuf message format.
-type MetricsLogger interface {
+// Logger logs data in protobuf message format.
+type Logger interface {
 	Log(proto.Message)
 	io.Closer
 }
 
 type jsonLogger struct {
+	logger logging.Logger
+
 	mut   sync.Mutex
-	mods  *Core
 	wr    io.Writer
 	first bool
 }
 
 // NewJSONLogger returns a new metrics logger that logs to the specified writer.
-func NewJSONLogger(wr io.Writer) (MetricsLogger, error) {
+func NewJSONLogger(wr io.Writer) (Logger, error) {
 	_, err := io.WriteString(wr, "[\n")
 	if err != nil {
 		return nil, fmt.Errorf("failed to write start of JSON array: %v", err)
@@ -33,8 +36,8 @@ func NewJSONLogger(wr io.Writer) (MetricsLogger, error) {
 }
 
 // InitModule initializes the metrics logger module.
-func (dl *jsonLogger) InitModule(mods *Core) {
-	dl.mods = mods
+func (dl *jsonLogger) InitModule(mods *modules.Core) {
+	mods.Get(&dl.logger)
 }
 
 func (dl *jsonLogger) Log(msg proto.Message) {
@@ -46,13 +49,13 @@ func (dl *jsonLogger) Log(msg proto.Message) {
 	if any, ok = msg.(*anypb.Any); !ok {
 		any, err = anypb.New(msg)
 		if err != nil {
-			dl.mods.Logger().Errorf("failed to create Any message: %v", err)
+			dl.logger.Errorf("failed to create Any message: %v", err)
 			return
 		}
 	}
 	err = dl.write(any)
 	if err != nil {
-		dl.mods.Logger().Errorf("failed to write message to log: %v", err)
+		dl.logger.Errorf("failed to write message to log: %v", err)
 	}
 }
 
@@ -94,6 +97,6 @@ func (nopLogger) Close() error      { return nil }
 
 // NopLogger returns a metrics logger that discards any messages.
 // This is useful for testing and other situations where metrics logging is disabled.
-func NopLogger() MetricsLogger {
+func NopLogger() Logger {
 	return nopLogger{}
 }

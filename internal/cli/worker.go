@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/protostream"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/metrics"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +20,7 @@ var (
 	trace         string
 	fgprofProfile string
 
-	metrics             []string
+	enableMetrics       []string
 	measurementInterval time.Duration
 )
 
@@ -54,7 +54,7 @@ func init() {
 	workerCmd.Flags().StringVar(&trace, "trace", "", "Path to store a trace")
 	workerCmd.Flags().StringVar(&fgprofProfile, "fgprof-profile", "", "Path to store a fgprof profile")
 
-	workerCmd.Flags().StringSliceVar(&metrics, "metrics", nil, "the metrics to enable")
+	workerCmd.Flags().StringSliceVar(&enableMetrics, "metrics", nil, "the metrics to enable")
 	workerCmd.Flags().DurationVar(&measurementInterval, "measurement-interval", 0, "the interval between measurements")
 }
 
@@ -66,12 +66,12 @@ func runWorker() {
 		checkf("failed to stop profilers: %v", err)
 	}()
 
-	metricsLogger := modules.NopLogger()
+	metricsLogger := metrics.NopLogger()
 	if dataPath != "" {
 		f, err := os.OpenFile(dataPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 		checkf("failed to create data path: %v", err)
 		writer := bufio.NewWriter(f)
-		metricsLogger, err = modules.NewJSONLogger(writer)
+		metricsLogger, err = metrics.NewJSONLogger(writer)
 		defer func() {
 			err = metricsLogger.Close()
 			checkf("failed to close metrics logger: %v", err)
@@ -82,7 +82,7 @@ func runWorker() {
 		}()
 	}
 
-	worker := orchestration.NewWorker(protostream.NewWriter(os.Stdout), protostream.NewReader(os.Stdin), metricsLogger, metrics, measurementInterval)
+	worker := orchestration.NewWorker(protostream.NewWriter(os.Stdout), protostream.NewReader(os.Stdin), metricsLogger, enableMetrics, measurementInterval)
 	err = worker.Run()
 	if err != nil {
 		log.Println(err)
