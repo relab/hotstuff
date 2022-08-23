@@ -51,7 +51,7 @@ func init() {
 	runCmd.Flags().Int("payload-size", 0, "size in bytes of the command payload")
 	runCmd.Flags().Int("max-concurrent", 4, "maximum number of conccurrent commands per client")
 	runCmd.Flags().Duration("client-timeout", 500*time.Millisecond, "Client timeout.")
-	runCmd.Flags().Duration("duration", 10*time.Second, "duration of the experiment")
+	runCmd.Flags().Duration("duration", 10*time.Second, "maximum duration of the experiment.")
 	runCmd.Flags().Duration("connect-timeout", 5*time.Second, "duration of the initial connection timeout")
 	runCmd.Flags().Duration("view-timeout", 100*time.Millisecond, "duration of the first view")
 	runCmd.Flags().Duration("max-timeout", 0, "upper limit on view timeouts")
@@ -62,6 +62,7 @@ func init() {
 	runCmd.Flags().String("leader-rotation", "round-robin", "name of the leader rotation algorithm")
 	runCmd.Flags().Int64("shared-seed", 0, "Shared random number generator seed")
 	runCmd.Flags().StringSlice("modules", nil, "Name additional modules to be loaded.")
+	runCmd.Flags().Uint64("views", 0, "number of views to run. 0 means run until duration is up")
 
 	runCmd.Flags().Bool("worker", false, "run a local worker")
 	runCmd.Flags().StringSlice("hosts", nil, "the remote hosts to run the experiment on via ssh")
@@ -102,6 +103,7 @@ func runController() {
 		NumReplicas: viper.GetInt("replicas"),
 		NumClients:  viper.GetInt("clients"),
 		Duration:    viper.GetDuration("duration"),
+		Views:       viper.GetUint64("views"),
 		Output:      outputDir,
 		ReplicaOpts: &orchestrationpb.ReplicaOpts{
 			UseTLS:            true,

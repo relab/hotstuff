@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -17,6 +18,12 @@ import (
 	"github.com/relab/hotstuff/logging"
 	"go.uber.org/multierr"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
+)
+
+var (
+	// ErrHashMismatch is returned when one or more replicas have a different hash than the others.
+	ErrHashMismatch = errors.New("hash mismatch")
 )
 
 // HostConfig specifies the number of replicas and clients that should be started on a specific host.
@@ -37,6 +44,7 @@ type Experiment struct {
 	NumReplicas int
 	NumClients  int
 	Duration    time.Duration
+	Views       uint64
 
 	Hosts       map[string]RemoteWorker
 	HostConfigs map[string]HostConfig
@@ -86,23 +94,22 @@ func (e *Experiment) Run() (err error) {
 	}
 
 	e.Logger.Info("Starting clients...")
-	err = e.startClients(cfg)
+	err = e.createClients(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to start clients: %w", err)
 	}
 
-	time.Sleep(e.Duration)
+	e.Logger.Info("Running experiment...")
+	err = e.run()
+	if err != nil {
+		return fmt.Errorf("failed to run experiment: %w", err)
+	}
 
 	e.Logger.Info("Stopping clients...")
 	err = e.stopClients()
 	if err != nil {
 		return fmt.Errorf("failed to stop clients: %w", err)
 	}
-
-	wait := 5 * e.ReplicaOpts.GetInitialTimeout().AsDuration()
-	e.Logger.Infof("Waiting %s for replicas to finish.", wait)
-	// give the replicas some time to commit the last batch
-	time.Sleep(wait)
 
 	e.Logger.Info("Stopping replicas...")
 	err = e.stopReplicas()
@@ -355,9 +362,9 @@ func (e *Experiment) stopReplicas() error {
 	return nil
 }
 
-func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration) error {
+func (e *Experiment) createClients(cfg *orchestrationpb.ReplicaConfiguration) error {
 	for host, worker := range e.Hosts {
-		req := &orchestrationpb.StartClientRequest{}
+		req := &orchestrationpb.CreateClientRequest{}
 		req.Clients = make(map[uint32]*orchestrationpb.ClientOpts)
 		req.Configuration = cfg.GetReplicas()
 		req.CertificateAuthority = keygen.CertToPEM(e.ca)
@@ -366,7 +373,7 @@ func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration) err
 			clientOpts.ID = uint32(id)
 			req.Clients[uint32(id)] = clientOpts
 		}
-		_, err := worker.StartClient(req)
+		_, err := worker.CreateClient(req)
 		if err != nil {
 			return err
 		}
@@ -383,6 +390,70 @@ func (e *Experiment) stopClients() error {
 			return err
 		}
 	}
+	return nil
+}
+
+func (e *Experiment) run() (err error) {
+	type result struct {
+		resp *orchestrationpb.RunResponse
+		err  error
+	}
+
+	results := make(chan result)
+	expectedResults := len(e.Hosts)
+
+	for host, worker := range e.Hosts {
+		var view *uint64
+		if e.Views > 0 {
+			view = new(uint64)
+			*view = uint64(e.Views)
+		}
+		req := &orchestrationpb.RunRequest{
+			Clients:  getIDs(host, e.hostsToClients),
+			Replicas: getIDs(host, e.hostsToReplicas),
+			Timeout:  durationpb.New(e.Duration),
+			View:     view,
+		}
+
+		if len(req.GetReplicas()) == 0 {
+			expectedResults--
+			continue
+		}
+
+		go func(worker RemoteWorker) {
+			resp, err := worker.Run(req)
+			results <- result{resp, err}
+		}(worker)
+	}
+
+	hashes := make(map[uint32][]byte)
+
+	for i := 0; i < expectedResults; i++ {
+		res := <-results
+
+		if res.err != nil {
+			err = multierr.Append(err, res.err)
+			continue
+		}
+		for id, hash := range res.resp.GetHashes() {
+			hashes[id] = hash
+		}
+	}
+
+	if err != nil {
+		return err
+	}
+
+	var cmp []byte
+	for _, hash := range hashes {
+		if cmp == nil {
+			cmp = hash
+		}
+		if !bytes.Equal(cmp, hash) {
+			e.Logger.Error("hash mismatch")
+		}
+	}
+
 	return nil
 }
 

@@ -80,13 +80,13 @@ func (w RemoteWorker) StopReplica(req *orchestrationpb.StopReplicaRequest) (res 
 	return res, nil
 }
 
-// StartClient requests that the remote worker starts the specified clients.
-func (w RemoteWorker) StartClient(req *orchestrationpb.StartClientRequest) (res *orchestrationpb.StartClientResponse, err error) {
+// CreateClient requests that the remote worker starts the specified clients.
+func (w RemoteWorker) CreateClient(req *orchestrationpb.CreateClientRequest) (res *orchestrationpb.CreateClientResponse, err error) {
 	msg, err := w.rpc(req)
 	if err != nil {
 		return nil, err
 	}
-	res, ok := msg.(*orchestrationpb.StartClientResponse)
+	res, ok := msg.(*orchestrationpb.CreateClientResponse)
 	if !ok {
 		return nil, fmt.Errorf("wrong type for response message: got %T, wanted: %T", msg, res)
 	}
@@ -100,6 +100,19 @@ func (w RemoteWorker) StopClient(req *orchestrationpb.StopClientRequest) (res *o
 		return nil, err
 	}
 	res, ok := msg.(*orchestrationpb.StopClientResponse)
+	if !ok {
+		return nil, fmt.Errorf("wrong type for response message: got %T, wanted: %T", msg, res)
+	}
+	return res, nil
+}
+
+// Run requests that the remote worker runs the experiment.
+func (w RemoteWorker) Run(req *orchestrationpb.RunRequest) (res *orchestrationpb.RunResponse, err error) {
+	msg, err := w.rpc(req)
+	if err != nil {
+		return nil, err
+	}
+	res, ok := msg.(*orchestrationpb.RunResponse)
 	if !ok {
 		return nil, fmt.Errorf("wrong type for response message: got %T, wanted: %T", msg, res)
 	}

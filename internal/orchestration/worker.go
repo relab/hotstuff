@@ -1,11 +1,13 @@
 package orchestration
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"strconv"
 	"time"
@@ -72,8 +74,10 @@ func (w *Worker) Run() error {
 			res, err = w.startReplicas(req)
 		case *orchestrationpb.StopReplicaRequest:
 			res, err = w.stopReplicas(req)
-		case *orchestrationpb.StartClientRequest:
-			res, err = w.startClients(req)
+		case *orchestrationpb.CreateClientRequest:
+			res, err = w.createClients(req)
+		case *orchestrationpb.RunRequest:
+			res, err = w.run(req)
 		case *orchestrationpb.StopClientRequest:
 			res, err = w.stopClients(req)
 		case *orchestrationpb.QuitRequest:
@@ -278,7 +282,7 @@ func (w *Worker) stopReplicas(req *orchestrationpb.StopReplicaRequest) (*orchest
 	return res, nil
 }
 
-func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchestrationpb.StartClientResponse, error) {
+func (w *Worker) createClients(req *orchestrationpb.CreateClientRequest) (*orchestrationpb.CreateClientResponse, error) {
 	ca := req.GetCertificateAuthority()
 	cp := x509.NewCertPool()
 	cp.AppendCertsFromPEM(ca)
@@ -320,11 +324,67 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		if err != nil {
 			return nil, err
 		}
-		cli.Start()
-		w.metricsLogger.Log(&types.StartEvent{Event: types.NewClientEvent(opts.GetID(), time.Now())})
 		w.clients[hotstuff.ID(opts.GetID())] = cli
 	}
-	return &orchestrationpb.StartClientResponse{}, nil
+	return &orchestrationpb.CreateClientResponse{}, nil
+}
+
+func (w *Worker) startClients(clients []uint32) error {
+	for _, id := range clients {
+		cli, ok := w.clients[hotstuff.ID(id)]
+		if !ok {
+			status.Errorf(codes.NotFound, "the client with ID %d was not found", id)
+		}
+		cli.Start()
+		w.metricsLogger.Log(&types.StartEvent{Event: types.NewClientEvent(uint32(id), time.Now())})
+	}
+	return nil
+}
+
+func (w *Worker) run(req *orchestrationpb.RunRequest) (*orchestrationpb.RunResponse, error) {
+
+	log.Printf("timeout: %s, views: %d", req.GetTimeout().String(), req.GetView())
+
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), req.GetTimeout().AsDuration())
+	defer cancel()
+
+	resp := &orchestrationpb.RunResponse{Hashes: make(map[uint32][]byte)}
+
+	doneChs := make(map[uint32]<-chan struct{})
+
+	for _, id := range req.GetReplicas() {
+		r, ok := w.replicas[hotstuff.ID(id)]
+		if !ok {
+			return nil, status.Errorf(codes.NotFound, "the replica with ID %d was not found", id)
+		}
+
+		var eventLoop *eventloop.EventLoop
+		r.Modules().Get(&eventLoop)
+
+		ctx, cancel := synchronizer.ViewContext(timeoutCtx, eventLoop, (*hotstuff.View)(req.View))
+		defer cancel()
+
+		doneChs[id] = ctx.Done()
+	}
+
+	err := w.startClients(req.GetClients())
+	if err != nil {
+		return nil, err
+	}
+
+	for _, ch := range doneChs {
+		<-ch
+	}
+
+	for _, id := range req.GetReplicas() {
+		r, ok := w.replicas[hotstuff.ID(id)]
+		if !ok {
+			return nil, status.Errorf(codes.NotFound, "the replica with ID %d was not found", id)
+		}
+		resp.Hashes[id] = r.GetHash()
+	}
+
+	return resp, nil
 }
 
 func (w *Worker) stopClients(req *orchestrationpb.StopClientRequest) (*orchestrationpb.StopClientResponse, error) {

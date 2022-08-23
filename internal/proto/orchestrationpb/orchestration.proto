@@ -120,7 +120,7 @@ message StopReplicaResponse { map<uint32, bytes> Hashes = 1; }
 
 /* ----------------------------- StartClient RPC ---------------------------- */
 
-message StartClientRequest {
+message CreateClientRequest {
   // The clients to create.
   map<uint32, ClientOpts> Clients = 1;
   // The certificate authority that created the TLS certificates.
@@ -129,7 +129,20 @@ message StartClientRequest {
   map<uint32, ReplicaInfo> Configuration = 10;
 }
 
-message StartClientResponse {}
+message CreateClientResponse {}
+
+/* --------------------------------- Run RPC -------------------------------- */
+
+message RunRequest {
+  repeated uint32 Clients = 1;
+  repeated uint32 Replicas = 2;
+  google.protobuf.Duration Timeout = 3;
+  optional uint64 View = 4;
+}
+
+message RunResponse {
+  map<uint32, bytes> Hashes = 1;
+}
 
 /* ----------------------------- StopClient RPC ----------------------------- */
 
