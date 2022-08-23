@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"strconv"
 	"time"
@@ -266,18 +265,15 @@ func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orche
 	return &orchestrationpb.StartReplicaResponse{}, nil
 }
 
-func (w *Worker) stopReplicas(req *orchestrationpb.StopReplicaRequest) (*orchestrationpb.StopReplicaResponse, error) {
-	res := &orchestrationpb.StopReplicaResponse{
-		Hashes: make(map[uint32][]byte),
-	}
+func (w *Worker) stopReplicas(req *orchestrationpb.StopReplicaRequest) (res *orchestrationpb.StopReplicaResponse, err error) {
+	res = &orchestrationpb.StopReplicaResponse{}
+
 	for _, id := range req.GetIDs() {
 		r, ok := w.replicas[hotstuff.ID(id)]
 		if !ok {
 			return nil, status.Errorf(codes.NotFound, "The replica with id %d was not found.", id)
 		}
 		r.Stop()
-		res.Hashes[id] = r.GetHash()
-		// TODO: return test results
 	}
 	return res, nil
 }
@@ -342,9 +338,6 @@ func (w *Worker) startClients(clients []uint32) error {
 }
 
 func (w *Worker) run(req *orchestrationpb.RunRequest) (*orchestrationpb.RunResponse, error) {
-
-	log.Printf("timeout: %s, views: %d", req.GetTimeout().String(), req.GetView())
-
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), req.GetTimeout().AsDuration())
 	defer cancel()
 
@@ -361,10 +354,13 @@ func (w *Worker) run(req *orchestrationpb.RunRequest) (*orchestrationpb.RunRespo
 		var eventLoop *eventloop.EventLoop
 		r.Modules().Get(&eventLoop)
 
-		ctx, cancel := synchronizer.ViewContext(timeoutCtx, eventLoop, (*hotstuff.View)(req.View))
-		defer cancel()
-
-		doneChs[id] = ctx.Done()
+		if req.GetView() > 0 {
+			ctx, cancel := synchronizer.ViewContext(timeoutCtx, eventLoop, (*hotstuff.View)(req.View))
+			defer cancel()
+			doneChs[id] = ctx.Done()
+		} else {
+			doneChs[id] = timeoutCtx.Done()
+		}
 	}
 
 	err := w.startClients(req.GetClients())

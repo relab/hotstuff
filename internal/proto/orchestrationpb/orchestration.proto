@@ -116,7 +116,7 @@ message StartReplicaResponse {}
 
 message StopReplicaRequest { repeated uint32 IDs = 1; }
 
-message StopReplicaResponse { map<uint32, bytes> Hashes = 1; }
+message StopReplicaResponse {}
 
 /* ----------------------------- StartClient RPC ---------------------------- */
 

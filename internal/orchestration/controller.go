@@ -339,24 +339,11 @@ func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration) (e
 }
 
 func (e *Experiment) stopReplicas() error {
-	hashes := make(map[uint32][]byte)
 	for host, worker := range e.Hosts {
 		req := &orchestrationpb.StopReplicaRequest{IDs: getIDs(host, e.hostsToReplicas)}
-		res, err := worker.StopReplica(req)
+		_, err := worker.StopReplica(req)
 		if err != nil {
 			return err
-		}
-		for id, hash := range res.GetHashes() {
-			hashes[id] = hash
-		}
-	}
-	var cmp []byte
-	for _, hash := range hashes {
-		if cmp == nil {
-			cmp = hash
-		}
-		if !bytes.Equal(cmp, hash) {
-			return fmt.Errorf("hash mismatch")
 		}
 	}
 	return nil
