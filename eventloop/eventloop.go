@@ -215,7 +215,7 @@ func (el *EventLoop) processEvent(event any, async bool) {
 		defer el.dispatchDelayedEvents(t)
 	}
 
-	if f, ok := event.(func()); ok {
+	if f, ok := event.(func()); ok && !async {
 		f()
 		return
 	}
