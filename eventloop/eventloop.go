@@ -77,10 +77,27 @@ func New(bufferSize uint) *EventLoop {
 	return el
 }
 
+// WithOptions is a convenience function for registering handlers with options,
+// by calling RegisterHandler on the returned options.
+func (el *EventLoop) WithOptions(opts ...HandlerOption) HandlerOptions {
+	return HandlerOptions{el, opts}
+}
+
+// HandlerOptions is a list of options for event handlers.
+type HandlerOptions struct {
+	el   *EventLoop
+	opts []HandlerOption
+}
+
+// RegisterHandler registers the given event handler for the given event type with the options.
+func (opts HandlerOptions) RegisterHandler(eventType any, handler EventHandler) int {
+	return opts.el.registerHandler(eventType, opts.opts, handler)
+}
+
 // RegisterObserver registers a handler with priority.
 // Deprecated: use RegisterHandler and the WithPriority option instead.
 func (el *EventLoop) RegisterObserver(eventType any, handler EventHandler) int {
-	return el.RegisterHandler(eventType, handler, WithPriority())
+	return el.WithOptions(WithPriority()).RegisterHandler(eventType, handler)
 }
 
 // UnregisterObserver unregister a handler.
@@ -89,8 +106,13 @@ func (el *EventLoop) UnregisterObserver(eventType any, id int) {
 	el.UnregisterHandler(eventType, id)
 }
 
-// RegisterHandler registers an event handler. The handler will
-func (el *EventLoop) RegisterHandler(eventType any, callback EventHandler, opts ...HandlerOption) int {
+// RegisterHandler registers the given event handler for the given event type with the default handler options.
+// Use WithOptions to specify handler options.
+func (el *EventLoop) RegisterHandler(eventType any, handler EventHandler) int {
+	return el.registerHandler(eventType, nil, handler)
+}
+
+func (el *EventLoop) registerHandler(eventType any, opts []HandlerOption, callback EventHandler) int {
 	h := handler{callback: callback}
 
 	for _, opt := range opts {
