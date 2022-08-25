@@ -210,14 +210,14 @@ func (si *SyncInfo) WithQC(qc *QuorumCert) *SyncInfo {
 
 // WithTC returns a copy of the SyncInfo struct with the given TC.
 func (si *SyncInfo) WithTC(tc *TimeoutCert) *SyncInfo {
-	si.TCert = new(TimeoutCert)
+	//si.TCert = new(TimeoutCert)
 	si.TCert = tc
 	return si
 }
 
 // WithAggQC returns a copy of the SyncInfo struct with the given AggregateQC.
 func (si *SyncInfo) WithAggQC(aggQC *AggQC) *SyncInfo {
-	si.AggQCert = new(AggQC)
+	//si.AggQCert = new(AggQC)
 	si.AggQCert = aggQC
 	return si
 }

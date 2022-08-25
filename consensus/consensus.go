@@ -212,7 +212,8 @@ func (cs *consensusBase) OnPropose(proposal *msg.Proposal) {
 
 	leaderID := cs.mods.LeaderRotation().GetLeader(cs.lastVote + 1)
 	if leaderID == cs.mods.ID() {
-		cs.mods.EventLoop().AddEvent(msg.VoteMsg{ID: cs.mods.ID(), PartialCert: pc})
+		pc.ID = uint32(cs.mods.ID())
+		cs.mods.EventLoop().AddEvent(pc)
 		return
 	}
 

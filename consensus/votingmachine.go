@@ -26,28 +26,27 @@ func NewVotingMachine() *VotingMachine {
 // It also allows the module to set module options using the OptionsBuilder.
 func (vm *VotingMachine) InitModule(mods *modules.ConsensusCore, _ *modules.OptionsBuilder) {
 	vm.mods = mods
-	vm.mods.EventLoop().RegisterHandler(msg.VoteMsg{}, func(event any) { vm.OnVote(event.(msg.VoteMsg)) })
+	vm.mods.EventLoop().RegisterHandler(&msg.PartialCert{}, func(event any) { vm.OnVote(event.(*msg.PartialCert)) })
 }
 
 // OnVote handles an incoming vote.
-func (vm *VotingMachine) OnVote(vote msg.VoteMsg) {
-	cert := vote.PartialCert
-	vm.mods.Logger().Debugf("OnVote(%d): %.8s", vote.ID, string(cert.GetHash()))
+func (vm *VotingMachine) OnVote(cert *msg.PartialCert) {
+	vm.mods.Logger().Debugf("OnVote(%d): %.8s", cert.ID, string(cert.GetHash()))
 
 	var (
 		block *msg.Block
 		ok    bool
 	)
 
-	if !vote.Deferred {
+	if !cert.IsDeffered {
 		// first, try to get the block from the local cache
 		block, ok = vm.mods.BlockChain().LocalGet(msg.ToHash(cert.Hash))
 		if !ok {
 			// if that does not work, we will try to handle this event later.
 			// hopefully, the block has arrived by then.
 			vm.mods.Logger().Debugf("Local cache miss for block: %.8s", cert.GetHash())
-			vote.Deferred = true
-			vm.mods.EventLoop().DelayUntil(msg.Proposal{}, vote)
+			cert.IsDeffered = true
+			vm.mods.EventLoop().DelayUntil(msg.Proposal{}, cert)
 			return
 		}
 	} else {
@@ -109,5 +108,5 @@ func (vm *VotingMachine) verifyCert(cert *msg.PartialCert, block *msg.Block) {
 	}
 	delete(vm.verifiedVotes, hash)
 
-	vm.mods.EventLoop().AddEvent(msg.NewViewMsg{ID: vm.mods.ID(), SyncInfo: msg.NewSyncInfo().WithQC(qc)})
+	vm.mods.EventLoop().AddEvent(msg.NewSyncInfo().WithQC(qc))
 }

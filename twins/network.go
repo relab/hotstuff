@@ -354,18 +354,12 @@ func (r *replica) PublicKey() msg.PublicKey {
 
 // Vote sends the partial certificate to the other replica.
 func (r *replica) Vote(cert *msg.PartialCert) {
-	r.config.sendMessage(r.id, msg.VoteMsg{
-		ID:          r.config.node.mods.ID(),
-		PartialCert: cert,
-	})
+	r.config.sendMessage(r.id, cert)
 }
 
 // NewView sends the quorum certificate to the other replica.
 func (r *replica) NewView(si *msg.SyncInfo) {
-	r.config.sendMessage(r.id, msg.NewViewMsg{
-		ID:       r.config.node.mods.ID(),
-		SyncInfo: si,
-	})
+	r.config.sendMessage(r.id, si)
 }
 
 func (r *replica) Metadata() map[string]string {

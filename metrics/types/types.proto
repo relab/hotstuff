@@ -39,3 +39,11 @@ message ViewTimeouts {
   // Number of view timeouts.
   uint64 Timeouts = 3;
 }
+
+message CPUMemoryStats {
+  Event Event = 1;
+  double CPUPercentage = 2;
+  double MemoryPercentage = 3;
+  uint32 Cores = 4;
+  uint64 AvailableMemory = 5;
+}

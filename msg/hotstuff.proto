@@ -67,8 +67,10 @@ message Signature {
 }
 
 message PartialCert {
-    Signature Sig = 1;
-    bytes Hash    = 2;
+    Signature Sig   = 1;
+    bytes Hash      = 2;
+    uint32 ID       = 3;
+    bool IsDeffered = 4;
 }
 
 message ECDSAThresholdSignature {
@@ -110,6 +112,7 @@ message SyncInfo {
     optional QuorumCert QCert  = 1;
     optional TimeoutCert TCert = 2;
     optional AggQC AggQCert    = 3;
+    uint32 ID                  = 4;
 }
 
 message AggQC {

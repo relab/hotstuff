@@ -144,11 +144,8 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *msg.PartialCert) {
 		impl.srv.mods.Logger().Infof("Failed to get client ID: %v", err)
 		return
 	}
-
-	impl.srv.mods.EventLoop().AddEvent(msg.VoteMsg{
-		ID:          id,
-		PartialCert: cert,
-	})
+	cert.ID = uint32(id)
+	impl.srv.mods.EventLoop().AddEvent(cert)
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
@@ -158,11 +155,8 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, syncMsg *msg.SyncInfo) {
 		impl.srv.mods.Logger().Infof("Failed to get client ID: %v", err)
 		return
 	}
-
-	impl.srv.mods.EventLoop().AddEvent(msg.NewViewMsg{
-		ID:       id,
-		SyncInfo: syncMsg,
-	})
+	syncMsg.ID = uint32(id)
+	impl.srv.mods.EventLoop().AddEvent(syncMsg)
 }
 
 // Fetch handles an incoming fetch request.

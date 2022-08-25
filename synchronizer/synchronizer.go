@@ -51,8 +51,8 @@ func (s *Synchronizer) InitModule(mods *modules.ConsensusCore, opts *modules.Opt
 		}
 	})
 
-	s.mods.EventLoop().RegisterHandler(msg.NewViewMsg{}, func(event any) {
-		newViewMsg := event.(msg.NewViewMsg)
+	s.mods.EventLoop().RegisterHandler(&msg.SyncInfo{}, func(event any) {
+		newViewMsg := event.(*msg.SyncInfo)
 		s.OnNewView(newViewMsg)
 	})
 
@@ -244,8 +244,8 @@ func (s *Synchronizer) OnRemoteTimeout(timeout *msg.TimeoutMsg) {
 }
 
 // OnNewView handles an incoming consensus.NewViewMsg
-func (s *Synchronizer) OnNewView(newView msg.NewViewMsg) {
-	s.AdvanceView(newView.SyncInfo)
+func (s *Synchronizer) OnNewView(newView *msg.SyncInfo) {
+	s.AdvanceView(newView)
 }
 
 // AdvanceView attempts to advance to the next view using the given QC.

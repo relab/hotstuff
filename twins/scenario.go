@@ -53,9 +53,9 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, 
 	// Timeout and NewView messages are permitted.
 	network := NewPartitionedNetwork(scenario,
 		msg.Proposal{},
-		msg.VoteMsg{},
+		msg.PartialCert{},
 		msg.Hash{},
-		msg.NewViewMsg{},
+		msg.SyncInfo{},
 		msg.TimeoutMsg{},
 	)
 

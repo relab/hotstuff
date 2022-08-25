@@ -9,17 +9,14 @@ protoc -I=.:/Users/2924108/go/pkg/mod/github.com/relab/gorums@v0.7.1-0.202203071
 		--go_out=paths=source_relative:. \
 		--gorums_out=paths=source_relative:. \
 		msg/hotstuff.proto
- 
 protoc -I=.:/Users/2924108/go/pkg/mod/github.com/relab/gorums@v0.7.1-0.20220307181651-94a8af8e467c:internal/proto \
 		--go_out=paths=source_relative:. \
 		--gorums_out=paths=source_relative:. \
 		internal/proto/orchestrationpb/orchestration.proto
- 
 protoc -I=.:/Users/2924108/go/pkg/mod/github.com/relab/gorums@v0.7.1-0.20220307181651-94a8af8e467c:internal/proto \
 		--go_out=paths=source_relative:. \
 		--gorums_out=paths=source_relative:. \
 		metrics/types/types.proto
- 
 go build -o ./hotstuff  ./cmd/hotstuff
 go build -o ./plot  ./cmd/plot
 make: Leaving directory `/Users/2924108/hanish/general/hotstuff'
