@@ -245,7 +245,7 @@ loop:
 			SequenceNumber: num,
 			Data:           data[:n],
 		}
-
+		c.logger.Info("Time out is ", c.timeout)
 		ctx, cancel := context.WithTimeout(ctx, c.timeout)
 		promise := c.gorumsConfig.ExecCommand(ctx, cmd)
 		pending := pendingCmd{sequenceNumber: num, sendTime: time.Now(), promise: promise, cancelCtx: cancel}

@@ -164,11 +164,8 @@ func (ec *ecdsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, e
 	if err != nil {
 		return nil, fmt.Errorf("ecdsa: sign failed: %w", err)
 	}
-	return MultiSignature{ec.opts.ID(): &Signature{
-		r:      r,
-		s:      s,
-		signer: ec.opts.ID(),
-	}}, nil
+	sig := &Signature{r: r, s: s, signer: ec.opts.ID()}
+	return MultiSignature{ec.opts.ID(): sig}, nil
 }
 
 // Combine combines multiple signatures into a single signature.
@@ -222,7 +219,6 @@ func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) 
 			valid = false
 		}
 	}
-
 	return valid
 }
 
@@ -270,5 +266,6 @@ func (ec *ecdsaBase) verifySingle(sig *Signature, hash hotstuff.Hash) bool {
 		return false
 	}
 	pk := replica.PublicKey().(*ecdsa.PublicKey)
-	return ecdsa.Verify(pk, hash[:], sig.R(), sig.S())
+	verified := ecdsa.Verify(pk, hash[:], sig.R(), sig.S())
+	return verified
 }

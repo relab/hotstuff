@@ -59,6 +59,7 @@ ptypes
 QC's
 qerr
 qspec
+Randel
 Reiter
 relab
 sigs

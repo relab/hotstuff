@@ -172,6 +172,12 @@ type Handel interface {
 	Begin(s hotstuff.PartialCert)
 }
 
+// Randel is an implementation of the Randel signature aggregation protocol.
+type Randel interface {
+	// Begin commissions the aggregation of a new signature.
+	Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg)
+}
+
 // ExtendedExecutor turns the given Executor into an ExecutorExt.
 func ExtendedExecutor(executor Executor) ExecutorExt {
 	return executorWrapper{executor}

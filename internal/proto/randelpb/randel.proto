@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package randelpb;
+
+import "gorums.proto";
+
+import "google/protobuf/empty.proto";
+
+import "hotstuffpb/hotstuff.proto";
+
+option go_package = "github.com/relab/hotstuff/internal/proto/randelpb";
+
+service Randel {
+  rpc SendAcknowledgement(RContribution) returns (google.protobuf.Empty) {
+    option (gorums.multicast) = true;
+  }
+  rpc SendNoAck(Request) returns (google.protobuf.Empty){
+
+  }
+  rpc SendContribution(RContribution) returns (google.protobuf.Empty) {
+  }
+}
+
+message Request {
+  uint32 NodeID = 1;
+  uint64 View = 2;
+}
+message RContribution {
+  uint32 ID = 1;
+  hotstuffpb.QuorumSignature Signature = 2;
+  bytes Hash = 3;
+  repeated uint32 failedNodes = 4;
+  uint64 View = 5;
+}

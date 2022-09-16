@@ -50,8 +50,8 @@ type consensusBase struct {
 	opts           *modules.Options
 	synchronizer   modules.Synchronizer
 
-	handel modules.Handel
-
+	handel   modules.Handel
+	randel   modules.Randel
 	lastVote hotstuff.View
 
 	mut   sync.Mutex
@@ -85,7 +85,7 @@ func (cs *consensusBase) InitModule(mods *modules.Core) {
 	)
 
 	mods.TryGet(&cs.handel)
-
+	mods.TryGet(&cs.randel)
 	if mod, ok := cs.impl.(modules.Module); ok {
 		mod.InitModule(mods)
 	}
@@ -154,9 +154,12 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 
 	cs.blockChain.Store(proposal.Block)
 
-	cs.configuration.Propose(proposal)
-	// self vote
-	cs.OnPropose(proposal)
+	if !cs.opts.ShouldUseRandel() {
+		cs.configuration.Propose(proposal)
+	} else {
+		// self vote
+		cs.OnPropose(proposal)
+	}
 }
 
 func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocyclo
@@ -184,10 +187,10 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	}
 
 	// ensure the block came from the leader.
-	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
-		cs.logger.Info("OnPropose: block was not proposed by the expected leader")
-		return
-	}
+	// if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
+	// 	cs.logger.Info("OnPropose: block was not proposed by the expected leader")
+	// 	return
+	// }
 
 	if !cs.impl.VoteRule(proposal) {
 		cs.logger.Info("OnPropose: Block not voted for")
@@ -204,7 +207,6 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		cs.logger.Info("OnPropose: command not accepted")
 		return
 	}
-
 	// block is safe and was accepted
 	cs.blockChain.Store(block)
 
@@ -237,6 +239,9 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 		didAdvanceView = true
 		cs.handel.Begin(pc)
+		return
+	} else if cs.randel != nil {
+		cs.randel.Begin(pc, proposal)
 		return
 	}
 

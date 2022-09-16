@@ -41,6 +41,7 @@ import (
 	_ "github.com/relab/hotstuff/crypto/ecdsa"
 	_ "github.com/relab/hotstuff/handel"
 	_ "github.com/relab/hotstuff/leaderrotation"
+	_ "github.com/relab/hotstuff/randel"
 )
 
 // Worker starts and runs clients and replicas based on commands from the controller.

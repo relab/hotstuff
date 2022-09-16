@@ -10,9 +10,9 @@ type Options struct {
 	shouldUseAggQC        bool
 	shouldUseHandel       bool
 	shouldVerifyVotesSync bool
-
-	sharedRandomSeed   int64
-	connectionMetadata map[string]string
+	shouldUseRandel       bool
+	sharedRandomSeed      int64
+	connectionMetadata    map[string]string
 }
 
 // ID returns the ID.
@@ -34,6 +34,10 @@ func (opts Options) ShouldUseAggQC() bool {
 // ShouldUseHandel returns true if the Handel signature aggregation protocol should be used.
 func (opts Options) ShouldUseHandel() bool {
 	return opts.shouldUseHandel
+}
+
+func (opts Options) ShouldUseRandel() bool {
+	return opts.shouldUseRandel
 }
 
 // ShouldVerifyVotesSync returns true if votes should be verified synchronously.
@@ -70,6 +74,11 @@ func (opts *Options) SetShouldVerifyVotesSync() {
 // SetSharedRandomSeed sets the shared random seed.
 func (opts *Options) SetSharedRandomSeed(seed int64) {
 	opts.sharedRandomSeed = seed
+}
+
+// shouldUseRandel
+func (opts *Options) SetShouldUseRandel() {
+	opts.shouldUseRandel = true
 }
 
 // SetConnectionMetadata sets the value of a key in the connection metadata map.

@@ -75,9 +75,9 @@ func (b *Block) View() View {
 // ToBytes returns the raw byte form of the Block, to be used for hashing, etc.
 func (b *Block) ToBytes() []byte {
 	buf := b.parent[:]
-	var proposerBuf [4]byte
-	binary.LittleEndian.PutUint32(proposerBuf[:], uint32(b.proposer))
-	buf = append(buf, proposerBuf[:]...)
+	//var proposerBuf [4]byte
+	//binary.LittleEndian.PutUint32(proposerBuf[:], uint32(b.proposer))
+	//buf = append(buf, proposerBuf[:]...)
 	var viewBuf [8]byte
 	binary.LittleEndian.PutUint64(viewBuf[:], uint64(b.view))
 	buf = append(buf, viewBuf[:]...)
