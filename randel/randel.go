@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sync"
 	"time"
 
 	"github.com/relab/gorums"
@@ -25,7 +24,7 @@ func init() {
 
 // Handel implements a signature aggregation protocol.
 type Randel struct {
-	sync.Mutex
+	//sync.Mutex
 	configuration          *backend.Config
 	server                 *backend.Server
 	blockChain             modules.BlockChain
@@ -81,8 +80,7 @@ func (r *Randel) InitModule(mods *modules.Core) {
 
 func (r *Randel) OnContributionRecv(event ContributionRecvEvent) {
 	contribution := event.Contribution
-	r.Lock()
-	defer r.Unlock()
+
 	if contribution == nil {
 		r.gotSubNodes = append(r.gotSubNodes, hotstuff.ID(0))
 		return
@@ -125,8 +123,7 @@ func (r *Randel) OnContributionRecv(event ContributionRecvEvent) {
 }
 
 func (r *Randel) OnNACK(event NACKRecvEvent) {
-	r.Lock()
-	defer r.Unlock()
+
 	if r.level.GetLevel() == r.maxLevel {
 		return
 	}
@@ -154,8 +151,7 @@ func (r *Randel) Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg, v hotstuff
 		r.eventLoop.DelayUntil(backend.ConnectedEvent{}, func() { r.Begin(s, p, v) })
 		return
 	}
-	r.Lock()
-	defer r.Unlock()
+
 	r.reset()
 	r.currentView = v
 	r.beginDone = true
@@ -213,15 +209,16 @@ func (r *Randel) sendProposalToZeroLevelNodes(proposal hotstuff.ProposeMsg) {
 }
 func (r *Randel) waitForContributions(ctx context.Context, view hotstuff.View) {
 
-	// <-ctx.Done()
-	// if r.currentView != view {
-	// 	return
-	// }
-	// if !r.isAggregationCompleted {
-	// 	lID := r.level.GetParent()
-	// 	r.logger.Info("sending contribution due to timeout", lID)
-	// 	r.SendContributionToNode(lID, r.aggregatedContribution)
-	// }
+	<-ctx.Done()
+
+	if r.currentView != view {
+		return
+	}
+	if !r.isAggregationCompleted {
+		lID := r.level.GetParent()
+		r.logger.Info("sending contribution due to timeout", lID)
+		r.SendContributionToNode(lID, r.aggregatedContribution)
+	}
 }
 
 func (r *Randel) SendContributionToNode(nodeID hotstuff.ID, contribution *randelpb.RContribution) {
@@ -355,8 +352,7 @@ func (i serviceImpl) SendAcknowledgement(ctx gorums.ServerCtx, request *randelpb
 }
 
 func (i serviceImpl) SendNoAck(ctx gorums.ServerCtx, request *randelpb.Request) {
-	i.r.Lock()
-	defer i.r.Unlock()
+
 	i.r.logger.Info("Received NACK from node ", request.NodeID)
 	if request.View == uint64(i.r.currentView) {
 		i.r.eventLoop.AddEvent(NACKRecvEvent{View: hotstuff.View(request.View)})
@@ -364,8 +360,7 @@ func (i serviceImpl) SendNoAck(ctx gorums.ServerCtx, request *randelpb.Request) 
 }
 
 func (i serviceImpl) SendContribution(ctx gorums.ServerCtx, request *randelpb.RContribution) {
-	i.r.Lock()
-	defer i.r.Unlock()
+
 	if request.View >= uint64(i.r.currentView) {
 		i.r.eventLoop.AddEvent(ContributionRecvEvent{Contribution: request})
 	} else {
