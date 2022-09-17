@@ -15,9 +15,10 @@ service Randel {
     option (gorums.multicast) = true;
   }
   rpc SendNoAck(Request) returns (google.protobuf.Empty){
-
+    option (gorums.unicast) = true;
   }
   rpc SendContribution(RContribution) returns (google.protobuf.Empty) {
+    option (gorums.unicast) = true;
   }
 }
 

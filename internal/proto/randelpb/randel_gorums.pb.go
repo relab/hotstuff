@@ -162,41 +162,11 @@ type QuorumSpec interface {
 	gorums.ConfigOption
 }
 
-// SendNoAck is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (n *Node) SendNoAck(ctx context.Context, in *Request) (resp *emptypb.Empty, err error) {
-	cd := gorums.CallData{
-		Message: in,
-		Method:  "randelpb.Randel.SendNoAck",
-	}
-
-	res, err := n.RawNode.RPCCall(ctx, cd)
-	if err != nil {
-		return nil, err
-	}
-	return res.(*emptypb.Empty), err
-}
-
-// SendContribution is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (n *Node) SendContribution(ctx context.Context, in *RContribution) (resp *emptypb.Empty, err error) {
-	cd := gorums.CallData{
-		Message: in,
-		Method:  "randelpb.Randel.SendContribution",
-	}
-
-	res, err := n.RawNode.RPCCall(ctx, cd)
-	if err != nil {
-		return nil, err
-	}
-	return res.(*emptypb.Empty), err
-}
-
 // Randel is the server-side API for the Randel Service
 type Randel interface {
 	SendAcknowledgement(ctx gorums.ServerCtx, request *RContribution)
-	SendNoAck(ctx gorums.ServerCtx, request *Request) (response *emptypb.Empty, err error)
-	SendContribution(ctx gorums.ServerCtx, request *RContribution) (response *emptypb.Empty, err error)
+	SendNoAck(ctx gorums.ServerCtx, request *Request)
+	SendContribution(ctx gorums.ServerCtx, request *RContribution)
 }
 
 func RegisterRandelServer(srv *gorums.Server, impl Randel) {
@@ -205,16 +175,42 @@ func RegisterRandelServer(srv *gorums.Server, impl Randel) {
 		defer ctx.Release()
 		impl.SendAcknowledgement(ctx, req)
 	})
-	srv.RegisterHandler("randelpb.Randel.SendNoAck", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
+	srv.RegisterHandler("randelpb.Randel.SendNoAck", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
 		req := in.Message.(*Request)
 		defer ctx.Release()
-		resp, err := impl.SendNoAck(ctx, req)
-		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
+		impl.SendNoAck(ctx, req)
 	})
-	srv.RegisterHandler("randelpb.Randel.SendContribution", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
+	srv.RegisterHandler("randelpb.Randel.SendContribution", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
 		req := in.Message.(*RContribution)
 		defer ctx.Release()
-		resp, err := impl.SendContribution(ctx, req)
-		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
+		impl.SendContribution(ctx, req)
 	})
+}
+
+// Reference imports to suppress errors if they are not otherwise used.
+var _ emptypb.Empty
+
+// SendNoAck is a quorum call invoked on all nodes in configuration c,
+// with the same argument in, and returns a combined result.
+func (n *Node) SendNoAck(ctx context.Context, in *Request, opts ...gorums.CallOption) {
+	cd := gorums.CallData{
+		Message: in,
+		Method:  "randelpb.Randel.SendNoAck",
+	}
+
+	n.RawNode.Unicast(ctx, cd, opts...)
+}
+
+// Reference imports to suppress errors if they are not otherwise used.
+var _ emptypb.Empty
+
+// SendContribution is a quorum call invoked on all nodes in configuration c,
+// with the same argument in, and returns a combined result.
+func (n *Node) SendContribution(ctx context.Context, in *RContribution, opts ...gorums.CallOption) {
+	cd := gorums.CallData{
+		Message: in,
+		Method:  "randelpb.Randel.SendContribution",
+	}
+
+	n.RawNode.Unicast(ctx, cd, opts...)
 }

@@ -13,6 +13,7 @@ import (
 type Level struct {
 	posToLevelMapping []int
 	idToPosMapping    map[hotstuff.ID]int
+	posToIDMapping    map[int]hotstuff.ID
 	subNodes          map[int][]int
 	parentMapping     []int //Map node pos to its parent
 	level1Peer        []int
@@ -85,12 +86,15 @@ func (r *Randel) randomizeIDS(hash hotstuff.Hash, leaderID hotstuff.ID) map[hots
 	for index, ID := range ids {
 		posMapping[ID] = index
 	}
-
 	return posMapping
 }
 
 func (l *Level) InitializeWithPIDs(posMapping map[hotstuff.ID]int) {
 	l.idToPosMapping = posMapping
+	l.posToIDMapping = make(map[int]hotstuff.ID)
+	for ID, index := range posMapping {
+		l.posToIDMapping[index] = ID
+	}
 }
 
 func (l *Level) GetParent() hotstuff.ID {
@@ -107,12 +111,7 @@ func (l *Level) GetLevel() int {
 	return l.posToLevelMapping[myPosition]
 }
 func (l *Level) getIDForPos(position int) hotstuff.ID {
-	for id, pos := range l.idToPosMapping {
-		if pos == position {
-			return id
-		}
-	}
-	return hotstuff.ID(0)
+	return l.posToIDMapping[position]
 }
 
 func (l *Level) GetChildren() []hotstuff.ID {

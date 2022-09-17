@@ -167,7 +167,7 @@ func (c *Client) Run(ctx context.Context) {
 	c.close()
 
 	commandStats := <-commandStatsChan
-	c.logger.Infof(
+	c.logger.Errorf(
 		"Done sending commands (executed: %d, failed: %d, timeouts: %d)",
 		commandStats.executed, commandStats.failed, commandStats.timeout,
 	)
@@ -245,7 +245,6 @@ loop:
 			SequenceNumber: num,
 			Data:           data[:n],
 		}
-		c.logger.Info("Time out is ", c.timeout)
 		ctx, cancel := context.WithTimeout(ctx, c.timeout)
 		promise := c.gorumsConfig.ExecCommand(ctx, cmd)
 		pending := pendingCmd{sequenceNumber: num, sendTime: time.Now(), promise: promise, cancelCtx: cancel}

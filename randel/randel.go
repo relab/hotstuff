@@ -16,7 +16,6 @@ import (
 	"github.com/relab/hotstuff/internal/proto/randelpb"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func init() {
@@ -34,7 +33,6 @@ type Randel struct {
 	eventLoop              *eventloop.EventLoop
 	logger                 logging.Logger
 	opts                   *modules.Options
-	synchronizer           modules.Synchronizer
 	leaderRotation         modules.LeaderRotation
 	nodes                  map[hotstuff.ID]*randelpb.Node
 	level                  *Level
@@ -47,6 +45,7 @@ type Randel struct {
 	isAggregationCompleted bool
 	cancelFunc             context.CancelFunc
 	blockHash              hotstuff.Hash
+	currentView            hotstuff.View
 }
 
 // New returns a new instance of the Handel module.
@@ -65,7 +64,6 @@ func (r *Randel) InitModule(mods *modules.Core) {
 		&r.eventLoop,
 		&r.logger,
 		&r.opts,
-		&r.synchronizer,
 		&r.leaderRotation,
 	)
 	r.opts.SetShouldUseRandel()
@@ -83,14 +81,15 @@ func (r *Randel) InitModule(mods *modules.Core) {
 
 func (r *Randel) OnContributionRecv(event ContributionRecvEvent) {
 	contribution := event.Contribution
-
+	r.Lock()
+	defer r.Unlock()
 	if contribution == nil {
 		r.gotSubNodes = append(r.gotSubNodes, hotstuff.ID(0))
 		return
 	}
 	r.logger.Info("processing the contribution from ", contribution.ID)
 
-	if contribution.View > uint64(r.synchronizer.View()) {
+	if contribution.View > uint64(r.currentView) {
 		r.logger.Info("waiting for the propose")
 		r.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, event)
 		return
@@ -101,16 +100,20 @@ func (r *Randel) OnContributionRecv(event ContributionRecvEvent) {
 		return
 	}
 
+	isDone, err := r.mergeWithContribution(contribution)
+	if err != nil {
+		return
+	}
 	r.gotSubNodes = append(r.gotSubNodes, hotstuff.ID(contribution.ID))
-	isDone, _ := r.mergeWithContribution(contribution)
 	for _, failNodeID := range contribution.FailedNodes {
 		rNode := r.nodes[hotstuff.ID(failNodeID)]
+		r.logger.Info("Sending nack to ", failNodeID)
 		rNode.SendNoAck(context.Background(), &randelpb.Request{NodeID: uint32(r.opts.ID()),
 			View: contribution.View})
 	}
 	if len(r.level.GetChildren()) == len(r.gotSubNodes) && r.level.GetLevel() != r.maxLevel {
 		lID := r.level.GetParent()
-		r.SendContribution(lID, r.aggregatedContribution)
+		r.SendContributionToNode(lID, r.aggregatedContribution)
 		r.isAggregationCompleted = true
 		r.cancelFunc()
 	}
@@ -122,11 +125,13 @@ func (r *Randel) OnContributionRecv(event ContributionRecvEvent) {
 }
 
 func (r *Randel) OnNACK(event NACKRecvEvent) {
+	r.Lock()
+	defer r.Unlock()
 	if r.level.GetLevel() == r.maxLevel {
 		return
 	}
 	gpID := r.level.GetGrandParent()
-	r.SendContribution(gpID, r.aggregatedContribution)
+	r.SendContributionToNode(gpID, r.aggregatedContribution)
 }
 
 func (r *Randel) postInit() {
@@ -141,16 +146,18 @@ func (r *Randel) postInit() {
 	randelpb.RegisterRandelServer(r.server.GetGorumsServer(), serviceImpl{r})
 	r.level = CreateLevelMapping(r.configuration.Len(), r.opts.ID())
 	r.initDone = true
-
 }
 
-func (r *Randel) Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg) {
+func (r *Randel) Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg, v hotstuff.View) {
 	if !r.initDone {
 		// wait until initialization is done
-		r.eventLoop.DelayUntil(backend.ConnectedEvent{}, func() { r.Begin(s, p) })
+		r.eventLoop.DelayUntil(backend.ConnectedEvent{}, func() { r.Begin(s, p, v) })
 		return
 	}
+	r.Lock()
+	defer r.Unlock()
 	r.reset()
+	r.currentView = v
 	r.beginDone = true
 	r.blockHash = s.BlockHash()
 	sig := hotstuffpb.QuorumSignatureToProto(s.Signature())
@@ -158,7 +165,7 @@ func (r *Randel) Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg) {
 		ID:        uint32(r.opts.ID()),
 		Signature: sig,
 		Hash:      r.blockHash[:],
-		View:      uint64(r.synchronizer.View()),
+		View:      uint64(v),
 	}
 	//idMappings := r.randomizeIDS(hash, r.leaderRotation.GetLeader(r.synchronizer.View()))
 	idMappings := make(map[hotstuff.ID]int)
@@ -168,23 +175,23 @@ func (r *Randel) Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg) {
 	r.level.InitializeWithPIDs(idMappings)
 	r.logger.Info("Randel: init done")
 	if r.level.GetLevel() == 0 {
-		r.SendContribution(r.level.GetLevel1Peer(), r.individualContribution)
+		r.SendContributionToNode(r.level.GetLevel1Peer(), r.individualContribution)
 		return
 	} else if r.level.GetLevel() != 1 {
 		r.sendProposalToChildren(p)
-		r.SendContribution(r.level.GetLevel1Peer(), r.individualContribution)
+		r.SendContributionToNode(r.level.GetLevel1Peer(), r.individualContribution)
 		if r.level.GetLevel() == r.maxLevel &&
-			r.leaderRotation.GetLeader(r.synchronizer.View()) == r.opts.ID() {
+			r.leaderRotation.GetLeader(r.currentView) == r.opts.ID() {
 			r.sendProposalToZeroLevelNodes(p)
 		}
 	} else {
 		r.aggregatedContribution = r.individualContribution
 	}
+	r.eventLoop.AddEvent(InitCompleteEvent{View: hotstuff.View(r.currentView)})
 	timeout := time.Duration(r.level.GetLevel() * 500)
 	context, cancel := context.WithTimeout(context.Background(), timeout*time.Millisecond)
 	r.cancelFunc = cancel
-	r.eventLoop.AddEvent(InitCompleteEvent{View: r.synchronizer.View()})
-	go r.waitForContributions(context)
+	go r.waitForContributions(context, r.currentView)
 }
 
 func (r *Randel) sendProposalToChildren(proposal hotstuff.ProposeMsg) {
@@ -204,19 +211,23 @@ func (r *Randel) sendProposalToZeroLevelNodes(proposal hotstuff.ProposeMsg) {
 	}
 	config.Propose(proposal)
 }
-func (r *Randel) waitForContributions(ctx context.Context) {
+func (r *Randel) waitForContributions(ctx context.Context, view hotstuff.View) {
 
-	<-ctx.Done()
-	if !r.isAggregationCompleted {
-		lID := r.level.GetParent()
-		r.SendContribution(lID, r.aggregatedContribution)
-	}
+	// <-ctx.Done()
+	// if r.currentView != view {
+	// 	return
+	// }
+	// if !r.isAggregationCompleted {
+	// 	lID := r.level.GetParent()
+	// 	r.logger.Info("sending contribution due to timeout", lID)
+	// 	r.SendContributionToNode(lID, r.aggregatedContribution)
+	// }
 }
 
-func (r *Randel) SendContribution(nodeID hotstuff.ID, contribution *randelpb.RContribution) {
+func (r *Randel) SendContributionToNode(nodeID hotstuff.ID, contribution *randelpb.RContribution) {
 	emptyContribution := &randelpb.RContribution{}
 	if nodeID == r.opts.ID() {
-		r.OnContributionRecv(ContributionRecvEvent{Contribution: contribution})
+		r.eventLoop.AddEvent(ContributionRecvEvent{Contribution: contribution})
 		return
 	}
 	node, ok := r.nodes[nodeID]
@@ -225,12 +236,12 @@ func (r *Randel) SendContribution(nodeID hotstuff.ID, contribution *randelpb.RCo
 		return
 	}
 	if contribution == nil {
-		node.SendContribution(r.synchronizer.ViewContext(), emptyContribution)
+		node.SendContribution(context.Background(), emptyContribution)
 	} else {
-		contribution.View = uint64(r.synchronizer.View())
+		contribution.View = uint64(r.currentView)
 		contribution.ID = uint32(r.opts.ID())
 		r.logger.Info("sending contribution from ", r.opts.ID(), " to ", nodeID, " for view ", contribution.View)
-		node.SendContribution(r.synchronizer.ViewContext(), contribution)
+		node.SendContribution(context.Background(), contribution)
 	}
 }
 
@@ -306,7 +317,7 @@ func (r *Randel) mergeWithContribution(contribution *randelpb.RContribution) (bo
 				r.eventLoop.AddEvent(hotstuff.NewViewMsg{
 					SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(
 						new,
-						r.synchronizer.View(),
+						r.currentView,
 						blockHash,
 					)),
 				})
@@ -330,7 +341,7 @@ type serviceImpl struct {
 func (i serviceImpl) SendAcknowledgement(ctx gorums.ServerCtx, request *randelpb.RContribution) {
 	i.r.logger.Info("Recevied acknowledement, storing the acknowledgement")
 	//TODO(hanish): Should we check the aggregation Signature before assigning?
-	if request.View == uint64(i.r.synchronizer.View()) {
+	if request.View == uint64(i.r.currentView) {
 		var hash [32]byte
 		copy(hash[:], request.Hash[:])
 		i.r.aggregatedContribution = &randelpb.RContribution{
@@ -343,21 +354,23 @@ func (i serviceImpl) SendAcknowledgement(ctx gorums.ServerCtx, request *randelpb
 
 }
 
-func (i serviceImpl) SendNoAck(ctx gorums.ServerCtx, request *randelpb.Request) (response *emptypb.Empty, err error) {
+func (i serviceImpl) SendNoAck(ctx gorums.ServerCtx, request *randelpb.Request) {
+	i.r.Lock()
+	defer i.r.Unlock()
 	i.r.logger.Info("Received NACK from node ", request.NodeID)
-	if request.View == uint64(i.r.synchronizer.View()) {
+	if request.View == uint64(i.r.currentView) {
 		i.r.eventLoop.AddEvent(NACKRecvEvent{View: hotstuff.View(request.View)})
 	}
-	return &emptypb.Empty{}, nil
 }
 
-func (i serviceImpl) SendContribution(ctx gorums.ServerCtx, request *randelpb.RContribution) (response *emptypb.Empty, err error) {
-	if request.View >= uint64(i.r.synchronizer.View()) {
+func (i serviceImpl) SendContribution(ctx gorums.ServerCtx, request *randelpb.RContribution) {
+	i.r.Lock()
+	defer i.r.Unlock()
+	if request.View >= uint64(i.r.currentView) {
 		i.r.eventLoop.AddEvent(ContributionRecvEvent{Contribution: request})
 	} else {
 		i.r.logger.Info("Received contribution for older view ", request.View)
 	}
-	return &emptypb.Empty{}, nil
 }
 
 type ContributionRecvEvent struct {

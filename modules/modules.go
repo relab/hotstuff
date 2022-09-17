@@ -175,7 +175,7 @@ type Handel interface {
 // Randel is an implementation of the Randel signature aggregation protocol.
 type Randel interface {
 	// Begin commissions the aggregation of a new signature.
-	Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg)
+	Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg, v hotstuff.View)
 }
 
 // ExtendedExecutor turns the given Executor into an ExecutorExt.

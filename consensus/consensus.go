@@ -243,7 +243,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	} else if cs.randel != nil {
 		cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 		didAdvanceView = true
-		cs.randel.Begin(pc, proposal)
+		cs.randel.Begin(pc, proposal, cs.synchronizer.View())
 		return
 	}
 
