@@ -355,7 +355,12 @@ func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
 		return
 	}
 
-	if qc.View() > s.highQC.View() {
+	oldBlock, ok := s.blockChain.Get(s.highQC.BlockHash())
+	if !ok {
+		s.logger.Panic("Block from the old highQC missing from chain")
+	}
+
+	if newBlock.View() > oldBlock.View() {
 		s.highQC = qc
 		s.leafBlock = newBlock
 		s.logger.Debug("HighQC updated")
