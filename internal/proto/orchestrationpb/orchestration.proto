@@ -116,7 +116,12 @@ message StartReplicaResponse {}
 
 message StopReplicaRequest { repeated uint32 IDs = 1; }
 
-message StopReplicaResponse { map<uint32, bytes> Hashes = 1; }
+message StopReplicaResponse { 
+  // The final state hash of all executed commands
+  map<uint32, bytes> Hashes = 1; 
+  // The final count of executed commands
+  map<uint32, uint32> Counts = 2; 
+}
 
 /* ----------------------------- StartClient RPC ---------------------------- */
 

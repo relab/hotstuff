@@ -265,6 +265,7 @@ func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orche
 func (w *Worker) stopReplicas(req *orchestrationpb.StopReplicaRequest) (*orchestrationpb.StopReplicaResponse, error) {
 	res := &orchestrationpb.StopReplicaResponse{
 		Hashes: make(map[uint32][]byte),
+		Counts: make(map[uint32]uint32),
 	}
 	for _, id := range req.GetIDs() {
 		r, ok := w.replicas[hotstuff.ID(id)]
@@ -273,6 +274,7 @@ func (w *Worker) stopReplicas(req *orchestrationpb.StopReplicaRequest) (*orchest
 		}
 		r.Stop()
 		res.Hashes[id] = r.GetHash()
+		res.Counts[id] = r.GetCnt()
 		// TODO: return test results
 	}
 	return res, nil
