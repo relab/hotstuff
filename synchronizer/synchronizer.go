@@ -353,6 +353,18 @@ func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
 	if qc.View() > s.highQC.View() {
 		s.highQC = qc
 		s.logger.Debug("HighQC updated")
+
+		// I believe the following can be removed, if leafBlock is updated elsewhere.
+		// However, placed here now for backwards compatibility
+		highQCBlock, ok := s.blockChain.Get(s.highQC.BlockHash())
+		if !ok {
+			s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
+			return
+		}
+
+		if s.leafBlock.View() < s.highQC.View() || !s.blockChain.Extends(s.leafBlock, highQCBlock) {
+			s.leafBlock = highQCBlock
+		}
 	}
 }
 
