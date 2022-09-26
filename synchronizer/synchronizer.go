@@ -349,20 +349,9 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 // This method is meant to be used instead of the exported UpdateHighQC internally
 // in this package when the qc has already been verified.
 func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
-	newBlock, ok := s.blockChain.Get(qc.BlockHash())
-	if !ok {
-		s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
-		return
-	}
 
-	oldBlock, ok := s.blockChain.Get(s.highQC.BlockHash())
-	if !ok {
-		s.logger.Panic("Block from the old highQC missing from chain")
-	}
-
-	if newBlock.View() > oldBlock.View() {
+	if qc.View() > s.highQC.View() {
 		s.highQC = qc
-		s.leafBlock = newBlock
 		s.logger.Debug("HighQC updated")
 	}
 }
