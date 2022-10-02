@@ -67,9 +67,44 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 		return nil
 	}
 
+	// normal hotstuff
 	if block1.Parent() == block2.Hash() && block2.Parent() == block3.Hash() {
 		hs.logger.Debug("DECIDE: ", block3)
 		return block3
+	}
+
+	// pipelined rule
+	// find all confirmed blocks
+	qcs := make(map[hotstuff.Hash]bool, block.View()-block3.View())
+	for loopblock := block; loopblock.View() > block1.View(); {
+		qcs[loopblock.QuorumCert().BlockHash()] = true
+		parent, ok := hs.blockChain.LocalGet(loopblock.Parent())
+		if !ok {
+			hs.logger.Info("CommitRule: unable to retrieve parent block")
+			return nil
+		}
+		loopblock = parent
+	}
+	for loopblock := block1; loopblock.View() > block3.View(); {
+		if !qcs[loopblock.Hash()] {
+			hs.logger.Info("CommitRule: unconfirmed parent block")
+			return nil
+		}
+		qcs[loopblock.QuorumCert().BlockHash()] = true
+		parent, ok := hs.blockChain.LocalGet(loopblock.Parent())
+		if !ok {
+			hs.logger.Info("CommitRule: unable to retrieve parent block")
+			return nil
+		}
+		if parent.View() != loopblock.View()-1 {
+			hs.logger.Info("CommitRule: found view without block")
+			return nil
+		}
+		if parent.Hash() == block3.Hash() {
+			hs.logger.Debug("DECIDE: ", block3)
+			return block3
+		}
+		loopblock = parent
 	}
 
 	return nil
