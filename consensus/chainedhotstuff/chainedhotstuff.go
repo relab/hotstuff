@@ -74,7 +74,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	}
 
 	// pipelined rule
-	// find all confirmed blocks
+	// check if all blocks between b1 and b3 are confirmed
 	qcs := make(map[hotstuff.Hash]bool, block.View()-block3.View())
 	for loopblock := block; loopblock.View() > block1.View(); {
 		qcs[loopblock.QuorumCert().BlockHash()] = true

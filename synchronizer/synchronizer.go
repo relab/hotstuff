@@ -94,7 +94,7 @@ func New(viewDuration ViewDuration) modules.Synchronizer {
 		leafBlock:   hotstuff.GetGenesis(),
 		currentView: 1,
 
-		pipelinedViews: 0,
+		pipelinedViews: 2,
 
 		viewCtx:   ctx,
 		cancelCtx: cancel,
@@ -326,22 +326,27 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	}
 
 	b, ok := syncInfo.Block()
-	if ok {
-		highQCBlock, ok := s.blockChain.Get(s.highQC.BlockHash())
-		if !ok {
-			s.logger.Error("AdvanceView: Could not find block referenced by new QC!")
-		}
-		if !s.blockChain.Extends(b, highQCBlock) {
-			b = highQCBlock
-		}
+	if !ok {
+		b = s.leafBlock
+	}
+
+	highQCBlock, ok := s.blockChain.LocalGet(s.highQC.BlockHash())
+	if !ok {
+		s.logger.Error("AdvanceView: Could not find block referenced by new QC!")
+	}
+	if !s.blockChain.Extends(b, highQCBlock) {
+		b = highQCBlock
+	}
+	if b.View() > s.leafBlock.View() {
 		s.leafBlock = b
-		if b.View() > v && b.View() < v+hotstuff.View(s.pipelinedViews) {
-			v = b.View()
-		}
+	}
+
+	if b.View() > v && b.View() < s.highQC.View()+hotstuff.View(s.pipelinedViews) {
+		v = b.View()
 	}
 
 	if timeoutV, ok := syncInfo.TimeoutView(); ok &&
-		timeoutV > v && timeoutV < v+hotstuff.View(s.pipelinedViews) {
+		timeoutV > v && timeoutV < s.highQC.View()+hotstuff.View(s.pipelinedViews) {
 		v = timeoutV
 	}
 
