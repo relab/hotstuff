@@ -174,10 +174,11 @@ func (pc PartialCert) ToBytes() []byte {
 // This can also hold an AggregateQC for Fast-Hotstuff.
 // This can also hola a block.
 type SyncInfo struct {
-	qc    *QuorumCert
-	tc    *TimeoutCert
-	aggQC *AggregateQC
-	block *Block
+	qc         *QuorumCert
+	tc         *TimeoutCert
+	aggQC      *AggregateQC
+	block      *Block
+	timoutView View
 }
 
 // NewSyncInfo returns a new SyncInfo struct.
@@ -202,6 +203,12 @@ func (si SyncInfo) WithTC(tc TimeoutCert) SyncInfo {
 // WithBlock returns a copy of the SyncInfo struct with the given block.
 func (si SyncInfo) WithBlock(b *Block) SyncInfo {
 	si.block = b
+	return si
+}
+
+// WithTimeoutView returns a copy of the SyncInfo struct with a view marked as local timeout.
+func (si SyncInfo) WithTimeoutView(tv View) SyncInfo {
+	si.timoutView = tv
 	return si
 }
 
@@ -244,6 +251,14 @@ func (si SyncInfo) Block() (_ *Block, _ bool) {
 	return
 }
 
+// TimeoutView returns the timeout view, if present.
+func (si SyncInfo) TimeoutView() (_ View, _ bool) {
+	if si.timoutView != 0 {
+		return si.timoutView, true
+	}
+	return
+}
+
 func (si SyncInfo) String() string {
 	var sb strings.Builder
 	sb.WriteString("{ ")
@@ -258,6 +273,9 @@ func (si SyncInfo) String() string {
 	}
 	if si.block != nil {
 		fmt.Fprintf(&sb, "%s ", si.block)
+	}
+	if si.timoutView != 0 {
+		fmt.Fprintf(&sb, "timeoutView: %d ", si.timoutView)
 	}
 	sb.WriteRune('}')
 	return sb.String()

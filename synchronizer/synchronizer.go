@@ -36,6 +36,9 @@ type Synchronizer struct {
 	duration ViewDuration
 	timer    *time.Timer
 
+	// This should be retrieved from a configuration
+	pipelinedViews uint8
+
 	viewCtx   context.Context // a context that is cancelled at the end of the current view
 	cancelCtx context.CancelFunc
 
@@ -90,6 +93,8 @@ func New(viewDuration ViewDuration) modules.Synchronizer {
 	return &Synchronizer{
 		leafBlock:   hotstuff.GetGenesis(),
 		currentView: 1,
+
+		pipelinedViews: 0,
 
 		viewCtx:   ctx,
 		cancelCtx: cancel,
@@ -192,6 +197,11 @@ func (s *Synchronizer) OnLocalTimeout() {
 	s.consensus.StopVoting(s.currentView)
 
 	s.configuration.Timeout(timeoutMsg)
+
+	if s.currentView < s.highQC.View()+hotstuff.View(s.pipelinedViews) {
+		s.AdvanceView(hotstuff.NewSyncInfo().WithTimeoutView(s.currentView))
+	}
+
 	s.OnRemoteTimeout(timeoutMsg)
 }
 
@@ -315,6 +325,26 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		}
 	}
 
+	b, ok := syncInfo.Block()
+	if ok {
+		highQCBlock, ok := s.blockChain.Get(s.highQC.BlockHash())
+		if !ok {
+			s.logger.Error("AdvanceView: Could not find block referenced by new QC!")
+		}
+		if !s.blockChain.Extends(b, highQCBlock) {
+			b = highQCBlock
+		}
+		s.leafBlock = b
+		if b.View() > v && b.View() < v+hotstuff.View(s.pipelinedViews) {
+			v = b.View()
+		}
+	}
+
+	if timeoutV, ok := syncInfo.TimeoutView(); ok &&
+		timeoutV > v && timeoutV < v+hotstuff.View(s.pipelinedViews) {
+		v = timeoutV
+	}
+
 	if v < s.currentView {
 		return
 	}
@@ -349,21 +379,21 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 // This method is meant to be used instead of the exported UpdateHighQC internally
 // in this package when the qc has already been verified.
 func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
-
 	if qc.View() > s.highQC.View() {
 		s.highQC = qc
 		s.logger.Debug("HighQC updated")
 
 		// I believe the following can be removed, if leafBlock is updated elsewhere.
 		// However, placed here now for backwards compatibility
-		highQCBlock, ok := s.blockChain.Get(s.highQC.BlockHash())
-		if !ok {
-			s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
-			return
-		}
-
-		if s.leafBlock.View() < s.highQC.View() || !s.blockChain.Extends(s.leafBlock, highQCBlock) {
-			s.leafBlock = highQCBlock
+		if s.leafBlock.View() < s.highQC.View() {
+			highQCBlock, ok := s.blockChain.Get(s.highQC.BlockHash())
+			if !ok {
+				s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
+				return
+			}
+			if s.blockChain.Extends(s.leafBlock, highQCBlock) {
+				s.leafBlock = highQCBlock
+			}
 		}
 	}
 }
