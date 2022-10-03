@@ -207,7 +207,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	s.configuration.Timeout(timeoutMsg)
 
 	if s.currentView < s.highQC.View()+hotstuff.View(s.pipelinedViews) {
-		s.AdvanceView(hotstuff.NewSyncInfo().WithTimeoutView(s.currentView))
+		s.AdvanceView(hotstuff.NewSyncInfo().WithTimeoutView(s.currentView).WithQC(s.highQC))
 	}
 
 	s.OnRemoteTimeout(timeoutMsg)
