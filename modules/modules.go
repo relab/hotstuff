@@ -162,6 +162,8 @@ type Synchronizer interface {
 	HighQC() hotstuff.QuorumCert
 	// LeafBlock returns the current leaf block.
 	LeafBlock() *hotstuff.Block
+	// PipelinedViews returns the number of concurrently executed views.
+	PipelinedViews() hotstuff.View
 	// Start starts the synchronizer with the given context.
 	Start(context.Context)
 }

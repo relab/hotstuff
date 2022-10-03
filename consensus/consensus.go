@@ -240,7 +240,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
-	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
+	leaderID := cs.leaderRotation.GetLeader(block.View() + cs.synchronizer.PipelinedViews())
 	if leaderID == cs.opts.ID() {
 		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})
 		return

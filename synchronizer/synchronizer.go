@@ -36,7 +36,7 @@ type Synchronizer struct {
 	duration ViewDuration
 	timer    *time.Timer
 
-	// This should be retrieved from a configuration
+	// number of cuncurrent views, 0 and 1 both give no concurrency.
 	pipelinedViews uint8
 
 	viewCtx   context.Context // a context that is cancelled at the end of the current view
@@ -94,7 +94,7 @@ func New(viewDuration ViewDuration) modules.Synchronizer {
 		leafBlock:   hotstuff.GetGenesis(),
 		currentView: 1,
 
-		pipelinedViews: 2,
+		pipelinedViews: 2, // this should be retrieved from a configuration.
 
 		viewCtx:   ctx,
 		cancelCtx: cancel,
@@ -123,6 +123,14 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	if s.currentView == 1 && s.leaderRotation.GetLeader(s.currentView) == s.opts.ID() {
 		s.consensus.Propose(s.SyncInfo())
 	}
+}
+
+// PipelinedViews returns 1 or the number of concurrent views in the pipeline
+func (s *Synchronizer) PipelinedViews() hotstuff.View {
+	if s.pipelinedViews < 1 {
+		return 1
+	}
+	return hotstuff.View(s.pipelinedViews)
 }
 
 // HighQC returns the highest known QC.
