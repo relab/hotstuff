@@ -36,8 +36,8 @@ type Synchronizer struct {
 	duration ViewDuration
 	timer    *time.Timer
 
-	// number of cuncurrent views, 0 and 1 both give no concurrency.
-	pipelinedViews uint8
+	// number of concurrent views, 0 and 1 both give no concurrency.
+	pipelinedViews hotstuff.View
 
 	viewCtx   context.Context // a context that is cancelled at the end of the current view
 	cancelCtx context.CancelFunc
@@ -206,7 +206,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 
 	s.configuration.Timeout(timeoutMsg)
 
-	if s.currentView < s.highQC.View()+hotstuff.View(s.pipelinedViews) {
+	if s.isInPipelineStretch(s.currentView) {
 		s.AdvanceView(hotstuff.NewSyncInfo().WithTimeoutView(s.currentView))
 	}
 
@@ -338,12 +338,12 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		s.updateLeafBlock(b)
 	}
 
-	if s.leafBlock.View() < s.highQC.View()+hotstuff.View(s.pipelinedViews) {
+	if s.isInPipelineStretch(s.leafBlock.View()) {
 		v = s.leafBlock.View()
 	}
 
 	if timeoutV, ok := syncInfo.TimeoutView(); ok &&
-		timeoutV > v && timeoutV < s.highQC.View()+hotstuff.View(s.pipelinedViews) {
+		timeoutV > v && s.isInPipelineStretch(timeoutV) {
 		v = timeoutV
 	}
 
@@ -375,6 +375,12 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	} else if replica, ok := s.configuration.Replica(leader); ok {
 		replica.NewView(syncInfo)
 	}
+}
+
+// isInPipelineStretch checks wether the given view lies
+// less then the pipelinestretch from the highQC
+func (s *Synchronizer) isInPipelineStretch(v hotstuff.View) bool {
+	return v > s.highQC.View() && v < s.highQC.View()+s.pipelinedViews
 }
 
 // updateHighQC attempts to update the highQC, but does not verify the qc first.
