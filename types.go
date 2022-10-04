@@ -172,13 +172,13 @@ func (pc PartialCert) ToBytes() []byte {
 // Generally, if highQC.View > highTC.View, there is no need to include highTC in the SyncInfo.
 // However, if highQC.View < highTC.View, we should still include highQC.
 // This can also hold an AggregateQC for Fast-Hotstuff.
-// This can also hola a block.
+// This can also hold a block and a view with local timeout.
 type SyncInfo struct {
-	qc         *QuorumCert
-	tc         *TimeoutCert
-	aggQC      *AggregateQC
-	block      *Block
-	timoutView View
+	qc          *QuorumCert
+	tc          *TimeoutCert
+	aggQC       *AggregateQC
+	block       *Block
+	timeoutView View
 }
 
 // NewSyncInfo returns a new SyncInfo struct.
@@ -208,7 +208,7 @@ func (si SyncInfo) WithBlock(b *Block) SyncInfo {
 
 // WithTimeoutView returns a copy of the SyncInfo struct with a view marked as local timeout.
 func (si SyncInfo) WithTimeoutView(tv View) SyncInfo {
-	si.timoutView = tv
+	si.timeoutView = tv
 	return si
 }
 
@@ -253,8 +253,8 @@ func (si SyncInfo) Block() (_ *Block, _ bool) {
 
 // TimeoutView returns the timeout view, if present.
 func (si SyncInfo) TimeoutView() (_ View, _ bool) {
-	if si.timoutView != 0 {
-		return si.timoutView, true
+	if si.timeoutView != 0 {
+		return si.timeoutView, true
 	}
 	return
 }
@@ -274,8 +274,8 @@ func (si SyncInfo) String() string {
 	if si.block != nil {
 		fmt.Fprintf(&sb, "%s ", si.block)
 	}
-	if si.timoutView != 0 {
-		fmt.Fprintf(&sb, "timeoutView: %d ", si.timoutView)
+	if si.timeoutView != 0 {
+		fmt.Fprintf(&sb, "timeoutView: %d ", si.timeoutView)
 	}
 	sb.WriteRune('}')
 	return sb.String()
