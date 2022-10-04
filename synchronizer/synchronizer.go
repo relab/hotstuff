@@ -207,7 +207,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	s.configuration.Timeout(timeoutMsg)
 
 	if s.currentView < s.highQC.View()+hotstuff.View(s.pipelinedViews) {
-		s.AdvanceView(hotstuff.NewSyncInfo().WithTimeoutView(s.currentView).WithQC(s.highQC))
+		s.AdvanceView(hotstuff.NewSyncInfo().WithTimeoutView(s.currentView))
 	}
 
 	s.OnRemoteTimeout(timeoutMsg)
@@ -334,23 +334,12 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	}
 
 	b, ok := syncInfo.Block()
-	if !ok {
-		b = s.leafBlock
+	if ok {
+		s.updateLeafBlock(b)
 	}
 
-	highQCBlock, ok := s.blockChain.LocalGet(s.highQC.BlockHash())
-	if !ok {
-		s.logger.Error("AdvanceView: Could not find block referenced by new QC!")
-	}
-	if !s.blockChain.Extends(b, highQCBlock) {
-		b = highQCBlock
-	}
-	if b.View() > s.leafBlock.View() {
-		s.leafBlock = b
-	}
-
-	if b.View() > v && b.View() < s.highQC.View()+hotstuff.View(s.pipelinedViews) {
-		v = b.View()
+	if s.leafBlock.View() < s.highQC.View()+hotstuff.View(s.pipelinedViews) {
+		v = s.leafBlock.View()
 	}
 
 	if timeoutV, ok := syncInfo.TimeoutView(); ok &&
@@ -382,7 +371,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 
 	leader := s.leaderRotation.GetLeader(s.currentView)
 	if leader == s.opts.ID() {
-		s.consensus.Propose(syncInfo)
+		s.consensus.Propose(syncInfo.WithQC(s.highQC))
 	} else if replica, ok := s.configuration.Replica(leader); ok {
 		replica.NewView(syncInfo)
 	}
@@ -391,22 +380,39 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 // updateHighQC attempts to update the highQC, but does not verify the qc first.
 // This method is meant to be used instead of the exported UpdateHighQC internally
 // in this package when the qc has already been verified.
+// This method ensures, the block of the highQC is always available locally.
 func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
 	if qc.View() > s.highQC.View() {
-		s.highQC = qc
-		s.logger.Debug("HighQC updated")
-
-		// I believe the following can be removed, if leafBlock is updated elsewhere.
-		// However, placed here now for backwards compatibility
 		highQCBlock, ok := s.blockChain.Get(s.highQC.BlockHash())
 		if !ok {
 			s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
 			return
 		}
 
+		s.highQC = qc
+		s.logger.Debug("HighQC updated")
+
 		if s.leafBlock.View() < s.highQC.View() || !s.blockChain.Extends(s.leafBlock, highQCBlock) {
 			s.leafBlock = highQCBlock
 		}
+	}
+}
+
+// updateLeafBlock attempts to update the leafBlock.
+// This method ensures, leafblock extends highQC.
+func (s *Synchronizer) updateLeafBlock(b *hotstuff.Block) {
+	highQCBlock, ok := s.blockChain.Get(s.highQC.BlockHash())
+	if !ok {
+		s.logger.Error("updateLeafBlock: Could not find block referenced by new QC!")
+		return
+	}
+
+	if !s.blockChain.Extends(b, highQCBlock) {
+		s.logger.Info("updateLeafBlock: new block did not extend highQC!")
+		return
+	}
+	if b.View() > s.leafBlock.View() {
+		s.leafBlock = b
 	}
 }
 
