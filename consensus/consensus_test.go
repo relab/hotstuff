@@ -19,7 +19,7 @@ func TestVote(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	bl := testutil.CreateBuilders(t, ctrl, n)
 	cs := mocks.NewMockConsensus(ctrl)
-	bl[0].Add(synchronizer.New(testutil.FixedTimeout(1000)), cs)
+	bl[0].Add(synchronizer.New(testutil.FixedTimeout(1000), 1), cs)
 	hl := bl.Build()
 	hs := hl[0]
 

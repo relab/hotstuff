@@ -143,7 +143,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusN
 			consensus.New(consensusModule),
 			consensus.NewVotingMachine(),
 			crypto.NewCache(ecdsa.New(), 100),
-			synchronizer.New(FixedTimeout(0)),
+			synchronizer.New(FixedTimeout(0), 1),
 			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			// twins-specific:
 			&configuration{network: n, node: node},

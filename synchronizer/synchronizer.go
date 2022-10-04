@@ -88,13 +88,13 @@ func (s *Synchronizer) InitModule(mods *modules.Core) {
 }
 
 // New creates a new Synchronizer.
-func New(viewDuration ViewDuration) modules.Synchronizer {
+func New(viewDuration ViewDuration, pipelinedViews uint32) modules.Synchronizer {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Synchronizer{
 		leafBlock:   hotstuff.GetGenesis(),
 		currentView: 1,
 
-		pipelinedViews: 2, // this should be retrieved from a configuration.
+		pipelinedViews: hotstuff.View(pipelinedViews),
 
 		viewCtx:   ctx,
 		cancelCtx: cancel,
