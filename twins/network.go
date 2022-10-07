@@ -132,7 +132,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusN
 
 		if pipelinedViews < 1 || consensusName != "chainedhotstuff" {
 			if pipelinedViews > 1 && consensusName != "chainedhotstuff" {
-				fmt.Errorf("pipelining currently only supported for chainedhotstuff")
+				return fmt.Errorf("pipelining currently only supported for chainedhotstuff")
 			}
 			pipelinedViews = 1
 		}
