@@ -106,7 +106,7 @@ func TestFHSBug(t *testing.T) {
 
 	settings := src.Settings()
 
-	res, err := twins.ExecuteScenario(scenario, settings.NumNodes, settings.NumTwins, 100, vulnerableModule)
+	res, err := twins.ExecuteScenario(scenario, settings.NumNodes, settings.NumTwins, 100, vulnerableModule, 1)
 	if err != nil {
 		t.Fatalf("failed to execute scenario: %v", err)
 	}

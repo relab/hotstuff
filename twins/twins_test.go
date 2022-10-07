@@ -31,7 +31,7 @@ func TestTwins(t *testing.T) {
 		if err != nil {
 			break
 		}
-		result, err := twins.ExecuteScenario(s, numNodes, numTwins, 100, "chainedhotstuff")
+		result, err := twins.ExecuteScenario(s, numNodes, numTwins, 100, "chainedhotstuff", 1)
 		if err != nil {
 			t.Fatal(err)
 		}

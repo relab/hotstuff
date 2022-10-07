@@ -260,7 +260,7 @@ func (ti twinsInstance) generateAndExecuteScenario() (bool, error) {
 
 	t := time.Now()
 
-	result, err := twins.ExecuteScenario(scenario, settings.NumNodes, settings.NumTwins, settings.Ticks, twinsConsensus)
+	result, err := twins.ExecuteScenario(scenario, settings.NumNodes, settings.NumTwins, settings.Ticks, twinsConsensus, 1)
 	if err != nil {
 		return false, err
 	}

@@ -120,7 +120,7 @@ func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) modules.Buil
 	return builder
 }
 
-func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusName string) error {
+func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusName string, pipelinedViews uint32) error {
 	cg := &commandGenerator{}
 	for _, nodeID := range nodes {
 
@@ -128,6 +128,13 @@ func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusN
 		pk, err := keygen.GenerateECDSAPrivateKey()
 		if err != nil {
 			return err
+		}
+
+		if pipelinedViews < 1 || consensusName != "chainedhotstuff" {
+			if pipelinedViews > 1 && consensusName != "chainedhotstuff" {
+				fmt.Errorf("pipelining currently only supported for chainedhotstuff")
+			}
+			pipelinedViews = 1
 		}
 
 		builder := n.GetNodeBuilder(nodeID, pk)
@@ -143,7 +150,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusN
 			consensus.New(consensusModule),
 			consensus.NewVotingMachine(),
 			crypto.NewCache(ecdsa.New(), 100),
-			synchronizer.New(FixedTimeout(0), 1),
+			synchronizer.New(FixedTimeout(0), pipelinedViews),
 			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			// twins-specific:
 			&configuration{network: n, node: node},

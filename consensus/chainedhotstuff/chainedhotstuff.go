@@ -68,7 +68,9 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	}
 
 	// normal hotstuff
-	if block1.Parent() == block2.Hash() && block2.Parent() == block3.Hash() {
+	if block1.Parent() == block2.Hash() &&
+		block2.Parent() == block3.Hash() &&
+		block3.View() == block1.View()-2 {
 		hs.logger.Debug("DECIDE: ", block3)
 		return block3
 	}

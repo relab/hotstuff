@@ -389,7 +389,7 @@ func (s *Synchronizer) isInPipelineStretch(v hotstuff.View) bool {
 // This method ensures, the block of the highQC is always available locally.
 func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
 	if qc.View() > s.highQC.View() {
-		highQCBlock, ok := s.blockChain.Get(s.highQC.BlockHash())
+		qcBlock, ok := s.blockChain.Get(qc.BlockHash())
 		if !ok {
 			s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
 			return
@@ -398,8 +398,8 @@ func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
 		s.highQC = qc
 		s.logger.Debug("HighQC updated")
 
-		if s.leafBlock.View() < s.highQC.View() || !s.blockChain.Extends(s.leafBlock, highQCBlock) {
-			s.leafBlock = highQCBlock
+		if s.leafBlock.View() < qc.View() || !s.blockChain.Extends(s.leafBlock, qcBlock) {
+			s.leafBlock = qcBlock
 		}
 	}
 }
