@@ -252,11 +252,8 @@ func (si SyncInfo) Block() (_ *Block, _ bool) {
 }
 
 // TimeoutView returns the timeout view, if present.
-func (si SyncInfo) TimeoutView() (_ View, _ bool) {
-	if si.timeoutView != 0 {
-		return si.timeoutView, true
-	}
-	return
+func (si SyncInfo) TimeoutView() (_ View) {
+	return si.timeoutView
 }
 
 func (si SyncInfo) String() string {

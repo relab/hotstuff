@@ -342,8 +342,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		v = s.leafBlock.View()
 	}
 
-	if timeoutV, ok := syncInfo.TimeoutView(); ok &&
-		timeoutV > v && s.inPipeline(timeoutV) {
+	if timeoutV := syncInfo.TimeoutView(); timeoutV > v && s.inPipeline(timeoutV) {
 		v = timeoutV
 	}
 
