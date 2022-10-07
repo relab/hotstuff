@@ -37,7 +37,7 @@ type Synchronizer struct {
 	timer    *time.Timer
 
 	// number of concurrent views, 0 and 1 both give no concurrency.
-	pipelinedViews hotstuff.View
+	pipelinedViews uint32
 
 	viewCtx   context.Context // a context that is cancelled at the end of the current view
 	cancelCtx context.CancelFunc
@@ -94,7 +94,7 @@ func New(viewDuration ViewDuration, pipelinedViews uint32) modules.Synchronizer 
 		leafBlock:   hotstuff.GetGenesis(),
 		currentView: 1,
 
-		pipelinedViews: hotstuff.View(pipelinedViews),
+		pipelinedViews: pipelinedViews,
 
 		viewCtx:   ctx,
 		cancelCtx: cancel,
@@ -206,7 +206,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 
 	s.configuration.Timeout(timeoutMsg)
 
-	if s.isInPipelineStretch(s.currentView) {
+	if s.inPipeline(s.currentView) {
 		s.AdvanceView(hotstuff.NewSyncInfo().WithTimeoutView(s.currentView))
 	}
 
@@ -338,12 +338,12 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		s.updateLeafBlock(b)
 	}
 
-	if s.isInPipelineStretch(s.leafBlock.View()) {
+	if s.inPipeline(s.leafBlock.View()) {
 		v = s.leafBlock.View()
 	}
 
 	if timeoutV, ok := syncInfo.TimeoutView(); ok &&
-		timeoutV > v && s.isInPipelineStretch(timeoutV) {
+		timeoutV > v && s.inPipeline(timeoutV) {
 		v = timeoutV
 	}
 
@@ -377,10 +377,9 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	}
 }
 
-// isInPipelineStretch checks wether the given view lies
-// less then the pipelinestretch from the highQC
-func (s *Synchronizer) isInPipelineStretch(v hotstuff.View) bool {
-	return v > s.highQC.View() && v < s.highQC.View()+s.pipelinedViews
+// inPipeline checks if the given view is in pipeline range from highQC.
+func (s *Synchronizer) inPipeline(v hotstuff.View) bool {
+	return v > s.highQC.View() && v < s.highQC.View()+hotstuff.View(s.pipelinedViews)
 }
 
 // updateHighQC attempts to update the highQC, but does not verify the qc first.
@@ -404,8 +403,8 @@ func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
 	}
 }
 
-// updateLeafBlock attempts to update the leafBlock.
-// This method ensures, leafblock extends highQC.
+// updateLeafBlock attempts to update the leaf block.
+// This method ensures leafBlock extends highQC.
 func (s *Synchronizer) updateLeafBlock(b *hotstuff.Block) {
 	highQCBlock, ok := s.blockChain.Get(s.highQC.BlockHash())
 	if !ok {
