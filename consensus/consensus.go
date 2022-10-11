@@ -191,7 +191,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	// 	cs.logger.Info("OnPropose: block was not proposed by the expected leader")
 	// 	return
 	// }
-
+	
 	if !cs.impl.VoteRule(proposal) {
 		cs.logger.Info("OnPropose: Block not voted for")
 		return

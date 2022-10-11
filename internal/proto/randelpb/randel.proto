@@ -29,7 +29,6 @@ message Request {
 message RContribution {
   uint32 ID = 1;
   hotstuffpb.QuorumSignature Signature = 2;
-  bytes Hash = 3;
-  repeated uint32 failedNodes = 4;
-  uint64 View = 5;
+  repeated uint32 failedNodes = 3;
+  uint64 View = 4;
 }
