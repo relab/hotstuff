@@ -277,6 +277,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 
 // OnNewView handles an incoming consensus.NewViewMsg
 func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
+	s.logger.Debug("Received NewView from ", newView.ID)
 	s.AdvanceView(newView.SyncInfo)
 }
 
@@ -371,7 +372,8 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	leader := s.leaderRotation.GetLeader(s.currentView)
 	if leader == s.opts.ID() {
 		s.consensus.Propose(syncInfo.WithQC(s.highQC))
-	} else if replica, ok := s.configuration.Replica(leader); ok {
+	} else if replica, ok := s.configuration.Replica(leader); ok && !s.inPipeline(s.currentView) {
+		s.logger.Debug("sending NewView msg")
 		replica.NewView(syncInfo)
 	}
 }
@@ -394,7 +396,7 @@ func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
 		}
 
 		s.highQC = qc
-		s.logger.Debug("HighQC updated")
+		s.logger.Debug("HighQC updated to ", s.highQC)
 
 		if s.leafBlock.View() < qc.View() || !s.blockChain.Extends(s.leafBlock, qcBlock) {
 			s.leafBlock = qcBlock
@@ -404,6 +406,7 @@ func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
 
 // updateLeafBlock attempts to update the leaf block.
 // This method ensures leafBlock extends highQC.
+// This method does not ensure leafBlock lies within pipeline.
 func (s *Synchronizer) updateLeafBlock(b *hotstuff.Block) {
 	highQCBlock, ok := s.blockChain.Get(s.highQC.BlockHash())
 	if !ok {

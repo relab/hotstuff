@@ -82,7 +82,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 		qcs[loopblock.QuorumCert().BlockHash()] = true
 		parent, ok := hs.blockChain.LocalGet(loopblock.Parent())
 		if !ok {
-			hs.logger.Info("CommitRule: unable to retrieve parent block")
+			hs.logger.Infof("CommitRule: unable to retrieve block %.6s", loopblock.Parent().String())
 			return nil
 		}
 		loopblock = parent
@@ -95,7 +95,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 		qcs[loopblock.QuorumCert().BlockHash()] = true
 		parent, ok := hs.blockChain.LocalGet(loopblock.Parent())
 		if !ok {
-			hs.logger.Info("CommitRule: unable to retrieve parent block")
+			hs.logger.Infof("CommitRule: unable to retrieve block %.6s", loopblock.Parent().String())
 			return nil
 		}
 		if parent.View() != loopblock.View()-1 {

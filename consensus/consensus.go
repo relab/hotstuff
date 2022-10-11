@@ -128,6 +128,11 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 		return
 	}
 
+	parentHash := qc.BlockHash()
+	if cs.synchronizer.LeafBlock().View() < cs.synchronizer.View() {
+		parentHash = cs.synchronizer.LeafBlock().Hash()
+	}
+
 	var proposal hotstuff.ProposeMsg
 	if proposer, ok := cs.impl.(ProposeRuler); ok {
 		proposal, ok = proposer.ProposeRule(cert, cmd)
@@ -139,7 +144,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 		proposal = hotstuff.ProposeMsg{
 			ID: cs.opts.ID(),
 			Block: hotstuff.NewBlock(
-				cs.synchronizer.LeafBlock().Hash(),
+				parentHash,
 				qc,
 				cmd,
 				cs.synchronizer.View(),
