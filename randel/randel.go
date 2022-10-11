@@ -2,7 +2,11 @@ package randel
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
+	"math/rand"
+	"reflect"
+	"sort"
 	"time"
 
 	"github.com/relab/gorums"
@@ -22,31 +26,32 @@ func init() {
 // Handel implements a signature aggregation protocol.
 type Randel struct {
 	//sync.Mutex
-	configuration  *backend.Config
-	server         *backend.Server
-	blockChain     modules.BlockChain
-	crypto         modules.Crypto
-	eventLoop      *eventloop.EventLoop
-	logger         logging.Logger
-	opts           *modules.Options
-	leaderRotation modules.LeaderRotation
-	nodes          map[hotstuff.ID]*randelpb.Node
-	tree           *TreeConfiguration
-	initDone       bool
-	beginDone      bool
-	//individualContribution *randelpb.RContribution
+	configuration          *backend.Config
+	server                 *backend.Server
+	blockChain             modules.BlockChain
+	crypto                 modules.Crypto
+	eventLoop              *eventloop.EventLoop
+	logger                 logging.Logger
+	opts                   *modules.Options
+	leaderRotation         modules.LeaderRotation
+	nodes                  map[hotstuff.ID]*randelpb.Node
+	tree                   *TreeConfiguration
+	initDone               bool
+	beginDone              bool
 	aggregatedContribution hotstuff.QuorumSignature
-	gotChildren            []hotstuff.ID
 	isAggregationCompleted bool
 	cancelFunc             context.CancelFunc
 	blockHash              hotstuff.Hash
 	currentView            hotstuff.View
+	children               []hotstuff.ID
+	senders                []hotstuff.ID
 }
 
 // New returns a new instance of the Handel module.
 func New() modules.Randel {
 	return &Randel{
-		nodes: make(map[hotstuff.ID]*randelpb.Node),
+		nodes:   make(map[hotstuff.ID]*randelpb.Node),
+		senders: make([]hotstuff.ID, 0),
 	}
 }
 
@@ -74,6 +79,13 @@ func (r *Randel) InitModule(mods *modules.Core) {
 	})
 }
 
+func (r *Randel) cancelWaitingContext() {
+	if r.cancelFunc != nil {
+		r.cancelFunc()
+		r.cancelFunc = nil
+	}
+}
+
 func (r *Randel) OnContributionRecv(event ContributionRecvEvent) {
 
 	contribution := event.Contribution
@@ -86,32 +98,31 @@ func (r *Randel) OnContributionRecv(event ContributionRecvEvent) {
 	if r.isAggregationCompleted {
 		return
 	}
-	isDone, err := r.mergeWithContribution(contribution)
+	currentSignature := hotstuffpb.QuorumSignatureFromProto(contribution.Signature)
+	isDone, err := r.mergeWithContribution(currentSignature)
 	if err != nil {
 		return
 	}
-	r.gotChildren = append(r.gotChildren, hotstuff.ID(contribution.ID))
-	for _, failNodeID := range contribution.FailedNodes {
-		rNode := r.nodes[hotstuff.ID(failNodeID)]
-		r.logger.Info("Sending nack to ", failNodeID)
-		rNode.SendNoAck(context.Background(), &randelpb.Request{NodeID: uint32(r.opts.ID()),
-			View: contribution.View})
-	}
-	if len(r.tree.GetChildren()) == len(r.gotChildren) {
+	r.senders = append(r.senders, hotstuff.ID(contribution.ID))
+	if isSubSet(r.children, r.senders) || isDone {
 		pID, ok := r.tree.GetParent()
 		if ok {
 			r.SendContributionToNode(pID, r.aggregatedContribution)
 		}
+		r.sendACKToSenders()
 		r.isAggregationCompleted = true
-		if r.cancelFunc != nil {
-			r.cancelFunc()
-		}
-	}
-	if isDone {
-		r.logger.Info("aggregation completed")
-		r.isAggregationCompleted = true
-		if r.cancelFunc != nil {
-			r.cancelFunc()
+		r.cancelWaitingContext()
+	} else {
+		participants := currentSignature.Participants()
+		nodeChildren := r.tree.GetChildrenOfNode(hotstuff.ID(contribution.ID))
+		if participants.Len() != len(nodeChildren) {
+			failedNodes := make([]hotstuff.ID, 0)
+			for _, ID := range nodeChildren {
+				if !participants.Contains(ID) {
+					failedNodes = append(failedNodes, ID)
+				}
+			}
+			r.sendNACKToFailedNodes(failedNodes)
 		}
 	}
 }
@@ -153,24 +164,66 @@ func (r *Randel) Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg, v hotstuff
 	// 	View:      uint64(v),
 	// }
 	r.aggregatedContribution = s.Signature()
-	//idMappings := r.randomizeIDS(r.blockHash, r.leaderRotation.GetLeader(r.currentView))
-	idMappings := make(map[hotstuff.ID]int)
-	for i := 0; i < r.configuration.Len(); i++ {
-		idMappings[hotstuff.ID(i+1)] = i
-	}
+	idMappings := r.randomizeIDS(r.blockHash, r.leaderRotation.GetLeader(r.currentView))
+	// idMappings := make(map[hotstuff.ID]int)
+	// for i := 0; i < r.configuration.Len(); i++ {
+	// 	idMappings[hotstuff.ID(i+1)] = i
+	// }
 	r.tree.InitializeWithPIDs(idMappings)
+	r.children = r.tree.GetChildren()
 	r.sendProposalToChildren(p, s.Signature())
 }
 
+func (r *Randel) sendNACKToFailedNodes(failedNodes []hotstuff.ID) {
+	if len(failedNodes) == 0 {
+		return
+	} else {
+		for _, nodeID := range failedNodes {
+			node, ok := r.nodes[nodeID]
+			if !ok {
+				r.logger.Error("node not found in map ", nodeID, r.nodes)
+				continue
+			}
+
+			r.logger.Info("sending SecondChance from ", r.opts.ID(), " to ",
+				nodeID, " for view ", r.currentView)
+
+			node.SendNoAck(context.Background(), &randelpb.Request{NodeID: uint32(nodeID), View: uint64(r.currentView)})
+		}
+	}
+}
+
+func (r *Randel) sendACKToSenders() {
+	if len(r.senders) == 0 || r.aggregatedContribution == nil {
+		return
+	} else {
+		for _, nodeID := range r.senders {
+			node, ok := r.nodes[nodeID]
+			if !ok {
+				r.logger.Error("node not found in map ", nodeID, r.nodes)
+				continue
+			}
+			contribution := randelpb.RContribution{
+				ID:        uint32(r.tree.ID),
+				Signature: hotstuffpb.QuorumSignatureToProto(r.aggregatedContribution),
+				View:      uint64(r.currentView),
+			}
+			r.logger.Info("sending acknowledgement from ", r.opts.ID(), " to ",
+				nodeID, " for view ", contribution.View)
+			node.SendAcknowledgement(context.Background(), &contribution)
+		}
+	}
+}
+
 func (r *Randel) sendProposalToChildren(proposal hotstuff.ProposeMsg, individual hotstuff.QuorumSignature) {
-	children := r.tree.GetChildren()
-	if len(children) == 0 {
+
+	if len(r.children) == 0 {
 		parent, ok := r.tree.GetParent()
 		if ok {
 			r.SendContributionToNode(parent, individual)
 		}
 	} else {
-		config, err := r.configuration.SubConfig(children)
+		config, err := r.configuration.SubConfig(r.children)
 		if err != nil {
 			r.logger.Error("Unable to send the proposal to children", err)
 			return
@@ -222,9 +275,8 @@ func (r *Randel) reset() {
 	r.beginDone = false
 	r.aggregatedContribution = nil
 	r.isAggregationCompleted = false
-	if r.cancelFunc != nil {
-		r.cancelFunc()
-	}
+	r.senders = make([]hotstuff.ID, 0)
+	r.cancelWaitingContext()
 }
 
 func (r *Randel) canMergeContributions(a, b hotstuff.QuorumSignature) bool {
@@ -259,9 +311,8 @@ func (r *Randel) verifyContribution(signature hotstuff.QuorumSignature, hash hot
 	verified = r.crypto.Verify(signature, block.ToBytes())
 	return verified
 }
-func (r *Randel) mergeWithContribution(contribution *randelpb.RContribution) (bool, error) {
+func (r *Randel) mergeWithContribution(currentSignature hotstuff.QuorumSignature) (bool, error) {
 
-	currentSignature := hotstuffpb.QuorumSignatureFromProto(contribution.Signature)
 	isVerified := r.verifyContribution(currentSignature, r.blockHash)
 	if !isVerified {
 		r.logger.Info("Contribution verification failed")
@@ -340,4 +391,46 @@ type NACKRecvEvent struct {
 
 type InitCompleteEvent struct {
 	View hotstuff.View
+}
+
+func (r *Randel) randomizeIDS(hash hotstuff.Hash, leaderID hotstuff.ID) map[hotstuff.ID]int {
+	//assign leader to the root of the tree.
+	seed := r.opts.SharedRandomSeed() + int64(binary.LittleEndian.Uint64(hash[:]))
+	totalNodes := r.configuration.Len()
+	ids := make([]hotstuff.ID, 0, totalNodes)
+	for id := range r.configuration.Replicas() {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	// Shuffle the list of IDs using the shared random seed + the first 8 bytes of the hash.
+	rnd := rand.New(rand.NewSource(seed))
+	rnd.Shuffle(len(ids), reflect.Swapper(ids))
+	lIndex := 0
+	for index, id := range ids {
+		if id == leaderID {
+			lIndex = index
+		}
+	}
+	currentRoot := ids[0]
+	ids[0] = ids[lIndex]
+	ids[lIndex] = currentRoot
+	posMapping := make(map[hotstuff.ID]int)
+	for index, ID := range ids {
+		posMapping[ID] = index
+	}
+	return posMapping
+}
+
+// check if a is subset of b
+func isSubSet(a, b []hotstuff.ID) bool {
+	c := hotstuff.NewIDSet()
+	for _, id := range b {
+		c.Add(id)
+	}
+	for _, id := range a {
+		if !c.Contains(id) {
+			return false
+		}
+	}
+	return true
 }

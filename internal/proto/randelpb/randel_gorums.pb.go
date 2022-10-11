@@ -143,20 +143,6 @@ type Node struct {
 	*gorums.RawNode
 }
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
-
-// SendAcknowledgement is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (c *Configuration) SendAcknowledgement(ctx context.Context, in *RContribution, opts ...gorums.CallOption) {
-	cd := gorums.QuorumCallData{
-		Message: in,
-		Method:  "randelpb.Randel.SendAcknowledgement",
-	}
-
-	c.RawConfiguration.Multicast(ctx, cd, opts...)
-}
-
 // QuorumSpec is the interface of quorum functions for Randel.
 type QuorumSpec interface {
 	gorums.ConfigOption
@@ -185,6 +171,20 @@ func RegisterRandelServer(srv *gorums.Server, impl Randel) {
 		defer ctx.Release()
 		impl.SendContribution(ctx, req)
 	})
+}
+
+// Reference imports to suppress errors if they are not otherwise used.
+var _ emptypb.Empty
+
+// SendAcknowledgement is a quorum call invoked on all nodes in configuration c,
+// with the same argument in, and returns a combined result.
+func (n *Node) SendAcknowledgement(ctx context.Context, in *RContribution, opts ...gorums.CallOption) {
+	cd := gorums.CallData{
+		Message: in,
+		Method:  "randelpb.Randel.SendAcknowledgement",
+	}
+
+	n.RawNode.Unicast(ctx, cd, opts...)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.

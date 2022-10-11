@@ -1,11 +1,7 @@
 package randel
 
 import (
-	"encoding/binary"
 	"math"
-	"math/rand"
-	"reflect"
-	"sort"
 
 	"github.com/relab/hotstuff"
 )
@@ -59,34 +55,6 @@ func CreateLevelMapping(configurationLength int, myID hotstuff.ID) *Level {
 		ID:                myID,
 		maxLevel:          maxLevel,
 	}
-}
-
-func (r *Randel) randomizeIDS(hash hotstuff.Hash, leaderID hotstuff.ID) map[hotstuff.ID]int {
-	//assign leader to the root of the tree.
-	seed := r.opts.SharedRandomSeed() + int64(binary.LittleEndian.Uint64(hash[:]))
-	totalNodes := r.configuration.Len()
-	ids := make([]hotstuff.ID, 0, totalNodes)
-	for id := range r.configuration.Replicas() {
-		ids = append(ids, id)
-	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-	// Shuffle the list of IDs using the shared random seed + the first 8 bytes of the hash.
-	rnd := rand.New(rand.NewSource(seed))
-	rnd.Shuffle(len(ids), reflect.Swapper(ids))
-	lIndex := 0
-	for index, id := range ids {
-		if id == leaderID {
-			lIndex = index
-		}
-	}
-	currentRoot := ids[0]
-	ids[0] = ids[lIndex]
-	ids[lIndex] = currentRoot
-	posMapping := make(map[hotstuff.ID]int)
-	for index, ID := range ids {
-		posMapping[ID] = index
-	}
-	return posMapping
 }
 
 func (l *Level) InitializeWithPIDs(posMapping map[hotstuff.ID]int) {

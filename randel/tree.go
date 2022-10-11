@@ -39,17 +39,7 @@ func (t *TreeConfiguration) GetParent() (hotstuff.ID, bool) {
 }
 
 func (t *TreeConfiguration) GetChildren() []hotstuff.ID {
-	children := make([]hotstuff.ID, 0)
-	myPos := t.idToPosMapping[t.ID]
-	for i := 1; i <= MAX_CHILD; i++ {
-		childPos := (MAX_CHILD * myPos) + i
-		if t.isWithInIndex(childPos) {
-			children = append(children, t.posToIDMapping[childPos])
-		} else {
-			break
-		}
-	}
-	return children
+	return t.GetChildrenOfNode(t.ID)
 }
 
 func (t *TreeConfiguration) isWithInIndex(position int) bool {
@@ -74,4 +64,18 @@ func (t *TreeConfiguration) GetGrandParent() (hotstuff.ID, bool) {
 
 func (t *TreeConfiguration) IsRoot() bool {
 	return t.idToPosMapping[t.ID] == 0
+}
+
+func (t *TreeConfiguration) GetChildrenOfNode(nodeID hotstuff.ID) []hotstuff.ID {
+	children := make([]hotstuff.ID, 0)
+	nodePos := t.idToPosMapping[nodeID]
+	for i := 1; i <= MAX_CHILD; i++ {
+		childPos := (MAX_CHILD * nodePos) + i
+		if t.isWithInIndex(childPos) {
+			children = append(children, t.posToIDMapping[childPos])
+		} else {
+			break
+		}
+	}
+	return children
 }
