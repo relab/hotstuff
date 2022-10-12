@@ -207,6 +207,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	s.configuration.Timeout(timeoutMsg)
 
 	if s.inPipeline(s.currentView) {
+		s.logger.Debug("OnLocalTimeout: advance view")
 		s.AdvanceView(hotstuff.NewSyncInfo().WithTimeoutView(s.currentView))
 	}
 
@@ -344,6 +345,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	}
 
 	if timeoutV := syncInfo.TimeoutView(); timeoutV > v && s.inPipeline(timeoutV) {
+		timeout = true
 		v = timeoutV
 	}
 
@@ -366,13 +368,13 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	s.newCtx(duration)
 	s.timer.Reset(duration)
 
-	s.logger.Debugf("advanced to view %d", s.currentView)
+	s.logger.Debugf("advanced to view %d with timeout %v", s.currentView, duration)
 	s.eventLoop.AddEvent(ViewChangeEvent{View: s.currentView, Timeout: timeout})
 
 	leader := s.leaderRotation.GetLeader(s.currentView)
 	if leader == s.opts.ID() {
 		s.consensus.Propose(syncInfo.WithQC(s.highQC))
-	} else if replica, ok := s.configuration.Replica(leader); ok && !s.inPipeline(s.currentView) {
+	} else if replica, ok := s.configuration.Replica(leader); ok && !s.inPipeline(s.currentView) && timeout {
 		s.logger.Debug("sending NewView msg")
 		replica.NewView(syncInfo)
 	}

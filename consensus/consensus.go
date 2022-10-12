@@ -127,6 +127,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 		cs.logger.Debug("Propose: No command")
 		return
 	}
+	cs.logger.Debugf("Propose: cmd %s", cmd)
 
 	parentHash := qc.BlockHash()
 	if cs.synchronizer.LeafBlock().View() < cs.synchronizer.View() {
@@ -199,16 +200,21 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
-	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
-		cs.acceptor.Proposed(qcBlock.Command())
-	} else {
-		cs.logger.Info("OnPropose: Failed to fetch qcBlock")
+	if _, ok := cs.blockChain.LocalGet(block.Parent()); !ok {
+		cs.logger.Info("OnPropose: Out of order block")
+		if proposal.Deferred {
+			return
+		}
+		proposal.Deferred = true
+		cs.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, proposal)
+		return
 	}
 
 	if !cs.acceptor.Accept(block.Command()) {
 		cs.logger.Info("OnPropose: command not accepted")
 		return
 	}
+	cs.acceptor.Proposed(block.Command())
 
 	// block is safe and was accepted
 	cs.blockChain.Store(block)

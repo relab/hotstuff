@@ -10,6 +10,7 @@ type ProposeMsg struct {
 	ID          ID           // The ID of the replica who sent the message.
 	Block       *Block       // The block that is proposed.
 	AggregateQC *AggregateQC // Optional AggregateQC
+	Deferred    bool
 }
 
 func (p ProposeMsg) String() string {
