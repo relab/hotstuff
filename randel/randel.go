@@ -164,11 +164,12 @@ func (r *Randel) Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg, v hotstuff
 	// 	View:      uint64(v),
 	// }
 	r.aggregatedContribution = s.Signature()
-	idMappings := r.randomizeIDS(r.blockHash, r.leaderRotation.GetLeader(r.currentView))
+
 	// idMappings := make(map[hotstuff.ID]int)
 	// for i := 0; i < r.configuration.Len(); i++ {
 	// 	idMappings[hotstuff.ID(i+1)] = i
 	// }
+	idMappings := r.randomizeIDS(r.blockHash, r.leaderRotation.GetLeader(r.currentView))
 	r.tree.InitializeWithPIDs(idMappings)
 	r.children = r.tree.GetChildren()
 	r.sendProposalToChildren(p, s.Signature())
