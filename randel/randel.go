@@ -43,6 +43,7 @@ type Randel struct {
 	cancelFunc             context.CancelFunc
 	blockHash              hotstuff.Hash
 	currentView            hotstuff.View
+	ProposalMsg            hotstuff.ProposeMsg
 	children               []hotstuff.ID
 	senders                []hotstuff.ID
 }
@@ -156,6 +157,7 @@ func (r *Randel) Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg, v hotstuff
 	r.currentView = v
 	r.beginDone = true
 	r.blockHash = s.BlockHash()
+	r.ProposalMsg = p
 	// sig := hotstuffpb.QuorumSignatureToProto(s.Signature())
 	// individualContribution := &randelpb.RContribution{
 	// 	ID:        uint32(r.opts.ID()),
@@ -185,11 +187,11 @@ func (r *Randel) sendNACKToFailedNodes(failedNodes []hotstuff.ID) {
 				r.logger.Error("node not found in map ", nodeID, r.nodes)
 				continue
 			}
-
 			r.logger.Info("sending SecondChance from ", r.opts.ID(), " to ",
 				nodeID, " for view ", r.currentView)
-
-			node.SendNoAck(context.Background(), &randelpb.Request{NodeID: uint32(nodeID), View: uint64(r.currentView)})
+			proposal := hotstuffpb.ProposalToProto(r.ProposalMsg)
+			node.SendNoAck(context.Background(), &randelpb.NACK{NodeID: uint32(nodeID),
+				Proposal: proposal})
 		}
 	}
 }
@@ -365,12 +367,13 @@ func (i serviceImpl) SendAcknowledgement(ctx gorums.ServerCtx, request *randelpb
 	}
 }
 
-func (i serviceImpl) SendNoAck(ctx gorums.ServerCtx, request *randelpb.Request) {
-
+func (i serviceImpl) SendNoAck(ctx gorums.ServerCtx, request *randelpb.NACK) {
 	i.r.logger.Info("Received NACK from node ", request.NodeID)
-	if request.View == uint64(i.r.currentView) {
-		i.r.eventLoop.AddEvent(NACKRecvEvent{View: hotstuff.View(request.View)})
-	}
+	proposal := request.Proposal
+	proposal.Block.Proposer = uint32(request.NodeID)
+	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
+	proposeMsg.ID = hotstuff.ID(request.NodeID)
+	i.r.eventLoop.AddEvent(proposeMsg)
 }
 
 func (i serviceImpl) SendContribution(ctx gorums.ServerCtx, request *randelpb.RContribution) {

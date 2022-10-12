@@ -14,7 +14,7 @@ service Randel {
   rpc SendAcknowledgement(RContribution) returns (google.protobuf.Empty) {
     option (gorums.unicast) = true;
   }
-  rpc SendNoAck(Request) returns (google.protobuf.Empty){
+  rpc SendNoAck(NACK) returns (google.protobuf.Empty){
     option (gorums.unicast) = true;
   }
   rpc SendContribution(RContribution) returns (google.protobuf.Empty) {
@@ -22,9 +22,9 @@ service Randel {
   }
 }
 
-message Request {
+message NACK {
   uint32 NodeID = 1;
-  uint64 View = 2;
+  hotstuffpb.Proposal Proposal = 2;
 }
 message RContribution {
   uint32 ID = 1;

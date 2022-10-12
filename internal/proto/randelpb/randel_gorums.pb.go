@@ -151,7 +151,7 @@ type QuorumSpec interface {
 // Randel is the server-side API for the Randel Service
 type Randel interface {
 	SendAcknowledgement(ctx gorums.ServerCtx, request *RContribution)
-	SendNoAck(ctx gorums.ServerCtx, request *Request)
+	SendNoAck(ctx gorums.ServerCtx, request *NACK)
 	SendContribution(ctx gorums.ServerCtx, request *RContribution)
 }
 
@@ -162,7 +162,7 @@ func RegisterRandelServer(srv *gorums.Server, impl Randel) {
 		impl.SendAcknowledgement(ctx, req)
 	})
 	srv.RegisterHandler("randelpb.Randel.SendNoAck", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*Request)
+		req := in.Message.(*NACK)
 		defer ctx.Release()
 		impl.SendNoAck(ctx, req)
 	})
@@ -192,7 +192,7 @@ var _ emptypb.Empty
 
 // SendNoAck is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (n *Node) SendNoAck(ctx context.Context, in *Request, opts ...gorums.CallOption) {
+func (n *Node) SendNoAck(ctx context.Context, in *NACK, opts ...gorums.CallOption) {
 	cd := gorums.CallData{
 		Message: in,
 		Method:  "randelpb.Randel.SendNoAck",
