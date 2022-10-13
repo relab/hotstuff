@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -97,6 +98,9 @@ func runController() {
 		err = os.MkdirAll(outputDir, 0755)
 		checkf("failed to create output directory: %v", err)
 	}
+
+	err = checkFlags()
+	checkf("invalid flag combination: %v", err)
 
 	experiment := orchestration.Experiment{
 		Logger:      logging.New("ctrl"),
@@ -325,4 +329,13 @@ func startLocalProfiling(output string) (stop func() error, err error) {
 
 	stop, err = profiling.StartProfilers(cpuProfile, memProfile, trace, fgprofProfile)
 	return
+}
+
+func checkFlags() error {
+	consensus := viper.GetString("consensus")
+	pipelinedViews := viper.GetInt("pipelined-views")
+	if pipelinedViews > 1 && consensus != "chainedhotstuff" {
+		return errors.New("piplining only supported for chainedhotstuff consensus")
+	}
+	return nil
 }

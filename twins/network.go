@@ -121,6 +121,14 @@ func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) modules.Buil
 }
 
 func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusName string, pipelinedViews uint32) error {
+
+	if pipelinedViews > 1 && consensusName != "chainedhotstuff" {
+		return fmt.Errorf("pipelining currently only supported for chainedhotstuff")
+	}
+	if pipelinedViews < 1 {
+		pipelinedViews = 1
+	}
+
 	cg := &commandGenerator{}
 	for _, nodeID := range nodes {
 
@@ -128,13 +136,6 @@ func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusN
 		pk, err := keygen.GenerateECDSAPrivateKey()
 		if err != nil {
 			return err
-		}
-
-		if pipelinedViews < 1 || consensusName != "chainedhotstuff" {
-			if pipelinedViews > 1 && consensusName != "chainedhotstuff" {
-				return fmt.Errorf("pipelining currently only supported for chainedhotstuff")
-			}
-			pipelinedViews = 1
 		}
 
 		builder := n.GetNodeBuilder(nodeID, pk)
