@@ -156,6 +156,8 @@ type Synchronizer interface {
 	AdvanceView(hotstuff.SyncInfo)
 	// View returns the current view.
 	View() hotstuff.View
+	// NextView returns the view in which the next proposal is expected.
+	NextView() hotstuff.View
 	// ViewContext returns a context that is cancelled at the end of the view.
 	ViewContext() context.Context
 	// HighQC returns the highest known QC.

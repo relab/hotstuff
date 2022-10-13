@@ -168,7 +168,7 @@ func (n *Network) run(ticks int) {
 	// kick off the initial proposal(s)
 	for _, node := range n.nodes {
 		if node.leaderRotation.GetLeader(1) == node.id.ReplicaID {
-			node.consensus.Propose(node.synchronizer.(*synchronizer.Synchronizer).SyncInfo())
+			node.consensus.Propose(node.synchronizer.(*synchronizer.Synchronizer).SyncInfo().WithNextView(1))
 		}
 	}
 
@@ -202,10 +202,10 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 
 	// Index into viewPartitions.
 	i := -1
-	if node.effectiveView > node.synchronizer.View() {
+	if node.effectiveView > node.synchronizer.NextView() {
 		i += int(node.effectiveView)
 	} else {
-		i += int(node.synchronizer.View())
+		i += int(node.synchronizer.NextView())
 	}
 
 	if i < 0 {

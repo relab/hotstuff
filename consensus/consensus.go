@@ -129,8 +129,15 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 	}
 	cs.logger.Debugf("Propose: cmd %s", cmd)
 
+	v := cert.NextView()
+	if v < cs.synchronizer.View() {
+		// this should not happen
+		cs.logger.Errorf("proposeView %v was passed in view %v", v, cs.synchronizer.View())
+		v = cs.synchronizer.View()
+	}
+
 	parentHash := qc.BlockHash()
-	if cs.synchronizer.LeafBlock().View() < cs.synchronizer.View() {
+	if cs.synchronizer.LeafBlock().View() < v {
 		parentHash = cs.synchronizer.LeafBlock().Hash()
 	}
 
@@ -148,7 +155,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 				parentHash,
 				qc,
 				cmd,
-				cs.synchronizer.View(),
+				v,
 				cs.opts.ID(),
 			),
 		}
@@ -200,14 +207,18 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
-	if _, ok := cs.blockChain.LocalGet(block.Parent()); !ok {
-		cs.logger.Info("OnPropose: Out of order block")
-		if proposal.Deferred {
+	if !proposal.Deferred {
+		if _, ok := cs.blockChain.LocalGet(block.Parent()); !ok {
+			cs.logger.Info("OnPropose: Out of order block")
+			proposal.Deferred = true
+			cs.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, proposal)
 			return
 		}
-		proposal.Deferred = true
-		cs.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, proposal)
-		return
+	} else {
+		if _, ok := cs.blockChain.Get(block.Parent()); !ok {
+			cs.logger.Error("OnPropose: Unable to retrieve parent")
+			return
+		}
 	}
 
 	if !cs.acceptor.Accept(block.Command()) {

@@ -174,11 +174,11 @@ func (pc PartialCert) ToBytes() []byte {
 // This can also hold an AggregateQC for Fast-Hotstuff.
 // This can also hold a block and a view with local timeout.
 type SyncInfo struct {
-	qc          *QuorumCert
-	tc          *TimeoutCert
-	aggQC       *AggregateQC
-	block       *Block
-	timeoutView View
+	qc       *QuorumCert
+	tc       *TimeoutCert
+	aggQC    *AggregateQC
+	block    *Block
+	nextView View
 }
 
 // NewSyncInfo returns a new SyncInfo struct.
@@ -206,9 +206,9 @@ func (si SyncInfo) WithBlock(b *Block) SyncInfo {
 	return si
 }
 
-// WithTimeoutView returns a copy of the SyncInfo struct with a view marked as local timeout.
-func (si SyncInfo) WithTimeoutView(tv View) SyncInfo {
-	si.timeoutView = tv
+// WithNextView returns a copy of the SyncInfo struct with a next view to propose in.
+func (si SyncInfo) WithNextView(nv View) SyncInfo {
+	si.nextView = nv
 	return si
 }
 
@@ -251,9 +251,9 @@ func (si SyncInfo) Block() (_ *Block, _ bool) {
 	return
 }
 
-// TimeoutView returns the timeout view, if present.
-func (si SyncInfo) TimeoutView() (_ View) {
-	return si.timeoutView
+// NextView returns the next view, if present.
+func (si SyncInfo) NextView() (_ View) {
+	return si.nextView
 }
 
 func (si SyncInfo) String() string {
@@ -271,8 +271,8 @@ func (si SyncInfo) String() string {
 	if si.block != nil {
 		fmt.Fprintf(&sb, "%s ", si.block)
 	}
-	if si.timeoutView != 0 {
-		fmt.Fprintf(&sb, "timeoutView: %d ", si.timeoutView)
+	if si.nextView != 0 {
+		fmt.Fprintf(&sb, "nextView: %d ", si.nextView)
 	}
 	sb.WriteRune('}')
 	return sb.String()

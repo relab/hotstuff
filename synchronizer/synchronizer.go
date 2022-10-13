@@ -24,6 +24,7 @@ type Synchronizer struct {
 	opts           *modules.Options
 
 	currentView hotstuff.View
+	nextView    hotstuff.View
 	highTC      hotstuff.TimeoutCert
 	highQC      hotstuff.QuorumCert
 	leafBlock   *hotstuff.Block
@@ -93,6 +94,7 @@ func New(viewDuration ViewDuration, pipelinedViews uint32) modules.Synchronizer 
 	return &Synchronizer{
 		leafBlock:   hotstuff.GetGenesis(),
 		currentView: 1,
+		nextView:    0,
 
 		pipelinedViews: pipelinedViews,
 
@@ -121,7 +123,9 @@ func (s *Synchronizer) Start(ctx context.Context) {
 
 	// start the initial proposal
 	if s.currentView == 1 && s.leaderRotation.GetLeader(s.currentView) == s.opts.ID() {
-		s.consensus.Propose(s.SyncInfo())
+		s.nextView = 1
+		s.consensus.Propose(s.SyncInfo().WithNextView(s.nextView))
+
 	}
 }
 
@@ -146,6 +150,11 @@ func (s *Synchronizer) LeafBlock() *hotstuff.Block {
 // View returns the current view.
 func (s *Synchronizer) View() hotstuff.View {
 	return s.currentView
+}
+
+// NextView returns the view in which the next proposal is expected.
+func (s *Synchronizer) NextView() hotstuff.View {
+	return s.nextView
 }
 
 // ViewContext returns a context that is cancelled at the end of the view.
@@ -205,11 +214,6 @@ func (s *Synchronizer) OnLocalTimeout() {
 	s.consensus.StopVoting(s.currentView)
 
 	s.configuration.Timeout(timeoutMsg)
-
-	if s.inPipeline(s.currentView) {
-		s.logger.Debug("OnLocalTimeout: advance view")
-		s.AdvanceView(hotstuff.NewSyncInfo().WithTimeoutView(s.currentView))
-	}
 
 	s.OnRemoteTimeout(timeoutMsg)
 }
@@ -286,6 +290,7 @@ func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
 // qc must be either a regular quorum certificate, or a timeout certificate.
 func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	v := hotstuff.View(0)
+	nextPropose := hotstuff.View(0)
 	timeout := false
 
 	// check for a TC
@@ -335,31 +340,44 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		}
 	}
 
+	if v >= s.currentView {
+		s.increaseView(v+1, timeout)
+		nextPropose = v + 1
+	}
+
 	b, ok := syncInfo.Block()
 	if ok {
 		s.updateLeafBlock(b)
 	}
 
-	if s.inPipeline(s.leafBlock.View()) {
-		v = s.leafBlock.View()
+	if s.inPipeline(s.leafBlock.View() + 1) {
+		nextPropose = s.leafBlock.View() + 1
 	}
 
-	if timeoutV := syncInfo.TimeoutView(); timeoutV > v && s.inPipeline(timeoutV) {
-		timeout = true
-		v = timeoutV
-	}
-
-	if v < s.currentView {
+	if nextPropose <= s.nextView {
 		return
 	}
 
+	s.nextView = nextPropose
+
+	leader := s.leaderRotation.GetLeader(s.nextView)
+	if leader == s.opts.ID() {
+		s.consensus.Propose(syncInfo.WithQC(s.highQC).WithNextView(s.nextView))
+	} else if replica, ok := s.configuration.Replica(leader); ok && !s.inPipeline(s.nextView) {
+		s.logger.Debug("sending NewView msg")
+		replica.NewView(syncInfo)
+	}
+}
+
+// increaseView resets the currentView and updates context and timer
+func (s *Synchronizer) increaseView(newView hotstuff.View, timeout bool) {
 	s.timer.Stop()
 
 	if !timeout {
 		s.duration.ViewSucceeded()
 	}
 
-	s.currentView = v + 1
+	s.currentView = newView
 	s.lastTimeout = nil
 	s.duration.ViewStarted()
 
@@ -370,19 +388,12 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 
 	s.logger.Debugf("advanced to view %d with timeout %v", s.currentView, duration)
 	s.eventLoop.AddEvent(ViewChangeEvent{View: s.currentView, Timeout: timeout})
-
-	leader := s.leaderRotation.GetLeader(s.currentView)
-	if leader == s.opts.ID() {
-		s.consensus.Propose(syncInfo.WithQC(s.highQC))
-	} else if replica, ok := s.configuration.Replica(leader); ok && !s.inPipeline(s.currentView) && timeout {
-		s.logger.Debug("sending NewView msg")
-		replica.NewView(syncInfo)
-	}
 }
 
 // inPipeline checks if the given view is in pipeline range from highQC.
 func (s *Synchronizer) inPipeline(v hotstuff.View) bool {
-	return v > s.highQC.View() && v < s.highQC.View()+hotstuff.View(s.pipelinedViews)
+	// current view is always the first view in the pipeline
+	return v >= s.currentView && v < s.currentView+hotstuff.View(s.pipelinedViews)
 }
 
 // updateHighQC attempts to update the highQC, but does not verify the qc first.

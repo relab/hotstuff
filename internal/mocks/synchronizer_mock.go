@@ -128,3 +128,17 @@ func (mr *MockSynchronizerMockRecorder) PipelinedViews() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PipelinedViews", reflect.TypeOf((*MockSynchronizer)(nil).PipelinedViews))
 }
+
+// NextView mocks base method.
+func (m *MockSynchronizer) NextView() hotstuff.View {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NextView")
+	ret0, _ := ret[0].(hotstuff.View)
+	return ret0
+}
+
+// NextView indicates an expected call of NextView.
+func (mr *MockSynchronizerMockRecorder) NextView() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NextView", reflect.TypeOf((*MockSynchronizer)(nil).NextView))
+}
