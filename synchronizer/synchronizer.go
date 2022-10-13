@@ -24,6 +24,7 @@ type Synchronizer struct {
 	opts           *modules.Options
 
 	currentView hotstuff.View
+	nextView    hotstuff.View
 	highTC      hotstuff.TimeoutCert
 	highQC      hotstuff.QuorumCert
 	leafBlock   *hotstuff.Block
@@ -35,6 +36,9 @@ type Synchronizer struct {
 
 	duration ViewDuration
 	timer    *time.Timer
+
+	// number of concurrent views, 0 and 1 both give no concurrency.
+	pipelinedViews uint32
 
 	viewCtx   context.Context // a context that is cancelled at the end of the current view
 	cancelCtx context.CancelFunc
@@ -85,11 +89,14 @@ func (s *Synchronizer) InitModule(mods *modules.Core) {
 }
 
 // New creates a new Synchronizer.
-func New(viewDuration ViewDuration) modules.Synchronizer {
+func New(viewDuration ViewDuration, pipelinedViews uint32) modules.Synchronizer {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Synchronizer{
 		leafBlock:   hotstuff.GetGenesis(),
 		currentView: 1,
+		nextView:    0,
+
+		pipelinedViews: pipelinedViews,
 
 		viewCtx:   ctx,
 		cancelCtx: cancel,
@@ -116,8 +123,18 @@ func (s *Synchronizer) Start(ctx context.Context) {
 
 	// start the initial proposal
 	if s.currentView == 1 && s.leaderRotation.GetLeader(s.currentView) == s.opts.ID() {
-		s.consensus.Propose(s.SyncInfo())
+		s.nextView = 1
+		s.consensus.Propose(s.SyncInfo().WithNextView(s.nextView))
+
 	}
+}
+
+// PipelinedViews returns 1 or the number of concurrent views in the pipeline
+func (s *Synchronizer) PipelinedViews() hotstuff.View {
+	if s.pipelinedViews < 1 {
+		return 1
+	}
+	return hotstuff.View(s.pipelinedViews)
 }
 
 // HighQC returns the highest known QC.
@@ -133,6 +150,11 @@ func (s *Synchronizer) LeafBlock() *hotstuff.Block {
 // View returns the current view.
 func (s *Synchronizer) View() hotstuff.View {
 	return s.currentView
+}
+
+// NextView returns the view in which the next proposal is expected.
+func (s *Synchronizer) NextView() hotstuff.View {
+	return s.nextView
 }
 
 // ViewContext returns a context that is cancelled at the end of the view.
@@ -192,6 +214,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	s.consensus.StopVoting(s.currentView)
 
 	s.configuration.Timeout(timeoutMsg)
+
 	s.OnRemoteTimeout(timeoutMsg)
 }
 
@@ -259,6 +282,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 
 // OnNewView handles an incoming consensus.NewViewMsg
 func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
+	s.logger.Debug("Received NewView from ", newView.ID)
 	s.AdvanceView(newView.SyncInfo)
 }
 
@@ -266,6 +290,7 @@ func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
 // qc must be either a regular quorum certificate, or a timeout certificate.
 func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	v := hotstuff.View(0)
+	nextPropose := hotstuff.View(0)
 	timeout := false
 
 	// check for a TC
@@ -315,17 +340,44 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		}
 	}
 
-	if v < s.currentView {
+	if v >= s.currentView {
+		s.increaseView(v+1, timeout)
+		nextPropose = v + 1
+	}
+
+	b, ok := syncInfo.Block()
+	if ok {
+		s.updateLeafBlock(b)
+	}
+
+	if s.inPipeline(s.leafBlock.View() + 1) {
+		nextPropose = s.leafBlock.View() + 1
+	}
+
+	if nextPropose <= s.nextView {
 		return
 	}
 
+	s.nextView = nextPropose
+
+	leader := s.leaderRotation.GetLeader(s.nextView)
+	if leader == s.opts.ID() {
+		s.consensus.Propose(syncInfo.WithQC(s.highQC).WithNextView(s.nextView))
+	} else if replica, ok := s.configuration.Replica(leader); ok && !s.inPipeline(s.nextView) {
+		s.logger.Debug("sending NewView msg")
+		replica.NewView(syncInfo)
+	}
+}
+
+// increaseView resets the currentView and updates context and timer
+func (s *Synchronizer) increaseView(newView hotstuff.View, timeout bool) {
 	s.timer.Stop()
 
 	if !timeout {
 		s.duration.ViewSucceeded()
 	}
 
-	s.currentView = v + 1
+	s.currentView = newView
 	s.lastTimeout = nil
 	s.duration.ViewStarted()
 
@@ -334,36 +386,53 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	s.newCtx(duration)
 	s.timer.Reset(duration)
 
-	s.logger.Debugf("advanced to view %d", s.currentView)
+	s.logger.Debugf("advanced to view %d with timeout %v", s.currentView, duration)
 	s.eventLoop.AddEvent(ViewChangeEvent{View: s.currentView, Timeout: timeout})
+}
 
-	leader := s.leaderRotation.GetLeader(s.currentView)
-	if leader == s.opts.ID() {
-		s.consensus.Propose(syncInfo)
-	} else if replica, ok := s.configuration.Replica(leader); ok {
-		replica.NewView(syncInfo)
-	}
+// inPipeline checks if the given view is in pipeline range from highQC.
+func (s *Synchronizer) inPipeline(v hotstuff.View) bool {
+	// current view is always the first view in the pipeline
+	return v >= s.currentView && v < s.currentView+hotstuff.View(s.pipelinedViews)
 }
 
 // updateHighQC attempts to update the highQC, but does not verify the qc first.
 // This method is meant to be used instead of the exported UpdateHighQC internally
 // in this package when the qc has already been verified.
+// This method ensures, the block of the highQC is always available locally.
 func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
-	newBlock, ok := s.blockChain.Get(qc.BlockHash())
+	if qc.View() > s.highQC.View() {
+		qcBlock, ok := s.blockChain.Get(qc.BlockHash())
+		if !ok {
+			s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
+			return
+		}
+
+		s.highQC = qc
+		s.logger.Debug("HighQC updated to ", s.highQC)
+
+		if s.leafBlock.View() < qc.View() || !s.blockChain.Extends(s.leafBlock, qcBlock) {
+			s.leafBlock = qcBlock
+		}
+	}
+}
+
+// updateLeafBlock attempts to update the leaf block.
+// This method ensures leafBlock extends highQC.
+// This method does not ensure leafBlock lies within pipeline.
+func (s *Synchronizer) updateLeafBlock(b *hotstuff.Block) {
+	highQCBlock, ok := s.blockChain.Get(s.highQC.BlockHash())
 	if !ok {
-		s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
+		s.logger.Error("updateLeafBlock: Could not find block referenced by new QC!")
 		return
 	}
 
-	oldBlock, ok := s.blockChain.Get(s.highQC.BlockHash())
-	if !ok {
-		s.logger.Panic("Block from the old highQC missing from chain")
+	if !s.blockChain.Extends(b, highQCBlock) {
+		s.logger.Info("updateLeafBlock: new block did not extend highQC!")
+		return
 	}
-
-	if newBlock.View() > oldBlock.View() {
-		s.highQC = qc
-		s.leafBlock = newBlock
-		s.logger.Debug("HighQC updated")
+	if b.View() > s.leafBlock.View() {
+		s.leafBlock = b
 	}
 }
 

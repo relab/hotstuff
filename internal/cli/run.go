@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -62,6 +63,7 @@ func init() {
 	runCmd.Flags().String("leader-rotation", "round-robin", "name of the leader rotation algorithm")
 	runCmd.Flags().Int64("shared-seed", 0, "Shared random number generator seed")
 	runCmd.Flags().StringSlice("modules", nil, "Name additional modules to be loaded.")
+	runCmd.Flags().Int("pipelined-views", 1, "number of blocks/views proposed concurrently")
 
 	runCmd.Flags().Bool("worker", false, "run a local worker")
 	runCmd.Flags().StringSlice("hosts", nil, "the remote hosts to run the experiment on via ssh")
@@ -97,6 +99,9 @@ func runController() {
 		checkf("failed to create output directory: %v", err)
 	}
 
+	err = checkFlags()
+	checkf("invalid flag combination: %v", err)
+
 	experiment := orchestration.Experiment{
 		Logger:      logging.New("ctrl"),
 		NumReplicas: viper.GetInt("replicas"),
@@ -116,6 +121,7 @@ func runController() {
 			MaxTimeout:        durationpb.New(viper.GetDuration("max-timeout")),
 			SharedSeed:        viper.GetInt64("shared-seed"),
 			Modules:           viper.GetStringSlice("modules"),
+			PipelinedViews:    viper.GetUint32("pipelined-views"),
 		},
 		ClientOpts: &orchestrationpb.ClientOpts{
 			UseTLS:           true,
@@ -323,4 +329,13 @@ func startLocalProfiling(output string) (stop func() error, err error) {
 
 	stop, err = profiling.StartProfilers(cpuProfile, memProfile, trace, fgprofProfile)
 	return
+}
+
+func checkFlags() error {
+	consensus := viper.GetString("consensus")
+	pipelinedViews := viper.GetInt("pipelined-views")
+	if pipelinedViews > 1 && consensus != "chainedhotstuff" {
+		return errors.New("piplining only supported for chainedhotstuff consensus")
+	}
+	return nil
 }

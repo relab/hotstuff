@@ -21,11 +21,11 @@ message ReplicaOpts {
   // Determines whether TLS should be used.
   bool UseTLS = 4;
   // The replica's TLS certificate.
-  optional bytes Certificate = 5;
+  bytes Certificate = 5;
   // The private key of the TLS certificate.
-  optional bytes CertificateKey = 6;
+  bytes CertificateKey = 6;
   // The certificate authority that created the TLS certificates.
-  optional bytes CertificateAuthority = 7;
+  bytes CertificateAuthority = 7;
   // The name of the crypto implementation to use.
   string Crypto = 8;
   // The name of the consensus implementation to use.
@@ -51,6 +51,8 @@ message ReplicaOpts {
   int64 SharedSeed = 20;
   // A list of modules to load.
   repeated string Modules = 21;
+  // Number of blocks proposed concurrently
+  uint32 PipelinedViews = 22;
 }
 
 // ReplicaInfo is the information that the replicas need about each other.
@@ -124,7 +126,7 @@ message StartClientRequest {
   // The clients to create.
   map<uint32, ClientOpts> Clients = 1;
   // The certificate authority that created the TLS certificates.
-  optional bytes CertificateAuthority = 7;
+  bytes CertificateAuthority = 7;
   // The replicas to connect to.
   map<uint32, ReplicaInfo> Configuration = 10;
 }

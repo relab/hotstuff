@@ -172,10 +172,13 @@ func (pc PartialCert) ToBytes() []byte {
 // Generally, if highQC.View > highTC.View, there is no need to include highTC in the SyncInfo.
 // However, if highQC.View < highTC.View, we should still include highQC.
 // This can also hold an AggregateQC for Fast-Hotstuff.
+// This can also hold a block and a view with local timeout.
 type SyncInfo struct {
-	qc    *QuorumCert
-	tc    *TimeoutCert
-	aggQC *AggregateQC
+	qc       *QuorumCert
+	tc       *TimeoutCert
+	aggQC    *AggregateQC
+	block    *Block
+	nextView View
 }
 
 // NewSyncInfo returns a new SyncInfo struct.
@@ -194,6 +197,18 @@ func (si SyncInfo) WithQC(qc QuorumCert) SyncInfo {
 func (si SyncInfo) WithTC(tc TimeoutCert) SyncInfo {
 	si.tc = new(TimeoutCert)
 	*si.tc = tc
+	return si
+}
+
+// WithBlock returns a copy of the SyncInfo struct with the given block.
+func (si SyncInfo) WithBlock(b *Block) SyncInfo {
+	si.block = b
+	return si
+}
+
+// WithNextView returns a copy of the SyncInfo struct with a next view to propose in.
+func (si SyncInfo) WithNextView(nv View) SyncInfo {
+	si.nextView = nv
 	return si
 }
 
@@ -228,6 +243,19 @@ func (si SyncInfo) AggQC() (_ AggregateQC, _ bool) {
 	return
 }
 
+// Block returns the block, if present.
+func (si SyncInfo) Block() (_ *Block, _ bool) {
+	if si.block != nil {
+		return si.block, true
+	}
+	return
+}
+
+// NextView returns the next view, if present.
+func (si SyncInfo) NextView() (_ View) {
+	return si.nextView
+}
+
 func (si SyncInfo) String() string {
 	var sb strings.Builder
 	sb.WriteString("{ ")
@@ -239,6 +267,12 @@ func (si SyncInfo) String() string {
 	}
 	if si.aggQC != nil {
 		fmt.Fprintf(&sb, "%s ", si.aggQC)
+	}
+	if si.block != nil {
+		fmt.Fprintf(&sb, "%s ", si.block)
+	}
+	if si.nextView != 0 {
+		fmt.Fprintf(&sb, "nextView: %d ", si.nextView)
 	}
 	sb.WriteRune('}')
 	return sb.String()

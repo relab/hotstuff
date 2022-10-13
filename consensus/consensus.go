@@ -127,6 +127,19 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 		cs.logger.Debug("Propose: No command")
 		return
 	}
+	cs.logger.Debugf("Propose: cmd %s", cmd)
+
+	v := cert.NextView()
+	if v < cs.synchronizer.View() {
+		// this should not happen
+		cs.logger.Errorf("proposeView %v was passed in view %v", v, cs.synchronizer.View())
+		v = cs.synchronizer.View()
+	}
+
+	parentHash := qc.BlockHash()
+	if cs.synchronizer.LeafBlock().View() < v {
+		parentHash = cs.synchronizer.LeafBlock().Hash()
+	}
 
 	var proposal hotstuff.ProposeMsg
 	if proposer, ok := cs.impl.(ProposeRuler); ok {
@@ -139,10 +152,10 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 		proposal = hotstuff.ProposeMsg{
 			ID: cs.opts.ID(),
 			Block: hotstuff.NewBlock(
-				cs.synchronizer.LeafBlock().Hash(),
+				parentHash,
 				qc,
 				cmd,
-				cs.synchronizer.View(),
+				v,
 				cs.opts.ID(),
 			),
 		}
@@ -194,16 +207,25 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
-	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
-		cs.acceptor.Proposed(qcBlock.Command())
+	if !proposal.Deferred {
+		if _, ok := cs.blockChain.LocalGet(block.Parent()); !ok {
+			cs.logger.Info("OnPropose: Out of order block")
+			proposal.Deferred = true
+			cs.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, proposal)
+			return
+		}
 	} else {
-		cs.logger.Info("OnPropose: Failed to fetch qcBlock")
+		if _, ok := cs.blockChain.Get(block.Parent()); !ok {
+			cs.logger.Error("OnPropose: Unable to retrieve parent")
+			return
+		}
 	}
 
 	if !cs.acceptor.Accept(block.Command()) {
 		cs.logger.Info("OnPropose: command not accepted")
 		return
 	}
+	cs.acceptor.Proposed(block.Command())
 
 	// block is safe and was accepted
 	cs.blockChain.Store(block)
@@ -215,7 +237,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 			cs.commit(b)
 		}
 		if !didAdvanceView {
-			cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+			cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()).WithBlock(block))
 		}
 	}()
 
@@ -240,7 +262,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
-	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
+	leaderID := cs.leaderRotation.GetLeader(block.View() + cs.synchronizer.PipelinedViews())
 	if leaderID == cs.opts.ID() {
 		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})
 		return

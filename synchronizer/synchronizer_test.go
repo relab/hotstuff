@@ -16,7 +16,7 @@ func TestAdvanceViewQC(t *testing.T) {
 	const n = 4
 	ctrl := gomock.NewController(t)
 	builders := testutil.CreateBuilders(t, ctrl, n)
-	s := New(testutil.FixedTimeout(1000))
+	s := New(testutil.FixedTimeout(1000), 1)
 	hs := mocks.NewMockConsensus(ctrl)
 	builders[0].Add(s, hs)
 
@@ -50,7 +50,7 @@ func TestAdvanceViewTC(t *testing.T) {
 	const n = 4
 	ctrl := gomock.NewController(t)
 	builders := testutil.CreateBuilders(t, ctrl, n)
-	s := New(testutil.FixedTimeout(100))
+	s := New(testutil.FixedTimeout(100), 1)
 	hs := mocks.NewMockConsensus(ctrl)
 	builders[0].Add(s, hs)
 

@@ -156,12 +156,16 @@ type Synchronizer interface {
 	AdvanceView(hotstuff.SyncInfo)
 	// View returns the current view.
 	View() hotstuff.View
+	// NextView returns the view in which the next proposal is expected.
+	NextView() hotstuff.View
 	// ViewContext returns a context that is cancelled at the end of the view.
 	ViewContext() context.Context
 	// HighQC returns the highest known QC.
 	HighQC() hotstuff.QuorumCert
 	// LeafBlock returns the current leaf block.
 	LeafBlock() *hotstuff.Block
+	// PipelinedViews returns the number of concurrently executed views.
+	PipelinedViews() hotstuff.View
 	// Start starts the synchronizer with the given context.
 	Start(context.Context)
 }

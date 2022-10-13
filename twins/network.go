@@ -120,7 +120,15 @@ func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) modules.Buil
 	return builder
 }
 
-func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusName string) error {
+func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusName string, pipelinedViews uint32) error {
+
+	if pipelinedViews > 1 && consensusName != "chainedhotstuff" {
+		return fmt.Errorf("pipelining currently only supported for chainedhotstuff")
+	}
+	if pipelinedViews < 1 {
+		pipelinedViews = 1
+	}
+
 	cg := &commandGenerator{}
 	for _, nodeID := range nodes {
 
@@ -143,7 +151,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusN
 			consensus.New(consensusModule),
 			consensus.NewVotingMachine(),
 			crypto.NewCache(ecdsa.New(), 100),
-			synchronizer.New(FixedTimeout(0)),
+			synchronizer.New(FixedTimeout(0), pipelinedViews),
 			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			// twins-specific:
 			&configuration{network: n, node: node},
@@ -161,7 +169,7 @@ func (n *Network) run(ticks int) {
 	// kick off the initial proposal(s)
 	for _, node := range n.nodes {
 		if node.leaderRotation.GetLeader(1) == node.id.ReplicaID {
-			node.consensus.Propose(node.synchronizer.(*synchronizer.Synchronizer).SyncInfo())
+			node.consensus.Propose(node.synchronizer.(*synchronizer.Synchronizer).SyncInfo().WithNextView(1))
 		}
 	}
 
@@ -195,10 +203,10 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 
 	// Index into viewPartitions.
 	i := -1
-	if node.effectiveView > node.synchronizer.View() {
+	if node.effectiveView > node.synchronizer.NextView() {
 		i += int(node.effectiveView)
 	} else {
-		i += int(node.synchronizer.View())
+		i += int(node.synchronizer.NextView())
 	}
 
 	if i < 0 {
