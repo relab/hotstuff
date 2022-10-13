@@ -137,6 +137,7 @@ func TestFHSBug(t *testing.T) {
 type vulnerableFHS struct {
 	logger     logging.Logger
 	blockChain modules.BlockChain
+	opts       *modules.Options
 	inner      fasthotstuff.FastHotStuff
 }
 
@@ -144,6 +145,7 @@ func (fhs *vulnerableFHS) InitModule(mods *modules.Core) {
 	mods.Get(
 		&fhs.logger,
 		&fhs.blockChain,
+		&fhs.opts,
 	)
 
 	fhs.inner.InitModule(mods)
@@ -179,6 +181,30 @@ func (fhs *vulnerableFHS) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 		return grandparent
 	}
 	return nil
+}
+
+func (fhs *vulnerableFHS) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
+	qc, ok := cert.QC()
+	if !ok {
+		return hotstuff.ProposeMsg{}, false
+	}
+
+	proposal = hotstuff.ProposeMsg{
+		ID: fhs.opts.ID(),
+		Block: hotstuff.NewBlock(
+			qc.BlockHash(),
+			qc,
+			cmd,
+			cert.NextView(),
+			fhs.opts.ID(),
+		),
+	}
+
+	if aggQC, ok := cert.AggQC(); ok {
+		proposal.AggregateQC = &aggQC
+	}
+
+	return proposal, true
 }
 
 // ChainLength returns the number of blocks that need to be chained together in order to commit.
