@@ -333,6 +333,7 @@ func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration) (e
 
 func (e *Experiment) stopReplicas() error {
 	hashes := make(map[uint32][]byte)
+	counts := make(map[uint32]uint32)
 	for host, worker := range e.Hosts {
 		req := &orchestrationpb.StopReplicaRequest{IDs: getIDs(host, e.hostsToReplicas)}
 		res, err := worker.StopReplica(req)
@@ -342,14 +343,31 @@ func (e *Experiment) stopReplicas() error {
 		for id, hash := range res.GetHashes() {
 			hashes[id] = hash
 		}
-	}
-	var cmp []byte
-	for _, hash := range hashes {
-		if cmp == nil {
-			cmp = hash
+		for id, cnt := range res.GetCounts() {
+			counts[id] = cnt
 		}
-		if !bytes.Equal(cmp, hash) {
-			return fmt.Errorf("hash mismatch")
+	}
+	for id1, cnt1 := range counts {
+		for id2, cnt2 := range counts {
+			if id2 > id1 && cnt2 == cnt1 {
+				if !bytes.Equal(hashes[id1], hashes[id2]) {
+					return fmt.Errorf("hash mismatch for same count")
+				}
+			}
+		}
+	}
+	var count uint32
+	first := true
+	for _, cnt := range counts {
+		if cnt == 0 {
+			return fmt.Errorf("no request executed")
+		}
+		if first {
+			count = cnt
+			first = false
+		}
+		if count != cnt {
+			e.Logger.Info("found different counts for executed requests")
 		}
 	}
 	return nil
