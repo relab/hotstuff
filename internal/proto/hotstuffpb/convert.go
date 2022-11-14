@@ -93,7 +93,8 @@ func QuorumCertFromProto(qc *QuorumCert) hotstuff.QuorumCert {
 // ProposalToProto converts a ProposeMsg to a protobuf message.
 func ProposalToProto(proposal hotstuff.ProposeMsg) *Proposal {
 	p := &Proposal{
-		Block: BlockToProto(proposal.Block),
+		Block:       BlockToProto(proposal.Block),
+		IsFinalCall: proposal.IsFinalCall,
 	}
 	if proposal.AggregateQC != nil {
 		p.AggQC = AggregateQCToProto(*proposal.AggregateQC)
@@ -104,6 +105,7 @@ func ProposalToProto(proposal hotstuff.ProposeMsg) *Proposal {
 // ProposalFromProto converts a protobuf message to a ProposeMsg.
 func ProposalFromProto(p *Proposal) (proposal hotstuff.ProposeMsg) {
 	proposal.Block = BlockFromProto(p.GetBlock())
+	proposal.IsFinalCall = p.IsFinalCall
 	if p.GetAggQC() != nil {
 		aggQC := AggregateQCFromProto(p.GetAggQC())
 		proposal.AggregateQC = &aggQC

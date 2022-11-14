@@ -23,6 +23,7 @@ message ThroughputMeasurement {
   uint64 Commits = 2;
   uint64 Commands = 3;
   google.protobuf.Duration Duration = 4;
+  uint64 AvgQCLength = 5;
 }
 
 message LatencyMeasurement {

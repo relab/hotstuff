@@ -93,3 +93,90 @@ func TestGetGrandParent(t *testing.T) {
 		}
 	}
 }
+
+func TestGetPeers(t *testing.T) {
+	expectedPeers := map[int][]hotstuff.ID{
+		0:  {},
+		1:  {1, 2, 3, 4},
+		2:  {1, 2, 3, 4},
+		3:  {1, 2, 3, 4},
+		4:  {1, 2, 3, 4},
+		5:  {5, 6, 7, 8},
+		6:  {5, 6, 7, 8},
+		7:  {5, 6, 7, 8},
+		8:  {5, 6, 7, 8},
+		9:  {9, 10, 11, 12},
+		10: {9, 10, 11, 12},
+		11: {9, 10, 11, 12},
+		12: {9, 10, 11, 12},
+		13: {13},
+	}
+	configLength := 14
+	ids := make(map[hotstuff.ID]int)
+	for i := 0; i < configLength; i++ {
+		ids[hotstuff.ID(i)] = i
+	}
+	for i := 0; i < configLength; i++ {
+		tree := CreateTree(configLength, hotstuff.ID(i))
+		tree.InitializeWithPIDs(ids)
+		gotRes := tree.GetPeers(hotstuff.ID(i))
+		if diff := cmp.Diff(gotRes, expectedPeers[i]); diff != "" {
+			t.Errorf("error in GetChildren(%d), difference is %s\n", i, diff)
+		}
+	}
+}
+
+func TestSubTree(t *testing.T) {
+	expectedSubTree := map[int][]hotstuff.ID{
+		0: {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13},
+		1: {5, 6, 7, 8},
+		2: {9, 10, 11, 12},
+		3: {13},
+		4: {},
+	}
+	configLength := 14
+	ids := make(map[hotstuff.ID]int)
+	for i := 0; i < configLength; i++ {
+		ids[hotstuff.ID(i)] = i
+	}
+	for i := 0; i < MAX_CHILD+1; i++ {
+		tree := CreateTree(configLength, hotstuff.ID(i))
+		tree.InitializeWithPIDs(ids)
+		gotRes := tree.GetSubTreeNodes(hotstuff.ID(i))
+		if diff := cmp.Diff(gotRes, expectedSubTree[i]); diff != "" {
+			t.Errorf("error in GetChildren(%d), difference is %s\n", i, diff)
+		}
+	}
+}
+
+func TestGetHeight(t *testing.T) {
+	expectedHeight := map[int]int{
+		0:  3,
+		1:  2,
+		2:  2,
+		3:  2,
+		4:  2,
+		5:  1,
+		6:  1,
+		7:  1,
+		8:  1,
+		9:  1,
+		10: 1,
+		11: 1,
+		12: 1,
+		13: 1,
+	}
+	configLength := 14
+	ids := make(map[hotstuff.ID]int)
+	for i := 0; i < configLength; i++ {
+		ids[hotstuff.ID(i)] = i
+	}
+	for i := 0; i < configLength; i++ {
+		tree := CreateTree(configLength, hotstuff.ID(i))
+		tree.InitializeWithPIDs(ids)
+		gotRes := tree.GetHeight(hotstuff.ID(i))
+		if gotRes != expectedHeight[i] {
+			t.Errorf("error in GetHeight(%d), expected height %d got height %d\n", i, expectedHeight[i], gotRes)
+		}
+	}
+}

@@ -27,6 +27,7 @@ type Synchronizer struct {
 	highTC      hotstuff.TimeoutCert
 	highQC      hotstuff.QuorumCert
 	leafBlock   *hotstuff.Block
+	randel      modules.Randel
 
 	// A pointer to the last timeout message that we sent.
 	// If a timeout happens again before we advance to the next view,
@@ -55,7 +56,7 @@ func (s *Synchronizer) InitModule(mods *modules.Core) {
 		&s.logger,
 		&s.opts,
 	)
-
+	mods.TryGet(&s.randel)
 	s.eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
 		timeoutView := event.(TimeoutEvent).View
 		if s.currentView == timeoutView {
@@ -152,6 +153,13 @@ func (s *Synchronizer) OnLocalTimeout() {
 	// until we get a timeout certificate.
 	//
 	// TODO: figure out the best way to handle this context and timeout.
+	if s.randel != nil {
+		newView, ok := s.randel.GetNewViewMsg(s.View())
+		if ok {
+			s.eventLoop.AddEvent(newView)
+			return
+		}
+	}
 	if s.viewCtx.Err() != nil {
 		s.newCtx(s.duration.Duration())
 	}
@@ -280,9 +288,10 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	}
 
 	var (
-		haveQC bool
-		qc     hotstuff.QuorumCert
-		aggQC  hotstuff.AggregateQC
+		haveQC       bool
+		qc           hotstuff.QuorumCert
+		aggQC        hotstuff.AggregateQC
+		participants int
 	)
 
 	// check for an AggQC or QC
@@ -307,6 +316,9 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	}
 
 	if haveQC {
+		if qc.Signature() != nil {
+			participants = qc.Signature().Participants().Len()
+		}
 		s.updateHighQC(qc)
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
 		if qc.View() >= v {
@@ -322,7 +334,11 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	s.timer.Stop()
 
 	if !timeout {
-		s.duration.ViewSucceeded()
+		if participants == s.configuration.Len() {
+			s.duration.ViewSucceeded(false)
+		} else {
+			s.duration.ViewSucceeded(true)
+		}
 	}
 
 	s.currentView = v + 1
@@ -378,6 +394,10 @@ func (s *Synchronizer) updateHighTC(tc hotstuff.TimeoutCert) {
 func (s *Synchronizer) newCtx(duration time.Duration) {
 	s.cancelCtx()
 	s.viewCtx, s.cancelCtx = context.WithTimeout(context.Background(), duration)
+}
+
+func (s *Synchronizer) ViewDuration() time.Duration {
+	return s.duration.Duration()
 }
 
 var _ modules.Synchronizer = (*Synchronizer)(nil)

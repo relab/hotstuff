@@ -13,6 +13,7 @@ type Options struct {
 	shouldUseRandel       bool
 	sharedRandomSeed      int64
 	connectionMetadata    map[string]string
+	IsRandelFaulty        bool
 }
 
 // ID returns the ID.
@@ -38,6 +39,10 @@ func (opts Options) ShouldUseHandel() bool {
 
 func (opts Options) ShouldUseRandel() bool {
 	return opts.shouldUseRandel
+}
+
+func (opts Options) ShouldRandelFaulty() bool {
+	return opts.IsRandelFaulty
 }
 
 // ShouldVerifyVotesSync returns true if votes should be verified synchronously.
@@ -79,6 +84,10 @@ func (opts *Options) SetSharedRandomSeed(seed int64) {
 // shouldUseRandel
 func (opts *Options) SetShouldUseRandel() {
 	opts.shouldUseRandel = true
+}
+
+func (opts *Options) SetRandelFaulty() {
+	opts.IsRandelFaulty = true
 }
 
 // SetConnectionMetadata sets the value of a key in the connection metadata map.

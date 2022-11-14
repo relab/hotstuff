@@ -25,6 +25,7 @@ type Throughput struct {
 
 	commitCount  uint64
 	commandCount uint64
+	qcLength     uint64
 }
 
 // InitModule gives the module access to the other modules.
@@ -43,7 +44,7 @@ func (t *Throughput) InitModule(mods *modules.Core) {
 
 	eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
 		commitEvent := event.(hotstuff.CommitEvent)
-		t.recordCommit(commitEvent.Commands)
+		t.recordCommit(commitEvent.Commands, commitEvent.QCLength)
 	})
 
 	eventLoop.RegisterObserver(types.TickEvent{}, func(event any) {
@@ -53,21 +54,28 @@ func (t *Throughput) InitModule(mods *modules.Core) {
 	logger.Info("Throughput metric enabled")
 }
 
-func (t *Throughput) recordCommit(commands int) {
+func (t *Throughput) recordCommit(commands int, qcLength int) {
 	t.commitCount++
+	t.qcLength += uint64(qcLength)
 	t.commandCount += uint64(commands)
 }
 
 func (t *Throughput) tick(tick types.TickEvent) {
 	now := time.Now()
+	var AvgQCLength uint64
+	if t.commitCount > 0 {
+		AvgQCLength = t.qcLength / t.commitCount
+	}
 	event := &types.ThroughputMeasurement{
-		Event:    types.NewReplicaEvent(uint32(t.opts.ID()), now),
-		Commits:  t.commitCount,
-		Commands: t.commandCount,
-		Duration: durationpb.New(now.Sub(tick.LastTick)),
+		Event:       types.NewReplicaEvent(uint32(t.opts.ID()), now),
+		Commits:     t.commitCount,
+		Commands:    t.commandCount,
+		AvgQCLength: AvgQCLength,
+		Duration:    durationpb.New(now.Sub(tick.LastTick)),
 	}
 	t.metricsLogger.Log(event)
 	// reset count for next tick
 	t.commandCount = 0
 	t.commitCount = 0
+	t.qcLength = 0
 }

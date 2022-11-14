@@ -10,6 +10,7 @@ import (
 	context "context"
 	fmt "fmt"
 	gorums "github.com/relab/gorums"
+	hotstuffpb "github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	encoding "google.golang.org/grpc/encoding"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
@@ -153,6 +154,7 @@ type Randel interface {
 	SendAcknowledgement(ctx gorums.ServerCtx, request *RContribution)
 	SendNoAck(ctx gorums.ServerCtx, request *NACK)
 	SendContribution(ctx gorums.ServerCtx, request *RContribution)
+	FinalCall(ctx gorums.ServerCtx, request *hotstuffpb.Proposal)
 }
 
 func RegisterRandelServer(srv *gorums.Server, impl Randel) {
@@ -170,6 +172,11 @@ func RegisterRandelServer(srv *gorums.Server, impl Randel) {
 		req := in.Message.(*RContribution)
 		defer ctx.Release()
 		impl.SendContribution(ctx, req)
+	})
+	srv.RegisterHandler("randelpb.Randel.FinalCall", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
+		req := in.Message.(*hotstuffpb.Proposal)
+		defer ctx.Release()
+		impl.FinalCall(ctx, req)
 	})
 }
 
@@ -210,6 +217,20 @@ func (n *Node) SendContribution(ctx context.Context, in *RContribution, opts ...
 	cd := gorums.CallData{
 		Message: in,
 		Method:  "randelpb.Randel.SendContribution",
+	}
+
+	n.RawNode.Unicast(ctx, cd, opts...)
+}
+
+// Reference imports to suppress errors if they are not otherwise used.
+var _ emptypb.Empty
+
+// FinalCall is a quorum call invoked on all nodes in configuration c,
+// with the same argument in, and returns a combined result.
+func (n *Node) FinalCall(ctx context.Context, in *hotstuffpb.Proposal, opts ...gorums.CallOption) {
+	cd := gorums.CallData{
+		Message: in,
+		Method:  "randelpb.Randel.FinalCall",
 	}
 
 	n.RawNode.Unicast(ctx, cd, opts...)

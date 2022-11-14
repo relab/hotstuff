@@ -30,7 +30,8 @@ service Hotstuff {
 
 message Proposal {
   Block Block = 1;
-  optional AggQC AggQC = 2;
+  bool IsFinalCall =2;
+  optional AggQC AggQC = 3;
 }
 
 message BlockHash { bytes Hash = 1; }

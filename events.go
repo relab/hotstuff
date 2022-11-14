@@ -10,6 +10,7 @@ type ProposeMsg struct {
 	ID          ID           // The ID of the replica who sent the message.
 	Block       *Block       // The block that is proposed.
 	AggregateQC *AggregateQC // Optional AggregateQC
+	IsFinalCall bool
 }
 
 func (p ProposeMsg) String() string {
@@ -62,4 +63,5 @@ type NewViewMsg struct {
 // and includes the number of client commands that were executed.
 type CommitEvent struct {
 	Commands int
+	QCLength int
 }

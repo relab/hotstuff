@@ -102,6 +102,9 @@ func (bf Bitfield) RangeWhile(f func(hotstuff.ID) bool) {
 func (bf Bitfield) Len() int {
 	return bf.len
 }
+func (bf Bitfield) ToSlice() []hotstuff.ID {
+	return make([]hotstuff.ID, 0)
+}
 
 func (bf Bitfield) String() string {
 	return hotstuff.IDSetToString(&bf)

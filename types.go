@@ -23,6 +23,8 @@ type IDSet interface {
 	RangeWhile(f func(ID) bool)
 	// Len returns the number of entries in the set.
 	Len() int
+	// ToSlice returns the set to slice
+	ToSlice() []ID
 }
 
 // idSetMap implements IDSet using a map.
@@ -63,6 +65,14 @@ func (s idSetMap) RangeWhile(f func(ID) bool) {
 // Len returns the number of entries in the set.
 func (s idSetMap) Len() int {
 	return len(s)
+}
+
+func (s idSetMap) ToSlice() []ID {
+	slice := make([]ID, 0)
+	for k, _ := range s {
+		slice = append(slice, k)
+	}
+	return slice
 }
 
 func (s idSetMap) String() string {

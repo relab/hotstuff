@@ -13,7 +13,7 @@ type ViewDuration interface {
 	// ViewStarted is called by the synchronizer when starting a new view.
 	ViewStarted()
 	// ViewSucceeded is called by the synchronizer when a view ended successfully.
-	ViewSucceeded()
+	ViewSucceeded(isPartial bool)
 	// ViewTimeout is called by the synchronizer when a view timed out.
 	ViewTimeout()
 }
@@ -22,12 +22,14 @@ type ViewDuration interface {
 // sampleSize determines the number of previous views that should be considered.
 // startTimeout determines the view duration of the first views.
 // When a timeout occurs, the next view duration will be multiplied by the multiplier.
-func NewViewDuration(sampleSize uint64, startTimeout, maxTimeout, multiplier float64) ViewDuration {
+func NewViewDuration(sampleSize uint64, startTimeout, maxTimeout, multiplier float64,
+	isRandel bool) ViewDuration {
 	return &viewDuration{
-		limit: sampleSize,
-		mean:  startTimeout,
-		max:   maxTimeout,
-		mul:   multiplier,
+		limit:    sampleSize,
+		mean:     startTimeout,
+		max:      maxTimeout,
+		mul:      multiplier,
+		isRandel: isRandel,
 	}
 }
 
@@ -42,18 +44,21 @@ type viewDuration struct {
 	m2        float64   // sum of squares of differences from the mean
 	prevM2    float64   // m2 calculated from the last period
 	max       float64   // upper bound on view timeout
+	isRandel  bool
 }
 
 // ViewSucceeded calculates the duration of the view
 // and updates the internal values used for mean and variance calculations.
-func (v *viewDuration) ViewSucceeded() {
+func (v *viewDuration) ViewSucceeded(isPartial bool) {
 	if v.startTime.IsZero() {
 		return
 	}
 
 	duration := float64(time.Since(v.startTime)) / float64(time.Millisecond)
 	v.count++
-
+	if v.isRandel && !isPartial {
+		duration *= 1.2
+	}
 	// Reset m2 occasionally such that we will pick up on changes in variance faster.
 	// We store the m2 to prevM2, which will be used when calculating the variance.
 	// This ensures that at least 'limit' measurements have contributed to the approximate variance.

@@ -172,7 +172,9 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 
 	if opts.GetByzantineStrategy() != "" {
-		if byz, ok := modules.GetModule[byzantine.Byzantine](opts.GetByzantineStrategy()); ok {
+		if opts.GetByzantineStrategy() == "randelfaulty" {
+			builder.Options().SetRandelFaulty()
+		} else if byz, ok := modules.GetModule[byzantine.Byzantine](opts.GetByzantineStrategy()); ok {
 			consensusRules = byz.Wrap(consensusRules)
 		} else {
 			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
@@ -188,12 +190,18 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if !ok {
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
-
+	modulesEnabled := opts.GetModules()
+	isRandel := false
+	for _, m := range modulesEnabled {
+		if m == "randel" {
+			isRandel = true
+		}
+	}
 	sync := synchronizer.New(synchronizer.NewViewDuration(
 		uint64(opts.GetTimeoutSamples()),
 		float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
 		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-		float64(opts.GetTimeoutMultiplier()),
+		float64(opts.GetTimeoutMultiplier()), isRandel,
 	))
 
 	builder.Add(

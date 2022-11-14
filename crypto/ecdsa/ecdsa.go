@@ -129,6 +129,10 @@ func (sig MultiSignature) String() string {
 	return hotstuff.IDSetToString(sig)
 }
 
+func (sig MultiSignature) ToSlice() []hotstuff.ID {
+	return make([]hotstuff.ID, 0)
+}
+
 var _ hotstuff.QuorumSignature = (*MultiSignature)(nil)
 var _ hotstuff.IDSet = (*MultiSignature)(nil)
 

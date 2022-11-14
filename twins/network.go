@@ -485,5 +485,5 @@ type fixedDuration struct {
 
 func (d fixedDuration) Duration() time.Duration { return d.timeout }
 func (d fixedDuration) ViewStarted()            {}
-func (d fixedDuration) ViewSucceeded()          {}
+func (d fixedDuration) ViewSucceeded(_ bool)    {}
 func (d fixedDuration) ViewTimeout()            {}

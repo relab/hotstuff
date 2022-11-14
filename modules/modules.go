@@ -2,6 +2,7 @@ package modules
 
 import (
 	"context"
+	"time"
 
 	"github.com/relab/hotstuff"
 )
@@ -34,7 +35,7 @@ type Acceptor interface {
 // Executor is responsible for executing the commands that are committed by the consensus protocol.
 type Executor interface {
 	// Exec executes the command.
-	Exec(cmd hotstuff.Command)
+	Exec(cmd hotstuff.Command, qcLength int)
 }
 
 // ExecutorExt is responsible for executing the commands that are committed by the consensus protocol.
@@ -164,6 +165,8 @@ type Synchronizer interface {
 	LeafBlock() *hotstuff.Block
 	// Start starts the synchronizer with the given context.
 	Start(context.Context)
+	// ViewDuration gets the view duration
+	ViewDuration() time.Duration
 }
 
 // Handel is an implementation of the Handel signature aggregation protocol.
@@ -176,6 +179,7 @@ type Handel interface {
 type Randel interface {
 	// Begin commissions the aggregation of a new signature.
 	Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg, v hotstuff.View)
+	GetNewViewMsg(v hotstuff.View) (hotstuff.NewViewMsg, bool)
 }
 
 // ExtendedExecutor turns the given Executor into an ExecutorExt.
@@ -194,7 +198,11 @@ func (ew executorWrapper) InitModule(mods *Core) {
 }
 
 func (ew executorWrapper) Exec(block *hotstuff.Block) {
-	ew.executor.Exec(block.Command())
+	qcLength := 0
+	if block.QuorumCert().Signature() != nil {
+		qcLength = block.QuorumCert().Signature().Participants().Len()
+	}
+	ew.executor.Exec(block.Command(), qcLength)
 }
 
 // ExtendedForkHandler turns the given ForkHandler into a ForkHandlerExt.

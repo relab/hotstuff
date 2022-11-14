@@ -7,7 +7,7 @@ import (
 
 func init() {
 	modules.RegisterModule("fixed", func() modules.LeaderRotation {
-		return NewFixed(1)
+		return NewFixed(2)
 	})
 }
 
