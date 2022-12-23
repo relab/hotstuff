@@ -44,6 +44,8 @@ type Config struct {
 	ReplicaServerOptions []gorums.ServerOption
 	// Options for the replica manager.
 	ManagerOptions []gorums.ManagerOption
+	// Location
+	LocationInfo map[uint32]string
 }
 
 // Replica is a participant in the consensus protocol.
@@ -88,7 +90,7 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		))
 	}
 
-	srv.hsSrv = backend.NewServer(replicaSrvOpts...)
+	srv.hsSrv = backend.NewServer(conf.ID, conf.LocationInfo, replicaSrvOpts...)
 
 	var creds credentials.TransportCredentials
 	managerOpts := conf.ManagerOptions

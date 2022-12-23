@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
@@ -183,6 +184,13 @@ func runController() {
 
 	for _, cfg := range hostConfigs {
 		experiment.HostConfigs[cfg.Name] = cfg
+		if cfg.Location == "" {
+			cfg.Location = hotstuff.DefaultLocation
+		}
+		ok := checkHostConfigLocations(cfg.Location)
+		if !ok {
+			log.Fatalf("invalid location configuration %s for host %s\n", cfg.Location, cfg.Name)
+		}
 	}
 
 	err = experiment.Run()
@@ -205,6 +213,22 @@ func runController() {
 	checkf("failed to close ssh connections: %v", err)
 }
 
+func checkHostConfigLocations(location string) bool {
+	isPresent := false
+	var validLocations = [...]string{"Cape Town", "Hong Kong", "Tokyo",
+		"Seoul", "Osaka", "Mumbai", "Singapore", "Sydney", "Central", "Frankfurt",
+		"Stockholm", "Milan", "Ireland", "London", "Paris", "Bahrain", "Sao Paulo",
+		"N. Virginia", "Ohio", "N. California", "Oregon", hotstuff.DefaultLocation}
+
+	for _, name := range validLocations {
+		if name == location {
+			isPresent = true
+			break
+		}
+	}
+	return isPresent
+
+}
 func checkf(format string, args ...any) {
 	for _, arg := range args {
 		if err, _ := arg.(error); err != nil {

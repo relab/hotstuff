@@ -2,9 +2,12 @@ package backend
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
+	"time"
 
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
@@ -27,8 +30,10 @@ type Server struct {
 	configuration modules.Configuration
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
-
-	gorumsSrv *gorums.Server
+	location      string
+	locationInfo  map[uint32]string
+	latencyMatrix map[string]float64
+	gorumsSrv     *gorums.Server
 }
 
 // InitModule initializes the Server.
@@ -42,9 +47,9 @@ func (srv *Server) InitModule(mods *modules.Core) {
 }
 
 // NewServer creates a new Server.
-func NewServer(opts ...gorums.ServerOption) *Server {
-	srv := &Server{}
-
+func NewServer(ID hotstuff.ID, locationInfo map[uint32]string, opts ...gorums.ServerOption) *Server {
+	srv := &Server{locationInfo: locationInfo, latencyMatrix: make(map[string]float64)}
+	srv.createLatencyMatrix(ID)
 	opts = append(opts, gorums.WithConnectCallback(func(ctx context.Context) {
 		srv.eventLoop.AddEvent(replicaConnected{ctx})
 	}))
@@ -53,6 +58,56 @@ func NewServer(opts ...gorums.ServerOption) *Server {
 
 	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, &serviceImpl{srv})
 	return srv
+}
+
+// Create latency matrix for the replica.
+
+func (srv *Server) createLatencyMatrix(ID hotstuff.ID) {
+	location, ok := srv.locationInfo[uint32(ID)]
+	if !ok {
+		return
+	}
+	srv.location = location
+	if srv.location == hotstuff.DefaultLocation {
+		return
+	}
+	latencyData, err := os.ReadFile("latency_data.json")
+	if err != nil {
+		fmt.Printf("Unable to read the latency data, change location to default \n")
+		srv.location = hotstuff.DefaultLocation
+		return
+	}
+	var allToAllMatrix map[string]map[string]string
+	err = json.Unmarshal(latencyData, &allToAllMatrix)
+	if err != nil {
+		fmt.Printf("Unable to read the latency data, change location to default \n")
+		srv.location = hotstuff.DefaultLocation
+		return
+	}
+	locationData, ok := allToAllMatrix[srv.location]
+	if !ok {
+		fmt.Printf("Unable to read the latency data, change location to default \n")
+		srv.location = hotstuff.DefaultLocation
+		return
+	}
+	for city, latencyStr := range locationData {
+		latency, err := strconv.ParseFloat(latencyStr, 32)
+		if err != nil {
+			latency = hotstuff.DefaultLatency
+		}
+		srv.latencyMatrix[city] = latency
+	}
+}
+
+func (srv *Server) induceLatency(sender hotstuff.ID) {
+	if srv.location == hotstuff.DefaultLocation {
+		return
+	}
+	senderLocation := srv.locationInfo[uint32(sender)]
+	senderLatencyMs := srv.latencyMatrix[senderLocation]
+	duration := time.Duration(senderLatencyMs * float64(time.Millisecond))
+	timer1 := time.NewTimer(duration)
+	<-timer1.C
 }
 
 // GetGorumsServer returns the underlying gorums Server.
@@ -143,7 +198,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposal.Block.Proposer = uint32(id)
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
-
+	impl.srv.induceLatency(id)
 	impl.srv.eventLoop.AddEvent(proposeMsg)
 }
 
@@ -154,7 +209,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
-
+	impl.srv.induceLatency(id)
 	impl.srv.eventLoop.AddEvent(hotstuff.VoteMsg{
 		ID:          id,
 		PartialCert: hotstuffpb.PartialCertFromProto(cert),
@@ -168,7 +223,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
-
+	impl.srv.induceLatency(id)
 	impl.srv.eventLoop.AddEvent(hotstuff.NewViewMsg{
 		ID:       id,
 		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
@@ -198,6 +253,7 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	if err != nil {
 		impl.srv.logger.Infof("Could not get ID of replica: %v", err)
 	}
+	impl.srv.induceLatency(timeoutMsg.ID)
 	impl.srv.eventLoop.AddEvent(timeoutMsg)
 }
 

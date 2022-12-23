@@ -223,7 +223,7 @@ func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (teardown
 	t.Helper()
 	servers := make([]*Server, td.n)
 	for i := range servers {
-		servers[i] = NewServer(gorums.WithGRPCServerOptions(grpc.Creds(td.creds)))
+		servers[i] = NewServer(hotstuff.ID(i), map[uint32]string{}, gorums.WithGRPCServerOptions(grpc.Creds(td.creds)))
 		servers[i].StartOnListener(td.listeners[i])
 		td.builders[i].Add(servers[i])
 	}

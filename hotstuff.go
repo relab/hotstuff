@@ -11,3 +11,6 @@ func (id ID) ToBytes() []byte {
 	binary.LittleEndian.PutUint32(idBytes[:], uint32(id))
 	return idBytes[:]
 }
+
+const DefaultLocation = "default"
+const DefaultLatency = 500

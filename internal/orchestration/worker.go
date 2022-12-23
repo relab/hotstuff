@@ -222,14 +222,14 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		}
 		builder.Add(m)
 	}
-
 	c := replica.Config{
-		ID:          hotstuff.ID(opts.GetID()),
-		PrivateKey:  privKey,
-		TLS:         opts.GetUseTLS(),
-		Certificate: &certificate,
-		RootCAs:     rootCAs,
-		BatchSize:   opts.GetBatchSize(),
+		ID:           hotstuff.ID(opts.GetID()),
+		PrivateKey:   privKey,
+		TLS:          opts.GetUseTLS(),
+		Certificate:  &certificate,
+		RootCAs:      rootCAs,
+		LocationInfo: opts.GetLocationInfo(),
+		BatchSize:    opts.GetBatchSize(),
 		ManagerOptions: []gorums.ManagerOption{
 			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 			gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
