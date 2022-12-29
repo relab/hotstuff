@@ -3,6 +3,7 @@ package hotstuffpb
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
@@ -43,7 +44,7 @@ func TestConvertQuorumCert(t *testing.T) {
 	builders := testutil.CreateBuilders(t, ctrl, 4)
 	hl := builders.Build()
 
-	b1 := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), "", 1, 1)
+	b1 := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hotstuff.NewQuorumCert(0, nil, 0, hotstuff.GetGenesis().Hash(), map[uint32]uint64{}), "", 1, 1, time.Now())
 
 	signatures := testutil.CreatePCs(t, b1, hl.Signers())
 
@@ -64,8 +65,8 @@ func TestConvertQuorumCert(t *testing.T) {
 }
 
 func TestConvertBlock(t *testing.T) {
-	qc := hotstuff.NewQuorumCert(nil, 0, hotstuff.Hash{})
-	want := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "", 1, 1)
+	qc := hotstuff.NewQuorumCert(0, nil, 0, hotstuff.Hash{}, map[uint32]uint64{})
+	want := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "", 1, 1, time.Now())
 	pb := BlockToProto(want)
 	got := BlockFromProto(pb)
 

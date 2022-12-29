@@ -3,6 +3,7 @@ package hotstuff
 import (
 	"bytes"
 	"fmt"
+	"time"
 )
 
 // ProposeMsg is broadcast when a leader makes a proposal.
@@ -21,6 +22,7 @@ type VoteMsg struct {
 	ID          ID          // the ID of the replica who sent the message.
 	PartialCert PartialCert // The partial certificate.
 	Deferred    bool
+	Time        time.Time // time is the timestamp of the vote
 }
 
 func (v VoteMsg) String() string {
@@ -62,4 +64,9 @@ type NewViewMsg struct {
 // and includes the number of client commands that were executed.
 type CommitEvent struct {
 	Commands int
+}
+
+type LatencyVectorEvent struct {
+	Creator       ID
+	LatencyVector map[uint32]uint64
 }

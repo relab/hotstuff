@@ -447,7 +447,6 @@ func (x *ClientOpts) GetTimeout() *durationpb.Duration {
 	return nil
 }
 
-// ReplicaConfiguration is a configuration of replicas.
 type ReplicaConfiguration struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

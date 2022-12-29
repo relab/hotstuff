@@ -84,9 +84,8 @@ type subConfig struct {
 	logger       logging.Logger
 	opts         *modules.Options
 	synchronizer modules.Synchronizer
-
-	cfg      *hotstuffpb.Configuration
-	replicas map[hotstuff.ID]modules.Replica
+	cfg          *hotstuffpb.Configuration
+	replicas     map[hotstuff.ID]modules.Replica
 }
 
 // InitModule initializes the configuration.

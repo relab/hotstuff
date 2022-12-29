@@ -22,6 +22,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/latency"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
@@ -194,7 +195,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
 		float64(opts.GetTimeoutMultiplier()),
 	))
-
 	builder.Add(
 		eventloop.New(1000),
 		consensus.New(consensusRules),
@@ -204,11 +204,11 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		sync,
 		w.metricsLogger,
 		blockchain.New(),
+		latency.NewLatencyMeasurement(),
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
-
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
-
+	builder.Options().SetLatencyCalculation(true)
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
 		builder.Add(replicaMetrics...)
@@ -235,7 +235,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
 		},
 	}
-
 	return replica.New(c, builder), nil
 }
 

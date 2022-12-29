@@ -147,6 +147,11 @@ type LeaderRotation interface {
 	GetLeader(hotstuff.View) hotstuff.ID
 }
 
+type LatencyMeasurement interface {
+	// fetches the latency matrix as observed
+	GetLatencyMatrix() map[hotstuff.ID]map[hotstuff.ID]uint64
+}
+
 //go:generate mockgen -destination=../internal/mocks/synchronizer_mock.go -package=mocks . Synchronizer
 
 // Synchronizer synchronizes replicas to the same view.

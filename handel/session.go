@@ -374,9 +374,11 @@ func (s *session) updateOutgoing(levelIndex int) {
 
 			s.h.eventLoop.AddEvent(hotstuff.NewViewMsg{
 				SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(
+					s.h.opts.ID(),
 					outgoing,
 					s.h.synchronizer.View(),
 					s.hash,
+					map[uint32]uint64{},
 				)),
 			})
 

@@ -89,12 +89,9 @@ message ClientOpts {
   // The timeout for a command.
   google.protobuf.Duration Timeout = 14;
 }
-
-// ReplicaConfiguration is a configuration of replicas.
-message ReplicaConfiguration { 
+message ReplicaConfiguration {
   map<uint32, ReplicaInfo> Replicas = 1;
  }
-
 /* -------------------------------------------------------------------------- */
 /*                        RPC request/response messages                       */
 /* -------------------------------------------------------------------------- */

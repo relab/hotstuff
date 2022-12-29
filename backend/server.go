@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"time"
 
@@ -49,13 +48,14 @@ func (srv *Server) InitModule(mods *modules.Core) {
 // NewServer creates a new Server.
 func NewServer(ID hotstuff.ID, locationInfo map[uint32]string, opts ...gorums.ServerOption) *Server {
 	srv := &Server{locationInfo: locationInfo, latencyMatrix: make(map[string]float64)}
+	if locationInfo == nil {
+		srv.logger.Error("Location info is nil")
+	}
 	srv.createLatencyMatrix(ID)
 	opts = append(opts, gorums.WithConnectCallback(func(ctx context.Context) {
 		srv.eventLoop.AddEvent(replicaConnected{ctx})
 	}))
-
 	srv.gorumsSrv = gorums.NewServer(opts...)
-
 	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, &serviceImpl{srv})
 	return srv
 }
@@ -67,26 +67,19 @@ func (srv *Server) createLatencyMatrix(ID hotstuff.ID) {
 	if !ok {
 		return
 	}
+
+	var allToAllMatrix map[string]map[string]string
+	err := json.Unmarshal([]byte(latencyMatrix), &allToAllMatrix)
+	if err != nil {
+		srv.location = hotstuff.DefaultLocation
+		return
+	}
 	srv.location = location
 	if srv.location == hotstuff.DefaultLocation {
 		return
 	}
-	latencyData, err := os.ReadFile("latency_data.json")
-	if err != nil {
-		fmt.Printf("Unable to read the latency data, change location to default \n")
-		srv.location = hotstuff.DefaultLocation
-		return
-	}
-	var allToAllMatrix map[string]map[string]string
-	err = json.Unmarshal(latencyData, &allToAllMatrix)
-	if err != nil {
-		fmt.Printf("Unable to read the latency data, change location to default \n")
-		srv.location = hotstuff.DefaultLocation
-		return
-	}
 	locationData, ok := allToAllMatrix[srv.location]
 	if !ok {
-		fmt.Printf("Unable to read the latency data, change location to default \n")
 		srv.location = hotstuff.DefaultLocation
 		return
 	}
@@ -97,15 +90,19 @@ func (srv *Server) createLatencyMatrix(ID hotstuff.ID) {
 		}
 		srv.latencyMatrix[city] = latency
 	}
+
 }
 
 func (srv *Server) induceLatency(sender hotstuff.ID) {
+
 	if srv.location == hotstuff.DefaultLocation {
 		return
 	}
+
 	senderLocation := srv.locationInfo[uint32(sender)]
 	senderLatencyMs := srv.latencyMatrix[senderLocation]
-	duration := time.Duration(senderLatencyMs * float64(time.Millisecond))
+	srv.logger.Debugf("latency from server %s to server %s is %f\n", srv.location, senderLocation, senderLatencyMs)
+	duration := time.Duration(int64(senderLatencyMs) * int64(time.Millisecond))
 	timer1 := time.NewTimer(duration)
 	<-timer1.C
 }

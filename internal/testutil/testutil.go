@@ -185,7 +185,7 @@ func CreateTimeouts(t *testing.T, view hotstuff.View, signers []modules.Crypto) 
 			ID:            signer(sig),
 			View:          view,
 			ViewSignature: sig,
-			SyncInfo:      hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())),
+			SyncInfo:      hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(0, nil, 0, hotstuff.GetGenesis().Hash(), map[uint32]uint64{})),
 		})
 	}
 	for i := range timeouts {
@@ -271,7 +271,7 @@ func GenerateKeys(t *testing.T, n int, keyFunc func(t *testing.T) hotstuff.Priva
 
 // NewProposeMsg wraps a new block in a ProposeMsg.
 func NewProposeMsg(parent hotstuff.Hash, qc hotstuff.QuorumCert, cmd hotstuff.Command, view hotstuff.View, id hotstuff.ID) hotstuff.ProposeMsg {
-	return hotstuff.ProposeMsg{ID: id, Block: hotstuff.NewBlock(parent, qc, cmd, view, id)}
+	return hotstuff.ProposeMsg{ID: id, Block: hotstuff.NewBlock(parent, qc, cmd, view, id, time.Now())}
 }
 
 type leaderRotation struct {

@@ -11,8 +11,9 @@ type Options struct {
 	shouldUseHandel       bool
 	shouldVerifyVotesSync bool
 
-	sharedRandomSeed   int64
-	connectionMetadata map[string]string
+	sharedRandomSeed       int64
+	connectionMetadata     map[string]string
+	shouldCalculateLatency bool
 }
 
 // ID returns the ID.
@@ -60,6 +61,14 @@ func (opts *Options) SetShouldUseAggQC() {
 // SetShouldUseHandel sets the ShouldUseHandel setting to true.
 func (opts *Options) SetShouldUseHandel() {
 	opts.shouldUseHandel = true
+}
+
+func (opts *Options) IsLatencyCalculationEnabled() bool {
+	return opts.shouldCalculateLatency
+}
+
+func (opts *Options) SetLatencyCalculation(enable bool) {
+	opts.shouldCalculateLatency = enable
 }
 
 // SetShouldVerifyVotesSync sets the ShouldVerifyVotesSync setting to true.

@@ -132,7 +132,7 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 			opts.CertificateAuthority = keygen.CertToPEM(e.ca)
 
 			// the generated certificate should be valid for the hostname and its ip addresses.
-			validFor := []string{"localhost", "127.0.0.1", host}
+			validFor := []string{"localhost", "127.0.0.1", "127.0.1.1", host}
 			ips, err := net.LookupIP(host)
 			if err == nil {
 				for _, ip := range ips {
@@ -151,11 +151,15 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate keychain: %w", err)
 			}
-
+			locationInfo := make(map[uint32]string)
+			for id, location := range e.replicaLocationInfo {
+				locationInfo[uint32(id)] = location
+			}
 			opts.PrivateKey = keyChain.PrivateKey
 			opts.PublicKey = keyChain.PublicKey
 			opts.Certificate = keyChain.Certificate
 			opts.CertificateKey = keyChain.CertificateKey
+			opts.LocationInfo = locationInfo
 			req.Replicas[opts.ID] = opts
 		}
 		wcfg, err := worker.CreateReplica(req)

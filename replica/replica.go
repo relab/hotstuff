@@ -44,7 +44,7 @@ type Config struct {
 	ReplicaServerOptions []gorums.ServerOption
 	// Options for the replica manager.
 	ManagerOptions []gorums.ManagerOption
-	// Location
+	// Location information of all replicas
 	LocationInfo map[uint32]string
 }
 
@@ -108,7 +108,6 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 
 		modules.ExtendedExecutor(srv.clientSrv),
 		modules.ExtendedForkHandler(srv.clientSrv),
-		srv.clientSrv.cmdCache,
 		srv.clientSrv.cmdCache,
 	)
 	srv.hs = builder.Build()

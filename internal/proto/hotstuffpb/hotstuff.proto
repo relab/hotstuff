@@ -6,6 +6,8 @@ import "gorums.proto";
 
 import "google/protobuf/empty.proto";
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/relab/hotstuff/internal/proto/hotstuffpb";
 
 service Hotstuff {
@@ -30,7 +32,7 @@ service Hotstuff {
 
 message Proposal {
   Block Block = 1;
-  optional AggQC AggQC = 2;
+  AggQC AggQC = 2;
 }
 
 message BlockHash { bytes Hash = 1; }
@@ -41,6 +43,7 @@ message Block {
   uint64 View = 3;
   bytes Command = 4;
   uint32 Proposer = 5;
+  google.protobuf.Timestamp Timestamp = 6;
 }
 
 message ECDSASignature {
@@ -61,6 +64,7 @@ message Signature {
 message PartialCert {
   QuorumSignature Sig = 1;
   bytes Hash = 2;
+  google.protobuf.Timestamp Timestamp =3;
 }
 
 message ECDSAMultiSignature { repeated ECDSASignature Sigs = 1; }
@@ -81,6 +85,12 @@ message QuorumCert {
   QuorumSignature Sig = 1;
   uint64 View = 2;
   bytes Hash = 3;
+  LatencyVector LatencyVector = 4;
+  uint32 Creator =5;
+}
+
+message LatencyVector {
+  map<uint32, uint64> LatencyData =1;
 }
 
 message TimeoutCert {
@@ -92,13 +102,13 @@ message TimeoutMsg {
   uint64 View = 1;
   SyncInfo SyncInfo = 2;
   QuorumSignature ViewSig = 3;
-  optional QuorumSignature MsgSig = 4;
+  QuorumSignature MsgSig = 4;
 }
 
 message SyncInfo {
-  optional QuorumCert QC = 1;
-  optional TimeoutCert TC = 2;
-  optional AggQC AggQC = 3;
+  QuorumCert QC = 1;
+  TimeoutCert TC = 2;
+  AggQC AggQC = 3;
 }
 
 message AggQC {

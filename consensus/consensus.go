@@ -3,6 +3,7 @@ package consensus
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/eventloop"
@@ -144,6 +145,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 				cmd,
 				cs.synchronizer.View(),
 				cs.opts.ID(),
+				time.Now(),
 			),
 		}
 
@@ -182,7 +184,8 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		cs.logger.Info("OnPropose: invalid QC")
 		return
 	}
-
+	cs.eventLoop.AddEvent(hotstuff.LatencyVectorEvent{Creator: block.Proposer(),
+		LatencyVector: block.QuorumCert().LatencyVector()})
 	// ensure the block came from the leader.
 	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
 		cs.logger.Info("OnPropose: block was not proposed by the expected leader")

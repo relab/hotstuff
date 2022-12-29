@@ -2,14 +2,18 @@
 package crypto
 
 import (
+	"time"
+
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
 
 type crypto struct {
 	blockChain    modules.BlockChain
 	configuration modules.Configuration
-
+	logger        logging.Logger
+	opts          *modules.Options
 	modules.CryptoBase
 }
 
@@ -25,6 +29,8 @@ func (c *crypto) InitModule(mods *modules.Core) {
 	mods.Get(
 		&c.blockChain,
 		&c.configuration,
+		&c.opts,
+		&c.logger,
 	)
 
 	if mod, ok := c.CryptoBase.(modules.Module); ok {
@@ -38,14 +44,14 @@ func (c crypto) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialC
 	if err != nil {
 		return hotstuff.PartialCert{}, err
 	}
-	return hotstuff.NewPartialCert(sig, block.Hash()), nil
+	return hotstuff.NewPartialCert(sig, block.Hash(), time.Now()), nil
 }
 
 // CreateQuorumCert creates a quorum certificate from a list of partial certificates.
 func (c crypto) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
 	// genesis QC is always valid.
 	if block.Hash() == hotstuff.GetGenesis().Hash() {
-		return hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), nil
+		return hotstuff.NewQuorumCert(c.opts.ID(), nil, 0, hotstuff.GetGenesis().Hash(), map[uint32]uint64{}), nil
 	}
 	sigs := make([]hotstuff.QuorumSignature, 0, len(signatures))
 	for _, sig := range signatures {
@@ -55,7 +61,23 @@ func (c crypto) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.Pa
 	if err != nil {
 		return hotstuff.QuorumCert{}, err
 	}
-	return hotstuff.NewQuorumCert(sig, block.View(), block.Hash()), nil
+	latencyVector := c.prepareLatencyVector(block, signatures)
+	return hotstuff.NewQuorumCert(c.opts.ID(), sig, block.View(), block.Hash(), latencyVector), nil
+}
+
+func (c crypto) prepareLatencyVector(block *hotstuff.Block, signatures []hotstuff.PartialCert) map[uint32]uint64 {
+	latencyVector := make(map[uint32]uint64)
+	if !c.opts.IsLatencyCalculationEnabled() || c.opts.ID() != block.Proposer() {
+		return latencyVector
+	}
+
+	for _, sig := range signatures {
+		//timeDiff := sig.Time().UnixNano() - block.Time().UnixNano()
+		//timeDiff := sig.Time().UnixMilli() - block.Time().UnixMilli()
+		timeDiff := sig.Time().UnixMicro() - block.Time().UnixMicro()
+		latencyVector[uint32(sig.Signer())] = uint64(timeDiff)
+	}
+	return latencyVector
 }
 
 // CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
@@ -135,7 +157,7 @@ func (c crypto) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
 func (c crypto) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, ok bool) {
 	messages := make(map[hotstuff.ID][]byte)
 	for id, qc := range aggQC.QCs() {
-		if highQC.View() < qc.View() || highQC == (hotstuff.QuorumCert{}) {
+		if highQC.View() < qc.View() || highQC.View() == hotstuff.View(0) {
 			highQC = qc
 		}
 		// reconstruct the TimeoutMsg to get the hash

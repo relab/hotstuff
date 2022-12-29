@@ -7,6 +7,7 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // QuorumSignatureToProto converts a threshold signature to a protocol buffers message.
@@ -61,8 +62,9 @@ func QuorumSignatureFromProto(sig *QuorumSignature) hotstuff.QuorumSignature {
 func PartialCertToProto(cert hotstuff.PartialCert) *PartialCert {
 	hash := cert.BlockHash()
 	return &PartialCert{
-		Sig:  QuorumSignatureToProto(cert.Signature()),
-		Hash: hash[:],
+		Sig:       QuorumSignatureToProto(cert.Signature()),
+		Hash:      hash[:],
+		Timestamp: timestamppb.New(cert.Time()),
 	}
 }
 
@@ -70,16 +72,18 @@ func PartialCertToProto(cert hotstuff.PartialCert) *PartialCert {
 func PartialCertFromProto(cert *PartialCert) hotstuff.PartialCert {
 	var h hotstuff.Hash
 	copy(h[:], cert.GetHash())
-	return hotstuff.NewPartialCert(QuorumSignatureFromProto(cert.GetSig()), h)
+	return hotstuff.NewPartialCert(QuorumSignatureFromProto(cert.GetSig()), h, cert.Timestamp.AsTime())
 }
 
 // QuorumCertToProto converts a consensus.QuorumCert to a hotstuffpb.QuorumCert.
 func QuorumCertToProto(qc hotstuff.QuorumCert) *QuorumCert {
 	hash := qc.BlockHash()
 	return &QuorumCert{
-		Sig:  QuorumSignatureToProto(qc.Signature()),
-		Hash: hash[:],
-		View: uint64(qc.View()),
+		Sig:           QuorumSignatureToProto(qc.Signature()),
+		Hash:          hash[:],
+		View:          uint64(qc.View()),
+		LatencyVector: &LatencyVector{LatencyData: qc.LatencyVector()},
+		Creator:       uint32(qc.Creator()),
 	}
 }
 
@@ -87,11 +91,12 @@ func QuorumCertToProto(qc hotstuff.QuorumCert) *QuorumCert {
 func QuorumCertFromProto(qc *QuorumCert) hotstuff.QuorumCert {
 	var h hotstuff.Hash
 	copy(h[:], qc.GetHash())
-	return hotstuff.NewQuorumCert(QuorumSignatureFromProto(qc.GetSig()), hotstuff.View(qc.GetView()), h)
+	return hotstuff.NewQuorumCert(hotstuff.ID(qc.Creator), QuorumSignatureFromProto(qc.GetSig()), hotstuff.View(qc.GetView()), h, qc.GetLatencyVector().LatencyData)
 }
 
 // ProposalToProto converts a ProposeMsg to a protobuf message.
 func ProposalToProto(proposal hotstuff.ProposeMsg) *Proposal {
+
 	p := &Proposal{
 		Block: BlockToProto(proposal.Block),
 	}
@@ -115,11 +120,12 @@ func ProposalFromProto(p *Proposal) (proposal hotstuff.ProposeMsg) {
 func BlockToProto(block *hotstuff.Block) *Block {
 	parentHash := block.Parent()
 	return &Block{
-		Parent:   parentHash[:],
-		Command:  []byte(block.Command()),
-		QC:       QuorumCertToProto(block.QuorumCert()),
-		View:     uint64(block.View()),
-		Proposer: uint32(block.Proposer()),
+		Parent:    parentHash[:],
+		Command:   []byte(block.Command()),
+		QC:        QuorumCertToProto(block.QuorumCert()),
+		View:      uint64(block.View()),
+		Proposer:  uint32(block.Proposer()),
+		Timestamp: timestamppb.New(block.Time()),
 	}
 }
 
@@ -133,6 +139,7 @@ func BlockFromProto(block *Block) *hotstuff.Block {
 		hotstuff.Command(block.GetCommand()),
 		hotstuff.View(block.GetView()),
 		hotstuff.ID(block.GetProposer()),
+		block.Timestamp.AsTime(),
 	)
 }
 

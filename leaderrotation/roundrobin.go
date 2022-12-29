@@ -1,6 +1,8 @@
 package leaderrotation
 
 import (
+	"math"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
 )
@@ -30,5 +32,6 @@ func NewRoundRobin() modules.LeaderRotation {
 }
 
 func chooseRoundRobin(view hotstuff.View, numReplicas int) hotstuff.ID {
-	return hotstuff.ID(view%hotstuff.View(numReplicas) + 1)
+	id := uint64(math.Ceil(float64(view) / 2.0))
+	return hotstuff.ID((id % uint64(numReplicas)) + 1)
 }

@@ -9,6 +9,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // IDSet implements a set of replica IDs. It is used to show which replicas participated in some event.
@@ -136,16 +137,17 @@ type PartialCert struct {
 	signer    ID
 	signature QuorumSignature
 	blockHash Hash
+	time      time.Time
 }
 
 // NewPartialCert returns a new partial certificate.
-func NewPartialCert(signature QuorumSignature, blockHash Hash) PartialCert {
+func NewPartialCert(signature QuorumSignature, blockHash Hash, time time.Time) PartialCert {
 	var signer ID
 	signature.Participants().RangeWhile(func(i ID) bool {
 		signer = i
 		return false
 	})
-	return PartialCert{signer, signature, blockHash}
+	return PartialCert{signer, signature, blockHash, time}
 }
 
 // Signer returns the ID of the replica that created the certificate.
@@ -161,6 +163,10 @@ func (pc PartialCert) Signature() QuorumSignature {
 // BlockHash returns the hash of the block that was signed.
 func (pc PartialCert) BlockHash() Hash {
 	return pc.blockHash
+}
+
+func (pc PartialCert) Time() time.Time {
+	return pc.time
 }
 
 // ToBytes returns a byte representation of the partial certificate.
@@ -246,14 +252,16 @@ func (si SyncInfo) String() string {
 
 // QuorumCert (QC) is a certificate for a Block created by a quorum of partial certificates.
 type QuorumCert struct {
-	signature QuorumSignature
-	view      View
-	hash      Hash
+	creator       ID
+	signature     QuorumSignature
+	view          View
+	hash          Hash
+	latencyVector map[uint32]uint64
 }
 
 // NewQuorumCert creates a new quorum cert from the given values.
-func NewQuorumCert(signature QuorumSignature, view View, hash Hash) QuorumCert {
-	return QuorumCert{signature, view, hash}
+func NewQuorumCert(creator ID, signature QuorumSignature, view View, hash Hash, latencyVector map[uint32]uint64) QuorumCert {
+	return QuorumCert{creator, signature, view, hash, latencyVector}
 }
 
 // ToBytes returns a byte representation of the quorum certificate.
@@ -271,6 +279,10 @@ func (qc QuorumCert) Signature() QuorumSignature {
 	return qc.signature
 }
 
+func (qc QuorumCert) Creator() ID {
+	return qc.creator
+}
+
 // BlockHash returns the hash of the block that was signed.
 func (qc QuorumCert) BlockHash() Hash {
 	return qc.hash
@@ -279,6 +291,10 @@ func (qc QuorumCert) BlockHash() Hash {
 // View returns the view in which the QC was created.
 func (qc QuorumCert) View() View {
 	return qc.view
+}
+
+func (qc QuorumCert) LatencyVector() map[uint32]uint64 {
+	return qc.latencyVector
 }
 
 // Equals returns true if the other QC equals this QC.

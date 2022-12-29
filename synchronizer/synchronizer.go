@@ -14,14 +14,15 @@ import (
 
 // Synchronizer synchronizes replicas to the same view.
 type Synchronizer struct {
-	blockChain     modules.BlockChain
-	consensus      modules.Consensus
-	crypto         modules.Crypto
-	configuration  modules.Configuration
-	eventLoop      *eventloop.EventLoop
-	leaderRotation modules.LeaderRotation
-	logger         logging.Logger
-	opts           *modules.Options
+	blockChain         modules.BlockChain
+	consensus          modules.Consensus
+	crypto             modules.Crypto
+	configuration      modules.Configuration
+	latencyMeasurement modules.LatencyMeasurement
+	eventLoop          *eventloop.EventLoop
+	leaderRotation     modules.LeaderRotation
+	logger             logging.Logger
+	opts               *modules.Options
 
 	currentView hotstuff.View
 	highTC      hotstuff.TimeoutCert
@@ -54,6 +55,7 @@ func (s *Synchronizer) InitModule(mods *modules.Core) {
 		&s.leaderRotation,
 		&s.logger,
 		&s.opts,
+		&s.latencyMeasurement,
 	)
 
 	s.eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
@@ -260,6 +262,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 // OnNewView handles an incoming consensus.NewViewMsg
 func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
 	s.AdvanceView(newView.SyncInfo)
+	s.logger.Info("latency measurement is ", s.latencyMeasurement.GetLatencyMatrix())
 }
 
 // AdvanceView attempts to advance to the next view using the given QC.

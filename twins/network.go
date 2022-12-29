@@ -314,6 +314,11 @@ func (c *configuration) SubConfig(ids []hotstuff.ID) (sub modules.Configuration,
 	}, nil
 }
 
+func (cfg *configuration) GetLatencyMatrix() map[hotstuff.ID]map[hotstuff.ID]uint64 {
+	latencyMatrix := make(map[hotstuff.ID]map[hotstuff.ID]uint64)
+	return latencyMatrix
+}
+
 // Len returns the number of replicas in the configuration.
 func (c *configuration) Len() int {
 	return len(c.network.replicas)
