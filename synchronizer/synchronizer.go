@@ -1,3 +1,4 @@
+// Package synchronizer implements the synchronizer module.
 package synchronizer
 
 import (

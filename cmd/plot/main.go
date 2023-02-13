@@ -1,3 +1,4 @@
+// Plot is a tool for plotting measurements from a HotStuff experiment.
 package main
 
 import (

@@ -1,0 +1,20 @@
+{
+    // flagWords - list of words to be always considered incorrect.
+    // This is useful for common spelling errors too short to be considered.
+    // For example "hte" should be "the"
+    "flagWords": [
+        "hte",
+        "teh"
+    ],
+    "dictionaries": [
+        "hotstuff-words"
+    ],
+    "dictionaryDefinitions": [
+        {
+            "name": "hotstuff-words",
+            "path": "./dict.txt",
+            // Some extensions use `addWords` for adding words to your personal dictionary.
+            "addWords": true
+        }
+    ]
+}
