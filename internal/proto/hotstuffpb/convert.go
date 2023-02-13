@@ -1,3 +1,4 @@
+// Package hotstuffpb contains protocol buffers message types and conversion functions for the HotStuff protocol.
 package hotstuffpb
 
 import (

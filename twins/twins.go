@@ -1,3 +1,4 @@
+// Package twins implements a framework for testing HotStuff implementations.
 package twins
 
 import (

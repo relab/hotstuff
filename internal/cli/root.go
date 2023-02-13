@@ -1,3 +1,4 @@
+// Package cli provide command line interface helpers for hotstuff.
 package cli
 
 import (
