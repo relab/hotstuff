@@ -14,7 +14,6 @@ type testResponsesData struct {
 var testData = []testResponsesData{
 	{
 		responses: []*orchestrationpb.StopReplicaResponse{
-
 			{
 				Hashes: map[uint32][]byte{
 					1: []byte("execution_hash"),
@@ -27,7 +26,6 @@ var testData = []testResponsesData{
 					3: 100,
 				},
 			},
-
 			{
 				Hashes: map[uint32][]byte{
 					4: []byte("execution_hash"),
@@ -40,7 +38,6 @@ var testData = []testResponsesData{
 					6: 100,
 				},
 			},
-
 			{
 				Hashes: map[uint32][]byte{
 					7: []byte("execution_hash"),
@@ -58,7 +55,6 @@ var testData = []testResponsesData{
 	},
 	{
 		responses: []*orchestrationpb.StopReplicaResponse{
-
 			{
 				Hashes: map[uint32][]byte{
 					1: []byte("execution_hash"),
@@ -71,7 +67,6 @@ var testData = []testResponsesData{
 					3: 100,
 				},
 			},
-
 			{
 				Hashes: map[uint32][]byte{
 					4: []byte("execution_hash"),
@@ -84,7 +79,6 @@ var testData = []testResponsesData{
 					6: 100,
 				},
 			},
-
 			{
 				Hashes: map[uint32][]byte{
 					7: []byte("execution_hash"),
@@ -100,10 +94,8 @@ var testData = []testResponsesData{
 		},
 		expectedError: true,
 	},
-
 	{
 		responses: []*orchestrationpb.StopReplicaResponse{
-
 			{
 				Hashes: map[uint32][]byte{
 					1: []byte("execution_hash"),
@@ -116,7 +108,6 @@ var testData = []testResponsesData{
 					3: 100,
 				},
 			},
-
 			{
 				Hashes: map[uint32][]byte{
 					4: []byte("execution_hash"),
@@ -129,7 +120,6 @@ var testData = []testResponsesData{
 					6: 100,
 				},
 			},
-
 			{
 				Hashes: map[uint32][]byte{
 					7: []byte("execution_hash"),
@@ -148,14 +138,13 @@ var testData = []testResponsesData{
 }
 
 func TestCorrectStopReplicaResponses(t *testing.T) {
-
 	for _, testCase := range testData {
-		ret := verifyStopResponses(testCase.responses)
-		if testCase.expectedError && ret == nil {
+		err := verifyStopResponses(testCase.responses)
+		switch {
+		case err == nil && testCase.expectedError:
 			t.Errorf("Failed to return error with invalid responses")
-		}
-		if !testCase.expectedError && ret != nil {
-			t.Errorf("returned error with valid responses")
+		case err != nil && !testCase.expectedError:
+			t.Errorf("Unexpected error with valid responses: %v", err)
 		}
 	}
 }
