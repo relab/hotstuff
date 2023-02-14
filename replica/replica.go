@@ -171,7 +171,7 @@ func (srv *Replica) GetHash() (b []byte) {
 	return srv.clientSrv.hash.Sum(b)
 }
 
-// GetCnt returns the count of all executed commands.
+// GetCmdCount returns the count of all executed commands.
 func (srv *Replica) GetCmdCount() (c uint32) {
 	return srv.clientSrv.cmdCount
 }
