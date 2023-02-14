@@ -332,42 +332,36 @@ func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration) (e
 }
 
 func (e *Experiment) stopReplicas() error {
-	hashes := make(map[uint32][]byte)
-	counts := make(map[uint32]uint32)
+	responses := make([]*orchestrationpb.StopReplicaResponse, 0)
 	for host, worker := range e.Hosts {
 		req := &orchestrationpb.StopReplicaRequest{IDs: getIDs(host, e.hostsToReplicas)}
 		res, err := worker.StopReplica(req)
 		if err != nil {
 			return err
 		}
-		for id, hash := range res.GetHashes() {
-			hashes[id] = hash
-		}
-		for id, cnt := range res.GetCounts() {
-			counts[id] = cnt
-		}
+		responses = append(responses, res)
 	}
-	for id1, cnt1 := range counts {
-		for id2, cnt2 := range counts {
-			if id2 > id1 && cnt2 == cnt1 {
-				if !bytes.Equal(hashes[id1], hashes[id2]) {
-					return fmt.Errorf("hash mismatch for same count")
-				}
+	return verifyStopResponses(responses)
+}
+
+func verifyStopResponses(responses []*orchestrationpb.StopReplicaResponse) error {
+	results := make(map[uint32][][]byte)
+	for _, response := range responses {
+		commandCount := response.GetCounts()
+		hashes := response.GetHashes()
+		for id, count := range commandCount {
+			if len(results[count]) == 0 {
+				results[count] = make([][]byte, 0)
 			}
+			results[count] = append(results[count], hashes[id])
 		}
 	}
-	var count uint32
-	first := true
-	for _, cnt := range counts {
-		if cnt == 0 {
-			return fmt.Errorf("no request executed")
-		}
-		if first {
-			count = cnt
-			first = false
-		}
-		if count != cnt {
-			e.Logger.Info("found different counts for executed requests")
+	for _, hashes := range results {
+		firstHash := hashes[0]
+		for _, hash := range hashes {
+			if !bytes.Equal(firstHash, hash) {
+				return fmt.Errorf("hash mismatch")
+			}
 		}
 	}
 	return nil

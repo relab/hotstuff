@@ -274,7 +274,7 @@ func (w *Worker) stopReplicas(req *orchestrationpb.StopReplicaRequest) (*orchest
 		}
 		r.Stop()
 		res.Hashes[id] = r.GetHash()
-		res.Counts[id] = r.GetCnt()
+		res.Counts[id] = r.GetCmdCount()
 		// TODO: return test results
 	}
 	return res, nil

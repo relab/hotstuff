@@ -172,6 +172,6 @@ func (srv *Replica) GetHash() (b []byte) {
 }
 
 // GetCnt returns the count of all executed commands.
-func (srv *Replica) GetCnt() (c uint32) {
+func (srv *Replica) GetCmdCount() (c uint32) {
 	return srv.clientSrv.cmdCount
 }
