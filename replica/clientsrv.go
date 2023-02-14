@@ -29,6 +29,7 @@ type clientSrv struct {
 	awaitingCmds map[cmdID]chan<- error
 	cmdCache     *cmdCache
 	hash         hash.Hash
+	cmdCount     uint32
 }
 
 // newClientServer returns a new client server.
@@ -100,6 +101,7 @@ func (srv *clientSrv) Exec(cmd hotstuff.Command) {
 
 	for _, cmd := range batch.GetCommands() {
 		_, _ = srv.hash.Write(cmd.Data)
+		srv.cmdCount++
 		srv.mut.Lock()
 		id := cmdID{cmd.GetClientID(), cmd.GetSequenceNumber()}
 		if done, ok := srv.awaitingCmds[id]; ok {
