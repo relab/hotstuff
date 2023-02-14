@@ -262,7 +262,6 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 // OnNewView handles an incoming consensus.NewViewMsg
 func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
 	s.AdvanceView(newView.SyncInfo)
-	s.logger.Info("latency measurement is ", s.latencyMeasurement.GetLatencyMatrix())
 }
 
 // AdvanceView attempts to advance to the next view using the given QC.
