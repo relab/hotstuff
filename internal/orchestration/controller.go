@@ -296,7 +296,7 @@ type assignmentsFileContents struct {
 }
 
 func (e *Experiment) writeAssignmentsFile() (err error) {
-	f, err := os.OpenFile(filepath.Join(e.Output, "hosts.json"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(filepath.Join(e.Output, "hosts.json"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
@@ -356,11 +356,11 @@ func verifyStopResponses(responses []*orchestrationpb.StopReplicaResponse) error
 			results[count] = append(results[count], hashes[id])
 		}
 	}
-	for _, hashes := range results {
+	for cmdCount, hashes := range results {
 		firstHash := hashes[0]
 		for _, hash := range hashes {
 			if !bytes.Equal(firstHash, hash) {
-				return fmt.Errorf("hash mismatch")
+				return fmt.Errorf("hash mismatch at command: %d", cmdCount)
 			}
 		}
 	}
