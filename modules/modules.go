@@ -125,6 +125,10 @@ type Configuration interface {
 	SubConfig(ids []hotstuff.ID) (sub Configuration, err error)
 }
 
+type Kauri interface {
+	Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg)
+}
+
 //go:generate mockgen -destination=../internal/mocks/consensus_mock.go -package=mocks . Consensus
 
 // Consensus implements a byzantine consensus protocol, such as HotStuff.

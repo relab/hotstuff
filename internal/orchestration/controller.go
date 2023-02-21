@@ -130,7 +130,7 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 			opts.CertificateAuthority = keygen.CertToPEM(e.ca)
 
 			// the generated certificate should be valid for the hostname and its ip addresses.
-			validFor := []string{"localhost", "127.0.0.1", host}
+			validFor := []string{"localhost", "127.0.0.1", "127.0.1.1", host}
 			ips, err := net.LookupIP(host)
 			if err == nil {
 				for _, ip := range ips {

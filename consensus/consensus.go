@@ -49,8 +49,8 @@ type consensusBase struct {
 	logger         logging.Logger
 	opts           *modules.Options
 	synchronizer   modules.Synchronizer
-
-	handel modules.Handel
+	kauri          modules.Kauri
+	handel         modules.Handel
 
 	lastVote hotstuff.View
 
@@ -85,7 +85,7 @@ func (cs *consensusBase) InitModule(mods *modules.Core) {
 	)
 
 	mods.TryGet(&cs.handel)
-
+	mods.TryGet(&cs.kauri)
 	if mod, ok := cs.impl.(modules.Module); ok {
 		mod.InitModule(mods)
 	}
@@ -153,8 +153,9 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 	}
 
 	cs.blockChain.Store(proposal.Block)
-
-	cs.configuration.Propose(proposal)
+	if cs.kauri == nil {
+		cs.configuration.Propose(proposal)
+	}
 	// self vote
 	cs.OnPropose(proposal)
 }
@@ -237,6 +238,13 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 		didAdvanceView = true
 		cs.handel.Begin(pc)
+		return
+	}
+	if cs.kauri != nil {
+		// Need to call advanceview such that the view context will be fresh.
+		cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+		didAdvanceView = true
+		cs.kauri.Begin(pc, proposal)
 		return
 	}
 
