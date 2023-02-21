@@ -64,7 +64,11 @@ func (f *fork) InitModule(mods *modules.Core) {
 }
 
 func (f *fork) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
-	parent, ok := f.blockChain.Get(f.synchronizer.LeafBlock().Parent())
+	block, ok := f.blockChain.Get(f.synchronizer.HighQC().BlockHash())
+	if !ok {
+		return proposal, false
+	}
+	parent, ok := f.blockChain.Get(block.Parent())
 	if !ok {
 		return proposal, false
 	}

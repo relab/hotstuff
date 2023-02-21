@@ -166,8 +166,6 @@ type Synchronizer interface {
 	ViewContext() context.Context
 	// HighQC returns the highest known QC.
 	HighQC() hotstuff.QuorumCert
-	// LeafBlock returns the current leaf block.
-	LeafBlock() *hotstuff.Block
 	// Start starts the synchronizer with the given context.
 	Start(context.Context)
 }

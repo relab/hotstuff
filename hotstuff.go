@@ -1,3 +1,4 @@
+// Package hotstuff implements the basic types that are used by hotstuff.
 package hotstuff
 
 import "encoding/binary"

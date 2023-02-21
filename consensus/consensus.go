@@ -140,7 +140,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 		proposal = hotstuff.ProposeMsg{
 			ID: cs.opts.ID(),
 			Block: hotstuff.NewBlock(
-				cs.synchronizer.LeafBlock().Hash(),
+				qc.BlockHash(),
 				qc,
 				cmd,
 				cs.synchronizer.View(),

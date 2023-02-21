@@ -36,11 +36,11 @@ type ReplicaOpts struct {
 	// Determines whether TLS should be used.
 	UseTLS bool `protobuf:"varint,4,opt,name=UseTLS,proto3" json:"UseTLS,omitempty"`
 	// The replica's TLS certificate.
-	Certificate []byte `protobuf:"bytes,5,opt,name=Certificate,proto3,oneof" json:"Certificate,omitempty"`
+	Certificate []byte `protobuf:"bytes,5,opt,name=Certificate,proto3" json:"Certificate,omitempty"`
 	// The private key of the TLS certificate.
-	CertificateKey []byte `protobuf:"bytes,6,opt,name=CertificateKey,proto3,oneof" json:"CertificateKey,omitempty"`
+	CertificateKey []byte `protobuf:"bytes,6,opt,name=CertificateKey,proto3" json:"CertificateKey,omitempty"`
 	// The certificate authority that created the TLS certificates.
-	CertificateAuthority []byte `protobuf:"bytes,7,opt,name=CertificateAuthority,proto3,oneof" json:"CertificateAuthority,omitempty"`
+	CertificateAuthority []byte `protobuf:"bytes,7,opt,name=CertificateAuthority,proto3" json:"CertificateAuthority,omitempty"`
 	// The name of the crypto implementation to use.
 	Crypto string `protobuf:"bytes,8,opt,name=Crypto,proto3" json:"Crypto,omitempty"`
 	// The name of the consensus implementation to use.
@@ -735,7 +735,10 @@ type StopReplicaResponse struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The final state hash of all executed commands
 	Hashes map[uint32][]byte `protobuf:"bytes,1,rep,name=Hashes,proto3" json:"Hashes,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// The final count of executed commands
+	Counts map[uint32]uint32 `protobuf:"bytes,2,rep,name=Counts,proto3" json:"Counts,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
 }
 
 func (x *StopReplicaResponse) Reset() {
@@ -777,6 +780,13 @@ func (x *StopReplicaResponse) GetHashes() map[uint32][]byte {
 	return nil
 }
 
+func (x *StopReplicaResponse) GetCounts() map[uint32]uint32 {
+	if x != nil {
+		return x.Counts
+	}
+	return nil
+}
+
 type StartClientRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -785,7 +795,7 @@ type StartClientRequest struct {
 	// The clients to create.
 	Clients map[uint32]*ClientOpts `protobuf:"bytes,1,rep,name=Clients,proto3" json:"Clients,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// The certificate authority that created the TLS certificates.
-	CertificateAuthority []byte `protobuf:"bytes,7,opt,name=CertificateAuthority,proto3,oneof" json:"CertificateAuthority,omitempty"`
+	CertificateAuthority []byte `protobuf:"bytes,7,opt,name=CertificateAuthority,proto3" json:"CertificateAuthority,omitempty"`
 	// The replicas to connect to.
 	Configuration map[uint32]*ReplicaInfo `protobuf:"bytes,10,rep,name=Configuration,proto3" json:"Configuration,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
@@ -1020,7 +1030,7 @@ var file_internal_proto_orchestrationpb_orchestration_proto_rawDesc = []byte{
 	0x74, 0x65, 0x4b, 0x65, 0x79, 0x12, 0x1c, 0x0a, 0x09, 0x50, 0x75, 0x62, 0x6c, 0x69, 0x63, 0x4b,
 	0x65, 0x79, 0x18, 0x10, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x09, 0x50, 0x75, 0x62, 0x6c, 0x69, 0x63,
 	0x4b, 0x65, 0x79, 0x12, 0x16, 0x0a, 0x06, 0x55, 0x73, 0x65, 0x54, 0x4c, 0x53, 0x18, 0x04, 0x20,
-	0x01, 0x28, 0x08, 0x52, 0x06, 0x55, 0x73, 0x65, 0x54, 0x4c, 0x53, 0x12, 0x25, 0x0a, 0x0b, 0x43,
+	0x01, 0x28, 0x08, 0x52, 0x06, 0x55, 0x73, 0x65, 0x54, 0x4c, 0x53, 0x12, 0x20, 0x0a, 0x0b, 0x43,
 	0x65, 0x72, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x65, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0c,
 	0x48, 0x00, 0x52, 0x0b, 0x43, 0x65, 0x72, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x65, 0x88,
 	0x01, 0x01, 0x12, 0x2b, 0x0a, 0x0e, 0x43, 0x65, 0x72, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74,
@@ -1468,8 +1478,6 @@ func file_internal_proto_orchestrationpb_orchestration_proto_init() {
 			}
 		}
 	}
-	file_internal_proto_orchestrationpb_orchestration_proto_msgTypes[0].OneofWrappers = []interface{}{}
-	file_internal_proto_orchestrationpb_orchestration_proto_msgTypes[10].OneofWrappers = []interface{}{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

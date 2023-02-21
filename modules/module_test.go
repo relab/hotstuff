@@ -18,7 +18,7 @@ type counterImpl struct {
 func (c counterImpl) Increment(name string) { c.counters[name]++ }
 func (c counterImpl) Count(name string) int { return c.counters[name] }
 
-func NewCounter() *counterImpl {
+func NewCounter() *counterImpl { //nolint:revive
 	return &counterImpl{
 		counters: make(map[string]int),
 	}
@@ -38,7 +38,7 @@ func (g greeterImpl) Greet(name string) string {
 	return "Hello, " + name
 }
 
-func NewGreeter() *greeterImpl {
+func NewGreeter() *greeterImpl { //nolint:revive
 	return &greeterImpl{}
 }
 
