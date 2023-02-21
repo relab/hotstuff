@@ -147,6 +147,7 @@ type LeaderRotation interface {
 	GetLeader(hotstuff.View) hotstuff.ID
 }
 
+// LatencyMeasurement implements the kauri protocol.
 type LatencyMeasurement interface {
 	// fetches the latency matrix as observed
 	GetLatencyMatrix() map[hotstuff.ID]map[hotstuff.ID]uint64

@@ -66,6 +66,7 @@ type CommitEvent struct {
 	Commands int
 }
 
+// LatencyVectorEvent is raised to process the new latency measurement.
 type LatencyVectorEvent struct {
 	Creator       ID
 	LatencyVector map[uint32]uint64

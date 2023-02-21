@@ -1,3 +1,4 @@
+// Package latency implements protocol latency measurements
 package latency
 
 import (
@@ -14,6 +15,7 @@ func init() {
 	modules.RegisterModule("latencymeasurement", NewLatencyMeasurement)
 }
 
+// NewLatencyMeasurement initializes the latency measurement.
 func NewLatencyMeasurement() modules.LatencyMeasurement {
 	return &latencyMeasurement{latencyStats: make(map[hotstuff.ID]map[hotstuff.ID]*statInfo)}
 }
@@ -102,9 +104,9 @@ func (l *latencyMeasurement) GetLatencyMatrix() map[hotstuff.ID]map[hotstuff.ID]
 
 func (l *latencyMeasurement) ComputeStats(stats *statInfo, newValue float64) {
 	stats.count++
-	old_mean := stats.mean
-	stats.mean += (newValue - old_mean) / float64(stats.count)
-	stats.m2 += (newValue - old_mean) * (newValue - stats.mean)
+	oldMean := stats.mean
+	stats.mean += (newValue - oldMean) / float64(stats.count)
+	stats.m2 += (newValue - oldMean) * (newValue - stats.mean)
 	if stats.count > 1 {
 		conf := 1.96
 		dev := math.Sqrt(stats.m2 / float64(stats.count-1))

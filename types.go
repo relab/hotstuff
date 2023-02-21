@@ -165,6 +165,7 @@ func (pc PartialCert) BlockHash() Hash {
 	return pc.blockHash
 }
 
+// Time returns the timestamp of the partial certificate.
 func (pc PartialCert) Time() time.Time {
 	return pc.time
 }
@@ -279,6 +280,7 @@ func (qc QuorumCert) Signature() QuorumSignature {
 	return qc.signature
 }
 
+// Creator returns the ID of the quorum certificate creation.
 func (qc QuorumCert) Creator() ID {
 	return qc.creator
 }
@@ -293,6 +295,7 @@ func (qc QuorumCert) View() View {
 	return qc.view
 }
 
+// LatencyVector returns the latency vector of the proposal.
 func (qc QuorumCert) LatencyVector() map[uint32]uint64 {
 	return qc.latencyVector
 }

@@ -1,3 +1,4 @@
+// Package leaderrotation implements the leaderrotation modules.
 package leaderrotation
 
 import (

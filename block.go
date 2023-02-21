@@ -75,6 +75,7 @@ func (b *Block) View() View {
 	return b.view
 }
 
+// Time returns the timestamp when the block is created.
 func (b *Block) Time() time.Time {
 	return b.time
 }

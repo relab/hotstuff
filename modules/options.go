@@ -63,10 +63,12 @@ func (opts *Options) SetShouldUseHandel() {
 	opts.shouldUseHandel = true
 }
 
+// IsLatencyCalculationEnabled returns true if the latency calculation is enabled.
 func (opts *Options) IsLatencyCalculationEnabled() bool {
 	return opts.shouldCalculateLatency
 }
 
+// SetLatencyCalculation enables the latency calculations.
 func (opts *Options) SetLatencyCalculation(enable bool) {
 	opts.shouldCalculateLatency = enable
 }
