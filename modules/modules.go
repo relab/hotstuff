@@ -125,6 +125,7 @@ type Configuration interface {
 	SubConfig(ids []hotstuff.ID) (sub Configuration, err error)
 }
 
+// Kauri module implements the Kauri protocol
 type Kauri interface {
 	Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg)
 }

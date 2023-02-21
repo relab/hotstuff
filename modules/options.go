@@ -36,6 +36,7 @@ func (opts Options) ShouldUseHandel() bool {
 	return opts.shouldUseHandel
 }
 
+// ShouldUseKauri returns true if Kauri protocol should be used.
 func (opts Options) ShouldUseKauri() bool {
 	return opts.shouldUseKauri
 }
@@ -71,6 +72,7 @@ func (opts *Options) SetShouldVerifyVotesSync() {
 	opts.shouldVerifyVotesSync = true
 }
 
+// SetShouldUseKauri sets the SetShouldUseKauri setting to true.
 func (opts *Options) SetShouldUseKauri() {
 	opts.shouldUseKauri = true
 }

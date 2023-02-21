@@ -1,3 +1,4 @@
+// Package kauri contains the implementation of the kauri protocol
 package kauri
 
 import (
@@ -23,13 +24,17 @@ func init() {
 	modules.RegisterModule("kauri", New)
 }
 
+// TreeType determines the type of tree to be built, for future extension
 type TreeType int
 
+// NoFaultTree is a tree without any faulty replicas in the tree, which is currently supported.
+// TreeWithFaults is a tree with faulty replicas, not yet implemented.
 const (
 	NoFaultTree    TreeType = 1
 	TreeWithFaults TreeType = 2
 )
 
+// Kauri structure contains the modules for kauri protocol implementation.
 type Kauri struct {
 	configuration          *backend.Config
 	server                 *backend.Server
@@ -50,6 +55,7 @@ type Kauri struct {
 	isAggregationSent      bool
 }
 
+// New initializes the kauri structure
 func New() modules.Kauri {
 	return &Kauri{nodes: make(map[hotstuff.ID]*kauripb.Node)}
 }
@@ -103,6 +109,7 @@ func (k *Kauri) initializeConfiguration() {
 	k.senders = make([]hotstuff.ID, 0)
 }
 
+// Begin starts dissemination of proposal and aggregation of votes.
 func (k *Kauri) Begin(pc hotstuff.PartialCert, p hotstuff.ProposeMsg) {
 	if !k.initDone {
 		k.eventLoop.DelayUntil(backend.ConnectedEvent{}, func() { k.Begin(pc, p) })
@@ -124,6 +131,7 @@ func (k *Kauri) reset() {
 	k.senders = make([]hotstuff.ID, 0)
 	k.isAggregationSent = false
 }
+
 func (k *Kauri) aggregateAndSend(t time.Duration, view hotstuff.View) {
 	ticker := time.NewTicker(t)
 	<-ticker.C
@@ -136,6 +144,7 @@ func (k *Kauri) aggregateAndSend(t time.Duration, view hotstuff.View) {
 	}
 }
 
+// SendProposalToChildren sends the proposal to the children
 func (k *Kauri) SendProposalToChildren(p hotstuff.ProposeMsg) {
 	children := k.tree.GetChildren()
 	if len(children) != 0 {
@@ -152,6 +161,7 @@ func (k *Kauri) SendProposalToChildren(p hotstuff.ProposeMsg) {
 	}
 }
 
+// OnContributionRecv is invoked upon receiving the vote for aggregation.
 func (k *Kauri) OnContributionRecv(event ContributionRecvEvent) {
 	if k.currentView != hotstuff.View(event.Contribution.View) {
 		return
@@ -171,6 +181,7 @@ func (k *Kauri) OnContributionRecv(event ContributionRecvEvent) {
 	}
 }
 
+// SendContributionToParent sends contribution to the parent node.
 func (k *Kauri) SendContributionToParent() {
 	parent, ok := k.tree.GetParent()
 	if ok {
@@ -193,6 +204,7 @@ func (i serviceImpl) SendContribution(ctx gorums.ServerCtx, request *kauripb.Con
 	i.k.eventLoop.AddEvent(ContributionRecvEvent{Contribution: request})
 }
 
+// ContributionRecvEvent is raised when a contribution is received.
 type ContributionRecvEvent struct {
 	Contribution *kauripb.Contribution
 }

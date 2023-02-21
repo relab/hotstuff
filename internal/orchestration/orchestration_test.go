@@ -29,9 +29,13 @@ func TestOrchestration(t *testing.T) {
 		workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
 		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), metrics.NopLogger(), nil, 0)
 
+		numReplicas := 4
+		if len(mods) > 0 && mods[0] == "kauri" {
+			numReplicas = 8
+		}
 		experiment := &orchestration.Experiment{
 			Logger:      logging.New("ctrl"),
-			NumReplicas: 4,
+			NumReplicas: numReplicas,
 			NumClients:  2,
 			ClientOpts: &orchestrationpb.ClientOpts{
 				ConnectTimeout: durationpb.New(time.Second),
@@ -86,6 +90,15 @@ func TestOrchestration(t *testing.T) {
 	t.Run("Fast-HotStuff+BLS12+Handel", func(t *testing.T) { run("fasthotstuff", "bls12", mods) })
 	t.Run("Simple-HotStuff+ECDSA+Handel", func(t *testing.T) { run("simplehotstuff", "ecdsa", mods) })
 	t.Run("Simple-HotStuff+BLS12+Handel", func(t *testing.T) { run("simplehotstuff", "bls12", mods) })
+
+	// kauri
+	mods = []string{"kauri"}
+	t.Run("ChainedHotStuff+ECDSA+Kauri", func(t *testing.T) { run("chainedhotstuff", "ecdsa", mods) })
+	t.Run("ChainedHotStuff+BLS12+Kauri", func(t *testing.T) { run("chainedhotstuff", "bls12", mods) })
+	t.Run("Fast-HotStuff+ECDSA+Kauri", func(t *testing.T) { run("fasthotstuff", "ecdsa", mods) })
+	t.Run("Fast-HotStuff+BLS12+Kauri", func(t *testing.T) { run("fasthotstuff", "bls12", mods) })
+	t.Run("Simple-HotStuff+ECDSA+Kauri", func(t *testing.T) { run("simplehotstuff", "ecdsa", mods) })
+	t.Run("Simple-HotStuff+BLS12+Kauri", func(t *testing.T) { run("simplehotstuff", "bls12", mods) })
 }
 
 func TestDeployment(t *testing.T) {
