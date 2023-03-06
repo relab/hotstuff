@@ -3,10 +3,12 @@ proto_src := internal/proto/clientpb/client.proto          \
 		internal/proto/hotstuffpb/hotstuff.proto           \
 		internal/proto/orchestrationpb/orchestration.proto \
 		internal/proto/handelpb/handel.proto               \
+		internal/proto/kauripb/kauri.proto		\
 		metrics/types/types.proto
 proto_go := $(proto_src:%.proto=%.pb.go)
 gorums_go := internal/proto/clientpb/client_gorums.pb.go \
 		internal/proto/hotstuffpb/hotstuff_gorums.pb.go  \
+		internal/proto/kauripb/kauri_gorums.pb.go	\
 		internal/proto/handelpb/handel_gorums.pb.go
 
 binaries := hotstuff plot

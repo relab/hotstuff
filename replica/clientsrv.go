@@ -28,6 +28,7 @@ type clientSrv struct {
 	srv          *gorums.Server
 	awaitingCmds map[cmdID]chan<- error
 	cmdCache     *cmdCache
+	sent         int
 	hash         hash.Hash
 }
 
@@ -85,11 +86,14 @@ func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (
 	srv.cmdCache.addCommand(cmd)
 	ctx.Release()
 	err := <-c
+	srv.sent++
+	srv.logger.Info("executing the commands and sending response", srv.sent)
 	return &emptypb.Empty{}, err
 }
 
 func (srv *clientSrv) Exec(cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
+
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {
 		srv.logger.Errorf("Failed to unmarshal command: %v", err)

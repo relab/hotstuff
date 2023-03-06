@@ -16,6 +16,8 @@ type ViewDuration interface {
 	ViewSucceeded()
 	// ViewTimeout is called by the synchronizer when a view timed out.
 	ViewTimeout()
+	//
+	CreateNewDuration() ViewDuration
 }
 
 // NewViewDuration returns a ViewDuration that approximates the view duration based on durations of previous views.
@@ -28,6 +30,15 @@ func NewViewDuration(sampleSize uint64, startTimeout, maxTimeout, multiplier flo
 		mean:  startTimeout,
 		max:   maxTimeout,
 		mul:   multiplier,
+	}
+}
+
+func (v *viewDuration) CreateNewDuration() ViewDuration {
+	return &viewDuration{
+		limit: v.limit,
+		mean:  v.mean,
+		max:   v.max,
+		mul:   v.mul,
 	}
 }
 

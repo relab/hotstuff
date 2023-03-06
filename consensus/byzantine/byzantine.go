@@ -62,15 +62,15 @@ func (f *fork) InitModule(mods *modules.Core) {
 }
 
 func (f *fork) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
-	block, ok := f.blockChain.Get(f.synchronizer.HighQC().BlockHash())
+	block, ok := f.blockChain.Get(1, f.synchronizer.HighQC(hotstuff.ChainNumber(1)).BlockHash())
 	if !ok {
 		return proposal, false
 	}
-	parent, ok := f.blockChain.Get(block.Parent())
+	parent, ok := f.blockChain.Get(block.ChainNumber(), block.Parent())
 	if !ok {
 		return proposal, false
 	}
-	grandparent, ok := f.blockChain.Get(parent.Hash())
+	grandparent, ok := f.blockChain.Get(block.ChainNumber(), parent.Hash())
 	if !ok {
 		return proposal, false
 	}
@@ -81,8 +81,9 @@ func (f *fork) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (propos
 			grandparent.Hash(),
 			grandparent.QuorumCert(),
 			cmd,
-			f.synchronizer.View(),
+			f.synchronizer.View(hotstuff.ChainNumber(1)),
 			f.opts.ID(),
+			1,
 		),
 	}
 	if aggQC, ok := cert.AggQC(); f.opts.ShouldUseAggQC() && ok {

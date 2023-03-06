@@ -84,6 +84,9 @@ func IDSetToString(set IDSet) string {
 // View is a number that uniquely identifies a view.
 type View uint64
 
+// ChainNumber is the chain of the block
+type ChainNumber uint32
+
 // ToBytes returns the view as bytes.
 func (v View) ToBytes() []byte {
 	var viewBytes [8]byte
@@ -133,19 +136,20 @@ type ThresholdSignature = QuorumSignature
 // PartialCert is a signed block hash.
 type PartialCert struct {
 	// shortcut to the signer of the signature
-	signer    ID
-	signature QuorumSignature
-	blockHash Hash
+	signer      ID
+	signature   QuorumSignature
+	blockHash   Hash
+	chainNumber ChainNumber
 }
 
 // NewPartialCert returns a new partial certificate.
-func NewPartialCert(signature QuorumSignature, blockHash Hash) PartialCert {
+func NewPartialCert(signature QuorumSignature, blockHash Hash, chainNumber ChainNumber) PartialCert {
 	var signer ID
 	signature.Participants().RangeWhile(func(i ID) bool {
 		signer = i
 		return false
 	})
-	return PartialCert{signer, signature, blockHash}
+	return PartialCert{signer, signature, blockHash, chainNumber}
 }
 
 // Signer returns the ID of the replica that created the certificate.
@@ -163,6 +167,10 @@ func (pc PartialCert) BlockHash() Hash {
 	return pc.blockHash
 }
 
+func (pc PartialCert) ChainNumber() ChainNumber {
+	return pc.chainNumber
+}
+
 // ToBytes returns a byte representation of the partial certificate.
 func (pc PartialCert) ToBytes() []byte {
 	return append(pc.blockHash[:], pc.signature.ToBytes()...)
@@ -173,14 +181,19 @@ func (pc PartialCert) ToBytes() []byte {
 // However, if highQC.View < highTC.View, we should still include highQC.
 // This can also hold an AggregateQC for Fast-Hotstuff.
 type SyncInfo struct {
-	qc    *QuorumCert
-	tc    *TimeoutCert
-	aggQC *AggregateQC
+	qc          *QuorumCert
+	tc          *TimeoutCert
+	aggQC       *AggregateQC
+	chainNumber ChainNumber
 }
 
 // NewSyncInfo returns a new SyncInfo struct.
-func NewSyncInfo() SyncInfo {
-	return SyncInfo{}
+func NewSyncInfo(chainNumber ChainNumber) SyncInfo {
+	return SyncInfo{chainNumber: chainNumber}
+}
+
+func (si SyncInfo) GetChainNumber() ChainNumber {
+	return si.chainNumber
 }
 
 // WithQC returns a copy of the SyncInfo struct with the given QC.
@@ -246,14 +259,15 @@ func (si SyncInfo) String() string {
 
 // QuorumCert (QC) is a certificate for a Block created by a quorum of partial certificates.
 type QuorumCert struct {
-	signature QuorumSignature
-	view      View
-	hash      Hash
+	signature   QuorumSignature
+	view        View
+	hash        Hash
+	chainNumber ChainNumber
 }
 
 // NewQuorumCert creates a new quorum cert from the given values.
-func NewQuorumCert(signature QuorumSignature, view View, hash Hash) QuorumCert {
-	return QuorumCert{signature, view, hash}
+func NewQuorumCert(signature QuorumSignature, view View, hash Hash, chainNumber ChainNumber) QuorumCert {
+	return QuorumCert{signature, view, hash, chainNumber}
 }
 
 // ToBytes returns a byte representation of the quorum certificate.
@@ -281,6 +295,10 @@ func (qc QuorumCert) View() View {
 	return qc.view
 }
 
+func (qc QuorumCert) ChainNumber() ChainNumber {
+	return qc.chainNumber
+}
+
 // Equals returns true if the other QC equals this QC.
 func (qc QuorumCert) Equals(other QuorumCert) bool {
 	if qc.view != other.view {
@@ -300,7 +318,7 @@ func (qc QuorumCert) String() string {
 	if qc.signature != nil {
 		_ = writeParticipants(&sb, qc.Signature().Participants())
 	}
-	return fmt.Sprintf("QC{ hash: %.6s, IDs: [ %s] }", qc.hash, &sb)
+	return fmt.Sprintf("QC{ hash: %.6s, IDs: [ %s]  view: %d chain %d }", qc.hash, &sb, qc.view, qc.chainNumber)
 }
 
 // TimeoutCert (TC) is a certificate created by a quorum of timeout messages.
@@ -343,19 +361,24 @@ func (tc TimeoutCert) String() string {
 //
 // This is used by the Fast-HotStuff consensus protocol.
 type AggregateQC struct {
-	qcs  map[ID]QuorumCert
-	sig  QuorumSignature
-	view View
+	qcs         map[ID]QuorumCert
+	sig         QuorumSignature
+	view        View
+	chainNumber ChainNumber
 }
 
 // NewAggregateQC returns a new AggregateQC from the QC map and the threshold signature.
-func NewAggregateQC(qcs map[ID]QuorumCert, sig QuorumSignature, view View) AggregateQC {
-	return AggregateQC{qcs, sig, view}
+func NewAggregateQC(qcs map[ID]QuorumCert, sig QuorumSignature, view View, chainNumber ChainNumber) AggregateQC {
+	return AggregateQC{qcs, sig, view, chainNumber}
 }
 
 // QCs returns the quorum certificates in the AggregateQC.
 func (aggQC AggregateQC) QCs() map[ID]QuorumCert {
 	return aggQC.qcs
+}
+
+func (aggQC AggregateQC) GetChainNumber() ChainNumber {
+	return aggQC.chainNumber
 }
 
 // Sig returns the threshold signature in the AggregateQC.

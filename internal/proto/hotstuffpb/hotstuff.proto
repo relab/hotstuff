@@ -33,7 +33,10 @@ message Proposal {
   AggQC AggQC = 2;
 }
 
-message BlockHash { bytes Hash = 1; }
+message BlockHash { 
+  bytes Hash = 1;
+  uint32 ChainNumber = 2;
+}
 
 message Block {
   bytes Parent = 1;
@@ -41,6 +44,7 @@ message Block {
   uint64 View = 3;
   bytes Command = 4;
   uint32 Proposer = 5;
+  uint32 ChainNumber = 6;
 }
 
 message ECDSASignature {
@@ -61,6 +65,7 @@ message Signature {
 message PartialCert {
   QuorumSignature Sig = 1;
   bytes Hash = 2;
+  uint32 ChainNumber = 3;
 }
 
 message ECDSAMultiSignature { repeated ECDSASignature Sigs = 1; }
@@ -81,6 +86,7 @@ message QuorumCert {
   QuorumSignature Sig = 1;
   uint64 View = 2;
   bytes Hash = 3;
+  uint32 ChainNumber = 4;
 }
 
 message TimeoutCert {
@@ -93,16 +99,19 @@ message TimeoutMsg {
   SyncInfo SyncInfo = 2;
   QuorumSignature ViewSig = 3;
   QuorumSignature MsgSig = 4;
+  uint32 ChainNumber = 5;
 }
 
 message SyncInfo {
   QuorumCert QC = 1;
   TimeoutCert TC = 2;
   AggQC AggQC = 3;
+  uint32 ChainNumber = 4;
 }
 
 message AggQC {
   map<uint32, QuorumCert> QCs = 1;
   QuorumSignature Sig = 2;
   uint64 View = 3;
+  uint32 ChainNumber = 4;
 }

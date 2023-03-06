@@ -88,7 +88,8 @@ type session struct {
 	disseminateTimerID   int
 }
 
-func (h *Handel) newSession(hash hotstuff.Hash, in hotstuff.QuorumSignature) *session {
+func (h *Handel) newSession(hash hotstuff.Hash, in hotstuff.QuorumSignature,
+	chainNumber hotstuff.ChainNumber) *session {
 	s := &session{
 		h:    h,
 		hash: hash,
@@ -131,10 +132,10 @@ func (h *Handel) newSession(hash hotstuff.Hash, in hotstuff.QuorumSignature) *se
 	s.levels[0].individual[h.opts.ID()] = in
 	s.levels[0].incoming = in
 
-	s.updateOutgoing(1)
+	s.updateOutgoing(1, chainNumber)
 
 	s.disseminateTimerID = h.eventLoop.AddTicker(disseminationPeriod, func(_ time.Time) (event any) {
-		return disseminateEvent{s.hash}
+		return disseminateEvent{s.hash, chainNumber}
 	})
 
 	s.levelActivateTimerID = h.eventLoop.AddTicker(levelActivateInterval, func(_ time.Time) (event any) {
@@ -331,17 +332,17 @@ func (s *session) updateIncoming(c contribution) {
 		level.done = true
 		s.advanceLevel()
 		if c.level+1 <= s.h.maxLevel {
-			s.sendFastPath(s.h.synchronizer.ViewContext(), c.level+1)
+			s.sendFastPath(s.h.synchronizer.ViewContext(c.chainNumber), c.level+1)
 		}
 	}
 
-	s.updateOutgoing(c.level + 1)
+	s.updateOutgoing(c.level+1, c.chainNumber)
 }
 
 // updateOutgoing updates the outgoing signature for the specified level,
 // and bubbles up the update to the highest level.
 // The lock must be held when calling this method.
-func (s *session) updateOutgoing(levelIndex int) {
+func (s *session) updateOutgoing(levelIndex int, chainNumber hotstuff.ChainNumber) {
 	if levelIndex == 0 {
 		panic("cannot update the outgoing signature for level 0")
 	}
@@ -373,10 +374,11 @@ func (s *session) updateOutgoing(levelIndex int) {
 			s.h.logger.Debugf("Done with session: %.8s", s.hash)
 
 			s.h.eventLoop.AddEvent(hotstuff.NewViewMsg{
-				SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(
+				SyncInfo: hotstuff.NewSyncInfo(chainNumber).WithQC(hotstuff.NewQuorumCert(
 					outgoing,
-					s.h.synchronizer.View(),
+					s.h.synchronizer.View(chainNumber),
 					s.hash,
+					chainNumber,
 				)),
 			})
 
@@ -390,7 +392,7 @@ func (s *session) updateOutgoing(levelIndex int) {
 		s.h.logger.Debugf("Updated outgoing for level %d: %v", levelIndex, outgoing.Participants())
 
 		if levelIndex <= s.h.maxLevel {
-			s.updateOutgoing(levelIndex + 1)
+			s.updateOutgoing(levelIndex+1, chainNumber)
 		}
 	}
 }
@@ -620,7 +622,7 @@ func (s *session) improveSignature(contribution contribution) hotstuff.QuorumSig
 }
 
 func (s *session) verifyContribution(c contribution, sig hotstuff.QuorumSignature, verifyIndiv bool) {
-	block, ok := s.h.blockChain.Get(s.hash)
+	block, ok := s.h.blockChain.Get(hotstuff.ChainNumber(1), s.hash)
 	if !ok {
 		return
 	}

@@ -41,7 +41,7 @@ func (r *repBased) InitModule(mods *modules.Core) {
 
 // GetLeader returns the id of the leader in the given view
 func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
-	block := r.consensus.CommittedBlock()
+	block := r.consensus.CommittedBlock(hotstuff.ChainNumber(1))
 	if block.View() > view-hotstuff.View(r.consensus.ChainLength()) {
 		// TODO: it could be possible to lookup leaders for older views if we
 		// store a copy of the reputations in a metadata field of each block.
@@ -105,6 +105,6 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 func NewRepBased() modules.LeaderRotation {
 	return &repBased{
 		reputations:    make(reputationsMap),
-		prevCommitHead: hotstuff.GetGenesis(),
+		prevCommitHead: hotstuff.GetGenesis(hotstuff.ChainNumber(1)),
 	}
 }

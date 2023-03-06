@@ -69,6 +69,7 @@ awaitBatch:
 		select {
 		case <-c.c:
 		case <-ctx.Done():
+			c.logger.Info("Context is done for get commands ")
 			return
 		}
 		c.mut.Lock()

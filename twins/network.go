@@ -161,7 +161,7 @@ func (n *Network) run(ticks int) {
 	// kick off the initial proposal(s)
 	for _, node := range n.nodes {
 		if node.leaderRotation.GetLeader(1) == node.id.ReplicaID {
-			node.consensus.Propose(node.synchronizer.(*synchronizer.Synchronizer).SyncInfo())
+			node.consensus.Propose(1, node.synchronizer.(*synchronizer.Synchronizer).SyncInfo(hotstuff.ChainNumber(1)))
 		}
 	}
 
@@ -195,10 +195,10 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 
 	// Index into viewPartitions.
 	i := -1
-	if node.effectiveView > node.synchronizer.View() {
+	if node.effectiveView > node.synchronizer.View(hotstuff.ChainNumber(1)) {
 		i += int(node.effectiveView)
 	} else {
-		i += int(node.synchronizer.View())
+		i += int(node.synchronizer.View(hotstuff.ChainNumber(1)))
 	}
 
 	if i < 0 {
@@ -335,13 +335,13 @@ func (c *configuration) Timeout(msg hotstuff.TimeoutMsg) {
 }
 
 // Fetch requests a block from all the replicas in the configuration.
-func (c *configuration) Fetch(_ context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
+func (c *configuration) Fetch(_ context.Context, chainNumber hotstuff.ChainNumber, hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
 	for _, replica := range c.network.replicas {
 		for _, node := range replica {
 			if c.shouldDrop(node.id, hash) {
 				continue
 			}
-			block, ok = node.blockChain.LocalGet(hash)
+			block, ok = node.blockChain.LocalGet(1, hash)
 			if ok {
 				return block, true
 			}
@@ -439,7 +439,7 @@ type timeoutManager struct {
 func (tm *timeoutManager) advance() {
 	tm.countdown--
 	if tm.countdown == 0 {
-		view := tm.synchronizer.View()
+		view := tm.synchronizer.View(hotstuff.ChainNumber(1))
 		tm.eventLoop.AddEvent(synchronizer.TimeoutEvent{View: view})
 		tm.countdown = tm.timeout
 		if tm.node.effectiveView <= view {
@@ -483,7 +483,8 @@ type fixedDuration struct {
 	timeout time.Duration
 }
 
-func (d fixedDuration) Duration() time.Duration { return d.timeout }
-func (d fixedDuration) ViewStarted()            {}
-func (d fixedDuration) ViewSucceeded()          {}
-func (d fixedDuration) ViewTimeout()            {}
+func (d fixedDuration) Duration() time.Duration                      { return d.timeout }
+func (d fixedDuration) ViewStarted()                                 {}
+func (d fixedDuration) ViewSucceeded()                               {}
+func (d fixedDuration) ViewTimeout()                                 {}
+func (d fixedDuration) CreateNewDuration() synchronizer.ViewDuration { return d }

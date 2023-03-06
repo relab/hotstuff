@@ -72,13 +72,13 @@ type BlockChain interface {
 	Store(*hotstuff.Block)
 
 	// Get retrieves a block given its hash, attempting to fetching it from other replicas if necessary.
-	Get(hotstuff.Hash) (*hotstuff.Block, bool)
+	Get(hotstuff.ChainNumber, hotstuff.Hash) (*hotstuff.Block, bool)
 
 	// LocalGet retrieves a block given its hash, without fetching it from other replicas.
-	LocalGet(hotstuff.Hash) (*hotstuff.Block, bool)
+	LocalGet(hotstuff.ChainNumber, hotstuff.Hash) (*hotstuff.Block, bool)
 
 	// Extends checks if the given block extends the branch of the target hash.
-	Extends(block, target *hotstuff.Block) bool
+	Extends(*hotstuff.Block, *hotstuff.Block) bool
 
 	// Prunes blocks from the in-memory tree up to the specified height.
 	// Returns a set of forked blocks (blocks that were on a different branch, and thus not committed).
@@ -120,7 +120,7 @@ type Configuration interface {
 	// Timeout sends the timeout message to all replicas.
 	Timeout(msg hotstuff.TimeoutMsg)
 	// Fetch requests a block from all the replicas in the configuration.
-	Fetch(ctx context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool)
+	Fetch(ctx context.Context, chainNumber hotstuff.ChainNumber, hash hotstuff.Hash) (block *hotstuff.Block, ok bool)
 	// SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
 	SubConfig(ids []hotstuff.ID) (sub Configuration, err error)
 }
@@ -137,11 +137,11 @@ type Kauri interface {
 // The methods OnPropose, OnVote, OnNewView, and OnDeliver should be called upon receiving a corresponding message.
 type Consensus interface {
 	// StopVoting ensures that no voting happens in a view earlier than `view`.
-	StopVoting(view hotstuff.View)
+	StopVoting(view hotstuff.View, chainNumber hotstuff.ChainNumber)
 	// Propose starts a new proposal. The command is fetched from the command queue.
-	Propose(cert hotstuff.SyncInfo)
+	Propose(chainNumber hotstuff.ChainNumber, cert hotstuff.SyncInfo)
 	// CommittedBlock returns the most recently committed block.
-	CommittedBlock() *hotstuff.Block
+	CommittedBlock(hotstuff.ChainNumber) *hotstuff.Block
 	// ChainLength returns the number of blocks that need to be chained together in order to commit.
 	ChainLength() int
 }
@@ -160,11 +160,11 @@ type Synchronizer interface {
 	// qc must be either a regular quorum certificate, or a timeout certificate.
 	AdvanceView(hotstuff.SyncInfo)
 	// View returns the current view.
-	View() hotstuff.View
+	View(hotstuff.ChainNumber) hotstuff.View
 	// ViewContext returns a context that is cancelled at the end of the view.
-	ViewContext() context.Context
+	ViewContext(hotstuff.ChainNumber) context.Context
 	// HighQC returns the highest known QC.
-	HighQC() hotstuff.QuorumCert
+	HighQC(hotstuff.ChainNumber) hotstuff.QuorumCert
 	// Start starts the synchronizer with the given context.
 	Start(context.Context)
 }

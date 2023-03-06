@@ -30,7 +30,7 @@ func TestVote(t *testing.T) {
 
 	hs.Get(&eventLoop, &blockChain)
 
-	cs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
+	cs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(hotstuff.ChainNumber(1))))
 
 	ok := false
 	ctx, cancel := context.WithCancel(context.Background())
@@ -40,8 +40,8 @@ func TestVote(t *testing.T) {
 	})
 
 	b := testutil.NewProposeMsg(
-		hotstuff.GetGenesis().Hash(),
-		hotstuff.NewQuorumCert(nil, 1, hotstuff.GetGenesis().Hash()),
+		hotstuff.GetGenesis(hotstuff.ChainNumber(1)).Hash(),
+		hotstuff.NewQuorumCert(nil, 1, hotstuff.GetGenesis(hotstuff.ChainNumber(1)).Hash(), hotstuff.ChainNumber(1)),
 		"test", 1, 1,
 	)
 	blockChain.Store(b.Block)

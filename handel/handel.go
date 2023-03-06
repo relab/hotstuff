@@ -120,7 +120,7 @@ func (h *Handel) postInit() {
 	// now we can start handling timer events
 	h.eventLoop.RegisterHandler(disseminateEvent{}, func(e any) {
 		if s, ok := h.sessions[e.(disseminateEvent).sessionID]; ok {
-			s.sendContributions(s.h.synchronizer.ViewContext())
+			s.sendContributions(s.h.synchronizer.ViewContext(e.(disseminateEvent).chainNumber))
 		}
 	})
 
@@ -143,10 +143,10 @@ func (h *Handel) Begin(s hotstuff.PartialCert) {
 
 	// turn the single signature into a threshold signature,
 	// this makes it easier to work with.
-	session := h.newSession(s.BlockHash(), s.Signature())
+	session := h.newSession(s.BlockHash(), s.Signature(), s.ChainNumber())
 	h.sessions[s.BlockHash()] = session
 
-	go session.verifyContributions(h.synchronizer.ViewContext())
+	go session.verifyContributions(h.synchronizer.ViewContext(s.ChainNumber()))
 }
 
 type serviceImpl struct {
@@ -180,18 +180,20 @@ func (impl serviceImpl) Contribute(ctx gorums.ServerCtx, msg *handelpb.Contribut
 }
 
 type contribution struct {
-	hash       hotstuff.Hash
-	sender     hotstuff.ID
-	level      int
-	signature  hotstuff.QuorumSignature
-	individual hotstuff.QuorumSignature
-	verified   bool
-	deferred   bool
-	score      int
+	hash        hotstuff.Hash
+	sender      hotstuff.ID
+	level       int
+	signature   hotstuff.QuorumSignature
+	individual  hotstuff.QuorumSignature
+	verified    bool
+	deferred    bool
+	score       int
+	chainNumber hotstuff.ChainNumber
 }
 
 type disseminateEvent struct {
-	sessionID hotstuff.Hash
+	sessionID   hotstuff.Hash
+	chainNumber hotstuff.ChainNumber
 }
 
 type levelActivateEvent struct {

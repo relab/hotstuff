@@ -33,7 +33,7 @@ func (c *carousel) InitModule(mods *modules.Core) {
 }
 
 func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
-	commitHead := c.consensus.CommittedBlock()
+	commitHead := c.consensus.CommittedBlock(hotstuff.ChainNumber(1))
 
 	if commitHead.QuorumCert().Signature() == nil {
 		c.logger.Debug("in startup; using round-robin")
@@ -55,9 +55,9 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 		ok          = true
 	)
 
-	for ok && i < f && block != hotstuff.GetGenesis() {
+	for ok && i < f && block != hotstuff.GetGenesis(hotstuff.ChainNumber(1)) {
 		lastAuthors.Add(block.Proposer())
-		block, ok = c.blockChain.Get(block.Parent())
+		block, ok = c.blockChain.Get(block.ChainNumber(), block.Parent())
 		i++
 	}
 

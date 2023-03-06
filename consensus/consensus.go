@@ -51,19 +51,23 @@ type consensusBase struct {
 	synchronizer   modules.Synchronizer
 	kauri          modules.Kauri
 	handel         modules.Handel
-
-	lastVote hotstuff.View
-
-	mut   sync.Mutex
-	bExec *hotstuff.Block
+	lastVotes      map[hotstuff.ChainNumber]hotstuff.View
+	mut            sync.Mutex
+	bExec          map[hotstuff.ChainNumber]*hotstuff.Block
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
 func New(impl Rules) modules.Consensus {
+	lastVotes := make(map[hotstuff.ChainNumber]hotstuff.View)
+	bExec := make(map[hotstuff.ChainNumber]*hotstuff.Block)
+	for i := 1; i <= hotstuff.NumberOfChains; i++ {
+		lastVotes[hotstuff.ChainNumber(i)] = 0
+		bExec[hotstuff.ChainNumber(i)] = hotstuff.GetGenesis(hotstuff.ChainNumber(i))
+	}
 	return &consensusBase{
-		impl:     impl,
-		lastVote: 0,
-		bExec:    hotstuff.GetGenesis(),
+		impl:      impl,
+		lastVotes: lastVotes,
+		bExec:     bExec,
 	}
 }
 
@@ -95,34 +99,32 @@ func (cs *consensusBase) InitModule(mods *modules.Core) {
 	})
 }
 
-func (cs *consensusBase) CommittedBlock() *hotstuff.Block {
+func (cs *consensusBase) CommittedBlock(chainNumber hotstuff.ChainNumber) *hotstuff.Block {
 	cs.mut.Lock()
 	defer cs.mut.Unlock()
-	return cs.bExec
+	return cs.bExec[chainNumber]
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
-func (cs *consensusBase) StopVoting(view hotstuff.View) {
-	if cs.lastVote < view {
-		cs.lastVote = view
+func (cs *consensusBase) StopVoting(view hotstuff.View, chainNumber hotstuff.ChainNumber) {
+	if cs.lastVotes[chainNumber] < view {
+		cs.lastVotes[chainNumber] = view
 	}
 }
 
 // Propose creates a new proposal.
-func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
-	cs.logger.Debug("Propose")
-
+func (cs *consensusBase) Propose(chainNumber hotstuff.ChainNumber, cert hotstuff.SyncInfo) {
 	qc, ok := cert.QC()
 	if ok {
 		// tell the acceptor that the previous proposal succeeded.
-		if qcBlock, ok := cs.blockChain.Get(qc.BlockHash()); ok {
+		if qcBlock, ok := cs.blockChain.Get(chainNumber, qc.BlockHash()); ok {
 			cs.acceptor.Proposed(qcBlock.Command())
 		} else {
 			cs.logger.Errorf("Could not find block for QC: %s", qc)
 		}
 	}
 
-	cmd, ok := cs.commandQueue.Get(cs.synchronizer.ViewContext())
+	cmd, ok := cs.commandQueue.Get(cs.synchronizer.ViewContext(chainNumber))
 	if !ok {
 		cs.logger.Debug("Propose: No command")
 		return
@@ -142,8 +144,9 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 				qc.BlockHash(),
 				qc,
 				cmd,
-				cs.synchronizer.View(),
+				cs.synchronizer.View(chainNumber),
 				cs.opts.ID(),
+				chainNumber,
 			),
 		}
 
@@ -157,6 +160,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 		cs.configuration.Propose(proposal)
 	}
 	// self vote
+	cs.logger.Debug("Propose chain number  view number ", chainNumber, proposal.Block.View())
 	cs.OnPropose(proposal)
 }
 
@@ -185,6 +189,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	}
 
 	// ensure the block came from the leader.
+	// TODO(hanish): for round robin handle this
 	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
 		cs.logger.Info("OnPropose: block was not proposed by the expected leader")
 		return
@@ -195,7 +200,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
-	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
+	if qcBlock, ok := cs.blockChain.Get(block.ChainNumber(), block.QuorumCert().BlockHash()); ok {
 		cs.acceptor.Proposed(qcBlock.Command())
 	} else {
 		cs.logger.Info("OnPropose: Failed to fetch qcBlock")
@@ -216,11 +221,11 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 			cs.commit(b)
 		}
 		if !didAdvanceView {
-			cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+			cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo(block.ChainNumber()).WithQC(block.QuorumCert()))
 		}
 	}()
 
-	if block.View() <= cs.lastVote {
+	if block.View() <= cs.lastVotes[block.ChainNumber()] {
 		cs.logger.Info("OnPropose: block view too old")
 		return
 	}
@@ -231,24 +236,24 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
-	cs.lastVote = block.View()
+	cs.lastVotes[block.ChainNumber()] = block.View()
 
 	if cs.handel != nil {
 		// Need to call advanceview such that the view context will be fresh.
-		cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+		cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo(block.ChainNumber()).WithQC(block.QuorumCert()))
 		didAdvanceView = true
 		cs.handel.Begin(pc)
 		return
 	}
 	if cs.kauri != nil {
 		// Need to call advanceview such that the view context will be fresh.
-		cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+		cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo(block.ChainNumber()).WithQC(block.QuorumCert()))
 		didAdvanceView = true
 		cs.kauri.Begin(pc, proposal)
 		return
 	}
 
-	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
+	leaderID := cs.leaderRotation.GetLeader(cs.lastVotes[block.ChainNumber()] + 1)
 	if leaderID == cs.opts.ID() {
 		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})
 		return
@@ -261,6 +266,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	}
 
 	leader.Vote(pc)
+	cs.logger.Info("sending vote for chain ", block.ChainNumber())
 }
 
 func (cs *consensusBase) commit(block *hotstuff.Block) {
@@ -274,19 +280,19 @@ func (cs *consensusBase) commit(block *hotstuff.Block) {
 		return
 	}
 
-	// prune the blockchain and handle forked blocks
-	forkedBlocks := cs.blockChain.PruneToHeight(block.View())
-	for _, block := range forkedBlocks {
-		cs.forkHandler.Fork(block)
-	}
+	// // prune the blockchain and handle forked blocks
+	// forkedBlocks := cs.blockChain.PruneToHeight(block.View())
+	// for _, block := range forkedBlocks {
+	// 	cs.forkHandler.Fork(block)
+	// }
 }
 
 // recursive helper for commit
 func (cs *consensusBase) commitInner(block *hotstuff.Block) error {
-	if cs.bExec.View() >= block.View() {
+	if cs.bExec[block.ChainNumber()].View() >= block.View() {
 		return nil
 	}
-	if parent, ok := cs.blockChain.Get(block.Parent()); ok {
+	if parent, ok := cs.blockChain.Get(block.ChainNumber(), block.Parent()); ok {
 		err := cs.commitInner(parent)
 		if err != nil {
 			return err
@@ -296,7 +302,7 @@ func (cs *consensusBase) commitInner(block *hotstuff.Block) error {
 	}
 	cs.logger.Debug("EXEC: ", block)
 	cs.executor.Exec(block)
-	cs.bExec = block
+	cs.bExec[block.ChainNumber()] = block
 	return nil
 }
 

@@ -89,9 +89,9 @@ func TestPropose(t *testing.T) {
 	want := hotstuff.ProposeMsg{
 		ID: 1,
 		Block: hotstuff.NewBlock(
-			hotstuff.GetGenesis().Hash(),
-			hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
-			"foo", 1, 1,
+			hotstuff.GetGenesis(hotstuff.ChainNumber(1)).Hash(),
+			hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis(hotstuff.ChainNumber(1)).Hash(), hotstuff.GetGenesis(hotstuff.ChainNumber(1)).ChainNumber()),
+			"foo", 1, 1, 1,
 		),
 	}
 	testBase(t, want, func(cfg modules.Configuration) {
@@ -116,7 +116,7 @@ func TestTimeout(t *testing.T) {
 		ID:            1,
 		View:          1,
 		ViewSignature: nil,
-		SyncInfo:      hotstuff.NewSyncInfo(),
+		SyncInfo:      hotstuff.NewSyncInfo(hotstuff.ChainNumber(1)),
 	}
 	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)

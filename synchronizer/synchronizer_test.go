@@ -24,11 +24,12 @@ func TestAdvanceViewQC(t *testing.T) {
 	signers := hl.Signers()
 
 	block := hotstuff.NewBlock(
-		hotstuff.GetGenesis().Hash(),
-		hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
+		hotstuff.GetGenesis(hotstuff.ChainNumber(1)).Hash(),
+		hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis(hotstuff.ChainNumber(1)).Hash(), 1),
 		"foo",
 		1,
 		2,
+		1,
 	)
 
 	var blockChain modules.BlockChain
@@ -37,12 +38,12 @@ func TestAdvanceViewQC(t *testing.T) {
 	blockChain.Store(block)
 	qc := testutil.CreateQC(t, block, signers)
 	// synchronizer should tell hotstuff to propose
-	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
+	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(hotstuff.ChainNumber(1))))
 
-	s.AdvanceView(hotstuff.NewSyncInfo().WithQC(qc))
+	s.AdvanceView(hotstuff.NewSyncInfo(hotstuff.ChainNumber(1)).WithQC(qc))
 
-	if s.View() != 2 {
-		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())
+	if s.View(hotstuff.ChainNumber(1)) != 2 {
+		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View(hotstuff.ChainNumber(1)))
 	}
 }
 
@@ -60,11 +61,11 @@ func TestAdvanceViewTC(t *testing.T) {
 	tc := testutil.CreateTC(t, 1, signers)
 
 	// synchronizer should tell hotstuff to propose
-	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
+	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(hotstuff.ChainNumber(1))))
 
-	s.AdvanceView(hotstuff.NewSyncInfo().WithTC(tc))
+	s.AdvanceView(hotstuff.NewSyncInfo(hotstuff.ChainNumber(1)).WithTC(tc))
 
-	if s.View() != 2 {
-		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())
+	if s.View(hotstuff.ChainNumber(1)) != 2 {
+		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View(hotstuff.ChainNumber(1)))
 	}
 }

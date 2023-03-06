@@ -33,21 +33,21 @@ func (fhs *FastHotStuff) InitModule(mods *modules.Core) {
 	opts.SetShouldUseAggQC()
 }
 
-func (fhs *FastHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
+func (fhs *FastHotStuff) qcRef(chainNumber hotstuff.ChainNumber, qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return fhs.blockChain.Get(qc.BlockHash())
+	return fhs.blockChain.Get(chainNumber, qc.BlockHash())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.
 func (fhs *FastHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
-	parent, ok := fhs.qcRef(block.QuorumCert())
+	parent, ok := fhs.qcRef(block.ChainNumber(), block.QuorumCert())
 	if !ok {
 		return nil
 	}
 	fhs.logger.Debug("PRECOMMIT: ", parent)
-	grandparent, ok := fhs.qcRef(parent.QuorumCert())
+	grandparent, ok := fhs.qcRef(parent.ChainNumber(), parent.QuorumCert())
 	if !ok {
 		return nil
 	}
@@ -64,10 +64,10 @@ func (fhs *FastHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
 	// The base implementation verifies both regular QCs and AggregateQCs, and asserts that the QC embedded in the
 	// block is the same as the highQC found in the aggregateQC.
 	if proposal.AggregateQC != nil {
-		hqcBlock, ok := fhs.blockChain.Get(proposal.Block.QuorumCert().BlockHash())
+		hqcBlock, ok := fhs.blockChain.Get(proposal.Block.ChainNumber(), proposal.Block.QuorumCert().BlockHash())
 		return ok && fhs.blockChain.Extends(proposal.Block, hqcBlock)
 	}
-	return proposal.Block.View() >= fhs.synchronizer.View() &&
+	return proposal.Block.View() >= fhs.synchronizer.View(proposal.Block.ChainNumber()) &&
 		proposal.Block.View() == proposal.Block.QuorumCert().View()+1
 }
 

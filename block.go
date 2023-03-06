@@ -9,22 +9,24 @@ import (
 // Block contains a propsed "command", metadata for the protocol, and a link to the "parent" block.
 type Block struct {
 	// keep a copy of the hash to avoid hashing multiple times
-	hash     Hash
-	parent   Hash
-	proposer ID
-	cmd      Command
-	cert     QuorumCert
-	view     View
+	hash        Hash
+	parent      Hash
+	proposer    ID
+	cmd         Command
+	cert        QuorumCert
+	view        View
+	chainNumber ChainNumber
 }
 
 // NewBlock creates a new Block
-func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID) *Block {
+func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID, chainNumber ChainNumber) *Block {
 	b := &Block{
-		parent:   parent,
-		cert:     cert,
-		cmd:      cmd,
-		view:     view,
-		proposer: proposer,
+		parent:      parent,
+		cert:        cert,
+		cmd:         cmd,
+		view:        view,
+		proposer:    proposer,
+		chainNumber: chainNumber,
 	}
 	// cache the hash immediately because it is too racy to do it in Hash()
 	b.hash = sha256.Sum256(b.ToBytes())
@@ -33,12 +35,13 @@ func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID)
 
 func (b *Block) String() string {
 	return fmt.Sprintf(
-		"Block{ hash: %.6s parent: %.6s, proposer: %d, view: %d , cert: %v }",
+		"Block{ hash: %.6s parent: %.6s, proposer: %d, view: %d , cert: %v, chain: %d }",
 		b.Hash().String(),
 		b.parent.String(),
 		b.proposer,
 		b.view,
 		b.cert,
+		b.chainNumber,
 	)
 }
 
@@ -70,6 +73,10 @@ func (b *Block) QuorumCert() QuorumCert {
 // View returns the view in which the Block was proposed
 func (b *Block) View() View {
 	return b.view
+}
+
+func (b *Block) ChainNumber() ChainNumber {
+	return b.chainNumber
 }
 
 // ToBytes returns the raw byte form of the Block, to be used for hashing, etc.

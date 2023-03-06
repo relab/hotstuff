@@ -36,23 +36,23 @@ const (
 
 // Kauri structure contains the modules for kauri protocol implementation.
 type Kauri struct {
-	configuration          *backend.Config
-	server                 *backend.Server
-	blockChain             modules.BlockChain
-	crypto                 modules.Crypto
-	eventLoop              *eventloop.EventLoop
-	logger                 logging.Logger
-	opts                   *modules.Options
-	synchronizer           modules.Synchronizer
-	leaderRotation         modules.LeaderRotation
-	tree                   TreeConfiguration
-	initDone               bool
-	aggregatedContribution hotstuff.QuorumSignature
-	blockHash              hotstuff.Hash
-	currentView            hotstuff.View
-	senders                []hotstuff.ID
-	nodes                  map[hotstuff.ID]*kauripb.Node
-	isAggregationSent      bool
+	configuration           *backend.Config
+	server                  *backend.Server
+	blockChain              modules.BlockChain
+	crypto                  modules.Crypto
+	eventLoop               *eventloop.EventLoop
+	logger                  logging.Logger
+	opts                    *modules.Options
+	synchronizer            modules.Synchronizer
+	leaderRotation          modules.LeaderRotation
+	tree                    TreeConfiguration
+	initDone                bool
+	aggregatedContributions map[hotstuff.ChainNumber]hotstuff.QuorumSignature
+	blockHashes             map[hotstuff.ChainNumber]hotstuff.Hash
+	currentViews            map[hotstuff.ChainNumber]hotstuff.View
+	senders                 map[hotstuff.ChainNumber][]hotstuff.ID
+	nodes                   map[hotstuff.ID]*kauripb.Node
+	isAggregationSent       map[hotstuff.ChainNumber]bool
 }
 
 // New initializes the kauri structure
@@ -106,7 +106,11 @@ func (k *Kauri) initializeConfiguration() {
 	}
 	k.tree.InitializeWithPIDs(idMappings)
 	k.initDone = true
-	k.senders = make([]hotstuff.ID, 0)
+	k.senders = make(map[hotstuff.ChainNumber][]hotstuff.ID)
+	k.isAggregationSent = make(map[hotstuff.ChainNumber]bool)
+	k.blockHashes = make(map[hotstuff.ChainNumber]hotstuff.Hash)
+	k.currentViews = make(map[hotstuff.ChainNumber]hotstuff.View)
+	k.aggregatedContributions = make(map[hotstuff.ChainNumber]hotstuff.QuorumSignature)
 }
 
 // Begin starts dissemination of proposal and aggregation of votes.
@@ -115,32 +119,34 @@ func (k *Kauri) Begin(pc hotstuff.PartialCert, p hotstuff.ProposeMsg) {
 		k.eventLoop.DelayUntil(backend.ConnectedEvent{}, func() { k.Begin(pc, p) })
 		return
 	}
-	k.reset()
-	k.blockHash = pc.BlockHash()
-	k.currentView = p.Block.View()
-	k.aggregatedContribution = pc.Signature()
-	ids := k.randomizeIDS(k.blockHash, k.leaderRotation.GetLeader(k.currentView))
-	k.tree.InitializeWithPIDs(ids)
+	k.reset(pc.ChainNumber())
+	k.blockHashes[pc.ChainNumber()] = pc.BlockHash()
+	k.currentViews[pc.ChainNumber()] = p.Block.View()
+	k.aggregatedContributions[pc.ChainNumber()] = pc.Signature()
+	// ids := k.randomizeIDS(k.blockHash, k.leaderRotation.GetLeader(k.currentView))
+	// k.tree.InitializeWithPIDs(ids)
 	k.SendProposalToChildren(p)
 	waitTime := time.Duration(uint64(k.tree.GetHeight() * 20 * int(time.Millisecond)))
-	go k.aggregateAndSend(waitTime, k.currentView)
+	go k.aggregateAndSend(waitTime, k.currentViews[pc.ChainNumber()], pc.ChainNumber())
 }
 
-func (k *Kauri) reset() {
-	k.aggregatedContribution = nil
-	k.senders = make([]hotstuff.ID, 0)
-	k.isAggregationSent = false
+func (k *Kauri) reset(chainNumber hotstuff.ChainNumber) {
+	//delete(k.aggregatedContributions, chainNumber)
+	delete(k.senders, chainNumber)
+	k.aggregatedContributions[chainNumber] = nil
+	k.senders[chainNumber] = make([]hotstuff.ID, 0)
+	k.isAggregationSent[chainNumber] = false
 }
 
-func (k *Kauri) aggregateAndSend(t time.Duration, view hotstuff.View) {
+func (k *Kauri) aggregateAndSend(t time.Duration, view hotstuff.View, chainNumber hotstuff.ChainNumber) {
 	ticker := time.NewTicker(t)
 	<-ticker.C
 	ticker.Stop()
-	if k.currentView != view {
+	if k.currentViews[chainNumber] != view {
 		return
 	}
-	if !k.isAggregationSent {
-		k.SendContributionToParent()
+	if !k.isAggregationSent[chainNumber] {
+		k.SendContributionToParent(chainNumber)
 	}
 }
 
@@ -156,41 +162,44 @@ func (k *Kauri) SendProposalToChildren(p hotstuff.ProposeMsg) {
 		k.logger.Debug("sending proposal to children ", k.tree.GetChildren())
 		config.Propose(p)
 	} else {
-		k.SendContributionToParent()
-		k.isAggregationSent = true
+		k.SendContributionToParent(p.Block.ChainNumber())
+		k.isAggregationSent[p.Block.ChainNumber()] = true
 	}
 }
 
 // OnContributionRecv is invoked upon receiving the vote for aggregation.
 func (k *Kauri) OnContributionRecv(event ContributionRecvEvent) {
-	if k.currentView != hotstuff.View(event.Contribution.View) {
+	contribution := event.Contribution
+	chainNumber := hotstuff.ChainNumber(contribution.ChainNumber)
+	if k.currentViews[chainNumber] !=
+		hotstuff.View(contribution.View) {
 		return
 	}
-	contribution := event.Contribution
 	k.logger.Debug("processing the contribution from ", contribution.ID)
 	currentSignature := hotstuffpb.QuorumSignatureFromProto(contribution.Signature)
-	_, err := k.mergeWithContribution(currentSignature)
+	_, err := k.mergeWithContribution(currentSignature, chainNumber)
 	if err != nil {
 		k.logger.Debug("Unable to merge the contribution from ", contribution.ID)
 		return
 	}
-	k.senders = append(k.senders, hotstuff.ID(contribution.ID))
-	if isSubSet(k.tree.GetSubTreeNodes(), k.senders) {
-		k.SendContributionToParent()
-		k.isAggregationSent = true
+	k.senders[chainNumber] = append(k.senders[chainNumber], hotstuff.ID(contribution.ID))
+	if isSubSet(k.tree.GetSubTreeNodes(), k.senders[chainNumber]) {
+		k.SendContributionToParent(chainNumber)
+		k.isAggregationSent[chainNumber] = true
 	}
 }
 
 // SendContributionToParent sends contribution to the parent node.
-func (k *Kauri) SendContributionToParent() {
+func (k *Kauri) SendContributionToParent(chainNumber hotstuff.ChainNumber) {
 	parent, ok := k.tree.GetParent()
 	if ok {
 		node, isPresent := k.nodes[parent]
 		if isPresent {
 			node.SendContribution(context.Background(), &kauripb.Contribution{
-				ID:        uint32(k.opts.ID()),
-				Signature: hotstuffpb.QuorumSignatureToProto(k.aggregatedContribution),
-				View:      uint64(k.currentView),
+				ID:          uint32(k.opts.ID()),
+				Signature:   hotstuffpb.QuorumSignatureToProto(k.aggregatedContributions[chainNumber]),
+				View:        uint64(k.currentViews[chainNumber]),
+				ChainNumber: uint32(chainNumber),
 			})
 		}
 	}
@@ -228,9 +237,9 @@ func (k *Kauri) canMergeContributions(a, b hotstuff.QuorumSignature) bool {
 	return canMerge
 }
 
-func (k *Kauri) verifyContribution(signature hotstuff.QuorumSignature, hash hotstuff.Hash) bool {
+func (k *Kauri) verifyContribution(signature hotstuff.QuorumSignature, hash hotstuff.Hash, chainNumber hotstuff.ChainNumber) bool {
 	verified := false
-	block, ok := k.blockChain.Get(hash)
+	block, ok := k.blockChain.Get(chainNumber, hash)
 	if !ok {
 		k.logger.Info("failed to fetch the block ", hash)
 		return verified
@@ -239,29 +248,30 @@ func (k *Kauri) verifyContribution(signature hotstuff.QuorumSignature, hash hots
 	return verified
 }
 
-func (k *Kauri) mergeWithContribution(currentSignature hotstuff.QuorumSignature) (bool, error) {
-	isVerified := k.verifyContribution(currentSignature, k.blockHash)
+func (k *Kauri) mergeWithContribution(currentSignature hotstuff.QuorumSignature, chainNumber hotstuff.ChainNumber) (bool, error) {
+	isVerified := k.verifyContribution(currentSignature, k.blockHashes[chainNumber], chainNumber)
 	if !isVerified {
-		k.logger.Info("Contribution verification failed for view ", k.currentView,
-			"from participants", currentSignature.Participants(), " block hash ", k.blockHash)
+		k.logger.Info("Contribution verification failed for view ", k.currentViews[chainNumber],
+			"from participants", currentSignature.Participants(), " block hash ", k.blockHashes[chainNumber])
 		return false, errors.New("unable to verify the contribution")
 	}
-	if k.aggregatedContribution == nil {
-		k.aggregatedContribution = currentSignature
+	if k.aggregatedContributions[chainNumber] == nil {
+		k.aggregatedContributions[chainNumber] = currentSignature
 		return false, nil
 	}
 
-	if k.canMergeContributions(currentSignature, k.aggregatedContribution) {
-		new, err := k.crypto.Combine(currentSignature, k.aggregatedContribution)
+	if k.canMergeContributions(currentSignature, k.aggregatedContributions[chainNumber]) {
+		new, err := k.crypto.Combine(currentSignature, k.aggregatedContributions[chainNumber])
 		if err == nil {
-			k.aggregatedContribution = new
+			k.aggregatedContributions[chainNumber] = new
 			if new.Participants().Len() >= k.configuration.QuorumSize() {
 				k.logger.Debug("Aggregated Complete QC and sending the event")
 				k.eventLoop.AddEvent(hotstuff.NewViewMsg{
-					SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(
-						k.aggregatedContribution,
-						k.currentView,
-						k.blockHash,
+					SyncInfo: hotstuff.NewSyncInfo(chainNumber).WithQC(hotstuff.NewQuorumCert(
+						k.aggregatedContributions[chainNumber],
+						k.currentViews[chainNumber],
+						k.blockHashes[chainNumber],
+						chainNumber,
 					)),
 				})
 				return true, nil

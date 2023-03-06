@@ -27,7 +27,7 @@ type SimpleHotStuff struct {
 // New returns a new SimpleHotStuff instance.
 func New() consensus.Rules {
 	return &SimpleHotStuff{
-		locked: hotstuff.GetGenesis(),
+		locked: hotstuff.GetGenesis(hotstuff.ChainNumber(1)),
 	}
 }
 
@@ -41,12 +41,12 @@ func (hs *SimpleHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
 	block := proposal.Block
 
 	// Rule 1: can only vote in increasing rounds
-	if block.View() < hs.synchronizer.View() {
+	if block.View() < hs.synchronizer.View(proposal.Block.ChainNumber()) {
 		hs.logger.Info("VoteRule: block view too low")
 		return false
 	}
 
-	parent, ok := hs.blockChain.Get(block.QuorumCert().BlockHash())
+	parent, ok := hs.blockChain.Get(block.ChainNumber(), block.QuorumCert().BlockHash())
 	if !ok {
 		hs.logger.Info("VoteRule: missing parent block: ", block.QuorumCert().BlockHash())
 		return false
@@ -64,12 +64,12 @@ func (hs *SimpleHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
 // CommitRule decides if an ancestor of the block can be committed, and returns the ancestor, otherwise returns nil.
 func (hs *SimpleHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	// will consider if the great-grandparent of the new block can be committed.
-	p, ok := hs.blockChain.Get(block.QuorumCert().BlockHash())
+	p, ok := hs.blockChain.Get(block.ChainNumber(), block.QuorumCert().BlockHash())
 	if !ok {
 		return nil
 	}
 
-	gp, ok := hs.blockChain.Get(p.QuorumCert().BlockHash())
+	gp, ok := hs.blockChain.Get(p.ChainNumber(), p.QuorumCert().BlockHash())
 	if ok && gp.View() > hs.locked.View() {
 		hs.locked = gp
 		hs.logger.Debug("Locked: ", gp)
@@ -77,7 +77,7 @@ func (hs *SimpleHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 		return nil
 	}
 
-	ggp, ok := hs.blockChain.Get(gp.QuorumCert().BlockHash())
+	ggp, ok := hs.blockChain.Get(gp.ChainNumber(), gp.QuorumCert().BlockHash())
 	// we commit the great-grandparent of the block if its grandchild is certified,
 	// which we already know is true because the new block contains the grandchild's certificate,
 	// and if the great-grandparent's view + 2 equals the grandchild's view.

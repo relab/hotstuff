@@ -183,7 +183,7 @@ func (impl *serviceImpl) Fetch(ctx gorums.ServerCtx, pb *hotstuffpb.BlockHash) (
 	var hash hotstuff.Hash
 	copy(hash[:], pb.GetHash())
 
-	block, ok := impl.srv.blockChain.LocalGet(hash)
+	block, ok := impl.srv.blockChain.LocalGet(hotstuff.ChainNumber(pb.GetChainNumber()), hash)
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "requested block was not found")
 	}

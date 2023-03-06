@@ -23,24 +23,23 @@ type Synchronizer struct {
 	leaderRotation modules.LeaderRotation
 	logger         logging.Logger
 	opts           *modules.Options
-
-	currentView hotstuff.View
-	highTC      hotstuff.TimeoutCert
-	highQC      hotstuff.QuorumCert
-
+	currentViews   map[hotstuff.ChainNumber]hotstuff.View
+	highTC         map[hotstuff.ChainNumber]hotstuff.TimeoutCert
+	highQC         map[hotstuff.ChainNumber]hotstuff.QuorumCert
+	lastTimeouts   map[hotstuff.ChainNumber]*hotstuff.TimeoutMsg
 	// A pointer to the last timeout message that we sent.
 	// If a timeout happens again before we advance to the next view,
 	// we will simply send this timeout again.
-	lastTimeout *hotstuff.TimeoutMsg
+	//lastTimeout *hotstuff.TimeoutMsg
 
-	duration ViewDuration
-	timer    *time.Timer
+	duration map[hotstuff.ChainNumber]ViewDuration
+	timer    map[hotstuff.ChainNumber]*time.Timer
 
-	viewCtx   context.Context // a context that is cancelled at the end of the current view
-	cancelCtx context.CancelFunc
+	viewCtx   map[hotstuff.ChainNumber]context.Context // a context that is cancelled at the end of the current view
+	cancelCtx map[hotstuff.ChainNumber]context.CancelFunc
 
 	// map of collected timeout messages per view
-	timeouts map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
+	timeouts map[hotstuff.ChainNumber]map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
 }
 
 // InitModule initializes the synchronizer.
@@ -57,9 +56,9 @@ func (s *Synchronizer) InitModule(mods *modules.Core) {
 	)
 
 	s.eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
-		timeoutView := event.(TimeoutEvent).View
-		if s.currentView == timeoutView {
-			s.OnLocalTimeout()
+		timeoutEvent := event.(TimeoutEvent)
+		if s.currentViews[timeoutEvent.ChainNumber] == timeoutEvent.View {
+			s.OnLocalTimeout(timeoutEvent.ChainNumber)
 		}
 	})
 
@@ -73,92 +72,128 @@ func (s *Synchronizer) InitModule(mods *modules.Core) {
 		s.OnRemoteTimeout(timeoutMsg)
 	})
 
-	var err error
-	s.highQC, err = s.crypto.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
-	if err != nil {
-		panic(fmt.Errorf("unable to create empty quorum cert for genesis block: %v", err))
-	}
-	s.highTC, err = s.crypto.CreateTimeoutCert(hotstuff.View(0), []hotstuff.TimeoutMsg{})
-	if err != nil {
-		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
+	s.eventLoop.RegisterHandler(DelayedProposeEvent{}, func(event any) {
+		proposeEvent := event.(DelayedProposeEvent)
+		s.onDelayProposeEvent(proposeEvent)
+	})
+	for i := 1; i <= hotstuff.NumberOfChains; i++ {
+
+		highQC, err := s.crypto.CreateQuorumCert(hotstuff.GetGenesis(hotstuff.ChainNumber(i)), []hotstuff.PartialCert{})
+		if err != nil {
+			panic(fmt.Errorf("unable to create empty quorum cert for genesis block: %v", err))
+		}
+		highTC, err := s.crypto.CreateTimeoutCert(hotstuff.View(0), []hotstuff.TimeoutMsg{})
+		if err != nil {
+			panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
+		}
+		s.highQC[hotstuff.ChainNumber(i)] = highQC
+		s.highTC[hotstuff.ChainNumber(i)] = highTC
 	}
 }
 
 // New creates a new Synchronizer.
 func New(viewDuration ViewDuration) modules.Synchronizer {
-	ctx, cancel := context.WithCancel(context.Background())
+	currentViews := make(map[hotstuff.ChainNumber]hotstuff.View)
+	viewCtx := make(map[hotstuff.ChainNumber]context.Context)
+	viewDurations := make(map[hotstuff.ChainNumber]ViewDuration)
+	cancelCtx := make(map[hotstuff.ChainNumber]context.CancelFunc)
+	timers := make(map[hotstuff.ChainNumber]*time.Timer)
+	highTC := make(map[hotstuff.ChainNumber]hotstuff.TimeoutCert)
+	highQC := make(map[hotstuff.ChainNumber]hotstuff.QuorumCert)
+	for i := 1; i <= hotstuff.NumberOfChains; i++ {
+		currentViews[hotstuff.ChainNumber(i)] = 1
+		timers[hotstuff.ChainNumber(i)] = time.AfterFunc(0, func() {})
+		ctx, cancel := context.WithCancel(context.Background())
+		viewCtx[hotstuff.ChainNumber(i)] = ctx
+		cancelCtx[hotstuff.ChainNumber(i)] = cancel
+		tmpViewDuration := viewDuration.CreateNewDuration()
+		viewDurations[hotstuff.ChainNumber(i)] = tmpViewDuration
+	}
+
 	return &Synchronizer{
-		currentView: 1,
+		currentViews: currentViews,
+		viewCtx:      viewCtx,
+		cancelCtx:    cancelCtx,
+		duration:     viewDurations,
+		timer:        timers, // dummy timer that will be replaced after start() is called
+		timeouts:     make(map[hotstuff.ChainNumber]map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
+		lastTimeouts: make(map[hotstuff.ChainNumber]*hotstuff.TimeoutMsg),
+		highTC:       highTC,
+		highQC:       highQC,
+	}
+}
 
-		viewCtx:   ctx,
-		cancelCtx: cancel,
-
-		duration: viewDuration,
-		timer:    time.AfterFunc(0, func() {}), // dummy timer that will be replaced after start() is called
-
-		timeouts: make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
+func (s *Synchronizer) addTimeoutEvent(chainNumber hotstuff.ChainNumber) func() {
+	// The event loop will execute onLocalTimeout for us.
+	return func() {
+		if chainNumber <= hotstuff.NumberOfChains {
+			s.cancelCtx[chainNumber]()
+			s.eventLoop.AddEvent(TimeoutEvent{View: s.currentViews[chainNumber], ChainNumber: chainNumber})
+		} else {
+			s.logger.Info("out of order i ", chainNumber)
+		}
 	}
 }
 
 // Start starts the synchronizer with the given context.
 func (s *Synchronizer) Start(ctx context.Context) {
-	s.timer = time.AfterFunc(s.duration.Duration(), func() {
-		// The event loop will execute onLocalTimeout for us.
-		s.cancelCtx()
-		s.eventLoop.AddEvent(TimeoutEvent{s.currentView})
-	})
-
+	for i := 1; i <= hotstuff.NumberOfChains; i++ {
+		s.logger.Info(" cancel ctx is ", s.cancelCtx, i, s.duration[hotstuff.ChainNumber(i)])
+		s.timer[hotstuff.ChainNumber(i)] = time.AfterFunc(s.duration[hotstuff.ChainNumber(i)].Duration(), s.addTimeoutEvent(hotstuff.ChainNumber(i)))
+		// start the initial proposal
+		if s.currentViews[hotstuff.ChainNumber(i)] == 1 &&
+			s.leaderRotation.GetLeader(s.currentViews[hotstuff.ChainNumber(i)]) == s.opts.ID() {
+			s.consensus.Propose(hotstuff.ChainNumber(i), s.SyncInfo(hotstuff.ChainNumber(i)))
+		}
+	}
 	go func() {
 		<-ctx.Done()
-		s.timer.Stop()
+		for i := 1; i <= hotstuff.NumberOfChains; i++ {
+			s.timer[hotstuff.ChainNumber(i)].Stop()
+		}
 	}()
-
-	// start the initial proposal
-	if s.currentView == 1 && s.leaderRotation.GetLeader(s.currentView) == s.opts.ID() {
-		s.consensus.Propose(s.SyncInfo())
-	}
 }
 
 // HighQC returns the highest known QC.
-func (s *Synchronizer) HighQC() hotstuff.QuorumCert {
-	return s.highQC
+func (s *Synchronizer) HighQC(chainNumber hotstuff.ChainNumber) hotstuff.QuorumCert {
+	return s.highQC[chainNumber]
 }
 
 // View returns the current view.
-func (s *Synchronizer) View() hotstuff.View {
-	return s.currentView
+func (s *Synchronizer) View(chainNumber hotstuff.ChainNumber) hotstuff.View {
+	return s.currentViews[chainNumber]
 }
 
 // ViewContext returns a context that is cancelled at the end of the view.
-func (s *Synchronizer) ViewContext() context.Context {
-	return s.viewCtx
+func (s *Synchronizer) ViewContext(chainNumber hotstuff.ChainNumber) context.Context {
+	return s.viewCtx[chainNumber]
 }
 
 // SyncInfo returns the highest known QC or TC.
-func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
-	return hotstuff.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
+func (s *Synchronizer) SyncInfo(chainNumber hotstuff.ChainNumber) hotstuff.SyncInfo {
+	return hotstuff.NewSyncInfo(chainNumber).WithQC(s.highQC[chainNumber]).WithTC(s.highTC[chainNumber])
 }
 
 // OnLocalTimeout is called when a local timeout happens.
-func (s *Synchronizer) OnLocalTimeout() {
+func (s *Synchronizer) OnLocalTimeout(chainNumber hotstuff.ChainNumber) {
 	// Reset the timer and ctx here so that we can get a new timeout in the same view.
 	// I think this is necessary to ensure that we can keep sending the same timeout message
 	// until we get a timeout certificate.
 	//
 	// TODO: figure out the best way to handle this context and timeout.
-	if s.viewCtx.Err() != nil {
-		s.newCtx(s.duration.Duration())
+	if s.viewCtx[chainNumber].Err() != nil {
+		s.newCtx(chainNumber, s.duration[chainNumber].Duration())
 	}
-	s.timer.Reset(s.duration.Duration())
+	s.timer[chainNumber].Reset(s.duration[chainNumber].Duration())
 
-	if s.lastTimeout != nil && s.lastTimeout.View == s.currentView {
-		s.configuration.Timeout(*s.lastTimeout)
+	if s.lastTimeouts[chainNumber] != nil && s.lastTimeouts[chainNumber].View == s.currentViews[chainNumber] {
+		s.configuration.Timeout(*s.lastTimeouts[chainNumber])
 		return
 	}
 
-	s.duration.ViewTimeout() // increase the duration of the next view
-	view := s.currentView
-	s.logger.Debugf("OnLocalTimeout: %v", view)
+	s.duration[chainNumber].ViewTimeout() // increase the duration of the next view
+	view := s.currentViews[chainNumber]
+	s.logger.Debugf("OnLocalTimeout: view  %v chain number %v ", view, chainNumber)
 
 	sig, err := s.crypto.Sign(view.ToBytes())
 	if err != nil {
@@ -168,8 +203,9 @@ func (s *Synchronizer) OnLocalTimeout() {
 	timeoutMsg := hotstuff.TimeoutMsg{
 		ID:            s.opts.ID(),
 		View:          view,
-		SyncInfo:      s.SyncInfo(),
+		SyncInfo:      s.SyncInfo(chainNumber),
 		ViewSignature: sig,
+		ChainNumber:   chainNumber,
 	}
 
 	if s.opts.ShouldUseAggQC() {
@@ -181,9 +217,9 @@ func (s *Synchronizer) OnLocalTimeout() {
 		}
 		timeoutMsg.MsgSignature = sig
 	}
-	s.lastTimeout = &timeoutMsg
+	s.lastTimeouts[chainNumber] = &timeoutMsg
 	// stop voting for current view
-	s.consensus.StopVoting(s.currentView)
+	s.consensus.StopVoting(s.currentViews[chainNumber], timeoutMsg.ChainNumber)
 
 	s.configuration.Timeout(timeoutMsg)
 	s.OnRemoteTimeout(timeoutMsg)
@@ -191,11 +227,13 @@ func (s *Synchronizer) OnLocalTimeout() {
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
 func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
+
 	defer func() {
 		// cleanup old timeouts
-		for view := range s.timeouts {
-			if view < s.currentView {
-				delete(s.timeouts, view)
+		timeoutMsg := s.timeouts[timeout.ChainNumber]
+		for view := range timeoutMsg {
+			if view < s.currentViews[timeout.ChainNumber] {
+				delete(s.timeouts[timeout.ChainNumber], view)
 			}
 		}
 	}()
@@ -207,11 +245,14 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	s.logger.Debug("OnRemoteTimeout: ", timeout)
 
 	s.AdvanceView(timeout.SyncInfo)
-
-	timeouts, ok := s.timeouts[timeout.View]
+	_, ok := s.timeouts[timeout.ChainNumber]
+	if !ok {
+		s.timeouts[timeout.ChainNumber] = make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg)
+	}
+	timeouts, ok := s.timeouts[timeout.ChainNumber][timeout.View]
 	if !ok {
 		timeouts = make(map[hotstuff.ID]hotstuff.TimeoutMsg)
-		s.timeouts[timeout.View] = timeouts
+		s.timeouts[timeout.ChainNumber][timeout.View] = timeouts
 	}
 
 	if _, ok := timeouts[timeout.ID]; !ok {
@@ -235,10 +276,11 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		return
 	}
 
-	si := s.SyncInfo().WithTC(tc)
+	si := s.SyncInfo(timeout.ChainNumber).WithTC(tc)
 
 	if s.opts.ShouldUseAggQC() {
-		aggQC, err := s.crypto.CreateAggregateQC(s.currentView, timeoutList)
+		aggQC, err := s.crypto.CreateAggregateQC(s.currentViews[timeout.ChainNumber],
+			timeoutList)
 		if err != nil {
 			s.logger.Debugf("Failed to create aggregateQC: %v", err)
 		} else {
@@ -246,7 +288,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		}
 	}
 
-	delete(s.timeouts, timeout.View)
+	delete(s.timeouts[timeout.ChainNumber], timeout.View)
 
 	s.AdvanceView(si)
 }
@@ -261,14 +303,14 @@ func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
 func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	v := hotstuff.View(0)
 	timeout := false
-
+	chainNumber := syncInfo.GetChainNumber()
 	// check for a TC
 	if tc, ok := syncInfo.TC(); ok {
 		if !s.crypto.VerifyTimeoutCert(tc) {
 			s.logger.Info("Timeout Certificate could not be verified!")
 			return
 		}
-		s.updateHighTC(tc)
+		s.updateHighTC(chainNumber, tc)
 		v = tc.View()
 		timeout = true
 	}
@@ -301,7 +343,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	}
 
 	if haveQC {
-		s.updateHighQC(qc)
+		s.updateHighQC(chainNumber, qc)
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
 		if qc.View() >= v {
 			v = qc.View()
@@ -309,63 +351,95 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		}
 	}
 
-	if v < s.currentView {
+	if v < s.currentViews[chainNumber] {
 		return
 	}
 
-	s.timer.Stop()
-
+	s.timer[chainNumber].Stop()
+	s.logger.Debugf("Timer stopped for chain %d view %d", chainNumber, v)
 	if !timeout {
-		s.duration.ViewSucceeded()
+		s.duration[chainNumber].ViewSucceeded()
 	}
 
-	s.currentView = v + 1
-	s.lastTimeout = nil
-	s.duration.ViewStarted()
+	s.currentViews[chainNumber] = v + 1
+	s.lastTimeouts[chainNumber] = nil
+	s.duration[chainNumber].ViewStarted()
 
-	duration := s.duration.Duration()
+	duration := s.duration[chainNumber].Duration()
 	// cancel the old view context and set up the next one
-	s.newCtx(duration)
-	s.timer.Reset(duration)
+	s.newCtx(chainNumber, duration)
+	s.timer[chainNumber].Reset(duration)
 
-	s.logger.Debugf("advanced to view %d", s.currentView)
-	s.eventLoop.AddEvent(ViewChangeEvent{View: s.currentView, Timeout: timeout})
+	s.logger.Debugf("advanced to view %d for chain %d", s.currentViews[chainNumber], chainNumber)
+	s.eventLoop.AddEvent(ViewChangeEvent{View: s.currentViews[chainNumber], Timeout: timeout})
 
-	leader := s.leaderRotation.GetLeader(s.currentView)
+	leader := s.leaderRotation.GetLeader(s.currentViews[chainNumber])
 	if leader == s.opts.ID() {
-		s.consensus.Propose(syncInfo)
+		// if !s.checkCurrentViews(chainNumber) {
+		// 	s.logger.Debug("Sync views of chains failed delaying the proposal")
+		// 	s.eventLoop.DelayUntil(ViewChangeEvent{}, DelayedProposeEvent{SyncInfo: syncInfo,
+		// 		ChainNumber: chainNumber})
+		// 	return
+		// }
+		s.consensus.Propose(chainNumber, syncInfo)
 	} else if replica, ok := s.configuration.Replica(leader); ok {
 		replica.NewView(syncInfo)
 	}
 }
 
+func (s *Synchronizer) checkCurrentViews(chainNumber hotstuff.ChainNumber) bool {
+	for i := 1; i <= hotstuff.NumberOfChains; i++ {
+		if i == int(chainNumber) {
+			continue
+		}
+		if s.currentViews[chainNumber] > s.currentViews[hotstuff.ChainNumber(i)]+4 {
+			s.logger.Debugf("Chain number %d has view %d and chain number %d has view %d",
+				chainNumber, s.currentViews[chainNumber], i, s.currentViews[hotstuff.ChainNumber(i)])
+			return false
+		}
+	}
+	return true
+}
+
 // updateHighQC attempts to update the highQC, but does not verify the qc first.
 // This method is meant to be used instead of the exported UpdateHighQC internally
 // in this package when the qc has already been verified.
-func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
-	newBlock, ok := s.blockChain.Get(qc.BlockHash())
+func (s *Synchronizer) updateHighQC(chainNumber hotstuff.ChainNumber, qc hotstuff.QuorumCert) {
+	newBlock, ok := s.blockChain.Get(chainNumber, qc.BlockHash())
 	if !ok {
 		s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
 		return
 	}
 
-	if newBlock.View() > s.highQC.View() {
-		s.highQC = qc
+	if newBlock.View() > s.highQC[chainNumber].View() {
+		s.highQC[chainNumber] = qc
 		s.logger.Debug("HighQC updated")
 	}
 }
 
 // updateHighTC attempts to update the highTC, but does not verify the tc first.
-func (s *Synchronizer) updateHighTC(tc hotstuff.TimeoutCert) {
-	if tc.View() > s.highTC.View() {
-		s.highTC = tc
+func (s *Synchronizer) updateHighTC(chainNumber hotstuff.ChainNumber, tc hotstuff.TimeoutCert) {
+	if tc.View() > s.highTC[chainNumber].View() {
+		s.highTC[chainNumber] = tc
 		s.logger.Debug("HighTC updated")
 	}
 }
 
-func (s *Synchronizer) newCtx(duration time.Duration) {
-	s.cancelCtx()
-	s.viewCtx, s.cancelCtx = context.WithTimeout(context.Background(), duration)
+func (s *Synchronizer) onDelayProposeEvent(event DelayedProposeEvent) {
+	if s.checkCurrentViews(event.ChainNumber) {
+		s.consensus.Propose(event.ChainNumber, event.SyncInfo)
+	} else {
+		s.logger.Debug("Sync views of chains failed delaying the proposal again")
+		s.eventLoop.DelayUntil(ViewChangeEvent{}, event)
+	}
+}
+
+func (s *Synchronizer) newCtx(chainNumber hotstuff.ChainNumber, duration time.Duration) {
+	s.cancelCtx[chainNumber]()
+	viewCtx, cancelCtx := context.WithTimeout(context.Background(), duration)
+	s.cancelCtx[chainNumber] = cancelCtx
+	s.viewCtx[chainNumber] = viewCtx
+
 }
 
 var _ modules.Synchronizer = (*Synchronizer)(nil)
@@ -378,5 +452,11 @@ type ViewChangeEvent struct {
 
 // TimeoutEvent is sent on the eventloop when a local timeout occurs.
 type TimeoutEvent struct {
-	View hotstuff.View
+	View        hotstuff.View
+	ChainNumber hotstuff.ChainNumber
+}
+
+type DelayedProposeEvent struct {
+	SyncInfo    hotstuff.SyncInfo
+	ChainNumber hotstuff.ChainNumber
 }

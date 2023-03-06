@@ -293,7 +293,7 @@ func (cfg *subConfig) Propose(proposal hotstuff.ProposeMsg) {
 		return
 	}
 	cfg.cfg.Propose(
-		cfg.synchronizer.ViewContext(),
+		cfg.synchronizer.ViewContext(proposal.Block.ChainNumber()),
 		hotstuffpb.ProposalToProto(proposal),
 		gorums.WithNoSendWaiting(),
 	)
@@ -305,15 +305,15 @@ func (cfg *subConfig) Timeout(msg hotstuff.TimeoutMsg) {
 		return
 	}
 	cfg.cfg.Timeout(
-		cfg.synchronizer.ViewContext(),
+		cfg.synchronizer.ViewContext(msg.ChainNumber),
 		hotstuffpb.TimeoutMsgToProto(msg),
 		gorums.WithNoSendWaiting(),
 	)
 }
 
 // Fetch requests a block from all the replicas in the configuration
-func (cfg *subConfig) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
-	protoBlock, err := cfg.cfg.Fetch(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
+func (cfg *subConfig) Fetch(ctx context.Context, chainNumber hotstuff.ChainNumber, hash hotstuff.Hash) (*hotstuff.Block, bool) {
+	protoBlock, err := cfg.cfg.Fetch(ctx, &hotstuffpb.BlockHash{Hash: hash[:], ChainNumber: uint32(chainNumber)})
 	if err != nil {
 		qcErr, ok := err.(gorums.QuorumCallError)
 		// filter out context errors

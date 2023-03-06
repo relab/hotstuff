@@ -95,7 +95,7 @@ func TestVerifyGenesisQC(t *testing.T) {
 
 		td := setup(t, ctrl, 4)
 
-		genesisQC, err := td.signers[0].CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+		genesisQC, err := td.signers[0].CreateQuorumCert(hotstuff.GetGenesis(hotstuff.ChainNumber(1)), []hotstuff.PartialCert{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -156,7 +156,7 @@ func TestVerifyAggregateQC(t *testing.T) {
 			t.Fatal("AggregateQC was not verified")
 		}
 
-		if highQC.BlockHash() != hotstuff.GetGenesis().Hash() {
+		if highQC.BlockHash() != hotstuff.GetGenesis(hotstuff.ChainNumber(1)).Hash() {
 			t.Fatal("Wrong hash for highQC")
 		}
 	}
@@ -174,12 +174,12 @@ func runAll(t *testing.T, run func(*testing.T, setupFunc)) {
 func createBlock(t *testing.T, signer modules.Crypto) *hotstuff.Block {
 	t.Helper()
 
-	qc, err := signer.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+	qc, err := signer.CreateQuorumCert(hotstuff.GetGenesis(hotstuff.ChainNumber(1)), []hotstuff.PartialCert{})
 	if err != nil {
 		t.Errorf("Could not create empty QC for genesis: %v", err)
 	}
 
-	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "foo", 42, 1)
+	b := hotstuff.NewBlock(hotstuff.GetGenesis(hotstuff.ChainNumber(1)).Hash(), qc, "foo", 42, 1, hotstuff.GetGenesis(hotstuff.ChainNumber(1)).ChainNumber())
 	return b
 }
 

@@ -20,4 +20,5 @@ message Contribution {
   uint32 ID = 1;
   hotstuffpb.QuorumSignature Signature = 2;
   uint64 View = 3;
+  uint32 ChainNumber = 4;
 }
