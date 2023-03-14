@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"strconv"
@@ -51,7 +50,7 @@ func NewServer(ID hotstuff.ID, locationInfo map[uint32]string, opts ...gorums.Se
 	if locationInfo == nil {
 		srv.logger.Error("Location info is nil")
 	}
-	srv.createLatencyMatrix(ID)
+	srv.initLatencyMatrix(ID)
 	opts = append(opts, gorums.WithConnectCallback(func(ctx context.Context) {
 		srv.eventLoop.AddEvent(replicaConnected{ctx})
 	}))
@@ -60,41 +59,25 @@ func NewServer(ID hotstuff.ID, locationInfo map[uint32]string, opts ...gorums.Se
 	return srv
 }
 
-// Create latency matrix for the replica.
-
-func (srv *Server) createLatencyMatrix(ID hotstuff.ID) {
+// initLatencyMatrix initializes the given replica's latency matrix.
+func (srv *Server) initLatencyMatrix(ID hotstuff.ID) {
 	location, ok := srv.locationInfo[uint32(ID)]
 	if !ok {
-		return
-	}
-
-	var allToAllMatrix map[string]map[string]string
-	err := json.Unmarshal([]byte(latencyMatrix), &allToAllMatrix)
-	if err != nil {
-		srv.location = hotstuff.DefaultLocation
 		return
 	}
 	srv.location = location
 	if srv.location == hotstuff.DefaultLocation {
 		return
 	}
-	locationData, ok := allToAllMatrix[srv.location]
+	locationData, ok := latencies[srv.location]
 	if !ok {
 		srv.location = hotstuff.DefaultLocation
 		return
 	}
-	for city, latencyStr := range locationData {
-		latency, err := strconv.ParseFloat(latencyStr, 32)
-		if err != nil {
-			latency = hotstuff.DefaultLatency
-		}
-		srv.latencyMatrix[city] = latency
-	}
-
+	srv.latencyMatrix = locationData
 }
 
 func (srv *Server) induceLatency(sender hotstuff.ID) {
-
 	if srv.location == hotstuff.DefaultLocation {
 		return
 	}
