@@ -1,3 +1,4 @@
+// LatencyGen generates a Go source file containing the latency matrix.
 package main
 
 import (
