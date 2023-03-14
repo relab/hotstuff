@@ -41,6 +41,7 @@ Jalalzai
 Jehl
 Jianyu
 kilic
+latencygen
 Malkhi
 Mathieu
 Meling
@@ -48,6 +49,7 @@ mitchellh
 nolint
 orchestrationpb
 partitioner
+Paulo
 perr
 pflag
 pflags
