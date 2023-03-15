@@ -186,10 +186,8 @@ func runController() {
 		if cfg.Location == "" {
 			cfg.Location = hotstuff.DefaultLocation
 		}
-		ok := checkHostConfigLocations(cfg.Location)
-		if !ok {
-			log.Fatalf("invalid location configuration %s for host %s\n", cfg.Location, cfg.Name)
-		}
+		err := checkHostConfigLocations(cfg.Location)
+		checkf("invalid location configuration for host %s: %v", cfg.Name, err)
 	}
 
 	err = experiment.Run()
@@ -212,22 +210,19 @@ func runController() {
 	checkf("failed to close ssh connections: %v", err)
 }
 
-func checkHostConfigLocations(location string) bool {
-	isPresent := false
+func checkHostConfigLocations(location string) error {
 	validLocations := [...]string{
 		"Cape Town", "Hong Kong", "Tokyo",
 		"Seoul", "Osaka", "Mumbai", "Singapore", "Sydney", "Central", "Frankfurt",
 		"Stockholm", "Milan", "Ireland", "London", "Paris", "Bahrain", "Sao Paulo",
 		"N. Virginia", "Ohio", "N. California", "Oregon", hotstuff.DefaultLocation,
 	}
-
 	for _, name := range validLocations {
 		if name == location {
-			isPresent = true
-			break
+			return nil
 		}
 	}
-	return isPresent
+	return fmt.Errorf("unknown location: %s", location)
 }
 
 func checkf(format string, args ...any) {
