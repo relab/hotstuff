@@ -8,7 +8,7 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // QuorumSignatureToProto converts a threshold signature to a protocol buffers message.
@@ -90,14 +90,19 @@ func QuorumCertToProto(qc hotstuff.QuorumCert) *QuorumCert {
 
 // QuorumCertFromProto converts a hotstuffpb.QuorumCert to an ecdsa.QuorumCert.
 func QuorumCertFromProto(qc *QuorumCert) hotstuff.QuorumCert {
-	var h hotstuff.Hash
-	copy(h[:], qc.GetHash())
-	return hotstuff.NewQuorumCert(hotstuff.ID(qc.Creator), QuorumSignatureFromProto(qc.GetSig()), hotstuff.View(qc.GetView()), h, qc.GetLatencyVector().LatencyData)
+	var hash hotstuff.Hash
+	copy(hash[:], qc.GetHash())
+	return hotstuff.NewQuorumCert(
+		hotstuff.ID(qc.Creator),
+		QuorumSignatureFromProto(qc.GetSig()),
+		hotstuff.View(qc.GetView()),
+		hash,
+		qc.GetLatencyVector().LatencyData,
+	)
 }
 
 // ProposalToProto converts a ProposeMsg to a protobuf message.
 func ProposalToProto(proposal hotstuff.ProposeMsg) *Proposal {
-
 	p := &Proposal{
 		Block: BlockToProto(proposal.Block),
 	}
