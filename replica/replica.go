@@ -90,7 +90,10 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		))
 	}
 
-	srv.hsSrv = backend.NewServer(conf.ID, conf.LocationInfo, replicaSrvOpts...)
+	srv.hsSrv = backend.NewServer(
+		backend.WithLatencyInfo(conf.ID, conf.LocationInfo),
+		backend.WithGorumsServerOptions(replicaSrvOpts...),
+	)
 
 	var creds credentials.TransportCredentials
 	managerOpts := conf.ManagerOptions

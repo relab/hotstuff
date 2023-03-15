@@ -39,7 +39,6 @@ func TestConnect(t *testing.T) {
 		builder.Build()
 
 		err := cfg.Connect(td.replicas)
-
 		if err != nil {
 			t.Error(err)
 		}
@@ -132,7 +131,6 @@ func TestTimeout(t *testing.T) {
 		}
 		wg.Done()
 	})
-
 }
 
 type testData struct {
@@ -223,7 +221,10 @@ func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (teardown
 	t.Helper()
 	servers := make([]*Server, td.n)
 	for i := range servers {
-		servers[i] = NewServer(hotstuff.ID(i), map[uint32]string{}, gorums.WithGRPCServerOptions(grpc.Creds(td.creds)))
+		servers[i] = NewServer(
+			WithLatencyInfo(hotstuff.ID(i), map[uint32]string{}),
+			WithGorumsServerOptions(gorums.WithGRPCServerOptions(grpc.Creds(td.creds))),
+		)
 		servers[i].StartOnListener(td.listeners[i])
 		td.builders[i].Add(servers[i])
 	}

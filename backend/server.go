@@ -45,43 +45,28 @@ func (srv *Server) InitModule(mods *modules.Core) {
 }
 
 // NewServer creates a new Server.
-func NewServer(ID hotstuff.ID, locationInfo map[uint32]string, opts ...gorums.ServerOption) *Server {
-	srv := &Server{locationInfo: locationInfo, latencyMatrix: make(map[string]float64)}
-	if locationInfo == nil {
-		srv.logger.Error("Location info is nil")
+func NewServer(opts ...ServerOptions) *Server {
+	options := &backendOptions{}
+	for _, opt := range opts {
+		opt(options)
 	}
-	srv.initLatencyMatrix(ID)
-	opts = append(opts, gorums.WithConnectCallback(func(ctx context.Context) {
+	srv := &Server{
+		location:      options.location,
+		locationInfo:  options.locationInfo,
+		latencyMatrix: options.locationLatencies,
+	}
+	options.gorumsSrvOpts = append(options.gorumsSrvOpts, gorums.WithConnectCallback(func(ctx context.Context) {
 		srv.eventLoop.AddEvent(replicaConnected{ctx})
 	}))
-	srv.gorumsSrv = gorums.NewServer(opts...)
+	srv.gorumsSrv = gorums.NewServer(options.gorumsSrvOpts...)
 	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, &serviceImpl{srv})
 	return srv
-}
-
-// initLatencyMatrix initializes the given replica's latency matrix.
-func (srv *Server) initLatencyMatrix(ID hotstuff.ID) {
-	location, ok := srv.locationInfo[uint32(ID)]
-	if !ok {
-		return
-	}
-	srv.location = location
-	if srv.location == hotstuff.DefaultLocation {
-		return
-	}
-	locationData, ok := latencies[srv.location]
-	if !ok {
-		srv.location = hotstuff.DefaultLocation
-		return
-	}
-	srv.latencyMatrix = locationData
 }
 
 func (srv *Server) induceLatency(sender hotstuff.ID) {
 	if srv.location == hotstuff.DefaultLocation {
 		return
 	}
-
 	senderLocation := srv.locationInfo[uint32(sender)]
 	senderLatencyMs := srv.latencyMatrix[senderLocation]
 	srv.logger.Debugf("latency from server %s to server %s is %f\n", srv.location, senderLocation, senderLatencyMs)
