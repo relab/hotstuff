@@ -10,6 +10,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/maps"
 )
@@ -37,13 +38,19 @@ func main() {
 	s := strings.Builder{}
 	s.WriteString(`package backend
 
-var latencies = map[string]map[string]float64{
+import "time"
+
+var latencies = map[string]map[string]time.Duration{
 `)
 	for _, city := range keys {
 		s.WriteString(fmt.Sprintf("%q: {\n", city))
 		latencies := allToAllMatrix[city]
 		for _, city2 := range keys {
-			s.WriteString(fmt.Sprintf("%q: %s,\n", city2, latencies[city2]))
+			latency, err := time.ParseDuration(latencies[city2] + "ms")
+			if err != nil {
+				log.Fatal(err)
+			}
+			s.WriteString(fmt.Sprintf("%q: %d,\n", city2, int64(latency)))
 		}
 		s.WriteString(fmt.Sprintln("},"))
 	}

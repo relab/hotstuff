@@ -1,6 +1,8 @@
 package backend
 
 import (
+	"time"
+
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 )
@@ -8,7 +10,7 @@ import (
 type backendOptions struct {
 	location          string
 	locationInfo      map[uint32]string
-	locationLatencies map[string]float64
+	locationLatencies map[string]time.Duration
 	gorumsSrvOpts     []gorums.ServerOption
 }
 

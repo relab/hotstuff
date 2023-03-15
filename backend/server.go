@@ -30,7 +30,7 @@ type Server struct {
 	logger        logging.Logger
 	location      string
 	locationInfo  map[uint32]string
-	latencyMatrix map[string]float64
+	latencyMatrix map[string]time.Duration
 	gorumsSrv     *gorums.Server
 }
 
@@ -68,10 +68,9 @@ func (srv *Server) induceLatency(sender hotstuff.ID) {
 		return
 	}
 	senderLocation := srv.locationInfo[uint32(sender)]
-	senderLatencyMs := srv.latencyMatrix[senderLocation]
-	srv.logger.Debugf("latency from server %s to server %s is %f\n", srv.location, senderLocation, senderLatencyMs)
-	duration := time.Duration(int64(senderLatencyMs) * int64(time.Millisecond))
-	timer1 := time.NewTimer(duration)
+	senderLatency := srv.latencyMatrix[senderLocation]
+	srv.logger.Debugf("latency from server %s to server %s is %s\n", srv.location, senderLocation, senderLatency)
+	timer1 := time.NewTimer(senderLatency)
 	<-timer1.C
 }
 
