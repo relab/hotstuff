@@ -31,6 +31,7 @@ gorums
 grpc
 Gueta
 Hein
+hostnames
 HOTSTUFF
 hotstuffgorums
 hotstuffpb
@@ -58,6 +59,7 @@ propsed
 proto
 protobuf
 protoc
+protostream
 ptypes
 QC's
 qerr
