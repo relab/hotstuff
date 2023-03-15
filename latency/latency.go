@@ -28,6 +28,7 @@ type latencyMeasurement struct {
 	latencyStats  map[hotstuff.ID]map[hotstuff.ID]*statInfo
 	isInitDone    bool
 }
+
 type statInfo struct {
 	count    uint64
 	mean     float64
@@ -64,7 +65,6 @@ func (l *latencyMeasurement) initialize() {
 }
 
 func (l *latencyMeasurement) handleNewMeasurement(event hotstuff.LatencyVectorEvent) {
-
 	if !l.opts.IsLatencyCalculationEnabled() || !l.isInitDone {
 		return
 	}
@@ -74,7 +74,7 @@ func (l *latencyMeasurement) handleNewMeasurement(event hotstuff.LatencyVectorEv
 		if stats == nil {
 			return
 		}
-		l.ComputeStats(l.latencyStats[event.Creator][hotstuff.ID(id)], float64(newValue))
+		l.ComputeStats(stats, float64(newValue))
 	}
 }
 
