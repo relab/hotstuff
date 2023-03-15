@@ -14,8 +14,10 @@ type backendOptions struct {
 	gorumsSrvOpts     []gorums.ServerOption
 }
 
+// ServerOptions is a function for configuring the Server.
 type ServerOptions func(*backendOptions)
 
+// WithLatencyInfo sets the location of the replica and the latency matrix.
 func WithLatencyInfo(id hotstuff.ID, locationInfo map[uint32]string) ServerOptions {
 	return func(opts *backendOptions) {
 		location, ok := locationInfo[uint32(id)]
@@ -34,6 +36,7 @@ func WithLatencyInfo(id hotstuff.ID, locationInfo map[uint32]string) ServerOptio
 	}
 }
 
+// WithGorumsServerOptions sets the gorums server options.
 func WithGorumsServerOptions(opts ...gorums.ServerOption) ServerOptions {
 	return func(o *backendOptions) {
 		o.gorumsSrvOpts = append(o.gorumsSrvOpts, opts...)
