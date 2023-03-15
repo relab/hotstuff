@@ -184,8 +184,10 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		cs.logger.Info("OnPropose: invalid QC")
 		return
 	}
-	cs.eventLoop.AddEvent(hotstuff.LatencyVectorEvent{Creator: block.Proposer(),
-		LatencyVector: block.QuorumCert().LatencyVector()})
+	cs.eventLoop.AddEvent(hotstuff.LatencyVectorEvent{
+		Creator:       block.Proposer(),
+		LatencyVector: block.QuorumCert().LatencyVector(),
+	})
 	// ensure the block came from the leader.
 	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
 		cs.logger.Info("OnPropose: block was not proposed by the expected leader")
