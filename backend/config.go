@@ -84,9 +84,8 @@ type subConfig struct {
 	logger       logging.Logger
 	opts         *modules.Options
 	synchronizer modules.Synchronizer
-
-	cfg      *hotstuffpb.Configuration
-	replicas map[hotstuff.ID]modules.Replica
+	cfg          *hotstuffpb.Configuration
+	replicas     map[hotstuff.ID]modules.Replica
 }
 
 // InitModule initializes the configuration.
@@ -181,9 +180,10 @@ func (cfg *Config) GetRawConfiguration() gorums.RawConfiguration {
 
 // ReplicaInfo holds information about a replica.
 type ReplicaInfo struct {
-	ID      hotstuff.ID
-	Address string
-	PubKey  hotstuff.PublicKey
+	ID       hotstuff.ID
+	Address  string
+	PubKey   hotstuff.PublicKey
+	Location string
 }
 
 // Connect opens connections to the replicas in the configuration.

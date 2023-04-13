@@ -195,7 +195,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
 		float64(opts.GetTimeoutMultiplier()),
 	))
-
 	builder.Add(
 		eventloop.New(1000),
 		consensus.New(consensusRules),
@@ -207,9 +206,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		blockchain.New(),
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
-
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
-
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
 		builder.Add(replicaMetrics...)
@@ -223,20 +220,19 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		}
 		builder.Add(m)
 	}
-
 	c := replica.Config{
-		ID:          hotstuff.ID(opts.GetID()),
-		PrivateKey:  privKey,
-		TLS:         opts.GetUseTLS(),
-		Certificate: &certificate,
-		RootCAs:     rootCAs,
-		BatchSize:   opts.GetBatchSize(),
+		ID:           hotstuff.ID(opts.GetID()),
+		PrivateKey:   privKey,
+		TLS:          opts.GetUseTLS(),
+		Certificate:  &certificate,
+		RootCAs:      rootCAs,
+		LocationInfo: opts.GetLocationInfo(),
+		BatchSize:    opts.GetBatchSize(),
 		ManagerOptions: []gorums.ManagerOption{
 			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 			gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
 		},
 	}
-
 	return replica.New(c, builder), nil
 }
 

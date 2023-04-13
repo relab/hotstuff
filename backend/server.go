@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
@@ -27,6 +28,9 @@ type Server struct {
 	configuration modules.Configuration
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
+	location      string
+	locationInfo  map[uint32]string
+	latencyMatrix map[string]time.Duration
 	opts          *modules.Options
 	gorumsSrv     *gorums.Server
 }
@@ -43,17 +47,33 @@ func (srv *Server) InitModule(mods *modules.Core) {
 }
 
 // NewServer creates a new Server.
-func NewServer(opts ...gorums.ServerOption) *Server {
-	srv := &Server{}
-
-	opts = append(opts, gorums.WithConnectCallback(func(ctx context.Context) {
+func NewServer(opts ...ServerOptions) *Server {
+	options := &backendOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+	srv := &Server{
+		location:      options.location,
+		locationInfo:  options.locationInfo,
+		latencyMatrix: options.locationLatencies,
+	}
+	options.gorumsSrvOpts = append(options.gorumsSrvOpts, gorums.WithConnectCallback(func(ctx context.Context) {
 		srv.eventLoop.AddEvent(replicaConnected{ctx})
 	}))
-
-	srv.gorumsSrv = gorums.NewServer(opts...)
-
+	srv.gorumsSrv = gorums.NewServer(options.gorumsSrvOpts...)
 	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, &serviceImpl{srv})
 	return srv
+}
+
+func (srv *Server) induceLatency(sender hotstuff.ID) {
+	if srv.location == hotstuff.DefaultLocation {
+		return
+	}
+	senderLocation := srv.locationInfo[uint32(sender)]
+	senderLatency := srv.latencyMatrix[senderLocation]
+	srv.logger.Debugf("latency from server %s to server %s is %s\n", srv.location, senderLocation, senderLatency)
+	timer1 := time.NewTimer(senderLatency)
+	<-timer1.C
 }
 
 // GetGorumsServer returns the underlying gorums Server.
@@ -136,8 +156,9 @@ type serviceImpl struct {
 // Propose handles a replica's response to the Propose QC from the leader.
 func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
+	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if !impl.srv.opts.ShouldUseKauri() {
-		id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+
 		if err != nil {
 			impl.srv.logger.Infof("Failed to get client ID: %v", err)
 			return
@@ -147,6 +168,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	} else {
 		proposeMsg.ID = hotstuff.ID(proposal.Block.Proposer)
 	}
+	impl.srv.induceLatency(id)
 	impl.srv.eventLoop.AddEvent(proposeMsg)
 }
 
@@ -157,7 +179,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
-
+	impl.srv.induceLatency(id)
 	impl.srv.eventLoop.AddEvent(hotstuff.VoteMsg{
 		ID:          id,
 		PartialCert: hotstuffpb.PartialCertFromProto(cert),
@@ -171,7 +193,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
-
+	impl.srv.induceLatency(id)
 	impl.srv.eventLoop.AddEvent(hotstuff.NewViewMsg{
 		ID:       id,
 		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
@@ -201,6 +223,7 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	if err != nil {
 		impl.srv.logger.Infof("Could not get ID of replica: %v", err)
 	}
+	impl.srv.induceLatency(timeoutMsg.ID)
 	impl.srv.eventLoop.AddEvent(timeoutMsg)
 }
 
