@@ -294,6 +294,9 @@ func (c *Client) handleCommands(ctx context.Context) (executed, failed, timeout 
 			}
 		} else {
 			executed++
+			if executed%100 == 0 {
+				c.logger.Info("Executed: ", executed)
+			}
 		}
 		c.mut.Lock()
 		if cmd.sequenceNumber > c.highestCommitted {

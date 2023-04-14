@@ -83,7 +83,7 @@ func (k *Kauri) InitModule(mods *modules.Core) {
 }
 
 func (k *Kauri) postInit() {
-	k.logger.Info("Handel: Initializing")
+	k.logger.Info("Kauri: Initializing")
 	kauripb.RegisterKauriServer(k.server.GetGorumsServer(), serviceImpl{k})
 	k.initializeConfiguration()
 }
