@@ -1,9 +1,39 @@
 package modules
 
-import "github.com/relab/hotstuff"
+import (
+	"sync"
+	"sync/atomic"
+
+	"github.com/relab/hotstuff"
+)
+
+// OptionID is the ID of an option.
+type OptionID uint64
+
+// nextID stores the ID for the next option created by NewOptions.
+// We want this to be global so that a package can export the option IDs it uses.
+// For example,
+//
+//	package a
+//	var MyOption = modules.NewOption()
+//
+//	package b
+//
+//	import "a"
+//
+//	opts.Get(a.MyOption)
+var nextID OptionID
+
+// NewOption returns a new option ID.
+func NewOption() OptionID {
+	return OptionID(atomic.AddUint64((*uint64)(&nextID), 1))
+}
 
 // Options stores runtime configuration settings.
 type Options struct {
+	mut     sync.Mutex
+	options []any
+
 	id         hotstuff.ID
 	privateKey hotstuff.PrivateKey
 
@@ -13,6 +43,32 @@ type Options struct {
 
 	sharedRandomSeed   int64
 	connectionMetadata map[string]string
+}
+
+func (opts *Options) ensureSpace(id OptionID) {
+	if int(id) >= len(opts.options) {
+		newOpts := make([]any, id+1)
+		copy(newOpts, opts.options)
+		opts.options = newOpts
+	}
+}
+
+// Get returns the value associated with the given option ID.
+func (opts *Options) Get(id OptionID) any {
+	opts.mut.Lock()
+	defer opts.mut.Unlock()
+	if len(opts.options) <= int(id) {
+		return nil
+	}
+	return opts.options[id]
+}
+
+// Set sets the value of the given option ID.
+func (opts *Options) Set(id OptionID, value any) {
+	opts.mut.Lock()
+	defer opts.mut.Unlock()
+	opts.ensureSpace(id)
+	opts.options[id] = value
 }
 
 // ID returns the ID.
