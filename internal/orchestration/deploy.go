@@ -63,7 +63,7 @@ func Deploy(g iago.Group, cfg DeployConfig) (workers map[string]WorkerSession, e
 			dataDir := testDir + "/data"
 			host.SetVar("test-dir", testDir)
 			host.SetVar("data-dir", dataDir)
-			err = fs.MkdirAll(host.GetFS(), dataDir, 0755)
+			err = fs.MkdirAll(host.GetFS(), dataDir, 0o755)
 			return err
 		})
 
@@ -82,7 +82,7 @@ func Deploy(g iago.Group, cfg DeployConfig) (workers map[string]WorkerSession, e
 			return iago.Upload{
 				Src:  src,
 				Dest: dest,
-				Perm: iago.NewPerm(0755),
+				Perm: iago.NewPerm(0o755),
 			}.Apply(ctx, host)
 		})
 
@@ -176,7 +176,7 @@ type workerSetup struct {
 	workers map[string]WorkerSession
 }
 
-func (w *workerSetup) Apply(ctx context.Context, host iago.Host) (err error) {
+func (w *workerSetup) Apply(_ context.Context, host iago.Host) (err error) {
 	cmd, err := host.NewCommand()
 	if err != nil {
 		return err
@@ -267,7 +267,7 @@ func tempDirPath(host iago.Host, dirName string) string {
 var rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func randString(n int) string {
-	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 	s := make([]rune, n)
 	for i := range s {
 		s[i] = letters[rnd.Intn(len(letters))]

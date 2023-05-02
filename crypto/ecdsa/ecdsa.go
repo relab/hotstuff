@@ -94,7 +94,7 @@ func (sig MultiSignature) Participants() hotstuff.IDSet {
 }
 
 // Add adds an ID to the set.
-func (sig MultiSignature) Add(id hotstuff.ID) {
+func (sig MultiSignature) Add(_ hotstuff.ID) {
 	panic("not implemented")
 }
 
@@ -129,8 +129,10 @@ func (sig MultiSignature) String() string {
 	return hotstuff.IDSetToString(sig)
 }
 
-var _ hotstuff.QuorumSignature = (*MultiSignature)(nil)
-var _ hotstuff.IDSet = (*MultiSignature)(nil)
+var (
+	_ hotstuff.QuorumSignature = (*MultiSignature)(nil)
+	_ hotstuff.IDSet           = (*MultiSignature)(nil)
+)
 
 type ecdsaBase struct {
 	configuration modules.Configuration

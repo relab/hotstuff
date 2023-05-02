@@ -29,11 +29,11 @@ func NewWriter(dest io.Writer) *Writer {
 
 // WriteAny writes a proto message to the stream wrapped in an anypb.Any message.
 func (w *Writer) WriteAny(msg proto.Message) error {
-	any, err := anypb.New(msg)
+	anyMsg, err := anypb.New(msg)
 	if err != nil {
 		return fmt.Errorf("protostream: failed to create Any message: %w", err)
 	}
-	return w.Write(any)
+	return w.Write(anyMsg)
 }
 
 // Write writes a proto message to the stream.
@@ -79,13 +79,13 @@ func NewReader(src io.Reader) *Reader {
 
 // ReadAny reads a protobuf message wrapped in an anypb.Any message from the stream.
 func (r *Reader) ReadAny() (proto.Message, error) {
-	any := anypb.Any{}
-	err := r.Read(&any)
+	anyMsg := anypb.Any{}
+	err := r.Read(&anyMsg)
 	if err != nil {
 		return nil, err
 	}
 
-	msg, err := any.UnmarshalNew()
+	msg, err := anyMsg.UnmarshalNew()
 	if err != nil {
 		return nil, fmt.Errorf("protostream: failed to unmarshal message from Any message: %w", err)
 	}
