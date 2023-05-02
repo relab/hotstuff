@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/logging"
-	"go.uber.org/multierr"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -314,7 +314,7 @@ func (e *Experiment) writeAssignmentsFile() (err error) {
 }
 
 func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration) (err error) {
-	errors := make(chan error)
+	errs := make(chan error)
 	for host, worker := range e.Hosts {
 		go func(host string, worker RemoteWorker) {
 			req := &orchestrationpb.StartReplicaRequest{
@@ -322,11 +322,11 @@ func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration) (e
 				IDs:           getIDs(host, e.hostsToReplicas),
 			}
 			_, err := worker.StartReplica(req)
-			errors <- err
+			errs <- err
 		}(host, worker)
 	}
 	for range e.Hosts {
-		err = multierr.Append(err, <-errors)
+		err = errors.Join(err, <-errs)
 	}
 	return err
 }

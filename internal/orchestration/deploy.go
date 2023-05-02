@@ -8,6 +8,7 @@ package orchestration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -19,7 +20,6 @@ import (
 
 	"github.com/relab/iago"
 	fs "github.com/relab/wrfs"
-	"go.uber.org/multierr"
 )
 
 // DeployConfig contains configuration options for deployment.
@@ -155,16 +155,16 @@ func (ws WorkerSession) Stderr() io.Reader {
 
 // Close closes the session and all of its streams.
 func (ws WorkerSession) Close() (err error) {
-	err = multierr.Append(err, ws.cmd.Wait())
+	err = ws.cmd.Wait()
 	// apparently, closing the streams can return EOF, so we'll have to check for that.
 	if cerr := ws.stdin.Close(); cerr != nil && cerr != io.EOF {
-		err = multierr.Append(err, cerr)
+		err = errors.Join(err, cerr)
 	}
 	if cerr := ws.stdout.Close(); cerr != nil && cerr != io.EOF {
-		err = multierr.Append(err, cerr)
+		err = errors.Join(err, cerr)
 	}
 	if cerr := ws.stderr.Close(); cerr != nil && cerr != io.EOF {
-		err = multierr.Append(err, cerr)
+		err = errors.Join(err, cerr)
 	}
 	return
 }
