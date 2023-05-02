@@ -32,6 +32,9 @@ tools: download
 test:
 	@go test -v ./...
 
+lint:
+	@golangci-lint run ./...
+
 clean:
 	@rm -fv $(binaries)
 

@@ -79,13 +79,13 @@ func NewReader(src io.Reader) *Reader {
 
 // ReadAny reads a protobuf message wrapped in an anypb.Any message from the stream.
 func (r *Reader) ReadAny() (proto.Message, error) {
-	any := anypb.Any{}
-	err := r.Read(&any)
+	anyMsg := anypb.Any{}
+	err := r.Read(&anyMsg)
 	if err != nil {
 		return nil, err
 	}
 
-	msg, err := any.UnmarshalNew()
+	msg, err := anyMsg.UnmarshalNew()
 	if err != nil {
 		return nil, fmt.Errorf("protostream: failed to unmarshal message from Any message: %w", err)
 	}
