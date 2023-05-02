@@ -489,7 +489,6 @@ func (s *session) verifyContributions(ctx context.Context) {
 
 	s.h.eventLoop.RemoveTicker(s.disseminateTimerID)
 	s.h.eventLoop.RemoveTicker(s.levelActivateTimerID)
-
 }
 
 // chooseContribution chooses the next contribution to verify.
@@ -596,9 +595,9 @@ func (s *session) improveSignature(contribution contribution) hotstuff.QuorumSig
 	signature := contribution.signature
 
 	if s.canMergeContributions(signature, level.incoming) {
-		new, err := s.h.crypto.Combine(signature, level.incoming)
+		mergedSignature, err := s.h.crypto.Combine(signature, level.incoming)
 		if err == nil {
-			signature = new
+			signature = mergedSignature
 		} else {
 			s.h.logger.Errorf("Failed to combine signatures: %v", err)
 		}
@@ -607,9 +606,9 @@ func (s *session) improveSignature(contribution contribution) hotstuff.QuorumSig
 	// add any individual signature, if possible
 	for _, indiv := range level.individual {
 		if s.canMergeContributions(signature, indiv) {
-			new, err := s.h.crypto.Combine(signature, indiv)
+			mergedSignature, err := s.h.crypto.Combine(signature, indiv)
 			if err == nil {
-				signature = new
+				signature = mergedSignature
 			} else {
 				s.h.logger.Errorf("Failed to combine signatures: %v", err)
 			}
