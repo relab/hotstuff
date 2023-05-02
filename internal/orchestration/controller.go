@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/logging"
-	"go.uber.org/multierr"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -296,7 +296,7 @@ type assignmentsFileContents struct {
 }
 
 func (e *Experiment) writeAssignmentsFile() (err error) {
-	f, err := os.OpenFile(filepath.Join(e.Output, "hosts.json"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(filepath.Join(e.Output, "hosts.json"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
@@ -314,7 +314,7 @@ func (e *Experiment) writeAssignmentsFile() (err error) {
 }
 
 func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration) (err error) {
-	errors := make(chan error)
+	errs := make(chan error)
 	for host, worker := range e.Hosts {
 		go func(host string, worker RemoteWorker) {
 			req := &orchestrationpb.StartReplicaRequest{
@@ -322,34 +322,46 @@ func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration) (e
 				IDs:           getIDs(host, e.hostsToReplicas),
 			}
 			_, err := worker.StartReplica(req)
-			errors <- err
+			errs <- err
 		}(host, worker)
 	}
 	for range e.Hosts {
-		err = multierr.Append(err, <-errors)
+		err = errors.Join(err, <-errs)
 	}
 	return err
 }
 
 func (e *Experiment) stopReplicas() error {
-	hashes := make(map[uint32][]byte)
+	responses := make([]*orchestrationpb.StopReplicaResponse, 0)
 	for host, worker := range e.Hosts {
 		req := &orchestrationpb.StopReplicaRequest{IDs: getIDs(host, e.hostsToReplicas)}
 		res, err := worker.StopReplica(req)
 		if err != nil {
 			return err
 		}
-		for id, hash := range res.GetHashes() {
-			hashes[id] = hash
+		responses = append(responses, res)
+	}
+	return verifyStopResponses(responses)
+}
+
+func verifyStopResponses(responses []*orchestrationpb.StopReplicaResponse) error {
+	results := make(map[uint32][][]byte)
+	for _, response := range responses {
+		commandCount := response.GetCounts()
+		hashes := response.GetHashes()
+		for id, count := range commandCount {
+			if len(results[count]) == 0 {
+				results[count] = make([][]byte, 0)
+			}
+			results[count] = append(results[count], hashes[id])
 		}
 	}
-	var cmp []byte
-	for _, hash := range hashes {
-		if cmp == nil {
-			cmp = hash
-		}
-		if !bytes.Equal(cmp, hash) {
-			return fmt.Errorf("hash mismatch")
+	for cmdCount, hashes := range results {
+		firstHash := hashes[0]
+		for _, hash := range hashes {
+			if !bytes.Equal(firstHash, hash) {
+				return fmt.Errorf("hash mismatch at command: %d", cmdCount)
+			}
 		}
 	}
 	return nil

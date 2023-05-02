@@ -1,3 +1,4 @@
+// Package types defines various types for metrics collection.
 package types
 
 import (

@@ -42,18 +42,18 @@ func (dl *jsonLogger) InitModule(mods *modules.Core) {
 
 func (dl *jsonLogger) Log(msg proto.Message) {
 	var (
-		any *anypb.Any
-		err error
-		ok  bool
+		anyMsg *anypb.Any
+		err    error
+		ok     bool
 	)
-	if any, ok = msg.(*anypb.Any); !ok {
-		any, err = anypb.New(msg)
+	if anyMsg, ok = msg.(*anypb.Any); !ok {
+		anyMsg, err = anypb.New(msg)
 		if err != nil {
 			dl.logger.Errorf("failed to create Any message: %v", err)
 			return
 		}
 	}
-	err = dl.write(any)
+	err = dl.write(anyMsg)
 	if err != nil {
 		dl.logger.Errorf("failed to write message to log: %v", err)
 	}

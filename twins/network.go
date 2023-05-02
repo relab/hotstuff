@@ -120,7 +120,7 @@ func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) modules.Buil
 	return builder
 }
 
-func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusName string) error {
+func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName string) error {
 	cg := &commandGenerator{}
 	for _, nodeID := range nodes {
 
@@ -179,8 +179,8 @@ func (n *Network) tick() {
 
 	for _, node := range n.nodes {
 		node.eventLoop.AddEvent(tick{})
-		// run each event loop as long as it has events
-		for node.eventLoop.Tick(context.Background()) {
+		// process all events in the node's event queue
+		for node.eventLoop.Tick(context.Background()) { //revive:disable-line:empty-block
 		}
 	}
 }

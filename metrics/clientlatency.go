@@ -56,7 +56,7 @@ func (lr *ClientLatency) addLatency(latency time.Duration) {
 	lr.wf.Update(millis)
 }
 
-func (lr *ClientLatency) tick(tick types.TickEvent) {
+func (lr *ClientLatency) tick(_ types.TickEvent) {
 	mean, variance, count := lr.wf.Get()
 	event := &types.LatencyMeasurement{
 		Event:    types.NewClientEvent(uint32(lr.opts.ID()), time.Now()),

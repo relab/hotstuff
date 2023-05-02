@@ -1,3 +1,4 @@
+// Package synchronizer implements the synchronizer module.
 package synchronizer
 
 import (
@@ -28,7 +29,6 @@ type Synchronizer struct {
 	currentView hotstuff.View
 	highTC      hotstuff.TimeoutCert
 	highQC      hotstuff.QuorumCert
-	leafBlock   *hotstuff.Block
 
 	// A pointer to the last timeout message that we sent.
 	// If a timeout happens again before we advance to the next view,
@@ -86,7 +86,6 @@ func (s *Synchronizer) InitModule(mods *modules.Core) {
 // New creates a new Synchronizer.
 func New(viewDuration ViewDuration) modules.Synchronizer {
 	return &Synchronizer{
-		leafBlock:   hotstuff.GetGenesis(),
 		currentView: 1,
 
 		duration: viewDuration,
@@ -117,11 +116,6 @@ func (s *Synchronizer) Start(ctx context.Context) {
 // HighQC returns the highest known QC.
 func (s *Synchronizer) HighQC() hotstuff.QuorumCert {
 	return s.highQC
-}
-
-// LeafBlock returns the current leaf block.
-func (s *Synchronizer) LeafBlock() *hotstuff.Block {
-	return s.leafBlock
 }
 
 // View returns the current view.
@@ -346,14 +340,8 @@ func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
 		return
 	}
 
-	oldBlock, ok := s.blockChain.Get(s.highQC.BlockHash())
-	if !ok {
-		s.logger.Panic("Block from the old highQC missing from chain")
-	}
-
-	if newBlock.View() > oldBlock.View() {
+	if newBlock.View() > s.highQC.View() {
 		s.highQC = qc
-		s.leafBlock = newBlock
 		s.logger.Debug("HighQC updated")
 	}
 }

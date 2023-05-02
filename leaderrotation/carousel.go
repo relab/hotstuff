@@ -1,3 +1,4 @@
+// Package leaderrotation provide various leader rotation algorithms.
 package leaderrotation
 
 import (
