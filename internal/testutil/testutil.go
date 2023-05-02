@@ -27,7 +27,7 @@ import (
 )
 
 // TestModules registers default modules for testing to the given builder.
-func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, privkey hotstuff.PrivateKey, builder *modules.Builder) {
+func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *modules.Builder) {
 	t.Helper()
 
 	acceptor := mocks.NewMockAcceptor(ctrl)
