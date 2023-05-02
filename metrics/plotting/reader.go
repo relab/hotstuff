@@ -65,13 +65,13 @@ func (r *Reader) ReadAll() error {
 }
 
 func (r *Reader) read(b []byte) error {
-	any := &anypb.Any{}
-	err := protojson.Unmarshal(b, any)
+	anyMsg := &anypb.Any{}
+	err := protojson.Unmarshal(b, anyMsg)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal JSON message: %w", err)
 	}
 
-	msg, err := any.UnmarshalNew()
+	msg, err := anyMsg.UnmarshalNew()
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal Any message: %w", err)
 	}

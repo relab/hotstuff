@@ -29,11 +29,11 @@ func NewWriter(dest io.Writer) *Writer {
 
 // WriteAny writes a proto message to the stream wrapped in an anypb.Any message.
 func (w *Writer) WriteAny(msg proto.Message) error {
-	any, err := anypb.New(msg)
+	anyMsg, err := anypb.New(msg)
 	if err != nil {
 		return fmt.Errorf("protostream: failed to create Any message: %w", err)
 	}
-	return w.Write(any)
+	return w.Write(anyMsg)
 }
 
 // Write writes a proto message to the stream.
