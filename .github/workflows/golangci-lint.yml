@@ -16,11 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
-        with:
-          go-version: 1.18
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+      - name: Setup Go environment
+        uses: actions/setup-go@v4
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v3.4.0
         with:
           version: latest
           args: --timeout 5m
