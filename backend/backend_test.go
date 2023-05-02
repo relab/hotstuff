@@ -217,7 +217,7 @@ func runBoth(t *testing.T, run func(*testing.T, setupFunc)) {
 	t.Run("WithTLS", func(t *testing.T) { run(t, setupTLS) })
 }
 
-func createServers(t *testing.T, td testData, ctrl *gomock.Controller) (teardown func()) {
+func createServers(t *testing.T, td testData, _ *gomock.Controller) (teardown func()) {
 	t.Helper()
 	servers := make([]*Server, td.n)
 	for i := range servers {

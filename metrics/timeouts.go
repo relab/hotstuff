@@ -57,7 +57,7 @@ func (vt *ViewTimeouts) viewChange(event synchronizer.ViewChangeEvent) {
 	}
 }
 
-func (vt *ViewTimeouts) tick(event types.TickEvent) {
+func (vt *ViewTimeouts) tick(_ types.TickEvent) {
 	vt.metricsLogger.Log(&types.ViewTimeouts{
 		Event:    types.NewReplicaEvent(uint32(vt.opts.ID()), time.Now()),
 		Views:    vt.numViews,
