@@ -72,39 +72,39 @@ func (opts *Options) Set(id OptionID, value any) {
 }
 
 // ID returns the ID.
-func (opts Options) ID() hotstuff.ID {
+func (opts *Options) ID() hotstuff.ID {
 	return opts.id
 }
 
 // PrivateKey returns the private key.
-func (opts Options) PrivateKey() hotstuff.PrivateKey {
+func (opts *Options) PrivateKey() hotstuff.PrivateKey {
 	return opts.privateKey
 }
 
 // ShouldUseAggQC returns true if aggregated quorum certificates should be used.
 // This is true for Fast-Hotstuff: https://arxiv.org/abs/2010.11454
-func (opts Options) ShouldUseAggQC() bool {
+func (opts *Options) ShouldUseAggQC() bool {
 	return opts.shouldUseAggQC
 }
 
 // ShouldUseHandel returns true if the Handel signature aggregation protocol should be used.
-func (opts Options) ShouldUseHandel() bool {
+func (opts *Options) ShouldUseHandel() bool {
 	return opts.shouldUseHandel
 }
 
 // ShouldVerifyVotesSync returns true if votes should be verified synchronously.
 // Enabling this should make the voting machine process votes synchronously.
-func (opts Options) ShouldVerifyVotesSync() bool {
+func (opts *Options) ShouldVerifyVotesSync() bool {
 	return opts.shouldVerifyVotesSync
 }
 
 // SharedRandomSeed returns a random number that is shared between all replicas.
-func (opts Options) SharedRandomSeed() int64 {
+func (opts *Options) SharedRandomSeed() int64 {
 	return opts.sharedRandomSeed
 }
 
 // ConnectionMetadata returns the metadata map that is sent when connecting to other replicas.
-func (opts Options) ConnectionMetadata() map[string]string {
+func (opts *Options) ConnectionMetadata() map[string]string {
 	return opts.connectionMetadata
 }
 
