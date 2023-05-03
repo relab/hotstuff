@@ -10,9 +10,9 @@ type Options struct {
 	shouldUseAggQC        bool
 	shouldUseHandel       bool
 	shouldVerifyVotesSync bool
-
-	sharedRandomSeed   int64
-	connectionMetadata map[string]string
+	shouldUseKauri        bool
+	sharedRandomSeed      int64
+	connectionMetadata    map[string]string
 }
 
 // ID returns the ID.
@@ -34,6 +34,11 @@ func (opts Options) ShouldUseAggQC() bool {
 // ShouldUseHandel returns true if the Handel signature aggregation protocol should be used.
 func (opts Options) ShouldUseHandel() bool {
 	return opts.shouldUseHandel
+}
+
+// ShouldUseKauri returns true if Kauri protocol should be used.
+func (opts Options) ShouldUseKauri() bool {
+	return opts.shouldUseKauri
 }
 
 // ShouldVerifyVotesSync returns true if votes should be verified synchronously.
@@ -65,6 +70,11 @@ func (opts *Options) SetShouldUseHandel() {
 // SetShouldVerifyVotesSync sets the ShouldVerifyVotesSync setting to true.
 func (opts *Options) SetShouldVerifyVotesSync() {
 	opts.shouldVerifyVotesSync = true
+}
+
+// SetShouldUseKauri sets the SetShouldUseKauri setting to true.
+func (opts *Options) SetShouldUseKauri() {
+	opts.shouldUseKauri = true
 }
 
 // SetSharedRandomSeed sets the shared random seed.

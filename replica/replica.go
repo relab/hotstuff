@@ -109,6 +109,7 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		srv.clientSrv.cmdCache,
 		srv.clientSrv.cmdCache,
 	)
+	//builder.Options().SetShouldVerifyVotesSync()
 	srv.hs = builder.Build()
 
 	return srv

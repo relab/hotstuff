@@ -30,7 +30,7 @@ service Hotstuff {
 
 message Proposal {
   Block Block = 1;
-  optional AggQC AggQC = 2;
+  AggQC AggQC = 2;
 }
 
 message BlockHash { bytes Hash = 1; }
@@ -92,13 +92,13 @@ message TimeoutMsg {
   uint64 View = 1;
   SyncInfo SyncInfo = 2;
   QuorumSignature ViewSig = 3;
-  optional QuorumSignature MsgSig = 4;
+  QuorumSignature MsgSig = 4;
 }
 
 message SyncInfo {
-  optional QuorumCert QC = 1;
-  optional TimeoutCert TC = 2;
-  optional AggQC AggQC = 3;
+  QuorumCert QC = 1;
+  TimeoutCert TC = 2;
+  AggQC AggQC = 3;
 }
 
 message AggQC {

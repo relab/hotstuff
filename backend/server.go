@@ -27,8 +27,8 @@ type Server struct {
 	configuration modules.Configuration
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
-
-	gorumsSrv *gorums.Server
+	opts          *modules.Options
+	gorumsSrv     *gorums.Server
 }
 
 // InitModule initializes the Server.
@@ -38,6 +38,7 @@ func (srv *Server) InitModule(mods *modules.Core) {
 		&srv.configuration,
 		&srv.blockChain,
 		&srv.logger,
+		&srv.opts,
 	)
 }
 
@@ -134,16 +135,18 @@ type serviceImpl struct {
 
 // Propose handles a replica's response to the Propose QC from the leader.
 func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
-	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
-	if err != nil {
-		impl.srv.logger.Infof("Failed to get client ID: %v", err)
-		return
-	}
-
-	proposal.Block.Proposer = uint32(id)
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
-	proposeMsg.ID = id
-
+	if !impl.srv.opts.ShouldUseKauri() {
+		id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+		if err != nil {
+			impl.srv.logger.Infof("Failed to get client ID: %v", err)
+			return
+		}
+		proposal.Block.Proposer = uint32(id)
+		proposeMsg.ID = id
+	} else {
+		proposeMsg.ID = hotstuff.ID(proposal.Block.Proposer)
+	}
 	impl.srv.eventLoop.AddEvent(proposeMsg)
 }
 
