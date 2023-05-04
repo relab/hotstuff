@@ -9,7 +9,7 @@ import (
 
 type backendOptions struct {
 	location          string
-	locationInfo      map[uint32]string
+	locationInfo      map[hotstuff.ID]string
 	locationLatencies map[string]time.Duration
 	gorumsSrvOpts     []gorums.ServerOption
 }
@@ -18,9 +18,9 @@ type backendOptions struct {
 type ServerOptions func(*backendOptions)
 
 // WithLatencyInfo sets the location of the replica and the latency matrix.
-func WithLatencyInfo(id hotstuff.ID, locationInfo map[uint32]string) ServerOptions {
+func WithLatencyInfo(id hotstuff.ID, locationInfo map[hotstuff.ID]string) ServerOptions {
 	return func(opts *backendOptions) {
-		location, ok := locationInfo[uint32(id)]
+		location, ok := locationInfo[id]
 		if !ok {
 			opts.location = hotstuff.DefaultLocation
 			return

@@ -45,7 +45,7 @@ type Config struct {
 	// Options for the replica manager.
 	ManagerOptions []gorums.ManagerOption
 	// Location information of all replicas
-	LocationInfo map[uint32]string
+	LocationInfo map[hotstuff.ID]string
 }
 
 // Replica is a participant in the consensus protocol.
