@@ -47,11 +47,10 @@ type Experiment struct {
 	// the host associated with each replica.
 	hostsToReplicas map[string][]hotstuff.ID
 	// the host associated with each client.
-	hostsToClients      map[string][]hotstuff.ID
-	replicaLocationInfo map[hotstuff.ID]string
-	replicaOpts         map[hotstuff.ID]*orchestrationpb.ReplicaOpts
-	caKey               *ecdsa.PrivateKey
-	ca                  *x509.Certificate
+	hostsToClients map[string][]hotstuff.ID
+	replicaOpts    map[hotstuff.ID]*orchestrationpb.ReplicaOpts
+	caKey          *ecdsa.PrivateKey
+	ca             *x509.Certificate
 }
 
 // Run runs the experiment.
@@ -151,15 +150,10 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate keychain: %w", err)
 			}
-			locationInfo := make(map[uint32]string)
-			for id, location := range e.replicaLocationInfo {
-				locationInfo[uint32(id)] = location
-			}
 			opts.PrivateKey = keyChain.PrivateKey
 			opts.PublicKey = keyChain.PublicKey
 			opts.Certificate = keyChain.Certificate
 			opts.CertificateKey = keyChain.CertificateKey
-			opts.LocationInfo = locationInfo
 			req.Replicas[opts.ID] = opts
 		}
 		wcfg, err := worker.CreateReplica(req)
@@ -187,7 +181,7 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 	e.hostsToReplicas = make(map[string][]hotstuff.ID)
 	e.replicaOpts = make(map[hotstuff.ID]*orchestrationpb.ReplicaOpts)
 	e.hostsToClients = make(map[string][]hotstuff.ID)
-	e.replicaLocationInfo = make(map[hotstuff.ID]string)
+	replicaLocationInfo := make(map[uint32]string)
 	nextReplicaID := hotstuff.ID(1)
 	nextClientID := hotstuff.ID(1)
 
@@ -279,7 +273,9 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 			replicaOpts := proto.Clone(e.ReplicaOpts).(*orchestrationpb.ReplicaOpts)
 			replicaOpts.ID = uint32(nextReplicaID)
 			replicaOpts.ByzantineStrategy = byzantineStrategy
-			e.replicaLocationInfo[nextReplicaID] = location
+			replicaLocationInfo[replicaOpts.ID] = location
+			// all replicaOpts share the same LocationInfo map, which is progressively updated
+			replicaOpts.LocationInfo = replicaLocationInfo
 			e.hostsToReplicas[host] = append(e.hostsToReplicas[host], nextReplicaID)
 			e.replicaOpts[nextReplicaID] = replicaOpts
 			e.Logger.Infof("replica %d assigned to host %s", nextReplicaID, host)
