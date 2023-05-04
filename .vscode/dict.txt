@@ -31,6 +31,7 @@ gorums
 grpc
 Gueta
 Hein
+hostnames
 HOTSTUFF
 hotstuffgorums
 hotstuffpb
@@ -41,6 +42,7 @@ Jalalzai
 Jehl
 Jianyu
 kilic
+latencygen
 Malkhi
 Mathieu
 Meling
@@ -48,6 +50,7 @@ mitchellh
 nolint
 orchestrationpb
 partitioner
+Paulo
 perr
 pflag
 pflags
@@ -56,6 +59,7 @@ propsed
 proto
 protobuf
 protoc
+protostream
 ptypes
 QC's
 qerr

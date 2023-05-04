@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
@@ -49,7 +50,7 @@ func init() {
 	runCmd.Flags().Int("clients", 1, "number of clients to run")
 	runCmd.Flags().Int("batch-size", 1, "number of commands to batch together in each block")
 	runCmd.Flags().Int("payload-size", 0, "size in bytes of the command payload")
-	runCmd.Flags().Int("max-concurrent", 4, "maximum number of conccurrent commands per client")
+	runCmd.Flags().Int("max-concurrent", 4, "maximum number of concurrent commands per client")
 	runCmd.Flags().Duration("client-timeout", 500*time.Millisecond, "Client timeout.")
 	runCmd.Flags().Duration("duration", 10*time.Second, "duration of the experiment")
 	runCmd.Flags().Duration("connect-timeout", 5*time.Second, "duration of the initial connection timeout")
@@ -93,7 +94,7 @@ func runController() {
 	if output := viper.GetString("output"); output != "" {
 		outputDir, err = filepath.Abs(output)
 		checkf("failed to get absolute path: %v", err)
-		err = os.MkdirAll(outputDir, 0755)
+		err = os.MkdirAll(outputDir, 0o755)
 		checkf("failed to create output directory: %v", err)
 	}
 
@@ -168,7 +169,6 @@ func runController() {
 	}
 
 	if worker || len(hosts) == 0 {
-
 		worker, wait := localWorker(outputDir, viper.GetStringSlice("metrics"), viper.GetDuration("measurement-interval"))
 		defer wait()
 		experiment.Hosts["localhost"] = worker
@@ -183,6 +183,11 @@ func runController() {
 
 	for _, cfg := range hostConfigs {
 		experiment.HostConfigs[cfg.Name] = cfg
+		if cfg.Location == "" {
+			cfg.Location = hotstuff.DefaultLocation
+		}
+		err := checkHostLocation(cfg.Location)
+		checkf("invalid configuration for %s: %v", cfg.Name, err)
 	}
 
 	err = experiment.Run()
@@ -203,6 +208,21 @@ func runController() {
 
 	err = g.Close()
 	checkf("failed to close ssh connections: %v", err)
+}
+
+func checkHostLocation(location string) error {
+	validLocations := [...]string{
+		"Cape Town", "Hong Kong", "Tokyo",
+		"Seoul", "Osaka", "Mumbai", "Singapore", "Sydney", "Central", "Frankfurt",
+		"Stockholm", "Milan", "Ireland", "London", "Paris", "Bahrain", "Sao Paulo",
+		"N. Virginia", "Ohio", "N. California", "Oregon", hotstuff.DefaultLocation,
+	}
+	for _, name := range validLocations {
+		if name == location {
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown location: %s", location)
 }
 
 func checkf(format string, args ...any) {
@@ -235,7 +255,7 @@ func localWorker(globalOutput string, enableMetrics []string, interval time.Dura
 	output := ""
 	if globalOutput != "" {
 		output = filepath.Join(globalOutput, "local")
-		err := os.MkdirAll(output, 0755)
+		err := os.MkdirAll(output, 0o755)
 		checkf("failed to create local output directory: %v", err)
 	}
 
@@ -249,7 +269,7 @@ func localWorker(globalOutput string, enableMetrics []string, interval time.Dura
 	go func() {
 		var logger metrics.Logger
 		if output != "" {
-			f, err := os.OpenFile(filepath.Join(output, "measurements.json"), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+			f, err := os.OpenFile(filepath.Join(output, "measurements.json"), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 			checkf("failed to create output file: %v", err)
 			defer func() { checkf("failed to close output file: %v", f.Close()) }()
 
