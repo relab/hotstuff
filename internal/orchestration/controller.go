@@ -24,6 +24,7 @@ type HostConfig struct {
 	Name            string
 	Clients         int
 	Replicas        int
+	Location        string
 	InternalAddress string `mapstructure:"internal-address"`
 }
 
@@ -130,7 +131,7 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 			opts.CertificateAuthority = keygen.CertToPEM(e.ca)
 
 			// the generated certificate should be valid for the hostname and its ip addresses.
-			validFor := []string{"localhost", "127.0.0.1", host}
+			validFor := []string{"localhost", "127.0.0.1", "127.0.1.1", host}
 			ips, err := net.LookupIP(host)
 			if err == nil {
 				for _, ip := range ips {
@@ -149,7 +150,6 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate keychain: %w", err)
 			}
-
 			opts.PrivateKey = keyChain.PrivateKey
 			opts.PublicKey = keyChain.PublicKey
 			opts.Certificate = keyChain.Certificate
@@ -181,7 +181,7 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 	e.hostsToReplicas = make(map[string][]hotstuff.ID)
 	e.replicaOpts = make(map[hotstuff.ID]*orchestrationpb.ReplicaOpts)
 	e.hostsToClients = make(map[string][]hotstuff.ID)
-
+	replicaLocationInfo := make(map[uint32]string)
 	nextReplicaID := hotstuff.ID(1)
 	nextClientID := hotstuff.ID(1)
 
@@ -236,10 +236,12 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 		var (
 			numReplicas int
 			numClients  int
+			location    string
 		)
 		if hostCfg, ok := e.HostConfigs[host]; ok && hostCfg.Clients|hostCfg.Replicas != 0 {
 			numReplicas = hostCfg.Replicas
 			numClients = hostCfg.Clients
+			location = hostCfg.Location
 		} else {
 			numReplicas = replicasPerNode
 			remainingReplicas -= replicasPerNode
@@ -255,6 +257,7 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 				remainderClients--
 				remainingClients--
 			}
+			location = "default"
 		}
 
 		for i := 0; i < numReplicas; i++ {
@@ -270,7 +273,9 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 			replicaOpts := proto.Clone(e.ReplicaOpts).(*orchestrationpb.ReplicaOpts)
 			replicaOpts.ID = uint32(nextReplicaID)
 			replicaOpts.ByzantineStrategy = byzantineStrategy
-
+			replicaLocationInfo[replicaOpts.ID] = location
+			// all replicaOpts share the same LocationInfo map, which is progressively updated
+			replicaOpts.LocationInfo = replicaLocationInfo
 			e.hostsToReplicas[host] = append(e.hostsToReplicas[host], nextReplicaID)
 			e.replicaOpts[nextReplicaID] = replicaOpts
 			e.Logger.Infof("replica %d assigned to host %s", nextReplicaID, host)

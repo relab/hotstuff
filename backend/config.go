@@ -177,9 +177,10 @@ func (cfg *Config) GetRawConfiguration() gorums.RawConfiguration {
 
 // ReplicaInfo holds information about a replica.
 type ReplicaInfo struct {
-	ID      hotstuff.ID
-	Address string
-	PubKey  hotstuff.PublicKey
+	ID       hotstuff.ID
+	Address  string
+	PubKey   hotstuff.PublicKey
+	Location string
 }
 
 // Connect opens connections to the replicas in the configuration.
