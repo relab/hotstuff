@@ -15,7 +15,7 @@ func ViewContext(parent context.Context, eventLoop *eventloop.EventLoop, view *h
 	ctx, cancel := context.WithCancel(parent)
 
 	id := eventLoop.
-		WithOptions(eventloop.WithPriority(), eventloop.RunAsync()).
+		WithOptions(eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent()).
 		RegisterHandler(ViewChangeEvent{}, func(event any) {
 			if view == nil || event.(ViewChangeEvent).View >= *view {
 				cancel()
@@ -34,7 +34,7 @@ func TimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop) (con
 	ctx, cancel := ViewContext(parent, eventLoop, nil)
 
 	id := eventLoop.
-		WithOptions(eventloop.RunAsync(), eventloop.WithPriority()).
+		WithOptions(eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent()).
 		RegisterHandler(TimeoutEvent{}, func(event any) {
 			cancel()
 		})

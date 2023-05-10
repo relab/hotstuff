@@ -1,9 +1,9 @@
 // Package eventloop provides an event loop which is widely used by modules.
+// The use of the event loop enables many of the modules to run synchronously, thus removing the need for thread safety.
+// This simplifies the implementation of modules and reduces the risks of race conditions.
 //
-// The event loop allows for flexible handling of events through the concept of observers and handlers.
-// An observer is a function that is able to view an event before it is handled.
-// Thus, there can be multiple observers for each event type.
-// A handler is a function that processes the event. There can only be one handler for each event type.
+// The event loop can accept events of any type.
+// It uses reflection to determine what handler function to execute based on the type of an event.
 package eventloop
 
 import (
@@ -16,23 +16,26 @@ import (
 )
 
 type handlerOpts struct {
-	async    bool
-	priority bool
+	runInAddEvent bool
+	priority      bool
 }
 
 // HandlerOption sets configuration options for event handlers.
 type HandlerOption func(*handlerOpts)
 
-// RunAsync instructs the eventloop to run the handler asynchronously.
-func RunAsync() HandlerOption {
+// UnsafeRunInAddEvent instructs the eventloop to run the handler as a part of AddEvent.
+// Handlers that use this option can process events before they are added to the event queue.
+// Because AddEvent could be running outside the event loop, it is unsafe.
+// Only thread-safe modules can be used safely from a handler using this option.
+func UnsafeRunInAddEvent() HandlerOption {
 	return func(ho *handlerOpts) {
-		ho.async = true
+		ho.runInAddEvent = true
 	}
 }
 
-// WithPriority instructs the eventloop to prioritize running the handler before others.
-// This guarantees that the handler runs before handlers that have not requested priority.
-func WithPriority() HandlerOption {
+// Prioritize instructs the event loop to run the handler before handlers that do not have priority.
+// It should only be used if you must look at an event before other handlers get to look at it.
+func Prioritize() HandlerOption {
 	return func(ho *handlerOpts) {
 		ho.priority = true
 	}
@@ -46,10 +49,7 @@ type handler struct {
 	opts     handlerOpts
 }
 
-// EventLoop accepts events of any type and executes relevant event handlers.
-// It supports registering both observers and handlers based on the type of event that they accept.
-// The difference between them is that there can be many observers per event type, but only one handler,
-// and the handler is executed last.
+// EventLoop accepts events of any type and executes registered event handlers.
 type EventLoop struct {
 	eventQ queue
 
@@ -78,7 +78,9 @@ func New(bufferSize uint) *EventLoop {
 }
 
 // WithOptions is a convenience function for registering handlers with options,
-// by calling RegisterHandler on the returned options.
+// by calling RegisterHandler on the returned options:
+//
+//	el.WithOptions(eventloop.Prioritize()).RegisterHandler(func (event any) { ... })
 func (el *EventLoop) WithOptions(opts ...HandlerOption) HandlerOptions {
 	return HandlerOptions{el, opts}
 }
@@ -95,9 +97,9 @@ func (opts HandlerOptions) RegisterHandler(eventType any, handler EventHandler) 
 }
 
 // RegisterObserver registers a handler with priority.
-// Deprecated: use RegisterHandler and the WithPriority option instead.
+// Deprecated: use RegisterHandler and the Prioritize option instead.
 func (el *EventLoop) RegisterObserver(eventType any, handler EventHandler) int {
-	return el.WithOptions(WithPriority()).RegisterHandler(eventType, handler)
+	return el.WithOptions(Prioritize()).RegisterHandler(eventType, handler)
 }
 
 // UnregisterObserver unregister a handler.
@@ -125,6 +127,7 @@ func (el *EventLoop) registerHandler(eventType any, opts []HandlerOption, callba
 
 	handlers := el.handlers[t]
 
+	// search for a free slot for the handler
 	i := 0
 	for ; i < len(handlers); i++ {
 		if handlers[i].callback == nil {
@@ -132,6 +135,7 @@ func (el *EventLoop) registerHandler(eventType any, opts []HandlerOption, callba
 		}
 	}
 
+	// no free slots; have to grow the list
 	if i == len(handlers) {
 		handlers = append(handlers, h)
 	} else {
@@ -154,8 +158,9 @@ func (el *EventLoop) UnregisterHandler(eventType any, id int) {
 // AddEvent adds an event to the event queue.
 func (el *EventLoop) AddEvent(event any) {
 	if event != nil {
-		el.eventQ.push(event)
+		// run handlers with runInAddEvent option
 		el.processEvent(event, true)
+		el.eventQ.push(event)
 	}
 }
 
@@ -195,7 +200,7 @@ loop:
 			}
 		}
 		if e, ok := event.(startTickerEvent); ok {
-			el.startTicker(ctx, e.tickerID)
+			el.startTicker(e.tickerID)
 			continue
 		}
 		el.processEvent(event, false)
@@ -219,7 +224,7 @@ func (el *EventLoop) Tick(ctx context.Context) bool {
 	}
 
 	if e, ok := event.(startTickerEvent); ok {
-		el.startTicker(context.Background(), e.tickerID)
+		el.startTicker(e.tickerID)
 	} else {
 		el.processEvent(event, false)
 	}
@@ -230,26 +235,28 @@ func (el *EventLoop) Tick(ctx context.Context) bool {
 var handlerListPool = gpool.New(func() []EventHandler { return make([]EventHandler, 0, 10) })
 
 // processEvent dispatches the event to the correct handler.
-func (el *EventLoop) processEvent(event any, async bool) {
+func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
 	t := reflect.TypeOf(event)
 
-	if !async {
+	if !runningInAddEvent {
 		defer el.dispatchDelayedEvents(t)
 	}
 
-	if f, ok := event.(func()); ok && !async {
+	// TODO: document this behavior
+	if f, ok := event.(func()); ok && !runningInAddEvent {
 		f()
 		return
 	}
 
 	// Must copy handlers to a list so that they can be executed after unlocking the mutex.
-	// Use a pool to reduce memory allocations.
+	// This looks like it might be slow, but there should be few handlers (< 10) registered for each event type.
+	// We use a pool to reduce memory allocations.
 	priorityList := handlerListPool.Get()
 	handlerList := handlerListPool.Get()
 
 	el.mut.Lock()
 	for _, handler := range el.handlers[t] {
-		if handler.opts.async != async || handler.callback == nil {
+		if handler.opts.runInAddEvent != runningInAddEvent || handler.callback == nil {
 			continue
 		}
 		if handler.opts.priority {
@@ -359,7 +366,7 @@ func (el *EventLoop) RemoveTicker(id int) bool {
 	return true
 }
 
-func (el *EventLoop) startTicker(ctx context.Context, id int) {
+func (el *EventLoop) startTicker(id int) {
 	// lock the mutex such that the ticker cannot be removed until we have started it
 	el.mut.Lock()
 	defer el.mut.Unlock()
@@ -367,6 +374,7 @@ func (el *EventLoop) startTicker(ctx context.Context, id int) {
 	if !ok {
 		return
 	}
+	ctx := el.ctx
 	ctx, ticker.cancel = context.WithCancel(ctx)
 	go el.runTicker(ctx, ticker)
 }
