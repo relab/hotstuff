@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/felixge/fgprof v0.9.2
 	github.com/golang/mock v1.6.0
+	github.com/google/gofuzz v1.1.0
 	github.com/kilic/bls12-381 v0.1.1-0.20210208205449-6045b0235e36
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mitchellh/go-homedir v1.1.0
