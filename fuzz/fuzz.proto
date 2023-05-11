@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package fuzz;
+
+import "internal/proto/hotstuffpb/hotstuff.proto";
+
+option go_package = "github.com/relab/hotstuff/fuzz";
+
+message FuzzMsg {
+	oneof Message {
+		ProposeMsg ProposeMsg = 1;
+		TimeoutMsg TimeoutMsg = 2;
+		VoteMsg    VoteMsg    = 3;
+		NewViewMsg NewViewMsg = 4;
+	}
+}
+
+message ProposeMsg {
+  uint32 ID = 1;
+	hotstuffpb.Proposal Proposal = 2;
+}
+
+message TimeoutMsg {
+  uint32 ID = 1;
+	hotstuffpb.TimeoutMsg TimeoutMsg = 2;
+}
+
+message VoteMsg {
+  uint32 ID = 1;
+	hotstuffpb.PartialCert PartialCert = 2;
+	bool Deferred = 3;
+}
+
+message NewViewMsg {
+  uint32 ID = 1;
+	hotstuffpb.SyncInfo SyncInfo = 2;
+}
