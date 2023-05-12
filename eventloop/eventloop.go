@@ -161,7 +161,6 @@ func (el *EventLoop) AddEvent(event any) {
 		// run handlers with runInAddEvent option
 		el.processEvent(event, true)
 		el.eventQ.push(event)
-		el.processEvent(event, true)
 	}
 }
 
