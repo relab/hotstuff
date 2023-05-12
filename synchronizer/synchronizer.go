@@ -95,12 +95,17 @@ func New(viewDuration ViewDuration) modules.Synchronizer {
 	}
 }
 
-// Start starts the synchronizer with the given context.
-func (s *Synchronizer) Start(ctx context.Context) {
+func (s *Synchronizer) startTimeoutTimer() {
+	view := s.View()
 	s.timer = time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
-		s.eventLoop.AddEvent(TimeoutEvent{s.View()})
+		s.eventLoop.AddEvent(TimeoutEvent{view})
 	})
+}
+
+// Start starts the synchronizer with the given context.
+func (s *Synchronizer) Start(ctx context.Context) {
+	s.startTimeoutTimer()
 
 	go func() {
 		<-ctx.Done()
@@ -134,7 +139,7 @@ func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
 
 // OnLocalTimeout is called when a local timeout happens.
 func (s *Synchronizer) OnLocalTimeout() {
-	s.timer.Reset(s.duration.Duration())
+	s.startTimeoutTimer()
 
 	view := s.View()
 
@@ -309,9 +314,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 
 	newView := v + 1
 
-	s.mut.Lock()
 	s.currentView = newView
-	s.mut.Unlock()
 
 	s.lastTimeout = nil
 	s.duration.ViewStarted()
