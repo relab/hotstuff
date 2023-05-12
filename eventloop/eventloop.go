@@ -77,29 +77,10 @@ func New(bufferSize uint) *EventLoop {
 	return el
 }
 
-// WithOptions is a convenience function for registering handlers with options,
-// by calling RegisterHandler on the returned options:
-//
-//	el.WithOptions(eventloop.Prioritize()).RegisterHandler(func (event any) { ... })
-func (el *EventLoop) WithOptions(opts ...HandlerOption) HandlerOptions {
-	return HandlerOptions{el, opts}
-}
-
-// HandlerOptions is a list of options for event handlers.
-type HandlerOptions struct {
-	el   *EventLoop
-	opts []HandlerOption
-}
-
-// RegisterHandler registers the given event handler for the given event type with the options.
-func (opts HandlerOptions) RegisterHandler(eventType any, handler EventHandler) int {
-	return opts.el.registerHandler(eventType, opts.opts, handler)
-}
-
 // RegisterObserver registers a handler with priority.
 // Deprecated: use RegisterHandler and the Prioritize option instead.
 func (el *EventLoop) RegisterObserver(eventType any, handler EventHandler) int {
-	return el.WithOptions(Prioritize()).RegisterHandler(eventType, handler)
+	return el.registerHandler(eventType, []HandlerOption{Prioritize()}, handler)
 }
 
 // UnregisterObserver unregister a handler.
@@ -108,10 +89,10 @@ func (el *EventLoop) UnregisterObserver(eventType any, id int) {
 	el.UnregisterHandler(eventType, id)
 }
 
-// RegisterHandler registers the given event handler for the given event type with the default handler options.
-// Use WithOptions to specify handler options.
-func (el *EventLoop) RegisterHandler(eventType any, handler EventHandler) int {
-	return el.registerHandler(eventType, nil, handler)
+// RegisterHandler registers the given event handler for the given event type with the given handler options, if any.
+// If no handler options are provided, the default handler options will be used.
+func (el *EventLoop) RegisterHandler(eventType any, handler EventHandler, opts ...HandlerOption) int {
+	return el.registerHandler(eventType, opts, handler)
 }
 
 func (el *EventLoop) registerHandler(eventType any, opts []HandlerOption, callback EventHandler) int {

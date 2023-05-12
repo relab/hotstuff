@@ -14,13 +14,11 @@ import (
 func ViewContext(parent context.Context, eventLoop *eventloop.EventLoop, view *hotstuff.View) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parent)
 
-	id := eventLoop.
-		WithOptions(eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent()).
-		RegisterHandler(ViewChangeEvent{}, func(event any) {
-			if view == nil || event.(ViewChangeEvent).View >= *view {
-				cancel()
-			}
-		})
+	id := eventLoop.RegisterHandler(ViewChangeEvent{}, func(event any) {
+		if view == nil || event.(ViewChangeEvent).View >= *view {
+			cancel()
+		}
+	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent())
 
 	return ctx, func() {
 		eventLoop.UnregisterHandler(ViewChangeEvent{}, id)
@@ -33,11 +31,9 @@ func TimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop) (con
 	// ViewContext handles view-change case.
 	ctx, cancel := ViewContext(parent, eventLoop, nil)
 
-	id := eventLoop.
-		WithOptions(eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent()).
-		RegisterHandler(TimeoutEvent{}, func(event any) {
-			cancel()
-		})
+	id := eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
+		cancel()
+	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent())
 
 	return ctx, func() {
 		eventLoop.UnregisterHandler(TimeoutEvent{}, id)
