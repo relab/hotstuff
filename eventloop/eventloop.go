@@ -223,12 +223,6 @@ func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
 		defer el.dispatchDelayedEvents(t)
 	}
 
-	// TODO: document this behavior
-	if f, ok := event.(func()); ok && !runningInAddEvent {
-		f()
-		return
-	}
-
 	// Must copy handlers to a list so that they can be executed after unlocking the mutex.
 	// This looks like it might be slow, but there should be few handlers (< 10) registered for each event type.
 	// We use a pool to reduce memory allocations.
