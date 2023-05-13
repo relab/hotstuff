@@ -6,8 +6,10 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/synchronizer"
 )
 
 // blockChain stores a limited amount of blocks in a map.
@@ -15,7 +17,7 @@ import (
 type blockChain struct {
 	configuration modules.Configuration
 	consensus     modules.Consensus
-	synchronizer  modules.Synchronizer
+	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
 
 	mut           sync.Mutex
@@ -29,7 +31,7 @@ func (chain *blockChain) InitModule(mods *modules.Core) {
 	mods.Get(
 		&chain.configuration,
 		&chain.consensus,
-		&chain.synchronizer,
+		&chain.eventLoop,
 		&chain.logger,
 	)
 }
@@ -88,7 +90,7 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 		goto done
 	}
 
-	ctx, cancel = context.WithCancel(chain.synchronizer.ViewContext())
+	ctx, cancel = synchronizer.TimeoutContext(chain.eventLoop.Context(), chain.eventLoop)
 	chain.pendingFetch[hash] = cancel
 
 	chain.mut.Unlock()
@@ -109,7 +111,7 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 	chain.blockAtHeight[block.View()] = block
 
 done:
-	defer chain.mut.Unlock()
+	chain.mut.Unlock()
 
 	if !ok {
 		return nil, false

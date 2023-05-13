@@ -8,6 +8,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/synchronizer"
 )
 
 // Rules is the minimum interface that a consensus implementations must implement.
@@ -122,7 +123,10 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 		}
 	}
 
-	cmd, ok := cs.commandQueue.Get(cs.synchronizer.ViewContext())
+	ctx, cancel := synchronizer.TimeoutContext(cs.eventLoop.Context(), cs.eventLoop)
+	defer cancel()
+
+	cmd, ok := cs.commandQueue.Get(ctx)
 	if !ok {
 		cs.logger.Debug("Propose: No command")
 		return
@@ -208,16 +212,10 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	// block is safe and was accepted
 	cs.blockChain.Store(block)
 
-	didAdvanceView := false
-	// we defer the following in order to speed up voting
-	defer func() {
-		if b := cs.impl.CommitRule(block); b != nil {
-			cs.commit(b)
-		}
-		if !didAdvanceView {
-			cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
-		}
-	}()
+	if b := cs.impl.CommitRule(block); b != nil {
+		cs.commit(b)
+	}
+	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 
 	if block.View() <= cs.lastVote {
 		cs.logger.Info("OnPropose: block view too old")
@@ -233,9 +231,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	cs.lastVote = block.View()
 
 	if cs.handel != nil {
-		// Need to call advanceview such that the view context will be fresh.
-		cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
-		didAdvanceView = true
+		// let Handel handle the voting
 		cs.handel.Begin(pc)
 		return
 	}

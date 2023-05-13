@@ -9,7 +9,7 @@ require (
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mroth/weightedrand v0.4.1
-	github.com/relab/gorums v0.7.1-0.20220307181651-94a8af8e467c
+	github.com/relab/gorums v0.7.1-0.20220818130557-8533cb369cd6
 	github.com/relab/iago v0.0.0-20220416090249-bf984205c7a8
 	github.com/relab/wrfs v0.0.0-20220416082020-a641cd350078
 	github.com/spf13/cobra v1.4.0

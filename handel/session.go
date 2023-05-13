@@ -13,6 +13,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/proto/handelpb"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
+	"github.com/relab/hotstuff/synchronizer"
 )
 
 const (
@@ -331,7 +332,9 @@ func (s *session) updateIncoming(c contribution) {
 		level.done = true
 		s.advanceLevel()
 		if c.level+1 <= s.h.maxLevel {
-			s.sendFastPath(s.h.synchronizer.ViewContext(), c.level+1)
+			ctx, cancel := synchronizer.ViewContext(s.h.eventLoop.Context(), s.h.eventLoop, nil)
+			defer cancel()
+			s.sendFastPath(ctx, c.level+1)
 		}
 	}
 
@@ -472,7 +475,10 @@ func (s *session) sendContributionToLevel(ctx context.Context, levelIndex int) {
 	level.cp[id] += len(s.part.ids)
 }
 
-func (s *session) verifyContributions(ctx context.Context) {
+func (s *session) verifyContributions() {
+	ctx, cancel := synchronizer.ViewContext(s.h.eventLoop.Context(), s.h.eventLoop, nil)
+	defer cancel()
+
 	for ctx.Err() == nil {
 		c, verifyIndiv, ok := s.chooseContribution()
 		if !ok {
