@@ -233,6 +233,10 @@ type configuration struct {
 	subConfig hotstuff.IDSet
 }
 
+func (c *configuration) GetLatencyInfo(sender, receiver hotstuff.ID) time.Duration {
+	return time.Duration(0)
+}
+
 // alternative way to get a pointer to the node.
 func (c *configuration) InitModule(mods *modules.Core) {
 	if c.node == nil {

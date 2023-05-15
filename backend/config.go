@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
@@ -86,6 +87,7 @@ type subConfig struct {
 	synchronizer modules.Synchronizer
 	cfg          *hotstuffpb.Configuration
 	replicas     map[hotstuff.ID]modules.Replica
+	locationInfo map[uint32]string
 }
 
 // InitModule initializes the configuration.
@@ -108,7 +110,8 @@ func (cfg *Config) InitModule(mods *modules.Core) {
 }
 
 // NewConfig creates a new configuration.
-func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOption) *Config {
+func NewConfig(creds credentials.TransportCredentials, locationInfo map[uint32]string,
+	opts ...gorums.ManagerOption) *Config {
 	if creds == nil {
 		creds = insecure.NewCredentials()
 	}
@@ -122,7 +125,8 @@ func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOpt
 	// initialization will be finished by InitModule
 	cfg := &Config{
 		subConfig: subConfig{
-			replicas: make(map[hotstuff.ID]modules.Replica),
+			replicas:     make(map[hotstuff.ID]modules.Replica),
+			locationInfo: locationInfo,
 		},
 		opts: opts,
 	}
@@ -275,6 +279,12 @@ func (cfg *Config) SubConfig(ids []hotstuff.ID) (sub modules.Configuration, err 
 
 func (cfg *subConfig) SubConfig(_ []hotstuff.ID) (_ modules.Configuration, err error) {
 	return nil, errors.New("not supported")
+}
+
+func (cfg *subConfig) GetLatencyInfo(sender, receiver hotstuff.ID) time.Duration {
+	sLocation := cfg.locationInfo[uint32(sender)]
+	rLocation := cfg.locationInfo[uint32(receiver)]
+	return latencies[sLocation][rLocation]
 }
 
 // Len returns the number of replicas in the configuration.

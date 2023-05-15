@@ -2,6 +2,7 @@ package modules
 
 import (
 	"context"
+	"time"
 
 	"github.com/relab/hotstuff"
 )
@@ -123,6 +124,8 @@ type Configuration interface {
 	Fetch(ctx context.Context, chainNumber hotstuff.ChainNumber, hash hotstuff.Hash) (block *hotstuff.Block, ok bool)
 	// SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
 	SubConfig(ids []hotstuff.ID) (sub Configuration, err error)
+	//GetLatencyInfo gives the latency between sender and receiver.
+	GetLatencyInfo(sender, receiver hotstuff.ID) time.Duration
 }
 
 // Kauri module implements the Kauri protocol

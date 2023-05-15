@@ -33,7 +33,7 @@ func TestConnect(t *testing.T) {
 		defer teardown()
 		td.builders.Build()
 
-		cfg := NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
+		cfg := NewConfig(td.creds, make(map[uint32]string), gorums.WithDialTimeout(time.Second))
 
 		builder.Add(cfg)
 		builder.Build()
@@ -57,7 +57,7 @@ func testBase(t *testing.T, typ any, send func(modules.Configuration), handle ev
 		serverTeardown := createServers(t, td, ctrl)
 		defer serverTeardown()
 
-		cfg := NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
+		cfg := NewConfig(td.creds, make(map[uint32]string), gorums.WithDialTimeout(time.Second))
 		td.builders[0].Add(cfg)
 		hl := td.builders.Build()
 

@@ -103,7 +103,7 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 			Certificates: []tls.Certificate{*conf.Certificate},
 		})
 	}
-	srv.cfg = backend.NewConfig(creds, managerOpts...)
+	srv.cfg = backend.NewConfig(creds, conf.LocationInfo, managerOpts...)
 
 	builder.Add(
 		srv.cfg,   // configuration

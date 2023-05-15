@@ -53,6 +53,7 @@ type Kauri struct {
 	senders                 map[hotstuff.ChainNumber][]hotstuff.ID
 	nodes                   map[hotstuff.ID]*kauripb.Node
 	isAggregationSent       map[hotstuff.ChainNumber]bool
+	waitTime                time.Duration
 }
 
 // New initializes the kauri structure
@@ -105,12 +106,50 @@ func (k *Kauri) initializeConfiguration() {
 		idMappings[hotstuff.ID(i+1)] = i
 	}
 	k.tree.InitializeWithPIDs(idMappings)
+	k.waitTime = k.GetWaitTime()
 	k.initDone = true
 	k.senders = make(map[hotstuff.ChainNumber][]hotstuff.ID)
 	k.isAggregationSent = make(map[hotstuff.ChainNumber]bool)
 	k.blockHashes = make(map[hotstuff.ChainNumber]hotstuff.Hash)
 	k.currentViews = make(map[hotstuff.ChainNumber]hotstuff.View)
 	k.aggregatedContributions = make(map[hotstuff.ChainNumber]hotstuff.QuorumSignature)
+}
+
+func (k *Kauri) GetWaitTime() time.Duration {
+	latency := time.Duration(0)
+	if k.tree.GetHeight() == 3 {
+		intermediate := k.tree.GetChildren()
+		for _, id := range intermediate {
+			latencies := make([]time.Duration, 0)
+			latency += k.configuration.GetLatencyInfo(k.opts.ID(), id)
+			for _, id1 := range k.tree.GetChildrenOfNode(id) {
+				latencies = append(latencies, k.configuration.GetLatencyInfo(id, id1))
+			}
+			sort.Slice(latencies, func(i, j int) bool { return latencies[i] < latencies[j] })
+			reqDataLen := hotstuff.QuorumSize(MaxChild)
+			if len(latencies) > reqDataLen {
+				latencies = latencies[:reqDataLen]
+			}
+			for _, nodeLatency := range latencies {
+				latency += nodeLatency
+			}
+		}
+	}
+	if k.tree.GetHeight() == 2 {
+		latencies := make([]time.Duration, 0)
+		for _, id := range k.tree.GetChildren() {
+			latencies = append(latencies, k.configuration.GetLatencyInfo(k.opts.ID(), id))
+		}
+		sort.Slice(latencies, func(i, j int) bool { return latencies[i] < latencies[j] })
+		reqDataLen := hotstuff.QuorumSize(MaxChild)
+		if len(latencies) > reqDataLen {
+			latencies = latencies[:reqDataLen]
+		}
+		for _, nodeLatency := range latencies {
+			latency += nodeLatency
+		}
+	}
+	return latency + (100 * time.Millisecond)
 }
 
 // Begin starts dissemination of proposal and aggregation of votes.
@@ -126,8 +165,10 @@ func (k *Kauri) Begin(pc hotstuff.PartialCert, p hotstuff.ProposeMsg) {
 	// ids := k.randomizeIDS(k.blockHash, k.leaderRotation.GetLeader(k.currentView))
 	// k.tree.InitializeWithPIDs(ids)
 	k.SendProposalToChildren(p)
-	waitTime := time.Duration(uint64(k.tree.GetHeight() * 20 * int(time.Millisecond)))
-	go k.aggregateAndSend(waitTime, k.currentViews[pc.ChainNumber()], pc.ChainNumber())
+	if k.waitTime == 0 {
+		k.waitTime = time.Duration(uint64(k.tree.GetHeight() * 20 * int(time.Millisecond)))
+	}
+	go k.aggregateAndSend(k.currentViews[pc.ChainNumber()], pc.ChainNumber())
 }
 
 func (k *Kauri) reset(chainNumber hotstuff.ChainNumber) {
@@ -138,8 +179,8 @@ func (k *Kauri) reset(chainNumber hotstuff.ChainNumber) {
 	k.isAggregationSent[chainNumber] = false
 }
 
-func (k *Kauri) aggregateAndSend(t time.Duration, view hotstuff.View, chainNumber hotstuff.ChainNumber) {
-	ticker := time.NewTicker(t)
+func (k *Kauri) aggregateAndSend(view hotstuff.View, chainNumber hotstuff.ChainNumber) {
+	ticker := time.NewTicker(k.waitTime)
 	<-ticker.C
 	ticker.Stop()
 	if k.currentViews[chainNumber] != view {

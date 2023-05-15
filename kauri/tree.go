@@ -16,6 +16,7 @@ type TreeConfiguration interface {
 	GetChildren() []hotstuff.ID
 	GetSubTreeNodes() []hotstuff.ID
 	GetParent() (hotstuff.ID, bool)
+	GetChildrenOfNode(nodeID hotstuff.ID) []hotstuff.ID
 }
 
 // FaultFreeTree implements a fault free tree configuration.
