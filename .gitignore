@@ -35,3 +35,5 @@ measurements.json
 *.pdf
 
 twins.json
+fuzz/previous_messages.b64
+fuzz/previous_messages.seed
