@@ -48,6 +48,8 @@ Mathieu
 Meling
 mitchellh
 nolint
+Oneof
+Oneofs
 orchestrationpb
 partitioner
 Paulo
@@ -59,6 +61,7 @@ propsed
 proto
 protobuf
 protoc
+protoreflect
 protostream
 ptypes
 QC's

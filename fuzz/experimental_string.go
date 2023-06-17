@@ -16,13 +16,11 @@ func ValueToString(v protoreflect.Value, depth int) string {
 
 	if ok {
 		return ProtoToString(v.Message(), depth+1)
-	} else {
-		return InterfaceToString(v.Interface())
 	}
+	return InterfaceToString(v.Interface())
 }
 
 func ListToString(list protoreflect.List, depth int) string {
-
 	if list.Len() == 0 {
 		return "[]"
 	}
@@ -42,7 +40,6 @@ func ListToString(list protoreflect.List, depth int) string {
 }
 
 func MapToString(mp protoreflect.Map, depth int) string {
-
 	if mp.Len() == 0 {
 		return "[]"
 	}
@@ -98,7 +95,6 @@ func FieldToString(field protoreflect.FieldDescriptor, prm protoreflect.Message,
 }
 
 func ProtoToString(prm protoreflect.Message, depth int) string {
-
 	if !prm.IsValid() {
 		return "nil\n"
 	}

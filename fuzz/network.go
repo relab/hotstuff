@@ -278,7 +278,7 @@ func (c *configuration) sendMessage(id hotstuff.ID, message any) {
 		}
 
 		c.network.Messages = append(c.network.Messages, message)
-		c.network.MessageCounter += 1
+		c.network.MessageCounter++
 
 		if c.network.shouldSwap(message) {
 
