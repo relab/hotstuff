@@ -2,7 +2,7 @@ package fuzz
 
 import (
 	"fmt"
-	reflect "reflect"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -62,7 +62,6 @@ func (errorInfo *ErrorInfo) Init() {
 }
 
 func (errorInfo *ErrorInfo) OutputInfo(t *testing.T) {
-
 	b64s := ""
 	seeds := ""
 
@@ -77,7 +76,7 @@ func (errorInfo *ErrorInfo) OutputInfo(t *testing.T) {
 		keys = append(keys, key)
 	}
 
-	//sorting the keys of the
+	// sorting the keys of the
 	sort.Strings(keys)
 
 	for i, key := range keys {
@@ -90,7 +89,7 @@ func (errorInfo *ErrorInfo) OutputInfo(t *testing.T) {
 
 		fmt.Println()
 		fmt.Printf("ERROR NUMBER %d\n", i+1)
-		//contains error location, err text and recover point
+		// contains error location, err text and recover point
 		fmt.Println(key)
 		fmt.Println()
 		fmt.Println("crash amounts grouped by type:")
@@ -135,7 +134,6 @@ func (errorInfo *ErrorInfo) AddTotal(fuzzMessage *FuzzMsg, seed *int64) {
 }
 
 func (errorInfo *ErrorInfo) AddPanic(fullStack string, err2 any, info string) {
-
 	simpleStack := SimplifyStack(fullStack)
 	identifier := "error location:\t" + simpleStack + "\nerror info:\t" + fmt.Sprint(err2) + "\nrecovered from:\t" + info
 

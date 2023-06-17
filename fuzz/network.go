@@ -195,7 +195,6 @@ func (n *Network) tick() {
 // shouldDrop decides if the sender should drop the message, based on the current view of the sender and the
 // partitions configured for that view.
 func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
-
 	node, ok := n.nodes[sender]
 	if !ok {
 		panic(fmt.Errorf("node matching sender id %d was not found", sender))
@@ -266,7 +265,6 @@ func (c *configuration) broadcastMessage(message any) {
 }
 
 func (c *configuration) sendMessage(id hotstuff.ID, message any) {
-
 	nodes, ok := c.network.replicas[id]
 	if !ok {
 		panic(fmt.Errorf("attempt to send message to replica %d, but this replica does not exist", id))

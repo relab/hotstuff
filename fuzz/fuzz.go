@@ -63,7 +63,6 @@ func initFuzz() *fuzz.Fuzzer {
 }
 
 func createFuzzMessage(f *fuzz.Fuzzer, seed *int64) *FuzzMsg {
-
 	if seed != nil {
 		f.RandSource(rand.NewSource(*seed))
 	}

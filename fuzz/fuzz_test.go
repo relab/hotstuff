@@ -34,7 +34,6 @@ func TryExecuteScenario(errorInfo *ErrorInfo, oldMessage any, newMessage any) {
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 
 	result, err := ExecuteScenario(s, numNodes, 0, 100, "chainedhotstuff", oldMessage, newMessage)
-
 	if err != nil {
 		panic(err)
 	}
@@ -122,12 +121,10 @@ func TestFuzz(t *testing.T) {
 // load previously created fuzz messages from a file
 // it doesn't work quite right, i blame proto.Marshal()
 func TestPreviousFuzz(t *testing.T) {
-
 	errorInfo := new(ErrorInfo)
 	errorInfo.Init()
 
 	fuzzMsgs, err := loadFuzzMessagesFromFile("previous_messages.b64")
-
 	if err != nil {
 		panic(err)
 	}
@@ -146,7 +143,6 @@ func TestSeedPreviousFuzz(t *testing.T) {
 	errorInfo.Init()
 
 	seeds, err := loadSeedsFromFile("previous_messages.seed")
-
 	if err != nil {
 		panic(err)
 	}

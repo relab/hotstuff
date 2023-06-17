@@ -12,7 +12,6 @@ import (
 )
 
 func TestFrequencyErrorFuzz(t *testing.T) {
-
 	frequency := make(map[string]int, 0)
 
 	f := initFuzz()
@@ -42,7 +41,6 @@ func TestFrequencyErrorFuzz(t *testing.T) {
 	}
 
 	fmt.Println(sum)
-
 }
 
 func BenchmarkFuzz(b *testing.B) {
@@ -59,13 +57,12 @@ func BenchmarkFuzz(b *testing.B) {
 
 	fmt.Println(b.Elapsed())
 
-	//errorInfo.OutputInfo(nil)
+	// errorInfo.OutputInfo(nil)
 
 	fmt.Println()
 }
 
 func TestExperimentalString(t *testing.T) {
-
 	f := initFuzz()
 	fuzzMessage := createFuzzMessage(f, nil)
 

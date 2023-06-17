@@ -27,7 +27,6 @@ func (proposeFuzzMsg *ProposeMsg) ToString(depth int) string {
 }
 
 func (timeoutFuzzMsg *TimeoutMsg) ToString(depth int) string {
-
 	tabs := depthToTabs(depth)
 
 	return fmt.Sprintf(
@@ -56,7 +55,6 @@ func (voteFuzzMsg *VoteMsg) ToString(depth int) string {
 }
 
 func (newViewFuzzMsg *NewViewMsg) ToString(depth int) string {
-
 	if newViewFuzzMsg == nil {
 		return "nil"
 	}
@@ -74,7 +72,6 @@ func (newViewFuzzMsg *NewViewMsg) ToString(depth int) string {
 }
 
 func ProposalToString(proposal *hotstuffpb.Proposal, depth int) string {
-
 	if proposal == nil {
 		return "nil"
 	}
@@ -92,7 +89,6 @@ func ProposalToString(proposal *hotstuffpb.Proposal, depth int) string {
 }
 
 func BlockToString(block *hotstuffpb.Block, depth int) string {
-
 	if block == nil {
 		return "nil"
 	}
@@ -116,7 +112,6 @@ func BlockToString(block *hotstuffpb.Block, depth int) string {
 }
 
 func TimeoutMsgToString(timeoutMsg *hotstuffpb.TimeoutMsg, depth int) string {
-
 	if timeoutMsg == nil {
 		return "nil"
 	}
@@ -146,7 +141,6 @@ func SyncInfoPtrToString(object *hotstuffpb.SyncInfo, depth int) string {
 }
 
 func SyncInfoToString(syncInfo *hotstuffpb.SyncInfo, depth int) string {
-
 	if syncInfo == nil {
 		return "nil"
 	}
@@ -166,7 +160,6 @@ func SyncInfoToString(syncInfo *hotstuffpb.SyncInfo, depth int) string {
 }
 
 func QuorumCertToString(qc *hotstuffpb.QuorumCert, depth int) string {
-
 	if qc == nil {
 		return "nil"
 	}
@@ -186,7 +179,6 @@ func QuorumCertToString(qc *hotstuffpb.QuorumCert, depth int) string {
 }
 
 func TimeoutCertToString(tc *hotstuffpb.TimeoutCert, depth int) string {
-
 	if tc == nil {
 		return "nil"
 	}
@@ -204,7 +196,6 @@ func TimeoutCertToString(tc *hotstuffpb.TimeoutCert, depth int) string {
 }
 
 func AggQCToString(aggQC *hotstuffpb.AggQC, depth int) string {
-
 	if aggQC == nil {
 		return "nil"
 	}
@@ -232,7 +223,6 @@ func AggQCToString(aggQC *hotstuffpb.AggQC, depth int) string {
 }
 
 func PartialCertToString(partialCert *hotstuffpb.PartialCert, depth int) string {
-
 	if partialCert == nil {
 		return "nil"
 	}
@@ -250,7 +240,6 @@ func PartialCertToString(partialCert *hotstuffpb.PartialCert, depth int) string 
 }
 
 func QuorumSignatureToString(quorumSignature *hotstuffpb.QuorumSignature, depth int) string {
-
 	if quorumSignature == nil {
 		return "nil"
 	}
@@ -278,7 +267,6 @@ func QuorumSignatureToString(quorumSignature *hotstuffpb.QuorumSignature, depth 
 }
 
 func QuorumSignature_ECDSASigsToString(ECDASigs *hotstuffpb.QuorumSignature_ECDSASigs, depth int) string {
-
 	if ECDASigs == nil {
 		return "nil"
 	}
@@ -294,7 +282,6 @@ func QuorumSignature_ECDSASigsToString(ECDASigs *hotstuffpb.QuorumSignature_ECDS
 }
 
 func ECDSAMultiSignatureToString(ECDASigs *hotstuffpb.ECDSAMultiSignature, depth int) string {
-
 	if ECDASigs == nil {
 		return "nil"
 	}
@@ -318,7 +305,6 @@ func ECDSAMultiSignatureToString(ECDASigs *hotstuffpb.ECDSAMultiSignature, depth
 }
 
 func ECDASigToString(sig *hotstuffpb.ECDSASignature, depth int) string {
-
 	if sig == nil {
 		return "nil"
 	}
@@ -338,7 +324,6 @@ func ECDASigToString(sig *hotstuffpb.ECDSASignature, depth int) string {
 }
 
 func QuorumSignature_BLS12SigToString(BLS12Sig *hotstuffpb.QuorumSignature_BLS12Sig, depth int) string {
-
 	if BLS12Sig == nil {
 		return "nil"
 	}
@@ -354,7 +339,6 @@ func QuorumSignature_BLS12SigToString(BLS12Sig *hotstuffpb.QuorumSignature_BLS12
 }
 
 func BLS12AggregateSignatureToString(BLS12Sig *hotstuffpb.BLS12AggregateSignature, depth int) string {
-
 	if BLS12Sig == nil {
 		return "nil"
 	}

@@ -40,7 +40,6 @@ func b64ToFuzzMsg(str string) (*FuzzMsg, error) {
 }*/
 
 func saveStringToFile(filename string, str string) error {
-
 	f, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -74,9 +73,7 @@ func loadStringFromFile(filename string) (string, error) {
 }
 
 func loadFuzzMessagesFromFile(filename string) ([]*FuzzMsg, error) {
-
 	str, err := loadStringFromFile(filename)
-
 	if err != nil {
 		return nil, err
 	}
@@ -102,9 +99,7 @@ func loadFuzzMessagesFromFile(filename string) ([]*FuzzMsg, error) {
 }
 
 func loadSeedsFromFile(filename string) ([]int64, error) {
-
 	str, err := loadStringFromFile(filename)
-
 	if err != nil {
 		return nil, err
 	}
