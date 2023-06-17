@@ -1,7 +1,7 @@
 package fuzz
 
 // this file includes a couple of extra unnecessary tests
-// used for propability tests, profiling and other things
+// used for probability tests, profiling and other things
 
 import (
 	"fmt"

@@ -45,7 +45,7 @@ func (voteFuzzMsg *VoteMsg) ToString(depth int) string {
 	return fmt.Sprintf(
 		"fuzz.VoteMsg{\n"+
 			"%s\tID: %v\n"+
-			"%s\tDeffered: %v\n"+
+			"%s\tDeferred: %v\n"+
 			"%s\tPartialCert: %v\n"+
 			"%s}",
 		tabs, voteFuzzMsg.ID,
@@ -266,8 +266,8 @@ func QuorumSignatureToString(quorumSignature *hotstuffpb.QuorumSignature, depth 
 		tabs)
 }
 
-func QuorumSignature_ECDSASigsToString(ECDASigs *hotstuffpb.QuorumSignature_ECDSASigs, depth int) string {
-	if ECDASigs == nil {
+func QuorumSignature_ECDSASigsToString(ECDSASigs *hotstuffpb.QuorumSignature_ECDSASigs, depth int) string {
+	if ECDSASigs == nil {
 		return "nil"
 	}
 
@@ -275,36 +275,36 @@ func QuorumSignature_ECDSASigsToString(ECDASigs *hotstuffpb.QuorumSignature_ECDS
 
 	return fmt.Sprintf(
 		"&hotstuffpb.QuorumSignature_ECDSASigs{\n"+
-			"%s\tECDASigs: %s\n"+
+			"%s\tECDSASigs: %s\n"+
 			"%s},",
-		tabs, ECDSAMultiSignatureToString(ECDASigs.ECDSASigs, depth+1),
+		tabs, ECDSAMultiSignatureToString(ECDSASigs.ECDSASigs, depth+1),
 		tabs)
 }
 
-func ECDSAMultiSignatureToString(ECDASigs *hotstuffpb.ECDSAMultiSignature, depth int) string {
-	if ECDASigs == nil {
+func ECDSAMultiSignatureToString(ECDSASigs *hotstuffpb.ECDSAMultiSignature, depth int) string {
+	if ECDSASigs == nil {
 		return "nil"
 	}
 
 	tabs := depthToTabs(depth)
 
-	sigsString := "[]*ECDASignature{\n"
+	sigsString := "[]*ECDSASignature{\n"
 
-	for _, sig := range ECDASigs.Sigs {
-		sigsString += fmt.Sprintf("%s\t\t%s\n", tabs, ECDASigToString(sig, depth+2))
+	for _, sig := range ECDSASigs.Sigs {
+		sigsString += fmt.Sprintf("%s\t\t%s\n", tabs, ECDSASigToString(sig, depth+2))
 	}
 
 	sigsString += tabs + "\t}"
 
 	return fmt.Sprintf(
 		"&hotstuffpb.ECDSAMultiSignature{\n"+
-			"%s\tECDASigs: %s\n"+
+			"%s\tECDSASigs: %s\n"+
 			"%s}",
 		tabs, sigsString,
 		tabs)
 }
 
-func ECDASigToString(sig *hotstuffpb.ECDSASignature, depth int) string {
+func ECDSASigToString(sig *hotstuffpb.ECDSASignature, depth int) string {
 	if sig == nil {
 		return "nil"
 	}

@@ -16,6 +16,7 @@ Debugf
 durationpb
 emptypb
 Erevik
+eventloop
 Fangyu
 fasthotstuff
 felixge
@@ -41,6 +42,7 @@ Infof
 Jalalzai
 Jehl
 Jianyu
+keygen
 kilic
 latencygen
 Malkhi
@@ -74,6 +76,7 @@ simplehotstuff
 Sonnino
 SSWU
 structs
+subconfiguration
 throughputvslatency
 timestamppb
 TMPDIR
