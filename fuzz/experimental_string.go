@@ -7,20 +7,19 @@ import (
 )
 
 // work in progress
-func InterfaceToString(i interface{}) string {
+func interfaceToString(i interface{}) string {
 	return fmt.Sprintf("%v", i)
 }
 
-func ValueToString(v protoreflect.Value, depth int) string {
+func valueToString(v protoreflect.Value, depth int) string {
 	_, ok := v.Interface().(protoreflect.Message)
-
 	if ok {
-		return ProtoToString(v.Message(), depth+1)
+		return protoToString(v.Message(), depth+1)
 	}
-	return InterfaceToString(v.Interface())
+	return interfaceToString(v.Interface())
 }
 
-func ListToString(list protoreflect.List, depth int) string {
+func listToString(list protoreflect.List, depth int) string {
 	if list.Len() == 0 {
 		return "[]"
 	}
@@ -31,7 +30,7 @@ func ListToString(list protoreflect.List, depth int) string {
 
 	for i := 0; i < list.Len(); i++ {
 		item := list.Get(i)
-		str += tabs + "\t" + ValueToString(item, depth) + ",\n"
+		str += tabs + "\t" + valueToString(item, depth) + ",\n"
 	}
 
 	str += tabs + "]"
@@ -39,7 +38,7 @@ func ListToString(list protoreflect.List, depth int) string {
 	return str
 }
 
-func MapToString(mp protoreflect.Map, depth int) string {
+func mapToString(mp protoreflect.Map, depth int) string {
 	if mp.Len() == 0 {
 		return "[]"
 	}
@@ -48,17 +47,15 @@ func MapToString(mp protoreflect.Map, depth int) string {
 	str := "[\n"
 
 	mp.Range(func(mk protoreflect.MapKey, v protoreflect.Value) bool {
-		str += tabs + "\t" + ValueToString(mk.Value(), depth) + ": " + ValueToString(v, depth) + ",\n"
-
+		str += tabs + "\t" + valueToString(mk.Value(), depth) + ": " + valueToString(v, depth) + ",\n"
 		return true
 	})
 
 	str += tabs + "]"
-
 	return str
 }
 
-func FieldToString(field protoreflect.FieldDescriptor, prm protoreflect.Message, depth int) string {
+func fieldToString(field protoreflect.FieldDescriptor, prm protoreflect.Message, depth int) string {
 	msg := field.Message()
 
 	str := ""
@@ -69,7 +66,7 @@ func FieldToString(field protoreflect.FieldDescriptor, prm protoreflect.Message,
 
 	if field.IsList() {
 		list := prm.Get(field).List()
-		return str + ListToString(list, depth) + "\n"
+		return str + listToString(list, depth) + "\n"
 	}
 
 	if field.IsExtension() {
@@ -78,7 +75,7 @@ func FieldToString(field protoreflect.FieldDescriptor, prm protoreflect.Message,
 
 	if field.IsMap() {
 		map2 := prm.Get(field).Map()
-		return str + MapToString(map2, depth) + "\n"
+		return str + mapToString(map2, depth) + "\n"
 	}
 
 	if field.IsPlaceholder() {
@@ -86,15 +83,13 @@ func FieldToString(field protoreflect.FieldDescriptor, prm protoreflect.Message,
 	}
 
 	refl := prm.Get(field).Message()
-
 	if refl == nil {
 		panic("message reflection is nil")
 	}
-
-	return str + ProtoToString(refl, depth) + "\n"
+	return str + protoToString(refl, depth) + "\n"
 }
 
-func ProtoToString(prm protoreflect.Message, depth int) string {
+func protoToString(prm protoreflect.Message, depth int) string {
 	if !prm.IsValid() {
 		return "nil\n"
 	}
@@ -111,7 +106,7 @@ func ProtoToString(prm protoreflect.Message, depth int) string {
 			continue
 		}
 
-		str += tabs + "\t" + string(field.Name()) + ": " + FieldToString(field, prm, depth+1)
+		str += tabs + "\t" + string(field.Name()) + ": " + fieldToString(field, prm, depth+1)
 	}
 
 	oneofs := desc.Oneofs()
@@ -129,7 +124,7 @@ func ProtoToString(prm protoreflect.Message, depth int) string {
 				continue
 			}
 
-			str += tabs + "\t" + string(oneof.Name()) + ": " + FieldToString(field, prm, depth+1)
+			str += tabs + "\t" + string(oneof.Name()) + ": " + fieldToString(field, prm, depth+1)
 		}
 	}
 

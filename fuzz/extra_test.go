@@ -75,5 +75,5 @@ func TestExperimentalString(t *testing.T) {
 	var msg proto.Message
 	msg = fuzzMessage
 
-	fmt.Println(ProtoToString(msg.ProtoReflect(), 0))
+	fmt.Println(protoToString(msg.ProtoReflect(), 0))
 }
