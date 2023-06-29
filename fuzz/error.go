@@ -11,15 +11,15 @@ import (
 	"github.com/meling/proto2"
 )
 
-type TypeCount map[reflect.Type]int
+type typeCount map[reflect.Type]int
 
-func (typeCount TypeCount) Add(typ reflect.Type) {
-	typeCount[typ]++
+func (tc typeCount) Add(typ reflect.Type) {
+	tc[typ]++
 }
 
-func (typeCount TypeCount) String(typeTotalCount TypeCount) string {
+func (tc typeCount) String(typeTotalCount typeCount) string {
 	keys := make([]reflect.Type, 0)
-	for key := range typeCount {
+	for key := range tc {
 		keys = append(keys, key)
 	}
 
@@ -27,43 +27,43 @@ func (typeCount TypeCount) String(typeTotalCount TypeCount) string {
 
 	str := ""
 	for _, key := range keys {
-		str += key.String() + ": " + strconv.Itoa(typeCount[key]) + " / " + strconv.Itoa(typeTotalCount[key]) + "\n"
+		str += key.String() + ": " + strconv.Itoa(tc[key]) + " / " + strconv.Itoa(typeTotalCount[key]) + "\n"
 	}
 	return str
 }
 
-type PanicInfo struct {
+type panicInfo struct {
 	Err        any
 	StackTrace string
 	FuzzMsg    string
 	FuzzMsgB64 string
 	Seed       *int64
 	LineNum    int
-	TypeCount  TypeCount
+	TypeCount  typeCount
 }
 
-type ErrorInfo struct {
+type errorInfo struct {
 	messageFile        string
 	currentFuzzMsg     *FuzzMsg
 	currentFuzzMsgB64  string
 	currentFuzzMsgSeed *int64
 	errorCount         int
-	panics             map[string]PanicInfo
+	panics             map[string]panicInfo
 	totalScenarios     int
 	failedScenarios    int
 	totalMessages      int
 	failedMessages     int
-	TypePanicCount     TypeCount
-	TypeTotalCount     TypeCount
+	TypePanicCount     typeCount
+	TypeTotalCount     typeCount
 }
 
-func (errorInfo *ErrorInfo) Init() {
-	errorInfo.panics = make(map[string]PanicInfo)
-	errorInfo.TypeTotalCount = make(TypeCount)
-	errorInfo.TypePanicCount = make(TypeCount)
+func (ei *errorInfo) init() {
+	ei.panics = make(map[string]panicInfo)
+	ei.TypeTotalCount = make(typeCount)
+	ei.TypePanicCount = make(typeCount)
 }
 
-func (errorInfo *ErrorInfo) OutputInfo(t *testing.T) {
+func (ei *errorInfo) outputInfo(t *testing.T) {
 	b64s := ""
 	seeds := ""
 
@@ -74,7 +74,7 @@ func (errorInfo *ErrorInfo) OutputInfo(t *testing.T) {
 	fmt.Println("ERROR INFO")
 
 	keys := make([]string, 0)
-	for key := range errorInfo.panics {
+	for key := range ei.panics {
 		keys = append(keys, key)
 	}
 
@@ -82,7 +82,7 @@ func (errorInfo *ErrorInfo) OutputInfo(t *testing.T) {
 	sort.Strings(keys)
 
 	for i, key := range keys {
-		panicInfo := errorInfo.panics[key]
+		panicInfo := ei.panics[key]
 		b64s += panicInfo.FuzzMsgB64 + "\n"
 
 		if panicInfo.Seed != nil {
@@ -95,7 +95,7 @@ func (errorInfo *ErrorInfo) OutputInfo(t *testing.T) {
 		fmt.Println(key)
 		fmt.Println()
 		fmt.Println("crash amounts grouped by type:")
-		fmt.Println(panicInfo.TypeCount.String(errorInfo.TypeTotalCount))
+		fmt.Println(panicInfo.TypeCount.String(ei.TypeTotalCount))
 		fmt.Println("- STACK TRACE BEGIN")
 		fmt.Print(panicInfo.StackTrace)
 		fmt.Println("- STACK TRACE END")
@@ -118,66 +118,66 @@ func (errorInfo *ErrorInfo) OutputInfo(t *testing.T) {
 
 	fmt.Println()
 	fmt.Println("SUMMARY")
-	fmt.Printf("unique errors found: %d\n", len(errorInfo.panics))
-	fmt.Printf("%d runs were errors\n", errorInfo.errorCount)
-	fmt.Printf("%d of %d scenarios failed\n", errorInfo.failedScenarios, errorInfo.totalScenarios)
-	fmt.Printf("%d of %d messages failed\n", errorInfo.failedMessages, errorInfo.totalMessages)
+	fmt.Printf("unique errors found: %d\n", len(ei.panics))
+	fmt.Printf("%d runs were errors\n", ei.errorCount)
+	fmt.Printf("%d of %d scenarios failed\n", ei.failedScenarios, ei.totalScenarios)
+	fmt.Printf("%d of %d messages failed\n", ei.failedMessages, ei.totalMessages)
 	fmt.Println()
 	fmt.Println("crash amounts grouped by type:")
-	fmt.Println(errorInfo.TypePanicCount.String(errorInfo.TypeTotalCount))
+	fmt.Println(ei.TypePanicCount.String(ei.TypeTotalCount))
 }
 
-func (errorInfo *ErrorInfo) AddTotal(fuzzMessage *FuzzMsg, seed *int64) {
-	errorInfo.totalMessages++
-	errorInfo.currentFuzzMsg = fuzzMessage
-	errorInfo.currentFuzzMsgSeed = seed
-	protoMsg := extractProtoMsg(errorInfo.currentFuzzMsg)
+func (ei *errorInfo) addTotal(fuzzMessage *FuzzMsg, seed *int64) {
+	ei.totalMessages++
+	ei.currentFuzzMsg = fuzzMessage
+	ei.currentFuzzMsgSeed = seed
+	protoMsg := extractProtoMsg(ei.currentFuzzMsg)
 	typ := reflect.TypeOf(protoMsg)
-	errorInfo.TypeTotalCount.Add(typ)
+	ei.TypeTotalCount.Add(typ)
 }
 
-func (errorInfo *ErrorInfo) AddPanic(fullStack string, err2 any, info string) {
-	simpleStack := SimplifyStack(fullStack)
+func (ei *errorInfo) addPanic(fullStack string, err2 any, info string) {
+	simpleStack := simplifyStack(fullStack)
 	identifier := "error location:\t" + simpleStack + "\nerror info:\t" + fmt.Sprint(err2) + "\nrecovered from:\t" + info
 
-	errorInfo.errorCount++
+	ei.errorCount++
 
-	oldPanic, okPanic := errorInfo.panics[identifier]
+	oldPanic, okPanic := ei.panics[identifier]
 
-	b64, err := fuzzMsgToB64(errorInfo.currentFuzzMsg)
+	b64, err := fuzzMsgToB64(ei.currentFuzzMsg)
 	if err != nil {
 		panic(err)
 	}
 
-	protoMsg := extractProtoMsg(errorInfo.currentFuzzMsg)
+	protoMsg := extractProtoMsg(ei.currentFuzzMsg)
 	fuzzMsgString := proto2.GoString(protoMsg)
 	newLines := strings.Count(fuzzMsgString, "\n")
 
-	newPanic := PanicInfo{
+	newPanic := panicInfo{
 		Err:        err2,
 		StackTrace: fullStack,
 		FuzzMsg:    fuzzMsgString,
 		FuzzMsgB64: b64,
-		Seed:       errorInfo.currentFuzzMsgSeed,
+		Seed:       ei.currentFuzzMsgSeed,
 		LineNum:    newLines,
 	}
 
 	if okPanic {
 		newPanic.TypeCount = oldPanic.TypeCount
 	} else {
-		newPanic.TypeCount = make(TypeCount)
+		newPanic.TypeCount = make(typeCount)
 	}
 
 	oldLines := oldPanic.LineNum
 	if !okPanic || newLines < oldLines {
-		errorInfo.panics[identifier] = newPanic
+		ei.panics[identifier] = newPanic
 	}
 	typ := reflect.TypeOf(protoMsg)
-	errorInfo.panics[identifier].TypeCount.Add(typ)
-	errorInfo.TypePanicCount.Add(typ)
+	ei.panics[identifier].TypeCount.Add(typ)
+	ei.TypePanicCount.Add(typ)
 }
 
-func SimplifyStack(stack string) string {
+func simplifyStack(stack string) string {
 	stackLines := strings.Split(strings.ReplaceAll(stack, "\r\n", "\n"), "\n")
 	// line 9 tells us where the panic happened, found through testing
 	return stackLines[8][1:]

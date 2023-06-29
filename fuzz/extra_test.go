@@ -16,8 +16,8 @@ func TestFrequencyErrorFuzz(t *testing.T) {
 
 	f := initFuzz()
 	for j := 0; j < 1000; j++ {
-		errorInfo := new(ErrorInfo)
-		errorInfo.Init()
+		errorInfo := new(errorInfo)
+		errorInfo.init()
 
 		iterations := 1
 
@@ -44,8 +44,8 @@ func TestFrequencyErrorFuzz(t *testing.T) {
 }
 
 func BenchmarkFuzz(b *testing.B) {
-	errorInfo := new(ErrorInfo)
-	errorInfo.Init()
+	errorInfo := new(errorInfo)
+	errorInfo.init()
 
 	f := initFuzz()
 

@@ -9,14 +9,14 @@ import (
 	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
 )
 
-func TryExecuteScenario(errorInfo *ErrorInfo, oldMessage any, newMessage any) {
-	errorInfo.totalScenarios++
+func TryExecuteScenario(errInfo *errorInfo, oldMessage any, newMessage any) {
+	errInfo.totalScenarios++
 	defer func() {
 		if err := recover(); err != nil {
 			stack := string(debug.Stack())
 
-			errorInfo.AddPanic(stack, err, "TryExecuteScenario")
-			errorInfo.failedScenarios++
+			errInfo.addPanic(stack, err, "TryExecuteScenario")
+			errInfo.failedScenarios++
 		}
 	}()
 
@@ -68,35 +68,35 @@ func getMessagesBasicScenario() int {
 	return messageCount
 }
 
-func fuzzScenario(errorInfo *ErrorInfo, newMessage any) {
-	TryExecuteScenario(errorInfo, 1, newMessage)
+func fuzzScenario(errInfo *errorInfo, newMessage any) {
+	TryExecuteScenario(errInfo, 1, newMessage)
 }
 
-func fuzzMsgToMsg(errorInfo *ErrorInfo, fuzzMsg *FuzzMsg) any {
-	errorInfo.totalMessages++
+func fuzzMsgToMsg(errInfo *errorInfo, fuzzMsg *FuzzMsg) any {
+	errInfo.totalMessages++
 	defer func() {
 		if err := recover(); err != nil {
 			stack := string(debug.Stack())
 
-			errorInfo.AddPanic(stack, err, "fuzzMsgToMsg")
-			errorInfo.failedMessages++
+			errInfo.addPanic(stack, err, "fuzzMsgToMsg")
+			errInfo.failedMessages++
 		}
 	}()
 	return fuzzMsgToHotStuffMsg(fuzzMsg)
 }
 
-func useFuzzMessage(errorInfo *ErrorInfo, fuzzMessage *FuzzMsg, seed *int64) {
-	errorInfo.AddTotal(fuzzMessage, seed)
-	newMessage := fuzzMsgToMsg(errorInfo, fuzzMessage)
+func useFuzzMessage(errInfo *errorInfo, fuzzMessage *FuzzMsg, seed *int64) {
+	errInfo.addTotal(fuzzMessage, seed)
+	newMessage := fuzzMsgToMsg(errInfo, fuzzMessage)
 	if newMessage != nil {
-		fuzzScenario(errorInfo, newMessage)
+		fuzzScenario(errInfo, newMessage)
 	}
 }
 
 // the main test
 func TestFuzz(t *testing.T) {
-	errorInfo := new(ErrorInfo)
-	errorInfo.Init()
+	errInfo := new(errorInfo)
+	errInfo.init()
 
 	f := initFuzz()
 
@@ -105,21 +105,21 @@ func TestFuzz(t *testing.T) {
 	for i := 0; i < iterations; i++ {
 		// \r is carriage return, writing the
 		// next line will overwrite the previous ;)
-		fmt.Printf("running test %4d/%4d %4d errors \r", i+1, iterations, errorInfo.errorCount)
+		fmt.Printf("running test %4d/%4d %4d errors \r", i+1, iterations, errInfo.errorCount)
 
 		seed := rand.Int63()
 		fuzzMessage := createFuzzMessage(f, &seed)
-		useFuzzMessage(errorInfo, fuzzMessage, &seed)
+		useFuzzMessage(errInfo, fuzzMessage, &seed)
 	}
 
-	errorInfo.OutputInfo(t)
+	errInfo.outputInfo(t)
 }
 
 // load previously created fuzz messages from a file
 // it doesn't work quite right, i blame proto.Marshal()
 func TestPreviousFuzz(t *testing.T) {
-	errorInfo := new(ErrorInfo)
-	errorInfo.Init()
+	errInfo := new(errorInfo)
+	errInfo.init()
 
 	fuzzMsgs, err := loadFuzzMessagesFromFile("previous_messages.b64")
 	if err != nil {
@@ -127,17 +127,17 @@ func TestPreviousFuzz(t *testing.T) {
 	}
 
 	for _, fuzzMessage := range fuzzMsgs {
-		useFuzzMessage(errorInfo, fuzzMessage, nil)
+		useFuzzMessage(errInfo, fuzzMessage, nil)
 	}
 
-	errorInfo.OutputInfo(t)
+	errInfo.outputInfo(t)
 }
 
 // load previously created fuzz messages from a file
 // it recreates the fuzz messages from a 64-bit source
 func TestSeedPreviousFuzz(t *testing.T) {
-	errorInfo := new(ErrorInfo)
-	errorInfo.Init()
+	errInfo := new(errorInfo)
+	errInfo.init()
 
 	seeds, err := loadSeedsFromFile("previous_messages.seed")
 	if err != nil {
@@ -148,8 +148,8 @@ func TestSeedPreviousFuzz(t *testing.T) {
 
 	for _, seed := range seeds {
 		fuzzMessage := createFuzzMessage(f, &seed)
-		useFuzzMessage(errorInfo, fuzzMessage, nil)
+		useFuzzMessage(errInfo, fuzzMessage, nil)
 	}
 
-	errorInfo.OutputInfo(t)
+	errInfo.outputInfo(t)
 }

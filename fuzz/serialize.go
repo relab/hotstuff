@@ -48,8 +48,7 @@ func saveStringToFile(filename string, str string) error {
 	w := bufio.NewWriter(f)
 	_, err = w.WriteString(str)
 	w.Flush()
-
-	return nil
+	return err
 }
 
 func loadStringFromFile(filename string) (string, error) {
