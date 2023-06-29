@@ -9,7 +9,7 @@ import (
 	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
 )
 
-func TryExecuteScenario(errInfo *errorInfo, oldMessage any, newMessage any) {
+func tryExecuteScenario(errInfo *errorInfo, oldMessage any, newMessage any) {
 	errInfo.totalScenarios++
 	defer func() {
 		if err := recover(); err != nil {
@@ -63,13 +63,11 @@ func getMessagesBasicScenario() int {
 
 	result, _ := ExecuteScenario(s, numNodes, 0, 100, "chainedhotstuff")
 
-	messageCount := result.MessageCount
-
-	return messageCount
+	return result.MessageCount
 }
 
 func fuzzScenario(errInfo *errorInfo, newMessage any) {
-	TryExecuteScenario(errInfo, 1, newMessage)
+	tryExecuteScenario(errInfo, 1, newMessage)
 }
 
 func fuzzMsgToMsg(errInfo *errorInfo, fuzzMsg *FuzzMsg) any {

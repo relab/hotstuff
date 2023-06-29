@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
-
-	"google.golang.org/protobuf/proto"
 )
 
 func TestFrequencyErrorFuzz(t *testing.T) {
@@ -16,17 +14,17 @@ func TestFrequencyErrorFuzz(t *testing.T) {
 
 	f := initFuzz()
 	for j := 0; j < 1000; j++ {
-		errorInfo := new(errorInfo)
-		errorInfo.init()
+		errInfo := new(errorInfo)
+		errInfo.init()
 
 		iterations := 1
 
 		for i := 0; i < iterations; i++ {
 			fuzzMessage := createFuzzMessage(f, nil)
-			useFuzzMessage(errorInfo, fuzzMessage, nil)
+			useFuzzMessage(errInfo, fuzzMessage, nil)
 		}
 
-		for key := range errorInfo.panics {
+		for key := range errInfo.panics {
 			frequency[key]++
 		}
 	}
@@ -44,36 +42,17 @@ func TestFrequencyErrorFuzz(t *testing.T) {
 }
 
 func BenchmarkFuzz(b *testing.B) {
-	errorInfo := new(errorInfo)
-	errorInfo.init()
+	errInfo := new(errorInfo)
+	errInfo.init()
 
 	f := initFuzz()
 
 	for i := 0; i < b.N; i++ {
 		seed := rand.Int63()
 		fuzzMessage := createFuzzMessage(f, &seed)
-		useFuzzMessage(errorInfo, fuzzMessage, &seed)
+		useFuzzMessage(errInfo, fuzzMessage, &seed)
 	}
 
 	fmt.Println(b.Elapsed())
-
-	// errorInfo.OutputInfo(nil)
-
 	fmt.Println()
-}
-
-func TestExperimentalString(t *testing.T) {
-	f := initFuzz()
-	fuzzMessage := createFuzzMessage(f, nil)
-
-	/*fuzzMessage := hotstuffpb.ECDSASignature{
-		Signer: uint32(10),
-		R:      []byte{3, 1, 2},
-		S:      []byte{5, 4, 3},
-	}*/
-
-	var msg proto.Message
-	msg = fuzzMessage
-
-	fmt.Println(protoToString(msg.ProtoReflect(), 0))
 }
