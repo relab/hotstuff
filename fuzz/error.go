@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/meling/proto2"
 )
 
 type TypeCount map[reflect.Type]int
@@ -129,7 +131,8 @@ func (errorInfo *ErrorInfo) AddTotal(fuzzMessage *FuzzMsg, seed *int64) {
 	errorInfo.totalMessages++
 	errorInfo.currentFuzzMsg = fuzzMessage
 	errorInfo.currentFuzzMsgSeed = seed
-	typ := reflect.TypeOf(fuzzMessage.Msg())
+	protoMsg := extractProtoMsg(errorInfo.currentFuzzMsg)
+	typ := reflect.TypeOf(protoMsg)
 	errorInfo.TypeTotalCount.Add(typ)
 }
 
@@ -146,13 +149,14 @@ func (errorInfo *ErrorInfo) AddPanic(fullStack string, err2 any, info string) {
 		panic(err)
 	}
 
-	FuzzMsgString := errorInfo.currentFuzzMsg.Msg().ToString(0)
-	newLines := strings.Count(FuzzMsgString, "\n")
+	protoMsg := extractProtoMsg(errorInfo.currentFuzzMsg)
+	fuzzMsgString := proto2.GoString(protoMsg)
+	newLines := strings.Count(fuzzMsgString, "\n")
 
 	newPanic := PanicInfo{
 		Err:        err2,
 		StackTrace: fullStack,
-		FuzzMsg:    FuzzMsgString,
+		FuzzMsg:    fuzzMsgString,
 		FuzzMsgB64: b64,
 		Seed:       errorInfo.currentFuzzMsgSeed,
 		LineNum:    newLines,
@@ -168,7 +172,7 @@ func (errorInfo *ErrorInfo) AddPanic(fullStack string, err2 any, info string) {
 	if !okPanic || newLines < oldLines {
 		errorInfo.panics[identifier] = newPanic
 	}
-	typ := reflect.TypeOf(errorInfo.currentFuzzMsg.Msg())
+	typ := reflect.TypeOf(protoMsg)
 	errorInfo.panics[identifier].TypeCount.Add(typ)
 	errorInfo.TypePanicCount.Add(typ)
 }

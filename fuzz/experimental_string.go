@@ -6,6 +6,13 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
+func depthToTabs(depth int) (tabs string) {
+	for i := 0; i < depth; i++ {
+		tabs += "\t"
+	}
+	return
+}
+
 // work in progress
 func interfaceToString(i interface{}) string {
 	return fmt.Sprintf("%v", i)

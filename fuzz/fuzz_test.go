@@ -82,15 +82,12 @@ func fuzzMsgToMsg(errorInfo *ErrorInfo, fuzzMsg *FuzzMsg) any {
 			errorInfo.failedMessages++
 		}
 	}()
-
-	return fuzzMsg.Msg().ToMsg()
+	return fuzzMsgToHotStuffMsg(fuzzMsg)
 }
 
 func useFuzzMessage(errorInfo *ErrorInfo, fuzzMessage *FuzzMsg, seed *int64) {
 	errorInfo.AddTotal(fuzzMessage, seed)
-
 	newMessage := fuzzMsgToMsg(errorInfo, fuzzMessage)
-
 	if newMessage != nil {
 		fuzzScenario(errorInfo, newMessage)
 	}
