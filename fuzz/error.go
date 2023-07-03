@@ -150,7 +150,7 @@ func (ei *errorInfo) addPanic(fullStack string, err2 any, info string) {
 	}
 
 	protoMsg := extractProtoMsg(ei.currentFuzzMsg)
-	fuzzMsgString := proto2.GoString(protoMsg)
+	fuzzMsgString := proto2.GoStruct(protoMsg)
 	newLines := strings.Count(fuzzMsgString, "\n")
 
 	newPanic := panicInfo{

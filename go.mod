@@ -8,7 +8,7 @@ require (
 	github.com/google/gofuzz v1.1.0
 	github.com/kilic/bls12-381 v0.1.1-0.20210208205449-6045b0235e36
 	github.com/mattn/go-isatty v0.0.14
-	github.com/meling/proto2 v0.0.0-20230629054207-f46066bf57ea
+	github.com/meling/proto2 v0.0.0-20230703190343-27bbb7955179
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mroth/weightedrand v0.4.1
 	github.com/relab/gorums v0.7.1-0.20220307181651-94a8af8e467c
