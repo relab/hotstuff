@@ -84,6 +84,7 @@ tmpl
 Tormod
 unittests
 unmarshals
+unregisters
 Warnf
 wcfg
 Welford

@@ -11,7 +11,7 @@ require (
 	github.com/meling/proto2 v0.0.0-20230703190343-27bbb7955179
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mroth/weightedrand v0.4.1
-	github.com/relab/gorums v0.7.1-0.20220307181651-94a8af8e467c
+	github.com/relab/gorums v0.7.1-0.20220818130557-8533cb369cd6
 	github.com/relab/iago v0.0.0-20220416090249-bf984205c7a8
 	github.com/relab/wrfs v0.0.0-20220416082020-a641cd350078
 	github.com/spf13/cobra v1.4.0
@@ -32,7 +32,7 @@ require (
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b // indirect
 	github.com/alexhunt7/ssher v0.0.0-20190216204854-d36569cf7047 // indirect
 	github.com/campoy/embedmd v1.0.0 // indirect
-	github.com/docker/distribution v2.8.1+incompatible // indirect
+	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/docker/docker v20.10.24+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect

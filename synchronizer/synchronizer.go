@@ -4,6 +4,7 @@ package synchronizer
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/relab/hotstuff/eventloop"
@@ -24,6 +25,7 @@ type Synchronizer struct {
 	logger         logging.Logger
 	opts           *modules.Options
 
+	mut         sync.RWMutex // to protect the following
 	currentView hotstuff.View
 	highTC      hotstuff.TimeoutCert
 	highQC      hotstuff.QuorumCert
@@ -35,9 +37,6 @@ type Synchronizer struct {
 
 	duration ViewDuration
 	timer    *time.Timer
-
-	viewCtx   context.Context // a context that is cancelled at the end of the current view
-	cancelCtx context.CancelFunc
 
 	// map of collected timeout messages per view
 	timeouts map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
@@ -58,7 +57,7 @@ func (s *Synchronizer) InitModule(mods *modules.Core) {
 
 	s.eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
 		timeoutView := event.(TimeoutEvent).View
-		if s.currentView == timeoutView {
+		if s.View() == timeoutView {
 			s.OnLocalTimeout()
 		}
 	})
@@ -86,12 +85,8 @@ func (s *Synchronizer) InitModule(mods *modules.Core) {
 
 // New creates a new Synchronizer.
 func New(viewDuration ViewDuration) modules.Synchronizer {
-	ctx, cancel := context.WithCancel(context.Background())
 	return &Synchronizer{
 		currentView: 1,
-
-		viewCtx:   ctx,
-		cancelCtx: cancel,
 
 		duration: viewDuration,
 		timer:    time.AfterFunc(0, func() {}), // dummy timer that will be replaced after start() is called
@@ -100,13 +95,17 @@ func New(viewDuration ViewDuration) modules.Synchronizer {
 	}
 }
 
-// Start starts the synchronizer with the given context.
-func (s *Synchronizer) Start(ctx context.Context) {
+func (s *Synchronizer) startTimeoutTimer() {
+	view := s.View()
 	s.timer = time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
-		s.cancelCtx()
-		s.eventLoop.AddEvent(TimeoutEvent{s.currentView})
+		s.eventLoop.AddEvent(TimeoutEvent{view})
 	})
+}
+
+// Start starts the synchronizer with the given context.
+func (s *Synchronizer) Start(ctx context.Context) {
+	s.startTimeoutTimer()
 
 	go func() {
 		<-ctx.Done()
@@ -114,7 +113,7 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	}()
 
 	// start the initial proposal
-	if s.currentView == 1 && s.leaderRotation.GetLeader(s.currentView) == s.opts.ID() {
+	if view := s.View(); view == 1 && s.leaderRotation.GetLeader(view) == s.opts.ID() {
 		s.consensus.Propose(s.SyncInfo())
 	}
 }
@@ -126,38 +125,30 @@ func (s *Synchronizer) HighQC() hotstuff.QuorumCert {
 
 // View returns the current view.
 func (s *Synchronizer) View() hotstuff.View {
+	s.mut.RLock()
+	defer s.mut.RUnlock()
 	return s.currentView
-}
-
-// ViewContext returns a context that is cancelled at the end of the view.
-func (s *Synchronizer) ViewContext() context.Context {
-	return s.viewCtx
 }
 
 // SyncInfo returns the highest known QC or TC.
 func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
+	s.mut.RLock()
+	defer s.mut.RUnlock()
 	return hotstuff.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
 }
 
 // OnLocalTimeout is called when a local timeout happens.
 func (s *Synchronizer) OnLocalTimeout() {
-	// Reset the timer and ctx here so that we can get a new timeout in the same view.
-	// I think this is necessary to ensure that we can keep sending the same timeout message
-	// until we get a timeout certificate.
-	//
-	// TODO: figure out the best way to handle this context and timeout.
-	if s.viewCtx.Err() != nil {
-		s.newCtx(s.duration.Duration())
-	}
-	s.timer.Reset(s.duration.Duration())
+	s.startTimeoutTimer()
 
-	if s.lastTimeout != nil && s.lastTimeout.View == s.currentView {
+	view := s.View()
+
+	if s.lastTimeout != nil && s.lastTimeout.View == view {
 		s.configuration.Timeout(*s.lastTimeout)
 		return
 	}
 
 	s.duration.ViewTimeout() // increase the duration of the next view
-	view := s.currentView
 	s.logger.Debugf("OnLocalTimeout: %v", view)
 
 	sig, err := s.crypto.Sign(view.ToBytes())
@@ -183,7 +174,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	}
 	s.lastTimeout = &timeoutMsg
 	// stop voting for current view
-	s.consensus.StopVoting(s.currentView)
+	s.consensus.StopVoting(view)
 
 	s.configuration.Timeout(timeoutMsg)
 	s.OnRemoteTimeout(timeoutMsg)
@@ -191,10 +182,12 @@ func (s *Synchronizer) OnLocalTimeout() {
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
 func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
+	currView := s.View()
+
 	defer func() {
 		// cleanup old timeouts
 		for view := range s.timeouts {
-			if view < s.currentView {
+			if view < currView {
 				delete(s.timeouts, view)
 			}
 		}
@@ -238,7 +231,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	si := s.SyncInfo().WithTC(tc)
 
 	if s.opts.ShouldUseAggQC() {
-		aggQC, err := s.crypto.CreateAggregateQC(s.currentView, timeoutList)
+		aggQC, err := s.crypto.CreateAggregateQC(currView, timeoutList)
 		if err != nil {
 			s.logger.Debugf("Failed to create aggregateQC: %v", err)
 		} else {
@@ -309,7 +302,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		}
 	}
 
-	if v < s.currentView {
+	if v < s.View() {
 		return
 	}
 
@@ -319,19 +312,20 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		s.duration.ViewSucceeded()
 	}
 
-	s.currentView = v + 1
+	newView := v + 1
+
+	s.currentView = newView
+
 	s.lastTimeout = nil
 	s.duration.ViewStarted()
 
 	duration := s.duration.Duration()
-	// cancel the old view context and set up the next one
-	s.newCtx(duration)
 	s.timer.Reset(duration)
 
-	s.logger.Debugf("advanced to view %d", s.currentView)
-	s.eventLoop.AddEvent(ViewChangeEvent{View: s.currentView, Timeout: timeout})
+	s.logger.Debugf("advanced to view %d", newView)
+	s.eventLoop.AddEvent(ViewChangeEvent{View: newView, Timeout: timeout})
 
-	leader := s.leaderRotation.GetLeader(s.currentView)
+	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.opts.ID() {
 		s.consensus.Propose(syncInfo)
 	} else if replica, ok := s.configuration.Replica(leader); ok {
@@ -361,11 +355,6 @@ func (s *Synchronizer) updateHighTC(tc hotstuff.TimeoutCert) {
 		s.highTC = tc
 		s.logger.Debug("HighTC updated")
 	}
-}
-
-func (s *Synchronizer) newCtx(duration time.Duration) {
-	s.cancelCtx()
-	s.viewCtx, s.cancelCtx = context.WithTimeout(context.Background(), duration)
 }
 
 var _ modules.Synchronizer = (*Synchronizer)(nil)
