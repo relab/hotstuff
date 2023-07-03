@@ -127,7 +127,7 @@ func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) modules.Buil
 	return builder
 }
 
-func (n *Network) createTwinsNodes(nodes []NodeID, scenario Scenario, consensusName string) error {
+func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName string) error {
 	cg := &commandGenerator{}
 	for _, nodeID := range nodes {
 
@@ -229,7 +229,7 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 	return ok
 }
 
-func (n *Network) shouldSwap(message any) bool {
+func (n *Network) shouldSwap(_ any) bool {
 	n.logger.Infof("is %d equal to %d?", n.OldMessage, n.MessageCounter)
 	return n.OldMessage == n.MessageCounter
 }

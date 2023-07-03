@@ -43,9 +43,7 @@ type panicInfo struct {
 }
 
 type errorInfo struct {
-	messageFile        string
 	currentFuzzMsg     *FuzzMsg
-	currentFuzzMsgB64  string
 	currentFuzzMsgSeed *int64
 	errorCount         int
 	panics             map[string]panicInfo
@@ -64,6 +62,7 @@ func (ei *errorInfo) init() {
 }
 
 func (ei *errorInfo) outputInfo(t *testing.T) {
+	t.Helper()
 	b64s := ""
 	seeds := ""
 
@@ -105,15 +104,19 @@ func (ei *errorInfo) outputInfo(t *testing.T) {
 		fmt.Println("- FUZZ MESSAGE END")
 		fmt.Println()
 
-		if t != nil {
-			t.Error(panicInfo.Err)
-		}
+		t.Error(panicInfo.Err)
 	}
 
-	saveStringToFile("previous_messages.b64", b64s)
+	err := saveStringToFile("previous_messages.b64", b64s)
+	if err != nil {
+		t.Error(err)
+	}
 
 	if seeds != "" {
-		saveStringToFile("previous_messages.seed", seeds)
+		err := saveStringToFile("previous_messages.seed", seeds)
+		if err != nil {
+			t.Error(err)
+		}
 	}
 
 	fmt.Println()

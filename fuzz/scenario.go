@@ -218,4 +218,4 @@ func (cm commandModule) Exec(block *hotstuff.Block) {
 	cm.node.executedBlocks = append(cm.node.executedBlocks, block)
 }
 
-func (commandModule) Fork(block *hotstuff.Block) {}
+func (commandModule) Fork(_ *hotstuff.Block) {}

@@ -47,25 +47,6 @@ func tryExecuteScenario(errInfo *errorInfo, oldMessage any, newMessage any) {
 	}
 }
 
-func getMessagesBasicScenario() int {
-	var numNodes uint8 = 4
-
-	allNodesSet := make(NodeSet)
-	for i := 1; i <= int(numNodes); i++ {
-		allNodesSet.Add(uint32(i))
-	}
-
-	s := Scenario{}
-	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
-	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
-	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
-	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
-
-	result, _ := ExecuteScenario(s, numNodes, 0, 100, "chainedhotstuff")
-
-	return result.MessageCount
-}
-
 func fuzzScenario(errInfo *errorInfo, newMessage any) {
 	tryExecuteScenario(errInfo, 1, newMessage)
 }

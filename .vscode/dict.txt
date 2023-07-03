@@ -24,7 +24,9 @@ Feng
 ferr
 fgprof
 fgprofprofile
+Fuzzer
 gocyclo
+gofuzz
 golangci
 golint
 gomock

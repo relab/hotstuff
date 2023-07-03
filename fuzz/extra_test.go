@@ -6,10 +6,14 @@ package fuzz
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"testing"
 )
 
 func TestFrequencyErrorFuzz(t *testing.T) {
+	if os.Getenv("FUZZ") == "" {
+		t.Skip("Skipping slow test; run with FUZZ=1 to enable")
+	}
 	frequency := make(map[string]int, 0)
 
 	f := initFuzz()
@@ -18,7 +22,6 @@ func TestFrequencyErrorFuzz(t *testing.T) {
 		errInfo.init()
 
 		iterations := 1
-
 		for i := 0; i < iterations; i++ {
 			fuzzMessage := createFuzzMessage(f, nil)
 			useFuzzMessage(errInfo, fuzzMessage, nil)
@@ -30,14 +33,12 @@ func TestFrequencyErrorFuzz(t *testing.T) {
 	}
 
 	sum := 0
-
 	for key, val := range frequency {
 		sum += val
 		fmt.Println(key)
 		fmt.Println(val)
 		fmt.Println()
 	}
-
 	fmt.Println(sum)
 }
 
