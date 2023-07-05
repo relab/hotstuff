@@ -229,8 +229,7 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 	return ok
 }
 
-func (n *Network) shouldSwap(_ any) bool {
-	n.logger.Infof("is %d equal to %d?", n.OldMessage, n.MessageCounter)
+func (n *Network) shouldSwap() bool {
 	return n.OldMessage == n.MessageCounter
 }
 
@@ -280,11 +279,7 @@ func (c *configuration) sendMessage(id hotstuff.ID, message any) {
 		c.network.Messages = append(c.network.Messages, message)
 		c.network.MessageCounter++
 
-		if c.network.shouldSwap(message) {
-
-			/*if (c.network.NewMessage.(hotstuff.ProposeMsg).Block.Parent() == hotstuff.Hash{}) {
-				c.network.NewMessage.(hotstuff.ProposeMsg).Block.SetParent(message.(hotstuff.ProposeMsg).Block.Parent())
-			}*/
+		if c.network.shouldSwap() {
 			c.network.logger.Infof("swapping message with fuzz message")
 			message = c.network.NewMessage
 		}
