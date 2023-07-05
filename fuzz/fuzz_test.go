@@ -72,6 +72,11 @@ func useFuzzMessage(errInfo *errorInfo, fuzzMessage *FuzzMsg, seed *int64) {
 	}
 }
 
+func ShowProgress(t *testing.T, numIteration int, iterations int, errorCount int) {
+	t.Helper()
+	fmt.Printf("running test %4d/%4d %4d errors \r", numIteration, iterations, errorCount)
+}
+
 // the main test
 func TestFuzz(t *testing.T) {
 	errInfo := new(errorInfo)
@@ -82,9 +87,7 @@ func TestFuzz(t *testing.T) {
 	iterations := 1000
 
 	for i := 0; i < iterations; i++ {
-		// \r is carriage return, writing the
-		// next line will overwrite the previous ;)
-		fmt.Printf("running test %4d/%4d %4d errors \r", i+1, iterations, errInfo.errorCount)
+		ShowProgress(t, i+1, iterations, errInfo.errorCount)
 
 		seed := rand.Int63()
 		fuzzMessage := createFuzzMessage(f, &seed)
