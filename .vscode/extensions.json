@@ -1,0 +1,10 @@
+{
+    "recommendations": [
+        "xaver.clang-format",
+        "streetsidesoftware.code-spell-checker",
+        "golang.go",
+        "davidanson.vscode-markdownlint",
+        "zxh404.vscode-proto3",
+        "github.vscode-pull-request-github",
+    ]
+}
