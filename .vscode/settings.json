@@ -1,19 +1,4 @@
 {
-	"clang-format.style": "{ IndentWidth: 4, BasedOnStyle: google, AlignConsecutiveAssignments: true, ColumnLimit: 120 }",
-	"editor.formatOnSave": true,
-	"protoc": {
-		"compile_on_save": false,
-		"options": [
-			"--proto_path=${workspaceRoot}/",
-			"--proto_path=/Users/meling/go/pkg/mod/github.com/relab/gorums@v0.7.1-0.20220307181651-94a8af8e467c",
-			// "--proto_path=$(shell go list -m -f {{.Dir}} github.com/relab/gorums)",
-			// "--proto_path=`go list -m -f {{.Dir}} github.com/relab/gorums`",
-		]
-	},
-	"go.lintTool": "golangci-lint",
-	"go.lintFlags": [
-		"--fast",
-	],
 	"go.testFlags": [
 		"-count=1"
 	],
