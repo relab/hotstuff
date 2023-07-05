@@ -94,7 +94,7 @@ func TestFuzz(t *testing.T) {
 		useFuzzMessage(errInfo, fuzzMessage, &seed)
 	}
 
-	errInfo.outputInfo(t)
+	errInfo.outputErrors(t)
 }
 
 // load previously created fuzz messages from a file
@@ -112,7 +112,7 @@ func TestPreviousFuzz(t *testing.T) {
 		useFuzzMessage(errInfo, fuzzMessage, nil)
 	}
 
-	errInfo.outputInfo(t)
+	errInfo.outputErrors(t)
 }
 
 // load previously created fuzz messages from a file
@@ -133,5 +133,5 @@ func TestSeedPreviousFuzz(t *testing.T) {
 		useFuzzMessage(errInfo, fuzzMessage, nil)
 	}
 
-	errInfo.outputInfo(t)
+	errInfo.outputErrors(t)
 }

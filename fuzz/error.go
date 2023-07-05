@@ -61,6 +61,15 @@ func (ei *errorInfo) init() {
 	ei.TypePanicCount = make(typeCount)
 }
 
+func (ei *errorInfo) outputErrors(t *testing.T) {
+
+	ei.outputInfo(t)
+
+	for panicInfo := range ei.panics {
+		t.Error(panicInfo.Err)
+	}
+}
+
 func (ei *errorInfo) outputInfo(t *testing.T) {
 	t.Helper()
 	b64s := ""
@@ -103,8 +112,6 @@ func (ei *errorInfo) outputInfo(t *testing.T) {
 		fmt.Println(panicInfo.FuzzMsg)
 		fmt.Println("- FUZZ MESSAGE END")
 		fmt.Println()
-
-		t.Error(panicInfo.Err)
 	}
 
 	err := saveStringToFile("previous_messages.b64", b64s)
