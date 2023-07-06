@@ -21,8 +21,8 @@ require (
 	golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306
 	gonum.org/v1/plot v0.11.0
-	google.golang.org/genproto v0.0.0-20220525015930-6ca3db687a9d
-	google.golang.org/grpc v1.47.0
+	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f
+	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.31.0
 )
 
