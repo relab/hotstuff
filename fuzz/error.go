@@ -62,10 +62,8 @@ func (ei *errorInfo) init() {
 }
 
 func (ei *errorInfo) outputErrors(t *testing.T) {
-
 	ei.outputInfo(t)
-
-	for panicInfo := range ei.panics {
+	for _, panicInfo := range ei.panics {
 		t.Error(panicInfo.Err)
 	}
 }
