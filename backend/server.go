@@ -221,6 +221,19 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	impl.srv.eventLoop.AddEvent(timeoutMsg)
 }
 
+// ReconfigurationRequest handles an incoming Reconfiguration request.
+func (impl *serviceImpl) ReconfigurationRequest(ctx gorums.ServerCtx, msg *hotstuffpb.ReconfigurationMsg) {
+	impl.srv.logger.Info("received reconfiguration request")
+	reconfigurationRequest := hotstuffpb.ReconfigurationFromProto(msg)
+	impl.srv.eventLoop.AddEvent(reconfigurationRequest)
+}
+
+// Update handles the incoming update message
+func (impl *serviceImpl) Update(ctx gorums.ServerCtx, msg *hotstuffpb.UpdateMsg) {
+	updateMsg := hotstuffpb.UpdateFromProto(msg)
+	impl.srv.eventLoop.AddEvent(updateMsg)
+}
+
 type replicaConnected struct {
 	ctx context.Context
 }

@@ -31,9 +31,9 @@ type qspec struct {
 }
 
 func (q *qspec) ExecCommandQF(_ *clientpb.Command, signatures map[uint32]*emptypb.Empty) (*emptypb.Empty, bool) {
-	if len(signatures) < q.faulty+1 {
-		return nil, false
-	}
+	// if len(signatures) < q.faulty+1 {
+	// 	return nil, false
+	// }
 	return &emptypb.Empty{}, true
 }
 

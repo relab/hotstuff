@@ -39,7 +39,7 @@ func TestAdvanceViewQC(t *testing.T) {
 	// synchronizer should tell hotstuff to propose
 	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
 
-	s.AdvanceView(hotstuff.NewSyncInfo().WithQC(qc))
+	s.AdvanceView(hotstuff.NewSyncInfo().WithQC(qc), false)
 
 	if s.View() != 2 {
 		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())
@@ -62,7 +62,7 @@ func TestAdvanceViewTC(t *testing.T) {
 	// synchronizer should tell hotstuff to propose
 	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
 
-	s.AdvanceView(hotstuff.NewSyncInfo().WithTC(tc))
+	s.AdvanceView(hotstuff.NewSyncInfo().WithTC(tc), false)
 
 	if s.View() != 2 {
 		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())

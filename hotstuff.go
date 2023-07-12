@@ -18,3 +18,5 @@ const DefaultLocation = "default"
 
 // DefaultLatency is the default latencies between the default replicas.
 const DefaultLatency = 500
+
+const SynchronousMaxDelay = 500

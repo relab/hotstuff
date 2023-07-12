@@ -114,7 +114,7 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	votes = append(votes, cert)
 	vm.verifiedVotes[cert.BlockHash()] = votes
 
-	if len(votes) < vm.configuration.QuorumSize() {
+	if len(votes) < vm.configuration.QuorumSize(block.View()) {
 		return
 	}
 

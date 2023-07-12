@@ -109,7 +109,7 @@ func (c crypto) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
 		return true
 	}
-	if qc.Signature().Participants().Len() < c.configuration.QuorumSize() {
+	if qc.Signature().Participants().Len() < c.configuration.QuorumSize(qc.View()) {
 		return false
 	}
 	block, ok := c.blockChain.Get(qc.BlockHash())
@@ -125,7 +125,7 @@ func (c crypto) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
 	if tc.View() == 0 {
 		return true
 	}
-	if tc.Signature().Participants().Len() < c.configuration.QuorumSize() {
+	if tc.Signature().Participants().Len() < c.configuration.QuorumSize(tc.View()) {
 		return false
 	}
 	return c.Verify(tc.Signature(), tc.View().ToBytes())
@@ -145,7 +145,7 @@ func (c crypto) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.Q
 			SyncInfo: hotstuff.NewSyncInfo().WithQC(qc),
 		}.ToBytes()
 	}
-	if aggQC.Sig().Participants().Len() < c.configuration.QuorumSize() {
+	if aggQC.Sig().Participants().Len() < c.configuration.QuorumSize(aggQC.View()) {
 		return hotstuff.QuorumCert{}, false
 	}
 	// both the batched aggQC signatures and the highQC must be verified

@@ -100,6 +100,10 @@ type Replica interface {
 	NewView(hotstuff.SyncInfo)
 	// Metadata returns the connection metadata sent by this replica.
 	Metadata() map[string]string
+	// Active returns if the replica is active or not
+	Active() bool
+	// SetActive() sets the replica status
+	SetActive(bool)
 }
 
 //go:generate mockgen -destination=../internal/mocks/configuration_mock.go -package=mocks . Configuration
@@ -114,15 +118,19 @@ type Configuration interface {
 	// Len returns the number of replicas in the configuration.
 	Len() int
 	// QuorumSize returns the size of a quorum.
-	QuorumSize() int
+	QuorumSize(hotstuff.View) int
 	// Propose sends the block to all replicas in the configuration.
 	Propose(proposal hotstuff.ProposeMsg)
 	// Timeout sends the timeout message to all replicas.
 	Timeout(msg hotstuff.TimeoutMsg)
+	// Update is the async broadcast from the leader to passive configuration.
+	Update(hotstuff.Block)
 	// Fetch requests a block from all the replicas in the configuration.
 	Fetch(ctx context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool)
 	// SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
 	SubConfig(ids []hotstuff.ID) (sub Configuration, err error)
+	// Reconfiguration sends the reconfiguration message to all replicas.
+	Reconfiguration(hotstuff.ReconfigurationMsg)
 }
 
 //go:generate mockgen -destination=../internal/mocks/consensus_mock.go -package=mocks . Consensus
@@ -139,6 +147,8 @@ type Consensus interface {
 	CommittedBlock() *hotstuff.Block
 	// ChainLength returns the number of blocks that need to be chained together in order to commit.
 	ChainLength() int
+	//
+	Commit(block *hotstuff.Block)
 }
 
 // LeaderRotation implements a leader rotation scheme.
@@ -153,13 +163,17 @@ type LeaderRotation interface {
 type Synchronizer interface {
 	// AdvanceView attempts to advance to the next view using the given QC.
 	// qc must be either a regular quorum certificate, or a timeout certificate.
-	AdvanceView(hotstuff.SyncInfo)
+	AdvanceView(hotstuff.SyncInfo, bool)
 	// View returns the current view.
 	View() hotstuff.View
 	// HighQC returns the highest known QC.
 	HighQC() hotstuff.QuorumCert
 	// Start starts the synchronizer with the given context.
 	Start(context.Context)
+	// Pause pauses the synchronizer, only processes the update messages
+	Pause(qc hotstuff.QuorumCert)
+	// Resume resumes the synchronizer.
+	Resume(qc hotstuff.QuorumCert)
 }
 
 // Handel is an implementation of the Handel signature aggregation protocol.

@@ -16,6 +16,8 @@ type ViewDuration interface {
 	ViewSucceeded()
 	// ViewTimeout is called by the synchronizer when a view timed out.
 	ViewTimeout()
+	// StartTimeout fetches the configured start timeout
+	StartTimeout() time.Duration
 }
 
 // NewViewDuration returns a ViewDuration that approximates the view duration based on durations of previous views.
@@ -24,24 +26,30 @@ type ViewDuration interface {
 // When a timeout occurs, the next view duration will be multiplied by the multiplier.
 func NewViewDuration(sampleSize uint64, startTimeout, maxTimeout, multiplier float64) ViewDuration {
 	return &viewDuration{
-		limit: sampleSize,
-		mean:  startTimeout,
-		max:   maxTimeout,
-		mul:   multiplier,
+		limit:        sampleSize,
+		mean:         startTimeout,
+		max:          maxTimeout,
+		mul:          multiplier,
+		startTimeout: startTimeout,
 	}
 }
 
 // viewDuration uses statistics from previous views to guess a good value for the view duration.
 // It only takes a limited amount of measurements into account.
 type viewDuration struct {
-	mul       float64   // on failed views, multiply the current mean by this number (should be > 1)
-	limit     uint64    // how many measurements should be included in mean
-	count     uint64    // total number of measurements
-	startTime time.Time // the start time for the current measurement
-	mean      float64   // the mean view duration
-	m2        float64   // sum of squares of differences from the mean
-	prevM2    float64   // m2 calculated from the last period
-	max       float64   // upper bound on view timeout
+	mul          float64   // on failed views, multiply the current mean by this number (should be > 1)
+	limit        uint64    // how many measurements should be included in mean
+	count        uint64    // total number of measurements
+	startTime    time.Time // the start time for the current measurement
+	mean         float64   // the mean view duration
+	m2           float64   // sum of squares of differences from the mean
+	prevM2       float64   // m2 calculated from the last period
+	max          float64   // upper bound on view timeout
+	startTimeout float64   // is the configured start timeout
+}
+
+func (v *viewDuration) StartTimeout() time.Duration {
+	return time.Duration(v.startTimeout * float64(time.Millisecond))
 }
 
 // ViewSucceeded calculates the duration of the view

@@ -383,3 +383,10 @@ func writeParticipants(wr io.Writer, participants IDSet) (err error) {
 	})
 	return err
 }
+
+type ReconfigurationMsg struct {
+	QuorumSize        int
+	ActiveReplicas    []ID
+	View              View
+	QuorumCertificate QuorumCert
+}

@@ -314,13 +314,17 @@ func (c *configuration) SubConfig(ids []hotstuff.ID) (sub modules.Configuration,
 	}, nil
 }
 
+func (c *configuration) Reconfiguration(hotstuff.ReconfigurationMsg) {}
+
+func (c *configuration) Update(hotstuff.Block) {}
+
 // Len returns the number of replicas in the configuration.
 func (c *configuration) Len() int {
 	return len(c.network.replicas)
 }
 
 // QuorumSize returns the size of a quorum.
-func (c *configuration) QuorumSize() int {
+func (c *configuration) QuorumSize(view hotstuff.View) int {
 	return hotstuff.QuorumSize(c.Len())
 }
 
@@ -386,6 +390,12 @@ func (r *replica) NewView(si hotstuff.SyncInfo) {
 func (r *replica) Metadata() map[string]string {
 	return r.config.network.replicas[r.id][0].opts.ConnectionMetadata()
 }
+
+func (r *replica) Active() bool {
+	return true
+}
+
+func (r *replica) SetActive(bool) {}
 
 // NodeSet is a set of network ids.
 type NodeSet map[uint32]struct{}
@@ -483,7 +493,8 @@ type fixedDuration struct {
 	timeout time.Duration
 }
 
-func (d fixedDuration) Duration() time.Duration { return d.timeout }
-func (d fixedDuration) ViewStarted()            {}
-func (d fixedDuration) ViewSucceeded()          {}
-func (d fixedDuration) ViewTimeout()            {}
+func (d fixedDuration) Duration() time.Duration     { return d.timeout }
+func (d fixedDuration) ViewStarted()                {}
+func (d fixedDuration) ViewSucceeded()              {}
+func (d fixedDuration) ViewTimeout()                {}
+func (d fixedDuration) StartTimeout() time.Duration { return d.timeout }

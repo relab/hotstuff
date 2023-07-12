@@ -63,3 +63,8 @@ type NewViewMsg struct {
 type CommitEvent struct {
 	Commands int
 }
+
+type Update struct {
+	Block      *Block
+	QuorumSize int
+}

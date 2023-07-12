@@ -24,11 +24,11 @@ type Synchronizer struct {
 	leaderRotation modules.LeaderRotation
 	logger         logging.Logger
 	opts           *modules.Options
-
-	mut         sync.RWMutex // to protect the following
-	currentView hotstuff.View
-	highTC      hotstuff.TimeoutCert
-	highQC      hotstuff.QuorumCert
+	acceptor       modules.Acceptor
+	mut            sync.RWMutex // to protect the following
+	currentView    hotstuff.View
+	highTC         hotstuff.TimeoutCert
+	highQC         hotstuff.QuorumCert
 
 	// A pointer to the last timeout message that we sent.
 	// If a timeout happens again before we advance to the next view,
@@ -53,6 +53,7 @@ func (s *Synchronizer) InitModule(mods *modules.Core) {
 		&s.leaderRotation,
 		&s.logger,
 		&s.opts,
+		&s.acceptor,
 	)
 
 	s.eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
@@ -70,6 +71,11 @@ func (s *Synchronizer) InitModule(mods *modules.Core) {
 	s.eventLoop.RegisterHandler(hotstuff.TimeoutMsg{}, func(event any) {
 		timeoutMsg := event.(hotstuff.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
+	})
+
+	s.eventLoop.RegisterHandler(hotstuff.Update{}, func(event any) {
+		update := event.(hotstuff.Update)
+		s.handleUpdateEvent(update.Block, update.QuorumSize)
 	})
 
 	var err error
@@ -199,7 +205,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	}
 	s.logger.Debug("OnRemoteTimeout: ", timeout)
 
-	s.AdvanceView(timeout.SyncInfo)
+	s.AdvanceView(timeout.SyncInfo, false)
 
 	timeouts, ok := s.timeouts[timeout.View]
 	if !ok {
@@ -211,7 +217,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		timeouts[timeout.ID] = timeout
 	}
 
-	if len(timeouts) < s.configuration.QuorumSize() {
+	if len(timeouts) < s.configuration.QuorumSize(timeout.View) {
 		return
 	}
 
@@ -241,17 +247,17 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 
 	delete(s.timeouts, timeout.View)
 
-	s.AdvanceView(si)
+	s.AdvanceView(si, false)
 }
 
 // OnNewView handles an incoming consensus.NewViewMsg
 func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
-	s.AdvanceView(newView.SyncInfo)
+	s.AdvanceView(newView.SyncInfo, false)
 }
 
 // AdvanceView attempts to advance to the next view using the given QC.
 // qc must be either a regular quorum certificate, or a timeout certificate.
-func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
+func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo, isReconfig bool) {
 	v := hotstuff.View(0)
 	timeout := false
 
@@ -302,7 +308,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		}
 	}
 
-	if v < s.View() {
+	if v < s.View() && !isReconfig {
 		return
 	}
 
@@ -314,18 +320,20 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 
 	newView := v + 1
 
-	s.currentView = newView
-
 	s.lastTimeout = nil
 	s.duration.ViewStarted()
 
 	duration := s.duration.Duration()
-	s.timer.Reset(duration)
-
-	s.logger.Debugf("advanced to view %d", newView)
+	if isReconfig {
+		s.currentView = newView + 1
+		s.timer.Reset(s.duration.StartTimeout())
+	} else {
+		s.currentView = newView
+		s.timer.Reset(duration)
+	}
 	s.eventLoop.AddEvent(ViewChangeEvent{View: newView, Timeout: timeout})
-
 	leader := s.leaderRotation.GetLeader(newView)
+	s.logger.Info(" advance to view ", s.currentView, leader)
 	if leader == s.opts.ID() {
 		s.consensus.Propose(syncInfo)
 	} else if replica, ok := s.configuration.Replica(leader); ok {
@@ -357,6 +365,46 @@ func (s *Synchronizer) updateHighTC(tc hotstuff.TimeoutCert) {
 	}
 }
 
+func (s *Synchronizer) Pause(qc hotstuff.QuorumCert) {
+	s.timer.Stop()
+	s.performCheckPoint(qc)
+}
+
+func (s *Synchronizer) Resume(qc hotstuff.QuorumCert) {
+	s.performCheckPoint(qc)
+	s.timer = time.AfterFunc(s.duration.Duration(), func() {
+		// The event loop will execute onLocalTimeout for us.
+		s.eventLoop.AddEvent(TimeoutEvent{View: s.currentView})
+	})
+	s.AdvanceView(hotstuff.NewSyncInfo().WithQC(qc), true)
+}
+
+func (s *Synchronizer) performCheckPoint(qc hotstuff.QuorumCert) {
+	// Check if the latest qc received from the reconfiguration request
+	// is higher than the qc we have seen.
+
+	currentHighQCView := s.highQC.View()
+
+	if currentHighQCView < s.highTC.View() {
+		currentHighQCView = s.highTC.View()
+	}
+	for currentHighQCView < qc.View()-1 {
+		block, ok := s.blockChain.Get(qc.BlockHash())
+		if !ok {
+			break
+		}
+		s.acceptor.Proposed(block.Command())
+		s.blockChain.Store(block)
+		currentHighQCView = block.QuorumCert().View()
+	}
+	// This should repeatedly committ the inner blocks.
+	block, ok := s.blockChain.Get(qc.BlockHash())
+	if ok {
+		s.consensus.Commit(block)
+	}
+	s.logger.Info("checkpoint completed", currentHighQCView, qc.View())
+}
+
 var _ modules.Synchronizer = (*Synchronizer)(nil)
 
 // ViewChangeEvent is sent on the eventloop whenever a view change occurs.
@@ -368,4 +416,14 @@ type ViewChangeEvent struct {
 // TimeoutEvent is sent on the eventloop when a local timeout occurs.
 type TimeoutEvent struct {
 	View hotstuff.View
+}
+
+func (s *Synchronizer) handleUpdateEvent(block *hotstuff.Block, quorumSize int) {
+	if !s.crypto.VerifyQuorumCert(block.QuorumCert()) {
+		return
+	}
+	s.blockChain.Store(block)
+	s.updateHighQC(block.QuorumCert())
+	s.currentView = block.QuorumCert().View() + 1
+	s.consensus.Commit(block)
 }

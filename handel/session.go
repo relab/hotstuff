@@ -195,7 +195,7 @@ func (s *session) score(contribution contribution) int {
 
 	need := s.part.size(contribution.level)
 	if contribution.level == s.h.maxLevel {
-		need = s.h.configuration.QuorumSize()
+		need = s.h.configuration.QuorumSize(hotstuff.View(s.h.configuration.QuorumSize(s.h.synchronizer.View())))
 	}
 
 	curBest := level.incoming
@@ -372,7 +372,7 @@ func (s *session) updateOutgoing(levelIndex int) {
 	}
 
 	if levelIndex > s.h.maxLevel {
-		if outgoing.Participants().Len() >= s.h.configuration.QuorumSize() {
+		if outgoing.Participants().Len() >= s.h.configuration.QuorumSize(s.h.synchronizer.View()) {
 			s.h.logger.Debugf("Done with session: %.8s", s.hash)
 
 			s.h.eventLoop.AddEvent(hotstuff.NewViewMsg{

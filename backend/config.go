@@ -29,6 +29,7 @@ type Replica struct {
 	id        hotstuff.ID
 	pubKey    hotstuff.PublicKey
 	md        map[string]string
+	active    bool
 }
 
 // ID returns the replica's ID.
@@ -52,6 +53,11 @@ func (r *Replica) Vote(cert hotstuff.PartialCert) {
 	r.node.Vote(ctx, pCert)
 }
 
+// SetActive sets the status of the replica
+func (r *Replica) SetActive(active bool) {
+	r.active = active
+}
+
 // NewView sends the quorum certificate to the other replica.
 func (r *Replica) NewView(msg hotstuff.SyncInfo) {
 	if r.node == nil {
@@ -67,23 +73,29 @@ func (r *Replica) Metadata() map[string]string {
 	return r.md
 }
 
+func (r *Replica) Active() bool {
+	return r.active
+}
+
 // Config holds information about the current configuration of replicas that participate in the protocol,
 // and some information about the local replica. It also provides methods to send messages to the other replicas.
 type Config struct {
-	opts      []gorums.ManagerOption
-	connected bool
-
-	mgr *hotstuffpb.Manager
+	synchronizer    modules.Synchronizer
+	opts            []gorums.ManagerOption
+	connected       bool
+	mgr             *hotstuffpb.Manager
+	isActiveReplica bool
 	subConfig
 }
 
 type subConfig struct {
-	eventLoop *eventloop.EventLoop
-	logger    logging.Logger
-	opts      *modules.Options
-
-	cfg      *hotstuffpb.Configuration
-	replicas map[hotstuff.ID]modules.Replica
+	eventLoop            *eventloop.EventLoop
+	logger               logging.Logger
+	opts                 *modules.Options
+	cfg                  *hotstuffpb.Configuration
+	replicas             map[hotstuff.ID]modules.Replica
+	passiveConfiguration *hotstuffpb.Configuration
+	quorumMap            map[hotstuff.View]int
 }
 
 // InitModule initializes the configuration.
@@ -92,6 +104,7 @@ func (cfg *Config) InitModule(mods *modules.Core) {
 		&cfg.eventLoop,
 		&cfg.logger,
 		&cfg.subConfig.opts,
+		&cfg.synchronizer,
 	)
 
 	// We delay processing `replicaConnected` events until after the configurations `connected` event has occurred.
@@ -102,6 +115,85 @@ func (cfg *Config) InitModule(mods *modules.Core) {
 		}
 		cfg.replicaConnected(event.(replicaConnected))
 	})
+
+	cfg.eventLoop.RegisterHandler(hotstuff.ReconfigurationMsg{}, func(event any) {
+		reconfigurationMsg := event.(hotstuff.ReconfigurationMsg)
+		cfg.handleReconfigurationEvent(reconfigurationMsg)
+	})
+}
+
+// createSubConfiguration creates a new active and passive subconfigurations
+func (cfg *Config) createSubConfiguration(activeIDs []hotstuff.ID) (sub *subConfig, err error) {
+
+	nodeIDs := make([]uint32, 0)
+	for _, id := range activeIDs {
+		if id != cfg.subConfig.opts.ID() {
+			nodeIDs = append(nodeIDs, uint32(id))
+		}
+	}
+	passiveNodeIDs := make([]uint32, 0)
+	for id := range cfg.replicas {
+		found := false
+		for _, activeID := range activeIDs {
+			if activeID == id {
+				found = true
+			}
+		}
+		if !found {
+			passiveNodeIDs = append(passiveNodeIDs, uint32(id))
+			cfg.replicas[id].SetActive(false)
+		}
+	}
+	newCfg, err := cfg.mgr.NewConfiguration(qspec{}, gorums.WithNodeIDs(nodeIDs))
+
+	if err != nil {
+		return nil, err
+	}
+	var passiveCfg *hotstuffpb.Configuration
+	if len(passiveNodeIDs) > 0 {
+		passiveCfg, _ = cfg.mgr.NewConfiguration(qspec{}, gorums.WithNodeIDs(passiveNodeIDs))
+	}
+	return &subConfig{
+		replicas:             cfg.replicas,
+		eventLoop:            cfg.eventLoop,
+		logger:               cfg.logger,
+		opts:                 cfg.subConfig.opts,
+		cfg:                  newCfg,
+		passiveConfiguration: passiveCfg,
+		quorumMap:            cfg.quorumMap,
+	}, nil
+}
+
+// handleReconfigurationEvent handles the reconfiguration request.
+func (cfg *Config) handleReconfigurationEvent(reconfigurationMsg hotstuff.ReconfigurationMsg) {
+	cfg.logger.Info("handling the configuration update event")
+	cfg.quorumMap[reconfigurationMsg.View] = reconfigurationMsg.QuorumSize
+	myId := cfg.subConfig.opts.ID()
+	isActive := false
+	for _, id := range reconfigurationMsg.ActiveReplicas {
+		if id == myId {
+			isActive = true
+		}
+	}
+	subConfig, err := cfg.createSubConfiguration(reconfigurationMsg.ActiveReplicas)
+	if err != nil {
+		// Unable to create the configuration, so no change in the failure case.
+		cfg.logger.Info("Unable to create configuration on the reconfiguration req")
+		return
+	}
+	cfg.subConfig = *subConfig
+	if isActive && !cfg.isActiveReplica {
+		cfg.synchronizer.Resume(reconfigurationMsg.QuorumCertificate)
+		cfg.isActiveReplica = true
+	} else if !isActive && cfg.isActiveReplica {
+		cfg.synchronizer.Pause(reconfigurationMsg.QuorumCertificate)
+		cfg.isActiveReplica = false
+	} else {
+		cfg.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(reconfigurationMsg.QuorumCertificate),
+			true)
+		cfg.isActiveReplica = true
+	}
+
 }
 
 // NewConfig creates a new configuration.
@@ -119,9 +211,11 @@ func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOpt
 	// initialization will be finished by InitModule
 	cfg := &Config{
 		subConfig: subConfig{
-			replicas: make(map[hotstuff.ID]modules.Replica),
+			replicas:  make(map[hotstuff.ID]modules.Replica),
+			quorumMap: make(map[hotstuff.View]int),
 		},
-		opts: opts,
+		opts:            opts,
+		isActiveReplica: true,
 	}
 	return cfg
 }
@@ -206,6 +300,7 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 			id:        replica.ID,
 			pubKey:    replica.PubKey,
 			md:        make(map[string]string),
+			active:    true,
 		}
 		// we do not want to connect to ourself
 		if replica.ID != cfg.subConfig.opts.ID() {
@@ -268,6 +363,28 @@ func (cfg *Config) SubConfig(ids []hotstuff.ID) (sub modules.Configuration, err 
 	}, nil
 }
 
+// Replicas returns all of the replicas in the configuration.
+func (cfg *subConfig) ActiveReplicas() map[hotstuff.ID]modules.Replica {
+	activeReplicas := make(map[hotstuff.ID]modules.Replica)
+	for id, replica := range cfg.replicas {
+		if replica.Active() {
+			activeReplicas[id] = replica
+		}
+	}
+	return activeReplicas
+}
+
+func (cfg *subConfig) Reconfiguration(reconfigurationMsg hotstuff.ReconfigurationMsg) {
+	ctx, cancel := synchronizer.TimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop)
+	defer cancel()
+	protoMsg := hotstuffpb.ReconfigurationToProto(reconfigurationMsg)
+	if cfg.passiveConfiguration != nil {
+		cfg.passiveConfiguration.ReconfigurationRequest(ctx,
+			protoMsg)
+	}
+	cfg.cfg.ReconfigurationRequest(ctx, protoMsg)
+}
+
 func (cfg *subConfig) SubConfig(_ []hotstuff.ID) (_ modules.Configuration, err error) {
 	return nil, errors.New("not supported")
 }
@@ -278,8 +395,12 @@ func (cfg *subConfig) Len() int {
 }
 
 // QuorumSize returns the size of a quorum
-func (cfg *subConfig) QuorumSize() int {
-	return hotstuff.QuorumSize(cfg.Len())
+func (cfg *subConfig) QuorumSize(view hotstuff.View) int {
+	qs, ok := cfg.quorumMap[view]
+	if !ok {
+		qs = hotstuff.QuorumSize(len(cfg.ActiveReplicas()))
+	}
+	return qs
 }
 
 // Propose sends the block to all replicas in the configuration
@@ -292,6 +413,19 @@ func (cfg *subConfig) Propose(proposal hotstuff.ProposeMsg) {
 	cfg.cfg.Propose(
 		ctx,
 		hotstuffpb.ProposalToProto(proposal),
+	)
+}
+
+func (cfg *subConfig) Update(block hotstuff.Block) {
+	if cfg.passiveConfiguration == nil {
+		return
+	}
+	ctx, cancel := synchronizer.TimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop)
+	defer cancel()
+	cfg.passiveConfiguration.Update(ctx,
+		hotstuffpb.UpdateToProto(hotstuff.Update{Block: &block,
+			QuorumSize: hotstuff.QuorumSize(len((cfg.ActiveReplicas())))}),
+		gorums.WithNoSendWaiting(),
 	)
 }
 

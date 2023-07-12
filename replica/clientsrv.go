@@ -2,6 +2,7 @@ package replica
 
 import (
 	"crypto/sha256"
+	"errors"
 	"hash"
 	"net"
 	"sync"
@@ -21,15 +22,16 @@ import (
 
 // clientSrv serves a client.
 type clientSrv struct {
-	eventLoop *eventloop.EventLoop
-	logger    logging.Logger
-
-	mut          sync.Mutex
-	srv          *gorums.Server
-	awaitingCmds map[cmdID]chan<- error
-	cmdCache     *cmdCache
-	hash         hash.Hash
-	cmdCount     uint32
+	eventLoop     *eventloop.EventLoop
+	logger        logging.Logger
+	configuration modules.Configuration
+	mut           sync.Mutex
+	srv           *gorums.Server
+	awaitingCmds  map[cmdID]chan<- error
+	cmdCache      *cmdCache
+	hash          hash.Hash
+	opts          *modules.Options
+	cmdCount      uint32
 }
 
 // newClientServer returns a new client server.
@@ -49,6 +51,8 @@ func (srv *clientSrv) InitModule(mods *modules.Core) {
 	mods.Get(
 		&srv.eventLoop,
 		&srv.logger,
+		&srv.configuration,
+		&srv.opts,
 	)
 	srv.cmdCache.InitModule(mods)
 }
@@ -76,6 +80,10 @@ func (srv *clientSrv) Stop() {
 }
 
 func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*emptypb.Empty, error) {
+	replica, _ := srv.configuration.Replica(srv.opts.ID())
+	if !replica.Active() {
+		return &emptypb.Empty{}, errors.New("Not part of configuration")
+	}
 	id := cmdID{cmd.ClientID, cmd.SequenceNumber}
 
 	c := make(chan error)

@@ -223,3 +223,43 @@ func SyncInfoToProto(syncInfo hotstuff.SyncInfo) *SyncInfo {
 	}
 	return m
 }
+
+func UpdateToProto(update hotstuff.Update) *UpdateMsg {
+	return &UpdateMsg{
+		Block:      BlockToProto(update.Block),
+		QuorumSize: uint32(update.QuorumSize),
+	}
+}
+
+func UpdateFromProto(updateMsg *UpdateMsg) hotstuff.Update {
+	return hotstuff.Update{
+		Block:      BlockFromProto(updateMsg.Block),
+		QuorumSize: int(updateMsg.QuorumSize),
+	}
+}
+
+func ReconfigurationFromProto(reconfigurationMsg *ReconfigurationMsg) hotstuff.ReconfigurationMsg {
+	ids := make([]hotstuff.ID, 0)
+	for _, id := range reconfigurationMsg.ActiveReplicas {
+		ids = append(ids, hotstuff.ID(id))
+	}
+	return hotstuff.ReconfigurationMsg{
+		ActiveReplicas:    ids,
+		QuorumSize:        int(reconfigurationMsg.QuorumSize),
+		View:              hotstuff.View(reconfigurationMsg.View),
+		QuorumCertificate: QuorumCertFromProto(reconfigurationMsg.QC),
+	}
+}
+
+func ReconfigurationToProto(reconfiguration hotstuff.ReconfigurationMsg) *ReconfigurationMsg {
+	activeReplicas := make([]uint32, 0)
+	for _, id := range reconfiguration.ActiveReplicas {
+		activeReplicas = append(activeReplicas, uint32(id))
+	}
+	return &ReconfigurationMsg{
+		ActiveReplicas: activeReplicas,
+		QuorumSize:     uint32(reconfiguration.QuorumSize),
+		View:           uint64(reconfiguration.View),
+		QC:             QuorumCertToProto(reconfiguration.QuorumCertificate),
+	}
+}

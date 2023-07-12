@@ -122,7 +122,29 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 			cs.logger.Errorf("Could not find block for QC: %s", qc)
 		}
 	}
+	if cs.synchronizer.View() == 500 {
+		reconfigurationRequest := hotstuff.ReconfigurationMsg{
+			QuorumSize:        3,
+			ActiveReplicas:    []hotstuff.ID{1, 2, 3, 4},
+			QuorumCertificate: qc,
+			View:              cs.synchronizer.View(),
+		}
+		cs.configuration.Reconfiguration(reconfigurationRequest)
+		cs.eventLoop.AddEvent(reconfigurationRequest)
+		return
+	}
 
+	if cs.synchronizer.View() == 1500 {
+		reconfigurationRequest := hotstuff.ReconfigurationMsg{
+			QuorumSize:        5,
+			ActiveReplicas:    []hotstuff.ID{1, 2, 3, 4, 5, 6, 7},
+			QuorumCertificate: qc,
+			View:              cs.synchronizer.View(),
+		}
+		cs.configuration.Reconfiguration(reconfigurationRequest)
+		cs.eventLoop.AddEvent(reconfigurationRequest)
+		return
+	}
 	ctx, cancel := synchronizer.TimeoutContext(cs.eventLoop.Context(), cs.eventLoop)
 	defer cancel()
 
@@ -213,9 +235,9 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	cs.blockChain.Store(block)
 
 	if b := cs.impl.CommitRule(block); b != nil {
-		cs.commit(b)
+		cs.Commit(b)
 	}
-	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()), false)
 
 	if block.View() <= cs.lastVote {
 		cs.logger.Info("OnPropose: block view too old")
@@ -251,7 +273,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	leader.Vote(pc)
 }
 
-func (cs *consensusBase) commit(block *hotstuff.Block) {
+func (cs *consensusBase) Commit(block *hotstuff.Block) {
 	cs.mut.Lock()
 	// can't recurse due to requiring the mutex, so we use a helper instead.
 	err := cs.commitInner(block)
