@@ -14,10 +14,11 @@ var (
 
 // RegisterModule registers a constructor for a module implementation with the specified name.
 // For example:
-//  RegisterModule("chainedhotstuff", func() consensus.Rules { return chainedhotstuff.New() })
+//
+//	RegisterModule("chainedhotstuff", func() consensus.Rules { return chainedhotstuff.New() })
 func RegisterModule[T any](name string, constructor func() T) {
 	var t T
-	moduleType := reflect.TypeOf(t)
+	moduleType := reflect.TypeOf(&t).Elem()
 
 	registryMut.Lock()
 	defer registryMut.Unlock()
@@ -39,7 +40,8 @@ func RegisterModule[T any](name string, constructor func() T) {
 // GetModule constructs a new instance of the module with the specified name.
 // GetModule returns true if the module is found, false otherwise.
 // For example:
-//  rules, ok := GetModule[consensus.Rules]("chainedhotstuff")
+//
+//	rules, ok := GetModule[consensus.Rules]("chainedhotstuff")
 func GetModule[T any](name string) (out T, ok bool) {
 	targetType := reflect.TypeOf(out)
 
