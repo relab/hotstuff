@@ -43,7 +43,7 @@ func RegisterModule[T any](name string, constructor func() T) {
 //
 //	rules, ok := GetModule[consensus.Rules]("chainedhotstuff")
 func GetModule[T any](name string) (out T, ok bool) {
-	targetType := reflect.TypeOf(out)
+	targetType := reflect.TypeOf(&out).Elem()
 
 	registryMut.Lock()
 	defer registryMut.Unlock()
