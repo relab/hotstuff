@@ -96,10 +96,9 @@ func New(viewDuration ViewDuration) modules.Synchronizer {
 }
 
 func (s *Synchronizer) startTimeoutTimer() {
-	view := s.View()
 	s.timer = time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
-		s.eventLoop.AddEvent(TimeoutEvent{view})
+		s.eventLoop.AddEvent(TimeoutEvent{s.View()})
 	})
 }
 
