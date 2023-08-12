@@ -36,7 +36,7 @@ type Synchronizer struct {
 	lastTimeout *hotstuff.TimeoutMsg
 
 	duration ViewDuration
-	timer    *time.Timer
+	timer    oneShotTimer
 
 	// map of collected timeout messages per view
 	timeouts map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
@@ -89,17 +89,34 @@ func New(viewDuration ViewDuration) modules.Synchronizer {
 		currentView: 1,
 
 		duration: viewDuration,
-		timer:    time.AfterFunc(0, func() {}), // dummy timer that will be replaced after start() is called
+		timer:    oneShotTimer{time.AfterFunc(0, func() {})}, // dummy timer that will be replaced after start() is called
 
 		timeouts: make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
 	}
 }
 
+// A oneShotTimer is a timer that should not be reused.
+type oneShotTimer struct {
+	timerDoNotUse *time.Timer
+}
+
+func (t oneShotTimer) Stop() bool {
+	return t.timerDoNotUse.Stop()
+}
+
 func (s *Synchronizer) startTimeoutTimer() {
-	s.timer = time.AfterFunc(s.duration.Duration(), func() {
+	// Store the view in a local variable so that we can avoid calling s.View() in the closure below,
+	// thus avoiding a data race.
+	view := s.View()
+	// It is important that the timer is NOT reused because then the view would be wrong.
+	s.timer = oneShotTimer{time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
-		s.eventLoop.AddEvent(TimeoutEvent{s.View()})
-	})
+		s.eventLoop.AddEvent(TimeoutEvent{view})
+	})}
+}
+
+func (s *Synchronizer) stopTimeoutTimer() {
+	s.timer.Stop()
 }
 
 // Start starts the synchronizer with the given context.
@@ -108,7 +125,7 @@ func (s *Synchronizer) Start(ctx context.Context) {
 
 	go func() {
 		<-ctx.Done()
-		s.timer.Stop()
+		s.stopTimeoutTimer()
 	}()
 
 	// start the initial proposal
@@ -305,7 +322,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		return
 	}
 
-	s.timer.Stop()
+	s.stopTimeoutTimer()
 
 	if !timeout {
 		s.duration.ViewSucceeded()
@@ -318,8 +335,8 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	s.lastTimeout = nil
 	s.duration.ViewStarted()
 
-	duration := s.duration.Duration()
-	s.timer.Reset(duration)
+	s.stopTimeoutTimer()
+	s.startTimeoutTimer()
 
 	s.logger.Debugf("advanced to view %d", newView)
 	s.eventLoop.AddEvent(ViewChangeEvent{View: newView, Timeout: timeout})
