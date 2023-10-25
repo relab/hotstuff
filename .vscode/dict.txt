@@ -16,6 +16,7 @@ Debugf
 durationpb
 emptypb
 Erevik
+eventloop
 Fangyu
 fasthotstuff
 felixge
@@ -23,7 +24,9 @@ Feng
 ferr
 fgprof
 fgprofprofile
+Fuzzer
 gocyclo
+gofuzz
 golangci
 golint
 gomock
@@ -41,6 +44,7 @@ Infof
 Jalalzai
 Jehl
 Jianyu
+keygen
 kilic
 latencygen
 Malkhi
@@ -48,6 +52,8 @@ Mathieu
 Meling
 mitchellh
 nolint
+Oneof
+Oneofs
 orchestrationpb
 partitioner
 Paulo
@@ -59,6 +65,7 @@ propsed
 proto
 protobuf
 protoc
+protoreflect
 protostream
 ptypes
 QC's
@@ -71,6 +78,7 @@ simplehotstuff
 Sonnino
 SSWU
 structs
+subconfiguration
 throughputvslatency
 timestamppb
 TMPDIR

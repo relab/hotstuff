@@ -5,8 +5,10 @@ go 1.20
 require (
 	github.com/felixge/fgprof v0.9.2
 	github.com/golang/mock v1.6.0
+	github.com/google/gofuzz v1.1.0
 	github.com/kilic/bls12-381 v0.1.1-0.20210208205449-6045b0235e36
 	github.com/mattn/go-isatty v0.0.14
+	github.com/meling/proto2 v0.0.0-20230703190343-27bbb7955179
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mroth/weightedrand v0.4.1
 	github.com/relab/gorums v0.7.1-0.20220818130557-8533cb369cd6
@@ -21,7 +23,7 @@ require (
 	gonum.org/v1/plot v0.11.0
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f
 	google.golang.org/grpc v1.53.0
-	google.golang.org/protobuf v1.28.1
+	google.golang.org/protobuf v1.31.0
 )
 
 require (
