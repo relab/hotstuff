@@ -1,0 +1,179 @@
+// Package eddsa implements 25519 curve signature
+package eddsa
+
+import (
+	"crypto/ed25519"
+	"crypto/sha256"
+
+	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/crypto"
+	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/modules"
+)
+
+func init() {
+	modules.RegisterModule("eddsa", New)
+}
+
+const (
+	// PrivateKeyFileType is the PEM type for a private key.
+	PrivateKeyFileType = "EDDSA PRIVATE KEY"
+
+	// PublicKeyFileType is the PEM type for a public key.
+	PublicKeyFileType = "EDDSA PUBLIC KEY"
+)
+
+// Signature is an ECDSA signature
+type Signature struct {
+	signer hotstuff.ID
+	sign   []byte
+}
+
+// RestoreSignature restores an existing signature. It should not be used to create new signatures, use Sign instead.
+func RestoreSignature(sign []byte, signer hotstuff.ID) *Signature {
+	return &Signature{signer, sign}
+}
+
+// Signer returns the ID of the replica that generated the signature.
+func (sig Signature) Signer() hotstuff.ID {
+	return sig.signer
+}
+
+// ToBytes returns a raw byte string representation of the signature
+func (sig Signature) ToBytes() []byte {
+	var b []byte
+	b = append(b, sig.sign...)
+	return b
+}
+
+type eddsaBase struct {
+	configuration modules.Configuration
+	logger        logging.Logger
+	opts          *modules.Options
+}
+
+// New returns a new instance of the ECDSA CryptoBase implementation.
+func New() modules.CryptoBase {
+	return &eddsaBase{}
+}
+
+// InitModule gives the module a reference to the Core object.
+// It also allows the module to set module options using the OptionsBuilder.
+func (ed *eddsaBase) InitModule(mods *modules.Core) {
+	mods.Get(
+		&ed.configuration,
+		&ed.logger,
+		&ed.opts,
+	)
+}
+
+func (ed *eddsaBase) privateKey() ed25519.PrivateKey {
+	return ed.opts.PrivateKey().(ed25519.PrivateKey)
+}
+
+func (ed *eddsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
+	sign := ed25519.Sign(ed.privateKey(), message)
+	eddsaSign := &Signature{signer: ed.opts.ID(), sign: sign}
+	return crypto.MultiSignature{ed.opts.ID(): eddsaSign}, nil
+}
+
+func (ed *eddsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
+	if len(signatures) < 2 {
+		return nil, crypto.ErrCombineMultiple
+	}
+
+	ts := make(crypto.MultiSignature)
+
+	for _, sig1 := range signatures {
+		if sig2, ok := sig1.(crypto.MultiSignature); ok {
+			for id, s := range sig2 {
+				if _, ok := ts[id]; ok {
+					return nil, crypto.ErrCombineOverlap
+				}
+				ts[id] = s
+			}
+		} else {
+			ed.logger.Panicf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
+		}
+	}
+	return ts, nil
+}
+
+func (ed *eddsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
+	s, ok := signature.(crypto.MultiSignature)
+	if !ok {
+		ed.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+	}
+	n := signature.Participants().Len()
+	if n == 0 {
+		return false
+	}
+
+	results := make(chan bool, n)
+
+	for _, sig := range s {
+		go func(sig *Signature, msg []byte) {
+			results <- ed.verifySingle(sig, msg)
+		}(sig.(*Signature), message)
+	}
+
+	valid := true
+	for range s {
+		if !<-results {
+			valid = false
+		}
+	}
+
+	return valid
+
+}
+func (ed *eddsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
+	s, ok := signature.(crypto.MultiSignature)
+	if !ok {
+		ed.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+	}
+
+	n := signature.Participants().Len()
+	if n == 0 {
+		return false
+	}
+
+	results := make(chan bool, n)
+	set := make(map[hotstuff.Hash]struct{})
+	for id, sig := range s {
+		message, ok := batch[id]
+		if !ok {
+			return false
+		}
+		hash := sha256.Sum256(message)
+		set[hash] = struct{}{}
+		go func(sig *Signature, msg []byte) {
+			results <- ed.verifySingle(sig, msg)
+		}(sig.(*Signature), message)
+	}
+
+	valid := true
+	for range s {
+		if !<-results {
+			valid = false
+		}
+	}
+
+	// valid if all partial signatures are valid and there are no duplicate messages
+	return valid && len(set) == len(batch)
+}
+func (ed *eddsaBase) verifySingle(sig *Signature, message []byte) bool {
+	replica, ok := ed.configuration.Replica(sig.Signer())
+	if !ok {
+		ed.logger.Warnf("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
+		return false
+	}
+	pk, ok := replica.PublicKey().([]byte)
+	if !ok {
+		ed.logger.Infof("ecdsaBase: got public key from replica that was not of type []byte.")
+		pk = replica.PublicKey().(ed25519.PublicKey)
+	}
+	return ed25519.Verify(pk, message, sig.sign)
+}
+
+var _ crypto.Signature = (*Signature)(nil)

@@ -14,6 +14,7 @@ coverpkg
 coverprofile
 Debugf
 durationpb
+eddsa
 emptypb
 Erevik
 Fangyu

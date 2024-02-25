@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
+	"github.com/relab/hotstuff/crypto/eddsa"
 	"github.com/relab/hotstuff/internal/testutil"
 )
 
@@ -167,6 +168,8 @@ func runAll(t *testing.T, run func(*testing.T, setupFunc)) {
 	t.Helper()
 	t.Run("Ecdsa", func(t *testing.T) { run(t, setup(NewBase(ecdsa.New), testutil.GenerateECDSAKey)) })
 	t.Run("Cache+Ecdsa", func(t *testing.T) { run(t, setup(NewCache(ecdsa.New), testutil.GenerateECDSAKey)) })
+	t.Run("Eddsa", func(t *testing.T) { run(t, setup(NewBase(eddsa.New), testutil.GenerateEDDSAKey)) })
+	t.Run("Cache+Eddsa", func(t *testing.T) { run(t, setup(NewCache(eddsa.New), testutil.GenerateEDDSAKey)) })
 	t.Run("BLS12-381", func(t *testing.T) { run(t, setup(NewBase(bls12.New), testutil.GenerateBLS12Key)) })
 	t.Run("Cache+BLS12-381", func(t *testing.T) { run(t, setup(NewCache(bls12.New), testutil.GenerateBLS12Key)) })
 }

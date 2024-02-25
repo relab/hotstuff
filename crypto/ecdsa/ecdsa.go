@@ -1,4 +1,4 @@
-// Package ecdsa provides a crypto implementation for HotStuff using Go's 'crypto/ecdsa' package.
+// Package ecdsa supports spec-k256 curve signature
 package ecdsa
 
 import (
@@ -12,7 +12,6 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"golang.org/x/exp/slices"
 )
 
 func init() {
@@ -61,79 +60,6 @@ func (sig Signature) ToBytes() []byte {
 	return b
 }
 
-// MultiSignature is a set of (partial) signatures.
-type MultiSignature map[hotstuff.ID]*Signature
-
-// RestoreMultiSignature should only be used to restore an existing threshold signature from a set of signatures.
-func RestoreMultiSignature(signatures []*Signature) MultiSignature {
-	sig := make(MultiSignature, len(signatures))
-	for _, s := range signatures {
-		sig[s.signer] = s
-	}
-	return sig
-}
-
-// ToBytes returns the object as bytes.
-func (sig MultiSignature) ToBytes() []byte {
-	var b []byte
-	// sort by ID to make it deterministic
-	order := make([]hotstuff.ID, 0, len(sig))
-	for _, signature := range sig {
-		order = append(order, signature.signer)
-	}
-	slices.Sort(order)
-	for _, id := range order {
-		b = append(b, sig[id].ToBytes()...)
-	}
-	return b
-}
-
-// Participants returns the IDs of replicas who participated in the threshold signature.
-func (sig MultiSignature) Participants() hotstuff.IDSet {
-	return sig
-}
-
-// Add adds an ID to the set.
-func (sig MultiSignature) Add(_ hotstuff.ID) {
-	panic("not implemented")
-}
-
-// Contains returns true if the set contains the ID.
-func (sig MultiSignature) Contains(id hotstuff.ID) bool {
-	_, ok := sig[id]
-	return ok
-}
-
-// ForEach calls f for each ID in the set.
-func (sig MultiSignature) ForEach(f func(hotstuff.ID)) {
-	for id := range sig {
-		f(id)
-	}
-}
-
-// RangeWhile calls f for each ID in the set until f returns false.
-func (sig MultiSignature) RangeWhile(f func(hotstuff.ID) bool) {
-	for id := range sig {
-		if !f(id) {
-			break
-		}
-	}
-}
-
-// Len returns the number of entries in the set.
-func (sig MultiSignature) Len() int {
-	return len(sig)
-}
-
-func (sig MultiSignature) String() string {
-	return hotstuff.IDSetToString(sig)
-}
-
-var (
-	_ hotstuff.QuorumSignature = (*MultiSignature)(nil)
-	_ hotstuff.IDSet           = (*MultiSignature)(nil)
-)
-
 type ecdsaBase struct {
 	configuration modules.Configuration
 	logger        logging.Logger
@@ -166,7 +92,7 @@ func (ec *ecdsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, e
 	if err != nil {
 		return nil, fmt.Errorf("ecdsa: sign failed: %w", err)
 	}
-	return MultiSignature{ec.opts.ID(): &Signature{
+	return crypto.MultiSignature{ec.opts.ID(): &Signature{
 		r:      r,
 		s:      s,
 		signer: ec.opts.ID(),
@@ -179,10 +105,10 @@ func (ec *ecdsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Q
 		return nil, crypto.ErrCombineMultiple
 	}
 
-	ts := make(MultiSignature)
+	ts := make(crypto.MultiSignature)
 
 	for _, sig1 := range signatures {
-		if sig2, ok := sig1.(MultiSignature); ok {
+		if sig2, ok := sig1.(crypto.MultiSignature); ok {
 			for id, s := range sig2 {
 				if _, ok := ts[id]; ok {
 					return nil, crypto.ErrCombineOverlap
@@ -199,7 +125,7 @@ func (ec *ecdsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Q
 
 // Verify verifies the given quorum signature against the message.
 func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
-	s, ok := signature.(MultiSignature)
+	s, ok := signature.(crypto.MultiSignature)
 	if !ok {
 		ec.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
@@ -215,7 +141,7 @@ func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) 
 	for _, sig := range s {
 		go func(sig *Signature, hash hotstuff.Hash) {
 			results <- ec.verifySingle(sig, hash)
-		}(sig, hash)
+		}(sig.(*Signature), hash)
 	}
 
 	valid := true
@@ -230,7 +156,7 @@ func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) 
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
 func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
-	s, ok := signature.(MultiSignature)
+	s, ok := signature.(crypto.MultiSignature)
 	if !ok {
 		ec.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
@@ -251,7 +177,7 @@ func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 		set[hash] = struct{}{}
 		go func(sig *Signature, hash hotstuff.Hash) {
 			results <- ec.verifySingle(sig, hash)
-		}(sig, hash)
+		}(sig.(*Signature), hash)
 	}
 
 	valid := true
@@ -274,3 +200,5 @@ func (ec *ecdsaBase) verifySingle(sig *Signature, hash hotstuff.Hash) bool {
 	pk := replica.PublicKey().(*ecdsa.PublicKey)
 	return ecdsa.Verify(pk, hash[:], sig.R(), sig.S())
 }
+
+var _ crypto.Signature = (*Signature)(nil)

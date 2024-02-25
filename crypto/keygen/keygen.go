@@ -4,6 +4,7 @@ package keygen
 
 import (
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
@@ -18,6 +19,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto/bls12"
 	ecdsacrypto "github.com/relab/hotstuff/crypto/ecdsa"
+	"github.com/relab/hotstuff/crypto/eddsa"
 )
 
 // GenerateECDSAPrivateKey returns a new ECDSA private key.
@@ -27,6 +29,15 @@ func GenerateECDSAPrivateKey() (pk *ecdsa.PrivateKey, err error) {
 		return nil, err
 	}
 	return pk, nil
+}
+
+// GenerateED25519Key generates 25519 key
+func GenerateED25519Key() (pub ed25519.PublicKey, pk ed25519.PrivateKey, err error) {
+	pub, pk, err = ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, nil, err
+	}
+	return pub, pk, nil
 }
 
 // GenerateRootCert generates a self-signed TLS certificate to act as a CA.
@@ -104,6 +115,10 @@ func PrivateKeyToPEM(key hotstuff.PrivateKey) ([]byte, error) {
 	case *bls12.PrivateKey:
 		marshalled = k.ToBytes()
 		keyType = bls12.PrivateKeyFileType
+	case ed25519.PrivateKey:
+		marshalled = make([]byte, ed25519.PrivateKeySize)
+		copy(marshalled, k)
+		keyType = eddsa.PrivateKeyFileType
 	}
 	b := &pem.Block{
 		Type:  keyType,
@@ -150,6 +165,10 @@ func PublicKeyToPEM(key hotstuff.PublicKey) ([]byte, error) {
 	case *bls12.PublicKey:
 		marshalled = k.ToBytes()
 		keyType = bls12.PublicKeyFileType
+	case ed25519.PublicKey:
+		marshalled = make([]byte, ed25519.PublicKeySize)
+		copy(marshalled, k)
+		keyType = eddsa.PublicKeyFileType
 	}
 
 	b := &pem.Block{
@@ -213,8 +232,11 @@ func ParsePrivateKey(buf []byte) (key hotstuff.PrivateKey, err error) {
 		k := &bls12.PrivateKey{}
 		k.FromBytes(b.Bytes)
 		key = k
+	case eddsa.PrivateKeyFileType:
+		k := ed25519.NewKeyFromSeed(b.Bytes[:32])
+		key = k
 	default:
-		return nil, fmt.Errorf("file type did not match any known types")
+		return nil, fmt.Errorf("file type did not match any known types %v", b.Type)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse key: %w", err)
@@ -247,8 +269,12 @@ func ParsePublicKey(buf []byte) (key hotstuff.PublicKey, err error) {
 			return nil, err
 		}
 		key = k
+	case eddsa.PublicKeyFileType:
+		k := make([]byte, ed25519.PublicKeySize)
+		copy(k, b.Bytes)
+		key = k
 	default:
-		return nil, fmt.Errorf("file type did not match any known types")
+		return nil, fmt.Errorf("file type did not match any known types %v", b.Type)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse key: %w", err)
@@ -316,13 +342,21 @@ func GenerateKeyChain(id hotstuff.ID, validFor []string, crypto string, ca *x509
 	certPEM := CertToPEM(cert)
 
 	var privateKey hotstuff.PrivateKey
+	var publicKey hotstuff.PublicKey
 	switch crypto {
 	case "ecdsa":
 		privateKey = ecdsaKey
+		publicKey = privateKey.Public()
 	case "bls12":
 		privateKey, err = bls12.GeneratePrivateKey()
 		if err != nil {
 			return KeyChain{}, fmt.Errorf("failed to generate bls12-381 private key: %w", err)
+		}
+		publicKey = privateKey.Public()
+	case "eddsa":
+		publicKey, privateKey, err = GenerateED25519Key()
+		if err != nil {
+			return KeyChain{}, fmt.Errorf("failed to generate ed25519 key: %w", err)
 		}
 	default:
 		return KeyChain{}, fmt.Errorf("unknown crypto implementation: %s", crypto)
@@ -333,7 +367,7 @@ func GenerateKeyChain(id hotstuff.ID, validFor []string, crypto string, ca *x509
 		return KeyChain{}, err
 	}
 
-	publicKeyPEM, err := PublicKeyToPEM(privateKey.Public())
+	publicKeyPEM, err := PublicKeyToPEM(publicKey)
 	if err != nil {
 		return KeyChain{}, err
 	}
