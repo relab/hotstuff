@@ -16,25 +16,25 @@ func QuorumSignatureToProto(sig hotstuff.QuorumSignature) *QuorumSignature {
 	signature := &QuorumSignature{}
 	switch ms := sig.(type) {
 	case crypto.MultiSignature[ecdsa.Signature]:
-		ECDSASigs := make([]*ECDSASignature, 0, sig.Participants().Len())
+		sigs := make([]*ECDSASignature, 0, sig.Participants().Len())
 		for _, s := range ms {
-			ECDSASigs = append(ECDSASigs, &ECDSASignature{
+			sigs = append(sigs, &ECDSASignature{
 				Signer: uint32(s.Signer()),
 				R:      s.R().Bytes(),
 				S:      s.S().Bytes(),
 			})
 		}
 		signature.Sig = &QuorumSignature_ECDSASigs{ECDSASigs: &ECDSAMultiSignature{
-			Sigs: ECDSASigs,
+			Sigs: sigs,
 		}}
 
 	case crypto.MultiSignature[eddsa.Signature]:
-		EDDSASigs := make([]*EDDSASignature, 0, sig.Participants().Len())
+		sigs := make([]*EDDSASignature, 0, sig.Participants().Len())
 		for _, s := range ms {
-			EDDSASigs = append(EDDSASigs, &EDDSASignature{Signer: uint32(s.Signer()), Sig: s.ToBytes()})
+			sigs = append(sigs, &EDDSASignature{Signer: uint32(s.Signer()), Sig: s.ToBytes()})
 		}
 		signature.Sig = &QuorumSignature_EDDSASigs{EDDSASigs: &EDDSAMultiSignature{
-			Sigs: EDDSASigs,
+			Sigs: sigs,
 		}}
 
 	case *bls12.AggregateSignature:
