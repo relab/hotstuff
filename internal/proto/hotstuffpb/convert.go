@@ -15,35 +15,37 @@ import (
 func QuorumSignatureToProto(sig hotstuff.QuorumSignature) *QuorumSignature {
 	signature := &QuorumSignature{}
 	switch ms := sig.(type) {
-	case crypto.MultiSignature:
+	case crypto.MultiSignature[ecdsa.Signature]:
 		ECDSASigs := make([]*ECDSASignature, 0, sig.Participants().Len())
+		for _, s := range ms {
+			ECDSASigs = append(ECDSASigs, &ECDSASignature{
+				Signer: uint32(s.Signer()),
+				R:      s.R().Bytes(),
+				S:      s.S().Bytes(),
+			})
+		}
+		signature.Sig = &QuorumSignature_ECDSASigs{ECDSASigs: &ECDSAMultiSignature{
+			Sigs: ECDSASigs,
+		}}
+
+	case crypto.MultiSignature[eddsa.Signature]:
 		EDDSASigs := make([]*EDDSASignature, 0, sig.Participants().Len())
-		for _, p := range ms {
-			switch s := p.(type) {
-			case *ecdsa.Signature:
-				ECDSASigs = append(ECDSASigs, &ECDSASignature{
-					Signer: uint32(s.Signer()),
-					R:      s.R().Bytes(),
-					S:      s.S().Bytes(),
-				})
-			case *eddsa.Signature:
-				EDDSASigs = append(EDDSASigs, &EDDSASignature{Signer: uint32(s.Signer()), Sig: s.ToBytes()})
-			}
+		for _, s := range ms {
+			EDDSASigs = append(EDDSASigs, &EDDSASignature{Signer: uint32(s.Signer()), Sig: s.ToBytes()})
 		}
-		if len(ECDSASigs) > 0 {
-			signature.Sig = &QuorumSignature_ECDSASigs{ECDSASigs: &ECDSAMultiSignature{
-				Sigs: ECDSASigs,
-			}}
-		} else {
-			signature.Sig = &QuorumSignature_EDDSASigs{EDDSASigs: &EDDSAMultiSignature{
-				Sigs: EDDSASigs,
-			}}
-		}
+		signature.Sig = &QuorumSignature_EDDSASigs{EDDSASigs: &EDDSAMultiSignature{
+			Sigs: EDDSASigs,
+		}}
 
 	case *bls12.AggregateSignature:
 		signature.Sig = &QuorumSignature_BLS12Sig{BLS12Sig: &BLS12AggregateSignature{
 			Sig:          ms.ToBytes(),
 			Participants: ms.Bitfield().Bytes(),
+		}}
+
+	default:
+		signature.Sig = &QuorumSignature_ECDSASigs{ECDSASigs: &ECDSAMultiSignature{
+			Sigs: nil,
 		}}
 	}
 	return signature

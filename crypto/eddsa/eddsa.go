@@ -23,6 +23,11 @@ const (
 	PublicKeyFileType = "EDDSA PUBLIC KEY"
 )
 
+var (
+	_ hotstuff.QuorumSignature = (*crypto.MultiSignature[*Signature])(nil)
+	_ hotstuff.IDSet           = (*crypto.MultiSignature[*Signature])(nil)
+)
+
 // Signature is an ECDSA signature
 type Signature struct {
 	signer hotstuff.ID
@@ -74,7 +79,7 @@ func (ed *eddsaBase) privateKey() ed25519.PrivateKey {
 func (ed *eddsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
 	sign := ed25519.Sign(ed.privateKey(), message)
 	eddsaSign := &Signature{signer: ed.opts.ID(), sign: sign}
-	return crypto.MultiSignature{ed.opts.ID(): eddsaSign}, nil
+	return crypto.MultiSignature[*Signature]{ed.opts.ID(): eddsaSign}, nil
 }
 
 func (ed *eddsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
@@ -82,10 +87,10 @@ func (ed *eddsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Q
 		return nil, crypto.ErrCombineMultiple
 	}
 
-	ts := make(crypto.MultiSignature)
+	ts := make(crypto.MultiSignature[*Signature])
 
 	for _, sig1 := range signatures {
-		if sig2, ok := sig1.(crypto.MultiSignature); ok {
+		if sig2, ok := sig1.(crypto.MultiSignature[*Signature]); ok {
 			for id, s := range sig2 {
 				if _, ok := ts[id]; ok {
 					return nil, crypto.ErrCombineOverlap
@@ -100,7 +105,7 @@ func (ed *eddsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Q
 }
 
 func (ed *eddsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
-	s, ok := signature.(crypto.MultiSignature)
+	s, ok := signature.(crypto.MultiSignature[*Signature])
 	if !ok {
 		ed.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
@@ -114,7 +119,7 @@ func (ed *eddsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) 
 	for _, sig := range s {
 		go func(sig *Signature, msg []byte) {
 			results <- ed.verifySingle(sig, msg)
-		}(sig.(*Signature), message)
+		}(sig, message)
 	}
 
 	valid := true
@@ -128,7 +133,7 @@ func (ed *eddsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) 
 
 }
 func (ed *eddsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
-	s, ok := signature.(crypto.MultiSignature)
+	s, ok := signature.(crypto.MultiSignature[*Signature])
 	if !ok {
 		ed.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
@@ -149,7 +154,7 @@ func (ed *eddsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 		set[hash] = struct{}{}
 		go func(sig *Signature, msg []byte) {
 			results <- ed.verifySingle(sig, msg)
-		}(sig.(*Signature), message)
+		}(sig, message)
 	}
 
 	valid := true
