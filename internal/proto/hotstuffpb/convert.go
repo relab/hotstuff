@@ -15,7 +15,7 @@ import (
 func QuorumSignatureToProto(sig hotstuff.QuorumSignature) *QuorumSignature {
 	signature := &QuorumSignature{}
 	switch ms := sig.(type) {
-	case crypto.MultiSignature[ecdsa.Signature]:
+	case crypto.MultiSignature[*ecdsa.Signature]:
 		sigs := make([]*ECDSASignature, 0, sig.Participants().Len())
 		for _, s := range ms {
 			sigs = append(sigs, &ECDSASignature{
@@ -28,7 +28,7 @@ func QuorumSignatureToProto(sig hotstuff.QuorumSignature) *QuorumSignature {
 			Sigs: sigs,
 		}}
 
-	case crypto.MultiSignature[eddsa.Signature]:
+	case crypto.MultiSignature[*eddsa.Signature]:
 		sigs := make([]*EDDSASignature, 0, sig.Participants().Len())
 		for _, s := range ms {
 			sigs = append(sigs, &EDDSASignature{Signer: uint32(s.Signer()), Sig: s.ToBytes()})
@@ -41,11 +41,6 @@ func QuorumSignatureToProto(sig hotstuff.QuorumSignature) *QuorumSignature {
 		signature.Sig = &QuorumSignature_BLS12Sig{BLS12Sig: &BLS12AggregateSignature{
 			Sig:          ms.ToBytes(),
 			Participants: ms.Bitfield().Bytes(),
-		}}
-
-	default:
-		signature.Sig = &QuorumSignature_ECDSASigs{ECDSASigs: &ECDSAMultiSignature{
-			Sigs: nil,
 		}}
 	}
 	return signature
