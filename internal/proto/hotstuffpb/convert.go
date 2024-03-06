@@ -49,7 +49,7 @@ func QuorumSignatureToProto(sig hotstuff.QuorumSignature) *QuorumSignature {
 // QuorumSignatureFromProto converts a protocol buffers message to a threshold signature.
 func QuorumSignatureFromProto(sig *QuorumSignature) hotstuff.QuorumSignature {
 	if signature := sig.GetECDSASigs(); signature != nil {
-		sigs := make([]crypto.Signature, len(signature.GetSigs()))
+		sigs := make([]*ecdsa.Signature, len(signature.GetSigs()))
 		for i, sig := range signature.GetSigs() {
 			r := new(big.Int)
 			r.SetBytes(sig.GetR())
@@ -60,7 +60,7 @@ func QuorumSignatureFromProto(sig *QuorumSignature) hotstuff.QuorumSignature {
 		return crypto.RestoreMultiSignature(sigs)
 	}
 	if signature := sig.GetEDDSASigs(); signature != nil {
-		sigs := make([]crypto.Signature, len(signature.GetSigs()))
+		sigs := make([]*eddsa.Signature, len(signature.GetSigs()))
 		for i, sig := range signature.GetSigs() {
 			sigs[i] = eddsa.RestoreSignature(sig.Sig, hotstuff.ID(sig.GetSigner()))
 		}
