@@ -151,7 +151,7 @@ func (srv *Replica) Stop() {
 	srv.Close()
 }
 
-// Run runs the replica until the context is cancelled.
+// Run runs the replica until the context is canceled.
 func (srv *Replica) Run(ctx context.Context) {
 	var (
 		synchronizer modules.Synchronizer
