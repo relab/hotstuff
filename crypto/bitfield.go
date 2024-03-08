@@ -47,7 +47,7 @@ func BitfieldFromBytes(b []byte) Bitfield {
 		len:  0,
 	}
 	l := 0
-	bf.ForEach(func(i hotstuff.ID) {
+	bf.ForEach(func(_ hotstuff.ID) {
 		l++
 	})
 	bf.len = l

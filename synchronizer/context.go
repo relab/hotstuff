@@ -31,7 +31,7 @@ func TimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop) (con
 	// ViewContext handles view-change case.
 	ctx, cancel := ViewContext(parent, eventLoop, nil)
 
-	id := eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
+	id := eventLoop.RegisterHandler(TimeoutEvent{}, func(_ any) {
 		cancel()
 	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent())
 

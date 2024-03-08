@@ -57,14 +57,13 @@ func Deploy(g iago.Group, cfg DeployConfig) (workers map[string]WorkerSession, e
 	}
 
 	g.Run("Create temporary directory",
-		func(ctx context.Context, host iago.Host) (err error) {
+		func(_ context.Context, host iago.Host) error {
 			tmpDir := "hotstuff." + randString(8)
 			testDir := strings.TrimPrefix(tempDirPath(host, tmpDir), "/")
 			dataDir := testDir + "/data"
 			host.SetVar("test-dir", testDir)
 			host.SetVar("data-dir", dataDir)
-			err = fs.MkdirAll(host.GetFS(), dataDir, 0o755)
-			return err
+			return fs.MkdirAll(host.GetFS(), dataDir, 0o755)
 		})
 
 	g.Run(
@@ -122,9 +121,8 @@ func FetchData(g iago.Group, dest string) (err error) {
 	}
 
 	g.Run("Remove test directory",
-		func(ctx context.Context, host iago.Host) (err error) {
-			err = fs.RemoveAll(host.GetFS(), iago.GetStringVar(host, "test-dir"))
-			return err
+		func(_ context.Context, host iago.Host) error {
+			return fs.RemoveAll(host.GetFS(), iago.GetStringVar(host, "test-dir"))
 		})
 
 	return nil
