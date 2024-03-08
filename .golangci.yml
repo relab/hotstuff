@@ -9,8 +9,14 @@ linters-settings:
   gocyclo:
     min-complexity: 15
 
+  misspell:
+    locale: US
+
   revive:
-    min-confidence: 0.21 # disables package comment warning
+    rules:
+      - name: unexported-return
+        disabled: true
+      - name: unused-parameter
 
 issues:
   exclude-use-default: false

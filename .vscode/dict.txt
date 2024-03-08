@@ -3,6 +3,7 @@ Bano
 Baudet
 BFT's
 Bitfield
+cerr
 chainedhotstuff
 checkf
 Chursin
@@ -88,6 +89,7 @@ timestamppb
 TMPDIR
 tmpl
 Tormod
+unexported
 unittests
 unmarshals
 unregisters
