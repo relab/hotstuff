@@ -63,7 +63,7 @@ func TestBitfieldForEach(t *testing.T) {
 
 	// first check that the bitfield is empty
 	count := 0
-	bm.ForEach(func(i hotstuff.ID) {
+	bm.ForEach(func(_ hotstuff.ID) {
 		count++
 	})
 

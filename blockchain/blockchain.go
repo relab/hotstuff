@@ -24,7 +24,7 @@ type blockChain struct {
 	pruneHeight   hotstuff.View
 	blocks        map[hotstuff.Hash]*hotstuff.Block
 	blockAtHeight map[hotstuff.View]*hotstuff.Block
-	pendingFetch  map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be cancelled
+	pendingFetch  map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
 }
 
 func (chain *blockChain) InitModule(mods *modules.Core) {

@@ -301,7 +301,7 @@ func (cfg *subConfig) Timeout(msg hotstuff.TimeoutMsg) {
 		return
 	}
 
-	// will wait until the second timeout before cancelling
+	// will wait until the second timeout before canceling
 	ctx, cancel := synchronizer.TimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop)
 	defer cancel()
 

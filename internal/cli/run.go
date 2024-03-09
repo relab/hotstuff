@@ -38,7 +38,7 @@ It is also required that the host keys for all remote machines are present in a 
 Then, you must use the '--ssh-config' parameter to specify the location of your 'ssh_config' file
 (or omit it to use ~/.ssh/config). Then, you must specify the list of remote machines to connect to
 using the '--host' parameter. This should be a comma separated list of hostnames or ip addresses.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		runController()
 	},
 }

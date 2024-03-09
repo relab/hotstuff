@@ -30,7 +30,7 @@ run the experiment, and fetch the experiment results.
 To run an experiment, use the 'hotstuff run' command.
 By default, this command will run a small configuration of replicas locally.
 use 'hotstuff help run' to view all possible parameters for this command.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			if !listModules {
 				return cmd.Usage()
 			}

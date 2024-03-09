@@ -23,7 +23,8 @@ import (
 )
 
 func TestOrchestration(t *testing.T) {
-	run := func(consensusImpl string, crypto string, mods []string, byzantine string) {
+	run := func(t *testing.T, consensusImpl string, crypto string, mods []string, byzantine string) {
+		t.Helper()
 		controllerStream, workerStream := net.Pipe()
 
 		workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
@@ -72,25 +73,25 @@ func TestOrchestration(t *testing.T) {
 		}
 	}
 
-	t.Run("ChainedHotStuff+ECDSA", func(t *testing.T) { run("chainedhotstuff", "ecdsa", nil, "") })
-	t.Run("ChainedHotStuff+BLS12", func(t *testing.T) { run("chainedhotstuff", "bls12", nil, "") })
-	t.Run("Fast-HotStuff+ECDSA", func(t *testing.T) { run("fasthotstuff", "ecdsa", nil, "") })
-	t.Run("Fast-HotStuff+BLS12", func(t *testing.T) { run("fasthotstuff", "bls12", nil, "") })
-	t.Run("Simple-HotStuff+ECDSA", func(t *testing.T) { run("simplehotstuff", "ecdsa", nil, "") })
-	t.Run("Simple-HotStuff+BLS12", func(t *testing.T) { run("simplehotstuff", "bls12", nil, "") })
+	t.Run("ChainedHotStuff+ECDSA", func(t *testing.T) { run(t, "chainedhotstuff", "ecdsa", nil, "") })
+	t.Run("ChainedHotStuff+BLS12", func(t *testing.T) { run(t, "chainedhotstuff", "bls12", nil, "") })
+	t.Run("Fast-HotStuff+ECDSA", func(t *testing.T) { run(t, "fasthotstuff", "ecdsa", nil, "") })
+	t.Run("Fast-HotStuff+BLS12", func(t *testing.T) { run(t, "fasthotstuff", "bls12", nil, "") })
+	t.Run("Simple-HotStuff+ECDSA", func(t *testing.T) { run(t, "simplehotstuff", "ecdsa", nil, "") })
+	t.Run("Simple-HotStuff+BLS12", func(t *testing.T) { run(t, "simplehotstuff", "bls12", nil, "") })
 
 	// handel
 	mods := []string{"handel"}
-	t.Run("ChainedHotStuff+ECDSA+Handel", func(t *testing.T) { run("chainedhotstuff", "ecdsa", mods, "") })
-	t.Run("ChainedHotStuff+BLS12+Handel", func(t *testing.T) { run("chainedhotstuff", "bls12", mods, "") })
-	t.Run("Fast-HotStuff+ECDSA+Handel", func(t *testing.T) { run("fasthotstuff", "ecdsa", mods, "") })
-	t.Run("Fast-HotStuff+BLS12+Handel", func(t *testing.T) { run("fasthotstuff", "bls12", mods, "") })
-	t.Run("Simple-HotStuff+ECDSA+Handel", func(t *testing.T) { run("simplehotstuff", "ecdsa", mods, "") })
-	t.Run("Simple-HotStuff+BLS12+Handel", func(t *testing.T) { run("simplehotstuff", "bls12", mods, "") })
+	t.Run("ChainedHotStuff+ECDSA+Handel", func(t *testing.T) { run(t, "chainedhotstuff", "ecdsa", mods, "") })
+	t.Run("ChainedHotStuff+BLS12+Handel", func(t *testing.T) { run(t, "chainedhotstuff", "bls12", mods, "") })
+	t.Run("Fast-HotStuff+ECDSA+Handel", func(t *testing.T) { run(t, "fasthotstuff", "ecdsa", mods, "") })
+	t.Run("Fast-HotStuff+BLS12+Handel", func(t *testing.T) { run(t, "fasthotstuff", "bls12", mods, "") })
+	t.Run("Simple-HotStuff+ECDSA+Handel", func(t *testing.T) { run(t, "simplehotstuff", "ecdsa", mods, "") })
+	t.Run("Simple-HotStuff+BLS12+Handel", func(t *testing.T) { run(t, "simplehotstuff", "bls12", mods, "") })
 
 	// byzantine
-	t.Run("ChainedHotStuff+Fork", func(t *testing.T) { run("chainedhotstuff", "ecdsa", nil, "fork:1") })
-	t.Run("ChainedHotStuff+Silence", func(t *testing.T) { run("chainedhotstuff", "ecdsa", nil, "silence:1") })
+	t.Run("ChainedHotStuff+Fork", func(t *testing.T) { run(t, "chainedhotstuff", "ecdsa", nil, "fork:1") })
+	t.Run("ChainedHotStuff+Silence", func(t *testing.T) { run(t, "chainedhotstuff", "ecdsa", nil, "silence:1") })
 }
 
 func TestDeployment(t *testing.T) {
@@ -144,8 +145,7 @@ func TestDeployment(t *testing.T) {
 			wg.Done()
 		}(session)
 	}
-	err = experiment.Run()
-	if err != nil {
+	if err = experiment.Run(); err != nil {
 		t.Fatal(err)
 	}
 	wg.Wait()
