@@ -10,7 +10,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mroth/weightedrand v1.0.0
 	github.com/relab/gorums v0.7.1-0.20220818130557-8533cb369cd6
-	github.com/relab/iago v0.0.0-20220416090249-bf984205c7a8
+	github.com/relab/iago v0.0.0-20240309180746-a87dd8478958
 	github.com/relab/wrfs v0.0.0-20220416082020-a641cd350078
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2

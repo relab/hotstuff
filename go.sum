@@ -631,6 +631,8 @@ github.com/relab/gorums v0.7.1-0.20220818130557-8533cb369cd6 h1:azahqG2RhvhFvHiJ
 github.com/relab/gorums v0.7.1-0.20220818130557-8533cb369cd6/go.mod h1:dS1JU8uB1QgQie2bvRPeJWWmIFLPyl5IU50YfWpYVBE=
 github.com/relab/iago v0.0.0-20220416090249-bf984205c7a8 h1:HbeM3xsbEE0pcnKc7E9EOTeWB0hmSaEIaxvgIbJxBso=
 github.com/relab/iago v0.0.0-20220416090249-bf984205c7a8/go.mod h1:ADclchTQWqG3npAa68T6ueqID28bf+lNKi3j1I26Bgg=
+github.com/relab/iago v0.0.0-20240309180746-a87dd8478958 h1:tkTBDHZdfgVDNS5VUWkxUDFhDNwDf6QRdaTF+zouoBs=
+github.com/relab/iago v0.0.0-20240309180746-a87dd8478958/go.mod h1:3gDmi27sJB5VKFObac3BRuojM8bgBFeRwY2vo5jhbbI=
 github.com/relab/wrfs v0.0.0-20220416082020-a641cd350078 h1:JN5qn8C/HZoyMAycX6z6O0SeX+09CV3w3GcVNW70OZA=
 github.com/relab/wrfs v0.0.0-20220416082020-a641cd350078/go.mod h1:8BTalsvE1BexSfZZFmZfmJKqfoXPzsP/ixpVOmg7Udk=
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6SoW27p1b0cqNHllgS5HIMJraePCO15w5zCzIWYg=
