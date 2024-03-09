@@ -66,8 +66,7 @@ func Deploy(g iago.Group, cfg DeployConfig) (workers map[string]WorkerSession, e
 			return fs.MkdirAll(host.GetFS(), dataDir, 0o755)
 		})
 
-	g.Run(
-		"Upload hotstuff binary",
+	g.Run("Upload hotstuff binary",
 		func(ctx context.Context, host iago.Host) (err error) {
 			dest, err := iago.NewPath("/", iago.GetStringVar(host, "test-dir")+"/hotstuff")
 			if err != nil {

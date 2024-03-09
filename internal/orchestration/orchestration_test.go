@@ -145,8 +145,7 @@ func TestDeployment(t *testing.T) {
 			wg.Done()
 		}(session)
 	}
-	err = experiment.Run()
-	if err != nil {
+	if err = experiment.Run(); err != nil {
 		t.Fatal(err)
 	}
 	wg.Wait()
