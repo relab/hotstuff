@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -19,7 +20,6 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 )
 
 // NodeID is an ID that is unique to a node in the network.

@@ -3,11 +3,11 @@ package leaderrotation
 
 import (
 	"math/rand"
+	"slices"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"golang.org/x/exp/slices"
 )
 
 func init() {

@@ -3,13 +3,13 @@ package crypto
 import (
 	"container/list"
 	"crypto/sha256"
+	"slices"
 	"strings"
 	"sync"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 )
 
 type cache struct {
