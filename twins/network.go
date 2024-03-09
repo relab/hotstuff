@@ -466,7 +466,7 @@ func (tm *timeoutManager) InitModule(mods *modules.Core) {
 		&tm.eventLoop,
 	)
 
-	tm.eventLoop.RegisterObserver(tick{}, func(event any) {
+	tm.eventLoop.RegisterObserver(tick{}, func(_ any) {
 		tm.advance()
 	})
 	tm.eventLoop.RegisterObserver(synchronizer.ViewChangeEvent{}, func(event any) {

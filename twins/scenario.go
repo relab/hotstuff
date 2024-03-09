@@ -166,7 +166,7 @@ func (commandModule) Accept(_ hotstuff.Command) bool {
 func (commandModule) Proposed(_ hotstuff.Command) {}
 
 // Get returns the next command to be proposed.
-// It may run until the context is cancelled.
+// It may run until the context is canceled.
 // If no command is available, the 'ok' return value should be false.
 func (cm commandModule) Get(_ context.Context) (cmd hotstuff.Command, ok bool) {
 	return cm.commandGenerator.next(), true

@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/synchronizer"
 )
 
-// TestTimeoutContext tests that a timeout context is cancelled after receiving a timeout event.
+// TestTimeoutContext tests that a timeout context is canceled after receiving a timeout event.
 func TestTimeoutContext(t *testing.T) {
 	eventloop := eventloop.New(10)
 	ctx, cancel := synchronizer.TimeoutContext(context.Background(), eventloop)
@@ -18,11 +18,11 @@ func TestTimeoutContext(t *testing.T) {
 	eventloop.AddEvent(synchronizer.TimeoutEvent{})
 
 	if ctx.Err() != context.Canceled {
-		t.Error("Context not cancelled")
+		t.Error("Context not canceled")
 	}
 }
 
-// TestTimeoutContextView tests that a timeout context is cancelled after receiving a view change event.
+// TestTimeoutContextView tests that a timeout context is canceled after receiving a view change event.
 func TestTimeoutContextView(t *testing.T) {
 	eventloop := eventloop.New(10)
 	ctx, cancel := synchronizer.TimeoutContext(context.Background(), eventloop)
@@ -31,11 +31,11 @@ func TestTimeoutContextView(t *testing.T) {
 	eventloop.AddEvent(synchronizer.ViewChangeEvent{View: 1})
 
 	if ctx.Err() != context.Canceled {
-		t.Error("Context not cancelled")
+		t.Error("Context not canceled")
 	}
 }
 
-// TestViewContext tests that a view context is cancelled after receiving a view change event.
+// TestViewContext tests that a view context is canceled after receiving a view change event.
 func TestViewContext(t *testing.T) {
 	eventloop := eventloop.New(10)
 	ctx, cancel := synchronizer.ViewContext(context.Background(), eventloop, nil)
@@ -44,11 +44,11 @@ func TestViewContext(t *testing.T) {
 	eventloop.AddEvent(synchronizer.ViewChangeEvent{View: 1})
 
 	if ctx.Err() != context.Canceled {
-		t.Error("Context not cancelled")
+		t.Error("Context not canceled")
 	}
 }
 
-// TestViewContextEarlierView tests that a view context is not cancelled when receiving a view change event for an earlier view.
+// TestViewContextEarlierView tests that a view context is not canceled when receiving a view change event for an earlier view.
 func TestViewContextEarlierView(t *testing.T) {
 	eventloop := eventloop.New(10)
 	view := hotstuff.View(1)
@@ -58,6 +58,6 @@ func TestViewContextEarlierView(t *testing.T) {
 	eventloop.AddEvent(synchronizer.ViewChangeEvent{View: 0})
 
 	if ctx.Err() != nil {
-		t.Error("Context cancelled")
+		t.Error("Context canceled")
 	}
 }

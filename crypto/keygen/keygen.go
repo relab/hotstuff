@@ -101,28 +101,28 @@ func GenerateTLSCert(id hotstuff.ID, hosts []string, parent *x509.Certificate, s
 // PrivateKeyToPEM encodes the private key in PEM format.
 func PrivateKeyToPEM(key hotstuff.PrivateKey) ([]byte, error) {
 	var (
-		marshalled []byte
-		keyType    string
-		err        error
+		marshaled []byte
+		keyType   string
+		err       error
 	)
 	switch k := key.(type) {
 	case *ecdsa.PrivateKey:
-		marshalled, err = x509.MarshalECPrivateKey(k)
+		marshaled, err = x509.MarshalECPrivateKey(k)
 		if err != nil {
 			return nil, err
 		}
 		keyType = ecdsacrypto.PrivateKeyFileType
 	case *bls12.PrivateKey:
-		marshalled = k.ToBytes()
+		marshaled = k.ToBytes()
 		keyType = bls12.PrivateKeyFileType
 	case ed25519.PrivateKey:
-		marshalled = make([]byte, ed25519.PrivateKeySize)
-		copy(marshalled, k)
+		marshaled = make([]byte, ed25519.PrivateKeySize)
+		copy(marshaled, k)
 		keyType = eddsa.PrivateKeyFileType
 	}
 	b := &pem.Block{
 		Type:  keyType,
-		Bytes: marshalled,
+		Bytes: marshaled,
 	}
 	return pem.EncodeToMemory(b), nil
 }
@@ -151,29 +151,29 @@ func WritePrivateKeyFile(key hotstuff.PrivateKey, filePath string) (err error) {
 // PublicKeyToPEM encodes the public key in PEM format.
 func PublicKeyToPEM(key hotstuff.PublicKey) ([]byte, error) {
 	var (
-		marshalled []byte
-		keyType    string
-		err        error
+		marshaled []byte
+		keyType   string
+		err       error
 	)
 	switch k := key.(type) {
 	case *ecdsa.PublicKey:
-		marshalled, err = x509.MarshalPKIXPublicKey(k)
+		marshaled, err = x509.MarshalPKIXPublicKey(k)
 		if err != nil {
 			return nil, err
 		}
 		keyType = ecdsacrypto.PublicKeyFileType
 	case *bls12.PublicKey:
-		marshalled = k.ToBytes()
+		marshaled = k.ToBytes()
 		keyType = bls12.PublicKeyFileType
 	case ed25519.PublicKey:
-		marshalled = make([]byte, ed25519.PublicKeySize)
-		copy(marshalled, k)
+		marshaled = make([]byte, ed25519.PublicKeySize)
+		copy(marshaled, k)
 		keyType = eddsa.PublicKeyFileType
 	}
 
 	b := &pem.Block{
 		Type:  keyType,
-		Bytes: marshalled,
+		Bytes: marshaled,
 	}
 
 	return pem.EncodeToMemory(b), nil

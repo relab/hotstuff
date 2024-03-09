@@ -107,7 +107,7 @@ func TestTicker(t *testing.T) {
 	go el.Run(ctx)
 
 	rate := 100 * time.Millisecond
-	id := el.AddTicker(rate, func(tick time.Time) (event any) { return testEvent(1) })
+	id := el.AddTicker(rate, func(_ time.Time) (_ any) { return testEvent(1) })
 
 	// sleep a little less than 1 second to ensure we get the expected amount of ticks
 	time.Sleep(time.Second - rate/4)

@@ -31,7 +31,7 @@ var workerCmd = &cobra.Command{
 	Short:  "Run a worker.",
 	Long: `Starts a worker that reads commands from stdin and writes responses to stdout.
 This is only intended to be used by a controller (hotstuff run).`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		runWorker()
 	},
 }
