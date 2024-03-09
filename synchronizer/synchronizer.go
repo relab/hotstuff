@@ -335,7 +335,6 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	s.lastTimeout = nil
 	s.duration.ViewStarted()
 
-	s.stopTimeoutTimer()
 	s.startTimeoutTimer()
 
 	s.logger.Debugf("advanced to view %d", newView)
