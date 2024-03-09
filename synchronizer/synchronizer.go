@@ -105,7 +105,7 @@ func (t oneShotTimer) Stop() bool {
 }
 
 func (s *Synchronizer) startTimeoutTimer() {
-	// Store the view in a local variable so that we can avoid calling s.View() in the closure below,
+	// Store the view in a local variable to avoid calling s.View() in the closure below,
 	// thus avoiding a data race.
 	view := s.View()
 	// It is important that the timer is NOT reused because then the view would be wrong.
