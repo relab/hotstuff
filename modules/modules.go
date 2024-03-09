@@ -13,7 +13,7 @@ import (
 // CommandQueue is a queue of commands to be proposed.
 type CommandQueue interface {
 	// Get returns the next command to be proposed.
-	// It may run until the context is cancelled.
+	// It may run until the context is canceled.
 	// If no command is available, the 'ok' return value should be false.
 	Get(ctx context.Context) (cmd hotstuff.Command, ok bool)
 }

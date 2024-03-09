@@ -9,14 +9,14 @@ import (
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/modules"
-	. "github.com/relab/hotstuff/synchronizer"
+	"github.com/relab/hotstuff/synchronizer"
 )
 
 func TestAdvanceViewQC(t *testing.T) {
 	const n = 4
 	ctrl := gomock.NewController(t)
 	builders := testutil.CreateBuilders(t, ctrl, n)
-	s := New(testutil.FixedTimeout(1000))
+	s := synchronizer.New(testutil.FixedTimeout(1000))
 	hs := mocks.NewMockConsensus(ctrl)
 	builders[0].Add(s, hs)
 
@@ -50,7 +50,7 @@ func TestAdvanceViewTC(t *testing.T) {
 	const n = 4
 	ctrl := gomock.NewController(t)
 	builders := testutil.CreateBuilders(t, ctrl, n)
-	s := New(testutil.FixedTimeout(100))
+	s := synchronizer.New(testutil.FixedTimeout(100))
 	hs := mocks.NewMockConsensus(ctrl)
 	builders[0].Add(s, hs)
 
