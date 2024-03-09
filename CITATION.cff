@@ -1,0 +1,17 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Extensible BFT-SMR Implementation
+message: Please cite this software using these metadata.
+type: software
+authors:
+  - given-names: Hein
+    name-particle: Meling
+    name-suffix: Professor
+    email: hein.meling@uis.no
+    affiliation: University of Stavanger
+  - given-names: John Ingve
+    name-particle: Olsen
+    email: john.i.olsen@uis.no
+    affiliation: University of Stavanger
