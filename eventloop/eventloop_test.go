@@ -22,6 +22,9 @@ func TestHandler(t *testing.T) {
 	defer cancel()
 	go el.Run(ctx)
 
+	// wait for the event loop to start
+	time.Sleep(1 * time.Millisecond)
+
 	want := testEvent(42)
 	el.AddEvent(want)
 
