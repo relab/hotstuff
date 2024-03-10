@@ -7,12 +7,12 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
+	"slices"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"golang.org/x/exp/slices"
 )
 
 func init() {
