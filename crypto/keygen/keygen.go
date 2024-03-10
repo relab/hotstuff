@@ -112,14 +112,17 @@ func PrivateKeyToPEM(key hotstuff.PrivateKey) ([]byte, error) {
 			return nil, err
 		}
 		keyType = ecdsacrypto.PrivateKeyFileType
+	case ed25519.PrivateKey:
+		marshaled, err = x509.MarshalPKCS8PrivateKey(k)
+		if err != nil {
+			return nil, err
+		}
+		keyType = eddsa.PrivateKeyFileType
 	case *bls12.PrivateKey:
 		marshaled = k.ToBytes()
 		keyType = bls12.PrivateKeyFileType
-	case ed25519.PrivateKey:
-		marshaled = make([]byte, ed25519.PrivateKeySize)
-		copy(marshaled, k)
-		keyType = eddsa.PrivateKeyFileType
 	}
+
 	b := &pem.Block{
 		Type:  keyType,
 		Bytes: marshaled,
@@ -162,20 +165,21 @@ func PublicKeyToPEM(key hotstuff.PublicKey) ([]byte, error) {
 			return nil, err
 		}
 		keyType = ecdsacrypto.PublicKeyFileType
+	case ed25519.PublicKey:
+		marshaled, err = x509.MarshalPKIXPublicKey(k)
+		if err != nil {
+			return nil, err
+		}
+		keyType = eddsa.PublicKeyFileType
 	case *bls12.PublicKey:
 		marshaled = k.ToBytes()
 		keyType = bls12.PublicKeyFileType
-	case ed25519.PublicKey:
-		marshaled = make(ed25519.PublicKey, ed25519.PublicKeySize)
-		copy(marshaled, k)
-		keyType = eddsa.PublicKeyFileType
 	}
 
 	b := &pem.Block{
 		Type:  keyType,
 		Bytes: marshaled,
 	}
-
 	return pem.EncodeToMemory(b), nil
 }
 
@@ -228,12 +232,12 @@ func ParsePrivateKey(buf []byte) (key hotstuff.PrivateKey, err error) {
 	switch b.Type {
 	case ecdsacrypto.PrivateKeyFileType:
 		key, err = x509.ParseECPrivateKey(b.Bytes)
+	case eddsa.PrivateKeyFileType:
+		key = ed25519.NewKeyFromSeed(b.Bytes[:32])
 	case bls12.PrivateKeyFileType:
 		k := &bls12.PrivateKey{}
 		k.FromBytes(b.Bytes)
 		key = k
-	case eddsa.PrivateKeyFileType:
-		key = ed25519.NewKeyFromSeed(b.Bytes[:32])
 	default:
 		return nil, fmt.Errorf("private key file type did not match any known types %v", b.Type)
 	}
@@ -261,16 +265,14 @@ func ParsePublicKey(buf []byte) (key hotstuff.PublicKey, err error) {
 	switch b.Type {
 	case ecdsacrypto.PublicKeyFileType:
 		key, err = x509.ParsePKIXPublicKey(b.Bytes)
+	case eddsa.PublicKeyFileType:
+		key, err = x509.ParsePKIXPublicKey(b.Bytes)
 	case bls12.PublicKeyFileType:
 		k := &bls12.PublicKey{}
 		err = k.FromBytes(b.Bytes)
 		if err != nil {
 			return nil, err
 		}
-		key = k
-	case eddsa.PublicKeyFileType:
-		k := make(ed25519.PublicKey, ed25519.PublicKeySize)
-		copy(k, b.Bytes)
 		key = k
 	default:
 		return nil, fmt.Errorf("public key file type did not match any known types %v", b.Type)
