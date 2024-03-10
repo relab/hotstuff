@@ -3,10 +3,10 @@ package modules_test
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/relab/hotstuff/modules"
-	"golang.org/x/exp/slices"
 )
 
 func init() {

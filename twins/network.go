@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -19,7 +20,6 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 )
 
 // NodeID is an ID that is unique to a node in the network.
@@ -143,7 +143,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 			consensus.New(consensusModule),
 			consensus.NewVotingMachine(),
 			crypto.NewCache(ecdsa.New(), 100),
-			synchronizer.New(FixedTimeout(0)),
+			synchronizer.New(FixedTimeout(1*time.Millisecond)),
 			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			// twins-specific:
 			&configuration{network: n, node: node},

@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
+	"slices"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
