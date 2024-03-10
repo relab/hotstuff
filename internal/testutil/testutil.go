@@ -250,6 +250,16 @@ func GenerateECDSAKey(t *testing.T) hotstuff.PrivateKey {
 	return key
 }
 
+// GenerateEDDSAKey generates an ECDSA private key for use in tests.
+func GenerateEDDSAKey(t *testing.T) hotstuff.PrivateKey {
+	t.Helper()
+	_, key, err := keygen.GenerateED25519Key()
+	if err != nil {
+		t.Fatalf("Failed to generate private key: %v", err)
+	}
+	return key
+}
+
 // GenerateBLS12Key generates a BLS12-381 private key for use in tests.
 func GenerateBLS12Key(t *testing.T) hotstuff.PrivateKey {
 	t.Helper()

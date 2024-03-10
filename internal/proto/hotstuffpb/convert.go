@@ -8,28 +8,39 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
+	"github.com/relab/hotstuff/crypto/eddsa"
 )
 
 // QuorumSignatureToProto converts a threshold signature to a protocol buffers message.
 func QuorumSignatureToProto(sig hotstuff.QuorumSignature) *QuorumSignature {
 	signature := &QuorumSignature{}
-	switch s := sig.(type) {
-	case ecdsa.MultiSignature:
-		sigs := make([]*ECDSASignature, 0, len(s))
-		for _, p := range s {
+	switch ms := sig.(type) {
+	case crypto.Multi[*ecdsa.Signature]:
+		sigs := make([]*ECDSASignature, 0, sig.Participants().Len())
+		for _, s := range ms {
 			sigs = append(sigs, &ECDSASignature{
-				Signer: uint32(p.Signer()),
-				R:      p.R().Bytes(),
-				S:      p.S().Bytes(),
+				Signer: uint32(s.Signer()),
+				R:      s.R().Bytes(),
+				S:      s.S().Bytes(),
 			})
 		}
 		signature.Sig = &QuorumSignature_ECDSASigs{ECDSASigs: &ECDSAMultiSignature{
 			Sigs: sigs,
 		}}
+
+	case crypto.Multi[*eddsa.Signature]:
+		sigs := make([]*EDDSASignature, 0, sig.Participants().Len())
+		for _, s := range ms {
+			sigs = append(sigs, &EDDSASignature{Signer: uint32(s.Signer()), Sig: s.ToBytes()})
+		}
+		signature.Sig = &QuorumSignature_EDDSASigs{EDDSASigs: &EDDSAMultiSignature{
+			Sigs: sigs,
+		}}
+
 	case *bls12.AggregateSignature:
 		signature.Sig = &QuorumSignature_BLS12Sig{BLS12Sig: &BLS12AggregateSignature{
-			Sig:          s.ToBytes(),
-			Participants: s.Bitfield().Bytes(),
+			Sig:          ms.ToBytes(),
+			Participants: ms.Bitfield().Bytes(),
 		}}
 	}
 	return signature
@@ -46,7 +57,14 @@ func QuorumSignatureFromProto(sig *QuorumSignature) hotstuff.QuorumSignature {
 			s.SetBytes(sig.GetS())
 			sigs[i] = ecdsa.RestoreSignature(r, s, hotstuff.ID(sig.GetSigner()))
 		}
-		return ecdsa.RestoreMultiSignature(sigs)
+		return crypto.Restore(sigs)
+	}
+	if signature := sig.GetEDDSASigs(); signature != nil {
+		sigs := make([]*eddsa.Signature, len(signature.GetSigs()))
+		for i, sig := range signature.GetSigs() {
+			sigs[i] = eddsa.RestoreSignature(sig.Sig, hotstuff.ID(sig.GetSigner()))
+		}
+		return crypto.Restore(sigs)
 	}
 	if signature := sig.GetBLS12Sig(); signature != nil {
 		aggSig, err := bls12.RestoreAggregateSignature(signature.GetSig(), crypto.BitfieldFromBytes(signature.GetParticipants()))
@@ -58,7 +76,7 @@ func QuorumSignatureFromProto(sig *QuorumSignature) hotstuff.QuorumSignature {
 	return nil
 }
 
-// PartialCertToProto converts a consensus.PartialCert to a hotstuffpb.Partialcert.
+// PartialCertToProto converts a consensus.PartialCert to a hotstuffpb.PartialCert.
 func PartialCertToProto(cert hotstuff.PartialCert) *PartialCert {
 	hash := cert.BlockHash()
 	return &PartialCert{

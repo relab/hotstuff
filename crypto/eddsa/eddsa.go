@@ -1,12 +1,9 @@
-// Package ecdsa implements the spec-k256 curve signature.
-package ecdsa
+// Package eddsa implements the ed25519 curve signature.
+package eddsa
 
 import (
-	"crypto/ecdsa"
-	"crypto/rand"
+	"crypto/ed25519"
 	"crypto/sha256"
-	"fmt"
-	"math/big"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
@@ -15,14 +12,14 @@ import (
 )
 
 func init() {
-	modules.RegisterModule("ecdsa", New)
+	modules.RegisterModule("eddsa", New)
 }
 
 const (
 	// PrivateKeyFileType is the PEM type for a private key.
-	PrivateKeyFileType = "ECDSA PRIVATE KEY"
+	PrivateKeyFileType = "EDDSA PRIVATE KEY"
 	// PublicKeyFileType is the PEM type for a public key.
-	PublicKeyFileType = "ECDSA PUBLIC KEY"
+	PublicKeyFileType = "EDDSA PUBLIC KEY"
 )
 
 var (
@@ -31,16 +28,16 @@ var (
 	_ crypto.Signature         = (*Signature)(nil)
 )
 
-// Signature is an ECDSA signature.
+// Signature is an EDDSA signature.
 type Signature struct {
-	r, s   *big.Int
 	signer hotstuff.ID
+	sign   []byte
 }
 
 // RestoreSignature restores an existing signature.
 // It should not be used to create new signatures, use Sign instead.
-func RestoreSignature(r, s *big.Int, signer hotstuff.ID) *Signature {
-	return &Signature{r, s, signer}
+func RestoreSignature(sign []byte, signer hotstuff.ID) *Signature {
+	return &Signature{signer, sign}
 }
 
 // Signer returns the ID of the replica that generated the signature.
@@ -48,65 +45,47 @@ func (sig Signature) Signer() hotstuff.ID {
 	return sig.signer
 }
 
-// R returns the r value of the signature.
-func (sig Signature) R() *big.Int {
-	return sig.r
-}
-
-// S returns the s value of the signature.
-func (sig Signature) S() *big.Int {
-	return sig.s
-}
-
 // ToBytes returns a raw byte string representation of the signature.
 func (sig Signature) ToBytes() []byte {
 	var b []byte
-	b = append(b, sig.r.Bytes()...)
-	b = append(b, sig.s.Bytes()...)
+	b = append(b, sig.sign...)
 	return b
 }
 
-type ecdsaBase struct {
+type eddsaBase struct {
 	configuration modules.Configuration
 	logger        logging.Logger
 	opts          *modules.Options
 }
 
-// New returns a new instance of the ECDSA CryptoBase implementation.
+// New returns a new instance of the EDDSA CryptoBase implementation.
 func New() modules.CryptoBase {
-	return &ecdsaBase{}
+	return &eddsaBase{}
 }
 
 // InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (ec *ecdsaBase) InitModule(mods *modules.Core) {
+func (ed *eddsaBase) InitModule(mods *modules.Core) {
 	mods.Get(
-		&ec.configuration,
-		&ec.logger,
-		&ec.opts,
+		&ed.configuration,
+		&ed.logger,
+		&ed.opts,
 	)
 }
 
-func (ec *ecdsaBase) privateKey() *ecdsa.PrivateKey {
-	return ec.opts.PrivateKey().(*ecdsa.PrivateKey)
+func (ed *eddsaBase) privateKey() ed25519.PrivateKey {
+	return ed.opts.PrivateKey().(ed25519.PrivateKey)
 }
 
 // Sign creates a cryptographic signature of the given message.
-func (ec *ecdsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
-	hash := sha256.Sum256(message)
-	r, s, err := ecdsa.Sign(rand.Reader, ec.privateKey(), hash[:])
-	if err != nil {
-		return nil, fmt.Errorf("ecdsa: sign failed: %w", err)
-	}
-	return crypto.Multi[*Signature]{ec.opts.ID(): &Signature{
-		r:      r,
-		s:      s,
-		signer: ec.opts.ID(),
-	}}, nil
+func (ed *eddsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
+	sign := ed25519.Sign(ed.privateKey(), message)
+	eddsaSign := &Signature{signer: ed.opts.ID(), sign: sign}
+	return crypto.Multi[*Signature]{ed.opts.ID(): eddsaSign}, nil
 }
 
 // Combine combines multiple signatures into a single signature.
-func (ec *ecdsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
+func (ed *eddsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
 	if len(signatures) < 2 {
 		return nil, crypto.ErrCombineMultiple
 	}
@@ -121,17 +100,17 @@ func (ec *ecdsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Q
 				ts[id] = s
 			}
 		} else {
-			ec.logger.Panicf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
+			ed.logger.Panicf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
 		}
 	}
 	return ts, nil
 }
 
 // Verify verifies the given quorum signature against the message.
-func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
+func (ed *eddsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
-		ec.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		ed.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 	n := signature.Participants().Len()
 	if n == 0 {
@@ -139,11 +118,10 @@ func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) 
 	}
 
 	results := make(chan bool, n)
-	hash := sha256.Sum256(message)
 	for _, sig := range s {
-		go func(sig *Signature, hash hotstuff.Hash) {
-			results <- ec.verifySingle(sig, hash)
-		}(sig, hash)
+		go func(sig *Signature, msg []byte) {
+			results <- ed.verifySingle(sig, msg)
+		}(sig, message)
 	}
 	valid := true
 	for range s {
@@ -155,10 +133,10 @@ func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) 
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
-func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
+func (ed *eddsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
-		ec.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		ed.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 	n := signature.Participants().Len()
 	if n == 0 {
@@ -174,9 +152,9 @@ func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 		}
 		hash := sha256.Sum256(message)
 		set[hash] = struct{}{}
-		go func(sig *Signature, hash hotstuff.Hash) {
-			results <- ec.verifySingle(sig, hash)
-		}(sig, hash)
+		go func(sig *Signature, msg []byte) {
+			results <- ed.verifySingle(sig, msg)
+		}(sig, message)
 	}
 	valid := true
 	for range s {
@@ -189,12 +167,12 @@ func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 	return valid && len(set) == len(batch)
 }
 
-func (ec *ecdsaBase) verifySingle(sig *Signature, hash hotstuff.Hash) bool {
-	replica, ok := ec.configuration.Replica(sig.Signer())
+func (ed *eddsaBase) verifySingle(sig *Signature, message []byte) bool {
+	replica, ok := ed.configuration.Replica(sig.Signer())
 	if !ok {
-		ec.logger.Warnf("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
+		ed.logger.Warnf("eddsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
 		return false
 	}
-	pk := replica.PublicKey().(*ecdsa.PublicKey)
-	return ecdsa.Verify(pk, hash[:], sig.R(), sig.S())
+	pk := replica.PublicKey().(ed25519.PublicKey)
+	return ed25519.Verify(pk, message, sig.sign)
 }

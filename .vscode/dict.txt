@@ -17,6 +17,7 @@ coverprofile
 cpuprofile
 Debugf
 durationpb
+eddsa
 emptypb
 Erevik
 eventloop

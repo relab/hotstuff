@@ -30,7 +30,7 @@ service Hotstuff {
 
 message Proposal {
   Block Block = 1;
-  optional AggQC AggQC = 2;
+  AggQC AggQC = 2;
 }
 
 message BlockHash { bytes Hash = 1; }
@@ -51,10 +51,16 @@ message ECDSASignature {
 
 message BLS12Signature { bytes Sig = 1; }
 
+message EDDSASignature {
+  uint32 Signer = 1;
+  bytes Sig = 2;
+ }
+
 message Signature {
   oneof Sig {
     ECDSASignature ECDSASig = 1;
     BLS12Signature BLS12Sig = 2;
+    EDDSASignature EDDSASig = 3;
   }
 }
 
@@ -65,6 +71,8 @@ message PartialCert {
 
 message ECDSAMultiSignature { repeated ECDSASignature Sigs = 1; }
 
+message EDDSAMultiSignature {repeated EDDSASignature Sigs = 1;}
+
 message BLS12AggregateSignature {
   bytes Sig = 1;
   bytes participants = 2;
@@ -74,6 +82,7 @@ message QuorumSignature {
   oneof Sig {
     ECDSAMultiSignature ECDSASigs = 1;
     BLS12AggregateSignature BLS12Sig = 2;
+    EDDSAMultiSignature EDDSASigs =3;
   }
 }
 
@@ -92,13 +101,13 @@ message TimeoutMsg {
   uint64 View = 1;
   SyncInfo SyncInfo = 2;
   QuorumSignature ViewSig = 3;
-  optional QuorumSignature MsgSig = 4;
+  QuorumSignature MsgSig = 4;
 }
 
 message SyncInfo {
-  optional QuorumCert QC = 1;
-  optional TimeoutCert TC = 2;
-  optional AggQC AggQC = 3;
+  QuorumCert QC = 1;
+  TimeoutCert TC = 2;
+  AggQC AggQC = 3;
 }
 
 message AggQC {

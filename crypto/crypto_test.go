@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
+	"github.com/relab/hotstuff/crypto/eddsa"
 	"github.com/relab/hotstuff/internal/testutil"
 )
 
@@ -84,6 +85,33 @@ func TestCreateTimeoutCert(t *testing.T) {
 
 		if tc.View() != hotstuff.View(1) {
 			t.Error("Timeout certificate view does not match original view.")
+		}
+	}
+	runAll(t, run)
+}
+
+func TestCreateQCWithOneSig(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		ctrl := gomock.NewController(t)
+		td := setup(t, ctrl, 4)
+		pcs := testutil.CreatePCs(t, td.block, td.signers)
+		_, err := td.signers[0].CreateQuorumCert(td.block, pcs[:1])
+		if err == nil {
+			t.Fatal("Expected error when creating QC with only one signature")
+		}
+	}
+	runAll(t, run)
+}
+
+func TestCreateQCWithOverlappingSigs(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		ctrl := gomock.NewController(t)
+		td := setup(t, ctrl, 4)
+		pcs := testutil.CreatePCs(t, td.block, td.signers)
+		pcs = append(pcs, pcs[0])
+		_, err := td.signers[0].CreateQuorumCert(td.block, pcs)
+		if err == nil {
+			t.Fatal("Expected error when creating QC with overlapping signatures")
 		}
 	}
 	runAll(t, run)
@@ -167,6 +195,8 @@ func runAll(t *testing.T, run func(*testing.T, setupFunc)) {
 	t.Helper()
 	t.Run("Ecdsa", func(t *testing.T) { run(t, setup(NewBase(ecdsa.New), testutil.GenerateECDSAKey)) })
 	t.Run("Cache+Ecdsa", func(t *testing.T) { run(t, setup(NewCache(ecdsa.New), testutil.GenerateECDSAKey)) })
+	t.Run("Eddsa", func(t *testing.T) { run(t, setup(NewBase(eddsa.New), testutil.GenerateEDDSAKey)) })
+	t.Run("Cache+Eddsa", func(t *testing.T) { run(t, setup(NewCache(eddsa.New), testutil.GenerateEDDSAKey)) })
 	t.Run("BLS12-381", func(t *testing.T) { run(t, setup(NewBase(bls12.New), testutil.GenerateBLS12Key)) })
 	t.Run("Cache+BLS12-381", func(t *testing.T) { run(t, setup(NewCache(bls12.New), testutil.GenerateBLS12Key)) })
 }
