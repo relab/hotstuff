@@ -31,7 +31,7 @@ func GenerateECDSAPrivateKey() (pk *ecdsa.PrivateKey, err error) {
 	return pk, nil
 }
 
-// GenerateED25519Key generates 25519 key
+// GenerateED25519Key generates ed25519 key.
 func GenerateED25519Key() (pub ed25519.PublicKey, pk ed25519.PrivateKey, err error) {
 	pub, pk, err = ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -129,7 +129,7 @@ func PrivateKeyToPEM(key hotstuff.PrivateKey) ([]byte, error) {
 
 // WritePrivateKeyFile writes a private key to the specified file.
 func WritePrivateKeyFile(key hotstuff.PrivateKey, filePath string) (err error) {
-	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return
 	}
@@ -166,7 +166,7 @@ func PublicKeyToPEM(key hotstuff.PublicKey) ([]byte, error) {
 		marshaled = k.ToBytes()
 		keyType = bls12.PublicKeyFileType
 	case ed25519.PublicKey:
-		marshaled = make([]byte, ed25519.PublicKeySize)
+		marshaled = make(ed25519.PublicKey, ed25519.PublicKeySize)
 		copy(marshaled, k)
 		keyType = eddsa.PublicKeyFileType
 	}
@@ -181,7 +181,7 @@ func PublicKeyToPEM(key hotstuff.PublicKey) ([]byte, error) {
 
 // WritePublicKeyFile writes a public key to the specified file.
 func WritePublicKeyFile(key hotstuff.PublicKey, filePath string) (err error) {
-	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
 		return
 	}
@@ -203,7 +203,7 @@ func WritePublicKeyFile(key hotstuff.PublicKey, filePath string) (err error) {
 
 // WriteCertFile writes an x509 certificate to a file.
 func WriteCertFile(cert *x509.Certificate, file string) (err error) {
-	f, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	f, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
 		return
 	}
@@ -233,10 +233,9 @@ func ParsePrivateKey(buf []byte) (key hotstuff.PrivateKey, err error) {
 		k.FromBytes(b.Bytes)
 		key = k
 	case eddsa.PrivateKeyFileType:
-		k := ed25519.NewKeyFromSeed(b.Bytes[:32])
-		key = k
+		key = ed25519.NewKeyFromSeed(b.Bytes[:32])
 	default:
-		return nil, fmt.Errorf("file type did not match any known types %v", b.Type)
+		return nil, fmt.Errorf("private key file type did not match any known types %v", b.Type)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse key: %w", err)
@@ -270,11 +269,11 @@ func ParsePublicKey(buf []byte) (key hotstuff.PublicKey, err error) {
 		}
 		key = k
 	case eddsa.PublicKeyFileType:
-		k := make([]byte, ed25519.PublicKeySize)
+		k := make(ed25519.PublicKey, ed25519.PublicKeySize)
 		copy(k, b.Bytes)
 		key = k
 	default:
-		return nil, fmt.Errorf("file type did not match any known types %v", b.Type)
+		return nil, fmt.Errorf("public key file type did not match any known types %v", b.Type)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse key: %w", err)
