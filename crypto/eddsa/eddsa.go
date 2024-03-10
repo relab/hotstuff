@@ -24,8 +24,8 @@ const (
 )
 
 var (
-	_ hotstuff.QuorumSignature = (*crypto.MultiSignature[*Signature])(nil)
-	_ hotstuff.IDSet           = (*crypto.MultiSignature[*Signature])(nil)
+	_ hotstuff.QuorumSignature = (*crypto.Multi[*Signature])(nil)
+	_ hotstuff.IDSet           = (*crypto.Multi[*Signature])(nil)
 )
 
 // Signature is an ECDSA signature
@@ -79,7 +79,7 @@ func (ed *eddsaBase) privateKey() ed25519.PrivateKey {
 func (ed *eddsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
 	sign := ed25519.Sign(ed.privateKey(), message)
 	eddsaSign := &Signature{signer: ed.opts.ID(), sign: sign}
-	return crypto.MultiSignature[*Signature]{ed.opts.ID(): eddsaSign}, nil
+	return crypto.Multi[*Signature]{ed.opts.ID(): eddsaSign}, nil
 }
 
 func (ed *eddsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
@@ -87,10 +87,10 @@ func (ed *eddsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Q
 		return nil, crypto.ErrCombineMultiple
 	}
 
-	ts := make(crypto.MultiSignature[*Signature])
+	ts := make(crypto.Multi[*Signature])
 
 	for _, sig1 := range signatures {
-		if sig2, ok := sig1.(crypto.MultiSignature[*Signature]); ok {
+		if sig2, ok := sig1.(crypto.Multi[*Signature]); ok {
 			for id, s := range sig2 {
 				if _, ok := ts[id]; ok {
 					return nil, crypto.ErrCombineOverlap
@@ -105,7 +105,7 @@ func (ed *eddsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Q
 }
 
 func (ed *eddsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
-	s, ok := signature.(crypto.MultiSignature[*Signature])
+	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
 		ed.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
@@ -133,7 +133,7 @@ func (ed *eddsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) 
 
 }
 func (ed *eddsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
-	s, ok := signature.(crypto.MultiSignature[*Signature])
+	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
 		ed.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}

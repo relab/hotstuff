@@ -1,8 +1,6 @@
 package crypto
 
 import (
-	"reflect"
-
 	"github.com/relab/hotstuff"
 	"golang.org/x/exp/slices"
 )
@@ -13,12 +11,12 @@ type Signature interface {
 	ToBytes() []byte
 }
 
-// MultiSignature is a set of (partial) signatures.
-type MultiSignature[T Signature] map[hotstuff.ID]T
+// Multi is a set of (partial) signatures.
+type Multi[T Signature] map[hotstuff.ID]T
 
-// RestoreMultiSignature should only be used to restore an existing threshold signature from a set of signatures.
-func RestoreMultiSignature[T Signature](signatures []T) MultiSignature[T] {
-	sig := make(MultiSignature[T], len(signatures))
+// Restore should only be used to restore an existing threshold signature from a set of signatures.
+func Restore[T Signature](signatures []T) Multi[T] {
+	sig := make(Multi[T], len(signatures))
 	for _, s := range signatures {
 		sig[s.Signer()] = s
 	}
@@ -26,7 +24,7 @@ func RestoreMultiSignature[T Signature](signatures []T) MultiSignature[T] {
 }
 
 // ToBytes returns the object as bytes.
-func (sig MultiSignature[T]) ToBytes() []byte {
+func (sig Multi[T]) ToBytes() []byte {
 	var b []byte
 	// sort by ID to make it deterministic
 	order := make([]hotstuff.ID, 0, len(sig))
@@ -41,30 +39,30 @@ func (sig MultiSignature[T]) ToBytes() []byte {
 }
 
 // Participants returns the IDs of replicas who participated in the threshold signature.
-func (sig MultiSignature[T]) Participants() hotstuff.IDSet {
+func (sig Multi[T]) Participants() hotstuff.IDSet {
 	return sig
 }
 
 // Add adds an ID to the set.
-func (sig MultiSignature[T]) Add(_ hotstuff.ID) {
+func (sig Multi[T]) Add(_ hotstuff.ID) {
 	panic("not implemented")
 }
 
 // Contains returns true if the set contains the ID.
-func (sig MultiSignature[T]) Contains(id hotstuff.ID) bool {
+func (sig Multi[T]) Contains(id hotstuff.ID) bool {
 	_, ok := sig[id]
 	return ok
 }
 
 // ForEach calls f for each ID in the set.
-func (sig MultiSignature[T]) ForEach(f func(hotstuff.ID)) {
+func (sig Multi[T]) ForEach(f func(hotstuff.ID)) {
 	for id := range sig {
 		f(id)
 	}
 }
 
 // RangeWhile calls f for each ID in the set until f returns false.
-func (sig MultiSignature[T]) RangeWhile(f func(hotstuff.ID) bool) {
+func (sig Multi[T]) RangeWhile(f func(hotstuff.ID) bool) {
 	for id := range sig {
 		if !f(id) {
 			break
@@ -73,17 +71,10 @@ func (sig MultiSignature[T]) RangeWhile(f func(hotstuff.ID) bool) {
 }
 
 // Len returns the number of entries in the set.
-func (sig MultiSignature[T]) Len() int {
+func (sig Multi[T]) Len() int {
 	return len(sig)
 }
 
-func (sig MultiSignature[T]) String() string {
+func (sig Multi[T]) String() string {
 	return hotstuff.IDSetToString(sig)
-}
-
-func (sig MultiSignature[T]) Type() reflect.Type {
-	for _, s := range sig {
-		return reflect.TypeOf(s)
-	}
-	return nil
 }

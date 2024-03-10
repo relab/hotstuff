@@ -90,6 +90,33 @@ func TestCreateTimeoutCert(t *testing.T) {
 	runAll(t, run)
 }
 
+func TestCreateQCWithOneSig(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		ctrl := gomock.NewController(t)
+		td := setup(t, ctrl, 4)
+		pcs := testutil.CreatePCs(t, td.block, td.signers)
+		_, err := td.signers[0].CreateQuorumCert(td.block, pcs[:1])
+		if err == nil {
+			t.Fatal("Expected error when creating QC with only one signature")
+		}
+	}
+	runAll(t, run)
+}
+
+func TestCreateQCWithOverlappingSigs(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		ctrl := gomock.NewController(t)
+		td := setup(t, ctrl, 4)
+		pcs := testutil.CreatePCs(t, td.block, td.signers)
+		pcs = append(pcs, pcs[0])
+		_, err := td.signers[0].CreateQuorumCert(td.block, pcs)
+		if err == nil {
+			t.Fatal("Expected error when creating QC with overlapping signatures")
+		}
+	}
+	runAll(t, run)
+}
+
 func TestVerifyGenesisQC(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		ctrl := gomock.NewController(t)
