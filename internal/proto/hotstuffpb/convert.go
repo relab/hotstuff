@@ -76,7 +76,7 @@ func QuorumSignatureFromProto(sig *QuorumSignature) hotstuff.QuorumSignature {
 	return nil
 }
 
-// PartialCertToProto converts a consensus.PartialCert to a hotstuffpb.Partialcert.
+// PartialCertToProto converts a consensus.PartialCert to a hotstuffpb.PartialCert.
 func PartialCertToProto(cert hotstuff.PartialCert) *PartialCert {
 	hash := cert.BlockHash()
 	return &PartialCert{
