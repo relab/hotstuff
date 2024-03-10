@@ -1,8 +1,9 @@
 package crypto
 
 import (
+	"slices"
+
 	"github.com/relab/hotstuff"
-	"golang.org/x/exp/slices"
 )
 
 // Signature is the individual component in MultiSignature
