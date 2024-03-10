@@ -1,4 +1,4 @@
-// Package eddsa implements 25519 curve signature
+// Package eddsa implements the ed25519 curve signature.
 package eddsa
 
 import (
@@ -18,7 +18,6 @@ func init() {
 const (
 	// PrivateKeyFileType is the PEM type for a private key.
 	PrivateKeyFileType = "EDDSA PRIVATE KEY"
-
 	// PublicKeyFileType is the PEM type for a public key.
 	PublicKeyFileType = "EDDSA PUBLIC KEY"
 )
@@ -26,15 +25,17 @@ const (
 var (
 	_ hotstuff.QuorumSignature = (*crypto.Multi[*Signature])(nil)
 	_ hotstuff.IDSet           = (*crypto.Multi[*Signature])(nil)
+	_ crypto.Signature         = (*Signature)(nil)
 )
 
-// Signature is an ECDSA signature
+// Signature is an EDDSA signature.
 type Signature struct {
 	signer hotstuff.ID
 	sign   []byte
 }
 
-// RestoreSignature restores an existing signature. It should not be used to create new signatures, use Sign instead.
+// RestoreSignature restores an existing signature.
+// It should not be used to create new signatures, use Sign instead.
 func RestoreSignature(sign []byte, signer hotstuff.ID) *Signature {
 	return &Signature{signer, sign}
 }
@@ -44,7 +45,7 @@ func (sig Signature) Signer() hotstuff.ID {
 	return sig.signer
 }
 
-// ToBytes returns a raw byte string representation of the signature
+// ToBytes returns a raw byte string representation of the signature.
 func (sig Signature) ToBytes() []byte {
 	var b []byte
 	b = append(b, sig.sign...)
@@ -57,7 +58,7 @@ type eddsaBase struct {
 	opts          *modules.Options
 }
 
-// New returns a new instance of the ECDSA CryptoBase implementation.
+// New returns a new instance of the EDDSA CryptoBase implementation.
 func New() modules.CryptoBase {
 	return &eddsaBase{}
 }
@@ -76,23 +77,24 @@ func (ed *eddsaBase) privateKey() ed25519.PrivateKey {
 	return ed.opts.PrivateKey().(ed25519.PrivateKey)
 }
 
+// Sign creates a cryptographic signature of the given message.
 func (ed *eddsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
 	sign := ed25519.Sign(ed.privateKey(), message)
 	eddsaSign := &Signature{signer: ed.opts.ID(), sign: sign}
 	return crypto.Multi[*Signature]{ed.opts.ID(): eddsaSign}, nil
 }
 
+// Combine combines multiple signatures into a single signature.
 func (ed *eddsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
 	if len(signatures) < 2 {
 		return nil, crypto.ErrCombineMultiple
 	}
 
 	ts := make(crypto.Multi[*Signature])
-
 	for _, sig1 := range signatures {
 		if sig2, ok := sig1.(crypto.Multi[*Signature]); ok {
 			for id, s := range sig2 {
-				if _, ok := ts[id]; ok {
+				if _, duplicate := ts[id]; duplicate {
 					return nil, crypto.ErrCombineOverlap
 				}
 				ts[id] = s
@@ -104,6 +106,7 @@ func (ed *eddsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Q
 	return ts, nil
 }
 
+// Verify verifies the given quorum signature against the message.
 func (ed *eddsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
@@ -115,29 +118,26 @@ func (ed *eddsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) 
 	}
 
 	results := make(chan bool, n)
-
 	for _, sig := range s {
 		go func(sig *Signature, msg []byte) {
 			results <- ed.verifySingle(sig, msg)
 		}(sig, message)
 	}
-
 	valid := true
 	for range s {
 		if !<-results {
 			valid = false
 		}
 	}
-
 	return valid
-
 }
+
+// BatchVerify verifies the given quorum signature against the batch of messages.
 func (ed *eddsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
 		ed.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
-
 	n := signature.Participants().Len()
 	if n == 0 {
 		return false
@@ -156,7 +156,6 @@ func (ed *eddsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 			results <- ed.verifySingle(sig, msg)
 		}(sig, message)
 	}
-
 	valid := true
 	for range s {
 		if !<-results {
@@ -167,18 +166,17 @@ func (ed *eddsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 	// valid if all partial signatures are valid and there are no duplicate messages
 	return valid && len(set) == len(batch)
 }
+
 func (ed *eddsaBase) verifySingle(sig *Signature, message []byte) bool {
 	replica, ok := ed.configuration.Replica(sig.Signer())
 	if !ok {
-		ed.logger.Warnf("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
+		ed.logger.Warnf("eddsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
 		return false
 	}
 	pk, ok := replica.PublicKey().([]byte)
 	if !ok {
-		ed.logger.Infof("ecdsaBase: got public key from replica that was not of type []byte.")
+		ed.logger.Infof("eddsaBase: got public key from replica that was not of type []byte.")
 		pk = replica.PublicKey().(ed25519.PublicKey)
 	}
 	return ed25519.Verify(pk, message, sig.sign)
 }
-
-var _ crypto.Signature = (*Signature)(nil)
