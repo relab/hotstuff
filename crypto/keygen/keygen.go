@@ -233,7 +233,15 @@ func ParsePrivateKey(buf []byte) (key hotstuff.PrivateKey, err error) {
 	case ecdsacrypto.PrivateKeyFileType:
 		key, err = x509.ParseECPrivateKey(b.Bytes)
 	case eddsa.PrivateKeyFileType:
-		key = ed25519.NewKeyFromSeed(b.Bytes[:32])
+		genericKey, err := x509.ParsePKCS8PrivateKey(b.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		var ok bool
+		key, ok = genericKey.(ed25519.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("failed to parse key")
+		}
 	case bls12.PrivateKeyFileType:
 		k := &bls12.PrivateKey{}
 		k.FromBytes(b.Bytes)
