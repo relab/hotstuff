@@ -33,7 +33,7 @@ require (
 	github.com/alexhunt7/ssher v0.0.0-20190216204854-d36569cf7047 // indirect
 	github.com/campoy/embedmd v1.0.0 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
-	github.com/docker/docker v25.0.4+incompatible // indirect
+	github.com/docker/docker v25.0.5+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
