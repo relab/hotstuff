@@ -57,6 +57,8 @@ jobs:
       - name: Upload code coverage report to Codecov
         if: runner.os == 'Linux'
         uses: codecov/codecov-action@v3
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           files: ./coverage.txt
           flags: unittests
