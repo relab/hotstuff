@@ -117,11 +117,11 @@ func (mods *Core) Get(pointers ...any) {
 
 // Builder is a helper for setting up client modules.
 type Builder struct {
-	core             Core
-	staticModules    []Module
-	pipelinedModules map[PipelineId][]Module
-	opts             *Options
-	pipelineCount    int
+	core            Core
+	staticModules   []Module
+	modulePipelines map[PipelineId][]Module
+	opts            *Options
+	pipelineCount   int
 }
 
 // NewBuilder returns a new builder.
@@ -138,14 +138,15 @@ func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey, pipelineCount uint) Buil
 
 	if pipelineCount == 0 {
 		bl.pipelineCount = 0
-		bl.pipelinedModules = nil
+		bl.modulePipelines = nil
 		return bl
 	}
 
-	bl.pipelinedModules = make(map[PipelineId][]Module)
+	bl.pipelineCount = int(pipelineCount)
+	bl.modulePipelines = make(map[PipelineId][]Module)
 	for i := uint(0); i < pipelineCount; i++ {
 		id := PipelineId(i)
-		bl.pipelinedModules[id] = make([]Module, 0)
+		bl.modulePipelines[id] = make([]Module, 0)
 	}
 
 	return bl
@@ -188,9 +189,32 @@ func CreatePipelinedModules(count int, ctor any, ctorArgs ...any) []any {
 
 // Alan: AddPipelined adds several instances of a module based on b.pipelineCount, provided its constructor arguments.
 // If b.pipelineCount == 0 then they will be added as static modules.
-// func (b *Builder) AddPipelined(count int, ctor any, ctorArgs ...any) {
-//
-// }
+func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
+	if reflect.TypeOf(ctor).Kind() != reflect.Func {
+		panic("second argument is not a function")
+	}
+
+	vargs := make([]reflect.Value, len(ctorArgs))
+	for n, v := range ctorArgs {
+		vargs[n] = reflect.ValueOf(v)
+	}
+
+	ctorVal := reflect.ValueOf(ctor)
+	if b.pipelineCount == 0 {
+		mod := ctorVal.Call(vargs)[0].Interface()
+		b.AddStatic(mod.(Module))
+		return
+	}
+
+	for id := range b.modulePipelines {
+		mod := ctorVal.Call(vargs)[0].Interface()
+		b.modulePipelines[id] = append(b.modulePipelines[id], mod.(Module))
+	}
+}
+
+func (b *Builder) GetModulePipelines() map[PipelineId][]Module {
+	return b.modulePipelines
+}
 
 // Build initializes all added modules and returns the Core object.
 func (b *Builder) Build() *Core {
