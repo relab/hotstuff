@@ -47,8 +47,12 @@ func (g *greeterImpl) InitModule(mods *modules.Core) {
 }
 
 func TestModule(t *testing.T) {
-	builder := modules.NewBuilder(0, nil)
-	builder.Add(NewCounter(), NewGreeter())
+	const pipelineCount = 3
+	builder := modules.NewBuilder(0, nil, pipelineCount)
+	builder.AddStatic(NewCounter(), NewGreeter())
+
+	pipelinedGreeters := modules.CreatePipelinedModules(pipelineCount, NewGreeter)
+	println(pipelinedGreeters)
 
 	mods := builder.Build()
 

@@ -105,7 +105,7 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 	}
 	srv.cfg = backend.NewConfig(creds, managerOpts...)
 
-	builder.Add(
+	builder.AddStatic(
 		srv.cfg,   // configuration
 		srv.hsSrv, // event handling
 

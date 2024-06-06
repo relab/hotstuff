@@ -39,6 +39,10 @@ import (
 	"github.com/relab/hotstuff"
 )
 
+type PipelineId uint32
+
+const StaticPipelineId = PipelineId(0)
+
 // Module is an interface for initializing modules.
 type Module interface {
 	InitModule(mods *Core)
@@ -47,7 +51,8 @@ type Module interface {
 // Core is the base of the module system.
 // It contains only a few core modules that are shared between replicas and clients.
 type Core struct {
-	modules []any
+	staticModules    []any
+	pipelinedModules map[PipelineId][]any
 }
 
 // TryGet attempts to find a module for ptr.
@@ -75,7 +80,7 @@ func (mods Core) TryGet(ptr any) bool {
 		panic("only pointer values allowed")
 	}
 
-	for _, m := range mods.modules {
+	for _, m := range mods.staticModules {
 		mv := reflect.ValueOf(m)
 		if mv.Type().AssignableTo(pt.Elem()) {
 			v.Elem().Set(mv)
@@ -112,13 +117,17 @@ func (mods *Core) Get(pointers ...any) {
 
 // Builder is a helper for setting up client modules.
 type Builder struct {
-	core    Core
-	modules []Module
-	opts    *Options
+	core             Core
+	staticModules    []Module
+	pipelinedModules map[PipelineId][]Module
+	opts             *Options
+	pipelineCount    int
 }
 
 // NewBuilder returns a new builder.
-func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey) Builder {
+// Alan: Builder now requires a pipeline count. If zero is specified, pipelined modules will be
+// insterted to staticModules in further function calls.
+func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey, pipelineCount uint) Builder {
 	bl := Builder{
 		opts: &Options{
 			id:                 id,
@@ -126,6 +135,19 @@ func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey) Builder {
 			connectionMetadata: make(map[string]string),
 		},
 	}
+
+	if pipelineCount == 0 {
+		bl.pipelineCount = 0
+		bl.pipelinedModules = nil
+		return bl
+	}
+
+	bl.pipelinedModules = make(map[PipelineId][]Module)
+	for i := uint(0); i < pipelineCount; i++ {
+		id := PipelineId(i)
+		bl.pipelinedModules[id] = make([]Module, 0)
+	}
+
 	return bl
 }
 
@@ -134,25 +156,51 @@ func (b *Builder) Options() *Options {
 	return b.opts
 }
 
-// Add adds modules to the builder.
-func (b *Builder) Add(modules ...any) {
-	b.core.modules = append(b.core.modules, modules...)
+// AddStatic adds existing, singular, module instances to the builder.
+func (b *Builder) AddStatic(modules ...any) {
+	b.core.staticModules = append(b.core.staticModules, modules...)
 	for _, module := range modules {
 		if m, ok := module.(Module); ok {
-			b.modules = append(b.modules, m)
+			b.staticModules = append(b.staticModules, m)
 		}
 	}
 }
 
+func CreatePipelinedModules(count int, ctor any, ctorArgs ...any) []any {
+	if reflect.TypeOf(ctor).Kind() != reflect.Func {
+		panic("second argument is not a function")
+	}
+
+	vargs := make([]reflect.Value, len(ctorArgs))
+	for n, v := range ctorArgs {
+		vargs[n] = reflect.ValueOf(v)
+	}
+
+	ctorVal := reflect.ValueOf(ctor)
+
+	modules := make([]any, count)
+	for i := range modules {
+		retVal := ctorVal.Call(vargs)
+		modules[i] = retVal
+	}
+	return modules
+}
+
+// Alan: AddPipelined adds several instances of a module based on b.pipelineCount, provided its constructor arguments.
+// If b.pipelineCount == 0 then they will be added as static modules.
+// func (b *Builder) AddPipelined(count int, ctor any, ctorArgs ...any) {
+//
+// }
+
 // Build initializes all added modules and returns the Core object.
 func (b *Builder) Build() *Core {
 	// reverse the order of the added modules so that TryGet will find the latest first.
-	for i, j := 0, len(b.core.modules)-1; i < j; i, j = i+1, j-1 {
-		b.core.modules[i], b.core.modules[j] = b.core.modules[j], b.core.modules[i]
+	for i, j := 0, len(b.core.staticModules)-1; i < j; i, j = i+1, j-1 {
+		b.core.staticModules[i], b.core.staticModules[j] = b.core.staticModules[j], b.core.staticModules[i]
 	}
 	// add the Options last so that it can be overridden by user.
-	b.Add(b.opts)
-	for _, module := range b.modules {
+	b.AddStatic(b.opts)
+	for _, module := range b.staticModules {
 		module.InitModule(&b.core)
 	}
 	return &b.core

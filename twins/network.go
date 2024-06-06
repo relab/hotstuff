@@ -114,9 +114,9 @@ func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) modules.Buil
 	}
 	n.nodes[id.NetworkID] = &node
 	n.replicas[id.ReplicaID] = append(n.replicas[id.ReplicaID], &node)
-	builder := modules.NewBuilder(id.ReplicaID, pk)
+	builder := modules.NewBuilder(id.ReplicaID, pk, 0)
 	// register node as an anonymous module because that allows configuration to obtain it.
-	builder.Add(&node)
+	builder.AddStatic(&node)
 	return builder
 }
 
@@ -137,7 +137,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 		if !ok {
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
-		builder.Add(
+		builder.AddStatic(
 			eventloop.New(100),
 			blockchain.New(),
 			consensus.New(consensusModule),
