@@ -139,7 +139,7 @@ func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey, pipelineCount uint) Buil
 	if pipelineCount == 0 {
 		bl.pipelineCount = 0
 		bl.modulePipelines = nil
-		return bl
+		return bl // Early exit
 	}
 
 	bl.pipelineCount = int(pipelineCount)
@@ -167,26 +167,6 @@ func (b *Builder) AddStatic(modules ...any) {
 	}
 }
 
-func CreatePipelinedModules(count int, ctor any, ctorArgs ...any) []any {
-	if reflect.TypeOf(ctor).Kind() != reflect.Func {
-		panic("second argument is not a function")
-	}
-
-	vargs := make([]reflect.Value, len(ctorArgs))
-	for n, v := range ctorArgs {
-		vargs[n] = reflect.ValueOf(v)
-	}
-
-	ctorVal := reflect.ValueOf(ctor)
-
-	modules := make([]any, count)
-	for i := range modules {
-		retVal := ctorVal.Call(vargs)
-		modules[i] = retVal
-	}
-	return modules
-}
-
 // Alan: AddPipelined adds several instances of a module based on b.pipelineCount, provided its constructor arguments.
 // If b.pipelineCount == 0 then they will be added as static modules.
 func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
@@ -201,13 +181,22 @@ func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
 
 	ctorVal := reflect.ValueOf(ctor)
 	if b.pipelineCount == 0 {
-		mod := ctorVal.Call(vargs)[0].Interface()
-		b.AddStatic(mod.(Module))
+		returnResult := ctorVal.Call(vargs)
+		if len(returnResult) != 1 {
+			panic("constructor does not return a single value")
+		}
+		mod := returnResult[0].Interface()
+		b.AddStatic(mod)
 		return
 	}
 
 	for id := range b.modulePipelines {
-		mod := ctorVal.Call(vargs)[0].Interface()
+		returnResult := ctorVal.Call(vargs)
+		if len(returnResult) != 1 {
+			panic("constructor does not return a single value")
+		}
+		mod := returnResult[0].Interface()
+		// TODO: Consider if the module is not of interface type Module
 		b.modulePipelines[id] = append(b.modulePipelines[id], mod.(Module))
 	}
 }
@@ -223,6 +212,7 @@ func (b *Builder) Build() *Core {
 		b.core.staticModules[i], b.core.staticModules[j] = b.core.staticModules[j], b.core.staticModules[i]
 	}
 	// add the Options last so that it can be overridden by user.
+	// TODO: Implement building of pipelined modules
 	b.AddStatic(b.opts)
 	for _, module := range b.staticModules {
 		module.InitModule(&b.core)

@@ -57,7 +57,7 @@ func (a *adderImpl) InitModule(mods *modules.Core) {
 }
 
 func TestPipelinedModule(t *testing.T) {
-	builder := modules.NewBuilder(0, nil, 0)
+	builder := modules.NewBuilder(0, nil, 3)
 	builder.AddPipelined(NewAdder)
 	builder.AddPipelined(NewMultiplier)
 
