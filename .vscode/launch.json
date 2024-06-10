@@ -16,6 +16,15 @@
 			]
 		},
 		{
+			"name": "Test Pipelined Modules",
+			"type": "go",
+			"request": "launch",
+			"mode": "test",
+			"program": "${workspaceRoot}/modules/pipelined_module_test.go",
+			"cwd": "${workspaceRoot}",
+			"args": []
+		},
+		{
 			"name": "Deploy to Docker container",
 			"type": "go",
 			"request": "launch",

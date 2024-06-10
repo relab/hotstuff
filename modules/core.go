@@ -42,7 +42,7 @@ import (
 type PipelineId uint32
 type ModuleTypeId uint32
 
-const StaticPipelineId = PipelineId(0)
+const PipelineIdNone = ^PipelineId(0)
 
 // Module is an interface for initializing modules.
 type Module interface {
@@ -116,6 +116,25 @@ func (mods *Core) Get(pointers ...any) {
 	}
 }
 
+func (mods *Core) FindModuleFromPipeline(typeId ModuleTypeId, pipelineId PipelineId) (any, bool) {
+	module, ok := mods.pipelinedModules[pipelineId][typeId]
+	return module, ok
+}
+
+func (mods *Core) FindModulePipelineId(ptr any) PipelineId {
+	for id := range mods.pipelinedModules {
+		pipeline := mods.pipelinedModules[id]
+		for typeId := range pipeline {
+			modRef := pipeline[typeId]
+			if modRef == ptr {
+				return id
+			}
+		}
+	}
+
+	return PipelineIdNone
+}
+
 // Builder is a helper for setting up client modules.
 type Builder struct {
 	core            Core
@@ -168,9 +187,10 @@ func (b *Builder) AddStatic(modules ...any) {
 	}
 }
 
-// Alan: AddPipelined adds several instances of a module based on b.pipelineCount, provided its constructor arguments.
-// If b.pipelineCount == 0 then they will be added as static modules.
-func (b *Builder) AddPipelined(typeId ModuleTypeId, ctor any, ctorArgs ...any) {
+// CreatePipelined constructs and adds several instances of a module based on b.pipelineCount,
+// provided its constructor arguments. If b.pipelineCount == 0 then one will be constructed and added
+// as a static module.
+func (b *Builder) CreatePipelined(typeId ModuleTypeId, ctor any, ctorArgs ...any) {
 	if reflect.TypeOf(ctor).Kind() != reflect.Func {
 		panic("second argument is not a function")
 	}
@@ -220,6 +240,15 @@ func (b *Builder) Build() *Core {
 	b.AddStatic(b.opts)
 	for _, module := range b.staticModules {
 		module.InitModule(&b.core)
+	}
+
+	b.core.pipelinedModules = make(map[PipelineId]map[ModuleTypeId]any)
+	for id, pipeline := range b.modulePipelines {
+		b.core.pipelinedModules[id] = make(map[ModuleTypeId]any)
+		for typeId, module := range pipeline {
+			b.core.pipelinedModules[id][typeId] = module
+			module.InitModule(&b.core)
+		}
 	}
 	return &b.core
 }

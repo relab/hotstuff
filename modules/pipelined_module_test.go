@@ -49,11 +49,11 @@ func NewMultiplier() *multiplierImpl { //nolint:revive
 }
 
 func (m *multiplierImpl) InitModule(mods *modules.Core) {
-	mods.Get(&m.adder)
+	// TODO: Figure out some get method
 }
 
 func (a *adderImpl) InitModule(mods *modules.Core) {
-	// Does nothing for now
+	// TODO: Figure out some get method
 }
 
 const (
@@ -63,8 +63,8 @@ const (
 
 func TestPipelinedModule(t *testing.T) {
 	builder := modules.NewBuilder(0, nil, 3)
-	builder.AddPipelined(AdderModuleId, NewAdder)
-	builder.AddPipelined(MultiplierModuleId, NewMultiplier)
+	builder.CreatePipelined(AdderModuleId, NewAdder)
+	builder.CreatePipelined(MultiplierModuleId, NewMultiplier)
 
 	// mods :=
 	builder.Build()

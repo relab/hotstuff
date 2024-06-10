@@ -20,7 +20,7 @@ __debug_bin
 # binaries
 /hotstuff
 /plot
-
+**/__debug_bin*
 
 # other
 *.in
