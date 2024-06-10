@@ -196,8 +196,11 @@ func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
 			panic("constructor does not return a single value")
 		}
 		mod := returnResult[0].Interface()
-		// TODO: Consider if the module is not of interface type Module
-		b.modulePipelines[id] = append(b.modulePipelines[id], mod.(Module))
+		converted, ok := mod.(Module)
+		if !ok {
+			panic("constructor did not construct a value of type Module")
+		}
+		b.modulePipelines[id] = append(b.modulePipelines[id], converted)
 	}
 }
 
