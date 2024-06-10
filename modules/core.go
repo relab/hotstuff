@@ -40,6 +40,7 @@ import (
 )
 
 type PipelineId uint32
+type ModuleTypeId uint32
 
 const StaticPipelineId = PipelineId(0)
 
@@ -52,7 +53,7 @@ type Module interface {
 // It contains only a few core modules that are shared between replicas and clients.
 type Core struct {
 	staticModules    []any
-	pipelinedModules map[PipelineId][]any
+	pipelinedModules map[PipelineId]map[ModuleTypeId]any
 }
 
 // TryGet attempts to find a module for ptr.
@@ -119,7 +120,7 @@ func (mods *Core) Get(pointers ...any) {
 type Builder struct {
 	core            Core
 	staticModules   []Module
-	modulePipelines map[PipelineId][]Module
+	modulePipelines map[PipelineId]map[ModuleTypeId]Module
 	opts            *Options
 	pipelineCount   int
 }
@@ -143,10 +144,10 @@ func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey, pipelineCount uint) Buil
 	}
 
 	bl.pipelineCount = int(pipelineCount)
-	bl.modulePipelines = make(map[PipelineId][]Module)
+	bl.modulePipelines = make(map[PipelineId]map[ModuleTypeId]Module)
 	for i := uint(0); i < pipelineCount; i++ {
 		id := PipelineId(i)
-		bl.modulePipelines[id] = make([]Module, 0)
+		bl.modulePipelines[id] = make(map[ModuleTypeId]Module, 0)
 	}
 
 	return bl
@@ -169,7 +170,7 @@ func (b *Builder) AddStatic(modules ...any) {
 
 // Alan: AddPipelined adds several instances of a module based on b.pipelineCount, provided its constructor arguments.
 // If b.pipelineCount == 0 then they will be added as static modules.
-func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
+func (b *Builder) AddPipelined(typeId ModuleTypeId, ctor any, ctorArgs ...any) {
 	if reflect.TypeOf(ctor).Kind() != reflect.Func {
 		panic("second argument is not a function")
 	}
@@ -200,11 +201,11 @@ func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
 		if !ok {
 			panic("constructor did not construct a value of type Module")
 		}
-		b.modulePipelines[id] = append(b.modulePipelines[id], converted)
+		b.modulePipelines[id][typeId] = converted
 	}
 }
 
-func (b *Builder) GetModulePipelines() map[PipelineId][]Module {
+func (b *Builder) GetModulePipelines() map[PipelineId]map[ModuleTypeId]Module {
 	return b.modulePipelines
 }
 

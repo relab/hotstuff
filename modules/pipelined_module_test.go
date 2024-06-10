@@ -56,10 +56,15 @@ func (a *adderImpl) InitModule(mods *modules.Core) {
 	// Does nothing for now
 }
 
+const (
+	AdderModuleId = iota
+	MultiplierModuleId
+)
+
 func TestPipelinedModule(t *testing.T) {
 	builder := modules.NewBuilder(0, nil, 3)
-	builder.AddPipelined(NewAdder)
-	builder.AddPipelined(NewMultiplier)
+	builder.AddPipelined(AdderModuleId, NewAdder)
+	builder.AddPipelined(MultiplierModuleId, NewMultiplier)
 
 	// mods :=
 	builder.Build()
