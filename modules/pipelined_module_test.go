@@ -50,6 +50,13 @@ func NewMultiplier() *multiplierImpl { //nolint:revive
 
 func (m *multiplierImpl) InitModule(mods *modules.Core) {
 	// TODO: Figure out some get method
+	pipeId := mods.FindModulePipelineId(m)
+	mod, ok := mods.FindModuleFromPipeline(ModuleTypeIdAdder, pipeId)
+	if !ok {
+		panic("could not find added")
+	}
+
+	m.adder = mod.(Adder)
 }
 
 func (a *adderImpl) InitModule(mods *modules.Core) {
@@ -57,30 +64,23 @@ func (a *adderImpl) InitModule(mods *modules.Core) {
 }
 
 const (
-	AdderModuleId = iota
-	MultiplierModuleId
+	ModuleTypeIdAdder = iota
+	ModuleTypeIdMultiplier
 )
 
 func TestPipelinedModule(t *testing.T) {
-	builder := modules.NewBuilder(0, nil, 3)
-	builder.CreatePipelined(AdderModuleId, NewAdder)
-	builder.CreatePipelined(MultiplierModuleId, NewMultiplier)
+	const pipelineCount = 3
+	builder := modules.NewBuilder(0, nil, pipelineCount)
+	builder.AddPipelined(ModuleTypeIdAdder, NewAdder)
+	builder.AddPipelined(ModuleTypeIdMultiplier, NewMultiplier)
 
-	// mods :=
-	builder.Build()
-
-	/*var (
-		counter Counter
-		greeter Greeter
-	)
-
-	mods.Get(&counter, &greeter)
-
-	if greeter.Greet("John") != "Hello, John" {
+	if builder.PipelineCount() != pipelineCount {
 		t.Fail()
 	}
 
-	if counter.Count("John") != 1 {
-		t.Fail()
-	}*/
+	mods := builder.Build()
+	multipliers := mods.GetAllPipelinedOfType(ModuleTypeIdMultiplier)
+	for _, m := range multipliers {
+		m.(*multiplierImpl).Mult(2, 3)
+	}
 }

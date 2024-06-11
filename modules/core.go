@@ -135,6 +135,14 @@ func (mods *Core) FindModulePipelineId(ptr any) PipelineId {
 	return PipelineIdNone
 }
 
+func (mods *Core) GetAllPipelinedOfType(t ModuleTypeId) []Module {
+	m := make([]Module, 0)
+	for _, pipeline := range mods.pipelinedModules {
+		m = append(m, pipeline[t].(Module))
+	}
+	return m
+}
+
 // Builder is a helper for setting up client modules.
 type Builder struct {
 	core            Core
@@ -187,10 +195,10 @@ func (b *Builder) AddStatic(modules ...any) {
 	}
 }
 
-// CreatePipelined constructs and adds several instances of a module based on b.pipelineCount,
+// AddPipelined constructs and adds several instances of a module based on b.pipelineCount,
 // provided its constructor arguments. If b.pipelineCount == 0 then one will be constructed and added
 // as a static module.
-func (b *Builder) CreatePipelined(typeId ModuleTypeId, ctor any, ctorArgs ...any) {
+func (b *Builder) AddPipelined(typeId ModuleTypeId, ctor any, ctorArgs ...any) {
 	if reflect.TypeOf(ctor).Kind() != reflect.Func {
 		panic("second argument is not a function")
 	}
@@ -225,8 +233,8 @@ func (b *Builder) CreatePipelined(typeId ModuleTypeId, ctor any, ctorArgs ...any
 	}
 }
 
-func (b *Builder) GetModulePipelines() map[PipelineId]map[ModuleTypeId]Module {
-	return b.modulePipelines
+func (b *Builder) PipelineCount() int {
+	return len(b.modulePipelines)
 }
 
 // Build initializes all added modules and returns the Core object.
@@ -236,18 +244,25 @@ func (b *Builder) Build() *Core {
 		b.core.staticModules[i], b.core.staticModules[j] = b.core.staticModules[j], b.core.staticModules[i]
 	}
 	// add the Options last so that it can be overridden by user.
-	// TODO: Implement building of pipelined modules
 	b.AddStatic(b.opts)
 	for _, module := range b.staticModules {
 		module.InitModule(&b.core)
 	}
 
+	// Adding the modules to core.
 	b.core.pipelinedModules = make(map[PipelineId]map[ModuleTypeId]any)
 	for id, pipeline := range b.modulePipelines {
 		b.core.pipelinedModules[id] = make(map[ModuleTypeId]any)
 		for typeId, module := range pipeline {
 			b.core.pipelinedModules[id][typeId] = module
-			module.InitModule(&b.core)
+		}
+	}
+
+	// Initializing later so that modules can reference
+	// other modules in the same pipeline without panicking.
+	for _, pipeline := range b.core.pipelinedModules {
+		for _, module := range pipeline {
+			module.(Module).InitModule(&b.core)
 		}
 	}
 	return &b.core
