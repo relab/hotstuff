@@ -37,9 +37,9 @@ type multiplierImpl struct {
 }
 
 func (m multiplierImpl) Mult(a, b int) int {
-	result := a
-	for i := 0; i < b; i++ {
-		result = m.adder.Add(result, 1)
+	result := 0
+	for i := 0; i < a; i++ {
+		result = m.adder.Add(result, b)
 	}
 	return result
 }
