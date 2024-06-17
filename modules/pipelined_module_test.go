@@ -52,13 +52,13 @@ func NewMultiplier() *multiplierImpl { //nolint:revive
 }
 
 func (m *multiplierImpl) InitModule(mods *modules.Core) {
-	if !mods.TryAssignPipelined(m, &m.adder) {
+	if !mods.TryGetPipelined(m, &m.adder) {
 		panic("adder dependency could not be found")
 	}
 }
 
 func (a *adderImpl) InitModule(_ *modules.Core) {
-	// TODO: Figure out some get method
+	// Does nothing for now
 }
 
 func TestPipelinedModule(t *testing.T) {
@@ -73,12 +73,14 @@ func TestPipelinedModule(t *testing.T) {
 
 	builder.Build()
 
-	type TestCase struct {
+	type AdderMultTestCase struct {
 		A      int
 		B      int
 		Result int
 	}
-	testCasesMult := map[modules.PipelineId]TestCase{
+
+	// Currently, pipeline ids are ints that get incremented from 0.
+	testCasesMult := map[modules.PipelineId]AdderMultTestCase{
 		0: {A: 2, B: 3, Result: 6},
 		1: {A: 2, B: 5, Result: 10},
 		2: {A: 2, B: 6, Result: 12},
@@ -94,8 +96,10 @@ func TestPipelinedModule(t *testing.T) {
 			t.Fail()
 		}
 
+		// The last result stored in the adder is the same as the result of multiplier,
+		// since the multiple addings will add up to the multiplication answer.
 		adder := pipeline[0].(Adder)
-		if adder.LastResult() != tc.Result {
+		if adder.LastResult() != tc.Result || adder.LastResult() != actualResult {
 			t.Fail()
 		}
 	}

@@ -119,11 +119,23 @@ func (mods *Core) Get(pointers ...any) {
 	}
 }
 
-// Assign a module pointer from the pipeline corresponding to the self module.
-// If self is not from any pipeline, the function returns false.
-// If pipelining is not enabled, this function will return false.
-// TODO: Handle the case for when pipelining is not enabled.
-func (mods *Core) TryAssignPipelined(self Module, ptr any) bool {
+// TODO: Test this
+func (mods *Core) GetPipelined(self Module, pointers ...any) {
+	if len(pointers) == 0 {
+		panic("no pointers given")
+	}
+	for _, ptr := range pointers {
+		if !mods.TryGetPipelined(self, ptr) {
+			panic(fmt.Sprintf("pipelined module of type %s not found", reflect.TypeOf(ptr).Elem()))
+		}
+	}
+}
+
+// TryGetPipelined attempts to find a module for ptr which also happens to be in the same
+// pipeline as self, false otherwise.
+// TryGetPipelined returns true if a module was successflully stored in ptr, false otherwise.
+// If pipelining was not enabled, TryGet is called instead.
+func (mods *Core) TryGetPipelined(self Module, ptr any) bool {
 	if len(mods.pipelinedModules) == 0 {
 		return mods.TryGet(ptr)
 	}
@@ -170,33 +182,6 @@ func (mods *Core) TryAssignPipelined(self Module, ptr any) bool {
 	return false
 }
 
-// func (mods *Core) FindModuleFromPipeline(typeId ModuleTypeId, pipelineId PipelineId) (any, bool) {
-// 	module, ok := mods.pipelinedModules[pipelineId][typeId]
-// 	return module, ok
-// }
-
-// func (mods *Core) FindModulePipelineId(ptr any) PipelineId {
-// 	for id := range mods.pipelinedModules {
-// 		pipeline := mods.pipelinedModules[id]
-// 		for typeId := range pipeline {
-// 			modRef := pipeline[typeId]
-// 			if modRef == ptr {
-// 				return id
-// 			}
-// 		}
-// 	}
-//
-// 	return PipelineIdNone
-// }
-
-// func (mods *Core) GetAllPipelinedOfType(t ModuleTypeId) []Module {
-// 	m := make([]Module, 0)
-// 	for _, pipeline := range mods.pipelinedModules {
-// 		m = append(m, pipeline[t].(Module))
-// 	}
-// 	return m
-// }
-
 // Builder is a helper for setting up client modules.
 type Builder struct {
 	core            Core
@@ -206,9 +191,9 @@ type Builder struct {
 	pipelineCount   int
 }
 
-// NewBuilder returns a new builder.
-// Alan: Builder now requires a pipeline count. If zero is specified, pipelined modules will be
-// insterted to staticModules in further function calls.
+// NewBuilder returns a new builder. Specifying a pipeline count greater than zero
+// enables pipelining, which results in all pipeline-based functions to build modules
+// in separate pipelines. Otherwise, pipeline-based functions
 func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey, pipelineCount uint) Builder {
 	bl := Builder{
 		opts: &Options{
@@ -250,8 +235,8 @@ func (b *Builder) AddStatic(modules ...any) {
 }
 
 // EmplacePipelined constructs and adds n instances of a module where n = b.pipelineCount,
-// provided its the module's constructor arguments. If b.pipelineCount == 0 then
-// only one will be constructed and added as a static module.
+// provided the module's constructor function and its subsequent arguments. If b.pipelineCount = 0,
+// then only one will be constructed and added as a static module.
 func (b *Builder) EmplacePipelined(ctor any, ctorArgs ...any) {
 	if reflect.TypeOf(ctor).Kind() != reflect.Func {
 		panic("second argument is not a function")
@@ -269,7 +254,12 @@ func (b *Builder) EmplacePipelined(ctor any, ctorArgs ...any) {
 			panic("constructor does not return a single value")
 		}
 		mod := returnResult[0].Interface()
-		b.AddStatic(mod)
+		converted, ok := mod.(Module)
+		if !ok {
+			// TODO: Consider if this is necessary
+			panic("constructor did not construct a value of type Module")
+		}
+		b.AddStatic(converted)
 		return
 	}
 
@@ -280,7 +270,9 @@ func (b *Builder) EmplacePipelined(ctor any, ctorArgs ...any) {
 		}
 		mod := returnResult[0].Interface()
 		converted, ok := mod.(Module)
+
 		if !ok {
+			// TODO: Consider if this is necessary
 			panic("constructor did not construct a value of type Module")
 		}
 		b.modulePipelines[id] = append(b.modulePipelines[id], converted)
