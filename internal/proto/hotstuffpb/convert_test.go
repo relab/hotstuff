@@ -17,7 +17,7 @@ func TestConvertPartialCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	key := testutil.GenerateECDSAKey(t)
-	builder := modules.NewBuilder(1, key, 0)
+	builder := modules.NewBuilder(1, key, false)
 	testutil.TestModules(t, ctrl, 1, key, &builder)
 	hs := builder.Build()
 

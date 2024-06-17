@@ -164,7 +164,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 	}
 	// prepare modules
-	builder := modules.NewBuilder(hotstuff.ID(opts.GetID()), privKey, 0)
+	builder := modules.NewBuilder(hotstuff.ID(opts.GetID()), privKey, false)
 
 	consensusRules, ok := modules.GetModule[consensus.Rules](opts.GetConsensus())
 	if !ok {
@@ -304,7 +304,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		mods := modules.NewBuilder(hotstuff.ID(opts.GetID()), nil, 0)
+		mods := modules.NewBuilder(hotstuff.ID(opts.GetID()), nil, false)
 		mods.AddStatic(eventloop.New(1000))
 
 		if w.measurementInterval > 0 {

@@ -63,7 +63,9 @@ func (a *adderImpl) InitModule(_ *modules.Core) {
 
 func TestPipelinedModule(t *testing.T) {
 	const pipelineCount = 3
-	builder := modules.NewBuilder(0, nil, pipelineCount)
+	builder := modules.NewBuilder(0, nil, true)
+	builder.GeneratePipelines(pipelineCount)
+	// builder.SupplyPipelineIds([]modules.PipelineId{0, 1, 2})
 	builder.EmplacePipelined(NewAdder)
 	builder.EmplacePipelined(NewMultiplier)
 

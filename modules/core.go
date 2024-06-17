@@ -184,17 +184,19 @@ func (mods *Core) TryGetPipelined(self Module, ptr any) bool {
 
 // Builder is a helper for setting up client modules.
 type Builder struct {
-	core            Core
-	staticModules   []Module
-	modulePipelines map[PipelineId]Pipeline
-	opts            *Options
-	pipelineCount   int
+	core              Core
+	staticModules     []Module
+	modulePipelines   map[PipelineId]Pipeline
+	opts              *Options
+	pipeliningEnabled bool
+	pipelineIds       []PipelineId
 }
 
-// NewBuilder returns a new builder. Specifying a pipeline count greater than zero
-// enables pipelining, which results in all pipeline-based functions to build modules
-// in separate pipelines. Otherwise, pipeline-based functions
-func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey, pipelineCount uint) Builder {
+// NewBuilder returns a new builder. Enabling pipelining results in all pipeline-based
+// functions to build modules in separate pipelines. Otherwise, pipeline-based functions
+// will default to their static counterparts. Either SupplyPipelineIds or GeneratePipelines
+// must be called if pipelining is desired.
+func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey, pipeliningEnabled bool) Builder {
 	bl := Builder{
 		opts: &Options{
 			id:                 id,
@@ -203,20 +205,47 @@ func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey, pipelineCount uint) Buil
 		},
 	}
 
-	if pipelineCount == 0 {
-		bl.pipelineCount = 0
+	bl.pipeliningEnabled = pipeliningEnabled
+	if !pipeliningEnabled {
+		bl.pipelineIds = nil
 		bl.modulePipelines = nil
-		return bl // Early exit
 	}
 
-	bl.pipelineCount = int(pipelineCount)
+	return bl
+}
+
+// GeneratePipelines creates the module pipelines and assigns them unique ids
+// starting from 0..n incrementally, where n = pipelineCount.
+func (bl *Builder) GeneratePipelines(pipelineCount uint) {
+	if !bl.pipeliningEnabled {
+		panic("failed to generate pipelines when pipelining is disabled")
+	}
+
+	bl.pipelineIds = make([]PipelineId, pipelineCount)
 	bl.modulePipelines = make(map[PipelineId]Pipeline)
 	for i := uint(0); i < pipelineCount; i++ {
 		id := PipelineId(i)
 		bl.modulePipelines[id] = make(Pipeline, 0)
+		bl.pipelineIds[i] = id
+	}
+}
+
+// SupplyPipelineIds creates the module pipelines and assigns them the ids
+// provided by pipelineIds. The number of pipelines will be len(pipelineIds).
+func (bl *Builder) SupplyPipelineIds(pipelineIds []PipelineId) {
+	if !bl.pipeliningEnabled {
+		panic("failed to supply pipeline ids when pipelining is disabled")
 	}
 
-	return bl
+	if len(pipelineIds) == 0 {
+		panic("no pipeline ids provided")
+	}
+
+	bl.modulePipelines = make(map[PipelineId]Pipeline)
+	bl.pipelineIds = pipelineIds
+	for _, id := range bl.pipelineIds {
+		bl.modulePipelines[id] = make(Pipeline, 0)
+	}
 }
 
 // Options returns the options module.
@@ -234,9 +263,11 @@ func (b *Builder) AddStatic(modules ...any) {
 	}
 }
 
-// EmplacePipelined constructs and adds n instances of a module where n = b.pipelineCount,
-// provided the module's constructor function and its subsequent arguments. If b.pipelineCount = 0,
+// EmplacePipelined constructs and adds n instances of a module where n = b.PipelineCount,
+// provided the module's constructor function and its subsequent arguments. If b.PipelineCount = 0,
 // then only one will be constructed and added as a static module.
+// Either SupplyPipelineIds or GeneratePipelines must be called before EmplacePipelined if
+// pipelining is desired.
 func (b *Builder) EmplacePipelined(ctor any, ctorArgs ...any) {
 	if reflect.TypeOf(ctor).Kind() != reflect.Func {
 		panic("second argument is not a function")
@@ -248,7 +279,7 @@ func (b *Builder) EmplacePipelined(ctor any, ctorArgs ...any) {
 	}
 
 	ctorVal := reflect.ValueOf(ctor)
-	if b.pipelineCount == 0 {
+	if !b.pipeliningEnabled {
 		returnResult := ctorVal.Call(vargs)
 		if len(returnResult) != 1 {
 			panic("constructor does not return a single value")
@@ -286,12 +317,7 @@ func (b *Builder) PipelineCount() int {
 
 // Return a slice of PipelineIds in the order which the pipelines were created.
 func (b *Builder) GetPipelineIds() []PipelineId {
-	keys := make([]PipelineId, len(b.modulePipelines))
-	i := 0
-	for key := range b.modulePipelines {
-		keys[i] = key
-	}
-	return keys
+	return b.pipelineIds
 }
 
 // Return a list of modules from a pipeline. The order of module types is influenced

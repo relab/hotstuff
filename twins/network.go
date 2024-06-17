@@ -114,7 +114,7 @@ func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) modules.Buil
 	}
 	n.nodes[id.NetworkID] = &node
 	n.replicas[id.ReplicaID] = append(n.replicas[id.ReplicaID], &node)
-	builder := modules.NewBuilder(id.ReplicaID, pk, 0)
+	builder := modules.NewBuilder(id.ReplicaID, pk, false)
 	// register node as an anonymous module because that allows configuration to obtain it.
 	builder.AddStatic(&node)
 	return builder
