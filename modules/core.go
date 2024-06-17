@@ -40,7 +40,10 @@ import (
 )
 
 type PipelineId uint32
-type ModuleTypeId uint32
+
+// type ModuleTypeId uint32
+
+type Pipeline []Module
 
 const PipelineIdNone = ^PipelineId(0)
 
@@ -53,7 +56,7 @@ type Module interface {
 // It contains only a few core modules that are shared between replicas and clients.
 type Core struct {
 	staticModules    []any
-	pipelinedModules map[PipelineId]map[ModuleTypeId]any
+	pipelinedModules map[PipelineId]Pipeline
 }
 
 // TryGet attempts to find a module for ptr.
@@ -116,38 +119,84 @@ func (mods *Core) Get(pointers ...any) {
 	}
 }
 
-func (mods *Core) FindModuleFromPipeline(typeId ModuleTypeId, pipelineId PipelineId) (any, bool) {
-	module, ok := mods.pipelinedModules[pipelineId][typeId]
-	return module, ok
-}
+// Assign a module reference
+func (mods *Core) TryAssignPipelined(self Module, ptr any) bool {
+	v := reflect.ValueOf(ptr)
+	// if !v.IsValid() {
+	// 	panic("nil value given")
+	// }
+	pt := v.Type()
+	if pt.Kind() != reflect.Ptr {
+		panic("only pointer values allowed")
+	}
 
-func (mods *Core) FindModulePipelineId(ptr any) PipelineId {
+	// TODO: Handle the case of pipelineCount = 0
+
+	correctPipelineId := PipelineIdNone
 	for id := range mods.pipelinedModules {
 		pipeline := mods.pipelinedModules[id]
-		for typeId := range pipeline {
-			modRef := pipeline[typeId]
-			if modRef == ptr {
-				return id
+		// Check if self is in pipeline
+		for _, module := range pipeline {
+			if module == self {
+				correctPipelineId = id
+				break
 			}
+		}
+		// Break outer loop too if a pipeline ID was found
+		if correctPipelineId != PipelineIdNone {
+			break
 		}
 	}
 
-	return PipelineIdNone
+	// If this variable remained unchanged, return false
+	if correctPipelineId == PipelineIdNone {
+		return false
+	}
+
+	correctPipeline := mods.pipelinedModules[correctPipelineId]
+	for _, m := range correctPipeline {
+		mv := reflect.ValueOf(m)
+		if mv.Type().AssignableTo(pt.Elem()) {
+			v.Elem().Set(mv)
+			return true
+		}
+	}
+
+	return false
 }
 
-func (mods *Core) GetAllPipelinedOfType(t ModuleTypeId) []Module {
-	m := make([]Module, 0)
-	for _, pipeline := range mods.pipelinedModules {
-		m = append(m, pipeline[t].(Module))
-	}
-	return m
-}
+// func (mods *Core) FindModuleFromPipeline(typeId ModuleTypeId, pipelineId PipelineId) (any, bool) {
+// 	module, ok := mods.pipelinedModules[pipelineId][typeId]
+// 	return module, ok
+// }
+
+// func (mods *Core) FindModulePipelineId(ptr any) PipelineId {
+// 	for id := range mods.pipelinedModules {
+// 		pipeline := mods.pipelinedModules[id]
+// 		for typeId := range pipeline {
+// 			modRef := pipeline[typeId]
+// 			if modRef == ptr {
+// 				return id
+// 			}
+// 		}
+// 	}
+//
+// 	return PipelineIdNone
+// }
+
+// func (mods *Core) GetAllPipelinedOfType(t ModuleTypeId) []Module {
+// 	m := make([]Module, 0)
+// 	for _, pipeline := range mods.pipelinedModules {
+// 		m = append(m, pipeline[t].(Module))
+// 	}
+// 	return m
+// }
 
 // Builder is a helper for setting up client modules.
 type Builder struct {
 	core            Core
 	staticModules   []Module
-	modulePipelines map[PipelineId]map[ModuleTypeId]Module
+	modulePipelines map[PipelineId]Pipeline
 	opts            *Options
 	pipelineCount   int
 }
@@ -171,10 +220,10 @@ func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey, pipelineCount uint) Buil
 	}
 
 	bl.pipelineCount = int(pipelineCount)
-	bl.modulePipelines = make(map[PipelineId]map[ModuleTypeId]Module)
+	bl.modulePipelines = make(map[PipelineId]Pipeline)
 	for i := uint(0); i < pipelineCount; i++ {
 		id := PipelineId(i)
-		bl.modulePipelines[id] = make(map[ModuleTypeId]Module, 0)
+		bl.modulePipelines[id] = make(Pipeline, 0)
 	}
 
 	return bl
@@ -198,7 +247,7 @@ func (b *Builder) AddStatic(modules ...any) {
 // AddPipelined constructs and adds several instances of a module based on b.pipelineCount,
 // provided its constructor arguments. If b.pipelineCount == 0 then one will be constructed and added
 // as a static module.
-func (b *Builder) AddPipelined(typeId ModuleTypeId, ctor any, ctorArgs ...any) {
+func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
 	if reflect.TypeOf(ctor).Kind() != reflect.Func {
 		panic("second argument is not a function")
 	}
@@ -229,12 +278,16 @@ func (b *Builder) AddPipelined(typeId ModuleTypeId, ctor any, ctorArgs ...any) {
 		if !ok {
 			panic("constructor did not construct a value of type Module")
 		}
-		b.modulePipelines[id][typeId] = converted
+		b.modulePipelines[id] = append(b.modulePipelines[id], converted)
 	}
 }
 
 func (b *Builder) PipelineCount() int {
 	return len(b.modulePipelines)
+}
+
+func (b *Builder) GetPipeline(id PipelineId) Pipeline {
+	return b.modulePipelines[id]
 }
 
 // Build initializes all added modules and returns the Core object.
@@ -249,12 +302,12 @@ func (b *Builder) Build() *Core {
 		module.InitModule(&b.core)
 	}
 
-	// Adding the modules to core.
-	b.core.pipelinedModules = make(map[PipelineId]map[ModuleTypeId]any)
+	// Adding the pipelined modules to core.
+	b.core.pipelinedModules = make(map[PipelineId]Pipeline)
 	for id, pipeline := range b.modulePipelines {
-		b.core.pipelinedModules[id] = make(map[ModuleTypeId]any)
-		for typeId, module := range pipeline {
-			b.core.pipelinedModules[id][typeId] = module
+		b.core.pipelinedModules[id] = make(Pipeline, 0)
+		for _, module := range pipeline {
+			b.core.pipelinedModules[id] = append(b.core.pipelinedModules[id], module)
 		}
 	}
 

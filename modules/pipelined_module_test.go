@@ -6,8 +6,6 @@ import (
 	"github.com/relab/hotstuff/modules"
 )
 
-const pipelineCount = 3
-
 type Adder interface {
 	Add(a, b int) int
 }
@@ -49,17 +47,12 @@ func NewMultiplier() *multiplierImpl { //nolint:revive
 }
 
 func (m *multiplierImpl) InitModule(mods *modules.Core) {
-	// TODO: Figure out some get method
-	pipeId := mods.FindModulePipelineId(m)
-	mod, ok := mods.FindModuleFromPipeline(ModuleTypeIdAdder, pipeId)
-	if !ok {
-		panic("could not find added")
+	if !mods.TryAssignPipelined(m, &m.adder) {
+		panic("adder dependency could not be found")
 	}
-
-	m.adder = mod.(Adder)
 }
 
-func (a *adderImpl) InitModule(mods *modules.Core) {
+func (a *adderImpl) InitModule(_ *modules.Core) {
 	// TODO: Figure out some get method
 }
 
@@ -71,16 +64,19 @@ const (
 func TestPipelinedModule(t *testing.T) {
 	const pipelineCount = 3
 	builder := modules.NewBuilder(0, nil, pipelineCount)
-	builder.AddPipelined(ModuleTypeIdAdder, NewAdder)
-	builder.AddPipelined(ModuleTypeIdMultiplier, NewMultiplier)
+	builder.AddPipelined(NewAdder)
+	builder.AddPipelined(NewMultiplier)
 
 	if builder.PipelineCount() != pipelineCount {
 		t.Fail()
 	}
 
-	mods := builder.Build()
-	multipliers := mods.GetAllPipelinedOfType(ModuleTypeIdMultiplier)
-	for _, m := range multipliers {
-		m.(*multiplierImpl).Mult(2, 3)
+	p0 := builder.GetPipeline(0)
+	p1 := builder.GetPipeline(1)
+
+	if p0[0] == p1[0] {
+		t.Fail()
 	}
+
+	builder.Build()
 }
