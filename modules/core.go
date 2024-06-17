@@ -119,18 +119,23 @@ func (mods *Core) Get(pointers ...any) {
 	}
 }
 
-// Assign a module reference
+// Assign a module pointer from the pipeline corresponding to the self module.
+// If self is not from any pipeline, the function returns false.
+// If pipelining is not enabled, this function will return false.
+// TODO: Handle the case for when pipelining is not enabled.
 func (mods *Core) TryAssignPipelined(self Module, ptr any) bool {
+	if len(mods.pipelinedModules) == 0 {
+		return mods.TryGet(ptr)
+	}
+
 	v := reflect.ValueOf(ptr)
-	// if !v.IsValid() {
-	// 	panic("nil value given")
-	// }
+	if !v.IsValid() {
+		panic("ptr value cannot be nil")
+	}
 	pt := v.Type()
 	if pt.Kind() != reflect.Ptr {
 		panic("only pointer values allowed")
 	}
-
-	// TODO: Handle the case of pipelineCount = 0
 
 	correctPipelineId := PipelineIdNone
 	for id := range mods.pipelinedModules {
@@ -244,10 +249,10 @@ func (b *Builder) AddStatic(modules ...any) {
 	}
 }
 
-// AddPipelined constructs and adds several instances of a module based on b.pipelineCount,
-// provided its constructor arguments. If b.pipelineCount == 0 then one will be constructed and added
-// as a static module.
-func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
+// EmplacePipelined constructs and adds n instances of a module where n = b.pipelineCount,
+// provided its the module's constructor arguments. If b.pipelineCount == 0 then
+// only one will be constructed and added as a static module.
+func (b *Builder) EmplacePipelined(ctor any, ctorArgs ...any) {
 	if reflect.TypeOf(ctor).Kind() != reflect.Func {
 		panic("second argument is not a function")
 	}
@@ -282,10 +287,23 @@ func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
 	}
 }
 
+// Return the number of pipelines the builder has generated.
 func (b *Builder) PipelineCount() int {
 	return len(b.modulePipelines)
 }
 
+// Return a slice of PipelineIds in the order which the pipelines were created.
+func (b *Builder) GetPipelineIds() []PipelineId {
+	keys := make([]PipelineId, len(b.modulePipelines))
+	i := 0
+	for key := range b.modulePipelines {
+		keys[i] = key
+	}
+	return keys
+}
+
+// Return a list of modules from a pipeline. The order of module types is influenced
+// by when EmplacePipelined was called for a type.
 func (b *Builder) GetPipeline(id PipelineId) Pipeline {
 	return b.modulePipelines[id]
 }
@@ -302,7 +320,7 @@ func (b *Builder) Build() *Core {
 		module.InitModule(&b.core)
 	}
 
-	// Adding the pipelined modules to core.
+	// Adding the pipelined modules to core first.
 	b.core.pipelinedModules = make(map[PipelineId]Pipeline)
 	for id, pipeline := range b.modulePipelines {
 		b.core.pipelinedModules[id] = make(Pipeline, 0)

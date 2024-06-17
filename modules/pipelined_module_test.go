@@ -8,6 +8,7 @@ import (
 
 type Adder interface {
 	Add(a, b int) int
+	LastResult() int
 }
 
 type adderImpl struct {
@@ -23,6 +24,10 @@ func NewAdder() *adderImpl { //nolint:revive
 func (ad *adderImpl) Add(a, b int) int {
 	ad.results = append(ad.results, a+b)
 	return a + b
+}
+
+func (ad *adderImpl) LastResult() int {
+	return ad.results[len(ad.results)-1]
 }
 
 type Multiplier interface {
@@ -56,27 +61,42 @@ func (a *adderImpl) InitModule(_ *modules.Core) {
 	// TODO: Figure out some get method
 }
 
-const (
-	ModuleTypeIdAdder = iota
-	ModuleTypeIdMultiplier
-)
-
 func TestPipelinedModule(t *testing.T) {
 	const pipelineCount = 3
 	builder := modules.NewBuilder(0, nil, pipelineCount)
-	builder.AddPipelined(NewAdder)
-	builder.AddPipelined(NewMultiplier)
+	builder.EmplacePipelined(NewAdder)
+	builder.EmplacePipelined(NewMultiplier)
 
 	if builder.PipelineCount() != pipelineCount {
 		t.Fail()
 	}
 
-	p0 := builder.GetPipeline(0)
-	p1 := builder.GetPipeline(1)
+	builder.Build()
 
-	if p0[0] == p1[0] {
-		t.Fail()
+	type TestCase struct {
+		A      int
+		B      int
+		Result int
+	}
+	testCasesMult := map[modules.PipelineId]TestCase{
+		0: {A: 2, B: 3, Result: 6},
+		1: {A: 2, B: 5, Result: 10},
+		2: {A: 2, B: 6, Result: 12},
 	}
 
-	builder.Build()
+	pipeIds := builder.GetPipelineIds()
+	for _, id := range pipeIds {
+		pipeline := builder.GetPipeline(id)
+		multer := pipeline[1].(Multiplier)
+		tc := testCasesMult[id]
+		actualResult := multer.Mult(tc.A, tc.B)
+		if tc.Result != actualResult {
+			t.Fail()
+		}
+
+		adder := pipeline[0].(Adder)
+		if adder.LastResult() != tc.Result {
+			t.Fail()
+		}
+	}
 }
