@@ -274,7 +274,7 @@ func (b *Builder) Add(modules ...any) {
 // constructor arguments. If pipelining is not enabled, only one will be created and Add is called for it.
 func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
 	if reflect.TypeOf(ctor).Kind() != reflect.Func {
-		panic("second argument is not a function")
+		panic("first argument is not a function")
 	}
 
 	vargs := make([]reflect.Value, len(ctorArgs))
@@ -292,7 +292,7 @@ func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
 		converted, ok := mod.(Module)
 		if !ok {
 			// TODO: Consider if this is necessary
-			panic("constructor did not construct a value of type Module")
+			panic("constructor did not construct a value that could be casted to Module")
 		}
 		b.Add(converted)
 		return
@@ -308,7 +308,7 @@ func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
 
 		if !ok {
 			// TODO: Consider if this is necessary
-			panic("constructor did not construct a value of type Module")
+			panic("constructor did not construct a value that could be casted to Module")
 		}
 		b.modulePipelines[id] = append(b.modulePipelines[id], converted)
 	}
@@ -343,6 +343,10 @@ func (b *Builder) Build() *Core {
 	b.Add(b.opts)
 	for _, module := range b.staticModules {
 		module.InitModule(&b.core)
+	}
+
+	if !b.pipeliningEnabled {
+		return &b.core // Exit early
 	}
 
 	// Adding the pipelined modules to core first.
