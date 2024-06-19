@@ -17,7 +17,7 @@ func TestConvertPartialCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	key := testutil.GenerateECDSAKey(t)
-	builder := modules.NewBuilder(1, key, false)
+	builder := modules.NewBuilder(1, key)
 	testutil.TestModules(t, ctrl, 1, key, &builder)
 	hs := builder.Build()
 
@@ -79,7 +79,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 
 	builders := testutil.CreateBuilders(t, ctrl, 4, testutil.GenerateKeys(t, 4, testutil.GenerateBLS12Key)...)
 	for i := range builders {
-		builders[i].AddStatic(crypto.New(bls12.New()))
+		builders[i].Add(crypto.New(bls12.New()))
 	}
 	hl := builders.Build()
 

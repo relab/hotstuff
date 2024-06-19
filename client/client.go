@@ -102,7 +102,7 @@ func New(conf Config, builder modules.Builder) (client *Client) {
 		timeout:          conf.Timeout,
 	}
 
-	builder.AddStatic(client)
+	builder.Add(client)
 
 	builder.Build()
 

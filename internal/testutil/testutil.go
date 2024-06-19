@@ -52,7 +52,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 	synchronizer.EXPECT().Start(gomock.Any()).AnyTimes()
 	synchronizer.EXPECT().ViewContext().AnyTimes().Return(context.Background())
 
-	builder.AddStatic(
+	builder.Add(
 		eventloop.New(100),
 		logging.New(fmt.Sprintf("hs%d", id)),
 		blockchain.New(),
@@ -128,9 +128,9 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 		}
 
 		builder := network.GetNodeBuilder(twins.NodeID{ReplicaID: id, NetworkID: uint32(id)}, key)
-		builder.AddStatic(network.NewConfiguration())
+		builder.Add(network.NewConfiguration())
 		TestModules(t, ctrl, id, key, &builder)
-		builder.AddStatic(network.NewConfiguration())
+		builder.Add(network.NewConfiguration())
 		builders[i] = &builder
 	}
 	return builders

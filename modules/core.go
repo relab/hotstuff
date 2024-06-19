@@ -41,9 +41,7 @@ import (
 
 type PipelineId uint32
 
-// type ModuleTypeId uint32
-
-type Pipeline []Module
+type ModulePipeline []Module
 
 const PipelineIdNone = ^PipelineId(0)
 
@@ -56,7 +54,7 @@ type Module interface {
 // It contains only a few core modules that are shared between replicas and clients.
 type Core struct {
 	staticModules    []any
-	pipelinedModules map[PipelineId]Pipeline
+	pipelinedModules map[PipelineId]ModulePipeline
 }
 
 // TryGet attempts to find a module for ptr.
@@ -119,7 +117,37 @@ func (mods *Core) Get(pointers ...any) {
 	}
 }
 
-// TODO: Test this
+// Get finds compatible modules for the given pointers, assuming that the self is in the same module pipeline
+// as those compatible pointers.
+//
+// NOTE: pointers must only contain non-nil pointers to types that have been provided to the module system
+// as a pipelined module.
+// GetPipelined panics if one of the given arguments is not a pointer, if a compatible module is not found,
+// if the module was not in a pipeline or if the module was not in the same pipeline as self.
+//
+// Example:
+//
+//	type OtherModule interface {
+//		Foo()
+//	}
+//
+//	type MyModuleImpl struct {
+//		otherModule OtherModule
+//	}
+//
+//	func (m *MyModuleImpl) InitModule(mods *modules.Core) {
+//		mods.GetPipelined(m, &m.otherModule) // Requires an OtherModule from the same pipeline
+//	}
+//
+//	func main() {
+//		pipelineIds := []modules.PipelineId{0, 1, 2, ...}
+//
+//		builder := modules.NewBuilder(0, nil)
+//		builder.EnablePipelining(pipelineIds)
+//		builder.AddPipelined(NewMyModuleImpl)
+//		builder.AddPipelined(NewOtherModuleImpl)
+//		builder.Build() // InitModule is called here
+//	}
 func (mods *Core) GetPipelined(self Module, pointers ...any) {
 	if len(pointers) == 0 {
 		panic("no pointers given")
@@ -186,65 +214,44 @@ func (mods *Core) TryGetPipelined(self Module, ptr any) bool {
 type Builder struct {
 	core              Core
 	staticModules     []Module
-	modulePipelines   map[PipelineId]Pipeline
+	modulePipelines   map[PipelineId]ModulePipeline
 	opts              *Options
 	pipeliningEnabled bool
 	pipelineIds       []PipelineId
 }
 
-// NewBuilder returns a new builder. Enabling pipelining results in all pipeline-based
-// functions to build modules in separate pipelines. Otherwise, pipeline-based functions
-// will default to their static counterparts. Either SupplyPipelineIds or GeneratePipelines
-// must be called if pipelining is desired.
-func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey, pipeliningEnabled bool) Builder {
+// NewBuilder returns a new builder.
+func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey) Builder {
 	bl := Builder{
 		opts: &Options{
 			id:                 id,
 			privateKey:         pk,
 			connectionMetadata: make(map[string]string),
 		},
-	}
-
-	bl.pipeliningEnabled = pipeliningEnabled
-	if !pipeliningEnabled {
-		bl.pipelineIds = nil
-		bl.modulePipelines = nil
+		pipeliningEnabled: false,
+		pipelineIds:       nil,
+		modulePipelines:   nil,
 	}
 
 	return bl
 }
 
-// GeneratePipelines creates the module pipelines and assigns them unique ids
-// starting from 0..n incrementally, where n = pipelineCount.
-func (bl *Builder) GeneratePipelines(pipelineCount uint) {
-	if !bl.pipeliningEnabled {
-		panic("failed to generate pipelines when pipelining is disabled")
-	}
-
-	bl.pipelineIds = make([]PipelineId, pipelineCount)
-	bl.modulePipelines = make(map[PipelineId]Pipeline)
-	for i := uint(0); i < pipelineCount; i++ {
-		id := PipelineId(i)
-		bl.modulePipelines[id] = make(Pipeline, 0)
-		bl.pipelineIds[i] = id
-	}
-}
-
-// SupplyPipelineIds creates the module pipelines and assigns them the ids
+// EnablePipelining enables pipelining by allocating the module pipelines and assigning them the ids
 // provided by pipelineIds. The number of pipelines will be len(pipelineIds).
-func (bl *Builder) SupplyPipelineIds(pipelineIds []PipelineId) {
-	if !bl.pipeliningEnabled {
-		panic("failed to supply pipeline ids when pipelining is disabled")
+func (bl *Builder) EnablePipelining(pipelineIds []PipelineId) {
+	if bl.pipeliningEnabled {
+		panic("pipelining already enabled")
 	}
 
 	if len(pipelineIds) == 0 {
 		panic("no pipeline ids provided")
 	}
 
-	bl.modulePipelines = make(map[PipelineId]Pipeline)
+	bl.pipeliningEnabled = true
+	bl.modulePipelines = make(map[PipelineId]ModulePipeline)
 	bl.pipelineIds = pipelineIds
 	for _, id := range bl.pipelineIds {
-		bl.modulePipelines[id] = make(Pipeline, 0)
+		bl.modulePipelines[id] = make(ModulePipeline, 0)
 	}
 }
 
@@ -253,8 +260,8 @@ func (b *Builder) Options() *Options {
 	return b.opts
 }
 
-// AddStatic adds existing, singular, module instances to the builder.
-func (b *Builder) AddStatic(modules ...any) {
+// Add adds existing, singular, module instances to the builder.
+func (b *Builder) Add(modules ...any) {
 	b.core.staticModules = append(b.core.staticModules, modules...)
 	for _, module := range modules {
 		if m, ok := module.(Module); ok {
@@ -263,12 +270,9 @@ func (b *Builder) AddStatic(modules ...any) {
 	}
 }
 
-// EmplacePipelined constructs and adds n instances of a module where n = b.PipelineCount,
-// provided the module's constructor function and its subsequent arguments. If b.PipelineCount = 0,
-// then only one will be constructed and added as a static module.
-// Either SupplyPipelineIds or GeneratePipelines must be called before EmplacePipelined if
-// pipelining is desired.
-func (b *Builder) EmplacePipelined(ctor any, ctorArgs ...any) {
+// AddPipelined constructs and adds n instances of a module kind, provided its constructor and subsequent
+// constructor arguments. If pipelining is not enabled, only one will be created and Add is called for it.
+func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
 	if reflect.TypeOf(ctor).Kind() != reflect.Func {
 		panic("second argument is not a function")
 	}
@@ -290,7 +294,7 @@ func (b *Builder) EmplacePipelined(ctor any, ctorArgs ...any) {
 			// TODO: Consider if this is necessary
 			panic("constructor did not construct a value of type Module")
 		}
-		b.AddStatic(converted)
+		b.Add(converted)
 		return
 	}
 
@@ -316,13 +320,16 @@ func (b *Builder) PipelineCount() int {
 }
 
 // Return a slice of PipelineIds in the order which the pipelines were created.
-func (b *Builder) GetPipelineIds() []PipelineId {
+func (b *Builder) PipelineIds() []PipelineId {
 	return b.pipelineIds
 }
 
 // Return a list of modules from a pipeline. The order of module types is influenced
-// by when EmplacePipelined was called for a type.
-func (b *Builder) GetPipeline(id PipelineId) Pipeline {
+// by when AddPipelined was called for a kind of module.
+func (b *Builder) GetPipeline(id PipelineId) ModulePipeline {
+	if !b.pipeliningEnabled {
+		panic("cannot get pipeline when pipelining is disabled")
+	}
 	return b.modulePipelines[id]
 }
 
@@ -333,15 +340,15 @@ func (b *Builder) Build() *Core {
 		b.core.staticModules[i], b.core.staticModules[j] = b.core.staticModules[j], b.core.staticModules[i]
 	}
 	// add the Options last so that it can be overridden by user.
-	b.AddStatic(b.opts)
+	b.Add(b.opts)
 	for _, module := range b.staticModules {
 		module.InitModule(&b.core)
 	}
 
 	// Adding the pipelined modules to core first.
-	b.core.pipelinedModules = make(map[PipelineId]Pipeline)
+	b.core.pipelinedModules = make(map[PipelineId]ModulePipeline)
 	for id, pipeline := range b.modulePipelines {
-		b.core.pipelinedModules[id] = make(Pipeline, 0)
+		b.core.pipelinedModules[id] = make(ModulePipeline, 0)
 		for _, module := range pipeline {
 			b.core.pipelinedModules[id] = append(b.core.pipelinedModules[id], module)
 		}

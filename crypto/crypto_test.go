@@ -246,7 +246,7 @@ func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() mo
 	bl := testutil.CreateBuilders(t, ctrl, n, testutil.GenerateKeys(t, n, keyFunc)...)
 	for _, builder := range bl {
 		signer := newFunc()
-		builder.AddStatic(signer)
+		builder.Add(signer)
 	}
 	hl := bl.Build()
 

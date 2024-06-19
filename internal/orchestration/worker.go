@@ -164,7 +164,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 	}
 	// prepare modules
-	builder := modules.NewBuilder(hotstuff.ID(opts.GetID()), privKey, false)
+	builder := modules.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 
 	consensusRules, ok := modules.GetModule[consensus.Rules](opts.GetConsensus())
 	if !ok {
@@ -195,7 +195,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
 		float64(opts.GetTimeoutMultiplier()),
 	))
-	builder.AddStatic(
+	builder.Add(
 		eventloop.New(1000),
 		consensus.New(consensusRules),
 		consensus.NewVotingMachine(),
@@ -209,8 +209,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
-		builder.AddStatic(replicaMetrics...)
-		builder.AddStatic(metrics.NewTicker(w.measurementInterval))
+		builder.Add(replicaMetrics...)
+		builder.Add(metrics.NewTicker(w.measurementInterval))
 	}
 
 	for _, n := range opts.GetModules() {
@@ -218,7 +218,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		if !ok {
 			return nil, fmt.Errorf("no module named '%s'", n)
 		}
-		builder.AddStatic(m)
+		builder.Add(m)
 	}
 	// convert location info map key from uint32 to hotstuff.ID
 	locationInfo := make(map[hotstuff.ID]string)
@@ -304,17 +304,17 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		mods := modules.NewBuilder(hotstuff.ID(opts.GetID()), nil, false)
-		mods.AddStatic(eventloop.New(1000))
+		mods := modules.NewBuilder(hotstuff.ID(opts.GetID()), nil)
+		mods.Add(eventloop.New(1000))
 
 		if w.measurementInterval > 0 {
 			clientMetrics := metrics.GetClientMetrics(w.metrics...)
-			mods.AddStatic(clientMetrics...)
-			mods.AddStatic(metrics.NewTicker(w.measurementInterval))
+			mods.Add(clientMetrics...)
+			mods.Add(metrics.NewTicker(w.measurementInterval))
 		}
 
-		mods.AddStatic(w.metricsLogger)
-		mods.AddStatic(logging.New("cli" + strconv.Itoa(int(opts.GetID()))))
+		mods.Add(w.metricsLogger)
+		mods.Add(logging.New("cli" + strconv.Itoa(int(opts.GetID()))))
 		cli := client.New(c, mods)
 		cfg, err := getConfiguration(req.GetConfiguration(), true)
 		if err != nil {

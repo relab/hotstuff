@@ -39,7 +39,7 @@ type multiplierImpl struct {
 	adder Adder
 }
 
-func (m multiplierImpl) Mult(a, b int) int {
+func (m *multiplierImpl) Mult(a, b int) int {
 	result := 0
 	for i := 0; i < a; i++ {
 		result = m.adder.Add(result, b)
@@ -52,24 +52,44 @@ func NewMultiplier() *multiplierImpl { //nolint:revive
 }
 
 func (m *multiplierImpl) InitModule(mods *modules.Core) {
-	if !mods.TryGetPipelined(m, &m.adder) {
-		panic("adder dependency could not be found")
-	}
+	mods.GetPipelined(m, &m.adder) // Requires an adder from the same pipeline
 }
 
 func (a *adderImpl) InitModule(_ *modules.Core) {
 	// Does nothing for now
 }
 
-func TestPipelinedModule(t *testing.T) {
-	const pipelineCount = 3
-	builder := modules.NewBuilder(0, nil, true)
-	builder.GeneratePipelines(pipelineCount)
-	// builder.SupplyPipelineIds([]modules.PipelineId{0, 1, 2})
-	builder.EmplacePipelined(NewAdder)
-	builder.EmplacePipelined(NewMultiplier)
+func TestPipelinedDisabled(t *testing.T) {
+	builder := modules.NewBuilder(0, nil)
 
-	if builder.PipelineCount() != pipelineCount {
+	builder.AddPipelined(NewAdder)
+	builder.AddPipelined(NewMultiplier)
+
+	if builder.PipelineCount() > 0 {
+		t.Fail()
+	}
+
+	mods := builder.Build()
+
+	var adder Adder
+	var multiplier Multiplier
+	mods.Get(&adder, &multiplier)
+
+	result := multiplier.Mult(2, 3)
+	if result != 6 {
+		t.Fail()
+	}
+}
+
+func TestPipelined(t *testing.T) {
+	pipelineIds := []modules.PipelineId{0, 1, 2}
+
+	builder := modules.NewBuilder(0, nil)
+	builder.EnablePipelining(pipelineIds)
+	builder.AddPipelined(NewAdder)
+	builder.AddPipelined(NewMultiplier)
+
+	if builder.PipelineCount() != len(pipelineIds) {
 		t.Fail()
 	}
 
@@ -81,14 +101,13 @@ func TestPipelinedModule(t *testing.T) {
 		Result int
 	}
 
-	// Currently, pipeline ids are ints that get incremented from 0.
 	testCasesMult := map[modules.PipelineId]AdderMultTestCase{
 		0: {A: 2, B: 3, Result: 6},
 		1: {A: 2, B: 5, Result: 10},
 		2: {A: 2, B: 6, Result: 12},
 	}
 
-	pipeIds := builder.GetPipelineIds()
+	pipeIds := builder.PipelineIds()
 	for _, id := range pipeIds {
 		pipeline := builder.GetPipeline(id)
 		multer := pipeline[1].(Multiplier)
