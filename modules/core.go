@@ -117,13 +117,13 @@ func (mods *Core) Get(pointers ...any) {
 	}
 }
 
-// Get finds compatible modules for the given pointers, assuming that the self is in the same module pipeline
-// as those compatible pointers.
+// GetFromPipeline finds compatible modules for the given pointers, assuming that moduleInPipeline is in the same module
+// pipeline as those compatible pointers.
 //
 // NOTE: pointers must only contain non-nil pointers to types that have been provided to the module system
 // as a pipelined module.
-// GetPipelined panics if one of the given arguments is not a pointer, if a compatible module is not found,
-// if the module was not in a pipeline or if the module was not in the same pipeline as self.
+// GetFromPipeline panics if one of the given arguments is not a pointer, if a compatible module is not found,
+// if the module was not in a pipeline or if the module was not in the same pipeline as moduleInPipeline.
 //
 // Example:
 //
@@ -136,7 +136,7 @@ func (mods *Core) Get(pointers ...any) {
 //	}
 //
 //	func (m *MyModuleImpl) InitModule(mods *modules.Core) {
-//		mods.GetPipelined(m, &m.otherModule) // Requires an OtherModule from the same pipeline
+//		mods.GetFromPipeline(m, &m.otherModule) // Requires an OtherModule from the same pipeline
 //	}
 //
 //	func main() {
@@ -148,22 +148,22 @@ func (mods *Core) Get(pointers ...any) {
 //		builder.AddPipelined(NewOtherModuleImpl)
 //		builder.Build() // InitModule is called here
 //	}
-func (mods *Core) GetPipelined(self Module, pointers ...any) {
+func (mods *Core) GetFromPipeline(moduleInPipeline Module, pointers ...any) {
 	if len(pointers) == 0 {
 		panic("no pointers given")
 	}
 	for _, ptr := range pointers {
-		if !mods.TryGetPipelined(self, ptr) {
+		if !mods.TryGetFromPipeline(moduleInPipeline, ptr) {
 			panic(fmt.Sprintf("pipelined module of type %s not found", reflect.TypeOf(ptr).Elem()))
 		}
 	}
 }
 
-// TryGetPipelined attempts to find a module for ptr which also happens to be in the same
-// pipeline as self, false otherwise.
-// TryGetPipelined returns true if a module was successflully stored in ptr, false otherwise.
-// If pipelining was not enabled, TryGet is called instead.
-func (mods *Core) TryGetPipelined(self Module, ptr any) bool {
+// TryGetFromPipeline attempts to find a module for ptr which also happens to be in the same
+// pipeline as moduleInPipeline, false otherwise.
+// TryGetFromPipeline returns true if a module was successflully stored in ptr, false otherwise.
+// If pipelining was not enabled, TryGet is called implicitly.
+func (mods *Core) TryGetFromPipeline(moduleInPipeline Module, ptr any) bool {
 	if len(mods.pipelinedModules) == 0 {
 		return mods.TryGet(ptr)
 	}
@@ -182,7 +182,7 @@ func (mods *Core) TryGetPipelined(self Module, ptr any) bool {
 		pipeline := mods.pipelinedModules[id]
 		// Check if self is in pipeline
 		for _, module := range pipeline {
-			if module == self {
+			if module == moduleInPipeline {
 				correctPipelineId = id
 				break
 			}

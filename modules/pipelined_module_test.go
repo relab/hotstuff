@@ -52,7 +52,7 @@ func NewMultiplier() *multiplierImpl { //nolint:revive
 }
 
 func (m *multiplierImpl) InitModule(mods *modules.Core) {
-	mods.GetPipelined(m, &m.adder) // Requires an adder from the same pipeline
+	mods.GetFromPipeline(m, &m.adder) // Requires an adder from the same pipeline
 }
 
 func (a *adderImpl) InitModule(_ *modules.Core) {
