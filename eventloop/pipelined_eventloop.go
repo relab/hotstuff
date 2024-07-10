@@ -22,7 +22,7 @@ type PipelinedEventLoop struct {
 
 	handlers map[reflect.Type]map[pipelining.PipelineId][]handler
 
-	tickers  map[int]*ticker
+	tickers  map[pipelining.PipelineId]map[int]*ticker
 	tickerID int
 }
 
@@ -33,7 +33,7 @@ func NewPipelined(bufferSize uint) *PipelinedEventLoop {
 		eventQ:        newQueue(bufferSize),
 		waitingEvents: make(map[reflect.Type][]any),
 		handlers:      make(map[reflect.Type]map[pipelining.PipelineId][]handler),
-		tickers:       make(map[int]*ticker),
+		tickers:       make(map[pipelining.PipelineId]map[int]*ticker),
 	}
 	return el
 }
@@ -170,7 +170,7 @@ loop:
 		}
 		handle := event.(pipelinedEventHandle)
 		if e, ok := handle.event.(startTickerEvent); ok {
-			el.startTicker(e.tickerID)
+			el.startTicker(handle.pipelineId, e.tickerID)
 			continue
 		}
 		el.processEvent(handle.pipelineId, handle.event, false)
@@ -196,7 +196,7 @@ func (el *PipelinedEventLoop) Tick(ctx context.Context) bool {
 
 	handle := event.(pipelinedEventHandle)
 	if e, ok := handle.event.(startTickerEvent); ok {
-		el.startTicker(e.tickerID)
+		el.startTicker(handle.pipelineId, e.tickerID)
 	} else {
 		el.processEvent(handle.pipelineId, handle.event, false)
 	}
@@ -284,24 +284,32 @@ func (el *PipelinedEventLoop) DelayUntil(eventType, event any) {
 // The ticker will send the specified event on the event loop at regular intervals.
 // The returned ticker id can be used to remove the ticker with RemoveTicker.
 // The ticker will not be started before the event loop is running.
-func (el *PipelinedEventLoop) AddTicker(interval time.Duration, callback func(tick time.Time) (event any)) int {
+func (el *PipelinedEventLoop) AddTicker(pipelineId pipelining.PipelineId, interval time.Duration, callback func(tick time.Time) (event any)) int {
 	el.mut.Lock()
 
 	id := el.tickerID
 	el.tickerID++
+
+	_, ok := el.tickers[pipelineId]
+	if !ok {
+		el.tickers[pipelineId] = make(map[int]*ticker)
+	}
 
 	ticker := ticker{
 		interval: interval,
 		callback: callback,
 		cancel:   func() {}, // initialized to empty function to avoid nil
 	}
-	el.tickers[id] = &ticker
+	el.tickers[pipelineId][id] = &ticker
 
 	el.mut.Unlock()
 
 	// We want the ticker to inherit the context of the event loop,
 	// so we need to start the ticker from the run loop.
-	el.eventQ.push(startTickerEvent{id})
+	el.eventQ.push(pipelinedEventHandle{
+		pipelineId: pipelineId,
+		event:      startTickerEvent{id},
+	})
 
 	return id
 }
@@ -309,33 +317,35 @@ func (el *PipelinedEventLoop) AddTicker(interval time.Duration, callback func(ti
 // RemoveTicker removes the ticker with the specified id.
 // If the ticker was removed, RemoveTicker will return true.
 // If the ticker does not exist, false will be returned instead.
-func (el *PipelinedEventLoop) RemoveTicker(id int) bool {
+func (el *PipelinedEventLoop) RemoveTicker(pipelineId pipelining.PipelineId, id int) bool {
 	el.mut.Lock()
 	defer el.mut.Unlock()
 
-	ticker, ok := el.tickers[id]
+	// TODO: Check if the pipeline exists too
+	ticker, ok := el.tickers[pipelineId][id]
 	if !ok {
 		return false
 	}
 	ticker.cancel()
-	delete(el.tickers, id)
+	delete(el.tickers[pipelineId], id)
 	return true
 }
 
-func (el *PipelinedEventLoop) startTicker(id int) {
+func (el *PipelinedEventLoop) startTicker(pipelineId pipelining.PipelineId, id int) {
 	// lock the mutex such that the ticker cannot be removed until we have started it
 	el.mut.Lock()
 	defer el.mut.Unlock()
-	ticker, ok := el.tickers[id]
+	// TODO: Check if the pipeline exists too
+	ticker, ok := el.tickers[pipelineId][id]
 	if !ok {
 		return
 	}
 	ctx := el.ctx
 	ctx, ticker.cancel = context.WithCancel(ctx)
-	go el.runTicker(ctx, ticker)
+	go el.runTicker(pipelineId, ctx, ticker)
 }
 
-func (el *PipelinedEventLoop) runTicker(ctx context.Context, ticker *ticker) {
+func (el *PipelinedEventLoop) runTicker(pipelineId pipelining.PipelineId, ctx context.Context, ticker *ticker) {
 	t := time.NewTicker(ticker.interval)
 	defer t.Stop()
 
@@ -345,12 +355,12 @@ func (el *PipelinedEventLoop) runTicker(ctx context.Context, ticker *ticker) {
 
 	// send the first event immediately
 	// TODO: Find out if this is correct
-	el.AddEvent(pipelining.PipelineIdNone, ticker.callback(time.Now()))
+	el.AddEvent(pipelineId, ticker.callback(time.Now()))
 
 	for {
 		select {
 		case tick := <-t.C:
-			el.AddEvent(pipelining.PipelineIdNone, ticker.callback(tick))
+			el.AddEvent(pipelineId, ticker.callback(tick))
 		case <-ctx.Done():
 			return
 		}

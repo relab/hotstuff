@@ -2,6 +2,7 @@ package eventloop_test
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -127,17 +128,19 @@ func TestHandlerPipelinedNoResponse(t *testing.T) {
 			t.Fatalf("wrong value for event: got: %v, want: %v", e, want)
 		}
 	}
-}
+}*/
 
-func TestTicker(t *testing.T) {
+func TestTickerPipelined(t *testing.T) {
 	if os.Getenv("GITHUB_ACTIONS") != "" {
 		t.SkipNow()
 		return
 	}
 
-	el := eventloop.New(10)
+	const pipelineIdThatListens = 0
+
+	el := eventloop.NewPipelined(10)
 	count := 0
-	el.RegisterHandler(testEvent(0), func(event any) {
+	el.RegisterHandler(pipelineIdThatListens, testEvent(0), func(event any) {
 		count += int(event.(testEvent))
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -145,7 +148,7 @@ func TestTicker(t *testing.T) {
 	go el.Run(ctx)
 
 	rate := 100 * time.Millisecond
-	id := el.AddTicker(rate, func(_ time.Time) (_ any) { return testEvent(1) })
+	id := el.AddTicker(pipelineIdThatListens, rate, func(_ time.Time) (_ any) { return testEvent(1) })
 
 	// sleep a little less than 1 second to ensure we get the expected amount of ticks
 	time.Sleep(time.Second - rate/4)
@@ -155,7 +158,7 @@ func TestTicker(t *testing.T) {
 
 	// check that the ticker stops correctly
 	old := count
-	el.RemoveTicker(id)
+	el.RemoveTicker(pipelineIdThatListens, id)
 
 	// sleep another tick to ensure the ticker has stopped
 	time.Sleep(rate)
@@ -165,11 +168,12 @@ func TestTicker(t *testing.T) {
 	}
 }
 
-func TestDelayedEvent(t *testing.T) {
-	el := eventloop.New(10)
+func TestDelayedEventPipelined(t *testing.T) {
+	const pipelineIdThatListens = 0
+	el := eventloop.NewPipelined(10)
 	c := make(chan testEvent)
 
-	el.RegisterHandler(testEvent(0), func(event any) {
+	el.RegisterHandler(pipelineIdThatListens, testEvent(0), func(event any) {
 		c <- event.(testEvent)
 	})
 
@@ -177,7 +181,7 @@ func TestDelayedEvent(t *testing.T) {
 	el.DelayUntil(testEvent(0), testEvent(2))
 	el.DelayUntil(testEvent(0), testEvent(3))
 	// then send the "1" event
-	el.AddEvent(testEvent(1))
+	el.AddEvent(pipelineIdThatListens, testEvent(1))
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -195,7 +199,7 @@ func TestDelayedEvent(t *testing.T) {
 	}
 }
 
-func BenchmarkEventLoopWithObservers(b *testing.B) {
+/*func BenchmarkEventLoopWithObservers(b *testing.B) {
 	el := eventloop.New(100)
 
 	for i := 0; i < 100; i++ {
