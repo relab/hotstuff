@@ -81,18 +81,20 @@ func TestHandlerPipelinedNoResponse(t *testing.T) {
 	}
 }
 
-/*func TestObserver(t *testing.T) {
+func TestObserverPipelined(t *testing.T) {
+	const pipelineIdThatListens = 0
+
 	type eventData struct {
 		event   any
 		handler bool
 	}
 
-	el := eventloop.New(10)
+	el := eventloop.NewPipelined(10)
 	c := make(chan eventData)
-	el.RegisterHandler(testEvent(0), func(event any) {
+	el.RegisterHandler(pipelineIdThatListens, testEvent(0), func(event any) {
 		c <- eventData{event: event, handler: true}
 	})
-	el.RegisterObserver(testEvent(0), func(event any) {
+	el.RegisterObserver(pipelineIdThatListens, testEvent(0), func(event any) {
 		c <- eventData{event: event, handler: false}
 	})
 
@@ -101,7 +103,7 @@ func TestHandlerPipelinedNoResponse(t *testing.T) {
 	go el.Run(ctx)
 
 	want := testEvent(42)
-	el.AddEvent(want)
+	el.AddEvent(pipelineIdThatListens, want)
 
 	for i := 0; i < 2; i++ {
 		var data eventData
@@ -128,7 +130,7 @@ func TestHandlerPipelinedNoResponse(t *testing.T) {
 			t.Fatalf("wrong value for event: got: %v, want: %v", e, want)
 		}
 	}
-}*/
+}
 
 func TestTickerPipelined(t *testing.T) {
 	if os.Getenv("GITHUB_ACTIONS") != "" {
