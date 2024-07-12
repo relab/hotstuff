@@ -15,7 +15,7 @@ func TestHandlerPipelined(t *testing.T) {
 	const pipelineIdThatListens = 0
 	el := eventloop.NewPipelined(10)
 	c := make(chan any)
-	el.RegisterHandler(pipelineIdThatListens, testEventPipelined(0), func(event any) {
+	el.RegisterPipelinedHandler(pipelineIdThatListens, testEventPipelined(0), func(event any) {
 		c <- event
 	})
 
@@ -27,7 +27,7 @@ func TestHandlerPipelined(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 
 	want := testEventPipelined(42)
-	el.AddEvent(pipelineIdThatListens, want)
+	el.AddPipelinedEvent(pipelineIdThatListens, want)
 
 	var event any
 	select {
@@ -53,7 +53,7 @@ func TestHandlerPipelinedNoResponse(t *testing.T) {
 
 	el := eventloop.NewPipelined(10)
 	c := make(chan any)
-	el.RegisterHandler(pipelineIdThatListens, testEventPipelined(0), func(event any) {
+	el.RegisterPipelinedHandler(pipelineIdThatListens, testEventPipelined(0), func(event any) {
 		c <- event
 	})
 
@@ -65,7 +65,7 @@ func TestHandlerPipelinedNoResponse(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 
 	want := testEventPipelined(42)
-	el.AddEvent(pipelineIdToEmitTo, want)
+	el.AddPipelinedEvent(pipelineIdToEmitTo, want)
 
 	var event any
 	select {
@@ -91,10 +91,10 @@ func TestObserverPipelined(t *testing.T) {
 
 	el := eventloop.NewPipelined(10)
 	c := make(chan eventData)
-	el.RegisterHandler(pipelineIdThatListens, testEvent(0), func(event any) {
+	el.RegisterPipelinedHandler(pipelineIdThatListens, testEvent(0), func(event any) {
 		c <- eventData{event: event, handler: true}
 	})
-	el.RegisterObserver(pipelineIdThatListens, testEvent(0), func(event any) {
+	el.RegisterPipelinedObserver(pipelineIdThatListens, testEvent(0), func(event any) {
 		c <- eventData{event: event, handler: false}
 	})
 
@@ -103,7 +103,7 @@ func TestObserverPipelined(t *testing.T) {
 	go el.Run(ctx)
 
 	want := testEvent(42)
-	el.AddEvent(pipelineIdThatListens, want)
+	el.AddPipelinedEvent(pipelineIdThatListens, want)
 
 	for i := 0; i < 2; i++ {
 		var data eventData
@@ -142,7 +142,7 @@ func TestTickerPipelined(t *testing.T) {
 
 	el := eventloop.NewPipelined(10)
 	count := 0
-	el.RegisterHandler(pipelineIdThatListens, testEvent(0), func(event any) {
+	el.RegisterPipelinedHandler(pipelineIdThatListens, testEvent(0), func(event any) {
 		count += int(event.(testEvent))
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -150,7 +150,7 @@ func TestTickerPipelined(t *testing.T) {
 	go el.Run(ctx)
 
 	rate := 100 * time.Millisecond
-	id := el.AddTicker(pipelineIdThatListens, rate, func(_ time.Time) (_ any) { return testEvent(1) })
+	id := el.AddPipelinedTicker(pipelineIdThatListens, rate, func(_ time.Time) (_ any) { return testEvent(1) })
 
 	// sleep a little less than 1 second to ensure we get the expected amount of ticks
 	time.Sleep(time.Second - rate/4)
@@ -160,7 +160,7 @@ func TestTickerPipelined(t *testing.T) {
 
 	// check that the ticker stops correctly
 	old := count
-	el.RemoveTicker(pipelineIdThatListens, id)
+	el.RemovePipelinedTicker(pipelineIdThatListens, id)
 
 	// sleep another tick to ensure the ticker has stopped
 	time.Sleep(rate)
@@ -175,7 +175,7 @@ func TestDelayedEventPipelined(t *testing.T) {
 	el := eventloop.NewPipelined(10)
 	c := make(chan testEvent)
 
-	el.RegisterHandler(pipelineIdThatListens, testEvent(0), func(event any) {
+	el.RegisterPipelinedHandler(pipelineIdThatListens, testEvent(0), func(event any) {
 		c <- event.(testEvent)
 	})
 
@@ -183,7 +183,156 @@ func TestDelayedEventPipelined(t *testing.T) {
 	el.DelayUntil(testEvent(0), testEvent(2))
 	el.DelayUntil(testEvent(0), testEvent(3))
 	// then send the "1" event
-	el.AddEvent(pipelineIdThatListens, testEvent(1))
+	el.AddPipelinedEvent(pipelineIdThatListens, testEvent(1))
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go el.Run(ctx)
+
+	for i := 1; i <= 3; i++ {
+		select {
+		case event := <-c:
+			if testEvent(i) != event {
+				t.Errorf("events arrived in the wrong order: want: %d, got: %d", i, event)
+			}
+		case <-ctx.Done():
+			t.Fatalf("timed out")
+		}
+	}
+}
+
+func TestHandlerStandard(t *testing.T) {
+	el := eventloop.NewPipelined(10)
+	c := make(chan any)
+	el.RegisterHandler(testEvent(0), func(event any) {
+		c <- event
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go el.Run(ctx)
+
+	// wait for the event loop to start
+	time.Sleep(1 * time.Millisecond)
+
+	want := testEvent(42)
+	el.AddEvent(want)
+
+	var event any
+	select {
+	case <-ctx.Done():
+		t.Fatal("timed out")
+	case event = <-c:
+	}
+
+	e, ok := event.(testEvent)
+	if !ok {
+		t.Fatalf("wrong type for event: got: %T, want: %T", event, want)
+	}
+
+	if e != want {
+		t.Fatalf("wrong value for event: got: %v, want: %v", e, want)
+	}
+}
+
+func TestObserverStandard(t *testing.T) {
+	type eventData struct {
+		event   any
+		handler bool
+	}
+
+	el := eventloop.NewPipelined(10)
+	c := make(chan eventData)
+	el.RegisterHandler(testEvent(0), func(event any) {
+		c <- eventData{event: event, handler: true}
+	})
+	el.RegisterObserver(testEvent(0), func(event any) {
+		c <- eventData{event: event, handler: false}
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go el.Run(ctx)
+
+	want := testEvent(42)
+	el.AddEvent(want)
+
+	for i := 0; i < 2; i++ {
+		var data eventData
+		select {
+		case <-ctx.Done():
+			t.Fatal("timed out")
+		case data = <-c:
+		}
+
+		if i == 0 && data.handler {
+			t.Fatalf("expected observer to run first")
+		}
+
+		if i == 1 && !data.handler {
+			t.Fatalf("expected handler to run second")
+		}
+
+		e, ok := data.event.(testEvent)
+		if !ok {
+			t.Fatalf("wrong type for event: got: %T, want: %T", data, want)
+		}
+
+		if e != want {
+			t.Fatalf("wrong value for event: got: %v, want: %v", e, want)
+		}
+	}
+}
+
+func TestTickerStandard(t *testing.T) {
+	if os.Getenv("GITHUB_ACTIONS") != "" {
+		t.SkipNow()
+		return
+	}
+
+	el := eventloop.NewPipelined(10)
+	count := 0
+	el.RegisterHandler(testEvent(0), func(event any) {
+		count += int(event.(testEvent))
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go el.Run(ctx)
+
+	rate := 100 * time.Millisecond
+	id := el.AddTicker(rate, func(_ time.Time) (_ any) { return testEvent(1) })
+
+	// sleep a little less than 1 second to ensure we get the expected amount of ticks
+	time.Sleep(time.Second - rate/4)
+	if expected := int(time.Second / rate); count != expected {
+		t.Fatalf("ticker fired %d times in 1 second, expected %d", count, expected)
+	}
+
+	// check that the ticker stops correctly
+	old := count
+	el.RemoveTicker(id)
+
+	// sleep another tick to ensure the ticker has stopped
+	time.Sleep(rate)
+
+	if old != count {
+		t.Fatal("ticker was not stopped")
+	}
+}
+
+func TestDelayedEventStandard(t *testing.T) {
+	el := eventloop.NewPipelined(10)
+	c := make(chan testEvent)
+
+	el.RegisterHandler(testEvent(0), func(event any) {
+		c <- event.(testEvent)
+	})
+
+	// delay the "2" and "3" events until after the first instance of testEvent
+	el.DelayUntil(testEvent(0), testEvent(2))
+	el.DelayUntil(testEvent(0), testEvent(3))
+	// then send the "1" event
+	el.AddEvent(testEvent(1))
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
