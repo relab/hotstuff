@@ -26,6 +26,54 @@ service Hotstuff {
   }
 
   rpc Fetch(BlockHash) returns (Block) { option (gorums.quorumcall) = true; }
+
+  rpc PipelinePropose(PipelineProposal) returns (google.protobuf.Empty) {
+    option (gorums.multicast) = true;
+  }
+
+  rpc PipelineVote(PipelinePartialCert) returns (google.protobuf.Empty) {
+    option (gorums.unicast) = true;
+  }
+
+  rpc PipelineTimeout(PipelineTimeoutMsg) returns (google.protobuf.Empty) {
+    option (gorums.multicast) = true;
+  }
+
+  rpc PipelineNewView(PipelineSyncInfo) returns (google.protobuf.Empty) {
+    option (gorums.unicast) = true;
+  }
+
+  rpc PipelineFetch(PipelineBlockHash) returns (PipelineBlock) { option (gorums.quorumcall) = true; }
+}
+
+message PipelineProposal {
+  uint32 PipelineId = 1;
+  Proposal Proposal = 2;
+}
+
+message PipelinePartialCert {
+  uint32 PipelineId = 1;
+  PartialCert PartialCert = 2;
+}
+
+message PipelineTimeoutMsg {
+  uint32 PipelineId = 1;
+  TimeoutMsg TimeoutMsg = 2;
+}
+
+message PipelineSyncInfo {
+  uint32 PipelineId = 1;
+  SyncInfo SyncInfo = 2;
+}
+
+message PipelineBlockHash {
+  uint32 PipelineId = 1;
+  BlockHash BlockHash = 2;
+}
+
+message PipelineBlock {
+  uint32 PipelineId = 1;
+  Block Block = 2;
 }
 
 message Proposal {

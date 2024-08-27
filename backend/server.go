@@ -224,3 +224,74 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 type replicaConnected struct {
 	ctx context.Context
 }
+
+// Propose handles a replica's response to the Propose QC from the leader.
+func (impl *serviceImpl) PipelinePropose(ctx gorums.ServerCtx, proposal *hotstuffpb.PipelineProposal) {
+	// id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+	// if err != nil {
+	// 	impl.srv.logger.Infof("Failed to get client ID: %v", err)
+	// 	return
+	// }
+	//
+	// proposal.Block.Proposer = uint32(id)
+	// proposeMsg := hotstuffpb.ProposalFromProto(proposal)
+	// proposeMsg.ID = id
+	// impl.srv.induceLatency(id)
+	// impl.srv.eventLoop.AddEvent(proposeMsg)
+}
+
+// Vote handles an incoming vote message.
+func (impl *serviceImpl) PipelineVote(ctx gorums.ServerCtx, cert *hotstuffpb.PipelinePartialCert) {
+	// id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+	// if err != nil {
+	// 	impl.srv.logger.Infof("Failed to get client ID: %v", err)
+	// 	return
+	// }
+	// impl.srv.induceLatency(id)
+	// impl.srv.eventLoop.AddEvent(hotstuff.VoteMsg{
+	// 	ID:          id,
+	// 	PartialCert: hotstuffpb.PartialCertFromProto(cert),
+	// })
+}
+
+// NewView handles the leader's response to receiving a NewView rpc from a replica.
+func (impl *serviceImpl) PipelineNewView(ctx gorums.ServerCtx, msg *hotstuffpb.PipelineSyncInfo) {
+	// id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+	// if err != nil {
+	// 	impl.srv.logger.Infof("Failed to get client ID: %v", err)
+	// 	return
+	// }
+	// impl.srv.induceLatency(id)
+	// impl.srv.eventLoop.AddEvent(hotstuff.NewViewMsg{
+	// 	ID:       id,
+	// 	SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
+	// })
+}
+
+// Fetch handles an incoming fetch request.
+func (impl *serviceImpl) PipelineFetch(_ gorums.ServerCtx, pb *hotstuffpb.PipelineBlockHash) (*hotstuffpb.PipelineBlock, error) {
+	// var hash hotstuff.Hash
+	// copy(hash[:], pb.GetHash())
+	//
+	// block, ok := impl.srv.blockChain.LocalGet(hash)
+	// if !ok {
+	// 	return nil, status.Errorf(codes.NotFound, "requested block was not found")
+	// }
+	//
+	// impl.srv.logger.Debugf("OnFetch: %.8s", hash)
+	//
+	// return hotstuffpb.BlockToProto(block), nil
+	return nil, fmt.Errorf("not implemented")
+}
+
+// Timeout handles an incoming TimeoutMsg.
+func (impl *serviceImpl) PipelineTimeout(ctx gorums.ServerCtx, msg *hotstuffpb.PipelineTimeoutMsg) {
+	// var err error
+	// timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
+	// timeoutMsg.ID, err = GetPeerIDFromContext(ctx, impl.srv.configuration)
+	// if err != nil {
+	// 	impl.srv.logger.Infof("Could not get ID of replica: %v", err)
+	// }
+	// impl.srv.induceLatency(timeoutMsg.ID)
+	// impl.srv.eventLoop.AddEvent(timeoutMsg)
+}
