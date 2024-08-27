@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -227,17 +228,17 @@ type replicaConnected struct {
 
 // Propose handles a replica's response to the Propose QC from the leader.
 func (impl *serviceImpl) PipelinePropose(ctx gorums.ServerCtx, proposal *hotstuffpb.PipelineProposal) {
-	// id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
-	// if err != nil {
-	// 	impl.srv.logger.Infof("Failed to get client ID: %v", err)
-	// 	return
-	// }
-	//
-	// proposal.Block.Proposer = uint32(id)
-	// proposeMsg := hotstuffpb.ProposalFromProto(proposal)
-	// proposeMsg.ID = id
-	// impl.srv.induceLatency(id)
-	// impl.srv.eventLoop.AddEvent(proposeMsg)
+	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+	if err != nil {
+		impl.srv.logger.Infof("Failed to get client ID: %v", err)
+		return
+	}
+
+	proposal.Proposal.Block.Proposer = uint32(id)
+	proposeMsg := hotstuffpb.ProposalFromProto(proposal.Proposal)
+	proposeMsg.ID = id
+	impl.srv.induceLatency(id)
+	impl.srv.eventLoop.AddPipelinedEvent(pipelining.PipelineId(proposal.PipelineId), proposeMsg)
 }
 
 // Vote handles an incoming vote message.
