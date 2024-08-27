@@ -178,24 +178,10 @@ var _ emptypb.Empty
 
 // PipelinePropose is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (c *Configuration) PipelinePropose(ctx context.Context, in *PipelineProposal, opts ...gorums.CallOption) {
+func (c *Configuration) PipelinePropose(ctx context.Context, in *PipelineBundleOfProposals, opts ...gorums.CallOption) {
 	cd := gorums.QuorumCallData{
 		Message: in,
 		Method:  "hotstuffpb.Hotstuff.PipelinePropose",
-	}
-
-	c.RawConfiguration.Multicast(ctx, cd, opts...)
-}
-
-// Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
-
-// PipelineTimeout is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (c *Configuration) PipelineTimeout(ctx context.Context, in *PipelineTimeoutMsg, opts ...gorums.CallOption) {
-	cd := gorums.QuorumCallData{
-		Message: in,
-		Method:  "hotstuffpb.Hotstuff.PipelineTimeout",
 	}
 
 	c.RawConfiguration.Multicast(ctx, cd, opts...)
@@ -211,13 +197,6 @@ type QuorumSpec interface {
 	// be used by the quorum function. If the in parameter is not needed
 	// you should implement your quorum function with '_ *BlockHash'.
 	FetchQF(in *BlockHash, replies map[uint32]*Block) (*Block, bool)
-
-	// PipelineFetchQF is the quorum function for the PipelineFetch
-	// quorum call method. The in parameter is the request object
-	// supplied to the PipelineFetch method at call time, and may or may not
-	// be used by the quorum function. If the in parameter is not needed
-	// you should implement your quorum function with '_ *PipelineBlockHash'.
-	PipelineFetchQF(in *PipelineBlockHash, replies map[uint32]*PipelineBlock) (*PipelineBlock, bool)
 }
 
 // Fetch is a quorum call invoked on all nodes in configuration c,
@@ -242,28 +221,6 @@ func (c *Configuration) Fetch(ctx context.Context, in *BlockHash) (resp *Block, 
 	return res.(*Block), err
 }
 
-// PipelineFetch is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (c *Configuration) PipelineFetch(ctx context.Context, in *PipelineBlockHash) (resp *PipelineBlock, err error) {
-	cd := gorums.QuorumCallData{
-		Message: in,
-		Method:  "hotstuffpb.Hotstuff.PipelineFetch",
-	}
-	cd.QuorumFunction = func(req protoreflect.ProtoMessage, replies map[uint32]protoreflect.ProtoMessage) (protoreflect.ProtoMessage, bool) {
-		r := make(map[uint32]*PipelineBlock, len(replies))
-		for k, v := range replies {
-			r[k] = v.(*PipelineBlock)
-		}
-		return c.qspec.PipelineFetchQF(req.(*PipelineBlockHash), r)
-	}
-
-	res, err := c.RawConfiguration.QuorumCall(ctx, cd)
-	if err != nil {
-		return nil, err
-	}
-	return res.(*PipelineBlock), err
-}
-
 // Hotstuff is the server-side API for the Hotstuff Service
 type Hotstuff interface {
 	Propose(ctx gorums.ServerCtx, request *Proposal)
@@ -271,11 +228,7 @@ type Hotstuff interface {
 	Timeout(ctx gorums.ServerCtx, request *TimeoutMsg)
 	NewView(ctx gorums.ServerCtx, request *SyncInfo)
 	Fetch(ctx gorums.ServerCtx, request *BlockHash) (response *Block, err error)
-	PipelinePropose(ctx gorums.ServerCtx, request *PipelineProposal)
-	PipelineVote(ctx gorums.ServerCtx, request *PipelinePartialCert)
-	PipelineTimeout(ctx gorums.ServerCtx, request *PipelineTimeoutMsg)
-	PipelineNewView(ctx gorums.ServerCtx, request *PipelineSyncInfo)
-	PipelineFetch(ctx gorums.ServerCtx, request *PipelineBlockHash) (response *PipelineBlock, err error)
+	PipelinePropose(ctx gorums.ServerCtx, request *PipelineBundleOfProposals)
 }
 
 func RegisterHotstuffServer(srv *gorums.Server, impl Hotstuff) {
@@ -306,42 +259,15 @@ func RegisterHotstuffServer(srv *gorums.Server, impl Hotstuff) {
 		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
 	})
 	srv.RegisterHandler("hotstuffpb.Hotstuff.PipelinePropose", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*PipelineProposal)
+		req := in.Message.(*PipelineBundleOfProposals)
 		defer ctx.Release()
 		impl.PipelinePropose(ctx, req)
-	})
-	srv.RegisterHandler("hotstuffpb.Hotstuff.PipelineVote", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*PipelinePartialCert)
-		defer ctx.Release()
-		impl.PipelineVote(ctx, req)
-	})
-	srv.RegisterHandler("hotstuffpb.Hotstuff.PipelineTimeout", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*PipelineTimeoutMsg)
-		defer ctx.Release()
-		impl.PipelineTimeout(ctx, req)
-	})
-	srv.RegisterHandler("hotstuffpb.Hotstuff.PipelineNewView", func(ctx gorums.ServerCtx, in *gorums.Message, _ chan<- *gorums.Message) {
-		req := in.Message.(*PipelineSyncInfo)
-		defer ctx.Release()
-		impl.PipelineNewView(ctx, req)
-	})
-	srv.RegisterHandler("hotstuffpb.Hotstuff.PipelineFetch", func(ctx gorums.ServerCtx, in *gorums.Message, finished chan<- *gorums.Message) {
-		req := in.Message.(*PipelineBlockHash)
-		defer ctx.Release()
-		resp, err := impl.PipelineFetch(ctx, req)
-		gorums.SendMessage(ctx, finished, gorums.WrapMessage(in.Metadata, resp, err))
 	})
 }
 
 type internalBlock struct {
 	nid   uint32
 	reply *Block
-	err   error
-}
-
-type internalPipelineBlock struct {
-	nid   uint32
-	reply *PipelineBlock
 	err   error
 }
 
@@ -368,34 +294,6 @@ func (n *Node) NewView(ctx context.Context, in *SyncInfo, opts ...gorums.CallOpt
 	cd := gorums.CallData{
 		Message: in,
 		Method:  "hotstuffpb.Hotstuff.NewView",
-	}
-
-	n.RawNode.Unicast(ctx, cd, opts...)
-}
-
-// Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
-
-// PipelineVote is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (n *Node) PipelineVote(ctx context.Context, in *PipelinePartialCert, opts ...gorums.CallOption) {
-	cd := gorums.CallData{
-		Message: in,
-		Method:  "hotstuffpb.Hotstuff.PipelineVote",
-	}
-
-	n.RawNode.Unicast(ctx, cd, opts...)
-}
-
-// Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
-
-// PipelineNewView is a quorum call invoked on all nodes in configuration c,
-// with the same argument in, and returns a combined result.
-func (n *Node) PipelineNewView(ctx context.Context, in *PipelineSyncInfo, opts ...gorums.CallOption) {
-	cd := gorums.CallData{
-		Message: in,
-		Method:  "hotstuffpb.Hotstuff.PipelineNewView",
 	}
 
 	n.RawNode.Unicast(ctx, cd, opts...)
