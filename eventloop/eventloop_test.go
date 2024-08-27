@@ -9,14 +9,13 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 )
 
-type testEventPipelined int
 type testEvent int
 
-func TestHandlerPipelined(t *testing.T) {
-	const pipelineIdThatListens = 0
+func TestHandlerPiped(t *testing.T) {
+	const pipeIdThatListens = 0
 	el := eventloop.New(10)
 	c := make(chan any)
-	el.RegisterPipelinedHandler(pipelineIdThatListens, testEventPipelined(0), func(event any) {
+	el.RegisterPipedHandler(pipeIdThatListens, testEvent(0), func(event any) {
 		c <- event
 	})
 
@@ -27,8 +26,8 @@ func TestHandlerPipelined(t *testing.T) {
 	// wait for the event loop to start
 	time.Sleep(1 * time.Millisecond)
 
-	want := testEventPipelined(42)
-	el.AddPipelinedEvent(pipelineIdThatListens, want)
+	want := testEvent(42)
+	el.PipeEvent(pipeIdThatListens, want)
 
 	var event any
 	select {
@@ -37,7 +36,7 @@ func TestHandlerPipelined(t *testing.T) {
 	case event = <-c:
 	}
 
-	e, ok := event.(testEventPipelined)
+	e, ok := event.(testEvent)
 
 	if !ok {
 		t.Fatalf("wrong type for event: got: %T, want: %T", event, want)
@@ -48,13 +47,13 @@ func TestHandlerPipelined(t *testing.T) {
 	}
 }
 
-func TestHandlerPipelinedNoResponse(t *testing.T) {
-	const pipelineIdThatListens = 0
-	const pipelineIdToEmitTo = 1
+func TestHandlerPipedNoResponse(t *testing.T) {
+	const pipeIdThatListens = 0
+	const pipeIdToEmitTo = 1
 
 	el := eventloop.New(10)
 	c := make(chan any)
-	el.RegisterPipelinedHandler(pipelineIdThatListens, testEventPipelined(0), func(event any) {
+	el.RegisterPipedHandler(pipeIdThatListens, testEvent(0), func(event any) {
 		c <- event
 	})
 
@@ -65,25 +64,25 @@ func TestHandlerPipelinedNoResponse(t *testing.T) {
 	// wait for the event loop to start
 	time.Sleep(1 * time.Millisecond)
 
-	want := testEventPipelined(42)
-	el.AddPipelinedEvent(pipelineIdToEmitTo, want)
+	want := testEvent(42)
+	el.PipeEvent(pipeIdToEmitTo, want)
 
 	var event any
 	select {
-	case <-ctx.Done(): // We expect a timeout since we dont want to listen to this pipeline ID
+	case <-ctx.Done(): // We expect a timeout since we dont want to listen to this pipe ID
 	case event = <-c:
-		t.Fatal("received on incorrect pipeline")
+		t.Fatal("received on incorrect pipe")
 	}
 
-	_, ok := event.(testEventPipelined)
+	_, ok := event.(testEvent)
 
 	if ok {
-		t.Fatal("received on incorrect pipeline")
+		t.Fatal("received on incorrect pipe")
 	}
 }
 
-func TestObserverPipelined(t *testing.T) {
-	const pipelineIdThatListens = 0
+func TestObserverPiped(t *testing.T) {
+	const pipeIdThatListens = 0
 
 	type eventData struct {
 		event   any
@@ -92,10 +91,10 @@ func TestObserverPipelined(t *testing.T) {
 
 	el := eventloop.New(10)
 	c := make(chan eventData)
-	el.RegisterPipelinedHandler(pipelineIdThatListens, testEvent(0), func(event any) {
+	el.RegisterPipedHandler(pipeIdThatListens, testEvent(0), func(event any) {
 		c <- eventData{event: event, handler: true}
 	})
-	el.RegisterPipelinedObserver(pipelineIdThatListens, testEvent(0), func(event any) {
+	el.RegisterPipedObserver(pipeIdThatListens, testEvent(0), func(event any) {
 		c <- eventData{event: event, handler: false}
 	})
 
@@ -104,7 +103,7 @@ func TestObserverPipelined(t *testing.T) {
 	go el.Run(ctx)
 
 	want := testEvent(42)
-	el.AddPipelinedEvent(pipelineIdThatListens, want)
+	el.PipeEvent(pipeIdThatListens, want)
 
 	for i := 0; i < 2; i++ {
 		var data eventData
@@ -133,17 +132,17 @@ func TestObserverPipelined(t *testing.T) {
 	}
 }
 
-func TestTickerPipelined(t *testing.T) {
+func TestTickerPiped(t *testing.T) {
 	if os.Getenv("GITHUB_ACTIONS") != "" {
 		t.SkipNow()
 		return
 	}
 
-	const pipelineIdThatListens = 0
+	const pipeIdThatListens = 0
 
 	el := eventloop.New(10)
 	count := 0
-	el.RegisterPipelinedHandler(pipelineIdThatListens, testEvent(0), func(event any) {
+	el.RegisterPipedHandler(pipeIdThatListens, testEvent(0), func(event any) {
 		count += int(event.(testEvent))
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -151,7 +150,7 @@ func TestTickerPipelined(t *testing.T) {
 	go el.Run(ctx)
 
 	rate := 100 * time.Millisecond
-	id := el.AddPipelinedTicker(pipelineIdThatListens, rate, func(_ time.Time) (_ any) { return testEvent(1) })
+	id := el.AddPipedTicker(pipeIdThatListens, rate, func(_ time.Time) (_ any) { return testEvent(1) })
 
 	// sleep a little less than 1 second to ensure we get the expected amount of ticks
 	time.Sleep(time.Second - rate/4)
@@ -161,7 +160,7 @@ func TestTickerPipelined(t *testing.T) {
 
 	// check that the ticker stops correctly
 	old := count
-	el.RemovePipelinedTicker(pipelineIdThatListens, id)
+	el.RemovePipedTicker(pipeIdThatListens, id)
 
 	// sleep another tick to ensure the ticker has stopped
 	time.Sleep(rate)
@@ -171,12 +170,12 @@ func TestTickerPipelined(t *testing.T) {
 	}
 }
 
-func TestDelayedEventPipelined(t *testing.T) {
-	const pipelineIdThatListens = 0
+func TestDelayedEventPiped(t *testing.T) {
+	const pipeIdThatListens = 0
 	el := eventloop.New(10)
 	c := make(chan testEvent)
 
-	el.RegisterPipelinedHandler(pipelineIdThatListens, testEvent(0), func(event any) {
+	el.RegisterPipedHandler(pipeIdThatListens, testEvent(0), func(event any) {
 		c <- event.(testEvent)
 	})
 
@@ -184,7 +183,7 @@ func TestDelayedEventPipelined(t *testing.T) {
 	el.DelayUntil(testEvent(0), testEvent(2))
 	el.DelayUntil(testEvent(0), testEvent(3))
 	// then send the "1" event
-	el.AddPipelinedEvent(pipelineIdThatListens, testEvent(1))
+	el.PipeEvent(pipeIdThatListens, testEvent(1))
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -351,7 +350,7 @@ func TestDelayedEventStandard(t *testing.T) {
 	}
 }
 
-/*func BenchmarkEventLoopWithObservers(b *testing.B) {
+func BenchmarkEventLoopWithObservers(b *testing.B) {
 	el := eventloop.New(100)
 
 	for i := 0; i < 100; i++ {
@@ -404,4 +403,4 @@ func BenchmarkDelay(b *testing.B) {
 		el.Tick(context.Background())
 		el.Tick(context.Background())
 	}
-}*/
+}

@@ -226,22 +226,20 @@ type replicaConnected struct {
 	ctx context.Context
 }
 
-// PipelinePropose handles a replica's response to the Propose QC from the leader.
-func (impl *serviceImpl) PipelinePropose(ctx gorums.ServerCtx, bundle *hotstuffpb.PipelineBundleOfProposals) {
+// ProposePiped parallellizes the handling of a replica's response to the Propose QC from the leader.
+func (impl *serviceImpl) ProposePiped(ctx gorums.ServerCtx, pipedProposal *hotstuffpb.PipedProposal) {
 	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
 
-	for _, pipelineProposal := range bundle.Proposals {
-		pipelineId := pipelining.PipelineId(pipelineProposal.PipelineId)
-		proposal := pipelineProposal.Proposal
-		proposal.Block.Proposer = uint32(id)
+	pipeId := pipelining.PipeId(pipedProposal.PipeId)
+	proposal := pipedProposal.Proposal
+	proposal.Block.Proposer = uint32(id)
 
-		proposeMsg := hotstuffpb.ProposalFromProto(proposal)
-		proposeMsg.ID = id
-		impl.srv.induceLatency(id)
-		impl.srv.eventLoop.AddPipelinedEvent(pipelineId, proposeMsg)
-	}
+	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
+	proposeMsg.ID = id
+	impl.srv.induceLatency(id)
+	impl.srv.eventLoop.PipeEvent(pipeId, proposeMsg)
 }

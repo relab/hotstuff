@@ -40,7 +40,7 @@ import (
 	"github.com/relab/hotstuff/pipelining"
 )
 
-type ModulePipeline []Module
+type ModulePipe []Module
 
 // Module is an interface for initializing modules.
 type Module interface {
@@ -50,8 +50,8 @@ type Module interface {
 // Core is the base of the module system.
 // It contains only a few core modules that are shared between replicas and clients.
 type Core struct {
-	staticModules    []any
-	pipelinedModules map[pipelining.PipelineId]ModulePipeline
+	staticModules []any
+	pipedModules  map[pipelining.PipeId]ModulePipe
 }
 
 // TryGet attempts to find a module for ptr.
@@ -115,12 +115,12 @@ func (mods *Core) Get(pointers ...any) {
 }
 
 // GetFromPipeline finds compatible modules for the given pointers, assuming that moduleInPipeline is in the same module
-// pipeline as those compatible pointers.
+// pipe as those compatible pointers.
 //
 // NOTE: pointers must only contain non-nil pointers to types that have been provided to the module system
-// as a pipelined module.
+// as a piped module.
 // GetFromPipeline panics if one of the given arguments is not a pointer, if a compatible module is not found,
-// if the module was not in a pipeline or if the module was not in the same pipeline as moduleInPipeline.
+// if the module was not in a pipe or if the module was not in the same pipe as moduleInPipeline.
 //
 // Example:
 //
@@ -133,14 +133,14 @@ func (mods *Core) Get(pointers ...any) {
 //	}
 //
 //	func (m *MyModuleImpl) InitModule(mods *modules.Core) {
-//		mods.GetFromPipeline(m, &m.otherModule) // Requires an OtherModule from the same pipeline
+//		mods.GetFromPipeline(m, &m.otherModule) // Requires an OtherModule from the same pipe
 //	}
 //
 //	func main() {
-//		pipelineIds := []modules.PipelineId{0, 1, 2, ...}
+//		pipeIds := []modules.PipelineId{0, 1, 2, ...}
 //
 //		builder := modules.NewBuilder(0, nil)
-//		builder.EnablePipelining(pipelineIds)
+//		builder.EnablePipelining(pipeIds)
 //		builder.AddPipelined(NewMyModuleImpl)
 //		builder.AddPipelined(NewOtherModuleImpl)
 //		builder.Build() // InitModule is called here
@@ -151,17 +151,17 @@ func (mods *Core) GetFromPipeline(moduleInPipeline Module, pointers ...any) {
 	}
 	for _, ptr := range pointers {
 		if !mods.TryGetFromPipeline(moduleInPipeline, ptr) {
-			panic(fmt.Sprintf("pipelined module of type %s not found", reflect.TypeOf(ptr).Elem()))
+			panic(fmt.Sprintf("piped module of type %s not found", reflect.TypeOf(ptr).Elem()))
 		}
 	}
 }
 
 // TryGetFromPipeline attempts to find a module for ptr which also happens to be in the same
-// pipeline as moduleInPipeline, false otherwise.
+// pipe as moduleInPipeline, false otherwise.
 // TryGetFromPipeline returns true if a module was successflully stored in ptr, false otherwise.
 // If pipelining was not enabled, TryGet is called implicitly.
 func (mods *Core) TryGetFromPipeline(moduleInPipeline Module, ptr any) bool {
-	if len(mods.pipelinedModules) == 0 {
+	if len(mods.pipedModules) == 0 {
 		return mods.TryGet(ptr)
 	}
 
@@ -174,29 +174,29 @@ func (mods *Core) TryGetFromPipeline(moduleInPipeline Module, ptr any) bool {
 		panic("only pointer values allowed")
 	}
 
-	correctPipelineId := pipelining.PipelineIdNone
-	for id := range mods.pipelinedModules {
-		pipeline := mods.pipelinedModules[id]
-		// Check if self is in pipeline
-		for _, module := range pipeline {
+	correctPipelineId := pipelining.NoPipeId
+	for id := range mods.pipedModules {
+		pipe := mods.pipedModules[id]
+		// Check if self is in pipe
+		for _, module := range pipe {
 			// TODO: Check if equality checking is correct
 			if module == moduleInPipeline {
 				correctPipelineId = id
 				break
 			}
 		}
-		// Break outer loop too if a pipeline ID was found
-		if correctPipelineId != pipelining.PipelineIdNone {
+		// Break outer loop too if a pipe ID was found
+		if correctPipelineId != pipelining.NoPipeId {
 			break
 		}
 	}
 
 	// If this variable remained unchanged, return false
-	if correctPipelineId == pipelining.PipelineIdNone {
+	if correctPipelineId == pipelining.NoPipeId {
 		return false
 	}
 
-	correctPipeline := mods.pipelinedModules[correctPipelineId]
+	correctPipeline := mods.pipedModules[correctPipelineId]
 	for _, m := range correctPipeline {
 		mv := reflect.ValueOf(m)
 		if mv.Type().AssignableTo(pt.Elem()) {
@@ -212,10 +212,10 @@ func (mods *Core) TryGetFromPipeline(moduleInPipeline Module, ptr any) bool {
 type Builder struct {
 	core              Core
 	staticModules     []Module
-	modulePipelines   map[pipelining.PipelineId]ModulePipeline
+	modulePipes       map[pipelining.PipeId]ModulePipe
 	opts              *Options
 	pipeliningEnabled bool
-	pipelineIds       []pipelining.PipelineId
+	pipeIds           []pipelining.PipeId
 }
 
 // NewBuilder returns a new builder.
@@ -227,29 +227,29 @@ func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey) Builder {
 			connectionMetadata: make(map[string]string),
 		},
 		pipeliningEnabled: false,
-		pipelineIds:       nil,
-		modulePipelines:   nil,
+		pipeIds:           nil,
+		modulePipes:       nil,
 	}
 
 	return bl
 }
 
-// EnablePipelining enables pipelining by allocating the module pipelines and assigning them the ids
-// provided by pipelineIds. The number of pipelines will be len(pipelineIds).
-func (bl *Builder) EnablePipelining(pipelineIds []pipelining.PipelineId) {
+// EnablePipelining enables pipelining by allocating the module pipes and assigning them the ids
+// provided by pipeIds. The number of pipes will be len(pipeIds).
+func (bl *Builder) EnablePipelining(pipeIds []pipelining.PipeId) {
 	if bl.pipeliningEnabled {
 		panic("pipelining already enabled")
 	}
 
-	if len(pipelineIds) == 0 {
-		panic("no pipeline ids provided")
+	if len(pipeIds) == 0 {
+		panic("no pipe ids provided")
 	}
 
 	bl.pipeliningEnabled = true
-	bl.modulePipelines = make(map[pipelining.PipelineId]ModulePipeline)
-	bl.pipelineIds = pipelineIds
-	for _, id := range bl.pipelineIds {
-		bl.modulePipelines[id] = make(ModulePipeline, 0)
+	bl.modulePipes = make(map[pipelining.PipeId]ModulePipe)
+	bl.pipeIds = pipeIds
+	for _, id := range bl.pipeIds {
+		bl.modulePipes[id] = make(ModulePipe, 0)
 	}
 }
 
@@ -296,7 +296,7 @@ func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
 		return
 	}
 
-	for id := range b.modulePipelines {
+	for id := range b.modulePipes {
 		returnResult := ctorVal.Call(vargs)
 		if len(returnResult) != 1 {
 			panic("constructor does not return a single value")
@@ -308,27 +308,27 @@ func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
 			// TODO: Consider if this is necessary
 			panic("constructor did not construct a value that could be casted to Module")
 		}
-		b.modulePipelines[id] = append(b.modulePipelines[id], converted)
+		b.modulePipes[id] = append(b.modulePipes[id], converted)
 	}
 }
 
-// Return the number of pipelines the builder has generated.
+// Return the number of pipes the builder has generated.
 func (b *Builder) PipelineCount() int {
-	return len(b.modulePipelines)
+	return len(b.modulePipes)
 }
 
-// Return a slice of PipelineIds in the order which the pipelines were created.
-func (b *Builder) PipelineIds() []pipelining.PipelineId {
-	return b.pipelineIds
+// Return a slice of PipelineIds in the order which the pipes were created.
+func (b *Builder) PipelineIds() []pipelining.PipeId {
+	return b.pipeIds
 }
 
-// Return a list of modules from a pipeline. The order of module types is influenced
+// Return a list of modules from a pipes. The order of module types is influenced
 // by when AddPipelined was called for a kind of module.
-func (b *Builder) GetPipeline(id pipelining.PipelineId) ModulePipeline {
+func (b *Builder) GetPipeline(id pipelining.PipeId) ModulePipe {
 	if !b.pipeliningEnabled {
-		panic("cannot get pipeline when pipelining is disabled")
+		panic("cannot get pipe when pipelining is disabled")
 	}
-	return b.modulePipelines[id]
+	return b.modulePipes[id]
 }
 
 // Build initializes all added modules and returns the Core object.
@@ -347,19 +347,19 @@ func (b *Builder) Build() *Core {
 		return &b.core // Exit early
 	}
 
-	// Adding the pipelined modules to core first.
-	b.core.pipelinedModules = make(map[pipelining.PipelineId]ModulePipeline)
-	for id, pipeline := range b.modulePipelines {
-		b.core.pipelinedModules[id] = make(ModulePipeline, 0)
-		for _, module := range pipeline {
-			b.core.pipelinedModules[id] = append(b.core.pipelinedModules[id], module)
+	// Adding the piped modules to core first.
+	b.core.pipedModules = make(map[pipelining.PipeId]ModulePipe)
+	for id, pipe := range b.modulePipes {
+		b.core.pipedModules[id] = make(ModulePipe, 0)
+		for _, module := range pipe {
+			b.core.pipedModules[id] = append(b.core.pipedModules[id], module)
 		}
 	}
 
 	// Initializing later so that modules can reference
-	// other modules in the same pipeline without panicking.
-	for _, pipeline := range b.core.pipelinedModules {
-		for _, module := range pipeline {
+	// other modules in the same pipe without panicking.
+	for _, pipe := range b.core.pipedModules {
+		for _, module := range pipe {
 			module.(Module).InitModule(&b.core)
 		}
 	}

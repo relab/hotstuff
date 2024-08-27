@@ -1,5 +1,5 @@
 package pipelining
 
-type PipelineId uint32
+type PipeId uint32
 
-const PipelineIdNone = ^PipelineId(0)
+const NoPipeId = ^PipeId(0)

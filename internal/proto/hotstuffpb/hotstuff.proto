@@ -27,19 +27,15 @@ service Hotstuff {
 
   rpc Fetch(BlockHash) returns (Block) { option (gorums.quorumcall) = true; }
 
-  rpc PipelinePropose(PipelineBundleOfProposals) returns (google.protobuf.Empty) {
+  rpc ProposePiped(PipedProposal) returns (google.protobuf.Empty) {
     option (gorums.multicast) = true;
   }
 
-  // TODO: Implement pipelined versions of the rest of the RPCs
+  // TODO: Implement piped versions of the rest of the RPCs
 }
 
-message PipelineBundleOfProposals {
-  repeated PipelinedProposal Proposals = 1;
-}
-
-message PipelinedProposal {
-  uint32 PipelineId = 1;
+message PipedProposal {
+  uint32 PipeId = 1;
   Proposal Proposal = 2;
 }
 
