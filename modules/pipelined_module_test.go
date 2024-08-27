@@ -53,20 +53,20 @@ func NewMultiplier() *multiplierImpl { //nolint:revive
 }
 
 func (m *multiplierImpl) InitModule(mods *modules.Core) {
-	mods.GetFromPipeline(m, &m.adder) // Requires an adder from the same pipe
+	mods.GetFromPipe(m, &m.adder) // Requires an adder from the same pipe
 }
 
 func (a *adderImpl) InitModule(_ *modules.Core) {
 	// Does nothing for now
 }
 
-func TestPipelinedDisabled(t *testing.T) {
+func TestPipeliningDisabled(t *testing.T) {
 	builder := modules.NewBuilder(0, nil)
 
-	builder.AddPipelined(NewAdder)
-	builder.AddPipelined(NewMultiplier)
+	builder.AddPiped(NewAdder)
+	builder.AddPiped(NewMultiplier)
 
-	if builder.PipelineCount() > 0 {
+	if builder.PipeCount() > 0 {
 		t.Fail()
 	}
 
@@ -87,10 +87,10 @@ func TestPipelined(t *testing.T) {
 
 	builder := modules.NewBuilder(0, nil)
 	builder.EnablePipelining(expectedPipeIds)
-	builder.AddPipelined(NewAdder)
-	builder.AddPipelined(NewMultiplier)
+	builder.AddPiped(NewAdder)
+	builder.AddPiped(NewMultiplier)
 
-	if builder.PipelineCount() != len(expectedPipeIds) {
+	if builder.PipeCount() != len(expectedPipeIds) {
 		t.Fail()
 	}
 
@@ -108,9 +108,9 @@ func TestPipelined(t *testing.T) {
 		2: {A: 2, B: 6, Result: 12},
 	}
 
-	pipeIds := builder.PipelineIds()
+	pipeIds := builder.PipeIds()
 	for _, id := range pipeIds {
-		pipe := builder.GetPipeline(id)
+		pipe := builder.GetPipe(id)
 		multer := pipe[1].(Multiplier)
 		tc := testCasesMult[id]
 		actualResult := multer.Mult(tc.A, tc.B)

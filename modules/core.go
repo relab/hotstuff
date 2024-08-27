@@ -114,13 +114,13 @@ func (mods *Core) Get(pointers ...any) {
 	}
 }
 
-// GetFromPipeline finds compatible modules for the given pointers, assuming that moduleInPipeline is in the same module
+// GetFromPipe finds compatible modules for the given pointers, assuming that moduleInPipe is in the same module
 // pipe as those compatible pointers.
 //
 // NOTE: pointers must only contain non-nil pointers to types that have been provided to the module system
 // as a piped module.
-// GetFromPipeline panics if one of the given arguments is not a pointer, if a compatible module is not found,
-// if the module was not in a pipe or if the module was not in the same pipe as moduleInPipeline.
+// GetFromPipe panics if one of the given arguments is not a pointer, if a compatible module is not found,
+// if the module was not in a pipe or if the module was not in the same pipe as moduleInPipe.
 //
 // Example:
 //
@@ -133,34 +133,34 @@ func (mods *Core) Get(pointers ...any) {
 //	}
 //
 //	func (m *MyModuleImpl) InitModule(mods *modules.Core) {
-//		mods.GetFromPipeline(m, &m.otherModule) // Requires an OtherModule from the same pipe
+//		mods.GetFromPipe(m, &m.otherModule) // Requires an OtherModule from the same pipe
 //	}
 //
 //	func main() {
-//		pipeIds := []modules.PipelineId{0, 1, 2, ...}
+//		pipeIds := []modules.PipeId{0, 1, 2, ...}
 //
 //		builder := modules.NewBuilder(0, nil)
 //		builder.EnablePipelining(pipeIds)
-//		builder.AddPipelined(NewMyModuleImpl)
-//		builder.AddPipelined(NewOtherModuleImpl)
+//		builder.AddPiped(NewMyModuleImpl)
+//		builder.AddPiped(NewOtherModuleImpl)
 //		builder.Build() // InitModule is called here
 //	}
-func (mods *Core) GetFromPipeline(moduleInPipeline Module, pointers ...any) {
+func (mods *Core) GetFromPipe(moduleInPipe Module, pointers ...any) {
 	if len(pointers) == 0 {
 		panic("no pointers given")
 	}
 	for _, ptr := range pointers {
-		if !mods.TryGetFromPipeline(moduleInPipeline, ptr) {
+		if !mods.TryGetFromPipe(moduleInPipe, ptr) {
 			panic(fmt.Sprintf("piped module of type %s not found", reflect.TypeOf(ptr).Elem()))
 		}
 	}
 }
 
-// TryGetFromPipeline attempts to find a module for ptr which also happens to be in the same
-// pipe as moduleInPipeline, false otherwise.
-// TryGetFromPipeline returns true if a module was successflully stored in ptr, false otherwise.
+// TryGetFromPipe attempts to find a module for ptr which also happens to be in the same
+// pipe as moduleInPipe, false otherwise.
+// TryGetFromPipe returns true if a module was successflully stored in ptr, false otherwise.
 // If pipelining was not enabled, TryGet is called implicitly.
-func (mods *Core) TryGetFromPipeline(moduleInPipeline Module, ptr any) bool {
+func (mods *Core) TryGetFromPipe(moduleInPipe Module, ptr any) bool {
 	if len(mods.pipedModules) == 0 {
 		return mods.TryGet(ptr)
 	}
@@ -174,30 +174,30 @@ func (mods *Core) TryGetFromPipeline(moduleInPipeline Module, ptr any) bool {
 		panic("only pointer values allowed")
 	}
 
-	correctPipelineId := pipelining.NoPipeId
+	correctPipeId := pipelining.NoPipeId
 	for id := range mods.pipedModules {
 		pipe := mods.pipedModules[id]
 		// Check if self is in pipe
 		for _, module := range pipe {
 			// TODO: Check if equality checking is correct
-			if module == moduleInPipeline {
-				correctPipelineId = id
+			if module == moduleInPipe {
+				correctPipeId = id
 				break
 			}
 		}
 		// Break outer loop too if a pipe ID was found
-		if correctPipelineId != pipelining.NoPipeId {
+		if correctPipeId != pipelining.NoPipeId {
 			break
 		}
 	}
 
 	// If this variable remained unchanged, return false
-	if correctPipelineId == pipelining.NoPipeId {
+	if correctPipeId == pipelining.NoPipeId {
 		return false
 	}
 
-	correctPipeline := mods.pipedModules[correctPipelineId]
-	for _, m := range correctPipeline {
+	correctPipe := mods.pipedModules[correctPipeId]
+	for _, m := range correctPipe {
 		mv := reflect.ValueOf(m)
 		if mv.Type().AssignableTo(pt.Elem()) {
 			v.Elem().Set(mv)
@@ -268,9 +268,9 @@ func (b *Builder) Add(modules ...any) {
 	}
 }
 
-// AddPipelined constructs and adds n instances of a module kind, provided its constructor and subsequent
+// AddPiped constructs and adds n instances of a module kind, provided its constructor and subsequent
 // constructor arguments. If pipelining is not enabled, only one will be created and Add is called for it.
-func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
+func (b *Builder) AddPiped(ctor any, ctorArgs ...any) {
 	if reflect.TypeOf(ctor).Kind() != reflect.Func {
 		panic("first argument is not a function")
 	}
@@ -313,18 +313,18 @@ func (b *Builder) AddPipelined(ctor any, ctorArgs ...any) {
 }
 
 // Return the number of pipes the builder has generated.
-func (b *Builder) PipelineCount() int {
+func (b *Builder) PipeCount() int {
 	return len(b.modulePipes)
 }
 
-// Return a slice of PipelineIds in the order which the pipes were created.
-func (b *Builder) PipelineIds() []pipelining.PipeId {
+// Return a slice of PipeIds in the order which the pipes were created.
+func (b *Builder) PipeIds() []pipelining.PipeId {
 	return b.pipeIds
 }
 
 // Return a list of modules from a pipes. The order of module types is influenced
-// by when AddPipelined was called for a kind of module.
-func (b *Builder) GetPipeline(id pipelining.PipeId) ModulePipe {
+// by when AddPiped was called for a kind of module.
+func (b *Builder) GetPipe(id pipelining.PipeId) ModulePipe {
 	if !b.pipeliningEnabled {
 		panic("cannot get pipe when pipelining is disabled")
 	}
