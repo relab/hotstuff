@@ -10,7 +10,6 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -226,20 +225,13 @@ type replicaConnected struct {
 	ctx context.Context
 }
 
-// ProposePiped parallellizes the handling of a replica's response to the Propose QC from the leader.
-func (impl *serviceImpl) ProposePiped(ctx gorums.ServerCtx, pipedProposal *hotstuffpb.PipedProposal) {
+func (impl *serviceImpl) TestPiped(ctx gorums.ServerCtx, pipedMessage *hotstuffpb.PipedMessage) {
 	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
-
-	pipeId := pipelining.PipeId(pipedProposal.PipeId)
-	proposal := pipedProposal.Proposal
-	proposal.Block.Proposer = uint32(id)
-
-	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
-	proposeMsg.ID = id
 	impl.srv.induceLatency(id)
-	impl.srv.eventLoop.PipeEvent(pipeId, proposeMsg)
+
+	impl.srv.logger.Infof("Message on pipe %d: %s\n", pipedMessage.PipeId, pipedMessage.Message)
 }

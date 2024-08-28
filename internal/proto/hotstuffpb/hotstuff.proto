@@ -27,16 +27,16 @@ service Hotstuff {
 
   rpc Fetch(BlockHash) returns (Block) { option (gorums.quorumcall) = true; }
 
-  rpc ProposePiped(PipedProposal) returns (google.protobuf.Empty) {
+  rpc TestPiped(PipedMessage) returns (google.protobuf.Empty) {
     option (gorums.multicast) = true;
   }
 
   // TODO: Implement piped versions of the rest of the RPCs
 }
 
-message PipedProposal {
+message PipedMessage {
   uint32 PipeId = 1;
-  Proposal Proposal = 2;
+  string Message = 2;
 }
 
 message Proposal {

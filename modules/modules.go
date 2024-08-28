@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/pipelining"
 )
 
 // Module interfaces
@@ -123,6 +124,8 @@ type Configuration interface {
 	Fetch(ctx context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool)
 	// SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
 	SubConfig(ids []hotstuff.ID) (sub Configuration, err error)
+	// Test function to do piped messaging
+	TestPiped(pipeId pipelining.PipeId, message string)
 }
 
 //go:generate mockgen -destination=../internal/mocks/consensus_mock.go -package=mocks . Consensus

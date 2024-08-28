@@ -18,6 +18,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 	"github.com/relab/hotstuff/synchronizer"
 	"golang.org/x/exp/maps"
 )
@@ -333,6 +334,9 @@ func (c *configuration) Propose(proposal hotstuff.ProposeMsg) {
 func (c *configuration) Timeout(msg hotstuff.TimeoutMsg) {
 	c.broadcastMessage(msg)
 }
+
+// TODO: REMOVE
+func (c *configuration) TestPiped(_ pipelining.PipeId, _ string) {}
 
 // Fetch requests a block from all the replicas in the configuration.
 func (c *configuration) Fetch(_ context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
