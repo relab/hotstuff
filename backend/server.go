@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -225,6 +226,78 @@ type replicaConnected struct {
 	ctx context.Context
 }
 
+// TODO: Implement pipelining logic
+func (impl *serviceImpl) PipedPropose(ctx gorums.ServerCtx, proposal *hotstuffpb.PipedProposal) {
+	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+	if err != nil {
+		impl.srv.logger.Infof("Failed to get client ID: %v", err)
+		return
+	}
+
+	proposal.Proposal.Block.Proposer = uint32(id)
+	proposeMsg := hotstuffpb.ProposalFromProto(proposal.Proposal)
+	proposeMsg.ID = id
+	impl.srv.induceLatency(id)
+	impl.srv.eventLoop.PipeEvent(pipelining.PipeId(proposal.PipeId), proposeMsg)
+}
+
+// TODO: Implement pipelining logic
+func (impl *serviceImpl) PipedVote(ctx gorums.ServerCtx, cert *hotstuffpb.PipedPartialCert) {
+	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+	if err != nil {
+		impl.srv.logger.Infof("Failed to get client ID: %v", err)
+		return
+	}
+	impl.srv.induceLatency(id)
+	impl.srv.eventLoop.PipeEvent(pipelining.PipeId(cert.PipeId), hotstuff.VoteMsg{
+		ID:          id,
+		PartialCert: hotstuffpb.PartialCertFromProto(cert.PartialCert),
+	})
+}
+
+// TODO: Implement pipelining logic
+func (impl *serviceImpl) PipedNewView(ctx gorums.ServerCtx, msg *hotstuffpb.PipedSyncInfo) {
+	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+	if err != nil {
+		impl.srv.logger.Infof("Failed to get client ID: %v", err)
+		return
+	}
+	impl.srv.induceLatency(id)
+	impl.srv.eventLoop.PipeEvent(pipelining.PipeId(msg.PipeId), hotstuff.NewViewMsg{
+		ID:       id,
+		SyncInfo: hotstuffpb.SyncInfoFromProto(msg.SyncInfo),
+	})
+}
+
+// TODO: Implement pipelining logic
+func (impl *serviceImpl) PipedFetch(_ gorums.ServerCtx, pb *hotstuffpb.PipedBlockHash) (*hotstuffpb.Block, error) {
+	// TODO: Fetch from correct pipe
+	var hash hotstuff.Hash
+	copy(hash[:], pb.BlockHash.GetHash())
+
+	block, ok := impl.srv.blockChain.LocalGet(hash)
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "requested block was not found")
+	}
+
+	impl.srv.logger.Debugf("OnFetch: %.8s", hash)
+
+	return hotstuffpb.BlockToProto(block), nil
+}
+
+// TODO: Implement pipelining logic
+func (impl *serviceImpl) PipedTimeout(ctx gorums.ServerCtx, msg *hotstuffpb.PipedTimeoutMsg) {
+	var err error
+	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg.TimeoutMsg)
+	timeoutMsg.ID, err = GetPeerIDFromContext(ctx, impl.srv.configuration)
+	if err != nil {
+		impl.srv.logger.Infof("Could not get ID of replica: %v", err)
+	}
+	impl.srv.induceLatency(timeoutMsg.ID)
+	impl.srv.eventLoop.PipeEvent(pipelining.PipeId(msg.PipeId), timeoutMsg)
+}
+
+// Alan: The only functional RPC I made
 func (impl *serviceImpl) TestPiped(ctx gorums.ServerCtx, pipedMessage *hotstuffpb.PipedMessage) {
 	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
