@@ -83,7 +83,7 @@ func TestPipeliningDisabled(t *testing.T) {
 }
 
 func TestPipelined(t *testing.T) {
-	expectedPipeIds := []pipelining.PipeId{0, 1, 2}
+	expectedPipeIds := []pipelining.PipeId{1, 2, 3}
 
 	builder := modules.NewBuilder(0, nil)
 	builder.EnablePipelining(expectedPipeIds)
@@ -103,9 +103,9 @@ func TestPipelined(t *testing.T) {
 	}
 
 	testCasesMult := map[pipelining.PipeId]AdderMultTestCase{
-		0: {A: 2, B: 3, Result: 6},
-		1: {A: 2, B: 5, Result: 10},
-		2: {A: 2, B: 6, Result: 12},
+		1: {A: 2, B: 3, Result: 6},
+		2: {A: 2, B: 5, Result: 10},
+		3: {A: 2, B: 6, Result: 12},
 	}
 
 	pipeIds := builder.PipeIds()

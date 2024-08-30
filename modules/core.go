@@ -174,7 +174,7 @@ func (mods *Core) TryGetFromPipe(moduleInPipe Module, ptr any) bool {
 		panic("only pointer values allowed")
 	}
 
-	correctPipeId := pipelining.NoPipeId
+	correctPipeId := pipelining.NullPipeId
 	for id := range mods.pipedModules {
 		pipe := mods.pipedModules[id]
 		// Check if self is in pipe
@@ -186,13 +186,13 @@ func (mods *Core) TryGetFromPipe(moduleInPipe Module, ptr any) bool {
 			}
 		}
 		// Break outer loop too if a pipe ID was found
-		if correctPipeId != pipelining.NoPipeId {
+		if correctPipeId != pipelining.NullPipeId {
 			break
 		}
 	}
 
 	// If this variable remained unchanged, return false
-	if correctPipeId == pipelining.NoPipeId {
+	if correctPipeId == pipelining.NullPipeId {
 		return false
 	}
 
@@ -243,6 +243,10 @@ func (bl *Builder) EnablePipelining(pipeIds []pipelining.PipeId) {
 
 	if len(pipeIds) == 0 {
 		panic("no pipe ids provided")
+	}
+
+	if !pipelining.ValidIds(pipeIds) {
+		panic("at least one pipe id was invalid or duplicate")
 	}
 
 	bl.pipeliningEnabled = true

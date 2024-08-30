@@ -1,3 +1,9 @@
+// Package eventloop provides an event loop which is widely used by modules.
+// The use of the event loop enables many of the modules to run synchronously, thus removing the need for thread safety.
+// This simplifies the implementation of modules and reduces the risks of race conditions.
+//
+// The event loop can accept events of any type.
+// It uses reflection to determine what handler function to execute based on the type of an event.
 package eventloop
 
 import (
@@ -13,36 +19,11 @@ import (
 type handlerOpts struct {
 	runInAddEvent bool
 	priority      bool
+	pipeId        pipelining.PipeId
 }
 
 // HandlerOption sets configuration options for event handlers.
 type HandlerOption func(*handlerOpts)
-
-type ticker struct {
-	interval time.Duration
-	callback func(time.Time) any
-	cancel   context.CancelFunc
-}
-
-type startTickerEvent struct {
-	tickerID int
-}
-
-// EventHandler processes an event.
-type EventHandler func(event any)
-
-type handler struct {
-	callback EventHandler
-	opts     handlerOpts
-}
-
-// Prioritize instructs the event loop to run the handler before handlers that do not have priority.
-// It should only be used if you must look at an event before other handlers get to look at it.
-func Prioritize() HandlerOption {
-	return func(ho *handlerOpts) {
-		ho.priority = true
-	}
-}
 
 // UnsafeRunInAddEvent instructs the eventloop to run the handler as a part of AddEvent.
 // Handlers that use this option can process events before they are added to the event queue.
@@ -54,7 +35,34 @@ func UnsafeRunInAddEvent() HandlerOption {
 	}
 }
 
-// EventLoop accepts events of any type and executes registered event handlers for pipes.
+// Prioritize instructs the event loop to run the handler before handlers that do not have priority.
+// It should only be used if you must look at an event before other handlers get to look at it.
+func Prioritize() HandlerOption {
+	return func(ho *handlerOpts) {
+		ho.priority = true
+	}
+}
+
+func RespondToPipeId(pipeId pipelining.PipeId) HandlerOption {
+	return func(ho *handlerOpts) {
+		ho.pipeId = pipeId
+	}
+}
+
+type pipedEventWrapper struct {
+	pipeId pipelining.PipeId
+	event  any
+}
+
+// EventHandler processes an event.
+type EventHandler func(event any)
+
+type handler struct {
+	callback EventHandler
+	opts     handlerOpts
+}
+
+// EventLoop accepts events of any type and executes registered event handlers.
 type EventLoop struct {
 	eventQ queue
 
@@ -64,20 +72,10 @@ type EventLoop struct {
 
 	waitingEvents map[reflect.Type][]any
 
-	handlers map[pipedReflectTypeKey][]handler
+	handlers map[reflect.Type][]handler
 
-	tickers  map[pipedTickerKey]*ticker
+	tickers  map[int]*ticker
 	tickerID int
-}
-
-type pipedReflectTypeKey struct {
-	pipeId        pipelining.PipeId
-	reflectedType reflect.Type
-}
-
-type pipedTickerKey struct {
-	pipeId   pipelining.PipeId
-	tickerId int
 }
 
 // New returns a new event loop with the requested buffer size.
@@ -86,54 +84,31 @@ func New(bufferSize uint) *EventLoop {
 		ctx:           context.Background(),
 		eventQ:        newQueue(bufferSize),
 		waitingEvents: make(map[reflect.Type][]any),
-		handlers:      make(map[pipedReflectTypeKey][]handler),
-		tickers:       make(map[pipedTickerKey]*ticker),
+		handlers:      make(map[reflect.Type][]handler),
+		tickers:       make(map[int]*ticker),
 	}
 	return el
-}
-
-type pipedEventHandle struct {
-	pipeId pipelining.PipeId
-	event  any
 }
 
 // RegisterObserver registers a handler with priority.
 // Deprecated: use RegisterHandler and the Prioritize option instead.
 func (el *EventLoop) RegisterObserver(eventType any, handler EventHandler) int {
-	return el.registerPipedHandler(pipelining.NoPipeId, eventType, []HandlerOption{Prioritize()}, handler)
+	return el.registerHandler(eventType, []HandlerOption{Prioritize()}, handler)
 }
 
 // UnregisterObserver unregister a handler.
 // Deprecated: use UnregisterHandler instead.
 func (el *EventLoop) UnregisterObserver(eventType any, id int) {
-	el.UnregisterPipedHandler(pipelining.NoPipeId, eventType, id)
+	el.UnregisterHandler(eventType, id)
 }
 
 // RegisterHandler registers the given event handler for the given event type with the given handler options, if any.
 // If no handler options are provided, the default handler options will be used.
 func (el *EventLoop) RegisterHandler(eventType any, handler EventHandler, opts ...HandlerOption) int {
-	return el.registerPipedHandler(pipelining.NoPipeId, eventType, opts, handler)
+	return el.registerHandler(eventType, opts, handler)
 }
 
-// RegisterPipedObserver registers a handler with priority.
-// Deprecated: use RegisterHandler and the Prioritize option instead.
-func (el *EventLoop) RegisterPipedObserver(pipeId pipelining.PipeId, eventType any, handler EventHandler) int {
-	return el.registerPipedHandler(pipeId, eventType, []HandlerOption{Prioritize()}, handler)
-}
-
-// UnregisterPipedObserver unregister a handler.
-// Deprecated: use UnregisterHandler instead.
-func (el *EventLoop) UnregisterPipedObserver(pipeId pipelining.PipeId, eventType any, id int) {
-	el.UnregisterPipedHandler(pipeId, eventType, id)
-}
-
-// RegisterPipedHandler registers the given event handler for the given event type with the given handler options, if any.
-// If no handler options are provided, the default handler options will be used.
-func (el *EventLoop) RegisterPipedHandler(pipeId pipelining.PipeId, eventType any, handler EventHandler, opts ...HandlerOption) int {
-	return el.registerPipedHandler(pipeId, eventType, opts, handler)
-}
-
-func (el *EventLoop) registerPipedHandler(pipeId pipelining.PipeId, eventType any, opts []HandlerOption, callback EventHandler) int {
+func (el *EventLoop) registerHandler(eventType any, opts []HandlerOption, callback EventHandler) int {
 	h := handler{callback: callback}
 
 	for _, opt := range opts {
@@ -144,12 +119,7 @@ func (el *EventLoop) registerPipedHandler(pipeId pipelining.PipeId, eventType an
 	defer el.mut.Unlock()
 	t := reflect.TypeOf(eventType)
 
-	key := pipedReflectTypeKey{
-		pipeId:        pipeId,
-		reflectedType: t,
-	}
-
-	handlers := el.handlers[key]
+	handlers := el.handlers[t]
 
 	// search for a free slot for the handler
 	i := 0
@@ -166,47 +136,35 @@ func (el *EventLoop) registerPipedHandler(pipeId pipelining.PipeId, eventType an
 		handlers[i] = h
 	}
 
-	el.handlers[key] = handlers
+	el.handlers[t] = handlers
 
-	// Because of maps with separate lists of handlers, where pipeID is key, the i (id)
-	// of two or more handler lists may overlap. What uniquely identifies a handler list is
-	// i + pipeId
-	// TODO: Figure out if IDs need to be unique
 	return i
 }
 
+// UnregisterHandler unregisters the handler for the given event type with the given id.
 func (el *EventLoop) UnregisterHandler(eventType any, id int) {
-	el.UnregisterPipedHandler(pipelining.NoPipeId, eventType, id)
-}
-
-// UnregisterPipedHandler unregisters the handler for the given event type with the given id.
-func (el *EventLoop) UnregisterPipedHandler(pipeId pipelining.PipeId, eventType any, id int) {
 	el.mut.Lock()
 	defer el.mut.Unlock()
 	t := reflect.TypeOf(eventType)
-	key := pipedReflectTypeKey{
-		pipeId:        pipeId,
-		reflectedType: t,
-	}
-	el.handlers[key][id].callback = nil
+	el.handlers[t][id].callback = nil
 }
 
+// AddEvent adds an event to the event queue.
 func (el *EventLoop) AddEvent(event any) {
-	el.PipeEvent(pipelining.NoPipeId, event)
+	if event != nil {
+		// run handlers with runInAddEvent option
+		el.processEvent(event, true)
+		el.eventQ.push(event)
+	}
 }
 
-// PipeEvent adds an event to the event pipe.
-// TODO: Parallellize the piped events. They are added to the same synchronous queue now.
-func (el *EventLoop) PipeEvent(pipeID pipelining.PipeId, event any) {
-	if event != nil {
-		handle := pipedEventHandle{
-			pipeId: pipeID,
-			event:  event,
-		}
-		// run handlers with runInAddEvent option
-		el.processEvent(pipeID, event, true)
-		el.eventQ.push(handle)
+// AddEvent adds an event to the event queue.
+func (el *EventLoop) PipeEvent(pipeId pipelining.PipeId, event any) {
+	wrapper := pipedEventWrapper{
+		pipeId: pipeId,
+		event:  event,
 	}
+	el.AddEvent(wrapper)
 }
 
 // Context returns the context associated with the event loop.
@@ -244,20 +202,18 @@ loop:
 				break loop
 			}
 		}
-		handle := event.(pipedEventHandle)
-		if e, ok := handle.event.(startTickerEvent); ok {
-			el.startPipedTicker(handle.pipeId, e.tickerID)
+		if e, ok := event.(startTickerEvent); ok {
+			el.startTicker(e.tickerID)
 			continue
 		}
-		el.processEvent(handle.pipeId, handle.event, false)
+		el.processEvent(event, false)
 	}
 
 	// HACK: when we get canceled, we will handle the events that were in the queue at that time before quitting.
 	l := el.eventQ.len()
 	for i := 0; i < l; i++ {
 		event, _ := el.eventQ.pop()
-		handle := event.(pipedEventHandle)
-		el.processEvent(handle.pipeId, handle.event, false)
+		el.processEvent(event, false)
 	}
 }
 
@@ -270,41 +226,52 @@ func (el *EventLoop) Tick(ctx context.Context) bool {
 		return false
 	}
 
-	handle := event.(pipedEventHandle)
-	if e, ok := handle.event.(startTickerEvent); ok {
-		el.startPipedTicker(handle.pipeId, e.tickerID)
+	if e, ok := event.(startTickerEvent); ok {
+		el.startTicker(e.tickerID)
 	} else {
-		el.processEvent(handle.pipeId, handle.event, false)
+		el.processEvent(event, false)
 	}
 
 	return true
 }
 
-var pipedHandlerListPool = gpool.New(func() []EventHandler { return make([]EventHandler, 0, 10) })
+var handlerListPool = gpool.New(func() []EventHandler { return make([]EventHandler, 0, 10) })
 
 // processEvent dispatches the event to the correct handler.
-func (el *EventLoop) processEvent(pipeId pipelining.PipeId, event any, runningInAddEvent bool) {
+// TODO: Process piped events
+func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
+
+	pipeId := pipelining.NullPipeId
+	_, ok := event.(pipedEventWrapper)
+	if ok {
+		pipedEvent := event.(pipedEventWrapper)
+		pipeId = pipedEvent.pipeId
+		// Reassign event to its original form after extracting its pipeId
+		event = pipedEvent.event
+	}
+
 	t := reflect.TypeOf(event)
 
 	if !runningInAddEvent {
-		defer el.dispatchDelayedEvents(pipeId, t)
+		defer el.dispatchDelayedEvents(t)
 	}
 
 	// Must copy handlers to a list so that they can be executed after unlocking the mutex.
 	// This looks like it might be slow, but there should be few handlers (< 10) registered for each event type.
 	// We use a pool to reduce memory allocations.
-	priorityList := pipedHandlerListPool.Get()
-	handlerList := pipedHandlerListPool.Get()
+	priorityList := handlerListPool.Get()
+	handlerList := handlerListPool.Get()
 
 	el.mut.Lock()
-	key := pipedReflectTypeKey{
-		pipeId:        pipeId,
-		reflectedType: t,
-	}
-	for _, handler := range el.handlers[key] {
+	for _, handler := range el.handlers[t] {
 		if handler.opts.runInAddEvent != runningInAddEvent || handler.callback == nil {
 			continue
 		}
+
+		if pipeId != pipelining.NullPipeId && pipeId != handler.opts.pipeId {
+			continue
+		}
+
 		if handler.opts.priority {
 			priorityList = append(priorityList, handler.callback)
 		} else {
@@ -318,17 +285,17 @@ func (el *EventLoop) processEvent(pipeId pipelining.PipeId, event any, runningIn
 	}
 
 	priorityList = priorityList[:0]
-	pipedHandlerListPool.Put(priorityList)
+	handlerListPool.Put(priorityList)
 
 	for _, handler := range handlerList {
 		handler(event)
 	}
 
 	handlerList = handlerList[:0]
-	pipedHandlerListPool.Put(handlerList)
+	handlerListPool.Put(handlerList)
 }
 
-func (el *EventLoop) dispatchDelayedEvents(pipeID pipelining.PipeId, t reflect.Type) {
+func (el *EventLoop) dispatchDelayedEvents(t reflect.Type) {
 	var (
 		events []any
 		ok     bool
@@ -341,7 +308,7 @@ func (el *EventLoop) dispatchDelayedEvents(pipeID pipelining.PipeId, t reflect.T
 	el.mut.Unlock()
 
 	for _, event := range events {
-		el.PipeEvent(pipeID, event)
+		el.AddEvent(event)
 	}
 }
 
@@ -360,88 +327,72 @@ func (el *EventLoop) DelayUntil(eventType, event any) {
 	el.mut.Unlock()
 }
 
-func (el *EventLoop) AddTicker(interval time.Duration, callback func(tick time.Time) (event any)) int {
-	return el.AddPipedTicker(pipelining.NoPipeId, interval, callback)
+type ticker struct {
+	interval time.Duration
+	callback func(time.Time) any
+	cancel   context.CancelFunc
 }
 
-func (el *EventLoop) RemoveTicker(id int) bool {
-	return el.RemovePipedTicker(pipelining.NoPipeId, id)
+type startTickerEvent struct {
+	tickerID int
 }
 
-// AddPipedTicker adds a ticker with the specified interval and returns the ticker id.
+// AddTicker adds a ticker with the specified interval and returns the ticker id.
 // The ticker will send the specified event on the event loop at regular intervals.
 // The returned ticker id can be used to remove the ticker with RemoveTicker.
 // The ticker will not be started before the event loop is running.
-func (el *EventLoop) AddPipedTicker(pipeId pipelining.PipeId, interval time.Duration, callback func(tick time.Time) (event any)) int {
+func (el *EventLoop) AddTicker(interval time.Duration, callback func(tick time.Time) (event any)) int {
 	el.mut.Lock()
 
 	id := el.tickerID
 	el.tickerID++
-
-	key := pipedTickerKey{
-		pipeId:   pipeId,
-		tickerId: id,
-	}
 
 	ticker := ticker{
 		interval: interval,
 		callback: callback,
 		cancel:   func() {}, // initialized to empty function to avoid nil
 	}
-
-	el.tickers[key] = &ticker
+	el.tickers[id] = &ticker
 
 	el.mut.Unlock()
 
 	// We want the ticker to inherit the context of the event loop,
 	// so we need to start the ticker from the run loop.
-	el.eventQ.push(pipedEventHandle{
-		pipeId: pipeId,
-		event:  startTickerEvent{id},
-	})
+	el.eventQ.push(startTickerEvent{id})
 
 	return id
 }
 
-// RemovePipedTicker removes the ticker with the specified id.
-// If the ticker was removed, RemovePipedTicker will return true.
+// RemoveTicker removes the ticker with the specified id.
+// If the ticker was removed, RemoveTicker will return true.
 // If the ticker does not exist, false will be returned instead.
-func (el *EventLoop) RemovePipedTicker(pipeId pipelining.PipeId, id int) bool {
+func (el *EventLoop) RemoveTicker(id int) bool {
 	el.mut.Lock()
 	defer el.mut.Unlock()
-	key := pipedTickerKey{
-		pipeId:   pipeId,
-		tickerId: id,
-	}
 
-	// TODO: Check if the pipe exists too
-	ticker, ok := el.tickers[key]
+	ticker, ok := el.tickers[id]
 	if !ok {
 		return false
 	}
 	ticker.cancel()
-	delete(el.tickers, key)
+	delete(el.tickers, id)
 	return true
 }
 
-func (el *EventLoop) startPipedTicker(pipeId pipelining.PipeId, id int) {
+func (el *EventLoop) startTicker(id int) {
 	// lock the mutex such that the ticker cannot be removed until we have started it
 	el.mut.Lock()
 	defer el.mut.Unlock()
-	key := pipedTickerKey{
-		pipeId:   pipeId,
-		tickerId: id,
-	}
-	ticker, ok := el.tickers[key]
+	ticker, ok := el.tickers[id]
 	if !ok {
 		return
 	}
 	ctx := el.ctx
 	ctx, ticker.cancel = context.WithCancel(ctx)
-	go el.runPipedTicker(pipeId, ctx, ticker)
+	go el.runTicker(ctx, ticker)
 }
 
-func (el *EventLoop) runPipedTicker(pipeId pipelining.PipeId, ctx context.Context, ticker *ticker) {
+func (el *EventLoop) runTicker(ctx context.Context, ticker *ticker) {
 	t := time.NewTicker(ticker.interval)
 	defer t.Stop()
 
@@ -450,13 +401,12 @@ func (el *EventLoop) runPipedTicker(pipeId pipelining.PipeId, ctx context.Contex
 	}
 
 	// send the first event immediately
-	// TODO: Find out if this is correct
-	el.PipeEvent(pipeId, ticker.callback(time.Now()))
+	el.AddEvent(ticker.callback(time.Now()))
 
 	for {
 		select {
 		case tick := <-t.C:
-			el.PipeEvent(pipeId, ticker.callback(tick))
+			el.AddEvent(ticker.callback(tick))
 		case <-ctx.Done():
 			return
 		}
