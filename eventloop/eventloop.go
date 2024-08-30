@@ -240,7 +240,6 @@ var handlerListPool = gpool.New(func() []EventHandler { return make([]EventHandl
 // processEvent dispatches the event to the correct handler.
 // TODO: Process piped events
 func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
-
 	pipeId := pipelining.NullPipeId
 	_, ok := event.(pipedEventWrapper)
 	if ok {
@@ -261,7 +260,6 @@ func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
 	// We use a pool to reduce memory allocations.
 	priorityList := handlerListPool.Get()
 	handlerList := handlerListPool.Get()
-
 	el.mut.Lock()
 	for _, handler := range el.handlers[t] {
 		if handler.opts.runInAddEvent != runningInAddEvent || handler.callback == nil {
