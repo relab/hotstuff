@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 	"github.com/relab/hotstuff/synchronizer"
 
 	"github.com/relab/gorums"
@@ -323,6 +324,18 @@ func (cfg *subConfig) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.
 		return nil, false
 	}
 	return hotstuffpb.BlockFromProto(protoBlock), true
+}
+
+func (cfg *subConfig) TestPiped(pipeId pipelining.PipeId, message string) {
+	if cfg.cfg == nil {
+		return
+	}
+
+	// will wait until the second timeout before canceling
+	ctx, cancel := synchronizer.TimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop)
+	defer cancel()
+	output := hotstuffpb.PipedMessageToProto(pipeId, message)
+	cfg.cfg.TestPiped(ctx, &output)
 }
 
 // Close closes all connections made by this configuration.

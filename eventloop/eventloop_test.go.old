@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/pipelining"
 )
 
 type testEvent int
@@ -28,46 +27,6 @@ func TestHandler(t *testing.T) {
 
 	want := testEvent(42)
 	el.AddEvent(want)
-
-	var event any
-	select {
-	case <-ctx.Done():
-		t.Fatal("timed out")
-	case event = <-c:
-	}
-
-	e, ok := event.(testEvent)
-	if !ok {
-		t.Fatalf("wrong type for event: got: %T, want: %T", event, want)
-	}
-
-	if e != want {
-		t.Fatalf("wrong value for event: got: %v, want: %v", e, want)
-	}
-}
-
-func TestHandlerPiped(t *testing.T) {
-	listeningPipeId := pipelining.PipeId(1)
-	incorrectPipeId := pipelining.PipeId(2)
-	el := eventloop.New(10)
-	c := make(chan any)
-	el.RegisterHandler(testEvent(0), func(event any) {
-		c <- event
-	}, eventloop.RespondToPipeId(listeningPipeId))
-
-	el.RegisterHandler(testEvent(0), func(_ any) {
-		panic("wrong pipe id")
-	}, eventloop.RespondToPipeId(incorrectPipeId))
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	go el.Run(ctx)
-
-	// wait for the event loop to start
-	time.Sleep(1 * time.Millisecond)
-
-	want := testEvent(42)
-	el.PipeEvent(listeningPipeId, want)
 
 	var event any
 	select {
