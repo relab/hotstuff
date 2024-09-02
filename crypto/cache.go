@@ -9,6 +9,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 	"golang.org/x/exp/maps"
 )
 
@@ -32,9 +33,9 @@ func NewCache(impl modules.CryptoBase, capacity int) modules.Crypto {
 
 // InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (cache *cache) InitModule(mods *modules.Core) {
+func (cache *cache) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 	if mod, ok := cache.impl.(modules.Module); ok {
-		mod.InitModule(mods)
+		mod.InitModule(mods, pipeId)
 	}
 }
 

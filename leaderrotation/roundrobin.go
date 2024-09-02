@@ -3,6 +3,7 @@ package leaderrotation
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 )
 
 func init() {
@@ -13,7 +14,7 @@ type roundRobin struct {
 	configuration modules.Configuration
 }
 
-func (rr *roundRobin) InitModule(mods *modules.Core) {
+func (rr *roundRobin) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 	mods.Get(&rr.configuration)
 }
 

@@ -19,6 +19,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -80,7 +81,7 @@ type Client struct {
 }
 
 // InitModule initializes the client.
-func (c *Client) InitModule(mods *modules.Core) {
+func (c *Client) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 	mods.Get(
 		&c.eventLoop,
 		&c.logger,

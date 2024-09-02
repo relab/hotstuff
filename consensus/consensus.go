@@ -8,6 +8,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -69,7 +70,7 @@ func New(impl Rules) modules.Consensus {
 }
 
 // InitModule initializes the module.
-func (cs *consensusBase) InitModule(mods *modules.Core) {
+func (cs *consensusBase) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 	mods.Get(
 		&cs.acceptor,
 		&cs.blockChain,
@@ -88,7 +89,7 @@ func (cs *consensusBase) InitModule(mods *modules.Core) {
 	mods.TryGet(&cs.handel)
 
 	if mod, ok := cs.impl.(modules.Module); ok {
-		mod.InitModule(mods)
+		mod.InitModule(mods, pipeId)
 	}
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {

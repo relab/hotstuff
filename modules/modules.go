@@ -124,8 +124,6 @@ type Configuration interface {
 	Fetch(ctx context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool)
 	// SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
 	SubConfig(ids []hotstuff.ID) (sub Configuration, err error)
-	// Test function to do piped messaging
-	TestPiped(pipeId pipelining.PipeId, message string)
 }
 
 //go:generate mockgen -destination=../internal/mocks/consensus_mock.go -package=mocks . Consensus
@@ -180,9 +178,9 @@ type executorWrapper struct {
 	executor Executor
 }
 
-func (ew executorWrapper) InitModule(mods *Core) {
+func (ew executorWrapper) InitModule(mods *Core, pipeId pipelining.PipeId) {
 	if m, ok := ew.executor.(Module); ok {
-		m.InitModule(mods)
+		m.InitModule(mods, pipeId)
 	}
 }
 
@@ -199,9 +197,9 @@ type forkHandlerWrapper struct {
 	forkHandler ForkHandler
 }
 
-func (fhw forkHandlerWrapper) InitModule(mods *Core) {
+func (fhw forkHandlerWrapper) InitModule(mods *Core, pipeId pipelining.PipeId) {
 	if m, ok := fhw.forkHandler.(Module); ok {
-		m.InitModule(mods)
+		m.InitModule(mods, pipeId)
 	}
 }
 

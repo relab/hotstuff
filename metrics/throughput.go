@@ -9,6 +9,7 @@ import (
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -28,7 +29,7 @@ type Throughput struct {
 }
 
 // InitModule gives the module access to the other modules.
-func (t *Throughput) InitModule(mods *modules.Core) {
+func (t *Throughput) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 	var (
 		eventLoop *eventloop.EventLoop
 		logger    logging.Logger

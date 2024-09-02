@@ -49,7 +49,7 @@ type node struct {
 	log            strings.Builder
 }
 
-func (n *node) InitModule(mods *modules.Core) {
+func (n *node) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 	mods.Get(
 		&n.blockChain,
 		&n.consensus,
@@ -235,7 +235,7 @@ type configuration struct {
 }
 
 // alternative way to get a pointer to the node.
-func (c *configuration) InitModule(mods *modules.Core) {
+func (c *configuration) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 	if c.node == nil {
 		mods.TryGet(&c.node)
 	}
@@ -334,9 +334,6 @@ func (c *configuration) Propose(proposal hotstuff.ProposeMsg) {
 func (c *configuration) Timeout(msg hotstuff.TimeoutMsg) {
 	c.broadcastMessage(msg)
 }
-
-// TODO: REMOVE
-func (c *configuration) TestPiped(_ pipelining.PipeId, _ string) {}
 
 // Fetch requests a block from all the replicas in the configuration.
 func (c *configuration) Fetch(_ context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
@@ -464,7 +461,7 @@ func (tm *timeoutManager) viewChange(event synchronizer.ViewChangeEvent) {
 
 // InitModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (tm *timeoutManager) InitModule(mods *modules.Core) {
+func (tm *timeoutManager) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 	mods.Get(
 		&tm.synchronizer,
 		&tm.eventLoop,

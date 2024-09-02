@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 
 	"github.com/relab/hotstuff"
 )
@@ -43,7 +44,7 @@ type Synchronizer struct {
 }
 
 // InitModule initializes the synchronizer.
-func (s *Synchronizer) InitModule(mods *modules.Core) {
+func (s *Synchronizer) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 	mods.Get(
 		&s.blockChain,
 		&s.consensus,

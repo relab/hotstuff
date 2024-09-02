@@ -7,6 +7,7 @@ import (
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -26,7 +27,7 @@ type ViewTimeouts struct {
 }
 
 // InitModule gives the module access to the other modules.
-func (vt *ViewTimeouts) InitModule(mods *modules.Core) {
+func (vt *ViewTimeouts) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 	var (
 		eventLoop *eventloop.EventLoop
 		logger    logging.Logger

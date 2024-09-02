@@ -88,7 +88,7 @@ type subConfig struct {
 }
 
 // InitModule initializes the configuration.
-func (cfg *Config) InitModule(mods *modules.Core) {
+func (cfg *Config) InitModule(mods *modules.Core, _ pipelining.PipeId) {
 	mods.Get(
 		&cfg.eventLoop,
 		&cfg.logger,
@@ -324,18 +324,6 @@ func (cfg *subConfig) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.
 		return nil, false
 	}
 	return hotstuffpb.BlockFromProto(protoBlock), true
-}
-
-func (cfg *subConfig) TestPiped(pipeId pipelining.PipeId, message string) {
-	if cfg.cfg == nil {
-		return
-	}
-
-	// will wait until the second timeout before canceling
-	ctx, cancel := synchronizer.TimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop)
-	defer cancel()
-	output := hotstuffpb.PipedMessageToProto(pipeId, message)
-	cfg.cfg.TestPiped(ctx, &output)
 }
 
 // Close closes all connections made by this configuration.

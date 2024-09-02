@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -36,7 +37,7 @@ func newCmdCache(batchSize int) *cmdCache {
 }
 
 // InitModule gives the module access to the other modules.
-func (c *cmdCache) InitModule(mods *modules.Core) {
+func (c *cmdCache) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 	mods.Get(&c.logger)
 }
 

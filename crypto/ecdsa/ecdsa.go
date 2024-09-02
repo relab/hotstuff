@@ -12,6 +12,7 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 )
 
 func init() {
@@ -79,7 +80,7 @@ func New() modules.CryptoBase {
 
 // InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (ec *ecdsaBase) InitModule(mods *modules.Core) {
+func (ec *ecdsaBase) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 	mods.Get(
 		&ec.configuration,
 		&ec.logger,

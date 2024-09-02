@@ -42,9 +42,13 @@ import (
 
 type ModulePipe []Module
 
+type ModuleBuildOptions struct {
+	pipeId pipelining.PipeId
+}
+
 // Module is an interface for initializing modules.
 type Module interface {
-	InitModule(mods *Core)
+	InitModule(mods *Core, pId pipelining.PipeId)
 }
 
 // Core is the base of the module system.
@@ -132,7 +136,7 @@ func (mods *Core) Get(pointers ...any) {
 //		otherModule OtherModule
 //	}
 //
-//	func (m *MyModuleImpl) InitModule(mods *modules.Core) {
+//	func (m *MyModuleImpl) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 //		mods.GetFromPipe(m, &m.otherModule) // Requires an OtherModule from the same pipe
 //	}
 //
@@ -344,7 +348,7 @@ func (b *Builder) Build() *Core {
 	// add the Options last so that it can be overridden by user.
 	b.Add(b.opts)
 	for _, module := range b.staticModules {
-		module.InitModule(&b.core)
+		module.InitModule(&b.core, pipelining.NullPipeId)
 	}
 
 	if !b.pipeliningEnabled {
@@ -362,9 +366,9 @@ func (b *Builder) Build() *Core {
 
 	// Initializing later so that modules can reference
 	// other modules in the same pipe without panicking.
-	for _, pipe := range b.core.pipedModules {
+	for pipeId, pipe := range b.core.pipedModules {
 		for _, module := range pipe {
-			module.(Module).InitModule(&b.core)
+			module.(Module).InitModule(&b.core, pipeId)
 		}
 	}
 	return &b.core

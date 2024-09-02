@@ -8,6 +8,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 )
 
 func init() {
@@ -22,7 +23,7 @@ type carousel struct {
 	logger        logging.Logger
 }
 
-func (c *carousel) InitModule(mods *modules.Core) {
+func (c *carousel) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 	mods.Get(
 		&c.blockChain,
 		&c.configuration,

@@ -149,7 +149,7 @@ Each module may implement the following `Module` interface.
 
 ```go
 type Module interface {
-  InitModule(mods *modules.Core)
+  InitModule(mods *modules.Core, pipeId pipelining.PipeId)
 }
 ```
 
@@ -163,7 +163,7 @@ For example:
 ```go
 type A1 struct{ b B }
 
-func (a *A1) InitModule(mods *modules.Core) {
+func (a *A1) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
   mods.Get(&a.b)
 }
 ```

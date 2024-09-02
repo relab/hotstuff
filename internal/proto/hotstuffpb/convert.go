@@ -9,7 +9,6 @@ import (
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/eddsa"
-	"github.com/relab/hotstuff/pipelining"
 )
 
 // QuorumSignatureToProto converts a threshold signature to a protocol buffers message.
@@ -128,12 +127,6 @@ func ProposalFromProto(p *Proposal) (proposal hotstuff.ProposeMsg) {
 		aggQC := AggregateQCFromProto(p.GetAggQC())
 		proposal.AggregateQC = &aggQC
 	}
-	return
-}
-
-func PipedMessageToProto(pipeId pipelining.PipeId, message string) (pipedMessage PipedMessage) {
-	pipedMessage.PipeId = uint32(pipeId)
-	pipedMessage.Message = message
 	return
 }
 

@@ -26,67 +26,17 @@ service Hotstuff {
   }
 
   rpc Fetch(BlockHash) returns (Block) { option (gorums.quorumcall) = true; }
-
-  rpc PipedPropose(PipedProposal) returns (google.protobuf.Empty) {
-    option (gorums.multicast) = true;
-  }
-
-  rpc PipedVote(PipedPartialCert) returns (google.protobuf.Empty) {
-    option (gorums.unicast) = true;
-  }
-
-  rpc PipedTimeout(PipedTimeoutMsg) returns (google.protobuf.Empty) {
-    option (gorums.multicast) = true;
-  }
-
-  rpc PipedNewView(PipedSyncInfo) returns (google.protobuf.Empty) {
-    option (gorums.unicast) = true;
-  }
-
-  rpc PipedFetch(PipedBlockHash) returns (Block) { option (gorums.quorumcall) = true; }
-
-  rpc TestPiped(PipedMessage) returns (google.protobuf.Empty) {
-    option (gorums.multicast) = true;
-  }
 }
-
-message PipedMessage {
-  uint32 PipeId = 1;
-  string Message = 2;
-}
-
-message PipedProposal {
-  uint32 PipeId = 1;
-  Proposal Proposal = 2;
-}
-
-message PipedPartialCert {
-  uint32 PipeId = 1;
-  PartialCert PartialCert = 2;
-}
-
-message PipedTimeoutMsg {
-  uint32 PipeId = 1;
-  TimeoutMsg TimeoutMsg = 2;
-}
-
-message PipedSyncInfo {
-  uint32 PipeId = 1;
-  SyncInfo SyncInfo = 2;
-}
-
-message PipedBlockHash {
-  uint32 PipeId = 1;
-  BlockHash BlockHash = 2;
-}
-
 
 message Proposal {
   Block Block = 1;
   AggQC AggQC = 2;
 }
 
-message BlockHash { bytes Hash = 1; }
+message BlockHash { 
+  bytes Hash = 1; 
+  uint32 PipeId = 2;
+}
 
 message Block {
   bytes Parent = 1;
@@ -94,6 +44,7 @@ message Block {
   uint64 View = 3;
   bytes Command = 4;
   uint32 Proposer = 5;
+  uint32 PipeId = 6;
 }
 
 message ECDSASignature {
@@ -120,6 +71,7 @@ message Signature {
 message PartialCert {
   QuorumSignature Sig = 1;
   bytes Hash = 2;
+  uint32 PipeId = 3;
 }
 
 message ECDSAMultiSignature { repeated ECDSASignature Sigs = 1; }
@@ -143,6 +95,7 @@ message QuorumCert {
   QuorumSignature Sig = 1;
   uint64 View = 2;
   bytes Hash = 3;
+  uint32 PipeId = 4;
 }
 
 message TimeoutCert {
@@ -155,16 +108,19 @@ message TimeoutMsg {
   SyncInfo SyncInfo = 2;
   QuorumSignature ViewSig = 3;
   QuorumSignature MsgSig = 4;
+  uint32 PipeId = 5;
 }
 
 message SyncInfo {
   QuorumCert QC = 1;
   TimeoutCert TC = 2;
   AggQC AggQC = 3;
+  uint32 PipeId = 4;
 }
 
 message AggQC {
   map<uint32, QuorumCert> QCs = 1;
   QuorumSignature Sig = 2;
   uint64 View = 3;
+  uint32 PipeId = 4;
 }

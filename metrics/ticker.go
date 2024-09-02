@@ -6,6 +6,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 )
 
 // Ticker emits TickEvents on the metrics event loop.
@@ -21,7 +22,7 @@ func NewTicker(interval time.Duration) *Ticker {
 }
 
 // InitModule gives the module access to the other modules.
-func (t *Ticker) InitModule(mods *modules.Core) {
+func (t *Ticker) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 	var eventLoop *eventloop.EventLoop
 
 	mods.Get(&eventLoop)
