@@ -13,7 +13,6 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 )
 
 func init() {
@@ -159,7 +158,7 @@ func New() modules.CryptoBase {
 
 // InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (bls *bls12Base) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (bls *bls12Base) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.Get(
 		&bls.configuration,
 		&bls.logger,

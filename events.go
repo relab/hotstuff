@@ -3,17 +3,20 @@ package hotstuff
 import (
 	"bytes"
 	"fmt"
+
+	"github.com/relab/hotstuff/pipelining"
 )
 
 // ProposeMsg is broadcast when a leader makes a proposal.
 type ProposeMsg struct {
-	ID          ID           // The ID of the replica who sent the message.
-	Block       *Block       // The block that is proposed.
-	AggregateQC *AggregateQC // Optional AggregateQC
+	ID          ID                // The ID of the replica who sent the message.
+	Block       *Block            // The block that is proposed.
+	AggregateQC *AggregateQC      // Optional AggregateQC
+	PipeId      pipelining.PipeId // Optional PipeId (defaults to 0)
 }
 
 func (p ProposeMsg) String() string {
-	return fmt.Sprintf("ID %d, %s, AggQC: %v", p.ID, p.Block, p.AggregateQC != nil)
+	return fmt.Sprintf("ID %d, %s, AggQC: %v, Pipe: %d", p.ID, p.Block, p.AggregateQC != nil, p.PipeId)
 }
 
 // VoteMsg is sent to the leader by replicas voting on a proposal.

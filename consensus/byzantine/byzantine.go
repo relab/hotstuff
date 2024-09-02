@@ -5,7 +5,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 )
 
 func init() {
@@ -23,9 +22,9 @@ type silence struct {
 	consensus.Rules
 }
 
-func (s *silence) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (s *silence) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	if mod, ok := s.Rules.(modules.Module); ok {
-		mod.InitModule(mods, pipeId)
+		mod.InitModule(mods, buildOpt)
 	}
 }
 
@@ -50,7 +49,7 @@ type fork struct {
 	consensus.Rules
 }
 
-func (f *fork) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (f *fork) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.Get(
 		&f.blockChain,
 		&f.synchronizer,
@@ -58,7 +57,7 @@ func (f *fork) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
 	)
 
 	if mod, ok := f.Rules.(modules.Module); ok {
-		mod.InitModule(mods, pipeId)
+		mod.InitModule(mods, buildOpt)
 	}
 }
 

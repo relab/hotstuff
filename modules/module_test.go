@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 )
 
 type Counter interface {
@@ -43,7 +42,7 @@ func NewGreeter() *greeterImpl { //nolint:revive
 	return &greeterImpl{}
 }
 
-func (g *greeterImpl) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (g *greeterImpl) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.Get(&g.counter)
 }
 

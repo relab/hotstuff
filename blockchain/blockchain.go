@@ -9,7 +9,6 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -28,7 +27,7 @@ type blockChain struct {
 	pendingFetch  map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
 }
 
-func (chain *blockChain) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (chain *blockChain) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.Get(
 		&chain.configuration,
 		&chain.consensus,

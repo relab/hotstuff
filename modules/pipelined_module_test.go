@@ -52,11 +52,11 @@ func NewMultiplier() *multiplierImpl { //nolint:revive
 	return &multiplierImpl{}
 }
 
-func (m *multiplierImpl) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (m *multiplierImpl) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.GetFromPipe(m, &m.adder) // Requires an adder from the same pipe
 }
 
-func (a *adderImpl) InitModule(_ *modules.Core, _ pipelining.PipeId) {
+func (a *adderImpl) InitModule(_ *modules.Core, buildOpt modules.BuildOptions) {
 	// Does nothing for now
 }
 

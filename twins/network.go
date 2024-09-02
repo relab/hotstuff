@@ -18,7 +18,6 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 	"github.com/relab/hotstuff/synchronizer"
 	"golang.org/x/exp/maps"
 )
@@ -49,7 +48,7 @@ type node struct {
 	log            strings.Builder
 }
 
-func (n *node) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (n *node) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.Get(
 		&n.blockChain,
 		&n.consensus,
@@ -235,7 +234,7 @@ type configuration struct {
 }
 
 // alternative way to get a pointer to the node.
-func (c *configuration) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (c *configuration) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	if c.node == nil {
 		mods.TryGet(&c.node)
 	}
@@ -461,7 +460,7 @@ func (tm *timeoutManager) viewChange(event synchronizer.ViewChangeEvent) {
 
 // InitModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (tm *timeoutManager) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (tm *timeoutManager) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.Get(
 		&tm.synchronizer,
 		&tm.eventLoop,

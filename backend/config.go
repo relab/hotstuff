@@ -10,7 +10,6 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 	"github.com/relab/hotstuff/synchronizer"
 
 	"github.com/relab/gorums"
@@ -88,7 +87,7 @@ type subConfig struct {
 }
 
 // InitModule initializes the configuration.
-func (cfg *Config) InitModule(mods *modules.Core, _ pipelining.PipeId) {
+func (cfg *Config) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.Get(
 		&cfg.eventLoop,
 		&cfg.logger,

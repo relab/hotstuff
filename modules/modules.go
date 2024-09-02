@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/pipelining"
 )
 
 // Module interfaces
@@ -178,9 +177,9 @@ type executorWrapper struct {
 	executor Executor
 }
 
-func (ew executorWrapper) InitModule(mods *Core, pipeId pipelining.PipeId) {
+func (ew executorWrapper) InitModule(mods *Core, buildOpt BuildOptions) {
 	if m, ok := ew.executor.(Module); ok {
-		m.InitModule(mods, pipeId)
+		m.InitModule(mods, buildOpt)
 	}
 }
 
@@ -197,9 +196,9 @@ type forkHandlerWrapper struct {
 	forkHandler ForkHandler
 }
 
-func (fhw forkHandlerWrapper) InitModule(mods *Core, pipeId pipelining.PipeId) {
+func (fhw forkHandlerWrapper) InitModule(mods *Core, buildOpt BuildOptions) {
 	if m, ok := fhw.forkHandler.(Module); ok {
-		m.InitModule(mods, pipeId)
+		m.InitModule(mods, buildOpt)
 	}
 }
 

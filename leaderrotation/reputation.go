@@ -9,7 +9,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 )
 
 func init() {
@@ -29,7 +28,7 @@ type repBased struct {
 
 // InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder
-func (r *repBased) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (r *repBased) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.Get(
 		&r.configuration,
 		&r.consensus,

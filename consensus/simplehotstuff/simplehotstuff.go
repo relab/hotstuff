@@ -6,7 +6,6 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 )
 
 func init() {
@@ -33,7 +32,7 @@ func New() consensus.Rules {
 }
 
 // InitModule initializes the module.
-func (hs *SimpleHotStuff) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (hs *SimpleHotStuff) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.Get(&hs.blockChain, &hs.logger, &hs.synchronizer)
 }
 

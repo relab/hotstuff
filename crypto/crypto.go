@@ -4,7 +4,6 @@ package crypto
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 )
 
 type crypto struct {
@@ -22,14 +21,14 @@ func New(impl modules.CryptoBase) modules.Crypto {
 
 // InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (c *crypto) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (c *crypto) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.Get(
 		&c.blockChain,
 		&c.configuration,
 	)
 
 	if mod, ok := c.CryptoBase.(modules.Module); ok {
-		mod.InitModule(mods, pipeId)
+		mod.InitModule(mods, buildOpt)
 	}
 }
 

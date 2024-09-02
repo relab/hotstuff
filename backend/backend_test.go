@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/gorums"
@@ -47,7 +48,7 @@ func TestConnect(t *testing.T) {
 }
 
 // testBase is a generic test for a unicast/multicast call
-func testBase(t *testing.T, typ any, send func(modules.Configuration), handle eventloop.EventHandler) {
+func testBase(t *testing.T, typ any, send func(modules.Configuration), handle eventloop.EventHandler, opts ...eventloop.HandlerOption) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		ctrl := gomock.NewController(t)
@@ -73,7 +74,7 @@ func testBase(t *testing.T, typ any, send func(modules.Configuration), handle ev
 				synchronizer modules.Synchronizer
 			)
 			hs.Get(&eventLoop, &synchronizer)
-			eventLoop.RegisterHandler(typ, handle)
+			eventLoop.RegisterHandler(typ, handle, opts...)
 			synchronizer.Start(ctx)
 			go eventLoop.Run(ctx)
 		}
@@ -85,6 +86,7 @@ func testBase(t *testing.T, typ any, send func(modules.Configuration), handle ev
 
 func TestPropose(t *testing.T) {
 	var wg sync.WaitGroup
+	pipeId := pipelining.PipeId(1)
 	want := hotstuff.ProposeMsg{
 		ID: 1,
 		Block: hotstuff.NewBlock(
@@ -92,7 +94,10 @@ func TestPropose(t *testing.T) {
 			hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
 			"foo", 1, 1,
 		),
+		PipeId: pipeId,
 	}
+
+	want.Block.SetPipe(pipeId)
 	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)
 		cfg.Propose(want)
@@ -106,7 +111,7 @@ func TestPropose(t *testing.T) {
 			t.Error("block hashes do not match")
 		}
 		wg.Done()
-	})
+	}, eventloop.RespondToPipeId(pipeId))
 }
 
 func TestTimeout(t *testing.T) {

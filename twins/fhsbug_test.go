@@ -11,7 +11,6 @@ import (
 	"github.com/relab/hotstuff/consensus/fasthotstuff"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 	"github.com/relab/hotstuff/twins"
 )
 
@@ -142,13 +141,13 @@ type vulnerableFHS struct {
 	inner      fasthotstuff.FastHotStuff
 }
 
-func (fhs *vulnerableFHS) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (fhs *vulnerableFHS) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.Get(
 		&fhs.logger,
 		&fhs.blockChain,
 	)
 
-	fhs.inner.InitModule(mods, pipeId)
+	fhs.inner.InitModule(mods, buildOpt)
 }
 
 // VoteRule decides whether to vote for the block.

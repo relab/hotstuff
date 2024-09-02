@@ -37,7 +37,6 @@ import (
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -72,7 +71,7 @@ func New() modules.Handel {
 }
 
 // InitModule initializes the Handel module.
-func (h *Handel) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (h *Handel) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.Get(
 		&h.configuration,
 		&h.server,

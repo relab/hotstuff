@@ -36,7 +36,7 @@ type Server struct {
 }
 
 // InitModule initializes the Server.
-func (srv *Server) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (srv *Server) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.Get(
 		&srv.eventLoop,
 		&srv.configuration,
@@ -164,7 +164,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
 	impl.srv.induceLatency(id)
-	impl.srv.eventLoop.AddEvent(proposeMsg)
+	impl.srv.eventLoop.PipeEvent(pipelining.PipeId(proposal.Block.PipeId), proposeMsg)
 }
 
 // Vote handles an incoming vote message.

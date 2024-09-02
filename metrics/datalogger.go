@@ -7,7 +7,6 @@ import (
 
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -37,7 +36,7 @@ func NewJSONLogger(wr io.Writer) (Logger, error) {
 }
 
 // InitModule initializes the metrics logger module.
-func (dl *jsonLogger) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (dl *jsonLogger) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.Get(&dl.logger)
 }
 

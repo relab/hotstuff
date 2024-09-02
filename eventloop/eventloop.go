@@ -43,6 +43,8 @@ func Prioritize() HandlerOption {
 	}
 }
 
+// RespondToPipeId assigns which pipe ID to respond to when PipeEvent is used to add an event to the
+// eventloop.
 func RespondToPipeId(pipeId pipelining.PipeId) HandlerOption {
 	return func(ho *handlerOpts) {
 		ho.pipeId = pipeId
@@ -158,8 +160,12 @@ func (el *EventLoop) AddEvent(event any) {
 	}
 }
 
-// AddEvent adds an event to the event queue.
+// PipeEvent adds an event to a specified pipeline.
 func (el *EventLoop) PipeEvent(pipeId pipelining.PipeId, event any) {
+	if !pipelining.ValidId(pipeId) {
+		panic("pipe id is not valid")
+	}
+
 	wrapper := pipedEventWrapper{
 		pipeId: pipeId,
 		event:  event,

@@ -13,7 +13,6 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -46,12 +45,12 @@ func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv
 }
 
 // InitModule gives the module access to the other modules.
-func (srv *clientSrv) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (srv *clientSrv) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
 	mods.Get(
 		&srv.eventLoop,
 		&srv.logger,
 	)
-	srv.cmdCache.InitModule(mods, pipeId)
+	srv.cmdCache.InitModule(mods, buildOpt)
 }
 
 func (srv *clientSrv) Start(addr string) error {
