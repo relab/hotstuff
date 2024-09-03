@@ -53,11 +53,11 @@ func TestHandlerPiped(t *testing.T) {
 	c := make(chan any)
 	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- event
-	}, eventloop.RespondToPipeId(listeningPipeId))
+	}, eventloop.RespondToPipe(listeningPipeId))
 
 	el.RegisterHandler(testEvent(0), func(_ any) {
 		panic("wrong pipe id")
-	}, eventloop.RespondToPipeId(incorrectPipeId))
+	}, eventloop.RespondToPipe(incorrectPipeId))
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

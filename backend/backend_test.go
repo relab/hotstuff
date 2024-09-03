@@ -86,7 +86,6 @@ func testBase(t *testing.T, typ any, send func(modules.Configuration), handle ev
 
 func TestPropose(t *testing.T) {
 	var wg sync.WaitGroup
-	pipeId := pipelining.PipeId(1)
 	want := hotstuff.ProposeMsg{
 		ID: 1,
 		Block: hotstuff.NewBlock(
@@ -94,10 +93,10 @@ func TestPropose(t *testing.T) {
 			hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
 			"foo", 1, 1,
 		),
-		PipeId: pipeId,
+		PipeId: 0,
 	}
 
-	want.Block.SetPipe(pipeId)
+	want.Block.SetPipe(0) // TODO: Hacky solution
 	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)
 		cfg.Propose(want)
@@ -111,7 +110,37 @@ func TestPropose(t *testing.T) {
 			t.Error("block hashes do not match")
 		}
 		wg.Done()
-	}, eventloop.RespondToPipeId(pipeId))
+	})
+}
+
+func TestProposePiped(t *testing.T) {
+	var wg sync.WaitGroup
+	pipeId := pipelining.PipeId(1)
+	want := hotstuff.ProposeMsg{
+		ID: 1,
+		Block: hotstuff.NewBlock(
+			hotstuff.GetGenesis().Hash(),
+			hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
+			"foo", 1, 1,
+		),
+		PipeId: pipeId,
+	}
+
+	want.Block.SetPipe(pipeId) // TODO: Hacky solution
+	testBase(t, want, func(cfg modules.Configuration) {
+		wg.Add(3)
+		cfg.Propose(want)
+		wg.Wait()
+	}, func(event any) {
+		got := event.(hotstuff.ProposeMsg)
+		if got.ID != want.ID {
+			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
+		}
+		if got.Block.Hash() != want.Block.Hash() {
+			t.Error("block hashes do not match")
+		}
+		wg.Done()
+	}, eventloop.RespondToPipe(pipeId))
 }
 
 func TestTimeout(t *testing.T) {

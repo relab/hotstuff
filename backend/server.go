@@ -164,6 +164,13 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
 	impl.srv.induceLatency(id)
+
+	// If the pipe ID is null, then add the event normally
+	if proposal.Block.PipeId == uint32(pipelining.NullPipeId) {
+		impl.srv.eventLoop.AddEvent(proposeMsg)
+		return
+	}
+
 	impl.srv.eventLoop.PipeEvent(pipelining.PipeId(proposal.Block.PipeId), proposeMsg)
 }
 

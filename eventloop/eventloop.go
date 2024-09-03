@@ -43,9 +43,9 @@ func Prioritize() HandlerOption {
 	}
 }
 
-// RespondToPipeId assigns which pipe ID to respond to when PipeEvent is used to add an event to the
+// RespondToPipe assigns which pipe ID to respond to when PipeEvent is used to add an event to the
 // eventloop.
-func RespondToPipeId(pipeId pipelining.PipeId) HandlerOption {
+func RespondToPipe(pipeId pipelining.PipeId) HandlerOption {
 	return func(ho *handlerOpts) {
 		ho.pipeId = pipeId
 	}
