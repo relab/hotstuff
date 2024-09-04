@@ -166,6 +166,7 @@ func TimeoutMsgFromProto(m *TimeoutMsg) hotstuff.TimeoutMsg {
 		View:          hotstuff.View(m.GetView()),
 		SyncInfo:      SyncInfoFromProto(m.GetSyncInfo()),
 		ViewSignature: QuorumSignatureFromProto(m.GetViewSig()),
+		PipeId:        pipelining.PipeId(m.PipeId),
 	}
 	if m.GetViewSig() != nil {
 		timeoutMsg.MsgSignature = QuorumSignatureFromProto(m.GetMsgSig())
@@ -179,6 +180,7 @@ func TimeoutMsgToProto(timeoutMsg hotstuff.TimeoutMsg) *TimeoutMsg {
 		View:     uint64(timeoutMsg.View),
 		SyncInfo: SyncInfoToProto(timeoutMsg.SyncInfo),
 		ViewSig:  QuorumSignatureToProto(timeoutMsg.ViewSignature),
+		PipeId:   uint32(timeoutMsg.PipeId),
 	}
 	if timeoutMsg.MsgSignature != nil {
 		tm.MsgSig = QuorumSignatureToProto(timeoutMsg.MsgSignature)

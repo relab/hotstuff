@@ -4,15 +4,15 @@ type PipeId uint32
 
 const NullPipeId = PipeId(0)
 
-// If the pipe ID is not NullPipeId, returns true
-func ValidId(pipeId PipeId) bool {
+// If the pipe ID is not NullPipeId, then return true
+func ValidPipe(pipeId PipeId) bool {
 	return pipeId != NullPipeId
 }
 
-// If the list contains duplicate IDs or a NullPipeId, return false
-func ValidIds(pipeIds []PipeId) bool {
+// If the list contains duplicate IDs or a NullPipeId, then return false
+func ValidPipes(pipeIds []PipeId) bool {
 	for i, pId := range pipeIds {
-		if !ValidId(pId) {
+		if !ValidPipe(pId) {
 			return false
 		}
 

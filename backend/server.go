@@ -225,8 +225,14 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	if err != nil {
 		impl.srv.logger.Infof("Could not get ID of replica: %v", err)
 	}
+
 	impl.srv.induceLatency(timeoutMsg.ID)
-	impl.srv.eventLoop.AddEvent(timeoutMsg)
+	if !pipelining.ValidPipe(timeoutMsg.PipeId) {
+		impl.srv.eventLoop.AddEvent(timeoutMsg)
+		return
+	}
+
+	impl.srv.eventLoop.PipeEvent(timeoutMsg.PipeId, timeoutMsg)
 }
 
 type replicaConnected struct {

@@ -37,6 +37,7 @@ type TimeoutMsg struct {
 	ViewSignature QuorumSignature // A signature of the view
 	MsgSignature  QuorumSignature // A signature of the view, QC.BlockHash, and the replica ID
 	SyncInfo      SyncInfo        // The highest QC/TC known to the sender.
+	PipeId        pipelining.PipeId
 }
 
 // ToBytes returns a byte form of the timeout message.

@@ -250,7 +250,7 @@ func (bl *Builder) EnablePipelining(pipeIds []pipelining.PipeId) {
 		panic("no pipe ids provided")
 	}
 
-	if !pipelining.ValidIds(pipeIds) {
+	if !pipelining.ValidPipes(pipeIds) {
 		panic("at least one pipe id was invalid or duplicate")
 	}
 

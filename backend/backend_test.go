@@ -167,6 +167,33 @@ func TestTimeout(t *testing.T) {
 	})
 }
 
+func TestTimeoutPiped(t *testing.T) {
+	var wg sync.WaitGroup
+
+	pipeid := pipelining.PipeId(1)
+	want := hotstuff.TimeoutMsg{
+		ID:            1,
+		View:          1,
+		ViewSignature: nil,
+		SyncInfo:      hotstuff.NewSyncInfo(),
+		PipeId:        pipeid,
+	}
+	testBase(t, want, func(cfg modules.Configuration) {
+		wg.Add(3)
+		cfg.Timeout(want)
+		wg.Wait()
+	}, func(event any) {
+		got := event.(hotstuff.TimeoutMsg)
+		if got.ID != want.ID {
+			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
+		}
+		if got.View != want.View {
+			t.Errorf("wrong view in proposal: got: %d, want: %d", got.View, want.View)
+		}
+		wg.Done()
+	}, eventloop.RespondToPipe(pipeid))
+}
+
 type testData struct {
 	n         int
 	creds     credentials.TransportCredentials
