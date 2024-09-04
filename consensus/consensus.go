@@ -69,7 +69,7 @@ func New(impl Rules) modules.Consensus {
 }
 
 // InitModule initializes the module.
-func (cs *consensusBase) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (cs *consensusBase) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(
 		&cs.acceptor,
 		&cs.blockChain,

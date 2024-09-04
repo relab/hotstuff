@@ -87,7 +87,7 @@ type subConfig struct {
 }
 
 // InitModule initializes the configuration.
-func (cfg *Config) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (cfg *Config) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(
 		&cfg.eventLoop,
 		&cfg.logger,

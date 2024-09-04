@@ -25,7 +25,7 @@ type ClientLatency struct {
 }
 
 // InitModule gives the module access to the other modules.
-func (lr *ClientLatency) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (lr *ClientLatency) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	var (
 		eventLoop *eventloop.EventLoop
 		logger    logging.Logger

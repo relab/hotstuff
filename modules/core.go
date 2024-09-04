@@ -42,21 +42,21 @@ import (
 
 type ModulePipe []Module
 
-type BuildOptions struct {
+type InitOptions struct {
 	isPiped bool
 	pipeId  pipelining.PipeId
 }
 
 // Module is an interface for initializing modules.
 type Module interface {
-	InitModule(mods *Core, buildOpt BuildOptions)
+	InitModule(mods *Core, buildOpt InitOptions)
 }
 
 // Core is the base of the module system.
 // It contains only a few core modules that are shared between replicas and clients.
 type Core struct {
 	staticModules []any
-	pipedModules  map[pipelining.PipeId]ModulePipe
+	pipedModules  map[pipelining.PipeId][]any
 }
 
 // TryGet attempts to find a module for ptr.
@@ -213,6 +213,46 @@ func (mods *Core) TryGetFromPipe(moduleInPipe Module, ptr any) bool {
 	return false
 }
 
+func (core *Core) MatchForPipe(pipeId pipelining.PipeId, ptr any) {
+	v := reflect.ValueOf(ptr)
+	if !v.IsValid() {
+		panic("pointer value cannot be nil")
+	}
+
+	pt := v.Type()
+	if pt.Kind() != reflect.Ptr {
+		panic("only pointer value allowed")
+	}
+
+	pipe := core.pipedModules[pipeId]
+	for _, m := range pipe {
+		mv := reflect.ValueOf(m)
+		if mv.Type().AssignableTo(pt.Elem()) {
+			v.Elem().Set(mv)
+			return
+		}
+	}
+}
+
+// Return the number of pipes the builder has generated.
+func (core *Core) PipeCount() int {
+	return len(core.pipedModules)
+}
+
+// Return a slice of Pipes in the order which the pipes were created by Builder.
+func (core *Core) Pipes() (ids []pipelining.PipeId) {
+	for id := range core.pipedModules {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// Return a list of modules from a pipes. The order of module types is influenced
+// by when AddPiped was called in Builder.
+func (core *Core) GetPipe(id pipelining.PipeId) []any {
+	return core.pipedModules[id]
+}
+
 // Builder is a helper for setting up client modules.
 type Builder struct {
 	core              Core
@@ -255,11 +295,14 @@ func (bl *Builder) EnablePipelining(pipeIds []pipelining.PipeId) {
 	}
 
 	bl.pipeliningEnabled = true
+	bl.core.pipedModules = make(map[pipelining.PipeId][]any)
 	bl.modulePipes = make(map[pipelining.PipeId]ModulePipe)
 	bl.pipeIds = pipeIds
 	for _, id := range bl.pipeIds {
 		bl.modulePipes[id] = make(ModulePipe, 0)
+		bl.core.pipedModules[id] = make([]any, 0)
 	}
+
 }
 
 // Options returns the options module.
@@ -296,12 +339,14 @@ func (b *Builder) AddPiped(ctor any, ctorArgs ...any) {
 			panic("constructor does not return a single value")
 		}
 		mod := returnResult[0].Interface()
-		converted, ok := mod.(Module)
-		if !ok {
-			// TODO: Consider if this is necessary
-			panic("constructor did not construct a value that could be casted to Module")
-		}
-		b.Add(converted)
+		// converted, ok := mod.(Module)
+		// if !ok {
+		// 	// TODO: Consider if this is necessary
+		// 	// panic("constructor did not construct a value that could be casted to Module")
+		// 	b.core.staticModules = append(b.core.staticModules, mod)
+		// 	return
+		// }
+		b.Add(mod)
 		return
 	}
 
@@ -313,31 +358,14 @@ func (b *Builder) AddPiped(ctor any, ctorArgs ...any) {
 		mod := returnResult[0].Interface()
 		converted, ok := mod.(Module)
 
+		b.core.pipedModules[id] = append(b.core.pipedModules[id], mod)
 		if !ok {
 			// TODO: Consider if this is necessary
-			panic("constructor did not construct a value that could be casted to Module")
+			// panic("constructor did not construct a value that could be casted to Module")
+			continue
 		}
 		b.modulePipes[id] = append(b.modulePipes[id], converted)
 	}
-}
-
-// Return the number of pipes the builder has generated.
-func (b *Builder) PipeCount() int {
-	return len(b.modulePipes)
-}
-
-// Return a slice of PipeIds in the order which the pipes were created.
-func (b *Builder) PipeIds() []pipelining.PipeId {
-	return b.pipeIds
-}
-
-// Return a list of modules from a pipes. The order of module types is influenced
-// by when AddPiped was called for a kind of module.
-func (b *Builder) GetPipe(id pipelining.PipeId) ModulePipe {
-	if !b.pipeliningEnabled {
-		panic("cannot get pipe when pipelining is disabled")
-	}
-	return b.modulePipes[id]
 }
 
 // Build initializes all added modules and returns the Core object.
@@ -348,7 +376,7 @@ func (b *Builder) Build() *Core {
 	}
 	// add the Options last so that it can be overridden by user.
 	b.Add(b.opts)
-	opt := BuildOptions{
+	opt := InitOptions{
 		isPiped: false,
 		pipeId:  pipelining.NullPipeId,
 	}
@@ -361,18 +389,18 @@ func (b *Builder) Build() *Core {
 	}
 
 	// Adding the piped modules to core first.
-	b.core.pipedModules = make(map[pipelining.PipeId]ModulePipe)
-	for id, pipe := range b.modulePipes {
-		b.core.pipedModules[id] = make(ModulePipe, 0)
-		for _, module := range pipe {
-			b.core.pipedModules[id] = append(b.core.pipedModules[id], module)
-		}
-	}
+	// b.core.pipedModules = make(map[pipelining.PipeId][]any)
+	// for id, pipe := range b.modulePipes {
+	// 	b.core.pipedModules[id] = make([]any, 0)
+	// 	for _, module := range pipe {
+	// 		b.core.pipedModules[id] = append(b.core.pipedModules[id], module)
+	// 	}
+	// }
 
 	// Initializing later so that modules can reference
 	// other modules in the same pipe without panicking.
-	for pipeId, pipe := range b.core.pipedModules {
-		pipeOpt := BuildOptions{
+	for pipeId, pipe := range b.modulePipes {
+		pipeOpt := InitOptions{
 			isPiped: true,
 			pipeId:  pipeId,
 		}

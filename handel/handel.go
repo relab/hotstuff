@@ -71,7 +71,7 @@ func New() modules.Handel {
 }
 
 // InitModule initializes the Handel module.
-func (h *Handel) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (h *Handel) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(
 		&h.configuration,
 		&h.server,

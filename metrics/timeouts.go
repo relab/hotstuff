@@ -26,7 +26,7 @@ type ViewTimeouts struct {
 }
 
 // InitModule gives the module access to the other modules.
-func (vt *ViewTimeouts) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (vt *ViewTimeouts) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	var (
 		eventLoop *eventloop.EventLoop
 		logger    logging.Logger

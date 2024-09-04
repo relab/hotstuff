@@ -28,7 +28,7 @@ type repBased struct {
 
 // InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder
-func (r *repBased) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (r *repBased) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(
 		&r.configuration,
 		&r.consensus,

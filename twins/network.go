@@ -48,7 +48,7 @@ type node struct {
 	log            strings.Builder
 }
 
-func (n *node) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (n *node) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(
 		&n.blockChain,
 		&n.consensus,
@@ -234,7 +234,7 @@ type configuration struct {
 }
 
 // alternative way to get a pointer to the node.
-func (c *configuration) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (c *configuration) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	if c.node == nil {
 		mods.TryGet(&c.node)
 	}
@@ -460,7 +460,7 @@ func (tm *timeoutManager) viewChange(event synchronizer.ViewChangeEvent) {
 
 // InitModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (tm *timeoutManager) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (tm *timeoutManager) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(
 		&tm.synchronizer,
 		&tm.eventLoop,

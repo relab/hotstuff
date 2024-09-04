@@ -80,7 +80,7 @@ type Client struct {
 }
 
 // InitModule initializes the client.
-func (c *Client) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (c *Client) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(
 		&c.eventLoop,
 		&c.logger,

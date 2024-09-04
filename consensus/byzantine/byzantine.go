@@ -22,7 +22,7 @@ type silence struct {
 	consensus.Rules
 }
 
-func (s *silence) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (s *silence) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	if mod, ok := s.Rules.(modules.Module); ok {
 		mod.InitModule(mods, buildOpt)
 	}
@@ -49,7 +49,7 @@ type fork struct {
 	consensus.Rules
 }
 
-func (f *fork) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (f *fork) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(
 		&f.blockChain,
 		&f.synchronizer,

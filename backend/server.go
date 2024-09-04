@@ -36,7 +36,7 @@ type Server struct {
 }
 
 // InitModule initializes the Server.
-func (srv *Server) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (srv *Server) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(
 		&srv.eventLoop,
 		&srv.configuration,
@@ -156,7 +156,7 @@ type serviceImpl struct {
 func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
 	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
-		impl.srv.logger.Infof("Failed to get client ID: %v", err)
+		impl.srv.logger.Infof("Failed to get clietestpipednt ID: %v", err)
 		return
 	}
 
@@ -166,12 +166,12 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	impl.srv.induceLatency(id)
 
 	// If the pipe ID is null, then add the event normally
-	if proposal.Block.PipeId == uint32(pipelining.NullPipeId) {
+	if !pipelining.ValidPipe(proposeMsg.Block.PipeId()) {
 		impl.srv.eventLoop.AddEvent(proposeMsg)
 		return
 	}
 
-	impl.srv.eventLoop.PipeEvent(pipelining.PipeId(proposal.Block.PipeId), proposeMsg)
+	impl.srv.eventLoop.PipeEvent(proposeMsg.Block.PipeId(), proposeMsg)
 }
 
 // Vote handles an incoming vote message.

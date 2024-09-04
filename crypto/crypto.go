@@ -21,7 +21,7 @@ func New(impl modules.CryptoBase) modules.Crypto {
 
 // InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (c *crypto) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (c *crypto) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(
 		&c.blockChain,
 		&c.configuration,

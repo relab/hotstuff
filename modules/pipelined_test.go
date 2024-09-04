@@ -52,13 +52,13 @@ func NewMultiplier() *multiplierImpl { //nolint:revive
 	return &multiplierImpl{}
 }
 
-func (m *multiplierImpl) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (m *multiplierImpl) InitModule(mods *modules.Core, _ modules.InitOptions) {
 	mods.GetFromPipe(m, &m.adder) // Requires an adder from the same pipe
 }
 
-func (a *adderImpl) InitModule(_ *modules.Core, buildOpt modules.BuildOptions) {
-	// Does nothing for now
-}
+// func (a *adderImpl) InitModule(_ *modules.Core, buildOpt modules.InitOptions) {
+// 	// Does nothing for now
+// }
 
 func TestPipeliningDisabled(t *testing.T) {
 	builder := modules.NewBuilder(0, nil)
@@ -66,11 +66,10 @@ func TestPipeliningDisabled(t *testing.T) {
 	builder.AddPiped(NewAdder)
 	builder.AddPiped(NewMultiplier)
 
-	if builder.PipeCount() > 0 {
+	mods := builder.Build()
+	if mods.PipeCount() > 0 {
 		t.Fail()
 	}
-
-	mods := builder.Build()
 
 	var adder Adder
 	var multiplier Multiplier
@@ -90,11 +89,10 @@ func TestPipelined(t *testing.T) {
 	builder.AddPiped(NewAdder)
 	builder.AddPiped(NewMultiplier)
 
-	if builder.PipeCount() != len(expectedPipeIds) {
+	core := builder.Build()
+	if core.PipeCount() != len(expectedPipeIds) {
 		t.Fail()
 	}
-
-	builder.Build()
 
 	type AdderMultTestCase struct {
 		A      int
@@ -108,10 +106,10 @@ func TestPipelined(t *testing.T) {
 		3: {A: 2, B: 6, Result: 12},
 	}
 
-	pipeIds := builder.PipeIds()
+	pipeIds := core.Pipes()
 	for _, id := range pipeIds {
-		pipe := builder.GetPipe(id)
-		multer := pipe[1].(Multiplier)
+		var multer Multiplier
+		core.MatchForPipe(id, &multer)
 		tc := testCasesMult[id]
 		actualResult := multer.Mult(tc.A, tc.B)
 		if tc.Result != actualResult {
@@ -120,7 +118,8 @@ func TestPipelined(t *testing.T) {
 
 		// The last result stored in the adder is the same as the result of multiplier,
 		// since the multiple addings will add up to the multiplication answer.
-		adder := pipe[0].(Adder)
+		var adder Adder
+		core.MatchForPipe(id, &adder)
 		if adder.LastResult() != tc.Result || adder.LastResult() != actualResult {
 			t.Fail()
 		}

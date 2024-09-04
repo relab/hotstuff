@@ -43,7 +43,7 @@ type Synchronizer struct {
 }
 
 // InitModule initializes the synchronizer.
-func (s *Synchronizer) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (s *Synchronizer) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(
 		&s.blockChain,
 		&s.consensus,

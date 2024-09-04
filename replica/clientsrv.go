@@ -45,7 +45,7 @@ func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv
 }
 
 // InitModule gives the module access to the other modules.
-func (srv *clientSrv) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (srv *clientSrv) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(
 		&srv.eventLoop,
 		&srv.logger,

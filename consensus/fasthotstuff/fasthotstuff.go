@@ -25,7 +25,7 @@ func New() consensus.Rules {
 }
 
 // InitModule initializes the module.
-func (fhs *FastHotStuff) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (fhs *FastHotStuff) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	var opts *modules.Options
 
 	mods.Get(&opts, &fhs.blockChain, &fhs.logger, &fhs.synchronizer)

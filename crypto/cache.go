@@ -32,7 +32,7 @@ func NewCache(impl modules.CryptoBase, capacity int) modules.Crypto {
 
 // InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (cache *cache) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (cache *cache) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	if mod, ok := cache.impl.(modules.Module); ok {
 		mod.InitModule(mods, buildOpt)
 	}

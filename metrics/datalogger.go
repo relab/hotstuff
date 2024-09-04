@@ -36,7 +36,7 @@ func NewJSONLogger(wr io.Writer) (Logger, error) {
 }
 
 // InitModule initializes the metrics logger module.
-func (dl *jsonLogger) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (dl *jsonLogger) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(&dl.logger)
 }
 

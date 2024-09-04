@@ -141,7 +141,7 @@ type vulnerableFHS struct {
 	inner      fasthotstuff.FastHotStuff
 }
 
-func (fhs *vulnerableFHS) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (fhs *vulnerableFHS) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(
 		&fhs.logger,
 		&fhs.blockChain,

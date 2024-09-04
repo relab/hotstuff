@@ -32,7 +32,7 @@ func New() consensus.Rules {
 }
 
 // InitModule initializes the module.
-func (hs *SimpleHotStuff) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (hs *SimpleHotStuff) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(&hs.blockChain, &hs.logger, &hs.synchronizer)
 }
 

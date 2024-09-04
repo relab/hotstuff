@@ -28,7 +28,7 @@ type Throughput struct {
 }
 
 // InitModule gives the module access to the other modules.
-func (t *Throughput) InitModule(mods *modules.Core, buildOpt modules.BuildOptions) {
+func (t *Throughput) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	var (
 		eventLoop *eventloop.EventLoop
 		logger    logging.Logger
