@@ -66,26 +66,27 @@ func TestVote(t *testing.T) {
 // TestVote checks that a leader can collect votes on a proposal to form a QC
 func TestVotePiped(t *testing.T) {
 	const n = 4
+	pipes := []pipelining.PipeId{1}
 	ctrl := gomock.NewController(t)
 	bl := testutil.CreateBuilders(t, ctrl, n)
-	bl[0].EnablePipelining([]pipelining.PipeId{1, 2, 3})
+	bl[0].EnablePipelining(pipes)
 	bl[0].AddPiped(synchronizer.New, testutil.FixedTimeout(1*time.Millisecond))
-	// bl[0].AddPiped(mocks.NewMockConsensus, ctrl)
+	bl[0].AddPiped(mocks.NewMockConsensus, ctrl)
 	hl := bl.Build()
 	hs := hl[0]
 	_ = hs
 
-	//pipes := bl[0].PipeIds()
-	//csList := map[pipelining.PipeId]*mocks.MockConsensus{}
-	//for _, pid := range pipes {
-	//	csList[pid] = mocks.NewMockConsensus(ctrl)
-	//}
-	//var (
-	//	eventLoop  *eventloop.EventLoop
-	//	blockChain modules.BlockChain
-	//)
-	//
-	//hs.Get(&eventLoop, &blockChain)
+	// for _, pid := range pipes {
+	// 	var cs mocks.IMockConsensus
+	// 	hs.MatchForPipe(pid, &cs)
+	// 	cs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
+	// }
+	// var (
+	// 	eventLoop  *eventloop.EventLoop
+	// 	blockChain modules.BlockChain
+	// )
+
+	// hs.Get(&eventLoop, &blockChain)
 
 	//
 	//ok := false

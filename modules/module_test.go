@@ -42,7 +42,7 @@ func NewGreeter() *greeterImpl { //nolint:revive
 	return &greeterImpl{}
 }
 
-func (g *greeterImpl) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
+func (g *greeterImpl) InitModule(mods *modules.Core, _ modules.InitOptions) {
 	mods.Get(&g.counter)
 }
 

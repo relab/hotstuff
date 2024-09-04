@@ -213,6 +213,9 @@ func (mods *Core) TryGetFromPipe(moduleInPipe Module, ptr any) bool {
 	return false
 }
 
+// MatchForPipe assigns ptr to a matching module in the pipe with pipeId.
+// This is mainly a helper function for tests and should not be used in
+// practical applications.
 func (core *Core) MatchForPipe(pipeId pipelining.PipeId, ptr any) {
 	v := reflect.ValueOf(ptr)
 	if !v.IsValid() {
@@ -232,6 +235,8 @@ func (core *Core) MatchForPipe(pipeId pipelining.PipeId, ptr any) {
 			return
 		}
 	}
+
+	panic("no match found")
 }
 
 // Return the number of pipes the builder has generated.
