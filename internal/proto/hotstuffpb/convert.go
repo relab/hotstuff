@@ -142,6 +142,7 @@ func BlockToProto(block *hotstuff.Block) *Block {
 		QC:       QuorumCertToProto(block.QuorumCert()),
 		View:     uint64(block.View()),
 		Proposer: uint32(block.Proposer()),
+		Pipe:     uint32(block.Pipe()),
 	}
 }
 

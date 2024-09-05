@@ -76,12 +76,19 @@ func (b *Block) View() View {
 	return b.view
 }
 
+func (b *Block) Pipe() pipelining.PipeId {
+	return b.pipe
+}
+
 // ToBytes returns the raw byte form of the Block, to be used for hashing, etc.
 func (b *Block) ToBytes() []byte {
 	buf := b.parent[:]
 	var proposerBuf [4]byte
 	binary.LittleEndian.PutUint32(proposerBuf[:], uint32(b.proposer))
 	buf = append(buf, proposerBuf[:]...)
+	var pipeBuf [4]byte
+	binary.LittleEndian.PutUint32(pipeBuf[:], uint32(b.pipe))
+	buf = append(buf, pipeBuf[:]...)
 	var viewBuf [8]byte
 	binary.LittleEndian.PutUint64(viewBuf[:], uint64(b.view))
 	buf = append(buf, viewBuf[:]...)

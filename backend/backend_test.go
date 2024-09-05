@@ -135,7 +135,8 @@ func TestProposePiped(t *testing.T) {
 			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
 		}
 		if got.Block.Hash() != want.Block.Hash() {
-			t.Error("block hashes do not match")
+
+			t.Errorf("block hashes do not match. want %d got %d", got.Block.Pipe(), want.Block.Pipe())
 		}
 		wg.Done()
 	}, eventloop.RespondToPipe(pipeId))
