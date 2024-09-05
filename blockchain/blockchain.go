@@ -16,9 +16,9 @@ import (
 // blocks are evicted in LRU order.
 type blockChain struct {
 	configuration modules.Configuration
-	consensus     modules.Consensus
-	eventLoop     *eventloop.EventLoop
-	logger        logging.Logger
+	// consensus     modules.Consensus
+	eventLoop *eventloop.EventLoop
+	logger    logging.Logger
 
 	mut           sync.Mutex
 	pruneHeight   hotstuff.View
@@ -27,10 +27,10 @@ type blockChain struct {
 	pendingFetch  map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
 }
 
-func (chain *blockChain) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
+func (chain *blockChain) InitModule(mods *modules.Core, _ modules.InitOptions) {
 	mods.Get(
 		&chain.configuration,
-		&chain.consensus,
+		// &chain.consensus,
 		&chain.eventLoop,
 		&chain.logger,
 	)
@@ -134,7 +134,7 @@ func (chain *blockChain) PruneToHeight(height hotstuff.View) (forkedBlocks []*ho
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
-	committedHeight := chain.consensus.CommittedBlock().View()
+	committedHeight := height // chain.consensus.CommittedBlock().View()
 	committedViews := make(map[hotstuff.View]bool)
 	committedViews[committedHeight] = true
 	for h := committedHeight; h >= chain.pruneHeight; {

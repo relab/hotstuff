@@ -83,6 +83,7 @@ func (f *fork) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (propos
 			cmd,
 			f.synchronizer.View(),
 			f.opts.ID(),
+			0,
 		),
 	}
 	if aggQC, ok := cert.AggQC(); f.opts.ShouldUseAggQC() && ok {

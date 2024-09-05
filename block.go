@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+
+	"github.com/relab/hotstuff/pipelining"
 )
 
 // Block contains a propsed "command", metadata for the protocol, and a link to the "parent" block.
@@ -15,16 +17,18 @@ type Block struct {
 	cmd      Command
 	cert     QuorumCert
 	view     View
+	pipe     pipelining.PipeId
 }
 
 // NewBlock creates a new Block
-func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID) *Block {
+func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID, pipe pipelining.PipeId) *Block {
 	b := &Block{
 		parent:   parent,
 		cert:     cert,
 		cmd:      cmd,
 		view:     view,
 		proposer: proposer,
+		pipe:     pipe,
 	}
 	// cache the hash immediately because it is too racy to do it in Hash()
 	b.hash = sha256.Sum256(b.ToBytes())

@@ -29,6 +29,7 @@ func TestAdvanceViewQC(t *testing.T) {
 		"foo",
 		1,
 		2,
+		0,
 	)
 
 	var blockChain modules.BlockChain

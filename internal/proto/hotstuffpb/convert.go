@@ -155,6 +155,7 @@ func BlockFromProto(block *Block) *hotstuff.Block {
 		hotstuff.Command(block.GetCommand()),
 		hotstuff.View(block.GetView()),
 		hotstuff.ID(block.GetProposer()),
+		pipelining.PipeId(block.Pipe),
 	)
 }
 
