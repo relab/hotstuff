@@ -4,8 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
-
-	"github.com/relab/hotstuff/pipelining"
 )
 
 // Block contains a propsed "command", metadata for the protocol, and a link to the "parent" block.
@@ -17,7 +15,6 @@ type Block struct {
 	cmd      Command
 	cert     QuorumCert
 	view     View
-	pipeId   pipelining.PipeId
 }
 
 // NewBlock creates a new Block
@@ -73,15 +70,6 @@ func (b *Block) QuorumCert() QuorumCert {
 // View returns the view in which the Block was proposed
 func (b *Block) View() View {
 	return b.view
-}
-
-func (b *Block) PipeId() pipelining.PipeId {
-	return b.pipeId
-}
-
-// TODO: Have this in the constructor!
-func (b *Block) SetPipe(id pipelining.PipeId) {
-	b.pipeId = id
 }
 
 // ToBytes returns the raw byte form of the Block, to be used for hashing, etc.

@@ -96,7 +96,6 @@ func TestPropose(t *testing.T) {
 		PipeId: 0,
 	}
 
-	want.Block.SetPipe(0) // TODO: Hacky solution
 	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)
 		cfg.Propose(want)
@@ -115,7 +114,7 @@ func TestPropose(t *testing.T) {
 
 func TestProposePiped(t *testing.T) {
 	var wg sync.WaitGroup
-	pipeId := pipelining.PipeId(1)
+	pipeId := pipelining.PipeId(123)
 	want := hotstuff.ProposeMsg{
 		ID: 1,
 		Block: hotstuff.NewBlock(
@@ -126,7 +125,6 @@ func TestProposePiped(t *testing.T) {
 		PipeId: pipeId,
 	}
 
-	want.Block.SetPipe(pipeId) // TODO: Hacky solution
 	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)
 		cfg.Propose(want)

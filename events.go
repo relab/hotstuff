@@ -12,11 +12,11 @@ type ProposeMsg struct {
 	ID          ID                // The ID of the replica who sent the message.
 	Block       *Block            // The block that is proposed.
 	AggregateQC *AggregateQC      // Optional AggregateQC
-	PipeId      pipelining.PipeId // Optional PipeId (defaults to 0)
+	PipeId      pipelining.PipeId //
 }
 
 func (p ProposeMsg) String() string {
-	return fmt.Sprintf("ID %d, %s, AggQC: %v, Pipe: %d", p.ID, p.Block, p.AggregateQC != nil, p.PipeId)
+	return fmt.Sprintf("ID %d, %s, AggQC: %v", p.ID, p.Block, p.AggregateQC != nil)
 }
 
 // VoteMsg is sent to the leader by replicas voting on a proposal.

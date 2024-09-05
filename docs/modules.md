@@ -163,7 +163,7 @@ For example:
 ```go
 type A1 struct{ b B }
 
-func (a *A1) InitModule(mods *modules.Core, buildOpt modules.ModuleBuildOptions) {
+func (a *A1) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
   mods.Get(&a.b)
 }
 ```

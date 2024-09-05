@@ -166,12 +166,12 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	impl.srv.induceLatency(id)
 
 	// If the pipe ID is null, then add the event normally
-	if !pipelining.ValidPipe(proposeMsg.Block.PipeId()) {
+	if !pipelining.ValidPipe(proposeMsg.PipeId) {
 		impl.srv.eventLoop.AddEvent(proposeMsg)
 		return
 	}
 
-	impl.srv.eventLoop.PipeEvent(proposeMsg.Block.PipeId(), proposeMsg)
+	impl.srv.eventLoop.PipeEvent(proposeMsg.PipeId, proposeMsg)
 }
 
 // Vote handles an incoming vote message.

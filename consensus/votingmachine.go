@@ -7,7 +7,6 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 )
 
 // VotingMachine collects votes.
@@ -32,7 +31,7 @@ func NewVotingMachine() *VotingMachine {
 }
 
 // InitModule initializes the VotingMachine.
-func (vm *VotingMachine) InitModule(mods *modules.Core, pipeId pipelining.PipeId) {
+func (vm *VotingMachine) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 	mods.Get(
 		&vm.blockChain,
 		&vm.configuration,

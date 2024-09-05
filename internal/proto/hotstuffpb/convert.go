@@ -113,7 +113,8 @@ func QuorumCertFromProto(qc *QuorumCert) hotstuff.QuorumCert {
 // ProposalToProto converts a ProposeMsg to a protobuf message.
 func ProposalToProto(proposal hotstuff.ProposeMsg) *Proposal {
 	p := &Proposal{
-		Block: BlockToProto(proposal.Block),
+		PipeId: 0,
+		Block:  BlockToProto(proposal.Block),
 	}
 	if proposal.AggregateQC != nil {
 		p.AggQC = AggregateQCToProto(*proposal.AggregateQC)
@@ -124,7 +125,7 @@ func ProposalToProto(proposal hotstuff.ProposeMsg) *Proposal {
 // ProposalFromProto converts a protobuf message to a ProposeMsg.
 func ProposalFromProto(p *Proposal) (proposal hotstuff.ProposeMsg) {
 	proposal.Block = BlockFromProto(p.GetBlock())
-	proposal.PipeId = pipelining.PipeId(p.Block.PipeId)
+	proposal.PipeId = pipelining.PipeId(p.PipeId)
 	if p.GetAggQC() != nil {
 		aggQC := AggregateQCFromProto(p.GetAggQC())
 		proposal.AggregateQC = &aggQC
@@ -141,23 +142,20 @@ func BlockToProto(block *hotstuff.Block) *Block {
 		QC:       QuorumCertToProto(block.QuorumCert()),
 		View:     uint64(block.View()),
 		Proposer: uint32(block.Proposer()),
-		PipeId:   uint32(block.PipeId()),
 	}
 }
 
 // BlockFromProto converts a hotstuffpb.Block to a consensus.Block.
-func BlockFromProto(block *Block) (converted *hotstuff.Block) {
+func BlockFromProto(block *Block) *hotstuff.Block {
 	var p hotstuff.Hash
 	copy(p[:], block.GetParent())
-	converted = hotstuff.NewBlock(
+	return hotstuff.NewBlock(
 		p,
 		QuorumCertFromProto(block.GetQC()),
 		hotstuff.Command(block.GetCommand()),
 		hotstuff.View(block.GetView()),
 		hotstuff.ID(block.GetProposer()),
 	)
-	converted.SetPipe(pipelining.PipeId(block.PipeId))
-	return
 }
 
 // TimeoutMsgFromProto converts a TimeoutMsg proto to the hotstuff type.

@@ -31,6 +31,7 @@ service Hotstuff {
 message Proposal {
   Block Block = 1;
   AggQC AggQC = 2;
+  uint32 PipeId = 6;
 }
 
 message BlockHash { 
@@ -44,7 +45,6 @@ message Block {
   uint64 View = 3;
   bytes Command = 4;
   uint32 Proposer = 5;
-  uint32 PipeId = 6;
 }
 
 message ECDSASignature {

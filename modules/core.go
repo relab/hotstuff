@@ -137,7 +137,7 @@ func (mods *Core) Get(pointers ...any) {
 //		otherModule OtherModule
 //	}
 //
-//	func (m *MyModuleImpl) InitModule(mods *modules.Core, buildOpt modules.ModuleBuildOptions) {
+//	func (m *MyModuleImpl) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
 //		mods.GetFromPipe(m, &m.otherModule) // Requires an OtherModule from the same pipe
 //	}
 //
