@@ -9,6 +9,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -23,8 +24,9 @@ type pipedBlockChain struct {
 	mut           sync.Mutex
 	pruneHeight   hotstuff.View
 	blocks        map[hotstuff.Hash]*hotstuff.Block
-	blockAtHeight map[hotstuff.View]*hotstuff.Block
+	blockAtHeight map[pipelining.PipeId]map[hotstuff.View]*hotstuff.Block
 	pendingFetch  map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
+	pipes         []pipelining.PipeId
 }
 
 func (chain *pipedBlockChain) InitModule(mods *modules.Core, _ modules.InitOptions) {
@@ -38,12 +40,18 @@ func (chain *pipedBlockChain) InitModule(mods *modules.Core, _ modules.InitOptio
 
 // New creates a new blockChain with a maximum size.
 // Blocks are dropped in least recently used order.
-func NewPiped() modules.BlockChain {
+func NewPiped(pipes []pipelining.PipeId) modules.BlockChain {
 	bc := &pipedBlockChain{
 		blocks:        make(map[hotstuff.Hash]*hotstuff.Block),
-		blockAtHeight: make(map[hotstuff.View]*hotstuff.Block),
+		blockAtHeight: make(map[pipelining.PipeId]map[hotstuff.View]*hotstuff.Block),
 		pendingFetch:  make(map[hotstuff.Hash]context.CancelFunc),
+		pipes:         pipes,
 	}
+
+	for _, pid := range pipes {
+		bc.blockAtHeight[pid] = make(map[hotstuff.View]*hotstuff.Block)
+	}
+
 	bc.Store(hotstuff.GetGenesis())
 	return bc
 }
@@ -54,7 +62,7 @@ func (chain *pipedBlockChain) Store(block *hotstuff.Block) {
 	defer chain.mut.Unlock()
 
 	chain.blocks[block.Hash()] = block
-	chain.blockAtHeight[block.View()] = block
+	chain.blockAtHeight[block.Pipe()][block.View()] = block
 
 	// cancel any pending fetch operations
 	if cancel, ok := chain.pendingFetch[block.Hash()]; ok {
@@ -108,7 +116,7 @@ func (chain *pipedBlockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok
 	chain.logger.Debugf("Successfully fetched block: %.8s", hash)
 
 	chain.blocks[hash] = block
-	chain.blockAtHeight[block.View()] = block
+	chain.blockAtHeight[block.Pipe()][block.View()] = block
 
 done:
 	chain.mut.Unlock()
@@ -135,32 +143,35 @@ func (chain *pipedBlockChain) PruneToHeight(height hotstuff.View) (forkedBlocks 
 	defer chain.mut.Unlock()
 
 	committedHeight := height // chain.consensus.CommittedBlock().View()
-	committedViews := make(map[hotstuff.View]bool)
-	committedViews[committedHeight] = true
-	for h := committedHeight; h >= chain.pruneHeight; {
-		block, ok := chain.blockAtHeight[h]
-		if !ok {
-			break
-		}
-		parent, ok := chain.blocks[block.Parent()]
-		if !ok || parent.View() < chain.pruneHeight {
-			break
-		}
-		h = parent.View()
-		committedViews[h] = true
-	}
 
-	for h := height; h > chain.pruneHeight; h-- {
-		if !committedViews[h] {
-			block, ok := chain.blockAtHeight[h]
-			if ok {
-				chain.logger.Debugf("PruneToHeight: found forked block: %v", block)
-				forkedBlocks = append(forkedBlocks, block)
+	for _, pid := range chain.pipes {
+		committedViews := make(map[hotstuff.View]bool)
+		committedViews[committedHeight] = true
+		for h := committedHeight; h >= chain.pruneHeight; {
+			block, ok := chain.blockAtHeight[pid][h]
+			if !ok {
+				break
 			}
+			parent, ok := chain.blocks[block.Parent()]
+			if !ok || parent.View() < chain.pruneHeight {
+				break
+			}
+			h = parent.View()
+			committedViews[h] = true
 		}
-		delete(chain.blockAtHeight, h)
+
+		for h := height; h > chain.pruneHeight; h-- {
+			if !committedViews[h] {
+				block, ok := chain.blockAtHeight[pid][h]
+				if ok {
+					chain.logger.Debugf("PruneToHeight: found forked block: %v", block)
+					forkedBlocks = append(forkedBlocks, block)
+				}
+			}
+			delete(chain.blockAtHeight[pid], h)
+		}
+		chain.pruneHeight = height
 	}
-	chain.pruneHeight = height
 	return forkedBlocks
 }
 
