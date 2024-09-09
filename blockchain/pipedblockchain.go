@@ -16,10 +16,10 @@ import (
 // blockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type pipedBlockChain struct {
-	configuration modules.Configuration
-	// consensus     modules.Consensus
-	eventLoop *eventloop.EventLoop
-	logger    logging.Logger
+	configuration      modules.Configuration
+	consensusInstances map[pipelining.PipeId]modules.Consensus
+	eventLoop          *eventloop.EventLoop
+	logger             logging.Logger
 
 	mut           sync.Mutex
 	pruneHeight   hotstuff.View
@@ -32,20 +32,26 @@ type pipedBlockChain struct {
 func (chain *pipedBlockChain) InitModule(mods *modules.Core, _ modules.InitOptions) {
 	mods.Get(
 		&chain.configuration,
-		// &chain.consensus,
 		&chain.eventLoop,
 		&chain.logger,
 	)
+
+	for _, pid := range mods.Pipes() {
+		var inst modules.Consensus
+		mods.MatchForPipe(pid, &inst)
+		chain.consensusInstances[pid] = inst
+	}
 }
 
 // New creates a new blockChain with a maximum size.
 // Blocks are dropped in least recently used order.
 func NewPiped(pipes []pipelining.PipeId) modules.BlockChain {
 	bc := &pipedBlockChain{
-		blocks:        make(map[hotstuff.Hash]*hotstuff.Block),
-		blockAtHeight: make(map[pipelining.PipeId]map[hotstuff.View]*hotstuff.Block),
-		pendingFetch:  make(map[hotstuff.Hash]context.CancelFunc),
-		pipes:         pipes,
+		blocks:             make(map[hotstuff.Hash]*hotstuff.Block),
+		blockAtHeight:      make(map[pipelining.PipeId]map[hotstuff.View]*hotstuff.Block),
+		pendingFetch:       make(map[hotstuff.Hash]context.CancelFunc),
+		pipes:              pipes,
+		consensusInstances: make(map[pipelining.PipeId]modules.Consensus),
 	}
 
 	for _, pid := range pipes {
@@ -142,11 +148,13 @@ func (chain *pipedBlockChain) PruneToHeight(height hotstuff.View) (forkedBlocks 
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
-	committedHeight := height // chain.consensus.CommittedBlock().View()
+	// committedHeight := height // chain.consensus.CommittedBlock().View()
 
 	for _, pid := range chain.pipes {
+		committedHeight := chain.consensusInstances[pid].CommittedBlock().View()
 		committedViews := make(map[hotstuff.View]bool)
 		committedViews[committedHeight] = true
+
 		for h := committedHeight; h >= chain.pruneHeight; {
 			block, ok := chain.blockAtHeight[pid][h]
 			if !ok {
