@@ -31,7 +31,24 @@ func NewVotingMachine() *VotingMachine {
 }
 
 // InitModule initializes the VotingMachine.
-func (vm *VotingMachine) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
+func (vm *VotingMachine) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
+	if initOpt.IsPipeliningEnabled {
+		mods.Get(
+			&vm.blockChain,
+			&vm.configuration,
+			&vm.crypto,
+			&vm.eventLoop,
+			&vm.logger,
+			// &vm.synchronizer,
+			&vm.opts,
+		)
+
+		mods.GetFromPipe(vm, &vm.synchronizer)
+
+		vm.eventLoop.RegisterHandler(hotstuff.VoteMsg{}, func(event any) { vm.OnVote(event.(hotstuff.VoteMsg)) }, eventloop.RespondToPipe(initOpt.ModulePipeId))
+		return
+	}
+
 	mods.Get(
 		&vm.blockChain,
 		&vm.configuration,

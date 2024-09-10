@@ -11,6 +11,7 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
@@ -60,6 +61,53 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 		consensus.NewVotingMachine(),
 		leaderrotation.NewFixed(1),
 		synchronizer,
+		config,
+		signer,
+		acceptor,
+		modules.ExtendedExecutor(executor),
+		commandQ,
+		modules.ExtendedForkHandler(forkHandler),
+	)
+}
+
+// TestModules registers default modules for testing to the given builder.
+func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *modules.Builder) {
+	t.Helper()
+
+	acceptor := mocks.NewMockAcceptor(ctrl)
+	acceptor.EXPECT().Accept(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes().Return(true)
+	acceptor.EXPECT().Proposed(gomock.Any()).AnyTimes()
+
+	executor := mocks.NewMockExecutor(ctrl)
+	executor.EXPECT().Exec(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes()
+
+	forkHandler := mocks.NewMockForkHandler(ctrl)
+
+	commandQ := mocks.NewMockCommandQueue(ctrl)
+	commandQ.EXPECT().Get(gomock.Any()).AnyTimes().Return(hotstuff.Command("foo"), true)
+
+	signer := crypto.NewCache(ecdsa.New(), 10)
+
+	config := mocks.NewMockConfiguration(ctrl)
+	config.EXPECT().Len().AnyTimes().Return(1)
+	config.EXPECT().QuorumSize().AnyTimes().Return(3)
+
+	pipes := []pipelining.PipeId{1, 2, 3, 4}
+	builder.EnablePipelining(pipes)
+
+	builder.AddPiped(mocks.NewMockConsensus, ctrl)
+	builder.AddPiped(consensus.NewVotingMachine)
+	builder.AddPiped(leaderrotation.NewFixed, hotstuff.ID(1)) // TODO: Check if ID needs to be unique for pipes too
+	builder.AddPipedWithCallback(mocks.NewMockSynchronizer, []any{ctrl}, func(mod any) {
+		synchronizer := mod.(*mocks.MockSynchronizer)
+		synchronizer.EXPECT().Start(gomock.Any()).AnyTimes()
+		synchronizer.EXPECT().ViewContext().AnyTimes().Return(context.Background())
+	})
+
+	builder.Add(
+		eventloop.New(100),
+		logging.New(fmt.Sprintf("hs%d", id)),
+		blockchain.NewPiped(pipes),
 		config,
 		signer,
 		acceptor,

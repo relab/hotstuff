@@ -47,6 +47,30 @@ func TestConnect(t *testing.T) {
 	runBoth(t, run)
 }
 
+func TestConnectPiped(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		const n = 4
+		ctrl := gomock.NewController(t)
+		td := setup(t, ctrl, n)
+		builder := modules.NewBuilder(1, td.keys[0])
+		testutil.TestModulesPiped(t, ctrl, 1, td.keys[0], &builder)
+		teardown := createServers(t, td, ctrl)
+		defer teardown()
+		td.builders.Build()
+
+		cfg := NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
+
+		builder.Add(cfg)
+		builder.Build()
+
+		err := cfg.Connect(td.replicas)
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	runBoth(t, run)
+}
+
 // testBase is a generic test for a unicast/multicast call
 func testBase(t *testing.T, typ any, send func(modules.Configuration), handle eventloop.EventHandler, opts ...eventloop.HandlerOption) {
 	run := func(t *testing.T, setup setupFunc) {

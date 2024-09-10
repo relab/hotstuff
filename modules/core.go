@@ -43,8 +43,8 @@ import (
 type ModulePipe []Module
 
 type InitOptions struct {
-	isPiped bool
-	pipeId  pipelining.PipeId
+	IsPipeliningEnabled bool
+	ModulePipeId        pipelining.PipeId
 }
 
 // Module is an interface for initializing modules.
@@ -373,6 +373,56 @@ func (b *Builder) AddPiped(ctor any, ctorArgs ...any) {
 	}
 }
 
+// AddPipedWithCallback performs AddPiped with an additional callback parameter
+func (b *Builder) AddPipedWithCallback(ctor any, ctorArgs []any, callback func(any)) {
+	if reflect.TypeOf(ctor).Kind() != reflect.Func {
+		panic("first argument is not a function")
+	}
+
+	vargs := make([]reflect.Value, len(ctorArgs))
+	for n, v := range ctorArgs {
+		vargs[n] = reflect.ValueOf(v)
+	}
+
+	ctorVal := reflect.ValueOf(ctor)
+	if !b.pipeliningEnabled {
+		returnResult := ctorVal.Call(vargs)
+		if len(returnResult) != 1 {
+			panic("constructor does not return a single value")
+		}
+		mod := returnResult[0].Interface()
+		// converted, ok := mod.(Module)
+		// if !ok {
+		// 	// TODO: Consider if this is necessary
+		// 	// panic("constructor did not construct a value that could be casted to Module")
+		// 	b.core.staticModules = append(b.core.staticModules, mod)
+		// 	return
+		// }
+		b.Add(mod)
+		callback(mod)
+		return
+	}
+
+	for id := range b.modulePipes {
+		returnResult := ctorVal.Call(vargs)
+		if len(returnResult) != 1 {
+			panic("constructor does not return a single value")
+		}
+		mod := returnResult[0].Interface()
+		callback(mod)
+
+		converted, ok := mod.(Module)
+
+		b.core.pipedModules[id] = append(b.core.pipedModules[id], mod)
+		if !ok {
+			// TODO: Consider if this is necessary
+			// panic("constructor did not construct a value that could be casted to Module")
+			continue
+		}
+		b.modulePipes[id] = append(b.modulePipes[id], converted)
+	}
+}
+
 // Build initializes all added modules and returns the Core object.
 func (b *Builder) Build() *Core {
 	// reverse the order of the added modules so that TryGet will find the latest first.
@@ -382,8 +432,8 @@ func (b *Builder) Build() *Core {
 	// add the Options last so that it can be overridden by user.
 	b.Add(b.opts)
 	opt := InitOptions{
-		isPiped: false,
-		pipeId:  pipelining.NullPipeId,
+		IsPipeliningEnabled: b.pipeliningEnabled,
+		ModulePipeId:        pipelining.NullPipeId,
 	}
 	for _, module := range b.staticModules {
 		module.InitModule(&b.core, opt)
@@ -406,8 +456,8 @@ func (b *Builder) Build() *Core {
 	// other modules in the same pipe without panicking.
 	for pipeId, pipe := range b.modulePipes {
 		pipeOpt := InitOptions{
-			isPiped: true,
-			pipeId:  pipeId,
+			IsPipeliningEnabled: b.pipeliningEnabled,
+			ModulePipeId:        pipeId,
 		}
 		for _, module := range pipe {
 			module.(Module).InitModule(&b.core, pipeOpt)

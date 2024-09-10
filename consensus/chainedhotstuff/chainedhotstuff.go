@@ -30,7 +30,7 @@ func New() consensus.Rules {
 }
 
 // InitModule initializes the module.
-func (hs *ChainedHotStuff) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
+func (hs *ChainedHotStuff) InitModule(mods *modules.Core, _ modules.InitOptions) {
 	mods.Get(&hs.blockChain, &hs.logger)
 }
 
