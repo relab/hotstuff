@@ -71,7 +71,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 }
 
 // TestModules registers default modules for testing to the given builder.
-func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *modules.Builder) {
+func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *modules.Builder, pipes []pipelining.PipeId) {
 	t.Helper()
 
 	acceptor := mocks.NewMockAcceptor(ctrl)
@@ -92,8 +92,7 @@ func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ h
 	config.EXPECT().Len().AnyTimes().Return(1)
 	config.EXPECT().QuorumSize().AnyTimes().Return(3)
 
-	pipes := []pipelining.PipeId{1, 2, 3, 4}
-	builder.EnablePipelining(pipes)
+	// builder.EnablePipelining(pipes)
 
 	builder.AddPiped(mocks.NewMockConsensus, ctrl)
 	builder.AddPiped(consensus.NewVotingMachine)
@@ -178,6 +177,30 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 		builder := network.GetNodeBuilder(twins.NodeID{ReplicaID: id, NetworkID: uint32(id)}, key)
 		builder.Add(network.NewConfiguration())
 		TestModules(t, ctrl, id, key, &builder)
+		builder.Add(network.NewConfiguration())
+		builders[i] = &builder
+	}
+	return builders
+}
+
+// TODO: Complete the implementation.
+func CreateBuildersPiped(t *testing.T, ctrl *gomock.Controller, n int, pipes []pipelining.PipeId, keys ...hotstuff.PrivateKey) (builders BuilderList) {
+	t.Helper()
+	network := twins.NewSimpleNetwork()
+	builders = make([]*modules.Builder, n)
+	for i := 0; i < n; i++ {
+		id := hotstuff.ID(i + 1)
+		var key hotstuff.PrivateKey
+		if i < len(keys) {
+			key = keys[i]
+		} else {
+			key = GenerateECDSAKey(t)
+		}
+
+		builder := network.GetNodeBuilder(twins.NodeID{ReplicaID: id, NetworkID: uint32(id)}, key)
+		builder.EnablePipelining(pipes)
+		builder.Add(network.NewConfiguration())
+		TestModulesPiped(t, ctrl, id, key, &builder, pipes)
 		builder.Add(network.NewConfiguration())
 		builders[i] = &builder
 	}

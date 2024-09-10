@@ -44,7 +44,7 @@ func Prioritize() HandlerOption {
 }
 
 // RespondToPipe assigns which pipe ID to respond to when PipeEvent is used to add an event to the
-// eventloop.
+// eventloop. If the NullPipeId (0) is passed, this handler option will not take effect.
 func RespondToPipe(pipeId pipelining.PipeId) HandlerOption {
 	return func(ho *handlerOpts) {
 		ho.pipeId = pipeId
@@ -244,7 +244,6 @@ func (el *EventLoop) Tick(ctx context.Context) bool {
 var handlerListPool = gpool.New(func() []EventHandler { return make([]EventHandler, 0, 10) })
 
 // processEvent dispatches the event to the correct handler.
-// TODO: Process piped events
 func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
 	pipeId := pipelining.NullPipeId
 	_, ok := event.(pipedEventWrapper)

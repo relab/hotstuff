@@ -43,16 +43,19 @@ type Synchronizer struct {
 }
 
 // InitModule initializes the synchronizer.
-func (s *Synchronizer) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
+func (s *Synchronizer) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
 	mods.Get(
 		&s.blockChain,
-		&s.consensus,
 		&s.crypto,
 		&s.configuration,
 		&s.eventLoop,
-		&s.leaderRotation,
 		&s.logger,
 		&s.opts,
+	)
+
+	mods.GetFromPipe(s,
+		&s.consensus,
+		&s.leaderRotation,
 	)
 
 	s.eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
@@ -60,17 +63,17 @@ func (s *Synchronizer) InitModule(mods *modules.Core, buildOpt modules.InitOptio
 		if s.View() == timeoutView {
 			s.OnLocalTimeout()
 		}
-	})
+	}, eventloop.RespondToPipe(initOpt.ModulePipeId))
 
 	s.eventLoop.RegisterHandler(hotstuff.NewViewMsg{}, func(event any) {
 		newViewMsg := event.(hotstuff.NewViewMsg)
 		s.OnNewView(newViewMsg)
-	})
+	}, eventloop.RespondToPipe(initOpt.ModulePipeId))
 
 	s.eventLoop.RegisterHandler(hotstuff.TimeoutMsg{}, func(event any) {
 		timeoutMsg := event.(hotstuff.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
-	})
+	}, eventloop.RespondToPipe(initOpt.ModulePipeId))
 
 	var err error
 	s.highQC, err = s.crypto.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})

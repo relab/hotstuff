@@ -120,7 +120,7 @@ func (mods *Core) Get(pointers ...any) {
 }
 
 // GetFromPipe finds compatible modules for the given pointers, assuming that moduleInPipe is in the same module
-// pipe as those compatible pointers.
+// pipe as those compatible pointers. If pipelining was not enabled in the Builder, Get is called internally.
 //
 // NOTE: pointers must only contain non-nil pointers to types that have been provided to the module system
 // as a piped module.
@@ -184,7 +184,7 @@ func (mods *Core) TryGetFromPipe(moduleInPipe Module, ptr any) bool {
 		pipe := mods.pipedModules[id]
 		// Check if self is in pipe
 		for _, module := range pipe {
-			// TODO: Check if equality checking is correct
+			// TODO: Verify if equality comparison is correct
 			if module == moduleInPipe {
 				correctPipeId = id
 				break
@@ -217,6 +217,10 @@ func (mods *Core) TryGetFromPipe(moduleInPipe Module, ptr any) bool {
 // This is mainly a helper function for tests and should not be used in
 // practical applications.
 func (core *Core) MatchForPipe(pipeId pipelining.PipeId, ptr any) {
+	if len(core.pipedModules) == 0 {
+		panic("pipelining is not enabled")
+	}
+
 	v := reflect.ValueOf(ptr)
 	if !v.IsValid() {
 		panic("pointer value cannot be nil")
@@ -236,7 +240,7 @@ func (core *Core) MatchForPipe(pipeId pipelining.PipeId, ptr any) {
 		}
 	}
 
-	panic("no match found")
+	panic("no match found for " + pt.Elem().Name())
 }
 
 // Return the number of pipes the builder has generated.
@@ -344,13 +348,6 @@ func (b *Builder) AddPiped(ctor any, ctorArgs ...any) {
 			panic("constructor does not return a single value")
 		}
 		mod := returnResult[0].Interface()
-		// converted, ok := mod.(Module)
-		// if !ok {
-		// 	// TODO: Consider if this is necessary
-		// 	// panic("constructor did not construct a value that could be casted to Module")
-		// 	b.core.staticModules = append(b.core.staticModules, mod)
-		// 	return
-		// }
 		b.Add(mod)
 		return
 	}
@@ -365,8 +362,6 @@ func (b *Builder) AddPiped(ctor any, ctorArgs ...any) {
 
 		b.core.pipedModules[id] = append(b.core.pipedModules[id], mod)
 		if !ok {
-			// TODO: Consider if this is necessary
-			// panic("constructor did not construct a value that could be casted to Module")
 			continue
 		}
 		b.modulePipes[id] = append(b.modulePipes[id], converted)
@@ -391,13 +386,6 @@ func (b *Builder) AddPipedWithCallback(ctor any, ctorArgs []any, callback func(a
 			panic("constructor does not return a single value")
 		}
 		mod := returnResult[0].Interface()
-		// converted, ok := mod.(Module)
-		// if !ok {
-		// 	// TODO: Consider if this is necessary
-		// 	// panic("constructor did not construct a value that could be casted to Module")
-		// 	b.core.staticModules = append(b.core.staticModules, mod)
-		// 	return
-		// }
 		b.Add(mod)
 		callback(mod)
 		return
@@ -415,8 +403,6 @@ func (b *Builder) AddPipedWithCallback(ctor any, ctorArgs []any, callback func(a
 
 		b.core.pipedModules[id] = append(b.core.pipedModules[id], mod)
 		if !ok {
-			// TODO: Consider if this is necessary
-			// panic("constructor did not construct a value that could be casted to Module")
 			continue
 		}
 		b.modulePipes[id] = append(b.modulePipes[id], converted)

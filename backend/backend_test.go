@@ -47,13 +47,14 @@ func TestConnect(t *testing.T) {
 	runBoth(t, run)
 }
 
+// Mainly test initialization of piped modules and how they depend on each other.
 func TestConnectPiped(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		ctrl := gomock.NewController(t)
 		td := setup(t, ctrl, n)
 		builder := modules.NewBuilder(1, td.keys[0])
-		testutil.TestModulesPiped(t, ctrl, 1, td.keys[0], &builder)
+		testutil.TestModulesPiped(t, ctrl, 1, td.keys[0], &builder, []pipelining.PipeId{1, 2, 3, 4})
 		teardown := createServers(t, td, ctrl)
 		defer teardown()
 		td.builders.Build()

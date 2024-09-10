@@ -69,7 +69,7 @@ func New(impl Rules) modules.Consensus {
 }
 
 // InitModule initializes the module.
-func (cs *consensusBase) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
+func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
 	mods.Get(
 		&cs.acceptor,
 		&cs.blockChain,
@@ -79,21 +79,24 @@ func (cs *consensusBase) InitModule(mods *modules.Core, buildOpt modules.InitOpt
 		&cs.eventLoop,
 		&cs.executor,
 		&cs.forkHandler,
-		&cs.leaderRotation,
 		&cs.logger,
 		&cs.opts,
+	)
+
+	mods.GetFromPipe(cs,
 		&cs.synchronizer,
+		&cs.leaderRotation,
 	)
 
 	mods.TryGet(&cs.handel)
 
 	if mod, ok := cs.impl.(modules.Module); ok {
-		mod.InitModule(mods, buildOpt)
+		mod.InitModule(mods, initOpt)
 	}
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.OnPropose(event.(hotstuff.ProposeMsg))
-	})
+	}, eventloop.RespondToPipe(initOpt.ModulePipeId))
 }
 
 func (cs *consensusBase) CommittedBlock() *hotstuff.Block {
