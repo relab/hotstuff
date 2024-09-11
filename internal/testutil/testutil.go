@@ -106,7 +106,7 @@ func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ h
 	builder.Add(
 		eventloop.New(100),
 		logging.New(fmt.Sprintf("hs%d", id)),
-		blockchain.NewPiped(pipes),
+		blockchain.New(),
 		config,
 		signer,
 		acceptor,

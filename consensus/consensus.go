@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/relab/hotstuff"
@@ -55,8 +54,7 @@ type consensusBase struct {
 
 	lastVote hotstuff.View
 
-	mut   sync.Mutex
-	bExec *hotstuff.Block
+	mut sync.Mutex
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
@@ -64,7 +62,6 @@ func New(impl Rules) modules.Consensus {
 	return &consensusBase{
 		impl:     impl,
 		lastVote: 0,
-		bExec:    hotstuff.GetGenesis(),
 	}
 }
 
@@ -100,9 +97,10 @@ func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOpti
 }
 
 func (cs *consensusBase) CommittedBlock() *hotstuff.Block {
-	cs.mut.Lock()
-	defer cs.mut.Unlock()
-	return cs.bExec
+	// cs.mut.Lock()
+	// defer cs.mut.Unlock()
+	// return cs.bExec
+	return cs.executor.CommittedBlock()
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
@@ -217,7 +215,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	cs.blockChain.Store(block)
 
 	if b := cs.impl.CommitRule(block); b != nil {
-		cs.commit(b)
+		cs.executor.Exec(block)
 	}
 	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 
@@ -253,43 +251,6 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	}
 
 	leader.Vote(pc)
-}
-
-func (cs *consensusBase) commit(block *hotstuff.Block) {
-	cs.mut.Lock()
-	// can't recurse due to requiring the mutex, so we use a helper instead.
-	err := cs.commitInner(block)
-	cs.mut.Unlock()
-
-	if err != nil {
-		cs.logger.Warnf("failed to commit: %v", err)
-		return
-	}
-
-	// prune the blockchain and handle forked blocks
-	forkedBlocks := cs.blockChain.PruneToHeight(block.View())
-	for _, block := range forkedBlocks {
-		cs.forkHandler.Fork(block)
-	}
-}
-
-// recursive helper for commit
-func (cs *consensusBase) commitInner(block *hotstuff.Block) error {
-	if cs.bExec.View() >= block.View() {
-		return nil
-	}
-	if parent, ok := cs.blockChain.Get(block.Parent()); ok {
-		err := cs.commitInner(parent)
-		if err != nil {
-			return err
-		}
-	} else {
-		return fmt.Errorf("failed to locate block: %s", block.Parent())
-	}
-	cs.logger.Debug("EXEC: ", block)
-	cs.executor.Exec(block)
-	cs.bExec = block
-	return nil
 }
 
 // ChainLength returns the number of blocks that need to be chained together in order to commit.

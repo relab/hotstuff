@@ -2,8 +2,11 @@ package modules
 
 import (
 	"context"
+	"fmt"
+	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/logging"
 )
 
 // Module interfaces
@@ -44,6 +47,7 @@ type Executor interface {
 type ExecutorExt interface {
 	// Exec executes the command in the block.
 	Exec(block *hotstuff.Block)
+	CommittedBlock() *hotstuff.Block
 }
 
 //go:generate mockgen -destination=../internal/mocks/forkhandler_mock.go -package=mocks . ForkHandler
@@ -170,21 +174,74 @@ type Handel interface {
 
 // ExtendedExecutor turns the given Executor into an ExecutorExt.
 func ExtendedExecutor(executor Executor) ExecutorExt {
-	return executorWrapper{executor}
+	return &executorWrapper{executor: executor, bExec: hotstuff.GetGenesis()}
 }
 
 type executorWrapper struct {
-	executor Executor
+	blockChain  BlockChain
+	executor    Executor
+	forkHandler ForkHandlerExt
+	logger      logging.Logger
+
+	mut   sync.Mutex
+	bExec *hotstuff.Block
 }
 
-func (ew executorWrapper) InitModule(mods *Core, buildOpt InitOptions) {
+func (ew *executorWrapper) InitModule(mods *Core, buildOpt InitOptions) {
+	mods.Get(
+		&ew.forkHandler,
+		&ew.blockChain,
+		&ew.logger,
+	)
 	if m, ok := ew.executor.(Module); ok {
 		m.InitModule(mods, buildOpt)
 	}
 }
 
-func (ew executorWrapper) Exec(block *hotstuff.Block) {
+func (ew *executorWrapper) Exec(block *hotstuff.Block) {
+	ew.commit(block)
+}
+
+func (ew *executorWrapper) CommittedBlock() *hotstuff.Block {
+	return ew.bExec
+}
+
+func (cs *executorWrapper) commit(block *hotstuff.Block) {
+	cs.mut.Lock()
+	// can't recurse due to requiring the mutex, so we use a helper instead.
+	err := cs.commitInner(block)
+	cs.mut.Unlock()
+
+	if err != nil {
+		cs.logger.Warnf("failed to commit: %v", err)
+		return
+	}
+
+	// cs.commitComp.Commit(block)
+	// prune the blockchain and handle forked blocks
+	forkedBlocks := cs.blockChain.PruneToHeight(block.View())
+	for _, block := range forkedBlocks {
+		cs.forkHandler.Fork(block)
+	}
+}
+
+// recursive helper for commit
+func (ew *executorWrapper) commitInner(block *hotstuff.Block) error {
+	if ew.bExec.View() >= block.View() {
+		return nil
+	}
+	if parent, ok := ew.blockChain.Get(block.Parent()); ok {
+		err := ew.commitInner(parent)
+		if err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("failed to locate block: %s", block.Parent())
+	}
+	ew.logger.Debug("EXEC: ", block)
 	ew.executor.Exec(block.Command())
+	ew.bExec = block
+	return nil
 }
 
 // ExtendedForkHandler turns the given ForkHandler into a ForkHandlerExt.

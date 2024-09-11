@@ -20,9 +20,10 @@ type blockChain struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
 
-	mut           sync.Mutex
-	pruneHeight   hotstuff.View
-	blocks        map[hotstuff.Hash]*hotstuff.Block
+	mut         sync.Mutex
+	pruneHeight hotstuff.View
+	blocks      map[hotstuff.Hash]*hotstuff.Block
+	// blocksAtHeight map[hotstuff.View][]*hotstuff.Block
 	blockAtHeight map[hotstuff.View]*hotstuff.Block
 	pendingFetch  map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
 }
