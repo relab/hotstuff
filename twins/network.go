@@ -18,7 +18,6 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
 	"github.com/relab/hotstuff/synchronizer"
 	"golang.org/x/exp/maps"
 )
@@ -35,17 +34,13 @@ func (id NodeID) String() string {
 	return fmt.Sprintf("r%dn%d", id.ReplicaID, id.NetworkID)
 }
 
-type nodeModulePipe struct {
-	consensus      modules.Consensus
-	leaderRotation modules.LeaderRotation
-	synchronizer   modules.Synchronizer
-}
-
 type node struct {
-	blockChain   modules.BlockChain
-	eventLoop    *eventloop.EventLoop
-	opts         *modules.Options
-	pipedModules map[pipelining.PipeId]nodeModulePipe
+	blockChain     modules.BlockChain
+	consensus      modules.Consensus
+	eventLoop      *eventloop.EventLoop
+	leaderRotation modules.LeaderRotation
+	opts           *modules.Options
+	synchronizer   modules.Synchronizer
 
 	id             NodeID
 	executedBlocks []*hotstuff.Block
@@ -54,34 +49,18 @@ type node struct {
 }
 
 func (n *node) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
-	n.pipedModules = make(map[pipelining.PipeId]nodeModulePipe)
 	if initOpt.IsPipeliningEnabled {
-		mods.Get(
-			&n.blockChain,
-			&n.eventLoop,
-			&n.opts,
-		)
-
-		for _, pid := range mods.Pipes() {
-			pipe := nodeModulePipe{}
-			mods.MatchForPipe(pid, &pipe.consensus)
-			mods.MatchForPipe(pid, &pipe.leaderRotation)
-			mods.MatchForPipe(pid, &pipe.synchronizer)
-			n.pipedModules[pid] = pipe
-		}
-		return
+		panic("pipelining not supported for this module")
 	}
 
-	pipe := nodeModulePipe{}
 	mods.Get(
 		&n.blockChain,
-		&pipe.consensus,
+		&n.consensus,
 		&n.eventLoop,
-		&pipe.leaderRotation,
-		&pipe.synchronizer,
+		&n.leaderRotation,
+		&n.synchronizer,
 		&n.opts,
 	)
-	n.pipedModules[pipelining.NullPipeId] = pipe
 }
 
 type pendingMessage struct {
@@ -186,10 +165,8 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 func (n *Network) run(ticks int) {
 	// kick off the initial proposal(s)
 	for _, node := range n.nodes {
-		for _, pipe := range node.pipedModules {
-			if pipe.leaderRotation.GetLeader(1) == node.id.ReplicaID {
-				pipe.consensus.Propose(pipe.synchronizer.(*synchronizer.Synchronizer).SyncInfo())
-			}
+		if node.leaderRotation.GetLeader(1) == node.id.ReplicaID {
+			node.consensus.Propose(node.synchronizer.(*synchronizer.Synchronizer).SyncInfo())
 		}
 	}
 
@@ -224,10 +201,10 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 	// Index into viewPartitions.
 	// TODO: Implement pipelining logic here
 	i := -1
-	if node.effectiveView > node.pipedModules[pipelining.NullPipeId].synchronizer.View() {
+	if node.effectiveView > node.synchronizer.View() {
 		i += int(node.effectiveView)
 	} else {
-		i += int(node.pipedModules[pipelining.NullPipeId].synchronizer.View())
+		i += int(node.synchronizer.View())
 	}
 
 	if i < 0 {
@@ -263,7 +240,7 @@ type configuration struct {
 }
 
 // alternative way to get a pointer to the node.
-func (c *configuration) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
+func (c *configuration) InitModule(mods *modules.Core, _ modules.InitOptions) {
 	if c.node == nil {
 		mods.TryGet(&c.node)
 	}
