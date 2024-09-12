@@ -7,6 +7,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipelining"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -39,11 +40,11 @@ type consensusBase struct {
 
 	acceptor       modules.Acceptor
 	blockChain     modules.BlockChain
+	blockComp      modules.BlockCompositor
 	commandQueue   modules.CommandQueue
 	configuration  modules.Configuration
 	crypto         modules.Crypto
 	eventLoop      *eventloop.EventLoop
-	executor       modules.ExecutorExt
 	forkHandler    modules.ForkHandlerExt
 	leaderRotation modules.LeaderRotation
 	logger         logging.Logger
@@ -53,6 +54,7 @@ type consensusBase struct {
 	handel modules.Handel
 
 	lastVote hotstuff.View
+	pipe     pipelining.PipeId
 
 	mut sync.Mutex
 }
@@ -67,14 +69,16 @@ func New(impl Rules) modules.Consensus {
 
 // InitModule initializes the module.
 func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
+	cs.pipe = initOpt.ModulePipeId
+
 	mods.Get(
 		&cs.acceptor,
 		&cs.blockChain,
+		&cs.blockComp,
 		&cs.commandQueue,
 		&cs.configuration,
 		&cs.crypto,
 		&cs.eventLoop,
-		&cs.executor,
 		&cs.forkHandler,
 		&cs.logger,
 		&cs.opts,
@@ -97,10 +101,7 @@ func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOpti
 }
 
 func (cs *consensusBase) CommittedBlock() *hotstuff.Block {
-	// cs.mut.Lock()
-	// defer cs.mut.Unlock()
-	// return cs.bExec
-	return cs.executor.CommittedBlock()
+	return cs.blockComp.CommittedBlock(cs.pipe)
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
@@ -215,7 +216,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	cs.blockChain.Store(block)
 
 	if b := cs.impl.CommitRule(block); b != nil {
-		cs.executor.Exec(block)
+		cs.blockComp.Store(block)
 	}
 	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 
