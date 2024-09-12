@@ -37,12 +37,13 @@ func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID,
 
 func (b *Block) String() string {
 	return fmt.Sprintf(
-		"Block{ hash: %.6s parent: %.6s, proposer: %d, view: %d , cert: %v }",
+		"Block{ hash: %.6s parent: %.6s, proposer: %d, view: %d , cert: %v, pipe: %d }",
 		b.Hash().String(),
 		b.parent.String(),
 		b.proposer,
 		b.view,
 		b.cert,
+		b.pipe,
 	)
 }
 

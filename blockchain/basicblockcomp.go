@@ -47,7 +47,6 @@ func (bb *basicBlockComp) Store(block *hotstuff.Block) {
 		return
 	}
 
-	// cs.commitComp.Commit(block)
 	// prune the blockchain and handle forked blocks
 	forkedBlocks := bb.blockChain.PruneToHeight(block.View())
 	for _, block := range forkedBlocks {
@@ -76,5 +75,7 @@ func (bb *basicBlockComp) commitInner(block *hotstuff.Block) error {
 
 // Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
 func (bb *basicBlockComp) CommittedBlock(_ pipelining.PipeId) *hotstuff.Block {
+	bb.mut.Lock()
+	defer bb.mut.Unlock()
 	return bb.bExec
 }
