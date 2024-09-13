@@ -10,7 +10,7 @@ import (
 	"github.com/relab/hotstuff/pipelining"
 )
 
-type basicBlockComp struct {
+type basicBlockComm struct {
 	blockChain  modules.BlockChain
 	executor    modules.ExecutorExt
 	forkHandler modules.ForkHandlerExt
@@ -20,13 +20,13 @@ type basicBlockComp struct {
 	bExec *hotstuff.Block
 }
 
-func NewBasicBlockComp() modules.BlockCompositor {
-	return &basicBlockComp{
+func NewBasicBlockComm() modules.BlockCommitter {
+	return &basicBlockComm{
 		bExec: hotstuff.GetGenesis(),
 	}
 }
 
-func (bb *basicBlockComp) InitModule(mods *modules.Core, _ modules.InitOptions) {
+func (bb *basicBlockComm) InitModule(mods *modules.Core, _ modules.InitOptions) {
 	mods.Get(
 		&bb.executor,
 		&bb.blockChain,
@@ -36,7 +36,7 @@ func (bb *basicBlockComp) InitModule(mods *modules.Core, _ modules.InitOptions) 
 }
 
 // Stores the block before further execution.
-func (bb *basicBlockComp) Store(block *hotstuff.Block) {
+func (bb *basicBlockComm) Store(block *hotstuff.Block) {
 	bb.mut.Lock()
 	// can't recurse due to requiring the mutex, so we use a helper instead.
 	err := bb.commitInner(block)
@@ -55,7 +55,7 @@ func (bb *basicBlockComp) Store(block *hotstuff.Block) {
 }
 
 // recursive helper for commit
-func (bb *basicBlockComp) commitInner(block *hotstuff.Block) error {
+func (bb *basicBlockComm) commitInner(block *hotstuff.Block) error {
 	if bb.bExec.View() >= block.View() {
 		return nil
 	}
@@ -74,7 +74,7 @@ func (bb *basicBlockComp) commitInner(block *hotstuff.Block) error {
 }
 
 // Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
-func (bb *basicBlockComp) CommittedBlock(_ pipelining.PipeId) *hotstuff.Block {
+func (bb *basicBlockComm) CommittedBlock(_ pipelining.PipeId) *hotstuff.Block {
 	bb.mut.Lock()
 	defer bb.mut.Unlock()
 	return bb.bExec

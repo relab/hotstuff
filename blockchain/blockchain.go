@@ -24,8 +24,8 @@ type blockChain struct {
 	pruneHeight hotstuff.View
 	blocks      map[hotstuff.Hash]*hotstuff.Block
 	// blocksAtHeight map[hotstuff.View][]*hotstuff.Block
-	blockAtHeight map[hotstuff.View]*hotstuff.Block
-	pendingFetch  map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
+	blocksAtHeight map[hotstuff.View][]*hotstuff.Block
+	pendingFetch   map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
 }
 
 func (chain *blockChain) InitModule(mods *modules.Core, _ modules.InitOptions) {
@@ -41,9 +41,9 @@ func (chain *blockChain) InitModule(mods *modules.Core, _ modules.InitOptions) {
 // Blocks are dropped in least recently used order.
 func New() modules.BlockChain {
 	bc := &blockChain{
-		blocks:        make(map[hotstuff.Hash]*hotstuff.Block),
-		blockAtHeight: make(map[hotstuff.View]*hotstuff.Block),
-		pendingFetch:  make(map[hotstuff.Hash]context.CancelFunc),
+		blocks:         make(map[hotstuff.Hash]*hotstuff.Block),
+		blocksAtHeight: make(map[hotstuff.View][]*hotstuff.Block),
+		pendingFetch:   make(map[hotstuff.Hash]context.CancelFunc),
 	}
 	bc.Store(hotstuff.GetGenesis())
 	return bc
@@ -55,7 +55,7 @@ func (chain *blockChain) Store(block *hotstuff.Block) {
 	defer chain.mut.Unlock()
 
 	chain.blocks[block.Hash()] = block
-	chain.blockAtHeight[block.View()] = block
+	chain.blocksAtHeight[block.View()] = append(chain.blocksAtHeight[block.View()], block)
 
 	// cancel any pending fetch operations
 	if cancel, ok := chain.pendingFetch[block.Hash()]; ok {
@@ -109,7 +109,7 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 	chain.logger.Debugf("Successfully fetched block: %.8s", hash)
 
 	chain.blocks[hash] = block
-	chain.blockAtHeight[block.View()] = block
+	chain.blocksAtHeight[block.View()] = append(chain.blocksAtHeight[block.View()], block)
 
 done:
 	chain.mut.Unlock()
@@ -131,38 +131,35 @@ func (chain *blockChain) Extends(block, target *hotstuff.Block) bool {
 	return ok && current.Hash() == target.Hash()
 }
 
-func (chain *blockChain) PruneToHeight(height hotstuff.View) (forkedBlocks []*hotstuff.Block) {
+// TODO: Test this algorithm
+func (chain *blockChain) PruneToHeight(height hotstuff.View) (prunedBlocks []*hotstuff.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
-	committedHeight := height // chain.consensus.CommittedBlock().View()
-	committedViews := make(map[hotstuff.View]bool)
-	committedViews[committedHeight] = true
-	for h := committedHeight; h >= chain.pruneHeight; {
-		block, ok := chain.blockAtHeight[h]
+	for h := height; h >= chain.pruneHeight; {
+		blocks, ok := chain.blocksAtHeight[h]
 		if !ok {
 			break
 		}
-		parent, ok := chain.blocks[block.Parent()]
-		if !ok || parent.View() < chain.pruneHeight {
-			break
+		for _, block := range blocks {
+			parent, ok := chain.blocks[block.Parent()]
+			// Stop at the lowest block (previously pruned height)
+			if !ok || parent.View() < chain.pruneHeight {
+				break
+			}
+			// Add pruned blocks to list and go back a height
+			prunedBlocks = append(prunedBlocks, block)
+			// This is reassigned to the same value for as many
+			// blocks as there are in the blocks list.
+			// TODO: Verify theory in comment above
+			h = parent.View()
 		}
-		h = parent.View()
-		committedViews[h] = true
+		delete(chain.blocksAtHeight, h)
 	}
 
-	for h := height; h > chain.pruneHeight; h-- {
-		if !committedViews[h] {
-			block, ok := chain.blockAtHeight[h]
-			if ok {
-				chain.logger.Debugf("PruneToHeight: found forked block: %v", block)
-				forkedBlocks = append(forkedBlocks, block)
-			}
-		}
-		delete(chain.blockAtHeight, h)
-	}
 	chain.pruneHeight = height
-	return forkedBlocks
+
+	return prunedBlocks
 }
 
 var _ modules.BlockChain = (*blockChain)(nil)

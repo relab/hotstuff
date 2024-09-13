@@ -204,7 +204,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		sync,
 		w.metricsLogger,
 		blockchain.New(),
-		blockchain.NewBasicBlockComp(),
+		blockchain.NewBasicBlockComm(),
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
