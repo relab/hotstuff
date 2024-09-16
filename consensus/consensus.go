@@ -40,7 +40,7 @@ type consensusBase struct {
 
 	acceptor       modules.Acceptor
 	blockChain     modules.BlockChain
-	blockComp      modules.BlockCommitter
+	committer      modules.BlockCommitter
 	commandQueue   modules.CommandQueue
 	configuration  modules.Configuration
 	crypto         modules.Crypto
@@ -74,7 +74,7 @@ func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOpti
 	mods.Get(
 		&cs.acceptor,
 		&cs.blockChain,
-		&cs.blockComp,
+		&cs.committer,
 		&cs.commandQueue,
 		&cs.configuration,
 		&cs.crypto,
@@ -101,7 +101,7 @@ func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOpti
 }
 
 func (cs *consensusBase) CommittedBlock() *hotstuff.Block {
-	return cs.blockComp.CommittedBlock(cs.pipe)
+	return cs.committer.CommittedBlock(cs.pipe)
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
@@ -216,7 +216,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	cs.blockChain.Store(block)
 
 	if b := cs.impl.CommitRule(block); b != nil {
-		cs.blockComp.Store(block)
+		cs.committer.Store(block)
 	}
 	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 

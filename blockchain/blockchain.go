@@ -162,4 +162,8 @@ func (chain *blockChain) PruneToHeight(height hotstuff.View) (prunedBlocks []*ho
 	return prunedBlocks
 }
 
+func (chain *blockChain) FindForks(blocks []*hotstuff.Block) []*hotstuff.Block {
+	return nil
+}
+
 var _ modules.BlockChain = (*blockChain)(nil)

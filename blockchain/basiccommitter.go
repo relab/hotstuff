@@ -10,7 +10,7 @@ import (
 	"github.com/relab/hotstuff/pipelining"
 )
 
-type pipedBlockComm struct {
+type basicCommitter struct {
 	blockChain  modules.BlockChain
 	executor    modules.ExecutorExt
 	forkHandler modules.ForkHandlerExt
@@ -20,13 +20,13 @@ type pipedBlockComm struct {
 	bExec *hotstuff.Block
 }
 
-func NewPipedBlockComp() modules.BlockCommitter {
-	return &pipedBlockComm{
+func NewBasicCommitter() modules.BlockCommitter {
+	return &basicCommitter{
 		bExec: hotstuff.GetGenesis(),
 	}
 }
 
-func (bb *pipedBlockComm) InitModule(mods *modules.Core, _ modules.InitOptions) {
+func (bb *basicCommitter) InitModule(mods *modules.Core, _ modules.InitOptions) {
 	mods.Get(
 		&bb.executor,
 		&bb.blockChain,
@@ -36,12 +36,9 @@ func (bb *pipedBlockComm) InitModule(mods *modules.Core, _ modules.InitOptions) 
 }
 
 // Stores the block before further execution.
-func (bb *pipedBlockComm) Store(block *hotstuff.Block) {
-	bb.mut.Lock()
-	// can't recurse due to requiring the mutex, so we use a helper instead.
-	err := bb.commitInner(block)
-	bb.mut.Unlock()
-
+func (bb *basicCommitter) Store(block *hotstuff.Block) {
+	return
+	err := bb.commit(block)
 	if err != nil {
 		bb.logger.Warnf("failed to commit: %v", err)
 		return
@@ -54,8 +51,16 @@ func (bb *pipedBlockComm) Store(block *hotstuff.Block) {
 	}
 }
 
+func (bb *basicCommitter) commit(block *hotstuff.Block) error {
+	bb.mut.Lock()
+	// can't recurse due to requiring the mutex, so we use a helper instead.
+	err := bb.commitInner(block)
+	bb.mut.Unlock()
+	return err
+}
+
 // recursive helper for commit
-func (bb *pipedBlockComm) commitInner(block *hotstuff.Block) error {
+func (bb *basicCommitter) commitInner(block *hotstuff.Block) error {
 	if bb.bExec.View() >= block.View() {
 		return nil
 	}
@@ -74,7 +79,7 @@ func (bb *pipedBlockComm) commitInner(block *hotstuff.Block) error {
 }
 
 // Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
-func (bb *pipedBlockComm) CommittedBlock(_ pipelining.PipeId) *hotstuff.Block {
+func (bb *basicCommitter) CommittedBlock(_ pipelining.PipeId) *hotstuff.Block {
 	bb.mut.Lock()
 	defer bb.mut.Unlock()
 	return bb.bExec
