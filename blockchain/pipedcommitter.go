@@ -48,7 +48,8 @@ func (bb *pipedCommitter) Store(block *hotstuff.Block) {
 	}
 
 	// prune the blockchain and handle forked blocks
-	forkedBlocks := bb.blockChain.PruneToHeight(block.View())
+	prunedBlocks := bb.blockChain.PruneToHeight(block.View())
+	forkedBlocks := bb.blockChain.FindForks(prunedBlocks)
 	for _, block := range forkedBlocks {
 		bb.forkHandler.Fork(block)
 	}

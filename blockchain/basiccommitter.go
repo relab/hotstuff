@@ -37,7 +37,6 @@ func (bb *basicCommitter) InitModule(mods *modules.Core, _ modules.InitOptions) 
 
 // Stores the block before further execution.
 func (bb *basicCommitter) Store(block *hotstuff.Block) {
-	return
 	err := bb.commit(block)
 	if err != nil {
 		bb.logger.Warnf("failed to commit: %v", err)
@@ -45,9 +44,10 @@ func (bb *basicCommitter) Store(block *hotstuff.Block) {
 	}
 
 	// prune the blockchain and handle forked blocks
-	forkedBlocks := bb.blockChain.PruneToHeight(block.View())
-	for _, block := range forkedBlocks {
-		bb.forkHandler.Fork(block)
+	prunedBlocks := bb.blockChain.PruneToHeight(block.View())
+	forkedBlocks := bb.blockChain.FindForks(prunedBlocks)
+	for _, blocks := range forkedBlocks {
+		bb.forkHandler.Fork(blocks)
 	}
 }
 

@@ -95,10 +95,10 @@ type BlockChain interface {
 
 	// Prunes blocks from the in-memory tree up to the specified height.
 	// Returns a set of forked blocks (blocks that were on a different branch, and thus not committed).
-	PruneToHeight(height hotstuff.View) (forkedBlocks []*hotstuff.Block)
+	PruneToHeight(height hotstuff.View) (prunedBlocks map[hotstuff.View][]*hotstuff.Block)
 
-	// Searches for a potential fork in the list of blocks.
-	FindForks(blocks []*hotstuff.Block) []*hotstuff.Block
+	// Searches for a potential fork in the list of blocks at heights.
+	FindForks(blocksAtHeight map[hotstuff.View][]*hotstuff.Block) []*hotstuff.Block
 }
 
 //go:generate mockgen -destination=../internal/mocks/replica_mock.go -package=mocks . Replica

@@ -20,9 +20,10 @@ type blockChain struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
 
-	mut         sync.Mutex
-	pruneHeight hotstuff.View
-	blocks      map[hotstuff.Hash]*hotstuff.Block
+	mut             sync.Mutex
+	prevPruneHeight hotstuff.View
+	pruneHeight     hotstuff.View
+	blocks          map[hotstuff.Hash]*hotstuff.Block
 	// blocksAtHeight map[hotstuff.View][]*hotstuff.Block
 	blocksAtHeight map[hotstuff.View][]*hotstuff.Block
 	pendingFetch   map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
@@ -132,38 +133,66 @@ func (chain *blockChain) Extends(block, target *hotstuff.Block) bool {
 }
 
 // TODO: Test this algorithm
-func (chain *blockChain) PruneToHeight(height hotstuff.View) (prunedBlocks []*hotstuff.Block) {
+func (chain *blockChain) PruneToHeight(height hotstuff.View) (prunedBlocks map[hotstuff.View][]*hotstuff.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
+	prunedBlocks = make(map[hotstuff.View][]*hotstuff.Block)
 
-	for h := height; h >= chain.pruneHeight; {
+	for h := height; h > chain.pruneHeight; h-- {
 		blocks, ok := chain.blocksAtHeight[h]
 		if !ok {
-			break
+			continue
 		}
 		for _, block := range blocks {
-			parent, ok := chain.blocks[block.Parent()]
-			// Stop at the lowest block (previously pruned height)
-			if !ok || parent.View() < chain.pruneHeight {
-				break
-			}
 			// Add pruned blocks to list and go back a height
-			prunedBlocks = append(prunedBlocks, block)
-			// This is reassigned to the same value for as many
-			// blocks as there are in the blocks list.
-			// TODO: Verify theory in comment above
-			h = parent.View()
+			// prunedBlocks = append(prunedBlocks, block)
+			prunedBlocks[block.View()] = append(prunedBlocks[block.View()], block)
 		}
 		delete(chain.blocksAtHeight, h)
 	}
 
+	chain.prevPruneHeight = chain.pruneHeight
 	chain.pruneHeight = height
 
-	return prunedBlocks
+	return
 }
 
-func (chain *blockChain) FindForks(blocks []*hotstuff.Block) []*hotstuff.Block {
-	return nil
+func (chain *blockChain) FindForks(blocksAtHeight map[hotstuff.View][]*hotstuff.Block) (forkedBlocks []*hotstuff.Block) {
+	chain.mut.Lock()
+	defer chain.mut.Unlock()
+
+	committedViews := make(map[hotstuff.View]bool)
+
+	// TODO: This is a hacky value: chain.prevPruneHeight.
+	for h := chain.prevPruneHeight; h >= chain.pruneHeight; {
+		blocks, ok := blocksAtHeight[h]
+		if !ok {
+			break
+		}
+		// TODO: Support pipelined blocks. Right now it just takes the first one from the list in the view
+		for _, block := range blocks {
+			parent, ok := chain.blocks[block.Parent()]
+			if !ok || parent.View() < chain.pruneHeight {
+				break
+			}
+			h = parent.View()
+			committedViews[h] = true
+		}
+	}
+
+	for h := chain.prevPruneHeight; h > chain.pruneHeight; h-- {
+		if !committedViews[h] {
+			// TODO: Support pipelined blocks. Right now it just takes the first one from the list in the view
+			blocks, ok := blocksAtHeight[h]
+			if ok {
+				chain.logger.Debugf("PruneToHeight: found forked blocks: %v", blocks)
+				for _, block := range blocks {
+					forkedBlocks = append(forkedBlocks, block)
+				}
+			}
+		}
+	}
+	return
 }
 
 var _ modules.BlockChain = (*blockChain)(nil)
