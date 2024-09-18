@@ -75,10 +75,6 @@ type BlockCommitter interface {
 
 	// Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
 	CommittedBlock(pipe pipelining.PipeId) *hotstuff.Block
-
-	// Searches for a potential fork in the list of blocks at heights.
-	// Requires that the modules refers to a blockchain module.
-	FindForks(height hotstuff.View, blocksAtHeight map[hotstuff.View][]*hotstuff.Block) []*hotstuff.Block
 }
 
 // BlockChain is a datastructure that stores a chain of blocks.

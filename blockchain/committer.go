@@ -11,7 +11,7 @@ import (
 )
 
 type basicCommitter struct {
-	consensuses map[pipelining.PipeId]modules.Consensus
+	consensus   modules.Consensus
 	blockChain  modules.BlockChain
 	executor    modules.ExecutorExt
 	forkHandler modules.ForkHandlerExt
@@ -28,26 +28,16 @@ func NewBasicCommitter() modules.BlockCommitter {
 }
 
 func (bb *basicCommitter) InitModule(mods *modules.Core, opt modules.InitOptions) {
+	if opt.IsPipeliningEnabled {
+		panic("pipelining not supported for this module")
+	}
 	mods.Get(
 		&bb.executor,
 		&bb.blockChain,
 		&bb.forkHandler,
 		&bb.logger,
+		&bb.consensus,
 	)
-
-	bb.consensuses = make(map[pipelining.PipeId]modules.Consensus)
-	if opt.IsPipeliningEnabled {
-		for _, pipe := range mods.Pipes() {
-			var cs modules.Consensus
-			mods.MatchForPipe(pipe, cs)
-			bb.consensuses[pipe] = cs
-		}
-		return
-	}
-
-	var cs modules.Consensus
-	mods.Get(&cs)
-	bb.consensuses[pipelining.NullPipeId] = cs
 }
 
 // Stores the block before further execution.
@@ -60,7 +50,7 @@ func (bb *basicCommitter) Store(block *hotstuff.Block) {
 
 	// prune the blockchain and handle forked blocks
 	prunedBlocks := bb.blockChain.PruneToHeight(block.View())
-	forkedBlocks := bb.FindForks(block.View(), prunedBlocks)
+	forkedBlocks := bb.findForks(block.View(), prunedBlocks)
 	for _, blocks := range forkedBlocks {
 		bb.forkHandler.Fork(blocks)
 	}
@@ -100,10 +90,10 @@ func (bb *basicCommitter) CommittedBlock(_ pipelining.PipeId) *hotstuff.Block {
 	return bb.bExec
 }
 
-func (bb *basicCommitter) FindForks(height hotstuff.View, blocksAtHeight map[hotstuff.View][]*hotstuff.Block) (forkedBlocks []*hotstuff.Block) {
+func (bb *basicCommitter) findForks(height hotstuff.View, blocksAtHeight map[hotstuff.View][]*hotstuff.Block) (forkedBlocks []*hotstuff.Block) {
 
 	committedViews := make(map[hotstuff.View]bool)
-	committedHeight := bb.consensuses[pipelining.NullPipeId].CommittedBlock().View()
+	committedHeight := bb.consensus.CommittedBlock().View()
 
 	// TODO: This is a hacky value: chain.prevPruneHeight.
 	for h := committedHeight; h >= bb.blockChain.PruneHeight(); {
