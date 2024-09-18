@@ -75,6 +75,10 @@ type BlockCommitter interface {
 
 	// Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
 	CommittedBlock(pipe pipelining.PipeId) *hotstuff.Block
+
+	// Searches for a potential fork in the list of blocks at heights.
+	// Requires that the modules refers to a blockchain module.
+	FindForks(height hotstuff.View, blocksAtHeight map[hotstuff.View][]*hotstuff.Block) []*hotstuff.Block
 }
 
 // BlockChain is a datastructure that stores a chain of blocks.
@@ -97,8 +101,7 @@ type BlockChain interface {
 	// Returns a set of forked blocks (blocks that were on a different branch, and thus not committed).
 	PruneToHeight(height hotstuff.View) (prunedBlocks map[hotstuff.View][]*hotstuff.Block)
 
-	// Searches for a potential fork in the list of blocks at heights.
-	FindForks(blocksAtHeight map[hotstuff.View][]*hotstuff.Block) []*hotstuff.Block
+	PruneHeight() hotstuff.View
 }
 
 //go:generate mockgen -destination=../internal/mocks/replica_mock.go -package=mocks . Replica

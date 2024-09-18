@@ -16,9 +16,8 @@ import (
 // blocks are evicted in LRU order.
 type blockChain struct {
 	configuration modules.Configuration
-	// consensus     modules.Consensus
-	eventLoop *eventloop.EventLoop
-	logger    logging.Logger
+	eventLoop     *eventloop.EventLoop
+	logger        logging.Logger
 
 	mut             sync.Mutex
 	prevPruneHeight hotstuff.View
@@ -29,7 +28,7 @@ type blockChain struct {
 	pendingFetch   map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
 }
 
-func (chain *blockChain) InitModule(mods *modules.Core, _ modules.InitOptions) {
+func (chain *blockChain) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	mods.Get(
 		&chain.configuration,
 		// &chain.consensus,
@@ -157,42 +156,8 @@ func (chain *blockChain) PruneToHeight(height hotstuff.View) (prunedBlocks map[h
 	return
 }
 
-func (chain *blockChain) FindForks(blocksAtHeight map[hotstuff.View][]*hotstuff.Block) (forkedBlocks []*hotstuff.Block) {
-	chain.mut.Lock()
-	defer chain.mut.Unlock()
-
-	committedViews := make(map[hotstuff.View]bool)
-
-	// TODO: This is a hacky value: chain.prevPruneHeight.
-	for h := chain.prevPruneHeight; h >= chain.pruneHeight; {
-		blocks, ok := blocksAtHeight[h]
-		if !ok {
-			break
-		}
-		// TODO: Support pipelined blocks. Right now it just takes the first one from the list in the view
-		for _, block := range blocks {
-			parent, ok := chain.blocks[block.Parent()]
-			if !ok || parent.View() < chain.pruneHeight {
-				break
-			}
-			h = parent.View()
-			committedViews[h] = true
-		}
-	}
-
-	for h := chain.prevPruneHeight; h > chain.pruneHeight; h-- {
-		if !committedViews[h] {
-			// TODO: Support pipelined blocks. Right now it just takes the first one from the list in the view
-			blocks, ok := blocksAtHeight[h]
-			if ok {
-				chain.logger.Debugf("PruneToHeight: found forked blocks: %v", blocks)
-				for _, block := range blocks {
-					forkedBlocks = append(forkedBlocks, block)
-				}
-			}
-		}
-	}
-	return
+func (chain *blockChain) PruneHeight() hotstuff.View {
+	return chain.pruneHeight
 }
 
 var _ modules.BlockChain = (*blockChain)(nil)
