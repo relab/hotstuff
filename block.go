@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/relab/hotstuff/pipelining"
+	"github.com/relab/hotstuff/pipeline"
 )
 
 // Block contains a propsed "command", metadata for the protocol, and a link to the "parent" block.
@@ -17,11 +17,11 @@ type Block struct {
 	cmd      Command
 	cert     QuorumCert
 	view     View
-	pipe     pipelining.PipeId
+	pipe     pipeline.Pipe
 }
 
 // NewBlock creates a new Block
-func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID, pipe pipelining.PipeId) *Block {
+func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID, pipe pipeline.Pipe) *Block {
 	b := &Block{
 		parent:   parent,
 		cert:     cert,
@@ -77,7 +77,7 @@ func (b *Block) View() View {
 	return b.view
 }
 
-func (b *Block) Pipe() pipelining.PipeId {
+func (b *Block) Pipe() pipeline.Pipe {
 	return b.pipe
 }
 

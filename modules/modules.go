@@ -6,7 +6,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/pipelining"
+	"github.com/relab/hotstuff/pipeline"
 )
 
 // Module interfaces
@@ -74,7 +74,7 @@ type BlockCommitter interface {
 	Store(block *hotstuff.Block)
 
 	// Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
-	CommittedBlock(pipe pipelining.PipeId) *hotstuff.Block
+	CommittedBlock(pipe pipeline.Pipe) *hotstuff.Block
 }
 
 // BlockChain is a datastructure that stores a chain of blocks.

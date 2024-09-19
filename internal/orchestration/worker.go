@@ -26,6 +26,7 @@ import (
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipeline"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc"
@@ -184,29 +185,33 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
 	}
 
-	leaderRotation, ok := modules.GetModule[modules.LeaderRotation](opts.GetLeaderRotation())
+	// TODO: Fix this function returning false and no ctor
+	newLeaderRotation, ok := modules.GetModuleCtor[modules.LeaderRotation](opts.GetLeaderRotation())
 	if !ok {
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
 
-	sync := synchronizer.New(synchronizer.NewViewDuration(
+	// TODO: Add this to the replica options above
+	pipes := []pipeline.Pipe{1, 2, 3, 4}
+	builder.EnablePipelining(pipes)
+	builder.Add(
+		eventloop.New(1000),
+		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
+		w.metricsLogger,
+		blockchain.New(),
+		blockchain.NewWaitingPipedCommitter(),
+		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
+	)
+	builder.AddPiped(consensus.New, consensusRules)
+	builder.AddPiped(consensus.NewVotingMachine)
+	builder.AddPiped(newLeaderRotation)
+	builder.AddPiped(synchronizer.New, synchronizer.NewViewDuration(
 		uint64(opts.GetTimeoutSamples()),
 		float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
 		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
 		float64(opts.GetTimeoutMultiplier()),
 	))
-	builder.Add(
-		eventloop.New(1000),
-		consensus.New(consensusRules),
-		consensus.NewVotingMachine(),
-		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
-		leaderRotation,
-		sync,
-		w.metricsLogger,
-		blockchain.New(),
-		blockchain.NewBasicCommitter(),
-		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
-	)
+
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)

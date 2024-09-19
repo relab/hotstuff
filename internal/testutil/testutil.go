@@ -11,7 +11,7 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
+	"github.com/relab/hotstuff/pipeline"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
@@ -72,7 +72,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 }
 
 // TestModules registers default modules for testing to the given builder.
-func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *modules.Builder, pipes []pipelining.PipeId) {
+func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *modules.Builder, pipes []pipeline.Pipe) {
 	t.Helper()
 
 	acceptor := mocks.NewMockAcceptor(ctrl)
@@ -186,7 +186,7 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 }
 
 // TODO: Complete the implementation.
-func CreateBuildersPiped(t *testing.T, ctrl *gomock.Controller, n int, pipes []pipelining.PipeId, keys ...hotstuff.PrivateKey) (builders BuilderList) {
+func CreateBuildersPiped(t *testing.T, ctrl *gomock.Controller, n int, pipes []pipeline.Pipe, keys ...hotstuff.PrivateKey) (builders BuilderList) {
 	t.Helper()
 	network := twins.NewSimpleNetwork()
 	builders = make([]*modules.Builder, n)

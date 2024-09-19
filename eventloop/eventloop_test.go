@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/pipelining"
+	"github.com/relab/hotstuff/pipeline"
 )
 
 type testEvent int
@@ -47,8 +47,8 @@ func TestHandler(t *testing.T) {
 }
 
 func TestHandlerPiped(t *testing.T) {
-	listeningPipeId := pipelining.PipeId(1)
-	incorrectPipeId := pipelining.PipeId(2)
+	listeningPipeId := pipeline.Pipe(1)
+	incorrectPipeId := pipeline.Pipe(2)
 	el := eventloop.New(10)
 	c := make(chan any)
 	el.RegisterHandler(testEvent(0), func(event any) {

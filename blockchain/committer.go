@@ -7,7 +7,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
+	"github.com/relab/hotstuff/pipeline"
 )
 
 type basicCommitter struct {
@@ -84,7 +84,7 @@ func (bb *basicCommitter) commitInner(block *hotstuff.Block) error {
 }
 
 // Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
-func (bb *basicCommitter) CommittedBlock(_ pipelining.PipeId) *hotstuff.Block {
+func (bb *basicCommitter) CommittedBlock(_ pipeline.Pipe) *hotstuff.Block {
 	bb.mut.Lock()
 	defer bb.mut.Unlock()
 	return bb.bExec
@@ -95,13 +95,12 @@ func (bb *basicCommitter) findForks(height hotstuff.View, blocksAtHeight map[hot
 	committedViews := make(map[hotstuff.View]bool)
 	committedHeight := bb.consensus.CommittedBlock().View()
 
-	// TODO: This is a hacky value: chain.prevPruneHeight.
+	// This is a hacky value: chain.prevPruneHeight, but it works.
 	for h := committedHeight; h >= bb.blockChain.PruneHeight(); {
 		blocks, ok := blocksAtHeight[h]
 		if !ok {
 			break
 		}
-		// TODO: Support pipelined blocks. Right now it just takes the first one from the list in the view
 		block := blocks[0]
 		parent, ok := bb.blockChain.LocalGet(block.Parent())
 		if !ok || parent.View() < bb.blockChain.PruneHeight() {
@@ -113,7 +112,6 @@ func (bb *basicCommitter) findForks(height hotstuff.View, blocksAtHeight map[hot
 
 	for h := height; h > bb.blockChain.PruneHeight(); h-- {
 		if !committedViews[h] {
-			// TODO: Support pipelined blocks. Right now it just takes the first one from the list in the view
 			blocks, ok := blocksAtHeight[h]
 			if ok {
 				bb.logger.Debugf("PruneToHeight: found forked blocks: %v", blocks)

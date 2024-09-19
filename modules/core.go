@@ -37,14 +37,15 @@ import (
 	"reflect"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/pipelining"
+	"github.com/relab/hotstuff/pipeline"
 )
 
 type ModulePipe []Module
 
 type InitOptions struct {
 	IsPipeliningEnabled bool
-	ModulePipeId        pipelining.PipeId
+	PipeCount           int
+	ModulePipeId        pipeline.Pipe
 }
 
 // Module is an interface for initializing modules.
@@ -56,7 +57,7 @@ type Module interface {
 // It contains only a few core modules that are shared between replicas and clients.
 type Core struct {
 	staticModules []any
-	pipedModules  map[pipelining.PipeId][]any
+	pipedModules  map[pipeline.Pipe][]any
 }
 
 // TryGet attempts to find a module for ptr.
@@ -179,7 +180,7 @@ func (mods *Core) TryGetFromPipe(moduleInPipe Module, ptr any) bool {
 		panic("only pointer values allowed")
 	}
 
-	correctPipeId := pipelining.NullPipeId
+	correctPipeId := pipeline.NullPipe
 	for id := range mods.pipedModules {
 		pipe := mods.pipedModules[id]
 		// Check if self is in pipe
@@ -191,13 +192,13 @@ func (mods *Core) TryGetFromPipe(moduleInPipe Module, ptr any) bool {
 			}
 		}
 		// Break outer loop too if a pipe ID was found
-		if correctPipeId != pipelining.NullPipeId {
+		if correctPipeId != pipeline.NullPipe {
 			break
 		}
 	}
 
 	// If this variable remained unchanged, return false
-	if correctPipeId == pipelining.NullPipeId {
+	if correctPipeId == pipeline.NullPipe {
 		return false
 	}
 
@@ -216,7 +217,7 @@ func (mods *Core) TryGetFromPipe(moduleInPipe Module, ptr any) bool {
 // MatchForPipe assigns ptr to a matching module in the pipe with pipeId.
 // This is mainly a helper function for tests and should not be used in
 // practical applications.
-func (core *Core) MatchForPipe(pipeId pipelining.PipeId, ptr any) {
+func (core *Core) MatchForPipe(pipeId pipeline.Pipe, ptr any) {
 	if len(core.pipedModules) == 0 {
 		panic("pipelining is not enabled")
 	}
@@ -249,7 +250,7 @@ func (core *Core) PipeCount() int {
 }
 
 // Return a slice of Pipes in the order which the pipes were created by Builder.
-func (core *Core) Pipes() (ids []pipelining.PipeId) {
+func (core *Core) Pipes() (ids []pipeline.Pipe) {
 	for id := range core.pipedModules {
 		ids = append(ids, id)
 	}
@@ -258,7 +259,7 @@ func (core *Core) Pipes() (ids []pipelining.PipeId) {
 
 // Return a list of modules from a pipes. The order of module types is influenced
 // by when AddPiped was called in Builder.
-func (core *Core) GetPipe(id pipelining.PipeId) []any {
+func (core *Core) GetPipe(id pipeline.Pipe) []any {
 	return core.pipedModules[id]
 }
 
@@ -266,10 +267,10 @@ func (core *Core) GetPipe(id pipelining.PipeId) []any {
 type Builder struct {
 	core              Core
 	staticModules     []Module
-	modulePipes       map[pipelining.PipeId]ModulePipe
+	modulePipes       map[pipeline.Pipe]ModulePipe
 	opts              *Options
 	pipeliningEnabled bool
-	pipeIds           []pipelining.PipeId
+	pipeIds           []pipeline.Pipe
 }
 
 // NewBuilder returns a new builder.
@@ -290,7 +291,7 @@ func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey) Builder {
 
 // EnablePipelining enables pipelining by allocating the module pipes and assigning them the ids
 // provided by pipeIds. The number of pipes will be len(pipeIds).
-func (bl *Builder) EnablePipelining(pipeIds []pipelining.PipeId) {
+func (bl *Builder) EnablePipelining(pipeIds []pipeline.Pipe) {
 	if bl.pipeliningEnabled {
 		panic("pipelining already enabled")
 	}
@@ -299,13 +300,13 @@ func (bl *Builder) EnablePipelining(pipeIds []pipelining.PipeId) {
 		panic("no pipe ids provided")
 	}
 
-	if !pipelining.ValidPipes(pipeIds) {
+	if !pipeline.ValidPipes(pipeIds) {
 		panic("at least one pipe id was invalid or duplicate")
 	}
 
 	bl.pipeliningEnabled = true
-	bl.core.pipedModules = make(map[pipelining.PipeId][]any)
-	bl.modulePipes = make(map[pipelining.PipeId]ModulePipe)
+	bl.core.pipedModules = make(map[pipeline.Pipe][]any)
+	bl.modulePipes = make(map[pipeline.Pipe]ModulePipe)
 	bl.pipeIds = pipeIds
 	for _, id := range bl.pipeIds {
 		bl.modulePipes[id] = make(ModulePipe, 0)
@@ -419,7 +420,8 @@ func (b *Builder) Build() *Core {
 	b.Add(b.opts)
 	opt := InitOptions{
 		IsPipeliningEnabled: b.pipeliningEnabled,
-		ModulePipeId:        pipelining.NullPipeId,
+		ModulePipeId:        pipeline.NullPipe,
+		PipeCount:           0,
 	}
 	for _, module := range b.staticModules {
 		module.InitModule(&b.core, opt)
@@ -444,6 +446,7 @@ func (b *Builder) Build() *Core {
 		pipeOpt := InitOptions{
 			IsPipeliningEnabled: b.pipeliningEnabled,
 			ModulePipeId:        pipeId,
+			PipeCount:           len(b.pipeIds),
 		}
 		for _, module := range pipe {
 			module.(Module).InitModule(&b.core, pipeOpt)

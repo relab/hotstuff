@@ -7,7 +7,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
+	"github.com/relab/hotstuff/pipeline"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -54,7 +54,7 @@ type consensusBase struct {
 	handel modules.Handel
 
 	lastVote hotstuff.View
-	pipe     pipelining.PipeId
+	pipe     pipeline.Pipe
 
 	mut sync.Mutex
 }

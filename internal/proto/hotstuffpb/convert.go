@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/eddsa"
-	"github.com/relab/hotstuff/pipelining"
+	"github.com/relab/hotstuff/pipeline"
 )
 
 // QuorumSignatureToProto converts a threshold signature to a protocol buffers message.
@@ -125,7 +125,7 @@ func ProposalToProto(proposal hotstuff.ProposeMsg) *Proposal {
 // ProposalFromProto converts a protobuf message to a ProposeMsg.
 func ProposalFromProto(p *Proposal) (proposal hotstuff.ProposeMsg) {
 	proposal.Block = BlockFromProto(p.GetBlock())
-	proposal.PipeId = pipelining.PipeId(p.PipeId)
+	proposal.PipeId = pipeline.Pipe(p.PipeId)
 	if p.GetAggQC() != nil {
 		aggQC := AggregateQCFromProto(p.GetAggQC())
 		proposal.AggregateQC = &aggQC
@@ -156,7 +156,7 @@ func BlockFromProto(block *Block) *hotstuff.Block {
 		hotstuff.Command(block.GetCommand()),
 		hotstuff.View(block.GetView()),
 		hotstuff.ID(block.GetProposer()),
-		pipelining.PipeId(block.Pipe),
+		pipeline.Pipe(block.Pipe),
 	)
 }
 
@@ -166,7 +166,7 @@ func TimeoutMsgFromProto(m *TimeoutMsg) hotstuff.TimeoutMsg {
 		View:          hotstuff.View(m.GetView()),
 		SyncInfo:      SyncInfoFromProto(m.GetSyncInfo()),
 		ViewSignature: QuorumSignatureFromProto(m.GetViewSig()),
-		PipeId:        pipelining.PipeId(m.PipeId),
+		PipeId:        pipeline.Pipe(m.PipeId),
 	}
 	if m.GetViewSig() != nil {
 		timeoutMsg.MsgSignature = QuorumSignatureFromProto(m.GetMsgSig())

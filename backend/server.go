@@ -10,7 +10,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
+	"github.com/relab/hotstuff/pipeline"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -166,7 +166,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	impl.srv.induceLatency(id)
 
 	// If the pipe ID is null, then add the event normally
-	if !pipelining.ValidPipe(proposeMsg.PipeId) {
+	if !pipeline.ValidPipe(proposeMsg.PipeId) {
 		impl.srv.eventLoop.AddEvent(proposeMsg)
 		return
 	}
@@ -227,7 +227,7 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	}
 
 	impl.srv.induceLatency(timeoutMsg.ID)
-	if !pipelining.ValidPipe(timeoutMsg.PipeId) {
+	if !pipeline.ValidPipe(timeoutMsg.PipeId) {
 		impl.srv.eventLoop.AddEvent(timeoutMsg)
 		return
 	}

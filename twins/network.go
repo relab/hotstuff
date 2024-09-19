@@ -199,7 +199,6 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 	}
 
 	// Index into viewPartitions.
-	// TODO: Implement pipelining logic here
 	i := -1
 	if node.effectiveView > node.synchronizer.View() {
 		i += int(node.effectiveView)

@@ -61,6 +61,25 @@ func GetModule[T any](name string) (out T, ok bool) {
 	return ctor.(func() T)(), true
 }
 
+func GetModuleCtor[T any](name string) (out func() T, ok bool) {
+	targetType := reflect.TypeOf(&out).Elem()
+
+	registryMut.Lock()
+	defer registryMut.Unlock()
+
+	modules, ok := byInterface[targetType]
+	if !ok {
+		return out, false
+	}
+
+	ctor, ok := modules[name]
+	if !ok {
+		return out, false
+	}
+
+	return ctor.(func() T), true
+}
+
 // GetModuleUntyped returns a new instance of the named module, if it exists.
 func GetModuleUntyped(name string) (m any, ok bool) {
 	registryMut.Lock()

@@ -1,16 +1,16 @@
-package pipelining
+package pipeline
 
-type PipeId uint32
+type Pipe uint32
 
-const NullPipeId = PipeId(0)
+const NullPipe = Pipe(0)
 
 // If the pipe ID is not NullPipeId, then return true
-func ValidPipe(pipeId PipeId) bool {
-	return pipeId != NullPipeId
+func ValidPipe(pipeId Pipe) bool {
+	return pipeId != NullPipe
 }
 
 // If the list contains duplicate IDs or a NullPipeId, then return false
-func ValidPipes(pipeIds []PipeId) bool {
+func ValidPipes(pipeIds []Pipe) bool {
 	for i, pId := range pipeIds {
 		if !ValidPipe(pId) {
 			return false

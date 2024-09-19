@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
+	"github.com/relab/hotstuff/pipeline"
 )
 
 type Adder interface {
@@ -82,7 +82,7 @@ func TestPipeliningDisabled(t *testing.T) {
 }
 
 func TestPipelined(t *testing.T) {
-	expectedPipeIds := []pipelining.PipeId{1, 2, 3}
+	expectedPipeIds := []pipeline.Pipe{1, 2, 3}
 
 	builder := modules.NewBuilder(0, nil)
 	builder.EnablePipelining(expectedPipeIds)
@@ -100,7 +100,7 @@ func TestPipelined(t *testing.T) {
 		Result int
 	}
 
-	testCasesMult := map[pipelining.PipeId]AdderMultTestCase{
+	testCasesMult := map[pipeline.Pipe]AdderMultTestCase{
 		1: {A: 2, B: 3, Result: 6},
 		2: {A: 2, B: 5, Result: 10},
 		3: {A: 2, B: 6, Result: 12},

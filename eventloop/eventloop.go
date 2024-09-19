@@ -12,14 +12,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/relab/hotstuff/pipelining"
+	"github.com/relab/hotstuff/pipeline"
 	"github.com/relab/hotstuff/util/gpool"
 )
 
 type handlerOpts struct {
 	runInAddEvent bool
 	priority      bool
-	pipeId        pipelining.PipeId
+	pipeId        pipeline.Pipe
 }
 
 // HandlerOption sets configuration options for event handlers.
@@ -45,14 +45,14 @@ func Prioritize() HandlerOption {
 
 // RespondToPipe assigns which pipe ID to respond to when PipeEvent is used to add an event to the
 // eventloop. If the NullPipeId (0) is passed, this handler option will not take effect.
-func RespondToPipe(pipeId pipelining.PipeId) HandlerOption {
+func RespondToPipe(pipeId pipeline.Pipe) HandlerOption {
 	return func(ho *handlerOpts) {
 		ho.pipeId = pipeId
 	}
 }
 
 type pipedEventWrapper struct {
-	pipeId pipelining.PipeId
+	pipeId pipeline.Pipe
 	event  any
 }
 
@@ -161,8 +161,8 @@ func (el *EventLoop) AddEvent(event any) {
 }
 
 // PipeEvent adds an event to a specified pipeline.
-func (el *EventLoop) PipeEvent(pipeId pipelining.PipeId, event any) {
-	if !pipelining.ValidPipe(pipeId) {
+func (el *EventLoop) PipeEvent(pipeId pipeline.Pipe, event any) {
+	if !pipeline.ValidPipe(pipeId) {
 		panic("pipe id is not valid")
 	}
 
@@ -245,7 +245,7 @@ var handlerListPool = gpool.New(func() []EventHandler { return make([]EventHandl
 
 // processEvent dispatches the event to the correct handler.
 func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
-	pipeId := pipelining.NullPipeId
+	pipeId := pipeline.NullPipe
 	_, ok := event.(pipedEventWrapper)
 	if ok {
 		pipedEvent := event.(pipedEventWrapper)
@@ -271,7 +271,7 @@ func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
 			continue
 		}
 
-		if pipeId != pipelining.NullPipeId && pipeId != handler.opts.pipeId {
+		if pipeId != pipeline.NullPipe && pipeId != handler.opts.pipeId {
 			continue
 		}
 

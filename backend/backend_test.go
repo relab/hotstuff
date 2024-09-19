@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipelining"
+	"github.com/relab/hotstuff/pipeline"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/gorums"
@@ -54,7 +54,7 @@ func TestConnectPiped(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		td := setup(t, ctrl, n)
 		builder := modules.NewBuilder(1, td.keys[0])
-		testutil.TestModulesPiped(t, ctrl, 1, td.keys[0], &builder, []pipelining.PipeId{1, 2, 3, 4})
+		testutil.TestModulesPiped(t, ctrl, 1, td.keys[0], &builder, []pipeline.Pipe{1, 2, 3, 4})
 		teardown := createServers(t, td, ctrl)
 		defer teardown()
 		td.builders.Build()
@@ -139,7 +139,7 @@ func TestPropose(t *testing.T) {
 
 func TestProposePiped(t *testing.T) {
 	var wg sync.WaitGroup
-	pipeId := pipelining.PipeId(123)
+	pipeId := pipeline.Pipe(123)
 	want := hotstuff.ProposeMsg{
 		ID: 1,
 		Block: hotstuff.NewBlock(
@@ -194,7 +194,7 @@ func TestTimeout(t *testing.T) {
 func TestTimeoutPiped(t *testing.T) {
 	var wg sync.WaitGroup
 
-	pipeid := pipelining.PipeId(1)
+	pipeid := pipeline.Pipe(1)
 	want := hotstuff.TimeoutMsg{
 		ID:            1,
 		View:          1,

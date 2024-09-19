@@ -4,15 +4,15 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/relab/hotstuff/pipelining"
+	"github.com/relab/hotstuff/pipeline"
 )
 
 // ProposeMsg is broadcast when a leader makes a proposal.
 type ProposeMsg struct {
-	ID          ID                // The ID of the replica who sent the message.
-	Block       *Block            // The block that is proposed.
-	AggregateQC *AggregateQC      // Optional AggregateQC
-	PipeId      pipelining.PipeId //
+	ID          ID            // The ID of the replica who sent the message.
+	Block       *Block        // The block that is proposed.
+	AggregateQC *AggregateQC  // Optional AggregateQC
+	PipeId      pipeline.Pipe //
 }
 
 func (p ProposeMsg) String() string {
@@ -37,7 +37,7 @@ type TimeoutMsg struct {
 	ViewSignature QuorumSignature // A signature of the view
 	MsgSignature  QuorumSignature // A signature of the view, QC.BlockHash, and the replica ID
 	SyncInfo      SyncInfo        // The highest QC/TC known to the sender.
-	PipeId        pipelining.PipeId
+	PipeId        pipeline.Pipe
 }
 
 // ToBytes returns a byte form of the timeout message.
