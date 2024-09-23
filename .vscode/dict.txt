@@ -10,6 +10,7 @@ Chursin
 clientpb
 cmdqueue
 Cmds
+cmpopts
 CODECOV
 covermode
 coverpkg
