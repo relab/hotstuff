@@ -43,7 +43,7 @@ func (pc *waitingPipedCommitter) InitModule(mods *modules.Core, opt modules.Init
 	if opt.IsPipeliningEnabled {
 		for _, pipe := range mods.Pipes() {
 			var cs modules.Consensus
-			mods.MatchForPipe(pipe, cs)
+			mods.MatchForPipe(pipe, &cs)
 			pc.consensuses[pipe] = cs
 			pc.bExecs[pipe] = hotstuff.GetGenesis()
 			pc.waitingBlocks[pipe] = nil
@@ -59,7 +59,7 @@ func (pc *waitingPipedCommitter) InitModule(mods *modules.Core, opt modules.Init
 }
 
 // Stores the block before further execution.
-func (pc *waitingPipedCommitter) Store(block *hotstuff.Block) {
+func (pc *waitingPipedCommitter) Commit(block *hotstuff.Block) {
 	pc.mut.Lock()
 	defer pc.mut.Unlock()
 

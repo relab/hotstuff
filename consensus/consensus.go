@@ -216,7 +216,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	cs.blockChain.Store(block)
 
 	if b := cs.impl.CommitRule(block); b != nil {
-		cs.committer.Store(block)
+		cs.committer.Commit(block)
 	}
 	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 

@@ -62,7 +62,7 @@ func GetModule[T any](name string) (out T, ok bool) {
 }
 
 func GetModuleCtor[T any](name string) (out func() T, ok bool) {
-	targetType := reflect.TypeOf(&out).Elem()
+	targetType := reflect.TypeFor[T]()
 
 	registryMut.Lock()
 	defer registryMut.Unlock()

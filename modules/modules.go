@@ -71,7 +71,7 @@ type ForkHandlerExt interface {
 // NOTE: This module was created to deal with pipelined consensus instances.
 type BlockCommitter interface {
 	// Stores the block before further execution.
-	Store(block *hotstuff.Block)
+	Commit(block *hotstuff.Block)
 
 	// Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
 	CommittedBlock(pipe pipeline.Pipe) *hotstuff.Block

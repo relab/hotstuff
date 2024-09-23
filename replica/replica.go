@@ -153,13 +153,15 @@ func (srv *Replica) Stop() {
 
 // Run runs the replica until the context is canceled.
 func (srv *Replica) Run(ctx context.Context) {
-	var (
-		synchronizer modules.Synchronizer
-		eventLoop    *eventloop.EventLoop
-	)
-	srv.hs.Get(&synchronizer, &eventLoop)
+	var eventLoop *eventloop.EventLoop
+	srv.hs.Get(&eventLoop)
 
-	synchronizer.Start(ctx)
+	for _, pipe := range srv.hs.Pipes() {
+		var synchronizer modules.Synchronizer
+		srv.hs.MatchForPipe(pipe, &synchronizer)
+		synchronizer.Start(ctx)
+	}
+
 	eventLoop.Run(ctx)
 }
 

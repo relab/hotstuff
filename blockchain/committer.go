@@ -41,7 +41,7 @@ func (bb *basicCommitter) InitModule(mods *modules.Core, opt modules.InitOptions
 }
 
 // Stores the block before further execution.
-func (bb *basicCommitter) Store(block *hotstuff.Block) {
+func (bb *basicCommitter) Commit(block *hotstuff.Block) {
 	err := bb.commit(block)
 	if err != nil {
 		bb.logger.Warnf("failed to commit: %v", err)
