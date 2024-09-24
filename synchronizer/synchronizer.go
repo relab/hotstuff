@@ -119,7 +119,7 @@ func (s *Synchronizer) startTimeoutTimer() {
 	// It is important that the timer is NOT reused because then the view would be wrong.
 	s.timer = oneShotTimer{time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
-		s.eventLoop.AddEvent(TimeoutEvent{view})
+		s.eventLoop.PipeEvent(s.pipe, TimeoutEvent{view})
 	})}
 }
 
@@ -158,7 +158,10 @@ func (s *Synchronizer) View() hotstuff.View {
 func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
 	s.mut.RLock()
 	defer s.mut.RUnlock()
-	return hotstuff.NewSyncInfo(s.pipe).WithQC(s.highQC).WithTC(s.highTC)
+	si := hotstuff.NewSyncInfo(s.pipe)
+	siWithQC := si.WithQC(s.highQC)
+	siWithTC := siWithQC.WithTC(s.highTC)
+	return siWithTC
 }
 
 // OnLocalTimeout is called when a local timeout happens.
@@ -346,7 +349,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	s.startTimeoutTimer()
 
 	s.logger.Debugf("advanced to view %d", newView)
-	s.eventLoop.AddEvent(ViewChangeEvent{View: newView, Timeout: timeout})
+	s.eventLoop.PipeEvent(s.pipe, ViewChangeEvent{View: newView, Timeout: timeout})
 
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.opts.ID() {

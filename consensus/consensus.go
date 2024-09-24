@@ -153,6 +153,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 				cs.opts.ID(),
 				cs.pipe,
 			),
+			PipeId: cs.pipe,
 		}
 
 		if aggQC, ok := cert.AggQC(); ok && cs.opts.ShouldUseAggQC() {
@@ -242,7 +243,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 
 	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
 	if leaderID == cs.opts.ID() {
-		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})
+		cs.eventLoop.PipeEvent(cs.pipe, hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})
 		return
 	}
 

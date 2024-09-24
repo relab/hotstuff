@@ -194,7 +194,6 @@ func NewSyncInfo(pipe pipeline.Pipe) SyncInfo {
 // WithQC returns a copy of the SyncInfo struct with the given QC.
 func (si SyncInfo) WithQC(qc QuorumCert) SyncInfo {
 	si.qc = new(QuorumCert)
-	si.pipe = qc.pipe
 	*si.qc = qc
 	return si
 }

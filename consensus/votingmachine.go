@@ -134,7 +134,7 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
 
-	vm.eventLoop.AddEvent(hotstuff.NewViewMsg{
+	vm.eventLoop.PipeEvent(vm.pipe, hotstuff.NewViewMsg{
 		ID:       vm.opts.ID(),
 		SyncInfo: hotstuff.NewSyncInfo(block.Pipe()).WithQC(qc)})
 }
