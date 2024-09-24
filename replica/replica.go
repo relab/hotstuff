@@ -161,7 +161,6 @@ func (srv *Replica) Run(ctx context.Context) {
 		srv.hs.MatchForPipe(pipe, &synchronizer)
 		synchronizer.Start(ctx)
 	}
-
 	eventLoop.Run(ctx)
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipeline"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -42,7 +43,11 @@ func TestVote(t *testing.T) {
 
 	b := testutil.NewProposeMsg(
 		hotstuff.GetGenesis().Hash(),
-		hotstuff.NewQuorumCert(nil, 1, hotstuff.GetGenesis().Hash()),
+		hotstuff.NewQuorumCert(
+			nil,
+			1,
+			pipeline.NullPipe, // TODO: Verify if this code conflicts with pipelining
+			hotstuff.GetGenesis().Hash()),
 		"test", 1, 1,
 	)
 	blockChain.Store(b.Block)

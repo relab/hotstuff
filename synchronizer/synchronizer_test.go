@@ -9,6 +9,7 @@ import (
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipeline"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -25,7 +26,11 @@ func TestAdvanceViewQC(t *testing.T) {
 
 	block := hotstuff.NewBlock(
 		hotstuff.GetGenesis().Hash(),
-		hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
+		hotstuff.NewQuorumCert(
+			nil,
+			0,
+			pipeline.NullPipe, // TODO: Verify if this code conflicts with pipelining
+			hotstuff.GetGenesis().Hash()),
 		"foo",
 		1,
 		2,

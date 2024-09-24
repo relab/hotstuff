@@ -258,7 +258,11 @@ func CreateTimeouts(t *testing.T, view hotstuff.View, signers []modules.Crypto) 
 			ID:            signer(sig),
 			View:          view,
 			ViewSignature: sig,
-			SyncInfo:      hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())),
+			SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(
+				nil,
+				0,
+				pipeline.NullPipe, // TODO: Verify if this code conflicts with pipelining
+				hotstuff.GetGenesis().Hash())),
 		})
 	}
 	for i := range timeouts {

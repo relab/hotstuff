@@ -9,6 +9,8 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/relab/hotstuff/pipeline"
 )
 
 // IDSet implements a set of replica IDs. It is used to show which replicas participated in some event.
@@ -248,12 +250,13 @@ func (si SyncInfo) String() string {
 type QuorumCert struct {
 	signature QuorumSignature
 	view      View
+	pipe      pipeline.Pipe
 	hash      Hash
 }
 
 // NewQuorumCert creates a new quorum cert from the given values.
-func NewQuorumCert(signature QuorumSignature, view View, hash Hash) QuorumCert {
-	return QuorumCert{signature, view, hash}
+func NewQuorumCert(signature QuorumSignature, view View, pipe pipeline.Pipe, hash Hash) QuorumCert {
+	return QuorumCert{signature, view, pipe, hash}
 }
 
 // ToBytes returns a byte representation of the quorum certificate.
@@ -279,6 +282,10 @@ func (qc QuorumCert) BlockHash() Hash {
 // View returns the view in which the QC was created.
 func (qc QuorumCert) View() View {
 	return qc.view
+}
+
+func (qc QuorumCert) Pipe() pipeline.Pipe {
+	return qc.pipe
 }
 
 // Equals returns true if the other QC equals this QC.

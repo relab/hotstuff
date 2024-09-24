@@ -115,7 +115,11 @@ func TestPropose(t *testing.T) {
 		ID: 1,
 		Block: hotstuff.NewBlock(
 			hotstuff.GetGenesis().Hash(),
-			hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
+			hotstuff.NewQuorumCert(
+				nil,
+				0,
+				pipeline.NullPipe, // TODO: Verify if this code conflicts with pipelining
+				hotstuff.GetGenesis().Hash()),
 			"foo", 1, 1, 0,
 		),
 		PipeId: 0,
@@ -144,7 +148,11 @@ func TestProposePiped(t *testing.T) {
 		ID: 1,
 		Block: hotstuff.NewBlock(
 			hotstuff.GetGenesis().Hash(),
-			hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
+			hotstuff.NewQuorumCert(
+				nil,
+				0,
+				pipeline.NullPipe, // TODO: Verify if this code conflicts with pipelining
+				hotstuff.GetGenesis().Hash()),
 			"foo", 1, 1, pipeId,
 		),
 		PipeId: pipeId,

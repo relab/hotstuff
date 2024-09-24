@@ -97,9 +97,10 @@ func PartialCertFromProto(cert *PartialCert) hotstuff.PartialCert {
 func QuorumCertToProto(qc hotstuff.QuorumCert) *QuorumCert {
 	hash := qc.BlockHash()
 	return &QuorumCert{
-		Sig:  QuorumSignatureToProto(qc.Signature()),
-		Hash: hash[:],
-		View: uint64(qc.View()),
+		Sig:    QuorumSignatureToProto(qc.Signature()),
+		Hash:   hash[:],
+		View:   uint64(qc.View()),
+		PipeId: uint32(qc.Pipe()),
 	}
 }
 
@@ -107,7 +108,11 @@ func QuorumCertToProto(qc hotstuff.QuorumCert) *QuorumCert {
 func QuorumCertFromProto(qc *QuorumCert) hotstuff.QuorumCert {
 	var h hotstuff.Hash
 	copy(h[:], qc.GetHash())
-	return hotstuff.NewQuorumCert(QuorumSignatureFromProto(qc.GetSig()), hotstuff.View(qc.GetView()), h)
+	return hotstuff.NewQuorumCert(
+		QuorumSignatureFromProto(qc.GetSig()),
+		hotstuff.View(qc.GetView()),
+		pipeline.Pipe(qc.PipeId),
+		h)
 }
 
 // ProposalToProto converts a ProposeMsg to a protobuf message.

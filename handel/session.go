@@ -13,6 +13,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/proto/handelpb"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
+	"github.com/relab/hotstuff/pipeline"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -379,6 +380,7 @@ func (s *session) updateOutgoing(levelIndex int) {
 				SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(
 					outgoing,
 					s.h.synchronizer.View(),
+					pipeline.NullPipe, // TODO: Verify if this code conflicts with pipelining
 					s.hash,
 				)),
 			})

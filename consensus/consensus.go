@@ -150,7 +150,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 				cmd,
 				cs.synchronizer.View(),
 				cs.opts.ID(),
-				0,
+				cs.pipe,
 			),
 		}
 

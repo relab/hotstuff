@@ -6,6 +6,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipeline"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff/crypto"
@@ -43,7 +44,13 @@ func TestConvertQuorumCert(t *testing.T) {
 	builders := testutil.CreateBuilders(t, ctrl, 4)
 	hl := builders.Build()
 
-	b1 := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), "", 1, 1, 0)
+	b1 := hotstuff.NewBlock(
+		hotstuff.GetGenesis().Hash(),
+		hotstuff.NewQuorumCert(
+			nil,
+			0,
+			pipeline.NullPipe, // TODO: Verify if this code conflicts with pipelining
+			hotstuff.GetGenesis().Hash()), "", 1, 1, 0)
 
 	signatures := testutil.CreatePCs(t, b1, hl.Signers())
 
@@ -64,7 +71,11 @@ func TestConvertQuorumCert(t *testing.T) {
 }
 
 func TestConvertBlock(t *testing.T) {
-	qc := hotstuff.NewQuorumCert(nil, 0, hotstuff.Hash{})
+	qc := hotstuff.NewQuorumCert(
+		nil,
+		0,
+		pipeline.NullPipe, // TODO: Verify if this code conflicts with pipelining
+		hotstuff.Hash{})
 	want := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "", 1, 1, 0)
 	pb := BlockToProto(want)
 	got := BlockFromProto(pb)
