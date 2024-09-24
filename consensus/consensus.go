@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/relab/hotstuff"
@@ -218,10 +219,10 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	if b := cs.impl.CommitRule(block); b != nil {
 		cs.committer.Commit(block)
 	}
-	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo(cs.pipe).WithQC(block.QuorumCert()))
 
 	if block.View() <= cs.lastVote {
-		cs.logger.Info("OnPropose: block view too old")
+		cs.logger.Info(fmt.Sprintf("OnPropose (pipe=%d): block view too old", cs.pipe))
 		return
 	}
 

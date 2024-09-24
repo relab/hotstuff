@@ -38,7 +38,7 @@ func (c crypto) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialC
 	if err != nil {
 		return hotstuff.PartialCert{}, err
 	}
-	return hotstuff.NewPartialCert(sig, block.Hash()), nil
+	return hotstuff.NewPartialCert(block.Pipe(), sig, block.Hash()), nil
 }
 
 // CreateQuorumCert creates a quorum certificate from a list of partial certificates.
@@ -142,7 +142,7 @@ func (c crypto) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.Q
 		messages[id] = hotstuff.TimeoutMsg{
 			ID:       id,
 			View:     aggQC.View(),
-			SyncInfo: hotstuff.NewSyncInfo().WithQC(qc),
+			SyncInfo: hotstuff.NewSyncInfo(qc.Pipe()).WithQC(qc),
 		}.ToBytes()
 	}
 	if aggQC.Sig().Participants().Len() < c.configuration.QuorumSize() {

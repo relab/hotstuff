@@ -181,7 +181,7 @@ func TestTimeout(t *testing.T) {
 		ID:            1,
 		View:          1,
 		ViewSignature: nil,
-		SyncInfo:      hotstuff.NewSyncInfo(),
+		SyncInfo:      hotstuff.NewSyncInfo(pipeline.NullPipe),
 	}
 	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)
@@ -207,7 +207,7 @@ func TestTimeoutPiped(t *testing.T) {
 		ID:            1,
 		View:          1,
 		ViewSignature: nil,
-		SyncInfo:      hotstuff.NewSyncInfo(),
+		SyncInfo:      hotstuff.NewSyncInfo(pipeid),
 		PipeId:        pipeid,
 	}
 	testBase(t, want, func(cfg modules.Configuration) {

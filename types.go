@@ -136,18 +136,19 @@ type ThresholdSignature = QuorumSignature
 type PartialCert struct {
 	// shortcut to the signer of the signature
 	signer    ID
+	pipe      pipeline.Pipe
 	signature QuorumSignature
 	blockHash Hash
 }
 
 // NewPartialCert returns a new partial certificate.
-func NewPartialCert(signature QuorumSignature, blockHash Hash) PartialCert {
+func NewPartialCert(pipe pipeline.Pipe, signature QuorumSignature, blockHash Hash) PartialCert {
 	var signer ID
 	signature.Participants().RangeWhile(func(i ID) bool {
 		signer = i
 		return false
 	})
-	return PartialCert{signer, signature, blockHash}
+	return PartialCert{signer, pipe, signature, blockHash}
 }
 
 // Signer returns the ID of the replica that created the certificate.
@@ -165,6 +166,10 @@ func (pc PartialCert) BlockHash() Hash {
 	return pc.blockHash
 }
 
+func (pc PartialCert) Pipe() pipeline.Pipe {
+	return pc.pipe
+}
+
 // ToBytes returns a byte representation of the partial certificate.
 func (pc PartialCert) ToBytes() []byte {
 	return append(pc.blockHash[:], pc.signature.ToBytes()...)
@@ -178,16 +183,18 @@ type SyncInfo struct {
 	qc    *QuorumCert
 	tc    *TimeoutCert
 	aggQC *AggregateQC
+	pipe  pipeline.Pipe
 }
 
 // NewSyncInfo returns a new SyncInfo struct.
-func NewSyncInfo() SyncInfo {
-	return SyncInfo{}
+func NewSyncInfo(pipe pipeline.Pipe) SyncInfo {
+	return SyncInfo{pipe: pipe}
 }
 
 // WithQC returns a copy of the SyncInfo struct with the given QC.
 func (si SyncInfo) WithQC(qc QuorumCert) SyncInfo {
 	si.qc = new(QuorumCert)
+	si.pipe = qc.pipe
 	*si.qc = qc
 	return si
 }
@@ -228,6 +235,10 @@ func (si SyncInfo) AggQC() (_ AggregateQC, _ bool) {
 		return *si.aggQC, true
 	}
 	return
+}
+
+func (si SyncInfo) Pipe() pipeline.Pipe {
+	return si.pipe
 }
 
 func (si SyncInfo) String() string {

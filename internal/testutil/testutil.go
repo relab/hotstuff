@@ -258,7 +258,7 @@ func CreateTimeouts(t *testing.T, view hotstuff.View, signers []modules.Crypto) 
 			ID:            signer(sig),
 			View:          view,
 			ViewSignature: sig,
-			SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(
+			SyncInfo: hotstuff.NewSyncInfo(pipeline.NullPipe).WithQC(hotstuff.NewQuorumCert(
 				nil,
 				0,
 				pipeline.NullPipe, // TODO: Verify if this code conflicts with pipelining

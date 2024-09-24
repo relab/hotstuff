@@ -377,7 +377,8 @@ func (s *session) updateOutgoing(levelIndex int) {
 			s.h.logger.Debugf("Done with session: %.8s", s.hash)
 
 			s.h.eventLoop.AddEvent(hotstuff.NewViewMsg{
-				SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(
+				// TODO: Check if null pipe is okay to use here
+				SyncInfo: hotstuff.NewSyncInfo(pipeline.NullPipe).WithQC(hotstuff.NewQuorumCert(
 					outgoing,
 					s.h.synchronizer.View(),
 					pipeline.NullPipe, // TODO: Verify if this code conflicts with pipelining

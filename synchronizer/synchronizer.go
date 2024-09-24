@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipeline"
 
 	"github.com/relab/hotstuff"
 )
@@ -38,6 +39,8 @@ type Synchronizer struct {
 	duration ViewDuration
 	timer    oneShotTimer
 
+	pipe pipeline.Pipe
+
 	// map of collected timeout messages per view
 	timeouts map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
 }
@@ -57,6 +60,8 @@ func (s *Synchronizer) InitModule(mods *modules.Core, initOpt modules.InitOption
 		&s.consensus,
 		&s.leaderRotation,
 	)
+
+	s.pipe = initOpt.ModulePipeId
 
 	s.eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
 		timeoutView := event.(TimeoutEvent).View
@@ -153,7 +158,7 @@ func (s *Synchronizer) View() hotstuff.View {
 func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
 	s.mut.RLock()
 	defer s.mut.RUnlock()
-	return hotstuff.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
+	return hotstuff.NewSyncInfo(s.pipe).WithQC(s.highQC).WithTC(s.highTC)
 }
 
 // OnLocalTimeout is called when a local timeout happens.

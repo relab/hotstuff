@@ -1,12 +1,14 @@
 package consensus
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipeline"
 )
 
 // VotingMachine collects votes.
@@ -19,6 +21,7 @@ type VotingMachine struct {
 	synchronizer  modules.Synchronizer
 	opts          *modules.Options
 
+	pipe          pipeline.Pipe
 	mut           sync.Mutex
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
 }
@@ -44,6 +47,7 @@ func (vm *VotingMachine) InitModule(mods *modules.Core, initOpt modules.InitOpti
 
 	mods.GetFromPipe(vm, &vm.synchronizer)
 
+	vm.pipe = initOpt.ModulePipeId
 	vm.eventLoop.RegisterHandler(
 		hotstuff.VoteMsg{},
 		func(event any) { vm.OnVote(event.(hotstuff.VoteMsg)) },
@@ -125,10 +129,12 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 
 	qc, err := vm.crypto.CreateQuorumCert(block, votes)
 	if err != nil {
-		vm.logger.Info("OnVote: could not create QC for block: ", err)
+		vm.logger.Info(fmt.Sprintf("OnVote (pipe=%d): could not create QC for block: ", vm.pipe), err)
 		return
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
 
-	vm.eventLoop.AddEvent(hotstuff.NewViewMsg{ID: vm.opts.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
+	vm.eventLoop.AddEvent(hotstuff.NewViewMsg{
+		ID:       vm.opts.ID(),
+		SyncInfo: hotstuff.NewSyncInfo(block.Pipe()).WithQC(qc)})
 }

@@ -32,7 +32,7 @@ func TestVote(t *testing.T) {
 
 	hs.Get(&eventLoop, &blockChain)
 
-	cs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
+	cs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(pipeline.NullPipe)))
 
 	ok := false
 	ctx, cancel := context.WithCancel(context.Background())

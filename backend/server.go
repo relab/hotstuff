@@ -165,13 +165,13 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposeMsg.ID = id
 	impl.srv.induceLatency(id)
 
-	// If the pipe ID is null, then add the event normally
-	if !pipeline.ValidPipe(proposeMsg.PipeId) {
-		impl.srv.eventLoop.AddEvent(proposeMsg)
+	if pipeline.ValidPipe(proposeMsg.PipeId) {
+		impl.srv.eventLoop.PipeEvent(proposeMsg.PipeId, proposeMsg)
 		return
 	}
 
-	impl.srv.eventLoop.PipeEvent(proposeMsg.PipeId, proposeMsg)
+	impl.srv.eventLoop.AddEvent(proposeMsg)
+	// If the pipe ID is null, then add the event normally
 }
 
 // Vote handles an incoming vote message.
@@ -182,6 +182,16 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		return
 	}
 	impl.srv.induceLatency(id)
+
+	pipe := pipeline.Pipe(cert.PipeId)
+	if pipeline.ValidPipe(pipe) {
+		impl.srv.eventLoop.PipeEvent(pipe, hotstuff.VoteMsg{
+			ID:          id,
+			PartialCert: hotstuffpb.PartialCertFromProto(cert),
+		})
+		return
+	}
+
 	impl.srv.eventLoop.AddEvent(hotstuff.VoteMsg{
 		ID:          id,
 		PartialCert: hotstuffpb.PartialCertFromProto(cert),
@@ -196,6 +206,16 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		return
 	}
 	impl.srv.induceLatency(id)
+
+	pipe := pipeline.Pipe(msg.PipeId)
+	if pipeline.ValidPipe(pipe) {
+		impl.srv.eventLoop.PipeEvent(pipe, hotstuff.NewViewMsg{
+			ID:       id,
+			SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
+		})
+		return
+	}
+
 	impl.srv.eventLoop.AddEvent(hotstuff.NewViewMsg{
 		ID:       id,
 		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),

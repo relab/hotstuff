@@ -81,8 +81,9 @@ func QuorumSignatureFromProto(sig *QuorumSignature) hotstuff.QuorumSignature {
 func PartialCertToProto(cert hotstuff.PartialCert) *PartialCert {
 	hash := cert.BlockHash()
 	return &PartialCert{
-		Sig:  QuorumSignatureToProto(cert.Signature()),
-		Hash: hash[:],
+		Sig:    QuorumSignatureToProto(cert.Signature()),
+		Hash:   hash[:],
+		PipeId: uint32(cert.Pipe()),
 	}
 }
 
@@ -90,7 +91,7 @@ func PartialCertToProto(cert hotstuff.PartialCert) *PartialCert {
 func PartialCertFromProto(cert *PartialCert) hotstuff.PartialCert {
 	var h hotstuff.Hash
 	copy(h[:], cert.GetHash())
-	return hotstuff.NewPartialCert(QuorumSignatureFromProto(cert.GetSig()), h)
+	return hotstuff.NewPartialCert(pipeline.Pipe(cert.PipeId), QuorumSignatureFromProto(cert.GetSig()), h)
 }
 
 // QuorumCertToProto converts a consensus.QuorumCert to a hotstuffpb.QuorumCert.
@@ -195,7 +196,10 @@ func TimeoutMsgToProto(timeoutMsg hotstuff.TimeoutMsg) *TimeoutMsg {
 
 // TimeoutCertFromProto converts a timeout certificate from the protobuf type to the hotstuff type.
 func TimeoutCertFromProto(m *TimeoutCert) hotstuff.TimeoutCert {
-	return hotstuff.NewTimeoutCert(QuorumSignatureFromProto(m.GetSig()), hotstuff.View(m.GetView()))
+	return hotstuff.NewTimeoutCert(
+		QuorumSignatureFromProto(m.GetSig()),
+		hotstuff.View(m.GetView()),
+	)
 }
 
 // TimeoutCertToProto converts a timeout certificate from the hotstuff type to the protobuf type.
@@ -226,7 +230,7 @@ func AggregateQCToProto(aggQC hotstuff.AggregateQC) *AggQC {
 
 // SyncInfoFromProto converts a SyncInfo struct from the protobuf type to the hotstuff type.
 func SyncInfoFromProto(m *SyncInfo) hotstuff.SyncInfo {
-	si := hotstuff.NewSyncInfo()
+	si := hotstuff.NewSyncInfo(pipeline.Pipe(m.PipeId))
 	if qc := m.GetQC(); qc != nil {
 		si = si.WithQC(QuorumCertFromProto(qc))
 	}
