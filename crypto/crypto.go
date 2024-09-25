@@ -143,6 +143,7 @@ func (c crypto) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.Q
 			ID:       id,
 			View:     aggQC.View(),
 			SyncInfo: hotstuff.NewSyncInfo(qc.Pipe()).WithQC(qc),
+			PipeId:   qc.Pipe(),
 		}.ToBytes()
 	}
 	if aggQC.Sig().Participants().Len() < c.configuration.QuorumSize() {

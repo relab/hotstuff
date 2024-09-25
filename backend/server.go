@@ -247,12 +247,12 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	}
 
 	impl.srv.induceLatency(timeoutMsg.ID)
-	if !pipeline.ValidPipe(timeoutMsg.PipeId) {
-		impl.srv.eventLoop.AddEvent(timeoutMsg)
+	if pipeline.ValidPipe(timeoutMsg.PipeId) {
+		impl.srv.eventLoop.PipeEvent(timeoutMsg.PipeId, timeoutMsg)
 		return
 	}
 
-	impl.srv.eventLoop.PipeEvent(timeoutMsg.PipeId, timeoutMsg)
+	impl.srv.eventLoop.AddEvent(timeoutMsg)
 }
 
 type replicaConnected struct {

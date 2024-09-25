@@ -171,6 +171,9 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocyclo
 	// TODO: extract parts of this method into helper functions maybe?
 	cs.logger.Debugf("OnPropose: %v", proposal.Block)
+	if cs.pipe != proposal.PipeId {
+		panic("OnPropose: incorrect pipe")
+	}
 
 	block := proposal.Block
 
@@ -209,7 +212,8 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		cs.logger.Info("OnPropose: Failed to fetch qcBlock")
 	}
 
-	if !cs.acceptor.Accept(block.Command()) {
+	cmd := block.Command()
+	if !cs.acceptor.Accept(cmd) {
 		cs.logger.Info("OnPropose: command not accepted")
 		return
 	}

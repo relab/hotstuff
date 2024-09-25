@@ -1,8 +1,17 @@
 package pipeline
 
+import "encoding/binary"
+
 type Pipe uint32
 
 const NullPipe = Pipe(0)
+
+// ToBytes returns the view as bytes.
+func (p Pipe) ToBytes() []byte {
+	var viewBytes [4]byte
+	binary.LittleEndian.PutUint32(viewBytes[:], uint32(p))
+	return viewBytes[:]
+}
 
 // If the pipe ID is not NullPipeId, then return true
 func ValidPipe(pipeId Pipe) bool {

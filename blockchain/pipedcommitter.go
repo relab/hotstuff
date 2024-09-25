@@ -7,7 +7,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	pipeline "github.com/relab/hotstuff/pipeline"
+	"github.com/relab/hotstuff/pipeline"
 )
 
 type waitingPipedCommitter struct {

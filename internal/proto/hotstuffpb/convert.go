@@ -119,7 +119,7 @@ func QuorumCertFromProto(qc *QuorumCert) hotstuff.QuorumCert {
 // ProposalToProto converts a ProposeMsg to a protobuf message.
 func ProposalToProto(proposal hotstuff.ProposeMsg) *Proposal {
 	p := &Proposal{
-		PipeId: 0,
+		PipeId: uint32(proposal.PipeId),
 		Block:  BlockToProto(proposal.Block),
 	}
 	if proposal.AggregateQC != nil {
@@ -246,6 +246,7 @@ func SyncInfoFromProto(m *SyncInfo) hotstuff.SyncInfo {
 // SyncInfoToProto converts a SyncInfo struct from the hotstuff type to the protobuf type.
 func SyncInfoToProto(syncInfo hotstuff.SyncInfo) *SyncInfo {
 	m := &SyncInfo{}
+	m.PipeId = uint32(syncInfo.Pipe())
 	if qc, ok := syncInfo.QC(); ok {
 		m.QC = QuorumCertToProto(qc)
 	}

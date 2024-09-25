@@ -188,6 +188,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 		View:          view,
 		SyncInfo:      s.SyncInfo(),
 		ViewSignature: sig,
+		PipeId:        s.pipe,
 	}
 
 	if s.opts.ShouldUseAggQC() {
