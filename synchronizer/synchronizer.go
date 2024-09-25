@@ -68,7 +68,7 @@ func (s *Synchronizer) InitModule(mods *modules.Core, initOpt modules.InitOption
 		if s.View() == timeoutView {
 			s.OnLocalTimeout()
 		}
-	}, eventloop.RespondToPipe(initOpt.ModulePipeId))
+	})
 
 	s.eventLoop.RegisterHandler(hotstuff.NewViewMsg{}, func(event any) {
 		newViewMsg := event.(hotstuff.NewViewMsg)
@@ -210,6 +210,10 @@ func (s *Synchronizer) OnLocalTimeout() {
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
 func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
+	if s.pipe != timeout.PipeId {
+		panic("incorrect pipe")
+	}
+
 	currView := s.View()
 
 	defer func() {
@@ -280,6 +284,10 @@ func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
 // AdvanceView attempts to advance to the next view using the given QC.
 // qc must be either a regular quorum certificate, or a timeout certificate.
 func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
+	if s.pipe != syncInfo.Pipe() {
+		panic("incorrect pipe")
+	}
+
 	v := hotstuff.View(0)
 	timeout := false
 

@@ -421,7 +421,7 @@ func (b *Builder) Build() *Core {
 	opt := InitOptions{
 		IsPipeliningEnabled: b.pipeliningEnabled,
 		ModulePipeId:        pipeline.NullPipe,
-		PipeCount:           0,
+		PipeCount:           len(b.pipeIds),
 	}
 	for _, module := range b.staticModules {
 		module.InitModule(&b.core, opt)
