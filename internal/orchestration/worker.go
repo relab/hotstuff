@@ -167,7 +167,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	// prepare modules
 	builder := modules.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 
-	newConsensusRules, ok := modules.GetModuleCtor[modules.Rules](opts.GetConsensus())
+	newConsensusRules, ok := modules.GetModuleCtor[consensus.Rules](opts.GetConsensus())
 	if !ok {
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
 	}
@@ -175,7 +175,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	var newByz func() byzantine.Byzantine = nil
 	if opts.GetByzantineStrategy() != "" {
 		if nb, ok := modules.GetModuleCtor[byzantine.Byzantine](opts.GetByzantineStrategy()); ok {
-			// consensusRules = byz.Wrap(consensusRules)
 			newByz = nb
 		} else {
 			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
@@ -209,7 +208,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if newByz != nil {
 		for pipe, rules := range cr {
 			byz := newByz()
-			cr[pipe] = byz.Wrap(rules.(modules.Rules))
+			cr[pipe] = byz.Wrap(rules.(consensus.Rules))
 		}
 	}
 

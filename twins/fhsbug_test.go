@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/fasthotstuff"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -14,7 +15,7 @@ import (
 )
 
 func init() {
-	modules.RegisterModule(vulnerableModule, func() modules.Rules { return &vulnerableFHS{} })
+	modules.RegisterModule(vulnerableModule, func() consensus.Rules { return &vulnerableFHS{} })
 }
 
 const vulnerableModule = "vulnerableFHS"

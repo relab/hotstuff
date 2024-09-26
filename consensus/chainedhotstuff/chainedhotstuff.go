@@ -2,9 +2,8 @@
 package chainedhotstuff
 
 import (
-	"fmt"
-
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/pipeline"
@@ -26,7 +25,7 @@ type ChainedHotStuff struct {
 }
 
 // New returns a new chainedhotstuff instance.
-func New() modules.Rules {
+func New() consensus.Rules {
 	return &ChainedHotStuff{
 		bLock: hotstuff.GetGenesis(),
 	}
@@ -34,7 +33,6 @@ func New() modules.Rules {
 
 // InitModule initializes the module.
 func (hs *ChainedHotStuff) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
-	fmt.Printf("%p\n", hs)
 	hs.pipe = initOpt.ModulePipeId
 	mods.Get(&hs.blockChain, &hs.logger)
 }

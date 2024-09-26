@@ -137,7 +137,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 		builder := n.GetNodeBuilder(nodeID, pk)
 		node := n.nodes[nodeID.NetworkID]
 
-		consensusModule, ok := modules.GetModule[modules.Rules](consensusName)
+		consensusModule, ok := modules.GetModule[consensus.Rules](consensusName)
 		if !ok {
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
