@@ -53,6 +53,37 @@ type Module interface {
 	InitModule(mods *Core, buildOpt InitOptions)
 }
 
+func NewPiped[T any](pipeCount uint, ctor any, ctorArgs ...any) (pipedMods map[pipeline.Pipe]T) {
+	if reflect.TypeOf(ctor).Kind() != reflect.Func {
+		panic("first argument is not a function")
+	}
+
+	pipedMods = make(map[pipeline.Pipe]T)
+
+	vargs := make([]reflect.Value, len(ctorArgs))
+	for n, v := range ctorArgs {
+		vargs[n] = reflect.ValueOf(v)
+	}
+
+	ctorVal := reflect.ValueOf(ctor)
+
+	if pipeCount == 0 {
+		pipeCount = 1
+	}
+	for pipe := pipeline.Pipe(1); pipe <= pipeline.Pipe(pipeCount); pipe++ {
+		returnResult := ctorVal.Call(vargs)
+		if len(returnResult) != 1 {
+			panic("constructor does not return a single value")
+		}
+		mod, ok := returnResult[0].Interface().(T)
+		if !ok {
+			panic("constructor did not return correct value type")
+		}
+		pipedMods[pipe] = mod
+	}
+	return pipedMods
+}
+
 // Core is the base of the module system.
 // It contains only a few core modules that are shared between replicas and clients.
 type Core struct {
@@ -330,9 +361,63 @@ func (b *Builder) Add(modules ...any) {
 	}
 }
 
+// CreatePiped constructs N modules of the same type based on the constructor function
+// and adds them to a map where each module is mapped to a pipe. The module's constructor
+// is called with the variadic arguments.
+// If pipelining is disabled when CreatePiped is called, only one module will be constructed and mapped
+// to pipeline.NullPipe.
+// To add the modules, use AddPipedModules later.
+func (b *Builder) CreatePiped(ctor any, ctorArgs ...any) (pipedMods map[pipeline.Pipe]any) {
+	if reflect.TypeOf(ctor).Kind() != reflect.Func {
+		panic("first argument is not a function")
+	}
+
+	pipedMods = make(map[pipeline.Pipe]any)
+
+	vargs := make([]reflect.Value, len(ctorArgs))
+	for n, v := range ctorArgs {
+		vargs[n] = reflect.ValueOf(v)
+	}
+
+	ctorVal := reflect.ValueOf(ctor)
+	pipes := b.pipeIds
+	if !b.pipeliningEnabled {
+		pipes = []pipeline.Pipe{pipeline.NullPipe}
+	}
+	for _, id := range pipes {
+		returnResult := ctorVal.Call(vargs)
+		if len(returnResult) != 1 {
+			panic("constructor does not return a single value")
+		}
+		mod := returnResult[0].Interface()
+		pipedMods[id] = mod
+	}
+	return pipedMods
+}
+
+func (b *Builder) AddPiped(pipedModMaps ...map[pipeline.Pipe]any) {
+	for _, pipedMods := range pipedModMaps {
+		if !b.pipeliningEnabled {
+			b.Add(pipedMods[pipeline.NullPipe])
+			continue
+		}
+
+		for id := range pipedMods {
+			mod := pipedMods[id]
+			converted, ok := mod.(Module)
+
+			b.core.pipedModules[id] = append(b.core.pipedModules[id], mod)
+			if !ok {
+				continue
+			}
+			b.modulePipes[id] = append(b.modulePipes[id], converted)
+		}
+	}
+}
+
 // AddPiped constructs and adds n instances of a module kind, provided its constructor and subsequent
 // constructor arguments. If pipelining is not enabled, only one will be created and Add is called for it.
-func (b *Builder) AddPiped(ctor any, ctorArgs ...any) {
+/*func (b *Builder) AddPiped(ctor any, ctorArgs ...any) {
 	if reflect.TypeOf(ctor).Kind() != reflect.Func {
 		panic("first argument is not a function")
 	}
@@ -367,48 +452,7 @@ func (b *Builder) AddPiped(ctor any, ctorArgs ...any) {
 		}
 		b.modulePipes[id] = append(b.modulePipes[id], converted)
 	}
-}
-
-// AddPipedWithCallback performs AddPiped with an additional callback parameter
-func (b *Builder) AddPipedWithCallback(ctor any, ctorArgs []any, callback func(any)) {
-	if reflect.TypeOf(ctor).Kind() != reflect.Func {
-		panic("first argument is not a function")
-	}
-
-	vargs := make([]reflect.Value, len(ctorArgs))
-	for n, v := range ctorArgs {
-		vargs[n] = reflect.ValueOf(v)
-	}
-
-	ctorVal := reflect.ValueOf(ctor)
-	if !b.pipeliningEnabled {
-		returnResult := ctorVal.Call(vargs)
-		if len(returnResult) != 1 {
-			panic("constructor does not return a single value")
-		}
-		mod := returnResult[0].Interface()
-		b.Add(mod)
-		callback(mod)
-		return
-	}
-
-	for id := range b.modulePipes {
-		returnResult := ctorVal.Call(vargs)
-		if len(returnResult) != 1 {
-			panic("constructor does not return a single value")
-		}
-		mod := returnResult[0].Interface()
-		callback(mod)
-
-		converted, ok := mod.(Module)
-
-		b.core.pipedModules[id] = append(b.core.pipedModules[id], mod)
-		if !ok {
-			continue
-		}
-		b.modulePipes[id] = append(b.modulePipes[id], converted)
-	}
-}
+}*/
 
 // Build initializes all added modules and returns the Core object.
 func (b *Builder) Build() *Core {

@@ -170,6 +170,7 @@ func (el *EventLoop) PipeEvent(pipeId pipeline.Pipe, event any) {
 		pipeId: pipeId,
 		event:  event,
 	}
+
 	el.AddEvent(wrapper)
 }
 
@@ -271,8 +272,10 @@ func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
 			continue
 		}
 
-		if pipeId != pipeline.NullPipe && pipeId != handler.opts.pipeId {
-			continue
+		if pipeId != pipeline.NullPipe {
+			if pipeId != handler.opts.pipeId {
+				continue
+			}
 		}
 
 		if handler.opts.priority {

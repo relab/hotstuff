@@ -167,14 +167,16 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	// prepare modules
 	builder := modules.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 
-	consensusRules, ok := modules.GetModule[consensus.Rules](opts.GetConsensus())
+	newConsensusRules, ok := modules.GetModuleCtor[modules.Rules](opts.GetConsensus())
 	if !ok {
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
 	}
 
+	var newByz func() byzantine.Byzantine = nil
 	if opts.GetByzantineStrategy() != "" {
-		if byz, ok := modules.GetModule[byzantine.Byzantine](opts.GetByzantineStrategy()); ok {
-			consensusRules = byz.Wrap(consensusRules)
+		if nb, ok := modules.GetModuleCtor[byzantine.Byzantine](opts.GetByzantineStrategy()); ok {
+			// consensusRules = byz.Wrap(consensusRules)
+			newByz = nb
 		} else {
 			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
 		}
@@ -202,15 +204,31 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		blockchain.NewWaitingPipedCommitter(),
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
-	builder.AddPiped(consensus.New, consensusRules)
-	builder.AddPiped(consensus.NewVotingMachine)
-	builder.AddPiped(newLeaderRotation)
-	builder.AddPiped(synchronizer.New, synchronizer.NewViewDuration(
+
+	cr := builder.CreatePiped(newConsensusRules)
+	if newByz != nil {
+		for pipe, rules := range cr {
+			byz := newByz()
+			cr[pipe] = byz.Wrap(rules.(modules.Rules))
+		}
+	}
+
+	css := builder.CreatePiped(consensus.New)
+	vms := builder.CreatePiped(consensus.NewVotingMachine)
+	lrs := builder.CreatePiped(newLeaderRotation)
+	syncs := builder.CreatePiped(synchronizer.New, synchronizer.NewViewDuration(
 		uint64(opts.GetTimeoutSamples()),
 		float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
 		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
 		float64(opts.GetTimeoutMultiplier()),
 	))
+
+	builder.AddPiped(
+		cr,
+		css,
+		vms,
+		lrs,
+		syncs)
 
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
 	if w.measurementInterval > 0 {

@@ -137,15 +137,17 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 		builder := n.GetNodeBuilder(nodeID, pk)
 		node := n.nodes[nodeID.NetworkID]
 
-		consensusModule, ok := modules.GetModule[consensus.Rules](consensusName)
+		consensusModule, ok := modules.GetModule[modules.Rules](consensusName)
 		if !ok {
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
+
 		builder.Add(
 			eventloop.New(100),
 			blockchain.New(),
 			blockchain.NewBasicCommitter(),
-			consensus.New(consensusModule),
+			consensus.New(),
+			consensusModule,
 			consensus.NewVotingMachine(),
 			crypto.NewCache(ecdsa.New(), 100),
 			synchronizer.New(FixedTimeout(1*time.Millisecond)),

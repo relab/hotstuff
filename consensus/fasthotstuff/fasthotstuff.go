@@ -3,7 +3,6 @@ package fasthotstuff
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
@@ -20,7 +19,7 @@ type FastHotStuff struct {
 }
 
 // New returns a new FastHotStuff instance.
-func New() consensus.Rules {
+func New() modules.Rules {
 	return &FastHotStuff{}
 }
 

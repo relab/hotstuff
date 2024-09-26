@@ -63,8 +63,10 @@ func (m *multiplierImpl) InitModule(mods *modules.Core, _ modules.InitOptions) {
 func TestPipeliningDisabled(t *testing.T) {
 	builder := modules.NewBuilder(0, nil)
 
-	builder.AddPiped(NewAdder)
-	builder.AddPiped(NewMultiplier)
+	adders := builder.CreatePiped(NewAdder)
+	multers := builder.CreatePiped(NewMultiplier)
+
+	builder.AddPiped(adders, multers)
 
 	mods := builder.Build()
 	if mods.PipeCount() > 0 {
@@ -86,8 +88,11 @@ func TestPipelined(t *testing.T) {
 
 	builder := modules.NewBuilder(0, nil)
 	builder.EnablePipelining(expectedPipeIds)
-	builder.AddPiped(NewAdder)
-	builder.AddPiped(NewMultiplier)
+
+	adders := builder.CreatePiped(NewAdder)
+	multers := builder.CreatePiped(NewMultiplier)
+
+	builder.AddPiped(adders, multers)
 
 	core := builder.Build()
 	if core.PipeCount() != len(expectedPipeIds) {

@@ -2,10 +2,12 @@
 package chainedhotstuff
 
 import (
+	"fmt"
+
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipeline"
 )
 
 func init() {
@@ -16,6 +18,7 @@ func init() {
 type ChainedHotStuff struct {
 	blockChain modules.BlockChain
 	logger     logging.Logger
+	pipe       pipeline.Pipe
 
 	// protocol variables
 
@@ -23,14 +26,16 @@ type ChainedHotStuff struct {
 }
 
 // New returns a new chainedhotstuff instance.
-func New() consensus.Rules {
+func New() modules.Rules {
 	return &ChainedHotStuff{
 		bLock: hotstuff.GetGenesis(),
 	}
 }
 
 // InitModule initializes the module.
-func (hs *ChainedHotStuff) InitModule(mods *modules.Core, _ modules.InitOptions) {
+func (hs *ChainedHotStuff) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
+	fmt.Printf("%p\n", hs)
+	hs.pipe = initOpt.ModulePipeId
 	mods.Get(&hs.blockChain, &hs.logger)
 }
 
@@ -43,6 +48,10 @@ func (hs *ChainedHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool)
 
 // CommitRule decides whether an ancestor of the block should be committed.
 func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
+	if hs.pipe != block.Pipe() {
+		panic("incorrect pipe")
+	}
+
 	block1, ok := hs.qcRef(block.QuorumCert())
 	if !ok {
 		return nil

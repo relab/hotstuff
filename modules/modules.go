@@ -156,6 +156,30 @@ type Consensus interface {
 	ChainLength() int
 }
 
+// TODO (Alan): This was moved here from consensus.go. Find a better solution.
+// Rules is the minimum interface that a consensus implementations must implement.
+// Implementations of this interface can be wrapped in the ConsensusBase struct.
+// Together, these provide an implementation of the main Consensus interface.
+// Implementors do not need to verify certificates or interact with other modules,
+// as this is handled by the ConsensusBase struct.
+type Rules interface {
+	// VoteRule decides whether to vote for the block.
+	VoteRule(proposal hotstuff.ProposeMsg) bool
+	// CommitRule decides whether any ancestor of the block can be committed.
+	// Returns the youngest ancestor of the block that can be committed.
+	CommitRule(*hotstuff.Block) *hotstuff.Block
+	// ChainLength returns the number of blocks that need to be chained together in order to commit.
+	ChainLength() int
+}
+
+// TODO (Alan): This was moved here from consensus.go. Find a better solution.
+// ProposeRuler is an optional interface that adds a ProposeRule method.
+// This allows implementors to specify how new blocks are created.
+type ProposeRuler interface {
+	// ProposeRule creates a new proposal.
+	ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool)
+}
+
 // LeaderRotation implements a leader rotation scheme.
 type LeaderRotation interface {
 	// GetLeader returns the id of the leader in the given view.

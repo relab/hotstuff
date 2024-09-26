@@ -3,7 +3,6 @@ package byzantine
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -15,11 +14,11 @@ func init() {
 // Byzantine wraps a consensus rules implementation and alters its behavior.
 type Byzantine interface {
 	// Wrap wraps the rules and returns an altered rules implementation.
-	Wrap(consensus.Rules) consensus.Rules
+	Wrap(modules.Rules) modules.Rules
 }
 
 type silence struct {
-	consensus.Rules
+	modules.Rules
 }
 
 func (s *silence) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
@@ -32,13 +31,13 @@ func (s *silence) ProposeRule(_ hotstuff.SyncInfo, _ hotstuff.Command) (hotstuff
 	return hotstuff.ProposeMsg{}, false
 }
 
-func (s *silence) Wrap(rules consensus.Rules) consensus.Rules {
+func (s *silence) Wrap(rules modules.Rules) modules.Rules {
 	s.Rules = rules
 	return s
 }
 
 // NewSilence returns a byzantine replica that will never propose.
-func NewSilence(c consensus.Rules) consensus.Rules {
+func NewSilence(c modules.Rules) modules.Rules {
 	return &silence{Rules: c}
 }
 
@@ -46,7 +45,7 @@ type fork struct {
 	blockChain   modules.BlockChain
 	synchronizer modules.Synchronizer
 	opts         *modules.Options
-	consensus.Rules
+	modules.Rules
 }
 
 func (f *fork) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
@@ -93,11 +92,11 @@ func (f *fork) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (propos
 }
 
 // NewFork returns a byzantine replica that will try to fork the chain.
-func NewFork(rules consensus.Rules) consensus.Rules {
+func NewFork(rules modules.Rules) modules.Rules {
 	return &fork{Rules: rules}
 }
 
-func (f *fork) Wrap(rules consensus.Rules) consensus.Rules {
+func (f *fork) Wrap(rules modules.Rules) modules.Rules {
 	f.Rules = rules
 	return f
 }

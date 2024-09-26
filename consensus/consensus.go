@@ -12,32 +12,12 @@ import (
 	"github.com/relab/hotstuff/synchronizer"
 )
 
-// Rules is the minimum interface that a consensus implementations must implement.
-// Implementations of this interface can be wrapped in the ConsensusBase struct.
-// Together, these provide an implementation of the main Consensus interface.
-// Implementors do not need to verify certificates or interact with other modules,
-// as this is handled by the ConsensusBase struct.
-type Rules interface {
-	// VoteRule decides whether to vote for the block.
-	VoteRule(proposal hotstuff.ProposeMsg) bool
-	// CommitRule decides whether any ancestor of the block can be committed.
-	// Returns the youngest ancestor of the block that can be committed.
-	CommitRule(*hotstuff.Block) *hotstuff.Block
-	// ChainLength returns the number of blocks that need to be chained together in order to commit.
-	ChainLength() int
-}
-
-// ProposeRuler is an optional interface that adds a ProposeRule method.
-// This allows implementors to specify how new blocks are created.
-type ProposeRuler interface {
-	// ProposeRule creates a new proposal.
-	ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool)
-}
+// TODO (Alan): Rules and Proposeruler moved to modules.go. Find a less hacky way to deal with this.
 
 // consensusBase provides a default implementation of the Consensus interface
 // for implementations of the ConsensusImpl interface.
 type consensusBase struct {
-	impl Rules
+	impl modules.Rules
 
 	acceptor       modules.Acceptor
 	blockChain     modules.BlockChain
@@ -61,9 +41,8 @@ type consensusBase struct {
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
-func New(impl Rules) modules.Consensus {
+func New() modules.Consensus {
 	return &consensusBase{
-		impl:     impl,
 		lastVote: 0,
 	}
 }
@@ -88,17 +67,22 @@ func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOpti
 	mods.GetFromPipe(cs,
 		&cs.synchronizer,
 		&cs.leaderRotation,
+		&cs.impl,
 	)
 
 	mods.TryGet(&cs.handel)
 
-	if mod, ok := cs.impl.(modules.Module); ok {
-		mod.InitModule(mods, initOpt)
-	}
+	// if mod, ok := cs.impl.(modules.Module); ok {
+	// 	mod.InitModule(mods, initOpt)
+	// }
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.OnPropose(event.(hotstuff.ProposeMsg))
 	}, eventloop.RespondToPipe(initOpt.ModulePipeId))
+}
+
+func (cs *consensusBase) SetRules(rules modules.Rules) {
+	cs.impl = rules
 }
 
 func (cs *consensusBase) CommittedBlock() *hotstuff.Block {
@@ -115,6 +99,10 @@ func (cs *consensusBase) StopVoting(view hotstuff.View) {
 // Propose creates a new proposal.
 func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 	cs.logger.Debug("Propose")
+
+	if cs.pipe != cert.Pipe() {
+		panic("incorrect pipe")
+	}
 
 	qc, ok := cert.QC()
 	if ok {
@@ -136,7 +124,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 	}
 
 	var proposal hotstuff.ProposeMsg
-	if proposer, ok := cs.impl.(ProposeRuler); ok {
+	if proposer, ok := cs.impl.(modules.ProposeRuler); ok {
 		proposal, ok = proposer.ProposeRule(cert, cmd)
 		if !ok {
 			cs.logger.Debug("Propose: No block")

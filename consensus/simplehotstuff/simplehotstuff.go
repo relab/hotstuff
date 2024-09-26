@@ -3,7 +3,6 @@ package simplehotstuff
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
@@ -25,7 +24,7 @@ type SimpleHotStuff struct {
 }
 
 // New returns a new SimpleHotStuff instance.
-func New() consensus.Rules {
+func New() modules.Rules {
 	return &SimpleHotStuff{
 		locked: hotstuff.GetGenesis(),
 	}
