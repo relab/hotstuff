@@ -29,6 +29,7 @@ func NewWaitingPipedCommitter() modules.BlockCommitter {
 	return &waitingPipedCommitter{
 		bExecAtPipe:         make(map[pipeline.Pipe]*hotstuff.Block),
 		waitingBlocksAtPipe: make(map[pipeline.Pipe][]*hotstuff.Block),
+		currentView:         1,
 		currentPipe:         1,
 	}
 }
@@ -73,8 +74,11 @@ func (pc *waitingPipedCommitter) Commit(block *hotstuff.Block) {
 	}
 
 	pc.mut.Lock()
-	pc.tryExec()
+	err = pc.tryExec()
 	pc.mut.Unlock()
+	if err != nil {
+		pc.logger.Error(err)
+	}
 }
 
 // Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
@@ -118,11 +122,11 @@ func (pc *waitingPipedCommitter) commitInner(block *hotstuff.Block) error {
 	return nil
 }
 
-func (pc *waitingPipedCommitter) tryExec() {
+func (pc *waitingPipedCommitter) tryExec() error {
 	waitingBlocks := pc.waitingBlocksAtPipe[pc.currentPipe]
 	canPeek := len(waitingBlocks) > 0
 	if !canPeek {
-		return
+		return nil
 	}
 
 	peekedBlock := waitingBlocks[0]
@@ -133,16 +137,19 @@ func (pc *waitingPipedCommitter) tryExec() {
 		// Pop from queue
 		pc.waitingBlocksAtPipe[pc.currentPipe] = pc.waitingBlocksAtPipe[pc.currentPipe][1:]
 		// Delete from chain. TODO (Alan): handle error
-		_ = pc.blockChain.DeleteAtHeight(peekedBlock.View(), peekedBlock.Hash())
+		err := pc.blockChain.DeleteAtHeight(peekedBlock.View(), peekedBlock.Hash())
+		if err != nil {
+			return err
+		}
 	}
 
 	pc.currentPipe++
-	if pc.currentPipe == pipeline.Pipe(pc.pipeCount) {
+	if pc.currentPipe == pipeline.Pipe(pc.pipeCount)+1 {
 		pc.currentPipe = 1
 		pc.currentView++
 	}
 
-	pc.tryExec()
+	return pc.tryExec()
 }
 
 var _ modules.BlockCommitter = (*basicCommitter)(nil)
