@@ -322,26 +322,23 @@ func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey) Builder {
 
 // EnablePipelining enables pipelining by allocating the module pipes and assigning them the ids
 // provided by pipeIds. The number of pipes will be len(pipeIds).
-func (bl *Builder) EnablePipelining(pipeIds []pipeline.Pipe) {
+func (bl *Builder) EnablePipelining(pipeCount int) {
 	if bl.pipeliningEnabled {
 		panic("pipelining already enabled")
 	}
 
-	if len(pipeIds) == 0 {
-		panic("no pipe ids provided")
-	}
-
-	if !pipeline.ValidPipes(pipeIds) {
-		panic("at least one pipe id was invalid or duplicate")
+	if pipeCount <= 1 {
+		panic("pipelining requires at least two pipes")
 	}
 
 	bl.pipeliningEnabled = true
 	bl.core.pipedModules = make(map[pipeline.Pipe][]any)
 	bl.modulePipes = make(map[pipeline.Pipe]ModulePipe)
-	bl.pipeIds = pipeIds
-	for _, id := range bl.pipeIds {
-		bl.modulePipes[id] = make(ModulePipe, 0)
-		bl.core.pipedModules[id] = make([]any, 0)
+
+	for pipe := pipeline.Pipe(1); pipe <= pipeline.Pipe(pipeCount); pipe++ {
+		bl.pipeIds = append(bl.pipeIds, pipe)
+		bl.modulePipes[pipe] = make(ModulePipe, 0)
+		bl.core.pipedModules[pipe] = make([]any, 0)
 	}
 
 }

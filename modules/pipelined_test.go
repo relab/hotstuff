@@ -84,10 +84,10 @@ func TestPipeliningDisabled(t *testing.T) {
 }
 
 func TestPipelined(t *testing.T) {
-	expectedPipeIds := []pipeline.Pipe{1, 2, 3}
+	pipeCount := 3
 
 	builder := modules.NewBuilder(0, nil)
-	builder.EnablePipelining(expectedPipeIds)
+	builder.EnablePipelining(pipeCount)
 
 	adders := builder.CreatePiped(NewAdder)
 	multers := builder.CreatePiped(NewMultiplier)
@@ -95,7 +95,7 @@ func TestPipelined(t *testing.T) {
 	builder.AddPiped(adders, multers)
 
 	core := builder.Build()
-	if core.PipeCount() != len(expectedPipeIds) {
+	if core.PipeCount() != pipeCount {
 		t.Fail()
 	}
 

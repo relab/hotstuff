@@ -72,7 +72,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 }
 
 // TestModules registers default modules for testing to the given builder.
-func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *modules.Builder, pipes []pipeline.Pipe) {
+func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *modules.Builder, pipeCount int) {
 	t.Helper()
 
 	acceptor := mocks.NewMockAcceptor(ctrl)
@@ -186,7 +186,7 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 }
 
 // TODO: Complete the implementation.
-func CreateBuildersPiped(t *testing.T, ctrl *gomock.Controller, n int, pipes []pipeline.Pipe, keys ...hotstuff.PrivateKey) (builders BuilderList) {
+func CreateBuildersPiped(t *testing.T, ctrl *gomock.Controller, n int, pipeCount int, keys ...hotstuff.PrivateKey) (builders BuilderList) {
 	t.Helper()
 	network := twins.NewSimpleNetwork()
 	builders = make([]*modules.Builder, n)
@@ -200,9 +200,9 @@ func CreateBuildersPiped(t *testing.T, ctrl *gomock.Controller, n int, pipes []p
 		}
 
 		builder := network.GetNodeBuilder(twins.NodeID{ReplicaID: id, NetworkID: uint32(id)}, key)
-		builder.EnablePipelining(pipes)
+		builder.EnablePipelining(pipeCount)
 		builder.Add(network.NewConfiguration())
-		TestModulesPiped(t, ctrl, id, key, &builder, pipes)
+		TestModulesPiped(t, ctrl, id, key, &builder, pipeCount)
 		builder.Add(network.NewConfiguration())
 		builders[i] = &builder
 	}

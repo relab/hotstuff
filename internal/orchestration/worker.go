@@ -26,7 +26,6 @@ import (
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipeline"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc"
@@ -193,8 +192,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 
 	// TODO: Add this to the replica options above
-	pipes := []pipeline.Pipe{1, 2, 3, 4}
-	builder.EnablePipelining(pipes)
+	builder.EnablePipelining(4)
 	builder.Add(
 		eventloop.New(1000),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable

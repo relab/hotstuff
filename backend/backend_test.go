@@ -54,7 +54,7 @@ func TestConnectPiped(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		td := setup(t, ctrl, n)
 		builder := modules.NewBuilder(1, td.keys[0])
-		testutil.TestModulesPiped(t, ctrl, 1, td.keys[0], &builder, []pipeline.Pipe{1, 2, 3, 4})
+		testutil.TestModulesPiped(t, ctrl, 1, td.keys[0], &builder, 4)
 		teardown := createServers(t, td, ctrl)
 		defer teardown()
 		td.builders.Build()
