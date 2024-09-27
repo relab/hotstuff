@@ -173,8 +173,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 
 	var newByz func() byzantine.Byzantine = nil
 	if opts.GetByzantineStrategy() != "" {
-		if nb, ok := modules.GetModuleCtor[byzantine.Byzantine](opts.GetByzantineStrategy()); ok {
-			newByz = nb
+		if ctor, ok := modules.GetModuleCtor[byzantine.Byzantine](opts.GetByzantineStrategy()); ok {
+			newByz = ctor
 		} else {
 			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
 		}
@@ -185,7 +185,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
 	}
 
-	// TODO: Fix this function returning false and no ctor
 	newLeaderRotation, ok := modules.GetModuleCtor[modules.LeaderRotation](opts.GetLeaderRotation())
 	if !ok {
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
@@ -193,6 +192,25 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 
 	// TODO: Add this to the replica options above
 	builder.EnablePipelining(4)
+
+	pipedConsensusRules := builder.CreatePiped(newConsensusRules)
+	if newByz != nil {
+		for pipe, rules := range pipedConsensusRules {
+			byz := newByz()
+			pipedConsensusRules[pipe] = byz.Wrap(rules.(consensus.Rules))
+		}
+	}
+
+	pipedConsensuses := builder.CreatePiped(consensus.New)
+	pipedVotingMachines := builder.CreatePiped(consensus.NewVotingMachine)
+	pipedLeaderRotations := builder.CreatePiped(newLeaderRotation)
+	pipedSynchronizers := builder.CreatePiped(synchronizer.New, synchronizer.NewViewDuration(
+		uint64(opts.GetTimeoutSamples()),
+		float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
+		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
+		float64(opts.GetTimeoutMultiplier()),
+	))
+
 	builder.Add(
 		eventloop.New(1000),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
@@ -202,30 +220,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
 
-	cr := builder.CreatePiped(newConsensusRules)
-	if newByz != nil {
-		for pipe, rules := range cr {
-			byz := newByz()
-			cr[pipe] = byz.Wrap(rules.(consensus.Rules))
-		}
-	}
-
-	css := builder.CreatePiped(consensus.New)
-	vms := builder.CreatePiped(consensus.NewVotingMachine)
-	lrs := builder.CreatePiped(newLeaderRotation)
-	syncs := builder.CreatePiped(synchronizer.New, synchronizer.NewViewDuration(
-		uint64(opts.GetTimeoutSamples()),
-		float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-		float64(opts.GetTimeoutMultiplier()),
-	))
-
 	builder.AddPiped(
-		cr,
-		css,
-		vms,
-		lrs,
-		syncs)
+		pipedConsensusRules,
+		pipedConsensuses,
+		pipedVotingMachines,
+		pipedLeaderRotations,
+		pipedSynchronizers)
 
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
 	if w.measurementInterval > 0 {

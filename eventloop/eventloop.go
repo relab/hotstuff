@@ -242,15 +242,15 @@ func (el *EventLoop) Tick(ctx context.Context) bool {
 	return true
 }
 
-var handlerListPool = gpool.New(func() []EventHandler { return make([]EventHandler, 0, 10) })
+var handlerListPool = gpool.New(func() []handler { return make([]handler, 0, 10) })
 
 // processEvent dispatches the event to the correct handler.
 func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
-	pipeId := pipeline.NullPipe
-	_, ok := event.(pipedEventWrapper)
-	if ok {
+	pipe := pipeline.NullPipe
+	_, isEventPiped := event.(pipedEventWrapper)
+	if isEventPiped {
 		pipedEvent := event.(pipedEventWrapper)
-		pipeId = pipedEvent.pipeId
+		pipe = pipedEvent.pipeId
 		// Reassign event to its original form after extracting its pipeId
 		event = pipedEvent.event
 	}
@@ -266,39 +266,50 @@ func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
 	// We use a pool to reduce memory allocations.
 	priorityList := handlerListPool.Get()
 	handlerList := handlerListPool.Get()
+	pipedList := handlerListPool.Get()
+
 	el.mut.Lock()
 	for _, handler := range el.handlers[t] {
 		if handler.opts.runInAddEvent != runningInAddEvent || handler.callback == nil {
 			continue
 		}
 
-		if pipeId != pipeline.NullPipe {
-			if pipeId != handler.opts.pipeId {
-				continue
-			}
+		if handler.opts.pipeId != pipeline.NullPipe {
+			pipedList = append(pipedList, handler)
+			continue
 		}
 
 		if handler.opts.priority {
-			priorityList = append(priorityList, handler.callback)
+			priorityList = append(priorityList, handler)
 		} else {
-			handlerList = append(handlerList, handler.callback)
+			handlerList = append(handlerList, handler)
 		}
 	}
 	el.mut.Unlock()
 
 	for _, handler := range priorityList {
-		handler(event)
+		handler.callback(event)
 	}
 
 	priorityList = priorityList[:0]
 	handlerListPool.Put(priorityList)
 
 	for _, handler := range handlerList {
-		handler(event)
+		handler.callback(event)
 	}
 
 	handlerList = handlerList[:0]
 	handlerListPool.Put(handlerList)
+
+	for _, handler := range pipedList {
+		if handler.opts.pipeId != pipe {
+			continue
+		}
+		handler.callback(event)
+	}
+
+	pipedList = pipedList[:0]
+	handlerListPool.Put(pipedList)
 }
 
 func (el *EventLoop) dispatchDelayedEvents(t reflect.Type) {

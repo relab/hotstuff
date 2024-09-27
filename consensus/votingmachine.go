@@ -57,6 +57,10 @@ func (vm *VotingMachine) InitModule(mods *modules.Core, initOpt modules.InitOpti
 // OnVote handles an incoming vote.
 func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 	cert := vote.PartialCert
+	if vm.pipe != cert.Pipe() {
+		panic("incorrect pipe")
+	}
+
 	vm.logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
 
 	var (

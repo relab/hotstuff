@@ -36,7 +36,7 @@ type Server struct {
 }
 
 // InitModule initializes the Server.
-func (srv *Server) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
+func (srv *Server) InitModule(mods *modules.Core, _ modules.InitOptions) {
 	mods.Get(
 		&srv.eventLoop,
 		&srv.configuration,

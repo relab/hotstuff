@@ -101,7 +101,7 @@ func (pc *waitingPipedCommitter) allPipesReady() bool {
 }
 
 // TODO: Implement
-func (pc *waitingPipedCommitter) findForks(height hotstuff.View, blocksAtHeight map[hotstuff.View][]*hotstuff.Block) (forkedBlocks []*hotstuff.Block) {
+func (pc *waitingPipedCommitter) findForks(_ hotstuff.View, _ map[hotstuff.View][]*hotstuff.Block) (forkedBlocks []*hotstuff.Block) {
 	return nil
 }
 
