@@ -17,16 +17,19 @@ type waitingPipedCommitter struct {
 	forkHandler modules.ForkHandlerExt
 	logger      logging.Logger
 
-	mut           sync.Mutex
-	bExecs        map[pipeline.Pipe]*hotstuff.Block
-	waitingBlocks map[pipeline.Pipe]*hotstuff.Block
-	pipeCount     int
+	mut                 sync.Mutex
+	bExecAtPipe         map[pipeline.Pipe]*hotstuff.Block
+	waitingBlocksAtPipe map[pipeline.Pipe][]*hotstuff.Block
+	pipeCount           int
+	currentView         hotstuff.View
+	currentPipe         pipeline.Pipe
 }
 
 func NewWaitingPipedCommitter() modules.BlockCommitter {
 	return &waitingPipedCommitter{
-		bExecs:        make(map[pipeline.Pipe]*hotstuff.Block),
-		waitingBlocks: make(map[pipeline.Pipe]*hotstuff.Block),
+		bExecAtPipe:         make(map[pipeline.Pipe]*hotstuff.Block),
+		waitingBlocksAtPipe: make(map[pipeline.Pipe][]*hotstuff.Block),
+		currentPipe:         1,
 	}
 }
 
@@ -45,8 +48,8 @@ func (pc *waitingPipedCommitter) InitModule(mods *modules.Core, opt modules.Init
 			var cs modules.Consensus
 			mods.MatchForPipe(pipe, &cs)
 			pc.consensuses[pipe] = cs
-			pc.bExecs[pipe] = hotstuff.GetGenesis()
-			pc.waitingBlocks[pipe] = nil
+			pc.bExecAtPipe[pipe] = hotstuff.GetGenesis()
+			pc.waitingBlocksAtPipe[pipe] = nil
 		}
 		return
 	}
@@ -54,36 +57,31 @@ func (pc *waitingPipedCommitter) InitModule(mods *modules.Core, opt modules.Init
 	var cs modules.Consensus
 	mods.Get(&cs)
 	pc.consensuses[pipeline.NullPipe] = cs
-	pc.bExecs[pipeline.NullPipe] = hotstuff.GetGenesis()
-	pc.waitingBlocks[pipeline.NullPipe] = nil
+	pc.bExecAtPipe[pipeline.NullPipe] = hotstuff.GetGenesis()
+	pc.waitingBlocksAtPipe[pipeline.NullPipe] = nil
 }
 
 // Stores the block before further execution.
 func (pc *waitingPipedCommitter) Commit(block *hotstuff.Block) {
 	pc.mut.Lock()
-	defer pc.mut.Unlock()
+	// can't recurse due to requiring the mutex, so we use a helper instead.
+	err := pc.commitInner(block)
+	pc.mut.Unlock()
 
-	// The waiting process is simply adding new blocks
-	// until we "fill all pipes" then start committing
-	pc.waitingBlocks[block.Pipe()] = block
-	if !pc.allPipesReady() {
-		return
+	if err != nil {
+		pc.logger.Error("failed to commit block")
 	}
 
-	// Pipe IDs are already sorted, so we execute the blocks from
-	// 1, 2, ..., N.
-	for _, block := range pc.waitingBlocks {
-		pc.commit(block)
-	}
-
-	// TODO: Handle forks for pipelines
+	pc.mut.Lock()
+	pc.tryExec()
+	pc.mut.Unlock()
 }
 
 // Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
 func (pc *waitingPipedCommitter) CommittedBlock(pipe pipeline.Pipe) *hotstuff.Block {
 	pc.mut.Lock()
 	defer pc.mut.Unlock()
-	return pc.bExecs[pipe]
+	return pc.bExecAtPipe[pipe]
 }
 
 func (pc *waitingPipedCommitter) allPipesReady() bool {
@@ -92,30 +90,17 @@ func (pc *waitingPipedCommitter) allPipesReady() bool {
 	}
 
 	count := 0
-	for pipe := range pc.waitingBlocks {
-		if pc.waitingBlocks[pipe] != nil {
+	for pipe := range pc.waitingBlocksAtPipe {
+		if pc.waitingBlocksAtPipe[pipe] != nil {
 			count++
 		}
 	}
 	return pc.pipeCount == count
 }
 
-// TODO: Implement
-func (pc *waitingPipedCommitter) findForks(_ hotstuff.View, _ map[hotstuff.View][]*hotstuff.Block) (forkedBlocks []*hotstuff.Block) {
-	return nil
-}
-
-func (pc *waitingPipedCommitter) commit(block *hotstuff.Block) error {
-	pc.mut.Lock()
-	// can't recurse due to requiring the mutex, so we use a helper instead.
-	err := pc.commitInner(block)
-	pc.mut.Unlock()
-	return err
-}
-
 // recursive helper for commit
 func (pc *waitingPipedCommitter) commitInner(block *hotstuff.Block) error {
-	if pc.bExecs[block.Pipe()].View() >= block.View() {
+	if pc.bExecAtPipe[block.Pipe()].View() >= block.View() {
 		return nil
 	}
 	if parent, ok := pc.blockChain.Get(block.Parent()); ok {
@@ -126,10 +111,38 @@ func (pc *waitingPipedCommitter) commitInner(block *hotstuff.Block) error {
 	} else {
 		return fmt.Errorf("failed to locate block: %s", block.Parent())
 	}
-	pc.logger.Debug("EXEC: ", block)
-	pc.executor.Exec(block)
-	pc.bExecs[block.Pipe()] = block
+	pc.logger.Debug("VALID COMMIT: ", block)
+	// pc.executor.Exec(block)
+	// pc.bExecs[block.Pipe()] = block
+	pc.waitingBlocksAtPipe[block.Pipe()] = append(pc.waitingBlocksAtPipe[block.Pipe()], block)
 	return nil
+}
+
+func (pc *waitingPipedCommitter) tryExec() {
+	waitingBlocks := pc.waitingBlocksAtPipe[pc.currentPipe]
+	canPeek := len(waitingBlocks) > 0
+	if !canPeek {
+		return
+	}
+
+	peekedBlock := waitingBlocks[0]
+	if peekedBlock.View() == pc.currentView {
+		// Execute block
+		pc.executor.Exec(peekedBlock)
+		pc.bExecAtPipe[peekedBlock.Pipe()] = peekedBlock
+		// Pop from queue
+		pc.waitingBlocksAtPipe[pc.currentPipe] = pc.waitingBlocksAtPipe[pc.currentPipe][1:]
+		// Delete from chain. TODO (Alan): handle error
+		_ = pc.blockChain.DeleteAtHeight(peekedBlock.View(), peekedBlock.Hash())
+	}
+
+	pc.currentPipe++
+	if pc.currentPipe == pipeline.Pipe(pc.pipeCount) {
+		pc.currentPipe = 1
+		pc.currentView++
+	}
+
+	pc.tryExec()
 }
 
 var _ modules.BlockCommitter = (*basicCommitter)(nil)

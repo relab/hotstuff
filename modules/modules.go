@@ -98,6 +98,8 @@ type BlockChain interface {
 	PruneToHeight(height hotstuff.View) (prunedBlocks map[hotstuff.View][]*hotstuff.Block)
 
 	PruneHeight() hotstuff.View
+
+	DeleteAtHeight(height hotstuff.View, blockHash hotstuff.Hash) error
 }
 
 //go:generate mockgen -destination=../internal/mocks/replica_mock.go -package=mocks . Replica

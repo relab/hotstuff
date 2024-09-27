@@ -3,6 +3,7 @@ package blockchain
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/relab/hotstuff"
@@ -72,6 +73,25 @@ func (chain *blockChain) LocalGet(hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	}
 
 	return block, true
+}
+
+func (chain *blockChain) DeleteAtHeight(height hotstuff.View, blockHash hotstuff.Hash) error {
+	blocks, ok := chain.blocksAtHeight[height]
+	if !ok {
+		return fmt.Errorf("no blocks at height %d", height)
+	}
+
+	strHash := blockHash.String()
+	for i, block := range blocks {
+		if block.Hash().String() == strHash {
+			chain.blocksAtHeight[height] = append(chain.blocksAtHeight[height][:i], chain.blocksAtHeight[height][i+1:]...)
+			if len(blocks) == 0 {
+				delete(chain.blocksAtHeight, height)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("block not found at height %d", height)
 }
 
 // Get retrieves a block given its hash. Get will try to find the block locally.
