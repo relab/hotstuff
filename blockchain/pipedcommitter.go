@@ -11,7 +11,6 @@ import (
 )
 
 type waitingPipedCommitter struct {
-	consensuses map[pipeline.Pipe]modules.Consensus
 	blockChain  modules.BlockChain
 	executor    modules.ExecutorExt
 	forkHandler modules.ForkHandlerExt
@@ -42,22 +41,15 @@ func (pc *waitingPipedCommitter) InitModule(mods *modules.Core, opt modules.Init
 		&pc.logger,
 	)
 
-	pc.consensuses = make(map[pipeline.Pipe]modules.Consensus)
 	pc.pipeCount = opt.PipeCount
 	if opt.IsPipeliningEnabled {
 		for _, pipe := range mods.Pipes() {
-			var cs modules.Consensus
-			mods.MatchForPipe(pipe, &cs)
-			pc.consensuses[pipe] = cs
 			pc.bExecAtPipe[pipe] = hotstuff.GetGenesis()
 			pc.waitingBlocksAtPipe[pipe] = nil
 		}
 		return
 	}
 
-	var cs modules.Consensus
-	mods.Get(&cs)
-	pc.consensuses[pipeline.NullPipe] = cs
 	pc.bExecAtPipe[pipeline.NullPipe] = hotstuff.GetGenesis()
 	pc.waitingBlocksAtPipe[pipeline.NullPipe] = nil
 }
@@ -86,20 +78,6 @@ func (pc *waitingPipedCommitter) CommittedBlock(pipe pipeline.Pipe) *hotstuff.Bl
 	pc.mut.Lock()
 	defer pc.mut.Unlock()
 	return pc.bExecAtPipe[pipe]
-}
-
-func (pc *waitingPipedCommitter) allPipesReady() bool {
-	if pc.pipeCount == 0 {
-		return true
-	}
-
-	count := 0
-	for pipe := range pc.waitingBlocksAtPipe {
-		if pc.waitingBlocksAtPipe[pipe] != nil {
-			count++
-		}
-	}
-	return pc.pipeCount == count
 }
 
 // recursive helper for commit
@@ -136,7 +114,7 @@ func (pc *waitingPipedCommitter) tryExec() error {
 		pc.bExecAtPipe[peekedBlock.Pipe()] = peekedBlock
 		// Pop from queue
 		pc.waitingBlocksAtPipe[pc.currentPipe] = pc.waitingBlocksAtPipe[pc.currentPipe][1:]
-		// Delete from chain. TODO (Alan): handle error
+		// Delete from chain.
 		err := pc.blockChain.DeleteAtHeight(peekedBlock.View(), peekedBlock.Hash())
 		if err != nil {
 			return err
