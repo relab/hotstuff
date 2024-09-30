@@ -100,6 +100,25 @@ func (pc *waitingPipedCommitter) commitInner(block *hotstuff.Block) error {
 	return nil
 }
 
+func (pc *waitingPipedCommitter) handleForks(prunedBlocks map[hotstuff.View][]*hotstuff.Block) {
+	// All pruned blocks are assumed to be forks after the previous exec logic
+	for _, blocks := range prunedBlocks {
+		for _, block := range blocks {
+			pc.forkHandler.Fork(block)
+		}
+	}
+	// blocksPerPipe := make(map[pipeline.Pipe]map[hotstuff.View]*hotstuff.Block)
+	// for _, blocks := range prunedBlocks {
+	// 	for _, block := range blocks {
+	// 		_, ok := blocksPerPipe[block.Pipe()]
+	// 		if !ok {
+	// 			blocksPerPipe[block.Pipe()] = make(map[hotstuff.View]*hotstuff.Block)
+	// 		}
+	// 		blocksPerPipe[block.Pipe()][block.View()] = block
+	// 	}
+	// }
+}
+
 func (pc *waitingPipedCommitter) tryExec() error {
 	waitingBlocks := pc.waitingBlocksAtPipe[pc.currentPipe]
 	canPeek := len(waitingBlocks) > 0
@@ -124,6 +143,8 @@ func (pc *waitingPipedCommitter) tryExec() error {
 	pc.currentPipe++
 	if pc.currentPipe == pipeline.Pipe(pc.pipeCount)+1 {
 		pc.currentPipe = 1
+		prunedBlocks := pc.blockChain.PruneToHeight(pc.currentView)
+		pc.handleForks(prunedBlocks)
 		pc.currentView++
 	}
 
