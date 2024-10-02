@@ -88,6 +88,12 @@ func (pc *waitingPipedCommitter) commitInner(block *hotstuff.Block) error {
 	if pc.bExecAtPipe[block.Pipe()].View() >= block.View() {
 		return nil
 	}
+
+	pipe := pc.waitingBlocksAtPipe[block.Pipe()]
+	if len(pipe) > 0 && pipe[len(pipe)-1].View() >= block.View() {
+		return nil
+	}
+
 	if parent, ok := pc.blockChain.Get(block.Parent()); ok {
 		err := pc.commitInner(parent)
 		if err != nil {
@@ -98,12 +104,12 @@ func (pc *waitingPipedCommitter) commitInner(block *hotstuff.Block) error {
 	}
 	// pc.executor.Exec(block)
 	// pc.bExecs[block.Pipe()] = block
-	for _, b := range pc.waitingBlocksAtPipe[block.Pipe()] {
-		if b.Hash().String() == block.Hash().String() {
-			pc.logger.Debugf("commitInner: block already in queue: {p:%d, v:%d, h:%s}",
-				block.Pipe(), block.View(), block.Hash().String()[:4])
-		}
-	}
+	// for _, b := range pc.waitingBlocksAtPipe[block.Pipe()] {
+	// 	if b.Hash().String() == block.Hash().String() {
+	// 		pc.logger.Debugf("commitInner: block already in queue: {p:%d, v:%d, h:%s}",
+	// 			block.Pipe(), block.View(), block.Hash().String()[:4])
+	// 	}
+	// }
 
 	pc.logger.Debugf("commitInner: Queued block: {p:%d, v:%d, h:%s}", block.Pipe(), block.View(), block.Hash().String()[:4])
 	pc.waitingBlocksAtPipe[block.Pipe()] = append(pc.waitingBlocksAtPipe[block.Pipe()], block)
