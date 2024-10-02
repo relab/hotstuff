@@ -56,20 +56,23 @@ func (pc *waitingPipedCommitter) InitModule(mods *modules.Core, opt modules.Init
 
 // Stores the block before further execution.
 func (pc *waitingPipedCommitter) Commit(block *hotstuff.Block) {
+	pc.logger.Debugf("Commit (currentPipe: %d, currentView: %d): new incoming block {p:%d, v:%d, h:%s}",
+		pc.currentPipe, pc.currentView,
+		block.Pipe(), block.View(), block.Hash().String()[:4])
 	pc.mut.Lock()
 	// can't recurse due to requiring the mutex, so we use a helper instead.
 	err := pc.commitInner(block)
 	pc.mut.Unlock()
 
 	if err != nil {
-		pc.logger.Error("failed to commit block")
+		pc.logger.Debug("failed to commit block")
 	}
 
 	pc.mut.Lock()
 	err = pc.tryExec()
 	pc.mut.Unlock()
 	if err != nil {
-		pc.logger.Error(err)
+		pc.logger.Debug(err)
 	}
 }
 
@@ -93,9 +96,16 @@ func (pc *waitingPipedCommitter) commitInner(block *hotstuff.Block) error {
 	} else {
 		return fmt.Errorf("failed to locate block: %s", block.Parent())
 	}
-	pc.logger.Debug("VALID COMMIT: ", block)
 	// pc.executor.Exec(block)
 	// pc.bExecs[block.Pipe()] = block
+	for _, b := range pc.waitingBlocksAtPipe[block.Pipe()] {
+		if b.Hash().String() == block.Hash().String() {
+			pc.logger.Debugf("commitInner: block already in queue: {p:%d, v:%d, h:%s}",
+				block.Pipe(), block.View(), block.Hash().String()[:4])
+		}
+	}
+
+	pc.logger.Debugf("commitInner: Queued block: {p:%d, v:%d, h:%s}", block.Pipe(), block.View(), block.Hash().String()[:4])
 	pc.waitingBlocksAtPipe[block.Pipe()] = append(pc.waitingBlocksAtPipe[block.Pipe()], block)
 	return nil
 }
@@ -123,6 +133,7 @@ func (pc *waitingPipedCommitter) tryExec() error {
 	waitingBlocks := pc.waitingBlocksAtPipe[pc.currentPipe]
 	canPeek := len(waitingBlocks) > 0
 	if !canPeek {
+		pc.logger.Debugf("tryExec (currentPipe: %d, currentView: %d): no block on pipe yet", pc.currentPipe, pc.currentView)
 		return nil
 	}
 
@@ -135,9 +146,14 @@ func (pc *waitingPipedCommitter) tryExec() error {
 		pc.waitingBlocksAtPipe[pc.currentPipe] = pc.waitingBlocksAtPipe[pc.currentPipe][1:]
 		// Delete from chain.
 		err := pc.blockChain.DeleteAtHeight(peekedBlock.View(), peekedBlock.Hash())
+		pc.logger.Debugf("tryExec: block executed: {p=%d, v=%d, h:%s}", peekedBlock.Pipe(), peekedBlock.View(), peekedBlock.Hash().String()[:4])
 		if err != nil {
 			return err
 		}
+	} else {
+		pc.logger.Debugf("tryExec (currentPipe: %d, currentView: %d): block in queue does not match view: {p:%d, v:%d, h:%s}",
+			pc.currentPipe, pc.currentView,
+			peekedBlock.Pipe(), peekedBlock.View(), peekedBlock.Hash().String()[:4])
 	}
 
 	pc.currentPipe++
@@ -146,6 +162,7 @@ func (pc *waitingPipedCommitter) tryExec() error {
 		prunedBlocks := pc.blockChain.PruneToHeight(pc.currentView)
 		pc.handleForks(prunedBlocks)
 		pc.currentView++
+		pc.logger.Debugf("tryExec (currentPipe: %d): advance to view %d", pc.currentPipe, pc.currentView)
 	}
 
 	return pc.tryExec()

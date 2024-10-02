@@ -226,6 +226,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 
 	// block is safe and was accepted
 	cs.blockChain.Store(block)
+	// cs.logger.Infof("Chain stored: (p=%d, v=%d)", block.Pipe(), block.View())
 
 	if b := cs.impl.CommitRule(block); b != nil {
 		cs.committer.Commit(block)

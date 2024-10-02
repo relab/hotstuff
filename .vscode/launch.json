@@ -12,17 +12,20 @@
 			"program": "${workspaceRoot}/cmd/hotstuff/main.go",
 			"cwd": "${workspaceRoot}",
 			"args": [
-				"run"
+				"run",
 			]
 		},
 		{
-			"name": "Test Pipelined Modules",
+			"name": "Local Debug",
 			"type": "go",
 			"request": "launch",
-			"mode": "test",
-			"program": "${workspaceRoot}/modules/pipelined_module_test.go",
+			"mode": "debug",
+			"program": "${workspaceRoot}/cmd/hotstuff/main.go",
 			"cwd": "${workspaceRoot}",
-			"args": []
+			"args": [
+				"run",
+				"--log-level=debug"
+			]
 		},
 		{
 			"name": "Deploy to Docker container",
