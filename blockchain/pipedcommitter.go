@@ -89,6 +89,7 @@ func (pc *waitingPipedCommitter) commitInner(block *hotstuff.Block) error {
 		return nil
 	}
 
+	// Check if the block was added to the end of the queue. If so, exit.
 	pipe := pc.waitingBlocksAtPipe[block.Pipe()]
 	if len(pipe) > 0 && pipe[len(pipe)-1].View() >= block.View() {
 		return nil
@@ -102,14 +103,6 @@ func (pc *waitingPipedCommitter) commitInner(block *hotstuff.Block) error {
 	} else {
 		return fmt.Errorf("failed to locate block: %s", block.Parent())
 	}
-	// pc.executor.Exec(block)
-	// pc.bExecs[block.Pipe()] = block
-	// for _, b := range pc.waitingBlocksAtPipe[block.Pipe()] {
-	// 	if b.Hash().String() == block.Hash().String() {
-	// 		pc.logger.Debugf("commitInner: block already in queue: {p:%d, v:%d, h:%s}",
-	// 			block.Pipe(), block.View(), block.Hash().String()[:4])
-	// 	}
-	// }
 
 	pc.logger.Debugf("commitInner: Queued block: {p:%d, v:%d, h:%s}", block.Pipe(), block.View(), block.Hash().String()[:4])
 	pc.waitingBlocksAtPipe[block.Pipe()] = append(pc.waitingBlocksAtPipe[block.Pipe()], block)
@@ -123,16 +116,6 @@ func (pc *waitingPipedCommitter) handleForks(prunedBlocks map[hotstuff.View][]*h
 			pc.forkHandler.Fork(block)
 		}
 	}
-	// blocksPerPipe := make(map[pipeline.Pipe]map[hotstuff.View]*hotstuff.Block)
-	// for _, blocks := range prunedBlocks {
-	// 	for _, block := range blocks {
-	// 		_, ok := blocksPerPipe[block.Pipe()]
-	// 		if !ok {
-	// 			blocksPerPipe[block.Pipe()] = make(map[hotstuff.View]*hotstuff.Block)
-	// 		}
-	// 		blocksPerPipe[block.Pipe()][block.View()] = block
-	// 	}
-	// }
 }
 
 func (pc *waitingPipedCommitter) tryExec() error {
@@ -165,6 +148,7 @@ func (pc *waitingPipedCommitter) tryExec() error {
 	pc.currentPipe++
 	if pc.currentPipe == pipeline.Pipe(pc.pipeCount)+1 {
 		pc.currentPipe = 1
+		// Prune out remaining blocks in the chain. Those blocks are guaranteed to be forks.
 		prunedBlocks := pc.blockChain.PruneToHeight(pc.currentView)
 		pc.handleForks(prunedBlocks)
 		pc.currentView++
