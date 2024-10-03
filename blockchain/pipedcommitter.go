@@ -129,13 +129,13 @@ func (pc *waitingPipedCommitter) tryExec() error {
 	peekedBlock := waitingBlocks[0]
 	if peekedBlock.View() == pc.currentView {
 		// Execute block
+		pc.logger.Debugf("tryExec: block executed: {p=%d, v=%d, h:%s}", peekedBlock.Pipe(), peekedBlock.View(), peekedBlock.Hash().String()[:4])
 		pc.executor.Exec(peekedBlock)
 		pc.bExecAtPipe[peekedBlock.Pipe()] = peekedBlock
 		// Pop from queue
 		pc.waitingBlocksAtPipe[pc.currentPipe] = pc.waitingBlocksAtPipe[pc.currentPipe][1:]
 		// Delete from chain.
 		err := pc.blockChain.DeleteAtHeight(peekedBlock.View(), peekedBlock.Hash())
-		pc.logger.Debugf("tryExec: block executed: {p=%d, v=%d, h:%s}", peekedBlock.Pipe(), peekedBlock.View(), peekedBlock.Hash().String()[:4])
 		if err != nil {
 			return err
 		}

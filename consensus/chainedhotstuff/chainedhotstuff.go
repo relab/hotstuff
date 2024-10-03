@@ -84,6 +84,9 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 
 // VoteRule decides whether to vote for the proposal or not.
 func (hs *ChainedHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
+	if hs.pipe != proposal.PipeId {
+		panic("incorrect pipe")
+	}
 	block := proposal.Block
 
 	qcBlock, haveQCBlock := hs.blockChain.Get(block.QuorumCert().BlockHash())

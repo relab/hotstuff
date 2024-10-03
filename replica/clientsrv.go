@@ -98,6 +98,7 @@ func (srv *clientSrv) Exec(cmd hotstuff.Command) {
 	}
 
 	srv.eventLoop.AddEvent(hotstuff.CommitEvent{Commands: len(batch.GetCommands())})
+	srv.logger.Debugf("Executed %d commands", len(batch.GetCommands()))
 
 	for _, cmd := range batch.GetCommands() {
 		_, _ = srv.hash.Write(cmd.Data)

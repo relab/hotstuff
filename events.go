@@ -53,7 +53,7 @@ func (timeout TimeoutMsg) ToBytes() []byte {
 }
 
 func (timeout TimeoutMsg) String() string {
-	return fmt.Sprintf("ID: %d, View: %d, SyncInfo: %v", timeout.ID, timeout.View, timeout.SyncInfo)
+	return fmt.Sprintf("ID: %d, Pipe: %d, View: %d, SyncInfo: %v", timeout.ID, timeout.PipeId, timeout.View, timeout.SyncInfo)
 }
 
 // NewViewMsg is sent to the leader whenever a replica decides to advance to the next view.
