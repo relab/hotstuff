@@ -49,7 +49,7 @@ func TestConvertQuorumCert(t *testing.T) {
 		hotstuff.NewQuorumCert(
 			nil,
 			0,
-			pipeline.NullPipe, // TODO: Verify if this code conflicts with pipelining
+			pipeline.NullPipe,
 			hotstuff.GetGenesis().Hash()), "", 1, 1, 0)
 
 	signatures := testutil.CreatePCs(t, b1, hl.Signers())

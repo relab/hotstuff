@@ -1,4 +1,6 @@
+DT=$(date '+%Y-%m-%d_%H-%M-%S')
+FILE="alans_logs/log_$DT.txt"
+echo $FILE
 make
-rm hs_log* 
-./hotstuff run &>> hs_log.txt
-cat hs_log.txt | grep "hs1" > hs_log1.txt
+mkdir alans_logs
+./hotstuff --log-level=debug run &>> $FILE
