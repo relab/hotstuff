@@ -61,7 +61,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 		panic("incorrect pipe")
 	}
 
-	vm.logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
+	vm.logger.Debugf("OnVote[pipe=%d](vote=%d): %.8s", vm.pipe, vote.ID, cert.BlockHash())
 
 	var (
 		block *hotstuff.Block
@@ -74,7 +74,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 		if !ok {
 			// if that does not work, we will try to handle this event later.
 			// hopefully, the block has arrived by then.
-			vm.logger.Debugf("Local cache miss for block: %.8s", cert.BlockHash())
+			vm.logger.Debugf("Local cache miss for block [pipe=%d]: %.8s", vm.pipe, cert.BlockHash())
 			vote.Deferred = true
 			vm.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, vote)
 			return
@@ -83,7 +83,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 		// if the block has not arrived at this point we will try to fetch it.
 		block, ok = vm.blockChain.Get(cert.BlockHash())
 		if !ok {
-			vm.logger.Debugf("Could not find block for vote: %.8s.", cert.BlockHash())
+			vm.logger.Debugf("Could not find block for vote [pipe=%d]: %.8s.", vm.pipe, cert.BlockHash())
 			return
 		}
 	}
@@ -102,7 +102,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 
 func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
 	if !vm.crypto.VerifyPartialCert(cert) {
-		vm.logger.Info("OnVote: Vote could not be verified!")
+		vm.logger.Infof("OnVote[pipe=%d]: Vote could not be verified!", vm.pipe)
 		return
 	}
 
@@ -133,7 +133,7 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 
 	qc, err := vm.crypto.CreateQuorumCert(block, votes)
 	if err != nil {
-		vm.logger.Info(fmt.Sprintf("OnVote (pipe=%d): could not create QC for block: ", vm.pipe), err)
+		vm.logger.Info(fmt.Sprintf("OnVote[pipe=%d]: could not create QC for block: ", vm.pipe), err)
 		return
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())

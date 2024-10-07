@@ -1,6 +1,7 @@
 DT=$(date '+%Y-%m-%d_%H-%M-%S')
-FILE="alans_logs/log_$DT.txt"
-echo $FILE
+DIR="debug_logs"
+FILE="$DIR/$DT.txt"
 make
-mkdir alans_logs
+mkdir $DIR
+echo "Writing to $FILE"
 ./hotstuff --log-level=debug run &>> $FILE
