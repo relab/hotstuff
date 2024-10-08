@@ -13,6 +13,7 @@
 			"cwd": "${workspaceRoot}",
 			"args": [
 				"run",
+				"--pipes=2"
 			]
 		},
 		{
@@ -24,6 +25,7 @@
 			"cwd": "${workspaceRoot}",
 			"args": [
 				"run",
+				"--pipes=2",
 				"--log-level=debug"
 			]
 		},

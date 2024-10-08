@@ -190,8 +190,13 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
 
-	// TODO: Add this to the replica options above
-	builder.EnablePipelining(4)
+	var committer modules.BlockCommitter
+	if opts.GetPipes() > 0 {
+		builder.EnablePipelining(int(opts.GetPipes()))
+		committer = blockchain.NewWaitingPipedCommitter()
+	} else {
+		committer = blockchain.NewBasicCommitter()
+	}
 
 	pipedConsensusRules := builder.CreatePiped(newConsensusRules)
 	if newByz != nil {
@@ -216,7 +221,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		w.metricsLogger,
 		blockchain.New(),
-		blockchain.NewUnorderedPipedCommitter(),
+		committer,
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
 

@@ -63,6 +63,7 @@ func init() {
 	runCmd.Flags().String("leader-rotation", "round-robin", "name of the leader rotation algorithm")
 	runCmd.Flags().Int64("shared-seed", 0, "Shared random number generator seed")
 	runCmd.Flags().StringSlice("modules", nil, "Name additional modules to be loaded.")
+	runCmd.Flags().Uint32("pipes", 0, "number of pipes in pipelining mode. Zero by default which disables pipelining mode.")
 
 	runCmd.Flags().Bool("worker", false, "run a local worker")
 	runCmd.Flags().StringSlice("hosts", nil, "the remote hosts to run the experiment on via ssh")
@@ -117,6 +118,7 @@ func runController() {
 			MaxTimeout:        durationpb.New(viper.GetDuration("max-timeout")),
 			SharedSeed:        viper.GetInt64("shared-seed"),
 			Modules:           viper.GetStringSlice("modules"),
+			Pipes:             viper.GetUint32("pipes"),
 		},
 		ClientOpts: &orchestrationpb.ClientOpts{
 			UseTLS:           true,
