@@ -216,7 +216,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		w.metricsLogger,
 		blockchain.New(),
-		blockchain.NewWaitingPipedCommitter(),
+		blockchain.NewUnorderedPipedCommitter(),
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
 

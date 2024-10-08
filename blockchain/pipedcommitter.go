@@ -59,7 +59,6 @@ func (pc *waitingPipedCommitter) Commit(block *hotstuff.Block) {
 	pc.logger.Debugf("Commit (currentPipe: %d, currentView: %d): new incoming block {p:%d, v:%d, h:%s}",
 		pc.currentPipe, pc.currentView,
 		block.Pipe(), block.View(), block.Hash().String()[:4])
-	pc.executor.Exec(block)
 	pc.mut.Lock()
 	// can't recurse due to requiring the mutex, so we use a helper instead.
 	err := pc.commitInner(block)
@@ -159,4 +158,4 @@ func (pc *waitingPipedCommitter) tryExec() error {
 	return pc.tryExec()
 }
 
-var _ modules.BlockCommitter = (*basicCommitter)(nil)
+var _ modules.BlockCommitter = (*waitingPipedCommitter)(nil)
