@@ -285,6 +285,7 @@ func (core *Core) Pipes() (ids []pipeline.Pipe) {
 	for id := range core.pipedModules {
 		ids = append(ids, id)
 	}
+
 	return
 }
 

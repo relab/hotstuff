@@ -163,7 +163,10 @@ func (el *EventLoop) AddEvent(event any) {
 // PipeEvent adds an event to a specified pipeline.
 func (el *EventLoop) PipeEvent(pipeId pipeline.Pipe, event any) {
 	if !pipeline.ValidPipe(pipeId) {
-		panic("pipe id is not valid")
+		// TODO (Alan): Verify if panicking is better or not.
+		// panic("pipe id is not valid")
+		el.AddEvent(event)
+		return
 	}
 
 	wrapper := pipedEventWrapper{
