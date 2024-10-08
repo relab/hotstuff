@@ -65,6 +65,10 @@ func (s *Synchronizer) InitModule(mods *modules.Core, initOpt modules.InitOption
 
 	s.eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
 		timeoutView := event.(TimeoutEvent).View
+		timeoutPipe := event.(TimeoutEvent).Pipe
+		if timeoutPipe != s.pipe {
+			return
+		}
 		if s.View() == timeoutView {
 			s.OnLocalTimeout()
 		}
@@ -119,7 +123,7 @@ func (s *Synchronizer) startTimeoutTimer() {
 	// It is important that the timer is NOT reused because then the view would be wrong.
 	s.timer = oneShotTimer{time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
-		s.eventLoop.PipeEvent(s.pipe, TimeoutEvent{view})
+		s.eventLoop.AddEvent(TimeoutEvent{view, s.pipe})
 	})}
 }
 
@@ -358,8 +362,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	s.startTimeoutTimer()
 
 	s.logger.Debugf("advanced to view %d [pipe=%d]", newView, s.pipe)
-	s.eventLoop.AddEvent(ViewChangeEvent{View: newView, Timeout: timeout})
-	// s.eventLoop.PipeEvent(s.pipe, ViewChangeEvent{View: newView, Timeout: timeout})
+	s.eventLoop.AddEvent(ViewChangeEvent{View: newView, Timeout: timeout, Pipe: s.pipe})
 
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.opts.ID() {
@@ -398,10 +401,12 @@ var _ modules.Synchronizer = (*Synchronizer)(nil)
 // ViewChangeEvent is sent on the eventloop whenever a view change occurs.
 type ViewChangeEvent struct {
 	View    hotstuff.View
+	Pipe    pipeline.Pipe
 	Timeout bool
 }
 
 // TimeoutEvent is sent on the eventloop when a local timeout occurs.
 type TimeoutEvent struct {
 	View hotstuff.View
+	Pipe pipeline.Pipe
 }
