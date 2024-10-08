@@ -12,7 +12,6 @@ import (
 	"github.com/relab/hotstuff/synchronizer"
 )
 
-// TODO (Alan): This was moved here from consensus.go. Find a better solution.
 // Rules is the minimum interface that a consensus implementations must implement.
 // Implementations of this interface can be wrapped in the ConsensusBase struct.
 // Together, these provide an implementation of the main Consensus interface.
@@ -28,7 +27,6 @@ type Rules interface {
 	ChainLength() int
 }
 
-// TODO (Alan): This was moved here from consensus.go. Find a better solution.
 // ProposeRuler is an optional interface that adds a ProposeRule method.
 // This allows implementors to specify how new blocks are created.
 type ProposeRuler interface {
