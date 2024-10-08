@@ -35,3 +35,5 @@ measurements.json
 *.pdf
 
 twins.json
+
+/debug_logs
