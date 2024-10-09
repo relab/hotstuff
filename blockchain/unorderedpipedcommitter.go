@@ -10,6 +10,10 @@ import (
 	"github.com/relab/hotstuff/pipeline"
 )
 
+func init() {
+	modules.RegisterModule("unordered", NewUnorderedPipedCommitter)
+}
+
 type unorderedPipedCommitter struct {
 	blockChain  modules.BlockChain
 	executor    modules.ExecutorExt

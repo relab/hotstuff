@@ -64,12 +64,11 @@ func (s *Synchronizer) InitModule(mods *modules.Core, initOpt modules.InitOption
 	s.pipe = initOpt.ModulePipeId
 
 	s.eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
-		timeoutView := event.(TimeoutEvent).View
-		timeoutPipe := event.(TimeoutEvent).Pipe
-		if timeoutPipe != s.pipe {
+		timeout := event.(TimeoutEvent)
+		if timeout.Pipe != s.pipe {
 			return
 		}
-		if s.View() == timeoutView {
+		if s.View() == timeout.View {
 			s.OnLocalTimeout()
 		}
 	})

@@ -193,7 +193,10 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	var committer modules.BlockCommitter
 	if opts.GetPipes() > 0 {
 		builder.EnablePipelining(int(opts.GetPipes()))
-		committer = blockchain.NewWaitingPipedCommitter()
+		committer, ok = modules.GetModule[modules.BlockCommitter](opts.GetPipelineOrdering())
+		if !ok {
+			return nil, fmt.Errorf("invalid pipeline ordering scheme: %s", opts.GetPipelineOrdering())
+		}
 	} else {
 		committer = blockchain.NewBasicCommitter()
 	}
