@@ -81,7 +81,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 		}
 	} else {
 		// if the block has not arrived at this point we will try to fetch it.
-		block, ok = vm.blockChain.Get(cert.BlockHash())
+		block, ok = vm.blockChain.Get(cert.BlockHash(), cert.Pipe())
 		if !ok {
 			vm.logger.Debugf("Could not find block for vote [pipe=%d]: %.8s.", vm.pipe, cert.BlockHash())
 			return

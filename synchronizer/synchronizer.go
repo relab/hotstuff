@@ -122,7 +122,7 @@ func (s *Synchronizer) startTimeoutTimer() {
 	// It is important that the timer is NOT reused because then the view would be wrong.
 	s.timer = oneShotTimer{time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
-		s.eventLoop.AddEvent(TimeoutEvent{view, s.pipe})
+		s.eventLoop.PipeEvent(s.pipe, TimeoutEvent{view, s.pipe})
 	})}
 }
 
@@ -361,7 +361,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	s.startTimeoutTimer()
 
 	s.logger.Debugf("advanced to view %d [pipe=%d]", newView, s.pipe)
-	s.eventLoop.AddEvent(ViewChangeEvent{View: newView, Timeout: timeout, Pipe: s.pipe})
+	s.eventLoop.PipeEvent(s.pipe, ViewChangeEvent{View: newView, Timeout: timeout, Pipe: s.pipe})
 
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.opts.ID() {
@@ -375,7 +375,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 // This method is meant to be used instead of the exported UpdateHighQC internally
 // in this package when the qc has already been verified.
 func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
-	newBlock, ok := s.blockChain.Get(qc.BlockHash())
+	newBlock, ok := s.blockChain.Get(qc.BlockHash(), qc.Pipe())
 	if !ok {
 		s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
 		return

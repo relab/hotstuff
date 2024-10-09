@@ -37,7 +37,7 @@ func (fhs *FastHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return fhs.blockChain.Get(qc.BlockHash())
+	return fhs.blockChain.Get(qc.BlockHash(), qc.Pipe())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.
@@ -64,7 +64,7 @@ func (fhs *FastHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
 	// The base implementation verifies both regular QCs and AggregateQCs, and asserts that the QC embedded in the
 	// block is the same as the highQC found in the aggregateQC.
 	if proposal.AggregateQC != nil {
-		hqcBlock, ok := fhs.blockChain.Get(proposal.Block.QuorumCert().BlockHash())
+		hqcBlock, ok := fhs.blockChain.Get(proposal.Block.QuorumCert().BlockHash(), proposal.PipeId)
 		return ok && fhs.blockChain.Extends(proposal.Block, hqcBlock)
 	}
 	return proposal.Block.View() >= fhs.synchronizer.View() &&

@@ -85,7 +85,7 @@ type BlockChain interface {
 	Store(*hotstuff.Block)
 
 	// Get retrieves a block given its hash, attempting to fetching it from other replicas if necessary.
-	Get(hotstuff.Hash) (*hotstuff.Block, bool)
+	Get(hash hotstuff.Hash, onPipe pipeline.Pipe) (*hotstuff.Block, bool)
 
 	// LocalGet retrieves a block given its hash, without fetching it from other replicas.
 	LocalGet(hotstuff.Hash) (*hotstuff.Block, bool)

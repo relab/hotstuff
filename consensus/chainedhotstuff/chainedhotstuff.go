@@ -41,7 +41,7 @@ func (hs *ChainedHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool)
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return hs.blockChain.Get(qc.BlockHash())
+	return hs.blockChain.Get(qc.BlockHash(), qc.Pipe())
 }
 
 // CommitRule decides whether an ancestor of the block should be committed.
@@ -89,7 +89,7 @@ func (hs *ChainedHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
 	}
 	block := proposal.Block
 
-	qcBlock, haveQCBlock := hs.blockChain.Get(block.QuorumCert().BlockHash())
+	qcBlock, haveQCBlock := hs.blockChain.Get(block.QuorumCert().BlockHash(), block.Pipe())
 
 	safe := false
 	if haveQCBlock && qcBlock.View() > hs.bLock.View() {

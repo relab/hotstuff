@@ -628,7 +628,8 @@ func (s *session) improveSignature(contribution contribution) hotstuff.QuorumSig
 }
 
 func (s *session) verifyContribution(c contribution, sig hotstuff.QuorumSignature, verifyIndiv bool) {
-	block, ok := s.h.blockChain.Get(s.hash)
+	// TODO (Alan): Verify issues with pipelining
+	block, ok := s.h.blockChain.Get(s.hash, pipeline.NullPipe)
 	if !ok {
 		return
 	}

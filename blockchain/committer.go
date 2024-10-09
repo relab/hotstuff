@@ -69,7 +69,7 @@ func (bb *basicCommitter) commitInner(block *hotstuff.Block) error {
 	if bb.bExec.View() >= block.View() {
 		return nil
 	}
-	if parent, ok := bb.blockChain.Get(block.Parent()); ok {
+	if parent, ok := bb.blockChain.Get(block.Parent(), block.Pipe()); ok {
 		err := bb.commitInner(parent)
 		if err != nil {
 			return err

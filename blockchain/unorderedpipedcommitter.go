@@ -62,8 +62,6 @@ func (pc *unorderedPipedCommitter) Commit(block *hotstuff.Block) {
 
 	pc.bExecAtPipe[block.Pipe()] = block
 	pc.executor.Exec(block)
-	prunedBlocks := pc.blockChain.PruneToHeight(block.View())
-	pc.handleForks(prunedBlocks)
 
 	//pc.mut.Lock()
 	//// can't recurse due to requiring the mutex, so we use a helper instead.
@@ -91,7 +89,7 @@ func (pc *unorderedPipedCommitter) commitInner(block *hotstuff.Block) error {
 		return nil
 	}
 
-	if parent, ok := pc.blockChain.Get(block.Parent()); ok {
+	if parent, ok := pc.blockChain.Get(block.Parent(), block.Pipe()); ok {
 		err := pc.commitInner(parent)
 		if err != nil {
 			return err

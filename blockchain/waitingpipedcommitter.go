@@ -94,12 +94,12 @@ func (pc *waitingPipedCommitter) commitInner(block *hotstuff.Block) error {
 	}
 
 	// Check if the block was added to the end of the queue. If so, exit.
-	pipe := pc.waitingBlocksAtPipe[block.Pipe()]
-	if len(pipe) > 0 && pipe[len(pipe)-1].View() >= block.View() {
+	blockQueue := pc.waitingBlocksAtPipe[block.Pipe()]
+	if len(blockQueue) > 0 && blockQueue[len(blockQueue)-1].View() >= block.View() {
 		return nil
 	}
 
-	if parent, ok := pc.blockChain.Get(block.Parent()); ok {
+	if parent, ok := pc.blockChain.Get(block.Parent(), block.Pipe()); ok {
 		err := pc.commitInner(parent)
 		if err != nil {
 			return err

@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipeline"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -96,7 +97,7 @@ func (chain *blockChain) DeleteAtHeight(height hotstuff.View, blockHash hotstuff
 
 // Get retrieves a block given its hash. Get will try to find the block locally.
 // If it is not available locally, it will try to fetch the block.
-func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
+func (chain *blockChain) Get(hash hotstuff.Hash, onPipe pipeline.Pipe) (block *hotstuff.Block, ok bool) {
 	// need to declare vars early, or else we won't be able to use goto
 	var (
 		ctx    context.Context
@@ -109,7 +110,7 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 		goto done
 	}
 
-	ctx, cancel = synchronizer.TimeoutContext(chain.eventLoop.Context(), chain.eventLoop)
+	ctx, cancel = synchronizer.PipedTimeoutContext(chain.eventLoop.Context(), chain.eventLoop, onPipe)
 	chain.pendingFetch[hash] = cancel
 
 	chain.mut.Unlock()
@@ -144,7 +145,7 @@ func (chain *blockChain) Extends(block, target *hotstuff.Block) bool {
 	current := block
 	ok := true
 	for ok && current.View() > target.View() {
-		current, ok = chain.Get(current.Parent())
+		current, ok = chain.Get(current.Parent(), block.Pipe())
 	}
 	return ok && current.Hash() == target.Hash()
 }

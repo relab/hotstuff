@@ -96,7 +96,7 @@ func (c crypto) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.Timeou
 
 // VerifyPartialCert verifies a single partial certificate.
 func (c crypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
-	block, ok := c.blockChain.Get(cert.BlockHash())
+	block, ok := c.blockChain.Get(cert.BlockHash(), cert.Pipe())
 	if !ok {
 		return false
 	}
@@ -112,7 +112,7 @@ func (c crypto) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 	if qc.Signature().Participants().Len() < c.configuration.QuorumSize() {
 		return false
 	}
-	block, ok := c.blockChain.Get(qc.BlockHash())
+	block, ok := c.blockChain.Get(qc.BlockHash(), qc.Pipe())
 	if !ok {
 		return false
 	}

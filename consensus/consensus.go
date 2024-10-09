@@ -123,14 +123,14 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 	qc, ok := cert.QC()
 	if ok {
 		// tell the acceptor that the previous proposal succeeded.
-		if qcBlock, ok := cs.blockChain.Get(qc.BlockHash()); ok {
+		if qcBlock, ok := cs.blockChain.Get(qc.BlockHash(), cs.pipe); ok {
 			cs.acceptor.Proposed(qcBlock.Command())
 		} else {
 			cs.logger.Errorf("Could not find block for QC: %s", qc)
 		}
 	}
 
-	ctx, cancel := synchronizer.TimeoutContext(cs.eventLoop.Context(), cs.eventLoop)
+	ctx, cancel := synchronizer.PipedTimeoutContext(cs.eventLoop.Context(), cs.eventLoop, cs.pipe)
 	defer cancel()
 
 	cmd, ok := cs.commandQueue.Get(ctx)
@@ -210,7 +210,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
-	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
+	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash(), cs.pipe); ok {
 		cs.acceptor.Proposed(qcBlock.Command())
 	} else {
 		cs.logger.Infof("OnPropose[pipe=%d]: Failed to fetch qcBlock", cs.pipe)
