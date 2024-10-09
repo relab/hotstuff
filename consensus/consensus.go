@@ -218,7 +218,8 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 
 	cmd := block.Command()
 	if !cs.acceptor.Accept(cmd) {
-		cs.logger.Infof("OnPropose[pipe=%d]: command not accepted", cs.pipe)
+		bytes := []byte(cmd[len(cmd)-2:])
+		cs.logger.Infof("OnPropose[pipe=%d]: command not accepted: %x", cs.pipe, bytes)
 		return
 	}
 
