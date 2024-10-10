@@ -9,6 +9,7 @@ import (
 
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipeline"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -46,6 +47,8 @@ type Config struct {
 	ManagerOptions []gorums.ManagerOption
 	// Location information of all replicas
 	LocationInfo map[hotstuff.ID]string
+	// Number of pipes in pipelining mode
+	PipeCount uint32
 }
 
 // Replica is a participant in the consensus protocol.
@@ -70,7 +73,13 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		))
 	}
 
-	clientSrv := newClientServer(conf, clientSrvOpts)
+	cmdCachePipe := builder.CreatePiped(newCmdCache, int(conf.BatchSize))
+	cmdCaches := make(map[pipeline.Pipe]*cmdCache)
+	for pipe := range cmdCachePipe {
+		cmdCaches[pipe] = cmdCachePipe[pipe].(*cmdCache)
+	}
+
+	clientSrv := newClientServer(cmdCaches, clientSrvOpts)
 
 	srv := &Replica{
 		clientSrv:    clientSrv,
@@ -111,7 +120,9 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 
 		modules.ExtendedExecutor(srv.clientSrv),
 		modules.ExtendedForkHandler(srv.clientSrv),
-		srv.clientSrv.cmdCache,
+	)
+	builder.AddPiped(
+		cmdCachePipe,
 	)
 	srv.hs = builder.Build()
 

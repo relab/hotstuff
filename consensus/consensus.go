@@ -72,10 +72,8 @@ func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOpti
 	cs.pipe = initOpt.ModulePipeId
 
 	mods.Get(
-		&cs.acceptor,
 		&cs.blockChain,
 		&cs.committer,
-		&cs.commandQueue,
 		&cs.configuration,
 		&cs.crypto,
 		&cs.eventLoop,
@@ -85,6 +83,8 @@ func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOpti
 	)
 
 	mods.GetFromPipe(cs,
+		&cs.acceptor,
+		&cs.commandQueue,
 		&cs.impl,
 		&cs.leaderRotation,
 		&cs.synchronizer,
@@ -217,11 +217,13 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	}
 
 	cmd := block.Command()
+	bytes := []byte(cmd[len(cmd)-2:])
 	if !cs.acceptor.Accept(cmd) {
-		bytes := []byte(cmd[len(cmd)-2:])
-		cs.logger.Infof("OnPropose[pipe=%d]: command not accepted: %x", cs.pipe, bytes)
+		cs.logger.Infof("OnPropose[pipe=%d]: command rejected: %x", cs.pipe, bytes)
 		return
 	}
+
+	// cs.logger.Infof("OnPropose[pipe=%d]: command accepted: %x", cs.pipe, bytes)
 
 	// block is safe and was accepted
 	cs.blockChain.Store(block)

@@ -262,6 +262,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		RootCAs:      rootCAs,
 		LocationInfo: locationInfo,
 		BatchSize:    opts.GetBatchSize(),
+		PipeCount:    opts.GetPipes(),
 		ManagerOptions: []gorums.ManagerOption{
 			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 			gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),

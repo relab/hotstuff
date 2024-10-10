@@ -40,6 +40,10 @@ func (c *cmdCache) InitModule(mods *modules.Core, _ modules.InitOptions) {
 	mods.Get(&c.logger)
 }
 
+func (c *cmdCache) commandCount() int {
+	return c.cache.Len()
+}
+
 func (c *cmdCache) addCommand(cmd *clientpb.Command) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
@@ -151,3 +155,4 @@ func (c *cmdCache) Proposed(cmd hotstuff.Command) {
 }
 
 var _ modules.Acceptor = (*cmdCache)(nil)
+var _ modules.CommandQueue = (*cmdCache)(nil)

@@ -26,7 +26,7 @@ type CommandQueue interface {
 // Acceptor decides if a replica should accept a command.
 type Acceptor interface {
 	// Accept returns true if the replica should accept the command, false otherwise.
-	Accept(hotstuff.Command) bool
+	Accept(cmd hotstuff.Command) bool
 	// Proposed tells the acceptor that the propose phase for the given command succeeded, and it should no longer be
 	// accepted in the future.
 	Proposed(hotstuff.Command)

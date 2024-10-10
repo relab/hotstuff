@@ -13,6 +13,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipeline"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -27,30 +28,32 @@ type clientSrv struct {
 	mut          sync.Mutex
 	srv          *gorums.Server
 	awaitingCmds map[cmdID]chan<- error
-	cmdCache     *cmdCache
+	cmdCaches    map[pipeline.Pipe]*cmdCache
 	hash         hash.Hash
 	cmdCount     uint32
 }
 
 // newClientServer returns a new client server.
-func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv) {
+func newClientServer(cmdCaches map[pipeline.Pipe]*cmdCache, srvOpts []gorums.ServerOption) (srv *clientSrv) {
 	srv = &clientSrv{
 		awaitingCmds: make(map[cmdID]chan<- error),
 		srv:          gorums.NewServer(srvOpts...),
-		cmdCache:     newCmdCache(int(conf.BatchSize)),
-		hash:         sha256.New(),
+		// cmdCache:     newCmdCache(int(conf.BatchSize)),
+		cmdCaches: cmdCaches,
+		hash:      sha256.New(),
 	}
+
 	clientpb.RegisterClientServer(srv.srv, srv)
 	return srv
 }
 
 // InitModule gives the module access to the other modules.
-func (srv *clientSrv) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
+func (srv *clientSrv) InitModule(mods *modules.Core, _ modules.InitOptions) {
 	mods.Get(
 		&srv.eventLoop,
 		&srv.logger,
 	)
-	srv.cmdCache.InitModule(mods, buildOpt)
+	// srv.cmdCache.InitModule(mods, buildOpt)
 }
 
 func (srv *clientSrv) Start(addr string) error {
@@ -83,7 +86,17 @@ func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (
 	srv.awaitingCmds[id] = c
 	srv.mut.Unlock()
 
-	srv.cmdCache.addCommand(cmd)
+	smallestCachePipe := pipeline.NullPipe
+	smallestCacheCount := 0
+	for pipe := range srv.cmdCaches {
+		count := srv.cmdCaches[pipe].commandCount()
+		if smallestCacheCount > count || smallestCachePipe == pipeline.NullPipe {
+			smallestCachePipe = pipe
+			smallestCacheCount = count
+		}
+	}
+
+	srv.cmdCaches[smallestCachePipe].addCommand(cmd)
 	ctx.Release()
 	err := <-c
 	return &emptypb.Empty{}, err
