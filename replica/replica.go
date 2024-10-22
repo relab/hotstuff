@@ -160,6 +160,7 @@ func (srv *Replica) Stop() {
 	srv.cancel()
 	<-srv.done
 	srv.Close()
+	srv.clientSrv.PrintCmdResult()
 }
 
 // Run runs the replica until the context is canceled.

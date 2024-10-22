@@ -26,13 +26,14 @@ type clientSrv struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
 
-	mut          sync.Mutex
-	srv          *gorums.Server
-	awaitingCmds map[cmdID]chan<- error
-	cmdCaches    map[pipeline.Pipe]*cmdCache
-	hash         hash.Hash
-	cmdCount     uint32
-	pipeCount    int
+	mut            sync.Mutex
+	srv            *gorums.Server
+	awaitingCmds   map[cmdID]chan<- error
+	cmdCaches      map[pipeline.Pipe]*cmdCache
+	hash           hash.Hash
+	cmdCount       uint32
+	pipeCount      int
+	cmdsSentToPipe map[pipeline.Pipe]int
 }
 
 // newClientServer returns a new client server.
@@ -41,9 +42,10 @@ func newClientServer(cmdCaches map[pipeline.Pipe]*cmdCache, srvOpts []gorums.Ser
 		awaitingCmds: make(map[cmdID]chan<- error),
 		srv:          gorums.NewServer(srvOpts...),
 		// cmdCache:     newCmdCache(int(conf.BatchSize)),
-		cmdCaches: cmdCaches,
-		pipeCount: len(cmdCaches),
-		hash:      sha256.New(),
+		cmdCaches:      cmdCaches,
+		pipeCount:      len(cmdCaches),
+		hash:           sha256.New(),
+		cmdsSentToPipe: make(map[pipeline.Pipe]int),
 	}
 
 	clientpb.RegisterClientServer(srv.srv, srv)
@@ -81,6 +83,13 @@ func (srv *clientSrv) Stop() {
 	srv.srv.Stop()
 }
 
+func (srv *clientSrv) PrintCmdResult() {
+	srv.logger.Info("Command count per pipe results:")
+	for pipe, count := range srv.cmdsSentToPipe {
+		srv.logger.Infof("\tP%d=(%d)", pipe, count)
+	}
+}
+
 func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*emptypb.Empty, error) {
 	id := cmdID{cmd.ClientID, cmd.SequenceNumber}
 
@@ -112,6 +121,7 @@ func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (
 		cache, ok := srv.cmdCaches[correctPipe]
 		if ok {
 			cache.addCommand(cmd)
+			srv.cmdsSentToPipe[correctPipe]++
 		} else {
 			srv.logger.DPanicf("addCommand: pipe not found: %d", correctPipe)
 		}

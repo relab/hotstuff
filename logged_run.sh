@@ -4,4 +4,4 @@ FILE="$DIR/$DT.txt"
 make
 mkdir $DIR
 echo "Writing to $FILE"
-./hotstuff --log-level=debug --pipes=2 run &>> $FILE
+./hotstuff --log-level=debug $@ run &>> $FILE
