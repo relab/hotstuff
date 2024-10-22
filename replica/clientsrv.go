@@ -3,6 +3,7 @@ package replica
 import (
 	"crypto/sha256"
 	"hash"
+	"hash/fnv"
 	"net"
 	"sync"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipeline"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -27,19 +29,21 @@ type clientSrv struct {
 	mut          sync.Mutex
 	srv          *gorums.Server
 	awaitingCmds map[cmdID]chan<- error
-	cmdCache     *cmdCache
+	cmdCaches    map[pipeline.Pipe]*cmdCache
 	hash         hash.Hash
 	cmdCount     uint32
+	pipeCount    int
 }
 
 // newClientServer returns a new client server.
-func newClientServer(cmdCache *cmdCache, srvOpts []gorums.ServerOption) (srv *clientSrv) {
+func newClientServer(cmdCaches map[pipeline.Pipe]*cmdCache, srvOpts []gorums.ServerOption) (srv *clientSrv) {
 	srv = &clientSrv{
 		awaitingCmds: make(map[cmdID]chan<- error),
 		srv:          gorums.NewServer(srvOpts...),
 		// cmdCache:     newCmdCache(int(conf.BatchSize)),
-		cmdCache: cmdCache,
-		hash:     sha256.New(),
+		cmdCaches: cmdCaches,
+		pipeCount: len(cmdCaches),
+		hash:      sha256.New(),
 	}
 
 	clientpb.RegisterClientServer(srv.srv, srv)
@@ -94,9 +98,21 @@ func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (
 	// 		smallestCacheCount = count
 	// 	}
 	// }
-	//
-	// srv.cmdCaches[smallestCachePipe].addCommand(cmd)
-	srv.cmdCache.addCommand(cmd)
+
+	if srv.pipeCount > 1 {
+		asBytes, err := proto.Marshal(cmd)
+		if err != nil {
+			return &emptypb.Empty{}, err
+		}
+		h := fnv.New32a()
+		h.Write(asBytes)
+		hSum := h.Sum32()
+
+		correctPipe := pipeline.Pipe((hSum % uint32(srv.pipeCount)) + 1)
+		srv.cmdCaches[correctPipe].addCommand(cmd)
+	} else {
+		srv.cmdCaches[pipeline.NullPipe].addCommand(cmd)
+	}
 	ctx.Release()
 	err := <-c
 	return &emptypb.Empty{}, err

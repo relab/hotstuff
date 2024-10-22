@@ -80,11 +80,11 @@ func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOpti
 		&cs.forkHandler,
 		&cs.logger,
 		&cs.opts,
-		&cs.acceptor,
-		&cs.commandQueue,
 	)
 
 	mods.GetFromPipe(cs,
+		&cs.acceptor,
+		&cs.commandQueue,
 		&cs.impl,
 		&cs.leaderRotation,
 		&cs.synchronizer,
@@ -210,12 +210,6 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
-	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash(), cs.pipe); ok {
-		cs.acceptor.Proposed(qcBlock.Command())
-	} else {
-		cs.logger.Infof("OnPropose[pipe=%d]: Failed to fetch qcBlock", cs.pipe)
-	}
-
 	cmd := block.Command()
 	bytes := []byte(cmd[len(cmd)-2:])
 	if !cs.acceptor.Accept(cmd) {
@@ -223,7 +217,14 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
-	// cs.logger.Infof("OnPropose[pipe=%d]: command accepted: %x", cs.pipe, bytes)
+	// ALAN - Note: This if-statement was above the Accept before.
+	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash(), cs.pipe); ok {
+		cs.acceptor.Proposed(qcBlock.Command())
+	} else {
+		cs.logger.Infof("OnPropose[pipe=%d]: Failed to fetch qcBlock", cs.pipe)
+	}
+
+	cs.logger.Debugf("OnPropose[pipe=%d]: command accepted: %x", cs.pipe, bytes)
 
 	// block is safe and was accepted
 	cs.blockChain.Store(block)

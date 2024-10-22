@@ -9,6 +9,7 @@ import (
 
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipeline"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -72,15 +73,13 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		))
 	}
 
-	// cmdCachePipe := builder.CreatePiped(newCmdCache, int(conf.BatchSize))
-	// cmdCaches := make(map[pipeline.Pipe]*cmdCache)
-	// for pipe := range cmdCachePipe {
-	// 	cmdCaches[pipe] = cmdCachePipe[pipe].(*cmdCache)
-	// }
+	cmdCachePipe := builder.CreatePiped(newCmdCache, int(conf.BatchSize))
+	cmdCaches := make(map[pipeline.Pipe]*cmdCache)
+	for pipe := range cmdCachePipe {
+		cmdCaches[pipe] = cmdCachePipe[pipe].(*cmdCache)
+	}
 
-	cmdCache := newCmdCache(int(conf.BatchSize))
-
-	clientSrv := newClientServer(cmdCache, clientSrvOpts)
+	clientSrv := newClientServer(cmdCaches, clientSrvOpts)
 
 	srv := &Replica{
 		clientSrv:    clientSrv,
@@ -118,13 +117,13 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 	builder.Add(
 		srv.cfg,   // configuration
 		srv.hsSrv, // event handling
-		cmdCache,
+
 		modules.ExtendedExecutor(srv.clientSrv),
 		modules.ExtendedForkHandler(srv.clientSrv),
 	)
-	// builder.AddPiped(
-	// 	cmdCachePipe,
-	// )
+	builder.AddPiped(
+		cmdCachePipe,
+	)
 	srv.hs = builder.Build()
 
 	return srv
