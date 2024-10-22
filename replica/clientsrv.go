@@ -121,7 +121,9 @@ func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (
 		cache, ok := srv.cmdCaches[correctPipe]
 		if ok {
 			cache.addCommand(cmd)
+			srv.mut.Lock()
 			srv.cmdsSentToPipe[correctPipe]++
+			srv.mut.Unlock()
 		} else {
 			srv.logger.DPanicf("addCommand: pipe not found: %d", correctPipe)
 		}
