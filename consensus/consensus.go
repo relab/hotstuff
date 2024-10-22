@@ -210,6 +210,12 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
+	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash(), cs.pipe); ok {
+		cs.acceptor.Proposed(qcBlock.Command())
+	} else {
+		cs.logger.Infof("OnPropose[pipe=%d]: Failed to fetch qcBlock", cs.pipe)
+	}
+
 	cmd := block.Command()
 	bytes := []byte(cmd[len(cmd)-2:])
 	if !cs.acceptor.Accept(cmd) {
@@ -218,11 +224,11 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	}
 
 	// ALAN - Note: This if-statement was above the Accept before.
-	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash(), cs.pipe); ok {
-		cs.acceptor.Proposed(qcBlock.Command())
-	} else {
-		cs.logger.Infof("OnPropose[pipe=%d]: Failed to fetch qcBlock", cs.pipe)
-	}
+	// if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash(), cs.pipe); ok {
+	// 	cs.acceptor.Proposed(qcBlock.Command())
+	// } else {
+	// 	cs.logger.Infof("OnPropose[pipe=%d]: Failed to fetch qcBlock", cs.pipe)
+	// }
 
 	cs.logger.Debugf("OnPropose[pipe=%d]: command accepted: %x", cs.pipe, bytes)
 

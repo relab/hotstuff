@@ -109,7 +109,12 @@ func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (
 		hSum := h.Sum32()
 
 		correctPipe := pipeline.Pipe((hSum % uint32(srv.pipeCount)) + 1)
-		srv.cmdCaches[correctPipe].addCommand(cmd)
+		cache, ok := srv.cmdCaches[correctPipe]
+		if ok {
+			cache.addCommand(cmd)
+		} else {
+			srv.logger.DPanicf("addCommand: pipe not found: %d", correctPipe)
+		}
 	} else {
 		srv.cmdCaches[pipeline.NullPipe].addCommand(cmd)
 	}
