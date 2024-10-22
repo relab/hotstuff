@@ -80,11 +80,11 @@ func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOpti
 		&cs.forkHandler,
 		&cs.logger,
 		&cs.opts,
+		&cs.acceptor,
+		&cs.commandQueue,
 	)
 
 	mods.GetFromPipe(cs,
-		&cs.acceptor,
-		&cs.commandQueue,
 		&cs.impl,
 		&cs.leaderRotation,
 		&cs.synchronizer,
@@ -135,7 +135,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 
 	cmd, ok := cs.commandQueue.Get(ctx)
 	if !ok {
-		cs.logger.Debugf("Propose[pipe=%d]: No command", cs.pipe)
+		cs.logger.Debugf("Propose[pipe=%d] (view=%d): No command", cs.pipe, cs.synchronizer.View())
 		return
 	}
 

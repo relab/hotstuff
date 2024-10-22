@@ -140,7 +140,6 @@ func runController() {
 	worker := viper.GetBool("worker")
 	hosts := viper.GetStringSlice("hosts")
 	exePath := viper.GetString("exe")
-
 	g, err := iago.NewSSHGroup(hosts, viper.GetString("ssh-config"))
 	checkf("failed to connect to remote hosts: %v", err)
 

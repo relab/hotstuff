@@ -49,6 +49,7 @@ func (c *cmdCache) addCommand(cmd *clientpb.Command) {
 	defer c.mut.Unlock()
 	if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
 		// command is too old
+		c.logger.Debugf("addCommand: command too old: %x", cmd.Data[len(cmd.Data)-4:])
 		return
 	}
 	c.cache.PushBack(cmd)

@@ -6,6 +6,7 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipeline"
 )
 
 func init() {
@@ -17,6 +18,8 @@ type FastHotStuff struct {
 	blockChain   modules.BlockChain
 	logger       logging.Logger
 	synchronizer modules.Synchronizer
+
+	pipe pipeline.Pipe
 }
 
 // New returns a new FastHotStuff instance.
@@ -25,10 +28,14 @@ func New() consensus.Rules {
 }
 
 // InitModule initializes the module.
-func (fhs *FastHotStuff) InitModule(mods *modules.Core, _ modules.InitOptions) {
+func (fhs *FastHotStuff) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
 	var opts *modules.Options
 
-	mods.Get(&opts, &fhs.blockChain, &fhs.logger, &fhs.synchronizer)
+	fhs.pipe = initOpt.ModulePipeId
+
+	mods.Get(&opts, &fhs.blockChain, &fhs.logger)
+
+	mods.GetFromPipe(fhs, &fhs.synchronizer)
 
 	opts.SetShouldUseAggQC()
 }
@@ -42,6 +49,10 @@ func (fhs *FastHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
 
 // CommitRule decides whether an ancestor of the block can be committed.
 func (fhs *FastHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
+	if fhs.pipe != block.Pipe() {
+		panic("incorrect pipe")
+	}
+
 	parent, ok := fhs.qcRef(block.QuorumCert())
 	if !ok {
 		return nil
@@ -61,6 +72,9 @@ func (fhs *FastHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 
 // VoteRule decides whether to vote for the proposal or not.
 func (fhs *FastHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
+	if fhs.pipe != proposal.PipeId {
+		panic("incorrect pipe")
+	}
 	// The base implementation verifies both regular QCs and AggregateQCs, and asserts that the QC embedded in the
 	// block is the same as the highQC found in the aggregateQC.
 	if proposal.AggregateQC != nil {
