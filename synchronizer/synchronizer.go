@@ -47,18 +47,15 @@ type Synchronizer struct {
 
 // InitModule initializes the synchronizer.
 func (s *Synchronizer) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
-	mods.Get(
+	mods.GetPiped(s,
 		&s.blockChain,
 		&s.crypto,
 		&s.configuration,
+		&s.consensus,
 		&s.eventLoop,
+		&s.leaderRotation,
 		&s.logger,
 		&s.opts,
-	)
-
-	mods.GetFromPipe(s,
-		&s.consensus,
-		&s.leaderRotation,
 	)
 
 	s.pipe = initOpt.ModulePipeId

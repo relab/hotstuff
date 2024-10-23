@@ -87,8 +87,9 @@ func NewPiped[T any](pipeCount uint, ctor any, ctorArgs ...any) (pipedMods map[p
 // Core is the base of the module system.
 // It contains only a few core modules that are shared between replicas and clients.
 type Core struct {
-	staticModules []any
-	pipedModules  map[pipeline.Pipe][]any
+	staticModules       []any
+	pipedModules        map[pipeline.Pipe][]any
+	isPipeliningEnabled bool
 }
 
 // TryGet attempts to find a module for ptr.
@@ -151,12 +152,12 @@ func (mods *Core) Get(pointers ...any) {
 	}
 }
 
-// GetFromPipe finds compatible modules for the given pointers, assuming that moduleInPipe is in the same module
-// pipe as those compatible pointers. If pipelining was not enabled in the Builder, Get is called internally.
+// GetPiped does the same as Get and additionally searches for pointers in the same pipe as moduleInPipe.
+// If pipelining is not enabled, Get is called internally instead.
 //
 // NOTE: pointers must only contain non-nil pointers to types that have been provided to the module system
 // as a piped module.
-// GetFromPipe panics if one of the given arguments is not a pointer, if a compatible module is not found,
+// GetPiped panics if one of the given arguments is not a pointer, if a compatible module is not found,
 // if the module was not in a pipe or if the module was not in the same pipe as moduleInPipe.
 //
 // Example:
@@ -170,7 +171,7 @@ func (mods *Core) Get(pointers ...any) {
 //	}
 //
 //	func (m *MyModuleImpl) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
-//		mods.GetFromPipe(m, &m.otherModule) // Requires an OtherModule from the same pipe
+//		mods.GetPiped(m, &m.otherModule) // Requires an OtherModule from the same pipe
 //	}
 //
 //	func main() {
@@ -182,13 +183,21 @@ func (mods *Core) Get(pointers ...any) {
 //		builder.AddPiped(NewOtherModuleImpl)
 //		builder.Build() // InitModule is called here
 //	}
-func (mods *Core) GetFromPipe(moduleInPipe Module, pointers ...any) {
+func (mods *Core) GetPiped(moduleInPipe Module, pointers ...any) {
 	if len(pointers) == 0 {
 		panic("no pointers given")
 	}
+
+	if !mods.isPipeliningEnabled {
+		mods.Get(pointers...)
+		return
+	}
+
 	for _, ptr := range pointers {
-		if !mods.TryGetFromPipe(moduleInPipe, ptr) {
-			panic(fmt.Sprintf("piped module of type %s not found", reflect.TypeOf(ptr).Elem()))
+		if !mods.TryGet(ptr) {
+			if !mods.tryGetFromPipe(moduleInPipe, ptr) {
+				panic(fmt.Sprintf("piped module of type %s not found", reflect.TypeOf(ptr).Elem()))
+			}
 		}
 	}
 }
@@ -197,7 +206,7 @@ func (mods *Core) GetFromPipe(moduleInPipe Module, pointers ...any) {
 // pipe as moduleInPipe, false otherwise.
 // TryGetFromPipe returns true if a module was successflully stored in ptr, false otherwise.
 // If pipelining was not enabled, TryGet is called implicitly.
-func (mods *Core) TryGetFromPipe(moduleInPipe Module, ptr any) bool {
+func (mods *Core) tryGetFromPipe(moduleInPipe Module, ptr any) bool {
 	if len(mods.pipedModules) == 0 {
 		return mods.TryGet(ptr)
 	}
@@ -396,7 +405,11 @@ func (b *Builder) CreatePiped(ctor any, ctorArgs ...any) (pipedMods map[pipeline
 func (b *Builder) AddPiped(pipedModMaps ...map[pipeline.Pipe]any) {
 	for _, pipedMods := range pipedModMaps {
 		if !b.pipeliningEnabled {
-			b.Add(pipedMods[pipeline.NullPipe])
+			mod, ok := pipedMods[pipeline.NullPipe]
+			if !ok {
+				panic("map of piped modules did not contain null-pipe key")
+			}
+			b.Add(mod)
 			continue
 		}
 
@@ -470,9 +483,11 @@ func (b *Builder) Build() *Core {
 	}
 
 	if !b.pipeliningEnabled {
+		b.core.isPipeliningEnabled = false
 		return &b.core // Exit early
 	}
 
+	b.core.isPipeliningEnabled = true
 	// Adding the piped modules to core first.
 	// b.core.pipedModules = make(map[pipelining.PipeId][]any)
 	// for id, pipe := range b.modulePipes {

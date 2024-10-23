@@ -71,22 +71,19 @@ func New() modules.Consensus {
 func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
 	cs.pipe = initOpt.ModulePipeId
 
-	mods.Get(
+	mods.GetPiped(cs,
+		&cs.acceptor,
 		&cs.blockChain,
+		&cs.commandQueue,
 		&cs.committer,
 		&cs.configuration,
 		&cs.crypto,
 		&cs.eventLoop,
 		&cs.forkHandler,
+		&cs.leaderRotation,
 		&cs.logger,
 		&cs.opts,
-	)
-
-	mods.GetFromPipe(cs,
-		&cs.acceptor,
-		&cs.commandQueue,
 		&cs.impl,
-		&cs.leaderRotation,
 		&cs.synchronizer,
 	)
 

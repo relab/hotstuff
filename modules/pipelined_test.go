@@ -53,7 +53,7 @@ func NewMultiplier() *multiplierImpl { //nolint:revive
 }
 
 func (m *multiplierImpl) InitModule(mods *modules.Core, _ modules.InitOptions) {
-	mods.GetFromPipe(m, &m.adder) // Requires an adder from the same pipe
+	mods.GetPiped(m, &m.adder) // Requires an adder from the same pipe
 }
 
 // func (a *adderImpl) InitModule(_ *modules.Core, buildOpt modules.InitOptions) {

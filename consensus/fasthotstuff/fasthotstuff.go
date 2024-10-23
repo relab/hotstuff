@@ -33,9 +33,11 @@ func (fhs *FastHotStuff) InitModule(mods *modules.Core, initOpt modules.InitOpti
 
 	fhs.pipe = initOpt.ModulePipeId
 
-	mods.Get(&opts, &fhs.blockChain, &fhs.logger)
-
-	mods.GetFromPipe(fhs, &fhs.synchronizer)
+	mods.GetPiped(fhs,
+		&fhs.blockChain,
+		&fhs.logger,
+		&opts,
+		&fhs.synchronizer)
 
 	opts.SetShouldUseAggQC()
 }

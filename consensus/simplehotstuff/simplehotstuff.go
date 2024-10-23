@@ -36,8 +36,10 @@ func New() consensus.Rules {
 // InitModule initializes the module.
 func (hs *SimpleHotStuff) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	hs.pipe = opt.ModulePipeId
-	mods.Get(&hs.blockChain, &hs.logger)
-	mods.GetFromPipe(hs, &hs.synchronizer)
+	mods.GetPiped(hs,
+		&hs.blockChain,
+		&hs.logger,
+		&hs.synchronizer)
 }
 
 // VoteRule decides if the replica should vote for the given block.
