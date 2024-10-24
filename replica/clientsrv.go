@@ -26,30 +26,86 @@ type clientSrv struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
 
-	mut            sync.Mutex
-	srv            *gorums.Server
-	awaitingCmds   map[cmdID]chan<- error
-	cmdCaches      map[pipeline.Pipe]*cmdCache
-	hash           hash.Hash
-	cmdCount       uint32
-	pipeCount      int
-	cmdsSentToPipe map[pipeline.Pipe]int
+	mut             sync.Mutex
+	srv             *gorums.Server
+	awaitingCmds    map[cmdID]chan<- error
+	cmdCaches       map[pipeline.Pipe]*cmdCache
+	hash            hash.Hash
+	cmdCount        uint32
+	pipeCount       int
+	cmdsSentToPipe  map[pipeline.Pipe]int
+	cmdAddMethodStr string
 }
 
 // newClientServer returns a new client server.
-func newClientServer(cmdCaches map[pipeline.Pipe]*cmdCache, srvOpts []gorums.ServerOption) (srv *clientSrv) {
+func newClientServer(cmdCaches map[pipeline.Pipe]*cmdCache, cmdAddMethodStr string, srvOpts []gorums.ServerOption) (srv *clientSrv) {
 	srv = &clientSrv{
 		awaitingCmds: make(map[cmdID]chan<- error),
 		srv:          gorums.NewServer(srvOpts...),
 		// cmdCache:     newCmdCache(int(conf.BatchSize)),
-		cmdCaches:      cmdCaches,
-		pipeCount:      len(cmdCaches),
-		hash:           sha256.New(),
-		cmdsSentToPipe: make(map[pipeline.Pipe]int),
+		cmdCaches:       cmdCaches,
+		pipeCount:       len(cmdCaches),
+		hash:            sha256.New(),
+		cmdsSentToPipe:  make(map[pipeline.Pipe]int),
+		cmdAddMethodStr: cmdAddMethodStr,
 	}
 
 	clientpb.RegisterClientServer(srv.srv, srv)
 	return srv
+}
+
+func (srv *clientSrv) addCommandToSmallestCache(cmd *clientpb.Command) {
+	smallestCachePipe := pipeline.NullPipe
+	smallestCacheCount := 0
+	for pipe := range srv.cmdCaches {
+		count := srv.cmdCaches[pipe].commandCount()
+		if smallestCacheCount > count || smallestCachePipe == pipeline.NullPipe {
+			smallestCachePipe = pipe
+			smallestCacheCount = count
+		}
+	}
+	srv.cmdCaches[smallestCachePipe].addCommand(cmd)
+	srv.mut.Lock()
+	srv.cmdsSentToPipe[smallestCachePipe]++
+	srv.mut.Unlock()
+}
+
+func (srv *clientSrv) addCommandHashed(cmd *clientpb.Command) error {
+	if srv.pipeCount > 1 {
+		asBytes, err := proto.Marshal(cmd)
+		if err != nil {
+			return err
+		}
+		h := fnv.New32a()
+		h.Write(asBytes)
+		hSum := h.Sum32()
+
+		correctPipe := pipeline.Pipe((hSum % uint32(srv.pipeCount)) + 1)
+		cache, ok := srv.cmdCaches[correctPipe]
+		if ok {
+			cache.addCommand(cmd)
+			srv.mut.Lock()
+			srv.cmdsSentToPipe[correctPipe]++
+			srv.mut.Unlock()
+		} else {
+			srv.logger.DPanicf("addCommand: pipe not found: %d", correctPipe)
+		}
+	} else {
+		srv.cmdCaches[pipeline.NullPipe].addCommand(cmd)
+	}
+
+	return nil
+}
+
+func (srv *clientSrv) commandAddingMethod(cmd *clientpb.Command) {
+	switch srv.cmdAddMethodStr {
+	case "hashed":
+		srv.addCommandHashed(cmd)
+		break
+	case "smallest":
+		srv.addCommandToSmallestCache(cmd)
+		break
+	}
 }
 
 // InitModule gives the module access to the other modules.
@@ -98,38 +154,7 @@ func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (
 	srv.awaitingCmds[id] = c
 	srv.mut.Unlock()
 
-	// smallestCachePipe := pipeline.NullPipe
-	// smallestCacheCount := 0
-	// for pipe := range srv.cmdCaches {
-	// 	count := srv.cmdCaches[pipe].commandCount()
-	// 	if smallestCacheCount > count || smallestCachePipe == pipeline.NullPipe {
-	// 		smallestCachePipe = pipe
-	// 		smallestCacheCount = count
-	// 	}
-	// }
-
-	if srv.pipeCount > 1 {
-		asBytes, err := proto.Marshal(cmd)
-		if err != nil {
-			return &emptypb.Empty{}, err
-		}
-		h := fnv.New32a()
-		h.Write(asBytes)
-		hSum := h.Sum32()
-
-		correctPipe := pipeline.Pipe((hSum % uint32(srv.pipeCount)) + 1)
-		cache, ok := srv.cmdCaches[correctPipe]
-		if ok {
-			cache.addCommand(cmd)
-			srv.mut.Lock()
-			srv.cmdsSentToPipe[correctPipe]++
-			srv.mut.Unlock()
-		} else {
-			srv.logger.DPanicf("addCommand: pipe not found: %d", correctPipe)
-		}
-	} else {
-		srv.cmdCaches[pipeline.NullPipe].addCommand(cmd)
-	}
+	srv.commandAddingMethod(cmd)
 	ctx.Release()
 	err := <-c
 	return &emptypb.Empty{}, err

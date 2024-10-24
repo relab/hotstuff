@@ -79,7 +79,7 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		cmdCaches[pipe] = cmdCachePipe[pipe].(*cmdCache)
 	}
 
-	clientSrv := newClientServer(cmdCaches, clientSrvOpts)
+	clientSrv := newClientServer(cmdCaches, "hashed", clientSrvOpts)
 
 	srv := &Replica{
 		clientSrv:    clientSrv,
