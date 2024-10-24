@@ -37,7 +37,6 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-
 	latencyPlot := plotting.NewClientLatencyPlot()
 	throughputPlot := plotting.NewThroughputPlot()
 	throughputVSLatencyPlot := plotting.NewThroughputVSLatencyPlot()
@@ -57,6 +56,7 @@ func main() {
 		if err := throughputPlot.PlotAverage(*throughput, *interval); err != nil {
 			log.Fatalln(err)
 		}
+
 	}
 
 	if *throughputVSLatency != "" {

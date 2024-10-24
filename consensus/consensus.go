@@ -41,7 +41,7 @@ type consensusBase struct {
 
 	acceptor       modules.Acceptor
 	blockChain     modules.BlockChain
-	committer      modules.BlockCommitter
+	committer      modules.Committer
 	commandQueue   modules.CommandQueue
 	configuration  modules.Configuration
 	crypto         modules.Crypto

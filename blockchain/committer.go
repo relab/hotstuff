@@ -21,7 +21,7 @@ type basicCommitter struct {
 	bExec *hotstuff.Block
 }
 
-func NewBasicCommitter() modules.BlockCommitter {
+func NewBasicCommitter() modules.Committer {
 	return &basicCommitter{
 		bExec: hotstuff.GetGenesis(),
 	}
@@ -123,4 +123,4 @@ func (bb *basicCommitter) findForks(height hotstuff.View, blocksAtHeight map[hot
 	return
 }
 
-var _ modules.BlockCommitter = (*basicCommitter)(nil)
+var _ modules.Committer = (*basicCommitter)(nil)

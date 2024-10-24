@@ -67,9 +67,9 @@ type ForkHandlerExt interface {
 	Fork(block *hotstuff.Block)
 }
 
-// BlockCommitter is a helper module which handles block commits and forks.
+// Committer is a helper module which handles block commits and forks.
 // NOTE: This module was created to deal with pipelined consensus instances.
-type BlockCommitter interface {
+type Committer interface {
 	// Stores the block before further execution.
 	Commit(block *hotstuff.Block)
 

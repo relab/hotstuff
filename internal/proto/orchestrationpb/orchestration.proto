@@ -55,7 +55,7 @@ message ReplicaOpts {
   map<uint32,string> LocationInfo = 22;
   // The number of pipes in pipelining mode. Leave as zero to disable pipelining mode.
   uint32 Pipes = 23;
-  // The ordering scheme for pipelining mode. Default is "waiting".
+  // The ordering scheme for pipelining mode. Default is "sequential".
   string PipelineOrdering = 24;
 }
 

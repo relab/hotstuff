@@ -54,6 +54,7 @@ func (p *ThroughputPlot) PlotAverage(filename string, measurementInterval time.D
 			return avgThroughput(p, measurementInterval)
 		})
 	}
+
 	return GonumPlot(filename, xlabel, ylabel, func(plt *plot.Plot) error {
 		if err := plotutil.AddLinePoints(plt, avgThroughput(p, measurementInterval)); err != nil {
 			return fmt.Errorf("failed to add line plot: %w", err)

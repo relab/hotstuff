@@ -190,10 +190,10 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
 
-	var committer modules.BlockCommitter
+	var committer modules.Committer
 	if opts.GetPipes() > 0 {
 		builder.EnablePipelining(int(opts.GetPipes()))
-		committer, ok = modules.GetModule[modules.BlockCommitter](opts.GetPipelineOrdering())
+		committer, ok = modules.GetModule[modules.Committer](opts.GetPipelineOrdering())
 		if !ok {
 			return nil, fmt.Errorf("invalid pipeline ordering scheme: %s", opts.GetPipelineOrdering())
 		}

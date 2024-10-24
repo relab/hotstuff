@@ -27,7 +27,7 @@ type unorderedPipedCommitter struct {
 	currentPipe pipeline.Pipe
 }
 
-func NewUnorderedPipedCommitter() modules.BlockCommitter {
+func NewUnorderedPipedCommitter() modules.Committer {
 	return &unorderedPipedCommitter{
 		bExecAtPipe: make(map[pipeline.Pipe]*hotstuff.Block),
 		currentView: 1,
@@ -113,4 +113,4 @@ func (pc *unorderedPipedCommitter) handleForks(prunedBlocks map[hotstuff.View][]
 	}
 }
 
-var _ modules.BlockCommitter = (*unorderedPipedCommitter)(nil)
+var _ modules.Committer = (*unorderedPipedCommitter)(nil)

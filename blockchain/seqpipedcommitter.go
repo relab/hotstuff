@@ -11,10 +11,10 @@ import (
 )
 
 func init() {
-	modules.RegisterModule("waiting", NewWaitingPipedCommitter)
+	modules.RegisterModule("sequential", NewSequentialPipedCommitter)
 }
 
-type waitingPipedCommitter struct {
+type sequentialPipedCommitter struct {
 	blockChain  modules.BlockChain
 	executor    modules.ExecutorExt
 	forkHandler modules.ForkHandlerExt
@@ -28,8 +28,8 @@ type waitingPipedCommitter struct {
 	currentPipe         pipeline.Pipe
 }
 
-func NewWaitingPipedCommitter() modules.BlockCommitter {
-	return &waitingPipedCommitter{
+func NewSequentialPipedCommitter() modules.Committer {
+	return &sequentialPipedCommitter{
 		bExecAtPipe:         make(map[pipeline.Pipe]*hotstuff.Block),
 		waitingBlocksAtPipe: make(map[pipeline.Pipe][]*hotstuff.Block),
 		currentView:         1,
@@ -37,7 +37,7 @@ func NewWaitingPipedCommitter() modules.BlockCommitter {
 	}
 }
 
-func (pc *waitingPipedCommitter) InitModule(mods *modules.Core, opt modules.InitOptions) {
+func (pc *sequentialPipedCommitter) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	mods.Get(
 		&pc.executor,
 		&pc.blockChain,
@@ -59,7 +59,7 @@ func (pc *waitingPipedCommitter) InitModule(mods *modules.Core, opt modules.Init
 }
 
 // Stores the block before further execution.
-func (pc *waitingPipedCommitter) Commit(block *hotstuff.Block) {
+func (pc *sequentialPipedCommitter) Commit(block *hotstuff.Block) {
 	pc.logger.Debugf("Commit (currentPipe: %d, currentView: %d): new incoming block {p:%d, v:%d, h:%s}",
 		pc.currentPipe, pc.currentView,
 		block.Pipe(), block.View(), block.Hash().String()[:4])
@@ -81,14 +81,14 @@ func (pc *waitingPipedCommitter) Commit(block *hotstuff.Block) {
 }
 
 // Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
-func (pc *waitingPipedCommitter) CommittedBlock(pipe pipeline.Pipe) *hotstuff.Block {
+func (pc *sequentialPipedCommitter) CommittedBlock(pipe pipeline.Pipe) *hotstuff.Block {
 	pc.mut.Lock()
 	defer pc.mut.Unlock()
 	return pc.bExecAtPipe[pipe]
 }
 
 // recursive helper for commit
-func (pc *waitingPipedCommitter) commitInner(block *hotstuff.Block) error {
+func (pc *sequentialPipedCommitter) commitInner(block *hotstuff.Block) error {
 	if pc.bExecAtPipe[block.Pipe()].View() >= block.View() {
 		return nil
 	}
@@ -113,7 +113,7 @@ func (pc *waitingPipedCommitter) commitInner(block *hotstuff.Block) error {
 	return nil
 }
 
-func (pc *waitingPipedCommitter) handleForks(prunedBlocks map[hotstuff.View][]*hotstuff.Block) {
+func (pc *sequentialPipedCommitter) handleForks(prunedBlocks map[hotstuff.View][]*hotstuff.Block) {
 	// All pruned blocks are assumed to be forks after the previous exec logic
 	for _, blocks := range prunedBlocks {
 		for _, block := range blocks {
@@ -122,7 +122,7 @@ func (pc *waitingPipedCommitter) handleForks(prunedBlocks map[hotstuff.View][]*h
 	}
 }
 
-func (pc *waitingPipedCommitter) tryExec() error {
+func (pc *sequentialPipedCommitter) tryExec() error {
 	waitingBlocks := pc.waitingBlocksAtPipe[pc.currentPipe]
 	canPeek := len(waitingBlocks) > 0
 	if !canPeek {
@@ -162,4 +162,4 @@ func (pc *waitingPipedCommitter) tryExec() error {
 	return pc.tryExec()
 }
 
-var _ modules.BlockCommitter = (*waitingPipedCommitter)(nil)
+var _ modules.Committer = (*sequentialPipedCommitter)(nil)
