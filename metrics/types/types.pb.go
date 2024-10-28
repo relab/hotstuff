@@ -429,6 +429,69 @@ func (x *ViewTimeouts) GetTimeouts() uint64 {
 	return 0
 }
 
+type SequentialPipedCommitHalts struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Event  *Event `protobuf:"bytes,1,opt,name=Event,proto3" json:"Event,omitempty"`
+	OnPipe uint32 `protobuf:"varint,2,opt,name=OnPipe,proto3" json:"OnPipe,omitempty"`
+	Halts  uint32 `protobuf:"varint,3,opt,name=Halts,proto3" json:"Halts,omitempty"`
+}
+
+func (x *SequentialPipedCommitHalts) Reset() {
+	*x = SequentialPipedCommitHalts{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_metrics_types_types_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *SequentialPipedCommitHalts) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SequentialPipedCommitHalts) ProtoMessage() {}
+
+func (x *SequentialPipedCommitHalts) ProtoReflect() protoreflect.Message {
+	mi := &file_metrics_types_types_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SequentialPipedCommitHalts.ProtoReflect.Descriptor instead.
+func (*SequentialPipedCommitHalts) Descriptor() ([]byte, []int) {
+	return file_metrics_types_types_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SequentialPipedCommitHalts) GetEvent() *Event {
+	if x != nil {
+		return x.Event
+	}
+	return nil
+}
+
+func (x *SequentialPipedCommitHalts) GetOnPipe() uint32 {
+	if x != nil {
+		return x.OnPipe
+	}
+	return 0
+}
+
+func (x *SequentialPipedCommitHalts) GetHalts() uint32 {
+	if x != nil {
+		return x.Halts
+	}
+	return 0
+}
+
 var File_metrics_types_types_proto protoreflect.FileDescriptor
 
 var file_metrics_types_types_proto_rawDesc = []byte{
@@ -487,7 +550,14 @@ var file_metrics_types_types_proto_rawDesc = []byte{
 	0x74, 0x52, 0x05, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x12, 0x14, 0x0a, 0x05, 0x56, 0x69, 0x65, 0x77,
 	0x73, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05, 0x56, 0x69, 0x65, 0x77, 0x73, 0x12, 0x1a,
 	0x0a, 0x08, 0x54, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74, 0x73, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04,
-	0x52, 0x08, 0x54, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74, 0x73, 0x42, 0x29, 0x5a, 0x27, 0x67, 0x69,
+	0x52, 0x08, 0x54, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74, 0x73, 0x22, 0x6e, 0x0a, 0x1a, 0x53, 0x65,
+	0x71, 0x75, 0x65, 0x6e, 0x74, 0x69, 0x61, 0x6c, 0x50, 0x69, 0x70, 0x65, 0x64, 0x43, 0x6f, 0x6d,
+	0x6d, 0x69, 0x74, 0x48, 0x61, 0x6c, 0x74, 0x73, 0x12, 0x22, 0x0a, 0x05, 0x45, 0x76, 0x65, 0x6e,
+	0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0c, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e,
+	0x45, 0x76, 0x65, 0x6e, 0x74, 0x52, 0x05, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x12, 0x16, 0x0a, 0x06,
+	0x4f, 0x6e, 0x50, 0x69, 0x70, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x06, 0x4f, 0x6e,
+	0x50, 0x69, 0x70, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x48, 0x61, 0x6c, 0x74, 0x73, 0x18, 0x03, 0x20,
+	0x01, 0x28, 0x0d, 0x52, 0x05, 0x48, 0x61, 0x6c, 0x74, 0x73, 0x42, 0x29, 0x5a, 0x27, 0x67, 0x69,
 	0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x72, 0x65, 0x6c, 0x61, 0x62, 0x2f, 0x68,
 	0x6f, 0x74, 0x73, 0x74, 0x75, 0x66, 0x66, 0x2f, 0x6d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x2f,
 	0x74, 0x79, 0x70, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
@@ -505,7 +575,7 @@ func file_metrics_types_types_proto_rawDescGZIP() []byte {
 	return file_metrics_types_types_proto_rawDescData
 }
 
-var file_metrics_types_types_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_metrics_types_types_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_metrics_types_types_proto_goTypes = []any{
 	(*StartEvent)(nil),                 // 0: types.StartEvent
 	(*Event)(nil),                      // 1: types.Event
@@ -513,23 +583,25 @@ var file_metrics_types_types_proto_goTypes = []any{
 	(*TotalThroughputMeasurement)(nil), // 3: types.TotalThroughputMeasurement
 	(*LatencyMeasurement)(nil),         // 4: types.LatencyMeasurement
 	(*ViewTimeouts)(nil),               // 5: types.ViewTimeouts
-	(*timestamppb.Timestamp)(nil),      // 6: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),        // 7: google.protobuf.Duration
+	(*SequentialPipedCommitHalts)(nil), // 6: types.SequentialPipedCommitHalts
+	(*timestamppb.Timestamp)(nil),      // 7: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),        // 8: google.protobuf.Duration
 }
 var file_metrics_types_types_proto_depIdxs = []int32{
 	1, // 0: types.StartEvent.Event:type_name -> types.Event
-	6, // 1: types.Event.Timestamp:type_name -> google.protobuf.Timestamp
+	7, // 1: types.Event.Timestamp:type_name -> google.protobuf.Timestamp
 	1, // 2: types.ThroughputMeasurement.Event:type_name -> types.Event
-	7, // 3: types.ThroughputMeasurement.Duration:type_name -> google.protobuf.Duration
+	8, // 3: types.ThroughputMeasurement.Duration:type_name -> google.protobuf.Duration
 	1, // 4: types.TotalThroughputMeasurement.Event:type_name -> types.Event
-	7, // 5: types.TotalThroughputMeasurement.Duration:type_name -> google.protobuf.Duration
+	8, // 5: types.TotalThroughputMeasurement.Duration:type_name -> google.protobuf.Duration
 	1, // 6: types.LatencyMeasurement.Event:type_name -> types.Event
 	1, // 7: types.ViewTimeouts.Event:type_name -> types.Event
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	1, // 8: types.SequentialPipedCommitHalts.Event:type_name -> types.Event
+	9, // [9:9] is the sub-list for method output_type
+	9, // [9:9] is the sub-list for method input_type
+	9, // [9:9] is the sub-list for extension type_name
+	9, // [9:9] is the sub-list for extension extendee
+	0, // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_metrics_types_types_proto_init() }
@@ -610,6 +682,18 @@ func file_metrics_types_types_proto_init() {
 				return nil
 			}
 		}
+		file_metrics_types_types_proto_msgTypes[6].Exporter = func(v any, i int) any {
+			switch v := v.(*SequentialPipedCommitHalts); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -617,7 +701,7 @@ func file_metrics_types_types_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_metrics_types_types_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

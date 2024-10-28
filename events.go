@@ -69,3 +69,7 @@ type CommitEvent struct {
 	OnPipe   pipeline.Pipe
 	Commands int
 }
+
+type SequentialPipedCommitHaltEvent struct {
+	OnPipe pipeline.Pipe
+}

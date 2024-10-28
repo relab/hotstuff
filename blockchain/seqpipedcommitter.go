@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/pipeline"
@@ -16,6 +17,7 @@ func init() {
 
 type sequentialPipedCommitter struct {
 	blockChain  modules.BlockChain
+	eventLoop   *eventloop.EventLoop
 	executor    modules.ExecutorExt
 	forkHandler modules.ForkHandlerExt
 	logger      logging.Logger
@@ -39,6 +41,7 @@ func NewSequentialPipedCommitter() modules.Committer {
 
 func (pc *sequentialPipedCommitter) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	mods.Get(
+		&pc.eventLoop,
 		&pc.executor,
 		&pc.blockChain,
 		&pc.forkHandler,
@@ -144,6 +147,7 @@ func (pc *sequentialPipedCommitter) tryExec() error {
 			return err
 		}
 	} else {
+		pc.eventLoop.AddEvent(hotstuff.SequentialPipedCommitHaltEvent{OnPipe: pc.currentPipe})
 		pc.logger.Debugf("tryExec (currentPipe: %d, currentView: %d): block in queue does not match view: {p:%d, v:%d, h:%s}",
 			pc.currentPipe, pc.currentView,
 			peekedBlock.Pipe(), peekedBlock.View(), peekedBlock.Hash().String()[:4])

@@ -48,3 +48,9 @@ message ViewTimeouts {
   // Number of view timeouts.
   uint64 Timeouts = 3;
 }
+
+message SequentialPipedCommitHalts {
+  Event Event = 1;
+  uint32 OnPipe = 2;
+  uint32 Halts = 3;
+}
