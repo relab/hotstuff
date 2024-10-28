@@ -37,7 +37,7 @@ type Acceptor interface {
 // Executor is responsible for executing the commands that are committed by the consensus protocol.
 type Executor interface {
 	// Exec executes the command.
-	Exec(cmd hotstuff.Command)
+	Exec(onPipe pipeline.Pipe, cmd hotstuff.Command)
 }
 
 // ExecutorExt is responsible for executing the commands that are committed by the consensus protocol.
@@ -207,7 +207,7 @@ func (ew *executorWrapper) InitModule(mods *Core, buildOpt InitOptions) {
 }
 
 func (ew *executorWrapper) Exec(block *hotstuff.Block) {
-	ew.executor.Exec(block.Command())
+	ew.executor.Exec(block.Pipe(), block.Command())
 }
 
 // ExtendedForkHandler turns the given ForkHandler into a ForkHandlerExt.

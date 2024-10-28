@@ -160,7 +160,7 @@ func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (
 	return &emptypb.Empty{}, err
 }
 
-func (srv *clientSrv) Exec(cmd hotstuff.Command) {
+func (srv *clientSrv) Exec(onPipe pipeline.Pipe, cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -168,7 +168,7 @@ func (srv *clientSrv) Exec(cmd hotstuff.Command) {
 		return
 	}
 
-	srv.eventLoop.AddEvent(hotstuff.CommitEvent{Commands: len(batch.GetCommands())})
+	srv.eventLoop.AddEvent(hotstuff.CommitEvent{OnPipe: onPipe, Commands: len(batch.GetCommands())})
 	srv.logger.Debugf("Executed %d commands", len(batch.GetCommands()))
 
 	for _, cmd := range batch.GetCommands() {
