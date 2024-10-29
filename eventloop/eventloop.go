@@ -160,6 +160,13 @@ func (el *EventLoop) AddEvent(event any) {
 	}
 }
 
+// DebugEvent adds an event to the event queue if debug mode is enabled.
+// Does nothing otherwise
+func (el *EventLoop) DebugEvent(event any) {
+	// TODO: Check for a debug flag
+	el.AddEvent(event)
+}
+
 // PipeEvent adds an event to a specified pipeline.
 func (el *EventLoop) PipeEvent(pipeId pipeline.Pipe, event any) {
 	if !pipeline.ValidPipe(pipeId) {

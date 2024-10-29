@@ -212,12 +212,14 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	pipedConsensuses := builder.CreatePiped(consensus.New)
 	pipedVotingMachines := builder.CreatePiped(consensus.NewVotingMachine)
 	pipedLeaderRotations := builder.CreatePiped(newLeaderRotation)
-	pipedSynchronizers := builder.CreatePiped(synchronizer.New, synchronizer.NewViewDuration(
+
+	duration := synchronizer.NewViewDuration(
 		uint64(opts.GetTimeoutSamples()),
 		float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
 		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
 		float64(opts.GetTimeoutMultiplier()),
-	))
+	)
+	pipedSynchronizers := builder.CreatePiped(synchronizer.New, duration)
 
 	builder.Add(
 		eventloop.New(1000),
