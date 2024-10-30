@@ -216,6 +216,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 
 	var pipedSynchronizers map[pipeline.Pipe]any
 
+	// TODO: Parameterize this
 	newViewDuration := func() synchronizer.ViewDuration {
 		return synchronizer.NewViewDuration(
 			uint64(opts.GetTimeoutSamples()),
@@ -224,6 +225,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			float64(opts.GetTimeoutMultiplier()),
 		)
 	}
+
+	newViewDuration = synchronizer.NewFixedDuration
 
 	switch opts.GetPipelineViewDuration() {
 	case "duplicate":

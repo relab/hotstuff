@@ -2,25 +2,29 @@ package synchronizer
 
 import "time"
 
-type FixedViewDuration struct {
+type fixedViewDuration struct {
+}
+
+func NewFixedDuration() ViewDuration {
+	return &fixedViewDuration{}
 }
 
 // Duration returns the duration that the next view should last.
-func (_ *FixedViewDuration) Duration() time.Duration {
-	return 100 * time.Millisecond
+func (_ *fixedViewDuration) Duration() time.Duration {
+	return 80 * time.Millisecond
 }
 
 // ViewStarted is called by the synchronizer when starting a new view.
-func (_ *FixedViewDuration) ViewStarted() {
+func (_ *fixedViewDuration) ViewStarted() {
 
 }
 
 // ViewSucceeded is called by the synchronizer when a view ended successfully.
-func (_ *FixedViewDuration) ViewSucceeded() {
+func (_ *fixedViewDuration) ViewSucceeded() {
 
 }
 
 // ViewTimeout is called by the synchronizer when a view timed out.
-func (_ *FixedViewDuration) ViewTimeout() {
+func (_ *fixedViewDuration) ViewTimeout() {
 
 }

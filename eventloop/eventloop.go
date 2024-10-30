@@ -339,6 +339,19 @@ func (el *EventLoop) dispatchDelayedEvents(t reflect.Type) {
 	}
 }
 
+func (el *EventLoop) DelayPiped(pipe pipeline.Pipe, eventType, event any) {
+	if !pipeline.ValidPipe(pipe) {
+		el.DelayUntil(eventType, event)
+		return
+	}
+
+	wrapper := pipedEventWrapper{
+		pipeId: pipe,
+		event:  event,
+	}
+	el.DelayUntil(eventType, wrapper)
+}
+
 // DelayUntil allows us to delay handling of an event until after another event has happened.
 // The eventType parameter decides the type of event to wait for, and it should be the zero value
 // of that event type. The event parameter is the event that will be delayed.
