@@ -337,8 +337,8 @@ func (bl *Builder) EnablePipelining(pipeCount int) {
 		panic("pipelining already enabled")
 	}
 
-	if pipeCount <= 1 {
-		panic("pipelining requires at least two pipes")
+	if pipeCount <= 0 {
+		panic("pipelining requires at least one pipe")
 	}
 
 	bl.pipeliningEnabled = true
