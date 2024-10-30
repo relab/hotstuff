@@ -15,6 +15,7 @@ func init() {
 	RegisterReplicaMetric("debug", func() any {
 		return &DebugMetrics{
 			sequentialPipedCommitHalts: make(map[pipeline.Pipe]int),
+			rejectedCommands:           make(map[pipeline.Pipe]int),
 		}
 	})
 }
