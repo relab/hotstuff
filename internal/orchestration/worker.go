@@ -225,6 +225,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		)
 	}
 
+	// TODO: This code does the same thing for both parameters. Change it!
 	switch opts.GetPipelineViewDuration() {
 	case "duplicate":
 		pipedSynchronizers = builder.CreatePiped(synchronizer.New, newViewDuration())
