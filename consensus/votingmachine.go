@@ -66,7 +66,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 		ok    bool
 	)
 
-	if !vote.Deferred {
+	if false { //!vote.Deferred {
 		// first, try to get the block from the local cache
 		block, ok = vm.blockChain.LocalGet(cert.BlockHash())
 		if !ok {

@@ -65,6 +65,7 @@ func init() {
 	runCmd.Flags().StringSlice("modules", nil, "Name additional modules to be loaded.")
 	runCmd.Flags().Uint32("pipes", 0, "number of pipes in pipelining mode. Zero by default which disables pipelining mode.")
 	runCmd.Flags().String("pipeline-ordering", "sequential", "ordering logic for pipelining mode.")
+	runCmd.Flags().String("pipeline-viewduration", "static", "whether or not to duplicate the state of view duration module when pipelining is enabled.")
 
 	runCmd.Flags().Bool("worker", false, "run a local worker")
 	runCmd.Flags().StringSlice("hosts", nil, "the remote hosts to run the experiment on via ssh")
@@ -107,20 +108,21 @@ func runController() {
 		Duration:    viper.GetDuration("duration"),
 		Output:      outputDir,
 		ReplicaOpts: &orchestrationpb.ReplicaOpts{
-			UseTLS:            true,
-			BatchSize:         viper.GetUint32("batch-size"),
-			TimeoutMultiplier: float32(viper.GetFloat64("timeout-multiplier")),
-			Consensus:         viper.GetString("consensus"),
-			Crypto:            viper.GetString("crypto"),
-			LeaderRotation:    viper.GetString("leader-rotation"),
-			ConnectTimeout:    durationpb.New(viper.GetDuration("connect-timeout")),
-			InitialTimeout:    durationpb.New(viper.GetDuration("view-timeout")),
-			TimeoutSamples:    viper.GetUint32("duration-samples"),
-			MaxTimeout:        durationpb.New(viper.GetDuration("max-timeout")),
-			SharedSeed:        viper.GetInt64("shared-seed"),
-			Modules:           viper.GetStringSlice("modules"),
-			Pipes:             viper.GetUint32("pipes"),
-			PipelineOrdering:  viper.GetString("pipeline-ordering"),
+			UseTLS:               true,
+			BatchSize:            viper.GetUint32("batch-size"),
+			TimeoutMultiplier:    float32(viper.GetFloat64("timeout-multiplier")),
+			Consensus:            viper.GetString("consensus"),
+			Crypto:               viper.GetString("crypto"),
+			LeaderRotation:       viper.GetString("leader-rotation"),
+			ConnectTimeout:       durationpb.New(viper.GetDuration("connect-timeout")),
+			InitialTimeout:       durationpb.New(viper.GetDuration("view-timeout")),
+			TimeoutSamples:       viper.GetUint32("duration-samples"),
+			MaxTimeout:           durationpb.New(viper.GetDuration("max-timeout")),
+			SharedSeed:           viper.GetInt64("shared-seed"),
+			Modules:              viper.GetStringSlice("modules"),
+			Pipes:                viper.GetUint32("pipes"),
+			PipelineOrdering:     viper.GetString("pipeline-ordering"),
+			PipelineViewDuration: viper.GetString("pipeline-viewduration"),
 		},
 		ClientOpts: &orchestrationpb.ClientOpts{
 			UseTLS:           true,

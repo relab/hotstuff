@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/pipeline"
@@ -16,6 +17,7 @@ func init() {
 
 type sequentialPipedCommitter struct {
 	blockChain  modules.BlockChain
+	eventLoop   *eventloop.EventLoop
 	executor    modules.ExecutorExt
 	forkHandler modules.ForkHandlerExt
 	logger      logging.Logger
@@ -39,6 +41,7 @@ func NewSequentialPipedCommitter() modules.Committer {
 
 func (pc *sequentialPipedCommitter) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	mods.Get(
+		&pc.eventLoop,
 		&pc.executor,
 		&pc.blockChain,
 		&pc.forkHandler,
@@ -127,6 +130,7 @@ func (pc *sequentialPipedCommitter) tryExec() error {
 	canPeek := len(waitingBlocks) > 0
 	if !canPeek {
 		pc.logger.Debugf("tryExec (currentPipe: %d, currentView: %d): no block on pipe yet", pc.currentPipe, pc.currentView)
+		// pc.eventLoop.DebugEvent(debug.SequentialPipedCommitHaltEvent{OnPipe: pc.currentPipe})
 		return nil
 	}
 

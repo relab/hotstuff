@@ -26,6 +26,7 @@ import (
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/pipeline"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc"
@@ -212,12 +213,32 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	pipedConsensuses := builder.CreatePiped(consensus.New)
 	pipedVotingMachines := builder.CreatePiped(consensus.NewVotingMachine)
 	pipedLeaderRotations := builder.CreatePiped(newLeaderRotation)
-	pipedSynchronizers := builder.CreatePiped(synchronizer.New, synchronizer.NewViewDuration(
-		uint64(opts.GetTimeoutSamples()),
-		float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-		float64(opts.GetTimeoutMultiplier()),
-	))
+
+	var pipedSynchronizers map[pipeline.Pipe]any
+
+	newViewDuration := func() synchronizer.ViewDuration {
+		return synchronizer.NewViewDuration(
+			uint64(opts.GetTimeoutSamples()),
+			float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
+			float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
+			float64(opts.GetTimeoutMultiplier()),
+		)
+	}
+
+	switch opts.GetPipelineViewDuration() {
+	case "duplicate":
+		pipedSynchronizers = make(map[pipeline.Pipe]any)
+		for pipe := pipeline.Pipe(1); pipe <= pipeline.Pipe(opts.GetPipes()); pipe++ {
+			pipedSynchronizers[pipe] = synchronizer.New(newViewDuration())
+		}
+		break
+	case "static":
+		duration := newViewDuration()
+		pipedSynchronizers = builder.CreatePiped(synchronizer.New, duration)
+		break
+	default:
+		return nil, fmt.Errorf("unrecognized pipeline-viewduration parameter %s", opts.GetPipelineViewDuration())
+	}
 
 	builder.Add(
 		eventloop.New(1000),
