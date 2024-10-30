@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/debug"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -217,6 +218,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	bytes := []byte(cmd[len(cmd)-2:])
 	if !cs.acceptor.Accept(cmd) {
 		cs.logger.Infof("OnPropose[pipe=%d]: command rejected: %x", cs.pipe, bytes)
+		cs.eventLoop.DebugEvent(debug.CommandRejectedEvent{OnPipe: cs.pipe, View: cs.synchronizer.View()})
 		return
 	}
 

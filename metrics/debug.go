@@ -3,7 +3,7 @@ package metrics
 import (
 	"time"
 
-	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/debug"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics/types"
@@ -47,8 +47,8 @@ func (db *DebugMetrics) InitModule(mods *modules.Core, opt modules.InitOptions) 
 
 	logger.Info("DebugMetrics enabled.")
 
-	eventLoop.RegisterHandler(hotstuff.SequentialPipedCommitHaltEvent{}, func(event any) {
-		sphe := event.(hotstuff.SequentialPipedCommitHaltEvent)
+	eventLoop.RegisterHandler(debug.SequentialPipedCommitHaltEvent{}, func(event any) {
+		sphe := event.(debug.SequentialPipedCommitHaltEvent)
 		db.onSequentialPipedCommitHalt(sphe)
 	})
 
@@ -57,7 +57,7 @@ func (db *DebugMetrics) InitModule(mods *modules.Core, opt modules.InitOptions) 
 	})
 }
 
-func (db *DebugMetrics) onSequentialPipedCommitHalt(event hotstuff.SequentialPipedCommitHaltEvent) {
+func (db *DebugMetrics) onSequentialPipedCommitHalt(event debug.SequentialPipedCommitHaltEvent) {
 	db.sequentialPipedCommitHalts[event.OnPipe]++
 }
 
