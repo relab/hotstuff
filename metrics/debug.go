@@ -27,6 +27,7 @@ type DebugMetrics struct {
 
 	// metrics
 	sequentialPipedCommitHalts map[pipeline.Pipe]int
+	rejectedCommands           map[pipeline.Pipe]int
 }
 
 // InitModule gives the module access to the other modules.
@@ -50,6 +51,11 @@ func (db *DebugMetrics) InitModule(mods *modules.Core, opt modules.InitOptions) 
 	eventLoop.RegisterHandler(debug.SequentialPipedCommitHaltEvent{}, func(event any) {
 		sphe := event.(debug.SequentialPipedCommitHaltEvent)
 		db.onSequentialPipedCommitHalt(sphe)
+	})
+
+	eventLoop.RegisterHandler(debug.CommandRejectedEvent{}, func(event any) {
+		reject := event.(debug.CommandRejectedEvent)
+		db.rejectedCommands[reject.OnPipe]++
 	})
 
 	eventLoop.RegisterObserver(types.TickEvent{}, func(event any) {
@@ -77,7 +83,14 @@ func (db *DebugMetrics) tick(_ types.TickEvent) {
 			Halts:  uint32(db.sequentialPipedCommitHalts[pipe]),
 		})
 
+		db.metricsLogger.Log(&types.CommandsRejected{
+			Event:    types.NewReplicaEvent(uint32(db.opts.ID()), time.Now()),
+			OnPipe:   uint32(pipe),
+			Commands: uint32(db.rejectedCommands[pipe]),
+		})
+
 		db.sequentialPipedCommitHalts[pipe] = 0
+		db.rejectedCommands[pipe] = 0
 	}
 
 }

@@ -54,3 +54,9 @@ message SequentialPipedCommitHalts {
   uint32 OnPipe = 2;
   uint32 Halts = 3;
 }
+
+message CommandsRejected {
+  Event Event = 1;
+  uint32 OnPipe = 2;
+  uint32 Commands = 3;
+}
