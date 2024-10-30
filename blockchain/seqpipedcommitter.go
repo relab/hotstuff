@@ -130,7 +130,7 @@ func (pc *sequentialPipedCommitter) tryExec() error {
 	canPeek := len(waitingBlocks) > 0
 	if !canPeek {
 		pc.logger.Debugf("tryExec (currentPipe: %d, currentView: %d): no block on pipe yet", pc.currentPipe, pc.currentView)
-		pc.eventLoop.AddEvent(hotstuff.SequentialPipedCommitHaltEvent{OnPipe: pc.currentPipe})
+		pc.eventLoop.DebugEvent(hotstuff.SequentialPipedCommitHaltEvent{OnPipe: pc.currentPipe})
 		return nil
 	}
 
