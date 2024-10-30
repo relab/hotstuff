@@ -225,17 +225,19 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		)
 	}
 
-	// TODO: This code does the same thing for both parameters. Change it!
 	switch opts.GetPipelineViewDuration() {
 	case "duplicate":
-		pipedSynchronizers = builder.CreatePiped(synchronizer.New, newViewDuration())
+		pipedSynchronizers = make(map[pipeline.Pipe]any)
+		for pipe := pipeline.Pipe(1); pipe <= pipeline.Pipe(opts.GetPipes()); pipe++ {
+			pipedSynchronizers[pipe] = synchronizer.New(newViewDuration())
+		}
 		break
 	case "static":
 		duration := newViewDuration()
 		pipedSynchronizers = builder.CreatePiped(synchronizer.New, duration)
 		break
 	default:
-		return nil, fmt.Errorf("unrecognized pipeline-viewduration parameter")
+		return nil, fmt.Errorf("unrecognized pipeline-viewduration parameter %s", opts.GetPipelineViewDuration())
 	}
 
 	builder.Add(
