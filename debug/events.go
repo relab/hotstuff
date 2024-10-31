@@ -5,7 +5,7 @@ import (
 	"github.com/relab/hotstuff/pipeline"
 )
 
-type SequentialPipedCommitHaltEvent struct {
+type CommitHaltEvent struct {
 	OnPipe pipeline.Pipe
 }
 

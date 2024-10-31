@@ -49,9 +49,9 @@ func (db *DebugMetrics) InitModule(mods *modules.Core, opt modules.InitOptions) 
 
 	logger.Info("DebugMetrics enabled.")
 
-	eventLoop.RegisterHandler(debug.SequentialPipedCommitHaltEvent{}, func(event any) {
-		sphe := event.(debug.SequentialPipedCommitHaltEvent)
-		db.onSequentialPipedCommitHalt(sphe)
+	eventLoop.RegisterHandler(debug.CommitHaltEvent{}, func(event any) {
+		halt := event.(debug.CommitHaltEvent)
+		db.sequentialPipedCommitHalts[halt.OnPipe]++
 	})
 
 	eventLoop.RegisterHandler(debug.CommandRejectedEvent{}, func(event any) {
@@ -64,10 +64,6 @@ func (db *DebugMetrics) InitModule(mods *modules.Core, opt modules.InitOptions) 
 	})
 }
 
-func (db *DebugMetrics) onSequentialPipedCommitHalt(event debug.SequentialPipedCommitHaltEvent) {
-	db.sequentialPipedCommitHalts[event.OnPipe]++
-}
-
 func (db *DebugMetrics) tick(_ types.TickEvent) {
 	var maxPipes pipeline.Pipe = 1
 	var startPipe pipeline.Pipe = pipeline.NullPipe
@@ -78,16 +74,11 @@ func (db *DebugMetrics) tick(_ types.TickEvent) {
 	}
 
 	for pipe := startPipe; pipe < maxPipes; pipe++ {
-		db.metricsLogger.Log(&types.SequentialPipedCommitHalts{
-			Event:  types.NewReplicaEvent(uint32(db.opts.ID()), time.Now()),
-			OnPipe: uint32(pipe),
-			Halts:  uint32(db.sequentialPipedCommitHalts[pipe]),
-		})
-
-		db.metricsLogger.Log(&types.CommandsRejected{
-			Event:    types.NewReplicaEvent(uint32(db.opts.ID()), time.Now()),
-			OnPipe:   uint32(pipe),
-			Commands: uint32(db.rejectedCommands[pipe]),
+		db.metricsLogger.Log(&types.DebugMeasurement{
+			Event:            types.NewReplicaEvent(uint32(db.opts.ID()), time.Now()),
+			OnPipe:           uint32(pipe),
+			CommitHalts:      uint32(db.sequentialPipedCommitHalts[pipe]),
+			RejectedCommands: uint32(db.rejectedCommands[pipe]),
 		})
 
 		db.sequentialPipedCommitHalts[pipe] = 0

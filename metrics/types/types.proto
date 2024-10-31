@@ -49,14 +49,9 @@ message ViewTimeouts {
   uint64 Timeouts = 3;
 }
 
-message SequentialPipedCommitHalts {
+message DebugMeasurement {
   Event Event = 1;
   uint32 OnPipe = 2;
-  uint32 Halts = 3;
-}
-
-message CommandsRejected {
-  Event Event = 1;
-  uint32 OnPipe = 2;
-  uint32 Commands = 3;
+  uint32 CommitHalts = 3;
+  uint32 RejectedCommands = 4;
 }
