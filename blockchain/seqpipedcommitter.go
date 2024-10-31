@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/debug"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -130,7 +131,6 @@ func (pc *sequentialPipedCommitter) tryExec() error {
 	canPeek := len(waitingBlocks) > 0
 	if !canPeek {
 		pc.logger.Debugf("tryExec (currentPipe: %d, currentView: %d): no block on pipe yet", pc.currentPipe, pc.currentView)
-		// pc.eventLoop.DebugEvent(debug.SequentialPipedCommitHaltEvent{OnPipe: pc.currentPipe})
 		return nil
 	}
 
@@ -151,6 +151,7 @@ func (pc *sequentialPipedCommitter) tryExec() error {
 		pc.logger.Debugf("tryExec (currentPipe: %d, currentView: %d): block in queue does not match view: {p:%d, v:%d, h:%s}",
 			pc.currentPipe, pc.currentView,
 			peekedBlock.Pipe(), peekedBlock.View(), peekedBlock.Hash().String()[:4])
+		pc.eventLoop.DebugEvent(debug.CommitHaltEvent{OnPipe: pc.currentPipe})
 	}
 
 	pc.currentPipe++

@@ -46,10 +46,9 @@ func (vm *VotingMachine) InitModule(mods *modules.Core, initOpt modules.InitOpti
 	)
 
 	vm.pipe = initOpt.ModulePipeId
-	vm.eventLoop.RegisterHandler(
-		hotstuff.VoteMsg{},
-		func(event any) { vm.OnVote(event.(hotstuff.VoteMsg)) },
-		eventloop.RespondToPipe(initOpt.ModulePipeId))
+	vm.eventLoop.RegisterHandler(hotstuff.VoteMsg{}, func(event any) {
+		vm.OnVote(event.(hotstuff.VoteMsg))
+	}, eventloop.RespondToPipe(initOpt.ModulePipeId))
 }
 
 // OnVote handles an incoming vote.
