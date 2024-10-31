@@ -88,10 +88,17 @@ func (srv *clientSrv) addCommandHashed(cmd *clientpb.Command) error {
 			srv.cmdsSentToPipe[correctPipe]++
 			srv.mut.Unlock()
 		} else {
-			srv.logger.DPanicf("addCommand: pipe not found: %d", correctPipe)
+			srv.logger.DPanicf("addCommand: pipe not found: %d. count was %d", correctPipe, srv.pipeCount)
 		}
 	} else {
-		srv.cmdCaches[pipeline.NullPipe].addCommand(cmd)
+		i := 0
+		for _, cmdCache := range srv.cmdCaches {
+			cmdCache.addCommand(cmd)
+			i++
+		}
+		if i > 1 {
+			panic("too many caches")
+		}
 	}
 
 	return nil

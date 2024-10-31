@@ -66,7 +66,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 		ok    bool
 	)
 
-	if false { //!vote.Deferred {
+	if !vote.Deferred {
 		// first, try to get the block from the local cache
 		block, ok = vm.blockChain.LocalGet(cert.BlockHash())
 		if !ok {
@@ -74,7 +74,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 			// hopefully, the block has arrived by then.
 			vm.logger.Debugf("Local cache miss for block [pipe=%d]: %.8s", vm.pipe, cert.BlockHash())
 			vote.Deferred = true
-			vm.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, vote)
+			vm.eventLoop.DelayPiped(vm.pipe, hotstuff.ProposeMsg{}, vote)
 			return
 		}
 	} else {
