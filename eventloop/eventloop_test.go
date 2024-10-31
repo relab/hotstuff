@@ -59,6 +59,10 @@ func TestHandlerPiped(t *testing.T) {
 		panic("wrong pipe id")
 	}, eventloop.RespondToPipe(incorrectPipeId))
 
+	el.RegisterHandler(testEvent(0), func(_ any) {
+		panic("unpiped handler should not respond")
+	})
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	go el.Run(ctx)
@@ -168,6 +172,46 @@ func TestTicker(t *testing.T) {
 
 	if old != count {
 		t.Fatal("ticker was not stopped")
+	}
+}
+
+func TestDelayedEventPiped(t *testing.T) {
+	listeningPipeId := pipeline.Pipe(1)
+	incorrectPipeId := pipeline.Pipe(2)
+	el := eventloop.New(10)
+	c := make(chan testEvent)
+
+	el.RegisterHandler(testEvent(0), func(event any) {
+		c <- event.(testEvent)
+	}, eventloop.RespondToPipe(listeningPipeId))
+
+	el.RegisterHandler(testEvent(0), func(_ any) {
+		panic("wrong pipe id")
+	}, eventloop.RespondToPipe(incorrectPipeId))
+
+	el.RegisterHandler(testEvent(0), func(_ any) {
+		panic("unpiped handler should not respond")
+	})
+
+	// delay the "2" and "3" events until after the first instance of testEvent
+	el.DelayPiped(listeningPipeId, testEvent(0), testEvent(2))
+	el.DelayPiped(listeningPipeId, testEvent(0), testEvent(3))
+	// then send the "1" event
+	el.PipeEvent(listeningPipeId, testEvent(1))
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go el.Run(ctx)
+
+	for i := 1; i <= 3; i++ {
+		select {
+		case event := <-c:
+			if testEvent(i) != event {
+				t.Errorf("events arrived in the wrong order: want: %d, got: %d", i, event)
+			}
+		case <-ctx.Done():
+			t.Fatalf("timed out")
+		}
 	}
 }
 

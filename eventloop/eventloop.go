@@ -276,16 +276,10 @@ func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
 	// We use a pool to reduce memory allocations.
 	priorityList := handlerListPool.Get()
 	handlerList := handlerListPool.Get()
-	pipedList := handlerListPool.Get()
 
 	el.mut.Lock()
 	for _, handler := range el.handlers[t] {
 		if handler.opts.runInAddEvent != runningInAddEvent || handler.callback == nil {
-			continue
-		}
-
-		if handler.opts.pipeId != pipeline.NullPipe {
-			pipedList = append(pipedList, handler)
 			continue
 		}
 
@@ -298,6 +292,9 @@ func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
 	el.mut.Unlock()
 
 	for _, handler := range priorityList {
+		if handler.opts.pipeId != pipe {
+			continue
+		}
 		handler.callback(event)
 	}
 
@@ -305,21 +302,14 @@ func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
 	handlerListPool.Put(priorityList)
 
 	for _, handler := range handlerList {
-		handler.callback(event)
-	}
-
-	handlerList = handlerList[:0]
-	handlerListPool.Put(handlerList)
-
-	for _, handler := range pipedList {
 		if handler.opts.pipeId != pipe {
 			continue
 		}
 		handler.callback(event)
 	}
 
-	pipedList = pipedList[:0]
-	handlerListPool.Put(pipedList)
+	handlerList = handlerList[:0]
+	handlerListPool.Put(handlerList)
 }
 
 func (el *EventLoop) dispatchDelayedEvents(t reflect.Type) {

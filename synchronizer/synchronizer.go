@@ -377,7 +377,7 @@ func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
 
 	if newBlock.View() > s.highQC.View() {
 		s.highQC = qc
-		s.logger.Debug("HighQC updated")
+		s.logger.Debugf("[pipe=%d] HighQC updated", s.pipe)
 	}
 }
 
