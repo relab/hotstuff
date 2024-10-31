@@ -170,12 +170,9 @@ func (el *EventLoop) DebugEvent(event any) {
 // PipeEvent adds an event to a specified pipeline.
 func (el *EventLoop) PipeEvent(pipeId pipeline.Pipe, event any) {
 	if !pipeline.ValidPipe(pipeId) {
-		// TODO (Alan): Verify if panicking is better or not.
-		// panic("pipe id is not valid")
 		el.AddEvent(event)
 		return
 	}
-
 	wrapper := pipedEventWrapper{
 		pipeId: pipeId,
 		event:  event,
@@ -252,20 +249,26 @@ func (el *EventLoop) Tick(ctx context.Context) bool {
 	return true
 }
 
+func (el *EventLoop) unwrapPipedEvent(possiblyPipedEvent any) (any, pipeline.Pipe) {
+	pipe := pipeline.NullPipe
+	event := possiblyPipedEvent
+	_, isEventPiped := possiblyPipedEvent.(pipedEventWrapper)
+	if isEventPiped {
+		pipedEvent := possiblyPipedEvent.(pipedEventWrapper)
+		pipe = pipedEvent.pipeId
+		// Reassign event to its original form after extracting its pipe
+		event = pipedEvent.event
+	}
+
+	return event, pipe
+}
+
 var handlerListPool = gpool.New(func() []handler { return make([]handler, 0, 10) })
 
 // processEvent dispatches the event to the correct handler.
 func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
-	pipe := pipeline.NullPipe
-	_, isEventPiped := event.(pipedEventWrapper)
-	if isEventPiped {
-		pipedEvent := event.(pipedEventWrapper)
-		pipe = pipedEvent.pipeId
-		// Reassign event to its original form after extracting its pipeId
-		event = pipedEvent.event
-	}
-
-	t := reflect.TypeOf(event)
+	unwrappedEvent, pipe := el.unwrapPipedEvent(event)
+	t := reflect.TypeOf(unwrappedEvent)
 
 	if !runningInAddEvent {
 		defer el.dispatchDelayedEvents(t)
@@ -295,7 +298,7 @@ func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
 		if handler.opts.pipeId != pipe {
 			continue
 		}
-		handler.callback(event)
+		handler.callback(unwrappedEvent)
 	}
 
 	priorityList = priorityList[:0]
@@ -305,7 +308,7 @@ func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
 		if handler.opts.pipeId != pipe {
 			continue
 		}
-		handler.callback(event)
+		handler.callback(unwrappedEvent)
 	}
 
 	handlerList = handlerList[:0]
