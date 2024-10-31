@@ -11,7 +11,7 @@ func NewFixedDuration() ViewDuration {
 
 // Duration returns the duration that the next view should last.
 func (_ *fixedViewDuration) Duration() time.Duration {
-	return 80 * time.Millisecond
+	return 30 * time.Millisecond
 }
 
 // ViewStarted is called by the synchronizer when starting a new view.

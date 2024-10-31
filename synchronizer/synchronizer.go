@@ -62,13 +62,10 @@ func (s *Synchronizer) InitModule(mods *modules.Core, initOpt modules.InitOption
 
 	s.eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
 		timeout := event.(TimeoutEvent)
-		if timeout.Pipe != s.pipe {
-			return
-		}
 		if s.View() == timeout.View {
 			s.OnLocalTimeout()
 		}
-	})
+	}, eventloop.RespondToPipe(initOpt.ModulePipeId))
 
 	s.eventLoop.RegisterHandler(hotstuff.NewViewMsg{}, func(event any) {
 		newViewMsg := event.(hotstuff.NewViewMsg)
