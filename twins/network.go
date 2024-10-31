@@ -143,7 +143,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 		}
 
 		builder.Add(
-			eventloop.New(100),
+			eventloop.NewPiped(100, 0),
 			blockchain.New(),
 			blockchain.NewBasicCommitter(),
 			consensus.New(),

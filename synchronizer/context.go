@@ -22,7 +22,7 @@ func ViewContext(parent context.Context, eventLoop *eventloop.EventLoop, view *h
 	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent())
 
 	return ctx, func() {
-		eventLoop.UnregisterHandler(ViewChangeEvent{}, id)
+		eventLoop.UnregisterHandler(ViewChangeEvent{}, pipeline.NullPipe, id)
 		cancel()
 	}
 }
@@ -37,7 +37,7 @@ func TimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop) (con
 	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent())
 
 	return ctx, func() {
-		eventLoop.UnregisterHandler(TimeoutEvent{}, id)
+		eventLoop.UnregisterHandler(TimeoutEvent{}, pipeline.NullPipe, id)
 		cancel()
 	}
 }
@@ -64,7 +64,7 @@ func PipedViewContext(parent context.Context, eventLoop *eventloop.EventLoop, pi
 	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToPipe(pipe))
 
 	return ctx, func() {
-		eventLoop.UnregisterHandler(ViewChangeEvent{}, id)
+		eventLoop.UnregisterHandler(ViewChangeEvent{}, pipe, id)
 		cancel()
 	}
 }
@@ -89,7 +89,7 @@ func PipedTimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop,
 	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToPipe(pipe))
 
 	return ctx, func() {
-		eventLoop.UnregisterHandler(TimeoutEvent{}, id)
+		eventLoop.UnregisterHandler(TimeoutEvent{}, pipe, id)
 		cancel()
 	}
 }

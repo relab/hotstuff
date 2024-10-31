@@ -227,7 +227,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	pipedSynchronizers := builder.CreatePiped(synchronizer.New, newViewDuration())
 
 	builder.Add(
-		eventloop.New(1000),
+		eventloop.NewPiped(1000, int(opts.GetPipes())),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		w.metricsLogger,
 		blockchain.New(),
@@ -342,7 +342,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
 		mods := modules.NewBuilder(hotstuff.ID(opts.GetID()), nil)
-		mods.Add(eventloop.New(1000))
+		mods.Add(eventloop.NewPiped(1000, 0))
 
 		if w.measurementInterval > 0 {
 			clientMetrics := metrics.GetClientMetrics(w.metrics...)

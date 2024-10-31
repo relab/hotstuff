@@ -13,7 +13,7 @@ import (
 type testEvent int
 
 func TestHandler(t *testing.T) {
-	el := eventloop.New(10)
+	el := eventloop.NewPiped(10, 0)
 	c := make(chan any)
 	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- event
@@ -49,7 +49,8 @@ func TestHandler(t *testing.T) {
 func TestHandlerPiped(t *testing.T) {
 	listeningPipeId := pipeline.Pipe(1)
 	incorrectPipeId := pipeline.Pipe(2)
-	el := eventloop.New(10)
+	pipeCount := 1
+	el := eventloop.NewPiped(10, pipeCount)
 	c := make(chan any)
 	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- event
@@ -96,7 +97,7 @@ func TestObserver(t *testing.T) {
 		handler bool
 	}
 
-	el := eventloop.New(10)
+	el := eventloop.NewPiped(10, 0)
 	c := make(chan eventData)
 	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- eventData{event: event, handler: true}
@@ -145,7 +146,7 @@ func TestTicker(t *testing.T) {
 		return
 	}
 
-	el := eventloop.New(10)
+	el := eventloop.NewPiped(10, 0)
 	count := 0
 	el.RegisterHandler(testEvent(0), func(event any) {
 		count += int(event.(testEvent))
@@ -176,9 +177,10 @@ func TestTicker(t *testing.T) {
 }
 
 func TestDelayedEventPiped(t *testing.T) {
+	pipeCount := 1
 	listeningPipeId := pipeline.Pipe(1)
 	incorrectPipeId := pipeline.Pipe(2)
-	el := eventloop.New(10)
+	el := eventloop.NewPiped(10, pipeCount)
 	c := make(chan testEvent)
 
 	el.RegisterHandler(testEvent(0), func(event any) {
@@ -216,7 +218,7 @@ func TestDelayedEventPiped(t *testing.T) {
 }
 
 func TestDelayedEvent(t *testing.T) {
-	el := eventloop.New(10)
+	el := eventloop.NewPiped(10, 0)
 	c := make(chan testEvent)
 
 	el.RegisterHandler(testEvent(0), func(event any) {
@@ -246,7 +248,7 @@ func TestDelayedEvent(t *testing.T) {
 }
 
 func BenchmarkEventLoopWithObservers(b *testing.B) {
-	el := eventloop.New(100)
+	el := eventloop.NewPiped(100, 0)
 
 	for i := 0; i < 100; i++ {
 		el.RegisterObserver(testEvent(0), func(event any) {
@@ -263,7 +265,7 @@ func BenchmarkEventLoopWithObservers(b *testing.B) {
 }
 
 func BenchmarkEventLoopWithUnsafeRunInAddEventHandlers(b *testing.B) {
-	el := eventloop.New(100)
+	el := eventloop.NewPiped(100, 0)
 
 	for i := 0; i < 100; i++ {
 		el.RegisterHandler(testEvent(0), func(event any) {
@@ -288,7 +290,7 @@ func BenchmarkEventLoopWithUnsafeRunInAddEventHandlers(b *testing.B) {
 }
 
 func BenchmarkDelay(b *testing.B) {
-	el := eventloop.New(100)
+	el := eventloop.NewPiped(100, 0)
 
 	for i := 0; i < b.N; i++ {
 		el.DelayUntil(testEvent(0), testEvent(2))

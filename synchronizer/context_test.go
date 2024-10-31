@@ -11,7 +11,7 @@ import (
 
 // TestTimeoutContext tests that a timeout context is canceled after receiving a timeout event.
 func TestTimeoutContext(t *testing.T) {
-	eventloop := eventloop.New(10)
+	eventloop := eventloop.NewPiped(10)
 	ctx, cancel := synchronizer.TimeoutContext(context.Background(), eventloop)
 	defer cancel()
 
@@ -24,7 +24,7 @@ func TestTimeoutContext(t *testing.T) {
 
 // TestTimeoutContextView tests that a timeout context is canceled after receiving a view change event.
 func TestTimeoutContextView(t *testing.T) {
-	eventloop := eventloop.New(10)
+	eventloop := eventloop.NewPiped(10)
 	ctx, cancel := synchronizer.TimeoutContext(context.Background(), eventloop)
 	defer cancel()
 
@@ -37,7 +37,7 @@ func TestTimeoutContextView(t *testing.T) {
 
 // TestViewContext tests that a view context is canceled after receiving a view change event.
 func TestViewContext(t *testing.T) {
-	eventloop := eventloop.New(10)
+	eventloop := eventloop.NewPiped(10)
 	ctx, cancel := synchronizer.ViewContext(context.Background(), eventloop, nil)
 	defer cancel()
 
@@ -50,7 +50,7 @@ func TestViewContext(t *testing.T) {
 
 // TestViewContextEarlierView tests that a view context is not canceled when receiving a view change event for an earlier view.
 func TestViewContextEarlierView(t *testing.T) {
-	eventloop := eventloop.New(10)
+	eventloop := eventloop.NewPiped(10)
 	view := hotstuff.View(1)
 	ctx, cancel := synchronizer.ViewContext(context.Background(), eventloop, &view)
 	defer cancel()
