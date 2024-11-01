@@ -241,13 +241,13 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo(cs.pipe).WithQC(block.QuorumCert()))
 
 	if block.View() <= cs.lastVote {
-		cs.logger.Info(fmt.Sprintf("OnPropose[pipe=%d]: block view too old for %8.s -> %.8x (diff=%d)", cs.pipe, block.Hash(), block.Command(), cs.lastVote-block.View()))
+		cs.logger.Info(fmt.Sprintf("OnPropose[pipe=%d, view=%d]: block view too old for %.8s -> %.8x (diff=%d)", cs.pipe, cs.synchronizer.View(), block.Hash(), block.Command(), cs.lastVote-block.View()))
 		return
 	}
 
 	pc, err := cs.crypto.CreatePartialCert(block)
 	if err != nil {
-		cs.logger.Errorf("OnPropose[pipe=%d]: failed to sign block: ", err)
+		cs.logger.Errorf("OnPropose[pipe=%d, view=%d]: failed to sign block: ", cs.pipe, cs.synchronizer.View(), err)
 		return
 	}
 
