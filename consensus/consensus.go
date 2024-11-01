@@ -106,6 +106,7 @@ func (cs *consensusBase) CommittedBlock() *hotstuff.Block {
 // StopVoting ensures that no voting happens in a view earlier than `view`.
 func (cs *consensusBase) StopVoting(view hotstuff.View) {
 	if cs.lastVote < view {
+		cs.logger.Debugf("stopped voting on view %d and changed view to %d", cs.lastVote, view)
 		cs.lastVote = view
 	}
 }
@@ -172,7 +173,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 
 func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocyclo
 	// TODO: extract parts of this method into helper functions maybe?
-	cs.logger.Debugf("OnPropose[pipe=%d]: %v", cs.pipe, proposal.Block)
+	cs.logger.Debugf("OnPropose[pipe=%d]: %.8s -> %.8x", cs.pipe, proposal.Block.Hash(), proposal.Block.Command())
 	if cs.pipe != proposal.PipeId {
 		panic("OnPropose: incorrect pipe")
 	}
@@ -215,9 +216,8 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	}
 
 	cmd := block.Command()
-	bytes := []byte(cmd[len(cmd)-2:])
 	if !cs.acceptor.Accept(cmd) {
-		cs.logger.Infof("OnPropose[pipe=%d]: command rejected: %x", cs.pipe, bytes)
+		cs.logger.Infof("OnPropose[pipe=%d]: block rejected: %.8s -> %.8x", cs.pipe, block.Hash(), block.Command())
 		cs.eventLoop.DebugEvent(debug.CommandRejectedEvent{OnPipe: cs.pipe, View: cs.synchronizer.View()})
 		return
 	}
@@ -229,7 +229,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	// 	cs.logger.Infof("OnPropose[pipe=%d]: Failed to fetch qcBlock", cs.pipe)
 	// }
 
-	cs.logger.Debugf("OnPropose[pipe=%d]: command accepted: %x", cs.pipe, bytes)
+	cs.logger.Debugf("OnPropose[pipe=%d]: block accepted: %.8s -> %.8x", cs.pipe, block.Hash(), block.Command())
 
 	// block is safe and was accepted
 	cs.blockChain.Store(block)
@@ -241,7 +241,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo(cs.pipe).WithQC(block.QuorumCert()))
 
 	if block.View() <= cs.lastVote {
-		cs.logger.Info(fmt.Sprintf("OnPropose[pipe=%d]: block view too old", cs.pipe))
+		cs.logger.Info(fmt.Sprintf("OnPropose[pipe=%d]: block view too old for %8.s -> %.8x (diff=%d)", cs.pipe, block.Hash(), block.Command(), cs.lastVote-block.View()))
 		return
 	}
 
