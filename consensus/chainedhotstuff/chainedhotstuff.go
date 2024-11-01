@@ -57,7 +57,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 
 	// Note that we do not call UpdateHighQC here.
 	// This is done through AdvanceView, which the Consensus implementation will call.
-	hs.logger.Debugf("PRE_COMMIT[pipe=%d]: %s", hs.pipe, block1)
+	hs.logger.Debugf("PRE_COMMIT[pipe=%d, view=%d]: %s", hs.pipe, hs.bLock.View(), block1)
 
 	block2, ok := hs.qcRef(block1.QuorumCert())
 	if !ok {
@@ -65,7 +65,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	}
 
 	if block2.View() > hs.bLock.View() {
-		hs.logger.Debugf("COMMIT[pipe=%d]: %s", hs.pipe, block2)
+		hs.logger.Debugf("COMMIT[pipe=%d, view=%d]: %s", hs.pipe, hs.bLock.View(), block2)
 		hs.bLock = block2
 	}
 
@@ -75,7 +75,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	}
 
 	if block1.Parent() == block2.Hash() && block2.Parent() == block3.Hash() {
-		hs.logger.Debugf("DECIDE[pipe=%d]: ", hs.pipe, block3)
+		hs.logger.Debugf("DECIDE[pipe=%d, view=%d]: ", hs.pipe, hs.bLock.View(), block3)
 		return block3
 	}
 

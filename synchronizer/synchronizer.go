@@ -80,11 +80,11 @@ func (s *Synchronizer) InitModule(mods *modules.Core, initOpt modules.InitOption
 	var err error
 	s.highQC, err = s.crypto.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
 	if err != nil {
-		panic(fmt.Errorf("unable to create empty quorum cert for genesis block [pipe=%d]: %v", s.pipe, err))
+		panic(fmt.Errorf("unable to create empty quorum cert for genesis block [pipe=%d, view=%d]: %v", s.pipe, s.View(), err))
 	}
 	s.highTC, err = s.crypto.CreateTimeoutCert(hotstuff.View(0), []hotstuff.TimeoutMsg{})
 	if err != nil {
-		panic(fmt.Errorf("unable to create empty timeout cert for view 0 [pipe=%d]: %v", s.pipe, err))
+		panic(fmt.Errorf("unable to create empty timeout cert for view 0 [pipe=%d, view=%d]: %v", s.pipe, s.View(), err))
 	}
 }
 
@@ -173,11 +173,11 @@ func (s *Synchronizer) OnLocalTimeout() {
 	}
 
 	s.duration.ViewTimeout() // increase the duration of the next view
-	s.logger.Debugf("OnLocalTimeout[pipe=%d]: %v", s.pipe, view)
+	s.logger.Debugf("OnLocalTimeout[pipe=%d, view=%d]", s.pipe, view)
 
 	sig, err := s.crypto.Sign(view.ToBytes())
 	if err != nil {
-		s.logger.Warnf("Failed to sign view [pipe=%d]: %v", s.pipe, err)
+		s.logger.Warnf("Failed to sign view [pipe=%d, view=%d]: %v", s.pipe, s.View(), err)
 		return
 	}
 	timeoutMsg := hotstuff.TimeoutMsg{
@@ -192,7 +192,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 		// generate a second signature that will become part of the aggregateQC
 		sig, err := s.crypto.Sign(timeoutMsg.ToBytes())
 		if err != nil {
-			s.logger.Warnf("Failed to sign timeout message [pipe=%d]: %v", s.pipe, err)
+			s.logger.Warnf("Failed to sign timeout message [pipe=%d, view=%d]: %v", s.pipe, s.View(), err)
 			return
 		}
 		timeoutMsg.MsgSignature = sig
@@ -226,7 +226,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	if !verifier.Verify(timeout.ViewSignature, timeout.View.ToBytes()) {
 		return
 	}
-	s.logger.Debugf("OnRemoteTimeout [pipe=%d]: ", s.pipe, timeout)
+	s.logger.Debugf("OnRemoteTimeout [pipe=%d, view=%d]: ", s.pipe, s.View(), timeout)
 
 	s.AdvanceView(timeout.SyncInfo)
 
@@ -253,7 +253,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 
 	tc, err := s.crypto.CreateTimeoutCert(timeout.View, timeoutList)
 	if err != nil {
-		s.logger.Debugf("Failed to create timeout certificate [pipe=%d]: %v", s.pipe, err)
+		s.logger.Debugf("Failed to create timeout certificate [pipe=%d, view=%d]: %v", s.pipe, s.View(), err)
 		return
 	}
 
@@ -262,7 +262,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	if s.opts.ShouldUseAggQC() {
 		aggQC, err := s.crypto.CreateAggregateQC(currView, timeoutList)
 		if err != nil {
-			s.logger.Debugf("Failed to create aggregateQC [pipe=%d]: %v", s.pipe, err)
+			s.logger.Debugf("Failed to create aggregateQC [pipe=%d, view=%d]: %v", s.pipe, s.View(), err)
 		} else {
 			si = si.WithAggQC(aggQC)
 		}
@@ -291,7 +291,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	// check for a TC
 	if tc, ok := syncInfo.TC(); ok {
 		if !s.crypto.VerifyTimeoutCert(tc) {
-			s.logger.Infof("Timeout Certificate could not be verified! [pipe=%d]", s.pipe)
+			s.logger.Infof("Timeout Certificate could not be verified! [pipe=%d, view=%d]", s.pipe, s.View())
 			return
 		}
 		s.updateHighTC(tc)
@@ -309,7 +309,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.opts.ShouldUseAggQC() {
 		highQC, ok := s.crypto.VerifyAggregateQC(aggQC)
 		if !ok {
-			s.logger.Infof("Aggregated Quorum Certificate could not be verified [pipe=%d]", s.pipe)
+			s.logger.Infof("Aggregated Quorum Certificate could not be verified [pipe=%d, view=%d]", s.pipe, s.View())
 			return
 		}
 		if aggQC.View() >= v {
@@ -377,7 +377,7 @@ func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
 
 	if newBlock.View() > s.highQC.View() {
 		s.highQC = qc
-		s.logger.Debugf("[pipe=%d] HighQC updated", s.pipe)
+		s.logger.Debugf("[pipe=%d, view=%d] HighQC updated", s.pipe, s.View())
 	}
 }
 
