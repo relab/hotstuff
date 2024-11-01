@@ -271,6 +271,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
+	cs.logger.Debugf("OnPropose[pipe=%d, view=%d]: voting for %.8s -> %.8x", cs.pipe, cs.synchronizer.View(), block.Hash(), block.Command())
 	leader.Vote(pc)
 }
 
