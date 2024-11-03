@@ -35,6 +35,7 @@ type clientSrv struct {
 	pipeCount       int
 	cmdsSentToPipe  map[pipeline.Pipe]int
 	cmdAddMethodStr string
+	marshaler       proto.MarshalOptions
 }
 
 // newClientServer returns a new client server.
@@ -48,6 +49,7 @@ func newClientServer(cmdCaches map[pipeline.Pipe]*cmdCache, cmdAddMethodStr stri
 		hash:            sha256.New(),
 		cmdsSentToPipe:  make(map[pipeline.Pipe]int),
 		cmdAddMethodStr: cmdAddMethodStr,
+		marshaler:       proto.MarshalOptions{Deterministic: true},
 	}
 
 	clientpb.RegisterClientServer(srv.srv, srv)
@@ -72,7 +74,7 @@ func (srv *clientSrv) addCommandToSmallestCache(cmd *clientpb.Command) {
 
 func (srv *clientSrv) addCommandHashed(cmd *clientpb.Command) error {
 	if srv.pipeCount > 1 {
-		asBytes, err := proto.Marshal(cmd)
+		asBytes, err := srv.marshaler.Marshal(cmd)
 		if err != nil {
 			return err
 		}
