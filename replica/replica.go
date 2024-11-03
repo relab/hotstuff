@@ -169,7 +169,7 @@ func (srv *Replica) Run(ctx context.Context) {
 	srv.hs.Get(&eventLoop)
 
 	if srv.hs.PipeCount() > 0 {
-		for _, pipe := range srv.hs.Pipes() {
+		for pipe := pipeline.Pipe(1); pipe <= pipeline.Pipe(srv.hs.PipeCount()); pipe++ {
 			var synchronizer modules.Synchronizer
 			srv.hs.MatchForPipe(pipe, &synchronizer)
 			synchronizer.Start(ctx)
