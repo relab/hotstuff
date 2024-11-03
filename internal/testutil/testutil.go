@@ -36,7 +36,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 	acceptor.EXPECT().Proposed(gomock.Any()).AnyTimes()
 
 	executor := mocks.NewMockExecutor(ctrl)
-	executor.EXPECT().Exec(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes()
+	executor.EXPECT().Exec(0, gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes()
 
 	forkHandler := mocks.NewMockForkHandler(ctrl)
 
@@ -54,7 +54,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 	synchronizer.EXPECT().ViewContext().AnyTimes().Return(context.Background())
 
 	builder.Add(
-		eventloop.NewPiped(100),
+		eventloop.NewPiped(100, 0),
 		logging.New(fmt.Sprintf("hs%d", id)),
 		blockchain.New(),
 		blockchain.NewBasicCommitter(),
@@ -80,7 +80,7 @@ func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ h
 	acceptor.EXPECT().Proposed(gomock.Any()).AnyTimes()
 
 	executor := mocks.NewMockExecutor(ctrl)
-	executor.EXPECT().Exec(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes()
+	executor.EXPECT().Exec(0, gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes()
 
 	forkHandler := mocks.NewMockForkHandler(ctrl)
 
@@ -105,7 +105,7 @@ func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ h
 	// })
 
 	builder.Add(
-		eventloop.NewPiped(100),
+		eventloop.NewPiped(100, 0),
 		logging.New(fmt.Sprintf("hs%d", id)),
 		blockchain.New(),
 		blockchain.NewBasicCommitter(),

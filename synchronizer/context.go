@@ -2,6 +2,7 @@ package synchronizer
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/eventloop"
@@ -56,7 +57,7 @@ func PipedViewContext(parent context.Context, eventLoop *eventloop.EventLoop, pi
 		myPipe := pipe
 		viewChangeEvent := event.(ViewChangeEvent)
 		if viewChangeEvent.Pipe != myPipe {
-			panic("something is wrong")
+			panic(fmt.Sprintf("incorrect pipes: want=%d, got=%d", myPipe, viewChangeEvent.Pipe))
 		}
 		if view == nil || viewChangeEvent.View >= *view {
 			cancel()
@@ -83,7 +84,7 @@ func PipedTimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop,
 		myPipe := pipe
 		timeoutEvent := event.(TimeoutEvent)
 		if timeoutEvent.Pipe != myPipe {
-			panic("something is wrong")
+			panic(fmt.Sprintf("incorrect pipes: want=%d, got=%d", myPipe, timeoutEvent.Pipe))
 		}
 		cancel()
 	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToPipe(pipe))
