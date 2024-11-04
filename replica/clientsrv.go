@@ -3,7 +3,6 @@ package replica
 import (
 	"crypto/sha256"
 	"hash"
-	"hash/fnv"
 	"net"
 	"sync"
 
@@ -72,15 +71,7 @@ func (srv *clientSrv) addCommandToSmallestCache(cmd *clientpb.Command) {
 }
 
 func (srv *clientSrv) addCommandHashed(cmd *clientpb.Command) error {
-	asBytes, err := srv.marshaler.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-	h := fnv.New32a()
-	h.Write(asBytes)
-	hSum := h.Sum32()
-
-	correctPipe := pipeline.Pipe((hSum % uint32(srv.pipeCount)) + 1)
+	correctPipe := pipeline.Pipe((uint32(cmd.SequenceNumber) % uint32(srv.pipeCount)) + 1)
 	cache, ok := srv.cmdCaches[correctPipe]
 	if ok {
 		cache.addCommand(cmd)
