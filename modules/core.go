@@ -255,8 +255,6 @@ func (mods *Core) tryGetFromPipe(moduleInPipe Module, ptr any) bool {
 }
 
 // MatchForPipe assigns ptr to a matching module in the pipe with pipeId.
-// This is mainly a helper function for the application entry point or tests
-// and should not be used in InitModule.
 func (core *Core) MatchForPipe(pipeId pipeline.Pipe, ptr any) {
 	if len(core.pipedModules) == 0 {
 		panic("pipelining is not enabled")

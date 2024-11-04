@@ -73,13 +73,9 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		))
 	}
 
-	cmdCachePipe := builder.CreatePiped(newCmdCache, int(conf.BatchSize))
-	cmdCaches := make(map[pipeline.Pipe]*cmdCache)
-	for pipe := range cmdCachePipe {
-		cmdCaches[pipe] = cmdCachePipe[pipe].(*cmdCache)
-	}
+	cmdCaches := builder.CreatePiped(newCmdCache, int(conf.BatchSize))
 
-	clientSrv := newClientServer(cmdCaches, "hashed", clientSrvOpts)
+	clientSrv := newClientServer("hashed", clientSrvOpts)
 
 	srv := &Replica{
 		clientSrv:    clientSrv,
@@ -122,7 +118,7 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		modules.ExtendedForkHandler(srv.clientSrv),
 	)
 	builder.AddPiped(
-		cmdCachePipe,
+		cmdCaches,
 	)
 	srv.hs = builder.Build()
 
