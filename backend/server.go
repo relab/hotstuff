@@ -70,6 +70,7 @@ func (srv *Server) induceLatency(sender hotstuff.ID) {
 	}
 	senderLocation := srv.locationInfo[sender]
 	senderLatency := srv.latencyMatrix[senderLocation]
+	srv.logger.Infof("server latency: %d", senderLatency)
 	srv.logger.Debugf("latency from server %s to server %s is %s\n", srv.location, senderLocation, senderLatency)
 	timer1 := time.NewTimer(senderLatency)
 	<-timer1.C
