@@ -16,6 +16,7 @@ import (
 	"github.com/relab/hotstuff/backend"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -49,6 +50,8 @@ type Config struct {
 	LocationInfo map[hotstuff.ID]string
 	// Number of pipes in pipelining mode
 	PipeCount uint32
+	// Latency induced by all replicas.
+	HackyLatency durationpb.Duration
 }
 
 // Replica is a participant in the consensus protocol.
@@ -99,6 +102,8 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		backend.WithLatencyInfo(conf.ID, conf.LocationInfo),
 		backend.WithGorumsServerOptions(replicaSrvOpts...),
 	)
+
+	srv.hsSrv.SetHackyLatency(conf.HackyLatency.AsDuration())
 
 	var creds credentials.TransportCredentials
 	managerOpts := conf.ManagerOptions
@@ -156,7 +161,7 @@ func (srv *Replica) Stop() {
 	srv.cancel()
 	<-srv.done
 	srv.Close()
-	srv.clientSrv.PrintCmdResult()
+	srv.clientSrv.PrintPipedCmdResult()
 }
 
 // Run runs the replica until the context is canceled.

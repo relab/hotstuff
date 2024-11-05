@@ -146,7 +146,10 @@ func (srv *clientSrv) Stop() {
 	srv.srv.Stop()
 }
 
-func (srv *clientSrv) PrintCmdResult() {
+func (srv *clientSrv) PrintPipedCmdResult() {
+	if srv.pipeCount <= 1 {
+		return
+	}
 	srv.logger.Info("Command count per pipe results:")
 	for pipe, count := range srv.cmdsSentToPipe {
 		srv.logger.Infof("\tP%d=(%d)", pipe, count)

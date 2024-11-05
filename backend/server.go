@@ -32,6 +32,7 @@ type Server struct {
 	location      string
 	locationInfo  map[hotstuff.ID]string
 	latencyMatrix map[string]time.Duration
+	hackyLatency  time.Duration
 	gorumsSrv     *gorums.Server
 }
 
@@ -70,7 +71,19 @@ func (srv *Server) induceLatency(sender hotstuff.ID) {
 	}
 	senderLocation := srv.locationInfo[sender]
 	senderLatency := srv.latencyMatrix[senderLocation]
-	srv.logger.Infof("server latency: %d", senderLatency)
+	srv.logger.Debugf("latency from server %s to server %s is %s\n", srv.location, senderLocation, senderLatency)
+	timer1 := time.NewTimer(senderLatency)
+	<-timer1.C
+}
+
+func (srv *Server) SetHackyLatency(amount time.Duration) {
+	srv.hackyLatency = amount
+}
+
+// Alan: Hacky version of induceLatency which just blocks execution for an arbitrary time.
+func (srv *Server) induceLatencyHacky(sender hotstuff.ID) {
+	senderLocation := srv.locationInfo[sender]
+	senderLatency := srv.hackyLatency
 	srv.logger.Debugf("latency from server %s to server %s is %s\n", srv.location, senderLocation, senderLatency)
 	timer1 := time.NewTimer(senderLatency)
 	<-timer1.C
@@ -164,7 +177,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposal.Block.Proposer = uint32(id)
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
-	impl.srv.induceLatency(id)
+	impl.srv.induceLatencyHacky(id)
 
 	if pipeline.ValidPipe(proposeMsg.PipeId) {
 		impl.srv.eventLoop.PipeEvent(proposeMsg.PipeId, proposeMsg)
@@ -182,7 +195,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
-	impl.srv.induceLatency(id)
+	impl.srv.induceLatencyHacky(id)
 
 	pipe := pipeline.Pipe(cert.PipeId)
 	if pipeline.ValidPipe(pipe) {
@@ -206,7 +219,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
-	impl.srv.induceLatency(id)
+	impl.srv.induceLatencyHacky(id)
 
 	pipe := pipeline.Pipe(msg.PipeId)
 	if pipeline.ValidPipe(pipe) {
@@ -247,7 +260,7 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 		impl.srv.logger.Infof("Could not get ID of replica: %v", err)
 	}
 
-	impl.srv.induceLatency(timeoutMsg.ID)
+	impl.srv.induceLatencyHacky(timeoutMsg.ID)
 	if pipeline.ValidPipe(timeoutMsg.PipeId) {
 		impl.srv.eventLoop.PipeEvent(timeoutMsg.PipeId, timeoutMsg)
 		return

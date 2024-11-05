@@ -3,15 +3,16 @@ package synchronizer
 import "time"
 
 type fixedViewDuration struct {
+	duration time.Duration
 }
 
-func NewFixedDuration() ViewDuration {
-	return &fixedViewDuration{}
+func NewFixedDuration(duration time.Duration) ViewDuration {
+	return &fixedViewDuration{duration: duration}
 }
 
 // Duration returns the duration that the next view should last.
-func (_ *fixedViewDuration) Duration() time.Duration {
-	return 30 * time.Millisecond
+func (f *fixedViewDuration) Duration() time.Duration {
+	return f.duration
 }
 
 // ViewStarted is called by the synchronizer when starting a new view.
