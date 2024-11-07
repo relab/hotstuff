@@ -54,7 +54,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 	synchronizer.EXPECT().ViewContext().AnyTimes().Return(context.Background())
 
 	builder.Add(
-		eventloop.NewPiped(100),
+		eventloop.NewPiped(100, 0),
 		logging.New(fmt.Sprintf("hs%d", id)),
 		blockchain.New(),
 		blockchain.NewBasicCommitter(),
