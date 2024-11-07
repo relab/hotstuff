@@ -6,6 +6,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/eventloop"
+	"github.com/relab/hotstuff/pipeline"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -56,6 +57,59 @@ func TestViewContextEarlierView(t *testing.T) {
 	defer cancel()
 
 	eventloop.AddEvent(synchronizer.ViewChangeEvent{View: 0})
+
+	if ctx.Err() != nil {
+		t.Error("Context canceled")
+	}
+}
+
+// TestTimeoutContext tests that a timeout context is canceled after receiving a timeout event.
+func TestTimeoutContextPiped(t *testing.T) {
+	eventloop := eventloop.NewPiped(10, 1)
+	ctx, cancel := synchronizer.PipedTimeoutContext(context.Background(), eventloop, pipeline.Pipe(1))
+	defer cancel()
+
+	eventloop.PipeEvent(pipeline.Pipe(1), synchronizer.TimeoutEvent{Pipe: 1})
+
+	if ctx.Err() != context.Canceled {
+		t.Error("Context not canceled")
+	}
+}
+
+// TestTimeoutContextView tests that a timeout context is canceled after receiving a view change event.
+func TestTimeoutContextViewPiped(t *testing.T) {
+	eventloop := eventloop.NewPiped(10, 1)
+	ctx, cancel := synchronizer.PipedTimeoutContext(context.Background(), eventloop, pipeline.Pipe(1))
+	defer cancel()
+
+	eventloop.PipeEvent(pipeline.Pipe(1), synchronizer.ViewChangeEvent{View: 1, Pipe: 1})
+
+	if ctx.Err() != context.Canceled {
+		t.Error("Context not canceled")
+	}
+}
+
+// TestViewContext tests that a view context is canceled after receiving a view change event.
+func TestViewContextPiped(t *testing.T) {
+	eventloop := eventloop.NewPiped(10, 1)
+	ctx, cancel := synchronizer.PipedViewContext(context.Background(), eventloop, pipeline.Pipe(1), nil)
+	defer cancel()
+
+	eventloop.PipeEvent(pipeline.Pipe(1), synchronizer.ViewChangeEvent{View: 1, Pipe: 1})
+
+	if ctx.Err() != context.Canceled {
+		t.Error("Context not canceled")
+	}
+}
+
+// TestViewContextEarlierView tests that a view context is not canceled when receiving a view change event for an earlier view.
+func TestViewContextEarlierViewPiped(t *testing.T) {
+	eventloop := eventloop.NewPiped(10, 1)
+	view := hotstuff.View(1)
+	ctx, cancel := synchronizer.PipedViewContext(context.Background(), eventloop, pipeline.Pipe(1), &view)
+	defer cancel()
+
+	eventloop.PipeEvent(pipeline.Pipe(1), synchronizer.ViewChangeEvent{View: 0, Pipe: 1})
 
 	if ctx.Err() != nil {
 		t.Error("Context canceled")

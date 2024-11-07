@@ -16,6 +16,7 @@ import (
 	"github.com/relab/hotstuff/backend"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -49,6 +50,8 @@ type Config struct {
 	LocationInfo map[hotstuff.ID]string
 	// Number of pipes in pipelining mode
 	PipeCount uint32
+	// Latency induced by all replicas.
+	HackyLatency durationpb.Duration
 }
 
 // Replica is a participant in the consensus protocol.
@@ -73,13 +76,9 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		))
 	}
 
-	cmdCachePipe := builder.CreatePiped(newCmdCache, int(conf.BatchSize))
-	cmdCaches := make(map[pipeline.Pipe]*cmdCache)
-	for pipe := range cmdCachePipe {
-		cmdCaches[pipe] = cmdCachePipe[pipe].(*cmdCache)
-	}
+	cmdCaches := builder.CreatePiped(newCmdCache, int(conf.BatchSize))
 
-	clientSrv := newClientServer(cmdCaches, "hashed", clientSrvOpts)
+	clientSrv := newClientServer("hashed", clientSrvOpts)
 
 	srv := &Replica{
 		clientSrv:    clientSrv,
@@ -104,6 +103,8 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		backend.WithGorumsServerOptions(replicaSrvOpts...),
 	)
 
+	srv.hsSrv.SetHackyLatency(conf.HackyLatency.AsDuration())
+
 	var creds credentials.TransportCredentials
 	managerOpts := conf.ManagerOptions
 	if conf.TLS {
@@ -122,7 +123,7 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		modules.ExtendedForkHandler(srv.clientSrv),
 	)
 	builder.AddPiped(
-		cmdCachePipe,
+		cmdCaches,
 	)
 	srv.hs = builder.Build()
 
@@ -160,7 +161,7 @@ func (srv *Replica) Stop() {
 	srv.cancel()
 	<-srv.done
 	srv.Close()
-	srv.clientSrv.PrintCmdResult()
+	srv.clientSrv.PrintPipedCmdResult()
 }
 
 // Run runs the replica until the context is canceled.
@@ -169,7 +170,7 @@ func (srv *Replica) Run(ctx context.Context) {
 	srv.hs.Get(&eventLoop)
 
 	if srv.hs.PipeCount() > 0 {
-		for _, pipe := range srv.hs.Pipes() {
+		for pipe := pipeline.Pipe(1); pipe <= pipeline.Pipe(srv.hs.PipeCount()); pipe++ {
 			var synchronizer modules.Synchronizer
 			srv.hs.MatchForPipe(pipe, &synchronizer)
 			synchronizer.Start(ctx)

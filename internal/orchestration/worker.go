@@ -213,7 +213,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	pipedVotingMachines := builder.CreatePiped(consensus.NewVotingMachine)
 	pipedLeaderRotations := builder.CreatePiped(newLeaderRotation)
 
-	// TODO: Parameterize this
+	// View duration for "dynamic"
 	newViewDuration := func() synchronizer.ViewDuration {
 		return synchronizer.NewViewDuration(
 			uint64(opts.GetTimeoutSamples()),
@@ -223,7 +223,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		)
 	}
 
-	newViewDuration = synchronizer.NewFixedDuration
+	if opts.GetPipelineViewDuration() == "fixed" {
+		newViewDuration = func() synchronizer.ViewDuration {
+			return synchronizer.NewFixedDuration(opts.GetInitialTimeout().AsDuration())
+		}
+	}
+
 	pipedSynchronizers := builder.CreatePiped(synchronizer.New, newViewDuration())
 
 	builder.Add(
@@ -270,6 +275,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		LocationInfo: locationInfo,
 		BatchSize:    opts.GetBatchSize(),
 		PipeCount:    opts.GetPipes(),
+		HackyLatency: *opts.GetHackyLatency(),
 		ManagerOptions: []gorums.ManagerOption{
 			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 			gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),

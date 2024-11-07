@@ -65,7 +65,8 @@ func init() {
 	runCmd.Flags().StringSlice("modules", nil, "Name additional modules to be loaded.")
 	runCmd.Flags().Uint32("pipes", 0, "number of pipes in pipelining mode. Zero by default which disables pipelining mode.")
 	runCmd.Flags().String("pipeline-ordering", "sequential", "ordering logic for pipelining mode.")
-	runCmd.Flags().String("pipeline-viewduration", "static", "whether or not to duplicate the state of view duration module when pipelining is enabled.")
+	runCmd.Flags().String("viewduration-method", "fixed", "Calculation method for computing view durations.")
+	runCmd.Flags().Duration("hacky-replica-latency", 0, "Hacky way to induce replica latency. All replicas will have this latency.")
 
 	runCmd.Flags().Bool("worker", false, "run a local worker")
 	runCmd.Flags().StringSlice("hosts", nil, "the remote hosts to run the experiment on via ssh")
@@ -123,6 +124,7 @@ func runController() {
 			Pipes:                viper.GetUint32("pipes"),
 			PipelineOrdering:     viper.GetString("pipeline-ordering"),
 			PipelineViewDuration: viper.GetString("pipeline-viewduration"),
+			HackyLatency:         durationpb.New(viper.GetDuration("hacky-replica-latency")),
 		},
 		ClientOpts: &orchestrationpb.ClientOpts{
 			UseTLS:           true,
