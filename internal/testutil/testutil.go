@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/modules"
@@ -57,7 +58,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 		eventloop.NewPiped(100, 0),
 		logging.New(fmt.Sprintf("hs%d", id)),
 		blockchain.New(),
-		blockchain.NewBasicCommitter(),
+		committer.NewBasic(),
 		mocks.NewMockConsensus(ctrl),
 		consensus.NewVotingMachine(),
 		leaderrotation.NewFixed(1),
@@ -108,7 +109,7 @@ func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ h
 		eventloop.NewPiped(100, 0),
 		logging.New(fmt.Sprintf("hs%d", id)),
 		blockchain.New(),
-		blockchain.NewBasicCommitter(),
+		committer.NewBasic(),
 		config,
 		signer,
 		acceptor,
