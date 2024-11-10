@@ -81,6 +81,7 @@ func (srv *Server) SetHackyLatency(amount time.Duration) {
 }
 
 // Alan: Hacky version of induceLatency which just blocks execution for an arbitrary time.
+// I will remove this after running experiments.
 func (srv *Server) induceLatencyHacky(sender hotstuff.ID) {
 	senderLocation := srv.locationInfo[sender]
 	senderLatency := srv.hackyLatency
@@ -177,6 +178,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposal.Block.Proposer = uint32(id)
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
+	// TODO: Revert back to induceLatency
 	impl.srv.induceLatencyHacky(id)
 
 	if pipeline.ValidPipe(proposeMsg.PipeId) {
@@ -195,6 +197,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
+	// TODO: Revert back to induceLatency
 	impl.srv.induceLatencyHacky(id)
 
 	pipe := pipeline.Pipe(cert.PipeId)
@@ -219,6 +222,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
+	// TODO: Revert back to induceLatency
 	impl.srv.induceLatencyHacky(id)
 
 	pipe := pipeline.Pipe(msg.PipeId)
@@ -260,6 +264,7 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 		impl.srv.logger.Infof("Could not get ID of replica: %v", err)
 	}
 
+	// TODO: Revert back to induceLatency
 	impl.srv.induceLatencyHacky(timeoutMsg.ID)
 	if pipeline.ValidPipe(timeoutMsg.PipeId) {
 		impl.srv.eventLoop.PipeEvent(timeoutMsg.PipeId, timeoutMsg)

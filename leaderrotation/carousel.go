@@ -22,8 +22,8 @@ type carousel struct {
 	logger        logging.Logger
 }
 
-func (c *carousel) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
-	mods.Get(
+func (c *carousel) InitModule(mods *modules.Core, _ modules.InitOptions) {
+	mods.GetPiped(c,
 		&c.blockChain,
 		&c.configuration,
 		&c.consensus,
