@@ -184,16 +184,11 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposal.Block.Proposer = uint32(id)
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
-<<<<<<< HEAD
-	// TODO: Revert back to induceLatency
-	impl.srv.induceLatencyHacky(id)
-=======
 	impl.srv.induceLatencyHacky(id, func() {
 		if pipeline.ValidPipe(proposeMsg.PipeId) {
 			impl.srv.eventLoop.PipeEvent(proposeMsg.PipeId, proposeMsg)
 			return
 		}
->>>>>>> 8aef8c6e40fe9a9fa6642558815d1f9b03185d8c
 
 		impl.srv.eventLoop.AddEvent(proposeMsg)
 	})
@@ -208,10 +203,6 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
-<<<<<<< HEAD
-	// TODO: Revert back to induceLatency
-	impl.srv.induceLatencyHacky(id)
-=======
 	impl.srv.induceLatencyHacky(id, func() {
 		pipe := pipeline.Pipe(cert.PipeId)
 		if pipeline.ValidPipe(pipe) {
@@ -221,7 +212,6 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 			})
 			return
 		}
->>>>>>> 8aef8c6e40fe9a9fa6642558815d1f9b03185d8c
 
 		impl.srv.eventLoop.AddEvent(hotstuff.VoteMsg{
 			ID:          id,
@@ -237,10 +227,6 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
-<<<<<<< HEAD
-	// TODO: Revert back to induceLatency
-	impl.srv.induceLatencyHacky(id)
-=======
 	impl.srv.induceLatencyHacky(id, func() {
 		pipe := pipeline.Pipe(msg.PipeId)
 		if pipeline.ValidPipe(pipe) {
@@ -250,7 +236,6 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 			})
 			return
 		}
->>>>>>> 8aef8c6e40fe9a9fa6642558815d1f9b03185d8c
 
 		impl.srv.eventLoop.AddEvent(hotstuff.NewViewMsg{
 			ID:       id,
@@ -283,20 +268,11 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 		impl.srv.logger.Infof("Could not get ID of replica: %v", err)
 	}
 
-<<<<<<< HEAD
-	// TODO: Revert back to induceLatency
-	impl.srv.induceLatencyHacky(timeoutMsg.ID)
-	if pipeline.ValidPipe(timeoutMsg.PipeId) {
-		impl.srv.eventLoop.PipeEvent(timeoutMsg.PipeId, timeoutMsg)
-		return
-	}
-=======
 	impl.srv.induceLatencyHacky(timeoutMsg.ID, func() {
 		if pipeline.ValidPipe(timeoutMsg.PipeId) {
 			impl.srv.eventLoop.PipeEvent(timeoutMsg.PipeId, timeoutMsg)
 			return
 		}
->>>>>>> 8aef8c6e40fe9a9fa6642558815d1f9b03185d8c
 
 		impl.srv.eventLoop.AddEvent(timeoutMsg)
 	})
