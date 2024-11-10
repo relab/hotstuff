@@ -15,6 +15,7 @@ import (
 	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/client"
+	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/byzantine"
 	"github.com/relab/hotstuff/crypto"
@@ -190,15 +191,15 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
 
-	var committer modules.Committer
+	var comm modules.Committer
 	if opts.GetPipes() > 0 {
 		builder.EnablePipelining(int(opts.GetPipes()))
-		committer, ok = modules.GetModule[modules.Committer](opts.GetPipelineOrdering())
+		comm, ok = modules.GetModule[modules.Committer](opts.GetPipelineOrdering())
 		if !ok {
 			return nil, fmt.Errorf("invalid pipeline ordering scheme: %s", opts.GetPipelineOrdering())
 		}
 	} else {
-		committer = blockchain.NewBasicCommitter()
+		comm = committer.NewBasic()
 	}
 
 	pipedConsensusRules := builder.CreatePiped(newConsensusRules)
@@ -236,7 +237,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		w.metricsLogger,
 		blockchain.New(),
-		committer,
+		comm,
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
 

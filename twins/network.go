@@ -11,6 +11,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
+	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/ecdsa"
@@ -145,7 +146,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 		builder.Add(
 			eventloop.NewPiped(100, 0),
 			blockchain.New(),
-			blockchain.NewBasicCommitter(),
+			committer.NewBasic(),
 			consensus.New(),
 			consensusModule,
 			consensus.NewVotingMachine(),
