@@ -159,7 +159,7 @@ func (fhs *vulnerableFHS) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) 
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return fhs.blockChain.Get(qc.BlockHash(), qc.Pipe())
+	return fhs.blockChain.Get(qc.BlockHash(), qc.Instance())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.

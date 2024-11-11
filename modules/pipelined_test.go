@@ -3,8 +3,8 @@ package modules_test
 import (
 	"testing"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipeline"
 )
 
 type Adder interface {
@@ -105,7 +105,7 @@ func TestPipelined(t *testing.T) {
 		Result int
 	}
 
-	testCasesMult := map[pipeline.Pipe]AdderMultTestCase{
+	testCasesMult := map[hotstuff.Instance]AdderMultTestCase{
 		1: {A: 2, B: 3, Result: 6},
 		2: {A: 2, B: 5, Result: 10},
 		3: {A: 2, B: 6, Result: 12},

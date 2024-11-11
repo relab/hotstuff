@@ -47,16 +47,16 @@ Here we have a chicken and egg situation.
 
 ### The Best Practices Solution
 
-Due to the problem described above, as well as other problems, circular dependencies in code are considered bad practice.
-Hence, following the "best practices" would call for refactoring of the code to avoid circular dependencies.
+Due to the problem described above, as well as other problems,instancercular dependencies in code are considered bad practice.
+Hence, following the "best practices" would call for refactoring of the code to avoidinstancercular dependencies.
 Unfortunately, this solution places challenging constraints on what we can do when creating new implementations of a module.
 For example, our first implementation of a leader rotation scheme, the round-robin scheme, has no dependencies.
 But later, when we want to implement on a more dynamic leader rotation scheme,
 we realize that we need historical information about the previous views and thus need to interact with the synchronizer and blockchain modules.
 The synchronizer probably needs to know about the identity of the leader, so we now have to refactor these somehow.
 
-It seems then, that strict adherence to the best practice of avoiding circular dependencies is only going to complicate the matter of creating new module implementations.
-Of course, we should keep this best practice in mind, but we should allow circular dependencies in order to make it easier to implement new modules.
+It seems then, that strict adherence to the best practice of avoidinginstancercular dependencies is only going to complicate the matter of creating new module implementations.
+Of course, we should keep this best practice in mind, but we should allowinstancercular dependencies in order to make it easier to implement new modules.
 
 ### Event-based Indirection
 
@@ -73,7 +73,7 @@ Second, it introduces a whole host of implementation challenges.
 However, interactions between modules are already in the form of events.
 For example, the delivery of messages from the network, or the occurrence of a timeout or proposal.
 Therefore, it may make sense to use this solution for some interactions between modules,
-but it is not sensible to use this as a solution to the circular dependency problem.
+but it is not sensible to use this as a solution to theinstancercular dependency problem.
 
 ### Deferred Initialization
 
@@ -135,12 +135,12 @@ func compose(choiceA string) {
 ```
 
 This naive implementation is not very good because it is difficult to extend when adding new modules.
-Also note that this does not include the solution to the circular dependency problem discussed above.
+Also note that this does not include the solution to theinstancercular dependency problem discussed above.
 Implementing deferred initialization as discussed above would further extend the amount of boilerplate code in the naive implementation.
 
 ### The Module System
 
-Our solution to the composition problem and the circular dependency problem is the *module system*.
+Our solution to the composition problem and theinstancercular dependency problem is the *module system*.
 It is essentially a combination of dependency injection and deferred initialization.
 In short, it is a set of interfaces and data structures that simplifies the composition of modules.
 The basic idea is this:
@@ -149,7 +149,7 @@ Each module may implement the following `Module` interface.
 
 ```go
 type Module interface {
-  InitModule(mods *modules.Core, pipeId pipelining.PipeId)
+  InitModule(mods *modules.Core)
 }
 ```
 
@@ -276,10 +276,10 @@ ensure it implements the `Provider` and `Module` interfaces as necessary, and th
 ## Conclusion
 
 This document has described two problems with implementing a modular system like `hotstuff`.
-Namely, the circular dependency problem and the composition problem.
+Namely, theinstancercular dependency problem and the composition problem.
 These both relate to the initialization of the system.
 First, how do we initialize modules that are mutually dependent?
-We have seen that requiring all circular dependencies to be removed makes it difficult to implement new modules.
+We have seen that requiring allinstancercular dependencies to be removed makes it difficult to implement new modules.
 We have seen that an indirection approach using the event system is too complicated.
 In the end, we conclude that deferred initialization is the simplest of the three solutions.
 Second, how do we compose together the specific module implementations that we want?

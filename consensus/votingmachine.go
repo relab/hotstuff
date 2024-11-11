@@ -8,7 +8,6 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipeline"
 )
 
 // VotingMachine collects votes.
@@ -21,7 +20,7 @@ type VotingMachine struct {
 	synchronizer  modules.Synchronizer
 	opts          *modules.Options
 
-	pipe          pipeline.Pipe
+	instance      hotstuff.Instance
 	mut           sync.Mutex
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
 }
@@ -45,20 +44,20 @@ func (vm *VotingMachine) InitModule(mods *modules.Core, initOpt modules.InitOpti
 		&vm.opts,
 	)
 
-	vm.pipe = initOpt.ModulePipeId
+	vm.instance = initOpt.ModuleConsensusInstance
 	vm.eventLoop.RegisterHandler(hotstuff.VoteMsg{}, func(event any) {
 		vm.OnVote(event.(hotstuff.VoteMsg))
-	}, eventloop.RespondToPipe(initOpt.ModulePipeId))
+	}, eventloop.RespondToPipe(initOpt.ModuleConsensusInstance))
 }
 
 // OnVote handles an incoming vote.
 func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 	cert := vote.PartialCert
-	if vm.pipe != cert.Pipe() {
-		panic("incorrect pipe")
+	if vm.instance != cert.Instance() {
+		panic("incorrect consensus instance")
 	}
 
-	vm.logger.Debugf("OnVote[pipe=%d, view=%d](vote=%d): %.8s", vm.pipe, vm.synchronizer.View(), vote.ID, cert.BlockHash())
+	vm.logger.Debugf("OnVote[ci=%d, view=%d](vote=%d): %.8s", vm.instance, vm.synchronizer.View(), vote.ID, cert.BlockHash())
 
 	var (
 		block *hotstuff.Block
@@ -71,16 +70,16 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 		if !ok {
 			// if that does not work, we will try to handle this event later.
 			// hopefully, the block has arrived by then.
-			vm.logger.Debugf("Local cache miss for block [pipe=%d, view=%d]: %.8s", vm.pipe, vm.synchronizer.View(), cert.BlockHash())
+			vm.logger.Debugf("Local cache miss for block [ci=%d, view=%d]: %.8s", vm.instance, vm.synchronizer.View(), cert.BlockHash())
 			vote.Deferred = true
-			vm.eventLoop.DelayPiped(vm.pipe, hotstuff.ProposeMsg{}, vote)
+			vm.eventLoop.DelayPiped(vm.instance, hotstuff.ProposeMsg{}, vote)
 			return
 		}
 	} else {
 		// if the block has not arrived at this point we will try to fetch it.
-		block, ok = vm.blockChain.Get(cert.BlockHash(), cert.Pipe())
+		block, ok = vm.blockChain.Get(cert.BlockHash(), cert.Instance())
 		if !ok {
-			vm.logger.Debugf("Could not find block for vote [pipe=%d, view=%d]", vm.pipe, vm.synchronizer.View())
+			vm.logger.Debugf("Could not find block for vote [ci=%d, view=%d]", vm.instance, vm.synchronizer.View())
 			return
 		}
 	}
@@ -99,7 +98,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 
 func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
 	if !vm.crypto.VerifyPartialCert(cert) {
-		vm.logger.Infof("OnVote[pipe=%d, view=%d]: Vote could not be verified!", vm.pipe, vm.synchronizer.View())
+		vm.logger.Infof("OnVote[ci=%d, view=%d]: Vote could not be verified!", vm.instance, vm.synchronizer.View())
 		return
 	}
 
@@ -130,12 +129,12 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 
 	qc, err := vm.crypto.CreateQuorumCert(block, votes)
 	if err != nil {
-		vm.logger.Info(fmt.Sprintf("OnVote[pipe=%d, view=%d]: could not create QC for block: ", vm.pipe, vm.synchronizer.View()), err)
+		vm.logger.Info(fmt.Sprintf("OnVote[ci=%d, view=%d]: could not create QC for block: ", vm.instance, vm.synchronizer.View()), err)
 		return
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
 
-	vm.eventLoop.PipeEvent(vm.pipe, hotstuff.NewViewMsg{
+	vm.eventLoop.PipeEvent(vm.instance, hotstuff.NewViewMsg{
 		ID:       vm.opts.ID(),
-		SyncInfo: hotstuff.NewSyncInfo(block.Pipe()).WithQC(qc)})
+		SyncInfo: hotstuff.NewSyncInfo(block.Instance()).WithQC(qc)})
 }

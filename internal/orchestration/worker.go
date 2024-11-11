@@ -204,9 +204,9 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 
 	pipedConsensusRules := builder.CreatePiped(newConsensusRules)
 	if newByz != nil {
-		for pipe, rules := range pipedConsensusRules {
+		for instance, rules := range pipedConsensusRules {
 			byz := newByz()
-			pipedConsensusRules[pipe] = byz.Wrap(rules.(consensus.Rules))
+			pipedConsensusRules[instance] = byz.Wrap(rules.(consensus.Rules))
 		}
 	}
 
@@ -268,15 +268,15 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		locationInfo[hotstuff.ID(k)] = v
 	}
 	c := replica.Config{
-		ID:           hotstuff.ID(opts.GetID()),
-		PrivateKey:   privKey,
-		TLS:          opts.GetUseTLS(),
-		Certificate:  &certificate,
-		RootCAs:      rootCAs,
-		LocationInfo: locationInfo,
-		BatchSize:    opts.GetBatchSize(),
-		PipeCount:    opts.GetPipes(),
-		HackyLatency: *opts.GetHackyLatency(),
+		ID:                     hotstuff.ID(opts.GetID()),
+		PrivateKey:             privKey,
+		TLS:                    opts.GetUseTLS(),
+		Certificate:            &certificate,
+		RootCAs:                rootCAs,
+		LocationInfo:           locationInfo,
+		BatchSize:              opts.GetBatchSize(),
+		ConsensusInstanceCount: opts.GetPipes(),
+		HackyLatency:           *opts.GetHackyLatency(),
 		ManagerOptions: []gorums.ManagerOption{
 			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 			gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),

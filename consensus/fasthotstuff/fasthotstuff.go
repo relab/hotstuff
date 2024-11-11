@@ -6,7 +6,6 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipeline"
 )
 
 func init() {
@@ -19,7 +18,7 @@ type FastHotStuff struct {
 	logger       logging.Logger
 	synchronizer modules.Synchronizer
 
-	pipe pipeline.Pipe
+	instance hotstuff.Instance
 }
 
 // New returns a new FastHotStuff instance.
@@ -28,10 +27,10 @@ func New() consensus.Rules {
 }
 
 // InitModule initializes the module.
-func (fhs *FastHotStuff) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
+func (fhs *FastHotStuff) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	var opts *modules.Options
 
-	fhs.pipe = initOpt.ModulePipeId
+	fhs.instance = opt.ModuleConsensusInstance
 
 	mods.GetPiped(fhs,
 		&fhs.blockChain,
@@ -46,13 +45,13 @@ func (fhs *FastHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return fhs.blockChain.Get(qc.BlockHash(), qc.Pipe())
+	return fhs.blockChain.Get(qc.BlockHash(), qc.Instance())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.
 func (fhs *FastHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
-	if fhs.pipe != block.Pipe() {
-		panic("incorrect pipe")
+	if fhs.instance != block.Instance() {
+		panic("incorrect consensus instance")
 	}
 
 	parent, ok := fhs.qcRef(block.QuorumCert())
@@ -74,13 +73,13 @@ func (fhs *FastHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 
 // VoteRule decides whether to vote for the proposal or not.
 func (fhs *FastHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
-	if fhs.pipe != proposal.PipeId {
-		panic("incorrect pipe")
+	if fhs.instance != proposal.CI {
+		panic("incorrect consensus instance")
 	}
 	// The base implementation verifies both regular QCs and AggregateQCs, and asserts that the QC embedded in the
 	// block is the same as the highQC found in the aggregateQC.
 	if proposal.AggregateQC != nil {
-		hqcBlock, ok := fhs.blockChain.Get(proposal.Block.QuorumCert().BlockHash(), proposal.PipeId)
+		hqcBlock, ok := fhs.blockChain.Get(proposal.Block.QuorumCert().BlockHash(), proposal.CI)
 		return ok && fhs.blockChain.Extends(proposal.Block, hqcBlock)
 	}
 	return proposal.Block.View() >= fhs.synchronizer.View() &&

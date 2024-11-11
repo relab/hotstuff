@@ -57,7 +57,7 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 
 	for ok && i < f && block != hotstuff.GetGenesis() {
 		lastAuthors.Add(block.Proposer())
-		block, ok = c.blockChain.Get(block.Parent(), block.Pipe())
+		block, ok = c.blockChain.Get(block.Parent(), block.Instance())
 		i++
 	}
 

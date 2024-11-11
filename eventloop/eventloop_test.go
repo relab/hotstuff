@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/pipeline"
 )
 
 type testEvent int
@@ -47,8 +47,8 @@ func TestHandler(t *testing.T) {
 }
 
 func TestHandlerPiped(t *testing.T) {
-	listeningPipeId := pipeline.Pipe(1)
-	incorrectPipeId := pipeline.Pipe(2)
+	listeningPipeId := hotstuff.Instance(1)
+	incorrectPipeId := hotstuff.Instance(2)
 	pipeCount := 1
 	el := eventloop.NewPiped(10, pipeCount)
 	c := make(chan any)
@@ -178,8 +178,8 @@ func TestTicker(t *testing.T) {
 
 func TestDelayedEventPiped(t *testing.T) {
 	pipeCount := 1
-	listeningPipeId := pipeline.Pipe(1)
-	incorrectPipeId := pipeline.Pipe(2)
+	listeningPipeId := hotstuff.Instance(1)
+	incorrectPipeId := hotstuff.Instance(2)
 	el := eventloop.NewPiped(10, pipeCount)
 	c := make(chan testEvent)
 

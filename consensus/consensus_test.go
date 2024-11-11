@@ -11,7 +11,6 @@ import (
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipeline"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -32,7 +31,7 @@ func TestVote(t *testing.T) {
 
 	hs.Get(&eventLoop, &blockChain)
 
-	cs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(pipeline.NullPipe)))
+	cs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(hotstuff.ZeroInstance)))
 
 	ok := false
 	ctx, cancel := context.WithCancel(context.Background())
@@ -46,7 +45,7 @@ func TestVote(t *testing.T) {
 		hotstuff.NewQuorumCert(
 			nil,
 			1,
-			pipeline.NullPipe, // TODO: Verify if this code conflicts with pipelining
+			hotstuff.ZeroInstance, // TODO: Verify if this code conflicts with pipelining
 			hotstuff.GetGenesis().Hash()),
 		"test", 1, 1,
 	)

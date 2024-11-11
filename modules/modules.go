@@ -6,7 +6,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/pipeline"
 )
 
 // Module interfaces
@@ -37,7 +36,7 @@ type Acceptor interface {
 // Executor is responsible for executing the commands that are committed by the consensus protocol.
 type Executor interface {
 	// Exec executes the command.
-	Exec(onPipe pipeline.Pipe, cmd hotstuff.Command)
+	Exec(onPipe hotstuff.Instance, cmd hotstuff.Command)
 }
 
 // ExecutorExt is responsible for executing the commands that are committed by the consensus protocol.
@@ -68,13 +67,13 @@ type ForkHandlerExt interface {
 }
 
 // Committer is a helper module which handles block commits and forks.
-// NOTE: This module was created to deal with pipelined consensus instances.
+// NOTE: This module was created to deal with multiple consensus instances.
 type Committer interface {
 	// Stores the block before further execution.
 	Commit(block *hotstuff.Block)
 
-	// Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
-	CommittedBlock(pipe pipeline.Pipe) *hotstuff.Block
+	// Retrieve the last block which was committed on a consensus instance. Use zero if pipelining is not desired in the implementation.
+	CommittedBlock(instance hotstuff.Instance) *hotstuff.Block
 }
 
 // BlockChain is a datastructure that stores a chain of blocks.
@@ -85,7 +84,7 @@ type BlockChain interface {
 	Store(*hotstuff.Block)
 
 	// Get retrieves a block given its hash, attempting to fetching it from other replicas if necessary.
-	Get(hash hotstuff.Hash, onPipe pipeline.Pipe) (*hotstuff.Block, bool)
+	Get(hash hotstuff.Hash, onPipe hotstuff.Instance) (*hotstuff.Block, bool)
 
 	// LocalGet retrieves a block given its hash, without fetching it from other replicas.
 	LocalGet(hotstuff.Hash) (*hotstuff.Block, bool)
@@ -207,7 +206,7 @@ func (ew *executorWrapper) InitModule(mods *Core, buildOpt InitOptions) {
 }
 
 func (ew *executorWrapper) Exec(block *hotstuff.Block) {
-	ew.executor.Exec(block.Pipe(), block.Command())
+	ew.executor.Exec(block.Instance(), block.Command())
 }
 
 // ExtendedForkHandler turns the given ForkHandler into a ForkHandlerExt.

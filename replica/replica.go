@@ -9,7 +9,6 @@ import (
 
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipeline"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -48,8 +47,8 @@ type Config struct {
 	ManagerOptions []gorums.ManagerOption
 	// Location information of all replicas
 	LocationInfo map[hotstuff.ID]string
-	// Number of pipes in pipelining mode
-	PipeCount uint32
+	// Number of consensus instances in pipelining mode
+	ConsensusInstanceCount uint32
 	// Latency induced by all replicas.
 	HackyLatency durationpb.Duration
 }
@@ -170,9 +169,9 @@ func (srv *Replica) Run(ctx context.Context) {
 	srv.hs.Get(&eventLoop)
 
 	if srv.hs.PipeCount() > 0 {
-		for pipe := pipeline.Pipe(1); pipe <= pipeline.Pipe(srv.hs.PipeCount()); pipe++ {
+		for instance := hotstuff.Instance(1); instance <= hotstuff.Instance(srv.hs.PipeCount()); instance++ {
 			var synchronizer modules.Synchronizer
-			srv.hs.MatchForPipe(pipe, &synchronizer)
+			srv.hs.MatchForPipe(instance, &synchronizer)
 			synchronizer.Start(ctx)
 		}
 	} else {

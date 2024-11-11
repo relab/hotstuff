@@ -2,14 +2,13 @@ package debug
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/pipeline"
 )
 
 type CommitHaltEvent struct {
-	OnPipe pipeline.Pipe
+	OnPipe hotstuff.Instance
 }
 
 type CommandRejectedEvent struct {
-	OnPipe pipeline.Pipe
+	OnPipe hotstuff.Instance
 	View   hotstuff.View
 }

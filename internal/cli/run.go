@@ -63,8 +63,8 @@ func init() {
 	runCmd.Flags().String("leader-rotation", "round-robin", "name of the leader rotation algorithm")
 	runCmd.Flags().Int64("shared-seed", 0, "Shared random number generator seed")
 	runCmd.Flags().StringSlice("modules", nil, "Name additional modules to be loaded.")
-	runCmd.Flags().Uint32("pipes", 0, "number of pipes in pipelining mode. Zero by default which disables pipelining mode.")
-	runCmd.Flags().String("pipeline-ordering", "sequential", "ordering logic for pipelining mode.")
+	runCmd.Flags().Uint32("pipeline-instances", 0, "number of consensus instances in pipelining mode, where zero means pipelining is disabled.")
+	runCmd.Flags().String("pipeline-ordering", "sequential", "block execution ordering logic for pipelining mode.")
 	runCmd.Flags().String("viewduration-method", "fixed", "Calculation method for computing view durations.")
 	runCmd.Flags().Duration("hacky-replica-latency", 0, "Hacky way to induce replica latency. All replicas will have this latency.")
 
@@ -121,7 +121,7 @@ func runController() {
 			MaxTimeout:           durationpb.New(viper.GetDuration("max-timeout")),
 			SharedSeed:           viper.GetInt64("shared-seed"),
 			Modules:              viper.GetStringSlice("modules"),
-			Pipes:                viper.GetUint32("pipes"),
+			Pipes:                viper.GetUint32("pipeline-instances"),
 			PipelineOrdering:     viper.GetString("pipeline-ordering"),
 			PipelineViewDuration: viper.GetString("pipeline-viewduration"),
 			HackyLatency:         durationpb.New(viper.GetDuration("hacky-replica-latency")),

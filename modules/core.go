@@ -37,15 +37,14 @@ import (
 	"reflect"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/pipeline"
 )
 
 type ModulePipe []Module
 
 type InitOptions struct {
-	IsPipeliningEnabled bool
-	PipeCount           int
-	ModulePipeId        pipeline.Pipe
+	IsPipeliningEnabled     bool
+	InstanceCount           int
+	ModuleConsensusInstance hotstuff.Instance
 }
 
 // Module is an interface for initializing modules.
@@ -53,12 +52,12 @@ type Module interface {
 	InitModule(mods *Core, buildOpt InitOptions)
 }
 
-func NewPiped[T any](pipeCount uint, ctor any, ctorArgs ...any) (pipedMods map[pipeline.Pipe]T) {
+func NewPiped[T any](instanceCount uint, ctor any, ctorArgs ...any) (pipedMods map[hotstuff.Instance]T) {
 	if reflect.TypeOf(ctor).Kind() != reflect.Func {
 		panic("first argument is not a function")
 	}
 
-	pipedMods = make(map[pipeline.Pipe]T)
+	pipedMods = make(map[hotstuff.Instance]T)
 
 	vargs := make([]reflect.Value, len(ctorArgs))
 	for n, v := range ctorArgs {
@@ -67,10 +66,10 @@ func NewPiped[T any](pipeCount uint, ctor any, ctorArgs ...any) (pipedMods map[p
 
 	ctorVal := reflect.ValueOf(ctor)
 
-	if pipeCount == 0 {
-		pipeCount = 1
+	if instanceCount == 0 {
+		instanceCount = 1
 	}
-	for pipe := pipeline.Pipe(1); pipe <= pipeline.Pipe(pipeCount); pipe++ {
+	for instance := hotstuff.Instance(1); instance <= hotstuff.Instance(instanceCount); instance++ {
 		returnResult := ctorVal.Call(vargs)
 		if len(returnResult) != 1 {
 			panic("constructor does not return a single value")
@@ -79,7 +78,7 @@ func NewPiped[T any](pipeCount uint, ctor any, ctorArgs ...any) (pipedMods map[p
 		if !ok {
 			panic("constructor did not return correct value type")
 		}
-		pipedMods[pipe] = mod
+		pipedMods[instance] = mod
 	}
 	return pipedMods
 }
@@ -88,7 +87,7 @@ func NewPiped[T any](pipeCount uint, ctor any, ctorArgs ...any) (pipedMods map[p
 // It contains only a few core modules that are shared between replicas and clients.
 type Core struct {
 	staticModules       []any
-	pipedModules        map[pipeline.Pipe][]any
+	pipedModules        map[hotstuff.Instance][]any
 	isPipeliningEnabled bool
 }
 
@@ -175,10 +174,11 @@ func (mods *Core) Get(pointers ...any) {
 //	}
 //
 //	func main() {
-//		pipeIds := []modules.PipeId{0, 1, 2, ...}
+//		// TODO: Fix this doc
+//		consensusInstanceCount := 3
 //
 //		builder := modules.NewBuilder(0, nil)
-//		builder.EnablePipelining(pipeIds)
+//		builder.EnablePipelining(consensusInstanceCount)
 //		builder.AddPiped(NewMyModuleImpl)
 //		builder.AddPiped(NewOtherModuleImpl)
 //		builder.Build() // InitModule is called here
@@ -220,25 +220,25 @@ func (mods *Core) tryGetFromPipe(moduleInPipe Module, ptr any) bool {
 		panic("only pointer values allowed")
 	}
 
-	correctPipeId := pipeline.NullPipe
-	for id := range mods.pipedModules {
-		pipe := mods.pipedModules[id]
+	correctPipeId := hotstuff.ZeroInstance
+	for instance := range mods.pipedModules {
+		pipe := mods.pipedModules[instance]
 		// Check if self is in pipe
 		for _, module := range pipe {
 			// TODO: Verify if equality comparison is correct
 			if module == moduleInPipe {
-				correctPipeId = id
+				correctPipeId = instance
 				break
 			}
 		}
-		// Break outer loop too if a pipe ID was found
-		if correctPipeId != pipeline.NullPipe {
+		// Break outer loop too if an instance was found
+		if correctPipeId != hotstuff.ZeroInstance {
 			break
 		}
 	}
 
 	// If this variable remained unchanged, return false
-	if correctPipeId == pipeline.NullPipe {
+	if correctPipeId == hotstuff.ZeroInstance {
 		return false
 	}
 
@@ -255,7 +255,7 @@ func (mods *Core) tryGetFromPipe(moduleInPipe Module, ptr any) bool {
 }
 
 // MatchForPipe assigns ptr to a matching module in the pipe with pipeId.
-func (core *Core) MatchForPipe(pipeId pipeline.Pipe, ptr any) {
+func (core *Core) MatchForPipe(pipeId hotstuff.Instance, ptr any) {
 	if len(core.pipedModules) == 0 {
 		panic("pipelining is not enabled")
 	}
@@ -288,7 +288,7 @@ func (core *Core) PipeCount() int {
 }
 
 // Return a slice of Pipes in the order which the pipes were created by Builder.
-func (core *Core) Pipes() (ids []pipeline.Pipe) {
+func (core *Core) Pipes() (ids []hotstuff.Instance) {
 	for id := range core.pipedModules {
 		ids = append(ids, id)
 	}
@@ -298,18 +298,18 @@ func (core *Core) Pipes() (ids []pipeline.Pipe) {
 
 // Return a list of modules from a pipes. The order of module types is influenced
 // by when AddPiped was called in Builder.
-func (core *Core) GetPipe(id pipeline.Pipe) []any {
+func (core *Core) GetPipe(id hotstuff.Instance) []any {
 	return core.pipedModules[id]
 }
 
 // Builder is a helper for setting up client modules.
 type Builder struct {
-	core              Core
-	staticModules     []Module
-	modulePipes       map[pipeline.Pipe]ModulePipe
-	opts              *Options
-	pipeliningEnabled bool
-	pipeIds           []pipeline.Pipe
+	core                 Core
+	staticModules        []Module
+	modulePipes          map[hotstuff.Instance]ModulePipe
+	opts                 *Options
+	pipeliningEnabled    bool
+	consensusInstanceIds []hotstuff.Instance
 }
 
 // NewBuilder returns a new builder.
@@ -320,9 +320,9 @@ func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey) Builder {
 			privateKey:         pk,
 			connectionMetadata: make(map[string]string),
 		},
-		pipeliningEnabled: false,
-		pipeIds:           nil,
-		modulePipes:       nil,
+		pipeliningEnabled:    false,
+		consensusInstanceIds: nil,
+		modulePipes:          nil,
 	}
 
 	return bl
@@ -340,11 +340,11 @@ func (bl *Builder) EnablePipelining(pipeCount int) {
 	}
 
 	bl.pipeliningEnabled = true
-	bl.core.pipedModules = make(map[pipeline.Pipe][]any)
-	bl.modulePipes = make(map[pipeline.Pipe]ModulePipe)
+	bl.core.pipedModules = make(map[hotstuff.Instance][]any)
+	bl.modulePipes = make(map[hotstuff.Instance]ModulePipe)
 
-	for pipe := pipeline.Pipe(1); pipe <= pipeline.Pipe(pipeCount); pipe++ {
-		bl.pipeIds = append(bl.pipeIds, pipe)
+	for pipe := hotstuff.Instance(1); pipe <= hotstuff.Instance(pipeCount); pipe++ {
+		bl.consensusInstanceIds = append(bl.consensusInstanceIds, pipe)
 		bl.modulePipes[pipe] = make(ModulePipe, 0)
 		bl.core.pipedModules[pipe] = make([]any, 0)
 	}
@@ -370,14 +370,14 @@ func (b *Builder) Add(modules ...any) {
 // and adds them to a map where each module is mapped to a pipe. The module's constructor
 // is called with the variadic arguments.
 // If pipelining is disabled when CreatePiped is called, only one module will be constructed and mapped
-// to pipeline.NullPipe.
+// to hotstuff.NullPipe.
 // To add the modules, use AddPipedModules later.
-func (b *Builder) CreatePiped(ctor any, ctorArgs ...any) (pipedMods map[pipeline.Pipe]any) {
+func (b *Builder) CreatePiped(ctor any, ctorArgs ...any) (pipedMods map[hotstuff.Instance]any) {
 	if reflect.TypeOf(ctor).Kind() != reflect.Func {
 		panic("first argument is not a function")
 	}
 
-	pipedMods = make(map[pipeline.Pipe]any)
+	pipedMods = make(map[hotstuff.Instance]any)
 
 	vargs := make([]reflect.Value, len(ctorArgs))
 	for n, v := range ctorArgs {
@@ -385,9 +385,9 @@ func (b *Builder) CreatePiped(ctor any, ctorArgs ...any) (pipedMods map[pipeline
 	}
 
 	ctorVal := reflect.ValueOf(ctor)
-	pipes := b.pipeIds
+	pipes := b.consensusInstanceIds
 	if !b.pipeliningEnabled {
-		pipes = []pipeline.Pipe{pipeline.NullPipe}
+		pipes = []hotstuff.Instance{hotstuff.ZeroInstance}
 	}
 	for _, id := range pipes {
 		returnResult := ctorVal.Call(vargs)
@@ -400,10 +400,10 @@ func (b *Builder) CreatePiped(ctor any, ctorArgs ...any) (pipedMods map[pipeline
 	return pipedMods
 }
 
-func (b *Builder) AddPiped(pipedModMaps ...map[pipeline.Pipe]any) {
+func (b *Builder) AddPiped(pipedModMaps ...map[hotstuff.Instance]any) {
 	for _, pipedMods := range pipedModMaps {
 		if !b.pipeliningEnabled {
-			mod, ok := pipedMods[pipeline.NullPipe]
+			mod, ok := pipedMods[hotstuff.ZeroInstance]
 			if !ok {
 				panic("map of piped modules did not contain null-pipe key")
 			}
@@ -472,9 +472,9 @@ func (b *Builder) Build() *Core {
 	// add the Options last so that it can be overridden by user.
 	b.Add(b.opts)
 	opt := InitOptions{
-		IsPipeliningEnabled: b.pipeliningEnabled,
-		ModulePipeId:        pipeline.NullPipe,
-		PipeCount:           len(b.pipeIds),
+		IsPipeliningEnabled:     b.pipeliningEnabled,
+		ModuleConsensusInstance: hotstuff.ZeroInstance,
+		InstanceCount:           len(b.consensusInstanceIds),
 	}
 	for _, module := range b.staticModules {
 		module.InitModule(&b.core, opt)
@@ -499,9 +499,9 @@ func (b *Builder) Build() *Core {
 	// other modules in the same pipe without panicking.
 	for pipeId, pipe := range b.modulePipes {
 		pipeOpt := InitOptions{
-			IsPipeliningEnabled: b.pipeliningEnabled,
-			ModulePipeId:        pipeId,
-			PipeCount:           len(b.pipeIds),
+			IsPipeliningEnabled:     b.pipeliningEnabled,
+			ModuleConsensusInstance: pipeId,
+			InstanceCount:           len(b.consensusInstanceIds),
 		}
 		for _, module := range pipe {
 			module.(Module).InitModule(&b.core, pipeOpt)

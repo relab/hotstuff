@@ -7,7 +7,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipeline"
 )
 
 type basic struct {
@@ -69,7 +68,7 @@ func (bb *basic) commitInner(block *hotstuff.Block) error {
 	if bb.bExec.View() >= block.View() {
 		return nil
 	}
-	if parent, ok := bb.blockChain.Get(block.Parent(), block.Pipe()); ok {
+	if parent, ok := bb.blockChain.Get(block.Parent(), block.Instance()); ok {
 		err := bb.commitInner(parent)
 		if err != nil {
 			return err
@@ -83,8 +82,8 @@ func (bb *basic) commitInner(block *hotstuff.Block) error {
 	return nil
 }
 
-// Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
-func (bb *basic) CommittedBlock(_ pipeline.Pipe) *hotstuff.Block {
+// Retrieve the last block which was committed on a consensus instance. Use zero if pipelining is not used.
+func (bb *basic) CommittedBlock(_ hotstuff.Instance) *hotstuff.Block {
 	bb.mut.Lock()
 	defer bb.mut.Unlock()
 	return bb.bExec

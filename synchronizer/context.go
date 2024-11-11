@@ -6,7 +6,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/pipeline"
 )
 
 // This file provides several functions for creating contexts with lifespans that are tied to synchronizer events.
@@ -23,7 +22,7 @@ func ViewContext(parent context.Context, eventLoop *eventloop.EventLoop, view *h
 	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent())
 
 	return ctx, func() {
-		eventLoop.UnregisterHandler(ViewChangeEvent{}, pipeline.NullPipe, id)
+		eventLoop.UnregisterHandler(ViewChangeEvent{}, hotstuff.ZeroInstance, id)
 		cancel()
 	}
 }
@@ -38,7 +37,7 @@ func TimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop) (con
 	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent())
 
 	return ctx, func() {
-		eventLoop.UnregisterHandler(TimeoutEvent{}, pipeline.NullPipe, id)
+		eventLoop.UnregisterHandler(TimeoutEvent{}, hotstuff.ZeroInstance, id)
 		cancel()
 	}
 }
@@ -46,51 +45,51 @@ func TimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop) (con
 // PipedViewContext returns a context that is canceled at the end of view.
 // If view is nil or less than or equal to the current view, the context will be canceled at the next view change.
 // Pipe is null-pipe, returns regular PipedViewContext.
-func PipedViewContext(parent context.Context, eventLoop *eventloop.EventLoop, pipe pipeline.Pipe, view *hotstuff.View) (context.Context, context.CancelFunc) {
-	if pipe == pipeline.NullPipe {
+func PipedViewContext(parent context.Context, eventLoop *eventloop.EventLoop, instance hotstuff.Instance, view *hotstuff.View) (context.Context, context.CancelFunc) {
+	if instance == hotstuff.ZeroInstance {
 		return ViewContext(parent, eventLoop, view)
 	}
 
 	ctx, cancel := context.WithCancel(parent)
 
 	id := eventLoop.RegisterHandler(ViewChangeEvent{}, func(event any) {
-		myPipe := pipe
+		myPipe := instance
 		viewChangeEvent := event.(ViewChangeEvent)
-		if viewChangeEvent.Pipe != myPipe {
-			panic(fmt.Sprintf("incorrect pipes: want=%d, got=%d", myPipe, viewChangeEvent.Pipe))
+		if viewChangeEvent.Instance != myPipe {
+			panic(fmt.Sprintf("incorrect consensus instance: want=%d, got=%d", myPipe, viewChangeEvent.Instance))
 		}
 		if view == nil || viewChangeEvent.View >= *view {
 			cancel()
 		}
-	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToPipe(pipe))
+	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToPipe(instance))
 
 	return ctx, func() {
-		eventLoop.UnregisterHandler(ViewChangeEvent{}, pipe, id)
+		eventLoop.UnregisterHandler(ViewChangeEvent{}, instance, id)
 		cancel()
 	}
 }
 
 // PipedTimeoutContext returns a context that is canceled either when a timeout occurs, or when the view changes.
 // Pipe is null-pipe, returns regular TimeoutContext.
-func PipedTimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop, pipe pipeline.Pipe) (context.Context, context.CancelFunc) {
-	if pipe == pipeline.NullPipe {
+func PipedTimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop, instance hotstuff.Instance) (context.Context, context.CancelFunc) {
+	if instance == hotstuff.ZeroInstance {
 		return TimeoutContext(parent, eventLoop)
 	}
 
 	// ViewContext handles view-change case.
-	ctx, cancel := PipedViewContext(parent, eventLoop, pipe, nil)
+	ctx, cancel := PipedViewContext(parent, eventLoop, instance, nil)
 
 	id := eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
-		myPipe := pipe
+		myPipe := instance
 		timeoutEvent := event.(TimeoutEvent)
-		if timeoutEvent.Pipe != myPipe {
-			panic(fmt.Sprintf("incorrect pipes: want=%d, got=%d", myPipe, timeoutEvent.Pipe))
+		if timeoutEvent.Instance != myPipe {
+			panic(fmt.Sprintf("incorrect consensus instance: want=%d, got=%d", myPipe, timeoutEvent.Instance))
 		}
 		cancel()
-	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToPipe(pipe))
+	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToPipe(instance))
 
 	return ctx, func() {
-		eventLoop.UnregisterHandler(TimeoutEvent{}, pipe, id)
+		eventLoop.UnregisterHandler(TimeoutEvent{}, instance, id)
 		cancel()
 	}
 }

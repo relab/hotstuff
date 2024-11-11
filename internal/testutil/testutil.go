@@ -12,7 +12,6 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipeline"
 
 	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
@@ -73,7 +72,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 }
 
 // TestModules registers default modules for testing to the given builder.
-func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *modules.Builder, pipeCount int) {
+func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *modules.Builder, instanceCount int) {
 	t.Helper()
 
 	acceptor := mocks.NewMockAcceptor(ctrl)
@@ -94,17 +93,7 @@ func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ h
 	config.EXPECT().Len().AnyTimes().Return(1)
 	config.EXPECT().QuorumSize().AnyTimes().Return(3)
 
-	// builder.EnablePipelining(pipes)
-	// TODO: Fix this
-	// builder.AddPiped(mocks.NewMockConsensus, ctrl)
-	// builder.AddPiped(consensus.NewVotingMachine)
-	// builder.AddPiped(leaderrotation.NewFixed, hotstuff.ID(1)) // TODO: Check if ID needs to be unique for pipes too
-	// builder.AddPipedWithCallback(mocks.NewMockSynchronizer, []any{ctrl}, func(mod any) {
-	// 	synchronizer := mod.(*mocks.MockSynchronizer)
-	// 	synchronizer.EXPECT().Start(gomock.Any()).AnyTimes()
-	// 	synchronizer.EXPECT().ViewContext().AnyTimes().Return(context.Background())
-	// })
-
+	// TODO: Check if this code still runs after implementing pipelining
 	builder.Add(
 		eventloop.NewPiped(100, 0),
 		logging.New(fmt.Sprintf("hs%d", id)),
@@ -187,7 +176,7 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 }
 
 // TODO: Complete the implementation.
-func CreateBuildersPiped(t *testing.T, ctrl *gomock.Controller, n int, pipeCount int, keys ...hotstuff.PrivateKey) (builders BuilderList) {
+func CreateBuildersPiped(t *testing.T, ctrl *gomock.Controller, n int, instanceCount int, keys ...hotstuff.PrivateKey) (builders BuilderList) {
 	t.Helper()
 	network := twins.NewSimpleNetwork()
 	builders = make([]*modules.Builder, n)
@@ -201,9 +190,9 @@ func CreateBuildersPiped(t *testing.T, ctrl *gomock.Controller, n int, pipeCount
 		}
 
 		builder := network.GetNodeBuilder(twins.NodeID{ReplicaID: id, NetworkID: uint32(id)}, key)
-		builder.EnablePipelining(pipeCount)
+		builder.EnablePipelining(instanceCount)
 		builder.Add(network.NewConfiguration())
-		TestModulesPiped(t, ctrl, id, key, &builder, pipeCount)
+		TestModulesPiped(t, ctrl, id, key, &builder, instanceCount)
 		builder.Add(network.NewConfiguration())
 		builders[i] = &builder
 	}
@@ -259,10 +248,10 @@ func CreateTimeouts(t *testing.T, view hotstuff.View, signers []modules.Crypto) 
 			ID:            signer(sig),
 			View:          view,
 			ViewSignature: sig,
-			SyncInfo: hotstuff.NewSyncInfo(pipeline.NullPipe).WithQC(hotstuff.NewQuorumCert(
+			SyncInfo: hotstuff.NewSyncInfo(hotstuff.ZeroInstance).WithQC(hotstuff.NewQuorumCert(
 				nil,
 				0,
-				pipeline.NullPipe, // TODO: Verify if this code conflicts with pipelining
+				hotstuff.ZeroInstance, // TODO: Verify if this code conflicts with pipelining
 				hotstuff.GetGenesis().Hash())),
 		})
 	}

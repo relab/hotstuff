@@ -6,7 +6,6 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipeline"
 )
 
 func init() {
@@ -22,8 +21,8 @@ type SimpleHotStuff struct {
 	logger       logging.Logger
 	synchronizer modules.Synchronizer
 
-	pipe   pipeline.Pipe
-	locked *hotstuff.Block
+	instance hotstuff.Instance
+	locked   *hotstuff.Block
 }
 
 // New returns a new SimpleHotStuff instance.
@@ -35,7 +34,7 @@ func New() consensus.Rules {
 
 // InitModule initializes the module.
 func (hs *SimpleHotStuff) InitModule(mods *modules.Core, opt modules.InitOptions) {
-	hs.pipe = opt.ModulePipeId
+	hs.instance = opt.ModuleConsensusInstance
 	mods.GetPiped(hs,
 		&hs.blockChain,
 		&hs.logger,
@@ -44,8 +43,8 @@ func (hs *SimpleHotStuff) InitModule(mods *modules.Core, opt modules.InitOptions
 
 // VoteRule decides if the replica should vote for the given block.
 func (hs *SimpleHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
-	if proposal.PipeId != hs.pipe {
-		panic("incorrect pipe")
+	if proposal.CI != hs.instance {
+		panic("incorrectinstance")
 	}
 
 	block := proposal.Block
@@ -56,7 +55,7 @@ func (hs *SimpleHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
 		return false
 	}
 
-	parent, ok := hs.blockChain.Get(block.QuorumCert().BlockHash(), block.Pipe())
+	parent, ok := hs.blockChain.Get(block.QuorumCert().BlockHash(), block.Instance())
 	if !ok {
 		hs.logger.Info("VoteRule: missing parent block: ", block.QuorumCert().BlockHash())
 		return false
@@ -73,16 +72,16 @@ func (hs *SimpleHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
 
 // CommitRule decides if an ancestor of the block can be committed, and returns the ancestor, otherwise returns nil.
 func (hs *SimpleHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
-	if block.Pipe() != hs.pipe {
-		panic("incorrect pipe")
+	if block.Instance() != hs.instance {
+		panic("incorrectinstance")
 	}
 	// will consider if the great-grandparent of the new block can be committed.
-	p, ok := hs.blockChain.Get(block.QuorumCert().BlockHash(), block.Pipe())
+	p, ok := hs.blockChain.Get(block.QuorumCert().BlockHash(), block.Instance())
 	if !ok {
 		return nil
 	}
 
-	gp, ok := hs.blockChain.Get(p.QuorumCert().BlockHash(), block.Pipe())
+	gp, ok := hs.blockChain.Get(p.QuorumCert().BlockHash(), block.Instance())
 	if ok && gp.View() > hs.locked.View() {
 		hs.locked = gp
 		hs.logger.Debug("Locked: ", gp)
@@ -90,7 +89,7 @@ func (hs *SimpleHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 		return nil
 	}
 
-	ggp, ok := hs.blockChain.Get(gp.QuorumCert().BlockHash(), block.Pipe())
+	ggp, ok := hs.blockChain.Get(gp.QuorumCert().BlockHash(), block.Instance())
 	// we commit the great-grandparent of the block if its grandchild is certified,
 	// which we already know is true because the new block contains the grandchild's certificate,
 	// and if the great-grandparent's view + 2 equals the grandchild's view.

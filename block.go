@@ -4,8 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
-
-	"github.com/relab/hotstuff/pipeline"
 )
 
 // Block contains a propsed "command", metadata for the protocol, and a link to the "parent" block.
@@ -17,18 +15,18 @@ type Block struct {
 	cmd      Command
 	cert     QuorumCert
 	view     View
-	pipe     pipeline.Pipe
+	instance Instance
 }
 
 // NewBlock creates a new Block
-func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID, pipe pipeline.Pipe) *Block {
+func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID, instance Instance) *Block {
 	b := &Block{
 		parent:   parent,
 		cert:     cert,
 		cmd:      cmd,
 		view:     view,
 		proposer: proposer,
-		pipe:     pipe,
+		instance: instance,
 	}
 	// cache the hash immediately because it is too racy to do it in Hash()
 	b.hash = sha256.Sum256(b.ToBytes())
@@ -37,13 +35,13 @@ func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID,
 
 func (b *Block) String() string {
 	return fmt.Sprintf(
-		"Block{ hash: %.6s parent: %.6s, proposer: %d, view: %d , cert: %v, pipe: %d }",
+		"Block{ hash: %.6s parent: %.6s, proposer: %d, view: %d , cert: %v, instance: %d }",
 		b.Hash().String(),
 		b.parent.String(),
 		b.proposer,
 		b.view,
 		b.cert,
-		b.pipe,
+		b.instance,
 	)
 }
 
@@ -77,8 +75,8 @@ func (b *Block) View() View {
 	return b.view
 }
 
-func (b *Block) Pipe() pipeline.Pipe {
-	return b.pipe
+func (b *Block) Instance() Instance {
+	return b.instance
 }
 
 // ToBytes returns the raw byte form of the Block, to be used for hashing, etc.
@@ -87,9 +85,9 @@ func (b *Block) ToBytes() []byte {
 	var proposerBuf [4]byte
 	binary.LittleEndian.PutUint32(proposerBuf[:], uint32(b.proposer))
 	buf = append(buf, proposerBuf[:]...)
-	var pipeBuf [4]byte
-	binary.LittleEndian.PutUint32(pipeBuf[:], uint32(b.pipe))
-	buf = append(buf, pipeBuf[:]...)
+	var instanceBuf [4]byte
+	binary.LittleEndian.PutUint32(instanceBuf[:], uint32(b.instance))
+	buf = append(buf, instanceBuf[:]...)
 	var viewBuf [8]byte
 	binary.LittleEndian.PutUint64(viewBuf[:], uint64(b.view))
 	buf = append(buf, viewBuf[:]...)

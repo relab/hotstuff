@@ -9,7 +9,6 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipeline"
 )
 
 func init() {
@@ -24,19 +23,19 @@ type sequentiallyPiped struct {
 	logger      logging.Logger
 
 	mut                 sync.Mutex
-	bExecAtPipe         map[pipeline.Pipe]*hotstuff.Block
-	waitingBlocksAtPipe map[pipeline.Pipe][]*hotstuff.Block
-	pipeCount           int
+	bExecAtCi           map[hotstuff.Instance]*hotstuff.Block
+	waitingBlocksAtPipe map[hotstuff.Instance][]*hotstuff.Block
+	instanceCount       int
 	currentView         hotstuff.View
-	currentPipe         pipeline.Pipe
+	currentInstance     hotstuff.Instance
 }
 
 func NewSequentiallyPiped() modules.Committer {
 	return &sequentiallyPiped{
-		bExecAtPipe:         make(map[pipeline.Pipe]*hotstuff.Block),
-		waitingBlocksAtPipe: make(map[pipeline.Pipe][]*hotstuff.Block),
+		bExecAtCi:           make(map[hotstuff.Instance]*hotstuff.Block),
+		waitingBlocksAtPipe: make(map[hotstuff.Instance][]*hotstuff.Block),
 		currentView:         1,
-		currentPipe:         1,
+		currentInstance:     1,
 	}
 }
 
@@ -49,24 +48,24 @@ func (sp *sequentiallyPiped) InitModule(mods *modules.Core, opt modules.InitOpti
 		&sp.logger,
 	)
 
-	sp.pipeCount = opt.PipeCount
+	sp.instanceCount = opt.InstanceCount
 	if opt.IsPipeliningEnabled {
-		for _, pipe := range mods.Pipes() {
-			sp.bExecAtPipe[pipe] = hotstuff.GetGenesis()
-			sp.waitingBlocksAtPipe[pipe] = nil
+		for _, instance := range mods.Pipes() {
+			sp.bExecAtCi[instance] = hotstuff.GetGenesis()
+			sp.waitingBlocksAtPipe[instance] = nil
 		}
 		return
 	}
 
-	sp.bExecAtPipe[pipeline.NullPipe] = hotstuff.GetGenesis()
-	sp.waitingBlocksAtPipe[pipeline.NullPipe] = nil
+	sp.bExecAtCi[hotstuff.ZeroInstance] = hotstuff.GetGenesis()
+	sp.waitingBlocksAtPipe[hotstuff.ZeroInstance] = nil
 }
 
 // Stores the block before further execution.
 func (sp *sequentiallyPiped) Commit(block *hotstuff.Block) {
-	sp.logger.Debugf("Commit (currentPipe: %d, currentView: %d): new incoming block {p:%d, v:%d, h:%s}",
-		sp.currentPipe, sp.currentView,
-		block.Pipe(), block.View(), block.Hash().String()[:4])
+	sp.logger.Debugf("Commit (currentCi: %d, currentView: %d): new incoming block {p:%d, v:%d, h:%s}",
+		sp.currentInstance, sp.currentView,
+		block.Instance(), block.View(), block.Hash().String()[:4])
 	sp.mut.Lock()
 	// can't recurse due to requiring the mutex, so we use a helper instead.
 	err := sp.commitInner(block)
@@ -84,26 +83,26 @@ func (sp *sequentiallyPiped) Commit(block *hotstuff.Block) {
 	}
 }
 
-// Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
-func (sp *sequentiallyPiped) CommittedBlock(pipe pipeline.Pipe) *hotstuff.Block {
+// Retrieve the last block which was committed on an instance. Use zero if pipelining is not used.
+func (sp *sequentiallyPiped) CommittedBlock(instance hotstuff.Instance) *hotstuff.Block {
 	sp.mut.Lock()
 	defer sp.mut.Unlock()
-	return sp.bExecAtPipe[pipe]
+	return sp.bExecAtCi[instance]
 }
 
 // recursive helper for commit
 func (sp *sequentiallyPiped) commitInner(block *hotstuff.Block) error {
-	if sp.bExecAtPipe[block.Pipe()].View() >= block.View() {
+	if sp.bExecAtCi[block.Instance()].View() >= block.View() {
 		return nil
 	}
 
 	// Check if the block was added to the end of the queue. If so, exit.
-	blockQueue := sp.waitingBlocksAtPipe[block.Pipe()]
+	blockQueue := sp.waitingBlocksAtPipe[block.Instance()]
 	if len(blockQueue) > 0 && blockQueue[len(blockQueue)-1].View() >= block.View() {
 		return nil
 	}
 
-	if parent, ok := sp.blockChain.Get(block.Parent(), block.Pipe()); ok {
+	if parent, ok := sp.blockChain.Get(block.Parent(), block.Instance()); ok {
 		err := sp.commitInner(parent)
 		if err != nil {
 			return err
@@ -112,8 +111,8 @@ func (sp *sequentiallyPiped) commitInner(block *hotstuff.Block) error {
 		return fmt.Errorf("failed to locate block: %s", block.Parent())
 	}
 
-	sp.logger.Debugf("commitInner: Queued block: {p:%d, v:%d, h:%s}", block.Pipe(), block.View(), block.Hash().String()[:4])
-	sp.waitingBlocksAtPipe[block.Pipe()] = append(sp.waitingBlocksAtPipe[block.Pipe()], block)
+	sp.logger.Debugf("commitInner: Queued block: {p:%d, v:%d, h:%s}", block.Instance(), block.View(), block.Hash().String()[:4])
+	sp.waitingBlocksAtPipe[block.Instance()] = append(sp.waitingBlocksAtPipe[block.Instance()], block)
 	return nil
 }
 
@@ -127,41 +126,41 @@ func (sp *sequentiallyPiped) handleForks(prunedBlocks map[hotstuff.View][]*hotst
 }
 
 func (sp *sequentiallyPiped) tryExec() error {
-	waitingBlocks := sp.waitingBlocksAtPipe[sp.currentPipe]
+	waitingBlocks := sp.waitingBlocksAtPipe[sp.currentInstance]
 	canPeek := len(waitingBlocks) > 0
 	if !canPeek {
-		sp.logger.Debugf("tryExec (currentPipe: %d, currentView: %d): no block on pipe yet", sp.currentPipe, sp.currentView)
+		sp.logger.Debugf("tryExec (currentCi: %d, currentView: %d): no block on instance yet", sp.currentInstance, sp.currentView)
 		return nil
 	}
 
 	peekedBlock := waitingBlocks[0]
 	if peekedBlock.View() == sp.currentView {
 		// Execute block
-		sp.logger.Debugf("tryExec: block executed: {p=%d, v=%d, h:%s}", peekedBlock.Pipe(), peekedBlock.View(), peekedBlock.Hash().String()[:4])
+		sp.logger.Debugf("tryExec: block executed: {p=%d, v=%d, h:%s}", peekedBlock.Instance(), peekedBlock.View(), peekedBlock.Hash().String()[:4])
 		sp.executor.Exec(peekedBlock)
-		sp.bExecAtPipe[peekedBlock.Pipe()] = peekedBlock
+		sp.bExecAtCi[peekedBlock.Instance()] = peekedBlock
 		// Pop from queue
-		sp.waitingBlocksAtPipe[sp.currentPipe] = sp.waitingBlocksAtPipe[sp.currentPipe][1:]
+		sp.waitingBlocksAtPipe[sp.currentInstance] = sp.waitingBlocksAtPipe[sp.currentInstance][1:]
 		// Delete from chain.
 		err := sp.blockChain.DeleteAtHeight(peekedBlock.View(), peekedBlock.Hash())
 		if err != nil {
 			return err
 		}
 	} else {
-		sp.logger.Debugf("tryExec (currentPipe: %d, currentView: %d): block in queue does not match view: {p:%d, v:%d, h:%s}",
-			sp.currentPipe, sp.currentView,
-			peekedBlock.Pipe(), peekedBlock.View(), peekedBlock.Hash().String()[:4])
-		sp.eventLoop.DebugEvent(debug.CommitHaltEvent{OnPipe: sp.currentPipe})
+		sp.logger.Debugf("tryExec (currentCi: %d, currentView: %d): block in queue does not match view: {p:%d, v:%d, h:%s}",
+			sp.currentInstance, sp.currentView,
+			peekedBlock.Instance(), peekedBlock.View(), peekedBlock.Hash().String()[:4])
+		sp.eventLoop.DebugEvent(debug.CommitHaltEvent{OnPipe: sp.currentInstance})
 	}
 
-	sp.currentPipe++
-	if sp.currentPipe == pipeline.Pipe(sp.pipeCount)+1 {
-		sp.currentPipe = 1
+	sp.currentInstance++
+	if sp.currentInstance == hotstuff.Instance(sp.instanceCount)+1 {
+		sp.currentInstance = 1
 		// Prune out remaining blocks in the chain. Those blocks are guaranteed to be forks.
 		prunedBlocks := sp.blockChain.PruneToHeight(sp.currentView)
 		sp.handleForks(prunedBlocks)
 		sp.currentView++
-		sp.logger.Debugf("tryExec (currentPipe: %d): advance to view %d", sp.currentPipe, sp.currentView)
+		sp.logger.Debugf("tryExec (currentCi: %d): advance to view %d", sp.currentInstance, sp.currentView)
 	}
 
 	return sp.tryExec()

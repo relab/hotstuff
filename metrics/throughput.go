@@ -9,15 +9,14 @@ import (
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipeline"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func init() {
 	RegisterReplicaMetric("throughput", func() any {
 		return &Throughput{
-			commitCount:  make(map[pipeline.Pipe]uint64),
-			commandCount: make(map[pipeline.Pipe]uint64),
+			commitCount:  make(map[hotstuff.Instance]uint64),
+			commandCount: make(map[hotstuff.Instance]uint64),
 		}
 	})
 }
@@ -26,10 +25,10 @@ func init() {
 type Throughput struct {
 	metricsLogger Logger
 	opts          *modules.Options
-	pipeCount     int
+	instanceCount int
 
-	commitCount  map[pipeline.Pipe]uint64
-	commandCount map[pipeline.Pipe]uint64
+	commitCount  map[hotstuff.Instance]uint64
+	commandCount map[hotstuff.Instance]uint64
 }
 
 // InitModule gives the module access to the other modules.
@@ -45,11 +44,11 @@ func (t *Throughput) InitModule(mods *modules.Core, opt modules.InitOptions) {
 		&logger,
 	)
 
-	t.pipeCount = opt.PipeCount
+	t.instanceCount = opt.InstanceCount
 
 	eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
 		commitEvent := event.(hotstuff.CommitEvent)
-		t.recordCommit(commitEvent.OnPipe, commitEvent.Commands)
+		t.recordCommit(commitEvent.CI, commitEvent.Commands)
 	})
 
 	eventLoop.RegisterObserver(types.TickEvent{}, func(event any) {
@@ -59,7 +58,7 @@ func (t *Throughput) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	logger.Info("Throughput metric enabled")
 }
 
-func (t *Throughput) recordCommit(onPipe pipeline.Pipe, commands int) {
+func (t *Throughput) recordCommit(onPipe hotstuff.Instance, commands int) {
 	t.commitCount[onPipe]++
 	t.commandCount[onPipe] += uint64(commands)
 }
@@ -69,37 +68,37 @@ func (t *Throughput) tick(tick types.TickEvent) {
 
 	var totalCommands uint64 = 0
 	var totalCommits uint64 = 0
-	var maxPipes pipeline.Pipe = 1
-	var startPipe pipeline.Pipe = pipeline.NullPipe
+	var maxCi hotstuff.Instance = 1
+	var start hotstuff.Instance = hotstuff.ZeroInstance
 
-	if t.pipeCount > 0 {
-		maxPipes = pipeline.Pipe(t.pipeCount) + 1
-		startPipe++
+	if t.instanceCount > 0 {
+		maxCi = hotstuff.Instance(t.instanceCount) + 1
+		start++
 	}
 
-	for pipe := startPipe; pipe < maxPipes; pipe++ {
+	for instance := start; instance < maxCi; instance++ {
 		event := &types.ThroughputMeasurement{
 			Event:    types.NewReplicaEvent(uint32(t.opts.ID()), now),
-			Commits:  t.commitCount[pipe],
-			Commands: t.commandCount[pipe],
+			Commits:  t.commitCount[instance],
+			Commands: t.commandCount[instance],
 			Duration: durationpb.New(now.Sub(tick.LastTick)),
-			Pipe:     uint32(pipe),
+			Pipe:     uint32(instance),
 		}
 		t.metricsLogger.Log(event)
-		totalCommands += t.commandCount[pipe]
-		totalCommits += t.commitCount[pipe]
+		totalCommands += t.commandCount[instance]
+		totalCommits += t.commitCount[instance]
 		// reset count for next tick
-		t.commandCount[pipe] = 0
-		t.commitCount[pipe] = 0
+		t.commandCount[instance] = 0
+		t.commitCount[instance] = 0
 	}
 
-	if t.pipeCount > 0 {
+	if t.instanceCount > 0 {
 		event := &types.TotalThroughputMeasurement{
 			Event:     types.NewReplicaEvent(uint32(t.opts.ID()), now),
 			Commits:   totalCommits,
 			Commands:  totalCommands,
 			Duration:  durationpb.New(now.Sub(tick.LastTick)),
-			PipeCount: uint32(t.pipeCount),
+			PipeCount: uint32(t.instanceCount),
 		}
 		t.metricsLogger.Log(event)
 	}

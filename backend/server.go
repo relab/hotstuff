@@ -10,7 +10,6 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipeline"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -177,7 +176,7 @@ type serviceImpl struct {
 func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
 	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
-		impl.srv.logger.Infof("Failed to get clietestpipednt ID: %v", err)
+		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
 
@@ -185,15 +184,13 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
 	impl.srv.induceLatencyHacky(id, func() {
-		if pipeline.ValidPipe(proposeMsg.PipeId) {
-			impl.srv.eventLoop.PipeEvent(proposeMsg.PipeId, proposeMsg)
+		if hotstuff.IsPipelined(proposeMsg.CI) {
+			impl.srv.eventLoop.PipeEvent(proposeMsg.CI, proposeMsg)
 			return
 		}
 
 		impl.srv.eventLoop.AddEvent(proposeMsg)
 	})
-
-	// If the pipe ID is null, then add the event normally
 }
 
 // Vote handles an incoming vote message.
@@ -204,9 +201,9 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		return
 	}
 	impl.srv.induceLatencyHacky(id, func() {
-		pipe := pipeline.Pipe(cert.PipeId)
-		if pipeline.ValidPipe(pipe) {
-			impl.srv.eventLoop.PipeEvent(pipe, hotstuff.VoteMsg{
+		instance := hotstuff.Instance(cert.PipeId)
+		if hotstuff.IsPipelined(instance) {
+			impl.srv.eventLoop.PipeEvent(instance, hotstuff.VoteMsg{
 				ID:          id,
 				PartialCert: hotstuffpb.PartialCertFromProto(cert),
 			})
@@ -228,9 +225,9 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		return
 	}
 	impl.srv.induceLatencyHacky(id, func() {
-		pipe := pipeline.Pipe(msg.PipeId)
-		if pipeline.ValidPipe(pipe) {
-			impl.srv.eventLoop.PipeEvent(pipe, hotstuff.NewViewMsg{
+		instance := hotstuff.Instance(msg.PipeId)
+		if hotstuff.IsPipelined(instance) {
+			impl.srv.eventLoop.PipeEvent(instance, hotstuff.NewViewMsg{
 				ID:       id,
 				SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
 			})
@@ -269,8 +266,8 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	}
 
 	impl.srv.induceLatencyHacky(timeoutMsg.ID, func() {
-		if pipeline.ValidPipe(timeoutMsg.PipeId) {
-			impl.srv.eventLoop.PipeEvent(timeoutMsg.PipeId, timeoutMsg)
+		if hotstuff.IsPipelined(timeoutMsg.CI) {
+			impl.srv.eventLoop.PipeEvent(timeoutMsg.CI, timeoutMsg)
 			return
 		}
 

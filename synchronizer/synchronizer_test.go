@@ -9,7 +9,6 @@ import (
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipeline"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -29,7 +28,7 @@ func TestAdvanceViewQC(t *testing.T) {
 		hotstuff.NewQuorumCert(
 			nil,
 			0,
-			pipeline.NullPipe, // TODO: Verify if this code conflicts with pipelining
+			hotstuff.ZeroInstance, // TODO: Verify if this code conflicts with pipelining
 			hotstuff.GetGenesis().Hash()),
 		"foo",
 		1,
@@ -43,9 +42,9 @@ func TestAdvanceViewQC(t *testing.T) {
 	blockChain.Store(block)
 	qc := testutil.CreateQC(t, block, signers)
 	// synchronizer should tell hotstuff to propose
-	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(pipeline.NullPipe)))
+	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(hotstuff.ZeroInstance)))
 
-	s.AdvanceView(hotstuff.NewSyncInfo(pipeline.NullPipe).WithQC(qc))
+	s.AdvanceView(hotstuff.NewSyncInfo(hotstuff.ZeroInstance).WithQC(qc))
 
 	if s.View() != 2 {
 		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())
@@ -66,9 +65,9 @@ func TestAdvanceViewTC(t *testing.T) {
 	tc := testutil.CreateTC(t, 1, signers)
 
 	// synchronizer should tell hotstuff to propose
-	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(pipeline.NullPipe)))
+	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(hotstuff.ZeroInstance)))
 
-	s.AdvanceView(hotstuff.NewSyncInfo(pipeline.NullPipe).WithTC(tc))
+	s.AdvanceView(hotstuff.NewSyncInfo(hotstuff.ZeroInstance).WithTC(tc))
 
 	if s.View() != 2 {
 		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())

@@ -3,19 +3,19 @@ package metrics
 import (
 	"time"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/debug"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/pipeline"
 )
 
 func init() {
 	RegisterReplicaMetric("debug", func() any {
 		return &DebugMetrics{
-			sequentialPipedCommitHalts: make(map[pipeline.Pipe]int),
-			rejectedCommands:           make(map[pipeline.Pipe]int),
+			sequentialPipedCommitHalts: make(map[hotstuff.Instance]int),
+			rejectedCommands:           make(map[hotstuff.Instance]int),
 		}
 	})
 }
@@ -24,11 +24,11 @@ func init() {
 type DebugMetrics struct {
 	metricsLogger Logger
 	opts          *modules.Options
-	pipeCount     int
+	instanceCount int
 
 	// metrics
-	sequentialPipedCommitHalts map[pipeline.Pipe]int
-	rejectedCommands           map[pipeline.Pipe]int
+	sequentialPipedCommitHalts map[hotstuff.Instance]int
+	rejectedCommands           map[hotstuff.Instance]int
 }
 
 // InitModule gives the module access to the other modules.
@@ -45,7 +45,7 @@ func (db *DebugMetrics) InitModule(mods *modules.Core, opt modules.InitOptions) 
 		&logger,
 	)
 
-	db.pipeCount = opt.PipeCount
+	db.instanceCount = opt.InstanceCount
 
 	logger.Info("DebugMetrics enabled.")
 
@@ -65,24 +65,24 @@ func (db *DebugMetrics) InitModule(mods *modules.Core, opt modules.InitOptions) 
 }
 
 func (db *DebugMetrics) tick(_ types.TickEvent) {
-	var maxPipes pipeline.Pipe = 1
-	var startPipe pipeline.Pipe = pipeline.NullPipe
+	var maxCi hotstuff.Instance = 1
+	var start hotstuff.Instance = hotstuff.ZeroInstance
 
-	if db.pipeCount > 0 {
-		maxPipes = pipeline.Pipe(db.pipeCount) + 1
-		startPipe++
+	if db.instanceCount > 0 {
+		maxCi = hotstuff.Instance(db.instanceCount) + 1
+		start++
 	}
 
-	for pipe := startPipe; pipe < maxPipes; pipe++ {
+	for instance := start; instance < maxCi; instance++ {
 		db.metricsLogger.Log(&types.DebugMeasurement{
 			Event:            types.NewReplicaEvent(uint32(db.opts.ID()), time.Now()),
-			OnPipe:           uint32(pipe),
-			CommitHalts:      uint32(db.sequentialPipedCommitHalts[pipe]),
-			RejectedCommands: uint32(db.rejectedCommands[pipe]),
+			OnPipe:           uint32(instance),
+			CommitHalts:      uint32(db.sequentialPipedCommitHalts[instance]),
+			RejectedCommands: uint32(db.rejectedCommands[instance]),
 		})
 
-		db.sequentialPipedCommitHalts[pipe] = 0
-		db.rejectedCommands[pipe] = 0
+		db.sequentialPipedCommitHalts[instance] = 0
+		db.rejectedCommands[instance] = 0
 	}
 
 }
