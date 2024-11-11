@@ -47,7 +47,7 @@ func (vm *VotingMachine) InitModule(mods *modules.Core, initOpt modules.InitOpti
 	vm.instance = initOpt.ModuleConsensusInstance
 	vm.eventLoop.RegisterHandler(hotstuff.VoteMsg{}, func(event any) {
 		vm.OnVote(event.(hotstuff.VoteMsg))
-	}, eventloop.RespondToPipe(initOpt.ModuleConsensusInstance))
+	}, eventloop.RespondToInstance(initOpt.ModuleConsensusInstance))
 }
 
 // OnVote handles an incoming vote.

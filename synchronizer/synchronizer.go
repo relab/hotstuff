@@ -64,17 +64,17 @@ func (s *Synchronizer) InitModule(mods *modules.Core, initOpt modules.InitOption
 		if s.View() == timeout.View {
 			s.OnLocalTimeout()
 		}
-	}, eventloop.RespondToPipe(initOpt.ModuleConsensusInstance))
+	}, eventloop.RespondToInstance(initOpt.ModuleConsensusInstance))
 
 	s.eventLoop.RegisterHandler(hotstuff.NewViewMsg{}, func(event any) {
 		newViewMsg := event.(hotstuff.NewViewMsg)
 		s.OnNewView(newViewMsg)
-	}, eventloop.RespondToPipe(initOpt.ModuleConsensusInstance))
+	}, eventloop.RespondToInstance(initOpt.ModuleConsensusInstance))
 
 	s.eventLoop.RegisterHandler(hotstuff.TimeoutMsg{}, func(event any) {
 		timeoutMsg := event.(hotstuff.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
-	}, eventloop.RespondToPipe(initOpt.ModuleConsensusInstance))
+	}, eventloop.RespondToInstance(initOpt.ModuleConsensusInstance))
 
 	var err error
 	s.highQC, err = s.crypto.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})

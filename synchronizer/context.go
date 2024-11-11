@@ -61,7 +61,7 @@ func PipedViewContext(parent context.Context, eventLoop *eventloop.EventLoop, in
 		if view == nil || viewChangeEvent.View >= *view {
 			cancel()
 		}
-	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToPipe(instance))
+	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToInstance(instance))
 
 	return ctx, func() {
 		eventLoop.UnregisterHandler(ViewChangeEvent{}, instance, id)
@@ -86,7 +86,7 @@ func PipedTimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop,
 			panic(fmt.Sprintf("incorrect consensus instance: want=%d, got=%d", myPipe, timeoutEvent.Instance))
 		}
 		cancel()
-	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToPipe(instance))
+	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToInstance(instance))
 
 	return ctx, func() {
 		eventLoop.UnregisterHandler(TimeoutEvent{}, instance, id)

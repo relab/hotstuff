@@ -95,7 +95,7 @@ func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOpti
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.OnPropose(event.(hotstuff.ProposeMsg))
-	}, eventloop.RespondToPipe(initOpt.ModuleConsensusInstance))
+	}, eventloop.RespondToInstance(initOpt.ModuleConsensusInstance))
 }
 
 func (cs *consensusBase) CommittedBlock() *hotstuff.Block {

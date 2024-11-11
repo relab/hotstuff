@@ -43,9 +43,9 @@ func Prioritize() HandlerOption {
 	}
 }
 
-// RespondToPipe assigns which consensus instance to respond to when PipeEvent is used to add an event to the
+// RespondToInstance assigns which consensus instance to respond to when PipeEvent is used to add an event to the
 // eventloop. If the NullPipeId (0) is passed, this handler option will not take effect.
-func RespondToPipe(instance hotstuff.Instance) HandlerOption {
+func RespondToInstance(instance hotstuff.Instance) HandlerOption {
 	return func(ho *handlerOpts) {
 		ho.consensusInstance = instance
 	}

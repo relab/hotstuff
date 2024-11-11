@@ -171,7 +171,7 @@ func TestProposePiped(t *testing.T) {
 			t.Errorf("block hashes do not match. want %d got %d", got.Block.Instance(), want.Block.Instance())
 		}
 		wg.Done()
-	}, eventloop.RespondToPipe(instance))
+	}, eventloop.RespondToInstance(instance))
 }
 
 func TestTimeout(t *testing.T) {
@@ -222,7 +222,7 @@ func TestTimeoutPiped(t *testing.T) {
 			t.Errorf("wrong view in proposal: got: %d, want: %d", got.View, want.View)
 		}
 		wg.Done()
-	}, eventloop.RespondToPipe(instance))
+	}, eventloop.RespondToInstance(instance))
 }
 
 type testData struct {

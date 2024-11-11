@@ -46,7 +46,7 @@ func (vt *ViewTimeouts) InitModule(mods *modules.Core, opt modules.InitOptions) 
 		for instance := hotstuff.Instance(1); instance <= hotstuff.Instance(opt.InstanceCount); instance++ {
 			eventLoop.RegisterHandler(synchronizer.ViewChangeEvent{}, func(event any) {
 				vt.viewChange(event.(synchronizer.ViewChangeEvent))
-			}, eventloop.RespondToPipe(instance))
+			}, eventloop.RespondToInstance(instance))
 		}
 	} else {
 

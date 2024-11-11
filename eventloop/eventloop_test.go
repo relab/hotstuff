@@ -54,11 +54,11 @@ func TestHandlerPiped(t *testing.T) {
 	c := make(chan any)
 	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- event
-	}, eventloop.RespondToPipe(listeningPipeId))
+	}, eventloop.RespondToInstance(listeningPipeId))
 
 	el.RegisterHandler(testEvent(0), func(_ any) {
 		panic("wrong pipe id")
-	}, eventloop.RespondToPipe(incorrectPipeId))
+	}, eventloop.RespondToInstance(incorrectPipeId))
 
 	el.RegisterHandler(testEvent(0), func(_ any) {
 		panic("unpiped handler should not respond")
@@ -185,11 +185,11 @@ func TestDelayedEventPiped(t *testing.T) {
 
 	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- event.(testEvent)
-	}, eventloop.RespondToPipe(listeningPipeId))
+	}, eventloop.RespondToInstance(listeningPipeId))
 
 	el.RegisterHandler(testEvent(0), func(_ any) {
 		panic("wrong pipe id")
-	}, eventloop.RespondToPipe(incorrectPipeId))
+	}, eventloop.RespondToInstance(incorrectPipeId))
 
 	el.RegisterHandler(testEvent(0), func(_ any) {
 		panic("unpiped handler should not respond")
