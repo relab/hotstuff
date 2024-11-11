@@ -192,8 +192,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 
 	var comm modules.Committer
-	if opts.GetPipes() > 0 {
-		builder.EnablePipelining(int(opts.GetPipes()))
+	if opts.GetPipelineConsensusInstances() > 0 {
+		builder.EnablePipelining(int(opts.GetPipelineConsensusInstances()))
 		comm, ok = modules.GetModule[modules.Committer](opts.GetPipelineOrdering())
 		if !ok {
 			return nil, fmt.Errorf("invalid pipeline ordering scheme: %s", opts.GetPipelineOrdering())
@@ -233,7 +233,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	pipedSynchronizers := builder.CreatePiped(synchronizer.New, newViewDuration())
 
 	builder.Add(
-		eventloop.NewPiped(1000, int(opts.GetPipes())),
+		eventloop.NewPiped(1000, int(opts.GetPipelineConsensusInstances())),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		w.metricsLogger,
 		blockchain.New(),
@@ -275,7 +275,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		RootCAs:                rootCAs,
 		LocationInfo:           locationInfo,
 		BatchSize:              opts.GetBatchSize(),
-		ConsensusInstanceCount: opts.GetPipes(),
+		ConsensusInstanceCount: opts.GetPipelineConsensusInstances(),
 		HackyLatency:           *opts.GetHackyLatency(),
 		ManagerOptions: []gorums.ManagerOption{
 			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),

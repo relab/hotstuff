@@ -201,7 +201,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		return
 	}
 	impl.srv.induceLatencyHacky(id, func() {
-		instance := hotstuff.Instance(cert.PipeId)
+		instance := hotstuff.Instance(cert.Instance)
 		if hotstuff.IsPipelined(instance) {
 			impl.srv.eventLoop.PipeEvent(instance, hotstuff.VoteMsg{
 				ID:          id,
@@ -225,7 +225,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		return
 	}
 	impl.srv.induceLatencyHacky(id, func() {
-		instance := hotstuff.Instance(msg.PipeId)
+		instance := hotstuff.Instance(msg.Instance)
 		if hotstuff.IsPipelined(instance) {
 			impl.srv.eventLoop.PipeEvent(instance, hotstuff.NewViewMsg{
 				ID:       id,

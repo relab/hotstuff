@@ -44,7 +44,7 @@ func TimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop) (con
 
 // PipedViewContext returns a context that is canceled at the end of view.
 // If view is nil or less than or equal to the current view, the context will be canceled at the next view change.
-// Pipe is null-pipe, returns regular PipedViewContext.
+// If instance is ZeroInstance, returns regular PipedViewContext.
 func PipedViewContext(parent context.Context, eventLoop *eventloop.EventLoop, instance hotstuff.Instance, view *hotstuff.View) (context.Context, context.CancelFunc) {
 	if instance == hotstuff.ZeroInstance {
 		return ViewContext(parent, eventLoop, view)
@@ -70,7 +70,7 @@ func PipedViewContext(parent context.Context, eventLoop *eventloop.EventLoop, in
 }
 
 // PipedTimeoutContext returns a context that is canceled either when a timeout occurs, or when the view changes.
-// Pipe is null-pipe, returns regular TimeoutContext.
+// If instance is ZeroInstance, returns regular TimeoutContext.
 func PipedTimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop, instance hotstuff.Instance) (context.Context, context.CancelFunc) {
 	if instance == hotstuff.ZeroInstance {
 		return TimeoutContext(parent, eventLoop)
