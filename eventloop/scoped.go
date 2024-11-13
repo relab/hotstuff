@@ -229,11 +229,11 @@ func (el *ScopedEventLoop) Tick(ctx context.Context) bool {
 var scopedHandlerListPool = gpool.New(func() []handler { return make([]handler, 0, 10) })
 
 // processEvent dispatches the event to the correct handler.
-func (el *ScopedEventLoop) processEvent(event any, onPipe hotstuff.Instance, runningInAddEvent bool) {
+func (el *ScopedEventLoop) processEvent(event any, instance hotstuff.Instance, runningInAddEvent bool) {
 	t := reflect.TypeOf(event)
 
 	if !runningInAddEvent {
-		defer el.dispatchDelayedEvents(onPipe, t)
+		defer el.dispatchDelayedEvents(instance, t)
 	}
 
 	// Must copy handlers to a list so that they can be executed after unlocking the mutex.
@@ -243,7 +243,7 @@ func (el *ScopedEventLoop) processEvent(event any, onPipe hotstuff.Instance, run
 	handlerList := scopedHandlerListPool.Get()
 
 	el.mut.Lock()
-	handlers := el.handlers[onPipe][t]
+	handlers := el.handlers[instance][t]
 	for _, handler := range handlers {
 		if handler.opts.runInAddEvent != runningInAddEvent || handler.callback == nil {
 			continue

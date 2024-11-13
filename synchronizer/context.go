@@ -53,10 +53,10 @@ func ScopedViewContext(parent context.Context, eventLoop *eventloop.ScopedEventL
 	ctx, cancel := context.WithCancel(parent)
 
 	id := eventLoop.RegisterHandler(ViewChangeEvent{}, func(event any) {
-		myPipe := instance
+		myScope := instance
 		viewChangeEvent := event.(ViewChangeEvent)
-		if viewChangeEvent.Instance != myPipe {
-			panic(fmt.Sprintf("incorrect consensus instance: want=%d, got=%d", myPipe, viewChangeEvent.Instance))
+		if viewChangeEvent.Instance != myScope {
+			panic(fmt.Sprintf("incorrect consensus instance: want=%d, got=%d", myScope, viewChangeEvent.Instance))
 		}
 		if view == nil || viewChangeEvent.View >= *view {
 			cancel()
@@ -80,10 +80,10 @@ func ScopedTimeoutContext(parent context.Context, eventLoop *eventloop.ScopedEve
 	ctx, cancel := ScopedViewContext(parent, eventLoop, instance, nil)
 
 	id := eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
-		myPipe := instance
+		myScope := instance
 		timeoutEvent := event.(TimeoutEvent)
-		if timeoutEvent.Instance != myPipe {
-			panic(fmt.Sprintf("incorrect consensus instance: want=%d, got=%d", myPipe, timeoutEvent.Instance))
+		if timeoutEvent.Instance != myScope {
+			panic(fmt.Sprintf("incorrect consensus instance: want=%d, got=%d", myScope, timeoutEvent.Instance))
 		}
 		cancel()
 	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToScope(instance))

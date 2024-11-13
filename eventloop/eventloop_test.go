@@ -47,18 +47,18 @@ func TestHandler(t *testing.T) {
 }
 
 func TestHandlerScoped(t *testing.T) {
-	listeningPipeId := hotstuff.Instance(1)
-	incorrectPipeId := hotstuff.Instance(2)
-	pipeCount := 1
-	el := eventloop.NewScoped(10, pipeCount)
+	listeningInstance := hotstuff.Instance(1)
+	incorrectInstance := hotstuff.Instance(2)
+	instances := 1
+	el := eventloop.NewScoped(10, instances)
 	c := make(chan any)
 	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- event
-	}, eventloop.RespondToScope(listeningPipeId))
+	}, eventloop.RespondToScope(listeningInstance))
 
 	el.RegisterHandler(testEvent(0), func(_ any) {
 		panic("wrong scope")
-	}, eventloop.RespondToScope(incorrectPipeId))
+	}, eventloop.RespondToScope(incorrectInstance))
 
 	el.RegisterHandler(testEvent(0), func(_ any) {
 		panic("non-scoped handler should not respond")
@@ -72,7 +72,7 @@ func TestHandlerScoped(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 
 	want := testEvent(42)
-	el.ScopeEvent(listeningPipeId, want)
+	el.ScopeEvent(listeningInstance, want)
 
 	var event any
 	select {
@@ -177,29 +177,29 @@ func TestTicker(t *testing.T) {
 }
 
 func TestDelayedEventScoped(t *testing.T) {
-	pipeCount := 1
-	listeningPipeId := hotstuff.Instance(1)
-	incorrectPipeId := hotstuff.Instance(2)
-	el := eventloop.NewScoped(10, pipeCount)
+	instances := 1
+	listeningInstance := hotstuff.Instance(1)
+	incorrectInstance := hotstuff.Instance(2)
+	el := eventloop.NewScoped(10, instances)
 	c := make(chan testEvent)
 
 	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- event.(testEvent)
-	}, eventloop.RespondToScope(listeningPipeId))
+	}, eventloop.RespondToScope(listeningInstance))
 
 	el.RegisterHandler(testEvent(0), func(_ any) {
 		panic("wrong scope")
-	}, eventloop.RespondToScope(incorrectPipeId))
+	}, eventloop.RespondToScope(incorrectInstance))
 
 	el.RegisterHandler(testEvent(0), func(_ any) {
 		panic("non-scoped handler should not respond")
 	})
 
 	// delay the "2" and "3" events until after the first instance of testEvent
-	el.DelayScoped(listeningPipeId, testEvent(0), testEvent(2))
-	el.DelayScoped(listeningPipeId, testEvent(0), testEvent(3))
+	el.DelayScoped(listeningInstance, testEvent(0), testEvent(2))
+	el.DelayScoped(listeningInstance, testEvent(0), testEvent(3))
 	// then send the "1" event
-	el.ScopeEvent(listeningPipeId, testEvent(1))
+	el.ScopeEvent(listeningInstance, testEvent(1))
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

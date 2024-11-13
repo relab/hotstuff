@@ -217,7 +217,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	cmd := block.Command()
 	if !cs.acceptor.Accept(cmd) {
 		cs.logger.Infof("OnPropose[ci=%d, view=%d]: block rejected: %.8s -> %.8x", cs.instance, cs.synchronizer.View(), block.Hash(), block.Command())
-		cs.eventLoop.DebugEvent(debug.CommandRejectedEvent{OnPipe: cs.instance, View: cs.synchronizer.View()})
+		cs.eventLoop.DebugEvent(debug.CommandRejectedEvent{Instance: cs.instance, View: cs.synchronizer.View()})
 		return
 	}
 

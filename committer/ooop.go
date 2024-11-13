@@ -150,7 +150,7 @@ func (c *outOfOrderProcessingCommitter) tryExec() error {
 		c.logger.Debugf("tryExec (currentCi: %d, currentView: %d): block in queue does not match view: {p:%d, v:%d, h:%s}",
 			c.currentInstance, c.currentView,
 			peekedBlock.Instance(), peekedBlock.View(), peekedBlock.Hash().String()[:4])
-		c.eventLoop.DebugEvent(debug.CommitHaltEvent{OnPipe: c.currentInstance})
+		c.eventLoop.DebugEvent(debug.CommitHaltEvent{Instance: c.currentInstance})
 	}
 
 	c.currentInstance++

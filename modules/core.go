@@ -120,13 +120,13 @@ func (mods *Core) Get(pointers ...any) {
 	}
 }
 
-// GetScoped does the same as Get and additionally searches for pointers in the same pipe as moduleInPipe.
+// GetScoped does the same as Get and additionally searches for pointers in the same scope as moduleInScope.
 // If pipelining is not enabled, Get is called internally instead.
 //
 // NOTE: pointers must only contain non-nil pointers to types that have been provided to the module system
-// as a piped module.
+// as a scoped module.
 // GetScoped panics if one of the given arguments is not a pointer, if a compatible module is not found,
-// if the module was not in a pipe or if the module was not in the same pipe as moduleInPipe.
+// if the module was not in a scope or if the module was not in the same scope as moduleInScope.
 //
 // Example:
 //
@@ -173,7 +173,7 @@ func (mods *Core) GetScoped(moduleInScope Module, pointers ...any) {
 
 // tryGetFromScope attempts to find a module for ptr which also happens to be in the same
 // instance as moduleInScope, false otherwise.
-// TryGetFromPipe returns true if a module was successflully stored in ptr, false otherwise.
+// tryGetFromScope returns true if a module was successflully stored in ptr, false otherwise.
 // If pipelining was not enabled, TryGet is called implicitly.
 func (mods *Core) tryGetFromScope(moduleInScope Module, ptr any) bool {
 	if len(mods.scopedModules) == 0 {
@@ -189,29 +189,29 @@ func (mods *Core) tryGetFromScope(moduleInScope Module, ptr any) bool {
 		panic("only pointer values allowed")
 	}
 
-	correctPipeId := hotstuff.ZeroInstance
+	correctInstance := hotstuff.ZeroInstance
 	for instance := range mods.scopedModules {
 		scope := mods.scopedModules[instance]
-		// Check if self is in pipe
+		// Check if self is in scope
 		for _, module := range scope {
 			// TODO: Verify if equality comparison is correct
 			if module == moduleInScope {
-				correctPipeId = instance
+				correctInstance = instance
 				break
 			}
 		}
 		// Break outer loop too if an instance was found
-		if correctPipeId != hotstuff.ZeroInstance {
+		if correctInstance != hotstuff.ZeroInstance {
 			break
 		}
 	}
 
 	// If this variable remained unchanged, return false
-	if correctPipeId == hotstuff.ZeroInstance {
+	if correctInstance == hotstuff.ZeroInstance {
 		return false
 	}
 
-	correctScope := mods.scopedModules[correctPipeId]
+	correctScope := mods.scopedModules[correctInstance]
 	for _, m := range correctScope {
 		mv := reflect.ValueOf(m)
 		if mv.Type().AssignableTo(pt.Elem()) {
@@ -251,12 +251,12 @@ func (core *Core) MatchForScope(instance hotstuff.Instance, ptr any) {
 	panic("no match found for " + pt.Elem().Name())
 }
 
-// Return the number of pipes the builder has generated.
+// Return the number of scopes the builder has generated.
 func (core *Core) ScopeCount() int {
 	return len(core.scopedModules)
 }
 
-// Return a slice of Scopes in the order which the pipes were created by Builder.
+// Return a slice of Scopes in the order which the scopes were created by Builder.
 func (core *Core) Scopes() (ids []hotstuff.Instance) {
 	for id := range core.scopedModules {
 		ids = append(ids, id)
@@ -265,7 +265,7 @@ func (core *Core) Scopes() (ids []hotstuff.Instance) {
 	return
 }
 
-// Return a list of modules from a pipes. The order of module types is influenced
+// Return a list of modules from a scope. The order of module types is influenced
 // by when AddScoped was called in Builder.
 func (core *Core) GetScope(instance hotstuff.Instance) []any {
 	return core.scopedModules[instance]
@@ -335,17 +335,17 @@ func (b *Builder) Add(modules ...any) {
 }
 
 // CreateScope constructs N modules of the same type based on the constructor function
-// and adds them to a map where each module is mapped to a pipe. The module's constructor
+// and adds them to a map where each module is mapped to a scope. The module's constructor
 // is called with the variadic arguments.
 // If pipelining is disabled when CreateScope is called, only one module will be constructed and mapped
 // to hotstuff.ZeroInstance.
 // To add the modules, use AddScopedModules later.
-func (b *Builder) CreateScope(ctor any, ctorArgs ...any) (pipedMods map[hotstuff.Instance]any) {
+func (b *Builder) CreateScope(ctor any, ctorArgs ...any) (scopedMods map[hotstuff.Instance]any) {
 	if reflect.TypeOf(ctor).Kind() != reflect.Func {
 		panic("first argument is not a function")
 	}
 
-	pipedMods = make(map[hotstuff.Instance]any)
+	scopedMods = make(map[hotstuff.Instance]any)
 
 	vargs := make([]reflect.Value, len(ctorArgs))
 	for n, v := range ctorArgs {
@@ -353,19 +353,19 @@ func (b *Builder) CreateScope(ctor any, ctorArgs ...any) (pipedMods map[hotstuff
 	}
 
 	ctorVal := reflect.ValueOf(ctor)
-	pipes := b.consensusInstanceIds
+	scopeIds := b.consensusInstanceIds
 	if !b.pipeliningEnabled {
-		pipes = []hotstuff.Instance{hotstuff.ZeroInstance}
+		scopeIds = []hotstuff.Instance{hotstuff.ZeroInstance}
 	}
-	for _, id := range pipes {
+	for _, id := range scopeIds {
 		returnResult := ctorVal.Call(vargs)
 		if len(returnResult) != 1 {
 			panic("constructor does not return a single value")
 		}
 		mod := returnResult[0].Interface()
-		pipedMods[id] = mod
+		scopedMods[id] = mod
 	}
-	return pipedMods
+	return scopedMods
 }
 
 func (b *Builder) AddScope(scopedModuleMaps ...map[hotstuff.Instance]any) {
@@ -373,7 +373,7 @@ func (b *Builder) AddScope(scopedModuleMaps ...map[hotstuff.Instance]any) {
 		if !b.pipeliningEnabled {
 			mod, ok := scopedMods[hotstuff.ZeroInstance]
 			if !ok {
-				panic("map of piped modules did not contain null-pipe key")
+				panic("map of scoped modules did not contain zero-instance key")
 			}
 			b.Add(mod)
 			continue
@@ -415,14 +415,6 @@ func (b *Builder) Build() *Core {
 	}
 
 	b.core.isPipeliningEnabled = true
-	// Adding the piped modules to core first.
-	// b.core.pipedModules = make(map[pipelining.PipeId][]any)
-	// for id, pipe := range b.modulePipes {
-	// 	b.core.pipedModules[id] = make([]any, 0)
-	// 	for _, module := range pipe {
-	// 		b.core.pipedModules[id] = append(b.core.pipedModules[id], module)
-	// 	}
-	// }
 
 	// Initializing later so that modules can reference
 	// other modules in the same pipe without panicking.

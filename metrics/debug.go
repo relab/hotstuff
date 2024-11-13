@@ -51,12 +51,12 @@ func (db *DebugMetrics) InitModule(mods *modules.Core, opt modules.InitOptions) 
 
 	eventLoop.RegisterHandler(debug.CommitHaltEvent{}, func(event any) {
 		halt := event.(debug.CommitHaltEvent)
-		db.sequentialScopedCommitHalts[halt.OnPipe]++
+		db.sequentialScopedCommitHalts[halt.Instance]++
 	})
 
 	eventLoop.RegisterHandler(debug.CommandRejectedEvent{}, func(event any) {
 		reject := event.(debug.CommandRejectedEvent)
-		db.rejectedCommands[reject.OnPipe]++
+		db.rejectedCommands[reject.Instance]++
 	})
 
 	eventLoop.RegisterObserver(types.TickEvent{}, func(event any) {
