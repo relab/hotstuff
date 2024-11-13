@@ -20,6 +20,7 @@ type basic struct {
 	bExec *hotstuff.Block
 }
 
+// Basic committer implements commit logic for a single consensus instance.
 func NewBasic() modules.Committer {
 	return &basic{
 		bExec: hotstuff.GetGenesis(),

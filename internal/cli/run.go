@@ -64,7 +64,7 @@ func init() {
 	runCmd.Flags().Int64("shared-seed", 0, "Shared random number generator seed")
 	runCmd.Flags().StringSlice("modules", nil, "Name additional modules to be loaded.")
 	runCmd.Flags().Uint32("pipeline-instances", 0, "number of consensus instances in pipelining mode, where zero means pipelining is disabled.")
-	runCmd.Flags().String("pipeline-ordering", "sequential", "block execution ordering logic for pipelining mode.")
+	runCmd.Flags().String("pipeline-ordering", "multiplexed", "block execution ordering logic for pipelining mode.")
 	runCmd.Flags().String("viewduration-method", "fixed", "Calculation method for computing view durations.")
 	runCmd.Flags().Duration("hacky-replica-latency", 0, "Hacky way to induce replica latency. All replicas will have this latency.")
 

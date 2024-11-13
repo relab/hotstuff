@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	modules.RegisterModule("sequential", NewMultiplexed)
+	modules.RegisterModule("multiplexed", NewMultiplexed)
 }
 
 type multiplexedCommitter struct {
@@ -30,6 +30,7 @@ type multiplexedCommitter struct {
 	currentInstance         hotstuff.Instance
 }
 
+// Multiplexed committer orders commits from multiple consensus instances by 1..n.
 func NewMultiplexed() modules.Committer {
 	return &multiplexedCommitter{
 		bExecAtCi:               make(map[hotstuff.Instance]*hotstuff.Block),
