@@ -9,6 +9,8 @@
 It provides a set of modules and interfaces that make it easy to test different algorithms.
 It also provides a tool for deploying and running experiments on multiple servers via SSH.
 
+_If you use this project for research, please cite the [APpLIED workshop paper](https://dl.acm.org/doi/10.1145/3584684.3597266) and the repository itself._
+
 ## Contents
 
 - [hotstuff](#hotstuff)
@@ -133,4 +135,6 @@ to implement quorum certificates.
 
 [5] Baudet, Mathieu, et al. "State machine replication in the libra blockchain." The Libra Assn., Tech. Rep (2019).
 
-[6]: S. Bano, A. Sonnino, A. Chursin, D. Perelman, en D. Malkhi, “Twins: White-Glove Approach for BFT Testing”, 2020.
+[6] S. Bano, A. Sonnino, A. Chursin, D. Perelman, en D. Malkhi, “Twins: White-Glove Approach for BFT Testing”, 2020.
+
+[7] Hanish Gogada, Hein Meling, Leander Jehl, and John Ingve Olsen. [An Extensible Framework for Implementing and Validating Byzantine Fault-Tolerant Protocols](https://dl.acm.org/doi/10.1145/3584684.3597266). In ApPLIED 2023: Proceedings of the 5th workshop on Advanced tools, programming languages, and PLatforms for Implementing and Evaluating algorithms for Distributed systems, 2023.
