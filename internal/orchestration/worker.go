@@ -349,7 +349,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
 		mods := modules.NewBuilder(hotstuff.ID(opts.GetID()), nil)
-		mods.Add(eventloop.New(1000))
+		mods.Add(eventloop.NewScoped(1000, 0))
 
 		if w.measurementInterval > 0 {
 			clientMetrics := metrics.GetClientMetrics(w.metrics...)

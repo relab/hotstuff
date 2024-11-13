@@ -60,7 +60,7 @@ type Config struct {
 
 // Client is a hotstuff client.
 type Client struct {
-	eventLoop *eventloop.EventLoop
+	eventLoop *eventloop.ScopedEventLoop
 	logger    logging.Logger
 	opts      *modules.Options
 

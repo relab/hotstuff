@@ -82,7 +82,7 @@ func (t *Throughput) tick(tick types.TickEvent) {
 			Commits:  t.commitCount[instance],
 			Commands: t.commandCount[instance],
 			Duration: durationpb.New(now.Sub(tick.LastTick)),
-			Pipe:     uint32(instance),
+			Instance: uint32(instance),
 		}
 		t.metricsLogger.Log(event)
 		totalCommands += t.commandCount[instance]
@@ -94,11 +94,11 @@ func (t *Throughput) tick(tick types.TickEvent) {
 
 	if t.instanceCount > 0 {
 		event := &types.TotalThroughputMeasurement{
-			Event:     types.NewReplicaEvent(uint32(t.opts.ID()), now),
-			Commits:   totalCommits,
-			Commands:  totalCommands,
-			Duration:  durationpb.New(now.Sub(tick.LastTick)),
-			PipeCount: uint32(t.instanceCount),
+			Event:         types.NewReplicaEvent(uint32(t.opts.ID()), now),
+			Commits:       totalCommits,
+			Commands:      totalCommands,
+			Duration:      durationpb.New(now.Sub(tick.LastTick)),
+			InstanceCount: uint32(t.instanceCount),
 		}
 		t.metricsLogger.Log(event)
 	}

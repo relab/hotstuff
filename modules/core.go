@@ -191,9 +191,9 @@ func (mods *Core) tryGetFromScope(moduleInScope Module, ptr any) bool {
 
 	correctPipeId := hotstuff.ZeroInstance
 	for instance := range mods.scopedModules {
-		pipe := mods.scopedModules[instance]
+		scope := mods.scopedModules[instance]
 		// Check if self is in pipe
-		for _, module := range pipe {
+		for _, module := range scope {
 			// TODO: Verify if equality comparison is correct
 			if module == moduleInScope {
 				correctPipeId = instance
@@ -311,10 +311,10 @@ func (bl *Builder) EnablePipelining(instanceCount int) {
 	bl.core.scopedModules = make(map[hotstuff.Instance][]any)
 	bl.moduleScopes = make(map[hotstuff.Instance]moduleScope)
 
-	for pipe := hotstuff.Instance(1); pipe <= hotstuff.Instance(instanceCount); pipe++ {
-		bl.consensusInstanceIds = append(bl.consensusInstanceIds, pipe)
-		bl.moduleScopes[pipe] = make(moduleScope, 0)
-		bl.core.scopedModules[pipe] = make([]any, 0)
+	for i := hotstuff.Instance(1); i <= hotstuff.Instance(instanceCount); i++ {
+		bl.consensusInstanceIds = append(bl.consensusInstanceIds, i)
+		bl.moduleScopes[i] = make(moduleScope, 0)
+		bl.core.scopedModules[i] = make([]any, 0)
 	}
 
 }

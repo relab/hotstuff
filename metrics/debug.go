@@ -76,7 +76,7 @@ func (db *DebugMetrics) tick(_ types.TickEvent) {
 	for instance := start; instance < maxCi; instance++ {
 		db.metricsLogger.Log(&types.DebugMeasurement{
 			Event:            types.NewReplicaEvent(uint32(db.opts.ID()), time.Now()),
-			OnPipe:           uint32(instance),
+			Instance:         uint32(instance),
 			CommitHalts:      uint32(db.sequentialScopedCommitHalts[instance]),
 			RejectedCommands: uint32(db.rejectedCommands[instance]),
 		})
