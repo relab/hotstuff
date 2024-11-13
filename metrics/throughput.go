@@ -58,9 +58,9 @@ func (t *Throughput) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	logger.Info("Throughput metric enabled")
 }
 
-func (t *Throughput) recordCommit(onPipe hotstuff.Instance, commands int) {
-	t.commitCount[onPipe]++
-	t.commandCount[onPipe] += uint64(commands)
+func (t *Throughput) recordCommit(instance hotstuff.Instance, commands int) {
+	t.commitCount[instance]++
+	t.commandCount[instance] += uint64(commands)
 }
 
 func (t *Throughput) tick(tick types.TickEvent) {
