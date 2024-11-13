@@ -54,7 +54,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 	synchronizer.EXPECT().ViewContext().AnyTimes().Return(context.Background())
 
 	builder.Add(
-		eventloop.NewPiped(100, 0),
+		eventloop.NewScoped(100, 0),
 		logging.New(fmt.Sprintf("hs%d", id)),
 		blockchain.New(),
 		committer.NewBasic(),
@@ -72,7 +72,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 }
 
 // TestModules registers default modules for testing to the given builder.
-func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *modules.Builder, instanceCount int) {
+func TestModulesScoped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *modules.Builder, instanceCount int) {
 	t.Helper()
 
 	acceptor := mocks.NewMockAcceptor(ctrl)
@@ -95,7 +95,7 @@ func TestModulesPiped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ h
 
 	// TODO: Check if this code still runs after implementing pipelining
 	builder.Add(
-		eventloop.NewPiped(100, 0),
+		eventloop.NewScoped(100, 0),
 		logging.New(fmt.Sprintf("hs%d", id)),
 		blockchain.New(),
 		committer.NewBasic(),
@@ -176,7 +176,7 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 }
 
 // TODO: Complete the implementation.
-func CreateBuildersPiped(t *testing.T, ctrl *gomock.Controller, n int, instanceCount int, keys ...hotstuff.PrivateKey) (builders BuilderList) {
+func CreateBuildersScoped(t *testing.T, ctrl *gomock.Controller, n int, instanceCount int, keys ...hotstuff.PrivateKey) (builders BuilderList) {
 	t.Helper()
 	network := twins.NewSimpleNetwork()
 	builders = make([]*modules.Builder, n)
@@ -192,7 +192,7 @@ func CreateBuildersPiped(t *testing.T, ctrl *gomock.Controller, n int, instanceC
 		builder := network.GetNodeBuilder(twins.NodeID{ReplicaID: id, NetworkID: uint32(id)}, key)
 		builder.EnablePipelining(instanceCount)
 		builder.Add(network.NewConfiguration())
-		TestModulesPiped(t, ctrl, id, key, &builder, instanceCount)
+		TestModulesScoped(t, ctrl, id, key, &builder, instanceCount)
 		builder.Add(network.NewConfiguration())
 		builders[i] = &builder
 	}

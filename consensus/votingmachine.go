@@ -15,7 +15,7 @@ type VotingMachine struct {
 	blockChain    modules.BlockChain
 	configuration modules.Configuration
 	crypto        modules.Crypto
-	eventLoop     *eventloop.EventLoop
+	eventLoop     *eventloop.ScopedEventLoop
 	logger        logging.Logger
 	synchronizer  modules.Synchronizer
 	opts          *modules.Options
@@ -34,7 +34,7 @@ func NewVotingMachine() *VotingMachine {
 
 // InitModule initializes the VotingMachine.
 func (vm *VotingMachine) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
-	mods.GetPiped(vm,
+	mods.GetScoped(vm,
 		&vm.blockChain,
 		&vm.configuration,
 		&vm.crypto,
@@ -47,7 +47,7 @@ func (vm *VotingMachine) InitModule(mods *modules.Core, initOpt modules.InitOpti
 	vm.instance = initOpt.ModuleConsensusInstance
 	vm.eventLoop.RegisterHandler(hotstuff.VoteMsg{}, func(event any) {
 		vm.OnVote(event.(hotstuff.VoteMsg))
-	}, eventloop.RespondToInstance(initOpt.ModuleConsensusInstance))
+	}, eventloop.RespondToScope(initOpt.ModuleConsensusInstance))
 }
 
 // OnVote handles an incoming vote.
@@ -72,7 +72,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 			// hopefully, the block has arrived by then.
 			vm.logger.Debugf("Local cache miss for block [ci=%d, view=%d]: %.8s", vm.instance, vm.synchronizer.View(), cert.BlockHash())
 			vote.Deferred = true
-			vm.eventLoop.DelayPiped(vm.instance, hotstuff.ProposeMsg{}, vote)
+			vm.eventLoop.DelayScoped(vm.instance, hotstuff.ProposeMsg{}, vote)
 			return
 		}
 	} else {
@@ -134,7 +134,7 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
 
-	vm.eventLoop.PipeEvent(vm.instance, hotstuff.NewViewMsg{
+	vm.eventLoop.ScopeEvent(vm.instance, hotstuff.NewViewMsg{
 		ID:       vm.opts.ID(),
 		SyncInfo: hotstuff.NewSyncInfo(block.Instance()).WithQC(qc)})
 }

@@ -25,7 +25,7 @@ func TestVote(t *testing.T) {
 	hs := hl[0]
 
 	var (
-		eventLoop  *eventloop.EventLoop
+		eventLoop  *eventloop.ScopedEventLoop
 		blockChain modules.BlockChain
 	)
 

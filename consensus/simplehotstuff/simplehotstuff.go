@@ -35,7 +35,7 @@ func New() consensus.Rules {
 // InitModule initializes the module.
 func (hs *SimpleHotStuff) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	hs.instance = opt.ModuleConsensusInstance
-	mods.GetPiped(hs,
+	mods.GetScoped(hs,
 		&hs.blockChain,
 		&hs.logger,
 		&hs.synchronizer)

@@ -202,17 +202,17 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		comm = committer.NewBasic()
 	}
 
-	pipedConsensusRules := builder.CreatePiped(newConsensusRules)
+	consensusRules := builder.CreateScope(newConsensusRules)
 	if newByz != nil {
-		for instance, rules := range pipedConsensusRules {
+		for instance, rules := range consensusRules {
 			byz := newByz()
-			pipedConsensusRules[instance] = byz.Wrap(rules.(consensus.Rules))
+			consensusRules[instance] = byz.Wrap(rules.(consensus.Rules))
 		}
 	}
 
-	pipedConsensuses := builder.CreatePiped(consensus.New)
-	pipedVotingMachines := builder.CreatePiped(consensus.NewVotingMachine)
-	pipedLeaderRotations := builder.CreatePiped(newLeaderRotation)
+	consensuses := builder.CreateScope(consensus.New)
+	votingMachines := builder.CreateScope(consensus.NewVotingMachine)
+	leaderRotations := builder.CreateScope(newLeaderRotation)
 
 	// View duration for "dynamic"
 	newViewDuration := func() synchronizer.ViewDuration {
@@ -230,10 +230,10 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		}
 	}
 
-	pipedSynchronizers := builder.CreatePiped(synchronizer.New, newViewDuration())
+	synchronizers := builder.CreateScope(synchronizer.New, newViewDuration())
 
 	builder.Add(
-		eventloop.NewPiped(1000, int(opts.GetPipelineConsensusInstances())),
+		eventloop.NewScoped(1000, int(opts.GetPipelineConsensusInstances())),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		w.metricsLogger,
 		blockchain.New(),
@@ -241,12 +241,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
 
-	builder.AddPiped(
-		pipedConsensusRules,
-		pipedConsensuses,
-		pipedVotingMachines,
-		pipedLeaderRotations,
-		pipedSynchronizers)
+	builder.AddScope(
+		consensusRules,
+		consensuses,
+		votingMachines,
+		leaderRotations,
+		synchronizers)
 
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
 	if w.measurementInterval > 0 {
@@ -349,7 +349,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
 		mods := modules.NewBuilder(hotstuff.ID(opts.GetID()), nil)
-		mods.Add(eventloop.NewPiped(1000, 0))
+		mods.Add(eventloop.New(1000))
 
 		if w.measurementInterval > 0 {
 			clientMetrics := metrics.GetClientMetrics(w.metrics...)

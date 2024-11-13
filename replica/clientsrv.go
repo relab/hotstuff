@@ -21,19 +21,19 @@ import (
 
 // clientSrv serves a client.
 type clientSrv struct {
-	eventLoop *eventloop.EventLoop
+	eventLoop *eventloop.ScopedEventLoop
 	logger    logging.Logger
 
-	mut             sync.Mutex
-	srv             *gorums.Server
-	awaitingCmds    map[cmdID]chan<- error
-	cmdCaches       map[hotstuff.Instance]*cmdCache
-	hash            hash.Hash
-	cmdCount        uint32
-	instanceCount   int
-	cmdsSentToPipe  map[hotstuff.Instance]int
-	cmdAddMethodStr string
-	marshaler       proto.MarshalOptions
+	mut                sync.Mutex
+	srv                *gorums.Server
+	awaitingCmds       map[cmdID]chan<- error
+	cmdCaches          map[hotstuff.Instance]*cmdCache
+	hash               hash.Hash
+	cmdCount           uint32
+	instanceCount      int
+	cmdsSentToInstance map[hotstuff.Instance]int
+	cmdAddMethodStr    string
+	marshaler          proto.MarshalOptions
 }
 
 // newClientServer returns a new client server.
@@ -42,11 +42,11 @@ func newClientServer(cmdAddMethodStr string, srvOpts []gorums.ServerOption) (srv
 		awaitingCmds: make(map[cmdID]chan<- error),
 		srv:          gorums.NewServer(srvOpts...),
 		// cmdCache:     newCmdCache(int(conf.BatchSize)),
-		cmdCaches:       make(map[hotstuff.Instance]*cmdCache),
-		hash:            sha256.New(),
-		cmdsSentToPipe:  make(map[hotstuff.Instance]int),
-		cmdAddMethodStr: cmdAddMethodStr,
-		marshaler:       proto.MarshalOptions{Deterministic: true},
+		cmdCaches:          make(map[hotstuff.Instance]*cmdCache),
+		hash:               sha256.New(),
+		cmdsSentToInstance: make(map[hotstuff.Instance]int),
+		cmdAddMethodStr:    cmdAddMethodStr,
+		marshaler:          proto.MarshalOptions{Deterministic: true},
 	}
 
 	clientpb.RegisterClientServer(srv.srv, srv)
@@ -54,31 +54,31 @@ func newClientServer(cmdAddMethodStr string, srvOpts []gorums.ServerOption) (srv
 }
 
 func (srv *clientSrv) addCommandToSmallestCache(cmd *clientpb.Command) {
-	smallestCachePipe := hotstuff.ZeroInstance
+	smallestCacheInstance := hotstuff.ZeroInstance
 	smallestCacheCount := 0
-	for pipe := range srv.cmdCaches {
-		count := srv.cmdCaches[pipe].commandCount()
-		if smallestCacheCount > count || smallestCachePipe == hotstuff.ZeroInstance {
-			smallestCachePipe = pipe
+	for instance := range srv.cmdCaches {
+		count := srv.cmdCaches[instance].commandCount()
+		if smallestCacheCount > count || smallestCacheInstance == hotstuff.ZeroInstance {
+			smallestCacheInstance = instance
 			smallestCacheCount = count
 		}
 	}
-	srv.cmdCaches[smallestCachePipe].addCommand(cmd)
+	srv.cmdCaches[smallestCacheInstance].addCommand(cmd)
 	srv.mut.Lock()
-	srv.cmdsSentToPipe[smallestCachePipe]++
+	srv.cmdsSentToInstance[smallestCacheInstance]++
 	srv.mut.Unlock()
 }
 
 func (srv *clientSrv) addCommandHashed(cmd *clientpb.Command) error {
-	correctPipe := hotstuff.Instance((uint32(cmd.SequenceNumber) % uint32(srv.instanceCount)) + 1)
-	cache, ok := srv.cmdCaches[correctPipe]
+	correctInstance := hotstuff.Instance((uint32(cmd.SequenceNumber) % uint32(srv.instanceCount)) + 1)
+	cache, ok := srv.cmdCaches[correctInstance]
 	if ok {
 		cache.addCommand(cmd)
 		srv.mut.Lock()
-		srv.cmdsSentToPipe[correctPipe]++
+		srv.cmdsSentToInstance[correctInstance]++
 		srv.mut.Unlock()
 	} else {
-		srv.logger.DPanicf("addCommand: pipe not found: %d. count was %d", correctPipe, srv.instanceCount)
+		srv.logger.DPanicf("addCommand: instance not found: %d. count was %d", correctInstance, srv.instanceCount)
 	}
 	return nil
 }
@@ -108,10 +108,10 @@ func (srv *clientSrv) InitModule(mods *modules.Core, opt modules.InitOptions) {
 
 	srv.instanceCount = opt.InstanceCount
 	if opt.IsPipeliningEnabled {
-		for _, pipe := range mods.Pipes() {
+		for _, scope := range mods.Scopes() {
 			var cache *cmdCache
-			mods.MatchForPipe(pipe, &cache)
-			srv.cmdCaches[pipe] = cache
+			mods.MatchForScope(scope, &cache)
+			srv.cmdCaches[scope] = cache
 		}
 		return
 	}
@@ -145,13 +145,13 @@ func (srv *clientSrv) Stop() {
 	srv.srv.Stop()
 }
 
-func (srv *clientSrv) PrintPipedCmdResult() {
+func (srv *clientSrv) PrintScopedCmdResult() {
 	if srv.instanceCount <= 1 {
 		return
 	}
-	srv.logger.Info("Command count per pipe results:")
-	for pipe, count := range srv.cmdsSentToPipe {
-		srv.logger.Infof("\tP%d=(%d)", pipe, count)
+	srv.logger.Info("Command count per instance results:")
+	for instance, count := range srv.cmdsSentToInstance {
+		srv.logger.Infof("\tP%d=(%d)", instance, count)
 	}
 }
 

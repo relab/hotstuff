@@ -20,7 +20,7 @@ type Synchronizer struct {
 	consensus      modules.Consensus
 	crypto         modules.Crypto
 	configuration  modules.Configuration
-	eventLoop      *eventloop.EventLoop
+	eventLoop      *eventloop.ScopedEventLoop
 	leaderRotation modules.LeaderRotation
 	logger         logging.Logger
 	opts           *modules.Options
@@ -46,7 +46,7 @@ type Synchronizer struct {
 
 // InitModule initializes the synchronizer.
 func (s *Synchronizer) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
-	mods.GetPiped(s,
+	mods.GetScoped(s,
 		&s.blockChain,
 		&s.crypto,
 		&s.configuration,
@@ -64,17 +64,17 @@ func (s *Synchronizer) InitModule(mods *modules.Core, initOpt modules.InitOption
 		if s.View() == timeout.View {
 			s.OnLocalTimeout()
 		}
-	}, eventloop.RespondToInstance(initOpt.ModuleConsensusInstance))
+	}, eventloop.RespondToScope(initOpt.ModuleConsensusInstance))
 
 	s.eventLoop.RegisterHandler(hotstuff.NewViewMsg{}, func(event any) {
 		newViewMsg := event.(hotstuff.NewViewMsg)
 		s.OnNewView(newViewMsg)
-	}, eventloop.RespondToInstance(initOpt.ModuleConsensusInstance))
+	}, eventloop.RespondToScope(initOpt.ModuleConsensusInstance))
 
 	s.eventLoop.RegisterHandler(hotstuff.TimeoutMsg{}, func(event any) {
 		timeoutMsg := event.(hotstuff.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
-	}, eventloop.RespondToInstance(initOpt.ModuleConsensusInstance))
+	}, eventloop.RespondToScope(initOpt.ModuleConsensusInstance))
 
 	var err error
 	s.highQC, err = s.crypto.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
@@ -115,7 +115,7 @@ func (s *Synchronizer) startTimeoutTimer() {
 	// It is important that the timer is NOT reused because then the view would be wrong.
 	s.timer = oneShotTimer{time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
-		s.eventLoop.PipeEvent(s.instance, TimeoutEvent{view, s.instance})
+		s.eventLoop.ScopeEvent(s.instance, TimeoutEvent{view, s.instance})
 	})}
 }
 
@@ -354,7 +354,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	s.startTimeoutTimer()
 
 	s.logger.Debugf("advanced to view %d [ci=%d]", newView, s.instance)
-	s.eventLoop.PipeEvent(s.instance, ViewChangeEvent{View: newView, Timeout: timeout, Instance: s.instance})
+	s.eventLoop.ScopeEvent(s.instance, ViewChangeEvent{View: newView, Timeout: timeout, Instance: s.instance})
 
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.opts.ID() {

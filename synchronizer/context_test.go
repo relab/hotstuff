@@ -11,7 +11,7 @@ import (
 
 // TestTimeoutContext tests that a timeout context is canceled after receiving a timeout event.
 func TestTimeoutContext(t *testing.T) {
-	eventloop := eventloop.NewPiped(10, 0)
+	eventloop := eventloop.NewScoped(10, 0)
 	ctx, cancel := synchronizer.TimeoutContext(context.Background(), eventloop)
 	defer cancel()
 
@@ -24,7 +24,7 @@ func TestTimeoutContext(t *testing.T) {
 
 // TestTimeoutContextView tests that a timeout context is canceled after receiving a view change event.
 func TestTimeoutContextView(t *testing.T) {
-	eventloop := eventloop.NewPiped(10, 0)
+	eventloop := eventloop.NewScoped(10, 0)
 	ctx, cancel := synchronizer.TimeoutContext(context.Background(), eventloop)
 	defer cancel()
 
@@ -37,7 +37,7 @@ func TestTimeoutContextView(t *testing.T) {
 
 // TestViewContext tests that a view context is canceled after receiving a view change event.
 func TestViewContext(t *testing.T) {
-	eventloop := eventloop.NewPiped(10, 0)
+	eventloop := eventloop.NewScoped(10, 0)
 	ctx, cancel := synchronizer.ViewContext(context.Background(), eventloop, nil)
 	defer cancel()
 
@@ -50,7 +50,7 @@ func TestViewContext(t *testing.T) {
 
 // TestViewContextEarlierView tests that a view context is not canceled when receiving a view change event for an earlier view.
 func TestViewContextEarlierView(t *testing.T) {
-	eventloop := eventloop.NewPiped(10, 0)
+	eventloop := eventloop.NewScoped(10, 0)
 	view := hotstuff.View(1)
 	ctx, cancel := synchronizer.ViewContext(context.Background(), eventloop, &view)
 	defer cancel()
@@ -63,12 +63,12 @@ func TestViewContextEarlierView(t *testing.T) {
 }
 
 // TestTimeoutContext tests that a timeout context is canceled after receiving a timeout event.
-func TestTimeoutContextPiped(t *testing.T) {
-	eventloop := eventloop.NewPiped(10, 1)
-	ctx, cancel := synchronizer.PipedTimeoutContext(context.Background(), eventloop, hotstuff.Instance(1))
+func TestTimeoutContextScoped(t *testing.T) {
+	eventloop := eventloop.NewScoped(10, 1)
+	ctx, cancel := synchronizer.ScopedTimeoutContext(context.Background(), eventloop, hotstuff.Instance(1))
 	defer cancel()
 
-	eventloop.PipeEvent(hotstuff.Instance(1), synchronizer.TimeoutEvent{Instance: 1})
+	eventloop.ScopeEvent(hotstuff.Instance(1), synchronizer.TimeoutEvent{Instance: 1})
 
 	if ctx.Err() != context.Canceled {
 		t.Error("Context not canceled")
@@ -76,12 +76,12 @@ func TestTimeoutContextPiped(t *testing.T) {
 }
 
 // TestTimeoutContextView tests that a timeout context is canceled after receiving a view change event.
-func TestTimeoutContextViewPiped(t *testing.T) {
-	eventloop := eventloop.NewPiped(10, 1)
-	ctx, cancel := synchronizer.PipedTimeoutContext(context.Background(), eventloop, hotstuff.Instance(1))
+func TestTimeoutContextViewScoped(t *testing.T) {
+	eventloop := eventloop.NewScoped(10, 1)
+	ctx, cancel := synchronizer.ScopedTimeoutContext(context.Background(), eventloop, hotstuff.Instance(1))
 	defer cancel()
 
-	eventloop.PipeEvent(hotstuff.Instance(1), synchronizer.ViewChangeEvent{View: 1, Instance: 1})
+	eventloop.ScopeEvent(hotstuff.Instance(1), synchronizer.ViewChangeEvent{View: 1, Instance: 1})
 
 	if ctx.Err() != context.Canceled {
 		t.Error("Context not canceled")
@@ -89,12 +89,12 @@ func TestTimeoutContextViewPiped(t *testing.T) {
 }
 
 // TestViewContext tests that a view context is canceled after receiving a view change event.
-func TestViewContextPiped(t *testing.T) {
-	eventloop := eventloop.NewPiped(10, 1)
-	ctx, cancel := synchronizer.PipedViewContext(context.Background(), eventloop, hotstuff.Instance(1), nil)
+func TestViewContextScoped(t *testing.T) {
+	eventloop := eventloop.NewScoped(10, 1)
+	ctx, cancel := synchronizer.ScopedViewContext(context.Background(), eventloop, hotstuff.Instance(1), nil)
 	defer cancel()
 
-	eventloop.PipeEvent(hotstuff.Instance(1), synchronizer.ViewChangeEvent{View: 1, Instance: 1})
+	eventloop.ScopeEvent(hotstuff.Instance(1), synchronizer.ViewChangeEvent{View: 1, Instance: 1})
 
 	if ctx.Err() != context.Canceled {
 		t.Error("Context not canceled")
@@ -102,13 +102,13 @@ func TestViewContextPiped(t *testing.T) {
 }
 
 // TestViewContextEarlierView tests that a view context is not canceled when receiving a view change event for an earlier view.
-func TestViewContextEarlierViewPiped(t *testing.T) {
-	eventloop := eventloop.NewPiped(10, 1)
+func TestViewContextEarlierViewScoped(t *testing.T) {
+	eventloop := eventloop.NewScoped(10, 1)
 	view := hotstuff.View(1)
-	ctx, cancel := synchronizer.PipedViewContext(context.Background(), eventloop, hotstuff.Instance(1), &view)
+	ctx, cancel := synchronizer.ScopedViewContext(context.Background(), eventloop, hotstuff.Instance(1), &view)
 	defer cancel()
 
-	eventloop.PipeEvent(hotstuff.Instance(1), synchronizer.ViewChangeEvent{View: 0, Instance: 1})
+	eventloop.ScopeEvent(hotstuff.Instance(1), synchronizer.ViewChangeEvent{View: 0, Instance: 1})
 
 	if ctx.Err() != nil {
 		t.Error("Context canceled")

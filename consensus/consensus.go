@@ -45,7 +45,7 @@ type consensusBase struct {
 	commandQueue   modules.CommandQueue
 	configuration  modules.Configuration
 	crypto         modules.Crypto
-	eventLoop      *eventloop.EventLoop
+	eventLoop      *eventloop.ScopedEventLoop
 	forkHandler    modules.ForkHandlerExt
 	leaderRotation modules.LeaderRotation
 	logger         logging.Logger
@@ -71,7 +71,7 @@ func New() modules.Consensus {
 func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
 	cs.instance = initOpt.ModuleConsensusInstance
 
-	mods.GetPiped(cs,
+	mods.GetScoped(cs,
 		&cs.acceptor,
 		&cs.blockChain,
 		&cs.commandQueue,
@@ -95,7 +95,7 @@ func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOpti
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.OnPropose(event.(hotstuff.ProposeMsg))
-	}, eventloop.RespondToInstance(initOpt.ModuleConsensusInstance))
+	}, eventloop.RespondToScope(initOpt.ModuleConsensusInstance))
 }
 
 func (cs *consensusBase) CommittedBlock() *hotstuff.Block {
@@ -128,7 +128,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 		}
 	}
 
-	ctx, cancel := synchronizer.PipedTimeoutContext(cs.eventLoop.Context(), cs.eventLoop, cs.instance)
+	ctx, cancel := synchronizer.ScopedTimeoutContext(cs.eventLoop.Context(), cs.eventLoop, cs.instance)
 	defer cancel()
 
 	cmd, ok := cs.commandQueue.Get(ctx)
@@ -260,7 +260,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 
 	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
 	if leaderID == cs.opts.ID() {
-		cs.eventLoop.PipeEvent(cs.instance, hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})
+		cs.eventLoop.ScopeEvent(cs.instance, hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})
 		return
 	}
 

@@ -13,7 +13,7 @@ import (
 type testEvent int
 
 func TestHandler(t *testing.T) {
-	el := eventloop.NewPiped(10, 0)
+	el := eventloop.NewScoped(10, 0)
 	c := make(chan any)
 	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- event
@@ -46,22 +46,22 @@ func TestHandler(t *testing.T) {
 	}
 }
 
-func TestHandlerPiped(t *testing.T) {
+func TestHandlerScoped(t *testing.T) {
 	listeningPipeId := hotstuff.Instance(1)
 	incorrectPipeId := hotstuff.Instance(2)
 	pipeCount := 1
-	el := eventloop.NewPiped(10, pipeCount)
+	el := eventloop.NewScoped(10, pipeCount)
 	c := make(chan any)
 	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- event
-	}, eventloop.RespondToInstance(listeningPipeId))
+	}, eventloop.RespondToScope(listeningPipeId))
 
 	el.RegisterHandler(testEvent(0), func(_ any) {
-		panic("wrong pipe id")
-	}, eventloop.RespondToInstance(incorrectPipeId))
+		panic("wrong scope")
+	}, eventloop.RespondToScope(incorrectPipeId))
 
 	el.RegisterHandler(testEvent(0), func(_ any) {
-		panic("unpiped handler should not respond")
+		panic("non-scoped handler should not respond")
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -72,7 +72,7 @@ func TestHandlerPiped(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 
 	want := testEvent(42)
-	el.PipeEvent(listeningPipeId, want)
+	el.ScopeEvent(listeningPipeId, want)
 
 	var event any
 	select {
@@ -97,7 +97,7 @@ func TestObserver(t *testing.T) {
 		handler bool
 	}
 
-	el := eventloop.NewPiped(10, 0)
+	el := eventloop.NewScoped(10, 0)
 	c := make(chan eventData)
 	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- eventData{event: event, handler: true}
@@ -146,7 +146,7 @@ func TestTicker(t *testing.T) {
 		return
 	}
 
-	el := eventloop.NewPiped(10, 0)
+	el := eventloop.NewScoped(10, 0)
 	count := 0
 	el.RegisterHandler(testEvent(0), func(event any) {
 		count += int(event.(testEvent))
@@ -176,30 +176,30 @@ func TestTicker(t *testing.T) {
 	}
 }
 
-func TestDelayedEventPiped(t *testing.T) {
+func TestDelayedEventScoped(t *testing.T) {
 	pipeCount := 1
 	listeningPipeId := hotstuff.Instance(1)
 	incorrectPipeId := hotstuff.Instance(2)
-	el := eventloop.NewPiped(10, pipeCount)
+	el := eventloop.NewScoped(10, pipeCount)
 	c := make(chan testEvent)
 
 	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- event.(testEvent)
-	}, eventloop.RespondToInstance(listeningPipeId))
+	}, eventloop.RespondToScope(listeningPipeId))
 
 	el.RegisterHandler(testEvent(0), func(_ any) {
-		panic("wrong pipe id")
-	}, eventloop.RespondToInstance(incorrectPipeId))
+		panic("wrong scope")
+	}, eventloop.RespondToScope(incorrectPipeId))
 
 	el.RegisterHandler(testEvent(0), func(_ any) {
-		panic("unpiped handler should not respond")
+		panic("non-scoped handler should not respond")
 	})
 
 	// delay the "2" and "3" events until after the first instance of testEvent
-	el.DelayPiped(listeningPipeId, testEvent(0), testEvent(2))
-	el.DelayPiped(listeningPipeId, testEvent(0), testEvent(3))
+	el.DelayScoped(listeningPipeId, testEvent(0), testEvent(2))
+	el.DelayScoped(listeningPipeId, testEvent(0), testEvent(3))
 	// then send the "1" event
-	el.PipeEvent(listeningPipeId, testEvent(1))
+	el.ScopeEvent(listeningPipeId, testEvent(1))
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -218,7 +218,7 @@ func TestDelayedEventPiped(t *testing.T) {
 }
 
 func TestDelayedEvent(t *testing.T) {
-	el := eventloop.NewPiped(10, 0)
+	el := eventloop.NewScoped(10, 0)
 	c := make(chan testEvent)
 
 	el.RegisterHandler(testEvent(0), func(event any) {
@@ -248,7 +248,7 @@ func TestDelayedEvent(t *testing.T) {
 }
 
 func BenchmarkEventLoopWithObservers(b *testing.B) {
-	el := eventloop.NewPiped(100, 0)
+	el := eventloop.NewScoped(100, 0)
 
 	for i := 0; i < 100; i++ {
 		el.RegisterObserver(testEvent(0), func(event any) {
@@ -265,7 +265,7 @@ func BenchmarkEventLoopWithObservers(b *testing.B) {
 }
 
 func BenchmarkEventLoopWithUnsafeRunInAddEventHandlers(b *testing.B) {
-	el := eventloop.NewPiped(100, 0)
+	el := eventloop.NewScoped(100, 0)
 
 	for i := 0; i < 100; i++ {
 		el.RegisterHandler(testEvent(0), func(event any) {
@@ -290,7 +290,7 @@ func BenchmarkEventLoopWithUnsafeRunInAddEventHandlers(b *testing.B) {
 }
 
 func BenchmarkDelay(b *testing.B) {
-	el := eventloop.NewPiped(100, 0)
+	el := eventloop.NewScoped(100, 0)
 
 	for i := 0; i < b.N; i++ {
 		el.DelayUntil(testEvent(0), testEvent(2))

@@ -12,7 +12,7 @@ import (
 
 // ViewContext returns a context that is canceled at the end of view.
 // If view is nil or less than or equal to the current view, the context will be canceled at the next view change.
-func ViewContext(parent context.Context, eventLoop *eventloop.EventLoop, view *hotstuff.View) (context.Context, context.CancelFunc) {
+func ViewContext(parent context.Context, eventLoop *eventloop.ScopedEventLoop, view *hotstuff.View) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parent)
 
 	id := eventLoop.RegisterHandler(ViewChangeEvent{}, func(event any) {
@@ -28,7 +28,7 @@ func ViewContext(parent context.Context, eventLoop *eventloop.EventLoop, view *h
 }
 
 // TimeoutContext returns a context that is canceled either when a timeout occurs, or when the view changes.
-func TimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop) (context.Context, context.CancelFunc) {
+func TimeoutContext(parent context.Context, eventLoop *eventloop.ScopedEventLoop) (context.Context, context.CancelFunc) {
 	// ViewContext handles view-change case.
 	ctx, cancel := ViewContext(parent, eventLoop, nil)
 
@@ -42,10 +42,10 @@ func TimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop) (con
 	}
 }
 
-// PipedViewContext returns a context that is canceled at the end of view.
+// ScopedViewContext returns a context that is canceled at the end of view.
 // If view is nil or less than or equal to the current view, the context will be canceled at the next view change.
-// If instance is ZeroInstance, returns regular PipedViewContext.
-func PipedViewContext(parent context.Context, eventLoop *eventloop.EventLoop, instance hotstuff.Instance, view *hotstuff.View) (context.Context, context.CancelFunc) {
+// If instance is ZeroInstance, returns regular ScopedViewContext.
+func ScopedViewContext(parent context.Context, eventLoop *eventloop.ScopedEventLoop, instance hotstuff.Instance, view *hotstuff.View) (context.Context, context.CancelFunc) {
 	if instance == hotstuff.ZeroInstance {
 		return ViewContext(parent, eventLoop, view)
 	}
@@ -61,7 +61,7 @@ func PipedViewContext(parent context.Context, eventLoop *eventloop.EventLoop, in
 		if view == nil || viewChangeEvent.View >= *view {
 			cancel()
 		}
-	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToInstance(instance))
+	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToScope(instance))
 
 	return ctx, func() {
 		eventLoop.UnregisterHandler(ViewChangeEvent{}, instance, id)
@@ -69,15 +69,15 @@ func PipedViewContext(parent context.Context, eventLoop *eventloop.EventLoop, in
 	}
 }
 
-// PipedTimeoutContext returns a context that is canceled either when a timeout occurs, or when the view changes.
+// ScopedTimeoutContext returns a context that is canceled either when a timeout occurs, or when the view changes.
 // If instance is ZeroInstance, returns regular TimeoutContext.
-func PipedTimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop, instance hotstuff.Instance) (context.Context, context.CancelFunc) {
+func ScopedTimeoutContext(parent context.Context, eventLoop *eventloop.ScopedEventLoop, instance hotstuff.Instance) (context.Context, context.CancelFunc) {
 	if instance == hotstuff.ZeroInstance {
 		return TimeoutContext(parent, eventLoop)
 	}
 
 	// ViewContext handles view-change case.
-	ctx, cancel := PipedViewContext(parent, eventLoop, instance, nil)
+	ctx, cancel := ScopedViewContext(parent, eventLoop, instance, nil)
 
 	id := eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
 		myPipe := instance
@@ -86,7 +86,7 @@ func PipedTimeoutContext(parent context.Context, eventLoop *eventloop.EventLoop,
 			panic(fmt.Sprintf("incorrect consensus instance: want=%d, got=%d", myPipe, timeoutEvent.Instance))
 		}
 		cancel()
-	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToInstance(instance))
+	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToScope(instance))
 
 	return ctx, func() {
 		eventLoop.UnregisterHandler(TimeoutEvent{}, instance, id)

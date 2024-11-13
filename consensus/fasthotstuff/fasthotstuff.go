@@ -32,7 +32,7 @@ func (fhs *FastHotStuff) InitModule(mods *modules.Core, opt modules.InitOptions)
 
 	fhs.instance = opt.ModuleConsensusInstance
 
-	mods.GetPiped(fhs,
+	mods.GetScoped(fhs,
 		&fhs.blockChain,
 		&fhs.logger,
 		&opts,

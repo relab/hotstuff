@@ -34,7 +34,7 @@ type Throughput struct {
 // InitModule gives the module access to the other modules.
 func (t *Throughput) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	var (
-		eventLoop *eventloop.EventLoop
+		eventLoop *eventloop.ScopedEventLoop
 		logger    logging.Logger
 	)
 	mods.Get(

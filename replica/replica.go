@@ -75,7 +75,7 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		))
 	}
 
-	cmdCaches := builder.CreatePiped(newCmdCache, int(conf.BatchSize))
+	cmdCaches := builder.CreateScope(newCmdCache, int(conf.BatchSize))
 
 	clientSrv := newClientServer("hashed", clientSrvOpts)
 
@@ -121,7 +121,7 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		modules.ExtendedExecutor(srv.clientSrv),
 		modules.ExtendedForkHandler(srv.clientSrv),
 	)
-	builder.AddPiped(
+	builder.AddScope(
 		cmdCaches,
 	)
 	srv.hs = builder.Build()
@@ -160,18 +160,18 @@ func (srv *Replica) Stop() {
 	srv.cancel()
 	<-srv.done
 	srv.Close()
-	srv.clientSrv.PrintPipedCmdResult()
+	srv.clientSrv.PrintScopedCmdResult()
 }
 
 // Run runs the replica until the context is canceled.
 func (srv *Replica) Run(ctx context.Context) {
-	var eventLoop *eventloop.EventLoop
+	var eventLoop *eventloop.ScopedEventLoop
 	srv.hs.Get(&eventLoop)
 
-	if srv.hs.PipeCount() > 0 {
-		for instance := hotstuff.Instance(1); instance <= hotstuff.Instance(srv.hs.PipeCount()); instance++ {
+	if srv.hs.ScopeCount() > 0 {
+		for instance := hotstuff.Instance(1); instance <= hotstuff.Instance(srv.hs.ScopeCount()); instance++ {
 			var synchronizer modules.Synchronizer
-			srv.hs.MatchForPipe(instance, &synchronizer)
+			srv.hs.MatchForScope(instance, &synchronizer)
 			synchronizer.Start(ctx)
 		}
 	} else {

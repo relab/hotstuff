@@ -17,7 +17,7 @@ import (
 // blocks are evicted in LRU order.
 type blockChain struct {
 	configuration modules.Configuration
-	eventLoop     *eventloop.EventLoop
+	eventLoop     *eventloop.ScopedEventLoop
 	logger        logging.Logger
 
 	mut         sync.Mutex
@@ -96,7 +96,7 @@ func (chain *blockChain) DeleteAtHeight(height hotstuff.View, blockHash hotstuff
 
 // Get retrieves a block given its hash. Get will try to find the block locally.
 // If it is not available locally, it will try to fetch the block.
-func (chain *blockChain) Get(hash hotstuff.Hash, onPipe hotstuff.Instance) (block *hotstuff.Block, ok bool) {
+func (chain *blockChain) Get(hash hotstuff.Hash, instance hotstuff.Instance) (block *hotstuff.Block, ok bool) {
 	// need to declare vars early, or else we won't be able to use goto
 	var (
 		ctx    context.Context
@@ -109,7 +109,7 @@ func (chain *blockChain) Get(hash hotstuff.Hash, onPipe hotstuff.Instance) (bloc
 		goto done
 	}
 
-	ctx, cancel = synchronizer.PipedTimeoutContext(chain.eventLoop.Context(), chain.eventLoop, onPipe)
+	ctx, cancel = synchronizer.ScopedTimeoutContext(chain.eventLoop.Context(), chain.eventLoop, instance)
 	chain.pendingFetch[hash] = cancel
 
 	chain.mut.Unlock()

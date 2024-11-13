@@ -51,7 +51,7 @@ type Handel struct {
 
 	blockChain   modules.BlockChain
 	crypto       modules.Crypto
-	eventLoop    *eventloop.EventLoop
+	eventLoop    *eventloop.ScopedEventLoop
 	logger       logging.Logger
 	opts         *modules.Options
 	synchronizer modules.Synchronizer

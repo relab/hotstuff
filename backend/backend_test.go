@@ -47,13 +47,13 @@ func TestConnect(t *testing.T) {
 }
 
 // Mainly test initialization of piped modules and how they depend on each other.
-func TestConnectPiped(t *testing.T) {
+func TestConnectScoped(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		ctrl := gomock.NewController(t)
 		td := setup(t, ctrl, n)
 		builder := modules.NewBuilder(1, td.keys[0])
-		testutil.TestModulesPiped(t, ctrl, 1, td.keys[0], &builder, 4)
+		testutil.TestModulesScoped(t, ctrl, 1, td.keys[0], &builder, 4)
 		teardown := createServers(t, td, ctrl)
 		defer teardown()
 		td.builders.Build()
@@ -94,7 +94,7 @@ func testBase(t *testing.T, typ any, send func(modules.Configuration), handle ev
 		ctx, cancel := context.WithCancel(context.Background())
 		for _, hs := range hl[1:] {
 			var (
-				eventLoop    *eventloop.EventLoop
+				eventLoop    *eventloop.ScopedEventLoop
 				synchronizer modules.Synchronizer
 			)
 			hs.Get(&eventLoop, &synchronizer)
@@ -140,7 +140,7 @@ func TestPropose(t *testing.T) {
 	})
 }
 
-func TestProposePiped(t *testing.T) {
+func TestProposeScoped(t *testing.T) {
 	var wg sync.WaitGroup
 	instance := hotstuff.Instance(123)
 	want := hotstuff.ProposeMsg{
@@ -171,7 +171,7 @@ func TestProposePiped(t *testing.T) {
 			t.Errorf("block hashes do not match. want %d got %d", got.Block.Instance(), want.Block.Instance())
 		}
 		wg.Done()
-	}, eventloop.RespondToInstance(instance))
+	}, eventloop.RespondToScope(instance))
 }
 
 func TestTimeout(t *testing.T) {
@@ -198,7 +198,7 @@ func TestTimeout(t *testing.T) {
 	})
 }
 
-func TestTimeoutPiped(t *testing.T) {
+func TestTimeoutScoped(t *testing.T) {
 	var wg sync.WaitGroup
 
 	instance := hotstuff.Instance(1)
@@ -222,7 +222,7 @@ func TestTimeoutPiped(t *testing.T) {
 			t.Errorf("wrong view in proposal: got: %d, want: %d", got.View, want.View)
 		}
 		wg.Done()
-	}, eventloop.RespondToInstance(instance))
+	}, eventloop.RespondToScope(instance))
 }
 
 type testData struct {

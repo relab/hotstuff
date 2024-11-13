@@ -26,7 +26,7 @@ import (
 type Server struct {
 	blockChain    modules.BlockChain
 	configuration modules.Configuration
-	eventLoop     *eventloop.EventLoop
+	eventLoop     *eventloop.ScopedEventLoop
 	logger        logging.Logger
 	location      string
 	locationInfo  map[hotstuff.ID]string
@@ -185,7 +185,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposeMsg.ID = id
 	impl.srv.induceLatencyHacky(id, func() {
 		if hotstuff.IsPipelined(proposeMsg.CI) {
-			impl.srv.eventLoop.PipeEvent(proposeMsg.CI, proposeMsg)
+			impl.srv.eventLoop.ScopeEvent(proposeMsg.CI, proposeMsg)
 			return
 		}
 
@@ -203,7 +203,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 	impl.srv.induceLatencyHacky(id, func() {
 		instance := hotstuff.Instance(cert.Instance)
 		if hotstuff.IsPipelined(instance) {
-			impl.srv.eventLoop.PipeEvent(instance, hotstuff.VoteMsg{
+			impl.srv.eventLoop.ScopeEvent(instance, hotstuff.VoteMsg{
 				ID:          id,
 				PartialCert: hotstuffpb.PartialCertFromProto(cert),
 			})
@@ -227,7 +227,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 	impl.srv.induceLatencyHacky(id, func() {
 		instance := hotstuff.Instance(msg.Instance)
 		if hotstuff.IsPipelined(instance) {
-			impl.srv.eventLoop.PipeEvent(instance, hotstuff.NewViewMsg{
+			impl.srv.eventLoop.ScopeEvent(instance, hotstuff.NewViewMsg{
 				ID:       id,
 				SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
 			})
@@ -267,7 +267,7 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 
 	impl.srv.induceLatencyHacky(timeoutMsg.ID, func() {
 		if hotstuff.IsPipelined(timeoutMsg.CI) {
-			impl.srv.eventLoop.PipeEvent(timeoutMsg.CI, timeoutMsg)
+			impl.srv.eventLoop.ScopeEvent(timeoutMsg.CI, timeoutMsg)
 			return
 		}
 

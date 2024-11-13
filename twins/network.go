@@ -38,7 +38,7 @@ func (id NodeID) String() string {
 type node struct {
 	blockChain     modules.BlockChain
 	consensus      modules.Consensus
-	eventLoop      *eventloop.EventLoop
+	eventLoop      *eventloop.ScopedEventLoop
 	leaderRotation modules.LeaderRotation
 	opts           *modules.Options
 	synchronizer   modules.Synchronizer
@@ -144,7 +144,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 		}
 
 		builder.Add(
-			eventloop.NewPiped(100, 0),
+			eventloop.NewScoped(100, 0),
 			blockchain.New(),
 			committer.NewBasic(),
 			consensus.New(),
@@ -436,7 +436,7 @@ type tick struct{}
 
 type timeoutManager struct {
 	synchronizer modules.Synchronizer
-	eventLoop    *eventloop.EventLoop
+	eventLoop    *eventloop.ScopedEventLoop
 
 	node      *node
 	network   *Network

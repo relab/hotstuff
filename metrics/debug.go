@@ -14,8 +14,8 @@ import (
 func init() {
 	RegisterReplicaMetric("debug", func() any {
 		return &DebugMetrics{
-			sequentialPipedCommitHalts: make(map[hotstuff.Instance]int),
-			rejectedCommands:           make(map[hotstuff.Instance]int),
+			sequentialScopedCommitHalts: make(map[hotstuff.Instance]int),
+			rejectedCommands:            make(map[hotstuff.Instance]int),
 		}
 	})
 }
@@ -27,14 +27,14 @@ type DebugMetrics struct {
 	instanceCount int
 
 	// metrics
-	sequentialPipedCommitHalts map[hotstuff.Instance]int
-	rejectedCommands           map[hotstuff.Instance]int
+	sequentialScopedCommitHalts map[hotstuff.Instance]int
+	rejectedCommands            map[hotstuff.Instance]int
 }
 
 // InitModule gives the module access to the other modules.
 func (db *DebugMetrics) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	var (
-		eventLoop *eventloop.EventLoop
+		eventLoop *eventloop.ScopedEventLoop
 		logger    logging.Logger
 	)
 
@@ -51,7 +51,7 @@ func (db *DebugMetrics) InitModule(mods *modules.Core, opt modules.InitOptions) 
 
 	eventLoop.RegisterHandler(debug.CommitHaltEvent{}, func(event any) {
 		halt := event.(debug.CommitHaltEvent)
-		db.sequentialPipedCommitHalts[halt.OnPipe]++
+		db.sequentialScopedCommitHalts[halt.OnPipe]++
 	})
 
 	eventLoop.RegisterHandler(debug.CommandRejectedEvent{}, func(event any) {
@@ -77,11 +77,11 @@ func (db *DebugMetrics) tick(_ types.TickEvent) {
 		db.metricsLogger.Log(&types.DebugMeasurement{
 			Event:            types.NewReplicaEvent(uint32(db.opts.ID()), time.Now()),
 			OnPipe:           uint32(instance),
-			CommitHalts:      uint32(db.sequentialPipedCommitHalts[instance]),
+			CommitHalts:      uint32(db.sequentialScopedCommitHalts[instance]),
 			RejectedCommands: uint32(db.rejectedCommands[instance]),
 		})
 
-		db.sequentialPipedCommitHalts[instance] = 0
+		db.sequentialScopedCommitHalts[instance] = 0
 		db.rejectedCommands[instance] = 0
 	}
 
