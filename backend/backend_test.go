@@ -46,7 +46,7 @@ func TestConnect(t *testing.T) {
 	runBoth(t, run)
 }
 
-// Mainly test initialization of piped modules and how they depend on each other.
+// Mainly test initialization of scoped modules and how they depend on each other.
 func TestConnectScoped(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4

@@ -400,8 +400,10 @@ func writeParticipants(wr io.Writer, participants IDSet) (err error) {
 	return err
 }
 
+// Instance is a number indicating the pipelined consensus instance.
 type Instance uint32
 
+// Flag for no piplining and identifier for unscoped modules and events.
 const ZeroInstance = Instance(0)
 
 // ToBytes returns the instance id as bytes.
@@ -412,6 +414,6 @@ func (p Instance) ToBytes() []byte {
 }
 
 // If the instance ID is not ZeroInstance, then return true
-func IsPipelined(instance Instance) bool {
-	return instance != ZeroInstance
+func (i Instance) IsPipelined() bool {
+	return i != ZeroInstance
 }

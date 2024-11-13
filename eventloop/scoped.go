@@ -141,7 +141,7 @@ func (el *ScopedEventLoop) DebugEvent(event any) {
 
 // ScopeEvent adds an event to a specified consensus instance.
 func (el *ScopedEventLoop) ScopeEvent(instance hotstuff.Instance, event any) {
-	if !hotstuff.IsPipelined(instance) {
+	if !instance.IsPipelined() {
 		el.AddEvent(event)
 		return
 	}

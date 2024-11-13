@@ -12,10 +12,10 @@ import (
 )
 
 func init() {
-	modules.RegisterModule("sequential", NewOutOfOrderProcessing)
+	modules.RegisterModule("sequential", NewMultiplexed)
 }
 
-type outOfOrderProcessingCommitter struct {
+type multiplexedCommitter struct {
 	blockChain  modules.BlockChain
 	eventLoop   *eventloop.ScopedEventLoop
 	executor    modules.ExecutorExt
@@ -30,8 +30,8 @@ type outOfOrderProcessingCommitter struct {
 	currentInstance         hotstuff.Instance
 }
 
-func NewOutOfOrderProcessing() modules.Committer {
-	return &outOfOrderProcessingCommitter{
+func NewMultiplexed() modules.Committer {
+	return &multiplexedCommitter{
 		bExecAtCi:               make(map[hotstuff.Instance]*hotstuff.Block),
 		waitingBlocksAtInstance: make(map[hotstuff.Instance][]*hotstuff.Block),
 		currentView:             1,
@@ -39,7 +39,7 @@ func NewOutOfOrderProcessing() modules.Committer {
 	}
 }
 
-func (c *outOfOrderProcessingCommitter) InitModule(mods *modules.Core, opt modules.InitOptions) {
+func (c *multiplexedCommitter) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	mods.Get(
 		&c.eventLoop,
 		&c.executor,
@@ -62,7 +62,7 @@ func (c *outOfOrderProcessingCommitter) InitModule(mods *modules.Core, opt modul
 }
 
 // Stores the block before further execution.
-func (c *outOfOrderProcessingCommitter) Commit(block *hotstuff.Block) {
+func (c *multiplexedCommitter) Commit(block *hotstuff.Block) {
 	c.logger.Debugf("Commit (currentCi: %d, currentView: %d): new incoming block {p:%d, v:%d, h:%s}",
 		c.currentInstance, c.currentView,
 		block.Instance(), block.View(), block.Hash().String()[:4])
@@ -84,14 +84,14 @@ func (c *outOfOrderProcessingCommitter) Commit(block *hotstuff.Block) {
 }
 
 // Retrieve the last block which was committed on an instance. Use zero if pipelining is not used.
-func (c *outOfOrderProcessingCommitter) CommittedBlock(instance hotstuff.Instance) *hotstuff.Block {
+func (c *multiplexedCommitter) CommittedBlock(instance hotstuff.Instance) *hotstuff.Block {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	return c.bExecAtCi[instance]
 }
 
 // recursive helper for commit
-func (c *outOfOrderProcessingCommitter) commitInner(block *hotstuff.Block) error {
+func (c *multiplexedCommitter) commitInner(block *hotstuff.Block) error {
 	if c.bExecAtCi[block.Instance()].View() >= block.View() {
 		return nil
 	}
@@ -116,7 +116,7 @@ func (c *outOfOrderProcessingCommitter) commitInner(block *hotstuff.Block) error
 	return nil
 }
 
-func (c *outOfOrderProcessingCommitter) handleForks(prunedBlocks map[hotstuff.View][]*hotstuff.Block) {
+func (c *multiplexedCommitter) handleForks(prunedBlocks map[hotstuff.View][]*hotstuff.Block) {
 	// All pruned blocks are assumed to be forks after the previous exec logic
 	for _, blocks := range prunedBlocks {
 		for _, block := range blocks {
@@ -125,7 +125,7 @@ func (c *outOfOrderProcessingCommitter) handleForks(prunedBlocks map[hotstuff.Vi
 	}
 }
 
-func (c *outOfOrderProcessingCommitter) tryExec() error {
+func (c *multiplexedCommitter) tryExec() error {
 	waitingBlocks := c.waitingBlocksAtInstance[c.currentInstance]
 	canPeek := len(waitingBlocks) > 0
 	if !canPeek {
@@ -166,4 +166,4 @@ func (c *outOfOrderProcessingCommitter) tryExec() error {
 	return c.tryExec()
 }
 
-var _ modules.Committer = (*outOfOrderProcessingCommitter)(nil)
+var _ modules.Committer = (*multiplexedCommitter)(nil)

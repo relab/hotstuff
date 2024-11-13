@@ -184,7 +184,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
 	impl.srv.induceLatencyHacky(id, func() {
-		if hotstuff.IsPipelined(proposeMsg.CI) {
+		if proposeMsg.CI.IsPipelined() {
 			impl.srv.eventLoop.ScopeEvent(proposeMsg.CI, proposeMsg)
 			return
 		}
@@ -202,7 +202,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 	}
 	impl.srv.induceLatencyHacky(id, func() {
 		instance := hotstuff.Instance(cert.Instance)
-		if hotstuff.IsPipelined(instance) {
+		if instance.IsPipelined() {
 			impl.srv.eventLoop.ScopeEvent(instance, hotstuff.VoteMsg{
 				ID:          id,
 				PartialCert: hotstuffpb.PartialCertFromProto(cert),
@@ -226,7 +226,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 	}
 	impl.srv.induceLatencyHacky(id, func() {
 		instance := hotstuff.Instance(msg.Instance)
-		if hotstuff.IsPipelined(instance) {
+		if instance.IsPipelined() {
 			impl.srv.eventLoop.ScopeEvent(instance, hotstuff.NewViewMsg{
 				ID:       id,
 				SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
@@ -266,7 +266,7 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	}
 
 	impl.srv.induceLatencyHacky(timeoutMsg.ID, func() {
-		if hotstuff.IsPipelined(timeoutMsg.CI) {
+		if timeoutMsg.CI.IsPipelined() {
 			impl.srv.eventLoop.ScopeEvent(timeoutMsg.CI, timeoutMsg)
 			return
 		}

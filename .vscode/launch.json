@@ -13,32 +13,6 @@
 			"cwd": "${workspaceRoot}",
 			"args": [
 				"run",
-				"--pipes=2"
-			]
-		},
-		{
-			"name": "Local Debug",
-			"type": "go",
-			"request": "launch",
-			"mode": "debug",
-			"program": "${workspaceRoot}/cmd/hotstuff/main.go",
-			"cwd": "${workspaceRoot}",
-			"args": [
-				"run",
-				"--pipes=2",
-				"--log-level=debug"
-			]
-		},
-		{
-			"name": "Local Run (not piped)",
-			"type": "go",
-			"request": "launch",
-			"mode": "debug",
-			"program": "${workspaceRoot}/cmd/hotstuff/main.go",
-			"cwd": "${workspaceRoot}",
-			"args": [
-				"run",
-				"--pipes=0",
 			]
 		},
 		{
