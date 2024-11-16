@@ -68,7 +68,7 @@ The example below shows a complete initialization function for the throughput me
 
 ```go
 // InitModule implements the modules.Module interface
-func (t *Throughput) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
+func (t *Throughput) InitModule(mods *modules.Core, opt modules.InitOptions) {
     var (
         eventLoop *eventloop.EventLoop
         logger logging.Logger

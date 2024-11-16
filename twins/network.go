@@ -49,8 +49,8 @@ type node struct {
 	log            strings.Builder
 }
 
-func (n *node) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
-	if initOpt.IsPipeliningEnabled {
+func (n *node) InitModule(mods *modules.Core, opt modules.InitOptions) {
+	if opt.IsPipeliningEnabled {
 		panic("pipelining not supported for this module")
 	}
 
@@ -468,7 +468,7 @@ func (tm *timeoutManager) viewChange(event synchronizer.ViewChangeEvent) {
 
 // InitModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (tm *timeoutManager) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
+func (tm *timeoutManager) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	mods.Get(
 		&tm.synchronizer,
 		&tm.eventLoop,

@@ -56,10 +56,6 @@ func (m *multiplierImpl) InitModule(mods *modules.Core, _ modules.InitOptions) {
 	mods.GetScoped(m, &m.adder) // Requires an adder from the same pipe
 }
 
-// func (a *adderImpl) InitModule(_ *modules.Core, buildOpt modules.InitOptions) {
-// 	// Does nothing for now
-// }
-
 func TestPipeliningDisabled(t *testing.T) {
 	builder := modules.NewBuilder(0, nil)
 

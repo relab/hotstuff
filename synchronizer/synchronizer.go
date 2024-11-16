@@ -45,7 +45,7 @@ type Synchronizer struct {
 }
 
 // InitModule initializes the synchronizer.
-func (s *Synchronizer) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
+func (s *Synchronizer) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	mods.GetScoped(s,
 		&s.blockChain,
 		&s.crypto,
@@ -57,24 +57,24 @@ func (s *Synchronizer) InitModule(mods *modules.Core, initOpt modules.InitOption
 		&s.opts,
 	)
 
-	s.instance = initOpt.ModuleConsensusInstance
+	s.instance = opt.ModuleConsensusInstance
 
 	s.eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
 		timeout := event.(TimeoutEvent)
 		if s.View() == timeout.View {
 			s.OnLocalTimeout()
 		}
-	}, eventloop.RespondToScope(initOpt.ModuleConsensusInstance))
+	}, eventloop.RespondToScope(opt.ModuleConsensusInstance))
 
 	s.eventLoop.RegisterHandler(hotstuff.NewViewMsg{}, func(event any) {
 		newViewMsg := event.(hotstuff.NewViewMsg)
 		s.OnNewView(newViewMsg)
-	}, eventloop.RespondToScope(initOpt.ModuleConsensusInstance))
+	}, eventloop.RespondToScope(opt.ModuleConsensusInstance))
 
 	s.eventLoop.RegisterHandler(hotstuff.TimeoutMsg{}, func(event any) {
 		timeoutMsg := event.(hotstuff.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
-	}, eventloop.RespondToScope(initOpt.ModuleConsensusInstance))
+	}, eventloop.RespondToScope(opt.ModuleConsensusInstance))
 
 	var err error
 	s.highQC, err = s.crypto.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
@@ -184,7 +184,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 		View:          view,
 		SyncInfo:      s.SyncInfo(),
 		ViewSignature: sig,
-		CI:            s.instance,
+		Instance:      s.instance,
 	}
 
 	if s.opts.ShouldUseAggQC() {
@@ -206,7 +206,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
 func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
-	if s.instance != timeout.CI {
+	if s.instance != timeout.Instance {
 		panic("incorrectinstance")
 	}
 

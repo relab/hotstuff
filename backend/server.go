@@ -184,8 +184,8 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
 	impl.srv.induceLatencyHacky(id, func() {
-		if proposeMsg.CI.IsPipelined() {
-			impl.srv.eventLoop.ScopeEvent(proposeMsg.CI, proposeMsg)
+		if proposeMsg.Instance.IsPipelined() {
+			impl.srv.eventLoop.ScopeEvent(proposeMsg.Instance, proposeMsg)
 			return
 		}
 
@@ -266,8 +266,8 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	}
 
 	impl.srv.induceLatencyHacky(timeoutMsg.ID, func() {
-		if timeoutMsg.CI.IsPipelined() {
-			impl.srv.eventLoop.ScopeEvent(timeoutMsg.CI, timeoutMsg)
+		if timeoutMsg.Instance.IsPipelined() {
+			impl.srv.eventLoop.ScopeEvent(timeoutMsg.Instance, timeoutMsg)
 			return
 		}
 

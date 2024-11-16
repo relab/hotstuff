@@ -13,7 +13,7 @@ type roundRobin struct {
 	configuration modules.Configuration
 }
 
-func (rr *roundRobin) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
+func (rr *roundRobin) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	mods.Get(&rr.configuration)
 }
 

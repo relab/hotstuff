@@ -68,8 +68,8 @@ func New() modules.Consensus {
 }
 
 // InitModule initializes the module.
-func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOptions) {
-	cs.instance = initOpt.ModuleConsensusInstance
+func (cs *consensusBase) InitModule(mods *modules.Core, opt modules.InitOptions) {
+	cs.instance = opt.ModuleConsensusInstance
 
 	mods.GetScoped(cs,
 		&cs.acceptor,
@@ -95,7 +95,7 @@ func (cs *consensusBase) InitModule(mods *modules.Core, initOpt modules.InitOpti
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.OnPropose(event.(hotstuff.ProposeMsg))
-	}, eventloop.RespondToScope(initOpt.ModuleConsensusInstance))
+	}, eventloop.RespondToScope(opt.ModuleConsensusInstance))
 }
 
 func (cs *consensusBase) CommittedBlock() *hotstuff.Block {
@@ -155,7 +155,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 				cs.opts.ID(),
 				cs.instance,
 			),
-			CI: cs.instance,
+			Instance: cs.instance,
 		}
 
 		if aggQC, ok := cert.AggQC(); ok && cs.opts.ShouldUseAggQC() {
@@ -173,7 +173,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocyclo
 	// TODO: extract parts of this method into helper functions maybe?
 	cs.logger.Debugf("OnPropose[ci=%d, view=%d]: %.8s -> %.8x", cs.instance, cs.synchronizer.View(), proposal.Block.Hash(), proposal.Block.Command())
-	if cs.instance != proposal.CI {
+	if cs.instance != proposal.Instance {
 		panic("OnPropose: incorrectinstance")
 	}
 
@@ -220,13 +220,6 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		cs.eventLoop.DebugEvent(debug.CommandRejectedEvent{Instance: cs.instance, View: cs.synchronizer.View()})
 		return
 	}
-
-	// ALAN - Note: This if-statement was above the Accept before.
-	// if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash(), cs.instance); ok {
-	// 	cs.acceptor.Proposed(qcBlock.Command())
-	// } else {
-	// 	cs.logger.Infof("OnPropose[ci=%d]: Failed to fetch qcBlock", cs.instance)
-	// }
 
 	cs.logger.Debugf("OnPropose[ci=%d, view=%d]: block accepted: %.8s -> %.8x", cs.instance, cs.synchronizer.View(), block.Hash(), block.Command())
 

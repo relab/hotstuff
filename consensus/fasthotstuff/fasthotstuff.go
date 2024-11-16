@@ -73,13 +73,13 @@ func (fhs *FastHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 
 // VoteRule decides whether to vote for the proposal or not.
 func (fhs *FastHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
-	if fhs.instance != proposal.CI {
+	if fhs.instance != proposal.Instance {
 		panic("incorrect consensus instance")
 	}
 	// The base implementation verifies both regular QCs and AggregateQCs, and asserts that the QC embedded in the
 	// block is the same as the highQC found in the aggregateQC.
 	if proposal.AggregateQC != nil {
-		hqcBlock, ok := fhs.blockChain.Get(proposal.Block.QuorumCert().BlockHash(), proposal.CI)
+		hqcBlock, ok := fhs.blockChain.Get(proposal.Block.QuorumCert().BlockHash(), proposal.Instance)
 		return ok && fhs.blockChain.Extends(proposal.Block, hqcBlock)
 	}
 	return proposal.Block.View() >= fhs.synchronizer.View() &&

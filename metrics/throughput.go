@@ -48,7 +48,7 @@ func (t *Throughput) InitModule(mods *modules.Core, opt modules.InitOptions) {
 
 	eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
 		commitEvent := event.(hotstuff.CommitEvent)
-		t.recordCommit(commitEvent.CI, commitEvent.Commands)
+		t.recordCommit(commitEvent.Instance, commitEvent.Commands)
 	})
 
 	eventLoop.RegisterObserver(types.TickEvent{}, func(event any) {

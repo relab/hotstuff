@@ -118,7 +118,7 @@ func QuorumCertFromProto(qc *QuorumCert) hotstuff.QuorumCert {
 // ProposalToProto converts a ProposeMsg to a protobuf message.
 func ProposalToProto(proposal hotstuff.ProposeMsg) *Proposal {
 	p := &Proposal{
-		Instance: uint32(proposal.CI),
+		Instance: uint32(proposal.Instance),
 		Block:    BlockToProto(proposal.Block),
 	}
 	if proposal.AggregateQC != nil {
@@ -130,7 +130,7 @@ func ProposalToProto(proposal hotstuff.ProposeMsg) *Proposal {
 // ProposalFromProto converts a protobuf message to a ProposeMsg.
 func ProposalFromProto(p *Proposal) (proposal hotstuff.ProposeMsg) {
 	proposal.Block = BlockFromProto(p.GetBlock())
-	proposal.CI = hotstuff.Instance(p.Instance)
+	proposal.Instance = hotstuff.Instance(p.Instance)
 	if p.GetAggQC() != nil {
 		aggQC := AggregateQCFromProto(p.GetAggQC())
 		proposal.AggregateQC = &aggQC
@@ -171,7 +171,7 @@ func TimeoutMsgFromProto(m *TimeoutMsg) hotstuff.TimeoutMsg {
 		View:          hotstuff.View(m.GetView()),
 		SyncInfo:      SyncInfoFromProto(m.GetSyncInfo()),
 		ViewSignature: QuorumSignatureFromProto(m.GetViewSig()),
-		CI:            hotstuff.Instance(m.Instance),
+		Instance:      hotstuff.Instance(m.Instance),
 	}
 	if m.GetViewSig() != nil {
 		timeoutMsg.MsgSignature = QuorumSignatureFromProto(m.GetMsgSig())
@@ -185,7 +185,7 @@ func TimeoutMsgToProto(timeoutMsg hotstuff.TimeoutMsg) *TimeoutMsg {
 		View:     uint64(timeoutMsg.View),
 		SyncInfo: SyncInfoToProto(timeoutMsg.SyncInfo),
 		ViewSig:  QuorumSignatureToProto(timeoutMsg.ViewSignature),
-		Instance: uint32(timeoutMsg.CI),
+		Instance: uint32(timeoutMsg.Instance),
 	}
 	if timeoutMsg.MsgSignature != nil {
 		tm.MsgSig = QuorumSignatureToProto(timeoutMsg.MsgSignature)

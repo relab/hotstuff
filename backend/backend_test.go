@@ -121,7 +121,7 @@ func TestPropose(t *testing.T) {
 				hotstuff.GetGenesis().Hash()),
 			"foo", 1, 1, 0,
 		),
-		CI: 0,
+		Instance: 0,
 	}
 
 	testBase(t, want, func(cfg modules.Configuration) {
@@ -154,7 +154,7 @@ func TestProposeScoped(t *testing.T) {
 				hotstuff.GetGenesis().Hash()),
 			"foo", 1, 1, instance,
 		),
-		CI: instance,
+		Instance: instance,
 	}
 
 	testBase(t, want, func(cfg modules.Configuration) {
@@ -207,7 +207,7 @@ func TestTimeoutScoped(t *testing.T) {
 		View:          1,
 		ViewSignature: nil,
 		SyncInfo:      hotstuff.NewSyncInfo(instance),
-		CI:            instance,
+		Instance:      instance,
 	}
 	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)

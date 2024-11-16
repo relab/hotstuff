@@ -21,14 +21,14 @@ func New(impl modules.CryptoBase) modules.Crypto {
 
 // InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (c *crypto) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
+func (c *crypto) InitModule(mods *modules.Core, opt modules.InitOptions) {
 	mods.Get(
 		&c.blockChain,
 		&c.configuration,
 	)
 
 	if mod, ok := c.CryptoBase.(modules.Module); ok {
-		mod.InitModule(mods, buildOpt)
+		mod.InitModule(mods, opt)
 	}
 }
 
@@ -143,7 +143,7 @@ func (c crypto) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.Q
 			ID:       id,
 			View:     aggQC.View(),
 			SyncInfo: hotstuff.NewSyncInfo(qc.Instance()).WithQC(qc),
-			CI:       qc.Instance(),
+			Instance: qc.Instance(),
 		}.ToBytes()
 	}
 	if aggQC.Sig().Participants().Len() < c.configuration.QuorumSize() {

@@ -83,7 +83,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 
 // VoteRule decides whether to vote for the proposal or not.
 func (hs *ChainedHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
-	if hs.instance != proposal.CI {
+	if hs.instance != proposal.Instance {
 		panic("incorrectinstance")
 	}
 	block := proposal.Block

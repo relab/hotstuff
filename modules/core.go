@@ -49,7 +49,7 @@ type InitOptions struct {
 
 // Module is an interface for initializing modules.
 type Module interface {
-	InitModule(mods *Core, buildOpt InitOptions)
+	InitModule(mods *Core, opt InitOptions)
 }
 
 // Core is the base of the module system.
@@ -138,7 +138,7 @@ func (mods *Core) Get(pointers ...any) {
 //		otherModule OtherModule
 //	}
 //
-//	func (m *MyModuleImpl) InitModule(mods *modules.Core, buildOpt modules.InitOptions) {
+//	func (m *MyModuleImpl) InitModule(mods *modules.Core, opt modules.InitOptions) {
 //		mods.GetScoped(m, &m.otherModule) // Requires an OtherModule from the same pipe
 //	}
 //

@@ -287,7 +287,7 @@ func (cfg *subConfig) Propose(proposal hotstuff.ProposeMsg) {
 	if cfg.cfg == nil {
 		return
 	}
-	ctx, cancel := synchronizer.ScopedTimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop, proposal.CI)
+	ctx, cancel := synchronizer.ScopedTimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop, proposal.Instance)
 	defer cancel()
 	cfg.cfg.Propose(
 		ctx,
@@ -302,7 +302,7 @@ func (cfg *subConfig) Timeout(msg hotstuff.TimeoutMsg) {
 	}
 
 	// will wait until the second timeout before canceling
-	ctx, cancel := synchronizer.ScopedTimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop, msg.CI)
+	ctx, cancel := synchronizer.ScopedTimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop, msg.Instance)
 	defer cancel()
 
 	cfg.cfg.Timeout(

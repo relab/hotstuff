@@ -10,7 +10,7 @@ type ProposeMsg struct {
 	ID          ID           // The ID of the replica who sent the message.
 	Block       *Block       // The block that is proposed.
 	AggregateQC *AggregateQC // Optional AggregateQC
-	CI          Instance     //
+	Instance    Instance     //
 }
 
 func (p ProposeMsg) String() string {
@@ -32,7 +32,7 @@ func (v VoteMsg) String() string {
 type TimeoutMsg struct {
 	ID            ID   // The ID of the replica who sent the message.
 	View          View // The view that the replica wants to enter.
-	CI            Instance
+	Instance      Instance
 	ViewSignature QuorumSignature // A signature of the view
 	MsgSignature  QuorumSignature // A signature of the view, QC.BlockHash, and the replica ID
 	SyncInfo      SyncInfo        // The highest QC/TC known to the sender.
@@ -43,7 +43,7 @@ func (timeout TimeoutMsg) ToBytes() []byte {
 	var b bytes.Buffer
 	_, _ = b.Write(timeout.ID.ToBytes())
 	_, _ = b.Write(timeout.View.ToBytes())
-	_, _ = b.Write(timeout.CI.ToBytes())
+	_, _ = b.Write(timeout.Instance.ToBytes())
 	if qc, ok := timeout.SyncInfo.QC(); ok {
 		_, _ = b.Write(qc.ToBytes())
 	}
@@ -51,7 +51,7 @@ func (timeout TimeoutMsg) ToBytes() []byte {
 }
 
 func (timeout TimeoutMsg) String() string {
-	return fmt.Sprintf("ID: %d, CI: %d, View: %d, SyncInfo: %v", timeout.ID, timeout.CI, timeout.View, timeout.SyncInfo)
+	return fmt.Sprintf("ID: %d, CI: %d, View: %d, SyncInfo: %v", timeout.ID, timeout.Instance, timeout.View, timeout.SyncInfo)
 }
 
 // NewViewMsg is sent to the leader whenever a replica decides to advance to the next view.
@@ -64,6 +64,6 @@ type NewViewMsg struct {
 // CommitEvent is raised whenever a block is committed,
 // and includes the number of client commands that were executed.
 type CommitEvent struct {
-	CI       Instance
+	Instance Instance
 	Commands int
 }

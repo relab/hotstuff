@@ -43,7 +43,7 @@ func (hs *SimpleHotStuff) InitModule(mods *modules.Core, opt modules.InitOptions
 
 // VoteRule decides if the replica should vote for the given block.
 func (hs *SimpleHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
-	if proposal.CI != hs.instance {
+	if proposal.Instance != hs.instance {
 		panic("incorrectinstance")
 	}
 
