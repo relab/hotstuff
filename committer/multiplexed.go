@@ -40,7 +40,7 @@ func NewMultiplexed() modules.Committer {
 	}
 }
 
-func (c *multiplexedCommitter) InitModule(mods *modules.Core, opt modules.InitOptions) {
+func (c *multiplexedCommitter) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	mods.Get(
 		&c.eventLoop,
 		&c.executor,
@@ -49,8 +49,8 @@ func (c *multiplexedCommitter) InitModule(mods *modules.Core, opt modules.InitOp
 		&c.logger,
 	)
 
-	c.instanceCount = opt.InstanceCount
-	if opt.IsPipeliningEnabled {
+	c.instanceCount = info.ScopeCount
+	if info.IsPipeliningEnabled {
 		for _, instance := range mods.Scopes() {
 			c.bExecAtCi[instance] = hotstuff.GetGenesis()
 			c.waitingBlocksAtInstance[instance] = nil

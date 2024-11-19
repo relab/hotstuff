@@ -27,7 +27,7 @@ type ViewTimeouts struct {
 }
 
 // InitModule gives the module access to the other modules.
-func (vt *ViewTimeouts) InitModule(mods *modules.Core, opt modules.InitOptions) {
+func (vt *ViewTimeouts) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	var (
 		eventLoop *eventloop.ScopedEventLoop
 		logger    logging.Logger
@@ -42,8 +42,8 @@ func (vt *ViewTimeouts) InitModule(mods *modules.Core, opt modules.InitOptions) 
 
 	logger.Info("ViewTimeouts metric enabled.")
 
-	if opt.IsPipeliningEnabled {
-		for instance := hotstuff.Instance(1); instance <= hotstuff.Instance(opt.InstanceCount); instance++ {
+	if info.IsPipeliningEnabled {
+		for instance := hotstuff.Instance(1); instance <= hotstuff.Instance(info.ScopeCount); instance++ {
 			eventLoop.RegisterHandler(synchronizer.ViewChangeEvent{}, func(event any) {
 				vt.viewChange(event.(synchronizer.ViewChangeEvent))
 			}, eventloop.RespondToScope(instance))

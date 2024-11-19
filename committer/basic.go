@@ -27,8 +27,8 @@ func NewBasic() modules.Committer {
 	}
 }
 
-func (bb *basic) InitModule(mods *modules.Core, opt modules.InitOptions) {
-	if opt.IsPipeliningEnabled {
+func (bb *basic) InitModule(mods *modules.Core, info modules.ScopeInfo) {
+	if info.IsPipeliningEnabled {
 		panic("pipelining not supported for this module")
 	}
 	mods.Get(

@@ -22,7 +22,7 @@ type carousel struct {
 	logger        logging.Logger
 }
 
-func (c *carousel) InitModule(mods *modules.Core, _ modules.InitOptions) {
+func (c *carousel) InitModule(mods *modules.Core, _ modules.ScopeInfo) {
 	mods.GetScoped(c,
 		&c.blockChain,
 		&c.configuration,

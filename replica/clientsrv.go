@@ -100,14 +100,14 @@ func (srv *clientSrv) commandAddingMethod(cmd *clientpb.Command) {
 }
 
 // InitModule gives the module access to the other modules.
-func (srv *clientSrv) InitModule(mods *modules.Core, opt modules.InitOptions) {
+func (srv *clientSrv) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	mods.Get(
 		&srv.eventLoop,
 		&srv.logger,
 	)
 
-	srv.instanceCount = opt.InstanceCount
-	if opt.IsPipeliningEnabled {
+	srv.instanceCount = info.ScopeCount
+	if info.IsPipeliningEnabled {
 		for _, scope := range mods.Scopes() {
 			var cache *cmdCache
 			mods.MatchForScope(scope, &cache)

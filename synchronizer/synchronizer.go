@@ -45,7 +45,7 @@ type Synchronizer struct {
 }
 
 // InitModule initializes the synchronizer.
-func (s *Synchronizer) InitModule(mods *modules.Core, opt modules.InitOptions) {
+func (s *Synchronizer) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	mods.GetScoped(s,
 		&s.blockChain,
 		&s.crypto,
@@ -57,24 +57,24 @@ func (s *Synchronizer) InitModule(mods *modules.Core, opt modules.InitOptions) {
 		&s.opts,
 	)
 
-	s.instance = opt.ModuleConsensusInstance
+	s.instance = info.ModuleScope
 
 	s.eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
 		timeout := event.(TimeoutEvent)
 		if s.View() == timeout.View {
 			s.OnLocalTimeout()
 		}
-	}, eventloop.RespondToScope(opt.ModuleConsensusInstance))
+	}, eventloop.RespondToScope(info.ModuleScope))
 
 	s.eventLoop.RegisterHandler(hotstuff.NewViewMsg{}, func(event any) {
 		newViewMsg := event.(hotstuff.NewViewMsg)
 		s.OnNewView(newViewMsg)
-	}, eventloop.RespondToScope(opt.ModuleConsensusInstance))
+	}, eventloop.RespondToScope(info.ModuleScope))
 
 	s.eventLoop.RegisterHandler(hotstuff.TimeoutMsg{}, func(event any) {
 		timeoutMsg := event.(hotstuff.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
-	}, eventloop.RespondToScope(opt.ModuleConsensusInstance))
+	}, eventloop.RespondToScope(info.ModuleScope))
 
 	var err error
 	s.highQC, err = s.crypto.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})

@@ -33,7 +33,7 @@ func NewVotingMachine() *VotingMachine {
 }
 
 // InitModule initializes the VotingMachine.
-func (vm *VotingMachine) InitModule(mods *modules.Core, opt modules.InitOptions) {
+func (vm *VotingMachine) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	mods.GetScoped(vm,
 		&vm.blockChain,
 		&vm.configuration,
@@ -44,10 +44,10 @@ func (vm *VotingMachine) InitModule(mods *modules.Core, opt modules.InitOptions)
 		&vm.opts,
 	)
 
-	vm.instance = opt.ModuleConsensusInstance
+	vm.instance = info.ModuleScope
 	vm.eventLoop.RegisterHandler(hotstuff.VoteMsg{}, func(event any) {
 		vm.OnVote(event.(hotstuff.VoteMsg))
-	}, eventloop.RespondToScope(opt.ModuleConsensusInstance))
+	}, eventloop.RespondToScope(info.ModuleScope))
 }
 
 // OnVote handles an incoming vote.

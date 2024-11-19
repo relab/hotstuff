@@ -41,15 +41,15 @@ import (
 
 type moduleScope []Module
 
-type InitOptions struct {
-	IsPipeliningEnabled     bool
-	InstanceCount           int
-	ModuleConsensusInstance hotstuff.Instance
+type ScopeInfo struct {
+	IsPipeliningEnabled bool
+	ScopeCount          int
+	ModuleScope         hotstuff.Instance
 }
 
 // Module is an interface for initializing modules.
 type Module interface {
-	InitModule(mods *Core, opt InitOptions)
+	InitModule(mods *Core, opt ScopeInfo)
 }
 
 // Core is the base of the module system.
@@ -400,10 +400,10 @@ func (b *Builder) Build() *Core {
 	}
 	// add the Options last so that it can be overridden by user.
 	b.Add(b.opts)
-	opt := InitOptions{
-		IsPipeliningEnabled:     b.pipeliningEnabled,
-		ModuleConsensusInstance: hotstuff.ZeroInstance,
-		InstanceCount:           len(b.consensusInstanceIds),
+	opt := ScopeInfo{
+		IsPipeliningEnabled: b.pipeliningEnabled,
+		ModuleScope:         hotstuff.ZeroInstance,
+		ScopeCount:          len(b.consensusInstanceIds),
 	}
 	for _, module := range b.staticModules {
 		module.InitModule(&b.core, opt)
@@ -419,10 +419,10 @@ func (b *Builder) Build() *Core {
 	// Initializing later so that modules can reference
 	// other modules in the same pipe without panicking.
 	for instance, scope := range b.moduleScopes {
-		opt := InitOptions{
-			IsPipeliningEnabled:     b.pipeliningEnabled,
-			ModuleConsensusInstance: instance,
-			InstanceCount:           len(b.consensusInstanceIds),
+		opt := ScopeInfo{
+			IsPipeliningEnabled: b.pipeliningEnabled,
+			ModuleScope:         instance,
+			ScopeCount:          len(b.consensusInstanceIds),
 		}
 		for _, module := range scope {
 			module.(Module).InitModule(&b.core, opt)

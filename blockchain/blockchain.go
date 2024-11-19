@@ -28,7 +28,7 @@ type blockChain struct {
 	pendingFetch   map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
 }
 
-func (chain *blockChain) InitModule(mods *modules.Core, _ modules.InitOptions) {
+func (chain *blockChain) InitModule(mods *modules.Core, _ modules.ScopeInfo) {
 	mods.Get(
 		&chain.configuration,
 		&chain.eventLoop,

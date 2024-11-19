@@ -199,7 +199,7 @@ type executorWrapper struct {
 	bExec *hotstuff.Block
 }
 
-func (ew *executorWrapper) InitModule(mods *Core, buildOpt InitOptions) {
+func (ew *executorWrapper) InitModule(mods *Core, buildOpt ScopeInfo) {
 	if m, ok := ew.executor.(Module); ok {
 		m.InitModule(mods, buildOpt)
 	}
@@ -218,7 +218,7 @@ type forkHandlerWrapper struct {
 	forkHandler ForkHandler
 }
 
-func (fhw forkHandlerWrapper) InitModule(mods *Core, buildOpt InitOptions) {
+func (fhw forkHandlerWrapper) InitModule(mods *Core, buildOpt ScopeInfo) {
 	if m, ok := fhw.forkHandler.(Module); ok {
 		m.InitModule(mods, buildOpt)
 	}

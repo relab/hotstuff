@@ -68,8 +68,8 @@ func New() modules.Consensus {
 }
 
 // InitModule initializes the module.
-func (cs *consensusBase) InitModule(mods *modules.Core, opt modules.InitOptions) {
-	cs.instance = opt.ModuleConsensusInstance
+func (cs *consensusBase) InitModule(mods *modules.Core, info modules.ScopeInfo) {
+	cs.instance = info.ModuleScope
 
 	mods.GetScoped(cs,
 		&cs.acceptor,
@@ -95,7 +95,7 @@ func (cs *consensusBase) InitModule(mods *modules.Core, opt modules.InitOptions)
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.OnPropose(event.(hotstuff.ProposeMsg))
-	}, eventloop.RespondToScope(opt.ModuleConsensusInstance))
+	}, eventloop.RespondToScope(info.ModuleScope))
 }
 
 func (cs *consensusBase) CommittedBlock() *hotstuff.Block {

@@ -27,10 +27,10 @@ func New() consensus.Rules {
 }
 
 // InitModule initializes the module.
-func (fhs *FastHotStuff) InitModule(mods *modules.Core, opt modules.InitOptions) {
+func (fhs *FastHotStuff) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	var opts *modules.Options
 
-	fhs.instance = opt.ModuleConsensusInstance
+	fhs.instance = info.ModuleScope
 
 	mods.GetScoped(fhs,
 		&fhs.blockChain,

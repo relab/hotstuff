@@ -33,8 +33,8 @@ func New() consensus.Rules {
 }
 
 // InitModule initializes the module.
-func (hs *SimpleHotStuff) InitModule(mods *modules.Core, opt modules.InitOptions) {
-	hs.instance = opt.ModuleConsensusInstance
+func (hs *SimpleHotStuff) InitModule(mods *modules.Core, info modules.ScopeInfo) {
+	hs.instance = info.ModuleScope
 	mods.GetScoped(hs,
 		&hs.blockChain,
 		&hs.logger,

@@ -32,7 +32,7 @@ type Throughput struct {
 }
 
 // InitModule gives the module access to the other modules.
-func (t *Throughput) InitModule(mods *modules.Core, opt modules.InitOptions) {
+func (t *Throughput) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	var (
 		eventLoop *eventloop.ScopedEventLoop
 		logger    logging.Logger
@@ -44,7 +44,7 @@ func (t *Throughput) InitModule(mods *modules.Core, opt modules.InitOptions) {
 		&logger,
 	)
 
-	t.instanceCount = opt.InstanceCount
+	t.instanceCount = info.ScopeCount
 
 	eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
 		commitEvent := event.(hotstuff.CommitEvent)

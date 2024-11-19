@@ -52,7 +52,7 @@ func NewMultiplier() *multiplierImpl { //nolint:revive
 	return &multiplierImpl{}
 }
 
-func (m *multiplierImpl) InitModule(mods *modules.Core, _ modules.InitOptions) {
+func (m *multiplierImpl) InitModule(mods *modules.Core, _ modules.ScopeInfo) {
 	mods.GetScoped(m, &m.adder) // Requires an adder from the same pipe
 }
 

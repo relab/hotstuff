@@ -32,7 +32,7 @@ type DebugMetrics struct {
 }
 
 // InitModule gives the module access to the other modules.
-func (db *DebugMetrics) InitModule(mods *modules.Core, opt modules.InitOptions) {
+func (db *DebugMetrics) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	var (
 		eventLoop *eventloop.ScopedEventLoop
 		logger    logging.Logger
@@ -45,7 +45,7 @@ func (db *DebugMetrics) InitModule(mods *modules.Core, opt modules.InitOptions) 
 		&logger,
 	)
 
-	db.instanceCount = opt.InstanceCount
+	db.instanceCount = info.ScopeCount
 
 	logger.Info("DebugMetrics enabled.")
 
