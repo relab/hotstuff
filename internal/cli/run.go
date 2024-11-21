@@ -63,7 +63,7 @@ func init() {
 	runCmd.Flags().String("leader-rotation", "round-robin", "name of the leader rotation algorithm")
 	runCmd.Flags().Int64("shared-seed", 0, "Shared random number generator seed")
 	runCmd.Flags().StringSlice("modules", nil, "Name additional modules to be loaded.")
-	runCmd.Flags().Uint32("pipeline-instances", 0, "number of consensus instances in pipelining mode, where zero means pipelining is disabled.")
+	runCmd.Flags().Uint32("pipes", 0, "number of pipes in pipelining mode, where zero means pipelining is disabled.")
 	runCmd.Flags().String("pipeline-ordering", "multiplexed", "block execution ordering logic for pipelining mode.")
 	runCmd.Flags().String("viewduration-method", "fixed", "Calculation method for computing view durations.")
 	runCmd.Flags().Duration("hacky-replica-latency", 0, "Hacky way to induce replica latency. All replicas will have this latency.")
@@ -109,22 +109,22 @@ func runController() {
 		Duration:    viper.GetDuration("duration"),
 		Output:      outputDir,
 		ReplicaOpts: &orchestrationpb.ReplicaOpts{
-			UseTLS:                     true,
-			BatchSize:                  viper.GetUint32("batch-size"),
-			TimeoutMultiplier:          float32(viper.GetFloat64("timeout-multiplier")),
-			Consensus:                  viper.GetString("consensus"),
-			Crypto:                     viper.GetString("crypto"),
-			LeaderRotation:             viper.GetString("leader-rotation"),
-			ConnectTimeout:             durationpb.New(viper.GetDuration("connect-timeout")),
-			InitialTimeout:             durationpb.New(viper.GetDuration("view-timeout")),
-			TimeoutSamples:             viper.GetUint32("duration-samples"),
-			MaxTimeout:                 durationpb.New(viper.GetDuration("max-timeout")),
-			SharedSeed:                 viper.GetInt64("shared-seed"),
-			Modules:                    viper.GetStringSlice("modules"),
-			PipelineConsensusInstances: viper.GetUint32("pipeline-instances"),
-			PipelineOrdering:           viper.GetString("pipeline-ordering"),
-			PipelineViewDuration:       viper.GetString("pipeline-viewduration"),
-			HackyLatency:               durationpb.New(viper.GetDuration("hacky-replica-latency")),
+			UseTLS:               true,
+			BatchSize:            viper.GetUint32("batch-size"),
+			TimeoutMultiplier:    float32(viper.GetFloat64("timeout-multiplier")),
+			Consensus:            viper.GetString("consensus"),
+			Crypto:               viper.GetString("crypto"),
+			LeaderRotation:       viper.GetString("leader-rotation"),
+			ConnectTimeout:       durationpb.New(viper.GetDuration("connect-timeout")),
+			InitialTimeout:       durationpb.New(viper.GetDuration("view-timeout")),
+			TimeoutSamples:       viper.GetUint32("duration-samples"),
+			MaxTimeout:           durationpb.New(viper.GetDuration("max-timeout")),
+			SharedSeed:           viper.GetInt64("shared-seed"),
+			Modules:              viper.GetStringSlice("modules"),
+			Pipes:                viper.GetUint32("pipes"),
+			PipelineOrdering:     viper.GetString("pipeline-ordering"),
+			PipelineViewDuration: viper.GetString("pipeline-viewduration"),
+			HackyLatency:         durationpb.New(viper.GetDuration("hacky-replica-latency")),
 		},
 		ClientOpts: &orchestrationpb.ClientOpts{
 			UseTLS:           true,

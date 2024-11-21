@@ -65,10 +65,10 @@ func TestViewContextEarlierView(t *testing.T) {
 // TestTimeoutContext tests that a timeout context is canceled after receiving a timeout event.
 func TestTimeoutContextScoped(t *testing.T) {
 	eventloop := eventloop.NewScoped(10, 1)
-	ctx, cancel := synchronizer.ScopedTimeoutContext(context.Background(), eventloop, hotstuff.Instance(1))
+	ctx, cancel := synchronizer.ScopedTimeoutContext(context.Background(), eventloop, hotstuff.Pipe(1))
 	defer cancel()
 
-	eventloop.ScopeEvent(hotstuff.Instance(1), synchronizer.TimeoutEvent{Instance: 1})
+	eventloop.AddScopedEvent(hotstuff.Pipe(1), synchronizer.TimeoutEvent{Pipe: 1})
 
 	if ctx.Err() != context.Canceled {
 		t.Error("Context not canceled")
@@ -78,10 +78,10 @@ func TestTimeoutContextScoped(t *testing.T) {
 // TestTimeoutContextView tests that a timeout context is canceled after receiving a view change event.
 func TestTimeoutContextViewScoped(t *testing.T) {
 	eventloop := eventloop.NewScoped(10, 1)
-	ctx, cancel := synchronizer.ScopedTimeoutContext(context.Background(), eventloop, hotstuff.Instance(1))
+	ctx, cancel := synchronizer.ScopedTimeoutContext(context.Background(), eventloop, hotstuff.Pipe(1))
 	defer cancel()
 
-	eventloop.ScopeEvent(hotstuff.Instance(1), synchronizer.ViewChangeEvent{View: 1, Instance: 1})
+	eventloop.AddScopedEvent(hotstuff.Pipe(1), synchronizer.ViewChangeEvent{View: 1, Pipe: 1})
 
 	if ctx.Err() != context.Canceled {
 		t.Error("Context not canceled")
@@ -91,10 +91,10 @@ func TestTimeoutContextViewScoped(t *testing.T) {
 // TestViewContext tests that a view context is canceled after receiving a view change event.
 func TestViewContextScoped(t *testing.T) {
 	eventloop := eventloop.NewScoped(10, 1)
-	ctx, cancel := synchronizer.ScopedViewContext(context.Background(), eventloop, hotstuff.Instance(1), nil)
+	ctx, cancel := synchronizer.ScopedViewContext(context.Background(), eventloop, hotstuff.Pipe(1), nil)
 	defer cancel()
 
-	eventloop.ScopeEvent(hotstuff.Instance(1), synchronizer.ViewChangeEvent{View: 1, Instance: 1})
+	eventloop.AddScopedEvent(hotstuff.Pipe(1), synchronizer.ViewChangeEvent{View: 1, Pipe: 1})
 
 	if ctx.Err() != context.Canceled {
 		t.Error("Context not canceled")
@@ -105,10 +105,10 @@ func TestViewContextScoped(t *testing.T) {
 func TestViewContextEarlierViewScoped(t *testing.T) {
 	eventloop := eventloop.NewScoped(10, 1)
 	view := hotstuff.View(1)
-	ctx, cancel := synchronizer.ScopedViewContext(context.Background(), eventloop, hotstuff.Instance(1), &view)
+	ctx, cancel := synchronizer.ScopedViewContext(context.Background(), eventloop, hotstuff.Pipe(1), &view)
 	defer cancel()
 
-	eventloop.ScopeEvent(hotstuff.Instance(1), synchronizer.ViewChangeEvent{View: 0, Instance: 1})
+	eventloop.AddScopedEvent(hotstuff.Pipe(1), synchronizer.ViewChangeEvent{View: 0, Pipe: 1})
 
 	if ctx.Err() != nil {
 		t.Error("Context canceled")

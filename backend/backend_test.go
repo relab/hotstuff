@@ -117,11 +117,11 @@ func TestPropose(t *testing.T) {
 			hotstuff.NewQuorumCert(
 				nil,
 				0,
-				hotstuff.ZeroInstance, // TODO: Verify if this code conflicts with pipelining
+				hotstuff.NullPipe, // TODO: Verify if this code conflicts with pipelining
 				hotstuff.GetGenesis().Hash()),
 			"foo", 1, 1, 0,
 		),
-		Instance: 0,
+		Pipe: 0,
 	}
 
 	testBase(t, want, func(cfg modules.Configuration) {
@@ -142,7 +142,7 @@ func TestPropose(t *testing.T) {
 
 func TestProposeScoped(t *testing.T) {
 	var wg sync.WaitGroup
-	instance := hotstuff.Instance(123)
+	pipe := hotstuff.Pipe(123)
 	want := hotstuff.ProposeMsg{
 		ID: 1,
 		Block: hotstuff.NewBlock(
@@ -150,11 +150,11 @@ func TestProposeScoped(t *testing.T) {
 			hotstuff.NewQuorumCert(
 				nil,
 				0,
-				hotstuff.ZeroInstance, // TODO: Verify if this code conflicts with pipelining
+				hotstuff.NullPipe, // TODO: Verify if this code conflicts with pipelining
 				hotstuff.GetGenesis().Hash()),
-			"foo", 1, 1, instance,
+			"foo", 1, 1, pipe,
 		),
-		Instance: instance,
+		Pipe: pipe,
 	}
 
 	testBase(t, want, func(cfg modules.Configuration) {
@@ -168,10 +168,10 @@ func TestProposeScoped(t *testing.T) {
 		}
 		if got.Block.Hash() != want.Block.Hash() {
 
-			t.Errorf("block hashes do not match. want %d got %d", got.Block.Instance(), want.Block.Instance())
+			t.Errorf("block hashes do not match. want %d got %d", got.Block.Pipe(), want.Block.Pipe())
 		}
 		wg.Done()
-	}, eventloop.RespondToScope(instance))
+	}, eventloop.RespondToScope(pipe))
 }
 
 func TestTimeout(t *testing.T) {
@@ -180,7 +180,7 @@ func TestTimeout(t *testing.T) {
 		ID:            1,
 		View:          1,
 		ViewSignature: nil,
-		SyncInfo:      hotstuff.NewSyncInfo(hotstuff.ZeroInstance),
+		SyncInfo:      hotstuff.NewSyncInfo(hotstuff.NullPipe),
 	}
 	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)
@@ -201,13 +201,13 @@ func TestTimeout(t *testing.T) {
 func TestTimeoutScoped(t *testing.T) {
 	var wg sync.WaitGroup
 
-	instance := hotstuff.Instance(1)
+	pipe := hotstuff.Pipe(1)
 	want := hotstuff.TimeoutMsg{
 		ID:            1,
 		View:          1,
 		ViewSignature: nil,
-		SyncInfo:      hotstuff.NewSyncInfo(instance),
-		Instance:      instance,
+		SyncInfo:      hotstuff.NewSyncInfo(pipe),
+		Pipe:          pipe,
 	}
 	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)
@@ -222,7 +222,7 @@ func TestTimeoutScoped(t *testing.T) {
 			t.Errorf("wrong view in proposal: got: %d, want: %d", got.View, want.View)
 		}
 		wg.Done()
-	}, eventloop.RespondToScope(instance))
+	}, eventloop.RespondToScope(pipe))
 }
 
 type testData struct {

@@ -18,7 +18,7 @@ type FastHotStuff struct {
 	logger       logging.Logger
 	synchronizer modules.Synchronizer
 
-	instance hotstuff.Instance
+	pipe hotstuff.Pipe
 }
 
 // New returns a new FastHotStuff instance.
@@ -30,7 +30,7 @@ func New() consensus.Rules {
 func (fhs *FastHotStuff) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	var opts *modules.Options
 
-	fhs.instance = info.ModuleScope
+	fhs.pipe = info.ModuleScope
 
 	mods.GetScoped(fhs,
 		&fhs.blockChain,
@@ -45,13 +45,13 @@ func (fhs *FastHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return fhs.blockChain.Get(qc.BlockHash(), qc.Instance())
+	return fhs.blockChain.Get(qc.BlockHash(), qc.Pipe())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.
 func (fhs *FastHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
-	if fhs.instance != block.Instance() {
-		panic("incorrect consensus instance")
+	if fhs.pipe != block.Pipe() {
+		panic("incorrect pipe")
 	}
 
 	parent, ok := fhs.qcRef(block.QuorumCert())
@@ -73,13 +73,13 @@ func (fhs *FastHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 
 // VoteRule decides whether to vote for the proposal or not.
 func (fhs *FastHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
-	if fhs.instance != proposal.Instance {
+	if fhs.pipe != proposal.Pipe {
 		panic("incorrect consensus instance")
 	}
 	// The base implementation verifies both regular QCs and AggregateQCs, and asserts that the QC embedded in the
 	// block is the same as the highQC found in the aggregateQC.
 	if proposal.AggregateQC != nil {
-		hqcBlock, ok := fhs.blockChain.Get(proposal.Block.QuorumCert().BlockHash(), proposal.Instance)
+		hqcBlock, ok := fhs.blockChain.Get(proposal.Block.QuorumCert().BlockHash(), proposal.Pipe)
 		return ok && fhs.blockChain.Extends(proposal.Block, hqcBlock)
 	}
 	return proposal.Block.View() >= fhs.synchronizer.View() &&

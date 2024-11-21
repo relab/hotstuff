@@ -55,7 +55,7 @@ type consensusBase struct {
 	handel modules.Handel
 
 	lastVote hotstuff.View
-	instance hotstuff.Instance
+	pipe     hotstuff.Pipe
 
 	mut sync.Mutex
 }
@@ -69,7 +69,7 @@ func New() modules.Consensus {
 
 // InitModule initializes the module.
 func (cs *consensusBase) InitModule(mods *modules.Core, info modules.ScopeInfo) {
-	cs.instance = info.ModuleScope
+	cs.pipe = info.ModuleScope
 
 	mods.GetScoped(cs,
 		&cs.acceptor,
@@ -99,7 +99,7 @@ func (cs *consensusBase) InitModule(mods *modules.Core, info modules.ScopeInfo) 
 }
 
 func (cs *consensusBase) CommittedBlock() *hotstuff.Block {
-	return cs.committer.CommittedBlock(cs.instance)
+	return cs.committer.CommittedBlock(cs.pipe)
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
@@ -112,28 +112,28 @@ func (cs *consensusBase) StopVoting(view hotstuff.View) {
 
 // Propose creates a new proposal.
 func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
-	cs.logger.Debugf("Propose[ci=%d]", cs.instance)
+	cs.logger.Debugf("Propose[p=%d]", cs.pipe)
 
-	if cs.instance != cert.Instance() {
-		panic("incorrectinstance")
+	if cs.pipe != cert.Pipe() {
+		panic("incorrect pipe")
 	}
 
 	qc, ok := cert.QC()
 	if ok {
 		// tell the acceptor that the previous proposal succeeded.
-		if qcBlock, ok := cs.blockChain.Get(qc.BlockHash(), cs.instance); ok {
+		if qcBlock, ok := cs.blockChain.Get(qc.BlockHash(), cs.pipe); ok {
 			cs.acceptor.Proposed(qcBlock.Command())
 		} else {
 			cs.logger.Errorf("Could not find block for QC: %s", qc)
 		}
 	}
 
-	ctx, cancel := synchronizer.ScopedTimeoutContext(cs.eventLoop.Context(), cs.eventLoop, cs.instance)
+	ctx, cancel := synchronizer.ScopedTimeoutContext(cs.eventLoop.Context(), cs.eventLoop, cs.pipe)
 	defer cancel()
 
 	cmd, ok := cs.commandQueue.Get(ctx)
 	if !ok {
-		cs.logger.Debugf("Propose[ci=%d, view=%d]: No command", cs.instance, cs.synchronizer.View())
+		cs.logger.Debugf("Propose[p=%d, view=%d]: No command", cs.pipe, cs.synchronizer.View())
 		return
 	}
 
@@ -141,7 +141,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 	if proposer, ok := cs.impl.(ProposeRuler); ok {
 		proposal, ok = proposer.ProposeRule(cert, cmd)
 		if !ok {
-			cs.logger.Debug("Propose[ci=%d]: No block", cs.instance)
+			cs.logger.Debug("Propose[p=%d]: No block", cs.pipe)
 			return
 		}
 	} else {
@@ -153,9 +153,9 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 				cmd,
 				cs.synchronizer.View(),
 				cs.opts.ID(),
-				cs.instance,
+				cs.pipe,
 			),
-			Instance: cs.instance,
+			Pipe: cs.pipe,
 		}
 
 		if aggQC, ok := cert.AggQC(); ok && cs.opts.ShouldUseAggQC() {
@@ -172,9 +172,9 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 
 func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocyclo
 	// TODO: extract parts of this method into helper functions maybe?
-	cs.logger.Debugf("OnPropose[ci=%d, view=%d]: %.8s -> %.8x", cs.instance, cs.synchronizer.View(), proposal.Block.Hash(), proposal.Block.Command())
-	if cs.instance != proposal.Instance {
-		panic("OnPropose: incorrectinstance")
+	cs.logger.Debugf("OnPropose[p=%d, view=%d]: %.8s -> %.8x", cs.pipe, cs.synchronizer.View(), proposal.Block.Hash(), proposal.Block.Command())
+	if cs.pipe != proposal.Pipe {
+		panic("OnPropose: incorrect pipe")
 	}
 
 	block := proposal.Block
@@ -182,46 +182,46 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	if cs.opts.ShouldUseAggQC() && proposal.AggregateQC != nil {
 		highQC, ok := cs.crypto.VerifyAggregateQC(*proposal.AggregateQC)
 		if !ok {
-			cs.logger.Warnf("OnPropose[ci=%d, view=%d]: failed to verify aggregate QC", cs.instance, cs.synchronizer.View())
+			cs.logger.Warnf("OnPropose[p=%d, view=%d]: failed to verify aggregate QC", cs.pipe, cs.synchronizer.View())
 			return
 		}
 		// NOTE: for simplicity, we require that the highQC found in the AggregateQC equals the QC embedded in the block.
 		if !block.QuorumCert().Equals(highQC) {
-			cs.logger.Warnf("OnPropose[ci=%d, view=%d]: block QC does not equal highQC", cs.instance, cs.synchronizer.View())
+			cs.logger.Warnf("OnPropose[p=%d, view=%d]: block QC does not equal highQC", cs.pipe, cs.synchronizer.View())
 			return
 		}
 	}
 
 	if !cs.crypto.VerifyQuorumCert(block.QuorumCert()) {
-		cs.logger.Infof("OnPropose[ci=%d, view=%d]: invalid QC", cs.instance, cs.synchronizer.View())
+		cs.logger.Infof("OnPropose[p=%d, view=%d]: invalid QC", cs.pipe, cs.synchronizer.View())
 		return
 	}
 
 	// ensure the block came from the leader.
 	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
-		cs.logger.Infof("OnPropose[ci=%d, view=%d]: block was not proposed by the expected leader", cs.instance, cs.synchronizer.View())
+		cs.logger.Infof("OnPropose[p=%d, view=%d]: block was not proposed by the expected leader", cs.pipe, cs.synchronizer.View())
 		return
 	}
 
 	if !cs.impl.VoteRule(proposal) {
-		cs.logger.Infof("OnPropose[ci=%d, view=%d]: Block not voted for", cs.instance, cs.synchronizer.View())
+		cs.logger.Infof("OnPropose[p=%d, view=%d]: Block not voted for", cs.pipe, cs.synchronizer.View())
 		return
 	}
 
-	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash(), cs.instance); ok {
+	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash(), cs.pipe); ok {
 		cs.acceptor.Proposed(qcBlock.Command())
 	} else {
-		cs.logger.Infof("OnPropose[ci=%d, view=%d]: Failed to fetch qcBlock", cs.instance, cs.synchronizer.View())
+		cs.logger.Infof("OnPropose[p=%d, view=%d]: Failed to fetch qcBlock", cs.pipe, cs.synchronizer.View())
 	}
 
 	cmd := block.Command()
 	if !cs.acceptor.Accept(cmd) {
-		cs.logger.Infof("OnPropose[ci=%d, view=%d]: block rejected: %.8s -> %.8x", cs.instance, cs.synchronizer.View(), block.Hash(), block.Command())
-		cs.eventLoop.DebugEvent(debug.CommandRejectedEvent{Instance: cs.instance, View: cs.synchronizer.View()})
+		cs.logger.Infof("OnPropose[p=%d, view=%d]: block rejected: %.8s -> %.8x", cs.pipe, cs.synchronizer.View(), block.Hash(), block.Command())
+		cs.eventLoop.DebugEvent(debug.CommandRejectedEvent{Pipe: cs.pipe, View: cs.synchronizer.View()})
 		return
 	}
 
-	cs.logger.Debugf("OnPropose[ci=%d, view=%d]: block accepted: %.8s -> %.8x", cs.instance, cs.synchronizer.View(), block.Hash(), block.Command())
+	cs.logger.Debugf("OnPropose[p=%d, view=%d]: block accepted: %.8s -> %.8x", cs.pipe, cs.synchronizer.View(), block.Hash(), block.Command())
 
 	// block is safe and was accepted
 	cs.blockChain.Store(block)
@@ -229,16 +229,16 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	if b := cs.impl.CommitRule(block); b != nil {
 		cs.committer.Commit(block)
 	}
-	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo(cs.instance).WithQC(block.QuorumCert()))
+	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo(cs.pipe).WithQC(block.QuorumCert()))
 
 	if block.View() <= cs.lastVote {
-		cs.logger.Info(fmt.Sprintf("OnPropose[ci=%d, view=%d]: block view too old for %.8s -> %.8x (diff=%d)", cs.instance, cs.synchronizer.View(), block.Hash(), block.Command(), cs.lastVote-block.View()))
+		cs.logger.Info(fmt.Sprintf("OnPropose[p=%d, view=%d]: block view too old for %.8s -> %.8x (diff=%d)", cs.pipe, cs.synchronizer.View(), block.Hash(), block.Command(), cs.lastVote-block.View()))
 		return
 	}
 
 	pc, err := cs.crypto.CreatePartialCert(block)
 	if err != nil {
-		cs.logger.Errorf("OnPropose[ci=%d, view=%d]: failed to sign block: ", cs.instance, cs.synchronizer.View(), err)
+		cs.logger.Errorf("OnPropose[p=%d, view=%d]: failed to sign block: ", cs.pipe, cs.synchronizer.View(), err)
 		return
 	}
 
@@ -252,7 +252,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 
 	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
 	if leaderID == cs.opts.ID() {
-		cs.eventLoop.ScopeEvent(cs.instance, hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})
+		cs.eventLoop.AddScopedEvent(cs.pipe, hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})
 		return
 	}
 
@@ -262,7 +262,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
-	cs.logger.Debugf("OnPropose[ci=%d, view=%d]: voting for %.8s -> %.8x", cs.instance, cs.synchronizer.View(), block.Hash(), block.Command())
+	cs.logger.Debugf("OnPropose[p=%d, view=%d]: voting for %.8s -> %.8x", cs.pipe, cs.synchronizer.View(), block.Hash(), block.Command())
 	leader.Vote(pc)
 }
 

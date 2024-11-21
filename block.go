@@ -15,18 +15,18 @@ type Block struct {
 	cmd      Command
 	cert     QuorumCert
 	view     View
-	instance Instance
+	pipe     Pipe
 }
 
 // NewBlock creates a new Block
-func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID, instance Instance) *Block {
+func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID, pipe Pipe) *Block {
 	b := &Block{
 		parent:   parent,
 		cert:     cert,
 		cmd:      cmd,
 		view:     view,
 		proposer: proposer,
-		instance: instance,
+		pipe:     pipe,
 	}
 	// cache the hash immediately because it is too racy to do it in Hash()
 	b.hash = sha256.Sum256(b.ToBytes())
@@ -35,13 +35,13 @@ func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID,
 
 func (b *Block) String() string {
 	return fmt.Sprintf(
-		"Block{ hash: %.6s parent: %.6s, proposer: %d, view: %d , cert: %v, instance: %d }",
+		"Block{ hash: %.6s parent: %.6s, proposer: %d, view: %d , cert: %v, pipe: %d }",
 		b.Hash().String(),
 		b.parent.String(),
 		b.proposer,
 		b.view,
 		b.cert,
-		b.instance,
+		b.pipe,
 	)
 }
 
@@ -75,8 +75,8 @@ func (b *Block) View() View {
 	return b.view
 }
 
-func (b *Block) Instance() Instance {
-	return b.instance
+func (b *Block) Pipe() Pipe {
+	return b.pipe
 }
 
 // ToBytes returns the raw byte form of the Block, to be used for hashing, etc.
@@ -86,7 +86,7 @@ func (b *Block) ToBytes() []byte {
 	binary.LittleEndian.PutUint32(proposerBuf[:], uint32(b.proposer))
 	buf = append(buf, proposerBuf[:]...)
 	var instanceBuf [4]byte
-	binary.LittleEndian.PutUint32(instanceBuf[:], uint32(b.instance))
+	binary.LittleEndian.PutUint32(instanceBuf[:], uint32(b.pipe))
 	buf = append(buf, instanceBuf[:]...)
 	var viewBuf [8]byte
 	binary.LittleEndian.PutUint64(viewBuf[:], uint64(b.view))

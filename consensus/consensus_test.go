@@ -31,7 +31,7 @@ func TestVote(t *testing.T) {
 
 	hs.Get(&eventLoop, &blockChain)
 
-	cs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(hotstuff.ZeroInstance)))
+	cs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(hotstuff.NullPipe)))
 
 	ok := false
 	ctx, cancel := context.WithCancel(context.Background())
@@ -45,7 +45,7 @@ func TestVote(t *testing.T) {
 		hotstuff.NewQuorumCert(
 			nil,
 			1,
-			hotstuff.ZeroInstance, // TODO: Verify if this code conflicts with pipelining
+			hotstuff.NullPipe, // TODO: Verify if this code conflicts with pipelining
 			hotstuff.GetGenesis().Hash()),
 		"test", 1, 1,
 	)

@@ -80,10 +80,10 @@ func TestPipeliningDisabled(t *testing.T) {
 }
 
 func TestPipelined(t *testing.T) {
-	instances := 3
+	pipes := 3
 
 	builder := modules.NewBuilder(0, nil)
-	builder.EnablePipelining(instances)
+	builder.EnablePipelining(pipes)
 
 	adders := builder.CreateScope(NewAdder)
 	multers := builder.CreateScope(NewMultiplier)
@@ -91,7 +91,7 @@ func TestPipelined(t *testing.T) {
 	builder.AddScope(adders, multers)
 
 	core := builder.Build()
-	if core.ScopeCount() != instances {
+	if core.ScopeCount() != pipes {
 		t.Fail()
 	}
 
@@ -101,7 +101,7 @@ func TestPipelined(t *testing.T) {
 		Result int
 	}
 
-	testCasesMult := map[hotstuff.Instance]AdderMultTestCase{
+	testCasesMult := map[hotstuff.Pipe]AdderMultTestCase{
 		1: {A: 2, B: 3, Result: 6},
 		2: {A: 2, B: 5, Result: 10},
 		3: {A: 2, B: 6, Result: 12},

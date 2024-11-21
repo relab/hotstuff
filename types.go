@@ -134,19 +134,19 @@ type ThresholdSignature = QuorumSignature
 type PartialCert struct {
 	// shortcut to the signer of the signature
 	signer    ID
-	instance  Instance
+	pipe      Pipe
 	signature QuorumSignature
 	blockHash Hash
 }
 
 // NewPartialCert returns a new partial certificate.
-func NewPartialCert(instance Instance, signature QuorumSignature, blockHash Hash) PartialCert {
+func NewPartialCert(pipe Pipe, signature QuorumSignature, blockHash Hash) PartialCert {
 	var signer ID
 	signature.Participants().RangeWhile(func(i ID) bool {
 		signer = i
 		return false
 	})
-	return PartialCert{signer, instance, signature, blockHash}
+	return PartialCert{signer, pipe, signature, blockHash}
 }
 
 // Signer returns the ID of the replica that created the certificate.
@@ -164,9 +164,9 @@ func (pc PartialCert) BlockHash() Hash {
 	return pc.blockHash
 }
 
-// Instance returns which consensus instance the PartialCert belongs to.
-func (pc PartialCert) Instance() Instance {
-	return pc.instance
+// Pipe returns which pipe the PartialCert belongs to.
+func (pc PartialCert) Pipe() Pipe {
+	return pc.pipe
 }
 
 // ToBytes returns a byte representation of the partial certificate.
@@ -179,15 +179,15 @@ func (pc PartialCert) ToBytes() []byte {
 // However, if highQC.View < highTC.View, we should still include highQC.
 // This can also hold an AggregateQC for Fast-Hotstuff.
 type SyncInfo struct {
-	qc       *QuorumCert
-	tc       *TimeoutCert
-	aggQC    *AggregateQC
-	instance Instance
+	qc    *QuorumCert
+	tc    *TimeoutCert
+	aggQC *AggregateQC
+	pipe  Pipe
 }
 
 // NewSyncInfo returns a new SyncInfo struct.
-func NewSyncInfo(instance Instance) SyncInfo {
-	return SyncInfo{instance: instance}
+func NewSyncInfo(pipe Pipe) SyncInfo {
+	return SyncInfo{pipe: pipe}
 }
 
 // WithQC returns a copy of the SyncInfo struct with the given QC.
@@ -235,8 +235,8 @@ func (si SyncInfo) AggQC() (_ AggregateQC, _ bool) {
 	return
 }
 
-func (si SyncInfo) Instance() Instance {
-	return si.instance
+func (si SyncInfo) Pipe() Pipe {
+	return si.pipe
 }
 
 func (si SyncInfo) String() string {
@@ -259,13 +259,13 @@ func (si SyncInfo) String() string {
 type QuorumCert struct {
 	signature QuorumSignature
 	view      View
-	instance  Instance
+	pipe      Pipe
 	hash      Hash
 }
 
 // NewQuorumCert creates a new quorum cert from the given values.
-func NewQuorumCert(signature QuorumSignature, view View, instance Instance, hash Hash) QuorumCert {
-	return QuorumCert{signature, view, instance, hash}
+func NewQuorumCert(signature QuorumSignature, view View, pipe Pipe, hash Hash) QuorumCert {
+	return QuorumCert{signature, view, pipe, hash}
 }
 
 // ToBytes returns a byte representation of the quorum certificate.
@@ -293,8 +293,8 @@ func (qc QuorumCert) View() View {
 	return qc.view
 }
 
-func (qc QuorumCert) Instance() Instance {
-	return qc.instance
+func (qc QuorumCert) Pipe() Pipe {
+	return qc.pipe
 }
 
 // Equals returns true if the other QC equals this QC.
@@ -400,20 +400,20 @@ func writeParticipants(wr io.Writer, participants IDSet) (err error) {
 	return err
 }
 
-// Instance is a number indicating the pipelined consensus instance.
-type Instance uint32
+// Pipe is a number indicating the pipe.
+type Pipe uint32
 
 // Flag for no piplining and identifier for unscoped modules and events.
-const ZeroInstance = Instance(0)
+const NullPipe = Pipe(0)
 
-// ToBytes returns the instance id as bytes.
-func (p Instance) ToBytes() []byte {
+// ToBytes returns the pipe id as bytes.
+func (p Pipe) ToBytes() []byte {
 	var viewBytes [4]byte
 	binary.LittleEndian.PutUint32(viewBytes[:], uint32(p))
 	return viewBytes[:]
 }
 
-// If the instance ID is not ZeroInstance, then return true
-func (i Instance) IsPipelined() bool {
-	return i != ZeroInstance
+// If the pipe ID is not NullPipe, then return true
+func (i Pipe) IsNull() bool {
+	return i != NullPipe
 }

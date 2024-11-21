@@ -47,8 +47,8 @@ type Config struct {
 	ManagerOptions []gorums.ManagerOption
 	// Location information of all replicas
 	LocationInfo map[hotstuff.ID]string
-	// Number of consensus instances in pipelining mode
-	ConsensusInstanceCount uint32
+	// Number of pipes in pipelining mode
+	PipeCount uint32
 	// Latency induced by all replicas.
 	HackyLatency durationpb.Duration
 }
@@ -169,9 +169,9 @@ func (srv *Replica) Run(ctx context.Context) {
 	srv.hs.Get(&eventLoop)
 
 	if srv.hs.ScopeCount() > 0 {
-		for instance := hotstuff.Instance(1); instance <= hotstuff.Instance(srv.hs.ScopeCount()); instance++ {
+		for pipe := hotstuff.Pipe(1); pipe <= hotstuff.Pipe(srv.hs.ScopeCount()); pipe++ {
 			var synchronizer modules.Synchronizer
-			srv.hs.MatchForScope(instance, &synchronizer)
+			srv.hs.MatchForScope(pipe, &synchronizer)
 			synchronizer.Start(ctx)
 		}
 	} else {

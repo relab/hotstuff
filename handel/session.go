@@ -376,11 +376,11 @@ func (s *session) updateOutgoing(levelIndex int) {
 			s.h.logger.Debugf("Done with session: %.8s", s.hash)
 
 			s.h.eventLoop.AddEvent(hotstuff.NewViewMsg{
-				// TODO: Check if zero instance is okay to use here
-				SyncInfo: hotstuff.NewSyncInfo(hotstuff.ZeroInstance).WithQC(hotstuff.NewQuorumCert(
+				// TODO: Check if null pipe is okay to use here
+				SyncInfo: hotstuff.NewSyncInfo(hotstuff.NullPipe).WithQC(hotstuff.NewQuorumCert(
 					outgoing,
 					s.h.synchronizer.View(),
-					hotstuff.ZeroInstance, // TODO: Verify if this code conflicts with pipelining
+					hotstuff.NullPipe, // TODO: Verify if this code conflicts with pipelining
 					s.hash,
 				)),
 			})
@@ -628,7 +628,7 @@ func (s *session) improveSignature(contribution contribution) hotstuff.QuorumSig
 
 func (s *session) verifyContribution(c contribution, sig hotstuff.QuorumSignature, verifyIndiv bool) {
 	// TODO (Alan): Verify issues with pipelining
-	block, ok := s.h.blockChain.Get(s.hash, hotstuff.ZeroInstance)
+	block, ok := s.h.blockChain.Get(s.hash, hotstuff.NullPipe)
 	if !ok {
 		return
 	}

@@ -22,7 +22,7 @@ func ViewContext(parent context.Context, eventLoop *eventloop.ScopedEventLoop, v
 	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent())
 
 	return ctx, func() {
-		eventLoop.UnregisterHandler(ViewChangeEvent{}, hotstuff.ZeroInstance, id)
+		eventLoop.UnregisterHandler(ViewChangeEvent{}, hotstuff.NullPipe, id)
 		cancel()
 	}
 }
@@ -37,59 +37,59 @@ func TimeoutContext(parent context.Context, eventLoop *eventloop.ScopedEventLoop
 	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent())
 
 	return ctx, func() {
-		eventLoop.UnregisterHandler(TimeoutEvent{}, hotstuff.ZeroInstance, id)
+		eventLoop.UnregisterHandler(TimeoutEvent{}, hotstuff.NullPipe, id)
 		cancel()
 	}
 }
 
 // ScopedViewContext returns a context that is canceled at the end of view.
 // If view is nil or less than or equal to the current view, the context will be canceled at the next view change.
-// If instance is ZeroInstance, returns regular ScopedViewContext.
-func ScopedViewContext(parent context.Context, eventLoop *eventloop.ScopedEventLoop, instance hotstuff.Instance, view *hotstuff.View) (context.Context, context.CancelFunc) {
-	if instance == hotstuff.ZeroInstance {
+// If pipe is null pipe, returns regular ScopedViewContext.
+func ScopedViewContext(parent context.Context, eventLoop *eventloop.ScopedEventLoop, pipe hotstuff.Pipe, view *hotstuff.View) (context.Context, context.CancelFunc) {
+	if pipe == hotstuff.NullPipe {
 		return ViewContext(parent, eventLoop, view)
 	}
 
 	ctx, cancel := context.WithCancel(parent)
 
 	id := eventLoop.RegisterHandler(ViewChangeEvent{}, func(event any) {
-		myScope := instance
+		myScope := pipe
 		viewChangeEvent := event.(ViewChangeEvent)
-		if viewChangeEvent.Instance != myScope {
-			panic(fmt.Sprintf("incorrect consensus instance: want=%d, got=%d", myScope, viewChangeEvent.Instance))
+		if viewChangeEvent.Pipe != myScope {
+			panic(fmt.Sprintf("incorrect pipe: want=%d, got=%d", myScope, viewChangeEvent.Pipe))
 		}
 		if view == nil || viewChangeEvent.View >= *view {
 			cancel()
 		}
-	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToScope(instance))
+	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToScope(pipe))
 
 	return ctx, func() {
-		eventLoop.UnregisterHandler(ViewChangeEvent{}, instance, id)
+		eventLoop.UnregisterHandler(ViewChangeEvent{}, pipe, id)
 		cancel()
 	}
 }
 
 // ScopedTimeoutContext returns a context that is canceled either when a timeout occurs, or when the view changes.
-// If instance is ZeroInstance, returns regular TimeoutContext.
-func ScopedTimeoutContext(parent context.Context, eventLoop *eventloop.ScopedEventLoop, instance hotstuff.Instance) (context.Context, context.CancelFunc) {
-	if instance == hotstuff.ZeroInstance {
+// If pipe is NullPipe, returns regular TimeoutContext.
+func ScopedTimeoutContext(parent context.Context, eventLoop *eventloop.ScopedEventLoop, pipe hotstuff.Pipe) (context.Context, context.CancelFunc) {
+	if pipe == hotstuff.NullPipe {
 		return TimeoutContext(parent, eventLoop)
 	}
 
 	// ViewContext handles view-change case.
-	ctx, cancel := ScopedViewContext(parent, eventLoop, instance, nil)
+	ctx, cancel := ScopedViewContext(parent, eventLoop, pipe, nil)
 
 	id := eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
-		myScope := instance
+		myScope := pipe
 		timeoutEvent := event.(TimeoutEvent)
-		if timeoutEvent.Instance != myScope {
-			panic(fmt.Sprintf("incorrect consensus instance: want=%d, got=%d", myScope, timeoutEvent.Instance))
+		if timeoutEvent.Pipe != myScope {
+			panic(fmt.Sprintf("incorrect pipe: want=%d, got=%d", myScope, timeoutEvent.Pipe))
 		}
 		cancel()
-	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToScope(instance))
+	}, eventloop.Prioritize(), eventloop.UnsafeRunInAddEvent(), eventloop.RespondToScope(pipe))
 
 	return ctx, func() {
-		eventLoop.UnregisterHandler(TimeoutEvent{}, instance, id)
+		eventLoop.UnregisterHandler(TimeoutEvent{}, pipe, id)
 		cancel()
 	}
 }

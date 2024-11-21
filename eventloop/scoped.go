@@ -17,8 +17,8 @@ import (
 )
 
 type scopedEventWrapper struct {
-	consensusInstance hotstuff.Instance
-	event             any
+	pipe  hotstuff.Pipe
+	event any
 }
 
 // ScopedEventLoop accepts events of any type and executes registered event handlers.
@@ -29,28 +29,28 @@ type ScopedEventLoop struct {
 
 	ctx context.Context // set by Run
 
-	waitingEvents map[hotstuff.Instance]map[reflect.Type][]any
+	waitingEvents map[hotstuff.Pipe]map[reflect.Type][]any
 
-	handlers map[hotstuff.Instance]map[reflect.Type][]handler
+	handlers map[hotstuff.Pipe]map[reflect.Type][]handler
 
-	tickers       map[int]*ticker
-	tickerID      int
-	instanceCount int // number of consensus instances
+	tickers   map[int]*ticker
+	tickerID  int
+	pipeCount int // number of pipes
 }
 
 // NewScoped returns a new event loop with the requested buffer size.
-func NewScoped(bufferSize uint, instanceCount int) *ScopedEventLoop {
+func NewScoped(bufferSize uint, pipeCount int) *ScopedEventLoop {
 	el := &ScopedEventLoop{
 		ctx:           context.Background(),
 		eventQ:        newQueue(bufferSize),
-		waitingEvents: make(map[hotstuff.Instance]map[reflect.Type][]any),
-		handlers:      make(map[hotstuff.Instance]map[reflect.Type][]handler),
+		waitingEvents: make(map[hotstuff.Pipe]map[reflect.Type][]any),
+		handlers:      make(map[hotstuff.Pipe]map[reflect.Type][]handler),
 		tickers:       make(map[int]*ticker),
 	}
 
-	el.instanceCount = instanceCount
-	if el.instanceCount == 0 {
-		el.instanceCount = 1
+	el.pipeCount = pipeCount
+	if el.pipeCount == 0 {
+		el.pipeCount = 1
 	}
 
 	return el
@@ -64,8 +64,8 @@ func (el *ScopedEventLoop) RegisterObserver(eventType any, handler EventHandler)
 
 // UnregisterObserver unregister a handler.
 // Deprecated: use UnregisterHandler instead.
-func (el *ScopedEventLoop) UnregisterObserver(eventType any, instance hotstuff.Instance, id int) {
-	el.UnregisterHandler(eventType, instance, id)
+func (el *ScopedEventLoop) UnregisterObserver(eventType any, pipe hotstuff.Pipe, id int) {
+	el.UnregisterHandler(eventType, pipe, id)
 }
 
 // RegisterHandler registers the given event handler for the given event type with the given handler options, if any.
@@ -85,12 +85,12 @@ func (el *ScopedEventLoop) registerHandler(eventType any, opts []HandlerOption, 
 	defer el.mut.Unlock()
 	t := reflect.TypeOf(eventType)
 
-	_, ok := el.handlers[h.opts.consensusInstance]
+	_, ok := el.handlers[h.opts.pipe]
 	if !ok {
-		el.handlers[h.opts.consensusInstance] = make(map[reflect.Type][]handler)
+		el.handlers[h.opts.pipe] = make(map[reflect.Type][]handler)
 	}
 
-	handlers := el.handlers[h.opts.consensusInstance][t]
+	handlers := el.handlers[h.opts.pipe][t]
 
 	// search for a free slot for the handler
 	i := 0
@@ -107,27 +107,27 @@ func (el *ScopedEventLoop) registerHandler(eventType any, opts []HandlerOption, 
 		handlers[i] = h
 	}
 
-	el.handlers[h.opts.consensusInstance][t] = handlers
+	el.handlers[h.opts.pipe][t] = handlers
 
 	return i
 }
 
 // UnregisterHandler unregisters the handler for the given event type with the given id.
-func (el *ScopedEventLoop) UnregisterHandler(eventType any, instance hotstuff.Instance, id int) {
+func (el *ScopedEventLoop) UnregisterHandler(eventType any, pipe hotstuff.Pipe, id int) {
 	el.mut.Lock()
 	defer el.mut.Unlock()
 	t := reflect.TypeOf(eventType)
-	el.handlers[instance][t][id].callback = nil
+	el.handlers[pipe][t][id].callback = nil
 }
 
 // AddEvent adds an event to the event queue.
 func (el *ScopedEventLoop) AddEvent(event any) {
 	if event != nil {
 		// run handlers with runInAddEvent option
-		el.processEvent(event, hotstuff.ZeroInstance, true)
+		el.processEvent(event, hotstuff.NullPipe, true)
 		el.eventQ.push(scopedEventWrapper{
-			event:             event,
-			consensusInstance: hotstuff.ZeroInstance,
+			event: event,
+			pipe:  hotstuff.NullPipe,
 		})
 	}
 }
@@ -139,19 +139,19 @@ func (el *ScopedEventLoop) DebugEvent(event any) {
 	el.AddEvent(event)
 }
 
-// ScopeEvent adds an event to a specified consensus instance.
-func (el *ScopedEventLoop) ScopeEvent(instance hotstuff.Instance, event any) {
-	if !instance.IsPipelined() {
+// AddScopedEvent adds an event to a specified pipe.
+func (el *ScopedEventLoop) AddScopedEvent(pipe hotstuff.Pipe, event any) {
+	if !pipe.IsNull() {
 		el.AddEvent(event)
 		return
 	}
 
 	if event != nil {
 		// run handlers with runInAddEvent option
-		el.processEvent(event, instance, true)
+		el.processEvent(event, pipe, true)
 		el.eventQ.push(scopedEventWrapper{
-			event:             event,
-			consensusInstance: instance,
+			event: event,
+			pipe:  pipe,
 		})
 	}
 }
@@ -196,7 +196,7 @@ loop:
 			el.startTicker(e.tickerID)
 			continue
 		}
-		el.processEvent(wrapper.event, wrapper.consensusInstance, false)
+		el.processEvent(wrapper.event, wrapper.pipe, false)
 	}
 
 	// HACK: when we get canceled, we will handle the events that were in the queue at that time before quitting.
@@ -204,7 +204,7 @@ loop:
 	for i := 0; i < l; i++ {
 		event, _ := el.eventQ.pop()
 		wrapper := event.(scopedEventWrapper)
-		el.processEvent(wrapper.event, wrapper.consensusInstance, false)
+		el.processEvent(wrapper.event, wrapper.pipe, false)
 	}
 }
 
@@ -220,7 +220,7 @@ func (el *ScopedEventLoop) Tick(ctx context.Context) bool {
 	if e, ok := wrapper.event.(startTickerEvent); ok {
 		el.startTicker(e.tickerID)
 	} else {
-		el.processEvent(wrapper.event, wrapper.consensusInstance, false)
+		el.processEvent(wrapper.event, wrapper.pipe, false)
 	}
 
 	return true
@@ -229,11 +229,11 @@ func (el *ScopedEventLoop) Tick(ctx context.Context) bool {
 var scopedHandlerListPool = gpool.New(func() []handler { return make([]handler, 0, 10) })
 
 // processEvent dispatches the event to the correct handler.
-func (el *ScopedEventLoop) processEvent(event any, instance hotstuff.Instance, runningInAddEvent bool) {
+func (el *ScopedEventLoop) processEvent(event any, pipe hotstuff.Pipe, runningInAddEvent bool) {
 	t := reflect.TypeOf(event)
 
 	if !runningInAddEvent {
-		defer el.dispatchDelayedEvents(instance, t)
+		defer el.dispatchDelayedEvents(pipe, t)
 	}
 
 	// Must copy handlers to a list so that they can be executed after unlocking the mutex.
@@ -243,7 +243,7 @@ func (el *ScopedEventLoop) processEvent(event any, instance hotstuff.Instance, r
 	handlerList := scopedHandlerListPool.Get()
 
 	el.mut.Lock()
-	handlers := el.handlers[instance][t]
+	handlers := el.handlers[pipe][t]
 	for _, handler := range handlers {
 		if handler.opts.runInAddEvent != runningInAddEvent || handler.callback == nil {
 			continue
@@ -272,41 +272,41 @@ func (el *ScopedEventLoop) processEvent(event any, instance hotstuff.Instance, r
 	scopedHandlerListPool.Put(handlerList)
 }
 
-func (el *ScopedEventLoop) dispatchDelayedEvents(instance hotstuff.Instance, t reflect.Type) {
+func (el *ScopedEventLoop) dispatchDelayedEvents(pipe hotstuff.Pipe, t reflect.Type) {
 	var (
 		events []any
 		ok     bool
 	)
 
-	if _, ok := el.waitingEvents[instance]; !ok {
+	if _, ok := el.waitingEvents[pipe]; !ok {
 		return
 	}
 
 	el.mut.Lock()
-	if events, ok = el.waitingEvents[instance][t]; ok {
-		delete(el.waitingEvents[instance], t)
+	if events, ok = el.waitingEvents[pipe][t]; ok {
+		delete(el.waitingEvents[pipe], t)
 	}
 	el.mut.Unlock()
 
 	for _, event := range events {
-		el.ScopeEvent(instance, event)
+		el.AddScopedEvent(pipe, event)
 	}
 }
 
-func (el *ScopedEventLoop) DelayScoped(instance hotstuff.Instance, eventType, event any) {
+func (el *ScopedEventLoop) DelayScoped(pipe hotstuff.Pipe, eventType, event any) {
 	if eventType == nil || event == nil {
 		return
 	}
 
-	if _, ok := el.waitingEvents[instance]; !ok {
-		el.waitingEvents[instance] = make(map[reflect.Type][]any)
+	if _, ok := el.waitingEvents[pipe]; !ok {
+		el.waitingEvents[pipe] = make(map[reflect.Type][]any)
 	}
 
 	el.mut.Lock()
 	t := reflect.TypeOf(eventType)
-	v := el.waitingEvents[instance][t]
+	v := el.waitingEvents[pipe][t]
 	v = append(v, event)
-	el.waitingEvents[instance][t] = v
+	el.waitingEvents[pipe][t] = v
 	el.mut.Unlock()
 }
 
@@ -314,7 +314,7 @@ func (el *ScopedEventLoop) DelayScoped(instance hotstuff.Instance, eventType, ev
 // The eventType parameter decides the type of event to wait for, and it should be the zero value
 // of that event type. The event parameter is the event that will be delayed.
 func (el *ScopedEventLoop) DelayUntil(eventType, event any) {
-	el.DelayScoped(hotstuff.ZeroInstance, eventType, event)
+	el.DelayScoped(hotstuff.NullPipe, eventType, event)
 }
 
 // AddTicker adds a ticker with the specified interval and returns the ticker id.
@@ -339,8 +339,8 @@ func (el *ScopedEventLoop) AddTicker(interval time.Duration, callback func(tick 
 	// We want the ticker to inherit the context of the event loop,
 	// so we need to start the ticker from the run loop.
 	el.eventQ.push(scopedEventWrapper{
-		event:             startTickerEvent{id},
-		consensusInstance: hotstuff.ZeroInstance,
+		event: startTickerEvent{id},
+		pipe:  hotstuff.NullPipe,
 	})
 
 	return id

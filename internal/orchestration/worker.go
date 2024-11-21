@@ -192,8 +192,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 
 	var comm modules.Committer
-	if opts.GetPipelineConsensusInstances() > 0 {
-		builder.EnablePipelining(int(opts.GetPipelineConsensusInstances()))
+	if opts.GetPipes() > 0 {
+		builder.EnablePipelining(int(opts.GetPipes()))
 		comm, ok = modules.GetModule[modules.Committer](opts.GetPipelineOrdering())
 		if !ok {
 			return nil, fmt.Errorf("invalid pipeline ordering scheme: %s", opts.GetPipelineOrdering())
@@ -204,9 +204,9 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 
 	consensusRules := builder.CreateScope(newConsensusRules)
 	if newByz != nil {
-		for instance, rules := range consensusRules {
+		for pipe, rules := range consensusRules {
 			byz := newByz()
-			consensusRules[instance] = byz.Wrap(rules.(consensus.Rules))
+			consensusRules[pipe] = byz.Wrap(rules.(consensus.Rules))
 		}
 	}
 
@@ -233,7 +233,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	synchronizers := builder.CreateScope(synchronizer.New, newViewDuration())
 
 	builder.Add(
-		eventloop.NewScoped(1000, int(opts.GetPipelineConsensusInstances())),
+		eventloop.NewScoped(1000, int(opts.GetPipes())),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		w.metricsLogger,
 		blockchain.New(),
@@ -268,15 +268,15 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		locationInfo[hotstuff.ID(k)] = v
 	}
 	c := replica.Config{
-		ID:                     hotstuff.ID(opts.GetID()),
-		PrivateKey:             privKey,
-		TLS:                    opts.GetUseTLS(),
-		Certificate:            &certificate,
-		RootCAs:                rootCAs,
-		LocationInfo:           locationInfo,
-		BatchSize:              opts.GetBatchSize(),
-		ConsensusInstanceCount: opts.GetPipelineConsensusInstances(),
-		HackyLatency:           *opts.GetHackyLatency(),
+		ID:           hotstuff.ID(opts.GetID()),
+		PrivateKey:   privKey,
+		TLS:          opts.GetUseTLS(),
+		Certificate:  &certificate,
+		RootCAs:      rootCAs,
+		LocationInfo: locationInfo,
+		BatchSize:    opts.GetBatchSize(),
+		PipeCount:    opts.GetPipes(),
+		HackyLatency: *opts.GetHackyLatency(),
 		ManagerOptions: []gorums.ManagerOption{
 			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 			gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),

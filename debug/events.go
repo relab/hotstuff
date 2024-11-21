@@ -5,10 +5,10 @@ import (
 )
 
 type CommitHaltEvent struct {
-	Instance hotstuff.Instance
+	Pipe hotstuff.Pipe
 }
 
 type CommandRejectedEvent struct {
-	Instance hotstuff.Instance
-	View     hotstuff.View
+	Pipe hotstuff.Pipe
+	View hotstuff.View
 }

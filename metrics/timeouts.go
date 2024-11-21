@@ -43,10 +43,10 @@ func (vt *ViewTimeouts) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	logger.Info("ViewTimeouts metric enabled.")
 
 	if info.IsPipeliningEnabled {
-		for instance := hotstuff.Instance(1); instance <= hotstuff.Instance(info.ScopeCount); instance++ {
+		for pipe := hotstuff.Pipe(1); pipe <= hotstuff.Pipe(info.ScopeCount); pipe++ {
 			eventLoop.RegisterHandler(synchronizer.ViewChangeEvent{}, func(event any) {
 				vt.viewChange(event.(synchronizer.ViewChangeEvent))
-			}, eventloop.RespondToScope(instance))
+			}, eventloop.RespondToScope(pipe))
 		}
 	} else {
 

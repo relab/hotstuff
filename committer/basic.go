@@ -20,7 +20,7 @@ type basic struct {
 	bExec *hotstuff.Block
 }
 
-// Basic committer implements commit logic for a single consensus instance.
+// Basic committer implements commit logic for a single pipe.
 func NewBasic() modules.Committer {
 	return &basic{
 		bExec: hotstuff.GetGenesis(),
@@ -69,7 +69,7 @@ func (bb *basic) commitInner(block *hotstuff.Block) error {
 	if bb.bExec.View() >= block.View() {
 		return nil
 	}
-	if parent, ok := bb.blockChain.Get(block.Parent(), block.Instance()); ok {
+	if parent, ok := bb.blockChain.Get(block.Parent(), block.Pipe()); ok {
 		err := bb.commitInner(parent)
 		if err != nil {
 			return err
@@ -84,7 +84,7 @@ func (bb *basic) commitInner(block *hotstuff.Block) error {
 }
 
 // Retrieve the last block which was committed on a consensus instance. Use zero if pipelining is not used.
-func (bb *basic) CommittedBlock(_ hotstuff.Instance) *hotstuff.Block {
+func (bb *basic) CommittedBlock(_ hotstuff.Pipe) *hotstuff.Block {
 	bb.mut.Lock()
 	defer bb.mut.Unlock()
 	return bb.bExec

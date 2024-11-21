@@ -53,8 +53,8 @@ message ReplicaOpts {
   repeated string Modules = 21;
   // locations of the replicas
   map<uint32,string> LocationInfo = 22;
-  // The number of consensus instances in pipelining mode. Leave as zero to disable pipelining mode.
-  uint32 PipelineConsensusInstances = 23;
+  // The number of pipes in pipelining mode. Leave as zero to disable pipelining mode.
+  uint32 Pipes = 23;
   // The ordering scheme for pipelining mode. Default is "multiplexed".
   string PipelineOrdering = 24;
   // Whether or not to duplicate the view duration module when pipelining is enabled. Either "duplicate" or "static".

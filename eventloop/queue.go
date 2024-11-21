@@ -2,7 +2,7 @@ package eventloop
 
 import "sync"
 
-// queue is a boundedinstancercular buffer.
+// queue is a bounded circular buffer.
 // If an entry is pushed to the queue when it is full, the oldest entry will be dropped.
 type queue struct {
 	mut       sync.Mutex

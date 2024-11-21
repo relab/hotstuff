@@ -28,9 +28,9 @@ type handler struct {
 }
 
 type handlerOpts struct {
-	runInAddEvent     bool
-	priority          bool
-	consensusInstance hotstuff.Instance
+	runInAddEvent bool
+	priority      bool
+	pipe          hotstuff.Pipe
 }
 
 // HandlerOption sets configuration options for event handlers.
@@ -54,10 +54,10 @@ func Prioritize() HandlerOption {
 	}
 }
 
-// RespondToScope assigns which consensus instance to respond to when ScopeEvent is used to add an event to the
-// eventloop. If the ZeroInstance (0) is passed, this handler option will not take effect.
-func RespondToScope(instance hotstuff.Instance) HandlerOption {
+// RespondToScope assigns which pipe (scope) to respond to when ScopeEvent is used to add an event to the
+// eventloop. If the NullPipe (0) is passed, this handler option will not take effect.
+func RespondToScope(pipe hotstuff.Pipe) HandlerOption {
 	return func(ho *handlerOpts) {
-		ho.consensusInstance = instance
+		ho.pipe = pipe
 	}
 }

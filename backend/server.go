@@ -22,7 +22,7 @@ import (
 )
 
 // Server is the Server-side of the gorums backend.
-// It is responsible for calling handler methods on the consensus instance.
+// It is responsible for calling handler methods on the pipe.
 type Server struct {
 	blockChain    modules.BlockChain
 	configuration modules.Configuration
@@ -184,8 +184,8 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
 	impl.srv.induceLatencyHacky(id, func() {
-		if proposeMsg.Instance.IsPipelined() {
-			impl.srv.eventLoop.ScopeEvent(proposeMsg.Instance, proposeMsg)
+		if proposeMsg.Pipe.IsNull() {
+			impl.srv.eventLoop.AddScopedEvent(proposeMsg.Pipe, proposeMsg)
 			return
 		}
 
@@ -201,9 +201,9 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		return
 	}
 	impl.srv.induceLatencyHacky(id, func() {
-		instance := hotstuff.Instance(cert.Instance)
-		if instance.IsPipelined() {
-			impl.srv.eventLoop.ScopeEvent(instance, hotstuff.VoteMsg{
+		pipe := hotstuff.Pipe(cert.Pipe)
+		if pipe.IsNull() {
+			impl.srv.eventLoop.AddScopedEvent(pipe, hotstuff.VoteMsg{
 				ID:          id,
 				PartialCert: hotstuffpb.PartialCertFromProto(cert),
 			})
@@ -225,9 +225,9 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		return
 	}
 	impl.srv.induceLatencyHacky(id, func() {
-		instance := hotstuff.Instance(msg.Instance)
-		if instance.IsPipelined() {
-			impl.srv.eventLoop.ScopeEvent(instance, hotstuff.NewViewMsg{
+		pipe := hotstuff.Pipe(msg.Pipe)
+		if pipe.IsNull() {
+			impl.srv.eventLoop.AddScopedEvent(pipe, hotstuff.NewViewMsg{
 				ID:       id,
 				SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
 			})
@@ -266,8 +266,8 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	}
 
 	impl.srv.induceLatencyHacky(timeoutMsg.ID, func() {
-		if timeoutMsg.Instance.IsPipelined() {
-			impl.srv.eventLoop.ScopeEvent(timeoutMsg.Instance, timeoutMsg)
+		if timeoutMsg.Pipe.IsNull() {
+			impl.srv.eventLoop.AddScopedEvent(timeoutMsg.Pipe, timeoutMsg)
 			return
 		}
 

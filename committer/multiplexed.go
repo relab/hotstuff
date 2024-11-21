@@ -22,21 +22,21 @@ type multiplexedCommitter struct {
 	forkHandler modules.ForkHandlerExt
 	logger      logging.Logger
 
-	mut                     sync.Mutex
-	bExecAtCi               map[hotstuff.Instance]*hotstuff.Block
-	waitingBlocksAtInstance map[hotstuff.Instance][]*hotstuff.Block
-	instanceCount           int
-	currentView             hotstuff.View
-	currentInstance         hotstuff.Instance
+	mut                 sync.Mutex
+	bExecAtCi           map[hotstuff.Pipe]*hotstuff.Block
+	waitingBlocksAtPipe map[hotstuff.Pipe][]*hotstuff.Block
+	pipeCount           int
+	currentView         hotstuff.View
+	currentPipe         hotstuff.Pipe
 }
 
-// Multiplexed committer orders commits from multiple consensus instances by 1..n.
+// Multiplexed committer orders commits from multiple pipes by 1..n.
 func NewMultiplexed() modules.Committer {
 	return &multiplexedCommitter{
-		bExecAtCi:               make(map[hotstuff.Instance]*hotstuff.Block),
-		waitingBlocksAtInstance: make(map[hotstuff.Instance][]*hotstuff.Block),
-		currentView:             1,
-		currentInstance:         1,
+		bExecAtCi:           make(map[hotstuff.Pipe]*hotstuff.Block),
+		waitingBlocksAtPipe: make(map[hotstuff.Pipe][]*hotstuff.Block),
+		currentView:         1,
+		currentPipe:         1,
 	}
 }
 
@@ -49,24 +49,24 @@ func (c *multiplexedCommitter) InitModule(mods *modules.Core, info modules.Scope
 		&c.logger,
 	)
 
-	c.instanceCount = info.ScopeCount
+	c.pipeCount = info.ScopeCount
 	if info.IsPipeliningEnabled {
-		for _, instance := range mods.Scopes() {
-			c.bExecAtCi[instance] = hotstuff.GetGenesis()
-			c.waitingBlocksAtInstance[instance] = nil
+		for _, pipe := range mods.Scopes() {
+			c.bExecAtCi[pipe] = hotstuff.GetGenesis()
+			c.waitingBlocksAtPipe[pipe] = nil
 		}
 		return
 	}
 
-	c.bExecAtCi[hotstuff.ZeroInstance] = hotstuff.GetGenesis()
-	c.waitingBlocksAtInstance[hotstuff.ZeroInstance] = nil
+	c.bExecAtCi[hotstuff.NullPipe] = hotstuff.GetGenesis()
+	c.waitingBlocksAtPipe[hotstuff.NullPipe] = nil
 }
 
 // Stores the block before further execution.
 func (c *multiplexedCommitter) Commit(block *hotstuff.Block) {
 	c.logger.Debugf("Commit (currentCi: %d, currentView: %d): new incoming block {p:%d, v:%d, h:%s}",
-		c.currentInstance, c.currentView,
-		block.Instance(), block.View(), block.Hash().String()[:4])
+		c.currentPipe, c.currentView,
+		block.Pipe(), block.View(), block.Hash().String()[:4])
 	c.mut.Lock()
 	// can't recurse due to requiring the mutex, so we use a helper instead.
 	err := c.commitInner(block)
@@ -84,26 +84,26 @@ func (c *multiplexedCommitter) Commit(block *hotstuff.Block) {
 	}
 }
 
-// Retrieve the last block which was committed on an instance. Use zero if pipelining is not used.
-func (c *multiplexedCommitter) CommittedBlock(instance hotstuff.Instance) *hotstuff.Block {
+// Retrieve the last block which was committed on an pipe. Use zero if pipelining is not used.
+func (c *multiplexedCommitter) CommittedBlock(pipe hotstuff.Pipe) *hotstuff.Block {
 	c.mut.Lock()
 	defer c.mut.Unlock()
-	return c.bExecAtCi[instance]
+	return c.bExecAtCi[pipe]
 }
 
 // recursive helper for commit
 func (c *multiplexedCommitter) commitInner(block *hotstuff.Block) error {
-	if c.bExecAtCi[block.Instance()].View() >= block.View() {
+	if c.bExecAtCi[block.Pipe()].View() >= block.View() {
 		return nil
 	}
 
 	// Check if the block was added to the end of the queue. If so, exit.
-	blockQueue := c.waitingBlocksAtInstance[block.Instance()]
+	blockQueue := c.waitingBlocksAtPipe[block.Pipe()]
 	if len(blockQueue) > 0 && blockQueue[len(blockQueue)-1].View() >= block.View() {
 		return nil
 	}
 
-	if parent, ok := c.blockChain.Get(block.Parent(), block.Instance()); ok {
+	if parent, ok := c.blockChain.Get(block.Parent(), block.Pipe()); ok {
 		err := c.commitInner(parent)
 		if err != nil {
 			return err
@@ -112,8 +112,8 @@ func (c *multiplexedCommitter) commitInner(block *hotstuff.Block) error {
 		return fmt.Errorf("failed to locate block: %s", block.Parent())
 	}
 
-	c.logger.Debugf("commitInner: Queued block: {p:%d, v:%d, h:%s}", block.Instance(), block.View(), block.Hash().String()[:4])
-	c.waitingBlocksAtInstance[block.Instance()] = append(c.waitingBlocksAtInstance[block.Instance()], block)
+	c.logger.Debugf("commitInner: Queued block: {p:%d, v:%d, h:%s}", block.Pipe(), block.View(), block.Hash().String()[:4])
+	c.waitingBlocksAtPipe[block.Pipe()] = append(c.waitingBlocksAtPipe[block.Pipe()], block)
 	return nil
 }
 
@@ -127,21 +127,21 @@ func (c *multiplexedCommitter) handleForks(prunedBlocks map[hotstuff.View][]*hot
 }
 
 func (c *multiplexedCommitter) tryExec() error {
-	waitingBlocks := c.waitingBlocksAtInstance[c.currentInstance]
+	waitingBlocks := c.waitingBlocksAtPipe[c.currentPipe]
 	canPeek := len(waitingBlocks) > 0
 	if !canPeek {
-		c.logger.Debugf("tryExec (currentCi: %d, currentView: %d): no block on instance yet", c.currentInstance, c.currentView)
+		c.logger.Debugf("tryExec (currentCi: %d, currentView: %d): no block on pipe yet", c.currentPipe, c.currentView)
 		return nil
 	}
 
 	peekedBlock := waitingBlocks[0]
 	if peekedBlock.View() == c.currentView {
 		// Execute block
-		c.logger.Debugf("tryExec: block executed: {p=%d, v=%d, h:%s}", peekedBlock.Instance(), peekedBlock.View(), peekedBlock.Hash().String()[:4])
+		c.logger.Debugf("tryExec: block executed: {p=%d, v=%d, h:%s}", peekedBlock.Pipe(), peekedBlock.View(), peekedBlock.Hash().String()[:4])
 		c.executor.Exec(peekedBlock)
-		c.bExecAtCi[peekedBlock.Instance()] = peekedBlock
+		c.bExecAtCi[peekedBlock.Pipe()] = peekedBlock
 		// Pop from queue
-		c.waitingBlocksAtInstance[c.currentInstance] = c.waitingBlocksAtInstance[c.currentInstance][1:]
+		c.waitingBlocksAtPipe[c.currentPipe] = c.waitingBlocksAtPipe[c.currentPipe][1:]
 		// Delete from chain.
 		err := c.blockChain.DeleteAtHeight(peekedBlock.View(), peekedBlock.Hash())
 		if err != nil {
@@ -149,19 +149,19 @@ func (c *multiplexedCommitter) tryExec() error {
 		}
 	} else {
 		c.logger.Debugf("tryExec (currentCi: %d, currentView: %d): block in queue does not match view: {p:%d, v:%d, h:%s}",
-			c.currentInstance, c.currentView,
-			peekedBlock.Instance(), peekedBlock.View(), peekedBlock.Hash().String()[:4])
-		c.eventLoop.DebugEvent(debug.CommitHaltEvent{Instance: c.currentInstance})
+			c.currentPipe, c.currentView,
+			peekedBlock.Pipe(), peekedBlock.View(), peekedBlock.Hash().String()[:4])
+		c.eventLoop.DebugEvent(debug.CommitHaltEvent{Pipe: c.currentPipe})
 	}
 
-	c.currentInstance++
-	if c.currentInstance == hotstuff.Instance(c.instanceCount)+1 {
-		c.currentInstance = 1
+	c.currentPipe++
+	if c.currentPipe == hotstuff.Pipe(c.pipeCount)+1 {
+		c.currentPipe = 1
 		// Prune out remaining blocks in the chain. Those blocks are guaranteed to be forks.
 		prunedBlocks := c.blockChain.PruneToHeight(c.currentView)
 		c.handleForks(prunedBlocks)
 		c.currentView++
-		c.logger.Debugf("tryExec (currentCi: %d): advance to view %d", c.currentInstance, c.currentView)
+		c.logger.Debugf("tryExec (currentCi: %d): advance to view %d", c.currentPipe, c.currentView)
 	}
 
 	return c.tryExec()

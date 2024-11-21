@@ -23,7 +23,7 @@ message ThroughputMeasurement {
   uint64 Commits = 2;
   uint64 Commands = 3;
   google.protobuf.Duration Duration = 4;
-  uint32 Instance = 5;
+  uint32 Pipe = 5;
 }
 
 message TotalThroughputMeasurement {
@@ -31,7 +31,7 @@ message TotalThroughputMeasurement {
   uint64 Commits = 2;
   uint64 Commands = 3;
   google.protobuf.Duration Duration = 4;
-  uint32 InstanceCount = 5;
+  uint32 PipeCount = 5;
 }
 
 message LatencyMeasurement {
@@ -51,7 +51,7 @@ message ViewTimeouts {
 
 message DebugMeasurement {
   Event Event = 1;
-  uint32 Instance = 2;
+  uint32 Pipe = 2;
   uint32 CommitHalts = 3;
   uint32 RejectedCommands = 4;
 }

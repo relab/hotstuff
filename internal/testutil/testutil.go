@@ -72,7 +72,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 }
 
 // TestModules registers default modules for testing to the given builder.
-func TestModulesScoped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *modules.Builder, instanceCount int) {
+func TestModulesScoped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *modules.Builder, pipeCount int) {
 	t.Helper()
 
 	acceptor := mocks.NewMockAcceptor(ctrl)
@@ -248,10 +248,10 @@ func CreateTimeouts(t *testing.T, view hotstuff.View, signers []modules.Crypto) 
 			ID:            signer(sig),
 			View:          view,
 			ViewSignature: sig,
-			SyncInfo: hotstuff.NewSyncInfo(hotstuff.ZeroInstance).WithQC(hotstuff.NewQuorumCert(
+			SyncInfo: hotstuff.NewSyncInfo(hotstuff.NullPipe).WithQC(hotstuff.NewQuorumCert(
 				nil,
 				0,
-				hotstuff.ZeroInstance, // TODO: Verify if this code conflicts with pipelining
+				hotstuff.NullPipe, // TODO: Verify if this code conflicts with pipelining
 				hotstuff.GetGenesis().Hash())),
 		})
 	}

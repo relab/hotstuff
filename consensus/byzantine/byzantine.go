@@ -62,15 +62,15 @@ func (f *fork) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 }
 
 func (f *fork) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
-	block, ok := f.blockChain.Get(f.synchronizer.HighQC().BlockHash(), cert.Instance())
+	block, ok := f.blockChain.Get(f.synchronizer.HighQC().BlockHash(), cert.Pipe())
 	if !ok {
 		return proposal, false
 	}
-	parent, ok := f.blockChain.Get(block.Parent(), cert.Instance())
+	parent, ok := f.blockChain.Get(block.Parent(), cert.Pipe())
 	if !ok {
 		return proposal, false
 	}
-	grandparent, ok := f.blockChain.Get(parent.Hash(), cert.Instance())
+	grandparent, ok := f.blockChain.Get(parent.Hash(), cert.Pipe())
 	if !ok {
 		return proposal, false
 	}

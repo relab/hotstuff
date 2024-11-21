@@ -48,7 +48,7 @@ func TestConvertQuorumCert(t *testing.T) {
 		hotstuff.NewQuorumCert(
 			nil,
 			0,
-			hotstuff.ZeroInstance,
+			hotstuff.NullPipe,
 			hotstuff.GetGenesis().Hash()), "", 1, 1, 0)
 
 	signatures := testutil.CreatePCs(t, b1, hl.Signers())
@@ -73,7 +73,7 @@ func TestConvertBlock(t *testing.T) {
 	qc := hotstuff.NewQuorumCert(
 		nil,
 		0,
-		hotstuff.ZeroInstance, // TODO: Verify if this code conflicts with pipelining
+		hotstuff.NullPipe, // TODO: Verify if this code conflicts with pipelining
 		hotstuff.Hash{})
 	want := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "", 1, 1, 0)
 	pb := BlockToProto(want)

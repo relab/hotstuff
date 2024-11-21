@@ -28,7 +28,7 @@ func TestAdvanceViewQC(t *testing.T) {
 		hotstuff.NewQuorumCert(
 			nil,
 			0,
-			hotstuff.ZeroInstance, // TODO: Verify if this code conflicts with pipelining
+			hotstuff.NullPipe, // TODO: Verify if this code conflicts with pipelining
 			hotstuff.GetGenesis().Hash()),
 		"foo",
 		1,
@@ -42,9 +42,9 @@ func TestAdvanceViewQC(t *testing.T) {
 	blockChain.Store(block)
 	qc := testutil.CreateQC(t, block, signers)
 	// synchronizer should tell hotstuff to propose
-	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(hotstuff.ZeroInstance)))
+	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(hotstuff.NullPipe)))
 
-	s.AdvanceView(hotstuff.NewSyncInfo(hotstuff.ZeroInstance).WithQC(qc))
+	s.AdvanceView(hotstuff.NewSyncInfo(hotstuff.NullPipe).WithQC(qc))
 
 	if s.View() != 2 {
 		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())
@@ -65,9 +65,9 @@ func TestAdvanceViewTC(t *testing.T) {
 	tc := testutil.CreateTC(t, 1, signers)
 
 	// synchronizer should tell hotstuff to propose
-	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(hotstuff.ZeroInstance)))
+	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(hotstuff.NullPipe)))
 
-	s.AdvanceView(hotstuff.NewSyncInfo(hotstuff.ZeroInstance).WithTC(tc))
+	s.AdvanceView(hotstuff.NewSyncInfo(hotstuff.NullPipe).WithTC(tc))
 
 	if s.View() != 2 {
 		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())
