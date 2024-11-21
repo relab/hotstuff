@@ -12,10 +12,10 @@ import (
 )
 
 func init() {
-	modules.RegisterModule("multiplexed", NewPiped)
+	modules.RegisterModule("sequential", NewSequentialPiped)
 }
 
-type pipedCommitter struct {
+type sequentialPipedCommitter struct {
 	blockChain  modules.BlockChain
 	eventLoop   *eventloop.ScopedEventLoop
 	executor    modules.ExecutorExt
@@ -31,8 +31,8 @@ type pipedCommitter struct {
 }
 
 // pipedCommitter orders commits from multiple pipes by 1..n.
-func NewPiped() modules.Committer {
-	return &pipedCommitter{
+func NewSequentialPiped() modules.Committer {
+	return &sequentialPipedCommitter{
 		bExecAtCi:           make(map[hotstuff.Pipe]*hotstuff.Block),
 		waitingBlocksAtPipe: make(map[hotstuff.Pipe][]*hotstuff.Block),
 		currentView:         1,
@@ -40,7 +40,7 @@ func NewPiped() modules.Committer {
 	}
 }
 
-func (c *pipedCommitter) InitModule(mods *modules.Core, info modules.ScopeInfo) {
+func (c *sequentialPipedCommitter) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	mods.Get(
 		&c.eventLoop,
 		&c.executor,
@@ -63,7 +63,7 @@ func (c *pipedCommitter) InitModule(mods *modules.Core, info modules.ScopeInfo) 
 }
 
 // Stores the block before further execution.
-func (c *pipedCommitter) Commit(block *hotstuff.Block) {
+func (c *sequentialPipedCommitter) Commit(block *hotstuff.Block) {
 	c.logger.Debugf("Commit (currentCi: %d, currentView: %d): new incoming block {p:%d, v:%d, h:%s}",
 		c.currentPipe, c.currentView,
 		block.Pipe(), block.View(), block.Hash().String()[:4])
@@ -85,14 +85,14 @@ func (c *pipedCommitter) Commit(block *hotstuff.Block) {
 }
 
 // Retrieve the last block which was committed on an pipe. Use zero if pipelining is not used.
-func (c *pipedCommitter) CommittedBlock(pipe hotstuff.Pipe) *hotstuff.Block {
+func (c *sequentialPipedCommitter) CommittedBlock(pipe hotstuff.Pipe) *hotstuff.Block {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	return c.bExecAtCi[pipe]
 }
 
 // recursive helper for commit
-func (c *pipedCommitter) commitInner(block *hotstuff.Block) error {
+func (c *sequentialPipedCommitter) commitInner(block *hotstuff.Block) error {
 	if c.bExecAtCi[block.Pipe()].View() >= block.View() {
 		return nil
 	}
@@ -117,7 +117,7 @@ func (c *pipedCommitter) commitInner(block *hotstuff.Block) error {
 	return nil
 }
 
-func (c *pipedCommitter) handleForks(prunedBlocks map[hotstuff.View][]*hotstuff.Block) {
+func (c *sequentialPipedCommitter) handleForks(prunedBlocks map[hotstuff.View][]*hotstuff.Block) {
 	// All pruned blocks are assumed to be forks after the previous exec logic
 	for _, blocks := range prunedBlocks {
 		for _, block := range blocks {
@@ -126,7 +126,7 @@ func (c *pipedCommitter) handleForks(prunedBlocks map[hotstuff.View][]*hotstuff.
 	}
 }
 
-func (c *pipedCommitter) tryExec() error {
+func (c *sequentialPipedCommitter) tryExec() error {
 	waitingBlocks := c.waitingBlocksAtPipe[c.currentPipe]
 	canPeek := len(waitingBlocks) > 0
 	if !canPeek {
@@ -167,4 +167,4 @@ func (c *pipedCommitter) tryExec() error {
 	return c.tryExec()
 }
 
-var _ modules.Committer = (*pipedCommitter)(nil)
+var _ modules.Committer = (*sequentialPipedCommitter)(nil)

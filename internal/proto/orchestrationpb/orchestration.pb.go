@@ -70,7 +70,7 @@ type ReplicaOpts struct {
 	LocationInfo map[uint32]string `protobuf:"bytes,22,rep,name=LocationInfo,proto3" json:"LocationInfo,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// The number of pipes in pipelining mode. Leave as zero to disable pipelining mode.
 	Pipes uint32 `protobuf:"varint,23,opt,name=Pipes,proto3" json:"Pipes,omitempty"`
-	// The ordering scheme for pipelining mode. Default is "multiplexed".
+	// The ordering scheme for pipelining mode. Default is "sequential".
 	PipelineOrdering string `protobuf:"bytes,24,opt,name=PipelineOrdering,proto3" json:"PipelineOrdering,omitempty"`
 	// Whether or not to duplicate the view duration module when pipelining is enabled. Either "duplicate" or "static".
 	PipelineViewDuration string `protobuf:"bytes,25,opt,name=PipelineViewDuration,proto3" json:"PipelineViewDuration,omitempty"`
