@@ -12,10 +12,10 @@ import (
 )
 
 func init() {
-	modules.RegisterModule("multiplexed", NewMultiplexed)
+	modules.RegisterModule("multiplexed", NewPiped)
 }
 
-type multiplexedCommitter struct {
+type pipedCommitter struct {
 	blockChain  modules.BlockChain
 	eventLoop   *eventloop.ScopedEventLoop
 	executor    modules.ExecutorExt
@@ -30,9 +30,9 @@ type multiplexedCommitter struct {
 	currentPipe         hotstuff.Pipe
 }
 
-// Multiplexed committer orders commits from multiple pipes by 1..n.
-func NewMultiplexed() modules.Committer {
-	return &multiplexedCommitter{
+// pipedCommitter orders commits from multiple pipes by 1..n.
+func NewPiped() modules.Committer {
+	return &pipedCommitter{
 		bExecAtCi:           make(map[hotstuff.Pipe]*hotstuff.Block),
 		waitingBlocksAtPipe: make(map[hotstuff.Pipe][]*hotstuff.Block),
 		currentView:         1,
@@ -40,7 +40,7 @@ func NewMultiplexed() modules.Committer {
 	}
 }
 
-func (c *multiplexedCommitter) InitModule(mods *modules.Core, info modules.ScopeInfo) {
+func (c *pipedCommitter) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	mods.Get(
 		&c.eventLoop,
 		&c.executor,
@@ -63,7 +63,7 @@ func (c *multiplexedCommitter) InitModule(mods *modules.Core, info modules.Scope
 }
 
 // Stores the block before further execution.
-func (c *multiplexedCommitter) Commit(block *hotstuff.Block) {
+func (c *pipedCommitter) Commit(block *hotstuff.Block) {
 	c.logger.Debugf("Commit (currentCi: %d, currentView: %d): new incoming block {p:%d, v:%d, h:%s}",
 		c.currentPipe, c.currentView,
 		block.Pipe(), block.View(), block.Hash().String()[:4])
@@ -85,14 +85,14 @@ func (c *multiplexedCommitter) Commit(block *hotstuff.Block) {
 }
 
 // Retrieve the last block which was committed on an pipe. Use zero if pipelining is not used.
-func (c *multiplexedCommitter) CommittedBlock(pipe hotstuff.Pipe) *hotstuff.Block {
+func (c *pipedCommitter) CommittedBlock(pipe hotstuff.Pipe) *hotstuff.Block {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	return c.bExecAtCi[pipe]
 }
 
 // recursive helper for commit
-func (c *multiplexedCommitter) commitInner(block *hotstuff.Block) error {
+func (c *pipedCommitter) commitInner(block *hotstuff.Block) error {
 	if c.bExecAtCi[block.Pipe()].View() >= block.View() {
 		return nil
 	}
@@ -117,7 +117,7 @@ func (c *multiplexedCommitter) commitInner(block *hotstuff.Block) error {
 	return nil
 }
 
-func (c *multiplexedCommitter) handleForks(prunedBlocks map[hotstuff.View][]*hotstuff.Block) {
+func (c *pipedCommitter) handleForks(prunedBlocks map[hotstuff.View][]*hotstuff.Block) {
 	// All pruned blocks are assumed to be forks after the previous exec logic
 	for _, blocks := range prunedBlocks {
 		for _, block := range blocks {
@@ -126,7 +126,7 @@ func (c *multiplexedCommitter) handleForks(prunedBlocks map[hotstuff.View][]*hot
 	}
 }
 
-func (c *multiplexedCommitter) tryExec() error {
+func (c *pipedCommitter) tryExec() error {
 	waitingBlocks := c.waitingBlocksAtPipe[c.currentPipe]
 	canPeek := len(waitingBlocks) > 0
 	if !canPeek {
@@ -167,4 +167,4 @@ func (c *multiplexedCommitter) tryExec() error {
 	return c.tryExec()
 }
 
-var _ modules.Committer = (*multiplexedCommitter)(nil)
+var _ modules.Committer = (*pipedCommitter)(nil)

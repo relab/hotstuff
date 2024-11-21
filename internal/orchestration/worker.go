@@ -199,7 +199,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			return nil, fmt.Errorf("invalid pipeline ordering scheme: %s", opts.GetPipelineOrdering())
 		}
 	} else {
-		comm = committer.NewBasic()
+		comm = committer.New()
 	}
 
 	consensusRules := builder.CreateScope(newConsensusRules)

@@ -20,8 +20,8 @@ type basic struct {
 	bExec *hotstuff.Block
 }
 
-// Basic committer implements commit logic for a single pipe.
-func NewBasic() modules.Committer {
+// Basic committer implements commit logic without pipelining.
+func New() modules.Committer {
 	return &basic{
 		bExec: hotstuff.GetGenesis(),
 	}
@@ -83,7 +83,7 @@ func (bb *basic) commitInner(block *hotstuff.Block) error {
 	return nil
 }
 
-// Retrieve the last block which was committed on a consensus instance. Use zero if pipelining is not used.
+// Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
 func (bb *basic) CommittedBlock(_ hotstuff.Pipe) *hotstuff.Block {
 	bb.mut.Lock()
 	defer bb.mut.Unlock()
