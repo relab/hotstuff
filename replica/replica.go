@@ -121,7 +121,7 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		modules.ExtendedExecutor(srv.clientSrv),
 		modules.ExtendedForkHandler(srv.clientSrv),
 	)
-	builder.AddScope(
+	builder.AddScoped(
 		cmdCaches,
 	)
 	srv.hs = builder.Build()

@@ -62,7 +62,7 @@ func TestPipeliningDisabled(t *testing.T) {
 	adders := builder.CreateScope(NewAdder)
 	multers := builder.CreateScope(NewMultiplier)
 
-	builder.AddScope(adders, multers)
+	builder.AddScoped(adders, multers)
 
 	mods := builder.Build()
 	if mods.ScopeCount() > 0 {
@@ -88,7 +88,7 @@ func TestPipelined(t *testing.T) {
 	adders := builder.CreateScope(NewAdder)
 	multers := builder.CreateScope(NewMultiplier)
 
-	builder.AddScope(adders, multers)
+	builder.AddScoped(adders, multers)
 
 	core := builder.Build()
 	if core.ScopeCount() != pipes {

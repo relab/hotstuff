@@ -368,7 +368,7 @@ func (b *Builder) CreateScope(ctor any, ctorArgs ...any) (scopedMods map[hotstuf
 	return scopedMods
 }
 
-func (b *Builder) AddScope(scopedModuleMaps ...map[hotstuff.Pipe]any) {
+func (b *Builder) AddScoped(scopedModuleMaps ...map[hotstuff.Pipe]any) {
 	for _, scopedMods := range scopedModuleMaps {
 		if !b.pipeliningEnabled {
 			mod, ok := scopedMods[hotstuff.NullPipe]

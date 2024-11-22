@@ -241,7 +241,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
 
-	builder.AddScope(
+	builder.AddScoped(
 		consensusRules,
 		consensuses,
 		votingMachines,
