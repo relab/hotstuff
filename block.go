@@ -85,9 +85,9 @@ func (b *Block) ToBytes() []byte {
 	var proposerBuf [4]byte
 	binary.LittleEndian.PutUint32(proposerBuf[:], uint32(b.proposer))
 	buf = append(buf, proposerBuf[:]...)
-	var instanceBuf [4]byte
-	binary.LittleEndian.PutUint32(instanceBuf[:], uint32(b.pipe))
-	buf = append(buf, instanceBuf[:]...)
+	var pipeBuf [4]byte
+	binary.LittleEndian.PutUint32(pipeBuf[:], uint32(b.pipe))
+	buf = append(buf, pipeBuf[:]...)
 	var viewBuf [8]byte
 	binary.LittleEndian.PutUint64(viewBuf[:], uint64(b.view))
 	buf = append(buf, viewBuf[:]...)
