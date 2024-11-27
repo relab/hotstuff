@@ -51,6 +51,7 @@ func (s *Synchronizer) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 		&s.crypto,
 		&s.configuration,
 		&s.consensus,
+		&s.duration,
 		&s.eventLoop,
 		&s.leaderRotation,
 		&s.logger,
@@ -88,12 +89,11 @@ func (s *Synchronizer) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 }
 
 // New creates a new Synchronizer.
-func New(viewDuration ViewDuration) modules.Synchronizer {
+func New() modules.Synchronizer {
 	return &Synchronizer{
 		currentView: 1,
 
-		duration: viewDuration,
-		timer:    oneShotTimer{time.AfterFunc(0, func() {})}, // dummy timer that will be replaced after start() is called
+		timer: oneShotTimer{time.AfterFunc(0, func() {})}, // dummy timer that will be replaced after start() is called
 
 		timeouts: make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
 	}

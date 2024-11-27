@@ -224,13 +224,16 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		)
 	}
 
-	if opts.GetPipelineViewDuration() == "fixed" {
+	if opts.GetViewDurationMethod() == "fixed" {
 		newViewDuration = func() synchronizer.ViewDuration {
 			return synchronizer.NewFixedDuration(opts.GetInitialTimeout().AsDuration())
 		}
 	}
 
-	synchronizers := builder.CreateScope(synchronizer.New, newViewDuration())
+	viewDurations := builder.CreateScope(newViewDuration)
+	synchronizers := builder.CreateScope(synchronizer.New)
+
+	logger := logging.New("hs" + strconv.Itoa(int(opts.GetID())))
 
 	builder.Add(
 		eventloop.NewScoped(1000, int(opts.GetPipes())),
@@ -238,7 +241,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		w.metricsLogger,
 		blockchain.New(),
 		comm,
-		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
+		logger,
 	)
 
 	builder.AddScoped(
@@ -246,7 +249,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		consensuses,
 		votingMachines,
 		leaderRotations,
-		synchronizers)
+		synchronizers,
+		viewDurations)
 
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
 	if w.measurementInterval > 0 {

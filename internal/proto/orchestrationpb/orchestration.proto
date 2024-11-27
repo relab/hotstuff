@@ -57,8 +57,8 @@ message ReplicaOpts {
   uint32 Pipes = 23;
   // The ordering scheme for pipelining mode. Default is "sequential".
   string PipelineOrdering = 24;
-  // Whether or not to duplicate the view duration module when pipelining is enabled. Either "duplicate" or "static".
-  string PipelineViewDuration = 25;
+  // Fixed or dynamic view duration per pipe. Default is "fixed".
+  string ViewDurationMethod = 25;
   // Latency induced by all replicas.
   google.protobuf.Duration HackyLatency = 26;
 }
