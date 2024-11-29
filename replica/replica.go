@@ -158,6 +158,7 @@ func (srv *Replica) Start() {
 // Stop stops the replica and closes connections.
 func (srv *Replica) Stop() {
 	srv.cancel()
+	srv.clientSrv.logger.Info("Server stopping...")
 	<-srv.done
 	srv.Close()
 	srv.clientSrv.PrintScopedCmdResult()

@@ -109,7 +109,7 @@ func runController() {
 		Duration:    viper.GetDuration("duration"),
 		Output:      outputDir,
 		ReplicaOpts: &orchestrationpb.ReplicaOpts{
-			UseTLS:             true,
+			UseTLS:             false, // TODO (Alan): this was true,
 			BatchSize:          viper.GetUint32("batch-size"),
 			TimeoutMultiplier:  float32(viper.GetFloat64("timeout-multiplier")),
 			Consensus:          viper.GetString("consensus"),
@@ -127,7 +127,7 @@ func runController() {
 			HackyLatency:       durationpb.New(viper.GetDuration("hacky-replica-latency")),
 		},
 		ClientOpts: &orchestrationpb.ClientOpts{
-			UseTLS:           true,
+			UseTLS:           false, // TODO (Alan): this was true,
 			ConnectTimeout:   durationpb.New(viper.GetDuration("connect-timeout")),
 			PayloadSize:      viper.GetUint32("payload-size"),
 			MaxConcurrent:    viper.GetUint32("max-concurrent"),
