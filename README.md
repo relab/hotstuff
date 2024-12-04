@@ -1,3 +1,7 @@
+# NOTICE
+
+This implementation was done as part of Alan Rostem's master's thesis. 
+
 # hotstuff
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/relab/consensus.svg)](https://pkg.go.dev/github.com/relab/hotstuff)
