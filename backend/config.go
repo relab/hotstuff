@@ -24,7 +24,7 @@ import (
 
 // Replica provides methods used by hotstuff to send messages to replicas.
 type Replica struct {
-	eventLoop *eventloop.EventLoop
+	eventLoop *eventloop.ScopedEventLoop
 	node      *hotstuffpb.Node
 	id        hotstuff.ID
 	pubKey    hotstuff.PublicKey
@@ -46,7 +46,7 @@ func (r *Replica) Vote(cert hotstuff.PartialCert) {
 	if r.node == nil {
 		return
 	}
-	ctx, cancel := synchronizer.TimeoutContext(r.eventLoop.Context(), r.eventLoop)
+	ctx, cancel := synchronizer.ScopedTimeoutContext(r.eventLoop.Context(), r.eventLoop, cert.Pipe())
 	defer cancel()
 	pCert := hotstuffpb.PartialCertToProto(cert)
 	r.node.Vote(ctx, pCert)
@@ -57,7 +57,7 @@ func (r *Replica) NewView(msg hotstuff.SyncInfo) {
 	if r.node == nil {
 		return
 	}
-	ctx, cancel := synchronizer.TimeoutContext(r.eventLoop.Context(), r.eventLoop)
+	ctx, cancel := synchronizer.ScopedTimeoutContext(r.eventLoop.Context(), r.eventLoop, msg.Pipe())
 	defer cancel()
 	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(msg))
 }
@@ -78,7 +78,7 @@ type Config struct {
 }
 
 type subConfig struct {
-	eventLoop *eventloop.EventLoop
+	eventLoop *eventloop.ScopedEventLoop
 	logger    logging.Logger
 	opts      *modules.Options
 
@@ -87,7 +87,7 @@ type subConfig struct {
 }
 
 // InitModule initializes the configuration.
-func (cfg *Config) InitModule(mods *modules.Core) {
+func (cfg *Config) InitModule(mods *modules.Core, _ modules.ScopeInfo) {
 	mods.Get(
 		&cfg.eventLoop,
 		&cfg.logger,
@@ -287,7 +287,7 @@ func (cfg *subConfig) Propose(proposal hotstuff.ProposeMsg) {
 	if cfg.cfg == nil {
 		return
 	}
-	ctx, cancel := synchronizer.TimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop)
+	ctx, cancel := synchronizer.ScopedTimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop, proposal.Pipe)
 	defer cancel()
 	cfg.cfg.Propose(
 		ctx,
@@ -302,7 +302,7 @@ func (cfg *subConfig) Timeout(msg hotstuff.TimeoutMsg) {
 	}
 
 	// will wait until the second timeout before canceling
-	ctx, cancel := synchronizer.TimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop)
+	ctx, cancel := synchronizer.ScopedTimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop, msg.Pipe)
 	defer cancel()
 
 	cfg.cfg.Timeout(

@@ -16,6 +16,7 @@ func init() {
 type ChainedHotStuff struct {
 	blockChain modules.BlockChain
 	logger     logging.Logger
+	pipe       hotstuff.Pipe
 
 	// protocol variables
 
@@ -30,7 +31,8 @@ func New() consensus.Rules {
 }
 
 // InitModule initializes the module.
-func (hs *ChainedHotStuff) InitModule(mods *modules.Core) {
+func (hs *ChainedHotStuff) InitModule(mods *modules.Core, initinfo modules.ScopeInfo) {
+	hs.pipe = initinfo.ModuleScope
 	mods.Get(&hs.blockChain, &hs.logger)
 }
 
@@ -38,11 +40,15 @@ func (hs *ChainedHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool)
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return hs.blockChain.Get(qc.BlockHash())
+	return hs.blockChain.Get(qc.BlockHash(), qc.Pipe())
 }
 
 // CommitRule decides whether an ancestor of the block should be committed.
 func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
+	if hs.pipe != block.Pipe() {
+		panic("incorrect pipe")
+	}
+
 	block1, ok := hs.qcRef(block.QuorumCert())
 	if !ok {
 		return nil
@@ -50,7 +56,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 
 	// Note that we do not call UpdateHighQC here.
 	// This is done through AdvanceView, which the Consensus implementation will call.
-	hs.logger.Debug("PRE_COMMIT: ", block1)
+	hs.logger.Debugf("PRE_COMMIT[p=%d, view=%d]: %s", hs.pipe, hs.bLock.View(), block1)
 
 	block2, ok := hs.qcRef(block1.QuorumCert())
 	if !ok {
@@ -58,7 +64,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	}
 
 	if block2.View() > hs.bLock.View() {
-		hs.logger.Debug("COMMIT: ", block2)
+		hs.logger.Debugf("COMMIT[p=%d, view=%d]: %s", hs.pipe, hs.bLock.View(), block2)
 		hs.bLock = block2
 	}
 
@@ -68,7 +74,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	}
 
 	if block1.Parent() == block2.Hash() && block2.Parent() == block3.Hash() {
-		hs.logger.Debug("DECIDE: ", block3)
+		hs.logger.Debugf("DECIDE[p=%d, view=%d]: ", hs.pipe, hs.bLock.View(), block3)
 		return block3
 	}
 
@@ -77,9 +83,12 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 
 // VoteRule decides whether to vote for the proposal or not.
 func (hs *ChainedHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
+	if hs.pipe != proposal.Pipe {
+		panic("incorrect pipe")
+	}
 	block := proposal.Block
 
-	qcBlock, haveQCBlock := hs.blockChain.Get(block.QuorumCert().BlockHash())
+	qcBlock, haveQCBlock := hs.blockChain.Get(block.QuorumCert().BlockHash(), block.Pipe())
 
 	safe := false
 	if haveQCBlock && qcBlock.View() > hs.bLock.View() {

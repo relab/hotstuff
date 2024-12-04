@@ -39,15 +39,25 @@ import (
 	"github.com/relab/hotstuff"
 )
 
+type moduleScope []Module
+
+type ScopeInfo struct {
+	IsPipeliningEnabled bool
+	ScopeCount          int
+	ModuleScope         hotstuff.Pipe
+}
+
 // Module is an interface for initializing modules.
 type Module interface {
-	InitModule(mods *Core)
+	InitModule(mods *Core, opt ScopeInfo)
 }
 
 // Core is the base of the module system.
 // It contains only a few core modules that are shared between replicas and clients.
 type Core struct {
-	modules []any
+	staticModules       []any
+	scopedModules       map[hotstuff.Pipe][]any
+	isPipeliningEnabled bool
 }
 
 // TryGet attempts to find a module for ptr.
@@ -75,7 +85,7 @@ func (mods Core) TryGet(ptr any) bool {
 		panic("only pointer values allowed")
 	}
 
-	for _, m := range mods.modules {
+	for _, m := range mods.staticModules {
 		mv := reflect.ValueOf(m)
 		if mv.Type().AssignableTo(pt.Elem()) {
 			v.Elem().Set(mv)
@@ -110,11 +120,165 @@ func (mods *Core) Get(pointers ...any) {
 	}
 }
 
+// GetScoped does the same as Get and additionally searches for pointers in the same scope as moduleInScope.
+// If pipelining is not enabled, Get is called internally instead.
+//
+// NOTE: pointers must only contain non-nil pointers to types that have been provided to the module system
+// as a scoped module.
+// GetScoped panics if one of the given arguments is not a pointer, if a compatible module is not found,
+// if the module was not in a scope or if the module was not in the same scope as moduleInScope.
+//
+// Example:
+//
+//	type OtherModule interface {
+//		Foo()
+//	}
+//
+//	type MyModuleImpl struct {
+//		otherModule OtherModule
+//	}
+//
+//	func (m *MyModuleImpl) InitModule(mods *modules.Core, opt modules.InitOptions) {
+//		mods.GetScoped(m, &m.otherModule) // Requires an OtherModule from the same pipe
+//	}
+//
+//	func main() {
+//		// TODO: Fix this doc
+//		pipeCount := 3
+//
+//		builder := modules.NewBuilder(0, nil)
+//		builder.EnablePipelining(pipeCount)
+//		builder.AddScoped(NewMyModuleImpl)
+//		builder.AddScoped(NewOtherModuleImpl)
+//		builder.Build() // InitModule is called here
+//	}
+func (mods *Core) GetScoped(moduleInScope Module, pointers ...any) {
+	if len(pointers) == 0 {
+		panic("no pointers given")
+	}
+
+	if !mods.isPipeliningEnabled {
+		mods.Get(pointers...)
+		return
+	}
+
+	for _, ptr := range pointers {
+		if !mods.TryGet(ptr) {
+			if !mods.tryGetFromScope(moduleInScope, ptr) {
+				panic(fmt.Sprintf("scoped module of type %s not found", reflect.TypeOf(ptr).Elem()))
+			}
+		}
+	}
+}
+
+// tryGetFromScope attempts to find a module for ptr which also happens to be in the same
+// pipe as moduleInScope, false otherwise.
+// tryGetFromScope returns true if a module was successflully stored in ptr, false otherwise.
+// If pipelining was not enabled, TryGet is called implicitly.
+func (mods *Core) tryGetFromScope(moduleInScope Module, ptr any) bool {
+	if len(mods.scopedModules) == 0 {
+		return mods.TryGet(ptr)
+	}
+
+	v := reflect.ValueOf(ptr)
+	if !v.IsValid() {
+		panic("ptr value cannot be nil")
+	}
+	pt := v.Type()
+	if pt.Kind() != reflect.Ptr {
+		panic("only pointer values allowed")
+	}
+
+	correctPipe := hotstuff.NullPipe
+	for pipe := range mods.scopedModules {
+		scope := mods.scopedModules[pipe]
+		// Check if self is in scope
+		for _, module := range scope {
+			// TODO: Verify if equality comparison is correct
+			if module == moduleInScope {
+				correctPipe = pipe
+				break
+			}
+		}
+		// Break outer loop too if pipe was found
+		if correctPipe != hotstuff.NullPipe {
+			break
+		}
+	}
+
+	// If this variable remained unchanged, return false
+	if correctPipe == hotstuff.NullPipe {
+		return false
+	}
+
+	correctScope := mods.scopedModules[correctPipe]
+	for _, m := range correctScope {
+		mv := reflect.ValueOf(m)
+		if mv.Type().AssignableTo(pt.Elem()) {
+			v.Elem().Set(mv)
+			return true
+		}
+	}
+
+	return false
+}
+
+// MatchForScope assigns ptr to a matching module in the scope with scope.
+func (core *Core) MatchForScope(pipe hotstuff.Pipe, ptr any) {
+	if len(core.scopedModules) == 0 {
+		panic("pipelining is not enabled")
+	}
+
+	v := reflect.ValueOf(ptr)
+	if !v.IsValid() {
+		panic("pointer value cannot be nil")
+	}
+
+	pt := v.Type()
+	if pt.Kind() != reflect.Ptr {
+		panic("only pointer value allowed")
+	}
+
+	scope := core.scopedModules[pipe]
+	for _, m := range scope {
+		mv := reflect.ValueOf(m)
+		if mv.Type().AssignableTo(pt.Elem()) {
+			v.Elem().Set(mv)
+			return
+		}
+	}
+
+	panic("no match found for " + pt.Elem().Name())
+}
+
+// Return the number of scopes the builder has generated.
+func (core *Core) ScopeCount() int {
+	return len(core.scopedModules)
+}
+
+// Return a slice of Scopes in the order which the scopes were created by Builder.
+func (core *Core) Scopes() (ids []hotstuff.Pipe) {
+	for id := range core.scopedModules {
+		ids = append(ids, id)
+	}
+
+	return
+}
+
+// Return a list of modules from a scope. The order of module types is influenced
+// by when AddScoped was called in Builder.
+func (core *Core) GetScope(pipe hotstuff.Pipe) []any {
+	return core.scopedModules[pipe]
+}
+
 // Builder is a helper for setting up client modules.
 type Builder struct {
-	core    Core
-	modules []Module
-	opts    *Options
+	core              Core
+	staticModules     []Module
+	moduleScopes      map[hotstuff.Pipe]moduleScope
+	opts              *Options
+	pipeliningEnabled bool
+	pipeIds           []hotstuff.Pipe
 }
 
 // NewBuilder returns a new builder.
@@ -125,8 +289,34 @@ func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey) Builder {
 			privateKey:         pk,
 			connectionMetadata: make(map[string]string),
 		},
+		pipeliningEnabled: false,
+		pipeIds:           nil,
+		moduleScopes:      nil,
 	}
+
 	return bl
+}
+
+// EnablePipelining enables pipelining by allocating the module scopes and assigning them the pipe identifiers.
+func (bl *Builder) EnablePipelining(pipeCount int) {
+	if bl.pipeliningEnabled {
+		panic("pipelining already enabled")
+	}
+
+	if pipeCount <= 0 {
+		panic("pipelining requires at least one pipe")
+	}
+
+	bl.pipeliningEnabled = true
+	bl.core.scopedModules = make(map[hotstuff.Pipe][]any)
+	bl.moduleScopes = make(map[hotstuff.Pipe]moduleScope)
+
+	for i := hotstuff.Pipe(1); i <= hotstuff.Pipe(pipeCount); i++ {
+		bl.pipeIds = append(bl.pipeIds, i)
+		bl.moduleScopes[i] = make(moduleScope, 0)
+		bl.core.scopedModules[i] = make([]any, 0)
+	}
+
 }
 
 // Options returns the options module.
@@ -134,12 +324,70 @@ func (b *Builder) Options() *Options {
 	return b.opts
 }
 
-// Add adds modules to the builder.
+// Add adds existing, singular, module instances to the builder.
 func (b *Builder) Add(modules ...any) {
-	b.core.modules = append(b.core.modules, modules...)
+	b.core.staticModules = append(b.core.staticModules, modules...)
 	for _, module := range modules {
 		if m, ok := module.(Module); ok {
-			b.modules = append(b.modules, m)
+			b.staticModules = append(b.staticModules, m)
+		}
+	}
+}
+
+// CreateScope constructs N modules of the same type based on the constructor function
+// and adds them to a map where each module is mapped to a scope. The module's constructor
+// is called with the variadic arguments.
+// If pipelining is disabled when CreateScope is called, only one module will be constructed and mapped
+// to hotstuff.NullPipe.
+// To add the modules, use AddScopedModules later.
+func (b *Builder) CreateScope(ctor any, ctorArgs ...any) (scopedMods map[hotstuff.Pipe]any) {
+	if reflect.TypeOf(ctor).Kind() != reflect.Func {
+		panic("first argument is not a function")
+	}
+
+	scopedMods = make(map[hotstuff.Pipe]any)
+
+	vargs := make([]reflect.Value, len(ctorArgs))
+	for n, v := range ctorArgs {
+		vargs[n] = reflect.ValueOf(v)
+	}
+
+	ctorVal := reflect.ValueOf(ctor)
+	scopeIds := b.pipeIds
+	if !b.pipeliningEnabled {
+		scopeIds = []hotstuff.Pipe{hotstuff.NullPipe}
+	}
+	for _, id := range scopeIds {
+		returnResult := ctorVal.Call(vargs)
+		if len(returnResult) != 1 {
+			panic("constructor does not return a single value")
+		}
+		mod := returnResult[0].Interface()
+		scopedMods[id] = mod
+	}
+	return scopedMods
+}
+
+func (b *Builder) AddScoped(scopedModuleMaps ...map[hotstuff.Pipe]any) {
+	for _, scopedMods := range scopedModuleMaps {
+		if !b.pipeliningEnabled {
+			mod, ok := scopedMods[hotstuff.NullPipe]
+			if !ok {
+				panic("map of scoped modules did not contain null pipe key")
+			}
+			b.Add(mod)
+			continue
+		}
+
+		for id := range scopedMods {
+			mod := scopedMods[id]
+			converted, ok := mod.(Module)
+
+			b.core.scopedModules[id] = append(b.core.scopedModules[id], mod)
+			if !ok {
+				continue
+			}
+			b.moduleScopes[id] = append(b.moduleScopes[id], converted)
 		}
 	}
 }
@@ -147,13 +395,38 @@ func (b *Builder) Add(modules ...any) {
 // Build initializes all added modules and returns the Core object.
 func (b *Builder) Build() *Core {
 	// reverse the order of the added modules so that TryGet will find the latest first.
-	for i, j := 0, len(b.core.modules)-1; i < j; i, j = i+1, j-1 {
-		b.core.modules[i], b.core.modules[j] = b.core.modules[j], b.core.modules[i]
+	for i, j := 0, len(b.core.staticModules)-1; i < j; i, j = i+1, j-1 {
+		b.core.staticModules[i], b.core.staticModules[j] = b.core.staticModules[j], b.core.staticModules[i]
 	}
 	// add the Options last so that it can be overridden by user.
 	b.Add(b.opts)
-	for _, module := range b.modules {
-		module.InitModule(&b.core)
+	opt := ScopeInfo{
+		IsPipeliningEnabled: b.pipeliningEnabled,
+		ModuleScope:         hotstuff.NullPipe,
+		ScopeCount:          len(b.pipeIds),
+	}
+	for _, module := range b.staticModules {
+		module.InitModule(&b.core, opt)
+	}
+
+	if !b.pipeliningEnabled {
+		b.core.isPipeliningEnabled = false
+		return &b.core // Exit early
+	}
+
+	b.core.isPipeliningEnabled = true
+
+	// Initializing later so that modules can reference
+	// other modules in the same pipe without panicking.
+	for pipe, scope := range b.moduleScopes {
+		opt := ScopeInfo{
+			IsPipeliningEnabled: b.pipeliningEnabled,
+			ModuleScope:         pipe,
+			ScopeCount:          len(b.pipeIds),
+		}
+		for _, module := range scope {
+			module.(Module).InitModule(&b.core, opt)
+		}
 	}
 	return &b.core
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/modules"
@@ -35,7 +36,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 	acceptor.EXPECT().Proposed(gomock.Any()).AnyTimes()
 
 	executor := mocks.NewMockExecutor(ctrl)
-	executor.EXPECT().Exec(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes()
+	executor.EXPECT().Exec(0, gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes()
 
 	forkHandler := mocks.NewMockForkHandler(ctrl)
 
@@ -53,13 +54,51 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 	synchronizer.EXPECT().ViewContext().AnyTimes().Return(context.Background())
 
 	builder.Add(
-		eventloop.New(100),
+		eventloop.NewScoped(100, 0),
 		logging.New(fmt.Sprintf("hs%d", id)),
 		blockchain.New(),
+		committer.New(),
 		mocks.NewMockConsensus(ctrl),
 		consensus.NewVotingMachine(),
 		leaderrotation.NewFixed(1),
 		synchronizer,
+		config,
+		signer,
+		acceptor,
+		modules.ExtendedExecutor(executor),
+		commandQ,
+		modules.ExtendedForkHandler(forkHandler),
+	)
+}
+
+// TestModules registers default modules for testing to the given builder.
+func TestModulesScoped(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *modules.Builder, pipeCount int) {
+	t.Helper()
+
+	acceptor := mocks.NewMockAcceptor(ctrl)
+	acceptor.EXPECT().Accept(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes().Return(true)
+	acceptor.EXPECT().Proposed(gomock.Any()).AnyTimes()
+
+	executor := mocks.NewMockExecutor(ctrl)
+	executor.EXPECT().Exec(0, gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes()
+
+	forkHandler := mocks.NewMockForkHandler(ctrl)
+
+	commandQ := mocks.NewMockCommandQueue(ctrl)
+	commandQ.EXPECT().Get(gomock.Any()).AnyTimes().Return(hotstuff.Command("foo"), true)
+
+	signer := crypto.NewCache(ecdsa.New(), 10)
+
+	config := mocks.NewMockConfiguration(ctrl)
+	config.EXPECT().Len().AnyTimes().Return(1)
+	config.EXPECT().QuorumSize().AnyTimes().Return(3)
+
+	// TODO: Check if this code still runs after implementing pipelining
+	builder.Add(
+		eventloop.NewScoped(100, 0),
+		logging.New(fmt.Sprintf("hs%d", id)),
+		blockchain.New(),
+		committer.New(),
 		config,
 		signer,
 		acceptor,
@@ -136,6 +175,30 @@ func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstu
 	return builders
 }
 
+// TODO: Complete the implementation.
+func CreateBuildersScoped(t *testing.T, ctrl *gomock.Controller, n int, pipeCount int, keys ...hotstuff.PrivateKey) (builders BuilderList) {
+	t.Helper()
+	network := twins.NewSimpleNetwork()
+	builders = make([]*modules.Builder, n)
+	for i := 0; i < n; i++ {
+		id := hotstuff.ID(i + 1)
+		var key hotstuff.PrivateKey
+		if i < len(keys) {
+			key = keys[i]
+		} else {
+			key = GenerateECDSAKey(t)
+		}
+
+		builder := network.GetNodeBuilder(twins.NodeID{ReplicaID: id, NetworkID: uint32(id)}, key)
+		builder.EnablePipelining(pipeCount)
+		builder.Add(network.NewConfiguration())
+		TestModulesScoped(t, ctrl, id, key, &builder, pipeCount)
+		builder.Add(network.NewConfiguration())
+		builders[i] = &builder
+	}
+	return builders
+}
+
 // CreateTCPListener creates a net.Listener on a random port.
 func CreateTCPListener(t *testing.T) net.Listener {
 	t.Helper()
@@ -185,7 +248,11 @@ func CreateTimeouts(t *testing.T, view hotstuff.View, signers []modules.Crypto) 
 			ID:            signer(sig),
 			View:          view,
 			ViewSignature: sig,
-			SyncInfo:      hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())),
+			SyncInfo: hotstuff.NewSyncInfo(hotstuff.NullPipe).WithQC(hotstuff.NewQuorumCert(
+				nil,
+				0,
+				hotstuff.NullPipe, // TODO: Verify if this code conflicts with pipelining
+				hotstuff.GetGenesis().Hash())),
 		})
 	}
 	for i := range timeouts {
@@ -281,7 +348,7 @@ func GenerateKeys(t *testing.T, n int, keyFunc func(t *testing.T) hotstuff.Priva
 
 // NewProposeMsg wraps a new block in a ProposeMsg.
 func NewProposeMsg(parent hotstuff.Hash, qc hotstuff.QuorumCert, cmd hotstuff.Command, view hotstuff.View, id hotstuff.ID) hotstuff.ProposeMsg {
-	return hotstuff.ProposeMsg{ID: id, Block: hotstuff.NewBlock(parent, qc, cmd, view, id)}
+	return hotstuff.ProposeMsg{ID: id, Block: hotstuff.NewBlock(parent, qc, cmd, view, id, 0)}
 }
 
 type leaderRotation struct {

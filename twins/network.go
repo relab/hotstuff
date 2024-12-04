@@ -11,6 +11,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
+	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/ecdsa"
@@ -37,10 +38,10 @@ func (id NodeID) String() string {
 type node struct {
 	blockChain     modules.BlockChain
 	consensus      modules.Consensus
-	eventLoop      *eventloop.EventLoop
+	eventLoop      *eventloop.ScopedEventLoop
 	leaderRotation modules.LeaderRotation
-	synchronizer   modules.Synchronizer
 	opts           *modules.Options
+	synchronizer   modules.Synchronizer
 
 	id             NodeID
 	executedBlocks []*hotstuff.Block
@@ -48,7 +49,11 @@ type node struct {
 	log            strings.Builder
 }
 
-func (n *node) InitModule(mods *modules.Core) {
+func (n *node) InitModule(mods *modules.Core, info modules.ScopeInfo) {
+	if info.IsPipeliningEnabled {
+		panic("pipelining not supported for this module")
+	}
+
 	mods.Get(
 		&n.blockChain,
 		&n.consensus,
@@ -137,13 +142,17 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 		if !ok {
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
+
 		builder.Add(
-			eventloop.New(100),
+			eventloop.NewScoped(100, 0),
 			blockchain.New(),
-			consensus.New(consensusModule),
+			committer.New(),
+			consensus.New(),
+			consensusModule,
 			consensus.NewVotingMachine(),
 			crypto.NewCache(ecdsa.New(), 100),
-			synchronizer.New(FixedTimeout(1*time.Millisecond)),
+			synchronizer.New(),
+			FixedTimeout(1*time.Millisecond),
 			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			// twins-specific:
 			&configuration{network: n, node: node},
@@ -234,7 +243,7 @@ type configuration struct {
 }
 
 // alternative way to get a pointer to the node.
-func (c *configuration) InitModule(mods *modules.Core) {
+func (c *configuration) InitModule(mods *modules.Core, _ modules.ScopeInfo) {
 	if c.node == nil {
 		mods.TryGet(&c.node)
 	}
@@ -428,7 +437,7 @@ type tick struct{}
 
 type timeoutManager struct {
 	synchronizer modules.Synchronizer
-	eventLoop    *eventloop.EventLoop
+	eventLoop    *eventloop.ScopedEventLoop
 
 	node      *node
 	network   *Network
@@ -460,7 +469,7 @@ func (tm *timeoutManager) viewChange(event synchronizer.ViewChangeEvent) {
 
 // InitModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (tm *timeoutManager) InitModule(mods *modules.Core) {
+func (tm *timeoutManager) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	mods.Get(
 		&tm.synchronizer,
 		&tm.eventLoop,

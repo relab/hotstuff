@@ -141,13 +141,13 @@ type vulnerableFHS struct {
 	inner      fasthotstuff.FastHotStuff
 }
 
-func (fhs *vulnerableFHS) InitModule(mods *modules.Core) {
+func (fhs *vulnerableFHS) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	mods.Get(
 		&fhs.logger,
 		&fhs.blockChain,
 	)
 
-	fhs.inner.InitModule(mods)
+	fhs.inner.InitModule(mods, info)
 }
 
 // VoteRule decides whether to vote for the block.
@@ -159,7 +159,7 @@ func (fhs *vulnerableFHS) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) 
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return fhs.blockChain.Get(qc.BlockHash())
+	return fhs.blockChain.Get(qc.BlockHash(), qc.Pipe())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.

@@ -3,6 +3,7 @@ package metrics
 import (
 	"time"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics/types"
@@ -26,9 +27,9 @@ type ViewTimeouts struct {
 }
 
 // InitModule gives the module access to the other modules.
-func (vt *ViewTimeouts) InitModule(mods *modules.Core) {
+func (vt *ViewTimeouts) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	var (
-		eventLoop *eventloop.EventLoop
+		eventLoop *eventloop.ScopedEventLoop
 		logger    logging.Logger
 	)
 
@@ -41,9 +42,18 @@ func (vt *ViewTimeouts) InitModule(mods *modules.Core) {
 
 	logger.Info("ViewTimeouts metric enabled.")
 
-	eventLoop.RegisterHandler(synchronizer.ViewChangeEvent{}, func(event any) {
-		vt.viewChange(event.(synchronizer.ViewChangeEvent))
-	})
+	if info.IsPipeliningEnabled {
+		for pipe := hotstuff.Pipe(1); pipe <= hotstuff.Pipe(info.ScopeCount); pipe++ {
+			eventLoop.RegisterHandler(synchronizer.ViewChangeEvent{}, func(event any) {
+				vt.viewChange(event.(synchronizer.ViewChangeEvent))
+			}, eventloop.RespondToScope(pipe))
+		}
+	} else {
+
+		eventLoop.RegisterHandler(synchronizer.ViewChangeEvent{}, func(event any) {
+			vt.viewChange(event.(synchronizer.ViewChangeEvent))
+		})
+	}
 
 	eventLoop.RegisterObserver(types.TickEvent{}, func(event any) {
 		vt.tick(event.(types.TickEvent))

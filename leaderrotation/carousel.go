@@ -22,8 +22,8 @@ type carousel struct {
 	logger        logging.Logger
 }
 
-func (c *carousel) InitModule(mods *modules.Core) {
-	mods.Get(
+func (c *carousel) InitModule(mods *modules.Core, _ modules.ScopeInfo) {
+	mods.GetScoped(c,
 		&c.blockChain,
 		&c.configuration,
 		&c.consensus,
@@ -57,7 +57,7 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 
 	for ok && i < f && block != hotstuff.GetGenesis() {
 		lastAuthors.Add(block.Proposer())
-		block, ok = c.blockChain.Get(block.Parent())
+		block, ok = c.blockChain.Get(block.Parent(), block.Pipe())
 		i++
 	}
 

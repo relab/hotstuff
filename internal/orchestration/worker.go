@@ -15,6 +15,7 @@ import (
 	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/client"
+	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/byzantine"
 	"github.com/relab/hotstuff/crypto"
@@ -166,14 +167,15 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	// prepare modules
 	builder := modules.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 
-	consensusRules, ok := modules.GetModule[consensus.Rules](opts.GetConsensus())
+	newConsensusRules, ok := modules.GetModuleCtor[consensus.Rules](opts.GetConsensus())
 	if !ok {
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
 	}
 
+	var newByz func() byzantine.Byzantine = nil
 	if opts.GetByzantineStrategy() != "" {
-		if byz, ok := modules.GetModule[byzantine.Byzantine](opts.GetByzantineStrategy()); ok {
-			consensusRules = byz.Wrap(consensusRules)
+		if ctor, ok := modules.GetModuleCtor[byzantine.Byzantine](opts.GetByzantineStrategy()); ok {
+			newByz = ctor
 		} else {
 			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
 		}
@@ -184,28 +186,72 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
 	}
 
-	leaderRotation, ok := modules.GetModule[modules.LeaderRotation](opts.GetLeaderRotation())
+	newLeaderRotation, ok := modules.GetModuleCtor[modules.LeaderRotation](opts.GetLeaderRotation())
 	if !ok {
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
 
-	sync := synchronizer.New(synchronizer.NewViewDuration(
-		uint64(opts.GetTimeoutSamples()),
-		float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-		float64(opts.GetTimeoutMultiplier()),
-	))
+	var comm modules.Committer
+	if opts.GetPipes() > 0 {
+		builder.EnablePipelining(int(opts.GetPipes()))
+		comm, ok = modules.GetModule[modules.Committer](opts.GetPipelineOrdering())
+		if !ok {
+			return nil, fmt.Errorf("invalid pipeline ordering scheme: %s", opts.GetPipelineOrdering())
+		}
+	} else {
+		comm = committer.New()
+	}
+
+	consensusRules := builder.CreateScope(newConsensusRules)
+	if newByz != nil {
+		for pipe, rules := range consensusRules {
+			byz := newByz()
+			consensusRules[pipe] = byz.Wrap(rules.(consensus.Rules))
+		}
+	}
+
+	consensuses := builder.CreateScope(consensus.New)
+	votingMachines := builder.CreateScope(consensus.NewVotingMachine)
+	leaderRotations := builder.CreateScope(newLeaderRotation)
+
+	// View duration for "dynamic"
+	newViewDuration := func() synchronizer.ViewDuration {
+		return synchronizer.NewViewDuration(
+			uint64(opts.GetTimeoutSamples()),
+			float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
+			float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
+			float64(opts.GetTimeoutMultiplier()),
+		)
+	}
+
+	if opts.GetViewDurationMethod() == "fixed" {
+		newViewDuration = func() synchronizer.ViewDuration {
+			return synchronizer.NewFixedDuration(opts.GetInitialTimeout().AsDuration())
+		}
+	}
+
+	viewDurations := builder.CreateScope(newViewDuration)
+	synchronizers := builder.CreateScope(synchronizer.New)
+
+	logger := logging.New("hs" + strconv.Itoa(int(opts.GetID())))
+
 	builder.Add(
-		eventloop.New(1000),
-		consensus.New(consensusRules),
-		consensus.NewVotingMachine(),
+		eventloop.NewScoped(1000, int(opts.GetPipes())),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
-		leaderRotation,
-		sync,
 		w.metricsLogger,
 		blockchain.New(),
-		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
+		comm,
+		logger,
 	)
+
+	builder.AddScoped(
+		consensusRules,
+		consensuses,
+		votingMachines,
+		leaderRotations,
+		synchronizers,
+		viewDurations)
+
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
@@ -233,6 +279,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		RootCAs:      rootCAs,
 		LocationInfo: locationInfo,
 		BatchSize:    opts.GetBatchSize(),
+		PipeCount:    opts.GetPipes(),
+		HackyLatency: *opts.GetHackyLatency(),
 		ManagerOptions: []gorums.ManagerOption{
 			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 			gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
@@ -305,7 +353,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
 		mods := modules.NewBuilder(hotstuff.ID(opts.GetID()), nil)
-		mods.Add(eventloop.New(1000))
+		mods.Add(eventloop.NewScoped(1000, 0))
 
 		if w.measurementInterval > 0 {
 			clientMetrics := metrics.GetClientMetrics(w.metrics...)

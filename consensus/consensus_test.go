@@ -20,18 +20,19 @@ func TestVote(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	bl := testutil.CreateBuilders(t, ctrl, n)
 	cs := mocks.NewMockConsensus(ctrl)
-	bl[0].Add(synchronizer.New(testutil.FixedTimeout(1*time.Millisecond)), cs)
+	d := testutil.FixedTimeout(1 * time.Millisecond)
+	bl[0].Add(synchronizer.New(), d, cs)
 	hl := bl.Build()
 	hs := hl[0]
 
 	var (
-		eventLoop  *eventloop.EventLoop
+		eventLoop  *eventloop.ScopedEventLoop
 		blockChain modules.BlockChain
 	)
 
 	hs.Get(&eventLoop, &blockChain)
 
-	cs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
+	cs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo(hotstuff.NullPipe)))
 
 	ok := false
 	ctx, cancel := context.WithCancel(context.Background())
@@ -42,7 +43,11 @@ func TestVote(t *testing.T) {
 
 	b := testutil.NewProposeMsg(
 		hotstuff.GetGenesis().Hash(),
-		hotstuff.NewQuorumCert(nil, 1, hotstuff.GetGenesis().Hash()),
+		hotstuff.NewQuorumCert(
+			nil,
+			1,
+			hotstuff.NullPipe, // TODO: Verify if this code conflicts with pipelining
+			hotstuff.GetGenesis().Hash()),
 		"test", 1, 1,
 	)
 	blockChain.Store(b.Block)

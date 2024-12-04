@@ -60,7 +60,7 @@ type Config struct {
 
 // Client is a hotstuff client.
 type Client struct {
-	eventLoop *eventloop.EventLoop
+	eventLoop *eventloop.ScopedEventLoop
 	logger    logging.Logger
 	opts      *modules.Options
 
@@ -80,7 +80,7 @@ type Client struct {
 }
 
 // InitModule initializes the client.
-func (c *Client) InitModule(mods *modules.Core) {
+func (c *Client) InitModule(mods *modules.Core, _ modules.ScopeInfo) {
 	mods.Get(
 		&c.eventLoop,
 		&c.logger,

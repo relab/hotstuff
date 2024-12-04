@@ -3,6 +3,7 @@ package blockchain
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/relab/hotstuff"
@@ -16,21 +17,20 @@ import (
 // blocks are evicted in LRU order.
 type blockChain struct {
 	configuration modules.Configuration
-	consensus     modules.Consensus
-	eventLoop     *eventloop.EventLoop
+	eventLoop     *eventloop.ScopedEventLoop
 	logger        logging.Logger
 
-	mut           sync.Mutex
-	pruneHeight   hotstuff.View
-	blocks        map[hotstuff.Hash]*hotstuff.Block
-	blockAtHeight map[hotstuff.View]*hotstuff.Block
-	pendingFetch  map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
+	mut         sync.Mutex
+	pruneHeight hotstuff.View
+	blocks      map[hotstuff.Hash]*hotstuff.Block
+	// blocksAtHeight map[hotstuff.View][]*hotstuff.Block
+	blocksAtHeight map[hotstuff.View][]*hotstuff.Block
+	pendingFetch   map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
 }
 
-func (chain *blockChain) InitModule(mods *modules.Core) {
+func (chain *blockChain) InitModule(mods *modules.Core, _ modules.ScopeInfo) {
 	mods.Get(
 		&chain.configuration,
-		&chain.consensus,
 		&chain.eventLoop,
 		&chain.logger,
 	)
@@ -40,9 +40,9 @@ func (chain *blockChain) InitModule(mods *modules.Core) {
 // Blocks are dropped in least recently used order.
 func New() modules.BlockChain {
 	bc := &blockChain{
-		blocks:        make(map[hotstuff.Hash]*hotstuff.Block),
-		blockAtHeight: make(map[hotstuff.View]*hotstuff.Block),
-		pendingFetch:  make(map[hotstuff.Hash]context.CancelFunc),
+		blocks:         make(map[hotstuff.Hash]*hotstuff.Block),
+		blocksAtHeight: make(map[hotstuff.View][]*hotstuff.Block),
+		pendingFetch:   make(map[hotstuff.Hash]context.CancelFunc),
 	}
 	bc.Store(hotstuff.GetGenesis())
 	return bc
@@ -54,7 +54,7 @@ func (chain *blockChain) Store(block *hotstuff.Block) {
 	defer chain.mut.Unlock()
 
 	chain.blocks[block.Hash()] = block
-	chain.blockAtHeight[block.View()] = block
+	chain.blocksAtHeight[block.View()] = append(chain.blocksAtHeight[block.View()], block)
 
 	// cancel any pending fetch operations
 	if cancel, ok := chain.pendingFetch[block.Hash()]; ok {
@@ -75,9 +75,28 @@ func (chain *blockChain) LocalGet(hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	return block, true
 }
 
+func (chain *blockChain) DeleteAtHeight(height hotstuff.View, blockHash hotstuff.Hash) error {
+	blocks, ok := chain.blocksAtHeight[height]
+	if !ok {
+		return fmt.Errorf("no blocks at height %d", height)
+	}
+
+	strHash := blockHash.String()
+	for i, block := range blocks {
+		if block.Hash().String() == strHash {
+			chain.blocksAtHeight[height] = append(chain.blocksAtHeight[height][:i], chain.blocksAtHeight[height][i+1:]...)
+			if len(blocks) == 0 {
+				delete(chain.blocksAtHeight, height)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("block not found at height %d", height)
+}
+
 // Get retrieves a block given its hash. Get will try to find the block locally.
 // If it is not available locally, it will try to fetch the block.
-func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
+func (chain *blockChain) Get(hash hotstuff.Hash, pipe hotstuff.Pipe) (block *hotstuff.Block, ok bool) {
 	// need to declare vars early, or else we won't be able to use goto
 	var (
 		ctx    context.Context
@@ -90,7 +109,7 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 		goto done
 	}
 
-	ctx, cancel = synchronizer.TimeoutContext(chain.eventLoop.Context(), chain.eventLoop)
+	ctx, cancel = synchronizer.ScopedTimeoutContext(chain.eventLoop.Context(), chain.eventLoop, pipe)
 	chain.pendingFetch[hash] = cancel
 
 	chain.mut.Unlock()
@@ -108,7 +127,7 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 	chain.logger.Debugf("Successfully fetched block: %.8s", hash)
 
 	chain.blocks[hash] = block
-	chain.blockAtHeight[block.View()] = block
+	chain.blocksAtHeight[block.View()] = append(chain.blocksAtHeight[block.View()], block)
 
 done:
 	chain.mut.Unlock()
@@ -125,43 +144,36 @@ func (chain *blockChain) Extends(block, target *hotstuff.Block) bool {
 	current := block
 	ok := true
 	for ok && current.View() > target.View() {
-		current, ok = chain.Get(current.Parent())
+		current, ok = chain.Get(current.Parent(), block.Pipe())
 	}
 	return ok && current.Hash() == target.Hash()
 }
 
-func (chain *blockChain) PruneToHeight(height hotstuff.View) (forkedBlocks []*hotstuff.Block) {
+func (chain *blockChain) PruneToHeight(height hotstuff.View) (prunedBlocks map[hotstuff.View][]*hotstuff.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
-
-	committedHeight := chain.consensus.CommittedBlock().View()
-	committedViews := make(map[hotstuff.View]bool)
-	committedViews[committedHeight] = true
-	for h := committedHeight; h >= chain.pruneHeight; {
-		block, ok := chain.blockAtHeight[h]
-		if !ok {
-			break
-		}
-		parent, ok := chain.blocks[block.Parent()]
-		if !ok || parent.View() < chain.pruneHeight {
-			break
-		}
-		h = parent.View()
-		committedViews[h] = true
-	}
+	prunedBlocks = make(map[hotstuff.View][]*hotstuff.Block)
 
 	for h := height; h > chain.pruneHeight; h-- {
-		if !committedViews[h] {
-			block, ok := chain.blockAtHeight[h]
-			if ok {
-				chain.logger.Debugf("PruneToHeight: found forked block: %v", block)
-				forkedBlocks = append(forkedBlocks, block)
-			}
+		blocks, ok := chain.blocksAtHeight[h]
+		if !ok {
+			continue
 		}
-		delete(chain.blockAtHeight, h)
+		for _, block := range blocks {
+			// Add pruned blocks to list and go back a height
+			// prunedBlocks = append(prunedBlocks, block)
+			prunedBlocks[block.View()] = append(prunedBlocks[block.View()], block)
+		}
+		delete(chain.blocksAtHeight, h)
 	}
+
 	chain.pruneHeight = height
-	return forkedBlocks
+
+	return
+}
+
+func (chain *blockChain) PruneHeight() hotstuff.View {
+	return chain.pruneHeight
 }
 
 var _ modules.BlockChain = (*blockChain)(nil)

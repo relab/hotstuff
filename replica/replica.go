@@ -15,6 +15,7 @@ import (
 	"github.com/relab/hotstuff/backend"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -46,6 +47,10 @@ type Config struct {
 	ManagerOptions []gorums.ManagerOption
 	// Location information of all replicas
 	LocationInfo map[hotstuff.ID]string
+	// Number of pipes in pipelining mode
+	PipeCount uint32
+	// Latency induced by all replicas.
+	HackyLatency durationpb.Duration
 }
 
 // Replica is a participant in the consensus protocol.
@@ -70,7 +75,9 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		))
 	}
 
-	clientSrv := newClientServer(conf, clientSrvOpts)
+	cmdCaches := builder.CreateScope(newCmdCache, int(conf.BatchSize))
+
+	clientSrv := newClientServer("hashed", clientSrvOpts)
 
 	srv := &Replica{
 		clientSrv:    clientSrv,
@@ -95,6 +102,8 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		backend.WithGorumsServerOptions(replicaSrvOpts...),
 	)
 
+	srv.hsSrv.SetHackyLatency(conf.HackyLatency.AsDuration())
+
 	var creds credentials.TransportCredentials
 	managerOpts := conf.ManagerOptions
 	if conf.TLS {
@@ -111,7 +120,9 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 
 		modules.ExtendedExecutor(srv.clientSrv),
 		modules.ExtendedForkHandler(srv.clientSrv),
-		srv.clientSrv.cmdCache,
+	)
+	builder.AddScoped(
+		cmdCaches,
 	)
 	srv.hs = builder.Build()
 
@@ -147,19 +158,29 @@ func (srv *Replica) Start() {
 // Stop stops the replica and closes connections.
 func (srv *Replica) Stop() {
 	srv.cancel()
+	srv.clientSrv.logger.Info("Server stopping...")
 	<-srv.done
 	srv.Close()
+	srv.clientSrv.PrintScopedCmdResult()
 }
 
 // Run runs the replica until the context is canceled.
 func (srv *Replica) Run(ctx context.Context) {
-	var (
-		synchronizer modules.Synchronizer
-		eventLoop    *eventloop.EventLoop
-	)
-	srv.hs.Get(&synchronizer, &eventLoop)
+	var eventLoop *eventloop.ScopedEventLoop
+	srv.hs.Get(&eventLoop)
 
-	synchronizer.Start(ctx)
+	if srv.hs.ScopeCount() > 0 {
+		for pipe := hotstuff.Pipe(1); pipe <= hotstuff.Pipe(srv.hs.ScopeCount()); pipe++ {
+			var synchronizer modules.Synchronizer
+			srv.hs.MatchForScope(pipe, &synchronizer)
+			synchronizer.Start(ctx)
+		}
+	} else {
+		var synchronizer modules.Synchronizer
+		srv.hs.Get(&synchronizer)
+		synchronizer.Start(ctx)
+	}
+
 	eventLoop.Run(ctx)
 }
 

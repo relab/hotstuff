@@ -21,14 +21,14 @@ func New(impl modules.CryptoBase) modules.Crypto {
 
 // InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (c *crypto) InitModule(mods *modules.Core) {
+func (c *crypto) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	mods.Get(
 		&c.blockChain,
 		&c.configuration,
 	)
 
 	if mod, ok := c.CryptoBase.(modules.Module); ok {
-		mod.InitModule(mods)
+		mod.InitModule(mods, info)
 	}
 }
 
@@ -38,14 +38,14 @@ func (c crypto) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialC
 	if err != nil {
 		return hotstuff.PartialCert{}, err
 	}
-	return hotstuff.NewPartialCert(sig, block.Hash()), nil
+	return hotstuff.NewPartialCert(block.Pipe(), sig, block.Hash()), nil
 }
 
 // CreateQuorumCert creates a quorum certificate from a list of partial certificates.
 func (c crypto) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
 	// genesis QC is always valid.
 	if block.Hash() == hotstuff.GetGenesis().Hash() {
-		return hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), nil
+		return hotstuff.NewQuorumCert(nil, 0, block.Pipe(), hotstuff.GetGenesis().Hash()), nil
 	}
 	sigs := make([]hotstuff.QuorumSignature, 0, len(signatures))
 	for _, sig := range signatures {
@@ -55,7 +55,7 @@ func (c crypto) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.Pa
 	if err != nil {
 		return hotstuff.QuorumCert{}, err
 	}
-	return hotstuff.NewQuorumCert(sig, block.View(), block.Hash()), nil
+	return hotstuff.NewQuorumCert(sig, block.View(), block.Pipe(), block.Hash()), nil
 }
 
 // CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
@@ -96,7 +96,7 @@ func (c crypto) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.Timeou
 
 // VerifyPartialCert verifies a single partial certificate.
 func (c crypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
-	block, ok := c.blockChain.Get(cert.BlockHash())
+	block, ok := c.blockChain.Get(cert.BlockHash(), cert.Pipe())
 	if !ok {
 		return false
 	}
@@ -112,7 +112,7 @@ func (c crypto) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 	if qc.Signature().Participants().Len() < c.configuration.QuorumSize() {
 		return false
 	}
-	block, ok := c.blockChain.Get(qc.BlockHash())
+	block, ok := c.blockChain.Get(qc.BlockHash(), qc.Pipe())
 	if !ok {
 		return false
 	}
@@ -142,7 +142,8 @@ func (c crypto) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.Q
 		messages[id] = hotstuff.TimeoutMsg{
 			ID:       id,
 			View:     aggQC.View(),
-			SyncInfo: hotstuff.NewSyncInfo().WithQC(qc),
+			SyncInfo: hotstuff.NewSyncInfo(qc.Pipe()).WithQC(qc),
+			Pipe:     qc.Pipe(),
 		}.ToBytes()
 	}
 	if aggQC.Sig().Participants().Len() < c.configuration.QuorumSize() {

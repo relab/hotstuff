@@ -77,7 +77,7 @@ but it is not sensible to use this as a solution to the circular dependency prob
 
 ### Deferred Initialization
 
-This idea is simple: First create the instances of all the modules.
+This idea is simple: First create the  cis of all the modules.
 Afterwards, initialize the modules using the now existing, albeit uninitialized, modules.
 Consider the following code example:
 
@@ -163,7 +163,7 @@ For example:
 ```go
 type A1 struct{ b B }
 
-func (a *A1) InitModule(mods *modules.Core) {
+func (a *A1) InitModule(mods *modules.Core, opt modules.InitOptions) {
   mods.Get(&a.b)
 }
 ```

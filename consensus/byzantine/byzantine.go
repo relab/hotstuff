@@ -22,9 +22,9 @@ type silence struct {
 	consensus.Rules
 }
 
-func (s *silence) InitModule(mods *modules.Core) {
+func (s *silence) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	if mod, ok := s.Rules.(modules.Module); ok {
-		mod.InitModule(mods)
+		mod.InitModule(mods, info)
 	}
 }
 
@@ -49,7 +49,7 @@ type fork struct {
 	consensus.Rules
 }
 
-func (f *fork) InitModule(mods *modules.Core) {
+func (f *fork) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	mods.Get(
 		&f.blockChain,
 		&f.synchronizer,
@@ -57,20 +57,20 @@ func (f *fork) InitModule(mods *modules.Core) {
 	)
 
 	if mod, ok := f.Rules.(modules.Module); ok {
-		mod.InitModule(mods)
+		mod.InitModule(mods, info)
 	}
 }
 
 func (f *fork) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
-	block, ok := f.blockChain.Get(f.synchronizer.HighQC().BlockHash())
+	block, ok := f.blockChain.Get(f.synchronizer.HighQC().BlockHash(), cert.Pipe())
 	if !ok {
 		return proposal, false
 	}
-	parent, ok := f.blockChain.Get(block.Parent())
+	parent, ok := f.blockChain.Get(block.Parent(), cert.Pipe())
 	if !ok {
 		return proposal, false
 	}
-	grandparent, ok := f.blockChain.Get(parent.Hash())
+	grandparent, ok := f.blockChain.Get(parent.Hash(), cert.Pipe())
 	if !ok {
 		return proposal, false
 	}
@@ -83,6 +83,7 @@ func (f *fork) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (propos
 			cmd,
 			f.synchronizer.View(),
 			f.opts.ID(),
+			0,
 		),
 	}
 	if aggQC, ok := cert.AggQC(); f.opts.ShouldUseAggQC() && ok {

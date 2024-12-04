@@ -20,7 +20,7 @@ type Synchronizer struct {
 	consensus      modules.Consensus
 	crypto         modules.Crypto
 	configuration  modules.Configuration
-	eventLoop      *eventloop.EventLoop
+	eventLoop      *eventloop.ScopedEventLoop
 	leaderRotation modules.LeaderRotation
 	logger         logging.Logger
 	opts           *modules.Options
@@ -38,58 +38,62 @@ type Synchronizer struct {
 	duration ViewDuration
 	timer    oneShotTimer
 
+	pipe hotstuff.Pipe
+
 	// map of collected timeout messages per view
 	timeouts map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
 }
 
 // InitModule initializes the synchronizer.
-func (s *Synchronizer) InitModule(mods *modules.Core) {
-	mods.Get(
+func (s *Synchronizer) InitModule(mods *modules.Core, info modules.ScopeInfo) {
+	mods.GetScoped(s,
 		&s.blockChain,
-		&s.consensus,
 		&s.crypto,
 		&s.configuration,
+		&s.consensus,
+		&s.duration,
 		&s.eventLoop,
 		&s.leaderRotation,
 		&s.logger,
 		&s.opts,
 	)
 
+	s.pipe = info.ModuleScope
+
 	s.eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
-		timeoutView := event.(TimeoutEvent).View
-		if s.View() == timeoutView {
+		timeout := event.(TimeoutEvent)
+		if s.View() == timeout.View {
 			s.OnLocalTimeout()
 		}
-	})
+	}, eventloop.RespondToScope(info.ModuleScope))
 
 	s.eventLoop.RegisterHandler(hotstuff.NewViewMsg{}, func(event any) {
 		newViewMsg := event.(hotstuff.NewViewMsg)
 		s.OnNewView(newViewMsg)
-	})
+	}, eventloop.RespondToScope(info.ModuleScope))
 
 	s.eventLoop.RegisterHandler(hotstuff.TimeoutMsg{}, func(event any) {
 		timeoutMsg := event.(hotstuff.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
-	})
+	}, eventloop.RespondToScope(info.ModuleScope))
 
 	var err error
 	s.highQC, err = s.crypto.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
 	if err != nil {
-		panic(fmt.Errorf("unable to create empty quorum cert for genesis block: %v", err))
+		panic(fmt.Errorf("unable to create empty quorum cert for genesis block [p=%d, view=%d]: %v", s.pipe, s.View(), err))
 	}
 	s.highTC, err = s.crypto.CreateTimeoutCert(hotstuff.View(0), []hotstuff.TimeoutMsg{})
 	if err != nil {
-		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
+		panic(fmt.Errorf("unable to create empty timeout cert for view 0 [p=%d, view=%d]: %v", s.pipe, s.View(), err))
 	}
 }
 
 // New creates a new Synchronizer.
-func New(viewDuration ViewDuration) modules.Synchronizer {
+func New() modules.Synchronizer {
 	return &Synchronizer{
 		currentView: 1,
 
-		duration: viewDuration,
-		timer:    oneShotTimer{time.AfterFunc(0, func() {})}, // dummy timer that will be replaced after start() is called
+		timer: oneShotTimer{time.AfterFunc(0, func() {})}, // dummy timer that will be replaced after start() is called
 
 		timeouts: make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
 	}
@@ -111,7 +115,7 @@ func (s *Synchronizer) startTimeoutTimer() {
 	// It is important that the timer is NOT reused because then the view would be wrong.
 	s.timer = oneShotTimer{time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
-		s.eventLoop.AddEvent(TimeoutEvent{view})
+		s.eventLoop.AddScopedEvent(s.pipe, TimeoutEvent{view, s.pipe})
 	})}
 }
 
@@ -150,7 +154,10 @@ func (s *Synchronizer) View() hotstuff.View {
 func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
 	s.mut.RLock()
 	defer s.mut.RUnlock()
-	return hotstuff.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
+	si := hotstuff.NewSyncInfo(s.pipe)
+	siWithQC := si.WithQC(s.highQC)
+	siWithTC := siWithQC.WithTC(s.highTC)
+	return siWithTC
 }
 
 // OnLocalTimeout is called when a local timeout happens.
@@ -165,11 +172,11 @@ func (s *Synchronizer) OnLocalTimeout() {
 	}
 
 	s.duration.ViewTimeout() // increase the duration of the next view
-	s.logger.Debugf("OnLocalTimeout: %v", view)
+	s.logger.Debugf("OnLocalTimeout[p=%d, view=%d]", s.pipe, view)
 
 	sig, err := s.crypto.Sign(view.ToBytes())
 	if err != nil {
-		s.logger.Warnf("Failed to sign view: %v", err)
+		s.logger.Warnf("Failed to sign view [p=%d, view=%d]: %v", s.pipe, s.View(), err)
 		return
 	}
 	timeoutMsg := hotstuff.TimeoutMsg{
@@ -177,13 +184,14 @@ func (s *Synchronizer) OnLocalTimeout() {
 		View:          view,
 		SyncInfo:      s.SyncInfo(),
 		ViewSignature: sig,
+		Pipe:          s.pipe,
 	}
 
 	if s.opts.ShouldUseAggQC() {
 		// generate a second signature that will become part of the aggregateQC
 		sig, err := s.crypto.Sign(timeoutMsg.ToBytes())
 		if err != nil {
-			s.logger.Warnf("Failed to sign timeout message: %v", err)
+			s.logger.Warnf("Failed to sign timeout message [p=%d, view=%d]: %v", s.pipe, s.View(), err)
 			return
 		}
 		timeoutMsg.MsgSignature = sig
@@ -198,6 +206,10 @@ func (s *Synchronizer) OnLocalTimeout() {
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
 func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
+	if s.pipe != timeout.Pipe {
+		panic("incorrect pipe")
+	}
+
 	currView := s.View()
 
 	defer func() {
@@ -213,7 +225,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	if !verifier.Verify(timeout.ViewSignature, timeout.View.ToBytes()) {
 		return
 	}
-	s.logger.Debug("OnRemoteTimeout: ", timeout)
+	s.logger.Debugf("OnRemoteTimeout [p=%d, view=%d]: ", s.pipe, s.View(), timeout)
 
 	s.AdvanceView(timeout.SyncInfo)
 
@@ -240,7 +252,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 
 	tc, err := s.crypto.CreateTimeoutCert(timeout.View, timeoutList)
 	if err != nil {
-		s.logger.Debugf("Failed to create timeout certificate: %v", err)
+		s.logger.Debugf("Failed to create timeout certificate [p=%d, view=%d]: %v", s.pipe, s.View(), err)
 		return
 	}
 
@@ -249,7 +261,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	if s.opts.ShouldUseAggQC() {
 		aggQC, err := s.crypto.CreateAggregateQC(currView, timeoutList)
 		if err != nil {
-			s.logger.Debugf("Failed to create aggregateQC: %v", err)
+			s.logger.Debugf("Failed to create aggregateQC [p=%d, view=%d]: %v", s.pipe, s.View(), err)
 		} else {
 			si = si.WithAggQC(aggQC)
 		}
@@ -268,13 +280,17 @@ func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
 // AdvanceView attempts to advance to the next view using the given QC.
 // qc must be either a regular quorum certificate, or a timeout certificate.
 func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
+	if s.pipe != syncInfo.Pipe() {
+		panic("incorrect pipe")
+	}
+
 	v := hotstuff.View(0)
 	timeout := false
 
 	// check for a TC
 	if tc, ok := syncInfo.TC(); ok {
 		if !s.crypto.VerifyTimeoutCert(tc) {
-			s.logger.Info("Timeout Certificate could not be verified!")
+			s.logger.Infof("Timeout Certificate could not be verified! [p=%d, view=%d]", s.pipe, s.View())
 			return
 		}
 		s.updateHighTC(tc)
@@ -292,7 +308,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.opts.ShouldUseAggQC() {
 		highQC, ok := s.crypto.VerifyAggregateQC(aggQC)
 		if !ok {
-			s.logger.Info("Aggregated Quorum Certificate could not be verified")
+			s.logger.Infof("Aggregated Quorum Certificate could not be verified [p=%d, view=%d]", s.pipe, s.View())
 			return
 		}
 		if aggQC.View() >= v {
@@ -304,7 +320,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		qc = highQC
 	} else if qc, haveQC = syncInfo.QC(); haveQC {
 		if !s.crypto.VerifyQuorumCert(qc) {
-			s.logger.Info("Quorum Certificate could not be verified!")
+			s.logger.Infof("Quorum Certificate could not be verified!", s.pipe)
 			return
 		}
 	}
@@ -337,8 +353,8 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 
 	s.startTimeoutTimer()
 
-	s.logger.Debugf("advanced to view %d", newView)
-	s.eventLoop.AddEvent(ViewChangeEvent{View: newView, Timeout: timeout})
+	s.logger.Debugf("advanced to view %d [p=%d]", newView, s.pipe)
+	s.eventLoop.AddScopedEvent(s.pipe, ViewChangeEvent{View: newView, Timeout: timeout, Pipe: s.pipe})
 
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.opts.ID() {
@@ -352,7 +368,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 // This method is meant to be used instead of the exported UpdateHighQC internally
 // in this package when the qc has already been verified.
 func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
-	newBlock, ok := s.blockChain.Get(qc.BlockHash())
+	newBlock, ok := s.blockChain.Get(qc.BlockHash(), qc.Pipe())
 	if !ok {
 		s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
 		return
@@ -360,7 +376,7 @@ func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
 
 	if newBlock.View() > s.highQC.View() {
 		s.highQC = qc
-		s.logger.Debug("HighQC updated")
+		s.logger.Debugf("[p=%d, view=%d] HighQC updated", s.pipe, s.View())
 	}
 }
 
@@ -377,10 +393,12 @@ var _ modules.Synchronizer = (*Synchronizer)(nil)
 // ViewChangeEvent is sent on the eventloop whenever a view change occurs.
 type ViewChangeEvent struct {
 	View    hotstuff.View
+	Pipe    hotstuff.Pipe
 	Timeout bool
 }
 
 // TimeoutEvent is sent on the eventloop when a local timeout occurs.
 type TimeoutEvent struct {
 	View hotstuff.View
+	Pipe hotstuff.Pipe
 }

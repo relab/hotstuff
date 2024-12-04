@@ -22,20 +22,21 @@ import (
 )
 
 // Server is the Server-side of the gorums backend.
-// It is responsible for calling handler methods on the consensus instance.
+// It is responsible for calling handler methods on the pipe.
 type Server struct {
 	blockChain    modules.BlockChain
 	configuration modules.Configuration
-	eventLoop     *eventloop.EventLoop
+	eventLoop     *eventloop.ScopedEventLoop
 	logger        logging.Logger
 	location      string
 	locationInfo  map[hotstuff.ID]string
 	latencyMatrix map[string]time.Duration
+	hackyLatency  time.Duration
 	gorumsSrv     *gorums.Server
 }
 
 // InitModule initializes the Server.
-func (srv *Server) InitModule(mods *modules.Core) {
+func (srv *Server) InitModule(mods *modules.Core, _ modules.ScopeInfo) {
 	mods.Get(
 		&srv.eventLoop,
 		&srv.configuration,
@@ -72,6 +73,26 @@ func (srv *Server) induceLatency(sender hotstuff.ID) {
 	srv.logger.Debugf("latency from server %s to server %s is %s\n", srv.location, senderLocation, senderLatency)
 	timer1 := time.NewTimer(senderLatency)
 	<-timer1.C
+}
+
+func (srv *Server) SetHackyLatency(amount time.Duration) {
+	srv.hackyLatency = amount
+}
+
+// Alan: Hacky version of induceLatency which just blocks execution for an arbitrary time.
+func (srv *Server) induceLatencyHacky(sender hotstuff.ID, callback func()) {
+	if srv.hackyLatency == 0 {
+		callback()
+		return
+	}
+	go func() {
+		senderLatency := srv.hackyLatency
+		senderLocation := srv.locationInfo[sender]
+		srv.logger.Debugf("latency from server %s to server %s is %s\n", srv.location, senderLocation, senderLatency)
+		timer1 := time.NewTimer(senderLatency)
+		<-timer1.C
+		callback()
+	}()
 }
 
 // GetGorumsServer returns the underlying gorums Server.
@@ -162,8 +183,14 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposal.Block.Proposer = uint32(id)
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
-	impl.srv.induceLatency(id)
-	impl.srv.eventLoop.AddEvent(proposeMsg)
+	impl.srv.induceLatencyHacky(id, func() {
+		if proposeMsg.Pipe.IsNull() {
+			impl.srv.eventLoop.AddScopedEvent(proposeMsg.Pipe, proposeMsg)
+			return
+		}
+
+		impl.srv.eventLoop.AddEvent(proposeMsg)
+	})
 }
 
 // Vote handles an incoming vote message.
@@ -173,10 +200,20 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
-	impl.srv.induceLatency(id)
-	impl.srv.eventLoop.AddEvent(hotstuff.VoteMsg{
-		ID:          id,
-		PartialCert: hotstuffpb.PartialCertFromProto(cert),
+	impl.srv.induceLatencyHacky(id, func() {
+		pipe := hotstuff.Pipe(cert.Pipe)
+		if pipe.IsNull() {
+			impl.srv.eventLoop.AddScopedEvent(pipe, hotstuff.VoteMsg{
+				ID:          id,
+				PartialCert: hotstuffpb.PartialCertFromProto(cert),
+			})
+			return
+		}
+
+		impl.srv.eventLoop.AddEvent(hotstuff.VoteMsg{
+			ID:          id,
+			PartialCert: hotstuffpb.PartialCertFromProto(cert),
+		})
 	})
 }
 
@@ -187,10 +224,20 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
-	impl.srv.induceLatency(id)
-	impl.srv.eventLoop.AddEvent(hotstuff.NewViewMsg{
-		ID:       id,
-		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
+	impl.srv.induceLatencyHacky(id, func() {
+		pipe := hotstuff.Pipe(msg.Pipe)
+		if pipe.IsNull() {
+			impl.srv.eventLoop.AddScopedEvent(pipe, hotstuff.NewViewMsg{
+				ID:       id,
+				SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
+			})
+			return
+		}
+
+		impl.srv.eventLoop.AddEvent(hotstuff.NewViewMsg{
+			ID:       id,
+			SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
+		})
 	})
 }
 
@@ -217,8 +264,15 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	if err != nil {
 		impl.srv.logger.Infof("Could not get ID of replica: %v", err)
 	}
-	impl.srv.induceLatency(timeoutMsg.ID)
-	impl.srv.eventLoop.AddEvent(timeoutMsg)
+
+	impl.srv.induceLatencyHacky(timeoutMsg.ID, func() {
+		if timeoutMsg.Pipe.IsNull() {
+			impl.srv.eventLoop.AddScopedEvent(timeoutMsg.Pipe, timeoutMsg)
+			return
+		}
+
+		impl.srv.eventLoop.AddEvent(timeoutMsg)
+	})
 }
 
 type replicaConnected struct {

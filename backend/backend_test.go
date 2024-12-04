@@ -46,8 +46,33 @@ func TestConnect(t *testing.T) {
 	runBoth(t, run)
 }
 
+// Mainly test initialization of scoped modules and how they depend on each other.
+func TestConnectScoped(t *testing.T) {
+	run := func(t *testing.T, setup setupFunc) {
+		const n = 4
+		ctrl := gomock.NewController(t)
+		td := setup(t, ctrl, n)
+		builder := modules.NewBuilder(1, td.keys[0])
+		testutil.TestModulesScoped(t, ctrl, 1, td.keys[0], &builder, 4)
+		teardown := createServers(t, td, ctrl)
+		defer teardown()
+		td.builders.Build()
+
+		cfg := NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
+
+		builder.Add(cfg)
+		builder.Build()
+
+		err := cfg.Connect(td.replicas)
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	runBoth(t, run)
+}
+
 // testBase is a generic test for a unicast/multicast call
-func testBase(t *testing.T, typ any, send func(modules.Configuration), handle eventloop.EventHandler) {
+func testBase(t *testing.T, typ any, send func(modules.Configuration), handle eventloop.EventHandler, opts ...eventloop.HandlerOption) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		ctrl := gomock.NewController(t)
@@ -69,11 +94,11 @@ func testBase(t *testing.T, typ any, send func(modules.Configuration), handle ev
 		ctx, cancel := context.WithCancel(context.Background())
 		for _, hs := range hl[1:] {
 			var (
-				eventLoop    *eventloop.EventLoop
+				eventLoop    *eventloop.ScopedEventLoop
 				synchronizer modules.Synchronizer
 			)
 			hs.Get(&eventLoop, &synchronizer)
-			eventLoop.RegisterHandler(typ, handle)
+			eventLoop.RegisterHandler(typ, handle, opts...)
 			synchronizer.Start(ctx)
 			go eventLoop.Run(ctx)
 		}
@@ -89,10 +114,16 @@ func TestPropose(t *testing.T) {
 		ID: 1,
 		Block: hotstuff.NewBlock(
 			hotstuff.GetGenesis().Hash(),
-			hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
-			"foo", 1, 1,
+			hotstuff.NewQuorumCert(
+				nil,
+				0,
+				hotstuff.NullPipe, // TODO: Verify if this code conflicts with pipelining
+				hotstuff.GetGenesis().Hash()),
+			"foo", 1, 1, 0,
 		),
+		Pipe: 0,
 	}
+
 	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)
 		cfg.Propose(want)
@@ -109,13 +140,47 @@ func TestPropose(t *testing.T) {
 	})
 }
 
+func TestProposeScoped(t *testing.T) {
+	var wg sync.WaitGroup
+	pipe := hotstuff.Pipe(123)
+	want := hotstuff.ProposeMsg{
+		ID: 1,
+		Block: hotstuff.NewBlock(
+			hotstuff.GetGenesis().Hash(),
+			hotstuff.NewQuorumCert(
+				nil,
+				0,
+				hotstuff.NullPipe, // TODO: Verify if this code conflicts with pipelining
+				hotstuff.GetGenesis().Hash()),
+			"foo", 1, 1, pipe,
+		),
+		Pipe: pipe,
+	}
+
+	testBase(t, want, func(cfg modules.Configuration) {
+		wg.Add(3)
+		cfg.Propose(want)
+		wg.Wait()
+	}, func(event any) {
+		got := event.(hotstuff.ProposeMsg)
+		if got.ID != want.ID {
+			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
+		}
+		if got.Block.Hash() != want.Block.Hash() {
+
+			t.Errorf("block hashes do not match. want %d got %d", got.Block.Pipe(), want.Block.Pipe())
+		}
+		wg.Done()
+	}, eventloop.RespondToScope(pipe))
+}
+
 func TestTimeout(t *testing.T) {
 	var wg sync.WaitGroup
 	want := hotstuff.TimeoutMsg{
 		ID:            1,
 		View:          1,
 		ViewSignature: nil,
-		SyncInfo:      hotstuff.NewSyncInfo(),
+		SyncInfo:      hotstuff.NewSyncInfo(hotstuff.NullPipe),
 	}
 	testBase(t, want, func(cfg modules.Configuration) {
 		wg.Add(3)
@@ -131,6 +196,33 @@ func TestTimeout(t *testing.T) {
 		}
 		wg.Done()
 	})
+}
+
+func TestTimeoutScoped(t *testing.T) {
+	var wg sync.WaitGroup
+
+	pipe := hotstuff.Pipe(1)
+	want := hotstuff.TimeoutMsg{
+		ID:            1,
+		View:          1,
+		ViewSignature: nil,
+		SyncInfo:      hotstuff.NewSyncInfo(pipe),
+		Pipe:          pipe,
+	}
+	testBase(t, want, func(cfg modules.Configuration) {
+		wg.Add(3)
+		cfg.Timeout(want)
+		wg.Wait()
+	}, func(event any) {
+		got := event.(hotstuff.TimeoutMsg)
+		if got.ID != want.ID {
+			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
+		}
+		if got.View != want.View {
+			t.Errorf("wrong view in proposal: got: %d, want: %d", got.View, want.View)
+		}
+		wg.Done()
+	}, eventloop.RespondToScope(pipe))
 }
 
 type testData struct {

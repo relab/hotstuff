@@ -66,7 +66,7 @@ func (m *MockSynchronizer) LeafBlock() *hotstuff.Block {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "LeafBlock")
 	ret0, _ := ret[0].(*hotstuff.Block)
-	return ret0
+	return ret0	
 }
 
 // LeafBlock indicates an expected call of LeafBlock.

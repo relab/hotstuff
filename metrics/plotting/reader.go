@@ -42,6 +42,7 @@ func (r *Reader) ReadAll() error {
 	}
 
 	for decoder.More() {
+
 		var b json.RawMessage
 		err = decoder.Decode(&b)
 		if err != nil {

@@ -21,8 +21,8 @@ func NewTicker(interval time.Duration) *Ticker {
 }
 
 // InitModule gives the module access to the other modules.
-func (t *Ticker) InitModule(mods *modules.Core) {
-	var eventLoop *eventloop.EventLoop
+func (t *Ticker) InitModule(mods *modules.Core, _ modules.ScopeInfo) {
+	var eventLoop *eventloop.ScopedEventLoop
 
 	mods.Get(&eventLoop)
 

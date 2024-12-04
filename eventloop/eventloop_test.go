@@ -6,13 +6,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/eventloop"
 )
 
 type testEvent int
 
 func TestHandler(t *testing.T) {
-	el := eventloop.New(10)
+	el := eventloop.NewScoped(10, 0)
 	c := make(chan any)
 	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- event
@@ -45,13 +46,58 @@ func TestHandler(t *testing.T) {
 	}
 }
 
+func TestHandlerScoped(t *testing.T) {
+	listeningScope := hotstuff.Pipe(1)
+	incorrectScope := hotstuff.Pipe(2)
+	scopes := 1
+	el := eventloop.NewScoped(10, scopes)
+	c := make(chan any)
+	el.RegisterHandler(testEvent(0), func(event any) {
+		c <- event
+	}, eventloop.RespondToScope(listeningScope))
+
+	el.RegisterHandler(testEvent(0), func(_ any) {
+		panic("wrong scope")
+	}, eventloop.RespondToScope(incorrectScope))
+
+	el.RegisterHandler(testEvent(0), func(_ any) {
+		panic("non-scoped handler should not respond")
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go el.Run(ctx)
+
+	// wait for the event loop to start
+	time.Sleep(1 * time.Millisecond)
+
+	want := testEvent(42)
+	el.AddScopedEvent(listeningScope, want)
+
+	var event any
+	select {
+	case <-ctx.Done():
+		t.Fatal("timed out")
+	case event = <-c:
+	}
+
+	e, ok := event.(testEvent)
+	if !ok {
+		t.Fatalf("wrong type for event: got: %T, want: %T", event, want)
+	}
+
+	if e != want {
+		t.Fatalf("wrong value for event: got: %v, want: %v", e, want)
+	}
+}
+
 func TestObserver(t *testing.T) {
 	type eventData struct {
 		event   any
 		handler bool
 	}
 
-	el := eventloop.New(10)
+	el := eventloop.NewScoped(10, 0)
 	c := make(chan eventData)
 	el.RegisterHandler(testEvent(0), func(event any) {
 		c <- eventData{event: event, handler: true}
@@ -100,7 +146,7 @@ func TestTicker(t *testing.T) {
 		return
 	}
 
-	el := eventloop.New(10)
+	el := eventloop.NewScoped(10, 0)
 	count := 0
 	el.RegisterHandler(testEvent(0), func(event any) {
 		count += int(event.(testEvent))
@@ -130,8 +176,49 @@ func TestTicker(t *testing.T) {
 	}
 }
 
+func TestDelayedEventScoped(t *testing.T) {
+	scopes := 1
+	listeningScope := hotstuff.Pipe(1)
+	incorrectScope := hotstuff.Pipe(2)
+	el := eventloop.NewScoped(10, scopes)
+	c := make(chan testEvent)
+
+	el.RegisterHandler(testEvent(0), func(event any) {
+		c <- event.(testEvent)
+	}, eventloop.RespondToScope(listeningScope))
+
+	el.RegisterHandler(testEvent(0), func(_ any) {
+		panic("wrong scope")
+	}, eventloop.RespondToScope(incorrectScope))
+
+	el.RegisterHandler(testEvent(0), func(_ any) {
+		panic("non-scoped handler should not respond")
+	})
+
+	// delay the "2" and "3" events until after the first instance of testEvent
+	el.DelayScoped(listeningScope, testEvent(0), testEvent(2))
+	el.DelayScoped(listeningScope, testEvent(0), testEvent(3))
+	// then send the "1" event
+	el.AddScopedEvent(listeningScope, testEvent(1))
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go el.Run(ctx)
+
+	for i := 1; i <= 3; i++ {
+		select {
+		case event := <-c:
+			if testEvent(i) != event {
+				t.Errorf("events arrived in the wrong order: want: %d, got: %d", i, event)
+			}
+		case <-ctx.Done():
+			t.Fatalf("timed out")
+		}
+	}
+}
+
 func TestDelayedEvent(t *testing.T) {
-	el := eventloop.New(10)
+	el := eventloop.NewScoped(10, 0)
 	c := make(chan testEvent)
 
 	el.RegisterHandler(testEvent(0), func(event any) {
@@ -161,7 +248,7 @@ func TestDelayedEvent(t *testing.T) {
 }
 
 func BenchmarkEventLoopWithObservers(b *testing.B) {
-	el := eventloop.New(100)
+	el := eventloop.NewScoped(100, 0)
 
 	for i := 0; i < 100; i++ {
 		el.RegisterObserver(testEvent(0), func(event any) {
@@ -178,7 +265,7 @@ func BenchmarkEventLoopWithObservers(b *testing.B) {
 }
 
 func BenchmarkEventLoopWithUnsafeRunInAddEventHandlers(b *testing.B) {
-	el := eventloop.New(100)
+	el := eventloop.NewScoped(100, 0)
 
 	for i := 0; i < 100; i++ {
 		el.RegisterHandler(testEvent(0), func(event any) {
@@ -203,7 +290,7 @@ func BenchmarkEventLoopWithUnsafeRunInAddEventHandlers(b *testing.B) {
 }
 
 func BenchmarkDelay(b *testing.B) {
-	el := eventloop.New(100)
+	el := eventloop.NewScoped(100, 0)
 
 	for i := 0; i < b.N; i++ {
 		el.DelayUntil(testEvent(0), testEvent(2))

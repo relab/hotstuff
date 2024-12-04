@@ -36,8 +36,12 @@ func newCmdCache(batchSize int) *cmdCache {
 }
 
 // InitModule gives the module access to the other modules.
-func (c *cmdCache) InitModule(mods *modules.Core) {
+func (c *cmdCache) InitModule(mods *modules.Core, _ modules.ScopeInfo) {
 	mods.Get(&c.logger)
+}
+
+func (c *cmdCache) commandCount() int {
+	return c.cache.Len()
 }
 
 func (c *cmdCache) addCommand(cmd *clientpb.Command) {
@@ -45,6 +49,7 @@ func (c *cmdCache) addCommand(cmd *clientpb.Command) {
 	defer c.mut.Unlock()
 	if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
 		// command is too old
+		c.logger.Debugf("addCommand: command too old: %.8x", cmd.Data)
 		return
 	}
 	c.cache.PushBack(cmd)
@@ -151,3 +156,4 @@ func (c *cmdCache) Proposed(cmd hotstuff.Command) {
 }
 
 var _ modules.Acceptor = (*cmdCache)(nil)
+var _ modules.CommandQueue = (*cmdCache)(nil)

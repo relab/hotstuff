@@ -2,8 +2,10 @@ package modules
 
 import (
 	"context"
+	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/logging"
 )
 
 // Module interfaces
@@ -23,7 +25,7 @@ type CommandQueue interface {
 // Acceptor decides if a replica should accept a command.
 type Acceptor interface {
 	// Accept returns true if the replica should accept the command, false otherwise.
-	Accept(hotstuff.Command) bool
+	Accept(cmd hotstuff.Command) bool
 	// Proposed tells the acceptor that the propose phase for the given command succeeded, and it should no longer be
 	// accepted in the future.
 	Proposed(hotstuff.Command)
@@ -34,7 +36,7 @@ type Acceptor interface {
 // Executor is responsible for executing the commands that are committed by the consensus protocol.
 type Executor interface {
 	// Exec executes the command.
-	Exec(cmd hotstuff.Command)
+	Exec(onPipe hotstuff.Pipe, cmd hotstuff.Command)
 }
 
 // ExecutorExt is responsible for executing the commands that are committed by the consensus protocol.
@@ -64,6 +66,16 @@ type ForkHandlerExt interface {
 	Fork(block *hotstuff.Block)
 }
 
+// Committer is a helper module which handles block commits and forks.
+// NOTE: This module was created to deal with multiple pipes.
+type Committer interface {
+	// Stores the block before further execution.
+	Commit(block *hotstuff.Block)
+
+	// Retrieve the last block which was committed on a pipe. Use zero if pipelining is not desired in the implementation.
+	CommittedBlock(pip hotstuff.Pipe) *hotstuff.Block
+}
+
 // BlockChain is a datastructure that stores a chain of blocks.
 // It is not required that a block is stored forever,
 // but a block must be stored until at least one of its children have been committed.
@@ -72,7 +84,7 @@ type BlockChain interface {
 	Store(*hotstuff.Block)
 
 	// Get retrieves a block given its hash, attempting to fetching it from other replicas if necessary.
-	Get(hotstuff.Hash) (*hotstuff.Block, bool)
+	Get(hash hotstuff.Hash, onPipe hotstuff.Pipe) (*hotstuff.Block, bool)
 
 	// LocalGet retrieves a block given its hash, without fetching it from other replicas.
 	LocalGet(hotstuff.Hash) (*hotstuff.Block, bool)
@@ -82,7 +94,11 @@ type BlockChain interface {
 
 	// Prunes blocks from the in-memory tree up to the specified height.
 	// Returns a set of forked blocks (blocks that were on a different branch, and thus not committed).
-	PruneToHeight(height hotstuff.View) (forkedBlocks []*hotstuff.Block)
+	PruneToHeight(height hotstuff.View) (prunedBlocks map[hotstuff.View][]*hotstuff.Block)
+
+	PruneHeight() hotstuff.View
+
+	DeleteAtHeight(height hotstuff.View, blockHash hotstuff.Hash) error
 }
 
 //go:generate mockgen -destination=../internal/mocks/replica_mock.go -package=mocks . Replica
@@ -170,21 +186,27 @@ type Handel interface {
 
 // ExtendedExecutor turns the given Executor into an ExecutorExt.
 func ExtendedExecutor(executor Executor) ExecutorExt {
-	return executorWrapper{executor}
+	return &executorWrapper{executor: executor, bExec: hotstuff.GetGenesis()}
 }
 
 type executorWrapper struct {
-	executor Executor
+	blockChain  BlockChain
+	executor    Executor
+	forkHandler ForkHandlerExt
+	logger      logging.Logger
+
+	mut   sync.Mutex
+	bExec *hotstuff.Block
 }
 
-func (ew executorWrapper) InitModule(mods *Core) {
+func (ew *executorWrapper) InitModule(mods *Core, buildOpt ScopeInfo) {
 	if m, ok := ew.executor.(Module); ok {
-		m.InitModule(mods)
+		m.InitModule(mods, buildOpt)
 	}
 }
 
-func (ew executorWrapper) Exec(block *hotstuff.Block) {
-	ew.executor.Exec(block.Command())
+func (ew *executorWrapper) Exec(block *hotstuff.Block) {
+	ew.executor.Exec(block.Pipe(), block.Command())
 }
 
 // ExtendedForkHandler turns the given ForkHandler into a ForkHandlerExt.
@@ -196,9 +218,9 @@ type forkHandlerWrapper struct {
 	forkHandler ForkHandler
 }
 
-func (fhw forkHandlerWrapper) InitModule(mods *Core) {
+func (fhw forkHandlerWrapper) InitModule(mods *Core, buildOpt ScopeInfo) {
 	if m, ok := fhw.forkHandler.(Module); ok {
-		m.InitModule(mods)
+		m.InitModule(mods, buildOpt)
 	}
 }
 

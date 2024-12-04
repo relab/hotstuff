@@ -51,7 +51,7 @@ type Handel struct {
 
 	blockChain   modules.BlockChain
 	crypto       modules.Crypto
-	eventLoop    *eventloop.EventLoop
+	eventLoop    *eventloop.ScopedEventLoop
 	logger       logging.Logger
 	opts         *modules.Options
 	synchronizer modules.Synchronizer
@@ -71,7 +71,7 @@ func New() modules.Handel {
 }
 
 // InitModule initializes the Handel module.
-func (h *Handel) InitModule(mods *modules.Core) {
+func (h *Handel) InitModule(mods *modules.Core, _ modules.ScopeInfo) {
 	mods.Get(
 		&h.configuration,
 		&h.server,

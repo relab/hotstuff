@@ -17,6 +17,8 @@ type FastHotStuff struct {
 	blockChain   modules.BlockChain
 	logger       logging.Logger
 	synchronizer modules.Synchronizer
+
+	pipe hotstuff.Pipe
 }
 
 // New returns a new FastHotStuff instance.
@@ -25,10 +27,16 @@ func New() consensus.Rules {
 }
 
 // InitModule initializes the module.
-func (fhs *FastHotStuff) InitModule(mods *modules.Core) {
+func (fhs *FastHotStuff) InitModule(mods *modules.Core, info modules.ScopeInfo) {
 	var opts *modules.Options
 
-	mods.Get(&opts, &fhs.blockChain, &fhs.logger, &fhs.synchronizer)
+	fhs.pipe = info.ModuleScope
+
+	mods.GetScoped(fhs,
+		&fhs.blockChain,
+		&fhs.logger,
+		&opts,
+		&fhs.synchronizer)
 
 	opts.SetShouldUseAggQC()
 }
@@ -37,11 +45,15 @@ func (fhs *FastHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return fhs.blockChain.Get(qc.BlockHash())
+	return fhs.blockChain.Get(qc.BlockHash(), qc.Pipe())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.
 func (fhs *FastHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
+	if fhs.pipe != block.Pipe() {
+		panic("incorrect pipe")
+	}
+
 	parent, ok := fhs.qcRef(block.QuorumCert())
 	if !ok {
 		return nil
@@ -61,10 +73,13 @@ func (fhs *FastHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 
 // VoteRule decides whether to vote for the proposal or not.
 func (fhs *FastHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
+	if fhs.pipe != proposal.Pipe {
+		panic("incorrect consensus instance")
+	}
 	// The base implementation verifies both regular QCs and AggregateQCs, and asserts that the QC embedded in the
 	// block is the same as the highQC found in the aggregateQC.
 	if proposal.AggregateQC != nil {
-		hqcBlock, ok := fhs.blockChain.Get(proposal.Block.QuorumCert().BlockHash())
+		hqcBlock, ok := fhs.blockChain.Get(proposal.Block.QuorumCert().BlockHash(), proposal.Pipe)
 		return ok && fhs.blockChain.Extends(proposal.Block, hqcBlock)
 	}
 	return proposal.Block.View() >= fhs.synchronizer.View() &&
