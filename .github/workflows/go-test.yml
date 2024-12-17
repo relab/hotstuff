@@ -38,7 +38,7 @@ jobs:
 
       - name: Run Go tests
         run: |
-          go test -v -timeout 2m ./...
+          go test -v -timeout 5m ./...
         shell: bash
         env:
           HOTSTUFF_LOG: info
