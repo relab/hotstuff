@@ -1,9 +1,9 @@
 ---
 linters:
   enable:
-    - revive
-    - gocyclo
-    - misspell
+  - revive
+  - gocyclo
+  - misspell
 
 linters-settings:
   gocyclo:
@@ -14,9 +14,14 @@ linters-settings:
 
   revive:
     rules:
-      - name: unexported-return
-        disabled: true
-      - name: unused-parameter
+    - name: unexported-return
+      disabled: true
+    - name: unused-parameter
+
+  staticcheck:
+    checks:
+    - all
+    - '-SA1019' # temporarily disable the "is deprecated" rule
 
 issues:
   exclude-use-default: false
