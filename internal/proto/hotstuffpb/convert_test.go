@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
 
@@ -93,5 +95,29 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 
 	if !signer.VerifyTimeoutCert(tc2) {
 		t.Fatal("Failed to verify timeout cert")
+	}
+}
+
+func TestTimeoutMsgFromProto_Issue129(t *testing.T) {
+	sig := &QuorumSignature{Sig: &QuorumSignature_ECDSASigs{ECDSASigs: &ECDSAMultiSignature{Sigs: []*ECDSASignature{}}}}
+	sync := &SyncInfo{QC: &QuorumCert{Sig: sig, Hash: []byte{1, 2, 3, 4}}}
+
+	tests := []struct {
+		name string
+		msg  *TimeoutMsg
+		want hotstuff.TimeoutMsg
+	}{
+		{name: "only-view", msg: &TimeoutMsg{View: 1}, want: hotstuff.TimeoutMsg{View: 1}},
+		{name: "only-sync-info", msg: &TimeoutMsg{SyncInfo: sync}, want: hotstuff.TimeoutMsg{SyncInfo: SyncInfoFromProto(sync)}},
+		{name: "only-msg-signature", msg: &TimeoutMsg{MsgSig: sig}, want: hotstuff.TimeoutMsg{MsgSignature: QuorumSignatureFromProto(sig)}},
+		{name: "only-view-signature", msg: &TimeoutMsg{ViewSig: sig}, want: hotstuff.TimeoutMsg{ViewSignature: QuorumSignatureFromProto(sig)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := TimeoutMsgFromProto(tt.msg)
+			if diff := cmp.Diff(tt.want, got, cmpopts.IgnoreUnexported(hotstuff.SyncInfo{})); diff != "" {
+				t.Errorf("TimeoutMsgFromProto() mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }

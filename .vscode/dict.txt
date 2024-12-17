@@ -3,6 +3,7 @@ Bano
 Baudet
 BFT's
 Bitfield
+bitmask
 cerr
 chainedhotstuff
 checkf
@@ -10,6 +11,7 @@ Chursin
 clientpb
 cmdqueue
 Cmds
+cmpopts
 CODECOV
 covermode
 coverpkg
@@ -17,6 +19,7 @@ coverprofile
 cpuprofile
 Debugf
 durationpb
+dylib
 eddsa
 emptypb
 Erevik
@@ -28,6 +31,7 @@ Feng
 ferr
 fgprof
 fgprofprofile
+gcflags
 gocyclo
 golangci
 golint
@@ -36,6 +40,7 @@ gorums
 gpool
 grpc
 Gueta
+handelpb
 Hein
 hostnames
 HOTSTUFF
@@ -44,6 +49,7 @@ hotstuffpb
 iagotest
 ICDCS
 iface
+Iinternal
 Infof
 Jalalzai
 Jehl
@@ -51,6 +57,7 @@ Jianyu
 keygen
 kilic
 latencygen
+ldflags
 leaderrotation
 Malkhi
 Mathieu
@@ -72,6 +79,7 @@ propsed
 proto
 protobuf
 protoc
+protos
 protostream
 ptypes
 QC's

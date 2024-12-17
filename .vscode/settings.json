@@ -16,5 +16,17 @@
 	"go.testFlags": [
 		"-count=1"
 	],
-	"cSpell.enabled": true
+	"cSpell.enabled": true,
+	"cSpell.ignorePaths": [
+		"package-lock.json",
+		"node_modules",
+		"vscode-extension",
+		".git/{info,lfs,logs,refs,objects}/**",
+		".git/{index,*refs,*HEAD}",
+		".vscode",
+		".vscode-insiders",
+		"go.mod",
+		"go.sum",
+		"**/**/*.pb.go"
+	]
 }

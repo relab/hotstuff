@@ -162,7 +162,7 @@ func TimeoutMsgFromProto(m *TimeoutMsg) hotstuff.TimeoutMsg {
 		SyncInfo:      SyncInfoFromProto(m.GetSyncInfo()),
 		ViewSignature: QuorumSignatureFromProto(m.GetViewSig()),
 	}
-	if m.GetViewSig() != nil {
+	if m.GetMsgSig() != nil {
 		timeoutMsg.MsgSignature = QuorumSignatureFromProto(m.GetMsgSig())
 	}
 	return timeoutMsg
