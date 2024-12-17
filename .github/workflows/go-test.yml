@@ -1,4 +1,4 @@
-name: Go Test and Coverage
+name: Go Test
 on:
   push:
     branches:
