@@ -3,13 +3,13 @@ package crypto
 import (
 	"container/list"
 	"crypto/sha256"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
-	"golang.org/x/exp/maps"
 )
 
 type cache struct {
@@ -106,8 +106,7 @@ func (cache *cache) Verify(signature hotstuff.QuorumSignature, message []byte) b
 // BatchVerify verifies the given quorum signature against the batch of messages.
 func (cache *cache) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
 	// sort the list of ids from the batch map
-	ids := maps.Keys(batch)
-	slices.Sort(ids)
+	ids := slices.Sorted(maps.Keys(batch))
 	var hash hotstuff.Hash
 	hasher := sha256.New()
 	// then hash the messages in sorted order

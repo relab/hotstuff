@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -19,7 +20,6 @@ import (
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
-	"golang.org/x/exp/maps"
 )
 
 // NodeID is an ID that is unique to a node in the network.
@@ -403,8 +403,7 @@ func (s NodeSet) Contains(v uint32) bool {
 
 // MarshalJSON returns a JSON representation of the node set.
 func (s NodeSet) MarshalJSON() ([]byte, error) {
-	ids := maps.Keys(s)
-	slices.Sort(ids)
+	ids := slices.Sorted(maps.Keys(s))
 	return json.Marshal(ids)
 }
 

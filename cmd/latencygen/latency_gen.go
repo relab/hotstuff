@@ -7,12 +7,11 @@ import (
 	"fmt"
 	"go/format"
 	"log"
+	"maps"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"time"
-
-	"golang.org/x/exp/maps"
 )
 
 // Run go generate from this directory to generate the latency matrix.
@@ -30,8 +29,7 @@ func main() {
 	if err := json.Unmarshal([]byte(latencyMatrix), &allToAllMatrix); err != nil {
 		log.Fatal(err)
 	}
-	keys := maps.Keys(allToAllMatrix)
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(allToAllMatrix))
 
 	s := strings.Builder{}
 	s.WriteString(`package backend
