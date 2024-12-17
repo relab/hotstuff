@@ -1,6 +1,6 @@
 #!/bin/bash
 
-image="hotstuff_worker"
+image="hotstuff-worker"
 
 if [ ! -f "./id" ]; then
 	ssh-keygen -t ed25519 -C "hotstuff-test" -f "./id" -N ""

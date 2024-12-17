@@ -1,5 +1,5 @@
 # ssh_config used with the controller container
 
-Host hotstuff_worker_*
+Host hotstuff-worker-*
 	User root
 	IdentityFile ~/.ssh/id

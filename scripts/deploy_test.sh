@@ -11,7 +11,7 @@ num_hosts=4
 declare -A hosts
 
 for ((i = 1; i <= num_hosts; i++)); do
-	hosts[$i]="hotstuff_worker_$i"
+	hosts[$i]="hotstuff-worker-$i"
 done
 
 if [ ! -f "./id" ]; then
