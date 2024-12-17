@@ -235,7 +235,7 @@ these additional flags are used:
 - `--worker` runs a worker locally, in addition to the remote hosts specified. Use this if you want the local machine
   to participate in the experiment.
 
-Additionally, it is possible to specify an *internal address* for each host.
+Additionally, it is possible to specify an _internal address_ for each host.
 The internal address is used by replicas instead of the address used by the controller.
 This is useful if the controller is connecting to the remote hosts using a global address,
 whereas the hosts can communicate using local addresses.
@@ -243,11 +243,11 @@ The internal address is configured through the configuration file (loaded by the
 
 ```toml
 [[hosts-config]]
-name = "hotstuff_worker_1"
+name = "hotstuff-worker-1"
 internal-address = "192.168.10.2"
 
 [[hosts-config]]
-name = "hotstuff_worker_1"
+name = "hotstuff-worker-1"
 internal-address = "192.168.10.3"
 ```
 
@@ -262,21 +262,21 @@ The following shows a configuration file that customizes the client and replica 
 clients = 2
 replicas = 8
 
-hosts = [ 
-    "hotstuff_worker_1",
-    "hotstuff_worker_2",
-    "hotstuff_worker_3",
-    "hotstuff_worker_4",
+hosts = [
+    "hotstuff-worker-1",
+    "hotstuff-worker-2",
+    "hotstuff-worker-3",
+    "hotstuff-worker-4",
 ]
 
 # specific assignments for some hosts
 [[hosts-config]]
-name = "hotstuff_worker_1"
+name = "hotstuff-worker-1"
 clients = 2
 replicas = 0
 ```
 
-In particular, in this example the host named `hotstuff_worker_1` is configured to run both clients and no replicas.
+In particular, in this example the host named `hotstuff-worker-1` is configured to run both clients and no replicas.
 The remaining replicas are divided among the remaining hosts. If all hosts are manually configured, the total number of
 clients and replicas configured must equal the requested number of clients and replicas.
 
