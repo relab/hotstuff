@@ -320,7 +320,7 @@ func (bls *bls12Base) fastAggregateVerify(publicKeys []*PublicKey, message []byt
 	return bls.coreVerify(&PublicKey{p: &aggregate}, message, signature, domain)
 }
 
-// Sign creates a cryptographic signature of the given messsage.
+// Sign creates a cryptographic signature of the given message.
 func (bls *bls12Base) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
 	p, err := bls.coreSign(message, domain)
 	if err != nil {
