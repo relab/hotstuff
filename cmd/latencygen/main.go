@@ -82,24 +82,33 @@ func latenciesToGoCode(allToAllMatrix map[string]map[string]string) ([]byte, err
 
 import "time"
 
-var latencies = map[string]map[string]time.Duration{
-`)
+var cities = []string{`)
+	// Write the city names to the `cities` slice
 	for _, city := range keys {
-		s.WriteString(fmt.Sprintf("%q: {\n", city))
+		s.WriteString(fmt.Sprintf("%q, ", city))
+	}
+	s.WriteString("}\n\n")
+
+	// Write the 2D latency slice
+	s.WriteString("var latencies = [][]time.Duration{\n")
+	for _, city := range keys {
+		s.WriteString("\t{")
 		latencies := allToAllMatrix[city]
 		for _, city2 := range keys {
+			// Parse the latency as time.Duration
 			latency, err := time.ParseDuration(latencies[city2] + "ms")
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("invalid latency between %s and %s: %w", city, city2, err)
 			}
-			s.WriteString(fmt.Sprintf("%q: %d,\n", city2, int64(latency)))
+			s.WriteString(fmt.Sprintf("%d, ", latency))
 		}
-		s.WriteString(fmt.Sprintln("},"))
+		s.WriteString("},\n")
 	}
-	s.WriteString(fmt.Sprintln("}"))
+	s.WriteString("}\n")
+
 	latenciesGoCode, err := format.Source([]byte(s.String()))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to format Go code: %w", err)
 	}
-	return latenciesGoCode, err
+	return latenciesGoCode, nil
 }

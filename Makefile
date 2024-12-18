@@ -11,7 +11,7 @@ gorums_go := internal/proto/clientpb/client_gorums.pb.go \
 
 binaries := hotstuff plot
 
-.PHONY: all debug clean protos download tools $(binaries)
+.PHONY: all latencies debug clean protos download tools $(binaries)
 
 all: $(binaries)
 
@@ -37,6 +37,9 @@ lint:
 
 clean:
 	@rm -fv $(binaries)
+
+latencies:
+	@go run cmd/latencygen/main.go -dest internal/latencies/latency_matrix.go
 
 %.pb.go %_gorums.pb.go : %.proto
 	protoc -I=.:$(proto_include) \
