@@ -32,6 +32,7 @@ ferr
 fgprof
 fgprofprofile
 gcflags
+gcov
 gocyclo
 golangci
 golint
