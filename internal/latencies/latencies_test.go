@@ -7,7 +7,6 @@ import (
 )
 
 func TestLatencySymmetry(t *testing.T) {
-	locations := Locations()
 	for _, fromLoc := range locations {
 		for _, toLoc := range locations {
 			latency := LatencyCity(fromLoc, toLoc)
@@ -40,7 +39,6 @@ func TestLatencySymmetry(t *testing.T) {
 }
 
 func TestLatencies(t *testing.T) {
-	locations := Locations()
 	for _, location := range locations {
 		latencies := Latencies(location)
 		if len(latencies) != len(locations) {
@@ -50,7 +48,7 @@ func TestLatencies(t *testing.T) {
 }
 
 func TestLocationName(t *testing.T) {
-	for i, location := range Locations() {
+	for i, location := range locations {
 		if location != LocationName(i) {
 			t.Errorf("LocationName(%d) = %s, want %s", i, LocationName(i), location)
 		}

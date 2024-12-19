@@ -7,13 +7,6 @@ import (
 	"github.com/relab/hotstuff"
 )
 
-// TODO: determine how to map config.Config.Locations ([]string) to latencies.Locations
-
-// Locations returns all locations.
-func Locations() []string {
-	return locations
-}
-
 // Latency returns the latency between from and to locations.
 func Latency(from, to int) time.Duration {
 	return latencies[from][to]
