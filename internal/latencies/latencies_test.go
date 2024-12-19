@@ -56,3 +56,24 @@ func TestLocationName(t *testing.T) {
 		}
 	}
 }
+
+func TestLatenciesFrom(t *testing.T) {
+	locations := []string{"Melbourne", "Toronto", "Prague", "Paris", "Tokyo", "Amsterdam", "Auckland", "Moscow", "Stockholm", "London"}
+	lm := LatenciesFrom(locations)
+	if len(lm) != len(locations) {
+		t.Errorf("len(LatenciesFrom(%v)) = %d, want %d", locations, len(lm), len(locations))
+	}
+	for i, fromLoc := range locations {
+		id1 := hotstuff.ID(i + 1)
+		for j, toLoc := range locations {
+			id2 := hotstuff.ID(j + 1)
+			// We can lookup the latency between location names using the global latencies matrix
+			// or by using the LatencyID method on the LatencyMatrix created by LatenciesFrom.
+			cityLatency := LatencyCity(fromLoc, toLoc)
+			lmLatency := lm.LatencyID(id1, id2)
+			if cityLatency != lmLatency {
+				t.Errorf("LatencyCity(%s, %s) != lm.LatencyID(%d, %d) ==> %v != %v", fromLoc, toLoc, id1, id2, cityLatency, lmLatency)
+			}
+		}
+	}
+}
