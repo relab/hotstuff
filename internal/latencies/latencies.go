@@ -13,12 +13,6 @@ func LatencyCity(from, to string) time.Duration {
 	return latencies[fromIdx][toIdx]
 }
 
-// Latencies returns the latencies to other locations for a given location.
-func Latencies(location string) []time.Duration {
-	locIndex := slices.Index(locations, location)
-	return latencies[locIndex]
-}
-
 // LocationName returns the location name at the given index.
 func LocationName(index int) string {
 	return locations[index]

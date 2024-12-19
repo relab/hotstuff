@@ -27,15 +27,6 @@ func TestLatencySymmetry(t *testing.T) {
 	}
 }
 
-func TestLatencies(t *testing.T) {
-	for _, location := range locations {
-		latencies := Latencies(location)
-		if len(latencies) != len(locations) {
-			t.Errorf("len(Locations()) != len(Latencies(%s)) ==> %d != %d", location, len(locations), len(latencies))
-		}
-	}
-}
-
 func TestLocationName(t *testing.T) {
 	for i, location := range locations {
 		if location != LocationName(i) {
