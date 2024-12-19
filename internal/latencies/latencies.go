@@ -7,12 +7,14 @@ import (
 	"github.com/relab/hotstuff"
 )
 
-// LatencyCity returns the latency between from and to locations.
-func LatencyCity(from, to string) time.Duration {
-	fromIdx, toIdx := slices.Index(locations, from), slices.Index(locations, to)
+// Latency returns the latency between locations a and b.
+// If a or b are not valid locations, the function will panic.
+func Latency(a, b string) time.Duration {
+	fromIdx, toIdx := slices.Index(locations, a), slices.Index(locations, b)
 	return latencies[fromIdx][toIdx]
 }
 
+// LatencyMatrix created by LatenciesFrom.
 type LatencyMatrix [][]time.Duration
 
 // LatenciesFrom returns the latencies between the given locations.
@@ -31,7 +33,8 @@ func LatenciesFrom(locs []string) LatencyMatrix {
 	return newLatencies
 }
 
-// LatencyID returns the latency between nodes a and b.
-func (lm LatencyMatrix) LatencyID(a, b hotstuff.ID) time.Duration {
+// Latency returns the latency between nodes a and b.
+// If a or b are not valid nodes, the function will panic.
+func (lm LatencyMatrix) Latency(a, b hotstuff.ID) time.Duration {
 	return lm[a-1][b-1]
 }
