@@ -30,9 +30,13 @@ func LatencyID(from, to hotstuff.ID) time.Duration {
 	return latencies[from-1][to-1]
 }
 
-// TODO: write tests for these functions
-// TODO: update latencygen to add city name as a /* City */ comment
-// TODO: add a function to get the index of a city?? Necessary?
-// TODO: check that the latencies are symmetric
-// TODO: check that the latencies are correctly stored in ms units.
-// TODO: check that the latencies are one-way latencies.
+// Latencies returns the latencies to other locations for a given location.
+func Latencies(location string) []time.Duration {
+	locIndex := slices.Index(locations, location)
+	return latencies[locIndex]
+}
+
+// LocationName returns the location name at the given index.
+func LocationName(index int) string {
+	return locations[index]
+}
