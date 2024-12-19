@@ -18,8 +18,8 @@ func TestLatencySymmetry(t *testing.T) {
 	}
 	for i := range locations {
 		for j := range locations {
-			latency := Latency(i, j)
-			reverse := Latency(j, i)
+			latency := latencies[i][j]
+			reverse := latencies[j][i]
 			if latency != reverse {
 				t.Errorf("Latency(%d, %d) != Latency(%d, %d) ==> %v != %v", i, j, j, i, latency, reverse)
 			}

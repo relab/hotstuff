@@ -7,11 +7,6 @@ import (
 	"github.com/relab/hotstuff"
 )
 
-// Latency returns the latency between from and to locations.
-func Latency(from, to int) time.Duration {
-	return latencies[from][to]
-}
-
 // LatencyCity returns the latency between from and to locations.
 func LatencyCity(from, to string) time.Duration {
 	fromIdx, toIdx := slices.Index(locations, from), slices.Index(locations, to)
