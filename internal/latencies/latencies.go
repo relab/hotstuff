@@ -13,11 +13,6 @@ func LatencyCity(from, to string) time.Duration {
 	return latencies[fromIdx][toIdx]
 }
 
-// LatencyID returns the latency between from and to nodes.
-func LatencyID(from, to hotstuff.ID) time.Duration {
-	return latencies[from-1][to-1]
-}
-
 // Latencies returns the latencies to other locations for a given location.
 func Latencies(location string) []time.Duration {
 	locIndex := slices.Index(locations, location)

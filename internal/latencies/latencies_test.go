@@ -25,17 +25,6 @@ func TestLatencySymmetry(t *testing.T) {
 			}
 		}
 	}
-	for i := range locations {
-		fromID := hotstuff.ID(i + 1)
-		for j := range locations {
-			toID := hotstuff.ID(j + 1)
-			latency := LatencyID(fromID, toID)
-			reverse := LatencyID(toID, fromID)
-			if latency != reverse {
-				t.Errorf("LatencyID(%d, %d) != LatencyID(%d, %d) ==> %v != %v", fromID, toID, toID, fromID, latency, reverse)
-			}
-		}
-	}
 }
 
 func TestLatencies(t *testing.T) {
