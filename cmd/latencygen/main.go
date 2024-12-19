@@ -83,16 +83,22 @@ func latenciesToGoCode(allToAllMatrix map[string]map[string]string) ([]byte, err
 import "time"
 
 var cities = []string{`)
+	var longestCityName int
 	// Write the city names to the `cities` slice
 	for _, city := range keys {
+		if len(city) > longestCityName {
+			longestCityName = len(city)
+		}
 		s.WriteString(fmt.Sprintf("%q, ", city))
 	}
 	s.WriteString("}\n\n")
 
 	// Write the 2D latency slice
+	s.WriteString("// one-way latencies between cities.\n")
 	s.WriteString("var latencies = [][]time.Duration{\n")
-	for _, city := range keys {
-		s.WriteString("\t{")
+	for idx, city := range keys {
+		paddedCity := fmt.Sprintf("%-*s", longestCityName, city)
+		s.WriteString(fmt.Sprintf("\t/* %03d: %s */ {", idx, paddedCity))
 		latencies := allToAllMatrix[city]
 		for _, city2 := range keys {
 			// Parse the latency as time.Duration
@@ -100,7 +106,8 @@ var cities = []string{`)
 			if err != nil {
 				return nil, fmt.Errorf("invalid latency between %s and %s: %w", city, city2, err)
 			}
-			s.WriteString(fmt.Sprintf("%d, ", latency))
+			// Divide the round-trip latency by 2 to simulate one-way latency
+			s.WriteString(fmt.Sprintf("%d, ", latency/2))
 		}
 		s.WriteString("},\n")
 	}
