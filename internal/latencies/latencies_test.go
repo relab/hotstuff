@@ -27,14 +27,6 @@ func TestLatencySymmetry(t *testing.T) {
 	}
 }
 
-func TestLocationName(t *testing.T) {
-	for i, location := range locations {
-		if location != LocationName(i) {
-			t.Errorf("LocationName(%d) = %s, want %s", i, LocationName(i), location)
-		}
-	}
-}
-
 func TestLatenciesFrom(t *testing.T) {
 	locations := []string{"Melbourne", "Toronto", "Prague", "Paris", "Tokyo", "Amsterdam", "Auckland", "Moscow", "Stockholm", "London"}
 	lm := LatenciesFrom(locations)
