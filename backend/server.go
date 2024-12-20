@@ -13,6 +13,7 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -28,9 +29,8 @@ type Server struct {
 	configuration modules.Configuration
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
-	location      string
-	locationInfo  map[hotstuff.ID]string
-	latencyMatrix map[string]time.Duration
+	id            hotstuff.ID
+	lm            latency.Matrix
 	gorumsSrv     *gorums.Server
 }
 
@@ -51,9 +51,8 @@ func NewServer(opts ...ServerOptions) *Server {
 		opt(options)
 	}
 	srv := &Server{
-		location:      options.location,
-		locationInfo:  options.locationInfo,
-		latencyMatrix: options.locationLatencies,
+		id: options.id,
+		lm: options.latencyMatrix,
 	}
 	options.gorumsSrvOpts = append(options.gorumsSrvOpts, gorums.WithConnectCallback(func(ctx context.Context) {
 		srv.eventLoop.AddEvent(replicaConnected{ctx})
@@ -64,13 +63,12 @@ func NewServer(opts ...ServerOptions) *Server {
 }
 
 func (srv *Server) induceLatency(sender hotstuff.ID) {
-	if srv.location == hotstuff.DefaultLocation {
+	if srv.lm.Enabled() {
 		return
 	}
-	senderLocation := srv.locationInfo[sender]
-	senderLatency := srv.latencyMatrix[senderLocation]
-	srv.logger.Debugf("latency from server %s to server %s is %s\n", srv.location, senderLocation, senderLatency)
-	timer1 := time.NewTimer(senderLatency)
+	delay := srv.lm.Latency(srv.id, sender)
+	srv.logger.Debugf("Adding delay between %s and %s: %v\n", srv.lm.Location(srv.id), srv.lm.Location(sender), delay)
+	timer1 := time.NewTimer(delay)
 	<-timer1.C
 }
 

@@ -1,5 +1,5 @@
 {
-	"clang-format.style": "{ IndentWidth: 4, BasedOnStyle: google, AlignConsecutiveAssignments: true, ColumnLimit: 120 }",
+	"clang-format.style": "{ IndentWidth: 2, BasedOnStyle: google, AlignConsecutiveAssignments: true, ColumnLimit: 120 }",
 	"editor.formatOnSave": true,
 	"files.insertFinalNewline": true,
 	"protoc": {
