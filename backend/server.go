@@ -62,7 +62,9 @@ func NewServer(opts ...ServerOptions) *Server {
 	return srv
 }
 
-func (srv *Server) induceLatency(sender hotstuff.ID) {
+// addNetworkDelay adds latency between this server and the sender based on
+// the latency between the two locations according to the latency matrix.
+func (srv *Server) addNetworkDelay(sender hotstuff.ID) {
 	if !srv.lm.Enabled() {
 		return
 	}
@@ -155,11 +157,10 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
-
 	proposal.Block.Proposer = uint32(id)
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
-	impl.srv.induceLatency(id)
+	impl.srv.addNetworkDelay(id)
 	impl.srv.eventLoop.AddEvent(proposeMsg)
 }
 
@@ -170,7 +171,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
-	impl.srv.induceLatency(id)
+	impl.srv.addNetworkDelay(id)
 	impl.srv.eventLoop.AddEvent(hotstuff.VoteMsg{
 		ID:          id,
 		PartialCert: hotstuffpb.PartialCertFromProto(cert),
@@ -184,7 +185,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		impl.srv.logger.Infof("Failed to get client ID: %v", err)
 		return
 	}
-	impl.srv.induceLatency(id)
+	impl.srv.addNetworkDelay(id)
 	impl.srv.eventLoop.AddEvent(hotstuff.NewViewMsg{
 		ID:       id,
 		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
@@ -208,13 +209,13 @@ func (impl *serviceImpl) Fetch(_ gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*h
 
 // Timeout handles an incoming TimeoutMsg.
 func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
-	var err error
-	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
-	timeoutMsg.ID, err = GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
 		impl.srv.logger.Infof("Could not get ID of replica: %v", err)
 	}
-	impl.srv.induceLatency(timeoutMsg.ID)
+	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
+	timeoutMsg.ID = id
+	impl.srv.addNetworkDelay(id)
 	impl.srv.eventLoop.AddEvent(timeoutMsg)
 }
 
