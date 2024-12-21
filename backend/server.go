@@ -67,9 +67,8 @@ func (srv *Server) induceLatency(sender hotstuff.ID) {
 		return
 	}
 	delay := srv.lm.Latency(srv.id, sender)
-	srv.logger.Debugf("Adding delay between %s and %s: %v\n", srv.lm.Location(srv.id), srv.lm.Location(sender), delay)
-	timer1 := time.NewTimer(delay)
-	<-timer1.C
+	srv.logger.Debugf("Delay between %s and %s: %v\n", srv.lm.Location(srv.id), srv.lm.Location(sender), delay)
+	time.Sleep(delay)
 }
 
 // GetGorumsServer returns the underlying gorums Server.
