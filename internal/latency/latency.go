@@ -86,3 +86,12 @@ func (lm Matrix) Location(id hotstuff.ID) string {
 func (lm Matrix) Enabled() bool {
 	return lm.enabled
 }
+
+// Delay sleeps for the duration of the latency between nodes a and b.
+func (lm Matrix) Delay(a, b hotstuff.ID) {
+	if !lm.Enabled() {
+		return
+	}
+	delay := lm.Latency(a, b)
+	time.Sleep(delay)
+}
