@@ -65,3 +65,32 @@ func TestLatencyMatrixFromDefault(t *testing.T) {
 	}
 }
 
+func TestLocation(t *testing.T) {
+	locations := []string{"Melbourne", "Toronto", "Prague", "Paris", "Tokyo", "Amsterdam", "Auckland", "Moscow", "Stockholm", "London"}
+	lm := MatrixFrom(locations)
+	for i := range len(locations) {
+		id := hotstuff.ID(i + 1)
+		loc := lm.Location(id)
+		if loc != locations[i] {
+			t.Errorf("Location(%d) = %s, want %s", id, loc, locations[i])
+		}
+	}
+	if lm.Location(0) != DefaultLocation {
+		t.Errorf("Location(0) = %s, want %s", lm.Location(0), DefaultLocation)
+	}
+
+	// test that lm.Location panics if the ID is out of range
+	outOfRangeID := hotstuff.ID(len(locations) + 1)
+	defer func() {
+		if r := recover(); r != nil {
+			if r != "ID 11 out of range" {
+				t.Errorf("Recovered from panic: %v, want ID 11 out of range", r)
+			}
+		} else {
+			t.Errorf("Location(%d) did not panic", outOfRangeID)
+		}
+	}()
+	if loc := lm.Location(outOfRangeID); loc != "" {
+		t.Errorf("Location(%d) = %s, want empty string and panic", outOfRangeID, loc)
+	}
+}
