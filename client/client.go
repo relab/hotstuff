@@ -201,13 +201,11 @@ func (c *Client) sendCommands(ctx context.Context) error {
 		num         uint64 = 1
 		lastCommand uint64 = math.MaxUint64
 		lastStep           = time.Now()
+		nextLogTime        = time.Now().Add(time.Second)
 	)
 
 loop:
-	for {
-		if ctx.Err() != nil {
-			break
-		}
+	for ctx.Err() == nil {
 
 		// step up the rate limiter
 		now := time.Now()
@@ -257,8 +255,9 @@ loop:
 			break loop
 		}
 
-		if num%100 == 0 {
-			c.logger.Infof("%d commands sent", num)
+		if time.Now().After(nextLogTime) {
+			c.logger.Infof("%d commands sent so far", num)
+			nextLogTime = time.Now().Add(time.Second)
 		}
 
 	}
