@@ -154,7 +154,7 @@ type serviceImpl struct {
 func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
 	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
-		impl.srv.logger.Infof("Failed to get client ID: %v", err)
+		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
 	}
 	proposal.Block.Proposer = uint32(id)
@@ -168,7 +168,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
 	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
-		impl.srv.logger.Infof("Failed to get client ID: %v", err)
+		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
 	}
 	impl.srv.addNetworkDelay(id)
@@ -182,7 +182,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo) {
 	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
-		impl.srv.logger.Infof("Failed to get client ID: %v", err)
+		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
 	}
 	impl.srv.addNetworkDelay(id)
@@ -211,7 +211,7 @@ func (impl *serviceImpl) Fetch(_ gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*h
 func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
 	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
-		impl.srv.logger.Infof("Could not get ID of replica: %v", err)
+		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 	}
 	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
 	timeoutMsg.ID = id
