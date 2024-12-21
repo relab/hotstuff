@@ -167,7 +167,8 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 			} else {
 				replicaCfg.Address = host
 			}
-			e.Logger.Debugf("Address for replica %d: %s", id, replicaCfg.Address)
+			e.Logger.Debugf("Replica %d: Address: %s, PublicKey: %t, ReplicaPort: %d, ClientPort: %d",
+				id, replicaCfg.Address, len(replicaCfg.PublicKey) > 0, replicaCfg.ReplicaPort, replicaCfg.ClientPort)
 			cfg.Replicas[id] = replicaCfg
 		}
 	}
