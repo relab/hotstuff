@@ -63,7 +63,7 @@ func NewServer(opts ...ServerOptions) *Server {
 }
 
 func (srv *Server) induceLatency(sender hotstuff.ID) {
-	if srv.lm.Enabled() {
+	if !srv.lm.Enabled() {
 		return
 	}
 	delay := srv.lm.Latency(srv.id, sender)

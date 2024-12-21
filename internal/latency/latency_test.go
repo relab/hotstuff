@@ -27,25 +27,25 @@ func TestLatencySymmetry(t *testing.T) {
 	}
 }
 
-func TestLatenciesFrom(t *testing.T) {
+func TestLatencyMatrixFrom(t *testing.T) {
 	locations := []string{"Melbourne", "Toronto", "Prague", "Paris", "Tokyo", "Amsterdam", "Auckland", "Moscow", "Stockholm", "London"}
 	xm := Matrix{}
 	if xm.Enabled() {
-		t.Errorf("LatencyMatrix{}.Enabled() = true, want false")
+		t.Errorf("Matrix{}.Enabled() = true, want false")
 	}
 	lm := MatrixFrom(locations)
 	if !lm.Enabled() {
-		t.Errorf("LatenciesFrom(%v).Enabled() = false, want true", locations)
+		t.Errorf("MatrixFrom(%v).Enabled() = false, want true", locations)
 	}
 	if len(lm.lm) != len(locations) {
-		t.Errorf("len(LatenciesFrom(%v)) = %d, want %d", locations, len(lm.lm), len(locations))
+		t.Errorf("len(MatrixFrom(%v)) = %d, want %d", locations, len(lm.lm), len(locations))
 	}
 	for i, fromLoc := range locations {
 		id1 := hotstuff.ID(i + 1)
 		for j, toLoc := range locations {
 			id2 := hotstuff.ID(j + 1)
-			// We can lookup the latency between location names using the global latencies matrix
-			// or by using the Latency method on the LatencyMatrix created by LatenciesFrom.
+			// We can lookup the latency Between location names using the global allLatencies matrix
+			// or by using the Latency method on the latency.Matrix created by MatrixFrom.
 			locLatency := Between(fromLoc, toLoc)
 			lmLatency := lm.Latency(id1, id2)
 			if locLatency != lmLatency {
@@ -54,3 +54,14 @@ func TestLatenciesFrom(t *testing.T) {
 		}
 	}
 }
+
+func TestLatencyMatrixFromDefault(t *testing.T) {
+	lm := MatrixFrom([]string{DefaultLocation})
+	if lm.Enabled() {
+		t.Errorf("Matrix{}.Enabled() = true, want false")
+	}
+	if len(lm.lm) != 0 {
+		t.Errorf("len(Matrix(%v)) = %d, want 0", []string{DefaultLocation}, len(lm.lm))
+	}
+}
+

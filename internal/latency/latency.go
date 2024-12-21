@@ -52,7 +52,7 @@ func (lm Matrix) Location(id hotstuff.ID) string {
 	return lm.locs[id-1]
 }
 
-// Enabled returns true if a LatencyMatrix was provided.
+// Enabled returns true if a latency matrix was provided.
 func (lm Matrix) Enabled() bool {
 	return lm.enabled
 }
