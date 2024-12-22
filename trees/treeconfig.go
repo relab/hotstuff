@@ -28,12 +28,11 @@ type Tree struct {
 
 // CreateTree Creates the tree configuration, currently only fault free tree configuration is supported.
 func CreateTree(configurationSize int, myID hotstuff.ID, bf int) TreeConfiguration {
-
 	if configurationSize <= 0 {
 		return nil
 	}
 	temp := configurationSize
-	temp = temp - 1 //root
+	temp = temp - 1 // root
 	height := 1
 	for i := 1; temp > 0; i++ {
 		temp = temp - int(math.Pow(float64(bf), float64(i)))
@@ -50,7 +49,7 @@ func CreateTree(configurationSize int, myID hotstuff.ID, bf int) TreeConfigurati
 // InitializeWithPIDs uses the map to initialize the position of replicas.
 func (t *Tree) InitializeWithPIDs(ids []hotstuff.ID) error {
 	if len(ids) != t.configurationSize {
-		return fmt.Errorf("Invalid number of replicas")
+		return fmt.Errorf("invalid number of replicas")
 	}
 	t.posToIDMapping = ids
 	t.idToPosMapping = make(map[hotstuff.ID]int)
@@ -58,7 +57,7 @@ func (t *Tree) InitializeWithPIDs(ids []hotstuff.ID) error {
 		if _, ok := t.idToPosMapping[ID]; !ok {
 			t.idToPosMapping[ID] = index
 		} else {
-			return fmt.Errorf("Duplicate replica ID")
+			return fmt.Errorf("duplicate replica ID")
 		}
 	}
 	return nil
@@ -71,7 +70,7 @@ func (t *Tree) GetTreeHeight() int {
 func (t *Tree) getPosition() (int, error) {
 	pos, ok := t.idToPosMapping[t.id]
 	if !ok {
-		return 0, fmt.Errorf("Replica not found")
+		return 0, fmt.Errorf("replica not found")
 	}
 	return pos, nil
 }
@@ -79,7 +78,7 @@ func (t *Tree) getPosition() (int, error) {
 func (t *Tree) getReplicaPosition(replicaId hotstuff.ID) (int, error) {
 	pos, ok := t.idToPosMapping[replicaId]
 	if !ok {
-		return 0, fmt.Errorf("Replica not found")
+		return 0, fmt.Errorf("replica not found")
 	}
 	return pos, nil
 }

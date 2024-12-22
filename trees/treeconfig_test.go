@@ -82,10 +82,12 @@ func TestTreeAPIWithInitializeWithPIDs(t *testing.T) {
 		{10, 2, 2, 4, []hotstuff.ID{4, 5}, []hotstuff.ID{4, 5, 8, 9, 10}, 1, false, 3, []hotstuff.ID{2, 3}},
 		{10, 3, 2, 4, []hotstuff.ID{6, 7}, []hotstuff.ID{6, 7}, 1, false, 3, []hotstuff.ID{2, 3}},
 		{10, 4, 2, 4, []hotstuff.ID{8, 9}, []hotstuff.ID{8, 9}, 2, false, 2, []hotstuff.ID{4, 5}},
-		{21, 1, 4, 3, []hotstuff.ID{2, 3, 4, 5}, []hotstuff.ID{2, 3, 4, 5, 6, 7, 8, 9, 10,
-			11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21}, 1, true, 3, []hotstuff.ID{}},
-		{21, 1, 3, 4, []hotstuff.ID{2, 3, 4}, []hotstuff.ID{2, 3, 4, 5, 6, 7, 8, 9, 10,
-			11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21}, 1, true, 4, []hotstuff.ID{}},
+		{21, 1, 4, 3, []hotstuff.ID{2, 3, 4, 5}, []hotstuff.ID{
+			2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+		}, 1, true, 3, []hotstuff.ID{}},
+		{21, 1, 3, 4, []hotstuff.ID{2, 3, 4}, []hotstuff.ID{
+			2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+		}, 1, true, 4, []hotstuff.ID{}},
 		{21, 2, 4, 3, []hotstuff.ID{6, 7, 8, 9}, []hotstuff.ID{6, 7, 8, 9}, 1, false, 2, []hotstuff.ID{2, 3, 4, 5}},
 		{21, 2, 3, 4, []hotstuff.ID{5, 6, 7}, []hotstuff.ID{5, 6, 7, 14, 15, 16, 17, 18, 19, 20, 21}, 1, false, 3, []hotstuff.ID{2, 3, 4}},
 		{21, 9, 3, 4, []hotstuff.ID{}, []hotstuff.ID{}, 3, false, 2, []hotstuff.ID{8, 9, 10}},
@@ -102,7 +104,9 @@ func TestTreeAPIWithInitializeWithPIDs(t *testing.T) {
 		for i := 0; i < test.configurationSize; i++ {
 			ids[i] = hotstuff.ID(i + 1)
 		}
-		tree.InitializeWithPIDs(ids)
+		if err := tree.InitializeWithPIDs(ids); err != nil {
+			t.Errorf("Expected nil, got %v", err)
+		}
 		if tree.GetTreeHeight() != test.height {
 			t.Errorf("Expected height %d, got %d", test.height, tree.GetTreeHeight())
 		}
