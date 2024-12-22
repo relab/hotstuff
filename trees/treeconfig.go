@@ -3,6 +3,7 @@ package trees
 import (
 	"fmt"
 	"math"
+	"slices"
 
 	"github.com/relab/hotstuff"
 )
@@ -12,7 +13,6 @@ type Tree struct {
 	id                hotstuff.ID
 	configurationSize int
 	height            int
-	idToPosMapping    map[hotstuff.ID]int
 	posToIDMapping    []hotstuff.ID
 	branchFactor      int
 }
@@ -42,15 +42,16 @@ func (t *Tree) InitializeWithPIDs(ids []hotstuff.ID) error {
 	if len(ids) != t.configurationSize {
 		return fmt.Errorf("invalid number of replicas")
 	}
-	t.posToIDMapping = ids
-	t.idToPosMapping = make(map[hotstuff.ID]int)
-	for index, ID := range ids {
-		if _, ok := t.idToPosMapping[ID]; !ok {
-			t.idToPosMapping[ID] = index
+	// check for duplicate IDs
+	idToIndexMap := make(map[hotstuff.ID]int)
+	for index, id := range ids {
+		if _, ok := idToIndexMap[id]; !ok {
+			idToIndexMap[id] = index
 		} else {
-			return fmt.Errorf("duplicate replica ID")
+			return fmt.Errorf("duplicate replica ID: %d", id)
 		}
 	}
+	t.posToIDMapping = ids
 	return nil
 }
 
@@ -59,16 +60,16 @@ func (t *Tree) GetTreeHeight() int {
 }
 
 func (t *Tree) getPosition() (int, error) {
-	pos, ok := t.idToPosMapping[t.id]
-	if !ok {
+	pos := slices.Index(t.posToIDMapping, t.id)
+	if pos == -1 {
 		return 0, fmt.Errorf("replica not found")
 	}
 	return pos, nil
 }
 
 func (t *Tree) getReplicaPosition(replicaId hotstuff.ID) (int, error) {
-	pos, ok := t.idToPosMapping[replicaId]
-	if !ok {
+	pos := slices.Index(t.posToIDMapping, replicaId)
+	if pos == -1 {
 		return 0, fmt.Errorf("replica not found")
 	}
 	return pos, nil
