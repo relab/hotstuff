@@ -7,15 +7,6 @@ import (
 	"github.com/relab/hotstuff"
 )
 
-// TreeConfiguration is an abstraction for a tree communication model.
-type TreeConfiguration interface {
-	InitializeWithPIDs(treePositions []hotstuff.ID) error
-	GetTreeHeight() int
-	GetChildren() []hotstuff.ID
-	GetSubTreeNodes() []hotstuff.ID
-	GetParent() (hotstuff.ID, bool)
-}
-
 // Tree implements a fault free tree configuration.
 type Tree struct {
 	id                hotstuff.ID
@@ -26,8 +17,8 @@ type Tree struct {
 	branchFactor      int
 }
 
-// CreateTree Creates the tree configuration, currently only fault free tree configuration is supported.
-func CreateTree(configurationSize int, myID hotstuff.ID, bf int) TreeConfiguration {
+// CreateTree creates the tree configuration, currently only fault free tree configuration is supported.
+func CreateTree(configurationSize int, myID hotstuff.ID, bf int) *Tree {
 	if configurationSize <= 0 {
 		return nil
 	}

@@ -126,17 +126,16 @@ func TestTreeAPIWithInitializeWithPIDs(t *testing.T) {
 				t.Errorf("Expected %d, got %d", test.parent, parent)
 			}
 		}
-		treeConfig := tree.(*Tree)
-		if treeConfig.IsRoot(test.id) != test.isRoot {
-			t.Errorf("Expected %t, got %t", test.isRoot, treeConfig.IsRoot(test.id))
+		if tree.IsRoot(test.id) != test.isRoot {
+			t.Errorf("Expected %t, got %t", test.isRoot, tree.IsRoot(test.id))
 		}
-		if treeConfig.GetHeight() != test.replicaHeight {
-			t.Errorf("Expected %d, got %d", test.replicaHeight, treeConfig.GetHeight())
+		if tree.GetHeight() != test.replicaHeight {
+			t.Errorf("Expected %d, got %d", test.replicaHeight, tree.GetHeight())
 		}
-		gotPeers := treeConfig.GetPeers(test.id)
+		gotPeers := tree.GetPeers(test.id)
 		sort.Slice(gotPeers, func(i, j int) bool { return gotPeers[i] < gotPeers[j] })
 		if len(gotPeers) != len(test.peers) || !slices.Equal(gotPeers, test.peers) {
-			t.Errorf("Expected %v, got %v", test.peers, treeConfig.GetPeers(test.id))
+			t.Errorf("Expected %v, got %v", test.peers, tree.GetPeers(test.id))
 		}
 	}
 }
