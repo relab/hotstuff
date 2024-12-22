@@ -8,25 +8,24 @@ import (
 	"github.com/relab/hotstuff"
 )
 
-type createTreeTest struct {
-	configurationSize int
-	id                hotstuff.ID
-	branchFactor      int
-	height            int
-}
-
 func TestCreateTree(t *testing.T) {
-	createTreeTestData := []createTreeTest{
-		{10, 1, 2, 4},
-		{21, 1, 4, 3},
-		{21, 1, 3, 4},
-		{111, 1, 10, 3},
-		{111, 1, 3, 5},
+	tests := []struct {
+		configurationSize int
+		id                hotstuff.ID
+		branchFactor      int
+		wantHeight        int
+	}{
+		{configurationSize: 10, id: 1, branchFactor: 2, wantHeight: 4},
+		{configurationSize: 21, id: 1, branchFactor: 4, wantHeight: 3},
+		{configurationSize: 21, id: 1, branchFactor: 3, wantHeight: 4},
+		{configurationSize: 111, id: 1, branchFactor: 10, wantHeight: 3},
+		{configurationSize: 111, id: 1, branchFactor: 3, wantHeight: 5},
 	}
-	for _, test := range createTreeTestData {
+	for _, test := range tests {
 		tree := CreateTree(test.configurationSize, test.id, test.branchFactor)
-		if tree.GetTreeHeight() != test.height {
-			t.Errorf("Expected height %d, got %d", test.height, tree.GetTreeHeight())
+		if tree.GetTreeHeight() != test.wantHeight {
+			t.Errorf("CreateTree(%d, %d, %d).GetTreeHeight() = %d, want %d",
+				test.configurationSize, test.id, test.branchFactor, tree.GetTreeHeight(), test.wantHeight)
 		}
 	}
 }
