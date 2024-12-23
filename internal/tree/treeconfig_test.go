@@ -1,4 +1,4 @@
-package trees
+package tree
 
 import (
 	"slices"
@@ -22,7 +22,11 @@ func TestCreateTree(t *testing.T) {
 		{configurationSize: 111, id: 1, branchFactor: 3, wantHeight: 5},
 	}
 	for _, test := range tests {
-		tree := CreateTree(test.configurationSize, test.id, test.branchFactor)
+		ids := make([]hotstuff.ID, test.configurationSize)
+		for i := 0; i < test.configurationSize; i++ {
+			ids[i] = hotstuff.ID(i + 1)
+		}
+		tree := CreateTree(test.id, test.branchFactor, ids)
 		if tree.GetTreeHeight() != test.wantHeight {
 			t.Errorf("CreateTree(%d, %d, %d).GetTreeHeight() = %d, want %d",
 				test.configurationSize, test.id, test.branchFactor, tree.GetTreeHeight(), test.wantHeight)
@@ -30,35 +34,18 @@ func TestCreateTree(t *testing.T) {
 	}
 }
 
-func TestTreeWithNegativeCases(t *testing.T) {
-	tree := CreateTree(10, 1, 2)
-	if tree.GetTreeHeight() != 4 {
-		t.Errorf("Expected height 4, got %d", tree.GetTreeHeight())
-	}
-	if len(tree.GetChildren()) != 0 {
-		t.Errorf("Expected nil, got %v", tree.GetChildren())
-	}
-	if len(tree.GetSubTreeNodes()) != 0 {
-		t.Errorf("Expected nil, got %v", tree.GetSubTreeNodes())
-	}
-	if _, ok := tree.GetParent(); ok {
-		t.Errorf("Expected false, got true")
-	}
-	tree = CreateTree(-1, 1, 2)
-	if tree != nil {
-		t.Errorf("Expected nil, got %v", tree)
-	}
-	ids := []hotstuff.ID{1, 2, 3, 3, 4, 5, 6, 7, 8, 9}
-	tree = CreateTree(10, 1, 2)
-	err := tree.InitializeWithPIDs(ids)
-	if err == nil {
-		t.Errorf("Expected error, got nil")
-	}
-	ids = []hotstuff.ID{1, 2, 3, 4, 5, 6, 7, 8, 9}
-	err = tree.InitializeWithPIDs(ids)
-	if err == nil {
-		t.Errorf("Expected error, got nil")
-	}
+func TestCreateTreeNegativeBF(t *testing.T) {
+	defer func() { _ = recover() }()
+	ids := []hotstuff.ID{1, 2, 3, 4, 5}
+	tree := CreateTree(1, -1, ids)
+	t.Errorf("CreateTree should panic, got %v", tree)
+}
+
+func TestCreateTreeInvalidId(t *testing.T) {
+	defer func() { _ = recover() }()
+	ids := []hotstuff.ID{1, 2, 3, 4, 5}
+	tree := CreateTree(10, 2, ids)
+	t.Errorf("CreateTree should panic, got %v", tree)
 }
 
 type treeConfigTest struct {
@@ -98,29 +85,27 @@ func TestTreeAPIWithInitializeWithPIDs(t *testing.T) {
 		{21, 5, 4, 3, []hotstuff.ID{18, 19, 20, 21}, []hotstuff.ID{18, 19, 20, 21}, 1, false, 2, []hotstuff.ID{2, 3, 4, 5}},
 	}
 	for _, test := range treeConfigTestData {
-		tree := CreateTree(test.configurationSize, test.id, test.branchFactor)
+
 		ids := make([]hotstuff.ID, test.configurationSize)
 		for i := 0; i < test.configurationSize; i++ {
 			ids[i] = hotstuff.ID(i + 1)
 		}
-		if err := tree.InitializeWithPIDs(ids); err != nil {
-			t.Errorf("Expected nil, got %v", err)
-		}
+		tree := CreateTree(test.id, test.branchFactor, ids)
 		if tree.GetTreeHeight() != test.height {
 			t.Errorf("Expected height %d, got %d", test.height, tree.GetTreeHeight())
 		}
-		gotChildren := tree.GetChildren()
+		gotChildren := tree.ChildrenOf()
 		sort.Slice(gotChildren, func(i, j int) bool { return gotChildren[i] < gotChildren[j] })
 		if len(gotChildren) != len(test.children) || !slices.Equal(gotChildren, test.children) {
-			t.Errorf("Expected %v, got %v", test.children, tree.GetChildren())
+			t.Errorf("Expected %v, got %v", test.children, tree.ChildrenOf())
 		}
-		subTree := tree.GetSubTreeNodes()
+		subTree := tree.SubTree()
 		sort.Slice(subTree, func(i, j int) bool { return subTree[i] < subTree[j] })
 		if len(subTree) != len(test.subTreeNodes) ||
 			!slices.Equal(subTree, test.subTreeNodes) {
-			t.Errorf("Expected %v, got %v", test.subTreeNodes, tree.GetSubTreeNodes())
+			t.Errorf("Expected %v, got %v", test.subTreeNodes, tree.SubTree())
 		}
-		if parent, ok := tree.GetParent(); ok {
+		if parent, ok := tree.Parent(); ok {
 			if parent != test.parent {
 				t.Errorf("Expected %d, got %d", test.parent, parent)
 			}
@@ -131,10 +116,41 @@ func TestTreeAPIWithInitializeWithPIDs(t *testing.T) {
 		if tree.GetHeight() != test.replicaHeight {
 			t.Errorf("Expected %d, got %d", test.replicaHeight, tree.GetHeight())
 		}
-		gotPeers := tree.GetPeers(test.id)
+		gotPeers := tree.PeersOf(test.id)
 		sort.Slice(gotPeers, func(i, j int) bool { return gotPeers[i] < gotPeers[j] })
 		if len(gotPeers) != len(test.peers) || !slices.Equal(gotPeers, test.peers) {
-			t.Errorf("Expected %v, got %v", test.peers, tree.GetPeers(test.id))
+			t.Errorf("Expected %v, got %v", test.peers, tree.PeersOf(test.id))
 		}
 	}
+}
+
+func benchmarkGetChildren(size int, bf int, b *testing.B) {
+	ids := make([]hotstuff.ID, size)
+	for i := 0; i < size; i++ {
+		ids[i] = hotstuff.ID(i + 1)
+	}
+	tree := CreateTree(1, bf, ids)
+	for i := 0; i < b.N; i++ {
+		tree.ChildrenOf()
+	}
+}
+
+func BenchmarkGetChildren10(b *testing.B) {
+	benchmarkGetChildren(10, 2, b)
+}
+
+func BenchmarkGetChildren21(b *testing.B) {
+	benchmarkGetChildren(21, 4, b)
+}
+
+func BenchmarkGetChildren111(b *testing.B) {
+	benchmarkGetChildren(111, 10, b)
+}
+
+func BenchmarkGetChildren211(b *testing.B) {
+	benchmarkGetChildren(211, 14, b)
+}
+
+func BenchmarkGetChildren421(b *testing.B) {
+	benchmarkGetChildren(421, 20, b)
 }
