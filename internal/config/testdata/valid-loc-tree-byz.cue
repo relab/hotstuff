@@ -20,5 +20,11 @@ config: {
 	clients:  2
 
 	locations: ["Melbourne", "Toronto", "Prague", "Paris", "Tokyo", "Amsterdam", "Auckland", "Moscow", "Stockholm", "London"]
-	treePositions: [11, 2, 3, 4, 5, 6, 7, 8, 9, 1]
+	treePositions: [10, 2, 3, 4, 5, 6, 7, 8, 9, 1]
+	branchFactor: 5
+
+	byzantineStrategy: {
+		silent: [2, 5]
+		slow: [4]
+	}
 }

@@ -15,6 +15,7 @@ type Config struct {
 	Clients           int
 	Locations         []string
 	TreePositions     []uint32
+	BranchFactor      int
 	ByzantineStrategy map[string][]uint32
 }
 

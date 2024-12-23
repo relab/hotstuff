@@ -28,6 +28,8 @@ config: {
 	if treePositions != _|_ {
 		// List of locations; required when treePositions is provided.
 		locations!: [...string] & _exactAndUnique
+		// Branching factor of the tree; must be greater than 1 and at most half the number of replicas.
+		branchFactor!: int & >1 & <=div(replicas, 2)
 	}
 
 	// Byzantine strategy for different replicas (optional).

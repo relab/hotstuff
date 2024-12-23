@@ -18,15 +18,24 @@ func TestLoad(t *testing.T) {
 		"slow":   {4},
 	}
 	validLocOnlyCfg := &config.Config{
-		LatenciesFile:     "latencies/aws.csv",
-		ReplicaHosts:      replicaHosts,
-		ClientHosts:       clientHosts,
-		Replicas:          10,
-		Clients:           2,
-		Locations:         locations,
-		ByzantineStrategy: byzantineStrategy,
+		LatenciesFile: "latencies/aws.csv",
+		ReplicaHosts:  replicaHosts,
+		ClientHosts:   clientHosts,
+		Replicas:      10,
+		Clients:       2,
+		Locations:     locations,
 	}
 	validLocTreeCfg := &config.Config{
+		LatenciesFile: "latencies/aws.csv",
+		ReplicaHosts:  replicaHosts,
+		ClientHosts:   clientHosts,
+		Replicas:      10,
+		Clients:       2,
+		Locations:     locations,
+		TreePositions: treePositions,
+		BranchFactor:  5,
+	}
+	validLocTreeByzCfg := &config.Config{
 		LatenciesFile:     "latencies/aws.csv",
 		ReplicaHosts:      replicaHosts,
 		ClientHosts:       clientHosts,
@@ -34,6 +43,7 @@ func TestLoad(t *testing.T) {
 		Clients:           2,
 		Locations:         locations,
 		TreePositions:     treePositions,
+		BranchFactor:      5,
 		ByzantineStrategy: byzantineStrategy,
 	}
 	valid2LocOnlyCfg := &config.Config{
@@ -48,10 +58,11 @@ func TestLoad(t *testing.T) {
 		LatenciesFile: "latencies/aws.csv",
 		ReplicaHosts:  []string{"relab1"},
 		ClientHosts:   []string{"relab2"},
-		Replicas:      3,
+		Replicas:      5,
 		Clients:       2,
-		Locations:     []string{"paris", "rome", "oslo"},
-		TreePositions: []uint32{3, 2, 1},
+		Locations:     []string{"paris", "rome", "oslo", "london", "berlin"},
+		TreePositions: []uint32{3, 2, 1, 4, 5},
+		BranchFactor:  2,
 	}
 	valid2NoLocNoTree := &config.Config{
 		ReplicaHosts: []string{"relab1"},
@@ -65,14 +76,15 @@ func TestLoad(t *testing.T) {
 		wantCfg  *config.Config
 		wantErr  bool
 	}{
-		{name: "ValidLocationsOnlyConfig", filename: "valid-loc-only.cue", wantCfg: validLocOnlyCfg, wantErr: false},
-		{name: "ValidLocationsTreeConfig", filename: "valid-loc-tree.cue", wantCfg: validLocTreeCfg, wantErr: false},
-		{name: "Valid2LocationsOnlyConfig", filename: "valid2-loc-only.cue", wantCfg: valid2LocOnlyCfg, wantErr: false},
-		{name: "Valid2LocationsTreeConfig", filename: "valid2-loc-tree.cue", wantCfg: valid2LocTreeCfg, wantErr: false},
-		{name: "Valid2NoLocationsNoTreeConfig", filename: "valid2-no-loc-no-tree.cue", wantCfg: valid2NoLocNoTree, wantErr: false},
-		{name: "InvalidLocationsConfig", filename: "invalid-loc.cue", wantCfg: nil, wantErr: true},
-		{name: "InvalidTreeConfig", filename: "invalid-tree.cue", wantCfg: nil, wantErr: true},
-		{name: "Invalid2TreeOnlyConfig", filename: "invalid-tree-only.cue", wantCfg: nil, wantErr: true},
+		{name: "ValidLocationsOnly", filename: "valid-loc-only.cue", wantCfg: validLocOnlyCfg, wantErr: false},
+		{name: "ValidLocationsTree", filename: "valid-loc-tree.cue", wantCfg: validLocTreeCfg, wantErr: false},
+		{name: "ValidLocationsTreeByz", filename: "valid-loc-tree-byz.cue", wantCfg: validLocTreeByzCfg, wantErr: false},
+		{name: "Valid2LocationsOnly", filename: "valid2-loc-only.cue", wantCfg: valid2LocOnlyCfg, wantErr: false},
+		{name: "Valid2LocationsTree", filename: "valid2-loc-tree.cue", wantCfg: valid2LocTreeCfg, wantErr: false},
+		{name: "Valid2NoLocationsNoTree", filename: "valid2-no-loc-no-tree.cue", wantCfg: valid2NoLocNoTree, wantErr: false},
+		{name: "InvalidLocations", filename: "invalid-loc.cue", wantCfg: nil, wantErr: true},
+		{name: "InvalidTree", filename: "invalid-tree.cue", wantCfg: nil, wantErr: true},
+		{name: "Invalid2TreeOnly", filename: "invalid-tree-only.cue", wantCfg: nil, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
