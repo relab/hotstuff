@@ -3,14 +3,14 @@ package config
 import "list"
 
 config: {
-	// File path for latencies
-	latenciesFile: string & =~".+\\.csv$"
+	// File path for latencies between locations (optional).
+	latenciesFile?: string & =~".+\\.csv$"
 
 	// List of replica/client hosts (non-empty)
 	replicaHosts: [_, ...string]
 	clientHosts: [_, ...string]
 
-	// Number of replicas/clients, must be greater than 0
+	// Number of replicas/clients; must be greater than 0
 	replicas: int & >0
 	clients:  int & >0
 

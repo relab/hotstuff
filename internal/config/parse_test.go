@@ -54,11 +54,10 @@ func TestLoad(t *testing.T) {
 		TreePositions: []uint32{3, 2, 1},
 	}
 	valid2NoLocNoTree := &config.Config{
-		LatenciesFile: "latencies/aws.csv",
-		ReplicaHosts:  []string{"relab1"},
-		ClientHosts:   []string{"relab2"},
-		Replicas:      3,
-		Clients:       2,
+		ReplicaHosts: []string{"relab1"},
+		ClientHosts:  []string{"relab2"},
+		Replicas:     3,
+		Clients:      2,
 	}
 	tests := []struct {
 		name     string
@@ -79,11 +78,11 @@ func TestLoad(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gotCfg, err := config.Load(filepath.Join("testdata", tt.filename))
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Load() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Load(%s) error = %v, wantErr %v", tt.filename, err, tt.wantErr)
 				return
 			}
 			if diff := cmp.Diff(gotCfg, tt.wantCfg); diff != "" {
-				t.Errorf("Load() mismatch (-want +got):\n%s", diff)
+				t.Errorf("Load(%s) mismatch (-want +got):\n%s", tt.filename, diff)
 			}
 		})
 	}
