@@ -128,14 +128,28 @@ func (t *Tree) heightOf(replicaID hotstuff.ID) int {
 	if replicaPos == -1 {
 		return 0
 	}
-	startLimit := 0
-	endLimit := 0
-	for i := 1; i < t.height; i++ {
-		startLimit = startLimit + int(math.Pow(float64(t.branchFactor), float64(i-1)))
-		endLimit = endLimit + int(math.Pow(float64(t.branchFactor), float64(i)))
-		if replicaPos >= startLimit && replicaPos <= endLimit {
-			return t.height - i
+
+	// startLvl is the "first index" in the current level,
+	// levelCount is how many nodes are in this level.
+	//
+	// With branchFactor = n, the level sizes grow as:
+	// Level 0: 1 node (the root)
+	// Level 1: n nodes
+	// Level 2: n^2 nodes
+	// ...
+	// We start at level 1, since the root returns early.
+	startLvl := 1              // index of the first node at level 1
+	lvlCount := t.branchFactor // number of nodes at level 1
+
+	for lvl := 1; lvl < t.height; lvl++ {
+		endLvl := startLvl + lvlCount // one-past the last node at this level
+		if replicaPos >= startLvl && replicaPos < endLvl {
+			// replicaPos is in [startLvl, endLvl): t.height-lvl is the height.
+			return t.height - lvl
 		}
+		// Move to the next level:
+		startLvl = endLvl
+		lvlCount *= t.branchFactor
 	}
 	return 0
 }
