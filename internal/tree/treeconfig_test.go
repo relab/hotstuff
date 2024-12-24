@@ -27,9 +27,9 @@ func TestCreateTree(t *testing.T) {
 			ids[i] = hotstuff.ID(i + 1)
 		}
 		tree := CreateTree(test.id, test.branchFactor, ids)
-		if tree.GetTreeHeight() != test.wantHeight {
+		if tree.TreeHeight() != test.wantHeight {
 			t.Errorf("CreateTree(%d, %d, %d).GetTreeHeight() = %d, want %d",
-				test.configurationSize, test.id, test.branchFactor, tree.GetTreeHeight(), test.wantHeight)
+				test.configurationSize, test.id, test.branchFactor, tree.TreeHeight(), test.wantHeight)
 		}
 	}
 }
@@ -41,7 +41,7 @@ func TestCreateTreeNegativeBF(t *testing.T) {
 	t.Errorf("CreateTree should panic, got %v", tree)
 }
 
-func TestCreateTreeInvalidId(t *testing.T) {
+func TestCreateTreeInvalidID(t *testing.T) {
 	defer func() { _ = recover() }()
 	ids := []hotstuff.ID{1, 2, 3, 4, 5}
 	tree := CreateTree(10, 2, ids)
@@ -85,14 +85,13 @@ func TestTreeAPIWithInitializeWithPIDs(t *testing.T) {
 		{21, 5, 4, 3, []hotstuff.ID{18, 19, 20, 21}, []hotstuff.ID{18, 19, 20, 21}, 1, false, 2, []hotstuff.ID{2, 3, 4, 5}},
 	}
 	for _, test := range treeConfigTestData {
-
 		ids := make([]hotstuff.ID, test.configurationSize)
 		for i := 0; i < test.configurationSize; i++ {
 			ids[i] = hotstuff.ID(i + 1)
 		}
 		tree := CreateTree(test.id, test.branchFactor, ids)
-		if tree.GetTreeHeight() != test.height {
-			t.Errorf("Expected height %d, got %d", test.height, tree.GetTreeHeight())
+		if tree.TreeHeight() != test.height {
+			t.Errorf("Expected height %d, got %d", test.height, tree.TreeHeight())
 		}
 		gotChildren := tree.ChildrenOf()
 		sort.Slice(gotChildren, func(i, j int) bool { return gotChildren[i] < gotChildren[j] })

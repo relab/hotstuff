@@ -38,12 +38,13 @@ func CreateTree(myID hotstuff.ID, bf int, ids []hotstuff.ID) *Tree {
 	}
 }
 
-func (t *Tree) GetTreeHeight() int {
+// TreeHeight returns the height of the full tree.
+func (t *Tree) TreeHeight() int {
 	return t.height
 }
 
-func (t *Tree) replicaPosition(replicaId hotstuff.ID) int {
-	return slices.Index(t.posToIDMapping, replicaId)
+func (t *Tree) replicaPosition(id hotstuff.ID) int {
+	return slices.Index(t.posToIDMapping, id)
 }
 
 // Parent fetches the ID of the parent, if root, returns itself
