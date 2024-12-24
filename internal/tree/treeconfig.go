@@ -108,14 +108,12 @@ func (t *Tree) SubTree() []hotstuff.ID {
 	if len(children) == 0 {
 		return nil
 	}
-	subTreeReplicas := slices.Clone(children)
-	queue := slices.Clone(children)
-	for len(queue) > 0 {
-		child := queue[0]
-		queue = queue[1:]
-		children := t.ChildrenOf(child)
-		subTreeReplicas = append(subTreeReplicas, children...)
-		queue = append(queue, children...)
+	subTreeReplicas := make([]hotstuff.ID, len(children))
+	copy(subTreeReplicas, children)
+	for i := 0; i < len(subTreeReplicas); i++ {
+		node := subTreeReplicas[i]
+		newChildren := t.ChildrenOf(node)
+		subTreeReplicas = append(subTreeReplicas, newChildren...)
 	}
 	return subTreeReplicas
 }
