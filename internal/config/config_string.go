@@ -12,11 +12,6 @@ func Join[T any](a []T, sep string) string {
 
 func (c *Config) String() string {
 	s := strings.Builder{}
-	if c.LatenciesFile != "" {
-		s.WriteString("LatenciesFile: ")
-		s.WriteString(c.LatenciesFile)
-		s.WriteString(", ")
-	}
 	s.WriteString("ReplicaHosts: ")
 	s.WriteString(strings.Join(c.ReplicaHosts, ", "))
 	s.WriteString(", ")

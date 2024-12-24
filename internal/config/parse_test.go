@@ -18,15 +18,13 @@ func TestLoad(t *testing.T) {
 		"slow":   {4},
 	}
 	validLocOnlyCfg := &config.Config{
-		LatenciesFile: "latencies/aws.csv",
-		ReplicaHosts:  replicaHosts,
-		ClientHosts:   clientHosts,
-		Replicas:      10,
-		Clients:       2,
-		Locations:     locations,
+		ReplicaHosts: replicaHosts,
+		ClientHosts:  clientHosts,
+		Replicas:     10,
+		Clients:      2,
+		Locations:    locations,
 	}
 	validLocTreeCfg := &config.Config{
-		LatenciesFile: "latencies/aws.csv",
 		ReplicaHosts:  replicaHosts,
 		ClientHosts:   clientHosts,
 		Replicas:      10,
@@ -36,7 +34,6 @@ func TestLoad(t *testing.T) {
 		BranchFactor:  5,
 	}
 	validLocTreeByzCfg := &config.Config{
-		LatenciesFile:     "latencies/aws.csv",
 		ReplicaHosts:      replicaHosts,
 		ClientHosts:       clientHosts,
 		Replicas:          10,
@@ -47,15 +44,13 @@ func TestLoad(t *testing.T) {
 		ByzantineStrategy: byzantineStrategy,
 	}
 	valid2LocOnlyCfg := &config.Config{
-		LatenciesFile: "latencies/aws.csv",
-		ReplicaHosts:  []string{"relab1"},
-		ClientHosts:   []string{"relab2"},
-		Replicas:      3,
-		Clients:       2,
-		Locations:     []string{"paris", "rome", "oslo"},
+		ReplicaHosts: []string{"relab1"},
+		ClientHosts:  []string{"relab2"},
+		Replicas:     3,
+		Clients:      2,
+		Locations:    []string{"paris", "rome", "oslo"},
 	}
 	valid2LocTreeCfg := &config.Config{
-		LatenciesFile: "latencies/aws.csv",
 		ReplicaHosts:  []string{"relab1"},
 		ClientHosts:   []string{"relab2"},
 		Replicas:      5,

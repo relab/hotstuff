@@ -1,8 +1,6 @@
 package config
 
 config: {
-	latenciesFile: "latencies/aws.csv"
-
 	replicaHosts: [
 		"bbchain1",
 		"bbchain2",

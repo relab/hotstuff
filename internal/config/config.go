@@ -8,7 +8,6 @@ import (
 )
 
 type Config struct {
-	LatenciesFile     string
 	ReplicaHosts      []string
 	ClientHosts       []string
 	Replicas          int
