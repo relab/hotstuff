@@ -90,8 +90,8 @@ func (t *Tree) ChildrenOf(nodeID hotstuff.ID) []hotstuff.ID {
 	return children
 }
 
-// getHeight returns the height from the given replica's vantage point.
-func (t *Tree) getHeight(nodeID hotstuff.ID) int {
+// heightOf returns the height from the given replica's vantage point.
+func (t *Tree) heightOf(nodeID hotstuff.ID) int {
 	if t.IsRoot(nodeID) {
 		return t.height
 	}
@@ -111,9 +111,9 @@ func (t *Tree) getHeight(nodeID hotstuff.ID) int {
 	return 0
 }
 
-// GetHeight returns the height of the replica
-func (t *Tree) GetHeight() int {
-	return t.getHeight(t.id)
+// NodeHeight returns the height of this tree's replica.
+func (t *Tree) NodeHeight() int {
+	return t.heightOf(t.id)
 }
 
 // PeersOf returns the peers of given ID, if any.
