@@ -15,7 +15,8 @@ type Tree struct {
 	branchFactor   int
 }
 
-// CreateTree creates the tree configuration, currently only fault free tree configuration is supported.
+// CreateTree creates the tree configuration.
+// Currently only fault free tree configuration is supported.
 func CreateTree(myID hotstuff.ID, bf int, ids []hotstuff.ID) *Tree {
 	if bf < 2 {
 		panic("Branch factor must be greater than 1")
@@ -24,6 +25,7 @@ func CreateTree(myID hotstuff.ID, bf int, ids []hotstuff.ID) *Tree {
 		panic("Replica ID not found in tree configuration")
 	}
 
+	// compute height of the tree
 	temp := len(ids) - 1 // root
 	height := 1
 	for i := 1; temp > 0; i++ {
