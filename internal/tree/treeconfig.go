@@ -49,8 +49,9 @@ func (t *Tree) replicaPosition(id hotstuff.ID) int {
 	return slices.Index(t.posToIDMapping, id)
 }
 
-// Parent returns the ID of the parent and true. If this tree's node ID is the root,
-// the root's ID is returned and false to indicate it does not have a parent.
+// Parent returns the ID of the parent of this tree's replica and true.
+// If this tree's replica is the root, the root's ID is returned
+// and false to indicate it does not have a parent.
 func (t *Tree) Parent() (hotstuff.ID, bool) {
 	myPos := t.replicaPosition(t.id)
 	if myPos == 0 {
@@ -65,24 +66,24 @@ func (t *Tree) isWithInIndex(position int) bool {
 }
 
 // IsRoot return true if the replica is at root of the tree.
-func (t *Tree) IsRoot(nodeID hotstuff.ID) bool {
-	return t.replicaPosition(nodeID) == 0
+func (t *Tree) IsRoot(replicaID hotstuff.ID) bool {
+	return t.replicaPosition(replicaID) == 0
 }
 
-// NodeChildren returns the children of this tree's replica, if any.
-func (t *Tree) NodeChildren() []hotstuff.ID {
+// ReplicaChildren returns the children of this tree's replica, if any.
+func (t *Tree) ReplicaChildren() []hotstuff.ID {
 	return t.ChildrenOf(t.id)
 }
 
 // ChildrenOf returns the children of a specific replica.
-func (t *Tree) ChildrenOf(nodeID hotstuff.ID) []hotstuff.ID {
-	nodePos := t.replicaPosition(nodeID)
-	if nodePos == -1 {
+func (t *Tree) ChildrenOf(replicaID hotstuff.ID) []hotstuff.ID {
+	replicaPos := t.replicaPosition(replicaID)
+	if replicaPos == -1 {
 		return nil
 	}
 	children := make([]hotstuff.ID, 0)
 	for i := 1; i <= t.branchFactor; i++ {
-		childPos := (t.branchFactor * nodePos) + i
+		childPos := (t.branchFactor * replicaPos) + i
 		if t.isWithInIndex(childPos) {
 			children = append(children, t.posToIDMapping[childPos])
 		} else {
@@ -93,12 +94,12 @@ func (t *Tree) ChildrenOf(nodeID hotstuff.ID) []hotstuff.ID {
 }
 
 // heightOf returns the height from the given replica's vantage point.
-func (t *Tree) heightOf(nodeID hotstuff.ID) int {
-	if t.IsRoot(nodeID) {
+func (t *Tree) heightOf(replicaID hotstuff.ID) int {
+	if t.IsRoot(replicaID) {
 		return t.height
 	}
-	nodePos := t.replicaPosition(nodeID)
-	if nodePos == -1 {
+	replicaPos := t.replicaPosition(replicaID)
+	if replicaPos == -1 {
 		return 0
 	}
 	startLimit := 0
@@ -106,21 +107,21 @@ func (t *Tree) heightOf(nodeID hotstuff.ID) int {
 	for i := 1; i < t.height; i++ {
 		startLimit = startLimit + int(math.Pow(float64(t.branchFactor), float64(i-1)))
 		endLimit = endLimit + int(math.Pow(float64(t.branchFactor), float64(i)))
-		if nodePos >= startLimit && nodePos <= endLimit {
+		if replicaPos >= startLimit && replicaPos <= endLimit {
 			return t.height - i
 		}
 	}
 	return 0
 }
 
-// NodeHeight returns the height of this tree's replica.
-func (t *Tree) NodeHeight() int {
+// ReplicaHeight returns the height of this tree's replica.
+func (t *Tree) ReplicaHeight() int {
 	return t.heightOf(t.id)
 }
 
 // PeersOf returns the sibling peers of given ID, if any.
-func (t *Tree) PeersOf(nodeID hotstuff.ID) []hotstuff.ID {
-	if t.IsRoot(nodeID) {
+func (t *Tree) PeersOf(replicaID hotstuff.ID) []hotstuff.ID {
+	if t.IsRoot(replicaID) {
 		return nil
 	}
 	parent, ok := t.Parent()
@@ -130,20 +131,20 @@ func (t *Tree) PeersOf(nodeID hotstuff.ID) []hotstuff.ID {
 	return t.ChildrenOf(parent)
 }
 
-// SubTree returns all subtree nodes of this tree's replica.
+// SubTree returns all subtree replicas of this tree's replica.
 func (t *Tree) SubTree() []hotstuff.ID {
 	children := t.ChildrenOf(t.id)
 	if len(children) == 0 {
 		return nil
 	}
-	subTreeNodes := slices.Clone(children)
+	subTreeReplicas := slices.Clone(children)
 	queue := slices.Clone(children)
 	for len(queue) > 0 {
 		child := queue[0]
 		queue = queue[1:]
 		children := t.ChildrenOf(child)
-		subTreeNodes = append(subTreeNodes, children...)
+		subTreeReplicas = append(subTreeReplicas, children...)
 		queue = append(queue, children...)
 	}
-	return subTreeNodes
+	return subTreeReplicas
 }
