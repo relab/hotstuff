@@ -157,7 +157,3 @@ func (t *Tree) heightOf(replicaID hotstuff.ID) int {
 func (t *Tree) replicaPosition(id hotstuff.ID) int {
 	return slices.Index(t.posToIDMapping, id)
 }
-
-func (t *Tree) isWithInIndex(position int) bool {
-	return position < len(t.posToIDMapping)
-}
