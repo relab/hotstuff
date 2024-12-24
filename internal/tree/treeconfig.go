@@ -17,17 +17,15 @@ type Tree struct {
 
 // CreateTree creates the tree configuration, currently only fault free tree configuration is supported.
 func CreateTree(myID hotstuff.ID, bf int, ids []hotstuff.ID) *Tree {
-
-	temp := len(ids)
-	temp = temp - 1 // root
-	height := 1
 	if bf < 2 {
-		panic("branch factor should be greater than 1")
+		panic("Branch factor must be greater than 1")
 	}
-	index := slices.Index(ids, myID)
-	if index == -1 {
-		panic("replica ID not found in tree configuration")
+	if slices.Index(ids, myID) == -1 {
+		panic("Replica ID not found in tree configuration")
 	}
+
+	temp := len(ids) - 1 // root
+	height := 1
 	for i := 1; temp > 0; i++ {
 		temp = temp - int(math.Pow(float64(bf), float64(i)))
 		height++
