@@ -2,27 +2,30 @@
 package main
 
 import (
-	_ "embed"
+	"embed"
 	"flag"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/relab/hotstuff/internal/cli"
+	"github.com/relab/hotstuff/internal/root"
 )
 
-//go:embed latencies.csv
-var csvLatencies string
+//go:embed latencies/*.csv
+var csvFiles embed.FS
 
 //go:generate go run .
 
 func main() {
-	dstFile := flag.String("dest", "../../internal/latency/latency_matrix.go", "file path to save latencies to.")
+	latencyFile := flag.String("file", "wonderproxy.csv", "csv file to use for latency matrix (default: wonderproxy)")
 	flag.Parse()
-	if *dstFile == "" {
-		flag.Usage()
-		os.Exit(1)
+
+	csvLatencies, err := csvFiles.ReadFile(filepath.Join("latencies", *latencyFile))
+	if err != nil {
+		log.Fatal(err)
 	}
-	allToAllMatrix, err := cli.ParseCSVLatencies(csvLatencies)
+	allToAllMatrix, err := cli.ParseCSVLatencies(string(csvLatencies))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -30,7 +33,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err = os.WriteFile(*dstFile, latenciesGoCode, 0o600); err != nil {
+
+	// file path to save generated latencies to.
+	dstFile := filepath.Join(root.Dir, "internal", "latency", "latency_matrix.go")
+	if err = os.WriteFile(dstFile, latenciesGoCode, 0o600); err != nil {
 		log.Fatal(err)
 	}
 }

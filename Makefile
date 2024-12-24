@@ -39,7 +39,7 @@ clean:
 	@rm -fv $(binaries)
 
 latencies:
-	@go run cmd/latencygen/main.go -dest internal/latencies/latency_matrix.go
+	@go run cmd/latencygen/main.go -file wonderproxy.csv
 
 %.pb.go %_gorums.pb.go : %.proto
 	protoc -I=.:$(proto_include) \

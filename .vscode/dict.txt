@@ -108,6 +108,7 @@ Warnf
 wcfg
 Welford
 Welford's
+wonderproxy
 wrfs
 xlabel
 xyer
