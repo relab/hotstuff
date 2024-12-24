@@ -116,17 +116,16 @@ func (t *Tree) NodeHeight() int {
 	return t.heightOf(t.id)
 }
 
-// PeersOf returns the peers of given ID, if any.
+// PeersOf returns the sibling peers of given ID, if any.
 func (t *Tree) PeersOf(nodeID hotstuff.ID) []hotstuff.ID {
-	peers := make([]hotstuff.ID, 0)
 	if t.IsRoot(nodeID) {
-		return peers
+		return nil
 	}
 	parent, ok := t.Parent()
 	if !ok {
-		return peers
+		return nil
 	}
-	return t.ChildrenOfNode(parent)
+	return t.ChildrenOf(parent)
 }
 
 // SubTree returns all the nodes of its subtree.
