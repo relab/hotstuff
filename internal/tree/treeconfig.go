@@ -45,10 +45,6 @@ func (t *Tree) TreeHeight() int {
 	return t.height
 }
 
-func (t *Tree) replicaPosition(id hotstuff.ID) int {
-	return slices.Index(t.posToIDMapping, id)
-}
-
 // Parent returns the ID of the parent of this tree's replica and true.
 // If this tree's replica is the root, the root's ID is returned
 // and false to indicate it does not have a parent.
@@ -59,10 +55,6 @@ func (t *Tree) Parent() (hotstuff.ID, bool) {
 	}
 	parentPos := (myPos - 1) / t.branchFactor
 	return t.posToIDMapping[parentPos], true
-}
-
-func (t *Tree) isWithInIndex(position int) bool {
-	return position < len(t.posToIDMapping)
 }
 
 // IsRoot return true if the replica is at root of the tree.
@@ -91,27 +83,6 @@ func (t *Tree) ChildrenOf(replicaID hotstuff.ID) []hotstuff.ID {
 		}
 	}
 	return children
-}
-
-// heightOf returns the height from the given replica's vantage point.
-func (t *Tree) heightOf(replicaID hotstuff.ID) int {
-	if t.IsRoot(replicaID) {
-		return t.height
-	}
-	replicaPos := t.replicaPosition(replicaID)
-	if replicaPos == -1 {
-		return 0
-	}
-	startLimit := 0
-	endLimit := 0
-	for i := 1; i < t.height; i++ {
-		startLimit = startLimit + int(math.Pow(float64(t.branchFactor), float64(i-1)))
-		endLimit = endLimit + int(math.Pow(float64(t.branchFactor), float64(i)))
-		if replicaPos >= startLimit && replicaPos <= endLimit {
-			return t.height - i
-		}
-	}
-	return 0
 }
 
 // ReplicaHeight returns the height of this tree's replica.
@@ -147,4 +118,33 @@ func (t *Tree) SubTree() []hotstuff.ID {
 		queue = append(queue, children...)
 	}
 	return subTreeReplicas
+}
+
+// heightOf returns the height from the given replica's vantage point.
+func (t *Tree) heightOf(replicaID hotstuff.ID) int {
+	if t.IsRoot(replicaID) {
+		return t.height
+	}
+	replicaPos := t.replicaPosition(replicaID)
+	if replicaPos == -1 {
+		return 0
+	}
+	startLimit := 0
+	endLimit := 0
+	for i := 1; i < t.height; i++ {
+		startLimit = startLimit + int(math.Pow(float64(t.branchFactor), float64(i-1)))
+		endLimit = endLimit + int(math.Pow(float64(t.branchFactor), float64(i)))
+		if replicaPos >= startLimit && replicaPos <= endLimit {
+			return t.height - i
+		}
+	}
+	return 0
+}
+
+func (t *Tree) replicaPosition(id hotstuff.ID) int {
+	return slices.Index(t.posToIDMapping, id)
+}
+
+func (t *Tree) isWithInIndex(position int) bool {
+	return position < len(t.posToIDMapping)
 }
