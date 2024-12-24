@@ -58,11 +58,6 @@ func (t *Tree) Parent() (hotstuff.ID, bool) {
 	return t.posToIDMapping[parentPos], true
 }
 
-// ChildrenOf returns the children of the replica, if any.
-func (t *Tree) ChildrenOf() []hotstuff.ID {
-	return t.ChildrenOfNode(t.id)
-}
-
 func (t *Tree) isWithInIndex(position int) bool {
 	return position < len(t.posToIDMapping)
 }
@@ -72,13 +67,18 @@ func (t *Tree) IsRoot(nodeID hotstuff.ID) bool {
 	return t.replicaPosition(nodeID) == 0
 }
 
-// ChildrenOfNode returns the children of a specific replica.
-func (t *Tree) ChildrenOfNode(nodeID hotstuff.ID) []hotstuff.ID {
-	children := make([]hotstuff.ID, 0)
+// NodeChildren returns the children of this tree's replica, if any.
+func (t *Tree) NodeChildren() []hotstuff.ID {
+	return t.ChildrenOf(t.id)
+}
+
+// ChildrenOf returns the children of a specific replica.
+func (t *Tree) ChildrenOf(nodeID hotstuff.ID) []hotstuff.ID {
 	nodePos := t.replicaPosition(nodeID)
 	if nodePos == -1 {
-		return children
+		return nil
 	}
+	children := make([]hotstuff.ID, 0)
 	for i := 1; i <= t.branchFactor; i++ {
 		childPos := (t.branchFactor * nodePos) + i
 		if t.isWithInIndex(childPos) {
