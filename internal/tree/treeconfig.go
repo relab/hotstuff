@@ -47,13 +47,10 @@ func (t *Tree) replicaPosition(id hotstuff.ID) int {
 	return slices.Index(t.posToIDMapping, id)
 }
 
-// Parent fetches the ID of the parent, if root, returns itself
-// bool value indicates there is no parent for this id
+// Parent returns the ID of the parent and true. If this tree's node ID is the root,
+// the root's ID is returned and false to indicate it does not have a parent.
 func (t *Tree) Parent() (hotstuff.ID, bool) {
 	myPos := t.replicaPosition(t.id)
-	if myPos == -1 {
-		return hotstuff.ID(0), false
-	}
 	if myPos == 0 {
 		return t.id, false
 	}
