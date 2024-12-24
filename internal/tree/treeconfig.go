@@ -73,16 +73,17 @@ func (t *Tree) ChildrenOf(replicaID hotstuff.ID) []hotstuff.ID {
 	if replicaPos == -1 {
 		return nil
 	}
-	children := make([]hotstuff.ID, 0)
-	for i := 1; i <= t.branchFactor; i++ {
-		childPos := (t.branchFactor * replicaPos) + i
-		if t.isWithInIndex(childPos) {
-			children = append(children, t.posToIDMapping[childPos])
-		} else {
-			break
-		}
+	childStart := replicaPos*t.branchFactor + 1
+	if childStart >= len(t.posToIDMapping) {
+		// no children since start is beyond slice length
+		return nil
 	}
-	return children
+	childEnd := childStart + t.branchFactor
+	if childEnd > len(t.posToIDMapping) {
+		// clamp to the slice length
+		childEnd = len(t.posToIDMapping)
+	}
+	return t.posToIDMapping[childStart:childEnd]
 }
 
 // ReplicaHeight returns the height of this tree's replica.
