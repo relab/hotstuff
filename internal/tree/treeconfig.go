@@ -128,21 +128,18 @@ func (t *Tree) PeersOf(nodeID hotstuff.ID) []hotstuff.ID {
 	return t.ChildrenOf(parent)
 }
 
-// SubTree returns all the nodes of its subtree.
+// SubTree returns all subtree nodes of this tree's replica.
 func (t *Tree) SubTree() []hotstuff.ID {
-	nodeID := t.id
-	subTreeNodes := make([]hotstuff.ID, 0)
-	children := t.ChildrenOfNode(nodeID)
-	queue := make([]hotstuff.ID, 0)
-	queue = append(queue, children...)
-	subTreeNodes = append(subTreeNodes, children...)
+	children := t.ChildrenOf(t.id)
 	if len(children) == 0 {
-		return subTreeNodes
+		return nil
 	}
+	subTreeNodes := slices.Clone(children)
+	queue := slices.Clone(children)
 	for len(queue) > 0 {
 		child := queue[0]
 		queue = queue[1:]
-		children := t.ChildrenOfNode(child)
+		children := t.ChildrenOf(child)
 		subTreeNodes = append(subTreeNodes, children...)
 		queue = append(queue, children...)
 	}
