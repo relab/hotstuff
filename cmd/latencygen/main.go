@@ -29,7 +29,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	latenciesGoCode, err := cli.GenerateGoLatencyMatrix(allToAllMatrix)
+	srcFile := filepath.Join("cmd", "latencygen", "latencies", *latencyFile)
+	latenciesGoCode, err := cli.GenerateGoLatencyMatrix(srcFile, allToAllMatrix)
 	if err != nil {
 		log.Fatal(err)
 	}

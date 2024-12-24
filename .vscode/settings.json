@@ -27,6 +27,8 @@
 		".vscode-insiders",
 		"go.mod",
 		"go.sum",
+		"**/**/latency_matrix.go",
+		"**/**/*.csv",
 		"**/**/*.pb.go"
 	]
 }
