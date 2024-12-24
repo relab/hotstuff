@@ -15,9 +15,9 @@ type backendOptions struct {
 // ServerOptions is a function for configuring the Server.
 type ServerOptions func(*backendOptions)
 
-// WithLocations sets the locations assigned to the replicas and
+// WithLatencies sets the locations assigned to the replicas and
 // constructs the corresponding latency matrix.
-func WithLocations(id hotstuff.ID, locations []string) ServerOptions {
+func WithLatencies(id hotstuff.ID, locations []string) ServerOptions {
 	return func(opts *backendOptions) {
 		opts.id = id
 		opts.latencyMatrix = latency.MatrixFrom(locations)

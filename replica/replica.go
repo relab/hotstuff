@@ -91,7 +91,7 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 	}
 
 	srv.hsSrv = backend.NewServer(
-		backend.WithLocations(conf.ID, conf.Locations),
+		backend.WithLatencies(conf.ID, conf.Locations),
 		backend.WithGorumsServerOptions(replicaSrvOpts...),
 	)
 
