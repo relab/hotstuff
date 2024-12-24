@@ -1,6 +1,7 @@
 package tree
 
 import (
+	"fmt"
 	"slices"
 	"sort"
 	"testing"
@@ -123,33 +124,29 @@ func TestTreeAPIWithInitializeWithPIDs(t *testing.T) {
 	}
 }
 
-func benchmarkGetChildren(size int, bf int, b *testing.B) {
-	ids := make([]hotstuff.ID, size)
-	for i := 0; i < size; i++ {
-		ids[i] = hotstuff.ID(i + 1)
+func BenchmarkReplicaChildren(b *testing.B) {
+	benchmarks := []struct {
+		size int
+		bf   int
+	}{
+		{size: 10, bf: 2},
+		{size: 21, bf: 4},
+		{size: 111, bf: 10},
+		{size: 211, bf: 14},
+		{size: 421, bf: 20},
 	}
-	tree := CreateTree(1, bf, ids)
-	for i := 0; i < b.N; i++ {
-		tree.ReplicaChildren()
+	for _, bm := range benchmarks {
+		b.Run(fmt.Sprintf("size=%d/bf=%d", bm.size, bm.bf), func(b *testing.B) {
+			ids := make([]hotstuff.ID, bm.size)
+			for i := 0; i < bm.size; i++ {
+				ids[i] = hotstuff.ID(i + 1)
+			}
+			tree := CreateTree(1, bm.bf, ids)
+			// replace `for range b.N` with `for b.Loop()` when go 1.24 released (in release candidate as of writing)
+			// for b.Loop() {
+			for range b.N {
+				tree.ReplicaChildren()
+			}
+		})
 	}
-}
-
-func BenchmarkGetChildren10(b *testing.B) {
-	benchmarkGetChildren(10, 2, b)
-}
-
-func BenchmarkGetChildren21(b *testing.B) {
-	benchmarkGetChildren(21, 4, b)
-}
-
-func BenchmarkGetChildren111(b *testing.B) {
-	benchmarkGetChildren(111, 10, b)
-}
-
-func BenchmarkGetChildren211(b *testing.B) {
-	benchmarkGetChildren(211, 14, b)
-}
-
-func BenchmarkGetChildren421(b *testing.B) {
-	benchmarkGetChildren(421, 20, b)
 }
