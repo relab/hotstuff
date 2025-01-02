@@ -3,7 +3,6 @@ package tree
 import (
 	"fmt"
 	"slices"
-	"sort"
 	"testing"
 
 	"github.com/relab/hotstuff"
@@ -98,12 +97,12 @@ func TestTreeAPIWithInitializeWithPIDs(t *testing.T) {
 			t.Errorf("Expected height %d, got %d", test.height, tree.TreeHeight())
 		}
 		gotChildren := tree.ReplicaChildren()
-		sort.Slice(gotChildren, func(i, j int) bool { return gotChildren[i] < gotChildren[j] })
+		slices.Sort(gotChildren)
 		if len(gotChildren) != len(test.children) || !slices.Equal(gotChildren, test.children) {
 			t.Errorf("Expected %v, got %v", test.children, tree.ReplicaChildren())
 		}
 		subTree := tree.SubTree()
-		sort.Slice(subTree, func(i, j int) bool { return subTree[i] < subTree[j] })
+		slices.Sort(subTree)
 		if len(subTree) != len(test.subTreeReplicas) ||
 			!slices.Equal(subTree, test.subTreeReplicas) {
 			t.Errorf("Expected %v, got %v", test.subTreeReplicas, tree.SubTree())
@@ -120,7 +119,7 @@ func TestTreeAPIWithInitializeWithPIDs(t *testing.T) {
 			t.Errorf("Expected %d, got %d", test.replicaHeight, tree.ReplicaHeight())
 		}
 		gotPeers := tree.PeersOf(test.id)
-		sort.Slice(gotPeers, func(i, j int) bool { return gotPeers[i] < gotPeers[j] })
+		slices.Sort(gotPeers)
 		if len(gotPeers) != len(test.peers) || !slices.Equal(gotPeers, test.peers) {
 			t.Errorf("Expected %v, got %v", test.peers, tree.PeersOf(test.id))
 		}
