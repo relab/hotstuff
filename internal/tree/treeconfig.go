@@ -1,13 +1,12 @@
 package tree
 
 import (
-	"math"
 	"slices"
 
 	"github.com/relab/hotstuff"
 )
 
-// Tree implements a fault free tree configuration.
+// Tree contains the local replica's ID which must be part of the tree.
 type Tree struct {
 	id             hotstuff.ID
 	height         int
@@ -25,19 +24,26 @@ func CreateTree(myID hotstuff.ID, bf int, ids []hotstuff.ID) *Tree {
 		panic("Replica ID not found in tree configuration")
 	}
 
-	// compute height of the tree
-	temp := len(ids) - 1 // root
-	height := 1
-	for i := 1; temp > 0; i++ {
-		temp = temp - int(math.Pow(float64(bf), float64(i)))
-		height++
-	}
 	return &Tree{
 		id:             myID,
-		height:         height,
+		height:         treeHeight(len(ids), bf),
 		branchFactor:   bf,
 		posToIDMapping: ids,
 	}
+}
+
+// treeHeight returns the height of a tree with numNodes and branch factor bf.
+func treeHeight(numNodes, bf int) (height int) {
+	// number of nodes at the current level (root = 1)
+	levelSize := 1
+
+	// subtract the number of nodes at each level until we run out of nodes.
+	for numNodes > 0 {
+		numNodes -= levelSize
+		levelSize *= bf // next level has bf times more nodes
+		height++
+	}
+	return height
 }
 
 // TreeHeight returns the height of the full tree.

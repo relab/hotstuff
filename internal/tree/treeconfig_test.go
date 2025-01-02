@@ -19,6 +19,8 @@ func TestCreateTree(t *testing.T) {
 		{configurationSize: 10, id: 1, branchFactor: 2, wantHeight: 4},
 		{configurationSize: 21, id: 1, branchFactor: 4, wantHeight: 3},
 		{configurationSize: 21, id: 1, branchFactor: 3, wantHeight: 4},
+		{configurationSize: 43, id: 1, branchFactor: 5, wantHeight: 4},
+		{configurationSize: 43, id: 1, branchFactor: 4, wantHeight: 4},
 		{configurationSize: 111, id: 1, branchFactor: 10, wantHeight: 3},
 		{configurationSize: 111, id: 1, branchFactor: 3, wantHeight: 5},
 	}
