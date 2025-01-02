@@ -76,6 +76,7 @@ func (t *Tree) ReplicaChildren() []hotstuff.ID {
 func (t *Tree) ChildrenOf(replicaID hotstuff.ID) []hotstuff.ID {
 	replicaPos := t.replicaPosition(replicaID)
 	if replicaPos == -1 {
+		// safe since nil slices are equal to empty slices when iterating.
 		return nil
 	}
 	childStart := replicaPos*t.branchFactor + 1
@@ -99,6 +100,7 @@ func (t *Tree) ReplicaHeight() int {
 // PeersOf returns the sibling peers of given ID, if any.
 func (t *Tree) PeersOf(replicaID hotstuff.ID) []hotstuff.ID {
 	if t.IsRoot(replicaID) {
+		// safe since nil slices are equal to empty slices when iterating.
 		return nil
 	}
 	parent, ok := t.Parent()
@@ -112,7 +114,7 @@ func (t *Tree) PeersOf(replicaID hotstuff.ID) []hotstuff.ID {
 func (t *Tree) SubTree() []hotstuff.ID {
 	children := t.ChildrenOf(t.id)
 	if len(children) == 0 {
-		// safe to return nil since nil slices are equal to empty slices
+		// safe since nil slices are equal to empty slices when iterating.
 		return nil
 	}
 	subTreeReplicas := make([]hotstuff.ID, len(children))
