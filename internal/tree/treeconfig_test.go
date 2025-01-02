@@ -9,6 +9,15 @@ import (
 	"github.com/relab/hotstuff"
 )
 
+// replicaIDs returns a slice of hotstuff.IDs from 1 to size.
+func replicaIDs(size int) []hotstuff.ID {
+	ids := make([]hotstuff.ID, size)
+	for i := range size {
+		ids[i] = hotstuff.ID(i + 1)
+	}
+	return ids
+}
+
 func TestCreateTree(t *testing.T) {
 	tests := []struct {
 		configurationSize int
@@ -25,11 +34,7 @@ func TestCreateTree(t *testing.T) {
 		{configurationSize: 111, id: 1, branchFactor: 3, wantHeight: 5},
 	}
 	for _, test := range tests {
-		ids := make([]hotstuff.ID, test.configurationSize)
-		for i := 0; i < test.configurationSize; i++ {
-			ids[i] = hotstuff.ID(i + 1)
-		}
-		tree := CreateTree(test.id, test.branchFactor, ids)
+		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.configurationSize))
 		if tree.TreeHeight() != test.wantHeight {
 			t.Errorf("CreateTree(%d, %d, %d).GetTreeHeight() = %d, want %d",
 				test.configurationSize, test.id, test.branchFactor, tree.TreeHeight(), test.wantHeight)
@@ -88,11 +93,7 @@ func TestTreeAPIWithInitializeWithPIDs(t *testing.T) {
 		{21, 5, 4, 3, []hotstuff.ID{18, 19, 20, 21}, []hotstuff.ID{18, 19, 20, 21}, 1, false, 2, []hotstuff.ID{2, 3, 4, 5}},
 	}
 	for _, test := range treeConfigTestData {
-		ids := make([]hotstuff.ID, test.configurationSize)
-		for i := 0; i < test.configurationSize; i++ {
-			ids[i] = hotstuff.ID(i + 1)
-		}
-		tree := CreateTree(test.id, test.branchFactor, ids)
+		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.configurationSize))
 		if tree.TreeHeight() != test.height {
 			t.Errorf("Expected height %d, got %d", test.height, tree.TreeHeight())
 		}
@@ -139,11 +140,7 @@ func BenchmarkReplicaChildren(b *testing.B) {
 	}
 	for _, bm := range benchmarks {
 		b.Run(fmt.Sprintf("size=%d/bf=%d", bm.size, bm.bf), func(b *testing.B) {
-			ids := make([]hotstuff.ID, bm.size)
-			for i := 0; i < bm.size; i++ {
-				ids[i] = hotstuff.ID(i + 1)
-			}
-			tree := CreateTree(1, bm.bf, ids)
+			tree := CreateTree(1, bm.bf, replicaIDs(bm.size))
 			// replace `for range b.N` with `for b.Loop()` when go 1.24 released (in release candidate as of writing)
 			// for b.Loop() {
 			for range b.N {
