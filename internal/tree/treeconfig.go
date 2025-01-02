@@ -8,10 +8,10 @@ import (
 
 // Tree contains the local replica's ID which must be part of the tree.
 type Tree struct {
-	id             hotstuff.ID
-	height         int
-	posToIDMapping []hotstuff.ID
-	branchFactor   int
+	id           hotstuff.ID
+	height       int
+	branchFactor int
+	treePosToID  []hotstuff.ID
 }
 
 // CreateTree creates the tree configuration.
@@ -25,10 +25,10 @@ func CreateTree(myID hotstuff.ID, bf int, ids []hotstuff.ID) *Tree {
 	}
 
 	return &Tree{
-		id:             myID,
-		height:         treeHeight(len(ids), bf),
-		branchFactor:   bf,
-		posToIDMapping: ids,
+		id:           myID,
+		height:       treeHeight(len(ids), bf),
+		branchFactor: bf,
+		treePosToID:  ids,
 	}
 }
 
@@ -60,7 +60,7 @@ func (t *Tree) Parent() (hotstuff.ID, bool) {
 		return t.id, false
 	}
 	parentPos := (myPos - 1) / t.branchFactor
-	return t.posToIDMapping[parentPos], true
+	return t.treePosToID[parentPos], true
 }
 
 // IsRoot return true if the replica is at root of the tree.
@@ -80,16 +80,16 @@ func (t *Tree) ChildrenOf(replicaID hotstuff.ID) []hotstuff.ID {
 		return nil
 	}
 	childStart := replicaPos*t.branchFactor + 1
-	if childStart >= len(t.posToIDMapping) {
+	if childStart >= len(t.treePosToID) {
 		// no children since start is beyond slice length
 		return nil
 	}
 	childEnd := childStart + t.branchFactor
-	if childEnd > len(t.posToIDMapping) {
+	if childEnd > len(t.treePosToID) {
 		// clamp to the slice length
-		childEnd = len(t.posToIDMapping)
+		childEnd = len(t.treePosToID)
 	}
-	return t.posToIDMapping[childStart:childEnd]
+	return t.treePosToID[childStart:childEnd]
 }
 
 // ReplicaHeight returns the height of this tree's replica.
@@ -161,5 +161,5 @@ func (t *Tree) heightOf(replicaID hotstuff.ID) int {
 }
 
 func (t *Tree) replicaPosition(id hotstuff.ID) int {
-	return slices.Index(t.posToIDMapping, id)
+	return slices.Index(t.treePosToID, id)
 }
