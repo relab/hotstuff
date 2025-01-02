@@ -55,21 +55,19 @@ func TestCreateTreeInvalidID(t *testing.T) {
 	t.Errorf("CreateTree should panic, got %v", tree)
 }
 
-type treeConfigTest struct {
-	configurationSize int
-	id                hotstuff.ID
-	branchFactor      int
-	height            int
-	children          []hotstuff.ID
-	subTreeReplicas   []hotstuff.ID
-	parent            hotstuff.ID
-	isRoot            bool
-	replicaHeight     int
-	peers             []hotstuff.ID
-}
-
-func TestTreeAPIWithInitializeWithPIDs(t *testing.T) {
-	treeConfigTestData := []treeConfigTest{
+func TreeTreeMethods(t *testing.T) {
+	treeConfigTestData := []struct {
+		configurationSize int
+		id                hotstuff.ID
+		branchFactor      int
+		wantTreeHeight    int
+		wantChildren      []hotstuff.ID
+		wantSubTree       []hotstuff.ID
+		wantParent        hotstuff.ID
+		wantIsRoot        bool
+		wantReplicaHeight int
+		wantPeers         []hotstuff.ID
+	}{
 		{10, 1, 2, 4, []hotstuff.ID{2, 3}, []hotstuff.ID{2, 3, 4, 5, 6, 7, 8, 9, 10}, 1, true, 4, []hotstuff.ID{}},
 		{10, 5, 2, 4, []hotstuff.ID{10}, []hotstuff.ID{10}, 2, false, 2, []hotstuff.ID{4, 5}},
 		{10, 2, 2, 4, []hotstuff.ID{4, 5}, []hotstuff.ID{4, 5, 8, 9, 10}, 1, false, 3, []hotstuff.ID{2, 3}},
@@ -93,35 +91,37 @@ func TestTreeAPIWithInitializeWithPIDs(t *testing.T) {
 	}
 	for _, test := range treeConfigTestData {
 		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.configurationSize))
-		if tree.TreeHeight() != test.height {
-			t.Errorf("Expected height %d, got %d", test.height, tree.TreeHeight())
+		gotTreeHeight := tree.TreeHeight()
+		if gotTreeHeight != test.wantTreeHeight {
+			t.Errorf("TreeHeight() = %d, want %d", gotTreeHeight, test.wantTreeHeight)
 		}
 		gotChildren := tree.ReplicaChildren()
 		slices.Sort(gotChildren)
-		if len(gotChildren) != len(test.children) || !slices.Equal(gotChildren, test.children) {
-			t.Errorf("Expected %v, got %v", test.children, tree.ReplicaChildren())
+		if !slices.Equal(gotChildren, test.wantChildren) {
+			t.Errorf("ReplicaChildren() = %v, want %v", gotChildren, test.wantChildren)
 		}
-		subTree := tree.SubTree()
-		slices.Sort(subTree)
-		if len(subTree) != len(test.subTreeReplicas) ||
-			!slices.Equal(subTree, test.subTreeReplicas) {
-			t.Errorf("Expected %v, got %v", test.subTreeReplicas, tree.SubTree())
+		gotSubTree := tree.SubTree()
+		slices.Sort(gotSubTree)
+		if !slices.Equal(gotSubTree, test.wantSubTree) {
+			t.Errorf("SubTree() = %v, want %v", gotSubTree, test.wantSubTree)
 		}
-		if parent, ok := tree.Parent(); ok {
-			if parent != test.parent {
-				t.Errorf("Expected %d, got %d", test.parent, parent)
+		if gotParent, ok := tree.Parent(); ok {
+			if gotParent != test.wantParent {
+				t.Errorf("Parent() = %d, want %d", gotParent, test.wantParent)
 			}
 		}
-		if tree.IsRoot(test.id) != test.isRoot {
-			t.Errorf("Expected %t, got %t", test.isRoot, tree.IsRoot(test.id))
+		gotIsRoot := tree.IsRoot(test.id)
+		if gotIsRoot != test.wantIsRoot {
+			t.Errorf("IsRoot() = %t, want %t", gotIsRoot, test.wantIsRoot)
 		}
-		if tree.ReplicaHeight() != test.replicaHeight {
-			t.Errorf("Expected %d, got %d", test.replicaHeight, tree.ReplicaHeight())
+		gotReplicaHeight := tree.ReplicaHeight()
+		if gotReplicaHeight != test.wantReplicaHeight {
+			t.Errorf("ReplicaHeight() = %d, want %d", gotReplicaHeight, test.wantReplicaHeight)
 		}
 		gotPeers := tree.PeersOf(test.id)
 		slices.Sort(gotPeers)
-		if len(gotPeers) != len(test.peers) || !slices.Equal(gotPeers, test.peers) {
-			t.Errorf("Expected %v, got %v", test.peers, tree.PeersOf(test.id))
+		if !slices.Equal(gotPeers, test.wantPeers) {
+			t.Errorf("PeersOf() = %v, want %v", gotPeers, test.wantPeers)
 		}
 	}
 }
