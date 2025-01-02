@@ -15,7 +15,6 @@ type Tree struct {
 }
 
 // CreateTree creates the tree configuration.
-// Currently only fault free tree configuration is supported.
 func CreateTree(myID hotstuff.ID, bf int, ids []hotstuff.ID) *Tree {
 	if bf < 2 {
 		panic("Branch factor must be greater than 1")
@@ -113,6 +112,7 @@ func (t *Tree) PeersOf(replicaID hotstuff.ID) []hotstuff.ID {
 func (t *Tree) SubTree() []hotstuff.ID {
 	children := t.ChildrenOf(t.id)
 	if len(children) == 0 {
+		// safe to return nil since nil slices are equal to empty slices
 		return nil
 	}
 	subTreeReplicas := make([]hotstuff.ID, len(children))
@@ -131,6 +131,8 @@ func (t *Tree) heightOf(replicaID hotstuff.ID) int {
 		return t.height
 	}
 	replicaPos := t.replicaPosition(replicaID)
+	// this -1 check is only necessary if we export this method.
+	// it is not necessary for internal use since then we know the replica is in the tree.
 	if replicaPos == -1 {
 		return 0
 	}
