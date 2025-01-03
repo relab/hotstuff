@@ -220,19 +220,14 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		}
 		builder.Add(m)
 	}
-	// convert location info map key from uint32 to hotstuff.ID
-	locationInfo := make(map[hotstuff.ID]string)
-	for k, v := range opts.GetLocationInfo() {
-		locationInfo[hotstuff.ID(k)] = v
-	}
 	c := replica.Config{
-		ID:           hotstuff.ID(opts.GetID()),
-		PrivateKey:   privKey,
-		TLS:          opts.GetUseTLS(),
-		Certificate:  &certificate,
-		RootCAs:      rootCAs,
-		LocationInfo: locationInfo,
-		BatchSize:    opts.GetBatchSize(),
+		ID:          hotstuff.ID(opts.GetID()),
+		PrivateKey:  privKey,
+		TLS:         opts.GetUseTLS(),
+		Certificate: &certificate,
+		RootCAs:     rootCAs,
+		Locations:   opts.GetLocations(),
+		BatchSize:   opts.GetBatchSize(),
 		ManagerOptions: []gorums.ManagerOption{
 			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 			gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),

@@ -44,8 +44,8 @@ type Config struct {
 	ReplicaServerOptions []gorums.ServerOption
 	// Options for the replica manager.
 	ManagerOptions []gorums.ManagerOption
-	// Location information of all replicas
-	LocationInfo map[hotstuff.ID]string
+	// Location names of all replicas.
+	Locations []string
 }
 
 // Replica is a participant in the consensus protocol.
@@ -91,7 +91,7 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 	}
 
 	srv.hsSrv = backend.NewServer(
-		backend.WithLatencyInfo(conf.ID, conf.LocationInfo),
+		backend.WithLatencies(conf.ID, conf.Locations),
 		backend.WithGorumsServerOptions(replicaSrvOpts...),
 	)
 

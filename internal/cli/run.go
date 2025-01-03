@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
@@ -177,17 +177,16 @@ func runController() {
 	experiment.HostConfigs = make(map[string]orchestration.HostConfig)
 
 	var hostConfigs []orchestration.HostConfig
-
 	err = viper.UnmarshalKey("hosts-config", &hostConfigs)
 	checkf("failed to unmarshal hosts-config: %v", err)
 
 	for _, cfg := range hostConfigs {
 		experiment.HostConfigs[cfg.Name] = cfg
-		if cfg.Location == "" {
-			cfg.Location = hotstuff.DefaultLocation
+		cfg.Location, err = latency.ValidLocation(cfg.Location)
+		log.Printf("cfg.Location: %v", cfg.Location)
+		if err != nil {
+			checkf("invalid configuration for %s: %v", cfg.Name, err)
 		}
-		err := checkHostLocation(cfg.Location)
-		checkf("invalid configuration for %s: %v", cfg.Name, err)
 	}
 
 	err = experiment.Run()
@@ -208,21 +207,6 @@ func runController() {
 
 	err = g.Close()
 	checkf("failed to close ssh connections: %v", err)
-}
-
-func checkHostLocation(location string) error {
-	validLocations := [...]string{
-		"Cape Town", "Hong Kong", "Tokyo",
-		"Seoul", "Osaka", "Mumbai", "Singapore", "Sydney", "Central", "Frankfurt",
-		"Stockholm", "Milan", "Ireland", "London", "Paris", "Bahrain", "Sao Paulo",
-		"N. Virginia", "Ohio", "N. California", "Oregon", hotstuff.DefaultLocation,
-	}
-	for _, name := range validLocations {
-		if name == location {
-			return nil
-		}
-	}
-	return fmt.Errorf("unknown location: %s", location)
 }
 
 func checkf(format string, args ...any) {

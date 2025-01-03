@@ -11,7 +11,9 @@ gorums_go := internal/proto/clientpb/client_gorums.pb.go \
 
 binaries := hotstuff plot
 
-.PHONY: all debug clean protos download tools $(binaries)
+CSV ?= wonderproxy.csv
+
+.PHONY: all aws wonderproxy latencies debug clean protos download tools $(binaries)
 
 all: $(binaries)
 
@@ -37,6 +39,16 @@ lint:
 
 clean:
 	@rm -fv $(binaries)
+
+latencies:
+	@echo "Generating Latency Matrix using $(CSV)"
+	@go run cmd/latencygen/main.go -file "$(CSV)"
+
+wonderproxy:
+	@$(MAKE) latencies CSV=wonderproxy.csv
+
+aws:
+	@$(MAKE) latencies CSV=aws.csv
 
 %.pb.go %_gorums.pb.go : %.proto
 	protoc -I=.:$(proto_include) \

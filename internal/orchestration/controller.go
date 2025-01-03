@@ -167,7 +167,8 @@ func (e *Experiment) createReplicas() (cfg *orchestrationpb.ReplicaConfiguration
 			} else {
 				replicaCfg.Address = host
 			}
-			e.Logger.Debugf("Address for replica %d: %s", id, replicaCfg.Address)
+			e.Logger.Debugf("Replica %d: Address: %s, PublicKey: %t, ReplicaPort: %d, ClientPort: %d",
+				id, replicaCfg.Address, len(replicaCfg.PublicKey) > 0, replicaCfg.ReplicaPort, replicaCfg.ClientPort)
 			cfg.Replicas[id] = replicaCfg
 		}
 	}
@@ -181,7 +182,7 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 	e.hostsToReplicas = make(map[string][]hotstuff.ID)
 	e.replicaOpts = make(map[hotstuff.ID]*orchestrationpb.ReplicaOpts)
 	e.hostsToClients = make(map[string][]hotstuff.ID)
-	replicaLocationInfo := make(map[uint32]string)
+	replicaLocations := make([]string, 0, e.NumReplicas)
 	nextReplicaID := hotstuff.ID(1)
 	nextClientID := hotstuff.ID(1)
 
@@ -273,9 +274,9 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 			replicaOpts := proto.Clone(e.ReplicaOpts).(*orchestrationpb.ReplicaOpts)
 			replicaOpts.ID = uint32(nextReplicaID)
 			replicaOpts.ByzantineStrategy = byzantineStrategy
-			replicaLocationInfo[replicaOpts.ID] = location
-			// all replicaOpts share the same LocationInfo map, which is progressively updated
-			replicaOpts.LocationInfo = replicaLocationInfo
+			replicaLocations = append(replicaLocations, location)
+			// all replicaOpts share the same Locations slice, which is progressively updated
+			replicaOpts.Locations = replicaLocations
 			e.hostsToReplicas[host] = append(e.hostsToReplicas[host], nextReplicaID)
 			e.replicaOpts[nextReplicaID] = replicaOpts
 			e.Logger.Infof("replica %d assigned to host %s", nextReplicaID, host)

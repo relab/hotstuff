@@ -51,8 +51,8 @@ message ReplicaOpts {
   int64 SharedSeed = 20;
   // A list of modules to load.
   repeated string Modules = 21;
-  // locations of the replicas
-  map<uint32,string> LocationInfo = 22;
+  // Replica locations indexed by replica ID.
+  repeated string Locations = 22;
 }
 
 // ReplicaInfo is the information that the replicas need about each other.
@@ -100,9 +100,13 @@ message ReplicaConfiguration {
 
 /* ---------------------------- CreateReplica RPC --------------------------- */
 
-message CreateReplicaRequest { map<uint32, ReplicaOpts> Replicas = 1; }
+message CreateReplicaRequest {
+  map<uint32, ReplicaOpts> Replicas = 1;
+}
 
-message CreateReplicaResponse { map<uint32, ReplicaInfo> Replicas = 1; }
+message CreateReplicaResponse {
+  map<uint32, ReplicaInfo> Replicas = 1;
+}
 
 /* ---------------------------- StartReplica RPC ---------------------------- */
 
@@ -117,13 +121,15 @@ message StartReplicaResponse {}
 
 /* ----------------------------- StopReplica RPC ---------------------------- */
 
-message StopReplicaRequest { repeated uint32 IDs = 1; }
+message StopReplicaRequest {
+  repeated uint32 IDs = 1;
+}
 
-message StopReplicaResponse { 
+message StopReplicaResponse {
   // The final state hash of all executed commands
-  map<uint32, bytes> Hashes = 1; 
+  map<uint32, bytes> Hashes = 1;
   // The final count of executed commands
-  map<uint32, uint32> Counts = 2; 
+  map<uint32, uint32> Counts = 2;
 }
 
 /* ----------------------------- StartClient RPC ---------------------------- */
@@ -141,7 +147,9 @@ message StartClientResponse {}
 
 /* ----------------------------- StopClient RPC ----------------------------- */
 
-message StopClientRequest { repeated uint32 IDs = 1; }
+message StopClientRequest {
+  repeated uint32 IDs = 1;
+}
 
 message StopClientResponse {}
 

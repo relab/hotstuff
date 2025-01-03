@@ -1,38 +1,26 @@
 package backend
 
 import (
-	"time"
-
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/latency"
 )
 
 type backendOptions struct {
-	location          string
-	locationInfo      map[hotstuff.ID]string
-	locationLatencies map[string]time.Duration
-	gorumsSrvOpts     []gorums.ServerOption
+	id            hotstuff.ID
+	latencyMatrix latency.Matrix
+	gorumsSrvOpts []gorums.ServerOption
 }
 
 // ServerOptions is a function for configuring the Server.
 type ServerOptions func(*backendOptions)
 
-// WithLatencyInfo sets the location of the replica and the latency matrix.
-func WithLatencyInfo(id hotstuff.ID, locationInfo map[hotstuff.ID]string) ServerOptions {
+// WithLatencies sets the locations assigned to the replicas and
+// constructs the corresponding latency matrix.
+func WithLatencies(id hotstuff.ID, locations []string) ServerOptions {
 	return func(opts *backendOptions) {
-		location, ok := locationInfo[id]
-		if !ok {
-			opts.location = hotstuff.DefaultLocation
-			return
-		}
-		opts.location = location
-		opts.locationInfo = locationInfo
-		locationLatencies, ok := latencies[location]
-		if !ok {
-			opts.location = hotstuff.DefaultLocation
-			return
-		}
-		opts.locationLatencies = locationLatencies
+		opts.id = id
+		opts.latencyMatrix = latency.MatrixFrom(locations)
 	}
 }
 
