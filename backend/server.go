@@ -159,8 +159,11 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposal.Block.Proposer = uint32(id)
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
-	impl.srv.addNetworkDelay(id)
-	impl.srv.eventLoop.AddEvent(proposeMsg)
+	//impl.srv.addNetworkDelay(id)
+	//impl.srv.eventLoop.AddEvent(proposeMsg)
+	delay := impl.srv.lm.Latency(impl.srv.id, id)
+	impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(id), delay)
+	impl.srv.eventLoop.DelayEvent(proposeMsg, delay)
 }
 
 // Vote handles an incoming vote message.
@@ -170,11 +173,19 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
 	}
-	impl.srv.addNetworkDelay(id)
-	impl.srv.eventLoop.AddEvent(hotstuff.VoteMsg{
+
+	// impl.srv.addNetworkDelay(id)
+	// impl.srv.eventLoop.AddEvent(hotstuff.VoteMsg{
+	// 	ID:          id,
+	// 	PartialCert: hotstuffpb.PartialCertFromProto(cert),
+	// })
+
+	delay := impl.srv.lm.Latency(impl.srv.id, id)
+	impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(id), delay)
+	impl.srv.eventLoop.DelayEvent(hotstuff.VoteMsg{
 		ID:          id,
 		PartialCert: hotstuffpb.PartialCertFromProto(cert),
-	})
+	}, delay)
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
@@ -184,11 +195,19 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
 	}
-	impl.srv.addNetworkDelay(id)
-	impl.srv.eventLoop.AddEvent(hotstuff.NewViewMsg{
+
+	// impl.srv.addNetworkDelay(id)
+	// impl.srv.eventLoop.AddEvent(hotstuff.NewViewMsg{
+	// 	ID:       id,
+	// 	SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
+	// })
+
+	delay := impl.srv.lm.Latency(impl.srv.id, id)
+	impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(id), delay)
+	impl.srv.eventLoop.DelayEvent(hotstuff.NewViewMsg{
 		ID:       id,
 		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
-	})
+	}, delay)
 }
 
 // Fetch handles an incoming fetch request.
@@ -214,8 +233,13 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	}
 	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
 	timeoutMsg.ID = id
-	impl.srv.addNetworkDelay(id)
-	impl.srv.eventLoop.AddEvent(timeoutMsg)
+
+	// impl.srv.addNetworkDelay(id)
+	// impl.srv.eventLoop.AddEvent(timeoutMsg)
+
+	delay := impl.srv.lm.Latency(impl.srv.id, id)
+	impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(id), delay)
+	impl.srv.eventLoop.DelayEvent(timeoutMsg, delay)
 }
 
 type replicaConnected struct {

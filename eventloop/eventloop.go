@@ -49,6 +49,11 @@ type handler struct {
 	opts     handlerOpts
 }
 
+type delayedEventWrapper struct {
+	deadline time.Time
+	event    any
+}
+
 // EventLoop accepts events of any type and executes registered event handlers.
 type EventLoop struct {
 	eventQ queue
@@ -58,6 +63,8 @@ type EventLoop struct {
 	ctx context.Context // set by Run
 
 	waitingEvents map[reflect.Type][]any
+
+	delayedEvents []*delayedEventWrapper
 
 	handlers map[reflect.Type][]handler
 
@@ -71,6 +78,7 @@ func New(bufferSize uint) *EventLoop {
 		ctx:           context.Background(),
 		eventQ:        newQueue(bufferSize),
 		waitingEvents: make(map[reflect.Type][]any),
+		delayedEvents: make([]*delayedEventWrapper, 0),
 		handlers:      make(map[reflect.Type][]handler),
 		tickers:       make(map[int]*ticker),
 	}
@@ -145,6 +153,23 @@ func (el *EventLoop) AddEvent(event any) {
 	}
 }
 
+// DelayEvent adds an event to a separate queue that triggers the event's handler
+// after a delay. The delay is computed for every tick in the eventloop's main loop.
+// If the delay is zero or negative, AddEvent is called instead.
+func (el *EventLoop) DelayEvent(event any, delay time.Duration) {
+	if delay <= 0 {
+		el.AddEvent(event)
+		return
+	}
+
+	el.mut.Lock()
+	defer el.mut.Unlock()
+	el.delayedEvents = append(el.delayedEvents, &delayedEventWrapper{
+		deadline: time.Now().Add(delay),
+		event:    event,
+	})
+}
+
 // Context returns the context associated with the event loop.
 // Usually, this context will be the one passed to Run.
 // However, if Tick is used instead of Run, Context will return
@@ -185,6 +210,30 @@ loop:
 			continue
 		}
 		el.processEvent(event, false)
+
+		// TODO: Handling delayed events is done after the normal way. This means delayed ones become even less prioritized.
+		now := time.Now()
+		expiredEvents := make([]any, 0)
+		for _, wrapper := range el.delayedEvents {
+			if wrapper.deadline.Compare(now) <= 0 {
+				// TODO: Log out the excess time
+				expiredEvents = append(expiredEvents, wrapper.event)
+				el.processEvent(wrapper.event, false)
+			}
+		}
+
+		// Remove delayed events from list
+		// TODO: Find out a cleaner way to delete the event from the list
+		for _, e := range expiredEvents {
+			i := -1
+			for j, f := range el.delayedEvents { // Find
+				if f == e {
+					i = j
+					break
+				}
+			}
+			el.delayedEvents = append(el.delayedEvents[:i], el.delayedEvents[:i+1]...)
+		}
 	}
 
 	// HACK: when we get canceled, we will handle the events that were in the queue at that time before quitting.
