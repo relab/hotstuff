@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"time"
 
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
@@ -70,7 +69,7 @@ func (srv *Server) addNetworkDelay(sender hotstuff.ID) {
 	}
 	delay := srv.lm.Latency(srv.id, sender)
 	srv.logger.Debugf("Delay between %s and %s: %v\n", srv.lm.Location(srv.id), srv.lm.Location(sender), delay)
-	time.Sleep(delay)
+	srv.lm.Delay(srv.id, sender)
 }
 
 // GetGorumsServer returns the underlying gorums Server.
