@@ -19,24 +19,24 @@ func replicaIDs(size int) []hotstuff.ID {
 
 func TestCreateTree(t *testing.T) {
 	tests := []struct {
-		configurationSize int
-		id                hotstuff.ID
-		branchFactor      int
-		wantHeight        int
+		size         int
+		id           hotstuff.ID
+		branchFactor int
+		wantHeight   int
 	}{
-		{configurationSize: 10, id: 1, branchFactor: 2, wantHeight: 4},
-		{configurationSize: 21, id: 1, branchFactor: 4, wantHeight: 3},
-		{configurationSize: 21, id: 1, branchFactor: 3, wantHeight: 4},
-		{configurationSize: 43, id: 1, branchFactor: 5, wantHeight: 4},
-		{configurationSize: 43, id: 1, branchFactor: 4, wantHeight: 4},
-		{configurationSize: 111, id: 1, branchFactor: 10, wantHeight: 3},
-		{configurationSize: 111, id: 1, branchFactor: 3, wantHeight: 5},
+		{size: 10, id: 1, branchFactor: 2, wantHeight: 4},
+		{size: 21, id: 1, branchFactor: 4, wantHeight: 3},
+		{size: 21, id: 1, branchFactor: 3, wantHeight: 4},
+		{size: 43, id: 1, branchFactor: 5, wantHeight: 4},
+		{size: 43, id: 1, branchFactor: 4, wantHeight: 4},
+		{size: 111, id: 1, branchFactor: 10, wantHeight: 3},
+		{size: 111, id: 1, branchFactor: 3, wantHeight: 5},
 	}
 	for _, test := range tests {
-		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.configurationSize))
+		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.size))
 		if tree.TreeHeight() != test.wantHeight {
 			t.Errorf("CreateTree(%d, %d, %d).GetTreeHeight() = %d, want %d",
-				test.configurationSize, test.id, test.branchFactor, tree.TreeHeight(), test.wantHeight)
+				test.size, test.id, test.branchFactor, tree.TreeHeight(), test.wantHeight)
 		}
 	}
 }
@@ -57,25 +57,25 @@ func TestCreateTreeInvalidID(t *testing.T) {
 
 func TestHeight(t *testing.T) {
 	treeTestData := []struct {
-		configurationSize int
-		id                hotstuff.ID
-		branchFactor      int
-		wantTreeHeight    int
+		size           int
+		id             hotstuff.ID
+		branchFactor   int
+		wantTreeHeight int
 	}{
-		{10, 1, 2, 4},
-		{10, 5, 2, 4},
-		{10, 2, 2, 4},
-		{10, 3, 2, 4},
-		{10, 4, 2, 4},
-		{21, 1, 4, 3},
-		{21, 1, 3, 4},
-		{21, 2, 4, 3},
-		{21, 2, 3, 4},
-		{21, 9, 3, 4},
-		{21, 10, 4, 3},
+		{size: 10, id: 1, branchFactor: 2, wantTreeHeight: 4},
+		{size: 10, id: 5, branchFactor: 2, wantTreeHeight: 4},
+		{size: 10, id: 2, branchFactor: 2, wantTreeHeight: 4},
+		{size: 10, id: 3, branchFactor: 2, wantTreeHeight: 4},
+		{size: 10, id: 4, branchFactor: 2, wantTreeHeight: 4},
+		{size: 21, id: 1, branchFactor: 4, wantTreeHeight: 3},
+		{size: 21, id: 1, branchFactor: 3, wantTreeHeight: 4},
+		{size: 21, id: 2, branchFactor: 4, wantTreeHeight: 3},
+		{size: 21, id: 2, branchFactor: 3, wantTreeHeight: 4},
+		{size: 21, id: 9, branchFactor: 3, wantTreeHeight: 4},
+		{size: 21, id: 10, branchFactor: 4, wantTreeHeight: 3},
 	}
 	for _, test := range treeTestData {
-		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.configurationSize))
+		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.size))
 		gotTreeHeight := tree.TreeHeight()
 		if gotTreeHeight != test.wantTreeHeight {
 			t.Errorf("TreeHeight() = %d, want %d", gotTreeHeight, test.wantTreeHeight)
@@ -85,30 +85,30 @@ func TestHeight(t *testing.T) {
 
 func TestReplicaChildren(t *testing.T) {
 	treeConfigTestData := []struct {
-		configurationSize int
-		id                hotstuff.ID
-		branchFactor      int
-		wantChildren      []hotstuff.ID
+		size         int
+		id           hotstuff.ID
+		branchFactor int
+		wantChildren []hotstuff.ID
 	}{
-		{10, 1, 2, []hotstuff.ID{2, 3}},
-		{10, 5, 2, []hotstuff.ID{10}},
-		{10, 2, 2, []hotstuff.ID{4, 5}},
-		{10, 3, 2, []hotstuff.ID{6, 7}},
-		{10, 4, 2, []hotstuff.ID{8, 9}},
-		{21, 1, 4, []hotstuff.ID{2, 3, 4, 5}},
-		{21, 1, 3, []hotstuff.ID{2, 3, 4}},
-		{21, 2, 4, []hotstuff.ID{6, 7, 8, 9}},
-		{21, 2, 3, []hotstuff.ID{5, 6, 7}},
-		{21, 9, 3, []hotstuff.ID{}},
-		{21, 7, 3, []hotstuff.ID{20, 21}},
-		{21, 3, 4, []hotstuff.ID{10, 11, 12, 13}},
-		{21, 10, 4, []hotstuff.ID{}},
-		{21, 15, 4, []hotstuff.ID{}},
-		{21, 20, 4, []hotstuff.ID{}},
-		{21, 5, 4, []hotstuff.ID{18, 19, 20, 21}},
+		{size: 10, id: 1, branchFactor: 2, wantChildren: []hotstuff.ID{2, 3}},
+		{size: 10, id: 5, branchFactor: 2, wantChildren: []hotstuff.ID{10}},
+		{size: 10, id: 2, branchFactor: 2, wantChildren: []hotstuff.ID{4, 5}},
+		{size: 10, id: 3, branchFactor: 2, wantChildren: []hotstuff.ID{6, 7}},
+		{size: 10, id: 4, branchFactor: 2, wantChildren: []hotstuff.ID{8, 9}},
+		{size: 21, id: 1, branchFactor: 4, wantChildren: []hotstuff.ID{2, 3, 4, 5}},
+		{size: 21, id: 1, branchFactor: 3, wantChildren: []hotstuff.ID{2, 3, 4}},
+		{size: 21, id: 2, branchFactor: 4, wantChildren: []hotstuff.ID{6, 7, 8, 9}},
+		{size: 21, id: 2, branchFactor: 3, wantChildren: []hotstuff.ID{5, 6, 7}},
+		{size: 21, id: 9, branchFactor: 3, wantChildren: []hotstuff.ID{}},
+		{size: 21, id: 7, branchFactor: 3, wantChildren: []hotstuff.ID{20, 21}},
+		{size: 21, id: 3, branchFactor: 4, wantChildren: []hotstuff.ID{10, 11, 12, 13}},
+		{size: 21, id: 10, branchFactor: 4, wantChildren: []hotstuff.ID{}},
+		{size: 21, id: 15, branchFactor: 4, wantChildren: []hotstuff.ID{}},
+		{size: 21, id: 20, branchFactor: 4, wantChildren: []hotstuff.ID{}},
+		{size: 21, id: 5, branchFactor: 4, wantChildren: []hotstuff.ID{18, 19, 20, 21}},
 	}
 	for _, test := range treeConfigTestData {
-		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.configurationSize))
+		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.size))
 		gotChildren := tree.ReplicaChildren()
 		slices.Sort(gotChildren)
 		if !slices.Equal(gotChildren, test.wantChildren) {
@@ -119,34 +119,30 @@ func TestReplicaChildren(t *testing.T) {
 
 func TestSubTree(t *testing.T) {
 	treeConfigTestData := []struct {
-		configurationSize int
-		id                hotstuff.ID
-		branchFactor      int
-		wantSubTree       []hotstuff.ID
+		size         int
+		id           hotstuff.ID
+		branchFactor int
+		wantSubTree  []hotstuff.ID
 	}{
-		{10, 1, 2, []hotstuff.ID{2, 3, 4, 5, 6, 7, 8, 9, 10}},
-		{10, 5, 2, []hotstuff.ID{10}},
-		{10, 2, 2, []hotstuff.ID{4, 5, 8, 9, 10}},
-		{10, 3, 2, []hotstuff.ID{6, 7}},
-		{10, 4, 2, []hotstuff.ID{8, 9}},
-		{21, 1, 4, []hotstuff.ID{
-			2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
-		}},
-		{21, 1, 3, []hotstuff.ID{
-			2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
-		}},
-		{21, 2, 4, []hotstuff.ID{6, 7, 8, 9}},
-		{21, 2, 3, []hotstuff.ID{5, 6, 7, 14, 15, 16, 17, 18, 19, 20, 21}},
-		{21, 9, 3, []hotstuff.ID{}},
-		{21, 7, 3, []hotstuff.ID{20, 21}},
-		{21, 3, 4, []hotstuff.ID{10, 11, 12, 13}},
-		{21, 10, 4, []hotstuff.ID{}},
-		{21, 15, 4, []hotstuff.ID{}},
-		{21, 20, 4, []hotstuff.ID{}},
-		{21, 5, 4, []hotstuff.ID{18, 19, 20, 21}},
+		{size: 10, id: 1, branchFactor: 2, wantSubTree: []hotstuff.ID{2, 3, 4, 5, 6, 7, 8, 9, 10}},
+		{size: 10, id: 5, branchFactor: 2, wantSubTree: []hotstuff.ID{10}},
+		{size: 10, id: 2, branchFactor: 2, wantSubTree: []hotstuff.ID{4, 5, 8, 9, 10}},
+		{size: 10, id: 3, branchFactor: 2, wantSubTree: []hotstuff.ID{6, 7}},
+		{size: 10, id: 4, branchFactor: 2, wantSubTree: []hotstuff.ID{8, 9}},
+		{size: 21, id: 1, branchFactor: 4, wantSubTree: []hotstuff.ID{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21}},
+		{size: 21, id: 1, branchFactor: 3, wantSubTree: []hotstuff.ID{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21}},
+		{size: 21, id: 2, branchFactor: 4, wantSubTree: []hotstuff.ID{6, 7, 8, 9}},
+		{size: 21, id: 2, branchFactor: 3, wantSubTree: []hotstuff.ID{5, 6, 7, 14, 15, 16, 17, 18, 19, 20, 21}},
+		{size: 21, id: 9, branchFactor: 3, wantSubTree: []hotstuff.ID{}},
+		{size: 21, id: 7, branchFactor: 3, wantSubTree: []hotstuff.ID{20, 21}},
+		{size: 21, id: 3, branchFactor: 4, wantSubTree: []hotstuff.ID{10, 11, 12, 13}},
+		{size: 21, id: 10, branchFactor: 4, wantSubTree: []hotstuff.ID{}},
+		{size: 21, id: 15, branchFactor: 4, wantSubTree: []hotstuff.ID{}},
+		{size: 21, id: 20, branchFactor: 4, wantSubTree: []hotstuff.ID{}},
+		{size: 21, id: 5, branchFactor: 4, wantSubTree: []hotstuff.ID{18, 19, 20, 21}},
 	}
 	for _, test := range treeConfigTestData {
-		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.configurationSize))
+		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.size))
 		gotSubTree := tree.SubTree()
 		slices.Sort(gotSubTree)
 		if !slices.Equal(gotSubTree, test.wantSubTree) {
@@ -157,30 +153,30 @@ func TestSubTree(t *testing.T) {
 
 func TestParent(t *testing.T) {
 	treeConfigTestData := []struct {
-		configurationSize int
-		id                hotstuff.ID
-		branchFactor      int
-		wantParent        hotstuff.ID
+		size         int
+		id           hotstuff.ID
+		branchFactor int
+		wantParent   hotstuff.ID
 	}{
-		{10, 1, 2, 1},
-		{10, 5, 2, 2},
-		{10, 2, 2, 1},
-		{10, 3, 2, 1},
-		{10, 4, 2, 2},
-		{21, 1, 4, 1},
-		{21, 1, 3, 1},
-		{21, 2, 4, 1},
-		{21, 2, 3, 1},
-		{21, 9, 3, 3},
-		{21, 7, 3, 2},
-		{21, 3, 4, 1},
-		{21, 10, 4, 3},
-		{21, 15, 4, 4},
-		{21, 20, 4, 5},
-		{21, 5, 4, 1},
+		{size: 10, id: 1, branchFactor: 2, wantParent: 1},
+		{size: 10, id: 5, branchFactor: 2, wantParent: 2},
+		{size: 10, id: 2, branchFactor: 2, wantParent: 1},
+		{size: 10, id: 3, branchFactor: 2, wantParent: 1},
+		{size: 10, id: 4, branchFactor: 2, wantParent: 2},
+		{size: 21, id: 1, branchFactor: 4, wantParent: 1},
+		{size: 21, id: 1, branchFactor: 3, wantParent: 1},
+		{size: 21, id: 2, branchFactor: 4, wantParent: 1},
+		{size: 21, id: 2, branchFactor: 3, wantParent: 1},
+		{size: 21, id: 9, branchFactor: 3, wantParent: 3},
+		{size: 21, id: 7, branchFactor: 3, wantParent: 2},
+		{size: 21, id: 3, branchFactor: 4, wantParent: 1},
+		{size: 21, id: 10, branchFactor: 4, wantParent: 3},
+		{size: 21, id: 15, branchFactor: 4, wantParent: 4},
+		{size: 21, id: 20, branchFactor: 4, wantParent: 5},
+		{size: 21, id: 5, branchFactor: 4, wantParent: 1},
 	}
 	for _, test := range treeConfigTestData {
-		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.configurationSize))
+		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.size))
 
 		if gotParent, ok := tree.Parent(); ok {
 			if gotParent != test.wantParent {
@@ -192,30 +188,30 @@ func TestParent(t *testing.T) {
 
 func TestIsRoot(t *testing.T) {
 	treeConfigTestData := []struct {
-		configurationSize int
-		id                hotstuff.ID
-		branchFactor      int
-		wantIsRoot        bool
+		size         int
+		id           hotstuff.ID
+		branchFactor int
+		wantIsRoot   bool
 	}{
-		{10, 1, 2, true},
-		{10, 5, 2, false},
-		{10, 2, 2, false},
-		{10, 3, 2, false},
-		{10, 4, 2, false},
-		{21, 1, 4, true},
-		{21, 1, 3, true},
-		{21, 2, 4, false},
-		{21, 2, 3, false},
-		{21, 9, 3, false},
-		{21, 7, 3, false},
-		{21, 3, 4, false},
-		{21, 10, 4, false},
-		{21, 15, 4, false},
-		{21, 20, 4, false},
-		{21, 5, 4, false},
+		{size: 10, id: 1, branchFactor: 2, wantIsRoot: true},
+		{size: 10, id: 5, branchFactor: 2, wantIsRoot: false},
+		{size: 10, id: 2, branchFactor: 2, wantIsRoot: false},
+		{size: 10, id: 3, branchFactor: 2, wantIsRoot: false},
+		{size: 10, id: 4, branchFactor: 2, wantIsRoot: false},
+		{size: 21, id: 1, branchFactor: 4, wantIsRoot: true},
+		{size: 21, id: 1, branchFactor: 3, wantIsRoot: true},
+		{size: 21, id: 2, branchFactor: 4, wantIsRoot: false},
+		{size: 21, id: 2, branchFactor: 3, wantIsRoot: false},
+		{size: 21, id: 9, branchFactor: 3, wantIsRoot: false},
+		{size: 21, id: 7, branchFactor: 3, wantIsRoot: false},
+		{size: 21, id: 3, branchFactor: 4, wantIsRoot: false},
+		{size: 21, id: 10, branchFactor: 4, wantIsRoot: false},
+		{size: 21, id: 15, branchFactor: 4, wantIsRoot: false},
+		{size: 21, id: 20, branchFactor: 4, wantIsRoot: false},
+		{size: 21, id: 5, branchFactor: 4, wantIsRoot: false},
 	}
 	for _, test := range treeConfigTestData {
-		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.configurationSize))
+		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.size))
 		gotIsRoot := tree.IsRoot(test.id)
 		if gotIsRoot != test.wantIsRoot {
 			t.Errorf("IsRoot() = %t, want %t", gotIsRoot, test.wantIsRoot)
@@ -225,30 +221,30 @@ func TestIsRoot(t *testing.T) {
 
 func TestReplicaHeight(t *testing.T) {
 	treeConfigTestData := []struct {
-		configurationSize int
+		size              int
 		id                hotstuff.ID
 		branchFactor      int
 		wantReplicaHeight int
 	}{
-		{10, 1, 2, 4},
-		{10, 5, 2, 2},
-		{10, 2, 2, 3},
-		{10, 3, 2, 3},
-		{10, 4, 2, 2},
-		{21, 1, 4, 3},
-		{21, 1, 3, 4},
-		{21, 2, 4, 2},
-		{21, 2, 3, 3},
-		{21, 9, 3, 2},
-		{21, 7, 3, 2},
-		{21, 3, 4, 2},
-		{21, 10, 4, 1},
-		{21, 15, 4, 1},
-		{21, 20, 4, 1},
-		{21, 5, 4, 2},
+		{size: 10, id: 1, branchFactor: 2, wantReplicaHeight: 4},
+		{size: 10, id: 5, branchFactor: 2, wantReplicaHeight: 2},
+		{size: 10, id: 2, branchFactor: 2, wantReplicaHeight: 3},
+		{size: 10, id: 3, branchFactor: 2, wantReplicaHeight: 3},
+		{size: 10, id: 4, branchFactor: 2, wantReplicaHeight: 2},
+		{size: 21, id: 1, branchFactor: 4, wantReplicaHeight: 3},
+		{size: 21, id: 1, branchFactor: 3, wantReplicaHeight: 4},
+		{size: 21, id: 2, branchFactor: 4, wantReplicaHeight: 2},
+		{size: 21, id: 2, branchFactor: 3, wantReplicaHeight: 3},
+		{size: 21, id: 9, branchFactor: 3, wantReplicaHeight: 2},
+		{size: 21, id: 7, branchFactor: 3, wantReplicaHeight: 2},
+		{size: 21, id: 3, branchFactor: 4, wantReplicaHeight: 2},
+		{size: 21, id: 10, branchFactor: 4, wantReplicaHeight: 1},
+		{size: 21, id: 15, branchFactor: 4, wantReplicaHeight: 1},
+		{size: 21, id: 20, branchFactor: 4, wantReplicaHeight: 1},
+		{size: 21, id: 5, branchFactor: 4, wantReplicaHeight: 2},
 	}
 	for _, test := range treeConfigTestData {
-		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.configurationSize))
+		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.size))
 		gotReplicaHeight := tree.ReplicaHeight()
 		if gotReplicaHeight != test.wantReplicaHeight {
 			t.Errorf("ReplicaHeight() = %d, want %d", gotReplicaHeight, test.wantReplicaHeight)
@@ -258,30 +254,30 @@ func TestReplicaHeight(t *testing.T) {
 
 func TestPeersOf(t *testing.T) {
 	treeConfigTestData := []struct {
-		configurationSize int
-		id                hotstuff.ID
-		branchFactor      int
-		wantPeers         []hotstuff.ID
+		size         int
+		id           hotstuff.ID
+		branchFactor int
+		wantPeers    []hotstuff.ID
 	}{
-		{10, 1, 2, []hotstuff.ID{}},
-		{10, 5, 2, []hotstuff.ID{4, 5}},
-		{10, 2, 2, []hotstuff.ID{2, 3}},
-		{10, 3, 2, []hotstuff.ID{2, 3}},
-		{10, 4, 2, []hotstuff.ID{4, 5}},
-		{21, 1, 4, []hotstuff.ID{}},
-		{21, 1, 3, []hotstuff.ID{}},
-		{21, 2, 4, []hotstuff.ID{2, 3, 4, 5}},
-		{21, 2, 3, []hotstuff.ID{2, 3, 4}},
-		{21, 9, 3, []hotstuff.ID{8, 9, 10}},
-		{21, 7, 3, []hotstuff.ID{5, 6, 7}},
-		{21, 3, 4, []hotstuff.ID{2, 3, 4, 5}},
-		{21, 10, 4, []hotstuff.ID{10, 11, 12, 13}},
-		{21, 15, 4, []hotstuff.ID{14, 15, 16, 17}},
-		{21, 20, 4, []hotstuff.ID{18, 19, 20, 21}},
-		{21, 5, 4, []hotstuff.ID{2, 3, 4, 5}},
+		{size: 10, id: 1, branchFactor: 2, wantPeers: []hotstuff.ID{}},
+		{size: 10, id: 5, branchFactor: 2, wantPeers: []hotstuff.ID{4, 5}},
+		{size: 10, id: 2, branchFactor: 2, wantPeers: []hotstuff.ID{2, 3}},
+		{size: 10, id: 3, branchFactor: 2, wantPeers: []hotstuff.ID{2, 3}},
+		{size: 10, id: 4, branchFactor: 2, wantPeers: []hotstuff.ID{4, 5}},
+		{size: 21, id: 1, branchFactor: 4, wantPeers: []hotstuff.ID{}},
+		{size: 21, id: 1, branchFactor: 3, wantPeers: []hotstuff.ID{}},
+		{size: 21, id: 2, branchFactor: 4, wantPeers: []hotstuff.ID{2, 3, 4, 5}},
+		{size: 21, id: 2, branchFactor: 3, wantPeers: []hotstuff.ID{2, 3, 4}},
+		{size: 21, id: 9, branchFactor: 3, wantPeers: []hotstuff.ID{8, 9, 10}},
+		{size: 21, id: 7, branchFactor: 3, wantPeers: []hotstuff.ID{5, 6, 7}},
+		{size: 21, id: 3, branchFactor: 4, wantPeers: []hotstuff.ID{2, 3, 4, 5}},
+		{size: 21, id: 10, branchFactor: 4, wantPeers: []hotstuff.ID{10, 11, 12, 13}},
+		{size: 21, id: 15, branchFactor: 4, wantPeers: []hotstuff.ID{14, 15, 16, 17}},
+		{size: 21, id: 20, branchFactor: 4, wantPeers: []hotstuff.ID{18, 19, 20, 21}},
+		{size: 21, id: 5, branchFactor: 4, wantPeers: []hotstuff.ID{2, 3, 4, 5}},
 	}
 	for _, test := range treeConfigTestData {
-		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.configurationSize))
+		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.size))
 		gotPeers := tree.PeersOf()
 		slices.Sort(gotPeers)
 		if !slices.Equal(gotPeers, test.wantPeers) {
