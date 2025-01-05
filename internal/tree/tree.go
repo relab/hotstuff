@@ -97,11 +97,12 @@ func (t *Tree) ReplicaHeight() int {
 	return t.heightOf(t.id)
 }
 
-// PeersOf returns the sibling peers of given ID, if any.
+// PeersOf returns the sibling peers of the tree's replica,
+// unless the replica is the root, in which case there are no siblings.
 func (t *Tree) PeersOf() []hotstuff.ID {
 	parent, ok := t.Parent()
 	if !ok {
-		// this indicates that the replica is the root, hence no siblings.
+		// the tree's replica is the root, hence it has no siblings.
 		return nil
 	}
 	return t.ChildrenOf(parent)
