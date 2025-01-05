@@ -282,7 +282,7 @@ func TestPeersOf(t *testing.T) {
 	}
 	for _, test := range treeConfigTestData {
 		tree := CreateTree(test.id, test.branchFactor, replicaIDs(test.configurationSize))
-		gotPeers := tree.PeersOf(test.id)
+		gotPeers := tree.PeersOf()
 		slices.Sort(gotPeers)
 		if !slices.Equal(gotPeers, test.wantPeers) {
 			t.Errorf("PeersOf() = %v, want %v", gotPeers, test.wantPeers)
