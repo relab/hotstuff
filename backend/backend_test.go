@@ -12,12 +12,12 @@ import (
 
 	"github.com/relab/hotstuff/modules"
 
-	"github.com/golang/mock/gomock"
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/testutil"
+	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )

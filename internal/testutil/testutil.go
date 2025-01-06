@@ -2,7 +2,6 @@
 package testutil
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"testing"
@@ -12,7 +11,6 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/modules"
 
-	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/crypto"
@@ -24,6 +22,7 @@ import (
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/synchronizer"
 	"github.com/relab/hotstuff/twins"
+	"go.uber.org/mock/gomock"
 )
 
 // TestModules registers default modules for testing to the given builder.
@@ -50,7 +49,8 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 
 	synchronizer := mocks.NewMockSynchronizer(ctrl)
 	synchronizer.EXPECT().Start(gomock.Any()).AnyTimes()
-	synchronizer.EXPECT().ViewContext().AnyTimes().Return(context.Background())
+	// TODO: This line was previously used to test ViewContext that was part of Synchronizer in the past. Make sure this removal makes sense.
+	// synchronizer.EXPECT().ViewContext().AnyTimes().Return(context.Background())
 
 	builder.Add(
 		eventloop.New(100),
