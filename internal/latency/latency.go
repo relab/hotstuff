@@ -19,7 +19,7 @@ func Between(a, b string) time.Duration {
 
 // ValidLocation returns the location if it is valid, or an error otherwise.
 func ValidLocation(location string) (string, error) {
-	if location == "" {
+	if location == "" || location == DefaultLocation {
 		return DefaultLocation, nil
 	}
 	if !slices.Contains(allLocations, location) {
@@ -67,6 +67,9 @@ func MatrixFrom(locations []string) Matrix {
 // Latency returns the latency between nodes a and b.
 // If a or b are not valid nodes, the function will panic.
 func (lm Matrix) Latency(a, b hotstuff.ID) time.Duration {
+	if a == b {
+		return 0
+	}
 	return lm.lm[a-1][b-1]
 }
 

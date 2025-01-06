@@ -183,7 +183,8 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 	e.replicaOpts = make(map[hotstuff.ID]*orchestrationpb.ReplicaOpts)
 	e.hostsToClients = make(map[string][]hotstuff.ID)
 	replicaLocations := make([]string, 0, e.NumReplicas)
-	nextReplicaID := hotstuff.ID(1)
+	initialReplicaID := hotstuff.ID(1)
+	nextReplicaID := initialReplicaID
 	nextClientID := hotstuff.ID(1)
 
 	// number of replicas that should be auto assigned
@@ -233,6 +234,7 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 		)
 	}
 
+	totalReplicaCount := 0
 	for host := range e.Hosts {
 		var (
 			numReplicas int
@@ -276,11 +278,11 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 			replicaOpts.ByzantineStrategy = byzantineStrategy
 			replicaLocations = append(replicaLocations, location)
 			// all replicaOpts share the same Locations slice, which is progressively updated
-			replicaOpts.Locations = replicaLocations
 			e.hostsToReplicas[host] = append(e.hostsToReplicas[host], nextReplicaID)
 			e.replicaOpts[nextReplicaID] = replicaOpts
 			e.Logger.Infof("replica %d assigned to host %s", nextReplicaID, host)
 			nextReplicaID++
+			totalReplicaCount++
 		}
 
 		for i := 0; i < numClients; i++ {
@@ -288,6 +290,14 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 			e.Logger.Infof("client %d assigned to host %s", nextClientID, host)
 			nextClientID++
 		}
+	}
+
+	// Reiterate the replicas to supply the full list of locations.
+	nextReplicaID = initialReplicaID
+	for range totalReplicaCount {
+		replicaOpts := e.replicaOpts[nextReplicaID]
+		replicaOpts.Locations = replicaLocations
+		nextReplicaID++
 	}
 
 	// TODO: warn if not all clients/replicas were assigned
