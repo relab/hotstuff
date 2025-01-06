@@ -61,17 +61,6 @@ func NewServer(opts ...ServerOptions) *Server {
 	return srv
 }
 
-// addNetworkDelay adds latency between this server and the sender based on
-// the latency between the two locations according to the latency matrix.
-func (srv *Server) addNetworkDelay(sender hotstuff.ID) {
-	if !srv.lm.Enabled() {
-		return
-	}
-	delay := srv.lm.Latency(srv.id, sender)
-	srv.logger.Debugf("Delay between %s and %s: %v\n", srv.lm.Location(srv.id), srv.lm.Location(sender), delay)
-	srv.lm.Delay(srv.id, sender)
-}
-
 // GetGorumsServer returns the underlying gorums Server.
 func (srv *Server) GetGorumsServer() *gorums.Server {
 	return srv.gorumsSrv
@@ -159,8 +148,12 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposal.Block.Proposer = uint32(id)
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
-	//impl.srv.addNetworkDelay(id)
-	//impl.srv.eventLoop.AddEvent(proposeMsg)
+
+	if !impl.srv.lm.Enabled() {
+		impl.srv.eventLoop.AddEvent(proposeMsg)
+		return
+	}
+
 	delay := impl.srv.lm.Latency(impl.srv.id, id)
 	impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(id), delay)
 	impl.srv.eventLoop.DelayEvent(proposeMsg, delay)
@@ -174,18 +167,19 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		return
 	}
 
-	// impl.srv.addNetworkDelay(id)
-	// impl.srv.eventLoop.AddEvent(hotstuff.VoteMsg{
-	// 	ID:          id,
-	// 	PartialCert: hotstuffpb.PartialCertFromProto(cert),
-	// })
+	voteMsg := hotstuff.VoteMsg{
+		ID:          id,
+		PartialCert: hotstuffpb.PartialCertFromProto(cert),
+	}
+
+	if !impl.srv.lm.Enabled() {
+		impl.srv.eventLoop.AddEvent(voteMsg)
+		return
+	}
 
 	delay := impl.srv.lm.Latency(impl.srv.id, id)
 	impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(id), delay)
-	impl.srv.eventLoop.DelayEvent(hotstuff.VoteMsg{
-		ID:          id,
-		PartialCert: hotstuffpb.PartialCertFromProto(cert),
-	}, delay)
+	impl.srv.eventLoop.DelayEvent(voteMsg, delay)
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
@@ -196,18 +190,19 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		return
 	}
 
-	// impl.srv.addNetworkDelay(id)
-	// impl.srv.eventLoop.AddEvent(hotstuff.NewViewMsg{
-	// 	ID:       id,
-	// 	SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
-	// })
+	newViewMsg := hotstuff.NewViewMsg{
+		ID:       id,
+		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
+	}
+
+	if !impl.srv.lm.Enabled() {
+		impl.srv.eventLoop.AddEvent(newViewMsg)
+		return
+	}
 
 	delay := impl.srv.lm.Latency(impl.srv.id, id)
 	impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(id), delay)
-	impl.srv.eventLoop.DelayEvent(hotstuff.NewViewMsg{
-		ID:       id,
-		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
-	}, delay)
+	impl.srv.eventLoop.DelayEvent(newViewMsg, delay)
 }
 
 // Fetch handles an incoming fetch request.
@@ -234,8 +229,10 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
 	timeoutMsg.ID = id
 
-	// impl.srv.addNetworkDelay(id)
-	// impl.srv.eventLoop.AddEvent(timeoutMsg)
+	if !impl.srv.lm.Enabled() {
+		impl.srv.eventLoop.AddEvent(timeoutMsg)
+		return
+	}
 
 	delay := impl.srv.lm.Latency(impl.srv.id, id)
 	impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(id), delay)
