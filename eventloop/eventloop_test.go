@@ -171,7 +171,7 @@ func BenchmarkEventLoopWithObservers(b *testing.B) {
 		})
 	}
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		el.AddEvent(testEvent(1))
 		el.Tick(context.Background())
 	}
@@ -188,7 +188,7 @@ func BenchmarkEventLoopWithUnsafeRunInAddEventHandlers(b *testing.B) {
 		}, eventloop.UnsafeRunInAddEvent())
 	}
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		el.AddEvent(testEvent(1))
 		el.AddEvent(testEvent(1))
 		el.AddEvent(testEvent(1))
@@ -205,7 +205,7 @@ func BenchmarkEventLoopWithUnsafeRunInAddEventHandlers(b *testing.B) {
 func BenchmarkDelay(b *testing.B) {
 	el := eventloop.New(100)
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		el.DelayUntil(testEvent(0), testEvent(2))
 		el.DelayUntil(testEvent(0), testEvent(3))
 		el.AddEvent(testEvent(1))

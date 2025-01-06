@@ -1,6 +1,6 @@
 module github.com/relab/hotstuff
 
-go 1.23.4
+go 1.24rc1
 
 require (
 	github.com/felixge/fgprof v0.9.5
