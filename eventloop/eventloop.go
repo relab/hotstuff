@@ -223,17 +223,17 @@ loop:
 		}
 
 		// Remove delayed events from list
-		// TODO: Find out a cleaner way to delete the event from the list
-		for _, e := range expiredEvents {
-			i := -1
-			for j, f := range el.delayedEvents { // Find
-				if f == e {
-					i = j
-					break
-				}
-			}
-			el.delayedEvents = append(el.delayedEvents[:i], el.delayedEvents[:i+1]...)
-		}
+		// TODO: Remove event from delayed list. This code doesn't work.
+		// for _, e := range expiredEvents {
+		// 	i := -1
+		// 	for j, f := range el.delayedEvents { // Find
+		// 		if f == e {
+		// 			i = j
+		// 			break
+		// 		}
+		// 	}
+		// 	el.delayedEvents = append(el.delayedEvents[:i], el.delayedEvents[:i+1]...)
+		// }
 	}
 
 	// HACK: when we get canceled, we will handle the events that were in the queue at that time before quitting.

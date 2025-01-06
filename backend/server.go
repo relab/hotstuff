@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
@@ -138,6 +139,17 @@ type serviceImpl struct {
 	srv *Server
 }
 
+func (impl *serviceImpl) addMessageEvent(event any, to hotstuff.ID) {
+	// if !impl.srv.lm.Enabled() {
+	// 	impl.srv.eventLoop.AddEvent(event)
+	// 	return
+	// }
+
+	delay := time.Millisecond * 100 // impl.srv.lm.Latency(impl.srv.id, to)
+	// impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(to), delay)
+	impl.srv.eventLoop.DelayEvent(event, delay)
+}
+
 // Propose handles a replica's response to the Propose QC from the leader.
 func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
 	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
@@ -149,14 +161,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
 
-	if !impl.srv.lm.Enabled() {
-		impl.srv.eventLoop.AddEvent(proposeMsg)
-		return
-	}
-
-	delay := impl.srv.lm.Latency(impl.srv.id, id)
-	impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(id), delay)
-	impl.srv.eventLoop.DelayEvent(proposeMsg, delay)
+	impl.addMessageEvent(proposeMsg, id)
 }
 
 // Vote handles an incoming vote message.
@@ -172,14 +177,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 		PartialCert: hotstuffpb.PartialCertFromProto(cert),
 	}
 
-	if !impl.srv.lm.Enabled() {
-		impl.srv.eventLoop.AddEvent(voteMsg)
-		return
-	}
-
-	delay := impl.srv.lm.Latency(impl.srv.id, id)
-	impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(id), delay)
-	impl.srv.eventLoop.DelayEvent(voteMsg, delay)
+	impl.addMessageEvent(voteMsg, id)
 }
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
@@ -195,14 +193,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
 	}
 
-	if !impl.srv.lm.Enabled() {
-		impl.srv.eventLoop.AddEvent(newViewMsg)
-		return
-	}
-
-	delay := impl.srv.lm.Latency(impl.srv.id, id)
-	impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(id), delay)
-	impl.srv.eventLoop.DelayEvent(newViewMsg, delay)
+	impl.addMessageEvent(newViewMsg, id)
 }
 
 // Fetch handles an incoming fetch request.
@@ -229,14 +220,7 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
 	timeoutMsg.ID = id
 
-	if !impl.srv.lm.Enabled() {
-		impl.srv.eventLoop.AddEvent(timeoutMsg)
-		return
-	}
-
-	delay := impl.srv.lm.Latency(impl.srv.id, id)
-	impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(id), delay)
-	impl.srv.eventLoop.DelayEvent(timeoutMsg, delay)
+	impl.addMessageEvent(timeoutMsg, id)
 }
 
 type replicaConnected struct {
