@@ -38,12 +38,6 @@ type Matrix struct {
 // MatrixFrom returns the latencies between the given locations.
 // If a location is not valid, the function will panic.
 func MatrixFrom(locations []string) Matrix {
-	if len(locations) == 0 {
-		return Matrix{
-			enabled: false,
-		}
-	}
-
 	locationIndices := make([]int, len(locations))
 	for i, loc := range locations {
 		if loc == DefaultLocation {
