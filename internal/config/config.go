@@ -34,12 +34,13 @@ type Config struct {
 	ByzantineStrategy map[string][]uint32
 }
 
-func unitsForHost(hostIndex int, numUnits int, numHosts int) int {
+// unitsForHost returns the number of units to be assigned to the host at hostIndex.
+func unitsForHost(hostIndex int, totalUnits int, numHosts int) int {
 	if numHosts == 0 {
 		return 0
 	}
-	unitsPerHost := numUnits / numHosts
-	remainingUnits := numUnits % numHosts
+	unitsPerHost := totalUnits / numHosts
+	remainingUnits := totalUnits % numHosts
 	if hostIndex < remainingUnits {
 		return unitsPerHost + 1
 	}
