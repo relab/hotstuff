@@ -19,7 +19,7 @@ func Between(a, b string) time.Duration {
 
 // ValidLocation returns the location if it is valid, or an error otherwise.
 func ValidLocation(location string) (string, error) {
-	if location == "" {
+	if location == "" || location == DefaultLocation {
 		return DefaultLocation, nil
 	}
 	if !slices.Contains(allLocations, location) {
