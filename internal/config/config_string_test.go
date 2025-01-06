@@ -1,9 +1,7 @@
-package config_test
+package config
 
 import (
 	"testing"
-
-	"github.com/relab/hotstuff/internal/config"
 )
 
 func TestJoin(t *testing.T) {
@@ -22,8 +20,8 @@ func TestJoin(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := config.Join(tt.a, tt.sep); got != tt.want {
-				t.Errorf("Join() = %v, want %v", got, tt.want)
+			if got := join(tt.a, tt.sep); got != tt.want {
+				t.Errorf("join() = %v, want %v", got, tt.want)
 			}
 		})
 	}

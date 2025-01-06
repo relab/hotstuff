@@ -6,7 +6,8 @@ import (
 	"strings"
 )
 
-func Join[T any](a []T, sep string) string {
+// join concatenates the elements of a to create a single string with elements separated by sep.
+func join[T any](a []T, sep string) string {
 	return strings.Trim(strings.ReplaceAll(fmt.Sprint(a), " ", sep), "[]")
 }
 
@@ -32,7 +33,7 @@ func (c *Config) String() string {
 	if len(c.TreePositions) > 0 {
 		s.WriteString(", ")
 		s.WriteString("TreePositions: ")
-		s.WriteString(Join(c.TreePositions, ", "))
+		s.WriteString(join(c.TreePositions, ", "))
 		s.WriteString(", ")
 		s.WriteString("BranchFactor: ")
 		s.WriteString(strconv.Itoa(c.BranchFactor))
@@ -46,7 +47,7 @@ func (c *Config) String() string {
 	for strategy, ids := range c.ByzantineStrategy {
 		s.WriteString(strategy)
 		s.WriteString(": ")
-		s.WriteString(Join(ids, ", "))
+		s.WriteString(join(ids, ", "))
 		s.WriteString(", ")
 	}
 	s.WriteString("}")
