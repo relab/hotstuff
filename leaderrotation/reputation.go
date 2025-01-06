@@ -56,10 +56,7 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 	}
 
 	voters := block.QuorumCert().Signature().Participants()
-	numVotes := 0
-	voters.ForEach(func(hotstuff.ID) {
-		numVotes++
-	})
+	numVotes := voters.Len()
 
 	frac := float64((2.0 / 3.0) * float64(numReplicas))
 	reputation := ((float64(numVotes) - frac) / frac)
