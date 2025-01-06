@@ -7,14 +7,30 @@ import (
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 )
 
+// Config holds the configuration for an experiment.
 type Config struct {
-	ReplicaHosts      []string
-	ClientHosts       []string
-	Replicas          int
-	Clients           int
-	Locations         []string
-	TreePositions     []uint32
-	BranchFactor      int
+	// ReplicaHosts is a list of hosts that will run replicas.
+	ReplicaHosts []string
+	// ClientHosts is a list of hosts that will run clients.
+	ClientHosts []string
+	// Replicas is the total number of replicas.
+	Replicas int
+	// Clients is the total number of clients.
+	Clients int
+	// Locations is a list of locations for the replicas (optional, but required if TreePositions is set).
+	// The length of Locations must be equal to the number of replicas, but it may contain duplicates.
+	// The locations are indexed by the replica ID.
+	// Entries in Locations must exist in the latency matrix.
+	Locations []string
+	// TreePositions is a list of tree positions for the replicas (optional).
+	// The length of TreePositions must be equal to the number of replicas and the entries must be unique.
+	// The tree positions are indexed by the replica ID.
+	// The 0th entry in TreePositions is the tree's root, the 1st entry is the root's left child,
+	// the 2nd entry is the root's right child, and so on.
+	TreePositions []uint32
+	// BranchFactor is the branch factor for the tree (required if TreePositions is set).
+	BranchFactor int
+	// ByzantineStrategy is a map from each strategy to a list of replica IDs exhibiting that strategy.
 	ByzantineStrategy map[string][]uint32
 }
 
