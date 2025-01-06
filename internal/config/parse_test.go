@@ -12,6 +12,7 @@ func TestLoad(t *testing.T) {
 	replicaHosts := []string{"bbchain1", "bbchain2", "bbchain3", "bbchain4", "bbchain5", "bbchain6"}
 	clientHosts := []string{"bbchain7", "bbchain8"}
 	locations := []string{"Melbourne", "Toronto", "Prague", "Paris", "Tokyo", "Amsterdam", "Auckland", "Moscow", "Stockholm", "London"}
+	locationsWithDuplicates := []string{"Melbourne", "Toronto", "Prague", "Paris", "Tokyo", "Melbourne", "Toronto", "Prague", "Paris", "Tokyo"}
 	treePositions := []uint32{10, 2, 3, 4, 5, 6, 7, 8, 9, 1}
 	byzantineStrategy := map[string][]uint32{
 		"silent": {2, 5},
@@ -23,6 +24,13 @@ func TestLoad(t *testing.T) {
 		Replicas:     10,
 		Clients:      2,
 		Locations:    locations,
+	}
+	validLocOnlyDupEntriesCfg := &config.Config{
+		ReplicaHosts: replicaHosts,
+		ClientHosts:  clientHosts,
+		Replicas:     10,
+		Clients:      2,
+		Locations:    locationsWithDuplicates,
 	}
 	validLocTreeCfg := &config.Config{
 		ReplicaHosts:  replicaHosts,
@@ -72,12 +80,13 @@ func TestLoad(t *testing.T) {
 		wantErr  bool
 	}{
 		{name: "ValidLocationsOnly", filename: "valid-loc-only.cue", wantCfg: validLocOnlyCfg, wantErr: false},
+		{name: "ValidLocationsDuplicateEntries", filename: "valid-loc-dup-entries.cue", wantCfg: validLocOnlyDupEntriesCfg, wantErr: false},
 		{name: "ValidLocationsTree", filename: "valid-loc-tree.cue", wantCfg: validLocTreeCfg, wantErr: false},
 		{name: "ValidLocationsTreeByz", filename: "valid-loc-tree-byz.cue", wantCfg: validLocTreeByzCfg, wantErr: false},
 		{name: "Valid2LocationsOnly", filename: "valid2-loc-only.cue", wantCfg: valid2LocOnlyCfg, wantErr: false},
 		{name: "Valid2LocationsTree", filename: "valid2-loc-tree.cue", wantCfg: valid2LocTreeCfg, wantErr: false},
 		{name: "Valid2NoLocationsNoTree", filename: "valid2-no-loc-no-tree.cue", wantCfg: valid2NoLocNoTree, wantErr: false},
-		{name: "InvalidLocations", filename: "invalid-loc.cue", wantCfg: nil, wantErr: true},
+		{name: "InvalidLocationsSize", filename: "invalid-loc-size.cue", wantCfg: nil, wantErr: true},
 		{name: "InvalidTree", filename: "invalid-tree.cue", wantCfg: nil, wantErr: true},
 		{name: "Invalid2TreeOnly", filename: "invalid-tree-only.cue", wantCfg: nil, wantErr: true},
 	}
