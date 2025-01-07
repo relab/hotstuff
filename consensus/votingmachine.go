@@ -63,7 +63,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 			// hopefully, the block has arrived by then.
 			vm.logger.Debugf("Local cache miss for block: %.8s", cert.BlockHash())
 			vote.Deferred = true
-			vm.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, vote)
+			vm.eventLoop.PostponeUntil(hotstuff.ProposeMsg{}, vote)
 			return
 		}
 	} else {

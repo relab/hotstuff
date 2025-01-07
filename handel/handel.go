@@ -96,7 +96,7 @@ func (h *Handel) InitModule(mods *modules.Core) {
 			s.handleContribution(c)
 		} else if !c.deferred {
 			c.deferred = true
-			h.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, c)
+			h.eventLoop.PostponeUntil(hotstuff.ProposeMsg{}, c)
 		}
 	})
 
@@ -140,7 +140,7 @@ func (h *Handel) postInit() {
 func (h *Handel) Begin(s hotstuff.PartialCert) {
 	if !h.initDone {
 		// wait until initialization is done
-		h.eventLoop.DelayUntil(backend.ConnectedEvent{}, func() { h.Begin(s) })
+		h.eventLoop.PostponeUntil(backend.ConnectedEvent{}, func() { h.Begin(s) })
 		return
 	}
 

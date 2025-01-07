@@ -97,7 +97,7 @@ func (cfg *Config) InitModule(mods *modules.Core) {
 	// We delay processing `replicaConnected` events until after the configurations `connected` event has occurred.
 	cfg.eventLoop.RegisterHandler(replicaConnected{}, func(event any) {
 		if !cfg.connected {
-			cfg.eventLoop.DelayUntil(ConnectedEvent{}, event)
+			cfg.eventLoop.PostponeUntil(ConnectedEvent{}, event)
 			return
 		}
 		cfg.replicaConnected(event.(replicaConnected))

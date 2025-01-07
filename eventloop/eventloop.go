@@ -49,7 +49,7 @@ type handler struct {
 	opts     handlerOpts
 }
 
-type delayedEventWrapper struct {
+type delayedEvent struct {
 	deadline time.Time
 	event    any
 }
@@ -62,9 +62,7 @@ type EventLoop struct {
 
 	ctx context.Context // set by Run
 
-	waitingEvents map[reflect.Type][]any
-
-	delayedEvents []*delayedEventWrapper
+	postponedEvents map[reflect.Type][]any
 
 	handlers map[reflect.Type][]handler
 
@@ -75,12 +73,11 @@ type EventLoop struct {
 // New returns a new event loop with the requested buffer size.
 func New(bufferSize uint) *EventLoop {
 	el := &EventLoop{
-		ctx:           context.Background(),
-		eventQ:        newQueue(bufferSize),
-		waitingEvents: make(map[reflect.Type][]any),
-		delayedEvents: make([]*delayedEventWrapper, 0),
-		handlers:      make(map[reflect.Type][]handler),
-		tickers:       make(map[int]*ticker),
+		ctx:             context.Background(),
+		eventQ:          newQueue(bufferSize),
+		postponedEvents: make(map[reflect.Type][]any),
+		handlers:        make(map[reflect.Type][]handler),
+		tickers:         make(map[int]*ticker),
 	}
 	return el
 }
@@ -153,8 +150,8 @@ func (el *EventLoop) AddEvent(event any) {
 	}
 }
 
-// DelayEvent adds an event to a separate queue that triggers the event's handler
-// after a delay. The delay is computed for every tick in the eventloop's main loop.
+// DelayEvent adds an event to the event queue and gets handled at a
+// later time based on delay.
 // If the delay is zero or negative, AddEvent is called instead.
 func (el *EventLoop) DelayEvent(event any, delay time.Duration) {
 	if delay <= 0 {
@@ -162,10 +159,10 @@ func (el *EventLoop) DelayEvent(event any, delay time.Duration) {
 		return
 	}
 
-	el.mut.Lock()
-	defer el.mut.Unlock()
-	el.delayedEvents = append(el.delayedEvents, &delayedEventWrapper{
-		deadline: time.Now().Add(delay),
+	now := time.Now()
+	deadline := now.Add(delay)
+	el.AddEvent(delayedEvent{
+		deadline: deadline,
 		event:    event,
 	})
 }
@@ -205,33 +202,24 @@ loop:
 				break loop
 			}
 		}
+
 		if e, ok := event.(startTickerEvent); ok {
 			el.startTicker(e.tickerID)
 			continue
 		}
+
+		if e, ok := event.(delayedEvent); ok {
+			now := time.Now()
+			if e.deadline.Compare(now) > 0 {
+				// If the deadline has yet to be reached, re-add the event.
+				el.eventQ.push(e)
+				continue
+			}
+
+			event = e.event
+		}
+
 		el.processEvent(event, false)
-
-		// TODO: Handling delayed events is done after the normal way. This means delayed ones become even less prioritized and causes issues.
-		// TODO: Consider performance overhead with fetching time so frequently.
-		now := time.Now()
-		for i, wrapper := range el.delayedEvents {
-			if wrapper.deadline.Compare(now) <= 0 {
-				// TODO: Log out the excess time
-				el.processEvent(wrapper.event, false)
-				el.delayedEvents[i] = nil
-			}
-		}
-
-		// Clear out nil values
-		newSlice := make([]*delayedEventWrapper, 0, len(el.delayedEvents))
-		for _, item := range el.delayedEvents {
-			if item != nil {
-				newSlice = append(newSlice, item)
-			}
-		}
-
-		el.delayedEvents = newSlice
-
 	}
 
 	// HACK: when we get canceled, we will handle the events that were in the queue at that time before quitting.
@@ -267,7 +255,7 @@ func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
 	t := reflect.TypeOf(event)
 
 	if !runningInAddEvent {
-		defer el.dispatchDelayedEvents(t)
+		defer el.dispatchPostponedEvents(t)
 	}
 
 	// Must copy handlers to a list so that they can be executed after unlocking the mutex.
@@ -304,15 +292,15 @@ func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {
 	handlerListPool.Put(handlerList)
 }
 
-func (el *EventLoop) dispatchDelayedEvents(t reflect.Type) {
+func (el *EventLoop) dispatchPostponedEvents(t reflect.Type) {
 	var (
 		events []any
 		ok     bool
 	)
 
 	el.mut.Lock()
-	if events, ok = el.waitingEvents[t]; ok {
-		delete(el.waitingEvents, t)
+	if events, ok = el.postponedEvents[t]; ok {
+		delete(el.postponedEvents, t)
 	}
 	el.mut.Unlock()
 
@@ -321,18 +309,18 @@ func (el *EventLoop) dispatchDelayedEvents(t reflect.Type) {
 	}
 }
 
-// DelayUntil allows us to delay handling of an event until after another event has happened.
+// PostponeUntil allows us to delay handling of an event until after another event has happened.
 // The eventType parameter decides the type of event to wait for, and it should be the zero value
 // of that event type. The event parameter is the event that will be delayed.
-func (el *EventLoop) DelayUntil(eventType, event any) {
+func (el *EventLoop) PostponeUntil(eventType, event any) {
 	if eventType == nil || event == nil {
 		return
 	}
 	el.mut.Lock()
 	t := reflect.TypeOf(eventType)
-	v := el.waitingEvents[t]
+	v := el.postponedEvents[t]
 	v = append(v, event)
-	el.waitingEvents[t] = v
+	el.postponedEvents[t] = v
 	el.mut.Unlock()
 }
 

@@ -139,8 +139,8 @@ func TestDelayedEvent(t *testing.T) {
 	})
 
 	// delay the "2" and "3" events until after the first instance of testEvent
-	el.DelayUntil(testEvent(0), testEvent(2))
-	el.DelayUntil(testEvent(0), testEvent(3))
+	el.PostponeUntil(testEvent(0), testEvent(2))
+	el.PostponeUntil(testEvent(0), testEvent(3))
 	// then send the "1" event
 	el.AddEvent(testEvent(1))
 
@@ -206,8 +206,8 @@ func BenchmarkDelay(b *testing.B) {
 	el := eventloop.New(100)
 
 	for i := 0; i < b.N; i++ {
-		el.DelayUntil(testEvent(0), testEvent(2))
-		el.DelayUntil(testEvent(0), testEvent(3))
+		el.PostponeUntil(testEvent(0), testEvent(2))
+		el.PostponeUntil(testEvent(0), testEvent(3))
 		el.AddEvent(testEvent(1))
 		el.Tick(context.Background())
 		el.Tick(context.Background())
