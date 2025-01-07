@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/util/gpool"
 )
 
@@ -50,12 +52,15 @@ type handler struct {
 }
 
 type delayedEvent struct {
-	deadline time.Time
-	event    any
+	startTime time.Time
+	deadline  time.Time
+	event     any
 }
 
 // EventLoop accepts events of any type and executes registered event handlers.
 type EventLoop struct {
+	logger logging.Logger
+
 	eventQ queue
 
 	mut sync.Mutex // protects the following:
@@ -80,6 +85,10 @@ func New(bufferSize uint) *EventLoop {
 		tickers:         make(map[int]*ticker),
 	}
 	return el
+}
+
+func (el *EventLoop) InitModule(mods *modules.Core) {
+	mods.Get(&el.logger)
 }
 
 // RegisterObserver registers a handler with priority.
@@ -162,8 +171,9 @@ func (el *EventLoop) DelayEvent(event any, delay time.Duration) {
 	now := time.Now()
 	deadline := now.Add(delay)
 	el.AddEvent(delayedEvent{
-		deadline: deadline,
-		event:    event,
+		startTime: now,
+		deadline:  deadline,
+		event:     event,
 	})
 }
 
@@ -216,6 +226,8 @@ loop:
 				continue
 			}
 
+			el.logger.Debugf("delayed event excess delay after handle: %s", now.Sub(e.deadline))
+			el.logger.Debugf("delayed event took %s to handle", now.Sub(e.startTime))
 			event = e.event
 		}
 

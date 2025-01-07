@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"time"
 
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
@@ -145,7 +144,7 @@ func (impl *serviceImpl) addMessageEvent(event any, to hotstuff.ID) {
 		return
 	}
 
-	delay := time.Millisecond * 100 // impl.srv.lm.Latency(impl.srv.id, to)
+	delay := impl.srv.lm.Latency(impl.srv.id, to)
 	impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(to), delay)
 	impl.srv.eventLoop.DelayEvent(event, delay)
 }
