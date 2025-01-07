@@ -106,18 +106,14 @@ func New(conf Config, builder modules.Builder) (client *Client) {
 
 	builder.Build()
 
-	grpcOpts := []grpc.DialOption{grpc.WithBlock()}
-
 	var creds credentials.TransportCredentials
 	if conf.TLS {
 		creds = credentials.NewClientTLSFromCert(conf.RootCAs, "")
 	} else {
 		creds = insecure.NewCredentials()
 	}
-	grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(creds))
 
-	opts := conf.ManagerOptions
-	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
+	opts := append(conf.ManagerOptions, gorums.WithGrpcDialOptions(grpc.WithTransportCredentials(creds)))
 
 	client.mgr = clientpb.NewManager(opts...)
 

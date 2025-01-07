@@ -110,8 +110,6 @@ func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOpt
 		creds = insecure.NewCredentials()
 	}
 	grpcOpts := []grpc.DialOption{
-		grpc.WithBlock(),
-		grpc.WithReturnConnectionError(),
 		grpc.WithTransportCredentials(creds),
 	}
 	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
