@@ -293,16 +293,21 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 		}
 	}
 
+	e.populateReplicaLocations(totalReplicaCount, initialReplicaID, replicaLocations)
+
+	// TODO: warn if not all clients/replicas were assigned
+	return nil
+}
+
+// This function exists to fix the cyclomatic complexity lint error.
+func (e *Experiment) populateReplicaLocations(totalReplicaCount int, initialReplicaID hotstuff.ID, replicaLocations []string) {
 	// Reiterate the replicas to supply the full list of locations.
-	nextReplicaID = initialReplicaID
+	nextReplicaID := initialReplicaID
 	for range totalReplicaCount {
 		replicaOpts := e.replicaOpts[nextReplicaID]
 		replicaOpts.Locations = replicaLocations
 		nextReplicaID++
 	}
-
-	// TODO: warn if not all clients/replicas were assigned
-	return nil
 }
 
 type assignmentsFileContents struct {
