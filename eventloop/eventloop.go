@@ -226,7 +226,6 @@ loop:
 				continue
 			}
 
-			el.logger.Debugf("delayed event excess delay after handle: %s", now.Sub(e.deadline))
 			el.logger.Debugf("delayed event took %s to handle", now.Sub(e.startTime))
 			event = e.event
 		}
