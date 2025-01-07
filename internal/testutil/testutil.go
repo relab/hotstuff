@@ -49,9 +49,6 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 
 	synchronizer := mocks.NewMockSynchronizer(ctrl)
 	synchronizer.EXPECT().Start(gomock.Any()).AnyTimes()
-	// TODO: This line was previously used to test ViewContext that was part of Synchronizer in the past. Make sure this removal makes sense.
-	// synchronizer.EXPECT().ViewContext().AnyTimes().Return(context.Background())
-
 	builder.Add(
 		eventloop.New(100),
 		logging.New(fmt.Sprintf("hs%d", id)),
