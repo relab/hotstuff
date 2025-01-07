@@ -145,9 +145,11 @@ func (impl *serviceImpl) addMessageEvent(event any, to hotstuff.ID) {
 	// 	return
 	// }
 
-	delay := time.Millisecond * 100 // impl.srv.lm.Latency(impl.srv.id, to)
+	delay := time.Millisecond * 10 // impl.srv.lm.Latency(impl.srv.id, to)
 	// impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(to), delay)
-	impl.srv.eventLoop.DelayEvent(event, delay)
+	//impl.srv.eventLoop.DelayEvent(event, delay)
+	time.Sleep(delay)
+	impl.srv.eventLoop.AddEvent(event)
 }
 
 // Propose handles a replica's response to the Propose QC from the leader.

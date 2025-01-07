@@ -211,29 +211,27 @@ loop:
 		}
 		el.processEvent(event, false)
 
-		// TODO: Handling delayed events is done after the normal way. This means delayed ones become even less prioritized.
+		// TODO: Handling delayed events is done after the normal way. This means delayed ones become even less prioritized and causes issues.
+		// TODO: Consider performance overhead with fetching time so frequently.
 		now := time.Now()
-		expiredEvents := make([]any, 0)
-		for _, wrapper := range el.delayedEvents {
+		for i, wrapper := range el.delayedEvents {
 			if wrapper.deadline.Compare(now) <= 0 {
 				// TODO: Log out the excess time
-				expiredEvents = append(expiredEvents, wrapper.event)
 				el.processEvent(wrapper.event, false)
+				el.delayedEvents[i] = nil
 			}
 		}
 
-		// Remove delayed events from list
-		// TODO: Remove event from delayed list. This code doesn't work.
-		// for _, e := range expiredEvents {
-		// 	i := -1
-		// 	for j, f := range el.delayedEvents { // Find
-		// 		if f == e {
-		// 			i = j
-		// 			break
-		// 		}
-		// 	}
-		// 	el.delayedEvents = append(el.delayedEvents[:i], el.delayedEvents[:i+1]...)
-		// }
+		// Clear out nil values
+		newSlice := make([]*delayedEventWrapper, 0, len(el.delayedEvents))
+		for _, item := range el.delayedEvents {
+			if item != nil {
+				newSlice = append(newSlice, item)
+			}
+		}
+
+		el.delayedEvents = newSlice
+
 	}
 
 	// HACK: when we get canceled, we will handle the events that were in the queue at that time before quitting.
