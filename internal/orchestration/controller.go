@@ -276,8 +276,9 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 			replicaOpts := proto.Clone(e.ReplicaOpts).(*orchestrationpb.ReplicaOpts)
 			replicaOpts.ID = uint32(nextReplicaID)
 			replicaOpts.ByzantineStrategy = byzantineStrategy
+			// Progressively updating the locations slice to ensure all locations are known.
+			// This slice is added to each replica options in a later loop.
 			replicaLocations = append(replicaLocations, location)
-			// all replicaOpts share the same Locations slice, which is progressively updated
 			e.hostsToReplicas[host] = append(e.hostsToReplicas[host], nextReplicaID)
 			e.replicaOpts[nextReplicaID] = replicaOpts
 			e.Logger.Infof("replica %d assigned to host %s", nextReplicaID, host)
