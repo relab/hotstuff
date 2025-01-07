@@ -18,20 +18,16 @@ func TestOptions(t *testing.T) {
 
 func BenchmarkOptionsGet(b *testing.B) {
 	opts := modules.Options{}
-	var v any
 	opts.Set(TestOption, 1)
 	for b.Loop() {
-		v = opts.Get(TestOption).(int)
+		opts.Get(TestOption)
 	}
-	_ = v
 }
 
 func BenchmarkOptionsField(b *testing.B) {
 	opts := modules.Options{}
-	var v any
 	opts.SetSharedRandomSeed(1)
 	for b.Loop() {
-		v = opts.SharedRandomSeed()
+		opts.SharedRandomSeed()
 	}
-	_ = v
 }
