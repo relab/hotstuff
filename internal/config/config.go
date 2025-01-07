@@ -78,6 +78,8 @@ func (c *Config) AssignReplicas(srcReplicaOpts *orchestrationpb.ReplicaOpts) Rep
 }
 
 // lookupByzStrategy returns the Byzantine strategy for the given replica.
+// If the replica is not Byzantine, the function will return an empty string.
+// This assumes the replicaID is valid; this is checked by the cue config parser.
 func (c *Config) lookupByzStrategy(replicaID hotstuff.ID) string {
 	for strategy, ids := range c.ByzantineStrategy {
 		if slices.Contains(ids, uint32(replicaID)) {
