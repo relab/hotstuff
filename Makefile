@@ -28,7 +28,7 @@ $(binaries): protos
 protos: $(proto_go) $(gorums_go)
 
 mocks: 
-	$(shell go generate $(mock_input_go))
+	@go generate $(mock_input_go)
 
 download:
 	@go mod download
