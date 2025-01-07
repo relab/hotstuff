@@ -1,6 +1,7 @@
 anypb
 Bano
 Baudet
+bbchain
 BFT's
 Bitfield
 bitmask
@@ -17,6 +18,8 @@ covermode
 coverpkg
 coverprofile
 cpuprofile
+cuecontext
+cuelang
 Debugf
 durationpb
 dylib
@@ -80,6 +83,7 @@ propsed
 proto
 protobuf
 protoc
+protocmp
 protos
 protostream
 ptypes
