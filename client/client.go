@@ -106,7 +106,7 @@ func New(conf Config, builder modules.Builder) (client *Client) {
 
 	builder.Build()
 
-	grpcOpts := []grpc.DialOption{grpc.WithBlock()}
+	grpcOpts := []grpc.DialOption{}
 
 	var creds credentials.TransportCredentials
 	if conf.TLS {
