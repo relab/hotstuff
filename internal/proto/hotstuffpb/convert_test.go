@@ -9,10 +9,10 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
 
-	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/internal/testutil"
+	"go.uber.org/mock/gomock"
 )
 
 func TestConvertPartialCert(t *testing.T) {
