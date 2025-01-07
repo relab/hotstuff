@@ -29,7 +29,6 @@ download:
 	@go mod download
 
 tools: download
-	@cat tools.go | grep _ | awk -F'"' '{print $$2}' | xargs -I % go install %
 
 test:
 	@go test -v ./...
