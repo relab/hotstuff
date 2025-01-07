@@ -28,6 +28,105 @@ type HostConfig struct {
 	InternalAddress string `mapstructure:"internal-address"`
 }
 
+type hostConfigHelper struct {
+	replicasPerNode   int
+	remainderReplicas int
+	clientsPerNode    int
+	remainderClients  int
+	remainingReplicas int
+	remainingClients  int
+}
+
+func newHostConfigHelper(hosts map[string]RemoteWorker, hostConfigs map[string]HostConfig, numReplicas, numClients int) (
+	helper *hostConfigHelper,
+	err error) {
+	// number of replicas that should be auto assigned
+	remainingReplicas := numReplicas
+	remainingClients := numClients
+
+	// how many workers that should be auto assigned
+	autoConfig := len(hosts)
+
+	// determine how many replicas should be assigned automatically
+	for _, hostCfg := range hostConfigs {
+		// TODO: ensure that this host is part of e.Hosts
+		if hostCfg.Clients|hostCfg.Replicas == 0 {
+			// if both are zero, we'll autoconfigure this host.
+			continue
+		}
+		remainingReplicas -= hostCfg.Replicas
+		remainingClients -= hostCfg.Clients
+		autoConfig--
+	}
+
+	var (
+		replicasPerNode,
+		remainderReplicas,
+		clientsPerNode,
+		remainderClients int
+	)
+
+	if autoConfig > 0 {
+		replicasPerNode = remainingReplicas / autoConfig
+		remainderReplicas = remainingReplicas % autoConfig
+		clientsPerNode = remainingClients / autoConfig
+		remainderClients = remainingClients % autoConfig
+	}
+
+	// ensure that we have not assigned more replicas or clients than requested
+	if remainingReplicas < 0 {
+		return nil, fmt.Errorf(
+			"invalid replica configuration: %d replicas requested, but host configuration specifies %d",
+			numReplicas, numReplicas-remainingReplicas,
+		)
+	}
+	if remainingClients < 0 {
+		return nil, fmt.Errorf(
+			"invalid client configuration: %d clients requested, but host configuration specifies %d",
+			numClients, numClients-remainingClients,
+		)
+	}
+
+	return &hostConfigHelper{
+		replicasPerNode:   replicasPerNode,
+		remainderReplicas: remainderReplicas,
+		clientsPerNode:    clientsPerNode,
+		remainderClients:  remainderClients,
+		remainingReplicas: remainingReplicas,
+		remainingClients:  remainingClients,
+	}, nil
+}
+
+func (h *hostConfigHelper) computeReplicasAndClientsFor(host string, hostConfigs map[string]HostConfig) (int, int, string) {
+	numReplicas := 0
+	numClients := 0
+	location := ""
+
+	if hostCfg, ok := hostConfigs[host]; ok && hostCfg.Clients|hostCfg.Replicas != 0 {
+		numReplicas = hostCfg.Replicas
+		numClients = hostCfg.Clients
+		location = hostCfg.Location
+	} else {
+		numReplicas = h.replicasPerNode
+		h.remainingReplicas -= h.replicasPerNode
+		if h.remainderReplicas > 0 {
+			numReplicas++
+			h.remainderReplicas--
+			h.remainingReplicas--
+		}
+		numClients = h.clientsPerNode
+		h.remainingClients -= h.clientsPerNode
+		if h.remainderClients > 0 {
+			numClients++
+			h.remainderClients--
+			h.remainingClients--
+		}
+		location = "default"
+	}
+
+	return numReplicas, numClients, location
+}
+
 // Experiment holds variables for an experiment.
 type Experiment struct {
 	*orchestrationpb.ReplicaOpts
@@ -187,81 +286,13 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 	nextReplicaID := initialReplicaID
 	nextClientID := hotstuff.ID(1)
 
-	// number of replicas that should be auto assigned
-	remainingReplicas := e.NumReplicas
-	remainingClients := e.NumClients
-
-	// how many workers that should be auto assigned
-	autoConfig := len(e.Hosts)
-
-	// determine how many replicas should be assigned automatically
-	for _, hostCfg := range e.HostConfigs {
-		// TODO: ensure that this host is part of e.Hosts
-		if hostCfg.Clients|hostCfg.Replicas == 0 {
-			// if both are zero, we'll autoconfigure this host.
-			continue
-		}
-		remainingReplicas -= hostCfg.Replicas
-		remainingClients -= hostCfg.Clients
-		autoConfig--
+	h, err := newHostConfigHelper(e.Hosts, e.HostConfigs, e.NumReplicas, e.NumClients)
+	if err != nil {
+		return err
 	}
 
-	var (
-		replicasPerNode   int
-		remainderReplicas int
-		clientsPerNode    int
-		remainderClients  int
-	)
-
-	if autoConfig > 0 {
-		replicasPerNode = remainingReplicas / autoConfig
-		remainderReplicas = remainingReplicas % autoConfig
-		clientsPerNode = remainingClients / autoConfig
-		remainderClients = remainingClients % autoConfig
-	}
-
-	// ensure that we have not assigned more replicas or clients than requested
-	if remainingReplicas < 0 {
-		return fmt.Errorf(
-			"invalid replica configuration: %d replicas requested, but host configuration specifies %d",
-			e.NumReplicas, e.NumReplicas-remainingReplicas,
-		)
-	}
-	if remainingClients < 0 {
-		return fmt.Errorf(
-			"invalid client configuration: %d clients requested, but host configuration specifies %d",
-			e.NumClients, e.NumClients-remainingClients,
-		)
-	}
-
-	totalReplicaCount := 0
 	for host := range e.Hosts {
-		var (
-			numReplicas int
-			numClients  int
-			location    string
-		)
-		if hostCfg, ok := e.HostConfigs[host]; ok && hostCfg.Clients|hostCfg.Replicas != 0 {
-			numReplicas = hostCfg.Replicas
-			numClients = hostCfg.Clients
-			location = hostCfg.Location
-		} else {
-			numReplicas = replicasPerNode
-			remainingReplicas -= replicasPerNode
-			if remainderReplicas > 0 {
-				numReplicas++
-				remainderReplicas--
-				remainingReplicas--
-			}
-			numClients = clientsPerNode
-			remainingClients -= clientsPerNode
-			if remainderClients > 0 {
-				numClients++
-				remainderClients--
-				remainingClients--
-			}
-			location = "default"
-		}
+		numReplicas, numClients, location := h.computeReplicasAndClientsFor(host, e.HostConfigs)
 
 		for i := 0; i < numReplicas; i++ {
 			var byzantineStrategy string
@@ -283,7 +314,6 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 			e.replicaOpts[nextReplicaID] = replicaOpts
 			e.Logger.Infof("replica %d assigned to host %s", nextReplicaID, host)
 			nextReplicaID++
-			totalReplicaCount++
 		}
 
 		for i := 0; i < numClients; i++ {
@@ -293,21 +323,16 @@ func (e *Experiment) assignReplicasAndClients() (err error) {
 		}
 	}
 
-	e.populateReplicaLocations(totalReplicaCount, initialReplicaID, replicaLocations)
-
-	// TODO: warn if not all clients/replicas were assigned
-	return nil
-}
-
-// This function exists to fix the cyclomatic complexity lint error.
-func (e *Experiment) populateReplicaLocations(totalReplicaCount int, initialReplicaID hotstuff.ID, replicaLocations []string) {
-	// Reiterate the replicas to supply the full list of locations.
-	nextReplicaID := initialReplicaID
-	for range totalReplicaCount {
+	// Reiterate the replicas to supply the full list of locations
+	// after acquiring them in the previous loop.
+	nextReplicaID = initialReplicaID
+	for range e.NumReplicas {
 		replicaOpts := e.replicaOpts[nextReplicaID]
 		replicaOpts.Locations = replicaLocations
 		nextReplicaID++
 	}
+	// TODO: warn if not all clients/replicas were assigned
+	return nil
 }
 
 type assignmentsFileContents struct {
