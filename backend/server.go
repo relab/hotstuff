@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"time"
 
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
@@ -140,16 +139,14 @@ type serviceImpl struct {
 }
 
 func (impl *serviceImpl) addMessageEvent(event any, to hotstuff.ID) {
-	// if !impl.srv.lm.Enabled() {
-	// 	impl.srv.eventLoop.AddEvent(event)
-	// 	return
-	// }
+	if !impl.srv.lm.Enabled() {
+		impl.srv.eventLoop.AddEvent(event)
+		return
+	}
 
-	delay := time.Millisecond * 10 // impl.srv.lm.Latency(impl.srv.id, to)
-	// impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(to), delay)
-	//impl.srv.eventLoop.DelayEvent(event, delay)
-	time.Sleep(delay)
-	impl.srv.eventLoop.AddEvent(event)
+	delay := impl.srv.lm.Latency(impl.srv.id, to)
+	impl.srv.logger.Debugf("Delay between %s and %s: %v\n", impl.srv.lm.Location(impl.srv.id), impl.srv.lm.Location(to), delay)
+	impl.srv.eventLoop.DelayEvent(event, delay)
 }
 
 // Propose handles a replica's response to the Propose QC from the leader.
