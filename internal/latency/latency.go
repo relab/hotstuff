@@ -67,9 +67,6 @@ func MatrixFrom(locations []string) Matrix {
 // Latency returns the latency between nodes a and b.
 // If a or b are not valid nodes, the function will panic.
 func (lm Matrix) Latency(a, b hotstuff.ID) time.Duration {
-	if a == b {
-		return 0
-	}
 	return lm.lm[a-1][b-1]
 }
 
