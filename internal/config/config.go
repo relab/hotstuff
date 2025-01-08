@@ -7,8 +7,8 @@ import (
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 )
 
-// Config holds the configuration for an experiment.
-type Config struct {
+// HostConfig holds the configuration for an experiment.
+type HostConfig struct {
 	// ReplicaHosts is a list of hosts that will run replicas.
 	ReplicaHosts []string
 	// ClientHosts is a list of hosts that will run clients.
@@ -34,6 +34,11 @@ type Config struct {
 	ByzantineStrategy map[string][]uint32
 }
 
+// TODO: Implement
+func NewDefault(numReplicas, numClients int) *HostConfig {
+	return &HostConfig{}
+}
+
 // unitsForHost returns the number of units to be assigned to the host at hostIndex.
 func unitsForHost(hostIndex int, totalUnits int, numHosts int) int {
 	if numHosts == 0 {
@@ -48,12 +53,12 @@ func unitsForHost(hostIndex int, totalUnits int, numHosts int) int {
 }
 
 // ReplicasForHost returns the number of replicas assigned to the host at the given index.
-func (c *Config) ReplicasForHost(hostIndex int) int {
+func (c *HostConfig) ReplicasForHost(hostIndex int) int {
 	return unitsForHost(hostIndex, c.Replicas, len(c.ReplicaHosts))
 }
 
 // ClientsForHost returns the number of clients assigned to the host at the given index.
-func (c *Config) ClientsForHost(hostIndex int) int {
+func (c *HostConfig) ClientsForHost(hostIndex int) int {
 	return unitsForHost(hostIndex, c.Clients, len(c.ClientHosts))
 }
 
@@ -61,7 +66,7 @@ func (c *Config) ClientsForHost(hostIndex int) int {
 type ReplicaMap map[string][]*orchestrationpb.ReplicaOpts
 
 // AssignReplicas assigns replicas to hosts.
-func (c *Config) AssignReplicas(srcReplicaOpts *orchestrationpb.ReplicaOpts) ReplicaMap {
+func (c *HostConfig) AssignReplicas(srcReplicaOpts *orchestrationpb.ReplicaOpts) ReplicaMap {
 	hostsToReplicas := make(ReplicaMap)
 	nextReplicaID := hotstuff.ID(1)
 
@@ -80,7 +85,7 @@ func (c *Config) AssignReplicas(srcReplicaOpts *orchestrationpb.ReplicaOpts) Rep
 // lookupByzStrategy returns the Byzantine strategy for the given replica.
 // If the replica is not Byzantine, the function will return an empty string.
 // This assumes the replicaID is valid; this is checked by the cue config parser.
-func (c *Config) lookupByzStrategy(replicaID hotstuff.ID) string {
+func (c *HostConfig) lookupByzStrategy(replicaID hotstuff.ID) string {
 	for strategy, ids := range c.ByzantineStrategy {
 		if slices.Contains(ids, uint32(replicaID)) {
 			return strategy
@@ -90,7 +95,7 @@ func (c *Config) lookupByzStrategy(replicaID hotstuff.ID) string {
 }
 
 // AssignClients assigns clients to hosts.
-func (c *Config) AssignClients() map[string][]hotstuff.ID {
+func (c *HostConfig) AssignClients() map[string][]hotstuff.ID {
 	hostsToClients := make(map[string][]hotstuff.ID)
 	nextClientID := hotstuff.ID(1)
 

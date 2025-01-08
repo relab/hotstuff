@@ -30,32 +30,36 @@ func TestOrchestration(t *testing.T) {
 		workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
 		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), metrics.NopLogger(), nil, 0)
 
-		experiment := &orchestration.Experiment{
-			Logger:      logging.New("ctrl"),
-			NumReplicas: 4,
-			NumClients:  2,
-			ClientOpts: &orchestrationpb.ClientOpts{
-				ConnectTimeout: durationpb.New(time.Second),
-				MaxConcurrent:  250,
-				PayloadSize:    100,
-				RateLimit:      math.Inf(1),
-				Timeout:        durationpb.New(500 * time.Millisecond),
-			},
-			ReplicaOpts: &orchestrationpb.ReplicaOpts{
-				BatchSize:         100,
-				ConnectTimeout:    durationpb.New(time.Second),
-				InitialTimeout:    durationpb.New(100 * time.Millisecond),
-				TimeoutSamples:    1000,
-				TimeoutMultiplier: 1.2,
-				Consensus:         consensusImpl,
-				Crypto:            crypto,
-				LeaderRotation:    "round-robin",
-				Modules:           mods,
-				ByzantineStrategy: byzantine,
-			},
-			Duration: 5 * time.Second,
-			Hosts:    map[string]orchestration.RemoteWorker{"127.0.0.1": workerProxy},
+		clientOpts := &orchestrationpb.ClientOpts{
+			ConnectTimeout: durationpb.New(time.Second),
+			MaxConcurrent:  250,
+			PayloadSize:    100,
+			RateLimit:      math.Inf(1),
+			Timeout:        durationpb.New(500 * time.Millisecond),
 		}
+		replicaOpts := &orchestrationpb.ReplicaOpts{
+			BatchSize:         100,
+			ConnectTimeout:    durationpb.New(time.Second),
+			InitialTimeout:    durationpb.New(100 * time.Millisecond),
+			TimeoutSamples:    1000,
+			TimeoutMultiplier: 1.2,
+			Consensus:         consensusImpl,
+			Crypto:            crypto,
+			LeaderRotation:    "round-robin",
+			Modules:           mods,
+			ByzantineStrategy: byzantine,
+		}
+
+		experiment := orchestration.NewExperiment(
+			replicaOpts,
+			clientOpts,
+			4, 2,
+			logging.New("ctrl"),
+			5*time.Second,
+			"",
+		)
+
+		experiment.SetWorkers(map[string]orchestration.RemoteWorker{"127.0.0.1": workerProxy})
 
 		c := make(chan error)
 		go func() {
@@ -102,29 +106,33 @@ func TestDeployment(t *testing.T) {
 		t.Skip("GitHub Actions only supports linux containers on linux runners.")
 	}
 
-	experiment := &orchestration.Experiment{
-		Logger:      logging.New("ctrl"),
-		NumReplicas: 4,
-		NumClients:  2,
-		ClientOpts: &orchestrationpb.ClientOpts{
-			ConnectTimeout: durationpb.New(time.Second),
-			MaxConcurrent:  250,
-			PayloadSize:    100,
-			RateLimit:      math.Inf(1),
-		},
-		ReplicaOpts: &orchestrationpb.ReplicaOpts{
-			BatchSize:         100,
-			ConnectTimeout:    durationpb.New(time.Second),
-			InitialTimeout:    durationpb.New(100 * time.Millisecond),
-			TimeoutSamples:    1000,
-			TimeoutMultiplier: 1.2,
-			Consensus:         "chainedhotstuff",
-			Crypto:            "ecdsa",
-			LeaderRotation:    "round-robin",
-		},
-		Duration: 10 * time.Second,
-		Hosts:    make(map[string]orchestration.RemoteWorker),
+	// workers := make(map[string]orchestration.RemoteWorker)
+	clientOpts := &orchestrationpb.ClientOpts{
+		ConnectTimeout: durationpb.New(time.Second),
+		MaxConcurrent:  250,
+		PayloadSize:    100,
+		RateLimit:      math.Inf(1),
 	}
+
+	replicaOpts := &orchestrationpb.ReplicaOpts{
+		BatchSize:         100,
+		ConnectTimeout:    durationpb.New(time.Second),
+		InitialTimeout:    durationpb.New(100 * time.Millisecond),
+		TimeoutSamples:    1000,
+		TimeoutMultiplier: 1.2,
+		Consensus:         "chainedhotstuff",
+		Crypto:            "ecdsa",
+		LeaderRotation:    "round-robin",
+	}
+
+	experiment := orchestration.NewExperiment(
+		replicaOpts,
+		clientOpts,
+		4, 2,
+		logging.New("ctrl"),
+		10*time.Second,
+		"",
+	)
 
 	exe := compileBinary(t)
 	g := iagotest.CreateSSHGroup(t, 4, true)
@@ -138,8 +146,9 @@ func TestDeployment(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	wg.Add(len(sessions))
+	hosts := make(map[string]orchestration.RemoteWorker)
 	for host, session := range sessions {
-		experiment.Hosts[host] = orchestration.NewRemoteWorker(protostream.NewWriter(session.Stdin()), protostream.NewReader(session.Stdout()))
+		hosts[host] = orchestration.NewRemoteWorker(protostream.NewWriter(session.Stdin()), protostream.NewReader(session.Stdout()))
 		go func(session orchestration.WorkerSession) {
 			_, err := io.Copy(os.Stderr, session.Stderr())
 			if err != nil {
@@ -148,6 +157,8 @@ func TestDeployment(t *testing.T) {
 			wg.Done()
 		}(session)
 	}
+
+	experiment.SetWorkers(hosts)
 	if err = experiment.Run(); err != nil {
 		t.Fatal(err)
 	}
