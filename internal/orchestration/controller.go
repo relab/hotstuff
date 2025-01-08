@@ -86,15 +86,15 @@ func (e *Experiment) Run() (err error) {
 		}
 	}()
 
+	replicaMap := e.hostCfg.AssignReplicas(e.replicaOpts)
+	clientIds := e.hostCfg.AssignClients()
+
 	if e.output != "" {
-		err = e.writeAssignmentsFile()
+		err = e.writeAssignmentsFile(replicaMap, clientIds)
 		if err != nil {
 			return err
 		}
 	}
-
-	replicaMap := e.hostCfg.AssignReplicas(e.replicaOpts)
-	clientIds := e.hostCfg.AssignClients()
 
 	e.logger.Info("Creating replicas...")
 	cfg, err := e.createReplicas(replicaMap)
@@ -195,7 +195,7 @@ type assignmentsFileContents struct {
 	HostsToClients map[string][]hotstuff.ID
 }
 
-func (e *Experiment) writeAssignmentsFile() (err error) {
+func (e *Experiment) writeAssignmentsFile(m config.ReplicaMap, clientIDs map[string][]hotstuff.ID) (err error) {
 	f, err := os.OpenFile(filepath.Join(e.output, "hosts.json"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
@@ -208,10 +208,17 @@ func (e *Experiment) writeAssignmentsFile() (err error) {
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "\t")
 
-	// TODO: Supply the host IDs
+	replicaIDs := make(map[string][]hotstuff.ID)
+	for host, opts := range m {
+		replicaIDs[host] = make([]hotstuff.ID, 0, len(opts))
+		for _, opt := range opts {
+			replicaIDs[host] = append(replicaIDs[host], opt.HotstuffID())
+		}
+	}
+
 	return enc.Encode(assignmentsFileContents{
-		HostsToReplicas: map[string][]hotstuff.ID{},
-		HostsToClients:  map[string][]hotstuff.ID{},
+		HostsToReplicas: replicaIDs,
+		HostsToClients:  clientIDs,
 	})
 }
 
