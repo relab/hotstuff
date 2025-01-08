@@ -205,3 +205,8 @@ func (fhw forkHandlerWrapper) InitModule(mods *Core) {
 func (fhw forkHandlerWrapper) Fork(block *hotstuff.Block) {
 	fhw.forkHandler.Fork(block.Command())
 }
+
+// Kauri module implements the Kauri protocol
+type Kauri interface {
+	Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg)
+}

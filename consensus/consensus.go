@@ -52,6 +52,7 @@ type consensusBase struct {
 	synchronizer   modules.Synchronizer
 
 	handel modules.Handel
+	kauri  modules.Kauri
 
 	lastVote hotstuff.View
 
