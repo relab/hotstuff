@@ -5,11 +5,11 @@ import (
 
 	"github.com/relab/hotstuff"
 
-	"github.com/golang/mock/gomock"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
+	"go.uber.org/mock/gomock"
 )
 
 func TestAdvanceViewQC(t *testing.T) {

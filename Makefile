@@ -9,11 +9,13 @@ gorums_go := internal/proto/clientpb/client_gorums.pb.go \
 		internal/proto/hotstuffpb/hotstuff_gorums.pb.go  \
 		internal/proto/handelpb/handel_gorums.pb.go
 
+mock_input_go := ./modules/./...
+
 binaries := hotstuff plot
 
 CSV ?= wonderproxy.csv
 
-.PHONY: all aws wonderproxy latencies debug clean protos download tools $(binaries)
+.PHONY: all aws wonderproxy latencies debug clean protos mocks download tools $(binaries)
 
 all: $(binaries)
 
@@ -24,6 +26,9 @@ $(binaries): protos
 	@go build -o ./$@ $(GCFLAGS) ./cmd/$@
 
 protos: $(proto_go) $(gorums_go)
+
+mocks: 
+	@go generate $(mock_input_go)
 
 download:
 	@go mod download

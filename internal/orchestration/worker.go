@@ -28,7 +28,6 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/synchronizer"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -230,7 +229,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		BatchSize:   opts.GetBatchSize(),
 		ManagerOptions: []gorums.ManagerOption{
 			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
-			gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
 		},
 	}
 	return replica.New(c, builder), nil
@@ -292,7 +290,6 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			Input:         io.NopCloser(rand.Reader),
 			ManagerOptions: []gorums.ManagerOption{
 				gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
-				gorums.WithGrpcDialOptions(grpc.WithReturnConnectionError()),
 			},
 			RateLimit:        opts.GetRateLimit(),
 			RateStep:         opts.GetRateStep(),

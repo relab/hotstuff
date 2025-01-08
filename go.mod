@@ -3,8 +3,8 @@ module github.com/relab/hotstuff
 go 1.23.4
 
 require (
+	cuelang.org/go v0.11.1
 	github.com/felixge/fgprof v0.9.5
-	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.6.0
 	github.com/kilic/bls12-381 v0.1.1-0.20210208205449-6045b0235e36
 	github.com/mattn/go-isatty v0.0.20
@@ -16,6 +16,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	go-hep.org/x/hep v0.36.0
+	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/time v0.8.0
 	gonum.org/v1/plot v0.15.0
@@ -31,6 +32,7 @@ require (
 	github.com/ajstarks/svgo v0.0.0-20211024235047-1546f124cd8b // indirect
 	github.com/alexhunt7/ssher v0.0.0-20190216204854-d36569cf7047 // indirect
 	github.com/campoy/embedmd v1.0.0 // indirect
+	github.com/cockroachdb/apd/v3 v3.2.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/docker v27.4.0+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
@@ -46,6 +48,7 @@ require (
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/gonuts/binary v0.2.0 // indirect
 	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
