@@ -195,7 +195,7 @@ type assignmentsFileContents struct {
 	HostsToClients map[string][]hotstuff.ID
 }
 
-func (e *Experiment) writeAssignmentsFile(m config.ReplicaMap, clientIDs map[string][]hotstuff.ID) (err error) {
+func (e *Experiment) writeAssignmentsFile(m config.ReplicaMap, clientIDs config.ClienIdMap) (err error) {
 	f, err := os.OpenFile(filepath.Join(e.output, "hosts.json"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
@@ -295,7 +295,7 @@ func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration, m m
 	return nil
 }
 
-func (e *Experiment) stopClients(clientIDs map[string][]hotstuff.ID) error {
+func (e *Experiment) stopClients(clientIDs config.ClienIdMap) error {
 	for host, worker := range e.workers {
 		req := &orchestrationpb.StopClientRequest{}
 		req.IDs = clientIDsToU32(host, clientIDs)
@@ -325,7 +325,7 @@ func replicaIDsToU32(host string, m config.ReplicaMap) []uint32 {
 	return ids
 }
 
-func clientIDsToU32(host string, clientIDs map[string][]hotstuff.ID) []uint32 {
+func clientIDsToU32(host string, clientIDs config.ClienIdMap) []uint32 {
 	newList := make([]uint32, 0, len(clientIDs))
 	for _, id := range clientIDs[host] {
 		newList = append(newList, uint32(id))

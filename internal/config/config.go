@@ -94,9 +94,11 @@ func (c *HostConfig) lookupByzStrategy(replicaID hotstuff.ID) string {
 	return ""
 }
 
+type ClienIdMap map[string][]hotstuff.ID
+
 // AssignClients assigns clients to hosts.
-func (c *HostConfig) AssignClients() map[string][]hotstuff.ID {
-	hostsToClients := make(map[string][]hotstuff.ID)
+func (c *HostConfig) AssignClients() ClienIdMap {
+	hostsToClients := make(ClienIdMap)
 	nextClientID := hotstuff.ID(1)
 
 	for hostIdx, host := range c.ClientHosts {
