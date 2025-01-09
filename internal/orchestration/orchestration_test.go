@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relab/hotstuff/internal/config"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
@@ -50,23 +51,26 @@ func TestOrchestration(t *testing.T) {
 			ByzantineStrategy: byzantine,
 		}
 
-		experiment := orchestration.NewExperiment(
-			replicaOpts,
-			clientOpts,
-			4, 2,
-			logging.New("ctrl"),
+		experiment, err := orchestration.NewExperiment(
 			5*time.Second,
 			"",
+			replicaOpts,
+			clientOpts,
+			config.NewLocal(4, 2),
+			map[string]orchestration.RemoteWorker{"localhost": workerProxy},
+			logging.New("ctrl"),
 		)
 
-		experiment.SetWorkers(map[string]orchestration.RemoteWorker{"127.0.0.1": workerProxy})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		c := make(chan error)
 		go func() {
 			c <- worker.Run()
 		}()
 
-		err := experiment.Run()
+		err = experiment.Run()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -125,15 +129,6 @@ func TestDeployment(t *testing.T) {
 		LeaderRotation:    "round-robin",
 	}
 
-	experiment := orchestration.NewExperiment(
-		replicaOpts,
-		clientOpts,
-		4, 2,
-		logging.New("ctrl"),
-		10*time.Second,
-		"",
-	)
-
 	exe := compileBinary(t)
 	g := iagotest.CreateSSHGroup(t, 4, true)
 
@@ -158,7 +153,20 @@ func TestDeployment(t *testing.T) {
 		}(session)
 	}
 
-	experiment.SetWorkers(hosts)
+	experiment, err := orchestration.NewExperiment(
+		10*time.Second,
+		"",
+		replicaOpts,
+		clientOpts,
+		config.NewLocal(4, 2),
+		hosts,
+		logging.New("ctrl"),
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if err = experiment.Run(); err != nil {
 		t.Fatal(err)
 	}

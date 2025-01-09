@@ -184,18 +184,16 @@ func runController() {
 		Timeout:          durationpb.New(viper.GetDuration("client-timeout")),
 	}
 
-	experiment := orchestration.NewExperiment(
-		replicaOpts,
-		clientOpts,
-		numReplicas, numClients,
-		logging.New("ctrl"),
+	experiment, err := orchestration.NewExperiment(
 		viper.GetDuration("duration"),
 		outputDir,
+		replicaOpts,
+		clientOpts,
+		cfg,
+		remoteWorkers,
+		logging.New("ctrl"),
 	)
 
-	experiment.SetWorkers(remoteWorkers)
-
-	err = experiment.SetHostConfig(cfg)
 	checkf("config error: %v", err)
 
 	err = experiment.Run()

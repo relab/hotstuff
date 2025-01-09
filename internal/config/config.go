@@ -106,11 +106,11 @@ func (c *HostConfig) lookupByzStrategy(replicaID hotstuff.ID) string {
 	return ""
 }
 
-type ClienIdMap map[string][]hotstuff.ID
+type ClientMap map[string][]hotstuff.ID
 
 // AssignClients assigns clients to hosts.
-func (c *HostConfig) AssignClients() ClienIdMap {
-	hostsToClients := make(ClienIdMap)
+func (c *HostConfig) AssignClients() ClientMap {
+	hostsToClients := make(ClientMap)
 	nextClientID := hotstuff.ID(1)
 
 	for hostIdx, host := range c.ClientHosts {
@@ -123,12 +123,12 @@ func (c *HostConfig) AssignClients() ClienIdMap {
 	return hostsToClients
 }
 
-// Returns true if both the replica and client hosts slices
+// IsLocal returns true if both the replica and client hosts slices
 // contain one instance of "localhost".
 func (c *HostConfig) IsLocal() bool {
 	if len(c.ClientHosts) > 1 || len(c.ReplicaHosts) > 1 {
 		return false
 	}
-
-	return c.ReplicaHosts[0] == "localhost" && c.ClientHosts[0] == "localhost"
+	return c.ReplicaHosts[0] == "localhost" && c.ClientHosts[0] == "localhost" ||
+		c.ReplicaHosts[0] == "127.0.0.1" && c.ClientHosts[0] == "127.0.0.1"
 }
