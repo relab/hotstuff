@@ -181,21 +181,15 @@ func (el *EventLoop) Run(ctx context.Context) {
 				el.processEvent(event, false)
 			}
 			return
-		default:
-		}
 
-		select {
-		case event, ok := <-el.eventQ:
-			if !ok {
-				continue
-			}
-
+		case event := <-el.eventQ:
 			if e, ok := event.(startTickerEvent); ok {
 				el.startTicker(e.tickerID)
 				continue
 			}
 			el.processEvent(event, false)
 		default:
+			// Continue loop
 		}
 
 	}
