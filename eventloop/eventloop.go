@@ -51,7 +51,8 @@ type handler struct {
 
 // EventLoop accepts events of any type and executes registered event handlers.
 type EventLoop struct {
-	eventQ queue
+	eventQ         chan any
+	isEventQClosed bool
 
 	mut sync.Mutex // protects the following:
 
@@ -68,11 +69,12 @@ type EventLoop struct {
 // New returns a new event loop with the requested buffer size.
 func New(bufferSize uint) *EventLoop {
 	el := &EventLoop{
-		ctx:           context.Background(),
-		eventQ:        newQueue(bufferSize),
-		waitingEvents: make(map[reflect.Type][]any),
-		handlers:      make(map[reflect.Type][]handler),
-		tickers:       make(map[int]*ticker),
+		ctx:            context.Background(),
+		eventQ:         make(chan any, bufferSize),
+		isEventQClosed: false,
+		waitingEvents:  make(map[reflect.Type][]any),
+		handlers:       make(map[reflect.Type][]handler),
+		tickers:        make(map[int]*ticker),
 	}
 	return el
 }
@@ -138,10 +140,10 @@ func (el *EventLoop) UnregisterHandler(eventType any, id int) {
 
 // AddEvent adds an event to the event queue.
 func (el *EventLoop) AddEvent(event any) {
-	if event != nil {
+	if event != nil && !el.isEventQClosed {
 		// run handlers with runInAddEvent option
 		el.processEvent(event, true)
-		el.eventQ.push(event)
+		el.eventQ <- event
 	}
 }
 
@@ -169,29 +171,33 @@ func (el *EventLoop) setContext(ctx context.Context) {
 func (el *EventLoop) Run(ctx context.Context) {
 	el.setContext(ctx)
 
-loop:
 	for {
-		event, ok := el.eventQ.pop()
-		if !ok {
-			select {
-			case <-el.eventQ.ready():
-				continue loop
-			case <-ctx.Done():
-				break loop
+		select {
+		case <-ctx.Done():
+			el.isEventQClosed = true
+			close(el.eventQ)
+			// HACK: when we get canceled, we will handle the events that were in the queue at that time before quitting.
+			for event := range el.eventQ {
+				el.processEvent(event, false)
 			}
+			return
+		default:
 		}
-		if e, ok := event.(startTickerEvent); ok {
-			el.startTicker(e.tickerID)
-			continue
-		}
-		el.processEvent(event, false)
-	}
 
-	// HACK: when we get canceled, we will handle the events that were in the queue at that time before quitting.
-	l := el.eventQ.len()
-	for i := 0; i < l; i++ {
-		event, _ := el.eventQ.pop()
-		el.processEvent(event, false)
+		select {
+		case event, ok := <-el.eventQ:
+			if !ok {
+				continue
+			}
+
+			if e, ok := event.(startTickerEvent); ok {
+				el.startTicker(e.tickerID)
+				continue
+			}
+			el.processEvent(event, false)
+		default:
+		}
+
 	}
 }
 
@@ -199,18 +205,18 @@ loop:
 func (el *EventLoop) Tick(ctx context.Context) bool {
 	el.setContext(ctx)
 
-	event, ok := el.eventQ.pop()
-	if !ok {
+	select {
+	case event := <-el.eventQ:
+		if e, ok := event.(startTickerEvent); ok {
+			el.startTicker(e.tickerID)
+		} else {
+			el.processEvent(event, false)
+		}
+
+		return true
+	default:
 		return false
 	}
-
-	if e, ok := event.(startTickerEvent); ok {
-		el.startTicker(e.tickerID)
-	} else {
-		el.processEvent(event, false)
-	}
-
-	return true
 }
 
 var handlerListPool = gpool.New(func() []EventHandler { return make([]EventHandler, 0, 10) })
@@ -320,7 +326,7 @@ func (el *EventLoop) AddTicker(interval time.Duration, callback func(tick time.T
 
 	// We want the ticker to inherit the context of the event loop,
 	// so we need to start the ticker from the run loop.
-	el.eventQ.push(startTickerEvent{id})
+	el.eventQ <- startTickerEvent{id}
 
 	return id
 }
