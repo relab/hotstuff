@@ -112,11 +112,16 @@ func runController() {
 		cfg, err = config.Load(cfgPath)
 		checkf("config error: %v", err)
 	} else {
-		cfg = config.NewDefault(numReplicas, numClients)
+		cfg = config.NewLocal(numReplicas, numClients)
 	}
 
 	worker := viper.GetBool("worker")
-	hosts := cfg.ReplicaHosts // viper.GetStringSlice("hosts")
+
+	var hosts []string
+	if !cfg.IsLocal() {
+		hosts = append(cfg.ReplicaHosts, cfg.ClientHosts...)
+	}
+
 	exePath := viper.GetString("exe")
 
 	g, err := iago.NewSSHGroup(hosts, viper.GetString("ssh-config"))

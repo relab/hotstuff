@@ -34,9 +34,21 @@ type HostConfig struct {
 	ByzantineStrategy map[string][]uint32
 }
 
-// TODO: Implement
-func NewDefault(numReplicas, numClients int) *HostConfig {
-	return &HostConfig{}
+// NewLocal creates a config for a localhost case.
+// TODO: Add support for locations through cli.
+func NewLocal(numReplicas, numClients int,
+
+// locations []string,
+// byzStrat map[string][]uint32,
+) *HostConfig {
+	return &HostConfig{
+		ReplicaHosts: []string{"localhost"},
+		ClientHosts:  []string{"localhost"},
+		Replicas:     numReplicas,
+		Clients:      numClients,
+		// Locations:         locations,
+		// ByzantineStrategy: byzStrat,
+	}
 }
 
 // unitsForHost returns the number of units to be assigned to the host at hostIndex.
@@ -109,4 +121,14 @@ func (c *HostConfig) AssignClients() ClienIdMap {
 		}
 	}
 	return hostsToClients
+}
+
+// Returns true if both the replica and client hosts slices
+// contain one instance of "localhost".
+func (c *HostConfig) IsLocal() bool {
+	if len(c.ClientHosts) > 1 || len(c.ReplicaHosts) > 1 {
+		return false
+	}
+
+	return c.ReplicaHosts[0] == "localhost" && c.ClientHosts[0] == "localhost"
 }
