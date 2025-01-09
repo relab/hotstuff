@@ -2,15 +2,12 @@ package cli
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"log"
 	"math"
 	"net"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/relab/hotstuff/internal/config"
@@ -227,23 +224,6 @@ func checkf(format string, args ...any) {
 			log.Fatalf(format, args...)
 		}
 	}
-}
-
-func parseByzantine() (map[string]int, error) {
-	strategies := make(map[string]int)
-	byzantine := viper.GetStringSlice("byzantine")
-	for _, arg := range byzantine {
-		parts := strings.Split(arg, ":")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("byzantine must be specified as a comma separated list of 'name:count'")
-		}
-		count, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return nil, fmt.Errorf("could not read number of replicas for byzantine strategy '%s': %w", arg, err)
-		}
-		strategies[parts[0]] = count
-	}
-	return strategies, nil
 }
 
 func localWorker(globalOutput string, enableMetrics []string, interval time.Duration) (worker orchestration.RemoteWorker, wait func()) {
