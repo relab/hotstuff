@@ -169,6 +169,7 @@ func (e *Experiment) createReplicas(m config.ReplicaMap) (cfg *orchestrationpb.R
 			opt.PublicKey = keyChain.PublicKey
 			opt.Certificate = keyChain.Certificate
 			opt.CertificateKey = keyChain.CertificateKey
+
 			req.Replicas[opt.ID] = opt
 		}
 

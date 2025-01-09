@@ -102,12 +102,21 @@ func runController() {
 		checkf("failed to create output directory: %v", err)
 	}
 
-	// TODO: use cue config info
-	// experiment.Byzantine, err = parseByzantine()
-	checkf("%v", err)
+	numReplicas := viper.GetInt("replicas")
+	numClients := viper.GetInt("clients")
+
+	cfgPath := viper.GetString("config")
+
+	var cfg *config.HostConfig
+	if cueCfgPath != "" {
+		cfg, err = config.Load(cfgPath)
+		checkf("config error: %v", err)
+	} else {
+		cfg = config.NewDefault(numReplicas, numClients)
+	}
 
 	worker := viper.GetBool("worker")
-	hosts := viper.GetStringSlice("hosts")
+	hosts := cfg.ReplicaHosts // viper.GetStringSlice("hosts")
 	exePath := viper.GetString("exe")
 
 	g, err := iago.NewSSHGroup(hosts, viper.GetString("ssh-config"))
@@ -173,9 +182,6 @@ func runController() {
 		Timeout:          durationpb.New(viper.GetDuration("client-timeout")),
 	}
 
-	numReplicas := viper.GetInt("replicas")
-	numClients := viper.GetInt("clients")
-
 	experiment := orchestration.NewExperiment(
 		replicaOpts,
 		clientOpts,
@@ -187,32 +193,8 @@ func runController() {
 
 	experiment.SetWorkers(remoteWorkers)
 
-	var cfg *config.HostConfig
-
-	cfgPath := viper.GetString("config")
-	if cueCfgPath != "" {
-		cfg, err = config.Load(cfgPath)
-		checkf("config error: %v", err)
-	} else {
-		cfg = config.NewDefault(numReplicas, numClients)
-	}
-
 	err = experiment.SetHostConfig(cfg)
 	checkf("config error: %v", err)
-	// experiment.HostConfigs = make(map[string]orchestration.HostConfig)
-	//
-	// var hostConfigs []orchestration.HostConfig
-	// err = viper.UnmarshalKey("hosts-config", &hostConfigs)
-	// checkf("failed to unmarshal hosts-config: %v", err)
-	//
-	// for _, cfg := range hostConfigs {
-	// 	experiment.HostConfigs[cfg.Name] = cfg
-	// 	cfg.Location, err = latency.ValidLocation(cfg.Location)
-	// 	log.Printf("cfg.Location: %v", cfg.Location)
-	// 	if err != nil {
-	// 		checkf("invalid configuration for %s: %v", cfg.Name, err)
-	// 	}
-	// }
 
 	err = experiment.Run()
 	checkf("failed to run experiment: %v", err)
