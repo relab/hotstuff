@@ -127,6 +127,32 @@ func (e *Experiment) Run() (err error) {
 	return nil
 }
 
+func (e *Experiment) putReplicaOpt(toMap map[uint32]*orchestrationpb.ReplicaOpts, host string, opt *orchestrationpb.ReplicaOpts) error {
+	opt.CertificateAuthority = keygen.CertToPEM(e.ca)
+	validFor := []string{"localhost", "127.0.0.1", "127.0.1.1", host}
+	ips, err := net.LookupIP(host)
+	if err == nil {
+		for _, ip := range ips {
+			// TODO: Not using internal addr anymore, but check if this is needed.
+			if ipStr := ip.String(); ipStr != host /*&& ipStr != internalAddr*/ {
+				validFor = append(validFor, ipStr)
+			}
+		}
+	}
+
+	keyChain, err := keygen.GenerateKeyChain(hotstuff.ID(opt.ID), validFor, e.replicaOpts.Crypto, e.ca, e.caKey)
+	if err != nil {
+		return fmt.Errorf("failed to generate keychain: %w", err)
+	}
+	opt.PrivateKey = keyChain.PrivateKey
+	opt.PublicKey = keyChain.PublicKey
+	opt.Certificate = keyChain.Certificate
+	opt.CertificateKey = keyChain.CertificateKey
+
+	toMap[opt.ID] = opt
+	return nil
+}
+
 func (e *Experiment) createReplicas(replicaMap config.ReplicaMap) (cfg *orchestrationpb.ReplicaConfiguration, err error) {
 	e.caKey, e.ca, err = keygen.GenerateCA()
 	if err != nil {
@@ -140,28 +166,10 @@ func (e *Experiment) createReplicas(replicaMap config.ReplicaMap) (cfg *orchestr
 		req := &orchestrationpb.CreateReplicaRequest{Replicas: make(map[uint32]*orchestrationpb.ReplicaOpts)}
 
 		for _, opt := range opts {
-			opt.CertificateAuthority = keygen.CertToPEM(e.ca)
-			validFor := []string{"localhost", "127.0.0.1", "127.0.1.1", host}
-			ips, err := net.LookupIP(host)
-			if err == nil {
-				for _, ip := range ips {
-					// TODO: Not using internal addr anymore, but check if this is needed.
-					if ipStr := ip.String(); ipStr != host /*&& ipStr != internalAddr*/ {
-						validFor = append(validFor, ipStr)
-					}
-				}
-			}
-
-			keyChain, err := keygen.GenerateKeyChain(hotstuff.ID(opt.ID), validFor, e.replicaOpts.Crypto, e.ca, e.caKey)
+			err = e.putReplicaOpt(req.Replicas, host, opt)
 			if err != nil {
-				return nil, fmt.Errorf("failed to generate keychain: %w", err)
+				return nil, err
 			}
-			opt.PrivateKey = keyChain.PrivateKey
-			opt.PublicKey = keyChain.PublicKey
-			opt.Certificate = keyChain.Certificate
-			opt.CertificateKey = keyChain.CertificateKey
-
-			req.Replicas[opt.ID] = opt
 		}
 
 		wcfg, err := worker.CreateReplica(req)

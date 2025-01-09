@@ -13,7 +13,6 @@
 			"cwd": "${workspaceRoot}",
 			"args": [
 				"run",
-				"--config=scripts/local_config.cue"
 			]
 		},
 		{
