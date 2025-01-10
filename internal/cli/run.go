@@ -114,10 +114,7 @@ func runController() {
 
 	worker := viper.GetBool("worker")
 
-	var hosts []string
-	if !cfg.IsLocal() {
-		hosts = append(cfg.ReplicaHosts, cfg.ClientHosts...)
-	}
+	hosts := cfg.AllHosts()
 
 	exePath := viper.GetString("exe")
 

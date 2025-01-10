@@ -77,6 +77,15 @@ func (c *HostConfig) ClientsForHost(hostIndex int) int {
 // ReplicaMap is a map from host to a list of replica options.
 type ReplicaMap map[string][]*orchestrationpb.ReplicaOpts
 
+// ReplicaIDs convert the existing map to a map of []uint32.
+func (r ReplicaMap) ReplicaIDs(host string) []uint32 {
+	ids := make([]uint32, 0, len(r[host]))
+	for _, opts := range r[host] {
+		ids = append(ids, opts.ID)
+	}
+	return ids
+}
+
 // AssignReplicas assigns replicas to hosts.
 func (c *HostConfig) AssignReplicas(srcReplicaOpts *orchestrationpb.ReplicaOpts) ReplicaMap {
 	hostsToReplicas := make(ReplicaMap)
@@ -108,6 +117,15 @@ func (c *HostConfig) lookupByzStrategy(replicaID hotstuff.ID) string {
 
 type ClientMap map[string][]hotstuff.ID
 
+// ClientIDs convert the existing map from hotstuff.ID to uint32.
+func (c ClientMap) ClientIDs(host string) []uint32 {
+	newList := make([]uint32, 0, len(c))
+	for _, id := range c[host] {
+		newList = append(newList, uint32(id))
+	}
+	return newList
+}
+
 // AssignClients assigns clients to hosts.
 func (c *HostConfig) AssignClients() ClientMap {
 	hostsToClients := make(ClientMap)
@@ -125,10 +143,19 @@ func (c *HostConfig) AssignClients() ClientMap {
 
 // IsLocal returns true if both the replica and client hosts slices
 // contain one instance of "localhost".
-func (c *HostConfig) IsLocal() bool {
+func (c *HostConfig) isLocal() bool {
 	if len(c.ClientHosts) > 1 || len(c.ReplicaHosts) > 1 {
 		return false
 	}
 	return c.ReplicaHosts[0] == "localhost" && c.ClientHosts[0] == "localhost" ||
 		c.ReplicaHosts[0] == "127.0.0.1" && c.ClientHosts[0] == "127.0.0.1"
+}
+
+// AllHosts returns the list of all hostnames, including replicas and clients.
+// If the configuration is set to run locally, the function returns an empty list.
+func (c *HostConfig) AllHosts() []string {
+	if c.isLocal() {
+		return []string{}
+	}
+	return append(c.ReplicaHosts, c.ClientHosts...)
 }
