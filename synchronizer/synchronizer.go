@@ -36,7 +36,7 @@ type Synchronizer struct {
 	// we will simply send this timeout again.
 	lastTimeout *hotstuff.TimeoutMsg
 
-	duration ViewDuration
+	duration modules.ViewDuration
 	timer    oneShotTimer
 
 	// map of collected timeout messages per view
@@ -50,6 +50,7 @@ func (s *Synchronizer) InitComponent(mods *core.Core) {
 		&s.consensus,
 		&s.crypto,
 		&s.configuration,
+		&s.duration,
 		&s.eventLoop,
 		&s.leaderRotation,
 		&s.logger,
@@ -85,13 +86,11 @@ func (s *Synchronizer) InitComponent(mods *core.Core) {
 }
 
 // New creates a new Synchronizer.
-func New(viewDuration ViewDuration) core.Synchronizer {
+func New() core.Synchronizer {
 	return &Synchronizer{
 		currentView: 1,
 
-		duration: viewDuration,
 		timer:    oneShotTimer{time.AfterFunc(0, func() {})}, // dummy timer that will be replaced after start() is called
-
 		timeouts: make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
 	}
 }

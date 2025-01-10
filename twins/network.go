@@ -139,12 +139,15 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
 		builder.Add(
+			consensusModule,
+			FixedTimeout(1*time.Millisecond),
+
 			eventloop.New(100),
 			blockchain.New(),
-			consensus.New(consensusModule),
+			consensus.New(),
 			consensus.NewVotingMachine(),
 			crypto.NewCache(ecdsa.New(), 100),
-			synchronizer.New(FixedTimeout(1*time.Millisecond)),
+			synchronizer.New(),
 			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			// twins-specific:
 			&configuration{network: n, node: node},
@@ -475,7 +478,7 @@ func (tm *timeoutManager) InitComponent(mods *core.Core) {
 }
 
 // FixedTimeout returns an ExponentialTimeout with a max exponent of 0.
-func FixedTimeout(timeout time.Duration) synchronizer.ViewDuration {
+func FixedTimeout(timeout time.Duration) modules.ViewDuration {
 	return fixedDuration{timeout}
 }
 

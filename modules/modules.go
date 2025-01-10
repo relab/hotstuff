@@ -1,6 +1,10 @@
 package modules
 
-import "github.com/relab/hotstuff"
+import (
+	"time"
+
+	"github.com/relab/hotstuff"
+)
 
 // Rules is the minimum interface that a consensus implementations must implement.
 // Implementations of this interface can be wrapped in the ConsensusBase struct.
@@ -28,6 +32,19 @@ type ProposeRuler interface {
 type LeaderRotation interface {
 	// GetLeader returns the id of the leader in the given view.
 	GetLeader(hotstuff.View) hotstuff.ID
+}
+
+// ViewDuration determines the duration of a view.
+// The view synchronizer uses this interface to set its timeouts.
+type ViewDuration interface {
+	// Duration returns the duration that the next view should last.
+	Duration() time.Duration
+	// ViewStarted is called by the synchronizer when starting a new view.
+	ViewStarted()
+	// ViewSucceeded is called by the synchronizer when a view ended successfully.
+	ViewSucceeded()
+	// ViewTimeout is called by the synchronizer when a view timed out.
+	ViewTimeout()
 }
 
 // CryptoBase provides the basic cryptographic methods needed to create, verify, and combine signatures.

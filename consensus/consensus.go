@@ -15,8 +15,6 @@ import (
 // consensusBase provides a default implementation of the Consensus interface
 // for implementations of the ConsensusImpl interface.
 type consensusBase struct {
-	impl modules.Rules
-
 	acceptor       core.Acceptor
 	blockChain     core.BlockChain
 	commandQueue   core.CommandQueue
@@ -28,6 +26,7 @@ type consensusBase struct {
 	leaderRotation modules.LeaderRotation
 	logger         logging.Logger
 	opts           *core.Options
+	rules          modules.Rules
 	synchronizer   core.Synchronizer
 
 	handel core.Handel
@@ -39,9 +38,8 @@ type consensusBase struct {
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
-func New(impl modules.Rules) core.Consensus {
+func New() core.Consensus {
 	return &consensusBase{
-		impl:     impl,
 		lastVote: 0,
 		bExec:    hotstuff.GetGenesis(),
 	}
@@ -58,6 +56,7 @@ func (cs *consensusBase) InitComponent(mods *core.Core) {
 		&cs.eventLoop,
 		&cs.executor,
 		&cs.forkHandler,
+		&cs.rules,
 		&cs.leaderRotation,
 		&cs.logger,
 		&cs.opts,
@@ -66,7 +65,7 @@ func (cs *consensusBase) InitComponent(mods *core.Core) {
 
 	mods.TryGet(&cs.handel)
 
-	if mod, ok := cs.impl.(core.Component); ok {
+	if mod, ok := cs.rules.(core.Component); ok {
 		mod.InitComponent(mods)
 	}
 
@@ -112,7 +111,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 	}
 
 	var proposal hotstuff.ProposeMsg
-	if proposer, ok := cs.impl.(modules.ProposeRuler); ok {
+	if proposer, ok := cs.rules.(modules.ProposeRuler); ok {
 		proposal, ok = proposer.ProposeRule(cert, cmd)
 		if !ok {
 			cs.logger.Debug("Propose: No block")
@@ -172,7 +171,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
-	if !cs.impl.VoteRule(proposal) {
+	if !cs.rules.VoteRule(proposal) {
 		cs.logger.Info("OnPropose: Block not voted for")
 		return
 	}
@@ -191,7 +190,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	// block is safe and was accepted
 	cs.blockChain.Store(block)
 
-	if b := cs.impl.CommitRule(block); b != nil {
+	if b := cs.rules.CommitRule(block); b != nil {
 		cs.commit(b)
 	}
 	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
@@ -269,5 +268,5 @@ func (cs *consensusBase) commitInner(block *hotstuff.Block) error {
 
 // ChainLength returns the number of blocks that need to be chained together in order to commit.
 func (cs *consensusBase) ChainLength() int {
-	return cs.impl.ChainLength()
+	return cs.rules.ChainLength()
 }

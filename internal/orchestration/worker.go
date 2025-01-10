@@ -189,19 +189,23 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
 
-	sync := synchronizer.New(synchronizer.NewViewDuration(
+	duration := synchronizer.NewViewDuration(
 		uint64(opts.GetTimeoutSamples()),
 		float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
 		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
 		float64(opts.GetTimeoutMultiplier()),
-	))
+	)
+
 	builder.Add(
+		consensusRules,
+		duration,
+		leaderRotation,
+
 		eventloop.New(1000),
-		consensus.New(consensusRules),
+		consensus.New(),
 		consensus.NewVotingMachine(),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
-		leaderRotation,
-		sync,
+		synchronizer.New(),
 		w.metricsLogger,
 		blockchain.New(),
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),

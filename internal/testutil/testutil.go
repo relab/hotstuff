@@ -21,7 +21,6 @@ import (
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/leaderrotation"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/synchronizer"
 	"github.com/relab/hotstuff/twins"
 	"go.uber.org/mock/gomock"
 )
@@ -306,6 +305,6 @@ func NewLeaderRotation(t *testing.T, order ...hotstuff.ID) modules.LeaderRotatio
 }
 
 // FixedTimeout returns an ExponentialTimeout with a max exponent of 0.
-func FixedTimeout(timeout time.Duration) synchronizer.ViewDuration {
+func FixedTimeout(timeout time.Duration) modules.ViewDuration {
 	return twins.FixedTimeout(timeout)
 }

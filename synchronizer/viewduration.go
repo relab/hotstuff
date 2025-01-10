@@ -3,26 +3,15 @@ package synchronizer
 import (
 	"math"
 	"time"
-)
 
-// ViewDuration determines the duration of a view.
-// The view synchronizer uses this interface to set its timeouts.
-type ViewDuration interface {
-	// Duration returns the duration that the next view should last.
-	Duration() time.Duration
-	// ViewStarted is called by the synchronizer when starting a new view.
-	ViewStarted()
-	// ViewSucceeded is called by the synchronizer when a view ended successfully.
-	ViewSucceeded()
-	// ViewTimeout is called by the synchronizer when a view timed out.
-	ViewTimeout()
-}
+	"github.com/relab/hotstuff/modules"
+)
 
 // NewViewDuration returns a ViewDuration that approximates the view duration based on durations of previous views.
 // sampleSize determines the number of previous views that should be considered.
 // startTimeout determines the view duration of the first views.
 // When a timeout occurs, the next view duration will be multiplied by the multiplier.
-func NewViewDuration(sampleSize uint64, startTimeout, maxTimeout, multiplier float64) ViewDuration {
+func NewViewDuration(sampleSize uint64, startTimeout, maxTimeout, multiplier float64) modules.ViewDuration {
 	return &viewDuration{
 		limit: sampleSize,
 		mean:  startTimeout,
