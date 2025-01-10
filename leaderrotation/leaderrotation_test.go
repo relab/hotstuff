@@ -8,22 +8,22 @@ import (
 	"github.com/relab/hotstuff/modules"
 )
 
-type mockConfig struct {
+type mockConfiguration struct {
 	modules.Configuration
 	len int
 }
 
-func (cfg *mockConfig) Len() int {
+func (cfg *mockConfiguration) Len() int {
 	return cfg.len
 }
 
-var _ modules.Configuration = (*mockConfig)(nil)
+var _ modules.Configuration = (*mockConfiguration)(nil)
 
 func TestRoundRobin(t *testing.T) {
 	length := 4
-	cycles := 3
+	cycles := 100
 
-	cfg := &mockConfig{len: length}
+	cfg := &mockConfiguration{len: length}
 	rr := leaderrotation.NewRoundRobin()
 
 	builder := modules.NewBuilder(hotstuff.ID(1), nil)
@@ -43,6 +43,21 @@ func TestRoundRobin(t *testing.T) {
 	view := hotstuff.View(1)
 	for range length * cycles {
 		if !checkLeader(view) {
+			t.Fail()
+		}
+		view++
+	}
+}
+
+func TestFixed(t *testing.T) {
+	expectedLeader := hotstuff.ID(1)
+	views := 100
+
+	fixed := leaderrotation.NewFixed(expectedLeader)
+
+	view := hotstuff.View(1)
+	for range views {
+		if fixed.GetLeader(view) != expectedLeader {
 			t.Fail()
 		}
 		view++
