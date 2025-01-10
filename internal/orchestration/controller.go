@@ -17,6 +17,7 @@ import (
 	"github.com/relab/hotstuff/internal/config"
 	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
+	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"google.golang.org/protobuf/proto"
 )
@@ -143,6 +144,12 @@ func (e *Experiment) createReplicas(replicaMap config.ReplicaMap) (cfg *orchestr
 			if err != nil {
 				return nil, err
 			}
+
+			tree := tree.CreateTree(opt.HotstuffID(), e.hostCfg.BranchFactor, replicaMap.ReplicaIDs(host))
+			children := tree.ChildrenOf(hotstuff.ID(opt.ID))
+			childrenConverted := children.Uint32Slice()
+			opt.SetTreePositions(childrenConverted)
+
 			req.Replicas[opt.ID] = opt
 		}
 
@@ -202,7 +209,7 @@ func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration, re
 		go func(host string, worker RemoteWorker) {
 			req := &orchestrationpb.StartReplicaRequest{
 				Configuration: cfg.GetReplicas(),
-				IDs:           replicaMap.ReplicaIDs(host),
+				IDs:           replicaMap.ReplicaIDs(host).Uint32Slice(),
 			}
 			_, err := worker.StartReplica(req)
 			errs <- err
@@ -217,7 +224,7 @@ func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration, re
 func (e *Experiment) stopReplicas(replicaMap config.ReplicaMap) error {
 	responses := make([]*orchestrationpb.StopReplicaResponse, 0)
 	for host, worker := range e.workers {
-		req := &orchestrationpb.StopReplicaRequest{IDs: replicaMap.ReplicaIDs(host)}
+		req := &orchestrationpb.StopReplicaRequest{IDs: replicaMap.ReplicaIDs(host).Uint32Slice()}
 		res, err := worker.StopReplica(req)
 		if err != nil {
 			return err
@@ -272,7 +279,7 @@ func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration, cli
 func (e *Experiment) stopClients(clientMap config.ClientMap) error {
 	for host, worker := range e.workers {
 		req := &orchestrationpb.StopClientRequest{}
-		req.IDs = clientMap.ClientIDs(host)
+		req.IDs = clientMap.ClientIDs(host).Uint32Slice()
 		_, err := worker.StopClient(req)
 		if err != nil {
 			return err

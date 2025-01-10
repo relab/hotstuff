@@ -11,11 +11,11 @@ type Tree struct {
 	id           hotstuff.ID
 	height       int
 	branchFactor int
-	treePosToID  []hotstuff.ID
+	treePosToID  hotstuff.IDSlice
 }
 
 // CreateTree creates the tree configuration.
-func CreateTree(myID hotstuff.ID, bf int, ids []hotstuff.ID) *Tree {
+func CreateTree(myID hotstuff.ID, bf int, ids hotstuff.IDSlice) *Tree {
 	if bf < 2 {
 		panic("Branch factor must be greater than 1")
 	}
@@ -68,12 +68,12 @@ func (t *Tree) IsRoot(replicaID hotstuff.ID) bool {
 }
 
 // ReplicaChildren returns the children of this tree's replica, if any.
-func (t *Tree) ReplicaChildren() []hotstuff.ID {
+func (t *Tree) ReplicaChildren() hotstuff.IDSlice {
 	return t.ChildrenOf(t.id)
 }
 
 // ChildrenOf returns the children of a specific replica.
-func (t *Tree) ChildrenOf(replicaID hotstuff.ID) []hotstuff.ID {
+func (t *Tree) ChildrenOf(replicaID hotstuff.ID) hotstuff.IDSlice {
 	replicaPos := t.replicaPosition(replicaID)
 	if replicaPos == -1 {
 		// safe since nil slices are equal to empty slices when iterating.
@@ -99,7 +99,7 @@ func (t *Tree) ReplicaHeight() int {
 
 // PeersOf returns the sibling peers of the tree's replica,
 // unless the replica is the root, in which case there are no siblings.
-func (t *Tree) PeersOf() []hotstuff.ID {
+func (t *Tree) PeersOf() hotstuff.IDSlice {
 	parent, ok := t.Parent()
 	if !ok {
 		// the tree's replica is the root, hence it has no siblings.
@@ -109,13 +109,13 @@ func (t *Tree) PeersOf() []hotstuff.ID {
 }
 
 // SubTree returns all subtree replicas of this tree's replica.
-func (t *Tree) SubTree() []hotstuff.ID {
+func (t *Tree) SubTree() hotstuff.IDSlice {
 	children := t.ChildrenOf(t.id)
 	if len(children) == 0 {
 		// safe since nil slices are equal to empty slices when iterating.
 		return nil
 	}
-	subTreeReplicas := make([]hotstuff.ID, len(children))
+	subTreeReplicas := make(hotstuff.IDSlice, len(children))
 	copy(subTreeReplicas, children)
 	for i := 0; i < len(subTreeReplicas); i++ {
 		node := subTreeReplicas[i]

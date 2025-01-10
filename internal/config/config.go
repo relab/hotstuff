@@ -7,6 +7,25 @@ import (
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 )
 
+// ReplicaMap is a map from host to a list of replica options.
+type ReplicaMap map[string][]*orchestrationpb.ReplicaOpts
+
+// ReplicaIDs converts the an entry map from []hotstuff.ID to []uint32.
+func (r ReplicaMap) ReplicaIDs(host string) hotstuff.IDSlice {
+	ids := make([]hotstuff.ID, 0, len(r[host]))
+	for _, opts := range r[host] {
+		ids = append(ids, hotstuff.ID(opts.ID))
+	}
+	return ids
+}
+
+type ClientMap map[string][]hotstuff.ID
+
+// ClientIDs converts the an entry map from []hotstuff.ID to []uint32.
+func (c ClientMap) ClientIDs(host string) hotstuff.IDSlice {
+	return c[host]
+}
+
 // HostConfig holds the configuration for an experiment.
 type HostConfig struct {
 	// ReplicaHosts is a list of hosts that will run replicas.
@@ -74,18 +93,6 @@ func (c *HostConfig) ClientsForHost(hostIndex int) int {
 	return unitsForHost(hostIndex, c.Clients, len(c.ClientHosts))
 }
 
-// ReplicaMap is a map from host to a list of replica options.
-type ReplicaMap map[string][]*orchestrationpb.ReplicaOpts
-
-// ReplicaIDs converts the an entry map from []hotstuff.ID to []uint32.
-func (r ReplicaMap) ReplicaIDs(host string) []uint32 {
-	ids := make([]uint32, 0, len(r[host]))
-	for _, opts := range r[host] {
-		ids = append(ids, opts.ID)
-	}
-	return ids
-}
-
 // AssignReplicas assigns replicas to hosts.
 func (c *HostConfig) AssignReplicas(srcReplicaOpts *orchestrationpb.ReplicaOpts) ReplicaMap {
 	hostsToReplicas := make(ReplicaMap)
@@ -113,17 +120,6 @@ func (c *HostConfig) lookupByzStrategy(replicaID hotstuff.ID) string {
 		}
 	}
 	return ""
-}
-
-type ClientMap map[string][]hotstuff.ID
-
-// ClientIDs converts the an entry map from []hotstuff.ID to []uint32.
-func (c ClientMap) ClientIDs(host string) []uint32 {
-	newList := make([]uint32, 0, len(c))
-	for _, id := range c[host] {
-		newList = append(newList, uint32(id))
-	}
-	return newList
 }
 
 // AssignClients assigns clients to hosts.
