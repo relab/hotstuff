@@ -26,10 +26,6 @@ import (
 func TestOrchestration(t *testing.T) {
 	run := func(t *testing.T, consensusImpl string, crypto string, mods []string, byzantine string) {
 		t.Helper()
-		controllerStream, workerStream := net.Pipe()
-
-		workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
-		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), metrics.NopLogger(), nil, 0)
 
 		clientOpts := &orchestrationpb.ClientOpts{
 			ConnectTimeout: durationpb.New(time.Second),
@@ -51,6 +47,10 @@ func TestOrchestration(t *testing.T) {
 			ByzantineStrategy: byzantine,
 		}
 
+		controllerStream, workerStream := net.Pipe()
+		workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
+		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), metrics.NopLogger(), nil, 0)
+
 		experiment, err := orchestration.NewExperiment(
 			5*time.Second,
 			"",
@@ -60,7 +60,6 @@ func TestOrchestration(t *testing.T) {
 			map[string]orchestration.RemoteWorker{"localhost": workerProxy},
 			logging.New("ctrl"),
 		)
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,7 +109,6 @@ func TestDeployment(t *testing.T) {
 		t.Skip("GitHub Actions only supports linux containers on linux runners.")
 	}
 
-	// workers := make(map[string]orchestration.RemoteWorker)
 	clientOpts := &orchestrationpb.ClientOpts{
 		ConnectTimeout: durationpb.New(time.Second),
 		MaxConcurrent:  250,
@@ -141,9 +139,9 @@ func TestDeployment(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	wg.Add(len(sessions))
-	hosts := make(map[string]orchestration.RemoteWorker)
+	workers := make(map[string]orchestration.RemoteWorker)
 	for host, session := range sessions {
-		hosts[host] = orchestration.NewRemoteWorker(protostream.NewWriter(session.Stdin()), protostream.NewReader(session.Stdout()))
+		workers[host] = orchestration.NewRemoteWorker(protostream.NewWriter(session.Stdin()), protostream.NewReader(session.Stdout()))
 		go func(session orchestration.WorkerSession) {
 			_, err := io.Copy(os.Stderr, session.Stderr())
 			if err != nil {
@@ -158,11 +156,10 @@ func TestDeployment(t *testing.T) {
 		"",
 		replicaOpts,
 		clientOpts,
-		config.NewLocal(4, 2),
-		hosts,
+		config.NewLocal(4, 2), // TODO(meling): this is not compatible with workers as is
+		workers,
 		logging.New("ctrl"),
 	)
-
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -49,6 +49,9 @@ func NewExperiment(
 	workers map[string]RemoteWorker,
 	logger logging.Logger,
 ) (*Experiment, error) {
+	if len(cfg.ReplicaHosts) != len(workers) {
+		return nil, fmt.Errorf("number of workers %d does not match number of replica hosts: %d", len(workers), len(cfg.ReplicaHosts))
+	}
 	for _, location := range cfg.Locations {
 		location, err := latency.ValidLocation(location)
 		log.Printf("Experiment: Location found: %v", location)
@@ -135,7 +138,6 @@ func (e *Experiment) createReplicas(replicaMap config.ReplicaMap) (cfg *orchestr
 	cfg = &orchestrationpb.ReplicaConfiguration{Replicas: make(map[uint32]*orchestrationpb.ReplicaInfo)}
 
 	for host, opts := range replicaMap {
-		worker := e.workers[host]
 		req := &orchestrationpb.CreateReplicaRequest{Replicas: make(map[uint32]*orchestrationpb.ReplicaOpts)}
 
 		for _, opt := range opts {
@@ -147,6 +149,7 @@ func (e *Experiment) createReplicas(replicaMap config.ReplicaMap) (cfg *orchestr
 			req.Replicas[opt.ID] = opt
 		}
 
+		worker := e.workers[host]
 		wcfg, err := worker.CreateReplica(req)
 		if err != nil {
 			return nil, err
