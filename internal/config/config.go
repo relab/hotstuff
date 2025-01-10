@@ -77,7 +77,7 @@ func (c *HostConfig) ClientsForHost(hostIndex int) int {
 // ReplicaMap is a map from host to a list of replica options.
 type ReplicaMap map[string][]*orchestrationpb.ReplicaOpts
 
-// ReplicaIDs convert the existing map to a map of []uint32.
+// ReplicaIDs converts the an entry map from []hotstuff.ID to []uint32.
 func (r ReplicaMap) ReplicaIDs(host string) []uint32 {
 	ids := make([]uint32, 0, len(r[host]))
 	for _, opts := range r[host] {
@@ -117,7 +117,7 @@ func (c *HostConfig) lookupByzStrategy(replicaID hotstuff.ID) string {
 
 type ClientMap map[string][]hotstuff.ID
 
-// ClientIDs convert the existing map from hotstuff.ID to uint32.
+// ClientIDs converts the an entry map from []hotstuff.ID to []uint32.
 func (c ClientMap) ClientIDs(host string) []uint32 {
 	newList := make([]uint32, 0, len(c))
 	for _, id := range c[host] {
