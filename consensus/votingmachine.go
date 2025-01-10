@@ -4,20 +4,20 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/modules"
 )
 
 // VotingMachine collects votes.
 type VotingMachine struct {
-	blockChain    modules.BlockChain
-	configuration modules.Configuration
-	crypto        modules.Crypto
+	blockChain    core.BlockChain
+	configuration core.Configuration
+	crypto        core.Crypto
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
-	synchronizer  modules.Synchronizer
-	opts          *modules.Options
+	synchronizer  core.Synchronizer
+	opts          *core.Options
 
 	mut           sync.Mutex
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
@@ -30,8 +30,8 @@ func NewVotingMachine() *VotingMachine {
 	}
 }
 
-// InitModule initializes the VotingMachine.
-func (vm *VotingMachine) InitModule(mods *modules.Core) {
+// InitComponent initializes the VotingMachine.
+func (vm *VotingMachine) InitComponent(mods *core.Core) {
 	mods.Get(
 		&vm.blockChain,
 		&vm.configuration,

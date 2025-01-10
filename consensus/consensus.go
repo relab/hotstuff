@@ -5,53 +5,32 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
-// Rules is the minimum interface that a consensus implementations must implement.
-// Implementations of this interface can be wrapped in the ConsensusBase struct.
-// Together, these provide an implementation of the main Consensus interface.
-// Implementors do not need to verify certificates or interact with other modules,
-// as this is handled by the ConsensusBase struct.
-type Rules interface {
-	// VoteRule decides whether to vote for the block.
-	VoteRule(proposal hotstuff.ProposeMsg) bool
-	// CommitRule decides whether any ancestor of the block can be committed.
-	// Returns the youngest ancestor of the block that can be committed.
-	CommitRule(*hotstuff.Block) *hotstuff.Block
-	// ChainLength returns the number of blocks that need to be chained together in order to commit.
-	ChainLength() int
-}
-
-// ProposeRuler is an optional interface that adds a ProposeRule method.
-// This allows implementors to specify how new blocks are created.
-type ProposeRuler interface {
-	// ProposeRule creates a new proposal.
-	ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool)
-}
-
 // consensusBase provides a default implementation of the Consensus interface
 // for implementations of the ConsensusImpl interface.
 type consensusBase struct {
-	impl Rules
+	impl modules.Rules
 
-	acceptor       modules.Acceptor
-	blockChain     modules.BlockChain
-	commandQueue   modules.CommandQueue
-	configuration  modules.Configuration
-	crypto         modules.Crypto
+	acceptor       core.Acceptor
+	blockChain     core.BlockChain
+	commandQueue   core.CommandQueue
+	configuration  core.Configuration
+	crypto         core.Crypto
 	eventLoop      *eventloop.EventLoop
-	executor       modules.ExecutorExt
-	forkHandler    modules.ForkHandlerExt
+	executor       core.ExecutorExt
+	forkHandler    core.ForkHandlerExt
 	leaderRotation modules.LeaderRotation
 	logger         logging.Logger
-	opts           *modules.Options
-	synchronizer   modules.Synchronizer
+	opts           *core.Options
+	synchronizer   core.Synchronizer
 
-	handel modules.Handel
+	handel core.Handel
 
 	lastVote hotstuff.View
 
@@ -60,7 +39,7 @@ type consensusBase struct {
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
-func New(impl Rules) modules.Consensus {
+func New(impl modules.Rules) core.Consensus {
 	return &consensusBase{
 		impl:     impl,
 		lastVote: 0,
@@ -68,8 +47,8 @@ func New(impl Rules) modules.Consensus {
 	}
 }
 
-// InitModule initializes the module.
-func (cs *consensusBase) InitModule(mods *modules.Core) {
+// InitComponent initializes the module.
+func (cs *consensusBase) InitComponent(mods *core.Core) {
 	mods.Get(
 		&cs.acceptor,
 		&cs.blockChain,
@@ -87,8 +66,8 @@ func (cs *consensusBase) InitModule(mods *modules.Core) {
 
 	mods.TryGet(&cs.handel)
 
-	if mod, ok := cs.impl.(modules.Module); ok {
-		mod.InitModule(mods)
+	if mod, ok := cs.impl.(core.Component); ok {
+		mod.InitComponent(mods)
 	}
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
@@ -133,7 +112,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 	}
 
 	var proposal hotstuff.ProposeMsg
-	if proposer, ok := cs.impl.(ProposeRuler); ok {
+	if proposer, ok := cs.impl.(modules.ProposeRuler); ok {
 		proposal, ok = proposer.ProposeRule(cert, cmd)
 		if !ok {
 			cs.logger.Debug("Propose: No block")

@@ -7,7 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/core"
 
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
@@ -19,11 +19,11 @@ func TestConvertPartialCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	key := testutil.GenerateECDSAKey(t)
-	builder := modules.NewBuilder(1, key)
+	builder := core.NewBuilder(1, key)
 	testutil.TestModules(t, ctrl, 1, key, &builder)
 	hs := builder.Build()
 
-	var signer modules.Crypto
+	var signer core.Crypto
 	hs.Get(&signer)
 
 	want, err := signer.CreatePartialCert(hotstuff.GetGenesis())
@@ -49,7 +49,7 @@ func TestConvertQuorumCert(t *testing.T) {
 
 	signatures := testutil.CreatePCs(t, b1, hl.Signers())
 
-	var signer modules.Crypto
+	var signer core.Crypto
 	hl[0].Get(&signer)
 
 	want, err := signer.CreateQuorumCert(b1, signatures)
@@ -90,7 +90,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 	pb := TimeoutCertToProto(tc1)
 	tc2 := TimeoutCertFromProto(pb)
 
-	var signer modules.Crypto
+	var signer core.Crypto
 	hl[0].Get(&signer)
 
 	if !signer.VerifyTimeoutCert(tc2) {

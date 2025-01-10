@@ -7,9 +7,9 @@ import (
 
 	"github.com/relab/hotstuff"
 
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/modules"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -35,8 +35,8 @@ func newCmdCache(batchSize int) *cmdCache {
 	}
 }
 
-// InitModule gives the module access to the other modules.
-func (c *cmdCache) InitModule(mods *modules.Core) {
+// InitComponent gives the module access to the other modules.
+func (c *cmdCache) InitComponent(mods *core.Core) {
 	mods.Get(&c.logger)
 }
 
@@ -150,4 +150,4 @@ func (c *cmdCache) Proposed(cmd hotstuff.Command) {
 	}
 }
 
-var _ modules.Acceptor = (*cmdCache)(nil)
+var _ core.Acceptor = (*cmdCache)(nil)

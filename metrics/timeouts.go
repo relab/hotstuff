@@ -3,10 +3,10 @@ package metrics
 import (
 	"time"
 
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics/types"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -19,14 +19,14 @@ func init() {
 // ViewTimeouts is a metric that measures the number of view timeouts that happen.
 type ViewTimeouts struct {
 	metricsLogger Logger
-	opts          *modules.Options
+	opts          *core.Options
 
 	numViews    uint64
 	numTimeouts uint64
 }
 
-// InitModule gives the module access to the other modules.
-func (vt *ViewTimeouts) InitModule(mods *modules.Core) {
+// InitComponent gives the module access to the other modules.
+func (vt *ViewTimeouts) InitComponent(mods *core.Core) {
 	var (
 		eventLoop *eventloop.EventLoop
 		logger    logging.Logger

@@ -3,7 +3,7 @@ package chainedhotstuff
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
@@ -14,7 +14,7 @@ func init() {
 
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {
-	blockChain modules.BlockChain
+	blockChain core.BlockChain
 	logger     logging.Logger
 
 	// protocol variables
@@ -23,14 +23,14 @@ type ChainedHotStuff struct {
 }
 
 // New returns a new chainedhotstuff instance.
-func New() consensus.Rules {
+func New() modules.Rules {
 	return &ChainedHotStuff{
 		bLock: hotstuff.GetGenesis(),
 	}
 }
 
-// InitModule initializes the module.
-func (hs *ChainedHotStuff) InitModule(mods *modules.Core) {
+// InitComponent initializes the module.
+func (hs *ChainedHotStuff) InitComponent(mods *core.Core) {
 	mods.Get(&hs.blockChain, &hs.logger)
 }
 

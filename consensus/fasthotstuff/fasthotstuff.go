@@ -3,7 +3,7 @@ package fasthotstuff
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
@@ -14,19 +14,19 @@ func init() {
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {
-	blockChain   modules.BlockChain
+	blockChain   core.BlockChain
 	logger       logging.Logger
-	synchronizer modules.Synchronizer
+	synchronizer core.Synchronizer
 }
 
 // New returns a new FastHotStuff instance.
-func New() consensus.Rules {
+func New() modules.Rules {
 	return &FastHotStuff{}
 }
 
-// InitModule initializes the module.
-func (fhs *FastHotStuff) InitModule(mods *modules.Core) {
-	var opts *modules.Options
+// InitComponent initializes the module.
+func (fhs *FastHotStuff) InitComponent(mods *core.Core) {
+	var opts *core.Options
 
 	mods.Get(&opts, &fhs.blockChain, &fhs.logger, &fhs.synchronizer)
 

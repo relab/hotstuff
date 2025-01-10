@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -53,9 +54,9 @@ func (sig Signature) ToBytes() []byte {
 }
 
 type eddsaBase struct {
-	configuration modules.Configuration
+	configuration core.Configuration
 	logger        logging.Logger
-	opts          *modules.Options
+	opts          *core.Options
 }
 
 // New returns a new instance of the EDDSA CryptoBase implementation.
@@ -63,9 +64,9 @@ func New() modules.CryptoBase {
 	return &eddsaBase{}
 }
 
-// InitModule gives the module a reference to the Core object.
+// InitComponent gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (ed *eddsaBase) InitModule(mods *modules.Core) {
+func (ed *eddsaBase) InitComponent(mods *core.Core) {
 	mods.Get(
 		&ed.configuration,
 		&ed.logger,

@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 	"go.uber.org/mock/gomock"
 )
@@ -26,7 +26,7 @@ func TestVote(t *testing.T) {
 
 	var (
 		eventLoop  *eventloop.EventLoop
-		blockChain modules.BlockChain
+		blockChain core.BlockChain
 	)
 
 	hs.Get(&eventLoop, &blockChain)

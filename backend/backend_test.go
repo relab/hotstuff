@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/core"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -27,7 +27,7 @@ func TestConnect(t *testing.T) {
 		const n = 4
 		ctrl := gomock.NewController(t)
 		td := setup(t, ctrl, n)
-		builder := modules.NewBuilder(1, td.keys[0])
+		builder := core.NewBuilder(1, td.keys[0])
 		testutil.TestModules(t, ctrl, 1, td.keys[0], &builder)
 		teardown := createServers(t, td, ctrl)
 		defer teardown()
@@ -47,7 +47,7 @@ func TestConnect(t *testing.T) {
 }
 
 // testBase is a generic test for a unicast/multicast call
-func testBase(t *testing.T, typ any, send func(modules.Configuration), handle eventloop.EventHandler) {
+func testBase(t *testing.T, typ any, send func(core.Configuration), handle eventloop.EventHandler) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		ctrl := gomock.NewController(t)
@@ -70,7 +70,7 @@ func testBase(t *testing.T, typ any, send func(modules.Configuration), handle ev
 		for _, hs := range hl[1:] {
 			var (
 				eventLoop    *eventloop.EventLoop
-				synchronizer modules.Synchronizer
+				synchronizer core.Synchronizer
 			)
 			hs.Get(&eventLoop, &synchronizer)
 			eventLoop.RegisterHandler(typ, handle)
@@ -93,7 +93,7 @@ func TestPropose(t *testing.T) {
 			"foo", 1, 1,
 		),
 	}
-	testBase(t, want, func(cfg modules.Configuration) {
+	testBase(t, want, func(cfg core.Configuration) {
 		wg.Add(3)
 		cfg.Propose(want)
 		wg.Wait()
@@ -117,7 +117,7 @@ func TestTimeout(t *testing.T) {
 		ViewSignature: nil,
 		SyncInfo:      hotstuff.NewSyncInfo(),
 	}
-	testBase(t, want, func(cfg modules.Configuration) {
+	testBase(t, want, func(cfg core.Configuration) {
 		wg.Add(3)
 		cfg.Timeout(want)
 		wg.Wait()

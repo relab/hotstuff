@@ -15,10 +15,10 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/modules"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -62,7 +62,7 @@ type Config struct {
 type Client struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
-	opts      *modules.Options
+	opts      *core.Options
 
 	mut              sync.Mutex
 	mgr              *clientpb.Manager
@@ -79,8 +79,8 @@ type Client struct {
 	timeout          time.Duration
 }
 
-// InitModule initializes the client.
-func (c *Client) InitModule(mods *modules.Core) {
+// InitComponent initializes the client.
+func (c *Client) InitComponent(mods *core.Core) {
 	mods.Get(
 		&c.eventLoop,
 		&c.logger,
@@ -89,7 +89,7 @@ func (c *Client) InitModule(mods *modules.Core) {
 }
 
 // New returns a new Client.
-func New(conf Config, builder modules.Builder) (client *Client) {
+func New(conf Config, builder core.Builder) (client *Client) {
 	client = &Client{
 		pendingCmds:      make(chan pendingCmd, conf.MaxConcurrent),
 		highestCommitted: 1,

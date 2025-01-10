@@ -6,9 +6,9 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/modules"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -24,8 +24,8 @@ import (
 // Server is the Server-side of the gorums backend.
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
-	blockChain    modules.BlockChain
-	configuration modules.Configuration
+	blockChain    core.BlockChain
+	configuration core.Configuration
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
 	id            hotstuff.ID
@@ -33,8 +33,8 @@ type Server struct {
 	gorumsSrv     *gorums.Server
 }
 
-// InitModule initializes the Server.
-func (srv *Server) InitModule(mods *modules.Core) {
+// InitComponent initializes the Server.
+func (srv *Server) InitComponent(mods *core.Core) {
 	mods.Get(
 		&srv.eventLoop,
 		&srv.configuration,
@@ -98,7 +98,7 @@ func (srv *Server) StartOnListener(listener net.Listener) {
 }
 
 // GetPeerIDFromContext extracts the ID of the peer from the context.
-func GetPeerIDFromContext(ctx context.Context, cfg modules.Configuration) (hotstuff.ID, error) {
+func GetPeerIDFromContext(ctx context.Context, cfg core.Configuration) (hotstuff.ID, error) {
 	peerInfo, ok := peer.FromContext(ctx)
 	if !ok {
 		return 0, fmt.Errorf("peerInfo not available")

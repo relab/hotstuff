@@ -6,17 +6,17 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
 // blockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type blockChain struct {
-	configuration modules.Configuration
-	consensus     modules.Consensus
+	configuration core.Configuration
+	consensus     core.Consensus
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
 
@@ -27,7 +27,7 @@ type blockChain struct {
 	pendingFetch  map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
 }
 
-func (chain *blockChain) InitModule(mods *modules.Core) {
+func (chain *blockChain) InitComponent(mods *core.Core) {
 	mods.Get(
 		&chain.configuration,
 		&chain.consensus,
@@ -38,7 +38,7 @@ func (chain *blockChain) InitModule(mods *modules.Core) {
 
 // New creates a new blockChain with a maximum size.
 // Blocks are dropped in least recently used order.
-func New() modules.BlockChain {
+func New() core.BlockChain {
 	bc := &blockChain{
 		blocks:        make(map[hotstuff.Hash]*hotstuff.Block),
 		blockAtHeight: make(map[hotstuff.View]*hotstuff.Block),
@@ -164,4 +164,4 @@ func (chain *blockChain) PruneToHeight(height hotstuff.View) (forkedBlocks []*ho
 	return forkedBlocks
 }
 
-var _ modules.BlockChain = (*blockChain)(nil)
+var _ core.BlockChain = (*blockChain)(nil)

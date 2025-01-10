@@ -1,9 +1,9 @@
-package modules_test
+package core_test
 
 import (
 	"testing"
 
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/core"
 )
 
 type Counter interface {
@@ -42,12 +42,12 @@ func NewGreeter() *greeterImpl { //nolint:revive
 	return &greeterImpl{}
 }
 
-func (g *greeterImpl) InitModule(mods *modules.Core) {
+func (g *greeterImpl) InitComponent(mods *core.Core) {
 	mods.Get(&g.counter)
 }
 
 func TestModule(t *testing.T) {
-	builder := modules.NewBuilder(0, nil)
+	builder := core.NewBuilder(0, nil)
 	builder.Add(NewCounter(), NewGreeter())
 
 	mods := builder.Build()

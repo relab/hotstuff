@@ -5,10 +5,10 @@ import (
 
 	"github.com/relab/hotstuff"
 
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics/types"
-	"github.com/relab/hotstuff/modules"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -21,14 +21,14 @@ func init() {
 // Throughput measures throughput in commits per second, and commands per second.
 type Throughput struct {
 	metricsLogger Logger
-	opts          *modules.Options
+	opts          *core.Options
 
 	commitCount  uint64
 	commandCount uint64
 }
 
-// InitModule gives the module access to the other modules.
-func (t *Throughput) InitModule(mods *modules.Core) {
+// InitComponent gives the module access to the other modules.
+func (t *Throughput) InitComponent(mods *core.Core) {
 	var (
 		eventLoop *eventloop.EventLoop
 		logger    logging.Logger

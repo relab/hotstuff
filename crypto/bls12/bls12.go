@@ -10,6 +10,7 @@ import (
 
 	bls12 "github.com/kilic/bls12-381"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -140,9 +141,9 @@ func firstParticipant(participants hotstuff.IDSet) hotstuff.ID {
 }
 
 type bls12Base struct {
-	configuration modules.Configuration
+	configuration core.Configuration
 	logger        logging.Logger
-	opts          *modules.Options
+	opts          *core.Options
 
 	mut sync.RWMutex
 	// popCache caches the proof-of-possession results of popVerify for each public key.
@@ -156,9 +157,9 @@ func New() modules.CryptoBase {
 	}
 }
 
-// InitModule gives the module a reference to the Core object.
+// InitComponent gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (bls *bls12Base) InitModule(mods *modules.Core) {
+func (bls *bls12Base) InitComponent(mods *core.Core) {
 	mods.Get(
 		&bls.configuration,
 		&bls.logger,
@@ -235,7 +236,7 @@ func (bls *bls12Base) popVerify(pubKey *PublicKey, proof *bls12.PointG2) bool {
 	return bls.coreVerify(pubKey, pubKey.ToBytes(), proof, domainPOP)
 }
 
-func (bls *bls12Base) checkPop(replica modules.Replica) (valid bool) {
+func (bls *bls12Base) checkPop(replica core.Replica) (valid bool) {
 	defer func() {
 		if !valid {
 			bls.logger.Warnf("Invalid proof-of-possession for replica %d", replica.ID())

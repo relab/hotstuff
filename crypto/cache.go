@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -22,7 +23,7 @@ type cache struct {
 
 // NewCache returns a new Crypto instance that caches the results of the operations of the given CryptoBase.
 // implementation.
-func NewCache(impl modules.CryptoBase, capacity int) modules.Crypto {
+func NewCache(impl modules.CryptoBase, capacity int) core.Crypto {
 	return New(&cache{
 		impl:     impl,
 		capacity: capacity,
@@ -30,11 +31,11 @@ func NewCache(impl modules.CryptoBase, capacity int) modules.Crypto {
 	})
 }
 
-// InitModule gives the module a reference to the Core object.
+// InitComponent gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (cache *cache) InitModule(mods *modules.Core) {
-	if mod, ok := cache.impl.(modules.Module); ok {
-		mod.InitModule(mods)
+func (cache *cache) InitComponent(mods *core.Core) {
+	if mod, ok := cache.impl.(core.Component); ok {
+		mod.InitComponent(mods)
 	}
 }
 

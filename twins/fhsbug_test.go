@@ -7,15 +7,15 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/fasthotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/twins"
 )
 
 func init() {
-	modules.RegisterModule(vulnerableModule, func() consensus.Rules { return &vulnerableFHS{} })
+	modules.RegisterModule(vulnerableModule, func() modules.Rules { return &vulnerableFHS{} })
 }
 
 const vulnerableModule = "vulnerableFHS"
@@ -137,17 +137,17 @@ func TestFHSBug(t *testing.T) {
 // A wrapper around the FHS rules that swaps the commit rule for a vulnerable version
 type vulnerableFHS struct {
 	logger     logging.Logger
-	blockChain modules.BlockChain
+	blockChain core.BlockChain
 	inner      fasthotstuff.FastHotStuff
 }
 
-func (fhs *vulnerableFHS) InitModule(mods *modules.Core) {
+func (fhs *vulnerableFHS) InitComponent(mods *core.Core) {
 	mods.Get(
 		&fhs.logger,
 		&fhs.blockChain,
 	)
 
-	fhs.inner.InitModule(mods)
+	fhs.inner.InitComponent(mods)
 }
 
 // VoteRule decides whether to vote for the block.

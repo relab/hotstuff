@@ -3,6 +3,7 @@ package crypto_test
 import (
 	"testing"
 
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/modules"
 
 	"github.com/relab/hotstuff"
@@ -201,7 +202,7 @@ func runAll(t *testing.T, run func(*testing.T, setupFunc)) {
 	t.Run("Cache+BLS12-381", func(t *testing.T) { run(t, setup(NewCache(bls12.New), testutil.GenerateBLS12Key)) })
 }
 
-func createBlock(t *testing.T, signer modules.Crypto) *hotstuff.Block {
+func createBlock(t *testing.T, signer core.Crypto) *hotstuff.Block {
 	t.Helper()
 
 	qc, err := signer.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
@@ -216,31 +217,31 @@ func createBlock(t *testing.T, signer modules.Crypto) *hotstuff.Block {
 type keyFunc func(t *testing.T) hotstuff.PrivateKey
 type setupFunc func(*testing.T, *gomock.Controller, int) testData
 
-func setup(newFunc func() modules.Crypto, keyFunc keyFunc) setupFunc {
+func setup(newFunc func() core.Crypto, keyFunc keyFunc) setupFunc {
 	return func(t *testing.T, ctrl *gomock.Controller, n int) testData {
 		return newTestData(t, ctrl, n, newFunc, keyFunc)
 	}
 }
 
-func NewCache(impl func() modules.CryptoBase) func() modules.Crypto {
-	return func() modules.Crypto {
+func NewCache(impl func() modules.CryptoBase) func() core.Crypto {
+	return func() core.Crypto {
 		return crypto.NewCache(impl(), 10)
 	}
 }
 
-func NewBase(impl func() modules.CryptoBase) func() modules.Crypto {
-	return func() modules.Crypto {
+func NewBase(impl func() modules.CryptoBase) func() core.Crypto {
+	return func() core.Crypto {
 		return crypto.New(impl())
 	}
 }
 
 type testData struct {
-	signers   []modules.Crypto
-	verifiers []modules.Crypto
+	signers   []core.Crypto
+	verifiers []core.Crypto
 	block     *hotstuff.Block
 }
 
-func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() modules.Crypto, keyFunc keyFunc) testData {
+func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() core.Crypto, keyFunc keyFunc) testData {
 	t.Helper()
 
 	bl := testutil.CreateBuilders(t, ctrl, n, testutil.GenerateKeys(t, n, keyFunc)...)
@@ -250,13 +251,13 @@ func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() mo
 	}
 	hl := bl.Build()
 
-	var signer modules.Crypto
+	var signer core.Crypto
 	hl[0].Get(&signer)
 
 	block := createBlock(t, signer)
 
 	for _, mods := range hl {
-		var blockChain modules.BlockChain
+		var blockChain core.BlockChain
 		mods.Get(&blockChain)
 
 		blockChain.Store(block)

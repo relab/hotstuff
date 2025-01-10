@@ -3,7 +3,7 @@ package simplehotstuff
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
@@ -17,22 +17,22 @@ func init() {
 // Based on the simplified algorithm described in the paper
 // "Formal Verification of HotStuff" by Leander Jehl.
 type SimpleHotStuff struct {
-	blockChain   modules.BlockChain
+	blockChain   core.BlockChain
 	logger       logging.Logger
-	synchronizer modules.Synchronizer
+	synchronizer core.Synchronizer
 
 	locked *hotstuff.Block
 }
 
 // New returns a new SimpleHotStuff instance.
-func New() consensus.Rules {
+func New() modules.Rules {
 	return &SimpleHotStuff{
 		locked: hotstuff.GetGenesis(),
 	}
 }
 
-// InitModule initializes the module.
-func (hs *SimpleHotStuff) InitModule(mods *modules.Core) {
+// InitComponent initializes the module.
+func (hs *SimpleHotStuff) InitComponent(mods *core.Core) {
 	mods.Get(&hs.blockChain, &hs.logger, &hs.synchronizer)
 }
 

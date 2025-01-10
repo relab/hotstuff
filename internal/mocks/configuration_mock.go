@@ -14,7 +14,7 @@ import (
 	reflect "reflect"
 
 	hotstuff "github.com/relab/hotstuff"
-	modules "github.com/relab/hotstuff/modules"
+	modules "github.com/relab/hotstuff/core"
 	gomock "go.uber.org/mock/gomock"
 )
 

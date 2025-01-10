@@ -17,6 +17,7 @@ import (
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/byzantine"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/eventloop"
@@ -163,9 +164,9 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 	}
 	// prepare modules
-	builder := modules.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
+	builder := core.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 
-	consensusRules, ok := modules.GetModule[consensus.Rules](opts.GetConsensus())
+	consensusRules, ok := modules.GetModule[modules.Rules](opts.GetConsensus())
 	if !ok {
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
 	}
@@ -296,7 +297,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		mods := modules.NewBuilder(hotstuff.ID(opts.GetID()), nil)
+		mods := core.NewBuilder(hotstuff.ID(opts.GetID()), nil)
 		mods.Add(eventloop.New(1000))
 
 		if w.measurementInterval > 0 {

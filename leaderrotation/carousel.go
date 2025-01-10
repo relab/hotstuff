@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
@@ -15,14 +16,14 @@ func init() {
 }
 
 type carousel struct {
-	blockChain    modules.BlockChain
-	configuration modules.Configuration
-	consensus     modules.Consensus
-	opts          *modules.Options
+	blockChain    core.BlockChain
+	configuration core.Configuration
+	consensus     core.Consensus
+	opts          *core.Options
 	logger        logging.Logger
 }
 
-func (c *carousel) InitModule(mods *modules.Core) {
+func (c *carousel) InitComponent(mods *core.Core) {
 	mods.Get(
 		&c.blockChain,
 		&c.configuration,

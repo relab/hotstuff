@@ -2,6 +2,7 @@ package leaderrotation
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -10,10 +11,10 @@ func init() {
 }
 
 type roundRobin struct {
-	configuration modules.Configuration
+	configuration core.Configuration
 }
 
-func (rr *roundRobin) InitModule(mods *modules.Core) {
+func (rr *roundRobin) InitComponent(mods *core.Core) {
 	mods.Get(&rr.configuration)
 }
 

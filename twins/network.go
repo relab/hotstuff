@@ -13,6 +13,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/consensus"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
@@ -35,12 +36,12 @@ func (id NodeID) String() string {
 }
 
 type node struct {
-	blockChain     modules.BlockChain
-	consensus      modules.Consensus
+	blockChain     core.BlockChain
+	consensus      core.Consensus
 	eventLoop      *eventloop.EventLoop
 	leaderRotation modules.LeaderRotation
-	synchronizer   modules.Synchronizer
-	opts           *modules.Options
+	synchronizer   core.Synchronizer
+	opts           *core.Options
 
 	id             NodeID
 	executedBlocks []*hotstuff.Block
@@ -48,7 +49,7 @@ type node struct {
 	log            strings.Builder
 }
 
-func (n *node) InitModule(mods *modules.Core) {
+func (n *node) InitComponent(mods *core.Core) {
 	mods.Get(
 		&n.blockChain,
 		&n.consensus,
@@ -108,13 +109,13 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 }
 
 // GetNodeBuilder returns a consensus.Builder instance for a node in the network.
-func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) modules.Builder {
+func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) core.Builder {
 	node := node{
 		id: id,
 	}
 	n.nodes[id.NetworkID] = &node
 	n.replicas[id.ReplicaID] = append(n.replicas[id.ReplicaID], &node)
-	builder := modules.NewBuilder(id.ReplicaID, pk)
+	builder := core.NewBuilder(id.ReplicaID, pk)
 	// register node as an anonymous module because that allows configuration to obtain it.
 	builder.Add(&node)
 	return builder
@@ -133,7 +134,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 		builder := n.GetNodeBuilder(nodeID, pk)
 		node := n.nodes[nodeID.NetworkID]
 
-		consensusModule, ok := modules.GetModule[consensus.Rules](consensusName)
+		consensusModule, ok := modules.GetModule[modules.Rules](consensusName)
 		if !ok {
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
@@ -223,7 +224,7 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 }
 
 // NewConfiguration returns a new Configuration module for this network.
-func (n *Network) NewConfiguration() modules.Configuration {
+func (n *Network) NewConfiguration() core.Configuration {
 	return &configuration{network: n}
 }
 
@@ -234,7 +235,7 @@ type configuration struct {
 }
 
 // alternative way to get a pointer to the node.
-func (c *configuration) InitModule(mods *modules.Core) {
+func (c *configuration) InitComponent(mods *core.Core) {
 	if c.node == nil {
 		mods.TryGet(&c.node)
 	}
@@ -279,8 +280,8 @@ func (c *configuration) shouldDrop(id NodeID, message any) bool {
 }
 
 // Replicas returns all of the replicas in the configuration.
-func (c *configuration) Replicas() map[hotstuff.ID]modules.Replica {
-	m := make(map[hotstuff.ID]modules.Replica)
+func (c *configuration) Replicas() map[hotstuff.ID]core.Replica {
+	m := make(map[hotstuff.ID]core.Replica)
 	for id := range c.network.replicas {
 		m[id] = &replica{
 			config: c,
@@ -291,7 +292,7 @@ func (c *configuration) Replicas() map[hotstuff.ID]modules.Replica {
 }
 
 // Replica returns a replica if present in the configuration.
-func (c *configuration) Replica(id hotstuff.ID) (r modules.Replica, ok bool) {
+func (c *configuration) Replica(id hotstuff.ID) (r core.Replica, ok bool) {
 	if _, ok = c.network.replicas[id]; ok {
 		return &replica{
 			config: c,
@@ -302,7 +303,7 @@ func (c *configuration) Replica(id hotstuff.ID) (r modules.Replica, ok bool) {
 }
 
 // SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
-func (c *configuration) SubConfig(ids []hotstuff.ID) (sub modules.Configuration, err error) {
+func (c *configuration) SubConfig(ids []hotstuff.ID) (sub core.Configuration, err error) {
 	subConfig := hotstuff.NewIDSet()
 	for _, id := range ids {
 		subConfig.Add(id)
@@ -426,7 +427,7 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 type tick struct{}
 
 type timeoutManager struct {
-	synchronizer modules.Synchronizer
+	synchronizer core.Synchronizer
 	eventLoop    *eventloop.EventLoop
 
 	node      *node
@@ -457,9 +458,9 @@ func (tm *timeoutManager) viewChange(event synchronizer.ViewChangeEvent) {
 	}
 }
 
-// InitModule gives the module a reference to the Modules object.
+// InitComponent gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (tm *timeoutManager) InitModule(mods *modules.Core) {
+func (tm *timeoutManager) InitComponent(mods *core.Core) {
 	mods.Get(
 		&tm.synchronizer,
 		&tm.eventLoop,

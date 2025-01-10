@@ -5,9 +5,9 @@ import (
 
 	"github.com/relab/hotstuff"
 
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 	"go.uber.org/mock/gomock"
 )
@@ -31,7 +31,7 @@ func TestAdvanceViewQC(t *testing.T) {
 		2,
 	)
 
-	var blockChain modules.BlockChain
+	var blockChain core.BlockChain
 	hl[0].Get(&blockChain)
 
 	blockChain.Store(block)

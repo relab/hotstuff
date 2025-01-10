@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -16,14 +17,14 @@ import (
 
 // Synchronizer synchronizes replicas to the same view.
 type Synchronizer struct {
-	blockChain     modules.BlockChain
-	consensus      modules.Consensus
-	crypto         modules.Crypto
-	configuration  modules.Configuration
+	blockChain     core.BlockChain
+	consensus      core.Consensus
+	crypto         core.Crypto
+	configuration  core.Configuration
 	eventLoop      *eventloop.EventLoop
 	leaderRotation modules.LeaderRotation
 	logger         logging.Logger
-	opts           *modules.Options
+	opts           *core.Options
 
 	mut         sync.RWMutex // to protect the following
 	currentView hotstuff.View
@@ -42,8 +43,8 @@ type Synchronizer struct {
 	timeouts map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
 }
 
-// InitModule initializes the synchronizer.
-func (s *Synchronizer) InitModule(mods *modules.Core) {
+// InitComponent initializes the synchronizer.
+func (s *Synchronizer) InitComponent(mods *core.Core) {
 	mods.Get(
 		&s.blockChain,
 		&s.consensus,
@@ -84,7 +85,7 @@ func (s *Synchronizer) InitModule(mods *modules.Core) {
 }
 
 // New creates a new Synchronizer.
-func New(viewDuration ViewDuration) modules.Synchronizer {
+func New(viewDuration ViewDuration) core.Synchronizer {
 	return &Synchronizer{
 		currentView: 1,
 
@@ -372,7 +373,7 @@ func (s *Synchronizer) updateHighTC(tc hotstuff.TimeoutCert) {
 	}
 }
 
-var _ modules.Synchronizer = (*Synchronizer)(nil)
+var _ core.Synchronizer = (*Synchronizer)(nil)
 
 // ViewChangeEvent is sent on the eventloop whenever a view change occurs.
 type ViewChangeEvent struct {

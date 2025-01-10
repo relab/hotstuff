@@ -7,8 +7,8 @@ import (
 	"crypto/x509"
 	"net"
 
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/modules"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -53,7 +53,7 @@ type Replica struct {
 	clientSrv *clientSrv
 	cfg       *backend.Config
 	hsSrv     *backend.Server
-	hs        *modules.Core
+	hs        *core.Core
 
 	execHandlers map[cmdID]func(*emptypb.Empty, error)
 	cancel       context.CancelFunc
@@ -61,7 +61,7 @@ type Replica struct {
 }
 
 // New returns a new replica.
-func New(conf Config, builder modules.Builder) (replica *Replica) {
+func New(conf Config, builder core.Builder) (replica *Replica) {
 	clientSrvOpts := conf.ClientServerOptions
 
 	if conf.TLS {
@@ -109,8 +109,8 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 		srv.cfg,   // configuration
 		srv.hsSrv, // event handling
 
-		modules.ExtendedExecutor(srv.clientSrv),
-		modules.ExtendedForkHandler(srv.clientSrv),
+		core.ExtendedExecutor(srv.clientSrv),
+		core.ExtendedForkHandler(srv.clientSrv),
 		srv.clientSrv.cmdCache,
 	)
 	srv.hs = builder.Build()
@@ -119,7 +119,7 @@ func New(conf Config, builder modules.Builder) (replica *Replica) {
 }
 
 // Modules returns the Modules object of this replica.
-func (srv *Replica) Modules() *modules.Core {
+func (srv *Replica) Modules() *core.Core {
 	return srv.hs
 }
 
@@ -154,7 +154,7 @@ func (srv *Replica) Stop() {
 // Run runs the replica until the context is canceled.
 func (srv *Replica) Run(ctx context.Context) {
 	var (
-		synchronizer modules.Synchronizer
+		synchronizer core.Synchronizer
 		eventLoop    *eventloop.EventLoop
 	)
 	srv.hs.Get(&synchronizer, &eventLoop)

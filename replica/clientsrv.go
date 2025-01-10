@@ -9,10 +9,10 @@ import (
 	"github.com/relab/hotstuff"
 
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/modules"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -44,13 +44,13 @@ func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv
 	return srv
 }
 
-// InitModule gives the module access to the other modules.
-func (srv *clientSrv) InitModule(mods *modules.Core) {
+// InitComponent gives the module access to the other modules.
+func (srv *clientSrv) InitComponent(mods *core.Core) {
 	mods.Get(
 		&srv.eventLoop,
 		&srv.logger,
 	)
-	srv.cmdCache.InitModule(mods)
+	srv.cmdCache.InitComponent(mods)
 }
 
 func (srv *clientSrv) Start(addr string) error {

@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 
 	"github.com/relab/gorums"
@@ -80,14 +80,14 @@ type Config struct {
 type subConfig struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
-	opts      *modules.Options
+	opts      *core.Options
 
 	cfg      *hotstuffpb.Configuration
-	replicas map[hotstuff.ID]modules.Replica
+	replicas map[hotstuff.ID]core.Replica
 }
 
-// InitModule initializes the configuration.
-func (cfg *Config) InitModule(mods *modules.Core) {
+// InitComponent initializes the configuration.
+func (cfg *Config) InitComponent(mods *core.Core) {
 	mods.Get(
 		&cfg.eventLoop,
 		&cfg.logger,
@@ -114,10 +114,10 @@ func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOpt
 	}
 	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
 
-	// initialization will be finished by InitModule
+	// initialization will be finished by InitComponent
 	cfg := &Config{
 		subConfig: subConfig{
-			replicas: make(map[hotstuff.ID]modules.Replica),
+			replicas: make(map[hotstuff.ID]core.Replica),
 		},
 		opts: opts,
 	}
@@ -235,19 +235,19 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 }
 
 // Replicas returns all of the replicas in the configuration.
-func (cfg *subConfig) Replicas() map[hotstuff.ID]modules.Replica {
+func (cfg *subConfig) Replicas() map[hotstuff.ID]core.Replica {
 	return cfg.replicas
 }
 
 // Replica returns a replica if it is present in the configuration.
-func (cfg *subConfig) Replica(id hotstuff.ID) (replica modules.Replica, ok bool) {
+func (cfg *subConfig) Replica(id hotstuff.ID) (replica core.Replica, ok bool) {
 	replica, ok = cfg.replicas[id]
 	return
 }
 
 // SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
-func (cfg *Config) SubConfig(ids []hotstuff.ID) (sub modules.Configuration, err error) {
-	replicas := make(map[hotstuff.ID]modules.Replica)
+func (cfg *Config) SubConfig(ids []hotstuff.ID) (sub core.Configuration, err error) {
+	replicas := make(map[hotstuff.ID]core.Replica)
 	nids := make([]uint32, len(ids))
 	for i, id := range ids {
 		nids[i] = uint32(id)
@@ -266,7 +266,7 @@ func (cfg *Config) SubConfig(ids []hotstuff.ID) (sub modules.Configuration, err 
 	}, nil
 }
 
-func (cfg *subConfig) SubConfig(_ []hotstuff.ID) (_ modules.Configuration, err error) {
+func (cfg *subConfig) SubConfig(_ []hotstuff.ID) (_ core.Configuration, err error) {
 	return nil, errors.New("not supported")
 }
 
@@ -328,7 +328,7 @@ func (cfg *Config) Close() {
 	cfg.mgr.Close()
 }
 
-var _ modules.Configuration = (*Config)(nil)
+var _ core.Configuration = (*Config)(nil)
 
 type qspec struct{}
 

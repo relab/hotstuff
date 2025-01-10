@@ -32,6 +32,7 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/handelpb"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
@@ -49,12 +50,12 @@ type Handel struct {
 	configuration *backend.Config
 	server        *backend.Server
 
-	blockChain   modules.BlockChain
-	crypto       modules.Crypto
+	blockChain   core.BlockChain
+	crypto       core.Crypto
 	eventLoop    *eventloop.EventLoop
 	logger       logging.Logger
-	opts         *modules.Options
-	synchronizer modules.Synchronizer
+	opts         *core.Options
+	synchronizer core.Synchronizer
 
 	nodes    map[hotstuff.ID]*handelpb.Node
 	maxLevel int
@@ -63,15 +64,15 @@ type Handel struct {
 }
 
 // New returns a new instance of the Handel module.
-func New() modules.Handel {
+func New() core.Handel {
 	return &Handel{
 		nodes:    make(map[hotstuff.ID]*handelpb.Node),
 		sessions: make(map[hotstuff.Hash]*session),
 	}
 }
 
-// InitModule initializes the Handel module.
-func (h *Handel) InitModule(mods *modules.Core) {
+// InitComponent initializes the Handel module.
+func (h *Handel) InitComponent(mods *core.Core) {
 	mods.Get(
 		&h.configuration,
 		&h.server,

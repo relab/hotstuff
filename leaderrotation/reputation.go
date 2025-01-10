@@ -7,6 +7,7 @@ import (
 	wr "github.com/mroth/weightedrand"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
@@ -18,17 +19,17 @@ func init() {
 type reputationsMap map[hotstuff.ID]float64
 
 type repBased struct {
-	configuration  modules.Configuration
-	consensus      modules.Consensus
-	opts           *modules.Options
+	configuration  core.Configuration
+	consensus      core.Consensus
+	opts           *core.Options
 	logger         logging.Logger
 	prevCommitHead *hotstuff.Block
 	reputations    reputationsMap // latest reputations
 }
 
-// InitModule gives the module a reference to the Core object.
+// InitComponent gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder
-func (r *repBased) InitModule(mods *modules.Core) {
+func (r *repBased) InitComponent(mods *core.Core) {
 	mods.Get(
 		&r.configuration,
 		&r.consensus,

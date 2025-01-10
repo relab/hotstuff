@@ -4,10 +4,10 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/client"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics/types"
-	"github.com/relab/hotstuff/modules"
 )
 
 func init() {
@@ -19,13 +19,13 @@ func init() {
 // ClientLatency processes LatencyMeasurementEvents, and writes LatencyMeasurements to the metrics logger.
 type ClientLatency struct {
 	metricsLogger Logger
-	opts          *modules.Options
+	opts          *core.Options
 
 	wf Welford
 }
 
-// InitModule gives the module access to the other modules.
-func (lr *ClientLatency) InitModule(mods *modules.Core) {
+// InitComponent gives the module access to the other modules.
+func (lr *ClientLatency) InitComponent(mods *core.Core) {
 	var (
 		eventLoop *eventloop.EventLoop
 		logger    logging.Logger

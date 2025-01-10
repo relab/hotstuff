@@ -60,15 +60,15 @@ eventLoop.AddEvent(consensus.CommitEvent{Commands: len(batch.GetCommands())}
 ### Create a module for your metric
 
 To be able to interact with the event loop and other modules, you must implement the `modules.Module` interface.
-In the `InitModule` functions you should add an observer or handler for the events that you want to receive.
+In the `InitComponent` functions you should add an observer or handler for the events that you want to receive.
 
 You should also add an observer for the `types.TickEvent` type on the `EventLoop`.
 This event is sent at a configured interval such that each metric can periodically log its measurement.
 The example below shows a complete initialization function for the throughput metric module.
 
 ```go
-// InitModule implements the modules.Module interface
-func (t *Throughput) InitModule(mods *modules.Core) {
+// InitComponent implements the modules.Module interface
+func (t *Throughput) InitComponent(mods *modules.Core) {
     var (
         eventLoop *eventloop.EventLoop
         logger logging.Logger

@@ -3,32 +3,33 @@ package crypto
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/modules"
 )
 
 type crypto struct {
-	blockChain    modules.BlockChain
-	configuration modules.Configuration
+	blockChain    core.BlockChain
+	configuration core.Configuration
 
 	modules.CryptoBase
 }
 
 // New returns a new implementation of the Crypto interface. It will use the given CryptoBase to create and verify
 // signatures.
-func New(impl modules.CryptoBase) modules.Crypto {
+func New(impl modules.CryptoBase) core.Crypto {
 	return &crypto{CryptoBase: impl}
 }
 
-// InitModule gives the module a reference to the Core object.
+// InitComponent gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (c *crypto) InitModule(mods *modules.Core) {
+func (c *crypto) InitComponent(mods *core.Core) {
 	mods.Get(
 		&c.blockChain,
 		&c.configuration,
 	)
 
-	if mod, ok := c.CryptoBase.(modules.Module); ok {
-		mod.InitModule(mods)
+	if mod, ok := c.CryptoBase.(core.Component); ok {
+		mod.InitComponent(mods)
 	}
 }
 
