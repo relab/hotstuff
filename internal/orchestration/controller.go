@@ -17,7 +17,6 @@ import (
 	"github.com/relab/hotstuff/internal/config"
 	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
-	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"google.golang.org/protobuf/proto"
 )
@@ -145,10 +144,7 @@ func (e *Experiment) createReplicas(replicaMap config.ReplicaMap) (cfg *orchestr
 				return nil, err
 			}
 
-			tree := tree.CreateTree(opt.HotstuffID(), e.hostCfg.BranchFactor, replicaMap.ReplicaIDs(host))
-			children := tree.ChildrenOf(hotstuff.ID(opt.ID))
-			childrenConverted := children.Uint32Slice()
-			opt.SetTreePositions(childrenConverted)
+			opt.SetTreeOptions(e.hostCfg.BranchFactor, e.hostCfg.TreePositions)
 
 			req.Replicas[opt.ID] = opt
 		}

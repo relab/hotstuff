@@ -22,7 +22,7 @@ func (x *ReplicaOpts) New(replicaID hotstuff.ID, locations []string) *ReplicaOpt
 	return replicaOpts
 }
 
-func (x *ReplicaOpts) SetTreePositions(positions []uint32) {
+func (x *ReplicaOpts) SetTreeOptions(branchFactor int, positions []uint32) {
 	x.TreePositions = positions
 }
 

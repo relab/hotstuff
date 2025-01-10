@@ -70,6 +70,14 @@ func NewLocal(numReplicas, numClients int,
 	}
 }
 
+func (c *HostConfig) TreePosIDs() []hotstuff.ID {
+	ids := make([]hotstuff.ID, 0, len(c.TreePositions))
+	for i, id := range c.TreePositions {
+		ids[i] = hotstuff.ID(id)
+	}
+	return ids
+}
+
 // unitsForHost returns the number of units to be assigned to the host at hostIndex.
 func unitsForHost(hostIndex int, totalUnits int, numHosts int) int {
 	if numHosts == 0 {
