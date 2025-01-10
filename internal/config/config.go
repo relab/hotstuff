@@ -48,7 +48,7 @@ type HostConfig struct {
 	// the 2nd entry is the root's right child, and so on.
 	TreePositions []uint32
 	// BranchFactor is the branch factor for the tree (required if TreePositions is set).
-	BranchFactor int
+	BranchFactor uint32
 	// ByzantineStrategy is a map from each strategy to a list of replica IDs exhibiting that strategy.
 	ByzantineStrategy map[string][]uint32
 }

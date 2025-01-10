@@ -143,9 +143,7 @@ func (e *Experiment) createReplicas(replicaMap config.ReplicaMap) (cfg *orchestr
 			if err != nil {
 				return nil, err
 			}
-
-			opt.SetTreeOptions(uint32(e.hostCfg.BranchFactor), e.hostCfg.TreePositions)
-
+			opt.SetTreeOptions(e.hostCfg.BranchFactor, e.hostCfg.TreePositions)
 			req.Replicas[opt.ID] = opt
 		}
 
