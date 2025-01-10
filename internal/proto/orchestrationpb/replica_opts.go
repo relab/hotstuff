@@ -22,8 +22,9 @@ func (x *ReplicaOpts) New(replicaID hotstuff.ID, locations []string) *ReplicaOpt
 	return replicaOpts
 }
 
-func (x *ReplicaOpts) SetTreeOptions(branchFactor int, positions []uint32) {
+func (x *ReplicaOpts) SetTreeOptions(branchFactor uint32, positions []uint32) {
 	x.TreePositions = positions
+	x.BranchFactor = branchFactor
 }
 
 func (x *ReplicaOpts) SetByzantineStrategy(strategy string) {
