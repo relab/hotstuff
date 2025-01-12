@@ -51,8 +51,7 @@ type consensusBase struct {
 	opts           *modules.Options
 	synchronizer   modules.Synchronizer
 
-	handel modules.Handel
-	kauri  modules.Kauri
+	kauri modules.Kauri
 
 	lastVote hotstuff.View
 
@@ -86,7 +85,6 @@ func (cs *consensusBase) InitModule(mods *modules.Core) {
 		&cs.synchronizer,
 	)
 
-	mods.TryGet(&cs.handel)
 	mods.TryGet(&cs.kauri)
 
 	if mod, ok := cs.impl.(modules.Module); ok {
@@ -159,7 +157,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 	}
 
 	cs.blockChain.Store(proposal.Block)
-	//kauri sends the proposal to only the children
+	// kauri sends the proposal to only the children
 	if cs.kauri == nil {
 		cs.configuration.Propose(proposal)
 	}
@@ -234,11 +232,6 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 
 	cs.lastVote = block.View()
 
-	if cs.handel != nil {
-		// let Handel handle the voting
-		cs.handel.Begin(pc)
-		return
-	}
 	if cs.kauri != nil {
 		cs.kauri.Begin(pc, proposal)
 		return

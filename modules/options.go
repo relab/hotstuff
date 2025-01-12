@@ -69,7 +69,6 @@ type Options struct {
 	privateKey hotstuff.PrivateKey
 
 	shouldUseAggQC        bool
-	shouldUseHandel       bool
 	shouldVerifyVotesSync bool
 
 	sharedRandomSeed   int64
@@ -135,11 +134,6 @@ func (opts *Options) ShouldUseAggQC() bool {
 	return opts.shouldUseAggQC
 }
 
-// ShouldUseHandel returns true if the Handel signature aggregation protocol should be used.
-func (opts *Options) ShouldUseHandel() bool {
-	return opts.shouldUseHandel
-}
-
 // ShouldVerifyVotesSync returns true if votes should be verified synchronously.
 // Enabling this should make the voting machine process votes synchronously.
 func (opts *Options) ShouldVerifyVotesSync() bool {
@@ -159,11 +153,6 @@ func (opts *Options) ConnectionMetadata() map[string]string {
 // SetShouldUseAggQC sets the ShouldUseAggQC setting to true.
 func (opts *Options) SetShouldUseAggQC() {
 	opts.shouldUseAggQC = true
-}
-
-// SetShouldUseHandel sets the ShouldUseHandel setting to true.
-func (opts *Options) SetShouldUseHandel() {
-	opts.shouldUseHandel = true
 }
 
 // SetShouldVerifyVotesSync sets the ShouldVerifyVotesSync setting to true.

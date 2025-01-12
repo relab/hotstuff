@@ -122,20 +122,6 @@ func TestOrchestration(t *testing.T) {
 	replicaOpts = makeReplicaOpts("simplehotstuff", "bls12", nil, "")
 	t.Run("Simple-HotStuff+BLS12", func(t *testing.T) { run(t, replicaOpts) })
 
-	// handel
-	mods := []string{"handel"}
-	replicaOpts = makeReplicaOpts("chainedhotstuff", "ecdsa", mods, "")
-	t.Run("ChainedHotStuff+ECDSA+Handel", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("chainedhotstuff", "bls12", mods, "")
-	t.Run("ChainedHotStuff+BLS12+Handel", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("fasthotstuff", "ecdsa", mods, "")
-	t.Run("Fast-HotStuff+ECDSA+Handel", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("fasthotstuff", "bls12", mods, "")
-	t.Run("Fast-HotStuff+BLS12+Handel", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("simplehotstuff", "ecdsa", mods, "")
-	t.Run("Simple-HotStuff+ECDSA+Handel", func(t *testing.T) { run(t, replicaOpts) })
-	t.Run("Simple-HotStuff+BLS12+Handel", func(t *testing.T) { run(t, replicaOpts) })
-
 	// byzantine
 	replicaOpts = makeReplicaOpts("chainedhotstuff", "ecdsa", nil, "fork:1")
 	t.Run("ChainedHotStuff+Fork", func(t *testing.T) { run(t, replicaOpts) })
@@ -143,7 +129,7 @@ func TestOrchestration(t *testing.T) {
 	t.Run("ChainedHotStuff+Silence", func(t *testing.T) { run(t, replicaOpts) })
 
 	// kauri
-	mods = []string{"kauri"}
+	mods := []string{"kauri"}
 	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "ecdsa", mods, 7, 2)
 	t.Run("ChainedHotStuff+ECDSA+Kauri", func(t *testing.T) { run(t, replicaOpts) })
 	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "bls12", mods, 7, 2)
