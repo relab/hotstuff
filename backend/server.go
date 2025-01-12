@@ -158,7 +158,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
 	}
-	if impl.srv.opts.TreeConfig() != nil {
+	if impl.srv.opts.ShouldUseTree() {
 		id = hotstuff.ID(proposal.Block.Proposer)
 	}
 	proposal.Block.Proposer = uint32(id)

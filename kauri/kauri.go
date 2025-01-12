@@ -65,6 +65,7 @@ func (k *Kauri) InitModule(mods *modules.Core) {
 		&k.leaderRotation,
 		&k.synchronizer,
 	)
+	k.opts.SetShouldUseTree()
 	k.eventLoop.RegisterObserver(backend.ConnectedEvent{}, func(_ any) {
 		k.postInit()
 	})
@@ -101,7 +102,6 @@ func (k *Kauri) Begin(pc hotstuff.PartialCert, p hotstuff.ProposeMsg) {
 	k.currentView = p.Block.View()
 	k.aggregatedContribution = pc.Signature()
 	k.SendProposalToChildren(p)
-	go k.aggregateAndSend(k.treeConfig.TreeWaitDelta(), k.currentView)
 }
 
 func (k *Kauri) reset() {
@@ -110,7 +110,7 @@ func (k *Kauri) reset() {
 	k.isAggregationSent = false
 }
 
-func (k *Kauri) aggregateAndSend(t time.Duration, view hotstuff.View) {
+func (k *Kauri) WaitToAggregate(t time.Duration, view hotstuff.View) {
 	ticker := time.NewTicker(t)
 	<-ticker.C
 	ticker.Stop()
@@ -119,6 +119,7 @@ func (k *Kauri) aggregateAndSend(t time.Duration, view hotstuff.View) {
 	}
 	if !k.isAggregationSent {
 		k.SendContributionToParent()
+		k.reset()
 	}
 }
 
@@ -133,6 +134,8 @@ func (k *Kauri) SendProposalToChildren(p hotstuff.ProposeMsg) {
 		}
 		k.logger.Debug("sending proposal to children ", children)
 		config.Propose(p)
+		waitTime := time.Duration(k.tree.TreeHeight()) * k.treeConfig.TreeWaitDelta()
+		go k.WaitToAggregate(waitTime, k.currentView)
 	} else {
 		k.SendContributionToParent()
 		k.isAggregationSent = true

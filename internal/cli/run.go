@@ -54,7 +54,8 @@ func init() {
 	runCmd.Flags().Duration("client-timeout", 500*time.Millisecond, "Client timeout.")
 	runCmd.Flags().Duration("duration", 10*time.Second, "duration of the experiment")
 	runCmd.Flags().Duration("connect-timeout", 5*time.Second, "duration of the initial connection timeout")
-	runCmd.Flags().Duration("view-timeout", 100*time.Millisecond, "duration of the first view")
+	// need longer default timeout for the kauri
+	runCmd.Flags().Duration("view-timeout", 500*time.Millisecond, "duration of the first view")
 	runCmd.Flags().Duration("max-timeout", 0, "upper limit on view timeouts")
 	runCmd.Flags().Int("duration-samples", 1000, "number of previous views to consider when predicting view duration")
 	runCmd.Flags().Float32("timeout-multiplier", 1.2, "number to multiply the view duration by in case of a timeout")
@@ -81,11 +82,23 @@ func init() {
 	runCmd.Flags().Float64("rate-step", 0, "rate limit step up for clients (in commands/second)")
 	runCmd.Flags().Duration("rate-step-interval", time.Hour, "how often the client rate limit should be increased")
 	runCmd.Flags().StringSlice("byzantine", nil, "byzantine strategies to use, as a comma separated list of 'name:count'")
+	// tree config parameter
+	runCmd.Flags().Int("bf", 2, "branch factor of the tree")
+	runCmd.Flags().IntSlice("tree-pos", []int{}, "tree positions of the replicas")
+	runCmd.Flags().Duration("tree-delta", 30*time.Millisecond, "waiting time for intermediate nodes in the tree")
 
 	err := viper.BindPFlags(runCmd.Flags())
 	if err != nil {
 		panic(err)
 	}
+}
+
+func defaultTreePos(numReplicas int) []uint32 {
+	treePos := make([]uint32, numReplicas)
+	for i := range treePos {
+		treePos[i] = uint32(i + 1)
+	}
+	return treePos
 }
 
 func runController() {
@@ -98,6 +111,16 @@ func runController() {
 		checkf("failed to create output directory: %v", err)
 	}
 
+	intTreePos := viper.GetIntSlice("tree-pos")
+	var treePos []uint32
+	if len(intTreePos) == 0 {
+		treePos = defaultTreePos(viper.GetInt("replicas"))
+	} else {
+		treePos = make([]uint32, len(intTreePos))
+		for i, pos := range intTreePos {
+			treePos[i] = uint32(pos)
+		}
+	}
 	experiment := orchestration.Experiment{
 		Logger:      logging.New("ctrl"),
 		NumReplicas: viper.GetInt("replicas"),
@@ -117,6 +140,9 @@ func runController() {
 			MaxTimeout:        durationpb.New(viper.GetDuration("max-timeout")),
 			SharedSeed:        viper.GetInt64("shared-seed"),
 			Modules:           viper.GetStringSlice("modules"),
+			TreePositions:     treePos,
+			BranchFactor:      viper.GetInt32("bf"),
+			TreeDelta:         durationpb.New(viper.GetDuration("tree-delta")),
 		},
 		ClientOpts: &orchestrationpb.ClientOpts{
 			UseTLS:           true,

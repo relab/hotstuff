@@ -40,6 +40,7 @@ import (
 	_ "github.com/relab/hotstuff/crypto/ecdsa"
 	_ "github.com/relab/hotstuff/crypto/eddsa"
 	_ "github.com/relab/hotstuff/handel"
+	_ "github.com/relab/hotstuff/kauri"
 	_ "github.com/relab/hotstuff/leaderrotation"
 )
 
@@ -206,6 +207,10 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
+
+	builder.Options().SetTreeConfig(int(opts.GetBranchFactor()),
+		convertUintHotstuffID(opts.GetTreePositions()),
+		opts.GetTreeDelta().AsDuration())
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
 		builder.Add(replicaMetrics...)
@@ -232,6 +237,14 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		},
 	}
 	return replica.New(c, builder), nil
+}
+
+func convertUintHotstuffID(ids []uint32) []hotstuff.ID {
+	hotstuffIDs := make([]hotstuff.ID, len(ids))
+	for i, id := range ids {
+		hotstuffIDs[i] = hotstuff.ID(id)
+	}
+	return hotstuffIDs
 }
 
 func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {

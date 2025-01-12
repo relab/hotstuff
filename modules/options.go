@@ -52,6 +52,14 @@ func (tc *TreeConfig) TreeWaitDelta() time.Duration {
 	return tc.treeWaitDelta
 }
 
+func NewTreeConfig(bf int, treePos []hotstuff.ID, treeWaitDelta time.Duration) *TreeConfig {
+	return &TreeConfig{
+		bf:            bf,
+		treePos:       treePos,
+		treeWaitDelta: treeWaitDelta,
+	}
+}
+
 // Options stores runtime configuration settings.
 type Options struct {
 	mut     sync.Mutex
@@ -67,7 +75,8 @@ type Options struct {
 	sharedRandomSeed   int64
 	connectionMetadata map[string]string
 
-	treeConfig *TreeConfig
+	treeConfig    *TreeConfig
+	shouldUseTree bool
 }
 
 func (opts *Options) ensureSpace(id OptionID) {
@@ -76,6 +85,15 @@ func (opts *Options) ensureSpace(id OptionID) {
 		copy(newOpts, opts.options)
 		opts.options = newOpts
 	}
+}
+
+// SetShouldUseTree sets the ShouldUseTree setting to true.
+func (opts *Options) SetShouldUseTree() {
+	opts.shouldUseTree = true
+}
+
+func (opts *Options) ShouldUseTree() bool {
+	return opts.shouldUseTree
 }
 
 // Get returns the value associated with the given option ID.
