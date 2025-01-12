@@ -74,11 +74,6 @@ Build-ProtoFile `
 	-GoOut     internal/proto/orchestrationpb/orchestration.pb.go
 
 Build-ProtoFile `
-	-SrcFile   internal/proto/handelpb/handel.proto `
-	-GoOut     internal/proto/handelpb/handel.pb.go `
-	-GorumsOut internal/proto/handelpb/handel_gorums.pb.go
-
-Build-ProtoFile `
 	-SrcFile   metrics/types/types.proto `
 	-GoOut     metrics/types/types.pb.go
 

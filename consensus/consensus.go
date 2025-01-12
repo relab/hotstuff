@@ -51,8 +51,6 @@ type consensusBase struct {
 	opts           *modules.Options
 	synchronizer   modules.Synchronizer
 
-	handel modules.Handel
-
 	lastVote hotstuff.View
 
 	mut   sync.Mutex
@@ -84,8 +82,6 @@ func (cs *consensusBase) InitModule(mods *modules.Core) {
 		&cs.opts,
 		&cs.synchronizer,
 	)
-
-	mods.TryGet(&cs.handel)
 
 	if mod, ok := cs.impl.(modules.Module); ok {
 		mod.InitModule(mods)
@@ -229,12 +225,6 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	}
 
 	cs.lastVote = block.View()
-
-	if cs.handel != nil {
-		// let Handel handle the voting
-		cs.handel.Begin(pc)
-		return
-	}
 
 	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
 	if leaderID == cs.opts.ID() {

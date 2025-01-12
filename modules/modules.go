@@ -162,12 +162,6 @@ type Synchronizer interface {
 	Start(context.Context)
 }
 
-// Handel is an implementation of the Handel signature aggregation protocol.
-type Handel interface {
-	// Begin commissions the aggregation of a new signature.
-	Begin(s hotstuff.PartialCert)
-}
-
 // ExtendedExecutor turns the given Executor into an ExecutorExt.
 func ExtendedExecutor(executor Executor) ExecutorExt {
 	return executorWrapper{executor}
