@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"path/filepath"
 	"time"
@@ -50,6 +49,9 @@ func NewExperiment(
 	workers map[string]RemoteWorker,
 	logger logging.Logger,
 ) (*Experiment, error) {
+	if len(cfg.ReplicaHosts) != len(workers) {
+		return nil, fmt.Errorf("number of workers %d does not match number of replica hosts: %d", len(workers), len(cfg.ReplicaHosts))
+	}
 	for _, location := range cfg.Locations {
 		location, err := latency.ValidLocation(location)
 		log.Printf("Experiment: Location found: %v", location)
@@ -127,32 +129,6 @@ func (e *Experiment) Run() (err error) {
 	return nil
 }
 
-func (e *Experiment) putReplicaOpt(toMap map[uint32]*orchestrationpb.ReplicaOpts, host string, opt *orchestrationpb.ReplicaOpts) error {
-	opt.CertificateAuthority = keygen.CertToPEM(e.ca)
-	validFor := []string{"localhost", "127.0.0.1", "127.0.1.1", host}
-	ips, err := net.LookupIP(host)
-	if err == nil {
-		for _, ip := range ips {
-			// TODO: Not using internal addr anymore, but check if this is needed.
-			if ipStr := ip.String(); ipStr != host /*&& ipStr != internalAddr*/ {
-				validFor = append(validFor, ipStr)
-			}
-		}
-	}
-
-	keyChain, err := keygen.GenerateKeyChain(hotstuff.ID(opt.ID), validFor, e.replicaOpts.Crypto, e.ca, e.caKey)
-	if err != nil {
-		return fmt.Errorf("failed to generate keychain: %w", err)
-	}
-	opt.PrivateKey = keyChain.PrivateKey
-	opt.PublicKey = keyChain.PublicKey
-	opt.Certificate = keyChain.Certificate
-	opt.CertificateKey = keyChain.CertificateKey
-
-	toMap[opt.ID] = opt
-	return nil
-}
-
 func (e *Experiment) createReplicas(replicaMap config.ReplicaMap) (cfg *orchestrationpb.ReplicaConfiguration, err error) {
 	e.caKey, e.ca, err = keygen.GenerateCA()
 	if err != nil {
@@ -162,16 +138,18 @@ func (e *Experiment) createReplicas(replicaMap config.ReplicaMap) (cfg *orchestr
 	cfg = &orchestrationpb.ReplicaConfiguration{Replicas: make(map[uint32]*orchestrationpb.ReplicaInfo)}
 
 	for host, opts := range replicaMap {
-		worker := e.workers[host]
 		req := &orchestrationpb.CreateReplicaRequest{Replicas: make(map[uint32]*orchestrationpb.ReplicaOpts)}
 
 		for _, opt := range opts {
-			err = e.putReplicaOpt(req.Replicas, host, opt)
+			err := opt.SetReplicaCertificates(host, e.ca, e.caKey)
 			if err != nil {
 				return nil, err
 			}
+			opt.SetTreeOptions(e.hostCfg.BranchFactor, e.hostCfg.TreePositions)
+			req.Replicas[opt.ID] = opt
 		}
 
+		worker := e.workers[host]
 		wcfg, err := worker.CreateReplica(req)
 		if err != nil {
 			return nil, err
@@ -228,7 +206,7 @@ func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration, re
 		go func(host string, worker RemoteWorker) {
 			req := &orchestrationpb.StartReplicaRequest{
 				Configuration: cfg.GetReplicas(),
-				IDs:           replicaIDsToU32(host, replicaMap),
+				IDs:           replicaMap.ReplicaIDs(host),
 			}
 			_, err := worker.StartReplica(req)
 			errs <- err
@@ -243,7 +221,7 @@ func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration, re
 func (e *Experiment) stopReplicas(replicaMap config.ReplicaMap) error {
 	responses := make([]*orchestrationpb.StopReplicaResponse, 0)
 	for host, worker := range e.workers {
-		req := &orchestrationpb.StopReplicaRequest{IDs: replicaIDsToU32(host, replicaMap)}
+		req := &orchestrationpb.StopReplicaRequest{IDs: replicaMap.ReplicaIDs(host)}
 		res, err := worker.StopReplica(req)
 		if err != nil {
 			return err
@@ -298,7 +276,7 @@ func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration, cli
 func (e *Experiment) stopClients(clientMap config.ClientMap) error {
 	for host, worker := range e.workers {
 		req := &orchestrationpb.StopClientRequest{}
-		req.IDs = clientIDsToU32(host, clientMap)
+		req.IDs = clientMap.ClientIDs(host)
 		_, err := worker.StopClient(req)
 		if err != nil {
 			return err
@@ -315,20 +293,4 @@ func (e *Experiment) quit() error {
 		}
 	}
 	return nil
-}
-
-func replicaIDsToU32(host string, replicaMap config.ReplicaMap) []uint32 {
-	var ids []uint32
-	for _, opts := range replicaMap[host] {
-		ids = append(ids, uint32(opts.ID))
-	}
-	return ids
-}
-
-func clientIDsToU32(host string, clientIDs config.ClientMap) []uint32 {
-	newList := make([]uint32, 0, len(clientIDs))
-	for _, id := range clientIDs[host] {
-		newList = append(newList, uint32(id))
-	}
-	return newList
 }

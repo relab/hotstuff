@@ -36,7 +36,7 @@ func (c *HostConfig) String() string {
 		s.WriteString(join(c.TreePositions, ", "))
 		s.WriteString(", ")
 		s.WriteString("BranchFactor: ")
-		s.WriteString(strconv.Itoa(c.BranchFactor))
+		s.WriteString(strconv.Itoa(int(c.BranchFactor)))
 	}
 	if len(c.ByzantineStrategy) == 0 {
 		return s.String()

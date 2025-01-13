@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/relab/hotstuff/internal/config"
@@ -114,9 +115,9 @@ func runController() {
 
 	worker := viper.GetBool("worker")
 
-	var hosts []string
-	if !cfg.IsLocal() {
-		hosts = append(cfg.ReplicaHosts, cfg.ClientHosts...)
+	hosts := cfg.AllHosts()
+	if len(hosts) == 1 && slices.Contains(hosts, "localhost") {
+		hosts = nil // TODO(AlanRostem): find a better workaround
 	}
 
 	exePath := viper.GetString("exe")

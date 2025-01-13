@@ -55,6 +55,8 @@ message ReplicaOpts {
   repeated string Locations = 22;
   // Tree positions of the replica.
   repeated uint32 TreePositions = 23;
+  // Branch factor for the tree positions.
+  uint32 BranchFactor = 24;
 }
 
 // ReplicaInfo is the information that the replicas need about each other.

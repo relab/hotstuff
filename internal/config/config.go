@@ -7,6 +7,29 @@ import (
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 )
 
+// ReplicaMap is a map from host to a list of replica options.
+type ReplicaMap map[string][]*orchestrationpb.ReplicaOpts
+
+// ReplicaIDs converts the an entry map from []hotstuff.ID to []uint32.
+func (r ReplicaMap) ReplicaIDs(host string) []uint32 {
+	ids := make([]uint32, 0, len(r[host]))
+	for _, opts := range r[host] {
+		ids = append(ids, opts.ID)
+	}
+	return ids
+}
+
+type ClientMap map[string][]hotstuff.ID
+
+// ClientIDs converts the an entry map from []hotstuff.ID to []uint32.
+func (c ClientMap) ClientIDs(host string) []uint32 {
+	ids := make([]uint32, 0, len(c[host]))
+	for _, id := range c[host] {
+		ids = append(ids, uint32(id))
+	}
+	return ids
+}
+
 // HostConfig holds the configuration for an experiment.
 type HostConfig struct {
 	// ReplicaHosts is a list of hosts that will run replicas.
@@ -29,7 +52,7 @@ type HostConfig struct {
 	// the 2nd entry is the root's right child, and so on.
 	TreePositions []uint32
 	// BranchFactor is the branch factor for the tree (required if TreePositions is set).
-	BranchFactor int
+	BranchFactor uint32
 	// ByzantineStrategy is a map from each strategy to a list of replica IDs exhibiting that strategy.
 	ByzantineStrategy map[string][]uint32
 }
@@ -49,6 +72,14 @@ func NewLocal(numReplicas, numClients int,
 		// Locations:         locations,
 		// ByzantineStrategy: byzStrat,
 	}
+}
+
+func (c *HostConfig) TreePosIDs() []hotstuff.ID {
+	ids := make([]hotstuff.ID, 0, len(c.TreePositions))
+	for i, id := range c.TreePositions {
+		ids[i] = hotstuff.ID(id)
+	}
+	return ids
 }
 
 // unitsForHost returns the number of units to be assigned to the host at hostIndex.
@@ -73,9 +104,6 @@ func (c *HostConfig) ReplicasForHost(hostIndex int) int {
 func (c *HostConfig) ClientsForHost(hostIndex int) int {
 	return unitsForHost(hostIndex, c.Clients, len(c.ClientHosts))
 }
-
-// ReplicaMap is a map from host to a list of replica options.
-type ReplicaMap map[string][]*orchestrationpb.ReplicaOpts
 
 // AssignReplicas assigns replicas to hosts.
 func (c *HostConfig) AssignReplicas(srcReplicaOpts *orchestrationpb.ReplicaOpts) ReplicaMap {
@@ -106,8 +134,6 @@ func (c *HostConfig) lookupByzStrategy(replicaID hotstuff.ID) string {
 	return ""
 }
 
-type ClientMap map[string][]hotstuff.ID
-
 // AssignClients assigns clients to hosts.
 func (c *HostConfig) AssignClients() ClientMap {
 	hostsToClients := make(ClientMap)
@@ -125,10 +151,19 @@ func (c *HostConfig) AssignClients() ClientMap {
 
 // IsLocal returns true if both the replica and client hosts slices
 // contain one instance of "localhost".
-func (c *HostConfig) IsLocal() bool {
+func (c *HostConfig) isLocal() bool {
 	if len(c.ClientHosts) > 1 || len(c.ReplicaHosts) > 1 {
 		return false
 	}
 	return c.ReplicaHosts[0] == "localhost" && c.ClientHosts[0] == "localhost" ||
 		c.ReplicaHosts[0] == "127.0.0.1" && c.ClientHosts[0] == "127.0.0.1"
+}
+
+// AllHosts returns the list of all hostnames, including replicas and clients.
+// If the configuration is set to run locally, the function returns an empty list.
+func (c *HostConfig) AllHosts() []string {
+	if c.isLocal() {
+		return []string{"localhost"}
+	}
+	return append(c.ReplicaHosts, c.ClientHosts...)
 }
