@@ -151,7 +151,7 @@ func (c *HostConfig) AssignClients() ClientMap {
 
 // IsLocal returns true if both the replica and client hosts slices
 // contain one instance of "localhost".
-func (c *HostConfig) isLocal() bool {
+func (c *HostConfig) IsLocal() bool {
 	if len(c.ClientHosts) > 1 || len(c.ReplicaHosts) > 1 {
 		return false
 	}
@@ -162,7 +162,7 @@ func (c *HostConfig) isLocal() bool {
 // AllHosts returns the list of all hostnames, including replicas and clients.
 // If the configuration is set to run locally, the function returns an empty list.
 func (c *HostConfig) AllHosts() []string {
-	if c.isLocal() {
+	if c.IsLocal() {
 		return []string{"localhost"}
 	}
 	return append(c.ReplicaHosts, c.ClientHosts...)

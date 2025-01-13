@@ -49,8 +49,9 @@ func NewExperiment(
 	workers map[string]RemoteWorker,
 	logger logging.Logger,
 ) (*Experiment, error) {
-	if len(cfg.ReplicaHosts)+len(cfg.ClientHosts) != len(workers) {
-		return nil, fmt.Errorf("number of workers %d does not match number of replica and client hosts: %d", len(workers), len(cfg.ReplicaHosts))
+	if !cfg.IsLocal() && len(cfg.ReplicaHosts)+len(cfg.ClientHosts) != len(workers) {
+		return nil, fmt.Errorf("number of workers %d does not match number of replica and client hosts: %d",
+			len(workers), len(cfg.ReplicaHosts)+len(cfg.ClientHosts))
 	}
 	for _, location := range cfg.Locations {
 		location, err := latency.ValidLocation(location)
@@ -147,6 +148,7 @@ func (e *Experiment) createReplicas(replicaMap config.ReplicaMap) (cfg *orchestr
 			}
 			opt.SetTreeOptions(e.hostCfg.BranchFactor, e.hostCfg.TreePositions)
 			req.Replicas[opt.ID] = opt
+			e.logger.Infof("replica %d assigned to host %s", opt.ID, host)
 		}
 
 		worker := e.workers[host]
@@ -264,6 +266,7 @@ func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration, cli
 			clientOpts := proto.Clone(e.clientOpts).(*orchestrationpb.ClientOpts)
 			clientOpts.ID = uint32(id)
 			req.Clients[uint32(id)] = clientOpts
+			e.logger.Infof("client %d assigned to host %s", id, host)
 		}
 		_, err := worker.StartClient(req)
 		if err != nil {

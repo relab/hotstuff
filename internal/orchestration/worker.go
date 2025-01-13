@@ -146,6 +146,7 @@ func (w *Worker) createReplicas(req *orchestrationpb.CreateReplicaRequest) (*orc
 
 func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Replica, error) {
 	w.metricsLogger.Log(opts)
+	logger := logging.New("hs" + strconv.Itoa(int(opts.GetID())))
 
 	// get private key and certificates
 	privKey, err := keygen.ParsePrivateKey(opts.GetPrivateKey())
@@ -170,9 +171,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
 	}
 
-	if opts.GetByzantineStrategy() != "" {
-		if byz, ok := modules.GetModule[byzantine.Byzantine](opts.GetByzantineStrategy()); ok {
+	strategy := opts.GetByzantineStrategy()
+	if strategy != "" {
+		if byz, ok := modules.GetModule[byzantine.Byzantine](strategy); ok {
 			consensusRules = byz.Wrap(consensusRules)
+			logger.Infof("assigned byzantine strategy: %s", strategy)
+
 		} else {
 			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
 		}
@@ -203,7 +207,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		sync,
 		w.metricsLogger,
 		blockchain.New(),
-		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
+		logger,
 	)
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
 	if w.measurementInterval > 0 {
