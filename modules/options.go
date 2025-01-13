@@ -30,36 +30,6 @@ func NewOption() OptionID {
 	return OptionID(atomic.AddUint64((*uint64)(&nextID), 1))
 }
 
-// TreeConfig stores the tree configuration
-type TreeConfig struct {
-	bf            uint32
-	treePos       []hotstuff.ID
-	treeWaitDelta time.Duration
-}
-
-// BranchFactor returns the branch factor of the tree.
-func (tc *TreeConfig) BranchFactor() uint32 {
-	return tc.bf
-}
-
-// TreePos returns the tree positions of the replicas.
-func (tc *TreeConfig) TreePos() []hotstuff.ID {
-	return tc.treePos
-}
-
-// TreeWaitDelta returns the time to wait for a tree node to be ready.
-func (tc *TreeConfig) TreeWaitDelta() time.Duration {
-	return tc.treeWaitDelta
-}
-
-func NewTreeConfig(bf uint32, treePos []hotstuff.ID, treeWaitDelta time.Duration) *TreeConfig {
-	return &TreeConfig{
-		bf:            bf,
-		treePos:       treePos,
-		treeWaitDelta: treeWaitDelta,
-	}
-}
-
 // Options stores runtime configuration settings.
 type Options struct {
 	mut     sync.Mutex
@@ -84,6 +54,28 @@ func (opts *Options) ensureSpace(id OptionID) {
 		copy(newOpts, opts.options)
 		opts.options = newOpts
 	}
+}
+
+// TreeConfig stores the tree configuration
+type TreeConfig struct {
+	bf            int
+	treePos       []hotstuff.ID
+	treeWaitDelta time.Duration
+}
+
+// BranchFactor returns the branch factor of the tree.
+func (tc *TreeConfig) BranchFactor() int {
+	return tc.bf
+}
+
+// TreePos returns the tree positions of the replicas.
+func (tc *TreeConfig) TreePos() []hotstuff.ID {
+	return tc.treePos
+}
+
+// TreeWaitDelta returns the time to wait for a tree node to be ready.
+func (tc *TreeConfig) TreeWaitDelta() time.Duration {
+	return tc.treeWaitDelta
 }
 
 // SetShouldUseTree sets the ShouldUseTree setting to true.
@@ -162,7 +154,7 @@ func (opts *Options) SetShouldVerifyVotesSync() {
 
 func (opts *Options) SetTreeConfig(bf uint32, treePos []hotstuff.ID, treeWaitDelta time.Duration) {
 	opts.treeConfig = &TreeConfig{
-		bf:            bf,
+		bf:            int(bf),
 		treePos:       treePos,
 		treeWaitDelta: treeWaitDelta,
 	}

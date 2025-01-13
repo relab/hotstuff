@@ -19,6 +19,7 @@ type treeLeader struct {
 func (t *treeLeader) InitModule(mods *modules.Core) {
 	mods.Get(&t.opts)
 }
+
 func NewTreeLeader() *treeLeader {
 	return &treeLeader{leader: 1}
 }
