@@ -4,6 +4,7 @@ package kauri
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/relab/gorums"
@@ -62,9 +63,9 @@ func (k *Kauri) InitModule(mods *modules.Core) {
 		&k.synchronizer,
 	)
 	k.opts.SetShouldUseTree()
-	k.eventLoop.RegisterObserver(backend.ConnectedEvent{}, func(_ any) {
+	k.eventLoop.RegisterHandler(backend.ConnectedEvent{}, func(_ any) {
 		k.postInit()
-	})
+	}, eventloop.Prioritize())
 	k.eventLoop.RegisterHandler(ContributionRecvEvent{}, func(event any) {
 		k.OnContributionRecv(event.(ContributionRecvEvent))
 	})
@@ -72,7 +73,7 @@ func (k *Kauri) InitModule(mods *modules.Core) {
 
 func (k *Kauri) postInit() {
 	k.logger.Info("Kauri: Initializing")
-	kauripb.RegisterKauriServer(k.server.GetGorumsServer(), serviceImpl{k})
+	kauripb.RegisterKauriServer(k.server.GetGorumsServer(), serviceImpl{k.eventLoop})
 	k.initializeConfiguration()
 }
 
@@ -106,10 +107,8 @@ func (k *Kauri) reset() {
 	k.aggSent = false
 }
 
-func (k *Kauri) WaitToAggregate(t time.Duration, view hotstuff.View) {
-	ticker := time.NewTicker(t)
-	<-ticker.C
-	ticker.Stop()
+func (k *Kauri) WaitToAggregate(waitTime time.Duration, view hotstuff.View) {
+	time.Sleep(waitTime)
 	if k.currentView != view {
 		return
 	}
@@ -119,16 +118,16 @@ func (k *Kauri) WaitToAggregate(t time.Duration, view hotstuff.View) {
 	}
 }
 
-// SendProposalToChildren sends the proposal to the children
+// SendProposalToChildren sends the proposal to the children.
 func (k *Kauri) SendProposalToChildren(p hotstuff.ProposeMsg) {
 	children := k.tree.ReplicaChildren()
 	if len(children) != 0 {
 		config, err := k.configuration.SubConfig(children)
 		if err != nil {
-			k.logger.Error("Unable to send the proposal to children", err)
+			k.logger.Errorf("Unable to send the proposal to children: %v", err)
 			return
 		}
-		k.logger.Debug("sending proposal to children ", children)
+		k.logger.Debug("Sending proposal to children ", children)
 		config.Propose(p)
 		waitTime := time.Duration(k.tree.TreeHeight()) * k.treeConfig.TreeWaitDelta()
 		go k.WaitToAggregate(waitTime, k.currentView)
@@ -144,11 +143,11 @@ func (k *Kauri) OnContributionRecv(event ContributionRecvEvent) {
 		return
 	}
 	contribution := event.Contribution
-	k.logger.Debug("processing the contribution from ", contribution.ID)
+	k.logger.Debugf("Processing the contribution from %d", contribution.ID)
 	currentSignature := hotstuffpb.QuorumSignatureFromProto(contribution.Signature)
-	_, err := k.mergeWithContribution(currentSignature)
+	err := k.mergeContribution(currentSignature)
 	if err != nil {
-		k.logger.Debug("Unable to merge the contribution from ", contribution.ID)
+		k.logger.Errorf("Failed to merge contribution from %d: %v", contribution.ID, err)
 		return
 	}
 	k.senders = append(k.senders, hotstuff.ID(contribution.ID))
@@ -174,11 +173,11 @@ func (k *Kauri) SendContributionToParent() {
 }
 
 type serviceImpl struct {
-	k *Kauri
+	eventLoop *eventloop.EventLoop
 }
 
 func (i serviceImpl) SendContribution(_ gorums.ServerCtx, request *kauripb.Contribution) {
-	i.k.eventLoop.AddEvent(ContributionRecvEvent{Contribution: request})
+	i.eventLoop.AddEvent(ContributionRecvEvent{Contribution: request})
 }
 
 // ContributionRecvEvent is raised when a contribution is received.
@@ -186,72 +185,55 @@ type ContributionRecvEvent struct {
 	Contribution *kauripb.Contribution
 }
 
-func (k *Kauri) canMergeContributions(a, b hotstuff.QuorumSignature) bool {
-	canMerge := true
+// canMergeContributions returns nil if the contributions are non-overlapping.
+func canMergeContributions(a, b hotstuff.QuorumSignature) error {
 	if a == nil || b == nil {
-		k.logger.Info("one of it is nil")
-		return false
+		return errors.New("cannot merge nil contributions")
 	}
+	canMerge := true
 	a.Participants().RangeWhile(func(i hotstuff.ID) bool {
-		b.Participants().RangeWhile(func(j hotstuff.ID) bool {
-			// cannot merge a and b if they both contain a contribution from the same ID.
-			if i == j {
-				canMerge = false
-			}
-			return canMerge
-		})
-		return canMerge
+		// cannot merge a and b if both contain a contribution from the same ID.
+		canMerge := !b.Participants().Contains(i)
+		return canMerge // exit the range-while loop if canMerge is false
 	})
-	return canMerge
-}
-
-func (k *Kauri) verifyContribution(signature hotstuff.QuorumSignature, hash hotstuff.Hash) bool {
-	verified := false
-	block, ok := k.blockChain.Get(hash)
-	if !ok {
-		k.logger.Info("failed to fetch the block ", hash)
-		return verified
+	if !canMerge {
+		return errors.New("cannot merge overlapping contributions")
 	}
-	verified = k.crypto.Verify(signature, block.ToBytes())
-	return verified
+	return nil
 }
 
-func (k *Kauri) mergeWithContribution(currentSignature hotstuff.QuorumSignature) (bool, error) {
-	isVerified := k.verifyContribution(currentSignature, k.blockHash)
-	if !isVerified {
-		k.logger.Info("Contribution verification failed for view ", k.currentView,
-			"from participants", currentSignature.Participants(), " block hash ", k.blockHash)
-		return false, errors.New("unable to verify the contribution")
+func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) error {
+	block, ok := k.blockChain.Get(k.blockHash)
+	if !ok {
+		return fmt.Errorf("failed to fetch block %v", k.blockHash)
+	}
+	if !k.crypto.Verify(currentSignature, block.ToBytes()) {
+		return fmt.Errorf("cannot verify contribution for view %d from participants %v", k.currentView, currentSignature.Participants())
 	}
 	if k.aggContrib == nil {
+		// first contribution
 		k.aggContrib = currentSignature
-		return false, nil
+		return nil
 	}
-
-	if k.canMergeContributions(currentSignature, k.aggContrib) {
-		new, err := k.crypto.Combine(currentSignature, k.aggContrib)
-		if err == nil {
-			k.aggContrib = new
-			if new.Participants().Len() >= k.configuration.QuorumSize() {
-				k.logger.Debug("Aggregated Complete QC and sending the event")
-				k.eventLoop.AddEvent(hotstuff.NewViewMsg{
-					SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(
-						k.aggContrib,
-						k.currentView,
-						k.blockHash,
-					)),
-				})
-				return true, nil
-			}
-		} else {
-			k.logger.Info("Failed to combine signatures: %v", err)
-			return false, errors.New("unable to combine signature")
-		}
-	} else {
-		k.logger.Debug("Failed to merge signatures due to overlap of signatures.")
-		return false, errors.New("unable to merge signature")
+	if err := canMergeContributions(currentSignature, k.aggContrib); err != nil {
+		return err
 	}
-	return false, nil
+	combSignature, err := k.crypto.Combine(currentSignature, k.aggContrib)
+	if err != nil {
+		return fmt.Errorf("failed to combine signatures: %v", err)
+	}
+	k.aggContrib = combSignature
+	if combSignature.Participants().Len() >= k.configuration.QuorumSize() {
+		k.logger.Debug("Aggregated Complete QC and sending the event")
+		k.eventLoop.AddEvent(hotstuff.NewViewMsg{
+			SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(
+				k.aggContrib,
+				k.currentView,
+				k.blockHash,
+			)),
+		})
+	} // else, wait for more contributions
+	return nil
 }
 
 func isSubSet(a, b []hotstuff.ID) bool {
