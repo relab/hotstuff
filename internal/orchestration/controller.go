@@ -49,8 +49,8 @@ func NewExperiment(
 	workers map[string]RemoteWorker,
 	logger logging.Logger,
 ) (*Experiment, error) {
-	if len(cfg.ReplicaHosts) != len(workers) {
-		return nil, fmt.Errorf("number of workers %d does not match number of replica hosts: %d", len(workers), len(cfg.ReplicaHosts))
+	if len(cfg.ReplicaHosts)+len(cfg.ClientHosts) != len(workers) {
+		return nil, fmt.Errorf("number of workers %d does not match number of replica and client hosts: %d", len(workers), len(cfg.ReplicaHosts))
 	}
 	for _, location := range cfg.Locations {
 		location, err := latency.ValidLocation(location)
