@@ -32,13 +32,13 @@ func NewOption() OptionID {
 
 // TreeConfig stores the tree configuration
 type TreeConfig struct {
-	bf            int
+	bf            uint32
 	treePos       []hotstuff.ID
 	treeWaitDelta time.Duration
 }
 
 // BranchFactor returns the branch factor of the tree.
-func (tc *TreeConfig) BranchFactor() int {
+func (tc *TreeConfig) BranchFactor() uint32 {
 	return tc.bf
 }
 
@@ -52,7 +52,7 @@ func (tc *TreeConfig) TreeWaitDelta() time.Duration {
 	return tc.treeWaitDelta
 }
 
-func NewTreeConfig(bf int, treePos []hotstuff.ID, treeWaitDelta time.Duration) *TreeConfig {
+func NewTreeConfig(bf uint32, treePos []hotstuff.ID, treeWaitDelta time.Duration) *TreeConfig {
 	return &TreeConfig{
 		bf:            bf,
 		treePos:       treePos,
@@ -160,7 +160,7 @@ func (opts *Options) SetShouldVerifyVotesSync() {
 	opts.shouldVerifyVotesSync = true
 }
 
-func (opts *Options) SetTreeConfig(bf int, treePos []hotstuff.ID, treeWaitDelta time.Duration) {
+func (opts *Options) SetTreeConfig(bf uint32, treePos []hotstuff.ID, treeWaitDelta time.Duration) {
 	opts.treeConfig = &TreeConfig{
 		bf:            bf,
 		treePos:       treePos,

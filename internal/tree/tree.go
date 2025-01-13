@@ -183,12 +183,3 @@ func DefaultTreePosUint32(size int) []uint32 {
 	}
 	return ids
 }
-
-// ConvertUintHotstuffID converts a slice of uint32 to a slice of hotstuff.ID.
-func ConvertUintHotstuffID(ids []uint32) []hotstuff.ID {
-	hotstuffIDs := make([]hotstuff.ID, len(ids))
-	for i, id := range ids {
-		hotstuffIDs[i] = hotstuff.ID(id)
-	}
-	return hotstuffIDs
-}

@@ -3,6 +3,7 @@ package orchestrationpb
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/relab/hotstuff"
 	"google.golang.org/protobuf/proto"
@@ -15,6 +16,20 @@ func (x *ReplicaOpts) New(replicaID hotstuff.ID, locations []string) *ReplicaOpt
 	replicaOpts.ID = uint32(replicaID)
 	replicaOpts.Locations = locations
 	return replicaOpts
+}
+
+// TreePositionIDs returns the tree positions as a slice of hotstuff.ID.
+func (x *ReplicaOpts) TreePositionIDs() []hotstuff.ID {
+	ids := make([]hotstuff.ID, len(x.GetTreePositions()))
+	for i, id := range x.GetTreePositions() {
+		ids[i] = hotstuff.ID(id)
+	}
+	return ids
+}
+
+// TreeDeltaDuration returns the tree delta as a time.Duration.
+func (x *ReplicaOpts) TreeDeltaDuration() time.Duration {
+	return x.GetTreeDelta().AsDuration()
 }
 
 func (x *ReplicaOpts) SetTreePositions(positions []uint32) {

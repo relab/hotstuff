@@ -22,7 +22,6 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
-	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
@@ -207,10 +206,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
+	builder.Options().SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
 
-	builder.Options().SetTreeConfig(int(opts.GetBranchFactor()),
-		tree.ConvertUintHotstuffID(opts.GetTreePositions()),
-		opts.GetTreeDelta().AsDuration())
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
 		builder.Add(replicaMetrics...)
