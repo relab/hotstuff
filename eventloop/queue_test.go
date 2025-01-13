@@ -3,7 +3,7 @@ package eventloop
 import "testing"
 
 func TestPopEmptyQueue(t *testing.T) {
-	q := newQueue(1)
+	q := newRingBuffer(1)
 	elem, ok := q.pop()
 	if elem != nil || ok {
 		t.Error("expected q.pop() to return nil, false")
@@ -11,7 +11,7 @@ func TestPopEmptyQueue(t *testing.T) {
 }
 
 func TestEmptyLen(t *testing.T) {
-	q := newQueue(1)
+	q := newRingBuffer(1)
 
 	if q.len() != 0 {
 		t.Error("expected q.len() to return 0")
@@ -19,7 +19,7 @@ func TestEmptyLen(t *testing.T) {
 }
 
 func TestPushAndPopWithCapacity1(t *testing.T) {
-	q := newQueue(1)
+	q := newRingBuffer(1)
 	q.push("hello")
 
 	elem, ok := q.pop()
@@ -30,7 +30,7 @@ func TestPushAndPopWithCapacity1(t *testing.T) {
 }
 
 func TestPushAndThenLen(t *testing.T) {
-	q := newQueue(1)
+	q := newRingBuffer(1)
 	q.push("hello")
 
 	if q.len() != 1 {
@@ -39,7 +39,7 @@ func TestPushAndThenLen(t *testing.T) {
 }
 
 func TestPushAndThenPopTwice(t *testing.T) {
-	q := newQueue(1)
+	q := newRingBuffer(1)
 	q.push("hello")
 
 	elem, ok := q.pop()
@@ -54,7 +54,7 @@ func TestPushAndThenPopTwice(t *testing.T) {
 }
 
 func TestPushWhenFull(t *testing.T) {
-	q := newQueue(1)
+	q := newRingBuffer(1)
 	q.push("hello")
 	q.push("world")
 
@@ -65,7 +65,7 @@ func TestPushWhenFull(t *testing.T) {
 }
 
 func TestPushMultiple(t *testing.T) {
-	q := newQueue(2)
+	q := newRingBuffer(2)
 	q.push("hello")
 	q.push("world")
 
@@ -81,7 +81,7 @@ func TestPushMultiple(t *testing.T) {
 }
 
 func TestLenWhenTailInFrontOfHead(t *testing.T) {
-	q := newQueue(2)
+	q := newRingBuffer(2)
 
 	q.push("hello")
 	q.push("world")
@@ -94,7 +94,7 @@ func TestLenWhenTailInFrontOfHead(t *testing.T) {
 }
 
 func TestPopWhenTailInFrontOfHead(t *testing.T) {
-	q := newQueue(2)
+	q := newRingBuffer(2)
 
 	q.push("hello")
 	q.push("world")

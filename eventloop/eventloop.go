@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/util/gpool"
 )
 
@@ -51,6 +53,8 @@ type handler struct {
 
 // EventLoop accepts events of any type and executes registered event handlers.
 type EventLoop struct {
+	logger logging.Logger
+
 	eventQ         chan any
 	isEventQClosed bool
 
@@ -77,6 +81,10 @@ func New(bufferSize uint) *EventLoop {
 		tickers:        make(map[int]*ticker),
 	}
 	return el
+}
+
+func (el *EventLoop) InitModule(mods *modules.Core) {
+	mods.Get(&el.logger)
 }
 
 // RegisterObserver registers a handler with priority.
@@ -143,6 +151,9 @@ func (el *EventLoop) AddEvent(event any) {
 	if event != nil && !el.isEventQClosed {
 		// run handlers with runInAddEvent option
 		el.processEvent(event, true)
+		if el.logger != nil && len(el.eventQ) == cap(el.eventQ) {
+			el.logger.Warnf("event queue full")
+		}
 		el.eventQ <- event
 	}
 }

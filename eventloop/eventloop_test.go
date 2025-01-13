@@ -160,6 +160,49 @@ func TestDelayedEvent(t *testing.T) {
 	}
 }
 
+func BenchmarkEventLoopQueueStressTest(b *testing.B) {
+	type testEvent struct {
+		id int
+	}
+
+	testCount := 100
+	bufferSize := uint(10)
+
+	for range b.N {
+		testData := make([]testEvent, testCount)
+		testedEvents := make([]bool, testCount)
+		testedEventCount := 0
+		for i := range testCount {
+			testData[i] = testEvent{id: i}
+			testedEvents[i] = false
+		}
+
+		el := eventloop.New(bufferSize)
+		el.RegisterHandler(testEvent{}, func(event any) {
+			if !testedEvents[event.(*testEvent).id] {
+				testedEvents[event.(*testEvent).id] = true
+				testedEventCount++
+			}
+		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		testEventIdx := 0
+		go el.Run(ctx)
+
+		for testEventIdx < testCount {
+			event := &testData[testEventIdx]
+			el.AddEvent(event)
+			testEventIdx++
+		}
+
+		cancel()
+		// if testedEventCount != testCount {
+		// 	fmt.Printf("want: %d, got: %d\n", testCount, testedEventCount)
+		// 	b.Fail()
+		// }
+	}
+}
+
 func BenchmarkEventLoopWithObservers(b *testing.B) {
 	el := eventloop.New(100)
 
