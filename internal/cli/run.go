@@ -108,7 +108,6 @@ func runController() {
 	}
 
 	intTreePos := viper.GetIntSlice("tree-pos")
-	randomTree := viper.GetBool("random-tree")
 	var treePos []uint32
 	if len(intTreePos) == 0 {
 		treePos = tree.DefaultTreePosUint32(viper.GetInt("replicas"))
@@ -118,7 +117,7 @@ func runController() {
 			treePos[i] = uint32(pos)
 		}
 	}
-	if randomTree {
+	if viper.GetBool("random-tree") {
 		rnd := rand.New(rand.NewSource(rand.Uint64()))
 		rnd.Shuffle(len(treePos), reflect.Swapper(treePos))
 	}
