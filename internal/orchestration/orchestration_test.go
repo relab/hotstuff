@@ -3,10 +3,12 @@ package orchestration_test
 import (
 	"io"
 	"math"
+	"math/rand"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -16,13 +18,15 @@ import (
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/iago/iagotest"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
-func makeReplicaOpts(consensusImpl string, crypto string, mods []string, byzantine string) *orchestrationpb.ReplicaOpts {
+// makeReplicaOpts creates a new ReplicaOpts with the given parameters.
+func makeReplicaOpts(consensusImpl, crypto, byzantine string, mods []string) *orchestrationpb.ReplicaOpts {
 	return &orchestrationpb.ReplicaOpts{
 		BatchSize:         100,
 		ConnectTimeout:    durationpb.New(time.Second),
@@ -37,10 +41,11 @@ func makeReplicaOpts(consensusImpl string, crypto string, mods []string, byzanti
 	}
 }
 
-func makeTreeReplicaOpts(consensusImpl string, crypto string, mods []string, replicas int, bf int) *orchestrationpb.ReplicaOpts {
-	treePos := make([]uint32, replicas)
-	for i := range treePos {
-		treePos[i] = uint32(i + 1)
+func makeTreeReplicaOpts(consensusImpl, crypto string, mods []string, replicas, bf int, random bool) *orchestrationpb.ReplicaOpts {
+	treePos := tree.DefaultTreePosUint32(replicas)
+	if random {
+		rnd := rand.New(rand.NewSource(int64(rand.Uint64())))
+		rnd.Shuffle(len(treePos), reflect.Swapper(treePos))
 	}
 	return &orchestrationpb.ReplicaOpts{
 		BatchSize:         100,
@@ -52,14 +57,14 @@ func makeTreeReplicaOpts(consensusImpl string, crypto string, mods []string, rep
 		Crypto:            crypto,
 		LeaderRotation:    "tree-leader",
 		Modules:           mods,
-		ByzantineStrategy: "", // currently kauri does not support byzantine replicas
+		ByzantineStrategy: "", // TODO currently kauri does not support byzantine replicas
 		BranchFactor:      int32(bf),
 		TreePositions:     treePos,
 		TreeDelta:         durationpb.New(30 * time.Millisecond),
 	}
 }
 
-func getDefaultClientOpts() *orchestrationpb.ClientOpts {
+func makeClientOpts() *orchestrationpb.ClientOpts {
 	return &orchestrationpb.ClientOpts{
 		ConnectTimeout: durationpb.New(time.Second),
 		MaxConcurrent:  250,
@@ -81,7 +86,7 @@ func TestOrchestration(t *testing.T) {
 			Logger:      logging.New("ctrl"),
 			NumReplicas: 7,
 			NumClients:  2,
-			ClientOpts:  getDefaultClientOpts(),
+			ClientOpts:  makeClientOpts(),
 			ReplicaOpts: replicaOpts,
 			Duration:    5 * time.Second,
 			Hosts:       map[string]orchestration.RemoteWorker{"127.0.0.1": workerProxy},
@@ -103,37 +108,41 @@ func TestOrchestration(t *testing.T) {
 		}
 	}
 
-	replicaOpts := makeReplicaOpts("chainedhotstuff", "ecdsa", nil, "")
+	replicaOpts := makeReplicaOpts("chainedhotstuff", "ecdsa", "", nil)
 	t.Run("ChainedHotStuff+ECDSA", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("chainedhotstuff", "eddsa", nil, "")
+	replicaOpts = makeReplicaOpts("chainedhotstuff", "eddsa", "", nil)
 	t.Run("ChainedHotStuff+EDDSA", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("chainedhotstuff", "bls12", nil, "")
+	replicaOpts = makeReplicaOpts("chainedhotstuff", "bls12", "", nil)
 	t.Run("ChainedHotStuff+BLS12", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("fasthotstuff", "ecdsa", nil, "")
+	replicaOpts = makeReplicaOpts("fasthotstuff", "ecdsa", "", nil)
 	t.Run("Fast-HotStuff+ECDSA", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("fasthotstuff", "eddsa", nil, "")
+	replicaOpts = makeReplicaOpts("fasthotstuff", "eddsa", "", nil)
 	t.Run("Fast-HotStuff+EDDSA", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("fasthotstuff", "bls12", nil, "")
+	replicaOpts = makeReplicaOpts("fasthotstuff", "bls12", "", nil)
 	t.Run("Fast-HotStuff+BLS12", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("simplehotstuff", "ecdsa", nil, "")
+	replicaOpts = makeReplicaOpts("simplehotstuff", "ecdsa", "", nil)
 	t.Run("Simple-HotStuff+ECDSA", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("simplehotstuff", "eddsa", nil, "")
+	replicaOpts = makeReplicaOpts("simplehotstuff", "eddsa", "", nil)
 	t.Run("Simple-HotStuff+EDDSA", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("simplehotstuff", "bls12", nil, "")
+	replicaOpts = makeReplicaOpts("simplehotstuff", "bls12", "", nil)
 	t.Run("Simple-HotStuff+BLS12", func(t *testing.T) { run(t, replicaOpts) })
 
 	// byzantine
-	replicaOpts = makeReplicaOpts("chainedhotstuff", "ecdsa", nil, "fork:1")
+	replicaOpts = makeReplicaOpts("chainedhotstuff", "ecdsa", "fork:1", nil)
 	t.Run("ChainedHotStuff+Fork", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("chainedhotstuff", "ecdsa", nil, "silence:1")
+	replicaOpts = makeReplicaOpts("chainedhotstuff", "ecdsa", "silence:1", nil)
 	t.Run("ChainedHotStuff+Silence", func(t *testing.T) { run(t, replicaOpts) })
 
 	// kauri
 	mods := []string{"kauri"}
-	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "ecdsa", mods, 7, 2)
-	t.Run("ChainedHotStuff+ECDSA+Kauri", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "bls12", mods, 7, 2)
-	t.Run("ChainedHotStuff+BLS12+Kauri", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "ecdsa", mods, 7, 2, false)
+	t.Run("ChainedHotStuff+ECDSA+Kauri+DefaultTree", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "bls12", mods, 7, 2, false)
+	t.Run("ChainedHotStuff+BLS12+Kauri+DefaultTree", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "ecdsa", mods, 7, 2, true)
+	t.Run("ChainedHotStuff+ECDSA+Kauri+RandomTree", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "bls12", mods, 7, 2, true)
+	t.Run("ChainedHotStuff+BLS12+Kauri+RandomTree", func(t *testing.T) { run(t, replicaOpts) })
 }
 
 func TestDeployment(t *testing.T) {

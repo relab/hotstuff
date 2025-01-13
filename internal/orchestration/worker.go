@@ -22,6 +22,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
@@ -208,7 +209,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
 
 	builder.Options().SetTreeConfig(int(opts.GetBranchFactor()),
-		convertUintHotstuffID(opts.GetTreePositions()),
+		tree.ConvertUintHotstuffID(opts.GetTreePositions()),
 		opts.GetTreeDelta().AsDuration())
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
@@ -236,14 +237,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		},
 	}
 	return replica.New(c, builder), nil
-}
-
-func convertUintHotstuffID(ids []uint32) []hotstuff.ID {
-	hotstuffIDs := make([]hotstuff.ID, len(ids))
-	for i, id := range ids {
-		hotstuffIDs[i] = hotstuff.ID(id)
-	}
-	return hotstuffIDs
 }
 
 func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {

@@ -1,14 +1,12 @@
 syntax = "proto3";
 
 package kauripb;
+option go_package = "github.com/relab/hotstuff/internal/proto/kauripb";
 
 import "gorums.proto";
-
 import "google/protobuf/empty.proto";
-
 import "hotstuffpb/hotstuff.proto";
 
-option go_package = "github.com/relab/hotstuff/internal/proto/kauripb";
 
 service Kauri {
   rpc SendContribution(Contribution) returns (google.protobuf.Empty) {

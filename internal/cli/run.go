@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -18,11 +19,13 @@ import (
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/iago"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/rand"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -86,19 +89,12 @@ func init() {
 	runCmd.Flags().Int("bf", 2, "branch factor of the tree")
 	runCmd.Flags().IntSlice("tree-pos", []int{}, "tree positions of the replicas")
 	runCmd.Flags().Duration("tree-delta", 30*time.Millisecond, "waiting time for intermediate nodes in the tree")
+	runCmd.Flags().Bool("random-tree", false, "randomize tree positions, tree-pos is ignored if set")
 
 	err := viper.BindPFlags(runCmd.Flags())
 	if err != nil {
 		panic(err)
 	}
-}
-
-func defaultTreePos(numReplicas int) []uint32 {
-	treePos := make([]uint32, numReplicas)
-	for i := range treePos {
-		treePos[i] = uint32(i + 1)
-	}
-	return treePos
 }
 
 func runController() {
@@ -112,14 +108,19 @@ func runController() {
 	}
 
 	intTreePos := viper.GetIntSlice("tree-pos")
+	randomTree := viper.GetBool("random-tree")
 	var treePos []uint32
 	if len(intTreePos) == 0 {
-		treePos = defaultTreePos(viper.GetInt("replicas"))
+		treePos = tree.DefaultTreePosUint32(viper.GetInt("replicas"))
 	} else {
 		treePos = make([]uint32, len(intTreePos))
 		for i, pos := range intTreePos {
 			treePos[i] = uint32(pos)
 		}
+	}
+	if randomTree {
+		rnd := rand.New(rand.NewSource(rand.Uint64()))
+		rnd.Shuffle(len(treePos), reflect.Swapper(treePos))
 	}
 	experiment := orchestration.Experiment{
 		Logger:      logging.New("ctrl"),

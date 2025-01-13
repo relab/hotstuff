@@ -3,11 +3,7 @@ package kauri
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
-	"math/rand"
-	"reflect"
-	"sort"
 	"time"
 
 	"github.com/relab/gorums"
@@ -27,24 +23,24 @@ func init() {
 
 // Kauri structure contains the modules for kauri protocol implementation.
 type Kauri struct {
-	configuration          *backend.Config
-	server                 *backend.Server
-	blockChain             modules.BlockChain
-	crypto                 modules.Crypto
-	eventLoop              *eventloop.EventLoop
-	logger                 logging.Logger
-	opts                   *modules.Options
-	synchronizer           modules.Synchronizer
-	leaderRotation         modules.LeaderRotation
-	tree                   tree.Tree
-	treeConfig             *modules.TreeConfig
-	initDone               bool
-	aggregatedContribution hotstuff.QuorumSignature
-	blockHash              hotstuff.Hash
-	currentView            hotstuff.View
-	senders                []hotstuff.ID
-	nodes                  map[hotstuff.ID]*kauripb.Node
-	isAggregationSent      bool
+	blockChain     modules.BlockChain
+	crypto         modules.Crypto
+	synchronizer   modules.Synchronizer
+	leaderRotation modules.LeaderRotation
+	treeConfig     *modules.TreeConfig
+	opts           *modules.Options
+	eventLoop      *eventloop.EventLoop
+	configuration  *backend.Config
+	server         *backend.Server
+	logger         logging.Logger
+	nodes          map[hotstuff.ID]*kauripb.Node
+	tree           tree.Tree
+	initDone       bool
+	aggContrib     hotstuff.QuorumSignature
+	blockHash      hotstuff.Hash
+	currentView    hotstuff.View
+	senders        []hotstuff.ID
+	aggSent        bool
 }
 
 // New initializes the kauri structure
@@ -75,7 +71,7 @@ func (k *Kauri) InitModule(mods *modules.Core) {
 }
 
 func (k *Kauri) postInit() {
-	k.logger.Info("Kuari: Initializing")
+	k.logger.Info("Kauri: Initializing")
 	kauripb.RegisterKauriServer(k.server.GetGorumsServer(), serviceImpl{k})
 	k.initializeConfiguration()
 }
@@ -100,14 +96,14 @@ func (k *Kauri) Begin(pc hotstuff.PartialCert, p hotstuff.ProposeMsg) {
 	k.reset()
 	k.blockHash = pc.BlockHash()
 	k.currentView = p.Block.View()
-	k.aggregatedContribution = pc.Signature()
+	k.aggContrib = pc.Signature()
 	k.SendProposalToChildren(p)
 }
 
 func (k *Kauri) reset() {
-	k.aggregatedContribution = nil
+	k.aggContrib = nil
 	k.senders = make([]hotstuff.ID, 0)
-	k.isAggregationSent = false
+	k.aggSent = false
 }
 
 func (k *Kauri) WaitToAggregate(t time.Duration, view hotstuff.View) {
@@ -117,7 +113,7 @@ func (k *Kauri) WaitToAggregate(t time.Duration, view hotstuff.View) {
 	if k.currentView != view {
 		return
 	}
-	if !k.isAggregationSent {
+	if !k.aggSent {
 		k.SendContributionToParent()
 		k.reset()
 	}
@@ -138,7 +134,7 @@ func (k *Kauri) SendProposalToChildren(p hotstuff.ProposeMsg) {
 		go k.WaitToAggregate(waitTime, k.currentView)
 	} else {
 		k.SendContributionToParent()
-		k.isAggregationSent = true
+		k.aggSent = true
 	}
 }
 
@@ -158,7 +154,7 @@ func (k *Kauri) OnContributionRecv(event ContributionRecvEvent) {
 	k.senders = append(k.senders, hotstuff.ID(contribution.ID))
 	if isSubSet(k.tree.SubTree(), k.senders) {
 		k.SendContributionToParent()
-		k.isAggregationSent = true
+		k.aggSent = true
 	}
 }
 
@@ -170,7 +166,7 @@ func (k *Kauri) SendContributionToParent() {
 		if isPresent {
 			node.SendContribution(context.Background(), &kauripb.Contribution{
 				ID:        uint32(k.opts.ID()),
-				Signature: hotstuffpb.QuorumSignatureToProto(k.aggregatedContribution),
+				Signature: hotstuffpb.QuorumSignatureToProto(k.aggContrib),
 				View:      uint64(k.currentView),
 			})
 		}
@@ -181,7 +177,7 @@ type serviceImpl struct {
 	k *Kauri
 }
 
-func (i serviceImpl) SendContribution(ctx gorums.ServerCtx, request *kauripb.Contribution) {
+func (i serviceImpl) SendContribution(_ gorums.ServerCtx, request *kauripb.Contribution) {
 	i.k.eventLoop.AddEvent(ContributionRecvEvent{Contribution: request})
 }
 
@@ -227,20 +223,20 @@ func (k *Kauri) mergeWithContribution(currentSignature hotstuff.QuorumSignature)
 			"from participants", currentSignature.Participants(), " block hash ", k.blockHash)
 		return false, errors.New("unable to verify the contribution")
 	}
-	if k.aggregatedContribution == nil {
-		k.aggregatedContribution = currentSignature
+	if k.aggContrib == nil {
+		k.aggContrib = currentSignature
 		return false, nil
 	}
 
-	if k.canMergeContributions(currentSignature, k.aggregatedContribution) {
-		new, err := k.crypto.Combine(currentSignature, k.aggregatedContribution)
+	if k.canMergeContributions(currentSignature, k.aggContrib) {
+		new, err := k.crypto.Combine(currentSignature, k.aggContrib)
 		if err == nil {
-			k.aggregatedContribution = new
+			k.aggContrib = new
 			if new.Participants().Len() >= k.configuration.QuorumSize() {
 				k.logger.Debug("Aggregated Complete QC and sending the event")
 				k.eventLoop.AddEvent(hotstuff.NewViewMsg{
 					SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(
-						k.aggregatedContribution,
+						k.aggContrib,
 						k.currentView,
 						k.blockHash,
 					)),
@@ -269,33 +265,4 @@ func isSubSet(a, b []hotstuff.ID) bool {
 		}
 	}
 	return true
-}
-
-func (k *Kauri) randomizeIDS(hash hotstuff.Hash, leaderID hotstuff.ID) map[hotstuff.ID]int {
-	//assign leader to the root of the tree.
-
-	totalNodes := k.configuration.Len()
-	ids := make([]hotstuff.ID, 0, totalNodes)
-	for id := range k.configuration.Replicas() {
-		ids = append(ids, id)
-	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-	seed := k.opts.SharedRandomSeed() + int64(binary.LittleEndian.Uint64(hash[:]))
-	//Shuffle the list of IDs using the shared random seed + the first 8 bytes of the hash.
-	rnd := rand.New(rand.NewSource(seed))
-	rnd.Shuffle(len(ids), reflect.Swapper(ids))
-	lIndex := 0
-	for index, id := range ids {
-		if id == leaderID {
-			lIndex = index
-		}
-	}
-	currentRoot := ids[0]
-	ids[0] = ids[lIndex]
-	ids[lIndex] = currentRoot
-	posMapping := make(map[hotstuff.ID]int)
-	for index, ID := range ids {
-		posMapping[ID] = index
-	}
-	return posMapping
 }
