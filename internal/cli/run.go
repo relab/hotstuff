@@ -142,7 +142,7 @@ func runController() {
 			SharedSeed:        viper.GetInt64("shared-seed"),
 			Modules:           viper.GetStringSlice("modules"),
 			TreePositions:     treePos,
-			BranchFactor:      viper.GetInt32("bf"),
+			BranchFactor:      viper.GetUint32("bf"),
 			TreeDelta:         durationpb.New(viper.GetDuration("tree-delta")),
 		},
 		ClientOpts: &orchestrationpb.ClientOpts{

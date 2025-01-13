@@ -58,7 +58,7 @@ func makeTreeReplicaOpts(consensusImpl, crypto string, mods []string, replicas, 
 		LeaderRotation:    "tree-leader",
 		Modules:           mods,
 		ByzantineStrategy: "", // TODO currently kauri does not support byzantine replicas
-		BranchFactor:      int32(bf),
+		BranchFactor:      uint32(bf),
 		TreePositions:     treePos,
 		TreeDelta:         durationpb.New(30 * time.Millisecond),
 	}
