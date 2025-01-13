@@ -11,10 +11,10 @@ import (
 type ReplicaMap map[string][]*orchestrationpb.ReplicaOpts
 
 // ReplicaIDs converts the an entry map from []hotstuff.ID to []uint32.
-func (r ReplicaMap) ReplicaIDs(host string) hotstuff.IDSlice {
-	ids := make([]hotstuff.ID, 0, len(r[host]))
+func (r ReplicaMap) ReplicaIDs(host string) []uint32 {
+	ids := make([]uint32, 0, len(r[host]))
 	for _, opts := range r[host] {
-		ids = append(ids, hotstuff.ID(opts.ID))
+		ids = append(ids, opts.ID)
 	}
 	return ids
 }
@@ -22,8 +22,12 @@ func (r ReplicaMap) ReplicaIDs(host string) hotstuff.IDSlice {
 type ClientMap map[string][]hotstuff.ID
 
 // ClientIDs converts the an entry map from []hotstuff.ID to []uint32.
-func (c ClientMap) ClientIDs(host string) hotstuff.IDSlice {
-	return c[host]
+func (c ClientMap) ClientIDs(host string) []uint32 {
+	ids := make([]uint32, 0, len(c[host]))
+	for _, id := range c[host] {
+		ids = append(ids, uint32(id))
+	}
+	return ids
 }
 
 // HostConfig holds the configuration for an experiment.
@@ -159,7 +163,7 @@ func (c *HostConfig) isLocal() bool {
 // If the configuration is set to run locally, the function returns an empty list.
 func (c *HostConfig) AllHosts() []string {
 	if c.isLocal() {
-		return []string{}
+		return []string{"localhost"}
 	}
 	return append(c.ReplicaHosts, c.ClientHosts...)
 }

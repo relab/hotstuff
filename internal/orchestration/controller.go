@@ -206,7 +206,7 @@ func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration, re
 		go func(host string, worker RemoteWorker) {
 			req := &orchestrationpb.StartReplicaRequest{
 				Configuration: cfg.GetReplicas(),
-				IDs:           replicaMap.ReplicaIDs(host).Uint32Slice(),
+				IDs:           replicaMap.ReplicaIDs(host),
 			}
 			_, err := worker.StartReplica(req)
 			errs <- err
@@ -221,7 +221,7 @@ func (e *Experiment) startReplicas(cfg *orchestrationpb.ReplicaConfiguration, re
 func (e *Experiment) stopReplicas(replicaMap config.ReplicaMap) error {
 	responses := make([]*orchestrationpb.StopReplicaResponse, 0)
 	for host, worker := range e.workers {
-		req := &orchestrationpb.StopReplicaRequest{IDs: replicaMap.ReplicaIDs(host).Uint32Slice()}
+		req := &orchestrationpb.StopReplicaRequest{IDs: replicaMap.ReplicaIDs(host)}
 		res, err := worker.StopReplica(req)
 		if err != nil {
 			return err
@@ -276,7 +276,7 @@ func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration, cli
 func (e *Experiment) stopClients(clientMap config.ClientMap) error {
 	for host, worker := range e.workers {
 		req := &orchestrationpb.StopClientRequest{}
-		req.IDs = clientMap.ClientIDs(host).Uint32Slice()
+		req.IDs = clientMap.ClientIDs(host)
 		_, err := worker.StopClient(req)
 		if err != nil {
 			return err
