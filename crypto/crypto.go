@@ -113,11 +113,10 @@ func (c crypto) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 		return true
 	}
 
-	// TODO(AlanRostem): verify if this leads to correct behavior. Also investigate why this is nil on this branch.
+	// TODO(AlanRostem): investigate why this is nil.
 	qcSignature := qc.Signature()
 	if qcSignature == nil {
-		c.logger.Warnf("quorum certificate has nil signature (view=%d)", qc.View())
-		return false
+		c.logger.DPanicf("quorum certificate has nil signature (view=%d)", qc.View())
 	}
 
 	participants := qcSignature.Participants()
