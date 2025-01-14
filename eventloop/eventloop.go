@@ -77,18 +77,6 @@ func New(bufferSize uint) *EventLoop {
 	return el
 }
 
-// RegisterObserver registers a handler with priority.
-// Deprecated: use RegisterHandler and the Prioritize option instead.
-func (el *EventLoop) RegisterObserver(eventType any, handler EventHandler) int {
-	return el.registerHandler(eventType, []HandlerOption{Prioritize()}, handler)
-}
-
-// UnregisterObserver unregister a handler.
-// Deprecated: use UnregisterHandler instead.
-func (el *EventLoop) UnregisterObserver(eventType any, id int) {
-	el.UnregisterHandler(eventType, id)
-}
-
 // RegisterHandler registers the given event handler for the given event type with the given handler options, if any.
 // If no handler options are provided, the default handler options will be used.
 func (el *EventLoop) RegisterHandler(eventType any, handler EventHandler, opts ...HandlerOption) int {
