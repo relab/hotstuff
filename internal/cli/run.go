@@ -41,8 +41,6 @@ using the '--host' parameter. This should be a comma separated list of hostnames
 	},
 }
 
-var cueCfgPath string
-
 func init() {
 	rootCmd.AddCommand(runCmd)
 
@@ -82,7 +80,7 @@ func init() {
 	runCmd.Flags().Duration("rate-step-interval", time.Hour, "how often the client rate limit should be increased")
 	runCmd.Flags().StringSlice("byzantine", nil, "byzantine strategies to use, as a comma separated list of 'name:count'")
 
-	runCmd.Flags().StringVar(&cueCfgPath, "config", "", "Cue-based host config")
+	runCmd.Flags().String("config", "", "Cue-based host config")
 
 	err := viper.BindPFlags(runCmd.Flags())
 	if err != nil {
@@ -106,9 +104,9 @@ func runController() {
 	cfgPath := viper.GetString("config")
 
 	var cfg *config.HostConfig
-	if cueCfgPath != "" {
+	if cfgPath != "" {
 		cfg, err = config.Load(cfgPath)
-		checkf("config error: %v", err)
+		checkf("config error when loading %s: %v", cfgPath, err)
 	} else {
 		cfg = config.NewLocal(numReplicas, numClients)
 	}
