@@ -1,6 +1,7 @@
 package orchestration_test
 
 import (
+	"fmt"
 	"io"
 	"math"
 	"net"
@@ -127,9 +128,8 @@ func TestDeployment(t *testing.T) {
 		LeaderRotation:    "round-robin",
 	}
 
-	n := 4
 	exe := compileBinary(t)
-	g := iagotest.CreateSSHGroup(t, n, true)
+	g := iagotest.CreateSSHGroup(t, 4, true)
 
 	sessions, err := orchestration.Deploy(g, orchestration.DeployConfig{
 		ExePath:  exe,
@@ -142,6 +142,7 @@ func TestDeployment(t *testing.T) {
 	wg.Add(len(sessions))
 	workers := make(map[string]orchestration.RemoteWorker)
 	for host, session := range sessions {
+		fmt.Printf("Added worker host: %s\n", host)
 		workers[host] = orchestration.NewRemoteWorker(protostream.NewWriter(session.Stdin()), protostream.NewReader(session.Stdout()))
 		go func(session orchestration.WorkerSession) {
 			_, err := io.Copy(os.Stderr, session.Stderr())
@@ -157,7 +158,7 @@ func TestDeployment(t *testing.T) {
 		"",
 		replicaOpts,
 		clientOpts,
-		config.NewLocal(n, 1), // TODO(meling): this is not compatible with workers as is
+		config.NewLocal(4, 2), // TODO(meling): this is not compatible with workers as is
 		workers,
 		logging.New("ctrl"),
 	)
