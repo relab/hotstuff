@@ -128,8 +128,11 @@ func TestDeployment(t *testing.T) {
 		LeaderRotation:    "round-robin",
 	}
 
+	numReplicas := 4
+	numClients := 2
+	numHosts := numReplicas + numClients
 	exe := compileBinary(t)
-	g := iagotest.CreateSSHGroup(t, 4, true)
+	g := iagotest.CreateSSHGroup(t, numHosts, true)
 
 	sessions, err := orchestration.Deploy(g, orchestration.DeployConfig{
 		ExePath:  exe,
@@ -153,12 +156,40 @@ func TestDeployment(t *testing.T) {
 		}(session)
 	}
 
+	i := 0
+	allHosts := make([]string, 0, numHosts)
+	for host := range workers {
+		allHosts[i] = host
+		i++
+	}
+
+	replicaHosts := make([]string, 0, numReplicas)
+	for j := range numReplicas {
+		popped := allHosts[0]
+		replicaHosts[j] = popped
+		allHosts = allHosts[1:]
+	}
+
+	clientHosts := make([]string, 0, numClients)
+	for j := range numClients {
+		popped := allHosts[0]
+		clientHosts[j] = popped
+		allHosts = allHosts[1:]
+	}
+
+	cfg := &config.HostConfig{
+		Replicas:     numReplicas,
+		Clients:      numClients,
+		ReplicaHosts: replicaHosts,
+		ClientHosts:  clientHosts,
+	}
+
 	experiment, err := orchestration.NewExperiment(
 		10*time.Second,
 		"",
 		replicaOpts,
 		clientOpts,
-		config.NewLocal(4, 2), // TODO(meling): this is not compatible with workers as is
+		cfg, // TODO(Alan): Consider using a constructor to generate this config.
 		workers,
 		logging.New("ctrl"),
 	)
