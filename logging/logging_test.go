@@ -8,7 +8,7 @@ func BenchmarkInnerLogger(b *testing.B) {
 	SetLogLevel("error")
 	logger := New("test").(*wrapper).inner
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		logger.Info("test")
 	}
 }
@@ -17,7 +17,7 @@ func BenchmarkWrappedLoggerNoPackages(b *testing.B) {
 	SetLogLevel("error")
 	logger := New("test")
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		logger.Info("test")
 	}
 }
@@ -27,7 +27,7 @@ func BenchmarkWrappedLoggerWithPackage(b *testing.B) {
 	SetPackageLogLevel("foo", "error")
 	logger := New("test")
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		logger.Info("test")
 	}
 }
@@ -41,7 +41,7 @@ func BenchmarkWrappedLoggerWithMultiplePackages(b *testing.B) {
 	SetPackageLogLevel("quux", "error")
 	logger := New("test")
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		logger.Info("test")
 	}
 }
