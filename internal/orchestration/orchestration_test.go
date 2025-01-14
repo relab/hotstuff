@@ -127,8 +127,9 @@ func TestDeployment(t *testing.T) {
 		LeaderRotation:    "round-robin",
 	}
 
+	n := 4
 	exe := compileBinary(t)
-	g := iagotest.CreateSSHGroup(t, 4, true)
+	g := iagotest.CreateSSHGroup(t, n, true)
 
 	sessions, err := orchestration.Deploy(g, orchestration.DeployConfig{
 		ExePath:  exe,
@@ -156,7 +157,7 @@ func TestDeployment(t *testing.T) {
 		"",
 		replicaOpts,
 		clientOpts,
-		config.NewLocal(4, 2), // TODO(meling): this is not compatible with workers as is
+		config.NewLocal(n, 1), // TODO(meling): this is not compatible with workers as is
 		workers,
 		logging.New("ctrl"),
 	)
