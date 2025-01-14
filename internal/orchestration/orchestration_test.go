@@ -156,24 +156,22 @@ func TestDeployment(t *testing.T) {
 		}(session)
 	}
 
-	i := 0
 	allHosts := make([]string, 0, numHosts)
 	for host := range workers {
-		allHosts[i] = host
-		i++
+		allHosts = append(allHosts, host)
 	}
 
 	replicaHosts := make([]string, 0, numReplicas)
-	for j := range numReplicas {
+	for range numReplicas {
 		popped := allHosts[0]
-		replicaHosts[j] = popped
+		replicaHosts = append(replicaHosts, popped)
 		allHosts = allHosts[1:]
 	}
 
 	clientHosts := make([]string, 0, numClients)
-	for j := range numClients {
+	for range numClients {
 		popped := allHosts[0]
-		clientHosts[j] = popped
+		clientHosts = append(clientHosts, popped)
 		allHosts = allHosts[1:]
 	}
 
@@ -189,7 +187,7 @@ func TestDeployment(t *testing.T) {
 		"",
 		replicaOpts,
 		clientOpts,
-		cfg, // TODO(Alan): Consider using a constructor to generate this config.
+		cfg, // TODO(Alan): Consider implementing a constructor to generate this config.
 		workers,
 		logging.New("ctrl"),
 	)
