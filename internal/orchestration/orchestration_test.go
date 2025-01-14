@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relab/hotstuff/internal/config"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
@@ -47,6 +48,7 @@ func makeTreeReplicaOpts(consensusImpl, crypto string, mods []string, replicas, 
 		rnd := rand.New(rand.NewSource(int64(rand.Uint64())))
 		rnd.Shuffle(len(treePos), reflect.Swapper(treePos))
 	}
+
 	return &orchestrationpb.ReplicaOpts{
 		BatchSize:         100,
 		ConnectTimeout:    durationpb.New(time.Second),
@@ -77,19 +79,29 @@ func makeClientOpts() *orchestrationpb.ClientOpts {
 func TestOrchestration(t *testing.T) {
 	run := func(t *testing.T, replicaOpts *orchestrationpb.ReplicaOpts) {
 		t.Helper()
-		controllerStream, workerStream := net.Pipe()
 
+		controllerStream, workerStream := net.Pipe()
 		workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
 		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), metrics.NopLogger(), nil, 0)
 
-		experiment := &orchestration.Experiment{
-			Logger:      logging.New("ctrl"),
-			NumReplicas: 7,
-			NumClients:  2,
-			ClientOpts:  makeClientOpts(),
-			ReplicaOpts: replicaOpts,
-			Duration:    5 * time.Second,
-			Hosts:       map[string]orchestration.RemoteWorker{"127.0.0.1": workerProxy},
+		cfg := config.NewLocalWithTree(
+			7, 2,
+			replicaOpts.TreePositions,
+			replicaOpts.BranchFactor,
+			replicaOpts.TreeDelta.AsDuration(),
+		)
+
+		experiment, err := orchestration.NewExperiment(
+			5*time.Second,
+			"",
+			replicaOpts,
+			makeClientOpts(),
+			cfg,
+			map[string]orchestration.RemoteWorker{"localhost": workerProxy},
+			logging.New("ctrl"),
+		)
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		c := make(chan error)
@@ -97,7 +109,7 @@ func TestOrchestration(t *testing.T) {
 			c <- worker.Run()
 		}()
 
-		err := experiment.Run()
+		err = experiment.Run()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -108,7 +120,19 @@ func TestOrchestration(t *testing.T) {
 		}
 	}
 
-	replicaOpts := makeReplicaOpts("chainedhotstuff", "ecdsa", "", nil)
+	// kauri
+	mods := []string{"kauri"}
+	replicaOpts := makeTreeReplicaOpts("chainedhotstuff", "ecdsa", mods, 7, 2, false)
+	t.Run("ChainedHotStuff+ECDSA+Kauri+DefaultTree", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "bls12", mods, 7, 2, false)
+	t.Run("ChainedHotStuff+BLS12+Kauri+DefaultTree", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "ecdsa", mods, 7, 2, true)
+	t.Run("ChainedHotStuff+ECDSA+Kauri+RandomTree", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "bls12", mods, 7, 2, true)
+	t.Run("ChainedHotStuff+BLS12+Kauri+RandomTree", func(t *testing.T) { run(t, replicaOpts) })
+
+	// hotstuff
+	replicaOpts = makeReplicaOpts("chainedhotstuff", "ecdsa", "", nil)
 	t.Run("ChainedHotStuff+ECDSA", func(t *testing.T) { run(t, replicaOpts) })
 	replicaOpts = makeReplicaOpts("chainedhotstuff", "eddsa", "", nil)
 	t.Run("ChainedHotStuff+EDDSA", func(t *testing.T) { run(t, replicaOpts) })
@@ -133,16 +157,6 @@ func TestOrchestration(t *testing.T) {
 	replicaOpts = makeReplicaOpts("chainedhotstuff", "ecdsa", "silence:1", nil)
 	t.Run("ChainedHotStuff+Silence", func(t *testing.T) { run(t, replicaOpts) })
 
-	// kauri
-	mods := []string{"kauri"}
-	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "ecdsa", mods, 7, 2, false)
-	t.Run("ChainedHotStuff+ECDSA+Kauri+DefaultTree", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "bls12", mods, 7, 2, false)
-	t.Run("ChainedHotStuff+BLS12+Kauri+DefaultTree", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "ecdsa", mods, 7, 2, true)
-	t.Run("ChainedHotStuff+ECDSA+Kauri+RandomTree", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "bls12", mods, 7, 2, true)
-	t.Run("ChainedHotStuff+BLS12+Kauri+RandomTree", func(t *testing.T) { run(t, replicaOpts) })
 }
 
 func TestDeployment(t *testing.T) {
@@ -150,28 +164,22 @@ func TestDeployment(t *testing.T) {
 		t.Skip("GitHub Actions only supports linux containers on linux runners.")
 	}
 
-	experiment := &orchestration.Experiment{
-		Logger:      logging.New("ctrl"),
-		NumReplicas: 4,
-		NumClients:  2,
-		ClientOpts: &orchestrationpb.ClientOpts{
-			ConnectTimeout: durationpb.New(time.Second),
-			MaxConcurrent:  250,
-			PayloadSize:    100,
-			RateLimit:      math.Inf(1),
-		},
-		ReplicaOpts: &orchestrationpb.ReplicaOpts{
-			BatchSize:         100,
-			ConnectTimeout:    durationpb.New(time.Second),
-			InitialTimeout:    durationpb.New(100 * time.Millisecond),
-			TimeoutSamples:    1000,
-			TimeoutMultiplier: 1.2,
-			Consensus:         "chainedhotstuff",
-			Crypto:            "ecdsa",
-			LeaderRotation:    "round-robin",
-		},
-		Duration: 10 * time.Second,
-		Hosts:    make(map[string]orchestration.RemoteWorker),
+	clientOpts := &orchestrationpb.ClientOpts{
+		ConnectTimeout: durationpb.New(time.Second),
+		MaxConcurrent:  250,
+		PayloadSize:    100,
+		RateLimit:      math.Inf(1),
+	}
+
+	replicaOpts := &orchestrationpb.ReplicaOpts{
+		BatchSize:         100,
+		ConnectTimeout:    durationpb.New(time.Second),
+		InitialTimeout:    durationpb.New(100 * time.Millisecond),
+		TimeoutSamples:    1000,
+		TimeoutMultiplier: 1.2,
+		Consensus:         "chainedhotstuff",
+		Crypto:            "ecdsa",
+		LeaderRotation:    "round-robin",
 	}
 
 	exe := compileBinary(t)
@@ -186,8 +194,9 @@ func TestDeployment(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	wg.Add(len(sessions))
+	workers := make(map[string]orchestration.RemoteWorker)
 	for host, session := range sessions {
-		experiment.Hosts[host] = orchestration.NewRemoteWorker(protostream.NewWriter(session.Stdin()), protostream.NewReader(session.Stdout()))
+		workers[host] = orchestration.NewRemoteWorker(protostream.NewWriter(session.Stdin()), protostream.NewReader(session.Stdout()))
 		go func(session orchestration.WorkerSession) {
 			_, err := io.Copy(os.Stderr, session.Stderr())
 			if err != nil {
@@ -196,6 +205,20 @@ func TestDeployment(t *testing.T) {
 			wg.Done()
 		}(session)
 	}
+
+	experiment, err := orchestration.NewExperiment(
+		10*time.Second,
+		"",
+		replicaOpts,
+		clientOpts,
+		config.NewLocal(4, 2), // TODO(meling): this is not compatible with workers as is
+		workers,
+		logging.New("ctrl"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if err = experiment.Run(); err != nil {
 		t.Fatal(err)
 	}

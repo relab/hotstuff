@@ -58,7 +58,7 @@ func MatrixFrom(locations []string) Matrix {
 		}
 	}
 	return Matrix{
-		enabled: true,
+		enabled: len(locations) > 0,
 		lm:      newLatencies,
 		locs:    locations,
 	}

@@ -26,6 +26,10 @@ func NewTreeLeader() *treeLeader {
 
 // GetLeader returns the id of the leader in the given view
 func (t *treeLeader) GetLeader(_ hotstuff.View) hotstuff.ID {
+	if t.opts == nil {
+		panic("oops")
+	}
+
 	treeConfig := t.opts.TreeConfig()
 	if treeConfig == nil {
 		return 1

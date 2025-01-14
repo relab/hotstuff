@@ -12,7 +12,7 @@ import (
 func TestReplicasForHost(t *testing.T) {
 	tests := []struct {
 		name string
-		cfg  *config.Config
+		cfg  *config.HostConfig
 		idx  []int
 		want []int
 	}{
@@ -43,7 +43,7 @@ func TestAssignReplicas(t *testing.T) {
 	emptyByz := map[uint32]string{}
 	tests := []struct {
 		name string
-		cfg  *config.Config
+		cfg  *config.HostConfig
 		want config.ReplicaMap
 	}{
 		{name: "NoReplicasNoHost_____", cfg: newConfig(0, []string{}, locations), want: newReplicaMap(hostMap{}, emptyByz)},
@@ -83,7 +83,7 @@ func TestAssignReplicasByzantine(t *testing.T) {
 	type hostMap map[string][]uint32
 	tests := []struct {
 		name string
-		cfg  *config.Config
+		cfg  *config.HostConfig
 		want config.ReplicaMap
 	}{
 		{name: "ThreeReplicasTwoHosts", cfg: newByzConfig(3, []string{"h1", "h2"}, locations, byzStrategy), want: newReplicaMap(hostMap{"h1": {1, 2}, "h2": {3}}, byzMap)},
@@ -109,12 +109,12 @@ func TestAssignReplicasByzantine(t *testing.T) {
 	}
 }
 
-func newConfig(replicas int, replicaHosts, locations []string) *config.Config {
-	return &config.Config{Replicas: replicas, ReplicaHosts: replicaHosts, Locations: locations}
+func newConfig(replicas int, replicaHosts, locations []string) *config.HostConfig {
+	return &config.HostConfig{Replicas: replicas, ReplicaHosts: replicaHosts, Locations: locations}
 }
 
-func newByzConfig(replicas int, replicaHosts, locations []string, byzantineStrategy map[string][]uint32) *config.Config {
-	return &config.Config{Replicas: replicas, ReplicaHosts: replicaHosts, Locations: locations, ByzantineStrategy: byzantineStrategy}
+func newByzConfig(replicas int, replicaHosts, locations []string, byzantineStrategy map[string][]uint32) *config.HostConfig {
+	return &config.HostConfig{Replicas: replicas, ReplicaHosts: replicaHosts, Locations: locations, ByzantineStrategy: byzantineStrategy}
 }
 
 func newReplicaMap(hostMap map[string][]uint32, byz map[uint32]string) config.ReplicaMap {

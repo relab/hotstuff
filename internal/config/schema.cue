@@ -29,6 +29,8 @@ config: {
 		locations!: [...string] & _exact
 		// Branching factor of the tree; must be greater than 1 and at most half the number of replicas.
 		branchFactor!: int & >1 & <=div(replicas, 2)
+		// Optional tree delta. Zero by default. 
+		treeDelta: *"0s" | float
 	}
 
 	// Byzantine strategy for different replicas (optional).

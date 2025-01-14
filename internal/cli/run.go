@@ -2,30 +2,25 @@ package cli
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"log"
 	"math"
 	"net"
 	"os"
 	"path/filepath"
-	"reflect"
-	"strconv"
-	"strings"
+	"slices"
 	"time"
 
-	"github.com/relab/hotstuff/internal/latency"
+	"github.com/relab/hotstuff/internal/config"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
-	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/iago"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/rand"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -45,6 +40,8 @@ using the '--host' parameter. This should be a comma separated list of hostnames
 		runController()
 	},
 }
+
+var cueCfgPath string
 
 func init() {
 	rootCmd.AddCommand(runCmd)
@@ -91,6 +88,8 @@ func init() {
 	runCmd.Flags().Duration("tree-delta", 30*time.Millisecond, "waiting time for intermediate nodes in the tree")
 	runCmd.Flags().Bool("random-tree", false, "randomize tree positions, tree-pos is ignored if set")
 
+	runCmd.Flags().StringVar(&cueCfgPath, "config", "", "Cue-based host config")
+
 	err := viper.BindPFlags(runCmd.Flags())
 	if err != nil {
 		panic(err)
@@ -107,60 +106,26 @@ func runController() {
 		checkf("failed to create output directory: %v", err)
 	}
 
-	intTreePos := viper.GetIntSlice("tree-pos")
-	var treePos []uint32
-	if len(intTreePos) == 0 {
-		treePos = tree.DefaultTreePosUint32(viper.GetInt("replicas"))
-	} else {
-		treePos = make([]uint32, len(intTreePos))
-		for i, pos := range intTreePos {
-			treePos[i] = uint32(pos)
-		}
-	}
-	if viper.GetBool("random-tree") {
-		rnd := rand.New(rand.NewSource(rand.Uint64()))
-		rnd.Shuffle(len(treePos), reflect.Swapper(treePos))
-	}
-	experiment := orchestration.Experiment{
-		Logger:      logging.New("ctrl"),
-		NumReplicas: viper.GetInt("replicas"),
-		NumClients:  viper.GetInt("clients"),
-		Duration:    viper.GetDuration("duration"),
-		Output:      outputDir,
-		ReplicaOpts: &orchestrationpb.ReplicaOpts{
-			UseTLS:            true,
-			BatchSize:         viper.GetUint32("batch-size"),
-			TimeoutMultiplier: float32(viper.GetFloat64("timeout-multiplier")),
-			Consensus:         viper.GetString("consensus"),
-			Crypto:            viper.GetString("crypto"),
-			LeaderRotation:    viper.GetString("leader-rotation"),
-			ConnectTimeout:    durationpb.New(viper.GetDuration("connect-timeout")),
-			InitialTimeout:    durationpb.New(viper.GetDuration("view-timeout")),
-			TimeoutSamples:    viper.GetUint32("duration-samples"),
-			MaxTimeout:        durationpb.New(viper.GetDuration("max-timeout")),
-			SharedSeed:        viper.GetInt64("shared-seed"),
-			Modules:           viper.GetStringSlice("modules"),
-			TreePositions:     treePos,
-			BranchFactor:      viper.GetUint32("bf"),
-			TreeDelta:         durationpb.New(viper.GetDuration("tree-delta")),
-		},
-		ClientOpts: &orchestrationpb.ClientOpts{
-			UseTLS:           true,
-			ConnectTimeout:   durationpb.New(viper.GetDuration("connect-timeout")),
-			PayloadSize:      viper.GetUint32("payload-size"),
-			MaxConcurrent:    viper.GetUint32("max-concurrent"),
-			RateLimit:        viper.GetFloat64("rate-limit"),
-			RateStep:         viper.GetFloat64("rate-step"),
-			RateStepInterval: durationpb.New(viper.GetDuration("rate-step-interval")),
-			Timeout:          durationpb.New(viper.GetDuration("client-timeout")),
-		},
-	}
+	numReplicas := viper.GetInt("replicas")
+	numClients := viper.GetInt("clients")
 
-	experiment.Byzantine, err = parseByzantine()
-	checkf("%v", err)
+	cfgPath := viper.GetString("config")
+
+	var cfg *config.HostConfig
+	if cueCfgPath != "" {
+		cfg, err = config.Load(cfgPath)
+		checkf("config error: %v", err)
+	} else {
+		cfg = config.NewLocal(numReplicas, numClients)
+	}
 
 	worker := viper.GetBool("worker")
-	hosts := viper.GetStringSlice("hosts")
+
+	hosts := cfg.AllHosts()
+	if len(hosts) == 1 && slices.Contains(hosts, "localhost") {
+		hosts = nil // TODO(AlanRostem): find a better workaround
+	}
+
 	exePath := viper.GetString("exe")
 
 	g, err := iago.NewSSHGroup(hosts, viper.GetString("ssh-config"))
@@ -185,10 +150,10 @@ func runController() {
 
 	errors := make(chan error)
 
-	experiment.Hosts = make(map[string]orchestration.RemoteWorker)
+	remoteWorkers := make(map[string]orchestration.RemoteWorker)
 
 	for host, session := range sessions {
-		experiment.Hosts[host] = orchestration.NewRemoteWorker(
+		remoteWorkers[host] = orchestration.NewRemoteWorker(
 			protostream.NewWriter(session.Stdin()), protostream.NewReader(session.Stdout()),
 		)
 		go stderrPipe(session.Stderr(), errors)
@@ -197,23 +162,46 @@ func runController() {
 	if worker || len(hosts) == 0 {
 		worker, wait := localWorker(outputDir, viper.GetStringSlice("metrics"), viper.GetDuration("measurement-interval"))
 		defer wait()
-		experiment.Hosts["localhost"] = worker
+		remoteWorkers["localhost"] = worker
 	}
 
-	experiment.HostConfigs = make(map[string]orchestration.HostConfig)
-
-	var hostConfigs []orchestration.HostConfig
-	err = viper.UnmarshalKey("hosts-config", &hostConfigs)
-	checkf("failed to unmarshal hosts-config: %v", err)
-
-	for _, cfg := range hostConfigs {
-		experiment.HostConfigs[cfg.Name] = cfg
-		cfg.Location, err = latency.ValidLocation(cfg.Location)
-		log.Printf("cfg.Location: %v", cfg.Location)
-		if err != nil {
-			checkf("invalid configuration for %s: %v", cfg.Name, err)
-		}
+	replicaOpts := &orchestrationpb.ReplicaOpts{
+		UseTLS:            true,
+		BatchSize:         viper.GetUint32("batch-size"),
+		TimeoutMultiplier: float32(viper.GetFloat64("timeout-multiplier")),
+		Consensus:         viper.GetString("consensus"),
+		Crypto:            viper.GetString("crypto"),
+		LeaderRotation:    viper.GetString("leader-rotation"),
+		ConnectTimeout:    durationpb.New(viper.GetDuration("connect-timeout")),
+		InitialTimeout:    durationpb.New(viper.GetDuration("view-timeout")),
+		TimeoutSamples:    viper.GetUint32("duration-samples"),
+		MaxTimeout:        durationpb.New(viper.GetDuration("max-timeout")),
+		SharedSeed:        viper.GetInt64("shared-seed"),
+		Modules:           viper.GetStringSlice("modules"),
 	}
+
+	clientOpts := &orchestrationpb.ClientOpts{
+		UseTLS:           true,
+		ConnectTimeout:   durationpb.New(viper.GetDuration("connect-timeout")),
+		PayloadSize:      viper.GetUint32("payload-size"),
+		MaxConcurrent:    viper.GetUint32("max-concurrent"),
+		RateLimit:        viper.GetFloat64("rate-limit"),
+		RateStep:         viper.GetFloat64("rate-step"),
+		RateStepInterval: durationpb.New(viper.GetDuration("rate-step-interval")),
+		Timeout:          durationpb.New(viper.GetDuration("client-timeout")),
+	}
+
+	experiment, err := orchestration.NewExperiment(
+		viper.GetDuration("duration"),
+		outputDir,
+		replicaOpts,
+		clientOpts,
+		cfg,
+		remoteWorkers,
+		logging.New("ctrl"),
+	)
+
+	checkf("config error: %v", err)
 
 	err = experiment.Run()
 	checkf("failed to run experiment: %v", err)
@@ -241,23 +229,6 @@ func checkf(format string, args ...any) {
 			log.Fatalf(format, args...)
 		}
 	}
-}
-
-func parseByzantine() (map[string]int, error) {
-	strategies := make(map[string]int)
-	byzantine := viper.GetStringSlice("byzantine")
-	for _, arg := range byzantine {
-		parts := strings.Split(arg, ":")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("byzantine must be specified as a comma separated list of 'name:count'")
-		}
-		count, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return nil, fmt.Errorf("could not read number of replicas for byzantine strategy '%s': %w", arg, err)
-		}
-		strategies[parts[0]] = count
-	}
-	return strategies, nil
 }
 
 func localWorker(globalOutput string, enableMetrics []string, interval time.Duration) (worker orchestration.RemoteWorker, wait func()) {
