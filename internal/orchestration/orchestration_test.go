@@ -84,12 +84,10 @@ func TestOrchestration(t *testing.T) {
 		workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
 		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), metrics.NopLogger(), nil, 0)
 
-		cfg := config.NewLocalWithTree(
-			7, 2,
-			replicaOpts.TreePositions,
-			replicaOpts.BranchFactor,
-			replicaOpts.TreeDelta.AsDuration(),
-		)
+		cfg := config.NewLocal(7, 2)
+		cfg.TreePositions = replicaOpts.TreePositions
+		cfg.BranchFactor = replicaOpts.BranchFactor
+		cfg.TreeDelta = replicaOpts.TreeDelta.AsDuration()
 
 		experiment, err := orchestration.NewExperiment(
 			5*time.Second,

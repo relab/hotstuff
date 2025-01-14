@@ -60,43 +60,13 @@ type HostConfig struct {
 	TreeDelta time.Duration
 }
 
-// NewLocal creates a config for a localhost case.
-// TODO: Add support for locations through cli.
-func NewLocal(numReplicas, numClients int,
-
-// locations []string,
-// byzStrat map[string][]uint32,
-) *HostConfig {
+// NewLocal creates a config for local hosting.
+func NewLocal(numReplicas, numClients int) *HostConfig {
 	return &HostConfig{
 		ReplicaHosts: []string{"localhost"},
 		ClientHosts:  []string{"localhost"},
 		Replicas:     numReplicas,
 		Clients:      numClients,
-		// Locations:         locations,
-		// ByzantineStrategy: byzStrat,
-	}
-}
-
-func NewLocalWithTree(
-	numReplicas,
-	numClients int,
-	treePos []uint32,
-	branchFactor uint32,
-	treeDelta time.Duration,
-
-	// locations []string,
-	// byzStrat map[string][]uint32,
-) *HostConfig {
-	return &HostConfig{
-		ReplicaHosts:  []string{"localhost"},
-		ClientHosts:   []string{"localhost"},
-		Replicas:      numReplicas,
-		Clients:       numClients,
-		TreePositions: treePos,
-		BranchFactor:  branchFactor,
-		TreeDelta:     treeDelta,
-		// Locations:         locations,
-		// ByzantineStrategy: byzStrat,
 	}
 }
 
