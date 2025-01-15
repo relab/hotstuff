@@ -113,7 +113,7 @@ func (c crypto) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 		return true
 	}
 
-	// TODO(AlanRostem): investigate why this is nil.
+	// TODO: FIX BUG - qcSignature can be nil when a leader is byzantine.
 	qcSignature := qc.Signature()
 	if qcSignature == nil {
 		c.logger.DPanicf("quorum certificate has nil signature (view=%d)", qc.View())

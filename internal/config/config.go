@@ -56,11 +56,11 @@ type HostConfig struct {
 	BranchFactor uint32
 	// ByzantineStrategy is a map from each strategy to a list of replica IDs exhibiting that strategy.
 	ByzantineStrategy map[string][]uint32
-
+	// TreeDelta is the waiting time for intermediate nodes in the tree.
 	TreeDelta time.Duration
 }
 
-// NewLocal creates a config for local hosting.
+// NewLocal is a helper that creates a config for local hosting.
 func NewLocal(numReplicas, numClients int) *HostConfig {
 	return &HostConfig{
 		ReplicaHosts: []string{"localhost"},
@@ -156,7 +156,8 @@ func (c *HostConfig) IsLocal() bool {
 }
 
 // AllHosts returns the list of all hostnames, including replicas and clients.
-// If the configuration is set to run locally, the function returns an empty list.
+// If the configuration is set to run locally, the function returns a list with
+// one entry called "localhost".
 func (c *HostConfig) AllHosts() []string {
 	if c.IsLocal() {
 		return []string{"localhost"}

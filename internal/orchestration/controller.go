@@ -21,7 +21,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Experiment holds variables for an experiment.
+// Experiment coordinates replicas and clients, controls experiment flow and
+// handles measurement output.
 type Experiment struct {
 	replicaOpts *orchestrationpb.ReplicaOpts
 	clientOpts  *orchestrationpb.ClientOpts
@@ -39,7 +40,8 @@ type Experiment struct {
 	hostCfg *config.HostConfig
 }
 
-// TODO: Attempt to reduce number of params
+// NewExperiment returns a struct containing the general experiment
+// configuration.
 func NewExperiment(
 	duration time.Duration,
 	outputDir string,
@@ -49,9 +51,14 @@ func NewExperiment(
 	workers map[string]RemoteWorker,
 	logger logging.Logger,
 ) (*Experiment, error) {
-	if !cfg.IsLocal() && len(cfg.ReplicaHosts)+len(cfg.ClientHosts) != len(workers) {
-		return nil, fmt.Errorf("number of workers %d does not match number of replica and client hosts: %d",
-			len(workers), len(cfg.ReplicaHosts)+len(cfg.ClientHosts))
+	totalHostCount := len(cfg.ReplicaHosts) + len(cfg.ClientHosts)
+	workerCount := len(workers)
+	// The map `workers` can be empty, which is the result when running localhost.
+	// Thus, using `!cfg.IsLocal()` will skip this sanity check,
+	if !cfg.IsLocal() && totalHostCount != workerCount {
+		return nil, fmt.Errorf(
+			"number of workers %d does not match number of replica and client hosts: %d",
+			workerCount, totalHostCount)
 	}
 	for _, location := range cfg.Locations {
 		location, err := latency.ValidLocation(location)

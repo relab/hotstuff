@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"slices"
 	"time"
 
 	"github.com/relab/hotstuff/internal/config"
@@ -142,9 +141,12 @@ func runController() {
 
 	worker := viper.GetBool("worker")
 
-	hosts := cfg.AllHosts()
-	if len(hosts) == 1 && slices.Contains(hosts, "localhost") {
-		hosts = nil // TODO(AlanRostem): find a better workaround
+	// If the config is set to run locally, `hosts` will be nil (empty)
+	// and when passed to iago.NewSSHGroup, thus iago will not generate
+	// an SSH group.
+	var hosts []string
+	if !cfg.IsLocal() {
+		hosts = cfg.AllHosts()
 	}
 
 	exePath := viper.GetString("exe")
