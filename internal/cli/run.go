@@ -88,7 +88,7 @@ func init() {
 	runCmd.Flags().Duration("tree-delta", 30*time.Millisecond, "waiting time for intermediate nodes in the tree")
 	runCmd.Flags().Bool("random-tree", false, "randomize tree positions, tree-pos is ignored if set")
 
-	runCmd.Flags().String("config", "", "Cue-based host config")
+	runCmd.Flags().String("cue", "", "Cue-based host config")
 
 	err := viper.BindPFlags(runCmd.Flags())
 	if err != nil {
@@ -109,7 +109,7 @@ func runController() {
 	numReplicas := viper.GetInt("replicas")
 	numClients := viper.GetInt("clients")
 
-	cfgPath := viper.GetString("config")
+	cfgPath := viper.GetString("cue")
 
 	var cfg *config.HostConfig
 	if cfgPath != "" {
