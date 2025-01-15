@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 
 	"github.com/relab/gorums"
@@ -26,7 +25,7 @@ import (
 type Server struct {
 	blockChain    core.BlockChain
 	configuration core.Configuration
-	eventLoop     *eventloop.EventLoop
+	eventLoop     *core.EventLoop
 	logger        logging.Logger
 	id            hotstuff.ID
 	lm            latency.Matrix

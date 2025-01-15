@@ -5,7 +5,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 )
 
@@ -14,7 +13,7 @@ type VotingMachine struct {
 	blockChain    core.BlockChain
 	configuration core.Configuration
 	crypto        core.Crypto
-	eventLoop     *eventloop.EventLoop
+	eventLoop     *core.EventLoop
 	logger        logging.Logger
 	synchronizer  core.Synchronizer
 	opts          *core.Options

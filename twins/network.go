@@ -17,7 +17,6 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
@@ -38,7 +37,7 @@ func (id NodeID) String() string {
 type node struct {
 	blockChain     core.BlockChain
 	consensus      core.Consensus
-	eventLoop      *eventloop.EventLoop
+	eventLoop      *core.EventLoop
 	leaderRotation modules.LeaderRotation
 	synchronizer   core.Synchronizer
 	opts           *core.Options
@@ -142,7 +141,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 			consensusModule,
 			FixedTimeout(1*time.Millisecond),
 
-			eventloop.New(100),
+			core.NewEventLoop(100),
 			blockchain.New(),
 			consensus.New(),
 			consensus.NewVotingMachine(),
@@ -431,7 +430,7 @@ type tick struct{}
 
 type timeoutManager struct {
 	synchronizer core.Synchronizer
-	eventLoop    *eventloop.EventLoop
+	eventLoop    *core.EventLoop
 
 	node      *node
 	network   *Network
@@ -471,10 +470,10 @@ func (tm *timeoutManager) InitComponent(mods *core.Core) {
 
 	tm.eventLoop.RegisterHandler(tick{}, func(_ any) {
 		tm.advance()
-	}, eventloop.Prioritize())
+	}, core.Prioritize())
 	tm.eventLoop.RegisterHandler(synchronizer.ViewChangeEvent{}, func(event any) {
 		tm.viewChange(event.(synchronizer.ViewChangeEvent))
-	}, eventloop.Prioritize())
+	}, core.Prioritize())
 }
 
 // FixedTimeout returns an ExponentialTimeout with a max exponent of 0.

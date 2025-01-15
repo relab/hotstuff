@@ -6,7 +6,6 @@ import (
 	"github.com/relab/hotstuff"
 
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics/types"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -30,7 +29,7 @@ type Throughput struct {
 // InitComponent gives the module access to the other modules.
 func (t *Throughput) InitComponent(mods *core.Core) {
 	var (
-		eventLoop *eventloop.EventLoop
+		eventLoop *core.EventLoop
 		logger    logging.Logger
 	)
 
@@ -48,7 +47,7 @@ func (t *Throughput) InitComponent(mods *core.Core) {
 
 	eventLoop.RegisterHandler(types.TickEvent{}, func(event any) {
 		t.tick(event.(types.TickEvent))
-	}, eventloop.Prioritize())
+	}, core.Prioritize())
 
 	logger.Info("Throughput metric enabled")
 }

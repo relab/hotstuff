@@ -15,7 +15,6 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/testutil"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
@@ -47,7 +46,7 @@ func TestConnect(t *testing.T) {
 }
 
 // testBase is a generic test for a unicast/multicast call
-func testBase(t *testing.T, typ any, send func(core.Configuration), handle eventloop.EventHandler) {
+func testBase(t *testing.T, typ any, send func(core.Configuration), handle core.EventHandler) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		ctrl := gomock.NewController(t)
@@ -69,7 +68,7 @@ func testBase(t *testing.T, typ any, send func(core.Configuration), handle event
 		ctx, cancel := context.WithCancel(context.Background())
 		for _, hs := range hl[1:] {
 			var (
-				eventLoop    *eventloop.EventLoop
+				eventLoop    *core.EventLoop
 				synchronizer core.Synchronizer
 			)
 			hs.Get(&eventLoop, &synchronizer)

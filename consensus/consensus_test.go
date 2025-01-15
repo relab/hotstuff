@@ -7,7 +7,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/synchronizer"
@@ -25,7 +24,7 @@ func TestVote(t *testing.T) {
 	hs := hl[0]
 
 	var (
-		eventLoop  *eventloop.EventLoop
+		eventLoop  *core.EventLoop
 		blockChain core.BlockChain
 	)
 
@@ -38,7 +37,7 @@ func TestVote(t *testing.T) {
 	eventLoop.RegisterHandler(hotstuff.NewViewMsg{}, func(_ any) {
 		ok = true
 		cancel()
-	}, eventloop.Prioritize())
+	}, core.Prioritize())
 
 	b := testutil.NewProposeMsg(
 		hotstuff.GetGenesis().Hash(),

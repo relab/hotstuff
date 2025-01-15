@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/metrics/types"
 )
 
@@ -22,7 +21,7 @@ func NewTicker(interval time.Duration) *Ticker {
 
 // InitComponent gives the module access to the other modules.
 func (t *Ticker) InitComponent(mods *core.Core) {
-	var eventLoop *eventloop.EventLoop
+	var eventLoop *core.EventLoop
 
 	mods.Get(&eventLoop)
 

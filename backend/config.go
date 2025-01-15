@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
+
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/synchronizer"
 
@@ -24,7 +24,7 @@ import (
 
 // Replica provides methods used by hotstuff to send messages to replicas.
 type Replica struct {
-	eventLoop *eventloop.EventLoop
+	eventLoop *core.EventLoop
 	node      *hotstuffpb.Node
 	id        hotstuff.ID
 	pubKey    hotstuff.PublicKey
@@ -78,7 +78,7 @@ type Config struct {
 }
 
 type subConfig struct {
-	eventLoop *eventloop.EventLoop
+	eventLoop *core.EventLoop
 	logger    logging.Logger
 	opts      *core.Options
 

@@ -16,7 +16,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/logging"
 	"golang.org/x/time/rate"
@@ -60,7 +59,7 @@ type Config struct {
 
 // Client is a hotstuff client.
 type Client struct {
-	eventLoop *eventloop.EventLoop
+	eventLoop *core.EventLoop
 	logger    logging.Logger
 	opts      *core.Options
 

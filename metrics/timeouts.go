@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/synchronizer"
@@ -28,7 +27,7 @@ type ViewTimeouts struct {
 // InitComponent gives the module access to the other modules.
 func (vt *ViewTimeouts) InitComponent(mods *core.Core) {
 	var (
-		eventLoop *eventloop.EventLoop
+		eventLoop *core.EventLoop
 		logger    logging.Logger
 	)
 
@@ -47,7 +46,7 @@ func (vt *ViewTimeouts) InitComponent(mods *core.Core) {
 
 	eventLoop.RegisterHandler(types.TickEvent{}, func(event any) {
 		vt.tick(event.(types.TickEvent))
-	}, eventloop.Prioritize())
+	}, core.Prioritize())
 }
 
 func (vt *ViewTimeouts) viewChange(event synchronizer.ViewChangeEvent) {

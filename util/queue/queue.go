@@ -1,10 +1,10 @@
-package eventloop
+package queue
 
 import "sync"
 
-// queue is a bounded circular buffer.
-// If an entry is pushed to the queue when it is full, the oldest entry will be dropped.
-type queue struct {
+// Queue is a bounded circular buffer.
+// If an entry is pushed to the Queue when it is full, the oldest entry will be dropped.
+type Queue struct {
 	mut       sync.Mutex
 	entries   []any
 	head      int
@@ -12,8 +12,8 @@ type queue struct {
 	readyChan chan struct{}
 }
 
-func newQueue(capacity uint) queue {
-	return queue{
+func NewQueue(capacity uint) Queue {
+	return Queue{
 		entries:   make([]any, capacity),
 		head:      -1,
 		tail:      -1,
@@ -21,7 +21,7 @@ func newQueue(capacity uint) queue {
 	}
 }
 
-func (q *queue) push(entry any) {
+func (q *Queue) Push(entry any) {
 	q.mut.Lock()
 	defer q.mut.Unlock()
 
@@ -53,7 +53,7 @@ func (q *queue) push(entry any) {
 	}
 }
 
-func (q *queue) pop() (entry any, ok bool) {
+func (q *Queue) Pop() (entry any, ok bool) {
 	q.mut.Lock()
 	defer q.mut.Unlock()
 
@@ -76,7 +76,7 @@ func (q *queue) pop() (entry any, ok bool) {
 	return entry, true
 }
 
-func (q *queue) len() int {
+func (q *Queue) Len() int {
 	q.mut.Lock()
 	defer q.mut.Unlock()
 
@@ -91,6 +91,6 @@ func (q *queue) len() int {
 	return len(q.entries) - q.head + q.tail + 1
 }
 
-func (q *queue) ready() <-chan struct{} {
+func (q *Queue) Ready() <-chan struct{} {
 	return q.readyChan
 }

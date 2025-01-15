@@ -9,7 +9,6 @@ import (
 
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/modules"
 
 	"github.com/relab/hotstuff"
@@ -50,7 +49,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 	synchronizer := mocks.NewMockSynchronizer(ctrl)
 	synchronizer.EXPECT().Start(gomock.Any()).AnyTimes()
 	builder.Add(
-		eventloop.New(100),
+		core.NewEventLoop(100),
 		logging.New(fmt.Sprintf("hs%d", id)),
 		blockchain.New(),
 		mocks.NewMockConsensus(ctrl),

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 
@@ -21,7 +20,7 @@ type Synchronizer struct {
 	consensus      core.Consensus
 	crypto         core.Crypto
 	configuration  core.Configuration
-	eventLoop      *eventloop.EventLoop
+	eventLoop      *core.EventLoop
 	leaderRotation modules.LeaderRotation
 	logger         logging.Logger
 	opts           *core.Options

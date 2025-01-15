@@ -1,10 +1,10 @@
-// Package eventloop provides an event loop which is widely used by modules.
+// Eventloop provides an event loop which is widely used by modules.
 // The use of the event loop enables many of the modules to run synchronously, thus removing the need for thread safety.
 // This simplifies the implementation of modules and reduces the risks of race conditions.
 //
 // The event loop can accept events of any type.
 // It uses reflection to determine what handler function to execute based on the type of an event.
-package eventloop
+package core
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/util/gpool"
+	"github.com/relab/hotstuff/util/queue"
 )
 
 type handlerOpts struct {
@@ -51,7 +52,7 @@ type handler struct {
 
 // EventLoop accepts events of any type and executes registered event handlers.
 type EventLoop struct {
-	eventQ queue
+	eventQ queue.Queue
 
 	mut sync.Mutex // protects the following:
 
@@ -66,15 +67,19 @@ type EventLoop struct {
 }
 
 // New returns a new event loop with the requested buffer size.
-func New(bufferSize uint) *EventLoop {
+func NewEventLoop(bufferSize uint) *EventLoop {
 	el := &EventLoop{
 		ctx:           context.Background(),
-		eventQ:        newQueue(bufferSize),
+		eventQ:        queue.NewQueue(bufferSize),
 		waitingEvents: make(map[reflect.Type][]any),
 		handlers:      make(map[reflect.Type][]handler),
 		tickers:       make(map[int]*ticker),
 	}
 	return el
+}
+
+func (el *EventLoop) InitComponent(_ *Core) {
+	// TODO: Change this when merging with the branch that implements this.
 }
 
 // RegisterHandler registers the given event handler for the given event type with the given handler options, if any.
@@ -129,7 +134,7 @@ func (el *EventLoop) AddEvent(event any) {
 	if event != nil {
 		// run handlers with runInAddEvent option
 		el.processEvent(event, true)
-		el.eventQ.push(event)
+		el.eventQ.Push(event)
 	}
 }
 
@@ -159,10 +164,10 @@ func (el *EventLoop) Run(ctx context.Context) {
 
 loop:
 	for {
-		event, ok := el.eventQ.pop()
+		event, ok := el.eventQ.Pop()
 		if !ok {
 			select {
-			case <-el.eventQ.ready():
+			case <-el.eventQ.Ready():
 				continue loop
 			case <-ctx.Done():
 				break loop
@@ -176,9 +181,9 @@ loop:
 	}
 
 	// HACK: when we get canceled, we will handle the events that were in the queue at that time before quitting.
-	l := el.eventQ.len()
+	l := el.eventQ.Len()
 	for i := 0; i < l; i++ {
-		event, _ := el.eventQ.pop()
+		event, _ := el.eventQ.Pop()
 		el.processEvent(event, false)
 	}
 }
@@ -187,7 +192,7 @@ loop:
 func (el *EventLoop) Tick(ctx context.Context) bool {
 	el.setContext(ctx)
 
-	event, ok := el.eventQ.pop()
+	event, ok := el.eventQ.Pop()
 	if !ok {
 		return false
 	}
@@ -308,7 +313,7 @@ func (el *EventLoop) AddTicker(interval time.Duration, callback func(tick time.T
 
 	// We want the ticker to inherit the context of the event loop,
 	// so we need to start the ticker from the run loop.
-	el.eventQ.push(startTickerEvent{id})
+	el.eventQ.Push(startTickerEvent{id})
 
 	return id
 }

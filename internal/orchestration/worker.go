@@ -20,7 +20,6 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/logging"
@@ -200,7 +199,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		duration,
 		leaderRotation,
 
-		eventloop.New(1000),
+		core.NewEventLoop(1000),
 		consensus.New(),
 		consensus.NewVotingMachine(),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
@@ -301,7 +300,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
 		mods := core.NewBuilder(hotstuff.ID(opts.GetID()), nil)
-		mods.Add(eventloop.New(1000))
+		mods.Add(core.NewEventLoop(1000))
 
 		if w.measurementInterval > 0 {
 			clientMetrics := metrics.GetClientMetrics(w.metrics...)

@@ -10,7 +10,6 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/logging"
 	"google.golang.org/grpc/codes"
@@ -21,7 +20,7 @@ import (
 
 // clientSrv serves a client.
 type clientSrv struct {
-	eventLoop *eventloop.EventLoop
+	eventLoop *core.EventLoop
 	logger    logging.Logger
 
 	mut          sync.Mutex

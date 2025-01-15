@@ -7,7 +7,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/synchronizer"
 )
@@ -17,7 +16,7 @@ import (
 type blockChain struct {
 	configuration core.Configuration
 	consensus     core.Consensus
-	eventLoop     *eventloop.EventLoop
+	eventLoop     *core.EventLoop
 	logger        logging.Logger
 
 	mut           sync.Mutex

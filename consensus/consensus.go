@@ -6,7 +6,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
@@ -20,7 +19,7 @@ type consensusBase struct {
 	commandQueue   core.CommandQueue
 	configuration  core.Configuration
 	crypto         core.Crypto
-	eventLoop      *eventloop.EventLoop
+	eventLoop      *core.EventLoop
 	executor       core.ExecutorExt
 	forkHandler    core.ForkHandlerExt
 	leaderRotation modules.LeaderRotation

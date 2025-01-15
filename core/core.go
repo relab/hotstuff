@@ -36,7 +36,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
@@ -54,7 +53,7 @@ type Core struct {
 	blockChain    BlockChain
 	consensus     Consensus
 	crypto        Crypto
-	eventLoop     *eventloop.EventLoop
+	eventLoop     *EventLoop
 	logger        logging.Logger
 	synchronizer  Synchronizer
 	votingMachine VotingMachine
@@ -83,7 +82,7 @@ func (c *Core) BlockChain() BlockChain {
 	return nil
 }
 
-func (c *Core) EventLoop() *eventloop.EventLoop {
+func (c *Core) EventLoop() *EventLoop {
 	return nil
 }
 

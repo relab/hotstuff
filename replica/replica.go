@@ -8,7 +8,6 @@ import (
 	"net"
 
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -155,7 +154,7 @@ func (srv *Replica) Stop() {
 func (srv *Replica) Run(ctx context.Context) {
 	var (
 		synchronizer core.Synchronizer
-		eventLoop    *eventloop.EventLoop
+		eventLoop    *core.EventLoop
 	)
 	srv.hs.Get(&synchronizer, &eventLoop)
 
