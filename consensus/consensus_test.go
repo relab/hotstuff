@@ -35,10 +35,10 @@ func TestVote(t *testing.T) {
 
 	ok := false
 	ctx, cancel := context.WithCancel(context.Background())
-	eventLoop.RegisterObserver(hotstuff.NewViewMsg{}, func(_ any) {
+	eventLoop.RegisterHandler(hotstuff.NewViewMsg{}, func(_ any) {
 		ok = true
 		cancel()
-	})
+	}, eventloop.Prioritize())
 
 	b := testutil.NewProposeMsg(
 		hotstuff.GetGenesis().Hash(),

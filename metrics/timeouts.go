@@ -45,9 +45,9 @@ func (vt *ViewTimeouts) InitComponent(mods *core.Core) {
 		vt.viewChange(event.(synchronizer.ViewChangeEvent))
 	})
 
-	eventLoop.RegisterObserver(types.TickEvent{}, func(event any) {
+	eventLoop.RegisterHandler(types.TickEvent{}, func(event any) {
 		vt.tick(event.(types.TickEvent))
-	})
+	}, eventloop.Prioritize())
 }
 
 func (vt *ViewTimeouts) viewChange(event synchronizer.ViewChangeEvent) {

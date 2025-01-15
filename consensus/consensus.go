@@ -29,8 +29,6 @@ type consensusBase struct {
 	rules          modules.Rules
 	synchronizer   core.Synchronizer
 
-	handel core.Handel
-
 	lastVote hotstuff.View
 
 	mut   sync.Mutex
@@ -62,8 +60,6 @@ func (cs *consensusBase) InitComponent(mods *core.Core) {
 		&cs.opts,
 		&cs.synchronizer,
 	)
-
-	mods.TryGet(&cs.handel)
 
 	if mod, ok := cs.rules.(core.Component); ok {
 		mod.InitComponent(mods)
@@ -207,12 +203,6 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	}
 
 	cs.lastVote = block.View()
-
-	if cs.handel != nil {
-		// let Handel handle the voting
-		cs.handel.Begin(pc)
-		return
-	}
 
 	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
 	if leaderID == cs.opts.ID() {

@@ -18,8 +18,7 @@
 
 This project, called `hotstuff`, started out as an implementation of the HotStuff BFT consensus protocol.
 Over time, however, the project has evolved to include implementations of other variants of the HotStuff protocol,
-as well as other protocols solving different problems, such as the view synchronization problem (see the view synchronizer),
-and scaling problems (see Handel).
+as well as other protocols solving different problems, such as the view synchronization problem (see the view synchronizer).
 
 Writing implementations of these protocols is one thing, but the protocols should also be able to function in practice,
 interoperating to achieve BFT consensus.

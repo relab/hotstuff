@@ -40,7 +40,6 @@ import (
 	_ "github.com/relab/hotstuff/crypto/bls12"
 	_ "github.com/relab/hotstuff/crypto/ecdsa"
 	_ "github.com/relab/hotstuff/crypto/eddsa"
-	_ "github.com/relab/hotstuff/handel"
 	_ "github.com/relab/hotstuff/leaderrotation"
 )
 

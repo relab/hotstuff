@@ -43,9 +43,9 @@ func (lr *ClientLatency) InitComponent(mods *core.Core) {
 		lr.addLatency(latencyEvent.Latency)
 	})
 
-	eventLoop.RegisterObserver(types.TickEvent{}, func(event any) {
+	eventLoop.RegisterHandler(types.TickEvent{}, func(event any) {
 		lr.tick(event.(types.TickEvent))
-	})
+	}, eventloop.Prioritize())
 
 	logger.Info("Client Latency metric enabled")
 }

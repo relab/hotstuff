@@ -83,15 +83,6 @@ func TestOrchestration(t *testing.T) {
 	t.Run("Simple-HotStuff+EDDSA", func(t *testing.T) { run(t, "simplehotstuff", "eddsa", nil, "") })
 	t.Run("Simple-HotStuff+BLS12", func(t *testing.T) { run(t, "simplehotstuff", "bls12", nil, "") })
 
-	// handel
-	mods := []string{"handel"}
-	t.Run("ChainedHotStuff+ECDSA+Handel", func(t *testing.T) { run(t, "chainedhotstuff", "ecdsa", mods, "") })
-	t.Run("ChainedHotStuff+BLS12+Handel", func(t *testing.T) { run(t, "chainedhotstuff", "bls12", mods, "") })
-	t.Run("Fast-HotStuff+ECDSA+Handel", func(t *testing.T) { run(t, "fasthotstuff", "ecdsa", mods, "") })
-	t.Run("Fast-HotStuff+BLS12+Handel", func(t *testing.T) { run(t, "fasthotstuff", "bls12", mods, "") })
-	t.Run("Simple-HotStuff+ECDSA+Handel", func(t *testing.T) { run(t, "simplehotstuff", "ecdsa", mods, "") })
-	t.Run("Simple-HotStuff+BLS12+Handel", func(t *testing.T) { run(t, "simplehotstuff", "bls12", mods, "") })
-
 	// byzantine
 	t.Run("ChainedHotStuff+Fork", func(t *testing.T) { run(t, "chainedhotstuff", "ecdsa", nil, "fork:1") })
 	t.Run("ChainedHotStuff+Silence", func(t *testing.T) { run(t, "chainedhotstuff", "ecdsa", nil, "silence:1") })
