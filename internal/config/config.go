@@ -146,7 +146,7 @@ func (c *HostConfig) AssignClients() ClientMap {
 }
 
 // IsLocal returns true if both the replica and client hosts slices
-// contain one instance of "localhost".
+// contain one instance of "localhost". See NewLocal.
 func (c *HostConfig) IsLocal() bool {
 	if len(c.ClientHosts) > 1 || len(c.ReplicaHosts) > 1 {
 		return false

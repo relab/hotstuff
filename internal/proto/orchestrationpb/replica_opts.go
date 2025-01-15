@@ -58,8 +58,7 @@ func (x *ReplicaOpts) SetReplicaCertificates(host string, ca *x509.Certificate, 
 	ips, err := net.LookupIP(host)
 	if err == nil {
 		for _, ip := range ips {
-			// TODO: Not using internal addr anymore, but check if this is needed.
-			if ipStr := ip.String(); ipStr != host /*&& ipStr != internalAddr*/ {
+			if ipStr := ip.String(); ipStr != host {
 				validFor = append(validFor, ipStr)
 			}
 		}
