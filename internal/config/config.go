@@ -8,10 +8,10 @@ import (
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 )
 
-// ReplicaMap is a map from host to a list of replica options.
+// ReplicaMap maps from a host to a slice of replica options.
 type ReplicaMap map[string][]*orchestrationpb.ReplicaOpts
 
-// ReplicaIDs converts the an entry map from []hotstuff.ID to []uint32.
+// ReplicaIDs returns the IDs of the replicas running on the given host.
 func (r ReplicaMap) ReplicaIDs(host string) []uint32 {
 	ids := make([]uint32, 0, len(r[host]))
 	for _, opts := range r[host] {
@@ -20,9 +20,10 @@ func (r ReplicaMap) ReplicaIDs(host string) []uint32 {
 	return ids
 }
 
+// ClientMap maps from a host to a slice of client IDs.
 type ClientMap map[string][]hotstuff.ID
 
-// ClientIDs converts the an entry map from []hotstuff.ID to []uint32.
+// ClientIDs returns the IDs of the clients running on the given host.
 func (c ClientMap) ClientIDs(host string) []uint32 {
 	ids := make([]uint32, 0, len(c[host]))
 	for _, id := range c[host] {
@@ -70,6 +71,7 @@ func NewLocal(numReplicas, numClients int) *HostConfig {
 	}
 }
 
+// TreePosIDs returns a slice of hotstuff.IDs ordered by the tree positions.
 func (c *HostConfig) TreePosIDs() []hotstuff.ID {
 	ids := make([]hotstuff.ID, 0, len(c.TreePositions))
 	for i, id := range c.TreePositions {
