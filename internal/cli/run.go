@@ -119,8 +119,8 @@ func runController() {
 	} else {
 		cfg = config.NewLocal(numReplicas, numClients)
 
-		// This is needed for Kauri to work.
-		cfg.BranchFactor = viper.GetUint32("bf") // TODO: Configure this value differently
+		// If a config is not specified, use the user/default cli flags.
+		cfg.BranchFactor = viper.GetUint32("bf")
 
 		intTreePos := viper.GetIntSlice("tree-pos")
 		var treePos []uint32

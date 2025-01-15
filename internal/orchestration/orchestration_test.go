@@ -209,11 +209,13 @@ func TestDeployment(t *testing.T) {
 		}(session)
 	}
 
+	// Put all hostnames into a string list.
 	allHosts := make([]string, 0, numHosts)
 	for host := range workers {
 		allHosts = append(allHosts, host)
 	}
 
+	// Pop any hostname and add them to a separate list for replicas.
 	replicaHosts := make([]string, 0, numReplicas)
 	for range numReplicas {
 		popped := allHosts[0]
@@ -221,6 +223,7 @@ func TestDeployment(t *testing.T) {
 		allHosts = allHosts[1:]
 	}
 
+	// Pop any hostname and add them to a separate list for clients.
 	clientHosts := make([]string, 0, numClients)
 	for range numClients {
 		popped := allHosts[0]
@@ -228,6 +231,8 @@ func TestDeployment(t *testing.T) {
 		allHosts = allHosts[1:]
 	}
 
+	// Add all replica and client hostnames (that came from workers) separately
+	// to the config.
 	cfg := &config.HostConfig{
 		Replicas:     numReplicas,
 		Clients:      numClients,
@@ -240,7 +245,7 @@ func TestDeployment(t *testing.T) {
 		"",
 		replicaOpts,
 		clientOpts,
-		cfg, // TODO(Alan): Consider implementing a constructor to generate this config.
+		cfg, // TODO: Find a cleaner approach to creating a config for a test case like this.
 		workers,
 		logging.New("ctrl"),
 	)
