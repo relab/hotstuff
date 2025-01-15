@@ -12,6 +12,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // New creates a new ReplicaOpts with the given replicaID and locations.
@@ -37,9 +38,10 @@ func (x *ReplicaOpts) TreeDeltaDuration() time.Duration {
 	return x.GetTreeDelta().AsDuration()
 }
 
-func (x *ReplicaOpts) SetTreeOptions(branchFactor uint32, positions []uint32) {
+func (x *ReplicaOpts) SetTreeOptions(branchFactor uint32, positions []uint32, treeDelta time.Duration) {
 	x.TreePositions = positions
 	x.BranchFactor = branchFactor
+	x.TreeDelta = durationpb.New(treeDelta)
 }
 
 func (x *ReplicaOpts) SetByzantineStrategy(strategy string) {
