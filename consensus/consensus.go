@@ -51,6 +51,8 @@ type consensusBase struct {
 	opts           *modules.Options
 	synchronizer   modules.Synchronizer
 
+	kauri modules.Kauri
+
 	lastVote hotstuff.View
 
 	mut   sync.Mutex
@@ -82,6 +84,8 @@ func (cs *consensusBase) InitModule(mods *modules.Core) {
 		&cs.opts,
 		&cs.synchronizer,
 	)
+
+	mods.TryGet(&cs.kauri)
 
 	if mod, ok := cs.impl.(modules.Module); ok {
 		mod.InitModule(mods)
@@ -153,8 +157,10 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 	}
 
 	cs.blockChain.Store(proposal.Block)
-
-	cs.configuration.Propose(proposal)
+	// kauri sends the proposal to only the children
+	if cs.kauri == nil {
+		cs.configuration.Propose(proposal)
+	}
 	// self vote
 	cs.OnPropose(proposal)
 }
@@ -226,6 +232,10 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 
 	cs.lastVote = block.View()
 
+	if cs.kauri != nil {
+		cs.kauri.Begin(pc, proposal)
+		return
+	}
 	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
 	if leaderID == cs.opts.ID() {
 		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})

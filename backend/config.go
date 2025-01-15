@@ -253,7 +253,7 @@ func (cfg *Config) SubConfig(ids []hotstuff.ID) (sub modules.Configuration, err 
 		nids[i] = uint32(id)
 		replicas[id] = cfg.replicas[id]
 	}
-	newCfg, err := cfg.mgr.NewConfiguration(gorums.WithNodeIDs(nids))
+	newCfg, err := cfg.mgr.NewConfiguration(qspec{}, gorums.WithNodeIDs(nids))
 	if err != nil {
 		return nil, err
 	}

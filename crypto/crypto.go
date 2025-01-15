@@ -3,12 +3,14 @@ package crypto
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
 
 type crypto struct {
 	blockChain    modules.BlockChain
 	configuration modules.Configuration
+	logger        logging.Logger
 
 	modules.CryptoBase
 }
@@ -25,6 +27,7 @@ func (c *crypto) InitModule(mods *modules.Core) {
 	mods.Get(
 		&c.blockChain,
 		&c.configuration,
+		&c.logger,
 	)
 
 	if mod, ok := c.CryptoBase.(modules.Module); ok {
@@ -109,7 +112,15 @@ func (c crypto) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
 		return true
 	}
-	if qc.Signature().Participants().Len() < c.configuration.QuorumSize() {
+
+	// TODO: FIX BUG - qcSignature can be nil when a leader is byzantine.
+	qcSignature := qc.Signature()
+	if qcSignature == nil {
+		c.logger.DPanicf("quorum certificate has nil signature (view=%d)", qc.View())
+	}
+
+	participants := qcSignature.Participants()
+	if participants.Len() < c.configuration.QuorumSize() {
 		return false
 	}
 	block, ok := c.blockChain.Get(qc.BlockHash())
