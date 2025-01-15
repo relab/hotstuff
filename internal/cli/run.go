@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"time"
 
@@ -16,11 +17,13 @@ import (
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/iago"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/rand"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -117,6 +120,26 @@ func runController() {
 		checkf("config error: %v", err)
 	} else {
 		cfg = config.NewLocal(numReplicas, numClients)
+
+		// This is needed for Kauri to work.
+		cfg.BranchFactor = viper.GetUint32("bf") // TODO: Configure this value differently
+
+		intTreePos := viper.GetIntSlice("tree-pos")
+		var treePos []uint32
+		if len(intTreePos) == 0 {
+			treePos = tree.DefaultTreePosUint32(viper.GetInt("replicas"))
+		} else {
+			treePos = make([]uint32, len(intTreePos))
+			for i, pos := range intTreePos {
+				treePos[i] = uint32(pos)
+			}
+		}
+		if viper.GetBool("random-tree") {
+			rnd := rand.New(rand.NewSource(rand.Uint64()))
+			rnd.Shuffle(len(treePos), reflect.Swapper(treePos))
+		}
+		cfg.TreePositions = treePos
+		cfg.TreeDelta = viper.GetDuration("tree-delta")
 	}
 
 	worker := viper.GetBool("worker")
