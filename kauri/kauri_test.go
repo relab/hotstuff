@@ -9,10 +9,10 @@ import (
 )
 
 func TestSubTree(t *testing.T) {
-	subTreeTestData := []struct {
-		test_a   []hotstuff.ID
-		test_b   []hotstuff.ID
-		expected bool
+	testData := []struct {
+		a    []hotstuff.ID
+		b    []hotstuff.ID
+		want bool
 	}{
 		{[]hotstuff.ID{1, 2, 3, 4, 5}, []hotstuff.ID{1, 2, 3, 4, 5}, true},
 		{[]hotstuff.ID{1, 2, 3, 4, 5}, []hotstuff.ID{1, 2, 3, 4}, false},
@@ -20,18 +20,18 @@ func TestSubTree(t *testing.T) {
 		{[]hotstuff.ID{1, 2, 3, 4, 5}, []hotstuff.ID{1, 2, 3, 4, 5, 6}, true},
 		{nil, nil, true},
 	}
-	for _, test := range subTreeTestData {
-		if isSubSet(test.test_a, test.test_b) != test.expected {
-			t.Errorf("SubTree(%v, %v) = %v; want %v", test.test_a, test.test_b, !test.expected, test.expected)
+	for _, test := range testData {
+		if isSubSet(test.a, test.b) != test.want {
+			t.Errorf("SubTree(%v, %v) = %t; want %t", test.a, test.b, !test.want, test.want)
 		}
 	}
 }
 
 func TestCanMerge(t *testing.T) {
-	mergeTestData := []struct {
-		test_a   []hotstuff.ID
-		test_b   []hotstuff.ID
-		expected bool
+	testData := []struct {
+		a       []hotstuff.ID
+		b       []hotstuff.ID
+		wantErr bool
 	}{
 		{[]hotstuff.ID{1, 2, 3, 4, 5}, []hotstuff.ID{1, 2, 3, 4, 5}, true},
 		{[]hotstuff.ID{1, 2, 3, 4, 5}, []hotstuff.ID{1, 2, 3, 4, 5, 6}, true},
@@ -40,20 +40,20 @@ func TestCanMerge(t *testing.T) {
 		{[]hotstuff.ID{3, 4, 5}, []hotstuff.ID{1, 2}, false},
 		{nil, nil, false},
 	}
-	for _, test := range mergeTestData {
+	for _, test := range testData {
 		a := make(crypto.Multi[*ecdsa.Signature])
-		for _, id := range test.test_a {
+		for _, id := range test.a {
 			a[id] = &ecdsa.Signature{}
 		}
 		b := make(crypto.Multi[*ecdsa.Signature])
-		for _, id := range test.test_b {
+		for _, id := range test.b {
 			b[id] = &ecdsa.Signature{}
 		}
 		err := canMergeContributions(a, b)
-		if err != nil && !test.expected {
+		if err != nil && !test.wantErr {
 			t.Errorf("canMergeContributions(%v, %v) got error and no error is expected", a, b)
 		}
-		if err == nil && test.expected {
+		if err == nil && test.wantErr {
 			t.Errorf("canMergeContributions(%v, %v) succeeded and error is expected", a, b)
 		}
 	}
