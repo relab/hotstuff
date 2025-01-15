@@ -2,6 +2,7 @@ package config
 
 import (
 	"slices"
+	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
@@ -55,22 +56,17 @@ type HostConfig struct {
 	BranchFactor uint32
 	// ByzantineStrategy is a map from each strategy to a list of replica IDs exhibiting that strategy.
 	ByzantineStrategy map[string][]uint32
+
+	TreeDelta time.Duration
 }
 
-// NewLocal creates a config for a localhost case.
-// TODO: Add support for locations through cli.
-func NewLocal(numReplicas, numClients int,
-
-// locations []string,
-// byzStrat map[string][]uint32,
-) *HostConfig {
+// NewLocal creates a config for local hosting.
+func NewLocal(numReplicas, numClients int) *HostConfig {
 	return &HostConfig{
 		ReplicaHosts: []string{"localhost"},
 		ClientHosts:  []string{"localhost"},
 		Replicas:     numReplicas,
 		Clients:      numClients,
-		// Locations:         locations,
-		// ByzantineStrategy: byzStrat,
 	}
 }
 

@@ -465,12 +465,12 @@ func (tm *timeoutManager) InitModule(mods *modules.Core) {
 		&tm.eventLoop,
 	)
 
-	tm.eventLoop.RegisterObserver(tick{}, func(_ any) {
+	tm.eventLoop.RegisterHandler(tick{}, func(_ any) {
 		tm.advance()
-	})
-	tm.eventLoop.RegisterObserver(synchronizer.ViewChangeEvent{}, func(event any) {
+	}, eventloop.Prioritize())
+	tm.eventLoop.RegisterHandler(synchronizer.ViewChangeEvent{}, func(event any) {
 		tm.viewChange(event.(synchronizer.ViewChangeEvent))
-	})
+	}, eventloop.Prioritize())
 }
 
 // FixedTimeout returns an ExponentialTimeout with a max exponent of 0.

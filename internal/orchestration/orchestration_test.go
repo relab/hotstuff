@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/rand"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -18,46 +20,82 @@ import (
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/iago/iagotest"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
-func TestOrchestration(t *testing.T) {
-	run := func(t *testing.T, consensusImpl string, crypto string, mods []string, byzantine string) {
-		t.Helper()
+// makeReplicaOpts creates a new ReplicaOpts with the given parameters.
+func makeReplicaOpts(consensusImpl, crypto, byzantine string, mods []string) *orchestrationpb.ReplicaOpts {
+	return &orchestrationpb.ReplicaOpts{
+		BatchSize:         100,
+		ConnectTimeout:    durationpb.New(time.Second),
+		InitialTimeout:    durationpb.New(100 * time.Millisecond),
+		TimeoutSamples:    1000,
+		TimeoutMultiplier: 1.2,
+		Consensus:         consensusImpl,
+		Crypto:            crypto,
+		LeaderRotation:    "round-robin",
+		Modules:           mods,
+		ByzantineStrategy: byzantine,
+	}
+}
 
-		clientOpts := &orchestrationpb.ClientOpts{
-			ConnectTimeout: durationpb.New(time.Second),
-			MaxConcurrent:  250,
-			PayloadSize:    100,
-			RateLimit:      math.Inf(1),
-			Timeout:        durationpb.New(500 * time.Millisecond),
-		}
-		replicaOpts := &orchestrationpb.ReplicaOpts{
-			BatchSize:         100,
-			ConnectTimeout:    durationpb.New(time.Second),
-			InitialTimeout:    durationpb.New(100 * time.Millisecond),
-			TimeoutSamples:    1000,
-			TimeoutMultiplier: 1.2,
-			Consensus:         consensusImpl,
-			Crypto:            crypto,
-			LeaderRotation:    "round-robin",
-			Modules:           mods,
-			ByzantineStrategy: byzantine,
-		}
+func makeTreeReplicaOpts(consensusImpl, crypto string, mods []string, replicas, bf int, random bool) *orchestrationpb.ReplicaOpts {
+	treePos := tree.DefaultTreePosUint32(replicas)
+	if random {
+		rnd := rand.New(rand.NewSource(int64(rand.Uint64())))
+		rnd.Shuffle(len(treePos), reflect.Swapper(treePos))
+	}
+
+	return &orchestrationpb.ReplicaOpts{
+		BatchSize:         100,
+		ConnectTimeout:    durationpb.New(time.Second),
+		InitialTimeout:    durationpb.New(100 * time.Millisecond),
+		TimeoutSamples:    1000,
+		TimeoutMultiplier: 1.2,
+		Consensus:         consensusImpl,
+		Crypto:            crypto,
+		LeaderRotation:    "tree-leader",
+		Modules:           mods,
+		ByzantineStrategy: "", // TODO currently kauri does not support byzantine replicas
+		BranchFactor:      uint32(bf),
+		TreePositions:     treePos,
+		TreeDelta:         durationpb.New(30 * time.Millisecond),
+	}
+}
+
+func makeClientOpts() *orchestrationpb.ClientOpts {
+	return &orchestrationpb.ClientOpts{
+		ConnectTimeout: durationpb.New(time.Second),
+		MaxConcurrent:  250,
+		PayloadSize:    100,
+		RateLimit:      math.Inf(1),
+		Timeout:        durationpb.New(500 * time.Millisecond),
+	}
+}
+
+func TestOrchestration(t *testing.T) {
+	run := func(t *testing.T, replicaOpts *orchestrationpb.ReplicaOpts) {
+		t.Helper()
 
 		controllerStream, workerStream := net.Pipe()
 		workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
 		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), metrics.NopLogger(), nil, 0)
 
+		cfg := config.NewLocal(7, 2)
+		cfg.TreePositions = replicaOpts.TreePositions
+		cfg.BranchFactor = replicaOpts.BranchFactor
+		cfg.TreeDelta = replicaOpts.TreeDelta.AsDuration()
+
 		experiment, err := orchestration.NewExperiment(
 			5*time.Second,
 			"",
 			replicaOpts,
-			clientOpts,
-			config.NewLocal(4, 2),
+			makeClientOpts(),
+			cfg,
 			map[string]orchestration.RemoteWorker{"localhost": workerProxy},
 			logging.New("ctrl"),
 		)
@@ -81,28 +119,43 @@ func TestOrchestration(t *testing.T) {
 		}
 	}
 
-	t.Run("ChainedHotStuff+ECDSA", func(t *testing.T) { run(t, "chainedhotstuff", "ecdsa", nil, "") })
-	t.Run("ChainedHotStuff+EDDSA", func(t *testing.T) { run(t, "chainedhotstuff", "eddsa", nil, "") })
-	t.Run("ChainedHotStuff+BLS12", func(t *testing.T) { run(t, "chainedhotstuff", "bls12", nil, "") })
-	t.Run("Fast-HotStuff+ECDSA", func(t *testing.T) { run(t, "fasthotstuff", "ecdsa", nil, "") })
-	t.Run("Fast-HotStuff+EDDSA", func(t *testing.T) { run(t, "fasthotstuff", "eddsa", nil, "") })
-	t.Run("Fast-HotStuff+BLS12", func(t *testing.T) { run(t, "fasthotstuff", "bls12", nil, "") })
-	t.Run("Simple-HotStuff+ECDSA", func(t *testing.T) { run(t, "simplehotstuff", "ecdsa", nil, "") })
-	t.Run("Simple-HotStuff+EDDSA", func(t *testing.T) { run(t, "simplehotstuff", "eddsa", nil, "") })
-	t.Run("Simple-HotStuff+BLS12", func(t *testing.T) { run(t, "simplehotstuff", "bls12", nil, "") })
+	// kauri
+	mods := []string{"kauri"}
+	replicaOpts := makeTreeReplicaOpts("chainedhotstuff", "ecdsa", mods, 7, 2, false)
+	t.Run("ChainedHotStuff+ECDSA+Kauri+DefaultTree", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "bls12", mods, 7, 2, false)
+	t.Run("ChainedHotStuff+BLS12+Kauri+DefaultTree", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "ecdsa", mods, 7, 2, true)
+	t.Run("ChainedHotStuff+ECDSA+Kauri+RandomTree", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "bls12", mods, 7, 2, true)
+	t.Run("ChainedHotStuff+BLS12+Kauri+RandomTree", func(t *testing.T) { run(t, replicaOpts) })
 
-	// handel
-	mods := []string{"handel"}
-	t.Run("ChainedHotStuff+ECDSA+Handel", func(t *testing.T) { run(t, "chainedhotstuff", "ecdsa", mods, "") })
-	t.Run("ChainedHotStuff+BLS12+Handel", func(t *testing.T) { run(t, "chainedhotstuff", "bls12", mods, "") })
-	t.Run("Fast-HotStuff+ECDSA+Handel", func(t *testing.T) { run(t, "fasthotstuff", "ecdsa", mods, "") })
-	t.Run("Fast-HotStuff+BLS12+Handel", func(t *testing.T) { run(t, "fasthotstuff", "bls12", mods, "") })
-	t.Run("Simple-HotStuff+ECDSA+Handel", func(t *testing.T) { run(t, "simplehotstuff", "ecdsa", mods, "") })
-	t.Run("Simple-HotStuff+BLS12+Handel", func(t *testing.T) { run(t, "simplehotstuff", "bls12", mods, "") })
+	// hotstuff
+	replicaOpts = makeReplicaOpts("chainedhotstuff", "ecdsa", "", nil)
+	t.Run("ChainedHotStuff+ECDSA", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeReplicaOpts("chainedhotstuff", "eddsa", "", nil)
+	t.Run("ChainedHotStuff+EDDSA", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeReplicaOpts("chainedhotstuff", "bls12", "", nil)
+	t.Run("ChainedHotStuff+BLS12", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeReplicaOpts("fasthotstuff", "ecdsa", "", nil)
+	t.Run("Fast-HotStuff+ECDSA", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeReplicaOpts("fasthotstuff", "eddsa", "", nil)
+	t.Run("Fast-HotStuff+EDDSA", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeReplicaOpts("fasthotstuff", "bls12", "", nil)
+	t.Run("Fast-HotStuff+BLS12", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeReplicaOpts("simplehotstuff", "ecdsa", "", nil)
+	t.Run("Simple-HotStuff+ECDSA", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeReplicaOpts("simplehotstuff", "eddsa", "", nil)
+	t.Run("Simple-HotStuff+EDDSA", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeReplicaOpts("simplehotstuff", "bls12", "", nil)
+	t.Run("Simple-HotStuff+BLS12", func(t *testing.T) { run(t, replicaOpts) })
 
 	// byzantine
-	t.Run("ChainedHotStuff+Fork", func(t *testing.T) { run(t, "chainedhotstuff", "ecdsa", nil, "fork:1") })
-	t.Run("ChainedHotStuff+Silence", func(t *testing.T) { run(t, "chainedhotstuff", "ecdsa", nil, "silence:1") })
+	replicaOpts = makeReplicaOpts("chainedhotstuff", "ecdsa", "fork:1", nil)
+	t.Run("ChainedHotStuff+Fork", func(t *testing.T) { run(t, replicaOpts) })
+	replicaOpts = makeReplicaOpts("chainedhotstuff", "ecdsa", "silence:1", nil)
+	t.Run("ChainedHotStuff+Silence", func(t *testing.T) { run(t, replicaOpts) })
+
 }
 
 func TestDeployment(t *testing.T) {

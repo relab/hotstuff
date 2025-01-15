@@ -46,9 +46,9 @@ func (t *Throughput) InitModule(mods *modules.Core) {
 		t.recordCommit(commitEvent.Commands)
 	})
 
-	eventLoop.RegisterObserver(types.TickEvent{}, func(event any) {
+	eventLoop.RegisterHandler(types.TickEvent{}, func(event any) {
 		t.tick(event.(types.TickEvent))
-	})
+	}, eventloop.Prioritize())
 
 	logger.Info("Throughput metric enabled")
 }

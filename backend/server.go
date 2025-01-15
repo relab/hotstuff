@@ -31,6 +31,7 @@ type Server struct {
 	id            hotstuff.ID
 	lm            latency.Matrix
 	gorumsSrv     *gorums.Server
+	opts          *modules.Options
 }
 
 // InitModule initializes the Server.
@@ -40,6 +41,7 @@ func (srv *Server) InitModule(mods *modules.Core) {
 		&srv.configuration,
 		&srv.blockChain,
 		&srv.logger,
+		&srv.opts,
 	)
 }
 
@@ -155,6 +157,9 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
+	}
+	if impl.srv.opts.ShouldUseTree() {
+		id = hotstuff.ID(proposal.Block.Proposer)
 	}
 	proposal.Block.Proposer = uint32(id)
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)

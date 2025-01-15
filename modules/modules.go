@@ -162,12 +162,6 @@ type Synchronizer interface {
 	Start(context.Context)
 }
 
-// Handel is an implementation of the Handel signature aggregation protocol.
-type Handel interface {
-	// Begin commissions the aggregation of a new signature.
-	Begin(s hotstuff.PartialCert)
-}
-
 // ExtendedExecutor turns the given Executor into an ExecutorExt.
 func ExtendedExecutor(executor Executor) ExecutorExt {
 	return executorWrapper{executor}
@@ -204,4 +198,9 @@ func (fhw forkHandlerWrapper) InitModule(mods *Core) {
 
 func (fhw forkHandlerWrapper) Fork(block *hotstuff.Block) {
 	fhw.forkHandler.Fork(block.Command())
+}
+
+// Kauri module implements the Kauri protocol
+type Kauri interface {
+	Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg)
 }

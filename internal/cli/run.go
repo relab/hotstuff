@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"time"
 
@@ -16,11 +17,13 @@ import (
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/iago"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/rand"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -52,7 +55,8 @@ func init() {
 	runCmd.Flags().Duration("client-timeout", 500*time.Millisecond, "Client timeout.")
 	runCmd.Flags().Duration("duration", 10*time.Second, "duration of the experiment")
 	runCmd.Flags().Duration("connect-timeout", 5*time.Second, "duration of the initial connection timeout")
-	runCmd.Flags().Duration("view-timeout", 100*time.Millisecond, "duration of the first view")
+	// need longer default timeout for the kauri
+	runCmd.Flags().Duration("view-timeout", 500*time.Millisecond, "duration of the first view")
 	runCmd.Flags().Duration("max-timeout", 0, "upper limit on view timeouts")
 	runCmd.Flags().Int("duration-samples", 1000, "number of previous views to consider when predicting view duration")
 	runCmd.Flags().Float32("timeout-multiplier", 1.2, "number to multiply the view duration by in case of a timeout")
@@ -79,6 +83,11 @@ func init() {
 	runCmd.Flags().Float64("rate-step", 0, "rate limit step up for clients (in commands/second)")
 	runCmd.Flags().Duration("rate-step-interval", time.Hour, "how often the client rate limit should be increased")
 	runCmd.Flags().StringSlice("byzantine", nil, "byzantine strategies to use, as a comma separated list of 'name:count'")
+	// tree config parameter
+	runCmd.Flags().Int("bf", 2, "branch factor of the tree")
+	runCmd.Flags().IntSlice("tree-pos", []int{}, "tree positions of the replicas")
+	runCmd.Flags().Duration("tree-delta", 30*time.Millisecond, "waiting time for intermediate nodes in the tree")
+	runCmd.Flags().Bool("random-tree", false, "randomize tree positions, tree-pos is ignored if set")
 
 	runCmd.Flags().String("config", "", "Cue-based host config")
 
@@ -109,6 +118,26 @@ func runController() {
 		checkf("config error when loading %s: %v", cfgPath, err)
 	} else {
 		cfg = config.NewLocal(numReplicas, numClients)
+
+		// This is needed for Kauri to work.
+		cfg.BranchFactor = viper.GetUint32("bf") // TODO: Configure this value differently
+
+		intTreePos := viper.GetIntSlice("tree-pos")
+		var treePos []uint32
+		if len(intTreePos) == 0 {
+			treePos = tree.DefaultTreePosUint32(viper.GetInt("replicas"))
+		} else {
+			treePos = make([]uint32, len(intTreePos))
+			for i, pos := range intTreePos {
+				treePos[i] = uint32(pos)
+			}
+		}
+		if viper.GetBool("random-tree") {
+			rnd := rand.New(rand.NewSource(rand.Uint64()))
+			rnd.Shuffle(len(treePos), reflect.Swapper(treePos))
+		}
+		cfg.TreePositions = treePos
+		cfg.TreeDelta = viper.GetDuration("tree-delta")
 	}
 
 	worker := viper.GetBool("worker")

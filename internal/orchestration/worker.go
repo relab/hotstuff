@@ -39,7 +39,7 @@ import (
 	_ "github.com/relab/hotstuff/crypto/bls12"
 	_ "github.com/relab/hotstuff/crypto/ecdsa"
 	_ "github.com/relab/hotstuff/crypto/eddsa"
-	_ "github.com/relab/hotstuff/handel"
+	_ "github.com/relab/hotstuff/kauri"
 	_ "github.com/relab/hotstuff/leaderrotation"
 )
 
@@ -210,6 +210,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 	)
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
+	builder.Options().SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
+
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
 		builder.Add(replicaMetrics...)

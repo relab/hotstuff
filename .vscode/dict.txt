@@ -44,7 +44,6 @@ gorums
 gpool
 grpc
 Gueta
-handelpb
 Hein
 hostnames
 HOTSTUFF
@@ -58,6 +57,7 @@ Infof
 Jalalzai
 Jehl
 Jianyu
+kauripb
 keygen
 kilic
 latencygen

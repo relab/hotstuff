@@ -3,6 +3,7 @@ package modules
 import (
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/relab/hotstuff"
 )
@@ -38,11 +39,13 @@ type Options struct {
 	privateKey hotstuff.PrivateKey
 
 	shouldUseAggQC        bool
-	shouldUseHandel       bool
 	shouldVerifyVotesSync bool
 
 	sharedRandomSeed   int64
 	connectionMetadata map[string]string
+
+	treeConfig    *TreeConfig
+	shouldUseTree bool
 }
 
 func (opts *Options) ensureSpace(id OptionID) {
@@ -51,6 +54,37 @@ func (opts *Options) ensureSpace(id OptionID) {
 		copy(newOpts, opts.options)
 		opts.options = newOpts
 	}
+}
+
+// TreeConfig stores the tree configuration
+type TreeConfig struct {
+	bf            int
+	treePos       []hotstuff.ID
+	treeWaitDelta time.Duration
+}
+
+// BranchFactor returns the branch factor of the tree.
+func (tc *TreeConfig) BranchFactor() int {
+	return tc.bf
+}
+
+// TreePos returns the tree positions of the replicas.
+func (tc *TreeConfig) TreePos() []hotstuff.ID {
+	return tc.treePos
+}
+
+// TreeWaitDelta returns the time to wait for a tree node to be ready.
+func (tc *TreeConfig) TreeWaitDelta() time.Duration {
+	return tc.treeWaitDelta
+}
+
+// SetShouldUseTree sets the ShouldUseTree setting to true.
+func (opts *Options) SetShouldUseTree() {
+	opts.shouldUseTree = true
+}
+
+func (opts *Options) ShouldUseTree() bool {
+	return opts.shouldUseTree
 }
 
 // Get returns the value associated with the given option ID.
@@ -81,15 +115,15 @@ func (opts *Options) PrivateKey() hotstuff.PrivateKey {
 	return opts.privateKey
 }
 
+// TreeConfig returns the tree config
+func (opts *Options) TreeConfig() *TreeConfig {
+	return opts.treeConfig
+}
+
 // ShouldUseAggQC returns true if aggregated quorum certificates should be used.
 // This is true for Fast-Hotstuff: https://arxiv.org/abs/2010.11454
 func (opts *Options) ShouldUseAggQC() bool {
 	return opts.shouldUseAggQC
-}
-
-// ShouldUseHandel returns true if the Handel signature aggregation protocol should be used.
-func (opts *Options) ShouldUseHandel() bool {
-	return opts.shouldUseHandel
 }
 
 // ShouldVerifyVotesSync returns true if votes should be verified synchronously.
@@ -113,14 +147,17 @@ func (opts *Options) SetShouldUseAggQC() {
 	opts.shouldUseAggQC = true
 }
 
-// SetShouldUseHandel sets the ShouldUseHandel setting to true.
-func (opts *Options) SetShouldUseHandel() {
-	opts.shouldUseHandel = true
-}
-
 // SetShouldVerifyVotesSync sets the ShouldVerifyVotesSync setting to true.
 func (opts *Options) SetShouldVerifyVotesSync() {
 	opts.shouldVerifyVotesSync = true
+}
+
+func (opts *Options) SetTreeConfig(bf uint32, treePos []hotstuff.ID, treeWaitDelta time.Duration) {
+	opts.treeConfig = &TreeConfig{
+		bf:            int(bf),
+		treePos:       treePos,
+		treeWaitDelta: treeWaitDelta,
+	}
 }
 
 // SetSharedRandomSeed sets the shared random seed.
