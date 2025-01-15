@@ -122,7 +122,7 @@ func runController() {
 		cfg = config.NewLocal(numReplicas, numClients)
 
 		// This is needed for Kauri to work.
-		cfg.BranchFactor = viper.GetUint32("bf") // TODO: Configure this value differently
+		cfg.BranchFactor = viper.GetUint32("bf")
 
 		intTreePos := viper.GetIntSlice("tree-pos")
 		var treePos []uint32
@@ -138,9 +138,13 @@ func runController() {
 			rnd := rand.New(rand.NewSource(rand.Uint64()))
 			rnd.Shuffle(len(treePos), reflect.Swapper(treePos))
 		}
+
 		cfg.TreePositions = treePos
-		cfg.TreeDelta = viper.GetDuration("tree-delta")
 	}
+
+	// Cue does not support duration. For now it must be supplied via cli.
+	// TODO: Configure this via Cue in the future.
+	cfg.TreeDelta = viper.GetDuration("tree-delta")
 
 	worker := viper.GetBool("worker")
 
