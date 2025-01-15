@@ -166,7 +166,7 @@ func (t *Tree) replicaPosition(id hotstuff.ID) int {
 	return slices.Index(t.treePosToID, id)
 }
 
-// TreePos returns the tree positions of the replicas.
+// DefaultTreePos returns the tree positions of the replicas.
 func DefaultTreePos(size int) []hotstuff.ID {
 	ids := make([]hotstuff.ID, size)
 	for i := range size {
@@ -175,7 +175,7 @@ func DefaultTreePos(size int) []hotstuff.ID {
 	return ids
 }
 
-// TreePos returns the tree positions of the replicas.
+// DefaultTreePosUint32 returns the tree positions of the replicas.
 func DefaultTreePosUint32(size int) []uint32 {
 	ids := make([]uint32, size)
 	for i := range size {
