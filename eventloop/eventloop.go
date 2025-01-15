@@ -137,9 +137,9 @@ func (el *EventLoop) AddEvent(event any) {
 	if event != nil {
 		// run handlers with runInAddEvent option
 		el.processEvent(event, true)
-		dropped := el.eventQ.push(event)
-		if dropped {
-			el.logger.Warn("event queue is full and dropped an event")
+		droppedEvent := el.eventQ.push(event)
+		if droppedEvent != nil {
+			el.logger.Warnf("event queue is full, dropped event: %v", droppedEvent)
 		}
 	}
 }
@@ -319,7 +319,10 @@ func (el *EventLoop) AddTicker(interval time.Duration, callback func(tick time.T
 
 	// We want the ticker to inherit the context of the event loop,
 	// so we need to start the ticker from the run loop.
-	el.eventQ.push(startTickerEvent{id})
+	droppedEvent := el.eventQ.push(startTickerEvent{id})
+	if droppedEvent != nil {
+		el.logger.Warnf("event queue is full, dropped event: %v", droppedEvent)
+	}
 
 	return id
 }

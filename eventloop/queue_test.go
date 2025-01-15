@@ -56,7 +56,10 @@ func TestPushAndThenPopTwice(t *testing.T) {
 func TestPushWhenFull(t *testing.T) {
 	q := newQueue(1)
 	q.push("hello")
-	q.push("world")
+	dropped := q.push("world")
+	if dropped.(string) != "hello" {
+		t.Errorf("expected q.push() to return \"hello\"")
+	}
 
 	elem, ok := q.pop()
 	if elem.(string) != "world" || !ok {
@@ -105,5 +108,4 @@ func TestPopWhenTailInFrontOfHead(t *testing.T) {
 	if elem.(string) != "world" || !ok {
 		t.Errorf("expected q.pop() to return \"world\", true")
 	}
-
 }

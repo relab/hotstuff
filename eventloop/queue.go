@@ -27,11 +27,9 @@ func newQueue(capacity uint) queue {
 
 // push adds an entry to the buffer in a FIFO fashion. If the queue is full, the first
 // entry is dropped to make space for the newest entry and returns true.
-func (q *queue) push(entry any) (droppedOne bool) {
+func (q *queue) push(entry any) (droppedEvent any) {
 	q.mut.Lock()
 	defer q.mut.Unlock()
-
-	droppedOne = false
 
 	pos := q.tail + 1
 	if pos == len(q.entries) {
@@ -43,7 +41,7 @@ func (q *queue) push(entry any) (droppedOne bool) {
 		if q.head == len(q.entries) {
 			q.head = 0
 		}
-		droppedOne = true
+		droppedEvent = q.entries[q.head]
 	}
 	q.entries[pos] = entry
 	q.tail = pos
@@ -56,7 +54,7 @@ func (q *queue) push(entry any) (droppedOne bool) {
 	case q.readyChan <- struct{}{}:
 	default:
 	}
-	return droppedOne
+	return droppedEvent
 }
 
 // pop removes the first entry and returns it.
