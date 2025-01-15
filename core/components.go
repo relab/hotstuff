@@ -142,6 +142,10 @@ type Consensus interface {
 	ChainLength() int
 }
 
+type VotingMachine interface {
+	OnVote(vote hotstuff.VoteMsg)
+}
+
 //go:generate mockgen -destination=../internal/mocks/synchronizer_mock.go -package=mocks . Synchronizer
 
 // Synchronizer synchronizes replicas to the same view.

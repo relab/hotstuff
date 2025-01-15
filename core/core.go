@@ -36,7 +36,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/eventloop"
+	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/modules"
 )
 
 // Component is an interface for initializing components.
@@ -47,7 +49,50 @@ type Component interface {
 // Core is the base of the component system.
 // It contains only a few core components that are shared between replicas and clients.
 type Core struct {
-	components []any
+	modules []any // TODO: Change type to Module
+
+	blockChain    BlockChain
+	consensus     Consensus
+	crypto        Crypto
+	eventLoop     *eventloop.EventLoop
+	logger        logging.Logger
+	synchronizer  Synchronizer
+	votingMachine VotingMachine
+
+	// TODO: This is a module, make a new system to acquire this.
+	leaderRotation modules.LeaderRotation
+}
+
+func (c *Core) Consensus() Consensus {
+	return nil
+}
+
+func (c *Core) VotingMachine() VotingMachine {
+	return nil
+}
+
+func (c *Core) Synchronizer() Synchronizer {
+	return nil
+}
+
+func (c *Core) Crypto() Crypto {
+	return nil
+}
+
+func (c *Core) BlockChain() BlockChain {
+	return nil
+}
+
+func (c *Core) EventLoop() *eventloop.EventLoop {
+	return nil
+}
+
+func (c *Core) Logger() logging.Logger {
+	return nil
+}
+
+func (c *Core) LeaderRotation() modules.LeaderRotation {
+	return nil
 }
 
 // TryGet attempts to find a component for ptr.
@@ -57,7 +102,7 @@ type Core struct {
 //
 // Example:
 //
-//	builder := components.New()
+//	builder := core.NewBuilder()
 //	builder.Add(MycomponentImpl{})
 //	mods = builder.Build()
 //
@@ -75,7 +120,7 @@ func (mods Core) TryGet(ptr any) bool {
 		panic("only pointer values allowed")
 	}
 
-	for _, m := range mods.components {
+	for _, m := range mods.modules {
 		mv := reflect.ValueOf(m)
 		if mv.Type().AssignableTo(pt.Elem()) {
 			v.Elem().Set(mv)
@@ -93,7 +138,7 @@ func (mods Core) TryGet(ptr any) bool {
 //
 // Example:
 //
-//	builder := components.New()
+//	builder := core.NewBuilder()
 //	builder.Add(MycomponentImpl{})
 //	mods = builder.Build()
 //
@@ -108,52 +153,4 @@ func (mods *Core) Get(pointers ...any) {
 			panic(fmt.Sprintf("component of type %s not found", reflect.TypeOf(ptr).Elem()))
 		}
 	}
-}
-
-// Builder is a helper for setting up client components.
-type Builder struct {
-	core       Core
-	components []Component
-	opts       *Options
-}
-
-// NewBuilder returns a new builder.
-func NewBuilder(id hotstuff.ID, pk hotstuff.PrivateKey) Builder {
-	bl := Builder{
-		opts: &Options{
-			id:                 id,
-			privateKey:         pk,
-			connectionMetadata: make(map[string]string),
-		},
-	}
-	return bl
-}
-
-// Options returns the options component.
-func (b *Builder) Options() *Options {
-	return b.opts
-}
-
-// Add adds components to the builder.
-func (b *Builder) Add(components ...any) {
-	b.core.components = append(b.core.components, components...)
-	for _, component := range components {
-		if m, ok := component.(Component); ok {
-			b.components = append(b.components, m)
-		}
-	}
-}
-
-// Build initializes all added components and returns the Core object.
-func (b *Builder) Build() *Core {
-	// reverse the order of the added components so that TryGet will find the latest first.
-	for i, j := 0, len(b.core.components)-1; i < j; i, j = i+1, j-1 {
-		b.core.components[i], b.core.components[j] = b.core.components[j], b.core.components[i]
-	}
-	// add the Options last so that it can be overridden by user.
-	b.Add(b.opts)
-	for _, component := range b.components {
-		component.InitComponent(&b.core)
-	}
-	return &b.core
 }
