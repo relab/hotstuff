@@ -14,7 +14,7 @@ type queue struct {
 
 func newQueue(capacity uint) queue {
 	if capacity == 0 {
-		panic("capacity must be over 0")
+		panic("capacity must be greater than 0")
 	}
 
 	return queue{
