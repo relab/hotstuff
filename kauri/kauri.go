@@ -129,7 +129,8 @@ func (k *Kauri) SendProposalToChildren(p hotstuff.ProposeMsg) {
 		}
 		k.logger.Debug("Sending proposal to children ", children)
 		config.Propose(p)
-		waitTime := time.Duration(k.tree.TreeHeight()) * k.treeConfig.TreeWaitDelta()
+		// delta is the network delay between two processes, at root it is 2*(3-1)*delta
+		waitTime := time.Duration(2*(k.tree.TreeHeight()-1)) * k.treeConfig.TreeWaitDelta()
 		go k.WaitToAggregate(waitTime, k.currentView)
 	} else {
 		k.SendContributionToParent()
@@ -193,7 +194,7 @@ func canMergeContributions(a, b hotstuff.QuorumSignature) error {
 	canMerge := true
 	a.Participants().RangeWhile(func(i hotstuff.ID) bool {
 		// cannot merge a and b if both contain a contribution from the same ID.
-		canMerge := !b.Participants().Contains(i)
+		canMerge = !b.Participants().Contains(i)
 		return canMerge // exit the range-while loop if canMerge is false
 	})
 	if !canMerge {
@@ -236,6 +237,7 @@ func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) err
 	return nil
 }
 
+// isSubSet returns true if a is a subset of b.
 func isSubSet(a, b []hotstuff.ID) bool {
 	c := hotstuff.NewIDSet()
 	for _, id := range b {
