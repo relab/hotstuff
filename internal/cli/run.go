@@ -138,10 +138,6 @@ func runController() {
 		replicaHosts = cfg.ReplicaHosts
 		clientHosts = cfg.ClientHosts
 	} else {
-		// If a config is not specified, use the user/default cli flags
-		// and instantiate a config for a local run.
-		cfg = config.NewLocal(numReplicas, numClients)
-
 		// If the hosts are specified in cli, overwrite the local cfg.
 
 		cfg = &config.HostConfig{
