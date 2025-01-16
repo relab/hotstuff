@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -20,6 +21,7 @@ import (
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/internal/test"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
@@ -77,85 +79,83 @@ func makeClientOpts() *orchestrationpb.ClientOpts {
 	}
 }
 
-func TestOrchestration(t *testing.T) {
-	run := func(t *testing.T, replicaOpts *orchestrationpb.ReplicaOpts) {
-		t.Helper()
+func run(t *testing.T, replicaOpts *orchestrationpb.ReplicaOpts) {
+	t.Helper()
 
-		controllerStream, workerStream := net.Pipe()
-		workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
-		worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), metrics.NopLogger(), nil, 0)
+	controllerStream, workerStream := net.Pipe()
+	workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
+	worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), metrics.NopLogger(), nil, 0)
 
-		cfg := config.NewLocal(7, 2)
-		cfg.TreePositions = replicaOpts.TreePositions
-		cfg.BranchFactor = replicaOpts.BranchFactor
-		cfg.TreeDelta = replicaOpts.TreeDelta.AsDuration()
+	cfg := config.NewLocal(7, 2)
+	cfg.TreePositions = replicaOpts.TreePositions
+	cfg.BranchFactor = replicaOpts.BranchFactor
+	cfg.TreeDelta = replicaOpts.TreeDelta.AsDuration()
 
-		experiment, err := orchestration.NewExperiment(
-			5*time.Second,
-			"",
-			replicaOpts,
-			makeClientOpts(),
-			cfg,
-			map[string]orchestration.RemoteWorker{"localhost": workerProxy},
-			logging.New("ctrl"),
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		c := make(chan error)
-		go func() {
-			c <- worker.Run()
-		}()
-
-		err = experiment.Run()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = <-c
-		if err != nil {
-			t.Fatal(err)
-		}
+	experiment, err := orchestration.NewExperiment(
+		5*time.Second,
+		"",
+		replicaOpts,
+		makeClientOpts(),
+		cfg,
+		map[string]orchestration.RemoteWorker{"localhost": workerProxy},
+		logging.New("ctrl"),
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	// kauri
-	mods := []string{"kauri"}
-	replicaOpts := makeTreeReplicaOpts("chainedhotstuff", "ecdsa", mods, 7, 2, false)
-	t.Run("ChainedHotStuff+ECDSA+Kauri+DefaultTree", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "bls12", mods, 7, 2, false)
-	t.Run("ChainedHotStuff+BLS12+Kauri+DefaultTree", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "ecdsa", mods, 7, 2, true)
-	t.Run("ChainedHotStuff+ECDSA+Kauri+RandomTree", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeTreeReplicaOpts("chainedhotstuff", "bls12", mods, 7, 2, true)
-	t.Run("ChainedHotStuff+BLS12+Kauri+RandomTree", func(t *testing.T) { run(t, replicaOpts) })
+	c := make(chan error)
+	go func() {
+		c <- worker.Run()
+	}()
 
-	// hotstuff
-	replicaOpts = makeReplicaOpts("chainedhotstuff", "ecdsa", "", nil)
-	t.Run("ChainedHotStuff+ECDSA", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("chainedhotstuff", "eddsa", "", nil)
-	t.Run("ChainedHotStuff+EDDSA", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("chainedhotstuff", "bls12", "", nil)
-	t.Run("ChainedHotStuff+BLS12", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("fasthotstuff", "ecdsa", "", nil)
-	t.Run("Fast-HotStuff+ECDSA", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("fasthotstuff", "eddsa", "", nil)
-	t.Run("Fast-HotStuff+EDDSA", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("fasthotstuff", "bls12", "", nil)
-	t.Run("Fast-HotStuff+BLS12", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("simplehotstuff", "ecdsa", "", nil)
-	t.Run("Simple-HotStuff+ECDSA", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("simplehotstuff", "eddsa", "", nil)
-	t.Run("Simple-HotStuff+EDDSA", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("simplehotstuff", "bls12", "", nil)
-	t.Run("Simple-HotStuff+BLS12", func(t *testing.T) { run(t, replicaOpts) })
+	err = experiment.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// byzantine
-	replicaOpts = makeReplicaOpts("chainedhotstuff", "ecdsa", "fork:1", nil)
-	t.Run("ChainedHotStuff+Fork", func(t *testing.T) { run(t, replicaOpts) })
-	replicaOpts = makeReplicaOpts("chainedhotstuff", "ecdsa", "silence:1", nil)
-	t.Run("ChainedHotStuff+Silence", func(t *testing.T) { run(t, replicaOpts) })
+	err = <-c
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
+func TestOrchestration(t *testing.T) {
+	tests := []struct {
+		consensus  string
+		crypto     string
+		byzantine  string
+		mods       []string
+		randomTree bool
+	}{
+		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "", mods: nil},
+		{consensus: "chainedhotstuff", crypto: "eddsa", byzantine: "", mods: nil},
+		{consensus: "chainedhotstuff", crypto: "bls12", byzantine: "", mods: nil},
+		{consensus: "fasthotstuff", crypto: "ecdsa", byzantine: "", mods: nil},
+		{consensus: "fasthotstuff", crypto: "eddsa", byzantine: "", mods: nil},
+		{consensus: "fasthotstuff", crypto: "bls12", byzantine: "", mods: nil},
+		{consensus: "simplehotstuff", crypto: "ecdsa", byzantine: "", mods: nil},
+		{consensus: "simplehotstuff", crypto: "eddsa", byzantine: "", mods: nil},
+		{consensus: "simplehotstuff", crypto: "bls12", byzantine: "", mods: nil},
+		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "fork:1", mods: nil},
+		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "silence:1", mods: nil},
+		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "", mods: []string{"kauri"}},
+		{consensus: "chainedhotstuff", crypto: "bls12", byzantine: "", mods: []string{"kauri"}},
+		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "", mods: []string{"kauri"}, randomTree: true},
+		{consensus: "chainedhotstuff", crypto: "bls12", byzantine: "", mods: []string{"kauri"}, randomTree: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(test.Name([]string{"consensus", "crypto", "byzantine", "mods"}, tt.consensus, tt.crypto, tt.byzantine, tt.mods), func(t *testing.T) {
+			var replicaOpts *orchestrationpb.ReplicaOpts
+			if slices.Contains(tt.mods, "kauri") {
+				replicaOpts = makeTreeReplicaOpts(tt.consensus, tt.crypto, tt.mods, 7, 2, tt.randomTree)
+			} else {
+				replicaOpts = makeReplicaOpts(tt.consensus, tt.crypto, tt.byzantine, tt.mods)
+			}
+			run(t, replicaOpts)
+		})
+	}
 }
 
 func TestDeployment(t *testing.T) {
