@@ -193,11 +193,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 
 	sync := synchronizer.New(synchronizer.NewViewDuration(
-		uint64(opts.GetTimeoutSamples()),
-		float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-		float64(opts.GetTimeoutMultiplier()),
+		opts.GetTimeoutSamples(),
+		opts.GetTimeoutMultiplier(),
+		opts.GetInitialTimeout().AsDuration(),
+		opts.GetMaxTimeout().AsDuration(),
 	))
+
 	builder.Add(
 		eventloop.New(1000),
 		consensus.New(consensusRules),

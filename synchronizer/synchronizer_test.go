@@ -1,7 +1,9 @@
 package synchronizer_test
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/relab/hotstuff"
 
@@ -66,5 +68,58 @@ func TestAdvanceViewTC(t *testing.T) {
 
 	if s.View() != 2 {
 		t.Errorf("wrong view: expected: %v, got: %v", 2, s.View())
+	}
+}
+
+func TestViewDurationViewStarted(t *testing.T) {
+	startDuration := 500 * time.Millisecond
+	maxDuration := 1000 * time.Second
+	vd := synchronizer.NewViewDuration(5, 2, startDuration, maxDuration)
+
+	vd.ViewStarted()
+	d := vd.Duration()
+	if d != startDuration {
+		t.Errorf("call 1: expected view duration to stay the same. want: %v, got: %v", startDuration, d)
+	}
+
+	vd.ViewStarted()
+	d = vd.Duration()
+	fmt.Printf("%v\n", d)
+	if d != startDuration {
+		t.Errorf("call 2: expected view duration to stay the same. want: %v, got: %v", startDuration, d)
+	}
+}
+
+func TestViewDurationViewTimeout(t *testing.T) {
+	startDuration := 500 * time.Millisecond
+	maxDuration := 2000 * time.Second
+	mult := float32(2.0)
+
+	vd := synchronizer.NewViewDuration(5, mult, startDuration, maxDuration)
+
+	vd.ViewStarted()
+	vd.ViewTimeout()
+
+	d := vd.Duration()
+	want := startDuration * time.Duration(mult)
+	if d != want {
+		t.Errorf("expected duration to be %f times larger. want: %v, go %v", mult, want, d)
+	}
+}
+
+func TestViewDurationMax(t *testing.T) {
+	startDuration := 100 * time.Millisecond
+	maxDuration := 500 * time.Millisecond
+	mult := float32(5.0)
+
+	vd := synchronizer.NewViewDuration(5, mult, startDuration, maxDuration)
+
+	vd.ViewStarted()
+	vd.ViewTimeout()
+
+	d := vd.Duration()
+	want := maxDuration
+	if d != want {
+		t.Errorf("expected duration to be the max. want: %v, go %v", want, d)
 	}
 }

@@ -22,12 +22,13 @@ type ViewDuration interface {
 // sampleSize determines the number of previous views that should be considered.
 // startTimeout determines the view duration of the first views.
 // When a timeout occurs, the next view duration will be multiplied by the multiplier.
-func NewViewDuration(sampleSize uint64, startTimeout, maxTimeout, multiplier float64) ViewDuration {
+func NewViewDuration(sampleSize uint32, multiplier float32, startTimeout, maxTimeout time.Duration) ViewDuration {
+
 	return &viewDuration{
-		limit: sampleSize,
-		mean:  startTimeout,
-		max:   maxTimeout,
-		mul:   multiplier,
+		limit: uint64(sampleSize),
+		mean:  float64(startTimeout.Nanoseconds()) / float64(time.Millisecond),
+		max:   float64(maxTimeout.Nanoseconds()) / float64(time.Millisecond),
+		mul:   float64(multiplier),
 	}
 }
 
