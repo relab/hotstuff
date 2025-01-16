@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"math"
@@ -109,43 +110,56 @@ func runController() {
 	numReplicas := viper.GetInt("replicas")
 	numClients := viper.GetInt("clients")
 
+	// Kauri values
+	branchFactor := viper.GetUint32("bf")
+
 	cfgPath := viper.GetString("cue")
+
+	treeDelta := viper.GetDuration("tree-delta")
+	intTreePos := viper.GetIntSlice("tree-pos")
 
 	var cfg *config.HostConfig
 	if cfgPath != "" {
 		cfg, err = config.Load(cfgPath)
 		checkf("config error when loading %s: %v", cfgPath, err)
+
+		// TODO: Find a better approach to overwrite the cli flags.
+		treeDelta = cfg.TreeDelta
+		intTreePos = nil
+		for _, id := range cfg.TreePositions {
+			intTreePos = append(intTreePos, int(id))
+		}
+		branchFactor = cfg.BranchFactor
+
 	} else {
+		// If a config is not specified, use the user/default cli flags
+		// and instantiate a config for a local run.
 		cfg = config.NewLocal(numReplicas, numClients)
+	}
 
-		// If a config is not specified, use the user/default cli flags.
-		cfg.BranchFactor = viper.GetUint32("bf")
-
-		intTreePos := viper.GetIntSlice("tree-pos")
-		var treePos []uint32
-		if len(intTreePos) == 0 {
-			treePos = tree.DefaultTreePosUint32(viper.GetInt("replicas"))
-		} else {
-			treePos = make([]uint32, len(intTreePos))
-			for i, pos := range intTreePos {
-				treePos[i] = uint32(pos)
-			}
+	// If the treePos is empty, generate them by the replica count.
+	var treePos []uint32
+	if len(intTreePos) == 0 {
+		treePos = tree.DefaultTreePosUint32(viper.GetInt("replicas"))
+	} else {
+		treePos = make([]uint32, len(intTreePos))
+		for i, pos := range intTreePos {
+			treePos[i] = uint32(pos)
 		}
-		if viper.GetBool("random-tree") {
-			rnd := rand.New(rand.NewSource(rand.Uint64()))
-			rnd.Shuffle(len(treePos), reflect.Swapper(treePos))
-		}
-		cfg.TreePositions = treePos
-		cfg.TreeDelta = viper.GetDuration("tree-delta")
+	}
+	if viper.GetBool("random-tree") {
+		rnd := rand.New(rand.NewSource(rand.Uint64()))
+		rnd.Shuffle(len(treePos), reflect.Swapper(treePos))
 	}
 
 	worker := viper.GetBool("worker")
 
-	// If the config is set to run locally, `hosts` will be nil (empty)
+	// If the config is set to run locally, `hosts` will be empty
 	// and when passed to iago.NewSSHGroup, thus iago will not generate
 	// an SSH group.
-	var hosts []string
-	if !cfg.IsLocal() {
+	hosts := viper.GetStringSlice("hosts")
+	fmt.Printf("%v\n", hosts)
+	if len(hosts) > 0 && !cfg.IsLocal() {
 		hosts = cfg.AllHosts()
 	}
 
@@ -201,6 +215,9 @@ func runController() {
 		MaxTimeout:        durationpb.New(viper.GetDuration("max-timeout")),
 		SharedSeed:        viper.GetInt64("shared-seed"),
 		Modules:           viper.GetStringSlice("modules"),
+		TreePositions:     treePos,
+		BranchFactor:      branchFactor,
+		TreeDelta:         durationpb.New(treeDelta),
 	}
 
 	clientOpts := &orchestrationpb.ClientOpts{
