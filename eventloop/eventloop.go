@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/util/gpool"
 )
 
@@ -51,6 +53,8 @@ type handler struct {
 
 // EventLoop accepts events of any type and executes registered event handlers.
 type EventLoop struct {
+	logger logging.Logger
+
 	eventQ queue
 
 	mut sync.Mutex // protects the following:
@@ -75,6 +79,10 @@ func New(bufferSize uint) *EventLoop {
 		tickers:       make(map[int]*ticker),
 	}
 	return el
+}
+
+func (el *EventLoop) InitModule(mods *modules.Core) {
+	mods.Get(&el.logger)
 }
 
 // RegisterHandler registers the given event handler for the given event type with the given handler options, if any.
@@ -129,7 +137,10 @@ func (el *EventLoop) AddEvent(event any) {
 	if event != nil {
 		// run handlers with runInAddEvent option
 		el.processEvent(event, true)
-		el.eventQ.push(event)
+		droppedEvent := el.eventQ.push(event)
+		if droppedEvent != nil {
+			el.logger.Warnf("event queue is full, dropped event: %v", droppedEvent)
+		}
 	}
 }
 
@@ -308,7 +319,10 @@ func (el *EventLoop) AddTicker(interval time.Duration, callback func(tick time.T
 
 	// We want the ticker to inherit the context of the event loop,
 	// so we need to start the ticker from the run loop.
-	el.eventQ.push(startTickerEvent{id})
+	droppedEvent := el.eventQ.push(startTickerEvent{id})
+	if droppedEvent != nil {
+		el.logger.Warnf("event queue is full, dropped event: %v", droppedEvent)
+	}
 
 	return id
 }
