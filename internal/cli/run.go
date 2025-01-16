@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"log"
 	"math"
@@ -67,7 +66,8 @@ func init() {
 	runCmd.Flags().StringSlice("modules", nil, "Name additional modules to be loaded.")
 
 	runCmd.Flags().Bool("worker", false, "run a local worker")
-	runCmd.Flags().StringSlice("hosts", nil, "the remote hosts to run the experiment on via ssh")
+	runCmd.Flags().StringSlice("replica-hosts", nil, "the remote hosts to run replicas on via ssh")
+	runCmd.Flags().StringSlice("client-hosts", nil, "the remote hosts to run clients on via ssh")
 	runCmd.Flags().String("exe", "", "path to the executable to deploy and run on remote workers")
 	runCmd.Flags().String("ssh-config", "", "path to ssh_config file to resolve host aliases (defaults to ~/.ssh/config)")
 
@@ -118,12 +118,16 @@ func runController() {
 	treeDelta := viper.GetDuration("tree-delta")
 	intTreePos := viper.GetIntSlice("tree-pos")
 
+	replicaHosts := viper.GetStringSlice("replica-hosts")
+	clientHosts := viper.GetStringSlice("client-hosts")
+
 	var cfg *config.HostConfig
 	if cfgPath != "" {
 		cfg, err = config.Load(cfgPath)
 		checkf("config error when loading %s: %v", cfgPath, err)
 
 		// TODO: Find a better approach to overwrite the cli flags.
+
 		treeDelta = cfg.TreeDelta
 		intTreePos = nil
 		for _, id := range cfg.TreePositions {
@@ -131,16 +135,36 @@ func runController() {
 		}
 		branchFactor = cfg.BranchFactor
 
+		replicaHosts = cfg.ReplicaHosts
+		clientHosts = cfg.ClientHosts
 	} else {
 		// If a config is not specified, use the user/default cli flags
 		// and instantiate a config for a local run.
 		cfg = config.NewLocal(numReplicas, numClients)
+
+		// If the hosts are specified in cli, overwrite the local cfg.
+
+		cfg = &config.HostConfig{
+			Replicas: numReplicas,
+			Clients:  numClients,
+		}
+		if len(replicaHosts) == 0 {
+			cfg.ReplicaHosts = []string{"localhost"}
+		} else {
+			cfg.ReplicaHosts = replicaHosts
+		}
+
+		if len(clientHosts) == 0 {
+			cfg.ClientHosts = []string{"localhost"}
+		} else {
+			cfg.ClientHosts = clientHosts
+		}
 	}
 
 	// If the treePos is empty, generate them by the replica count.
 	var treePos []uint32
 	if len(intTreePos) == 0 {
-		treePos = tree.DefaultTreePosUint32(viper.GetInt("replicas"))
+		treePos = tree.DefaultTreePosUint32(numReplicas)
 	} else {
 		treePos = make([]uint32, len(intTreePos))
 		for i, pos := range intTreePos {
@@ -153,19 +177,11 @@ func runController() {
 	}
 
 	worker := viper.GetBool("worker")
-
-	// If the config is set to run locally, `hosts` will be empty
-	// and when passed to iago.NewSSHGroup, thus iago will not generate
-	// an SSH group.
-	hosts := viper.GetStringSlice("hosts")
-	fmt.Printf("%v\n", hosts)
-	if len(hosts) > 0 && !cfg.IsLocal() {
-		hosts = cfg.AllHosts()
-	}
-
 	exePath := viper.GetString("exe")
 
-	g, err := iago.NewSSHGroup(hosts, viper.GetString("ssh-config"))
+	allHosts := append(replicaHosts, clientHosts...)
+
+	g, err := iago.NewSSHGroup(allHosts, viper.GetString("ssh-config"))
 	checkf("failed to connect to remote hosts: %v", err)
 
 	if exePath == "" {
@@ -196,7 +212,7 @@ func runController() {
 		go stderrPipe(session.Stderr(), errors)
 	}
 
-	if worker || len(hosts) == 0 {
+	if worker || len(allHosts) == 0 {
 		worker, wait := localWorker(outputDir, viper.GetStringSlice("metrics"), viper.GetDuration("measurement-interval"))
 		defer wait()
 		remoteWorkers["localhost"] = worker
