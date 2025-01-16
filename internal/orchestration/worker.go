@@ -191,13 +191,18 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if !ok {
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
-
-	sync := synchronizer.New(synchronizer.NewViewDuration(
-		uint64(opts.GetTimeoutSamples()),
-		float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-		float64(opts.GetTimeoutMultiplier()),
-	))
+	var viewDuration synchronizer.ViewDuration
+	if opts.GetLeaderRotation() == "tree-leader" {
+		viewDuration = synchronizer.NewFixedViewDuration(opts.GetInitialTimeout().AsDuration())
+	} else {
+		viewDuration = synchronizer.NewViewDuration(
+			uint64(opts.GetTimeoutSamples()),
+			float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
+			float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
+			float64(opts.GetTimeoutMultiplier()),
+		)
+	}
+	sync := synchronizer.New(viewDuration)
 	builder.Add(
 		eventloop.New(1000),
 		consensus.New(consensusRules),
