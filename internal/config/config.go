@@ -59,6 +59,43 @@ type HostConfig struct {
 	ByzantineStrategy map[string][]uint32
 	// TreeDelta is the waiting time for intermediate nodes in the tree.
 	TreeDelta time.Duration
+
+	BatchSize uint32
+
+	ClientTimeout       time.Duration
+	ConnectTimeout      time.Duration
+	Duration            time.Duration
+	MeasurementInterval time.Duration
+	ViewTimeout         time.Duration
+	MaxTimeout          time.Duration
+
+	Consensus      string
+	Crypto         string
+	LeaderRotation string
+	Modules        []string
+
+	Metrics []string
+
+	Cue       string
+	Exe       string
+	Output    string
+	SshConfig string
+
+	CpuProfile        bool
+	DurationSamples   uint32
+	FgProfProfile     bool
+	MaxConcurrent     uint32
+	MemProfile        bool
+	PayloadSize       uint32
+	RandomTree        bool
+	RateLimit         float64
+	RateStep          float64
+	RateStepInterval  time.Duration
+	SharedSeed        int64
+	TimeoutMultiplier float64
+	Trace             bool
+	Worker            bool
+	LogLevel          string
 }
 
 // NewLocal is a helper that creates a config for local hosting.
