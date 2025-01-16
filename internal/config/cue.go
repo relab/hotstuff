@@ -11,9 +11,10 @@ import (
 //go:embed schema.cue
 var schemaFile string
 
-// Load loads a cue configuration from filename and returns a Config struct.
+// NewCue loads a cue configuration from filename and returns a Config struct.
 // The configuration is validated against the schema embedded in the binary.
-func Load(filename string) (*HostConfig, error) {
+// TODO: For now, this config extends NewViper to extract default values. This should be in schema.cue.
+func NewCue(filename string) (*HostConfig, error) {
 	ctx := cuecontext.New()
 	schema := ctx.CompileString(schemaFile).LookupPath(cue.ParsePath("config"))
 	if schema.Err() != nil {
@@ -31,7 +32,10 @@ func Load(filename string) (*HostConfig, error) {
 	if err := unified.Validate(cue.Concrete(true)); err != nil {
 		return nil, err
 	}
-	conf := &HostConfig{}
+	conf, err := NewViper()
+	if err != nil {
+		return nil, err
+	}
 	if err := cfg.Decode(conf); err != nil {
 		return nil, err
 	}

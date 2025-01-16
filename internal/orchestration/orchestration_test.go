@@ -29,46 +29,6 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
-// makeReplicaOpts creates a new ReplicaOpts with the given parameters.
-func makeReplicaOpts(consensusImpl, crypto, byzantine string, mods []string) *orchestrationpb.ReplicaOpts {
-	return &orchestrationpb.ReplicaOpts{
-		BatchSize:         100,
-		ConnectTimeout:    durationpb.New(time.Second),
-		InitialTimeout:    durationpb.New(100 * time.Millisecond),
-		TimeoutSamples:    1000,
-		TimeoutMultiplier: 1.2,
-		Consensus:         consensusImpl,
-		Crypto:            crypto,
-		LeaderRotation:    "round-robin",
-		Modules:           mods,
-		ByzantineStrategy: byzantine,
-	}
-}
-
-func makeTreeReplicaOpts(consensusImpl, crypto string, mods []string, replicas, bf int, random bool) *orchestrationpb.ReplicaOpts {
-	treePos := tree.DefaultTreePosUint32(replicas)
-	if random {
-		rnd := rand.New(rand.NewSource(int64(rand.Uint64())))
-		rnd.Shuffle(len(treePos), reflect.Swapper(treePos))
-	}
-
-	return &orchestrationpb.ReplicaOpts{
-		BatchSize:         100,
-		ConnectTimeout:    durationpb.New(time.Second),
-		InitialTimeout:    durationpb.New(100 * time.Millisecond),
-		TimeoutSamples:    1000,
-		TimeoutMultiplier: 1.2,
-		Consensus:         consensusImpl,
-		Crypto:            crypto,
-		LeaderRotation:    "tree-leader",
-		Modules:           mods,
-		ByzantineStrategy: "", // TODO currently kauri does not support byzantine replicas
-		BranchFactor:      uint32(bf),
-		TreePositions:     treePos,
-		TreeDelta:         durationpb.New(30 * time.Millisecond),
-	}
-}
-
 func makeClientOpts() *orchestrationpb.ClientOpts {
 	return &orchestrationpb.ClientOpts{
 		ConnectTimeout: durationpb.New(time.Second),
@@ -79,23 +39,57 @@ func makeClientOpts() *orchestrationpb.ClientOpts {
 	}
 }
 
-func run(t *testing.T, replicaOpts *orchestrationpb.ReplicaOpts, numReplicas, numClients int) {
+func makeCfg(
+	replicas, clients int,
+	consensusImpl,
+	crypto string,
+	leaderRotation string,
+	byzantine string,
+	branchFactor uint32,
+	randomTree bool,
+	mods ...string) *config.HostConfig {
+	cfg := &config.HostConfig{
+		Replicas:          replicas,
+		Clients:           clients,
+		ReplicaHosts:      []string{"localhost"},
+		ClientHosts:       []string{"localhost"},
+		TreePositions:     tree.DefaultTreePosUint32(replicas),
+		RandomTree:        randomTree,
+		BranchFactor:      branchFactor,
+		Consensus:         consensusImpl,
+		Crypto:            crypto,
+		LeaderRotation:    leaderRotation,
+		ByzantineStrategy: map[string][]uint32{byzantine: {1}},
+
+		// Common default values:
+		Duration:          5 * time.Second,
+		BatchSize:         100,
+		ConnectTimeout:    time.Second,
+		ViewTimeout:       100 * time.Millisecond,
+		DurationSamples:   1000,
+		TimeoutMultiplier: 1.2,
+		Modules:           mods,
+		MaxConcurrent:     250,
+		PayloadSize:       100,
+		RateLimit:         math.Inf(1),
+		ClientTimeout:     500 * time.Millisecond,
+		TreeDelta:         30 * time.Millisecond,
+	}
+	if randomTree {
+		rnd := rand.New(rand.NewSource(int64(rand.Uint64())))
+		rnd.Shuffle(len(cfg.TreePositions), reflect.Swapper(cfg.TreePositions))
+	}
+	return cfg
+}
+
+func run(t *testing.T, cfg *config.HostConfig) {
 	t.Helper()
 
 	controllerStream, workerStream := net.Pipe()
 	workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
 	worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), metrics.NopLogger(), nil, 0)
 
-	cfg := config.NewLocal(numReplicas, numClients)
-	cfg.TreePositions = replicaOpts.TreePositions
-	cfg.BranchFactor = replicaOpts.BranchFactor
-	cfg.TreeDelta = replicaOpts.TreeDelta.AsDuration()
-
 	experiment, err := orchestration.NewExperiment(
-		5*time.Second,
-		"",
-		replicaOpts,
-		makeClientOpts(),
 		cfg,
 		map[string]orchestration.RemoteWorker{"localhost": workerProxy},
 		logging.New("ctrl"),
@@ -127,18 +121,18 @@ func TestOrchestration(t *testing.T) {
 		byzantine    string
 		mods         []string
 		replicas     int
-		branchFactor int
+		branchFactor uint32
 		randomTree   bool
 	}{
-		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "", mods: nil},
-		{consensus: "chainedhotstuff", crypto: "eddsa"},
-		{consensus: "chainedhotstuff", crypto: "bls12"},
-		{consensus: "fasthotstuff", crypto: "ecdsa"},
-		{consensus: "fasthotstuff", crypto: "eddsa"},
-		{consensus: "fasthotstuff", crypto: "bls12"},
-		{consensus: "simplehotstuff", crypto: "ecdsa"},
-		{consensus: "simplehotstuff", crypto: "eddsa"},
-		{consensus: "simplehotstuff", crypto: "bls12"},
+		{consensus: "chainedhotstuff", crypto: "ecdsa", replicas: 4},
+		{consensus: "chainedhotstuff", crypto: "eddsa", replicas: 4},
+		{consensus: "chainedhotstuff", crypto: "bls12", replicas: 4},
+		{consensus: "fasthotstuff", crypto: "ecdsa", replicas: 4},
+		{consensus: "fasthotstuff", crypto: "eddsa", replicas: 4},
+		{consensus: "fasthotstuff", crypto: "bls12", replicas: 4},
+		{consensus: "simplehotstuff", crypto: "ecdsa", replicas: 4},
+		{consensus: "simplehotstuff", crypto: "eddsa", replicas: 4},
+		{consensus: "simplehotstuff", crypto: "bls12", replicas: 4},
 		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "fork:1"},
 		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "silence:1"},
 		{consensus: "chainedhotstuff", crypto: "ecdsa", mods: []string{"kauri"}, replicas: 7, branchFactor: 2},
@@ -149,13 +143,23 @@ func TestOrchestration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(test.Name([]string{"consensus", "crypto", "byzantine", "mods"}, tt.consensus, tt.crypto, tt.byzantine, tt.mods), func(t *testing.T) {
+			var leaderRotation string
 			if slices.Contains(tt.mods, "kauri") {
-				replicaOpts := makeTreeReplicaOpts(tt.consensus, tt.crypto, tt.mods, tt.replicas, tt.branchFactor, tt.randomTree)
-				run(t, replicaOpts, tt.replicas, 2)
+				leaderRotation = "tree-leader"
 			} else {
-				replicaOpts := makeReplicaOpts(tt.consensus, tt.crypto, tt.byzantine, tt.mods)
-				run(t, replicaOpts, 4, 2)
+				leaderRotation = "round-robin"
 			}
+			cfg := makeCfg(
+				tt.replicas, 2,
+				tt.consensus,
+				tt.crypto,
+				leaderRotation,
+				tt.byzantine,
+				tt.branchFactor,
+				tt.randomTree,
+				tt.mods...,
+			)
+			run(t, cfg)
 		})
 	}
 }
@@ -163,24 +167,6 @@ func TestOrchestration(t *testing.T) {
 func TestDeployment(t *testing.T) {
 	if os.Getenv("GITHUB_ACTIONS") != "" && runtime.GOOS != "linux" {
 		t.Skip("GitHub Actions only supports linux containers on linux runners.")
-	}
-
-	clientOpts := &orchestrationpb.ClientOpts{
-		ConnectTimeout: durationpb.New(time.Second),
-		MaxConcurrent:  250,
-		PayloadSize:    100,
-		RateLimit:      math.Inf(1),
-	}
-
-	replicaOpts := &orchestrationpb.ReplicaOpts{
-		BatchSize:         100,
-		ConnectTimeout:    durationpb.New(time.Second),
-		InitialTimeout:    durationpb.New(100 * time.Millisecond),
-		TimeoutSamples:    1000,
-		TimeoutMultiplier: 1.2,
-		Consensus:         "chainedhotstuff",
-		Crypto:            "ecdsa",
-		LeaderRotation:    "round-robin",
 	}
 
 	numReplicas := 4
@@ -236,17 +222,25 @@ func TestDeployment(t *testing.T) {
 	// Add all replica and client hostnames (that came from workers) separately
 	// to the config.
 	cfg := &config.HostConfig{
-		Replicas:     numReplicas,
-		Clients:      numClients,
-		ReplicaHosts: replicaHosts,
-		ClientHosts:  clientHosts,
+		Replicas:          numReplicas,
+		Clients:           numClients,
+		ReplicaHosts:      replicaHosts,
+		ClientHosts:       clientHosts,
+		Duration:          10 * time.Second,
+		ConnectTimeout:    time.Second,
+		MaxConcurrent:     250,
+		PayloadSize:       100,
+		RateLimit:         math.Inf(1),
+		BatchSize:         100,
+		ViewTimeout:       100 * time.Millisecond,
+		DurationSamples:   1000,
+		TimeoutMultiplier: 1.2,
+		Consensus:         "chainedhotstuff",
+		Crypto:            "ecdsa",
+		LeaderRotation:    "round-robin",
 	}
 
 	experiment, err := orchestration.NewExperiment(
-		10*time.Second,
-		"",
-		replicaOpts,
-		clientOpts,
 		cfg, // TODO: Find a cleaner approach to creating a config for a test case like this.
 		workers,
 		logging.New("ctrl"),

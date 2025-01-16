@@ -24,13 +24,7 @@ import (
 // Experiment coordinates replicas and clients, controls experiment flow and
 // handles measurement output.
 type Experiment struct {
-	replicaOpts *orchestrationpb.ReplicaOpts
-	clientOpts  *orchestrationpb.ClientOpts
-
-	logger logging.Logger
-
-	duration time.Duration
-
+	logger  logging.Logger
 	workers map[string]RemoteWorker
 	output  string // path to output folder
 
@@ -43,10 +37,6 @@ type Experiment struct {
 // NewExperiment returns a struct containing the general experiment
 // configuration.
 func NewExperiment(
-	duration time.Duration,
-	outputDir string,
-	replicaOpts *orchestrationpb.ReplicaOpts,
-	clientOpts *orchestrationpb.ClientOpts,
 	cfg *config.HostConfig,
 	workers map[string]RemoteWorker,
 	logger logging.Logger,
@@ -68,13 +58,9 @@ func NewExperiment(
 		}
 	}
 	return &Experiment{
-		replicaOpts: replicaOpts,
-		clientOpts:  clientOpts,
-		logger:      logger,
-		duration:    duration,
-		output:      outputDir,
-		workers:     workers,
-		hostCfg:     cfg,
+		logger:  logger,
+		workers: workers,
+		hostCfg: cfg,
 	}, nil
 }
 
@@ -86,8 +72,10 @@ func (e *Experiment) Run() (err error) {
 			err = qerr
 		}
 	}()
+	replicaOpts := e.hostCfg.CreateReplicaOpts()
+	clientOpts := e.hostCfg.CreateClientOpts()
 
-	replicaMap := e.hostCfg.AssignReplicas(e.replicaOpts)
+	replicaMap := e.hostCfg.AssignReplicas(replicaOpts)
 	clientIds := e.hostCfg.AssignClients()
 
 	if e.output != "" {
@@ -110,12 +98,12 @@ func (e *Experiment) Run() (err error) {
 	}
 
 	e.logger.Info("Starting clients...")
-	err = e.startClients(cfg, clientIds)
+	err = e.startClients(cfg, clientOpts, clientIds)
 	if err != nil {
 		return fmt.Errorf("failed to start clients: %w", err)
 	}
 
-	time.Sleep(e.duration)
+	time.Sleep(e.hostCfg.Duration)
 
 	e.logger.Info("Stopping clients...")
 	err = e.stopClients(clientIds)
@@ -123,7 +111,7 @@ func (e *Experiment) Run() (err error) {
 		return fmt.Errorf("failed to stop clients: %w", err)
 	}
 
-	wait := 5 * e.replicaOpts.GetInitialTimeout().AsDuration()
+	wait := 5 * replicaOpts.GetInitialTimeout().AsDuration()
 	e.logger.Infof("Waiting %s for replicas to finish.", wait)
 	// give the replicas some time to commit the last batch
 	time.Sleep(wait)
@@ -263,14 +251,14 @@ func verifyStopResponses(responses []*orchestrationpb.StopReplicaResponse) error
 	return nil
 }
 
-func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration, clientMap config.ClientMap) error {
+func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration, srcClientOpt *orchestrationpb.ClientOpts, clientMap config.ClientMap) error {
 	for host, worker := range e.workers {
 		req := &orchestrationpb.StartClientRequest{}
 		req.Clients = make(map[uint32]*orchestrationpb.ClientOpts)
 		req.Configuration = cfg.GetReplicas()
 		req.CertificateAuthority = keygen.CertToPEM(e.ca)
 		for _, id := range clientMap[host] {
-			clientOpts := proto.Clone(e.clientOpts).(*orchestrationpb.ClientOpts)
+			clientOpts := proto.Clone(srcClientOpt).(*orchestrationpb.ClientOpts)
 			clientOpts.ID = uint32(id)
 			req.Clients[uint32(id)] = clientOpts
 			e.logger.Infof("client %d assigned to host %s", id, host)

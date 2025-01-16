@@ -14,7 +14,6 @@ import (
 	"github.com/relab/hotstuff/internal/config"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/profiling"
-	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
@@ -22,7 +21,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/rand"
-	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // runCmd represents the run command
@@ -102,7 +100,7 @@ func runController() {
 	cfgPath := viper.GetString("cue")
 	var cfg *config.HostConfig
 	if cfgPath != "" {
-		cfg, err = config.Load(cfgPath)
+		cfg, err = config.NewCue(cfgPath)
 		checkf("config error when loading %s: %v", cfgPath, err)
 	} else {
 		cfg, err = config.NewViper()
@@ -160,38 +158,7 @@ func runController() {
 		remoteWorkers["localhost"] = worker
 	}
 
-	// TODO: Generate this from HostsConfig type.
-	replicaOpts := &orchestrationpb.ReplicaOpts{
-		UseTLS:            true,
-		BatchSize:         cfg.BatchSize,
-		TimeoutMultiplier: float32(cfg.TimeoutMultiplier),
-		Consensus:         cfg.Consensus,
-		Crypto:            cfg.Crypto,
-		LeaderRotation:    cfg.LeaderRotation,
-		ConnectTimeout:    durationpb.New(cfg.ConnectTimeout),
-		InitialTimeout:    durationpb.New(cfg.ViewTimeout),
-		TimeoutSamples:    cfg.DurationSamples,
-		MaxTimeout:        durationpb.New(cfg.MaxTimeout),
-		SharedSeed:        cfg.SharedSeed,
-		Modules:           cfg.Modules,
-	}
-	// TODO: Generate DeployConfig from HostsConfig type.
-	clientOpts := &orchestrationpb.ClientOpts{
-		UseTLS:           true,
-		ConnectTimeout:   durationpb.New(cfg.ConnectTimeout),
-		PayloadSize:      cfg.PayloadSize,
-		MaxConcurrent:    cfg.MaxConcurrent,
-		RateLimit:        cfg.RateLimit,
-		RateStep:         cfg.RateStep,
-		RateStepInterval: durationpb.New(cfg.RateStepInterval),
-		Timeout:          durationpb.New(cfg.ClientTimeout),
-	}
-
 	experiment, err := orchestration.NewExperiment(
-		cfg.Duration,
-		cfg.Output,
-		replicaOpts,
-		clientOpts,
 		cfg,
 		remoteWorkers,
 		logging.New("ctrl"),

@@ -6,6 +6,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // ReplicaMap maps from a host to a slice of replica options.
@@ -202,4 +203,37 @@ func (c *HostConfig) AllHosts() []string {
 		return []string{"localhost"}
 	}
 	return append(c.ReplicaHosts, c.ClientHosts...)
+}
+
+func (c *HostConfig) CreateReplicaOpts() *orchestrationpb.ReplicaOpts {
+	return &orchestrationpb.ReplicaOpts{
+		UseTLS:            true,
+		BatchSize:         c.BatchSize,
+		TimeoutMultiplier: float32(c.TimeoutMultiplier),
+		Consensus:         c.Consensus,
+		Crypto:            c.Crypto,
+		LeaderRotation:    c.LeaderRotation,
+		ConnectTimeout:    durationpb.New(c.ConnectTimeout),
+		InitialTimeout:    durationpb.New(c.ViewTimeout),
+		TimeoutSamples:    c.DurationSamples,
+		MaxTimeout:        durationpb.New(c.MaxTimeout),
+		SharedSeed:        c.SharedSeed,
+		Modules:           c.Modules,
+		BranchFactor:      c.BranchFactor,
+		TreePositions:     c.TreePositions,
+		TreeDelta:         durationpb.New(c.TreeDelta),
+	}
+}
+
+func (cfg *HostConfig) CreateClientOpts() *orchestrationpb.ClientOpts {
+	return &orchestrationpb.ClientOpts{
+		UseTLS:           true,
+		ConnectTimeout:   durationpb.New(cfg.ConnectTimeout),
+		PayloadSize:      cfg.PayloadSize,
+		MaxConcurrent:    cfg.MaxConcurrent,
+		RateLimit:        cfg.RateLimit,
+		RateStep:         cfg.RateStep,
+		RateStepInterval: durationpb.New(cfg.RateStepInterval),
+		Timeout:          durationpb.New(cfg.ClientTimeout),
+	}
 }
