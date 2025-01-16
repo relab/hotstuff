@@ -153,7 +153,7 @@ func (e *Experiment) createReplicas(replicaMap config.ReplicaMap) (cfg *orchestr
 			if err != nil {
 				return nil, err
 			}
-			opt.SetTreeOptions(e.hostCfg.BranchFactor, e.hostCfg.TreePositions, e.hostCfg.TreeDelta)
+			// opt.SetTreeOptions(e.hostCfg.BranchFactor, e.hostCfg.TreePositions, e.hostCfg.TreeDelta)
 			req.Replicas[opt.ID] = opt
 			e.logger.Infof("replica %d assigned to host %s", opt.ID, host)
 		}
