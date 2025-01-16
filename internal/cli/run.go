@@ -180,7 +180,7 @@ func runController() {
 		UseTLS:           true,
 		ConnectTimeout:   durationpb.New(cfg.ConnectTimeout),
 		PayloadSize:      cfg.PayloadSize,
-		MaxConcurrent:    cfg.PayloadSize,
+		MaxConcurrent:    cfg.MaxConcurrent,
 		RateLimit:        cfg.RateLimit,
 		RateStep:         cfg.RateStep,
 		RateStepInterval: durationpb.New(cfg.RateStepInterval),

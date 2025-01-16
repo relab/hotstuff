@@ -17,8 +17,11 @@ func NewViper() (*HostConfig, error) {
 	}
 
 	cfg := &HostConfig{
+		Duration:            viper.GetDuration("duration"),
 		Replicas:            viper.GetInt("replicas"),
 		Clients:             viper.GetInt("clients"),
+		ReplicaHosts:        viper.GetStringSlice("replica-hosts"),
+		ClientHosts:         viper.GetStringSlice("client-hosts"),
 		BranchFactor:        viper.GetUint32("bf"),
 		TreeDelta:           viper.GetDuration("tree-delta"),
 		RandomTree:          viper.GetBool("random-tree"),
@@ -51,6 +54,14 @@ func NewViper() (*HostConfig, error) {
 		RateStep:            viper.GetFloat64("rate-step"),
 		RateStepInterval:    viper.GetDuration("rate-step-interval"),
 		ClientTimeout:       viper.GetDuration("client-timeout"),
+	}
+
+	if len(cfg.ReplicaHosts) == 0 {
+		cfg.ReplicaHosts = []string{"localhost"}
+	}
+
+	if len(cfg.ClientHosts) == 0 {
+		cfg.ClientHosts = []string{"localhost"}
 	}
 
 	var err error
