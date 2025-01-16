@@ -79,14 +79,14 @@ func makeClientOpts() *orchestrationpb.ClientOpts {
 	}
 }
 
-func run(t *testing.T, replicaOpts *orchestrationpb.ReplicaOpts) {
+func run(t *testing.T, replicaOpts *orchestrationpb.ReplicaOpts, numReplicas, numClients int) {
 	t.Helper()
 
 	controllerStream, workerStream := net.Pipe()
 	workerProxy := orchestration.NewRemoteWorker(protostream.NewWriter(controllerStream), protostream.NewReader(controllerStream))
 	worker := orchestration.NewWorker(protostream.NewWriter(workerStream), protostream.NewReader(workerStream), metrics.NopLogger(), nil, 0)
 
-	cfg := config.NewLocal(7, 2)
+	cfg := config.NewLocal(numReplicas, numClients)
 	cfg.TreePositions = replicaOpts.TreePositions
 	cfg.BranchFactor = replicaOpts.BranchFactor
 	cfg.TreeDelta = replicaOpts.TreeDelta.AsDuration()
@@ -122,38 +122,40 @@ func run(t *testing.T, replicaOpts *orchestrationpb.ReplicaOpts) {
 
 func TestOrchestration(t *testing.T) {
 	tests := []struct {
-		consensus  string
-		crypto     string
-		byzantine  string
-		mods       []string
-		randomTree bool
+		consensus    string
+		crypto       string
+		byzantine    string
+		mods         []string
+		replicas     int
+		branchFactor int
+		randomTree   bool
 	}{
 		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "", mods: nil},
-		{consensus: "chainedhotstuff", crypto: "eddsa", byzantine: "", mods: nil},
-		{consensus: "chainedhotstuff", crypto: "bls12", byzantine: "", mods: nil},
-		{consensus: "fasthotstuff", crypto: "ecdsa", byzantine: "", mods: nil},
-		{consensus: "fasthotstuff", crypto: "eddsa", byzantine: "", mods: nil},
-		{consensus: "fasthotstuff", crypto: "bls12", byzantine: "", mods: nil},
-		{consensus: "simplehotstuff", crypto: "ecdsa", byzantine: "", mods: nil},
-		{consensus: "simplehotstuff", crypto: "eddsa", byzantine: "", mods: nil},
-		{consensus: "simplehotstuff", crypto: "bls12", byzantine: "", mods: nil},
-		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "fork:1", mods: nil},
-		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "silence:1", mods: nil},
-		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "", mods: []string{"kauri"}},
-		{consensus: "chainedhotstuff", crypto: "bls12", byzantine: "", mods: []string{"kauri"}},
-		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "", mods: []string{"kauri"}, randomTree: true},
-		{consensus: "chainedhotstuff", crypto: "bls12", byzantine: "", mods: []string{"kauri"}, randomTree: true},
+		{consensus: "chainedhotstuff", crypto: "eddsa"},
+		{consensus: "chainedhotstuff", crypto: "bls12"},
+		{consensus: "fasthotstuff", crypto: "ecdsa"},
+		{consensus: "fasthotstuff", crypto: "eddsa"},
+		{consensus: "fasthotstuff", crypto: "bls12"},
+		{consensus: "simplehotstuff", crypto: "ecdsa"},
+		{consensus: "simplehotstuff", crypto: "eddsa"},
+		{consensus: "simplehotstuff", crypto: "bls12"},
+		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "fork:1"},
+		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "silence:1"},
+		{consensus: "chainedhotstuff", crypto: "ecdsa", mods: []string{"kauri"}, replicas: 7, branchFactor: 2},
+		{consensus: "chainedhotstuff", crypto: "bls12", mods: []string{"kauri"}, replicas: 7, branchFactor: 2},
+		{consensus: "chainedhotstuff", crypto: "ecdsa", mods: []string{"kauri"}, replicas: 7, branchFactor: 2, randomTree: true},
+		{consensus: "chainedhotstuff", crypto: "bls12", mods: []string{"kauri"}, replicas: 7, branchFactor: 2, randomTree: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(test.Name([]string{"consensus", "crypto", "byzantine", "mods"}, tt.consensus, tt.crypto, tt.byzantine, tt.mods), func(t *testing.T) {
-			var replicaOpts *orchestrationpb.ReplicaOpts
 			if slices.Contains(tt.mods, "kauri") {
-				replicaOpts = makeTreeReplicaOpts(tt.consensus, tt.crypto, tt.mods, 7, 2, tt.randomTree)
+				replicaOpts := makeTreeReplicaOpts(tt.consensus, tt.crypto, tt.mods, tt.replicas, tt.branchFactor, tt.randomTree)
+				run(t, replicaOpts, tt.replicas, 2)
 			} else {
-				replicaOpts = makeReplicaOpts(tt.consensus, tt.crypto, tt.byzantine, tt.mods)
+				replicaOpts := makeReplicaOpts(tt.consensus, tt.crypto, tt.byzantine, tt.mods)
+				run(t, replicaOpts, 4, 2)
 			}
-			run(t, replicaOpts)
 		})
 	}
 }
