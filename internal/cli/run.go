@@ -16,7 +16,6 @@ import (
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
-	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/iago"
@@ -99,101 +98,48 @@ func init() {
 
 func runController() {
 	var err error
-	outputDir := ""
-	if output := viper.GetString("output"); output != "" {
-		outputDir, err = filepath.Abs(output)
-		checkf("failed to get absolute path: %v", err)
-		err = os.MkdirAll(outputDir, 0o755)
-		checkf("failed to create output directory: %v", err)
-	}
-
-	numReplicas := viper.GetInt("replicas")
-	numClients := viper.GetInt("clients")
-
-	// Kauri values
-	branchFactor := viper.GetUint32("bf")
 
 	cfgPath := viper.GetString("cue")
-
-	treeDelta := viper.GetDuration("tree-delta")
-	intTreePos := viper.GetIntSlice("tree-pos")
-
-	replicaHosts := viper.GetStringSlice("replica-hosts")
-	clientHosts := viper.GetStringSlice("client-hosts")
-
 	var cfg *config.HostConfig
 	if cfgPath != "" {
 		cfg, err = config.Load(cfgPath)
 		checkf("config error when loading %s: %v", cfgPath, err)
-
-		// TODO: Find a better approach to overwrite the cli flags.
-
-		treeDelta = cfg.TreeDelta
-		intTreePos = nil
-		for _, id := range cfg.TreePositions {
-			intTreePos = append(intTreePos, int(id))
-		}
-		branchFactor = cfg.BranchFactor
-
-		replicaHosts = cfg.ReplicaHosts
-		clientHosts = cfg.ClientHosts
 	} else {
-		// If the hosts are specified in cli, overwrite the local cfg.
-
-		cfg = &config.HostConfig{
-			Replicas: numReplicas,
-			Clients:  numClients,
-		}
-		if len(replicaHosts) == 0 {
-			cfg.ReplicaHosts = []string{"localhost"}
-		} else {
-			cfg.ReplicaHosts = replicaHosts
-		}
-
-		if len(clientHosts) == 0 {
-			cfg.ClientHosts = []string{"localhost"}
-		} else {
-			cfg.ClientHosts = clientHosts
-		}
+		cfg, err = config.NewViper()
+		checkf("viper config error: %v", err)
 	}
 
-	// If the treePos is empty, generate them by the replica count.
-	var treePos []uint32
-	if len(intTreePos) == 0 {
-		treePos = tree.DefaultTreePosUint32(numReplicas)
-	} else {
-		treePos = make([]uint32, len(intTreePos))
-		for i, pos := range intTreePos {
-			treePos[i] = uint32(pos)
-		}
-	}
-	if viper.GetBool("random-tree") {
+	if cfg.RandomTree {
 		rnd := rand.New(rand.NewSource(rand.Uint64()))
-		rnd.Shuffle(len(treePos), reflect.Swapper(treePos))
+		rnd.Shuffle(len(cfg.TreePositions), reflect.Swapper(cfg.TreePositions))
 	}
 
-	worker := viper.GetBool("worker")
-	exePath := viper.GetString("exe")
+	// If the config is set to run locally, `hosts` will be nil (empty)
+	// and when passed to iago.NewSSHGroup, thus iago will not generate
+	// an SSH group.
+	var hosts []string
+	if !cfg.IsLocal() {
+		hosts = cfg.AllHosts()
+	}
 
-	allHosts := append(replicaHosts, clientHosts...)
-
-	g, err := iago.NewSSHGroup(allHosts, viper.GetString("ssh-config"))
+	g, err := iago.NewSSHGroup(hosts, cfg.SshConfig)
 	checkf("failed to connect to remote hosts: %v", err)
 
-	if exePath == "" {
-		exePath, err = os.Executable()
+	if cfg.Exe == "" {
+		cfg.Exe, err = os.Executable()
 		checkf("failed to get executable path: %v", err)
 	}
 
+	// TODO: Generate DeployConfig from HostsConfig type.
 	sessions, err := orchestration.Deploy(g, orchestration.DeployConfig{
-		ExePath:             exePath,
-		LogLevel:            viper.GetString("log-level"),
-		CPUProfiling:        viper.GetBool("cpu-profile"),
-		MemProfiling:        viper.GetBool("mem-profile"),
-		Tracing:             viper.GetBool("trace"),
-		Fgprof:              viper.GetBool("fgprof-profile"),
-		Metrics:             viper.GetStringSlice("metrics"),
-		MeasurementInterval: viper.GetDuration("measurement-interval"),
+		ExePath:             cfg.Exe,
+		LogLevel:            cfg.LogLevel,
+		CPUProfiling:        cfg.CpuProfile,
+		MemProfiling:        cfg.MemProfile,
+		Tracing:             cfg.Trace,
+		Fgprof:              cfg.FgProfProfile,
+		Metrics:             cfg.Metrics,
+		MeasurementInterval: cfg.MeasurementInterval,
 	})
 	checkf("failed to deploy workers: %v", err)
 
@@ -208,44 +154,42 @@ func runController() {
 		go stderrPipe(session.Stderr(), errors)
 	}
 
-	if worker || len(allHosts) == 0 {
-		worker, wait := localWorker(outputDir, viper.GetStringSlice("metrics"), viper.GetDuration("measurement-interval"))
+	if cfg.Worker || len(hosts) == 0 {
+		worker, wait := localWorker(cfg.Output, cfg.Metrics, cfg.MeasurementInterval)
 		defer wait()
 		remoteWorkers["localhost"] = worker
 	}
 
+	// TODO: Generate this from HostsConfig type.
 	replicaOpts := &orchestrationpb.ReplicaOpts{
 		UseTLS:            true,
-		BatchSize:         viper.GetUint32("batch-size"),
-		TimeoutMultiplier: float32(viper.GetFloat64("timeout-multiplier")),
-		Consensus:         viper.GetString("consensus"),
-		Crypto:            viper.GetString("crypto"),
-		LeaderRotation:    viper.GetString("leader-rotation"),
-		ConnectTimeout:    durationpb.New(viper.GetDuration("connect-timeout")),
-		InitialTimeout:    durationpb.New(viper.GetDuration("view-timeout")),
-		TimeoutSamples:    viper.GetUint32("duration-samples"),
-		MaxTimeout:        durationpb.New(viper.GetDuration("max-timeout")),
-		SharedSeed:        viper.GetInt64("shared-seed"),
-		Modules:           viper.GetStringSlice("modules"),
-		TreePositions:     treePos,
-		BranchFactor:      branchFactor,
-		TreeDelta:         durationpb.New(treeDelta),
+		BatchSize:         cfg.BatchSize,
+		TimeoutMultiplier: float32(cfg.TimeoutMultiplier),
+		Consensus:         cfg.Consensus,
+		Crypto:            cfg.Crypto,
+		LeaderRotation:    cfg.LeaderRotation,
+		ConnectTimeout:    durationpb.New(cfg.ConnectTimeout),
+		InitialTimeout:    durationpb.New(cfg.ViewTimeout),
+		TimeoutSamples:    cfg.DurationSamples,
+		MaxTimeout:        durationpb.New(cfg.MaxTimeout),
+		SharedSeed:        cfg.SharedSeed,
+		Modules:           cfg.Modules,
 	}
-
+	// TODO: Generate DeployConfig from HostsConfig type.
 	clientOpts := &orchestrationpb.ClientOpts{
 		UseTLS:           true,
-		ConnectTimeout:   durationpb.New(viper.GetDuration("connect-timeout")),
-		PayloadSize:      viper.GetUint32("payload-size"),
-		MaxConcurrent:    viper.GetUint32("max-concurrent"),
-		RateLimit:        viper.GetFloat64("rate-limit"),
-		RateStep:         viper.GetFloat64("rate-step"),
-		RateStepInterval: durationpb.New(viper.GetDuration("rate-step-interval")),
-		Timeout:          durationpb.New(viper.GetDuration("client-timeout")),
+		ConnectTimeout:   durationpb.New(cfg.ConnectTimeout),
+		PayloadSize:      cfg.PayloadSize,
+		MaxConcurrent:    cfg.PayloadSize,
+		RateLimit:        cfg.RateLimit,
+		RateStep:         cfg.RateStep,
+		RateStepInterval: durationpb.New(cfg.RateStepInterval),
+		Timeout:          durationpb.New(cfg.ClientTimeout),
 	}
 
 	experiment, err := orchestration.NewExperiment(
-		viper.GetDuration("duration"),
-		outputDir,
+		cfg.Duration,
+		cfg.Output,
 		replicaOpts,
 		clientOpts,
 		cfg,
@@ -268,7 +212,7 @@ func runController() {
 		checkf("failed to read from remote's standard error stream %v", err)
 	}
 
-	err = orchestration.FetchData(g, outputDir)
+	err = orchestration.FetchData(g, cfg.Output)
 	checkf("failed to fetch data: %v", err)
 
 	err = g.Close()
