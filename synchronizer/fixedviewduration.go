@@ -18,11 +18,11 @@ func (f *fixedViewDuration) Duration() time.Duration {
 	return f.duration
 }
 
-// ViewStarted does nothing for the FixedViewDuration.
+// ViewStarted does nothing for FixedViewDuration.
 func (f *fixedViewDuration) ViewStarted() {}
 
-// ViewSucceeded does nothing for the FixedViewDuration.
+// ViewSucceeded does nothing for FixedViewDuration.
 func (f *fixedViewDuration) ViewSucceeded() {}
 
-// ViewTimeout does nothing for the FixedViewDuration.
+// ViewTimeout does nothing for FixedViewDuration.
 func (f *fixedViewDuration) ViewTimeout() {}
