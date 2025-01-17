@@ -206,7 +206,6 @@ func TestDeployment(t *testing.T) {
 		clientHosts = append(clientHosts, popped)
 		allHosts = allHosts[1:]
 	}
-
 	// Add all replica and client hostnames (that came from workers) separately
 	// to the config.
 	cfg := &config.ExperimentConfig{
@@ -215,6 +214,7 @@ func TestDeployment(t *testing.T) {
 		ReplicaHosts:      replicaHosts,
 		ClientHosts:       clientHosts,
 		Duration:          10 * time.Second,
+		ClientTimeout:     500 * time.Millisecond,
 		ConnectTimeout:    time.Second,
 		MaxConcurrent:     250,
 		PayloadSize:       100,

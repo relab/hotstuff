@@ -61,6 +61,8 @@ type ExperimentConfig struct {
 	// TreeDelta is the waiting time for intermediate nodes in the tree.
 	TreeDelta time.Duration
 
+	// TODO: Add field descriptions.
+
 	BatchSize uint32
 
 	ClientTimeout       time.Duration

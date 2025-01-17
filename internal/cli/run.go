@@ -57,7 +57,7 @@ func runController() {
 		checkf("failed to get executable path: %v", err)
 	}
 
-	// TODO: Generate DeployConfig from HostsConfig type.
+	// TODO: Generate DeployConfig from ExperimentConfig type.
 	sessions, err := orchestration.Deploy(g, orchestration.DeployConfig{
 		ExePath:             cfg.Exe,
 		LogLevel:            cfg.LogLevel,

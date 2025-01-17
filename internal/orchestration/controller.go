@@ -31,7 +31,7 @@ type Experiment struct {
 	caKey *ecdsa.PrivateKey
 	ca    *x509.Certificate
 
-	hostCfg *config.ExperimentConfig
+	cfg *config.ExperimentConfig
 }
 
 // NewExperiment returns a struct containing the general experiment
@@ -60,7 +60,7 @@ func NewExperiment(
 	return &Experiment{
 		logger:  logger,
 		workers: workers,
-		hostCfg: cfg,
+		cfg:     cfg,
 	}, nil
 }
 
@@ -72,11 +72,11 @@ func (e *Experiment) Run() (err error) {
 			err = qerr
 		}
 	}()
-	replicaOpts := e.hostCfg.CreateReplicaOpts()
-	clientOpts := e.hostCfg.CreateClientOpts()
+	replicaOpts := e.cfg.CreateReplicaOpts()
+	clientOpts := e.cfg.CreateClientOpts()
 
-	replicaMap := e.hostCfg.AssignReplicas(replicaOpts)
-	clientIds := e.hostCfg.AssignClients()
+	replicaMap := e.cfg.AssignReplicas(replicaOpts)
+	clientIds := e.cfg.AssignClients()
 
 	if e.output != "" {
 		err = e.writeAssignmentsFile(replicaMap, clientIds)
@@ -103,7 +103,7 @@ func (e *Experiment) Run() (err error) {
 		return fmt.Errorf("failed to start clients: %w", err)
 	}
 
-	time.Sleep(e.hostCfg.Duration)
+	time.Sleep(e.cfg.Duration)
 
 	e.logger.Info("Stopping clients...")
 	err = e.stopClients(clientIds)

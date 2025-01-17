@@ -11,9 +11,10 @@ import (
 //go:embed schema.cue
 var schemaFile string
 
-// NewCue loads a cue configuration from filename and returns a Config struct.
+// NewCue loads a cue configuration from filename and returns a ExperimentConfig struct.
 // The configuration is validated against the schema embedded in the binary.
-// TODO: For now, this config extends NewViper to extract default values. This should be in schema.cue.
+// One can specify the `base` config to overwrite its values from the Cue config.
+// Leave `base` nil to construct a Cue config from scratch.
 func NewCue(filename string, base *ExperimentConfig) (*ExperimentConfig, error) {
 	ctx := cuecontext.New()
 	schema := ctx.CompileString(schemaFile).LookupPath(cue.ParsePath("config"))
