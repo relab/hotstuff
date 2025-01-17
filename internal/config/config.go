@@ -33,8 +33,8 @@ func (c ClientMap) ClientIDs(host string) []uint32 {
 	return ids
 }
 
-// HostConfig holds the configuration for an experiment.
-type HostConfig struct {
+// ExperimentConfig holds the configuration for an experiment.
+type ExperimentConfig struct {
 	// ReplicaHosts is a list of hosts that will run replicas.
 	ReplicaHosts []string
 	// ClientHosts is a list of hosts that will run clients.
@@ -99,18 +99,8 @@ type HostConfig struct {
 	LogLevel          string
 }
 
-// NewLocal is a helper that creates a config for local hosting.
-func NewLocal(numReplicas, numClients int) *HostConfig {
-	return &HostConfig{
-		ReplicaHosts: []string{"localhost"},
-		ClientHosts:  []string{"localhost"},
-		Replicas:     numReplicas,
-		Clients:      numClients,
-	}
-}
-
 // TreePosIDs returns a slice of hotstuff.IDs ordered by the tree positions.
-func (c *HostConfig) TreePosIDs() []hotstuff.ID {
+func (c *ExperimentConfig) TreePosIDs() []hotstuff.ID {
 	ids := make([]hotstuff.ID, 0, len(c.TreePositions))
 	for i, id := range c.TreePositions {
 		ids[i] = hotstuff.ID(id)
@@ -132,17 +122,17 @@ func unitsForHost(hostIndex int, totalUnits int, numHosts int) int {
 }
 
 // ReplicasForHost returns the number of replicas assigned to the host at the given index.
-func (c *HostConfig) ReplicasForHost(hostIndex int) int {
+func (c *ExperimentConfig) ReplicasForHost(hostIndex int) int {
 	return unitsForHost(hostIndex, c.Replicas, len(c.ReplicaHosts))
 }
 
 // ClientsForHost returns the number of clients assigned to the host at the given index.
-func (c *HostConfig) ClientsForHost(hostIndex int) int {
+func (c *ExperimentConfig) ClientsForHost(hostIndex int) int {
 	return unitsForHost(hostIndex, c.Clients, len(c.ClientHosts))
 }
 
 // AssignReplicas assigns replicas to hosts.
-func (c *HostConfig) AssignReplicas(srcReplicaOpts *orchestrationpb.ReplicaOpts) ReplicaMap {
+func (c *ExperimentConfig) AssignReplicas(srcReplicaOpts *orchestrationpb.ReplicaOpts) ReplicaMap {
 	hostsToReplicas := make(ReplicaMap)
 	nextReplicaID := hotstuff.ID(1)
 
@@ -161,7 +151,7 @@ func (c *HostConfig) AssignReplicas(srcReplicaOpts *orchestrationpb.ReplicaOpts)
 // lookupByzStrategy returns the Byzantine strategy for the given replica.
 // If the replica is not Byzantine, the function will return an empty string.
 // This assumes the replicaID is valid; this is checked by the cue config parser.
-func (c *HostConfig) lookupByzStrategy(replicaID hotstuff.ID) string {
+func (c *ExperimentConfig) lookupByzStrategy(replicaID hotstuff.ID) string {
 	for strategy, ids := range c.ByzantineStrategy {
 		if slices.Contains(ids, uint32(replicaID)) {
 			return strategy
@@ -171,7 +161,7 @@ func (c *HostConfig) lookupByzStrategy(replicaID hotstuff.ID) string {
 }
 
 // AssignClients assigns clients to hosts.
-func (c *HostConfig) AssignClients() ClientMap {
+func (c *ExperimentConfig) AssignClients() ClientMap {
 	hostsToClients := make(ClientMap)
 	nextClientID := hotstuff.ID(1)
 
@@ -187,7 +177,7 @@ func (c *HostConfig) AssignClients() ClientMap {
 
 // IsLocal returns true if both the replica and client hosts slices
 // contain one instance of "localhost". See NewLocal.
-func (c *HostConfig) IsLocal() bool {
+func (c *ExperimentConfig) IsLocal() bool {
 	if len(c.ClientHosts) > 1 || len(c.ReplicaHosts) > 1 {
 		return false
 	}
@@ -198,14 +188,14 @@ func (c *HostConfig) IsLocal() bool {
 // AllHosts returns the list of all hostnames, including replicas and clients.
 // If the configuration is set to run locally, the function returns a list with
 // one entry called "localhost".
-func (c *HostConfig) AllHosts() []string {
+func (c *ExperimentConfig) AllHosts() []string {
 	if c.IsLocal() {
 		return []string{"localhost"}
 	}
 	return append(c.ReplicaHosts, c.ClientHosts...)
 }
 
-func (c *HostConfig) CreateReplicaOpts() *orchestrationpb.ReplicaOpts {
+func (c *ExperimentConfig) CreateReplicaOpts() *orchestrationpb.ReplicaOpts {
 	return &orchestrationpb.ReplicaOpts{
 		UseTLS:            true,
 		BatchSize:         c.BatchSize,
@@ -225,7 +215,7 @@ func (c *HostConfig) CreateReplicaOpts() *orchestrationpb.ReplicaOpts {
 	}
 }
 
-func (cfg *HostConfig) CreateClientOpts() *orchestrationpb.ClientOpts {
+func (cfg *ExperimentConfig) CreateClientOpts() *orchestrationpb.ClientOpts {
 	return &orchestrationpb.ClientOpts{
 		UseTLS:           true,
 		ConnectTimeout:   durationpb.New(cfg.ConnectTimeout),

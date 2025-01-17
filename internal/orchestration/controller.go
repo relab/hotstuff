@@ -31,13 +31,13 @@ type Experiment struct {
 	caKey *ecdsa.PrivateKey
 	ca    *x509.Certificate
 
-	hostCfg *config.HostConfig
+	hostCfg *config.ExperimentConfig
 }
 
 // NewExperiment returns a struct containing the general experiment
 // configuration.
 func NewExperiment(
-	cfg *config.HostConfig,
+	cfg *config.ExperimentConfig,
 	workers map[string]RemoteWorker,
 	logger logging.Logger,
 ) (*Experiment, error) {

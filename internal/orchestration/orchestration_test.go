@@ -35,8 +35,8 @@ func makeCfg(
 	byzantine string,
 	branchFactor uint32,
 	randomTree bool,
-	mods ...string) *config.HostConfig {
-	cfg := &config.HostConfig{
+	mods ...string) *config.ExperimentConfig {
+	cfg := &config.ExperimentConfig{
 		Replicas:          replicas,
 		Clients:           clients,
 		TreePositions:     tree.DefaultTreePosUint32(replicas),
@@ -70,7 +70,7 @@ func makeCfg(
 	return cfg
 }
 
-func run(t *testing.T, cfg *config.HostConfig) {
+func run(t *testing.T, cfg *config.ExperimentConfig) {
 	t.Helper()
 
 	controllerStream, workerStream := net.Pipe()
@@ -209,7 +209,7 @@ func TestDeployment(t *testing.T) {
 
 	// Add all replica and client hostnames (that came from workers) separately
 	// to the config.
-	cfg := &config.HostConfig{
+	cfg := &config.ExperimentConfig{
 		Replicas:          numReplicas,
 		Clients:           numClients,
 		ReplicaHosts:      replicaHosts,

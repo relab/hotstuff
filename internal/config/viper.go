@@ -9,14 +9,14 @@ import (
 	"github.com/spf13/viper"
 )
 
-func NewViper() (*HostConfig, error) {
+func NewViper() (*ExperimentConfig, error) {
 	intTreePos := viper.GetIntSlice("tree-pos")
 	treePos := make([]uint32, len(intTreePos))
 	for i, pos := range intTreePos {
 		treePos[i] = uint32(pos)
 	}
 
-	cfg := &HostConfig{
+	cfg := &ExperimentConfig{
 		Duration:            viper.GetDuration("duration"),
 		Replicas:            viper.GetInt("replicas"),
 		Clients:             viper.GetInt("clients"),
