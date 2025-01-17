@@ -19,25 +19,13 @@ import (
 
 	"github.com/relab/hotstuff/internal/config"
 	"github.com/relab/hotstuff/internal/orchestration"
-	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/internal/test"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/iago/iagotest"
-	"google.golang.org/protobuf/types/known/durationpb"
 )
-
-func makeClientOpts() *orchestrationpb.ClientOpts {
-	return &orchestrationpb.ClientOpts{
-		ConnectTimeout: durationpb.New(time.Second),
-		MaxConcurrent:  250,
-		PayloadSize:    100,
-		RateLimit:      math.Inf(1),
-		Timeout:        durationpb.New(500 * time.Millisecond),
-	}
-}
 
 func makeCfg(
 	replicas, clients int,
@@ -51,8 +39,6 @@ func makeCfg(
 	cfg := &config.HostConfig{
 		Replicas:          replicas,
 		Clients:           clients,
-		ReplicaHosts:      []string{"localhost"},
-		ClientHosts:       []string{"localhost"},
 		TreePositions:     tree.DefaultTreePosUint32(replicas),
 		RandomTree:        randomTree,
 		BranchFactor:      branchFactor,
@@ -62,6 +48,8 @@ func makeCfg(
 		ByzantineStrategy: map[string][]uint32{byzantine: {1}},
 
 		// Common default values:
+		ReplicaHosts:      []string{"localhost"},
+		ClientHosts:       []string{"localhost"},
 		Duration:          5 * time.Second,
 		BatchSize:         100,
 		ConnectTimeout:    time.Second,
@@ -241,7 +229,7 @@ func TestDeployment(t *testing.T) {
 	}
 
 	experiment, err := orchestration.NewExperiment(
-		cfg, // TODO: Find a cleaner approach to creating a config for a test case like this.
+		cfg,
 		workers,
 		logging.New("ctrl"),
 	)
