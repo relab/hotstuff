@@ -1,6 +1,7 @@
 package kauri
 
 import (
+	"slices"
 	"time"
 
 	"github.com/relab/hotstuff"
@@ -9,46 +10,53 @@ import (
 	"github.com/relab/hotstuff/modules"
 )
 
-// AggDuration calculates the maximum duration of a path in the tree.
-type AggDuration struct {
+// AggregationLatency calculates the maximum duration of a path in the tree.
+type AggregationLatency struct {
 	tree      *tree.Tree
 	lm        latency.Matrix
 	id        hotstuff.ID
-	delta     time.Duration //the time it takes to aggregate the children
+	delta     time.Duration // the time it takes to aggregate the children
 	timerType modules.WaitTimerType
 }
 
-func NewAggDuration(tree *tree.Tree, lm latency.Matrix, opts *modules.Options) *AggDuration {
-	return &AggDuration{tree: tree, lm: lm, id: opts.ID(),
+func NewAggregationLatency(tree *tree.Tree, lm latency.Matrix, opts *modules.Options) *AggregationLatency {
+	return &AggregationLatency{
+		tree:      tree,
+		lm:        lm,
+		id:        opts.ID(),
 		delta:     opts.TreeConfig().TreeWaitDelta(),
-		timerType: opts.TreeConfig().WaitTimerType()}
+		timerType: opts.TreeConfig().WaitTimerType(),
+	}
 }
 
-func (t *AggDuration) WaitTimerDuration() time.Duration {
+func (t *AggregationLatency) WaitTimerDuration() time.Duration {
 	if t.timerType == modules.WaitTimerAgg {
-		return t.aggTimerDuration(t.id)
+		return t.aggregationLatency(t.id)
 	}
 	return t.fixedAggDuration()
 }
 
-// aggTimerDuration calculates the network latency at child to aggregate the latency of its children.
-// if child is leaf node, so it returns 0.
-// any other level, it returns the maximum latency of its children to complete the aggregation.
-func (t *AggDuration) aggTimerDuration(id hotstuff.ID) time.Duration {
+// aggregationLatency returns the highest latency path from node id to its leaf nodes.
+//
+// If the node is a leaf, it returns 0 as no aggregation is required.
+// For other nodes, the aggregation latency for a child includes:
+// - Round-trip latency to the child
+// - Aggregation latency required by the child node (recursive call)
+func (t *AggregationLatency) aggregationLatency(id hotstuff.ID) time.Duration {
 	children := t.tree.ChildrenOf(id)
 	if len(children) == 0 {
-		return 0
+		return 0 // base case: leaf nodes have zero aggregation latency.
 	}
+	// calculate aggregation latencies for each child
 	latencies := make([]time.Duration, len(children))
-	// this logic can be pushed to the recursive function, but in this case one way latency is sufficient.
-	for index, child := range children {
-		latencies[index] = (2 * t.lm.Latency(id, child)) + t.aggTimerDuration(child)
+	for i, child := range children {
+		latencies[i] = 2*t.lm.Latency(id, child) + t.aggregationLatency(child)
 	}
 	return max(latencies) + t.delta
 }
 
 // FixedAggDuration returns the fixed aggregation duration based on the height of the tree.
-func (t *AggDuration) fixedAggDuration() time.Duration {
+func (t *AggregationLatency) fixedAggDuration() time.Duration {
 	return time.Duration(2*(t.tree.ReplicaHeight()-1)) * t.delta
 }
 
@@ -56,11 +64,5 @@ func max(latencies []time.Duration) time.Duration {
 	if len(latencies) == 0 {
 		return 0
 	}
-	max := latencies[0]
-	for _, latency := range latencies {
-		if latency > max {
-			max = latency
-		}
-	}
-	return max
+	return slices.Max(latencies)
 }

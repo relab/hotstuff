@@ -31,7 +31,7 @@ func TestAggDurationHeight2(t *testing.T) {
 		opts := modules.OptionsWithID(test.id)
 		opts.SetTreeConfig(uint32(bf), treePos, time.Duration(delta), modules.WaitTimerAgg)
 		tree := tree.CreateTree(test.id, bf, treePos)
-		agg := kauri.NewAggDuration(tree, test.lm, opts)
+		agg := kauri.NewAggregationLatency(tree, test.lm, opts)
 		if agg.WaitTimerDuration() != test.want {
 			t.Errorf("AggDuration(%d, %v).Duration() = %v; want %v", test.id, test.lm, agg.WaitTimerDuration(), test.want)
 		}
@@ -39,16 +39,17 @@ func TestAggDurationHeight2(t *testing.T) {
 }
 
 func TestAggDurationHeight3(t *testing.T) {
-	locations := []string{"Melbourne", "Melbourne", "Toronto",
+	locations := []string{
+		"Melbourne", "Melbourne", "Toronto",
 		"Toronto", "Prague", "Prague", "Paris", "Paris", "Tokyo",
-		"Tokyo", "Amsterdam", "Amsterdam", "Auckland", "Auckland", "Melbourne"}
+		"Tokyo", "Amsterdam", "Amsterdam", "Auckland", "Auckland", "Melbourne",
+	}
 	lm := latency.MatrixFrom(locations)
 	testData := []struct {
 		id   hotstuff.ID
 		lm   latency.Matrix
 		want time.Duration
 	}{
-
 		{1, lm, 607507000},
 		{2, lm, 511744000},
 		{3, lm, 388915000},
@@ -62,7 +63,7 @@ func TestAggDurationHeight3(t *testing.T) {
 		opts := modules.OptionsWithID(test.id)
 		opts.SetTreeConfig(uint32(bf), treePos, time.Duration(delta), modules.WaitTimerAgg)
 		tree := tree.CreateTree(test.id, bf, treePos)
-		agg := kauri.NewAggDuration(tree, test.lm, opts)
+		agg := kauri.NewAggregationLatency(tree, test.lm, opts)
 		if agg.WaitTimerDuration() != test.want {
 			t.Errorf("AggDuration(%d, %v).Duration() = %v; want %v", test.id, test.lm, agg.WaitTimerDuration(), test.want)
 		}
@@ -87,12 +88,13 @@ func TestFixedAggDurationH4(t *testing.T) {
 		bf := 2
 		opts.SetTreeConfig(2, treePos, time.Duration(delta), modules.WaitTimerFixed)
 		tree := tree.CreateTree(test.id, bf, treePos)
-		agg := kauri.NewAggDuration(tree, latency.Matrix{}, opts)
+		agg := kauri.NewAggregationLatency(tree, latency.Matrix{}, opts)
 		if agg.WaitTimerDuration() != test.want {
 			t.Errorf("FixedAggDuration(%d).Duration() = %v; want %v", test.id, agg.WaitTimerDuration(), test.want)
 		}
 	}
 }
+
 func TestFixedAggDuration(t *testing.T) {
 	treePos := []hotstuff.ID{1, 2, 3, 4, 5, 6, 7}
 	testData := []struct {
@@ -110,7 +112,7 @@ func TestFixedAggDuration(t *testing.T) {
 		bf := 2
 		opts.SetTreeConfig(2, treePos, time.Duration(delta), modules.WaitTimerFixed)
 		tree := tree.CreateTree(test.id, bf, treePos)
-		agg := kauri.NewAggDuration(tree, latency.Matrix{}, opts)
+		agg := kauri.NewAggregationLatency(tree, latency.Matrix{}, opts)
 		if agg.WaitTimerDuration() != test.want {
 			t.Errorf("FixedAggDuration(%d).Duration() = %v; want %v", test.id, agg.WaitTimerDuration(), test.want)
 		}

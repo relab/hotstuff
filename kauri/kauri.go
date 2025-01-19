@@ -129,7 +129,7 @@ func (k *Kauri) SendProposalToChildren(p hotstuff.ProposeMsg) {
 		}
 		k.logger.Debug("Sending proposal to children ", children)
 		config.Propose(p)
-		waitTime := NewAggDuration(&k.tree, k.server.LatencyMatrix(), k.opts).WaitTimerDuration()
+		waitTime := NewAggregationLatency(&k.tree, k.server.LatencyMatrix(), k.opts).WaitTimerDuration()
 		go k.WaitToAggregate(waitTime, k.currentView)
 	} else {
 		k.SendContributionToParent()
