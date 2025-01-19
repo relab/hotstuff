@@ -215,7 +215,9 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 	)
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
-	builder.Options().SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
+	//default to the waitTimer need a parameter in config for this
+	builder.Options().SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(),
+		opts.TreeDeltaDuration(), modules.WaitTimerFixed)
 
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)

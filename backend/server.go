@@ -146,6 +146,11 @@ func (srv *Server) Stop() {
 	srv.gorumsSrv.Stop()
 }
 
+// Latency matrix to use in Kauri
+func (srv *Server) LatencyMatrix() latency.Matrix {
+	return srv.lm
+}
+
 // serviceImpl provides the implementation of the HotStuff gorums service.
 type serviceImpl struct {
 	srv *Server

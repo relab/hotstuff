@@ -56,11 +56,23 @@ func (opts *Options) ensureSpace(id OptionID) {
 	}
 }
 
+type WaitTimerType int
+
+const (
+	WaitTimerFixed WaitTimerType = iota
+	WaitTimerAgg   WaitTimerType = iota + 1
+)
+
 // TreeConfig stores the tree configuration
 type TreeConfig struct {
 	bf            int
 	treePos       []hotstuff.ID
 	treeWaitDelta time.Duration
+	waitTimerType WaitTimerType
+}
+
+func (tc *TreeConfig) WaitTimerType() WaitTimerType {
+	return tc.waitTimerType
 }
 
 // BranchFactor returns the branch factor of the tree.
@@ -152,11 +164,12 @@ func (opts *Options) SetShouldVerifyVotesSync() {
 	opts.shouldVerifyVotesSync = true
 }
 
-func (opts *Options) SetTreeConfig(bf uint32, treePos []hotstuff.ID, treeWaitDelta time.Duration) {
+func (opts *Options) SetTreeConfig(bf uint32, treePos []hotstuff.ID, treeWaitDelta time.Duration, timerType WaitTimerType) {
 	opts.treeConfig = &TreeConfig{
 		bf:            int(bf),
 		treePos:       treePos,
 		treeWaitDelta: treeWaitDelta,
+		waitTimerType: timerType,
 	}
 }
 
@@ -172,4 +185,9 @@ func (opts *Options) SetSharedRandomSeed(seed int64) {
 // See: https://github.com/grpc/grpc-go/blob/master/Documentation/grpc-metadata.md#storing-binary-data-in-metadata
 func (opts *Options) SetConnectionMetadata(key string, value string) {
 	opts.connectionMetadata[key] = value
+}
+
+// OptionsWithID meant to be used in tests
+func OptionsWithID(id hotstuff.ID) *Options {
+	return &Options{id: id}
 }
