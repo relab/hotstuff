@@ -10,7 +10,6 @@ import (
 )
 
 type Committer struct {
-	consensus   core.Consensus
 	blockChain  core.BlockChain
 	executor    core.ExecutorExt
 	forkHandler core.ForkHandlerExt
@@ -33,12 +32,11 @@ func (bb *Committer) InitModule(mods *core.Core) {
 		&bb.blockChain,
 		&bb.forkHandler,
 		&bb.logger,
-		&bb.consensus,
 	)
 }
 
 // Stores the block before further execution.
-func (bb *Committer) Commit(block *hotstuff.Block) {
+func (bb *Committer) Commit(committedHeight hotstuff.View, block *hotstuff.Block) {
 	err := bb.commit(block)
 	if err != nil {
 		bb.logger.Warnf("failed to commit: %v", err)
@@ -47,7 +45,7 @@ func (bb *Committer) Commit(block *hotstuff.Block) {
 
 	// prune the blockchain and handle forked blocks
 	prunedBlocks := bb.blockChain.PruneToHeight(block.View())
-	forkedBlocks := bb.findForks(block.View(), prunedBlocks)
+	forkedBlocks := bb.findForks(committedHeight, block.View(), prunedBlocks)
 	for _, blocks := range forkedBlocks {
 		bb.forkHandler.Fork(blocks)
 	}
@@ -87,10 +85,9 @@ func (bb *Committer) CommittedBlock() *hotstuff.Block {
 	return bb.bExec
 }
 
-func (bb *Committer) findForks(height hotstuff.View, blocksAtHeight map[hotstuff.View][]*hotstuff.Block) (forkedBlocks []*hotstuff.Block) {
+func (bb *Committer) findForks(committedHeight, height hotstuff.View, blocksAtHeight map[hotstuff.View][]*hotstuff.Block) (forkedBlocks []*hotstuff.Block) {
 
 	committedViews := make(map[hotstuff.View]bool)
-	committedHeight := bb.consensus.CommittedBlock().View()
 
 	// This is a hacky value: chain.prevPruneHeight, but it works.
 	for h := committedHeight; h >= bb.blockChain.PruneHeight(); {
@@ -119,5 +116,3 @@ func (bb *Committer) findForks(height hotstuff.View, blocksAtHeight map[hotstuff
 	}
 	return
 }
-
-var _ core.Committer = (*Committer)(nil)

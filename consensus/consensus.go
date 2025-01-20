@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -40,7 +41,7 @@ type Consensus struct {
 
 	acceptor       core.Acceptor
 	blockChain     core.BlockChain
-	committer      core.Committer
+	committer      *committer.Committer
 	commandQueue   core.CommandQueue
 	configuration  core.Configuration
 	crypto         core.Crypto
@@ -210,7 +211,7 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 	cs.blockChain.Store(block)
 
 	if b := cs.impl.CommitRule(block); b != nil {
-		cs.committer.Commit(block)
+		cs.committer.Commit(view, block)
 	}
 
 	// Tells the synchronizer to advance the view
