@@ -139,7 +139,7 @@ type Consensus interface {
 	// StopVoting ensures that no voting happens in a view earlier than `view`.
 	StopVoting(view hotstuff.View)
 	// Propose starts a new proposal. The command is fetched from the command queue.
-	Propose(cert hotstuff.SyncInfo)
+	Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncInfo hotstuff.SyncInfo, advance bool)
 	// CommittedBlock returns the most recently committed block.
 	CommittedBlock() *hotstuff.Block
 	// ChainLength returns the number of blocks that need to be chained together in order to commit.

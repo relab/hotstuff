@@ -129,7 +129,10 @@ func (s *Synchronizer) Start(ctx context.Context) {
 
 	// start the initial proposal
 	if view := s.View(); view == 1 && s.leaderRotation.GetLeader(view) == s.opts.ID() {
-		s.consensus.Propose(s.SyncInfo())
+		sInfo, ok := s.consensus.Propose(s.View(), s.SyncInfo())
+		if ok {
+			s.AdvanceView(sInfo)
+		}
 	}
 }
 
@@ -341,7 +344,10 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.opts.ID() {
-		s.consensus.Propose(syncInfo)
+		sInfo, ok := s.consensus.Propose(s.View(), syncInfo)
+		if ok {
+			s.AdvanceView(sInfo)
+		}
 	} else if replica, ok := s.configuration.Replica(leader); ok {
 		replica.NewView(syncInfo)
 	}

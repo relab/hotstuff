@@ -164,7 +164,8 @@ func (n *Network) run(ticks int) {
 	// kick off the initial proposal(s)
 	for _, node := range n.nodes {
 		if node.leaderRotation.GetLeader(1) == node.id.ReplicaID {
-			node.consensus.Propose(node.synchronizer.(*synchronizer.Synchronizer).SyncInfo())
+			s := node.synchronizer.(*synchronizer.Synchronizer)
+			node.consensus.Propose(s.View(), s.SyncInfo())
 		}
 	}
 

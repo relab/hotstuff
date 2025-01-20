@@ -49,11 +49,11 @@ type consensusBase struct {
 	leaderRotation modules.LeaderRotation
 	logger         logging.Logger
 	opts           *core.Options
-	synchronizer   core.Synchronizer
 
 	handel core.Handel
 
 	lastVote hotstuff.View
+	view     hotstuff.View
 
 	mut sync.Mutex
 }
@@ -80,17 +80,13 @@ func (cs *consensusBase) InitModule(mods *core.Core) {
 		&cs.logger,
 		&cs.opts,
 		&cs.impl,
-		&cs.synchronizer,
 	)
 
 	mods.TryGet(&cs.handel)
 
-	// if mod, ok := cs.impl.(core.Module); ok {
-	// 	mod.InitModule(mods, initOpt)
-	// }
-
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
-		cs.OnPropose(event.(hotstuff.ProposeMsg))
+		// TODO: determine potential bugs
+		cs.OnPropose(cs.view, event.(hotstuff.ProposeMsg))
 	})
 }
 
@@ -107,8 +103,9 @@ func (cs *consensusBase) StopVoting(view hotstuff.View) {
 }
 
 // Propose creates a new proposal.
-func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
+func (cs *consensusBase) Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncInfo hotstuff.SyncInfo, advance bool) {
 	cs.logger.Debugf("Propose")
+	cs.view = view
 
 	qc, ok := cert.QC()
 	if ok {
@@ -125,7 +122,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 
 	cmd, ok := cs.commandQueue.Get(ctx)
 	if !ok {
-		cs.logger.Debugf("Propose[view=%d]: No command", cs.synchronizer.View())
+		cs.logger.Debugf("Propose[view=%d]: No command", view)
 		return
 	}
 
@@ -143,7 +140,7 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 				qc.BlockHash(),
 				qc,
 				cmd,
-				cs.synchronizer.View(),
+				view,
 				cs.opts.ID(),
 			),
 		}
@@ -157,57 +154,57 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 
 	cs.configuration.Propose(proposal)
 	// self vote
-	cs.OnPropose(proposal)
+	return cs.OnPropose(view, proposal)
 }
 
-func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocyclo
+func (cs *consensusBase) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) { //nolint:gocyclo
 	// TODO: extract parts of this method into helper functions maybe?
-	cs.logger.Debugf("OnPropose[view=%d]: %.8s -> %.8x", cs.synchronizer.View(), proposal.Block.Hash(), proposal.Block.Command())
+	cs.logger.Debugf("OnPropose[view=%d]: %.8s -> %.8x", view, proposal.Block.Hash(), proposal.Block.Command())
 
 	block := proposal.Block
 
 	if cs.opts.ShouldUseAggQC() && proposal.AggregateQC != nil {
 		highQC, ok := cs.crypto.VerifyAggregateQC(*proposal.AggregateQC)
 		if !ok {
-			cs.logger.Warnf("OnPropose[view=%d]: failed to verify aggregate QC", cs.synchronizer.View())
+			cs.logger.Warnf("OnPropose[view=%d]: failed to verify aggregate QC", view)
 			return
 		}
 		// NOTE: for simplicity, we require that the highQC found in the AggregateQC equals the QC embedded in the block.
 		if !block.QuorumCert().Equals(highQC) {
-			cs.logger.Warnf("OnPropose[view=%d]: block QC does not equal highQC", cs.synchronizer.View())
+			cs.logger.Warnf("OnPropose[view=%d]: block QC does not equal highQC", view)
 			return
 		}
 	}
 
 	if !cs.crypto.VerifyQuorumCert(block.QuorumCert()) {
-		cs.logger.Infof("OnPropose[view=%d]: invalid QC", cs.synchronizer.View())
+		cs.logger.Infof("OnPropose[view=%d]: invalid QC", view)
 		return
 	}
 
 	// ensure the block came from the leader.
 	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
-		cs.logger.Infof("OnPropose[p=%d, view=%d]: block was not proposed by the expected leader", cs.synchronizer.View())
+		cs.logger.Infof("OnPropose[p=%d, view=%d]: block was not proposed by the expected leader", view)
 		return
 	}
 
 	if !cs.impl.VoteRule(proposal) {
-		cs.logger.Infof("OnPropose[p=%d, view=%d]: Block not voted for", cs.synchronizer.View())
+		cs.logger.Infof("OnPropose[p=%d, view=%d]: Block not voted for", view)
 		return
 	}
 
 	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
 		cs.acceptor.Proposed(qcBlock.Command())
 	} else {
-		cs.logger.Infof("OnPropose[view=%d]: Failed to fetch qcBlock", cs.synchronizer.View())
+		cs.logger.Infof("OnPropose[view=%d]: Failed to fetch qcBlock", view)
 	}
 
 	cmd := block.Command()
 	if !cs.acceptor.Accept(cmd) {
-		cs.logger.Infof("OnPropose[view=%d]: block rejected: %.8s -> %.8x", cs.synchronizer.View(), block.Hash(), block.Command())
+		cs.logger.Infof("OnPropose[view=%d]: block rejected: %.8s -> %.8x", view, block.Hash(), block.Command())
 		return
 	}
 
-	cs.logger.Debugf("OnPropose[view=%d]: block accepted: %.8s -> %.8x", cs.synchronizer.View(), block.Hash(), block.Command())
+	cs.logger.Debugf("OnPropose[view=%d]: block accepted: %.8s -> %.8x", view, block.Hash(), block.Command())
 
 	// block is safe and was accepted
 	cs.blockChain.Store(block)
@@ -215,16 +212,19 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 	if b := cs.impl.CommitRule(block); b != nil {
 		cs.committer.Commit(block)
 	}
-	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+
+	// Tells the synchronizer to advance the view
+	advance = true
+	syncInfo = hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
 
 	if block.View() <= cs.lastVote {
-		cs.logger.Info(fmt.Sprintf("OnPropose[view=%d]: block view too old for %.8s -> %.8x (diff=%d)", cs.synchronizer.View(), block.Hash(), block.Command(), cs.lastVote-block.View()))
+		cs.logger.Info(fmt.Sprintf("OnPropose[view=%d]: block view too old for %.8s -> %.8x (diff=%d)", view, block.Hash(), block.Command(), cs.lastVote-block.View()))
 		return
 	}
 
 	pc, err := cs.crypto.CreatePartialCert(block)
 	if err != nil {
-		cs.logger.Errorf("OnPropose[view=%d]: failed to sign block: ", cs.synchronizer.View(), err)
+		cs.logger.Errorf("OnPropose[view=%d]: failed to sign block: ", view, err)
 		return
 	}
 
@@ -248,8 +248,9 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
-	cs.logger.Debugf("OnPropose[view=%d]: voting for %.8s -> %.8x", cs.synchronizer.View(), block.Hash(), block.Command())
+	cs.logger.Debugf("OnPropose[view=%d]: voting for %.8s -> %.8x", view, block.Hash(), block.Command())
 	leader.Vote(pc)
+	return
 }
 
 // ChainLength returns the number of blocks that need to be chained together in order to commit.
