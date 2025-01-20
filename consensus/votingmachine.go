@@ -5,18 +5,11 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/logging"
 )
 
 // VotingMachine collects votes.
 type VotingMachine struct {
-	blockChain    core.BlockChain
-	configuration core.Configuration
-	crypto        core.Crypto
-	eventLoop     *core.EventLoop
-	logger        logging.Logger
-	synchronizer  core.Synchronizer
-	opts          *core.Options
+	comps core.ComponentList
 
 	mut           sync.Mutex
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
@@ -31,23 +24,14 @@ func NewVotingMachine() *VotingMachine {
 
 // InitComponent initializes the VotingMachine.
 func (vm *VotingMachine) InitComponent(mods *core.Core) {
-	mods.Get(
-		&vm.blockChain,
-		&vm.configuration,
-		&vm.crypto,
-		&vm.eventLoop,
-		&vm.logger,
-		&vm.synchronizer,
-		&vm.opts,
-	)
-
-	vm.eventLoop.RegisterHandler(hotstuff.VoteMsg{}, func(event any) { vm.OnVote(event.(hotstuff.VoteMsg)) })
+	vm.comps = mods.Components()
+	vm.comps.EventLoop.RegisterHandler(hotstuff.VoteMsg{}, func(event any) { vm.OnVote(event.(hotstuff.VoteMsg)) })
 }
 
 // OnVote handles an incoming vote.
 func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 	cert := vote.PartialCert
-	vm.logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
+	vm.comps.Logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
 
 	var (
 		block *hotstuff.Block
@@ -56,30 +40,30 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 
 	if !vote.Deferred {
 		// first, try to get the block from the local cache
-		block, ok = vm.blockChain.LocalGet(cert.BlockHash())
+		block, ok = vm.comps.BlockChain.LocalGet(cert.BlockHash())
 		if !ok {
 			// if that does not work, we will try to handle this event later.
 			// hopefully, the block has arrived by then.
-			vm.logger.Debugf("Local cache miss for block: %.8s", cert.BlockHash())
+			vm.comps.Logger.Debugf("Local cache miss for block: %.8s", cert.BlockHash())
 			vote.Deferred = true
-			vm.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, vote)
+			vm.comps.EventLoop.DelayUntil(hotstuff.ProposeMsg{}, vote)
 			return
 		}
 	} else {
 		// if the block has not arrived at this point we will try to fetch it.
-		block, ok = vm.blockChain.Get(cert.BlockHash())
+		block, ok = vm.comps.BlockChain.Get(cert.BlockHash())
 		if !ok {
-			vm.logger.Debugf("Could not find block for vote: %.8s.", cert.BlockHash())
+			vm.comps.Logger.Debugf("Could not find block for vote: %.8s.", cert.BlockHash())
 			return
 		}
 	}
 
-	if block.View() <= vm.synchronizer.HighQC().View() {
+	if block.View() <= vm.comps.Synchronizer.HighQC().View() {
 		// too old
 		return
 	}
 
-	if vm.opts.ShouldVerifyVotesSync() {
+	if vm.comps.Options.ShouldVerifyVotesSync() {
 		vm.verifyCert(cert, block)
 	} else {
 		go vm.verifyCert(cert, block)
@@ -87,8 +71,8 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 }
 
 func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
-	if !vm.crypto.VerifyPartialCert(cert) {
-		vm.logger.Info("OnVote: Vote could not be verified!")
+	if !vm.comps.Crypto.VerifyPartialCert(cert) {
+		vm.comps.Logger.Info("OnVote: Vote could not be verified!")
 		return
 	}
 
@@ -99,8 +83,8 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	defer func() {
 		// delete any pending QCs with lower height than bLeaf
 		for k := range vm.verifiedVotes {
-			if block, ok := vm.blockChain.LocalGet(k); ok {
-				if block.View() <= vm.synchronizer.HighQC().View() {
+			if block, ok := vm.comps.BlockChain.LocalGet(k); ok {
+				if block.View() <= vm.comps.Synchronizer.HighQC().View() {
 					delete(vm.verifiedVotes, k)
 				}
 			} else {
@@ -113,16 +97,16 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	votes = append(votes, cert)
 	vm.verifiedVotes[cert.BlockHash()] = votes
 
-	if len(votes) < vm.configuration.QuorumSize() {
+	if len(votes) < vm.comps.Configuration.QuorumSize() {
 		return
 	}
 
-	qc, err := vm.crypto.CreateQuorumCert(block, votes)
+	qc, err := vm.comps.Crypto.CreateQuorumCert(block, votes)
 	if err != nil {
-		vm.logger.Info("OnVote: could not create QC for block: ", err)
+		vm.comps.Logger.Info("OnVote: could not create QC for block: ", err)
 		return
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
 
-	vm.eventLoop.AddEvent(hotstuff.NewViewMsg{ID: vm.opts.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
+	vm.comps.EventLoop.AddEvent(hotstuff.NewViewMsg{ID: vm.comps.Options.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
 }

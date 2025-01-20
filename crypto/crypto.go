@@ -8,8 +8,7 @@ import (
 )
 
 type crypto struct {
-	blockChain    core.BlockChain
-	configuration core.Configuration
+	comps core.ComponentList
 
 	modules.CryptoBase
 }
@@ -23,11 +22,7 @@ func New(impl modules.CryptoBase) core.Crypto {
 // InitComponent gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
 func (c *crypto) InitComponent(mods *core.Core) {
-	mods.Get(
-		&c.blockChain,
-		&c.configuration,
-	)
-
+	c.comps = mods.Components()
 	if mod, ok := c.CryptoBase.(core.Component); ok {
 		mod.InitComponent(mods)
 	}
@@ -97,7 +92,7 @@ func (c crypto) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.Timeou
 
 // VerifyPartialCert verifies a single partial certificate.
 func (c crypto) VerifyPartialCert(cert hotstuff.PartialCert) bool {
-	block, ok := c.blockChain.Get(cert.BlockHash())
+	block, ok := c.comps.BlockChain.Get(cert.BlockHash())
 	if !ok {
 		return false
 	}
@@ -110,10 +105,10 @@ func (c crypto) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
 		return true
 	}
-	if qc.Signature().Participants().Len() < c.configuration.QuorumSize() {
+	if qc.Signature().Participants().Len() < c.comps.Configuration.QuorumSize() {
 		return false
 	}
-	block, ok := c.blockChain.Get(qc.BlockHash())
+	block, ok := c.comps.BlockChain.Get(qc.BlockHash())
 	if !ok {
 		return false
 	}
@@ -126,7 +121,7 @@ func (c crypto) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
 	if tc.View() == 0 {
 		return true
 	}
-	if tc.Signature().Participants().Len() < c.configuration.QuorumSize() {
+	if tc.Signature().Participants().Len() < c.comps.Configuration.QuorumSize() {
 		return false
 	}
 	return c.Verify(tc.Signature(), tc.View().ToBytes())
@@ -146,7 +141,7 @@ func (c crypto) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.Q
 			SyncInfo: hotstuff.NewSyncInfo().WithQC(qc),
 		}.ToBytes()
 	}
-	if aggQC.Sig().Participants().Len() < c.configuration.QuorumSize() {
+	if aggQC.Sig().Participants().Len() < c.comps.Configuration.QuorumSize() {
 		return hotstuff.QuorumCert{}, false
 	}
 	// both the batched aggQC signatures and the highQC must be verified

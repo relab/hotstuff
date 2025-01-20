@@ -15,7 +15,7 @@ type roundRobin struct {
 }
 
 func (rr *roundRobin) InitComponent(mods *core.Core) {
-	mods.Get(&rr.configuration)
+	rr.configuration = mods.Components().Configuration
 }
 
 // GetLeader returns the id of the leader in the given view

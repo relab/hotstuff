@@ -9,7 +9,6 @@ import (
 
 	"github.com/relab/hotstuff/core"
 
-	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/synchronizer"
 
 	"github.com/relab/gorums"
@@ -78,9 +77,7 @@ type Config struct {
 }
 
 type subConfig struct {
-	eventLoop *core.EventLoop
-	logger    logging.Logger
-	opts      *core.Options
+	comps core.ComponentList
 
 	cfg      *hotstuffpb.Configuration
 	replicas map[hotstuff.ID]core.Replica
@@ -88,16 +85,12 @@ type subConfig struct {
 
 // InitComponent initializes the configuration.
 func (cfg *Config) InitComponent(mods *core.Core) {
-	mods.Get(
-		&cfg.eventLoop,
-		&cfg.logger,
-		&cfg.subConfig.opts,
-	)
+	cfg.comps = mods.Components()
 
 	// We delay processing `replicaConnected` events until after the configurations `connected` event has occurred.
-	cfg.eventLoop.RegisterHandler(replicaConnected{}, func(event any) {
+	cfg.comps.EventLoop.RegisterHandler(replicaConnected{}, func(event any) {
 		if !cfg.connected {
-			cfg.eventLoop.DelayUntil(ConnectedEvent{}, event)
+			cfg.comps.EventLoop.DelayUntil(ConnectedEvent{}, event)
 			return
 		}
 		cfg.replicaConnected(event.(replicaConnected))
@@ -133,19 +126,19 @@ func (cfg *Config) replicaConnected(c replicaConnected) {
 
 	id, err := GetPeerIDFromContext(c.ctx, cfg)
 	if err != nil {
-		cfg.logger.Warnf("Failed to get id for %v: %v", info.Addr, err)
+		cfg.comps.Logger.Warnf("Failed to get id for %v: %v", info.Addr, err)
 		return
 	}
 
 	replica, ok := cfg.replicas[id]
 	if !ok {
-		cfg.logger.Warnf("Replica with id %d was not found", id)
+		cfg.comps.Logger.Warnf("Replica with id %d was not found", id)
 		return
 	}
 
 	replica.(*Replica).md = readMetadata(md)
 
-	cfg.logger.Debugf("Replica %d connected from address %v", id, info.Addr)
+	cfg.comps.Logger.Debugf("Replica %d connected from address %v", id, info.Addr)
 }
 
 const keyPrefix = "hotstuff-"
@@ -186,10 +179,10 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 	opts := cfg.opts
 	cfg.opts = nil // options are not needed beyond this point, so we delete them.
 
-	md := mapToMetadata(cfg.subConfig.opts.ConnectionMetadata())
+	md := mapToMetadata(cfg.subConfig.comps.Options.ConnectionMetadata())
 
 	// embed own ID to allow other replicas to identify messages from this replica
-	md.Set("id", fmt.Sprintf("%d", cfg.subConfig.opts.ID()))
+	md.Set("id", fmt.Sprintf("%d", cfg.subConfig.comps.Options.ID()))
 
 	opts = append(opts, gorums.WithMetadata(md))
 
@@ -200,13 +193,13 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 	for _, replica := range replicas {
 		// also initialize Replica structures
 		cfg.replicas[replica.ID] = &Replica{
-			eventLoop: cfg.eventLoop,
+			eventLoop: cfg.comps.EventLoop,
 			id:        replica.ID,
 			pubKey:    replica.PubKey,
 			md:        make(map[string]string),
 		}
 		// we do not want to connect to ourself
-		if replica.ID != cfg.subConfig.opts.ID() {
+		if replica.ID != cfg.subConfig.comps.Options.ID() {
 			idMapping[replica.Address] = uint32(replica.ID)
 		}
 	}
@@ -229,7 +222,7 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 	cfg.connected = true
 
 	// this event is sent so that any delayed `replicaConnected` events can be processed.
-	cfg.eventLoop.AddEvent(ConnectedEvent{})
+	cfg.comps.EventLoop.AddEvent(ConnectedEvent{})
 
 	return nil
 }
@@ -258,11 +251,9 @@ func (cfg *Config) SubConfig(ids []hotstuff.ID) (sub core.Configuration, err err
 		return nil, err
 	}
 	return &subConfig{
-		eventLoop: cfg.eventLoop,
-		logger:    cfg.logger,
-		opts:      cfg.subConfig.opts,
-		cfg:       newCfg,
-		replicas:  replicas,
+		comps:    cfg.comps, // Copies over all comp refs, including Option
+		cfg:      newCfg,
+		replicas: replicas,
 	}, nil
 }
 
@@ -285,7 +276,7 @@ func (cfg *subConfig) Propose(proposal hotstuff.ProposeMsg) {
 	if cfg.cfg == nil {
 		return
 	}
-	ctx, cancel := synchronizer.TimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop)
+	ctx, cancel := synchronizer.TimeoutContext(cfg.comps.EventLoop.Context(), cfg.comps.EventLoop)
 	defer cancel()
 	cfg.cfg.Propose(
 		ctx,
@@ -300,7 +291,7 @@ func (cfg *subConfig) Timeout(msg hotstuff.TimeoutMsg) {
 	}
 
 	// will wait until the second timeout before canceling
-	ctx, cancel := synchronizer.TimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop)
+	ctx, cancel := synchronizer.TimeoutContext(cfg.comps.EventLoop.Context(), cfg.comps.EventLoop)
 	defer cancel()
 
 	cfg.cfg.Timeout(
@@ -316,7 +307,7 @@ func (cfg *subConfig) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.
 		qcErr, ok := err.(gorums.QuorumCallError)
 		// filter out context errors
 		if !ok || (qcErr.Reason != context.Canceled.Error() && qcErr.Reason != context.DeadlineExceeded.Error()) {
-			cfg.logger.Infof("Failed to fetch block: %v", err)
+			cfg.comps.Logger.Infof("Failed to fetch block: %v", err)
 		}
 		return nil, false
 	}

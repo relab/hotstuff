@@ -9,12 +9,11 @@ import (
 
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/logging"
 	"google.golang.org/protobuf/proto"
 )
 
 type cmdCache struct {
-	logger logging.Logger
+	comps core.ComponentList
 
 	mut           sync.Mutex
 	c             chan struct{}
@@ -37,7 +36,7 @@ func newCmdCache(batchSize int) *cmdCache {
 
 // InitComponent gives the module access to the other modules.
 func (c *cmdCache) InitComponent(mods *core.Core) {
-	mods.Get(&c.logger)
+	c.comps = mods.Components()
 }
 
 func (c *cmdCache) addCommand(cmd *clientpb.Command) {
@@ -101,7 +100,7 @@ awaitBatch:
 	// otherwise, we should have at least one command
 	b, err := c.marshaler.Marshal(batch)
 	if err != nil {
-		c.logger.Errorf("Failed to marshal batch: %v", err)
+		c.comps.Logger.Errorf("Failed to marshal batch: %v", err)
 		return "", false
 	}
 
@@ -114,7 +113,7 @@ func (c *cmdCache) Accept(cmd hotstuff.Command) bool {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
-		c.logger.Errorf("Failed to unmarshal batch: %v", err)
+		c.comps.Logger.Errorf("Failed to unmarshal batch: %v", err)
 		return false
 	}
 
@@ -136,7 +135,7 @@ func (c *cmdCache) Proposed(cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
-		c.logger.Errorf("Failed to unmarshal batch: %v", err)
+		c.comps.Logger.Errorf("Failed to unmarshal batch: %v", err)
 		return
 	}
 

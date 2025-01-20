@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/logging"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -23,23 +22,16 @@ import (
 // Server is the Server-side of the gorums backend.
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
-	blockChain    core.BlockChain
-	configuration core.Configuration
-	eventLoop     *core.EventLoop
-	logger        logging.Logger
-	id            hotstuff.ID
-	lm            latency.Matrix
-	gorumsSrv     *gorums.Server
+	comps core.ComponentList
+
+	id        hotstuff.ID
+	lm        latency.Matrix
+	gorumsSrv *gorums.Server
 }
 
 // InitComponent initializes the Server.
 func (srv *Server) InitComponent(mods *core.Core) {
-	mods.Get(
-		&srv.eventLoop,
-		&srv.configuration,
-		&srv.blockChain,
-		&srv.logger,
-	)
+	srv.comps = mods.Components()
 }
 
 // NewServer creates a new Server.
@@ -53,7 +45,7 @@ func NewServer(opts ...ServerOptions) *Server {
 		lm: options.latencyMatrix,
 	}
 	options.gorumsSrvOpts = append(options.gorumsSrvOpts, gorums.WithConnectCallback(func(ctx context.Context) {
-		srv.eventLoop.AddEvent(replicaConnected{ctx})
+		srv.comps.EventLoop.AddEvent(replicaConnected{ctx})
 	}))
 	srv.gorumsSrv = gorums.NewServer(options.gorumsSrvOpts...)
 	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, &serviceImpl{srv})
@@ -67,7 +59,7 @@ func (srv *Server) addNetworkDelay(sender hotstuff.ID) {
 		return
 	}
 	delay := srv.lm.Latency(srv.id, sender)
-	srv.logger.Debugf("Delay between %s and %s: %v\n", srv.lm.Location(srv.id), srv.lm.Location(sender), delay)
+	srv.comps.Logger.Debugf("Delay between %s and %s: %v\n", srv.lm.Location(srv.id), srv.lm.Location(sender), delay)
 	srv.lm.Delay(srv.id, sender)
 }
 
@@ -91,7 +83,7 @@ func (srv *Server) StartOnListener(listener net.Listener) {
 	go func() {
 		err := srv.gorumsSrv.Serve(listener)
 		if err != nil {
-			srv.logger.Errorf("An error occurred while serving: %v", err)
+			srv.comps.Logger.Errorf("An error occurred while serving: %v", err)
 		}
 	}()
 }
@@ -150,27 +142,27 @@ type serviceImpl struct {
 
 // Propose handles a replica's response to the Propose QC from the leader.
 func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
-	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := GetPeerIDFromContext(ctx, impl.srv.comps.Configuration)
 	if err != nil {
-		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
+		impl.srv.comps.Logger.Warnf("Could not get replica ID: %v", err)
 		return
 	}
 	proposal.Block.Proposer = uint32(id)
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
 	impl.srv.addNetworkDelay(id)
-	impl.srv.eventLoop.AddEvent(proposeMsg)
+	impl.srv.comps.EventLoop.AddEvent(proposeMsg)
 }
 
 // Vote handles an incoming vote message.
 func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
-	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := GetPeerIDFromContext(ctx, impl.srv.comps.Configuration)
 	if err != nil {
-		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
+		impl.srv.comps.Logger.Warnf("Could not get replica ID: %v", err)
 		return
 	}
 	impl.srv.addNetworkDelay(id)
-	impl.srv.eventLoop.AddEvent(hotstuff.VoteMsg{
+	impl.srv.comps.EventLoop.AddEvent(hotstuff.VoteMsg{
 		ID:          id,
 		PartialCert: hotstuffpb.PartialCertFromProto(cert),
 	})
@@ -178,13 +170,13 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
 func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo) {
-	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := GetPeerIDFromContext(ctx, impl.srv.comps.Configuration)
 	if err != nil {
-		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
+		impl.srv.comps.Logger.Warnf("Could not get replica ID: %v", err)
 		return
 	}
 	impl.srv.addNetworkDelay(id)
-	impl.srv.eventLoop.AddEvent(hotstuff.NewViewMsg{
+	impl.srv.comps.EventLoop.AddEvent(hotstuff.NewViewMsg{
 		ID:       id,
 		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
 	})
@@ -195,26 +187,26 @@ func (impl *serviceImpl) Fetch(_ gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*h
 	var hash hotstuff.Hash
 	copy(hash[:], pb.GetHash())
 
-	block, ok := impl.srv.blockChain.LocalGet(hash)
+	block, ok := impl.srv.comps.BlockChain.LocalGet(hash)
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "requested block was not found")
 	}
 
-	impl.srv.logger.Debugf("OnFetch: %.8s", hash)
+	impl.srv.comps.Logger.Debugf("OnFetch: %.8s", hash)
 
 	return hotstuffpb.BlockToProto(block), nil
 }
 
 // Timeout handles an incoming TimeoutMsg.
 func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
-	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := GetPeerIDFromContext(ctx, impl.srv.comps.Configuration)
 	if err != nil {
-		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
+		impl.srv.comps.Logger.Warnf("Could not get replica ID: %v", err)
 	}
 	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
 	timeoutMsg.ID = id
 	impl.srv.addNetworkDelay(id)
-	impl.srv.eventLoop.AddEvent(timeoutMsg)
+	impl.srv.comps.EventLoop.AddEvent(timeoutMsg)
 }
 
 type replicaConnected struct {

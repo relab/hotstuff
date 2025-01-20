@@ -4,7 +4,6 @@ package fasthotstuff
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -14,9 +13,7 @@ func init() {
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {
-	blockChain   core.BlockChain
-	logger       logging.Logger
-	synchronizer core.Synchronizer
+	comps core.ComponentList
 }
 
 // New returns a new FastHotStuff instance.
@@ -26,18 +23,15 @@ func New() modules.Rules {
 
 // InitComponent initializes the module.
 func (fhs *FastHotStuff) InitComponent(mods *core.Core) {
-	var opts *core.Options
-
-	mods.Get(&opts, &fhs.blockChain, &fhs.logger, &fhs.synchronizer)
-
-	opts.SetShouldUseAggQC()
+	fhs.comps = mods.Components()
+	fhs.comps.Options.SetShouldUseAggQC()
 }
 
 func (fhs *FastHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return fhs.blockChain.Get(qc.BlockHash())
+	return fhs.comps.BlockChain.Get(qc.BlockHash())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.
@@ -46,14 +40,14 @@ func (fhs *FastHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	if !ok {
 		return nil
 	}
-	fhs.logger.Debug("PRECOMMIT: ", parent)
+	fhs.comps.Logger.Debug("PRECOMMIT: ", parent)
 	grandparent, ok := fhs.qcRef(parent.QuorumCert())
 	if !ok {
 		return nil
 	}
 	if block.Parent() == parent.Hash() && block.View() == parent.View()+1 &&
 		parent.Parent() == grandparent.Hash() && parent.View() == grandparent.View()+1 {
-		fhs.logger.Debug("COMMIT: ", grandparent)
+		fhs.comps.Logger.Debug("COMMIT: ", grandparent)
 		return grandparent
 	}
 	return nil
@@ -64,10 +58,10 @@ func (fhs *FastHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
 	// The base implementation verifies both regular QCs and AggregateQCs, and asserts that the QC embedded in the
 	// block is the same as the highQC found in the aggregateQC.
 	if proposal.AggregateQC != nil {
-		hqcBlock, ok := fhs.blockChain.Get(proposal.Block.QuorumCert().BlockHash())
-		return ok && fhs.blockChain.Extends(proposal.Block, hqcBlock)
+		hqcBlock, ok := fhs.comps.BlockChain.Get(proposal.Block.QuorumCert().BlockHash())
+		return ok && fhs.comps.BlockChain.Extends(proposal.Block, hqcBlock)
 	}
-	return proposal.Block.View() >= fhs.synchronizer.View() &&
+	return proposal.Block.View() >= fhs.comps.Synchronizer.View() &&
 		proposal.Block.View() == proposal.Block.QuorumCert().View()+1
 }
 

@@ -30,6 +30,19 @@ type Acceptor interface {
 	Proposed(hotstuff.Command)
 }
 
+//go:generate mockgen -destination=../internal/mocks/commandcache_mock.go -package=mocks . CommandCache
+type CommandCache interface {
+	// Get returns the next command to be proposed.
+	// It may run until the context is canceled.
+	// If no command is available, the 'ok' return value should be false.
+	Get(ctx context.Context) (cmd hotstuff.Command, ok bool)
+	// Accept returns true if the replica should accept the command, false otherwise.
+	Accept(hotstuff.Command) bool
+	// Proposed tells the cache that the propose phase for the given command succeeded, and it should no longer be
+	// accepted in the future.
+	Proposed(hotstuff.Command)
+}
+
 //go:generate mockgen -destination=../internal/mocks/executor_mock.go -package=mocks . Executor
 
 // Executor is responsible for executing the commands that are committed by the consensus protocol.

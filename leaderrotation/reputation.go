@@ -8,7 +8,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -19,10 +18,8 @@ func init() {
 type reputationsMap map[hotstuff.ID]float64
 
 type repBased struct {
-	configuration  core.Configuration
-	consensus      core.Consensus
-	opts           *core.Options
-	logger         logging.Logger
+	comps core.ComponentList
+
 	prevCommitHead *hotstuff.Block
 	reputations    reputationsMap // latest reputations
 }
@@ -30,27 +27,22 @@ type repBased struct {
 // InitComponent gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder
 func (r *repBased) InitComponent(mods *core.Core) {
-	mods.Get(
-		&r.configuration,
-		&r.consensus,
-		&r.opts,
-		&r.logger,
-	)
+	r.comps = mods.Components()
 }
 
 // TODO: should GetLeader be thread-safe?
 
 // GetLeader returns the id of the leader in the given view
 func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
-	block := r.consensus.CommittedBlock()
-	if block.View() > view-hotstuff.View(r.consensus.ChainLength()) {
+	block := r.comps.Consensus.CommittedBlock()
+	if block.View() > view-hotstuff.View(r.comps.Consensus.ChainLength()) {
 		// TODO: it could be possible to lookup leaders for older views if we
 		// store a copy of the reputations in a metadata field of each block.
-		r.logger.Error("looking up leaders of old views is not supported")
+		r.comps.Logger.Error("looking up leaders of old views is not supported")
 		return 0
 	}
 
-	numReplicas := r.configuration.Len()
+	numReplicas := r.comps.Configuration.Len()
 	// use round-robin for the first few views until we get a signature
 	if block.QuorumCert().Signature() == nil {
 		return chooseRoundRobin(view, numReplicas)
@@ -82,19 +74,19 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 		r.prevCommitHead = block
 	}
 
-	r.logger.Debug(weights)
+	r.comps.Logger.Debug(weights)
 
 	chooser, err := wr.NewChooser(weights...)
 	if err != nil {
-		r.logger.Error("weightedrand error: ", err)
+		r.comps.Logger.Error("weightedrand error: ", err)
 		return 0
 	}
 
-	seed := r.opts.SharedRandomSeed() + int64(view)
+	seed := r.comps.Options.SharedRandomSeed() + int64(view)
 	rnd := rand.New(rand.NewSource(seed))
 
 	leader := chooser.PickSource(rnd).(hotstuff.ID)
-	r.logger.Debugf("picked leader %d for view %d using seed %d", leader, view, seed)
+	r.comps.Logger.Debugf("picked leader %d for view %d using seed %d", leader, view, seed)
 
 	return leader
 }

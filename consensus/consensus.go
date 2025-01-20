@@ -6,7 +6,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
 )
@@ -14,19 +13,10 @@ import (
 // consensusBase provides a default implementation of the Consensus interface
 // for implementations of the ConsensusImpl interface.
 type consensusBase struct {
-	acceptor       core.Acceptor
-	blockChain     core.BlockChain
-	commandQueue   core.CommandQueue
-	configuration  core.Configuration
-	crypto         core.Crypto
-	eventLoop      *core.EventLoop
-	executor       core.ExecutorExt
-	forkHandler    core.ForkHandlerExt
-	leaderRotation modules.LeaderRotation
-	logger         logging.Logger
-	opts           *core.Options
 	rules          modules.Rules
-	synchronizer   core.Synchronizer
+	leaderRotation modules.LeaderRotation
+
+	comps core.ComponentList
 
 	lastVote hotstuff.View
 
@@ -44,27 +34,18 @@ func New() core.Consensus {
 
 // InitComponent initializes the module.
 func (cs *consensusBase) InitComponent(mods *core.Core) {
+	cs.comps = mods.Components()
+
 	mods.Get(
-		&cs.acceptor,
-		&cs.blockChain,
-		&cs.commandQueue,
-		&cs.configuration,
-		&cs.crypto,
-		&cs.eventLoop,
-		&cs.executor,
-		&cs.forkHandler,
-		&cs.rules,
 		&cs.leaderRotation,
-		&cs.logger,
-		&cs.opts,
-		&cs.synchronizer,
+		&cs.rules,
 	)
 
 	if mod, ok := cs.rules.(core.Component); ok {
 		mod.InitComponent(mods)
 	}
 
-	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
+	cs.comps.EventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.OnPropose(event.(hotstuff.ProposeMsg))
 	})
 }
@@ -84,24 +65,24 @@ func (cs *consensusBase) StopVoting(view hotstuff.View) {
 
 // Propose creates a new proposal.
 func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
-	cs.logger.Debug("Propose")
+	cs.comps.Logger.Debug("Propose")
 
 	qc, ok := cert.QC()
 	if ok {
 		// tell the acceptor that the previous proposal succeeded.
-		if qcBlock, ok := cs.blockChain.Get(qc.BlockHash()); ok {
-			cs.acceptor.Proposed(qcBlock.Command())
+		if qcBlock, ok := cs.comps.BlockChain.Get(qc.BlockHash()); ok {
+			cs.comps.CommandCache.Proposed(qcBlock.Command())
 		} else {
-			cs.logger.Errorf("Could not find block for QC: %s", qc)
+			cs.comps.Logger.Errorf("Could not find block for QC: %s", qc)
 		}
 	}
 
-	ctx, cancel := synchronizer.TimeoutContext(cs.eventLoop.Context(), cs.eventLoop)
+	ctx, cancel := synchronizer.TimeoutContext(cs.comps.EventLoop.Context(), cs.comps.EventLoop)
 	defer cancel()
 
-	cmd, ok := cs.commandQueue.Get(ctx)
+	cmd, ok := cs.comps.CommandCache.Get(ctx)
 	if !ok {
-		cs.logger.Debug("Propose: No command")
+		cs.comps.Logger.Debug("Propose: No command")
 		return
 	}
 
@@ -109,109 +90,109 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 	if proposer, ok := cs.rules.(modules.ProposeRuler); ok {
 		proposal, ok = proposer.ProposeRule(cert, cmd)
 		if !ok {
-			cs.logger.Debug("Propose: No block")
+			cs.comps.Logger.Debug("Propose: No block")
 			return
 		}
 	} else {
 		proposal = hotstuff.ProposeMsg{
-			ID: cs.opts.ID(),
+			ID: cs.comps.Options.ID(),
 			Block: hotstuff.NewBlock(
 				qc.BlockHash(),
 				qc,
 				cmd,
-				cs.synchronizer.View(),
-				cs.opts.ID(),
+				cs.comps.Synchronizer.View(),
+				cs.comps.Options.ID(),
 			),
 		}
 
-		if aggQC, ok := cert.AggQC(); ok && cs.opts.ShouldUseAggQC() {
+		if aggQC, ok := cert.AggQC(); ok && cs.comps.Options.ShouldUseAggQC() {
 			proposal.AggregateQC = &aggQC
 		}
 	}
 
-	cs.blockChain.Store(proposal.Block)
+	cs.comps.BlockChain.Store(proposal.Block)
 
-	cs.configuration.Propose(proposal)
+	cs.comps.Configuration.Propose(proposal)
 	// self vote
 	cs.OnPropose(proposal)
 }
 
 func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocyclo
 	// TODO: extract parts of this method into helper functions maybe?
-	cs.logger.Debugf("OnPropose: %v", proposal.Block)
+	cs.comps.Logger.Debugf("OnPropose: %v", proposal.Block)
 
 	block := proposal.Block
 
-	if cs.opts.ShouldUseAggQC() && proposal.AggregateQC != nil {
-		highQC, ok := cs.crypto.VerifyAggregateQC(*proposal.AggregateQC)
+	if cs.comps.Options.ShouldUseAggQC() && proposal.AggregateQC != nil {
+		highQC, ok := cs.comps.Crypto.VerifyAggregateQC(*proposal.AggregateQC)
 		if !ok {
-			cs.logger.Warn("OnPropose: failed to verify aggregate QC")
+			cs.comps.Logger.Warn("OnPropose: failed to verify aggregate QC")
 			return
 		}
 		// NOTE: for simplicity, we require that the highQC found in the AggregateQC equals the QC embedded in the block.
 		if !block.QuorumCert().Equals(highQC) {
-			cs.logger.Warn("OnPropose: block QC does not equal highQC")
+			cs.comps.Logger.Warn("OnPropose: block QC does not equal highQC")
 			return
 		}
 	}
 
-	if !cs.crypto.VerifyQuorumCert(block.QuorumCert()) {
-		cs.logger.Info("OnPropose: invalid QC")
+	if !cs.comps.Crypto.VerifyQuorumCert(block.QuorumCert()) {
+		cs.comps.Logger.Info("OnPropose: invalid QC")
 		return
 	}
 
 	// ensure the block came from the leader.
 	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
-		cs.logger.Info("OnPropose: block was not proposed by the expected leader")
+		cs.comps.Logger.Info("OnPropose: block was not proposed by the expected leader")
 		return
 	}
 
 	if !cs.rules.VoteRule(proposal) {
-		cs.logger.Info("OnPropose: Block not voted for")
+		cs.comps.Logger.Info("OnPropose: Block not voted for")
 		return
 	}
 
-	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
-		cs.acceptor.Proposed(qcBlock.Command())
+	if qcBlock, ok := cs.comps.BlockChain.Get(block.QuorumCert().BlockHash()); ok {
+		cs.comps.CommandCache.Proposed(qcBlock.Command())
 	} else {
-		cs.logger.Info("OnPropose: Failed to fetch qcBlock")
+		cs.comps.Logger.Info("OnPropose: Failed to fetch qcBlock")
 	}
 
-	if !cs.acceptor.Accept(block.Command()) {
-		cs.logger.Info("OnPropose: command not accepted")
+	if !cs.comps.CommandCache.Accept(block.Command()) {
+		cs.comps.Logger.Info("OnPropose: command not accepted")
 		return
 	}
 
 	// block is safe and was accepted
-	cs.blockChain.Store(block)
+	cs.comps.BlockChain.Store(block)
 
 	if b := cs.rules.CommitRule(block); b != nil {
 		cs.commit(b)
 	}
-	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+	cs.comps.Synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 
 	if block.View() <= cs.lastVote {
-		cs.logger.Info("OnPropose: block view too old")
+		cs.comps.Logger.Info("OnPropose: block view too old")
 		return
 	}
 
-	pc, err := cs.crypto.CreatePartialCert(block)
+	pc, err := cs.comps.Crypto.CreatePartialCert(block)
 	if err != nil {
-		cs.logger.Error("OnPropose: failed to sign block: ", err)
+		cs.comps.Logger.Error("OnPropose: failed to sign block: ", err)
 		return
 	}
 
 	cs.lastVote = block.View()
 
 	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
-	if leaderID == cs.opts.ID() {
-		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})
+	if leaderID == cs.comps.Options.ID() {
+		cs.comps.EventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.comps.Options.ID(), PartialCert: pc})
 		return
 	}
 
-	leader, ok := cs.configuration.Replica(leaderID)
+	leader, ok := cs.comps.Configuration.Replica(leaderID)
 	if !ok {
-		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
+		cs.comps.Logger.Warnf("Replica with ID %d was not found!", leaderID)
 		return
 	}
 
@@ -225,14 +206,14 @@ func (cs *consensusBase) commit(block *hotstuff.Block) {
 	cs.mut.Unlock()
 
 	if err != nil {
-		cs.logger.Warnf("failed to commit: %v", err)
+		cs.comps.Logger.Warnf("failed to commit: %v", err)
 		return
 	}
 
 	// prune the blockchain and handle forked blocks
-	forkedBlocks := cs.blockChain.PruneToHeight(block.View())
+	forkedBlocks := cs.comps.BlockChain.PruneToHeight(block.View())
 	for _, block := range forkedBlocks {
-		cs.forkHandler.Fork(block)
+		cs.comps.ForkHandler.Fork(block)
 	}
 }
 
@@ -241,7 +222,7 @@ func (cs *consensusBase) commitInner(block *hotstuff.Block) error {
 	if cs.bExec.View() >= block.View() {
 		return nil
 	}
-	if parent, ok := cs.blockChain.Get(block.Parent()); ok {
+	if parent, ok := cs.comps.BlockChain.Get(block.Parent()); ok {
 		err := cs.commitInner(parent)
 		if err != nil {
 			return err
@@ -249,8 +230,8 @@ func (cs *consensusBase) commitInner(block *hotstuff.Block) error {
 	} else {
 		return fmt.Errorf("failed to locate block: %s", block.Parent())
 	}
-	cs.logger.Debug("EXEC: ", block)
-	cs.executor.Exec(block)
+	cs.comps.Logger.Debug("EXEC: ", block)
+	cs.comps.Executor.Exec(block)
 	cs.bExec = block
 	return nil
 }
