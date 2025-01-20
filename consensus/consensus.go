@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
@@ -38,17 +39,17 @@ type ProposeRuler interface {
 // Consensus provides a default implementation of the Consensus interface
 // for implementations of the ConsensusImpl interface.
 type Consensus struct {
-	impl Rules
-
-	blockChain     core.BlockChain
-	committer      *committer.Committer
-	commandCache   *replica.CmdCache
-	configuration  core.Configuration
-	crypto         core.Crypto
-	eventLoop      *core.EventLoop
+	impl           Rules
 	leaderRotation modules.LeaderRotation
-	logger         logging.Logger
-	opts           *core.Options
+
+	blockChain    *blockchain.BlockChain
+	committer     *committer.Committer
+	commandCache  *replica.CmdCache
+	configuration core.Configuration
+	crypto        core.Crypto
+	eventLoop     *core.EventLoop
+	logger        logging.Logger
+	opts          *core.Options
 
 	handel core.Handel
 
