@@ -34,14 +34,16 @@ type Kauri struct {
 	configuration  *backend.Config
 	server         *backend.Server
 	logger         logging.Logger
-	nodes          map[hotstuff.ID]*kauripb.Node
-	tree           tree.Tree
-	initDone       bool
-	aggContrib     hotstuff.QuorumSignature
-	blockHash      hotstuff.Hash
-	currentView    hotstuff.View
-	senders        []hotstuff.ID
-	aggSent        bool
+
+	aggContrib  hotstuff.QuorumSignature
+	aggLatency  *AggregationLatency
+	aggSent     bool
+	blockHash   hotstuff.Hash
+	currentView hotstuff.View
+	initDone    bool
+	nodes       map[hotstuff.ID]*kauripb.Node
+	senders     []hotstuff.ID
+	tree        tree.Tree
 }
 
 // New initializes the kauri structure
@@ -62,6 +64,9 @@ func (k *Kauri) InitModule(mods *modules.Core) {
 		&k.leaderRotation,
 		&k.synchronizer,
 	)
+
+	k.aggLatency = NewAggregationLatency(&k.tree, k.server.LatencyMatrix(), k.opts)
+
 	k.opts.SetShouldUseTree()
 	k.eventLoop.RegisterHandler(backend.ConnectedEvent{}, func(_ any) {
 		k.postInit()
@@ -129,7 +134,7 @@ func (k *Kauri) SendProposalToChildren(p hotstuff.ProposeMsg) {
 		}
 		k.logger.Debug("Sending proposal to children ", children)
 		config.Propose(p)
-		waitTime := NewAggregationLatency(&k.tree, k.server.LatencyMatrix(), k.opts).WaitTimerDuration()
+		waitTime := k.aggLatency.WaitTimerDuration()
 		go k.WaitToAggregate(waitTime, k.currentView)
 	} else {
 		k.SendContributionToParent()
