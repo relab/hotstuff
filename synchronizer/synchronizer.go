@@ -85,7 +85,7 @@ func (s *Synchronizer) InitModule(mods *core.Core) {
 }
 
 // New creates a new Synchronizer.
-func New() core.Synchronizer {
+func New() *Synchronizer {
 	return &Synchronizer{
 		currentView: 1,
 

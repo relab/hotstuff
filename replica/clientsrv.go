@@ -18,25 +18,25 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// clientSrv serves a client.
-type clientSrv struct {
+// ClientServer serves a client.
+type ClientServer struct {
 	eventLoop *core.EventLoop
 	logger    logging.Logger
 
 	mut          sync.Mutex
 	srv          *gorums.Server
 	awaitingCmds map[cmdID]chan<- error
-	cmdCache     *cmdCache
+	cmdCache     *CmdCache
 	hash         hash.Hash
 	cmdCount     uint32
 }
 
-// newClientServer returns a new client server.
-func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv) {
-	srv = &clientSrv{
+// NewClientServer returns a new client server.
+func NewClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *ClientServer) {
+	srv = &ClientServer{
 		awaitingCmds: make(map[cmdID]chan<- error),
 		srv:          gorums.NewServer(srvOpts...),
-		cmdCache:     newCmdCache(int(conf.BatchSize)),
+		cmdCache:     NewCmdCache(int(conf.BatchSize)),
 		hash:         sha256.New(),
 	}
 	clientpb.RegisterClientServer(srv.srv, srv)
@@ -44,7 +44,7 @@ func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv
 }
 
 // InitModule gives the module access to the other modules.
-func (srv *clientSrv) InitModule(mods *core.Core) {
+func (srv *ClientServer) InitModule(mods *core.Core) {
 	mods.Get(
 		&srv.eventLoop,
 		&srv.logger,
@@ -52,7 +52,7 @@ func (srv *clientSrv) InitModule(mods *core.Core) {
 	srv.cmdCache.InitModule(mods)
 }
 
-func (srv *clientSrv) Start(addr string) error {
+func (srv *ClientServer) Start(addr string) error {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -61,7 +61,7 @@ func (srv *clientSrv) Start(addr string) error {
 	return nil
 }
 
-func (srv *clientSrv) StartOnListener(lis net.Listener) {
+func (srv *ClientServer) StartOnListener(lis net.Listener) {
 	go func() {
 		err := srv.srv.Serve(lis)
 		if err != nil {
@@ -70,11 +70,11 @@ func (srv *clientSrv) StartOnListener(lis net.Listener) {
 	}()
 }
 
-func (srv *clientSrv) Stop() {
+func (srv *ClientServer) Stop() {
 	srv.srv.Stop()
 }
 
-func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*emptypb.Empty, error) {
+func (srv *ClientServer) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*emptypb.Empty, error) {
 	id := cmdID{cmd.ClientID, cmd.SequenceNumber}
 
 	c := make(chan error)
@@ -88,7 +88,7 @@ func (srv *clientSrv) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (
 	return &emptypb.Empty{}, err
 }
 
-func (srv *clientSrv) Exec(cmd hotstuff.Command) {
+func (srv *ClientServer) Exec(cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -113,7 +113,7 @@ func (srv *clientSrv) Exec(cmd hotstuff.Command) {
 	srv.logger.Debugf("Hash: %.8x", srv.hash.Sum(nil))
 }
 
-func (srv *clientSrv) Fork(cmd hotstuff.Command) {
+func (srv *ClientServer) Fork(cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {

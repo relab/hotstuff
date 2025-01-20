@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/logging"
 )
 
-type basic struct {
+type Committer struct {
 	consensus   core.Consensus
 	blockChain  core.BlockChain
 	executor    core.ExecutorExt
@@ -21,13 +21,13 @@ type basic struct {
 }
 
 // Basic committer implements commit logic without pipelining.
-func New() core.Committer {
-	return &basic{
+func New() *Committer {
+	return &Committer{
 		bExec: hotstuff.GetGenesis(),
 	}
 }
 
-func (bb *basic) InitModule(mods *core.Core) {
+func (bb *Committer) InitModule(mods *core.Core) {
 	mods.Get(
 		&bb.executor,
 		&bb.blockChain,
@@ -38,7 +38,7 @@ func (bb *basic) InitModule(mods *core.Core) {
 }
 
 // Stores the block before further execution.
-func (bb *basic) Commit(block *hotstuff.Block) {
+func (bb *Committer) Commit(block *hotstuff.Block) {
 	err := bb.commit(block)
 	if err != nil {
 		bb.logger.Warnf("failed to commit: %v", err)
@@ -53,7 +53,7 @@ func (bb *basic) Commit(block *hotstuff.Block) {
 	}
 }
 
-func (bb *basic) commit(block *hotstuff.Block) error {
+func (bb *Committer) commit(block *hotstuff.Block) error {
 	bb.mut.Lock()
 	// can't recurse due to requiring the mutex, so we use a helper instead.
 	err := bb.commitInner(block)
@@ -62,7 +62,7 @@ func (bb *basic) commit(block *hotstuff.Block) error {
 }
 
 // recursive helper for commit
-func (bb *basic) commitInner(block *hotstuff.Block) error {
+func (bb *Committer) commitInner(block *hotstuff.Block) error {
 	if bb.bExec.View() >= block.View() {
 		return nil
 	}
@@ -81,13 +81,13 @@ func (bb *basic) commitInner(block *hotstuff.Block) error {
 }
 
 // Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
-func (bb *basic) CommittedBlock() *hotstuff.Block {
+func (bb *Committer) CommittedBlock() *hotstuff.Block {
 	bb.mut.Lock()
 	defer bb.mut.Unlock()
 	return bb.bExec
 }
 
-func (bb *basic) findForks(height hotstuff.View, blocksAtHeight map[hotstuff.View][]*hotstuff.Block) (forkedBlocks []*hotstuff.Block) {
+func (bb *Committer) findForks(height hotstuff.View, blocksAtHeight map[hotstuff.View][]*hotstuff.Block) (forkedBlocks []*hotstuff.Block) {
 
 	committedViews := make(map[hotstuff.View]bool)
 	committedHeight := bb.consensus.CommittedBlock().View()
@@ -120,4 +120,4 @@ func (bb *basic) findForks(height hotstuff.View, blocksAtHeight map[hotstuff.Vie
 	return
 }
 
-var _ core.Committer = (*basic)(nil)
+var _ core.Committer = (*Committer)(nil)

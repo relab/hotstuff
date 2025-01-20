@@ -33,9 +33,9 @@ type ProposeRuler interface {
 	ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool)
 }
 
-// consensusBase provides a default implementation of the Consensus interface
+// Consensus provides a default implementation of the Consensus interface
 // for implementations of the ConsensusImpl interface.
-type consensusBase struct {
+type Consensus struct {
 	impl Rules
 
 	acceptor       core.Acceptor
@@ -59,14 +59,14 @@ type consensusBase struct {
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
-func New() core.Consensus {
-	return &consensusBase{
+func New() *Consensus {
+	return &Consensus{
 		lastVote: 0,
 	}
 }
 
 // InitModule initializes the module.
-func (cs *consensusBase) InitModule(mods *core.Core) {
+func (cs *Consensus) InitModule(mods *core.Core) {
 	mods.Get(
 		&cs.acceptor,
 		&cs.blockChain,
@@ -90,12 +90,12 @@ func (cs *consensusBase) InitModule(mods *core.Core) {
 	})
 }
 
-func (cs *consensusBase) CommittedBlock() *hotstuff.Block {
+func (cs *Consensus) CommittedBlock() *hotstuff.Block {
 	return cs.committer.CommittedBlock()
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
-func (cs *consensusBase) StopVoting(view hotstuff.View) {
+func (cs *Consensus) StopVoting(view hotstuff.View) {
 	if cs.lastVote < view {
 		cs.logger.Debugf("stopped voting on view %d and changed view to %d", cs.lastVote, view)
 		cs.lastVote = view
@@ -103,7 +103,7 @@ func (cs *consensusBase) StopVoting(view hotstuff.View) {
 }
 
 // Propose creates a new proposal.
-func (cs *consensusBase) Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncInfo hotstuff.SyncInfo, advance bool) {
+func (cs *Consensus) Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncInfo hotstuff.SyncInfo, advance bool) {
 	cs.logger.Debugf("Propose")
 	cs.view = view
 
@@ -157,7 +157,7 @@ func (cs *consensusBase) Propose(view hotstuff.View, cert hotstuff.SyncInfo) (sy
 	return cs.OnPropose(view, proposal)
 }
 
-func (cs *consensusBase) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) { //nolint:gocyclo
+func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) { //nolint:gocyclo
 	// TODO: extract parts of this method into helper functions maybe?
 	cs.logger.Debugf("OnPropose[view=%d]: %.8s -> %.8x", view, proposal.Block.Hash(), proposal.Block.Command())
 
@@ -254,7 +254,7 @@ func (cs *consensusBase) OnPropose(view hotstuff.View, proposal hotstuff.Propose
 }
 
 // ChainLength returns the number of blocks that need to be chained together in order to commit.
-func (cs *consensusBase) ChainLength() int {
+func (cs *Consensus) ChainLength() int {
 	return cs.impl.ChainLength()
 }
 

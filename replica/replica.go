@@ -49,7 +49,7 @@ type Config struct {
 
 // Replica is a participant in the consensus protocol.
 type Replica struct {
-	clientSrv *clientSrv
+	clientSrv *ClientServer
 	cfg       *backend.Config
 	hsSrv     *backend.Server
 	hs        *core.Core
@@ -69,7 +69,7 @@ func New(conf Config, builder core.Builder) (replica *Replica) {
 		))
 	}
 
-	clientSrv := newClientServer(conf, clientSrvOpts)
+	clientSrv := NewClientServer(conf, clientSrvOpts)
 
 	srv := &Replica{
 		clientSrv:    clientSrv,

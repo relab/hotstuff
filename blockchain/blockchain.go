@@ -12,9 +12,9 @@ import (
 	"github.com/relab/hotstuff/synchronizer"
 )
 
-// blockChain stores a limited amount of blocks in a map.
+// BlockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
-type blockChain struct {
+type BlockChain struct {
 	configuration core.Configuration
 	eventLoop     *core.EventLoop
 	logger        logging.Logger
@@ -27,7 +27,7 @@ type blockChain struct {
 	pendingFetch   map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
 }
 
-func (chain *blockChain) InitModule(mods *core.Core) {
+func (chain *BlockChain) InitModule(mods *core.Core) {
 	mods.Get(
 		&chain.configuration,
 		&chain.eventLoop,
@@ -37,8 +37,8 @@ func (chain *blockChain) InitModule(mods *core.Core) {
 
 // New creates a new blockChain with a maximum size.
 // Blocks are dropped in least recently used order.
-func New() core.BlockChain {
-	bc := &blockChain{
+func New() *BlockChain {
+	bc := &BlockChain{
 		blocks:         make(map[hotstuff.Hash]*hotstuff.Block),
 		blocksAtHeight: make(map[hotstuff.View][]*hotstuff.Block),
 		pendingFetch:   make(map[hotstuff.Hash]context.CancelFunc),
@@ -48,7 +48,7 @@ func New() core.BlockChain {
 }
 
 // Store stores a block in the blockchain
-func (chain *blockChain) Store(block *hotstuff.Block) {
+func (chain *BlockChain) Store(block *hotstuff.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
@@ -62,7 +62,7 @@ func (chain *blockChain) Store(block *hotstuff.Block) {
 }
 
 // Get retrieves a block given its hash. It will only try the local cache.
-func (chain *blockChain) LocalGet(hash hotstuff.Hash) (*hotstuff.Block, bool) {
+func (chain *BlockChain) LocalGet(hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
@@ -74,7 +74,7 @@ func (chain *blockChain) LocalGet(hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	return block, true
 }
 
-func (chain *blockChain) DeleteAtHeight(height hotstuff.View, blockHash hotstuff.Hash) error {
+func (chain *BlockChain) DeleteAtHeight(height hotstuff.View, blockHash hotstuff.Hash) error {
 	blocks, ok := chain.blocksAtHeight[height]
 	if !ok {
 		return fmt.Errorf("no blocks at height %d", height)
@@ -95,7 +95,7 @@ func (chain *blockChain) DeleteAtHeight(height hotstuff.View, blockHash hotstuff
 
 // Get retrieves a block given its hash. Get will try to find the block locally.
 // If it is not available locally, it will try to fetch the block.
-func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
+func (chain *BlockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
 	// need to declare vars early, or else we won't be able to use goto
 	var (
 		ctx    context.Context
@@ -139,7 +139,7 @@ done:
 }
 
 // Extends checks if the given block extends the branch of the target block.
-func (chain *blockChain) Extends(block, target *hotstuff.Block) bool {
+func (chain *BlockChain) Extends(block, target *hotstuff.Block) bool {
 	current := block
 	ok := true
 	for ok && current.View() > target.View() {
@@ -148,7 +148,7 @@ func (chain *blockChain) Extends(block, target *hotstuff.Block) bool {
 	return ok && current.Hash() == target.Hash()
 }
 
-func (chain *blockChain) PruneToHeight(height hotstuff.View) (prunedBlocks map[hotstuff.View][]*hotstuff.Block) {
+func (chain *BlockChain) PruneToHeight(height hotstuff.View) (prunedBlocks map[hotstuff.View][]*hotstuff.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 	prunedBlocks = make(map[hotstuff.View][]*hotstuff.Block)
@@ -171,8 +171,8 @@ func (chain *blockChain) PruneToHeight(height hotstuff.View) (prunedBlocks map[h
 	return
 }
 
-func (chain *blockChain) PruneHeight() hotstuff.View {
+func (chain *BlockChain) PruneHeight() hotstuff.View {
 	return chain.pruneHeight
 }
 
-var _ core.BlockChain = (*blockChain)(nil)
+var _ core.BlockChain = (*BlockChain)(nil)

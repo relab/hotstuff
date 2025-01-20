@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type cmdCache struct {
+type CmdCache struct {
 	logger logging.Logger
 
 	mut           sync.Mutex
@@ -25,8 +25,8 @@ type cmdCache struct {
 	unmarshaler   proto.UnmarshalOptions
 }
 
-func newCmdCache(batchSize int) *cmdCache {
-	return &cmdCache{
+func NewCmdCache(batchSize int) *CmdCache {
+	return &CmdCache{
 		c:             make(chan struct{}),
 		batchSize:     batchSize,
 		serialNumbers: make(map[uint32]uint64),
@@ -36,11 +36,11 @@ func newCmdCache(batchSize int) *cmdCache {
 }
 
 // InitModule gives the module access to the other modules.
-func (c *cmdCache) InitModule(mods *core.Core) {
+func (c *CmdCache) InitModule(mods *core.Core) {
 	mods.Get(&c.logger)
 }
 
-func (c *cmdCache) addCommand(cmd *clientpb.Command) {
+func (c *CmdCache) addCommand(cmd *clientpb.Command) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
@@ -58,7 +58,7 @@ func (c *cmdCache) addCommand(cmd *clientpb.Command) {
 }
 
 // Get returns a batch of commands to propose.
-func (c *cmdCache) Get(ctx context.Context) (cmd hotstuff.Command, ok bool) {
+func (c *CmdCache) Get(ctx context.Context) (cmd hotstuff.Command, ok bool) {
 	batch := new(clientpb.Batch)
 
 	c.mut.Lock()
@@ -110,7 +110,7 @@ awaitBatch:
 }
 
 // Accept returns true if the replica can accept the batch.
-func (c *cmdCache) Accept(cmd hotstuff.Command) bool {
+func (c *CmdCache) Accept(cmd hotstuff.Command) bool {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -132,7 +132,7 @@ func (c *cmdCache) Accept(cmd hotstuff.Command) bool {
 }
 
 // Proposed updates the serial numbers such that we will not accept the given batch again.
-func (c *cmdCache) Proposed(cmd hotstuff.Command) {
+func (c *CmdCache) Proposed(cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -150,4 +150,4 @@ func (c *cmdCache) Proposed(cmd hotstuff.Command) {
 	}
 }
 
-var _ core.Acceptor = (*cmdCache)(nil)
+var _ core.Acceptor = (*CmdCache)(nil)
