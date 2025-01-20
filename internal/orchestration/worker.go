@@ -15,6 +15,7 @@ import (
 	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/client"
+	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/byzantine"
 	"github.com/relab/hotstuff/core"
@@ -202,6 +203,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		core.NewEventLoop(1000),
 		consensus.New(),
 		consensus.NewVotingMachine(),
+		committer.New(),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		synchronizer.New(),
 		w.metricsLogger,

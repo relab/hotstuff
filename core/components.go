@@ -73,7 +73,7 @@ type BlockChain interface {
 	Store(*hotstuff.Block)
 
 	// Get retrieves a block given its hash, attempting to fetching it from other replicas if necessary.
-	Get(hotstuff.Hash) (*hotstuff.Block, bool)
+	Get(hash hotstuff.Hash) (*hotstuff.Block, bool)
 
 	// LocalGet retrieves a block given its hash, without fetching it from other replicas.
 	LocalGet(hotstuff.Hash) (*hotstuff.Block, bool)
@@ -83,7 +83,11 @@ type BlockChain interface {
 
 	// Prunes blocks from the in-memory tree up to the specified height.
 	// Returns a set of forked blocks (blocks that were on a different branch, and thus not committed).
-	PruneToHeight(height hotstuff.View) (forkedBlocks []*hotstuff.Block)
+	PruneToHeight(height hotstuff.View) (prunedBlocks map[hotstuff.View][]*hotstuff.Block)
+
+	PruneHeight() hotstuff.View
+
+	DeleteAtHeight(height hotstuff.View, blockHash hotstuff.Hash) error
 }
 
 //go:generate mockgen -destination=../internal/mocks/replica_mock.go -package=mocks . Replica
@@ -140,6 +144,16 @@ type Consensus interface {
 	CommittedBlock() *hotstuff.Block
 	// ChainLength returns the number of blocks that need to be chained together in order to commit.
 	ChainLength() int
+}
+
+// Committer is a helper module which handles block commits and forks.
+// NOTE: This module was created to deal with multiple pipes.
+type Committer interface {
+	// Stores the block before further execution.
+	Commit(block *hotstuff.Block)
+
+	// CommittedBlock returns the most recently committed block.
+	CommittedBlock() *hotstuff.Block
 }
 
 type VotingMachine interface {

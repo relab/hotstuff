@@ -11,34 +11,57 @@ import (
 	"github.com/relab/hotstuff/synchronizer"
 )
 
+// Rules is the minimum interface that a consensus implementations must implement.
+// Implementations of this interface can be wrapped in the ConsensusBase struct.
+// Together, these provide an implementation of the main Consensus interface.
+// Implementors do not need to verify certificates or interact with other core,
+// as this is handled by the ConsensusBase struct.
+type Rules interface {
+	// VoteRule decides whether to vote for the block.
+	VoteRule(proposal hotstuff.ProposeMsg) bool
+	// CommitRule decides whether any ancestor of the block can be committed.
+	// Returns the youngest ancestor of the block that can be committed.
+	CommitRule(*hotstuff.Block) *hotstuff.Block
+	// ChainLength returns the number of blocks that need to be chained together in order to commit.
+	ChainLength() int
+}
+
+// ProposeRuler is an optional interface that adds a ProposeRule method.
+// This allows implementors to specify how new blocks are created.
+type ProposeRuler interface {
+	// ProposeRule creates a new proposal.
+	ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool)
+}
+
 // consensusBase provides a default implementation of the Consensus interface
 // for implementations of the ConsensusImpl interface.
 type consensusBase struct {
+	impl Rules
+
 	acceptor       core.Acceptor
 	blockChain     core.BlockChain
+	committer      core.Committer
 	commandQueue   core.CommandQueue
 	configuration  core.Configuration
 	crypto         core.Crypto
 	eventLoop      *core.EventLoop
-	executor       core.ExecutorExt
 	forkHandler    core.ForkHandlerExt
 	leaderRotation modules.LeaderRotation
 	logger         logging.Logger
 	opts           *core.Options
-	rules          modules.Rules
 	synchronizer   core.Synchronizer
+
+	handel core.Handel
 
 	lastVote hotstuff.View
 
-	mut   sync.Mutex
-	bExec *hotstuff.Block
+	mut sync.Mutex
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
 func New() core.Consensus {
 	return &consensusBase{
 		lastVote: 0,
-		bExec:    hotstuff.GetGenesis(),
 	}
 }
 
@@ -48,21 +71,23 @@ func (cs *consensusBase) InitModule(mods *core.Core) {
 		&cs.acceptor,
 		&cs.blockChain,
 		&cs.commandQueue,
+		&cs.committer,
 		&cs.configuration,
 		&cs.crypto,
 		&cs.eventLoop,
-		&cs.executor,
 		&cs.forkHandler,
-		&cs.rules,
 		&cs.leaderRotation,
 		&cs.logger,
 		&cs.opts,
+		&cs.impl,
 		&cs.synchronizer,
 	)
 
-	if mod, ok := cs.rules.(core.Module); ok {
-		mod.InitModule(mods)
-	}
+	mods.TryGet(&cs.handel)
+
+	// if mod, ok := cs.impl.(core.Module); ok {
+	// 	mod.InitModule(mods, initOpt)
+	// }
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.OnPropose(event.(hotstuff.ProposeMsg))
@@ -70,21 +95,20 @@ func (cs *consensusBase) InitModule(mods *core.Core) {
 }
 
 func (cs *consensusBase) CommittedBlock() *hotstuff.Block {
-	cs.mut.Lock()
-	defer cs.mut.Unlock()
-	return cs.bExec
+	return cs.committer.CommittedBlock()
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
 func (cs *consensusBase) StopVoting(view hotstuff.View) {
 	if cs.lastVote < view {
+		cs.logger.Debugf("stopped voting on view %d and changed view to %d", cs.lastVote, view)
 		cs.lastVote = view
 	}
 }
 
 // Propose creates a new proposal.
 func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
-	cs.logger.Debug("Propose")
+	cs.logger.Debugf("Propose")
 
 	qc, ok := cert.QC()
 	if ok {
@@ -101,12 +125,12 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 
 	cmd, ok := cs.commandQueue.Get(ctx)
 	if !ok {
-		cs.logger.Debug("Propose: No command")
+		cs.logger.Debugf("Propose[view=%d]: No command", cs.synchronizer.View())
 		return
 	}
 
 	var proposal hotstuff.ProposeMsg
-	if proposer, ok := cs.rules.(modules.ProposeRuler); ok {
+	if proposer, ok := cs.impl.(ProposeRuler); ok {
 		proposal, ok = proposer.ProposeRule(cert, cmd)
 		if !ok {
 			cs.logger.Debug("Propose: No block")
@@ -138,70 +162,79 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 
 func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocyclo
 	// TODO: extract parts of this method into helper functions maybe?
-	cs.logger.Debugf("OnPropose: %v", proposal.Block)
+	cs.logger.Debugf("OnPropose[view=%d]: %.8s -> %.8x", cs.synchronizer.View(), proposal.Block.Hash(), proposal.Block.Command())
 
 	block := proposal.Block
 
 	if cs.opts.ShouldUseAggQC() && proposal.AggregateQC != nil {
 		highQC, ok := cs.crypto.VerifyAggregateQC(*proposal.AggregateQC)
 		if !ok {
-			cs.logger.Warn("OnPropose: failed to verify aggregate QC")
+			cs.logger.Warnf("OnPropose[view=%d]: failed to verify aggregate QC", cs.synchronizer.View())
 			return
 		}
 		// NOTE: for simplicity, we require that the highQC found in the AggregateQC equals the QC embedded in the block.
 		if !block.QuorumCert().Equals(highQC) {
-			cs.logger.Warn("OnPropose: block QC does not equal highQC")
+			cs.logger.Warnf("OnPropose[view=%d]: block QC does not equal highQC", cs.synchronizer.View())
 			return
 		}
 	}
 
 	if !cs.crypto.VerifyQuorumCert(block.QuorumCert()) {
-		cs.logger.Info("OnPropose: invalid QC")
+		cs.logger.Infof("OnPropose[view=%d]: invalid QC", cs.synchronizer.View())
 		return
 	}
 
 	// ensure the block came from the leader.
 	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
-		cs.logger.Info("OnPropose: block was not proposed by the expected leader")
+		cs.logger.Infof("OnPropose[p=%d, view=%d]: block was not proposed by the expected leader", cs.synchronizer.View())
 		return
 	}
 
-	if !cs.rules.VoteRule(proposal) {
-		cs.logger.Info("OnPropose: Block not voted for")
+	if !cs.impl.VoteRule(proposal) {
+		cs.logger.Infof("OnPropose[p=%d, view=%d]: Block not voted for", cs.synchronizer.View())
 		return
 	}
 
 	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
 		cs.acceptor.Proposed(qcBlock.Command())
 	} else {
-		cs.logger.Info("OnPropose: Failed to fetch qcBlock")
+		cs.logger.Infof("OnPropose[view=%d]: Failed to fetch qcBlock", cs.synchronizer.View())
 	}
 
-	if !cs.acceptor.Accept(block.Command()) {
-		cs.logger.Info("OnPropose: command not accepted")
+	cmd := block.Command()
+	if !cs.acceptor.Accept(cmd) {
+		cs.logger.Infof("OnPropose[view=%d]: block rejected: %.8s -> %.8x", cs.synchronizer.View(), block.Hash(), block.Command())
 		return
 	}
+
+	cs.logger.Debugf("OnPropose[view=%d]: block accepted: %.8s -> %.8x", cs.synchronizer.View(), block.Hash(), block.Command())
 
 	// block is safe and was accepted
 	cs.blockChain.Store(block)
 
-	if b := cs.rules.CommitRule(block); b != nil {
-		cs.commit(b)
+	if b := cs.impl.CommitRule(block); b != nil {
+		cs.committer.Commit(block)
 	}
 	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
 
 	if block.View() <= cs.lastVote {
-		cs.logger.Info("OnPropose: block view too old")
+		cs.logger.Info(fmt.Sprintf("OnPropose[view=%d]: block view too old for %.8s -> %.8x (diff=%d)", cs.synchronizer.View(), block.Hash(), block.Command(), cs.lastVote-block.View()))
 		return
 	}
 
 	pc, err := cs.crypto.CreatePartialCert(block)
 	if err != nil {
-		cs.logger.Error("OnPropose: failed to sign block: ", err)
+		cs.logger.Errorf("OnPropose[view=%d]: failed to sign block: ", cs.synchronizer.View(), err)
 		return
 	}
 
 	cs.lastVote = block.View()
+
+	if cs.handel != nil {
+		// let Handel handle the voting
+		cs.handel.Begin(pc)
+		return
+	}
 
 	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
 	if leaderID == cs.opts.ID() {
@@ -215,47 +248,13 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
+	cs.logger.Debugf("OnPropose[view=%d]: voting for %.8s -> %.8x", cs.synchronizer.View(), block.Hash(), block.Command())
 	leader.Vote(pc)
-}
-
-func (cs *consensusBase) commit(block *hotstuff.Block) {
-	cs.mut.Lock()
-	// can't recurse due to requiring the mutex, so we use a helper instead.
-	err := cs.commitInner(block)
-	cs.mut.Unlock()
-
-	if err != nil {
-		cs.logger.Warnf("failed to commit: %v", err)
-		return
-	}
-
-	// prune the blockchain and handle forked blocks
-	forkedBlocks := cs.blockChain.PruneToHeight(block.View())
-	for _, block := range forkedBlocks {
-		cs.forkHandler.Fork(block)
-	}
-}
-
-// recursive helper for commit
-func (cs *consensusBase) commitInner(block *hotstuff.Block) error {
-	if cs.bExec.View() >= block.View() {
-		return nil
-	}
-	if parent, ok := cs.blockChain.Get(block.Parent()); ok {
-		err := cs.commitInner(parent)
-		if err != nil {
-			return err
-		}
-	} else {
-		return fmt.Errorf("failed to locate block: %s", block.Parent())
-	}
-	cs.logger.Debug("EXEC: ", block)
-	cs.executor.Exec(block)
-	cs.bExec = block
-	return nil
 }
 
 // ChainLength returns the number of blocks that need to be chained together in order to commit.
 func (cs *consensusBase) ChainLength() int {
-	return cs.rules.ChainLength()
+	return cs.impl.ChainLength()
 }
+
+var _ core.Consensus = (core.Consensus)(nil)
