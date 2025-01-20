@@ -9,6 +9,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
@@ -39,14 +40,12 @@ type ProposeRuler interface {
 type Consensus struct {
 	impl Rules
 
-	acceptor       core.Acceptor
 	blockChain     core.BlockChain
 	committer      *committer.Committer
-	commandQueue   core.CommandQueue
+	commandCache   *replica.CmdCache
 	configuration  core.Configuration
 	crypto         core.Crypto
 	eventLoop      *core.EventLoop
-	forkHandler    core.ForkHandlerExt
 	leaderRotation modules.LeaderRotation
 	logger         logging.Logger
 	opts           *core.Options
@@ -69,14 +68,12 @@ func New() *Consensus {
 // InitModule initializes the module.
 func (cs *Consensus) InitModule(mods *core.Core) {
 	mods.Get(
-		&cs.acceptor,
 		&cs.blockChain,
-		&cs.commandQueue,
+		&cs.commandCache,
 		&cs.committer,
 		&cs.configuration,
 		&cs.crypto,
 		&cs.eventLoop,
-		&cs.forkHandler,
 		&cs.leaderRotation,
 		&cs.logger,
 		&cs.opts,
@@ -112,7 +109,7 @@ func (cs *Consensus) Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncIn
 	if ok {
 		// tell the acceptor that the previous proposal succeeded.
 		if qcBlock, ok := cs.blockChain.Get(qc.BlockHash()); ok {
-			cs.acceptor.Proposed(qcBlock.Command())
+			cs.commandCache.Proposed(qcBlock.Command())
 		} else {
 			cs.logger.Errorf("Could not find block for QC: %s", qc)
 		}
@@ -121,7 +118,7 @@ func (cs *Consensus) Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncIn
 	ctx, cancel := synchronizer.TimeoutContext(cs.eventLoop.Context(), cs.eventLoop)
 	defer cancel()
 
-	cmd, ok := cs.commandQueue.Get(ctx)
+	cmd, ok := cs.commandCache.Get(ctx)
 	if !ok {
 		cs.logger.Debugf("Propose[view=%d]: No command", view)
 		return
@@ -194,13 +191,13 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 	}
 
 	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
-		cs.acceptor.Proposed(qcBlock.Command())
+		cs.commandCache.Proposed(qcBlock.Command())
 	} else {
 		cs.logger.Infof("OnPropose[view=%d]: Failed to fetch qcBlock", view)
 	}
 
 	cmd := block.Command()
-	if !cs.acceptor.Accept(cmd) {
+	if !cs.commandCache.Accept(cmd) {
 		cs.logger.Infof("OnPropose[view=%d]: block rejected: %.8s -> %.8x", view, block.Hash(), block.Command())
 		return
 	}
