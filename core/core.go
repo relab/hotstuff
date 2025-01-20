@@ -10,7 +10,7 @@
 // 2. To give other components access to the component.
 //
 // To be able to access other components from a struct, you will need to implement the component interface from this package.
-// The InitComponent method of the component interface gives your struct a pointer to the Core object, which can be used
+// The InitModule method of the component interface gives your struct a pointer to the Core object, which can be used
 // to obtain pointers to the other components.
 // If your component will be interacting with the event loop,
 // then this method is the preferred location to set up handlers for events.
@@ -35,63 +35,17 @@ package core
 import (
 	"fmt"
 	"reflect"
-
-	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/modules"
 )
 
-// Component is an interface for initializing components.
-type Component interface {
-	InitComponent(mods *Core)
+// Module is an interface for initializing components.
+type Module interface {
+	InitModule(mods *Core)
 }
 
 // Core is the base of the component system.
 // It contains only a few core components that are shared between replicas and clients.
 type Core struct {
-	modules []any // TODO: Change type to Module
-
-	blockChain    BlockChain
-	consensus     Consensus
-	crypto        Crypto
-	eventLoop     *EventLoop
-	logger        logging.Logger
-	synchronizer  Synchronizer
-	votingMachine VotingMachine
-
-	// TODO: This is a module, make a new system to acquire this.
-	leaderRotation modules.LeaderRotation
-}
-
-func (c *Core) Consensus() Consensus {
-	return nil
-}
-
-func (c *Core) VotingMachine() VotingMachine {
-	return nil
-}
-
-func (c *Core) Synchronizer() Synchronizer {
-	return nil
-}
-
-func (c *Core) Crypto() Crypto {
-	return nil
-}
-
-func (c *Core) BlockChain() BlockChain {
-	return nil
-}
-
-func (c *Core) EventLoop() *EventLoop {
-	return nil
-}
-
-func (c *Core) Logger() logging.Logger {
-	return nil
-}
-
-func (c *Core) LeaderRotation() modules.LeaderRotation {
-	return nil
+	modules []any
 }
 
 // TryGet attempts to find a component for ptr.

@@ -157,9 +157,9 @@ func New() modules.CryptoBase {
 	}
 }
 
-// InitComponent gives the module a reference to the Core object.
+// InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (bls *bls12Base) InitComponent(mods *core.Core) {
+func (bls *bls12Base) InitModule(mods *core.Core) {
 	mods.Get(
 		&bls.configuration,
 		&bls.logger,

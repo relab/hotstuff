@@ -24,8 +24,8 @@ func New() modules.Rules {
 	return &FastHotStuff{}
 }
 
-// InitComponent initializes the module.
-func (fhs *FastHotStuff) InitComponent(mods *core.Core) {
+// InitModule initializes the module.
+func (fhs *FastHotStuff) InitModule(mods *core.Core) {
 	var opts *core.Options
 
 	mods.Get(&opts, &fhs.blockChain, &fhs.logger, &fhs.synchronizer)

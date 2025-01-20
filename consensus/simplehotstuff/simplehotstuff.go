@@ -31,8 +31,8 @@ func New() modules.Rules {
 	}
 }
 
-// InitComponent initializes the module.
-func (hs *SimpleHotStuff) InitComponent(mods *core.Core) {
+// InitModule initializes the module.
+func (hs *SimpleHotStuff) InitModule(mods *core.Core) {
 	mods.Get(&hs.blockChain, &hs.logger, &hs.synchronizer)
 }
 

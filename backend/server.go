@@ -32,8 +32,8 @@ type Server struct {
 	gorumsSrv     *gorums.Server
 }
 
-// InitComponent initializes the Server.
-func (srv *Server) InitComponent(mods *core.Core) {
+// InitModule initializes the Server.
+func (srv *Server) InitModule(mods *core.Core) {
 	mods.Get(
 		&srv.eventLoop,
 		&srv.configuration,

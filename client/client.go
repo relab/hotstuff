@@ -78,8 +78,8 @@ type Client struct {
 	timeout          time.Duration
 }
 
-// InitComponent initializes the client.
-func (c *Client) InitComponent(mods *core.Core) {
+// InitModule initializes the client.
+func (c *Client) InitModule(mods *core.Core) {
 	mods.Get(
 		&c.eventLoop,
 		&c.logger,

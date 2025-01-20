@@ -35,8 +35,8 @@ func newCmdCache(batchSize int) *cmdCache {
 	}
 }
 
-// InitComponent gives the module access to the other modules.
-func (c *cmdCache) InitComponent(mods *core.Core) {
+// InitModule gives the module access to the other modules.
+func (c *cmdCache) InitModule(mods *core.Core) {
 	mods.Get(&c.logger)
 }
 

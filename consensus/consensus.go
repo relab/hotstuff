@@ -42,8 +42,8 @@ func New() core.Consensus {
 	}
 }
 
-// InitComponent initializes the module.
-func (cs *consensusBase) InitComponent(mods *core.Core) {
+// InitModule initializes the module.
+func (cs *consensusBase) InitModule(mods *core.Core) {
 	mods.Get(
 		&cs.acceptor,
 		&cs.blockChain,
@@ -60,8 +60,8 @@ func (cs *consensusBase) InitComponent(mods *core.Core) {
 		&cs.synchronizer,
 	)
 
-	if mod, ok := cs.rules.(core.Component); ok {
-		mod.InitComponent(mods)
+	if mod, ok := cs.rules.(core.Module); ok {
+		mod.InitModule(mods)
 	}
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {

@@ -198,9 +198,9 @@ type executorWrapper struct {
 	executor Executor
 }
 
-func (ew executorWrapper) InitComponent(mods *Core) {
-	if m, ok := ew.executor.(Component); ok {
-		m.InitComponent(mods)
+func (ew executorWrapper) InitModule(mods *Core) {
+	if m, ok := ew.executor.(Module); ok {
+		m.InitModule(mods)
 	}
 }
 
@@ -217,9 +217,9 @@ type forkHandlerWrapper struct {
 	forkHandler ForkHandler
 }
 
-func (fhw forkHandlerWrapper) InitComponent(mods *Core) {
-	if m, ok := fhw.forkHandler.(Component); ok {
-		m.InitComponent(mods)
+func (fhw forkHandlerWrapper) InitModule(mods *Core) {
+	if m, ok := fhw.forkHandler.(Module); ok {
+		m.InitModule(mods)
 	}
 }
 

@@ -24,8 +24,8 @@ type ViewTimeouts struct {
 	numTimeouts uint64
 }
 
-// InitComponent gives the module access to the other modules.
-func (vt *ViewTimeouts) InitComponent(mods *core.Core) {
+// InitModule gives the module access to the other modules.
+func (vt *ViewTimeouts) InitModule(mods *core.Core) {
 	var (
 		eventLoop *core.EventLoop
 		logger    logging.Logger

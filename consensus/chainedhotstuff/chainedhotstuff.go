@@ -29,8 +29,8 @@ func New() modules.Rules {
 	}
 }
 
-// InitComponent initializes the module.
-func (hs *ChainedHotStuff) InitComponent(mods *core.Core) {
+// InitModule initializes the module.
+func (hs *ChainedHotStuff) InitModule(mods *core.Core) {
 	mods.Get(&hs.blockChain, &hs.logger)
 }
 

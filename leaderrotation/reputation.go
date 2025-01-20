@@ -27,9 +27,9 @@ type repBased struct {
 	reputations    reputationsMap // latest reputations
 }
 
-// InitComponent gives the module a reference to the Core object.
+// InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder
-func (r *repBased) InitComponent(mods *core.Core) {
+func (r *repBased) InitModule(mods *core.Core) {
 	mods.Get(
 		&r.configuration,
 		&r.consensus,

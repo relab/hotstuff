@@ -78,7 +78,7 @@ func NewEventLoop(bufferSize uint) *EventLoop {
 	return el
 }
 
-func (el *EventLoop) InitComponent(_ *Core) {
+func (el *EventLoop) InitModule(_ *Core) {
 	// TODO: Change this when merging with the branch that implements this.
 }
 

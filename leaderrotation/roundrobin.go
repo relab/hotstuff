@@ -14,7 +14,7 @@ type roundRobin struct {
 	configuration core.Configuration
 }
 
-func (rr *roundRobin) InitComponent(mods *core.Core) {
+func (rr *roundRobin) InitModule(mods *core.Core) {
 	mods.Get(&rr.configuration)
 }
 

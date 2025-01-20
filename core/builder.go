@@ -5,7 +5,7 @@ import "github.com/relab/hotstuff"
 // Builder is a helper for setting up client components.
 type Builder struct {
 	core       Core
-	components []Component
+	components []Module
 	opts       *Options
 }
 
@@ -30,7 +30,7 @@ func (b *Builder) Options() *Options {
 func (b *Builder) Add(components ...any) {
 	b.core.modules = append(b.core.modules, components...)
 	for _, component := range components {
-		if m, ok := component.(Component); ok {
+		if m, ok := component.(Module); ok {
 			b.components = append(b.components, m)
 		}
 	}
@@ -45,7 +45,7 @@ func (b *Builder) Build() *Core {
 	// add the Options last so that it can be overridden by user.
 	b.Add(b.opts)
 	for _, component := range b.components {
-		component.InitComponent(&b.core)
+		component.InitModule(&b.core)
 	}
 	return &b.core
 }

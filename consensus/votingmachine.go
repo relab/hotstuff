@@ -29,8 +29,8 @@ func NewVotingMachine() *VotingMachine {
 	}
 }
 
-// InitComponent initializes the VotingMachine.
-func (vm *VotingMachine) InitComponent(mods *core.Core) {
+// InitModule initializes the VotingMachine.
+func (vm *VotingMachine) InitModule(mods *core.Core) {
 	mods.Get(
 		&vm.blockChain,
 		&vm.configuration,

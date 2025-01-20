@@ -86,8 +86,8 @@ type subConfig struct {
 	replicas map[hotstuff.ID]core.Replica
 }
 
-// InitComponent initializes the configuration.
-func (cfg *Config) InitComponent(mods *core.Core) {
+// InitModule initializes the configuration.
+func (cfg *Config) InitModule(mods *core.Core) {
 	mods.Get(
 		&cfg.eventLoop,
 		&cfg.logger,
@@ -114,7 +114,7 @@ func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOpt
 	}
 	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
 
-	// initialization will be finished by InitComponent
+	// initialization will be finished by InitModule
 	cfg := &Config{
 		subConfig: subConfig{
 			replicas: make(map[hotstuff.ID]core.Replica),

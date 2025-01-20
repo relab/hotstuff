@@ -19,8 +19,8 @@ func NewTicker(interval time.Duration) *Ticker {
 	return &Ticker{interval: interval}
 }
 
-// InitComponent gives the module access to the other modules.
-func (t *Ticker) InitComponent(mods *core.Core) {
+// InitModule gives the module access to the other modules.
+func (t *Ticker) InitModule(mods *core.Core) {
 	var eventLoop *core.EventLoop
 
 	mods.Get(&eventLoop)

@@ -42,8 +42,8 @@ type Synchronizer struct {
 	timeouts map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
 }
 
-// InitComponent initializes the synchronizer.
-func (s *Synchronizer) InitComponent(mods *core.Core) {
+// InitModule initializes the synchronizer.
+func (s *Synchronizer) InitModule(mods *core.Core) {
 	mods.Get(
 		&s.blockChain,
 		&s.consensus,

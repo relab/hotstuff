@@ -141,13 +141,13 @@ type vulnerableFHS struct {
 	inner      fasthotstuff.FastHotStuff
 }
 
-func (fhs *vulnerableFHS) InitComponent(mods *core.Core) {
+func (fhs *vulnerableFHS) InitModule(mods *core.Core) {
 	mods.Get(
 		&fhs.logger,
 		&fhs.blockChain,
 	)
 
-	fhs.inner.InitComponent(mods)
+	fhs.inner.InitModule(mods)
 }
 
 // VoteRule decides whether to vote for the block.

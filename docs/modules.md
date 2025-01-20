@@ -148,11 +148,11 @@ Each module may implement the following `Module` interface.
 
 ```go
 type Module interface {
-  InitComponent(mods *modules.Core)
+  InitModule(mods *modules.Core)
 }
 ```
 
-The `InitComponent` method is called by the module system to give the module an opportunity to initialize itself.
+The `InitModule` method is called by the module system to give the module an opportunity to initialize itself.
 The module does this by calling the `Get`, `GetAll` or `TryGet` methods of the `modules.Core` object.
 These methods take a pointer to the variable where a module should be stored.
 The module system then looks for a module of the requested type and stores it in the pointer.
@@ -162,7 +162,7 @@ For example:
 ```go
 type A1 struct{ b B }
 
-func (a *A1) InitComponent(mods *modules.Core) {
+func (a *A1) InitModule(mods *modules.Core) {
   mods.Get(&a.b)
 }
 ```

@@ -20,16 +20,16 @@ func New(impl modules.CryptoBase) core.Crypto {
 	return &crypto{CryptoBase: impl}
 }
 
-// InitComponent gives the module a reference to the Core object.
+// InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (c *crypto) InitComponent(mods *core.Core) {
+func (c *crypto) InitModule(mods *core.Core) {
 	mods.Get(
 		&c.blockChain,
 		&c.configuration,
 	)
 
-	if mod, ok := c.CryptoBase.(core.Component); ok {
-		mod.InitComponent(mods)
+	if mod, ok := c.CryptoBase.(core.Module); ok {
+		mod.InitModule(mods)
 	}
 }
 

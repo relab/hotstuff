@@ -26,8 +26,8 @@ type Throughput struct {
 	commandCount uint64
 }
 
-// InitComponent gives the module access to the other modules.
-func (t *Throughput) InitComponent(mods *core.Core) {
+// InitModule gives the module access to the other modules.
+func (t *Throughput) InitModule(mods *core.Core) {
 	var (
 		eventLoop *core.EventLoop
 		logger    logging.Logger

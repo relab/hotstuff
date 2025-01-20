@@ -43,13 +43,13 @@ func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv
 	return srv
 }
 
-// InitComponent gives the module access to the other modules.
-func (srv *clientSrv) InitComponent(mods *core.Core) {
+// InitModule gives the module access to the other modules.
+func (srv *clientSrv) InitModule(mods *core.Core) {
 	mods.Get(
 		&srv.eventLoop,
 		&srv.logger,
 	)
-	srv.cmdCache.InitComponent(mods)
+	srv.cmdCache.InitModule(mods)
 }
 
 func (srv *clientSrv) Start(addr string) error {

@@ -23,7 +23,7 @@ type carousel struct {
 	logger        logging.Logger
 }
 
-func (c *carousel) InitComponent(mods *core.Core) {
+func (c *carousel) InitModule(mods *core.Core) {
 	mods.Get(
 		&c.blockChain,
 		&c.configuration,

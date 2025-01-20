@@ -64,9 +64,9 @@ func New() modules.CryptoBase {
 	return &eddsaBase{}
 }
 
-// InitComponent gives the module a reference to the Core object.
+// InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (ed *eddsaBase) InitComponent(mods *core.Core) {
+func (ed *eddsaBase) InitModule(mods *core.Core) {
 	mods.Get(
 		&ed.configuration,
 		&ed.logger,
