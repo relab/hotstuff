@@ -7,13 +7,17 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/synchronizer"
 )
 
 // blockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type blockChain struct {
-	comps core.ComponentList
+	configuration core.Configuration
+	consensus     core.Consensus
+	eventLoop     *core.EventLoop
+	logger        logging.Logger
 
 	mut           sync.Mutex
 	pruneHeight   hotstuff.View
@@ -23,7 +27,12 @@ type blockChain struct {
 }
 
 func (chain *blockChain) InitComponent(mods *core.Core) {
-	chain.comps = mods.Components()
+	mods.Get(
+		&chain.configuration,
+		&chain.consensus,
+		&chain.eventLoop,
+		&chain.logger,
+	)
 }
 
 // New creates a new blockChain with a maximum size.
@@ -80,12 +89,12 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 		goto done
 	}
 
-	ctx, cancel = synchronizer.TimeoutContext(chain.comps.EventLoop.Context(), chain.comps.EventLoop)
+	ctx, cancel = synchronizer.TimeoutContext(chain.eventLoop.Context(), chain.eventLoop)
 	chain.pendingFetch[hash] = cancel
 
 	chain.mut.Unlock()
-	chain.comps.Logger.Debugf("Attempting to fetch block: %.8s", hash)
-	block, ok = chain.comps.Configuration.Fetch(ctx, hash)
+	chain.logger.Debugf("Attempting to fetch block: %.8s", hash)
+	block, ok = chain.configuration.Fetch(ctx, hash)
 	chain.mut.Lock()
 
 	delete(chain.pendingFetch, hash)
@@ -95,7 +104,7 @@ func (chain *blockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 		goto done
 	}
 
-	chain.comps.Logger.Debugf("Successfully fetched block: %.8s", hash)
+	chain.logger.Debugf("Successfully fetched block: %.8s", hash)
 
 	chain.blocks[hash] = block
 	chain.blockAtHeight[block.View()] = block
@@ -124,7 +133,7 @@ func (chain *blockChain) PruneToHeight(height hotstuff.View) (forkedBlocks []*ho
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
-	committedHeight := chain.comps.Consensus.CommittedBlock().View()
+	committedHeight := chain.consensus.CommittedBlock().View()
 	committedViews := make(map[hotstuff.View]bool)
 	committedViews[committedHeight] = true
 	for h := committedHeight; h >= chain.pruneHeight; {
@@ -144,7 +153,7 @@ func (chain *blockChain) PruneToHeight(height hotstuff.View) (forkedBlocks []*ho
 		if !committedViews[h] {
 			block, ok := chain.blockAtHeight[h]
 			if ok {
-				chain.comps.Logger.Debugf("PruneToHeight: found forked block: %v", block)
+				chain.logger.Debugf("PruneToHeight: found forked block: %v", block)
 				forkedBlocks = append(forkedBlocks, block)
 			}
 		}

@@ -11,6 +11,7 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/logging"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -19,7 +20,8 @@ import (
 
 // clientSrv serves a client.
 type clientSrv struct {
-	comps core.ComponentList
+	eventLoop *core.EventLoop
+	logger    logging.Logger
 
 	mut          sync.Mutex
 	srv          *gorums.Server
@@ -43,7 +45,10 @@ func newClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *clientSrv
 
 // InitComponent gives the module access to the other modules.
 func (srv *clientSrv) InitComponent(mods *core.Core) {
-	srv.comps = mods.Components()
+	mods.Get(
+		&srv.eventLoop,
+		&srv.logger,
+	)
 	srv.cmdCache.InitComponent(mods)
 }
 
@@ -60,7 +65,7 @@ func (srv *clientSrv) StartOnListener(lis net.Listener) {
 	go func() {
 		err := srv.srv.Serve(lis)
 		if err != nil {
-			srv.comps.Logger.Error(err)
+			srv.logger.Error(err)
 		}
 	}()
 }
@@ -87,11 +92,11 @@ func (srv *clientSrv) Exec(cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {
-		srv.comps.Logger.Errorf("Failed to unmarshal command: %v", err)
+		srv.logger.Errorf("Failed to unmarshal command: %v", err)
 		return
 	}
 
-	srv.comps.EventLoop.AddEvent(hotstuff.CommitEvent{Commands: len(batch.GetCommands())})
+	srv.eventLoop.AddEvent(hotstuff.CommitEvent{Commands: len(batch.GetCommands())})
 
 	for _, cmd := range batch.GetCommands() {
 		_, _ = srv.hash.Write(cmd.Data)
@@ -105,14 +110,14 @@ func (srv *clientSrv) Exec(cmd hotstuff.Command) {
 		srv.mut.Unlock()
 	}
 
-	srv.comps.Logger.Debugf("Hash: %.8x", srv.hash.Sum(nil))
+	srv.logger.Debugf("Hash: %.8x", srv.hash.Sum(nil))
 }
 
 func (srv *clientSrv) Fork(cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {
-		srv.comps.Logger.Errorf("Failed to unmarshal command: %v", err)
+		srv.logger.Errorf("Failed to unmarshal command: %v", err)
 		return
 	}
 

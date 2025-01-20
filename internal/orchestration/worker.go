@@ -194,19 +194,18 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		float64(opts.GetTimeoutMultiplier()),
 	)
 
-	builder.RequireMandatoryComps()
 	builder.Add(
 		consensusRules,
 		duration,
 		leaderRotation,
 
-		blockchain.New(),
 		core.NewEventLoop(1000),
 		consensus.New(),
 		consensus.NewVotingMachine(),
 		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		synchronizer.New(),
 		w.metricsLogger,
+		blockchain.New(),
 		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())

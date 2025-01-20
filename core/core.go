@@ -45,44 +45,53 @@ type Component interface {
 	InitComponent(mods *Core)
 }
 
-type ComponentList struct {
-	BlockChain    BlockChain
-	CommandCache  CommandCache
-	Configuration Configuration
-	Consensus     Consensus
-	Crypto        Crypto
-	EventLoop     *EventLoop
-	Executor      ExecutorExt
-	ForkHandler   ForkHandlerExt
-	Logger        logging.Logger
-	Synchronizer  Synchronizer
-	VotingMachine VotingMachine
-	Options       *Options
-}
-
-func (c *ComponentList) init(core *Core) error {
-	v := reflect.ValueOf(*c)
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		iface := field.Interface()
-		if iface == nil {
-			return fmt.Errorf("component %s cannot be nil", field.Type().Name())
-		}
-		if comp, ok := iface.(Component); ok {
-			comp.InitComponent(core)
-		}
-	}
-	return nil
-}
-
 // Core is the base of the component system.
 // It contains only a few core components that are shared between replicas and clients.
 type Core struct {
-	modules    []any
-	components ComponentList
+	modules []any // TODO: Change type to Module
+
+	blockChain    BlockChain
+	consensus     Consensus
+	crypto        Crypto
+	eventLoop     *EventLoop
+	logger        logging.Logger
+	synchronizer  Synchronizer
+	votingMachine VotingMachine
 
 	// TODO: This is a module, make a new system to acquire this.
 	leaderRotation modules.LeaderRotation
+}
+
+func (c *Core) Consensus() Consensus {
+	return nil
+}
+
+func (c *Core) VotingMachine() VotingMachine {
+	return nil
+}
+
+func (c *Core) Synchronizer() Synchronizer {
+	return nil
+}
+
+func (c *Core) Crypto() Crypto {
+	return nil
+}
+
+func (c *Core) BlockChain() BlockChain {
+	return nil
+}
+
+func (c *Core) EventLoop() *EventLoop {
+	return nil
+}
+
+func (c *Core) Logger() logging.Logger {
+	return nil
+}
+
+func (c *Core) LeaderRotation() modules.LeaderRotation {
+	return nil
 }
 
 // TryGet attempts to find a component for ptr.
@@ -143,11 +152,4 @@ func (mods *Core) Get(pointers ...any) {
 			panic(fmt.Sprintf("component of type %s not found", reflect.TypeOf(ptr).Elem()))
 		}
 	}
-}
-
-// Components returns a copied struct containing
-// pointers (and interface refs) to the mandatory
-// components of Core.
-func (mods *Core) Components() ComponentList {
-	return mods.components
 }
