@@ -3,6 +3,7 @@ package chainedhotstuff
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -14,7 +15,7 @@ func init() {
 
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {
-	blockChain core.BlockChain
+	blockChain *blockchain.BlockChain
 	logger     logging.Logger
 
 	// protocol variables

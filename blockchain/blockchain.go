@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/synchronizer"
+	"github.com/relab/hotstuff/synctools"
 )
 
 // BlockChain stores a limited amount of blocks in a map.
@@ -108,7 +108,7 @@ func (chain *BlockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 		goto done
 	}
 
-	ctx, cancel = synchronizer.TimeoutContext(chain.eventLoop.Context(), chain.eventLoop)
+	ctx, cancel = synctools.TimeoutContext(chain.eventLoop.Context(), chain.eventLoop)
 	chain.pendingFetch[hash] = cancel
 
 	chain.mut.Unlock()
@@ -174,5 +174,3 @@ func (chain *BlockChain) PruneToHeight(height hotstuff.View) (prunedBlocks map[h
 func (chain *BlockChain) PruneHeight() hotstuff.View {
 	return chain.pruneHeight
 }
-
-var _ core.BlockChain = (*BlockChain)(nil)

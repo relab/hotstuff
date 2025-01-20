@@ -5,12 +5,13 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 )
 
 type Committer struct {
-	blockChain  core.BlockChain
+	blockChain  *blockchain.BlockChain
 	executor    core.ExecutorExt
 	forkHandler core.ForkHandlerExt
 	logger      logging.Logger

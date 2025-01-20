@@ -3,6 +3,7 @@ package crypto_test
 import (
 	"testing"
 
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/modules"
 
@@ -257,7 +258,7 @@ func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() co
 	block := createBlock(t, signer)
 
 	for _, mods := range hl {
-		var blockChain core.BlockChain
+		var blockChain *blockchain.BlockChain
 		mods.Get(&blockChain)
 
 		blockChain.Store(block)

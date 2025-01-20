@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 
@@ -23,7 +24,7 @@ import (
 // Server is the Server-side of the gorums backend.
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
-	blockChain    core.BlockChain
+	blockChain    *blockchain.BlockChain
 	configuration core.Configuration
 	eventLoop     *core.EventLoop
 	logger        logging.Logger

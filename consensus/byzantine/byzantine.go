@@ -3,6 +3,7 @@ package byzantine
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/modules"
 )
@@ -43,7 +44,7 @@ func NewSilence(c modules.Rules) modules.Rules {
 }
 
 type fork struct {
-	blockChain   core.BlockChain
+	blockChain   *blockchain.BlockChain
 	synchronizer core.Synchronizer
 	opts         *core.Options
 	modules.Rules

@@ -1,4 +1,4 @@
-package synchronizer
+package synctools
 
 import (
 	"context"
@@ -14,14 +14,14 @@ import (
 func ViewContext(parent context.Context, eventLoop *core.EventLoop, view *hotstuff.View) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parent)
 
-	id := eventLoop.RegisterHandler(ViewChangeEvent{}, func(event any) {
-		if view == nil || event.(ViewChangeEvent).View >= *view {
+	id := eventLoop.RegisterHandler(hotstuff.ViewChangeEvent{}, func(event any) {
+		if view == nil || event.(hotstuff.ViewChangeEvent).View >= *view {
 			cancel()
 		}
 	}, core.Prioritize(), core.UnsafeRunInAddEvent())
 
 	return ctx, func() {
-		eventLoop.UnregisterHandler(ViewChangeEvent{}, id)
+		eventLoop.UnregisterHandler(hotstuff.ViewChangeEvent{}, id)
 		cancel()
 	}
 }
@@ -31,12 +31,12 @@ func TimeoutContext(parent context.Context, eventLoop *core.EventLoop) (context.
 	// ViewContext handles view-change case.
 	ctx, cancel := ViewContext(parent, eventLoop, nil)
 
-	id := eventLoop.RegisterHandler(TimeoutEvent{}, func(_ any) {
+	id := eventLoop.RegisterHandler(hotstuff.TimeoutEvent{}, func(_ any) {
 		cancel()
 	}, core.Prioritize(), core.UnsafeRunInAddEvent())
 
 	return ctx, func() {
-		eventLoop.UnregisterHandler(TimeoutEvent{}, id)
+		eventLoop.UnregisterHandler(hotstuff.TimeoutEvent{}, id)
 		cancel()
 	}
 }

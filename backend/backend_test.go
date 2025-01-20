@@ -1,4 +1,4 @@
-package backend
+package backend_test
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/core"
 
 	"github.com/relab/gorums"
@@ -32,7 +33,7 @@ func TestConnect(t *testing.T) {
 		defer teardown()
 		td.builders.Build()
 
-		cfg := NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
+		cfg := backend.NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
 
 		builder.Add(cfg)
 		builder.Build()
@@ -55,7 +56,7 @@ func testBase(t *testing.T, typ any, send func(core.Configuration), handle core.
 		serverTeardown := createServers(t, td, ctrl)
 		defer serverTeardown()
 
-		cfg := NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
+		cfg := backend.NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
 		td.builders[0].Add(cfg)
 		hl := td.builders.Build()
 
@@ -135,7 +136,7 @@ func TestTimeout(t *testing.T) {
 type testData struct {
 	n         int
 	creds     credentials.TransportCredentials
-	replicas  []ReplicaInfo
+	replicas  []backend.ReplicaInfo
 	listeners []net.Listener
 	keys      []hotstuff.PrivateKey
 	builders  testutil.BuilderList
@@ -148,13 +149,13 @@ func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
 
 	listeners := make([]net.Listener, n)
 	keys := make([]hotstuff.PrivateKey, 0, n)
-	replicas := make([]ReplicaInfo, 0, n)
+	replicas := make([]backend.ReplicaInfo, 0, n)
 
 	// generate keys and replicaInfo
 	for i := 0; i < n; i++ {
 		listeners[i] = testutil.CreateTCPListener(t)
 		keys = append(keys, testutil.GenerateECDSAKey(t))
-		replicas = append(replicas, ReplicaInfo{
+		replicas = append(replicas, backend.ReplicaInfo{
 			ID:      hotstuff.ID(i) + 1,
 			Address: listeners[i].Addr().String(),
 			PubKey:  keys[i].Public(),
@@ -218,9 +219,9 @@ func runBoth(t *testing.T, run func(*testing.T, setupFunc)) {
 
 func createServers(t *testing.T, td testData, _ *gomock.Controller) (teardown func()) {
 	t.Helper()
-	servers := make([]*Server, td.n)
+	servers := make([]*backend.Server, td.n)
 	for i := range servers {
-		servers[i] = NewServer(WithGorumsServerOptions(gorums.WithGRPCServerOptions(grpc.Creds(td.creds))))
+		servers[i] = backend.NewServer(backend.WithGorumsServerOptions(gorums.WithGRPCServerOptions(grpc.Creds(td.creds))))
 		servers[i].StartOnListener(td.listeners[i])
 		td.builders[i].Add(servers[i])
 	}

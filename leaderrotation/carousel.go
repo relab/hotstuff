@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -16,7 +17,7 @@ func init() {
 }
 
 type carousel struct {
-	blockChain    core.BlockChain
+	blockChain    *blockchain.BlockChain
 	configuration core.Configuration
 	consensus     core.Consensus
 	opts          *core.Options

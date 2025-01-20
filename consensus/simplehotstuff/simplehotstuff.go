@@ -3,6 +3,7 @@ package simplehotstuff
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -17,7 +18,7 @@ func init() {
 // Based on the simplified algorithm described in the paper
 // "Formal Verification of HotStuff" by Leander Jehl.
 type SimpleHotStuff struct {
-	blockChain   core.BlockChain
+	blockChain   *blockchain.BlockChain
 	logger       logging.Logger
 	synchronizer core.Synchronizer
 

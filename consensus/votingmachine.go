@@ -4,13 +4,14 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 )
 
 // VotingMachine collects votes.
 type VotingMachine struct {
-	blockChain    core.BlockChain
+	blockChain    *blockchain.BlockChain
 	configuration core.Configuration
 	crypto        core.Crypto
 	eventLoop     *core.EventLoop

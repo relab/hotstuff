@@ -3,10 +3,10 @@ package metrics
 import (
 	"time"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics/types"
-	"github.com/relab/hotstuff/synchronizer"
 )
 
 func init() {
@@ -40,8 +40,8 @@ func (vt *ViewTimeouts) InitModule(mods *core.Core) {
 
 	logger.Info("ViewTimeouts metric enabled.")
 
-	eventLoop.RegisterHandler(synchronizer.ViewChangeEvent{}, func(event any) {
-		vt.viewChange(event.(synchronizer.ViewChangeEvent))
+	eventLoop.RegisterHandler(hotstuff.ViewChangeEvent{}, func(event any) {
+		vt.viewChange(event.(hotstuff.ViewChangeEvent))
 	})
 
 	eventLoop.RegisterHandler(types.TickEvent{}, func(event any) {
@@ -49,7 +49,7 @@ func (vt *ViewTimeouts) InitModule(mods *core.Core) {
 	}, core.Prioritize())
 }
 
-func (vt *ViewTimeouts) viewChange(event synchronizer.ViewChangeEvent) {
+func (vt *ViewTimeouts) viewChange(event hotstuff.ViewChangeEvent) {
 	vt.numViews++
 	if event.Timeout {
 		vt.numTimeouts++

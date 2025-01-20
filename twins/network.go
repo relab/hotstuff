@@ -35,7 +35,7 @@ func (id NodeID) String() string {
 }
 
 type node struct {
-	blockChain     core.BlockChain
+	blockChain     *blockchain.BlockChain
 	consensus      core.Consensus
 	eventLoop      *core.EventLoop
 	leaderRotation modules.LeaderRotation
@@ -443,7 +443,7 @@ func (tm *timeoutManager) advance() {
 	tm.countdown--
 	if tm.countdown == 0 {
 		view := tm.synchronizer.View()
-		tm.eventLoop.AddEvent(synchronizer.TimeoutEvent{View: view})
+		tm.eventLoop.AddEvent(hotstuff.TimeoutEvent{View: view})
 		tm.countdown = tm.timeout
 		if tm.node.effectiveView <= view {
 			tm.node.effectiveView = view + 1
@@ -452,7 +452,7 @@ func (tm *timeoutManager) advance() {
 	}
 }
 
-func (tm *timeoutManager) viewChange(event synchronizer.ViewChangeEvent) {
+func (tm *timeoutManager) viewChange(event hotstuff.ViewChangeEvent) {
 	tm.countdown = tm.timeout
 	if event.Timeout {
 		tm.network.logger.Infof("node %v entered view %d after timeout", tm.node.id, event.View)
@@ -472,8 +472,8 @@ func (tm *timeoutManager) InitModule(mods *core.Core) {
 	tm.eventLoop.RegisterHandler(tick{}, func(_ any) {
 		tm.advance()
 	}, core.Prioritize())
-	tm.eventLoop.RegisterHandler(synchronizer.ViewChangeEvent{}, func(event any) {
-		tm.viewChange(event.(synchronizer.ViewChangeEvent))
+	tm.eventLoop.RegisterHandler(hotstuff.ViewChangeEvent{}, func(event any) {
+		tm.viewChange(event.(hotstuff.ViewChangeEvent))
 	}, core.Prioritize())
 }
 

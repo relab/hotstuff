@@ -63,3 +63,14 @@ type NewViewMsg struct {
 type CommitEvent struct {
 	Commands int
 }
+
+// ViewChangeEvent is sent on the eventloop whenever a view change occurs.
+type ViewChangeEvent struct {
+	View    View
+	Timeout bool
+}
+
+// TimeoutEvent is sent on the eventloop when a local timeout occurs.
+type TimeoutEvent struct {
+	View View
+}

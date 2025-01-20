@@ -3,12 +3,13 @@ package crypto
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/modules"
 )
 
 type crypto struct {
-	blockChain    core.BlockChain
+	blockChain    *blockchain.BlockChain
 	configuration core.Configuration
 
 	modules.CryptoBase

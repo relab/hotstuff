@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/consensus/fasthotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
@@ -137,7 +138,7 @@ func TestFHSBug(t *testing.T) {
 // A wrapper around the FHS rules that swaps the commit rule for a vulnerable version
 type vulnerableFHS struct {
 	logger     logging.Logger
-	blockChain core.BlockChain
+	blockChain *blockchain.BlockChain
 	inner      fasthotstuff.FastHotStuff
 }
 

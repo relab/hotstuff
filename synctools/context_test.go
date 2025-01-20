@@ -1,4 +1,4 @@
-package synchronizer_test
+package synctools_test
 
 import (
 	"context"
@@ -6,16 +6,16 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/synchronizer"
+	"github.com/relab/hotstuff/synctools"
 )
 
 // TestTimeoutContext tests that a timeout context is canceled after receiving a timeout event.
 func TestTimeoutContext(t *testing.T) {
 	eventloop := core.NewEventLoop(10)
-	ctx, cancel := synchronizer.TimeoutContext(context.Background(), eventloop)
+	ctx, cancel := synctools.TimeoutContext(context.Background(), eventloop)
 	defer cancel()
 
-	eventloop.AddEvent(synchronizer.TimeoutEvent{})
+	eventloop.AddEvent(hotstuff.TimeoutEvent{})
 
 	if ctx.Err() != context.Canceled {
 		t.Error("Context not canceled")
@@ -25,10 +25,10 @@ func TestTimeoutContext(t *testing.T) {
 // TestTimeoutContextView tests that a timeout context is canceled after receiving a view change event.
 func TestTimeoutContextView(t *testing.T) {
 	eventloop := core.NewEventLoop(10)
-	ctx, cancel := synchronizer.TimeoutContext(context.Background(), eventloop)
+	ctx, cancel := synctools.TimeoutContext(context.Background(), eventloop)
 	defer cancel()
 
-	eventloop.AddEvent(synchronizer.ViewChangeEvent{View: 1})
+	eventloop.AddEvent(hotstuff.ViewChangeEvent{View: 1})
 
 	if ctx.Err() != context.Canceled {
 		t.Error("Context not canceled")
@@ -38,10 +38,10 @@ func TestTimeoutContextView(t *testing.T) {
 // TestViewContext tests that a view context is canceled after receiving a view change event.
 func TestViewContext(t *testing.T) {
 	eventloop := core.NewEventLoop(10)
-	ctx, cancel := synchronizer.ViewContext(context.Background(), eventloop, nil)
+	ctx, cancel := synctools.ViewContext(context.Background(), eventloop, nil)
 	defer cancel()
 
-	eventloop.AddEvent(synchronizer.ViewChangeEvent{View: 1})
+	eventloop.AddEvent(hotstuff.ViewChangeEvent{View: 1})
 
 	if ctx.Err() != context.Canceled {
 		t.Error("Context not canceled")
@@ -52,10 +52,10 @@ func TestViewContext(t *testing.T) {
 func TestViewContextEarlierView(t *testing.T) {
 	eventloop := core.NewEventLoop(10)
 	view := hotstuff.View(1)
-	ctx, cancel := synchronizer.ViewContext(context.Background(), eventloop, &view)
+	ctx, cancel := synctools.ViewContext(context.Background(), eventloop, &view)
 	defer cancel()
 
-	eventloop.AddEvent(synchronizer.ViewChangeEvent{View: 0})
+	eventloop.AddEvent(hotstuff.ViewChangeEvent{View: 0})
 
 	if ctx.Err() != nil {
 		t.Error("Context canceled")

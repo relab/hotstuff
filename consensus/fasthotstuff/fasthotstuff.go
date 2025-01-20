@@ -3,6 +3,7 @@ package fasthotstuff
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -14,7 +15,7 @@ func init() {
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {
-	blockChain   core.BlockChain
+	blockChain   *blockchain.BlockChain
 	logger       logging.Logger
 	synchronizer core.Synchronizer
 }

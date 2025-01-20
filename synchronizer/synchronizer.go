@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -16,7 +17,7 @@ import (
 
 // Synchronizer synchronizes replicas to the same view.
 type Synchronizer struct {
-	blockChain     core.BlockChain
+	blockChain     *blockchain.BlockChain
 	consensus      core.Consensus
 	crypto         core.Crypto
 	configuration  core.Configuration
@@ -56,8 +57,8 @@ func (s *Synchronizer) InitModule(mods *core.Core) {
 		&s.opts,
 	)
 
-	s.eventLoop.RegisterHandler(TimeoutEvent{}, func(event any) {
-		timeoutView := event.(TimeoutEvent).View
+	s.eventLoop.RegisterHandler(hotstuff.TimeoutEvent{}, func(event any) {
+		timeoutView := event.(hotstuff.TimeoutEvent).View
 		if s.View() == timeoutView {
 			s.OnLocalTimeout()
 		}
@@ -110,7 +111,7 @@ func (s *Synchronizer) startTimeoutTimer() {
 	// It is important that the timer is NOT reused because then the view would be wrong.
 	s.timer = oneShotTimer{time.AfterFunc(s.duration.Duration(), func() {
 		// The event loop will execute onLocalTimeout for us.
-		s.eventLoop.AddEvent(TimeoutEvent{view})
+		s.eventLoop.AddEvent(hotstuff.TimeoutEvent{View: view})
 	})}
 }
 
@@ -340,7 +341,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 	s.startTimeoutTimer()
 
 	s.logger.Debugf("advanced to view %d", newView)
-	s.eventLoop.AddEvent(ViewChangeEvent{View: newView, Timeout: timeout})
+	s.eventLoop.AddEvent(hotstuff.ViewChangeEvent{View: newView, Timeout: timeout})
 
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.opts.ID() {
@@ -378,14 +379,3 @@ func (s *Synchronizer) updateHighTC(tc hotstuff.TimeoutCert) {
 }
 
 var _ core.Synchronizer = (*Synchronizer)(nil)
-
-// ViewChangeEvent is sent on the eventloop whenever a view change occurs.
-type ViewChangeEvent struct {
-	View    hotstuff.View
-	Timeout bool
-}
-
-// TimeoutEvent is sent on the eventloop when a local timeout occurs.
-type TimeoutEvent struct {
-	View hotstuff.View
-}

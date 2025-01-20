@@ -11,7 +11,7 @@ import (
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/replica"
-	"github.com/relab/hotstuff/synchronizer"
+	"github.com/relab/hotstuff/synctools"
 )
 
 // Rules is the minimum interface that a consensus implementations must implement.
@@ -116,7 +116,7 @@ func (cs *Consensus) Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncIn
 		}
 	}
 
-	ctx, cancel := synchronizer.TimeoutContext(cs.eventLoop.Context(), cs.eventLoop)
+	ctx, cancel := synctools.TimeoutContext(cs.eventLoop.Context(), cs.eventLoop)
 	defer cancel()
 
 	cmd, ok := cs.commandCache.Get(ctx)

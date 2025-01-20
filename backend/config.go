@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/synctools"
 
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/synchronizer"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -46,7 +46,7 @@ func (r *Replica) Vote(cert hotstuff.PartialCert) {
 	if r.node == nil {
 		return
 	}
-	ctx, cancel := synchronizer.TimeoutContext(r.eventLoop.Context(), r.eventLoop)
+	ctx, cancel := synctools.TimeoutContext(r.eventLoop.Context(), r.eventLoop)
 	defer cancel()
 	pCert := hotstuffpb.PartialCertToProto(cert)
 	r.node.Vote(ctx, pCert)
@@ -57,7 +57,7 @@ func (r *Replica) NewView(msg hotstuff.SyncInfo) {
 	if r.node == nil {
 		return
 	}
-	ctx, cancel := synchronizer.TimeoutContext(r.eventLoop.Context(), r.eventLoop)
+	ctx, cancel := synctools.TimeoutContext(r.eventLoop.Context(), r.eventLoop)
 	defer cancel()
 	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(msg))
 }
@@ -285,7 +285,7 @@ func (cfg *subConfig) Propose(proposal hotstuff.ProposeMsg) {
 	if cfg.cfg == nil {
 		return
 	}
-	ctx, cancel := synchronizer.TimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop)
+	ctx, cancel := synctools.TimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop)
 	defer cancel()
 	cfg.cfg.Propose(
 		ctx,
@@ -300,7 +300,7 @@ func (cfg *subConfig) Timeout(msg hotstuff.TimeoutMsg) {
 	}
 
 	// will wait until the second timeout before canceling
-	ctx, cancel := synchronizer.TimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop)
+	ctx, cancel := synctools.TimeoutContext(cfg.eventLoop.Context(), cfg.eventLoop)
 	defer cancel()
 
 	cfg.cfg.Timeout(

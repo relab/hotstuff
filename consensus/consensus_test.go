@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/mocks"
 	"github.com/relab/hotstuff/internal/testutil"
@@ -25,7 +26,7 @@ func TestVote(t *testing.T) {
 
 	var (
 		eventLoop  *core.EventLoop
-		blockChain core.BlockChain
+		blockChain *blockchain.BlockChain
 	)
 
 	hs.Get(&eventLoop, &blockChain)
