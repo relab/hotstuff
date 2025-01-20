@@ -35,7 +35,8 @@ func makeCfg(
 	byzantine string,
 	branchFactor uint32,
 	randomTree bool,
-	mods ...string) *config.ExperimentConfig {
+	mods ...string,
+) *config.ExperimentConfig {
 	cfg := &config.ExperimentConfig{
 		Replicas:          replicas,
 		Clients:           clients,
@@ -91,13 +92,10 @@ func run(t *testing.T, cfg *config.ExperimentConfig) {
 		c <- worker.Run()
 	}()
 
-	err = experiment.Run()
-	if err != nil {
+	if err = experiment.Run(); err != nil {
 		t.Fatal(err)
 	}
-
-	err = <-c
-	if err != nil {
+	if err = <-c; err != nil {
 		t.Fatal(err)
 	}
 }
