@@ -9,30 +9,6 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
-// ReplicaMap maps from a host to a slice of replica options.
-type ReplicaMap map[string][]*orchestrationpb.ReplicaOpts
-
-// ReplicaIDs returns the IDs of the replicas running on the given host.
-func (r ReplicaMap) ReplicaIDs(host string) []uint32 {
-	ids := make([]uint32, 0, len(r[host]))
-	for _, opts := range r[host] {
-		ids = append(ids, opts.ID)
-	}
-	return ids
-}
-
-// ClientMap maps from a host to a slice of client IDs.
-type ClientMap map[string][]hotstuff.ID
-
-// ClientIDs returns the IDs of the clients running on the given host.
-func (c ClientMap) ClientIDs(host string) []uint32 {
-	ids := make([]uint32, 0, len(c[host]))
-	for _, id := range c[host] {
-		ids = append(ids, uint32(id))
-	}
-	return ids
-}
-
 // ExperimentConfig holds the configuration for an experiment.
 type ExperimentConfig struct {
 	// ReplicaHosts is a list of hosts that will run replicas.
@@ -110,6 +86,16 @@ func (c *ExperimentConfig) TreePosIDs() []hotstuff.ID {
 	return ids
 }
 
+// ReplicasForHost returns the number of replicas assigned to the host at the given index.
+func (c *ExperimentConfig) ReplicasForHost(hostIndex int) int {
+	return unitsForHost(hostIndex, c.Replicas, len(c.ReplicaHosts))
+}
+
+// ClientsForHost returns the number of clients assigned to the host at the given index.
+func (c *ExperimentConfig) ClientsForHost(hostIndex int) int {
+	return unitsForHost(hostIndex, c.Clients, len(c.ClientHosts))
+}
+
 // unitsForHost returns the number of units to be assigned to the host at hostIndex.
 func unitsForHost(hostIndex int, totalUnits int, numHosts int) int {
 	if numHosts == 0 {
@@ -121,16 +107,6 @@ func unitsForHost(hostIndex int, totalUnits int, numHosts int) int {
 		return unitsPerHost + 1
 	}
 	return unitsPerHost
-}
-
-// ReplicasForHost returns the number of replicas assigned to the host at the given index.
-func (c *ExperimentConfig) ReplicasForHost(hostIndex int) int {
-	return unitsForHost(hostIndex, c.Replicas, len(c.ReplicaHosts))
-}
-
-// ClientsForHost returns the number of clients assigned to the host at the given index.
-func (c *ExperimentConfig) ClientsForHost(hostIndex int) int {
-	return unitsForHost(hostIndex, c.Clients, len(c.ClientHosts))
 }
 
 // AssignReplicas assigns replicas to hosts.
@@ -197,6 +173,7 @@ func (c *ExperimentConfig) AllHosts() []string {
 	return append(c.ReplicaHosts, c.ClientHosts...)
 }
 
+// CreateReplicaOpts creates a new ReplicaOpts based on the experiment configuration.
 func (c *ExperimentConfig) CreateReplicaOpts() *orchestrationpb.ReplicaOpts {
 	return &orchestrationpb.ReplicaOpts{
 		UseTLS:            true,
@@ -217,15 +194,40 @@ func (c *ExperimentConfig) CreateReplicaOpts() *orchestrationpb.ReplicaOpts {
 	}
 }
 
-func (cfg *ExperimentConfig) CreateClientOpts() *orchestrationpb.ClientOpts {
+// CreateClientOpts creates a new ClientOpts based on the experiment configuration.
+func (c *ExperimentConfig) CreateClientOpts() *orchestrationpb.ClientOpts {
 	return &orchestrationpb.ClientOpts{
 		UseTLS:           true,
-		ConnectTimeout:   durationpb.New(cfg.ConnectTimeout),
-		PayloadSize:      cfg.PayloadSize,
-		MaxConcurrent:    cfg.MaxConcurrent,
-		RateLimit:        cfg.RateLimit,
-		RateStep:         cfg.RateStep,
-		RateStepInterval: durationpb.New(cfg.RateStepInterval),
-		Timeout:          durationpb.New(cfg.ClientTimeout),
+		ConnectTimeout:   durationpb.New(c.ConnectTimeout),
+		PayloadSize:      c.PayloadSize,
+		MaxConcurrent:    c.MaxConcurrent,
+		RateLimit:        c.RateLimit,
+		RateStep:         c.RateStep,
+		RateStepInterval: durationpb.New(c.RateStepInterval),
+		Timeout:          durationpb.New(c.ClientTimeout),
 	}
+}
+
+// ReplicaMap maps from a host to a slice of replica options.
+type ReplicaMap map[string][]*orchestrationpb.ReplicaOpts
+
+// ReplicaIDs returns the IDs of the replicas running on the given host.
+func (r ReplicaMap) ReplicaIDs(host string) []uint32 {
+	ids := make([]uint32, 0, len(r[host]))
+	for _, opts := range r[host] {
+		ids = append(ids, opts.ID)
+	}
+	return ids
+}
+
+// ClientMap maps from a host to a slice of client IDs.
+type ClientMap map[string][]hotstuff.ID
+
+// ClientIDs returns the IDs of the clients running on the given host.
+func (c ClientMap) ClientIDs(host string) []uint32 {
+	ids := make([]uint32, 0, len(c[host]))
+	for _, id := range c[host] {
+		ids = append(ids, uint32(id))
+	}
+	return ids
 }
