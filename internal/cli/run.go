@@ -22,8 +22,6 @@ import (
 )
 
 func runController() {
-	var err error
-
 	cfg, err := config.NewViper()
 	checkf("viper config error: %v", err)
 
@@ -71,9 +69,7 @@ func runController() {
 	checkf("failed to deploy workers: %v", err)
 
 	errors := make(chan error)
-
 	remoteWorkers := make(map[string]orchestration.RemoteWorker)
-
 	for host, session := range sessions {
 		remoteWorkers[host] = orchestration.NewRemoteWorker(
 			protostream.NewWriter(session.Stdin()), protostream.NewReader(session.Stdout()),
@@ -92,7 +88,6 @@ func runController() {
 		remoteWorkers,
 		logging.New("ctrl"),
 	)
-
 	checkf("config error: %v", err)
 
 	err = experiment.Run()
@@ -102,7 +97,6 @@ func runController() {
 		err := session.Close()
 		checkf("failed to close ssh command session: %v", err)
 	}
-
 	for range sessions {
 		err = <-errors
 		checkf("failed to read from remote's standard error stream %v", err)
@@ -193,27 +187,21 @@ func startLocalProfiling(output string) (stop func() error, err error) {
 		trace         string
 		fgprofProfile string
 	)
-
 	if output == "" {
 		return func() error { return nil }, nil
 	}
-
 	if viper.GetBool("cpu-profile") {
 		cpuProfile = filepath.Join(output, "cpuprofile")
 	}
-
 	if viper.GetBool("mem-profile") {
 		memProfile = filepath.Join(output, "memprofile")
 	}
-
 	if viper.GetBool("trace") {
 		trace = filepath.Join(output, "trace")
 	}
-
 	if viper.GetBool("fgprof-profile") {
 		fgprofProfile = filepath.Join(output, "fgprofprofile")
 	}
-
 	stop, err = profiling.StartProfilers(cpuProfile, memProfile, trace, fgprofProfile)
 	return
 }
