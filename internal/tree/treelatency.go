@@ -9,6 +9,23 @@ import (
 	"github.com/relab/hotstuff/modules"
 )
 
+type LatencyType int
+
+const (
+	AggregationLatency LatencyType = iota
+	FixedLatency
+)
+
+func (t *Tree) Latency(lm latency.Matrix, delta time.Duration, latType LatencyType) time.Duration {
+	switch latType {
+	case AggregationLatency:
+		return t.aggregationLatency(t.id, lm, delta)
+	case FixedLatency:
+		return t.fixedAggDuration(delta)
+	}
+	return 0
+}
+
 func (t *Tree) WaitTimerDuration(lm latency.Matrix, opts *modules.Options) time.Duration {
 	if opts.TreeConfig().WaitTimerType() == modules.WaitTimerAgg {
 		return t.aggregationLatency(t.id, lm, opts.TreeConfig().TreeWaitDelta())

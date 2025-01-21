@@ -6,10 +6,9 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/latency"
-	"github.com/relab/hotstuff/modules"
 )
 
-func TestAggDurationHeight(t *testing.T) {
+func TestTreeLatency(t *testing.T) {
 	var (
 		sevenLocations   = []string{"Melbourne", "Toronto", "Prague", "Paris", "Tokyo", "Amsterdam", "Auckland"}
 		fifteenLocations = []string{
@@ -21,7 +20,7 @@ func TestAggDurationHeight(t *testing.T) {
 		id    hotstuff.ID
 		size  int
 		fixed bool
-		delta int
+		delta time.Duration
 		want  time.Duration
 	}{
 		{id: 1, size: 7, fixed: false, delta: 0, want: 521775000},
@@ -50,23 +49,19 @@ func TestAggDurationHeight(t *testing.T) {
 		} else {
 			lm = latency.MatrixFrom(fifteenLocations)
 		}
-		var timerType modules.WaitTimerType
+		var latType LatencyType
 		if test.fixed {
-			timerType = modules.WaitTimerFixed
+			latType = FixedLatency
 		} else {
-			timerType = modules.WaitTimerAgg
+			latType = AggregationLatency
 		}
 
 		bf := 2
 		treePos := DefaultTreePos(test.size)
-
-		opts := modules.OptionsWithID(test.id)
-		opts.SetTreeConfig(uint32(bf), treePos, time.Duration(test.delta), timerType)
 		tree := CreateTree(test.id, bf, treePos)
-
-		agg := tree.WaitTimerDuration(lm, opts)
-		if agg != test.want {
-			t.Errorf("AggDuration(%d, %v).Duration() = %v; want %v", test.id, lm, agg, test.want)
+		got := tree.Latency(lm, test.delta, latType)
+		if got != test.want {
+			t.Errorf("tree.Latency(_, %v, %v) = %v, want %v", test.delta, latType, got, test.want)
 		}
 	}
 }
