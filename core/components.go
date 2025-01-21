@@ -142,6 +142,8 @@ type Consensus interface {
 	Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncInfo hotstuff.SyncInfo, advance bool)
 }
 
+//go:generate mockgen -destination=../internal/mocks/committer_mock.go -package=mocks . Committer
+
 // Committer is a helper module which handles block commits and forks.
 type Committer interface {
 	// Stores the block before further execution.

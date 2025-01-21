@@ -257,4 +257,4 @@ func (cs *Consensus) ChainLength() int {
 	return cs.impl.ChainLength()
 }
 
-var _ core.Consensus = (core.Consensus)(nil)
+var _ core.Consensus = (*Consensus)(nil)

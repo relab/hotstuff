@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/relab/hotstuff/convert"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/synctools"
 
@@ -47,7 +48,7 @@ func (r *Replica) Vote(cert hotstuff.PartialCert) {
 	}
 	ctx, cancel := synctools.TimeoutContext(r.eventLoop.Context(), r.eventLoop)
 	defer cancel()
-	pCert := hotstuffpb.PartialCertToProto(cert)
+	pCert := convert.PartialCertToProto(cert)
 	r.node.Vote(ctx, pCert)
 }
 
@@ -58,7 +59,7 @@ func (r *Replica) NewView(msg hotstuff.SyncInfo) {
 	}
 	ctx, cancel := synctools.TimeoutContext(r.eventLoop.Context(), r.eventLoop)
 	defer cancel()
-	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(msg))
+	r.node.NewView(ctx, convert.SyncInfoToProto(msg))
 }
 
 // Metadata returns the gRPC metadata from this replica's connection.
@@ -288,7 +289,7 @@ func (cfg *SubConfig) Propose(proposal hotstuff.ProposeMsg) {
 	defer cancel()
 	cfg.cfg.Propose(
 		ctx,
-		hotstuffpb.ProposalToProto(proposal),
+		convert.ProposalToProto(proposal),
 	)
 }
 
@@ -304,7 +305,7 @@ func (cfg *SubConfig) Timeout(msg hotstuff.TimeoutMsg) {
 
 	cfg.cfg.Timeout(
 		ctx,
-		hotstuffpb.TimeoutMsgToProto(msg),
+		convert.TimeoutMsgToProto(msg),
 	)
 }
 
@@ -319,7 +320,7 @@ func (cfg *SubConfig) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.
 		}
 		return nil, false
 	}
-	return hotstuffpb.BlockFromProto(protoBlock), true
+	return convert.BlockFromProto(protoBlock), true
 }
 
 // Close closes all connections made by this configuration.
@@ -337,7 +338,7 @@ func (q qspec) FetchQF(in *hotstuffpb.BlockHash, replies map[uint32]*hotstuffpb.
 	var h hotstuff.Hash
 	copy(h[:], in.GetHash())
 	for _, b := range replies {
-		block := hotstuffpb.BlockFromProto(b)
+		block := convert.BlockFromProto(b)
 		if h == block.Hash() {
 			return b, true
 		}

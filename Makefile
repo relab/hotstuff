@@ -7,7 +7,7 @@ proto_go := $(proto_src:%.proto=%.pb.go)
 gorums_go := internal/proto/clientpb/client_gorums.pb.go \
 		internal/proto/hotstuffpb/hotstuff_gorums.pb.go  \
 
-mock_input_go := ./modules/./...
+mock_input_go := ./modules/./... ./core/./...
 
 binaries := hotstuff plot
 

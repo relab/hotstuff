@@ -1,4 +1,4 @@
-package hotstuffpb_test
+package convert_test
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/convert"
 	"github.com/relab/hotstuff/core"
 
 	"github.com/relab/hotstuff/crypto"
@@ -32,8 +33,8 @@ func TestConvertPartialCert(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pb := hotstuffpb.PartialCertToProto(want)
-	got := hotstuffpb.PartialCertFromProto(pb)
+	pb := convert.PartialCertToProto(want)
+	got := convert.PartialCertFromProto(pb)
 
 	if !bytes.Equal(want.ToBytes(), got.ToBytes()) {
 		t.Error("Certificates don't match.")
@@ -58,8 +59,8 @@ func TestConvertQuorumCert(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pb := hotstuffpb.QuorumCertToProto(want)
-	got := hotstuffpb.QuorumCertFromProto(pb)
+	pb := convert.QuorumCertToProto(want)
+	got := convert.QuorumCertFromProto(pb)
 
 	if !bytes.Equal(want.ToBytes(), got.ToBytes()) {
 		t.Error("Certificates don't match.")
@@ -69,8 +70,8 @@ func TestConvertQuorumCert(t *testing.T) {
 func TestConvertBlock(t *testing.T) {
 	qc := hotstuff.NewQuorumCert(nil, 0, hotstuff.Hash{})
 	want := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "", 1, 1)
-	pb := hotstuffpb.BlockToProto(want)
-	got := hotstuffpb.BlockFromProto(pb)
+	pb := convert.BlockToProto(want)
+	got := convert.BlockFromProto(pb)
 
 	if want.Hash() != got.Hash() {
 		t.Error("Hashes don't match.")
@@ -88,8 +89,8 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 
 	tc1 := testutil.CreateTC(t, 1, hl.Signers())
 
-	pb := hotstuffpb.TimeoutCertToProto(tc1)
-	tc2 := hotstuffpb.TimeoutCertFromProto(pb)
+	pb := convert.TimeoutCertToProto(tc1)
+	tc2 := convert.TimeoutCertFromProto(pb)
 
 	var signer core.Crypto
 	hl[0].Get(&signer)
@@ -109,13 +110,13 @@ func TestTimeoutMsgFromProto_Issue129(t *testing.T) {
 		want hotstuff.TimeoutMsg
 	}{
 		{name: "only-view", msg: &hotstuffpb.TimeoutMsg{View: 1}, want: hotstuff.TimeoutMsg{View: 1}},
-		{name: "only-sync-info", msg: &hotstuffpb.TimeoutMsg{SyncInfo: sync}, want: hotstuff.TimeoutMsg{SyncInfo: hotstuffpb.SyncInfoFromProto(sync)}},
-		{name: "only-msg-signature", msg: &hotstuffpb.TimeoutMsg{MsgSig: sig}, want: hotstuff.TimeoutMsg{MsgSignature: hotstuffpb.QuorumSignatureFromProto(sig)}},
-		{name: "only-view-signature", msg: &hotstuffpb.TimeoutMsg{ViewSig: sig}, want: hotstuff.TimeoutMsg{ViewSignature: hotstuffpb.QuorumSignatureFromProto(sig)}},
+		{name: "only-sync-info", msg: &hotstuffpb.TimeoutMsg{SyncInfo: sync}, want: hotstuff.TimeoutMsg{SyncInfo: convert.SyncInfoFromProto(sync)}},
+		{name: "only-msg-signature", msg: &hotstuffpb.TimeoutMsg{MsgSig: sig}, want: hotstuff.TimeoutMsg{MsgSignature: convert.QuorumSignatureFromProto(sig)}},
+		{name: "only-view-signature", msg: &hotstuffpb.TimeoutMsg{ViewSig: sig}, want: hotstuff.TimeoutMsg{ViewSignature: convert.QuorumSignatureFromProto(sig)}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := hotstuffpb.TimeoutMsgFromProto(tt.msg)
+			got := convert.TimeoutMsgFromProto(tt.msg)
 			if diff := cmp.Diff(tt.want, got, cmpopts.IgnoreUnexported(hotstuff.SyncInfo{})); diff != "" {
 				t.Errorf("TimeoutMsgFromProto() mismatch (-want +got):\n%s", diff)
 			}

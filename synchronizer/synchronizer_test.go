@@ -37,7 +37,7 @@ func TestAdvanceViewQC(t *testing.T) {
 	blockChain.Store(block)
 	qc := testutil.CreateQC(t, block, signers)
 	// synchronizer should tell hotstuff to propose
-	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
+	hs.EXPECT().Propose(0, gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
 
 	s.AdvanceView(hotstuff.NewSyncInfo().WithQC(qc))
 
@@ -60,7 +60,7 @@ func TestAdvanceViewTC(t *testing.T) {
 	tc := testutil.CreateTC(t, 1, signers)
 
 	// synchronizer should tell hotstuff to propose
-	hs.EXPECT().Propose(gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
+	hs.EXPECT().Propose(0, gomock.AssignableToTypeOf(hotstuff.NewSyncInfo()))
 
 	s.AdvanceView(hotstuff.NewSyncInfo().WithTC(tc))
 
