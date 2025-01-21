@@ -14,10 +14,10 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/networking"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -120,7 +120,7 @@ func New(conf Config, builder core.Builder) (client *Client) {
 }
 
 // Connect connects the client to the replicas.
-func (c *Client) Connect(replicas []backend.ReplicaInfo) (err error) {
+func (c *Client) Connect(replicas []networking.ReplicaInfo) (err error) {
 	nodes := make(map[string]uint32, len(replicas))
 	for _, r := range replicas {
 		nodes[r.Address] = uint32(r.ID)

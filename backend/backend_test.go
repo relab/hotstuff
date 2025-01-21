@@ -12,6 +12,7 @@ import (
 
 	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/networking"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -33,7 +34,7 @@ func TestConnect(t *testing.T) {
 		defer teardown()
 		td.builders.Build()
 
-		cfg := backend.NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
+		cfg := networking.NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
 
 		builder.Add(cfg)
 		builder.Build()
@@ -56,7 +57,7 @@ func testBase(t *testing.T, typ any, send func(core.Configuration), handle core.
 		serverTeardown := createServers(t, td, ctrl)
 		defer serverTeardown()
 
-		cfg := backend.NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
+		cfg := networking.NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
 		td.builders[0].Add(cfg)
 		hl := td.builders.Build()
 
@@ -136,7 +137,7 @@ func TestTimeout(t *testing.T) {
 type testData struct {
 	n         int
 	creds     credentials.TransportCredentials
-	replicas  []backend.ReplicaInfo
+	replicas  []networking.ReplicaInfo
 	listeners []net.Listener
 	keys      []hotstuff.PrivateKey
 	builders  testutil.BuilderList
@@ -149,13 +150,13 @@ func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
 
 	listeners := make([]net.Listener, n)
 	keys := make([]hotstuff.PrivateKey, 0, n)
-	replicas := make([]backend.ReplicaInfo, 0, n)
+	replicas := make([]networking.ReplicaInfo, 0, n)
 
 	// generate keys and replicaInfo
 	for i := 0; i < n; i++ {
 		listeners[i] = testutil.CreateTCPListener(t)
 		keys = append(keys, testutil.GenerateECDSAKey(t))
-		replicas = append(replicas, backend.ReplicaInfo{
+		replicas = append(replicas, networking.ReplicaInfo{
 			ID:      hotstuff.ID(i) + 1,
 			Address: listeners[i].Addr().String(),
 			PubKey:  keys[i].Public(),

@@ -2,6 +2,7 @@ package hotstuff
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 )
 
@@ -73,4 +74,8 @@ type ViewChangeEvent struct {
 // TimeoutEvent is sent on the eventloop when a local timeout occurs.
 type TimeoutEvent struct {
 	View View
+}
+
+type ReplicaConnectedEvent struct {
+	Ctx context.Context
 }

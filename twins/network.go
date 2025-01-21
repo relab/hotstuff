@@ -305,8 +305,8 @@ func (c *configuration) Replica(id hotstuff.ID) (r core.Replica, ok bool) {
 	return nil, false
 }
 
-// SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
-func (c *configuration) SubConfig(ids []hotstuff.ID) (sub core.Configuration, err error) {
+// GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
+func (c *configuration) GetSubConfig(ids []hotstuff.ID) (sub core.Configuration, err error) {
 	subConfig := hotstuff.NewIDSet()
 	for _, id := range ids {
 		subConfig.Add(id)

@@ -126,8 +126,8 @@ type Configuration interface {
 	Timeout(msg hotstuff.TimeoutMsg)
 	// Fetch requests a block from all the replicas in the configuration.
 	Fetch(ctx context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool)
-	// SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
-	SubConfig(ids []hotstuff.ID) (sub Configuration, err error)
+	// GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
+	GetSubConfig(ids []hotstuff.ID) (sub Configuration, err error)
 }
 
 //go:generate mockgen -destination=../internal/mocks/consensus_mock.go -package=mocks . Consensus

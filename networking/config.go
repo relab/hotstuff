@@ -1,5 +1,4 @@
-// Package backend implements the networking backend for hotstuff using the Gorums framework.
-package backend
+package networking
 
 import (
 	"context"
@@ -74,10 +73,10 @@ type Config struct {
 	connected bool
 
 	mgr *hotstuffpb.Manager
-	subConfig
+	SubConfig
 }
 
-type subConfig struct {
+type SubConfig struct {
 	eventLoop *core.EventLoop
 	logger    logging.Logger
 	opts      *core.Options
@@ -91,16 +90,16 @@ func (cfg *Config) InitModule(mods *core.Core) {
 	mods.Get(
 		&cfg.eventLoop,
 		&cfg.logger,
-		&cfg.subConfig.opts,
+		&cfg.SubConfig.opts,
 	)
 
 	// We delay processing `replicaConnected` events until after the configurations `connected` event has occurred.
-	cfg.eventLoop.RegisterHandler(replicaConnected{}, func(event any) {
+	cfg.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(event any) {
 		if !cfg.connected {
 			cfg.eventLoop.DelayUntil(ConnectedEvent{}, event)
 			return
 		}
-		cfg.replicaConnected(event.(replicaConnected))
+		cfg.replicaConnected(event.(hotstuff.ReplicaConnectedEvent))
 	})
 }
 
@@ -116,7 +115,7 @@ func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOpt
 
 	// initialization will be finished by InitModule
 	cfg := &Config{
-		subConfig: subConfig{
+		SubConfig: SubConfig{
 			replicas: make(map[hotstuff.ID]core.Replica),
 		},
 		opts: opts,
@@ -124,14 +123,14 @@ func NewConfig(creds credentials.TransportCredentials, opts ...gorums.ManagerOpt
 	return cfg
 }
 
-func (cfg *Config) replicaConnected(c replicaConnected) {
-	info, peerok := peer.FromContext(c.ctx)
-	md, mdok := metadata.FromIncomingContext(c.ctx)
+func (cfg *Config) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
+	info, peerok := peer.FromContext(c.Ctx)
+	md, mdok := metadata.FromIncomingContext(c.Ctx)
 	if !peerok || !mdok {
 		return
 	}
 
-	id, err := GetPeerIDFromContext(c.ctx, cfg)
+	id, err := GetPeerIDFromContext(c.Ctx, cfg)
 	if err != nil {
 		cfg.logger.Warnf("Failed to get id for %v: %v", info.Addr, err)
 		return
@@ -186,10 +185,10 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 	opts := cfg.opts
 	cfg.opts = nil // options are not needed beyond this point, so we delete them.
 
-	md := mapToMetadata(cfg.subConfig.opts.ConnectionMetadata())
+	md := mapToMetadata(cfg.SubConfig.opts.ConnectionMetadata())
 
 	// embed own ID to allow other replicas to identify messages from this replica
-	md.Set("id", fmt.Sprintf("%d", cfg.subConfig.opts.ID()))
+	md.Set("id", fmt.Sprintf("%d", cfg.SubConfig.opts.ID()))
 
 	opts = append(opts, gorums.WithMetadata(md))
 
@@ -206,7 +205,7 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 			md:        make(map[string]string),
 		}
 		// we do not want to connect to ourself
-		if replica.ID != cfg.subConfig.opts.ID() {
+		if replica.ID != cfg.SubConfig.opts.ID() {
 			idMapping[replica.Address] = uint32(replica.ID)
 		}
 	}
@@ -235,18 +234,18 @@ func (cfg *Config) Connect(replicas []ReplicaInfo) (err error) {
 }
 
 // Replicas returns all of the replicas in the configuration.
-func (cfg *subConfig) Replicas() map[hotstuff.ID]core.Replica {
+func (cfg *SubConfig) Replicas() map[hotstuff.ID]core.Replica {
 	return cfg.replicas
 }
 
 // Replica returns a replica if it is present in the configuration.
-func (cfg *subConfig) Replica(id hotstuff.ID) (replica core.Replica, ok bool) {
+func (cfg *SubConfig) Replica(id hotstuff.ID) (replica core.Replica, ok bool) {
 	replica, ok = cfg.replicas[id]
 	return
 }
 
-// SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
-func (cfg *Config) SubConfig(ids []hotstuff.ID) (sub core.Configuration, err error) {
+// GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
+func (cfg *Config) GetSubConfig(ids []hotstuff.ID) (sub core.Configuration, err error) {
 	replicas := make(map[hotstuff.ID]core.Replica)
 	nids := make([]uint32, len(ids))
 	for i, id := range ids {
@@ -257,31 +256,31 @@ func (cfg *Config) SubConfig(ids []hotstuff.ID) (sub core.Configuration, err err
 	if err != nil {
 		return nil, err
 	}
-	return &subConfig{
+	return &SubConfig{
 		eventLoop: cfg.eventLoop,
 		logger:    cfg.logger,
-		opts:      cfg.subConfig.opts,
+		opts:      cfg.SubConfig.opts,
 		cfg:       newCfg,
 		replicas:  replicas,
 	}, nil
 }
 
-func (cfg *subConfig) SubConfig(_ []hotstuff.ID) (_ core.Configuration, err error) {
+func (cfg *SubConfig) GetSubConfig(_ []hotstuff.ID) (_ core.Configuration, err error) {
 	return nil, errors.New("not supported")
 }
 
 // Len returns the number of replicas in the configuration.
-func (cfg *subConfig) Len() int {
+func (cfg *SubConfig) Len() int {
 	return len(cfg.replicas)
 }
 
 // QuorumSize returns the size of a quorum
-func (cfg *subConfig) QuorumSize() int {
+func (cfg *SubConfig) QuorumSize() int {
 	return hotstuff.QuorumSize(cfg.Len())
 }
 
 // Propose sends the block to all replicas in the configuration
-func (cfg *subConfig) Propose(proposal hotstuff.ProposeMsg) {
+func (cfg *SubConfig) Propose(proposal hotstuff.ProposeMsg) {
 	if cfg.cfg == nil {
 		return
 	}
@@ -294,7 +293,7 @@ func (cfg *subConfig) Propose(proposal hotstuff.ProposeMsg) {
 }
 
 // Timeout sends the timeout message to all replicas.
-func (cfg *subConfig) Timeout(msg hotstuff.TimeoutMsg) {
+func (cfg *SubConfig) Timeout(msg hotstuff.TimeoutMsg) {
 	if cfg.cfg == nil {
 		return
 	}
@@ -310,7 +309,7 @@ func (cfg *subConfig) Timeout(msg hotstuff.TimeoutMsg) {
 }
 
 // Fetch requests a block from all the replicas in the configuration
-func (cfg *subConfig) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
+func (cfg *SubConfig) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	protoBlock, err := cfg.cfg.Fetch(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
 	if err != nil {
 		qcErr, ok := err.(gorums.QuorumCallError)

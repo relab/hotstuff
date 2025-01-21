@@ -8,6 +8,7 @@ import (
 	"net"
 
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/networking"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -50,7 +51,7 @@ type Config struct {
 // Replica is a participant in the consensus protocol.
 type Replica struct {
 	clientSrv *ClientServer
-	cfg       *backend.Config
+	cfg       *networking.Config
 	hsSrv     *backend.Server
 	hs        *core.Core
 
@@ -102,7 +103,7 @@ func New(conf Config, builder core.Builder) (replica *Replica) {
 			Certificates: []tls.Certificate{*conf.Certificate},
 		})
 	}
-	srv.cfg = backend.NewConfig(creds, managerOpts...)
+	srv.cfg = networking.NewConfig(creds, managerOpts...)
 
 	builder.Add(
 		srv.cfg,   // configuration
@@ -129,7 +130,7 @@ func (srv *Replica) StartServers(replicaListen, clientListen net.Listener) {
 }
 
 // Connect connects to the other replicas.
-func (srv *Replica) Connect(replicas []backend.ReplicaInfo) error {
+func (srv *Replica) Connect(replicas []networking.ReplicaInfo) error {
 	return srv.cfg.Connect(replicas)
 }
 

@@ -4,20 +4,17 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"strconv"
 
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/networking"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 )
 
@@ -54,7 +51,7 @@ func NewServer(opts ...ServerOptions) *Server {
 		lm: options.latencyMatrix,
 	}
 	options.gorumsSrvOpts = append(options.gorumsSrvOpts, gorums.WithConnectCallback(func(ctx context.Context) {
-		srv.eventLoop.AddEvent(replicaConnected{ctx})
+		srv.eventLoop.AddEvent(hotstuff.ReplicaConnectedEvent{Ctx: ctx})
 	}))
 	srv.gorumsSrv = gorums.NewServer(options.gorumsSrvOpts...)
 	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, &serviceImpl{srv})
@@ -97,48 +94,6 @@ func (srv *Server) StartOnListener(listener net.Listener) {
 	}()
 }
 
-// GetPeerIDFromContext extracts the ID of the peer from the context.
-func GetPeerIDFromContext(ctx context.Context, cfg core.Configuration) (hotstuff.ID, error) {
-	peerInfo, ok := peer.FromContext(ctx)
-	if !ok {
-		return 0, fmt.Errorf("peerInfo not available")
-	}
-
-	if peerInfo.AuthInfo != nil && peerInfo.AuthInfo.AuthType() == "tls" {
-		tlsInfo, ok := peerInfo.AuthInfo.(credentials.TLSInfo)
-		if !ok {
-			return 0, fmt.Errorf("authInfo of wrong type: %T", peerInfo.AuthInfo)
-		}
-		if len(tlsInfo.State.PeerCertificates) > 0 {
-			cert := tlsInfo.State.PeerCertificates[0]
-			for replicaID := range cfg.Replicas() {
-				if subject, err := strconv.Atoi(cert.Subject.CommonName); err == nil && hotstuff.ID(subject) == replicaID {
-					return replicaID, nil
-				}
-			}
-		}
-		return 0, fmt.Errorf("could not find matching certificate")
-	}
-
-	// If we're not using TLS, we'll fallback to checking the metadata
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return 0, fmt.Errorf("metadata not available")
-	}
-
-	v := md.Get("id")
-	if len(v) < 1 {
-		return 0, fmt.Errorf("id field not present")
-	}
-
-	id, err := strconv.Atoi(v[0])
-	if err != nil {
-		return 0, fmt.Errorf("cannot parse ID field: %w", err)
-	}
-
-	return hotstuff.ID(id), nil
-}
-
 // Stop stops the server.
 func (srv *Server) Stop() {
 	srv.gorumsSrv.Stop()
@@ -151,7 +106,7 @@ type serviceImpl struct {
 
 // Propose handles a replica's response to the Propose QC from the leader.
 func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
-	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := networking.GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
@@ -165,7 +120,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 
 // Vote handles an incoming vote message.
 func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
-	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := networking.GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
@@ -179,7 +134,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
 func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo) {
-	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := networking.GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
@@ -208,7 +163,7 @@ func (impl *serviceImpl) Fetch(_ gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*h
 
 // Timeout handles an incoming TimeoutMsg.
 func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
-	id, err := GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := networking.GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 	}
@@ -216,8 +171,4 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	timeoutMsg.ID = id
 	impl.srv.addNetworkDelay(id)
 	impl.srv.eventLoop.AddEvent(timeoutMsg)
-}
-
-type replicaConnected struct {
-	ctx context.Context
 }

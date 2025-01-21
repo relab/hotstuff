@@ -12,7 +12,6 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/committer"
@@ -27,6 +26,7 @@ import (
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/networking"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc/codes"
@@ -339,8 +339,8 @@ func (w *Worker) stopClients(req *orchestrationpb.StopClientRequest) (*orchestra
 	return &orchestrationpb.StopClientResponse{}, nil
 }
 
-func getConfiguration(conf map[uint32]*orchestrationpb.ReplicaInfo, client bool) ([]backend.ReplicaInfo, error) {
-	replicas := make([]backend.ReplicaInfo, 0, len(conf))
+func getConfiguration(conf map[uint32]*orchestrationpb.ReplicaInfo, client bool) ([]networking.ReplicaInfo, error) {
+	replicas := make([]networking.ReplicaInfo, 0, len(conf))
 	for _, replica := range conf {
 		pubKey, err := keygen.ParsePublicKey(replica.GetPublicKey())
 		if err != nil {
@@ -352,7 +352,7 @@ func getConfiguration(conf map[uint32]*orchestrationpb.ReplicaInfo, client bool)
 		} else {
 			addr = net.JoinHostPort(replica.GetAddress(), strconv.Itoa(int(replica.GetReplicaPort())))
 		}
-		replicas = append(replicas, backend.ReplicaInfo{
+		replicas = append(replicas, networking.ReplicaInfo{
 			ID:      hotstuff.ID(replica.GetID()),
 			Address: addr,
 			PubKey:  pubKey,
