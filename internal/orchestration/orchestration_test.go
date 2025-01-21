@@ -1,7 +1,6 @@
 package orchestration_test
 
 import (
-	"fmt"
 	"io"
 	"math"
 	"net"
@@ -27,10 +26,7 @@ import (
 
 func makeCfg(
 	replicas, clients int,
-	consensusImpl,
-	crypto string,
-	leaderRotation string,
-	byzantine string,
+	consensusImpl, crypto, leaderRotation, byzantine string,
 	branchFactor uint32,
 	randomTree bool,
 	mods ...string,
@@ -45,6 +41,7 @@ func makeCfg(
 		Crypto:            crypto,
 		LeaderRotation:    leaderRotation,
 		ByzantineStrategy: map[string][]uint32{byzantine: {1}},
+		Modules:           mods,
 
 		// Common default values:
 		ReplicaHosts:      []string{"localhost"},
@@ -55,7 +52,6 @@ func makeCfg(
 		ViewTimeout:       100 * time.Millisecond,
 		DurationSamples:   1000,
 		TimeoutMultiplier: 1.2,
-		Modules:           mods,
 		MaxConcurrent:     250,
 		PayloadSize:       100,
 		RateLimit:         math.Inf(1),
@@ -169,7 +165,7 @@ func TestDeployment(t *testing.T) {
 	wg.Add(len(sessions))
 	workers := make(map[string]orchestration.RemoteWorker)
 	for host, session := range sessions {
-		fmt.Printf("Added worker host: %s\n", host)
+		t.Logf("Added worker host: %s", host)
 		workers[host] = orchestration.NewRemoteWorker(protostream.NewWriter(session.Stdin()), protostream.NewReader(session.Stdout()))
 		go func(session orchestration.WorkerSession) {
 			_, err := io.Copy(os.Stderr, session.Stderr())
