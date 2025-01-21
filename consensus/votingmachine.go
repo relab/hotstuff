@@ -7,12 +7,13 @@ import (
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/netconfig"
 )
 
 // VotingMachine collects votes.
 type VotingMachine struct {
 	blockChain    *blockchain.BlockChain
-	configuration core.Configuration
+	configuration *netconfig.Config
 	crypto        core.Crypto
 	eventLoop     *core.EventLoop
 	logger        logging.Logger

@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/netconfig"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/synctools"
 )
@@ -45,7 +46,7 @@ type Consensus struct {
 	blockChain    *blockchain.BlockChain
 	committer     *committer.Committer
 	commandCache  *replica.CmdCache
-	configuration core.Configuration
+	configuration *netconfig.Config
 	invoker       core.ProtocolInvoker
 	crypto        core.Crypto
 	eventLoop     *core.EventLoop

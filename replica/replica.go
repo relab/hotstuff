@@ -55,6 +55,7 @@ type Replica struct {
 	cfg       *netconfig.Config
 	hsSrv     *backend.Server
 	hs        *core.Core
+	invoker   *invoker.Invoker
 
 	execHandlers map[cmdID]func(*emptypb.Empty, error)
 	cancel       context.CancelFunc
@@ -104,13 +105,14 @@ func New(conf Config, builder core.Builder) (replica *Replica) {
 			Certificates: []tls.Certificate{*conf.Certificate},
 		})
 	}
-	srv.cfg = netconfig.NewConfig(creds, managerOpts...)
+	srv.cfg = netconfig.NewConfig()
 
+	// TODO(AlanRostem) check if this is enough to instantiate the invoker
+	srv.invoker = invoker.NewInvoker(creds, managerOpts...)
 	builder.Add(
-		// TODO(AlanRostem) check if this is enough to instantiate the invoker
-		invoker.NewInvoker(),
 		srv.cfg,   // configuration
 		srv.hsSrv, // event handling
+		srv.invoker,
 
 		core.ExtendedExecutor(srv.clientSrv),
 		core.ExtendedForkHandler(srv.clientSrv),
@@ -134,7 +136,7 @@ func (srv *Replica) StartServers(replicaListen, clientListen net.Listener) {
 
 // Connect connects to the other replicas.
 func (srv *Replica) Connect(replicas []netconfig.ReplicaInfo) error {
-	return srv.cfg.Connect(replicas)
+	return srv.invoker.Connect(replicas)
 }
 
 // Start runs the replica in a goroutine.
@@ -169,7 +171,7 @@ func (srv *Replica) Run(ctx context.Context) {
 // Close closes the connections and stops the servers used by the replica.
 func (srv *Replica) Close() {
 	srv.clientSrv.Stop()
-	srv.cfg.Close()
+	srv.invoker.Close()
 	srv.hsSrv.Stop()
 }
 

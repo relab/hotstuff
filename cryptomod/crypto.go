@@ -6,11 +6,12 @@ import (
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/netconfig"
 )
 
 type cryptoModule struct {
 	blockChain    *blockchain.BlockChain
-	configuration core.Configuration
+	configuration *netconfig.Config
 
 	modules.CryptoBase
 }

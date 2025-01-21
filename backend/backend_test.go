@@ -23,6 +23,8 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
+// TODO(AlanRostem): Fix compile errors
+
 func TestConnect(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
