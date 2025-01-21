@@ -1,4 +1,4 @@
-package networking
+package invoker
 
 import (
 	"context"
@@ -9,11 +9,12 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/netconfig"
 	"github.com/relab/hotstuff/synctools"
 )
 
 type Invoker struct {
-	configuration *Config
+	configuration *netconfig.Config
 	eventLoop     *core.EventLoop
 	logger        logging.Logger
 }

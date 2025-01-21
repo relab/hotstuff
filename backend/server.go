@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/convert"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/networking"
+	"github.com/relab/hotstuff/netconfig"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -23,7 +23,7 @@ import (
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
 	blockChain    *blockchain.BlockChain
-	configuration *networking.Config
+	configuration *netconfig.Config
 	eventLoop     *core.EventLoop
 	logger        logging.Logger
 	id            hotstuff.ID
@@ -107,7 +107,7 @@ type serviceImpl struct {
 
 // Propose handles a replica's response to the Propose QC from the leader.
 func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
-	id, err := networking.GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := netconfig.GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
@@ -121,7 +121,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 
 // Vote handles an incoming vote message.
 func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
-	id, err := networking.GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := netconfig.GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
@@ -135,7 +135,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
 func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo) {
-	id, err := networking.GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := netconfig.GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
@@ -164,7 +164,7 @@ func (impl *serviceImpl) Fetch(_ gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*h
 
 // Timeout handles an incoming TimeoutMsg.
 func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
-	id, err := networking.GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := netconfig.GetPeerIDFromContext(ctx, impl.srv.configuration)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 	}

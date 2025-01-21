@@ -1,4 +1,4 @@
-package networking
+package netconfig
 
 import (
 	"fmt"
@@ -194,26 +194,26 @@ func (cfg *Config) Replica(id hotstuff.ID) (replica core.Replica, ok bool) {
 }
 
 // GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
-func (cfg *Config) GetSubConfig(_ []hotstuff.ID) (core.Configuration, error) {
+/*func (cfg *Config) GetSubConfig(_ []hotstuff.ID) (core.Configuration, error) {
 	return nil, fmt.Errorf("subconfig support removed")
-	// replicas := make(map[hotstuff.ID]core.Replica)
-	// nids := make([]uint32, len(ids))
-	// for i, id := range ids {
-	// 	nids[i] = uint32(id)
-	// 	replicas[id] = cfg.replicas[id]
-	// }
-	// newCfg, err := cfg.mgr.NewConfiguration(gorums.WithNodeIDs(nids))
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// return &SubConfig{
-	// 	eventLoop: cfg.eventLoop,
-	// 	logger:    cfg.logger,
-	// 	opts:      cfg.SubConfig.opts,
-	// 	cfg:       newCfg,
-	// 	replicas:  replicas,
-	// }, nil
-}
+	replicas := make(map[hotstuff.ID]core.Replica)
+	nids := make([]uint32, len(ids))
+	for i, id := range ids {
+		nids[i] = uint32(id)
+		replicas[id] = cfg.replicas[id]
+	}
+	newCfg, err := cfg.mgr.NewConfiguration(gorums.WithNodeIDs(nids))
+	if err != nil {
+		return nil, err
+	}
+	return &SubConfig{
+		eventLoop: cfg.eventLoop,
+		logger:    cfg.logger,
+		opts:      cfg.SubConfig.opts,
+		cfg:       newCfg,
+		replicas:  replicas,
+	}, nil
+}*/
 
 // Len returns the number of replicas in the configuration.
 func (cfg *Config) Len() int {

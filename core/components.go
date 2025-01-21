@@ -121,7 +121,7 @@ type Configuration interface {
 	QuorumSize() int
 	// GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
 	// TODO: is this really needed?
-	GetSubConfig(ids []hotstuff.ID) (sub Configuration, err error)
+	// GetSubConfig(ids []hotstuff.ID) (sub Configuration, err error)
 }
 
 //go:generate mockgen -destination=../internal/mocks/protocolinvoker_mock.go -package=mocks . ProtocolInvoker
@@ -135,7 +135,6 @@ type ProtocolInvoker interface {
 	Timeout(msg hotstuff.TimeoutMsg)
 	// Fetch requests a block from all the replicas in the configuration.
 	Fetch(ctx context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool)
-	// GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
 }
 
 //go:generate mockgen -destination=../internal/mocks/consensus_mock.go -package=mocks . Consensus

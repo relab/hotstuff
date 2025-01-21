@@ -1,4 +1,4 @@
-package networking
+package netconfig
 
 import (
 	"github.com/relab/hotstuff"
