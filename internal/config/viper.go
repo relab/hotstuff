@@ -10,6 +10,18 @@ import (
 )
 
 func NewViper() (*ExperimentConfig, error) {
+	output := viper.GetString("output")
+	if output != "" {
+		var err error
+		output, err = filepath.Abs(output)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get absolute path: %v", err)
+		}
+		if err = os.MkdirAll(output, 0o755); err != nil {
+			return nil, fmt.Errorf("failed to create output directory: %v", err)
+		}
+	}
+
 	intTreePos := viper.GetIntSlice("tree-pos")
 	treePos := make([]uint32, len(intTreePos))
 	for i, pos := range intTreePos {
@@ -25,7 +37,7 @@ func NewViper() (*ExperimentConfig, error) {
 		BranchFactor:        viper.GetUint32("bf"),
 		TreeDelta:           viper.GetDuration("tree-delta"),
 		RandomTree:          viper.GetBool("random-tree"),
-		Output:              viper.GetString("output"),
+		Output:              output,
 		TreePositions:       treePos,
 		Worker:              viper.GetBool("worker"),
 		Exe:                 viper.GetString("exe"),
@@ -59,27 +71,11 @@ func NewViper() (*ExperimentConfig, error) {
 	if len(cfg.ReplicaHosts) == 0 {
 		cfg.ReplicaHosts = []string{"localhost"}
 	}
-
 	if len(cfg.ClientHosts) == 0 {
 		cfg.ClientHosts = []string{"localhost"}
 	}
-
-	var err error
-	if cfg.Output != "" {
-		cfg.Output, err = filepath.Abs(cfg.Output)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get absolute path: %v", err)
-		}
-
-		err = os.MkdirAll(cfg.Output, 0o755)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create output directory: %v", err)
-		}
-	}
-
 	if len(cfg.TreePositions) == 0 {
 		cfg.TreePositions = tree.DefaultTreePosUint32(cfg.Replicas)
 	}
-
 	return cfg, nil
 }
