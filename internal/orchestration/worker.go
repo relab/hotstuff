@@ -215,7 +215,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 	)
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
-	//default to the waitTimer need a parameter in config for this
+	// default to the waitTimer need a parameter in config for this
 	builder.Options().SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(),
 		opts.TreeDeltaDuration(), modules.WaitTimerFixed)
 
