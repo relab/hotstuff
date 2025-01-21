@@ -1,14 +1,14 @@
-package crypto_test
+package cryptomod_test
 
 import (
 	"testing"
 
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/cryptomod"
 	"github.com/relab/hotstuff/modules"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/eddsa"
@@ -226,13 +226,13 @@ func setup(newFunc func() core.Crypto, keyFunc keyFunc) setupFunc {
 
 func NewCache(impl func() modules.CryptoBase) func() core.Crypto {
 	return func() core.Crypto {
-		return crypto.NewCache(impl(), 10)
+		return cryptomod.NewCache(impl(), 10)
 	}
 }
 
 func NewBase(impl func() modules.CryptoBase) func() core.Crypto {
 	return func() core.Crypto {
-		return crypto.New(impl())
+		return cryptomod.New(impl())
 	}
 }
 

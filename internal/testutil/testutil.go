@@ -9,11 +9,11 @@ import (
 
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/cryptomod"
 	"github.com/relab/hotstuff/modules"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
@@ -40,7 +40,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 	commandQ := mocks.NewMockCommandQueue(ctrl)
 	commandQ.EXPECT().Get(gomock.Any()).AnyTimes().Return(hotstuff.Command("foo"), true)
 
-	signer := crypto.NewCache(ecdsa.New(), 10)
+	signer := cryptomod.NewCache(ecdsa.New(), 10)
 
 	config := mocks.NewMockConfiguration(ctrl)
 	config.EXPECT().Len().AnyTimes().Return(1)

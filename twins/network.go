@@ -14,9 +14,9 @@ import (
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/cryptomod"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
@@ -145,7 +145,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 			blockchain.New(),
 			consensus.New(),
 			consensus.NewVotingMachine(),
-			crypto.NewCache(ecdsa.New(), 100),
+			cryptomod.NewCache(ecdsa.New(), 100),
 			synchronizer.New(),
 			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			// twins-specific:

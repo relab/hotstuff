@@ -18,8 +18,8 @@ import (
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/byzantine"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/cryptomod"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/logging"
@@ -204,7 +204,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		consensus.New(),
 		consensus.NewVotingMachine(),
 		committer.New(),
-		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
+		cryptomod.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		synchronizer.New(),
 		w.metricsLogger,
 		blockchain.New(),

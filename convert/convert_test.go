@@ -9,8 +9,8 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/convert"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/cryptomod"
 
-	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/testutil"
@@ -83,7 +83,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 
 	builders := testutil.CreateBuilders(t, ctrl, 4, testutil.GenerateKeys(t, 4, testutil.GenerateBLS12Key)...)
 	for i := range builders {
-		builders[i].Add(crypto.New(bls12.New()))
+		builders[i].Add(cryptomod.New(bls12.New()))
 	}
 	hl := builders.Build()
 

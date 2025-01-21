@@ -23,7 +23,7 @@ import (
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
 	blockChain    *blockchain.BlockChain
-	configuration core.Configuration
+	configuration *networking.Config
 	eventLoop     *core.EventLoop
 	logger        logging.Logger
 	id            hotstuff.ID

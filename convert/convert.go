@@ -1,4 +1,4 @@
-// Package convert contains conversion methods between protocol buffers message types and HotStuff protocol message structures.
+// Package convert contains conversion methods between protocol buffer message types and HotStuff protocol message structures.
 package convert
 
 import (

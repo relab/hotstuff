@@ -1,4 +1,4 @@
-package crypto
+package cryptomod
 
 import (
 	"container/list"
