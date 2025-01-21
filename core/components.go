@@ -140,17 +140,12 @@ type Consensus interface {
 	StopVoting(view hotstuff.View)
 	// Propose starts a new proposal. The command is fetched from the command queue.
 	Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncInfo hotstuff.SyncInfo, advance bool)
-	// CommittedBlock returns the most recently committed block.
-	CommittedBlock() *hotstuff.Block
-	// ChainLength returns the number of blocks that need to be chained together in order to commit.
-	ChainLength() int
 }
 
 // Committer is a helper module which handles block commits and forks.
-// NOTE: This module was created to deal with multiple pipes.
 type Committer interface {
 	// Stores the block before further execution.
-	Commit(block *hotstuff.Block)
+	Commit(committedHeight hotstuff.View, block *hotstuff.Block)
 
 	// CommittedBlock returns the most recently committed block.
 	CommittedBlock() *hotstuff.Block

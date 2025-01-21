@@ -17,32 +17,34 @@ func init() {
 }
 
 type carousel struct {
-	blockChain    *blockchain.BlockChain
-	configuration core.Configuration
-	consensus     core.Consensus
-	opts          *core.Options
-	logger        logging.Logger
+	blockChain     *blockchain.BlockChain
+	consensusRules modules.Rules
+	configuration  core.Configuration
+	committer      core.Committer
+	opts           *core.Options
+	logger         logging.Logger
 }
 
 func (c *carousel) InitModule(mods *core.Core) {
 	mods.Get(
 		&c.blockChain,
+		&c.consensusRules,
 		&c.configuration,
-		&c.consensus,
+		&c.committer,
 		&c.opts,
 		&c.logger,
 	)
 }
 
 func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
-	commitHead := c.consensus.CommittedBlock()
+	commitHead := c.committer.CommittedBlock()
 
 	if commitHead.QuorumCert().Signature() == nil {
 		c.logger.Debug("in startup; using round-robin")
 		return chooseRoundRobin(round, c.configuration.Len())
 	}
 
-	if commitHead.View() != round-hotstuff.View(c.consensus.ChainLength()) {
+	if commitHead.View() != round-hotstuff.View(c.consensusRules.ChainLength()) {
 		c.logger.Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.View())
 		return chooseRoundRobin(round, c.configuration.Len())
 	}

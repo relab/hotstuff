@@ -20,7 +20,8 @@ type reputationsMap map[hotstuff.ID]float64
 
 type repBased struct {
 	configuration  core.Configuration
-	consensus      core.Consensus
+	consensusRules modules.Rules
+	committer      core.Committer
 	opts           *core.Options
 	logger         logging.Logger
 	prevCommitHead *hotstuff.Block
@@ -32,7 +33,8 @@ type repBased struct {
 func (r *repBased) InitModule(mods *core.Core) {
 	mods.Get(
 		&r.configuration,
-		&r.consensus,
+		&r.consensusRules,
+		&r.committer,
 		&r.opts,
 		&r.logger,
 	)
@@ -42,8 +44,8 @@ func (r *repBased) InitModule(mods *core.Core) {
 
 // GetLeader returns the id of the leader in the given view
 func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
-	block := r.consensus.CommittedBlock()
-	if block.View() > view-hotstuff.View(r.consensus.ChainLength()) {
+	block := r.committer.CommittedBlock()
+	if block.View() > view-hotstuff.View(r.consensusRules.ChainLength()) {
 		// TODO: it could be possible to lookup leaders for older views if we
 		// store a copy of the reputations in a metadata field of each block.
 		r.logger.Error("looking up leaders of old views is not supported")

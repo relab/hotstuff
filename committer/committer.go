@@ -117,3 +117,5 @@ func (bb *Committer) findForks(committedHeight, height hotstuff.View, blocksAtHe
 	}
 	return
 }
+
+var _ core.Committer = (*Committer)(nil)
