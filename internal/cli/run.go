@@ -7,18 +7,17 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"reflect"
 	"time"
 
 	"github.com/relab/hotstuff/internal/config"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/iago"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/rand"
 )
 
 func runController() {
@@ -31,12 +30,8 @@ func runController() {
 		checkf("config error when loading %s: %v", cuePath, err)
 	}
 
-	// A cleaner way would be to have this in the constructor of
-	// config, but this is done here since the Cue might overwrite
-	// RandomTree.
 	if cfg.RandomTree {
-		rnd := rand.New(rand.NewSource(rand.Uint64()))
-		rnd.Shuffle(len(cfg.TreePositions), reflect.Swapper(cfg.TreePositions))
+		tree.Randomize(cfg.TreePositions)
 	}
 
 	// If the config is set to run locally, `hosts` will be nil (empty)
