@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"math/rand"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"slices"
 	"strings"
@@ -65,8 +63,7 @@ func makeCfg(
 		TreeDelta:         30 * time.Millisecond,
 	}
 	if randomTree {
-		rnd := rand.New(rand.NewSource(int64(rand.Uint64())))
-		rnd.Shuffle(len(cfg.TreePositions), reflect.Swapper(cfg.TreePositions))
+		tree.Shuffle(cfg.TreePositions)
 	}
 	return cfg
 }

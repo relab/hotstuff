@@ -31,7 +31,7 @@ func runController() {
 	}
 
 	if cfg.RandomTree {
-		tree.Randomize(cfg.TreePositions)
+		tree.Shuffle(cfg.TreePositions)
 	}
 
 	// If the config is set to run locally, `hosts` will be nil (empty)
