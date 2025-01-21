@@ -15,9 +15,9 @@ import (
 // BlockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type BlockChain struct {
-	configuration core.Configuration
-	eventLoop     *core.EventLoop
-	logger        logging.Logger
+	invoker   core.ProtocolInvoker
+	eventLoop *core.EventLoop
+	logger    logging.Logger
 
 	mut         sync.Mutex
 	pruneHeight hotstuff.View
@@ -29,7 +29,7 @@ type BlockChain struct {
 
 func (chain *BlockChain) InitModule(mods *core.Core) {
 	mods.Get(
-		&chain.configuration,
+		&chain.invoker,
 		&chain.eventLoop,
 		&chain.logger,
 	)
@@ -113,7 +113,7 @@ func (chain *BlockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 
 	chain.mut.Unlock()
 	chain.logger.Debugf("Attempting to fetch block: %.8s", hash)
-	block, ok = chain.configuration.Fetch(ctx, hash)
+	block, ok = chain.invoker.Fetch(ctx, hash)
 	chain.mut.Lock()
 
 	delete(chain.pendingFetch, hash)

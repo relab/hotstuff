@@ -21,6 +21,7 @@ type Synchronizer struct {
 	consensus      core.Consensus
 	crypto         core.Crypto
 	configuration  core.Configuration
+	invoker        core.ProtocolInvoker
 	eventLoop      *core.EventLoop
 	leaderRotation modules.LeaderRotation
 	logger         logging.Logger
@@ -52,6 +53,7 @@ func (s *Synchronizer) InitModule(mods *core.Core) {
 		&s.configuration,
 		&s.duration,
 		&s.eventLoop,
+		&s.invoker,
 		&s.leaderRotation,
 		&s.logger,
 		&s.opts,
@@ -163,7 +165,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	view := s.View()
 
 	if s.lastTimeout != nil && s.lastTimeout.View == view {
-		s.configuration.Timeout(*s.lastTimeout)
+		s.invoker.Timeout(*s.lastTimeout)
 		return
 	}
 
@@ -195,7 +197,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	// stop voting for current view
 	s.consensus.StopVoting(view)
 
-	s.configuration.Timeout(timeoutMsg)
+	s.invoker.Timeout(timeoutMsg)
 	s.OnRemoteTimeout(timeoutMsg)
 }
 

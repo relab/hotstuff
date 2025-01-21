@@ -46,6 +46,7 @@ type Consensus struct {
 	committer     *committer.Committer
 	commandCache  *replica.CmdCache
 	configuration core.Configuration
+	invoker       core.ProtocolInvoker
 	crypto        core.Crypto
 	eventLoop     *core.EventLoop
 	logger        logging.Logger
@@ -76,6 +77,7 @@ func (cs *Consensus) InitModule(mods *core.Core) {
 		&cs.crypto,
 		&cs.eventLoop,
 		&cs.leaderRotation,
+		&cs.invoker,
 		&cs.logger,
 		&cs.opts,
 		&cs.impl,
@@ -151,7 +153,7 @@ func (cs *Consensus) Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncIn
 
 	cs.blockChain.Store(proposal.Block)
 
-	cs.configuration.Propose(proposal)
+	cs.invoker.Propose(proposal)
 	// self vote
 	return cs.OnPropose(view, proposal)
 }

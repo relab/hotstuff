@@ -110,7 +110,6 @@ type Replica interface {
 //go:generate mockgen -destination=../internal/mocks/configuration_mock.go -package=mocks . Configuration
 
 // Configuration holds information about the current configuration of replicas that participate in the protocol,
-// It provides methods to send messages to the other replicas.
 type Configuration interface {
 	// Replicas returns all of the replicas in the configuration.
 	Replicas() map[hotstuff.ID]Replica
@@ -120,6 +119,16 @@ type Configuration interface {
 	Len() int
 	// QuorumSize returns the size of a quorum.
 	QuorumSize() int
+	// GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
+	// TODO: is this really needed?
+	GetSubConfig(ids []hotstuff.ID) (sub Configuration, err error)
+}
+
+//go:generate mockgen -destination=../internal/mocks/protocolinvoker_mock.go -package=mocks . ProtocolInvoker
+
+// ProtocolInvoker provides methods to send messages to the other replicas through
+// knowledge of the configuration of participant replicas in the protocol.
+type ProtocolInvoker interface {
 	// Propose sends the block to all replicas in the configuration.
 	Propose(proposal hotstuff.ProposeMsg)
 	// Timeout sends the timeout message to all replicas.
@@ -127,7 +136,6 @@ type Configuration interface {
 	// Fetch requests a block from all the replicas in the configuration.
 	Fetch(ctx context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool)
 	// GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
-	GetSubConfig(ids []hotstuff.ID) (sub Configuration, err error)
 }
 
 //go:generate mockgen -destination=../internal/mocks/consensus_mock.go -package=mocks . Consensus

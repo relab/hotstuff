@@ -106,6 +106,8 @@ func New(conf Config, builder core.Builder) (replica *Replica) {
 	srv.cfg = networking.NewConfig(creds, managerOpts...)
 
 	builder.Add(
+		// TODO(AlanRostem) check if this is enough to instantiate the invoker
+		networking.NewInvoker(),
 		srv.cfg,   // configuration
 		srv.hsSrv, // event handling
 
