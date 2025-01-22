@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/blockchain"
+	"github.com/relab/hotstuff/certauth"
+	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/invoker"
 	"github.com/relab/hotstuff/logging"
@@ -19,15 +21,16 @@ import (
 
 // Synchronizer synchronizes replicas to the same view.
 type Synchronizer struct {
-	blockChain     *blockchain.BlockChain
-	consensus      core.Consensus
-	crypto         core.CertAuth
-	configuration  *netconfig.Config
-	invoker        *invoker.Invoker
-	eventLoop      *core.EventLoop
 	leaderRotation modules.LeaderRotation
-	logger         logging.Logger
-	opts           *core.Options
+
+	blockChain    *blockchain.BlockChain
+	consensus     *consensus.Consensus
+	crypto        *certauth.CertAuth
+	configuration *netconfig.Config
+	invoker       *invoker.Invoker
+	eventLoop     *core.EventLoop
+	logger        logging.Logger
+	opts          *core.Options
 
 	mut         sync.RWMutex // to protect the following
 	currentView hotstuff.View

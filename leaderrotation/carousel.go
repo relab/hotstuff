@@ -7,6 +7,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
+	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -21,7 +22,7 @@ type carousel struct {
 	blockChain     *blockchain.BlockChain
 	consensusRules modules.Rules
 	configuration  *netconfig.Config
-	committer      core.Committer
+	committer      *committer.Committer
 	opts           *core.Options
 	logger         logging.Logger
 }

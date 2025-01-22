@@ -5,6 +5,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
+	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/netconfig"
@@ -14,7 +15,7 @@ import (
 type VotingMachine struct {
 	blockChain    *blockchain.BlockChain
 	configuration *netconfig.Config
-	crypto        core.CertAuth
+	crypto        *certauth.CertAuth
 	eventLoop     *core.EventLoop
 	logger        logging.Logger
 	synchronizer  core.Synchronizer

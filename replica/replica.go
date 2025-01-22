@@ -114,8 +114,7 @@ func New(conf Config, builder core.Builder) (replica *Replica) {
 		srv.hsSrv, // event handling
 		srv.invoker,
 
-		core.ExtendedExecutor(srv.clientSrv),
-		core.ExtendedForkHandler(srv.clientSrv),
+		srv.clientSrv,
 		srv.clientSrv.cmdCache,
 	)
 	srv.hs = builder.Build()

@@ -7,6 +7,7 @@ import (
 	wr "github.com/mroth/weightedrand"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -22,7 +23,7 @@ type reputationsMap map[hotstuff.ID]float64
 type repBased struct {
 	configuration  *netconfig.Config
 	consensusRules modules.Rules
-	committer      core.Committer
+	committer      *committer.Committer
 	opts           *core.Options
 	logger         logging.Logger
 	prevCommitHead *hotstuff.Block

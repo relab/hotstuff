@@ -8,13 +8,13 @@ import (
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/replica"
 )
 
 type Committer struct {
-	blockChain  *blockchain.BlockChain
-	executor    core.ExecutorExt
-	forkHandler core.ForkHandlerExt
-	logger      logging.Logger
+	blockChain *blockchain.BlockChain
+	clientSrv  *replica.ClientServer
+	logger     logging.Logger
 
 	mut   sync.Mutex
 	bExec *hotstuff.Block
@@ -29,9 +29,8 @@ func New() *Committer {
 
 func (bb *Committer) InitModule(mods *core.Core) {
 	mods.Get(
-		&bb.executor,
+		&bb.clientSrv,
 		&bb.blockChain,
-		&bb.forkHandler,
 		&bb.logger,
 	)
 }
@@ -47,8 +46,8 @@ func (bb *Committer) Commit(committedHeight hotstuff.View, block *hotstuff.Block
 	// prune the blockchain and handle forked blocks
 	prunedBlocks := bb.blockChain.PruneToHeight(block.View())
 	forkedBlocks := bb.findForks(committedHeight, block.View(), prunedBlocks)
-	for _, blocks := range forkedBlocks {
-		bb.forkHandler.Fork(blocks)
+	for _, block := range forkedBlocks {
+		bb.clientSrv.Fork(block.Command())
 	}
 }
 
@@ -74,7 +73,7 @@ func (bb *Committer) commitInner(block *hotstuff.Block) error {
 		return fmt.Errorf("failed to locate block: %s", block.Parent())
 	}
 	bb.logger.Debug("EXEC: ", block)
-	bb.executor.Exec(block)
+	bb.clientSrv.Exec(block.Command())
 	bb.bExec = block
 	return nil
 }
