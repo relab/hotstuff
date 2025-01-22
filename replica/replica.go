@@ -6,9 +6,11 @@ import (
 	"crypto/tls"
 	"net"
 
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/clientsrv"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/invoker"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/netconfig"
 	"github.com/relab/hotstuff/synchronizer"
 
@@ -25,8 +27,9 @@ type Replica struct {
 	clientSrv *clientsrv.ClientServer
 	cfg       *netconfig.Config
 	hsSrv     *backend.Server
-	hs        *core.Core
 	invoker   *invoker.Invoker
+
+	hs *core.Core
 
 	execHandlers map[clientsrv.CmdID]func(*emptypb.Empty, error)
 	cancel       context.CancelFunc
@@ -34,19 +37,20 @@ type Replica struct {
 }
 
 // New returns a new replica.
-func New(conf hotstuff.ReplicaConfig, builder core.Builder) (replica *Replica) {
-	clientSrvOpts := conf.ClientServerOptions
+func New(
+	configuration *netconfig.Config,
+	blockChain *blockchain.BlockChain,
+	eventLoop *core.EventLoop,
+	logger logging.Logger,
+	clientSrv *clientsrv.ClientServer,
+	invoker *invoker.Invoker,
 
-	if conf.TLS {
-		clientSrvOpts = append(clientSrvOpts, gorums.WithGRPCServerOptions(
-			grpc.Creds(credentials.NewServerTLSFromCert(conf.Certificate)),
-		))
-	}
-
-	clientSrv := clientsrv.NewClientServer(conf, clientSrvOpts)
-
+	conf hotstuff.ReplicaConfig,
+	builder core.Builder) (replica *Replica) {
 	srv := &Replica{
-		clientSrv:    clientSrv,
+		clientSrv: clientSrv,
+		invoker:   invoker,
+
 		execHandlers: make(map[clientsrv.CmdID]func(*emptypb.Empty, error)),
 		cancel:       func() {},
 		done:         make(chan struct{}),
@@ -64,29 +68,19 @@ func New(conf hotstuff.ReplicaConfig, builder core.Builder) (replica *Replica) {
 	}
 
 	srv.hsSrv = backend.NewServer(
+		blockChain,
+		configuration,
+		eventLoop,
+		logger,
+
 		backend.WithLatencies(conf.ID, conf.Locations),
 		backend.WithGorumsServerOptions(replicaSrvOpts...),
 	)
 
-	var creds credentials.TransportCredentials
-	managerOpts := conf.ManagerOptions
-	if conf.TLS {
-		creds = credentials.NewTLS(&tls.Config{
-			RootCAs:      conf.RootCAs,
-			Certificates: []tls.Certificate{*conf.Certificate},
-		})
-	}
-	srv.cfg = netconfig.NewConfig()
-
-	// TODO(AlanRostem) check if this is enough to instantiate the invoker
-	srv.invoker = invoker.New(creds, managerOpts...)
 	builder.Add(
 		srv.cfg,   // configuration
 		srv.hsSrv, // event handling
 		srv.invoker,
-
-		srv.clientSrv,
-		srv.clientSrv.CmdCache(),
 	)
 	srv.hs = builder.Build()
 

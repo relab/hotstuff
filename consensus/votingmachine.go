@@ -5,7 +5,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/netconfig"
@@ -15,7 +14,7 @@ import (
 type VotingMachine struct {
 	blockChain    *blockchain.BlockChain
 	configuration *netconfig.Config
-	crypto        *certauth.CertAuth
+	crypto        core.CertAuth
 	eventLoop     *core.EventLoop
 	logger        logging.Logger
 	synchronizer  core.Synchronizer
@@ -26,25 +25,29 @@ type VotingMachine struct {
 }
 
 // NewVotingMachine returns a new VotingMachine.
-func NewVotingMachine() *VotingMachine {
-	return &VotingMachine{
+func NewVotingMachine(
+	blockChain *blockchain.BlockChain,
+	configuration *netconfig.Config,
+	crypto core.CertAuth, // TODO: change to explicit ptr
+	eventLoop *core.EventLoop,
+	logger logging.Logger,
+	synchronizer core.Synchronizer, // TODO: change to explicit ptr
+	opts *core.Options,
+) *VotingMachine {
+	vm := &VotingMachine{
+		blockChain:    blockChain,
+		configuration: configuration,
+		crypto:        crypto,
+		eventLoop:     eventLoop,
+		logger:        logger,
+		synchronizer:  synchronizer,
+		opts:          opts,
+
 		verifiedVotes: make(map[hotstuff.Hash][]hotstuff.PartialCert),
 	}
-}
-
-// InitModule initializes the VotingMachine.
-func (vm *VotingMachine) InitModule(mods *core.Core) {
-	mods.Get(
-		&vm.blockChain,
-		&vm.configuration,
-		&vm.crypto,
-		&vm.eventLoop,
-		&vm.logger,
-		&vm.synchronizer,
-		&vm.opts,
-	)
-
 	vm.eventLoop.RegisterHandler(hotstuff.VoteMsg{}, func(event any) { vm.OnVote(event.(hotstuff.VoteMsg)) })
+
+	return vm
 }
 
 // OnVote handles an incoming vote.

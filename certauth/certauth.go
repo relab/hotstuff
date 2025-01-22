@@ -18,18 +18,23 @@ type CertAuth struct {
 
 // New returns a new implementation of the Crypto interface. It will use the given CryptoBase to create and verify
 // signatures.
-func New(impl modules.CryptoBase) core.CertAuth {
-	return &CertAuth{CryptoBase: impl}
+func New(
+	impl modules.CryptoBase,
+
+	blockChain *blockchain.BlockChain,
+	configuration *netconfig.Config,
+) core.CertAuth {
+	return &CertAuth{
+		CryptoBase: impl,
+
+		blockChain:    blockChain,
+		configuration: configuration,
+	}
 }
 
 // InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
 func (c *CertAuth) InitModule(mods *core.Core) {
-	mods.Get(
-		&c.blockChain,
-		&c.configuration,
-	)
-
 	if mod, ok := c.CryptoBase.(core.Module); ok {
 		mod.InitModule(mods)
 	}

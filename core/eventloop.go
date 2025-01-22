@@ -78,10 +78,6 @@ func NewEventLoop(bufferSize uint) *EventLoop {
 	return el
 }
 
-func (el *EventLoop) InitModule(_ *Core) {
-	// TODO: Change this when merging with the branch that implements this.
-}
-
 // RegisterHandler registers the given event handler for the given event type with the given handler options, if any.
 // If no handler options are provided, the default handler options will be used.
 func (el *EventLoop) RegisterHandler(eventType any, handler EventHandler, opts ...HandlerOption) int {

@@ -9,8 +9,10 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/netconfig"
 )
 
 type cache struct {
@@ -23,12 +25,20 @@ type cache struct {
 
 // NewCache returns a new Crypto instance that caches the results of the operations of the given CryptoBase.
 // implementation.
-func NewCache(impl modules.CryptoBase, capacity int) core.CertAuth {
+func NewCache(
+	impl modules.CryptoBase,
+	blockChain *blockchain.BlockChain,
+	configuration *netconfig.Config,
+
+	capacity int) core.CertAuth {
 	return New(&cache{
 		impl:     impl,
 		capacity: capacity,
 		entries:  make(map[string]*list.Element, capacity),
-	})
+	},
+		blockChain,
+		configuration,
+	)
 }
 
 // InitModule gives the module a reference to the Core object.

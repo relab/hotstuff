@@ -35,29 +35,31 @@ type Invoker struct {
 	pbCfg *hotstuffpb.Configuration
 }
 
-func New(creds credentials.TransportCredentials, opts ...gorums.ManagerOption) *Invoker {
+func New(
+	configuration *netconfig.Config,
+	eventLoop *core.EventLoop,
+	logger logging.Logger,
+	opts *core.Options,
+
+	creds credentials.TransportCredentials,
+	mgrOpts ...gorums.ManagerOption) *Invoker {
 	if creds == nil {
 		creds = insecure.NewCredentials()
 	}
 	grpcOpts := []grpc.DialOption{
 		grpc.WithTransportCredentials(creds),
 	}
-	opts = append(opts, gorums.WithGrpcDialOptions(grpcOpts...))
+	mgrOpts = append(mgrOpts, gorums.WithGrpcDialOptions(grpcOpts...))
 
-	// initialization will be finished by InitModule
-	return &Invoker{
-		mgrOpts:  opts,
+	inv := &Invoker{
+		configuration: configuration,
+		eventLoop:     eventLoop,
+		logger:        logger,
+		opts:          opts,
+
+		mgrOpts:  mgrOpts,
 		replicas: make(map[hotstuff.ID]*Replica),
 	}
-}
-
-func (inv *Invoker) InitModule(mods *core.Core) {
-	mods.Get(
-		&inv.configuration,
-		&inv.eventLoop,
-		&inv.logger,
-		&inv.opts,
-	)
 
 	// We delay processing `replicaConnected` events until after the configurations `connected` event has occurred.
 	inv.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(event any) {
@@ -67,6 +69,7 @@ func (inv *Invoker) InitModule(mods *core.Core) {
 		}
 		inv.replicaConnected(event.(hotstuff.ReplicaConnectedEvent))
 	})
+	return inv
 }
 
 func (inv *Invoker) Connect(replicas []hotstuff.ReplicaInfo) (err error) {

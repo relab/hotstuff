@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/invoker"
@@ -21,11 +20,12 @@ import (
 
 // Synchronizer synchronizes replicas to the same view.
 type Synchronizer struct {
+	duration       modules.ViewDuration
 	leaderRotation modules.LeaderRotation
 
 	blockChain    *blockchain.BlockChain
 	consensus     *consensus.Consensus
-	crypto        *certauth.CertAuth
+	crypto        core.CertAuth
 	configuration *netconfig.Config
 	invoker       *invoker.Invoker
 	eventLoop     *core.EventLoop
@@ -42,27 +42,44 @@ type Synchronizer struct {
 	// we will simply send this timeout again.
 	lastTimeout *hotstuff.TimeoutMsg
 
-	duration modules.ViewDuration
-	timer    oneShotTimer
+	timer oneShotTimer
 
 	// map of collected timeout messages per view
 	timeouts map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
 }
 
-// InitModule initializes the synchronizer.
-func (s *Synchronizer) InitModule(mods *core.Core) {
-	mods.Get(
-		&s.blockChain,
-		&s.consensus,
-		&s.crypto,
-		&s.configuration,
-		&s.duration,
-		&s.eventLoop,
-		&s.invoker,
-		&s.leaderRotation,
-		&s.logger,
-		&s.opts,
-	)
+// New creates a new Synchronizer.
+func New(
+	leaderRotation modules.LeaderRotation,
+	duration modules.ViewDuration,
+
+	blockChain *blockchain.BlockChain,
+	consensus *consensus.Consensus,
+	crypto core.CertAuth,
+	configuration *netconfig.Config,
+	invoker *invoker.Invoker,
+	eventLoop *core.EventLoop,
+	logger logging.Logger,
+	opts *core.Options,
+) *Synchronizer {
+	s := &Synchronizer{
+		duration:       duration,
+		leaderRotation: leaderRotation,
+
+		blockChain:    blockChain,
+		consensus:     consensus,
+		crypto:        crypto,
+		configuration: configuration,
+		invoker:       invoker,
+		eventLoop:     eventLoop,
+		logger:        logger,
+		opts:          opts,
+
+		currentView: 1,
+
+		timer:    oneShotTimer{time.AfterFunc(0, func() {})}, // dummy timer that will be replaced after start() is called
+		timeouts: make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
+	}
 
 	s.eventLoop.RegisterHandler(hotstuff.TimeoutEvent{}, func(event any) {
 		timeoutView := event.(hotstuff.TimeoutEvent).View
@@ -90,16 +107,8 @@ func (s *Synchronizer) InitModule(mods *core.Core) {
 	if err != nil {
 		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
 	}
-}
 
-// New creates a new Synchronizer.
-func New() *Synchronizer {
-	return &Synchronizer{
-		currentView: 1,
-
-		timer:    oneShotTimer{time.AfterFunc(0, func() {})}, // dummy timer that will be replaced after start() is called
-		timeouts: make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
-	}
+	return s
 }
 
 // A oneShotTimer is a timer that should not be reused.

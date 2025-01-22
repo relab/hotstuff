@@ -77,18 +77,20 @@ type Client struct {
 	timeout          time.Duration
 }
 
-// InitModule initializes the client.
-func (c *Client) InitModule(mods *core.Core) {
-	mods.Get(
-		&c.eventLoop,
-		&c.logger,
-		&c.opts,
-	)
-}
-
 // New returns a new Client.
-func New(conf Config, builder core.Builder) (client *Client) {
+func New(
+	eventLoop *core.EventLoop,
+	logger logging.Logger,
+	opts *core.Options,
+
+	conf Config,
+	builder core.Builder,
+) (client *Client) {
 	client = &Client{
+		eventLoop: eventLoop,
+		logger:    logger,
+		opts:      opts,
+
 		pendingCmds:      make(chan pendingCmd, conf.MaxConcurrent),
 		highestCommitted: 1,
 		done:             make(chan struct{}),
@@ -111,9 +113,9 @@ func New(conf Config, builder core.Builder) (client *Client) {
 		creds = insecure.NewCredentials()
 	}
 
-	opts := append(conf.ManagerOptions, gorums.WithGrpcDialOptions(grpc.WithTransportCredentials(creds)))
+	mgrOpts := append(conf.ManagerOptions, gorums.WithGrpcDialOptions(grpc.WithTransportCredentials(creds)))
 
-	client.mgr = clientpb.NewManager(opts...)
+	client.mgr = clientpb.NewManager(mgrOpts...)
 
 	return client
 }

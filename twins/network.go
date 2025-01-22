@@ -12,11 +12,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/certauth"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/crypto/ecdsa"
-	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
@@ -121,7 +117,7 @@ func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) core.Builder
 }
 
 func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName string) error {
-	cg := &commandGenerator{}
+	/*cg := &commandGenerator{}
 	for _, nodeID := range nodes {
 
 		var err error
@@ -133,12 +129,40 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 		builder := n.GetNodeBuilder(nodeID, pk)
 		node := n.nodes[nodeID.NetworkID]
 
-		consensusModule, ok := modules.GetModule[modules.Rules](consensusName)
+		consensusRules, ok := modules.GetModule[modules.Rules](consensusName)
 		if !ok {
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
+
+		builderOpt := builder.Options()
+		netConfiguration := netconfig.NewConfig()
+		eventLoop := core.NewEventLoop(1000)
+		logger := logging.New("hs" + strconv.Itoa(int(opts.GetID())))
+		protocolInvoker := invoker.New(netConfiguration, eventLoop, logger, builderOpt, creds, managerOpts...)
+
+		cmdCache := clientsrv.NewCmdCache(logger, int(conf.BatchSize))
+		clientSrv := clientsrv.NewClientServer(eventLoop, logger, cmdCache, clientSrvOpts)
+		blockChain := blockchain.New(protocolInvoker, eventLoop, logger)
+		committer := committer.New(blockChain, clientSrv, logger)
+		certAuthority := certauth.NewCache(cryptoImpl, blockChain, netConfiguration, 100) // TODO: consider making this configurable
+		csus := consensus.New(
+			consensusRules,
+			node.leaderRotation,
+			blockChain,
+			committer,
+			cmdCache,
+			netConfiguration,
+			protocolInvoker,
+			certAuthority,
+			eventLoop,
+			logger,
+			builderOpt,
+		)
+		synch := synchronizer.New(leaderRotation, blockChain, csus, certAuthority, netConfiguration, protocolInvoker, eventLoop, logger, builderOpt)
+		votingMachine := consensus.NewVotingMachine(blockChain, netConfiguration, certAuthority, eventLoop, logger, synch, builderOpt)
+
 		builder.Add(
-			consensusModule,
+			consensusRules,
 			FixedTimeout(1*time.Millisecond),
 
 			core.NewEventLoop(100),
@@ -156,8 +180,8 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 		)
 		builder.Options().SetShouldVerifyVotesSync()
 		builder.Build()
-	}
-	return nil
+	}*/
+	return nil // TODO: Fix the problems with the above code.
 }
 
 func (n *Network) run(ticks int) {

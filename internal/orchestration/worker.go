@@ -15,6 +15,7 @@ import (
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/client"
+	"github.com/relab/hotstuff/clientsrv"
 	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/byzantine"
@@ -22,13 +23,17 @@ import (
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/invoker"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/netconfig"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/synchronizer"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
@@ -194,20 +199,80 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		float64(opts.GetTimeoutMultiplier()),
 	)
 
+	conf := hotstuff.ReplicaConfig{
+		ID:          hotstuff.ID(opts.GetID()),
+		PrivateKey:  privKey,
+		TLS:         opts.GetUseTLS(),
+		Certificate: &certificate,
+		RootCAs:     rootCAs,
+		Locations:   opts.GetLocations(),
+		BatchSize:   opts.GetBatchSize(),
+		ManagerOptions: []gorums.ManagerOption{
+			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
+		},
+	}
+
+	var creds credentials.TransportCredentials
+	managerOpts := conf.ManagerOptions
+	if conf.TLS {
+		creds = credentials.NewTLS(&tls.Config{
+			RootCAs:      conf.RootCAs,
+			Certificates: []tls.Certificate{*conf.Certificate},
+		})
+	}
+
+	clientSrvOpts := conf.ClientServerOptions
+	if conf.TLS {
+		clientSrvOpts = append(clientSrvOpts, gorums.WithGRPCServerOptions(
+			grpc.Creds(credentials.NewServerTLSFromCert(conf.Certificate)),
+		))
+	}
+
+	builderOpt := builder.Options()
+	netConfiguration := netconfig.NewConfig()
+	eventLoop := core.NewEventLoop(1000)
+	logger := logging.New("hs" + strconv.Itoa(int(opts.GetID())))
+	protocolInvoker := invoker.New(netConfiguration, eventLoop, logger, builderOpt, creds, managerOpts...)
+
+	cmdCache := clientsrv.NewCmdCache(logger, int(conf.BatchSize))
+	clientSrv := clientsrv.NewClientServer(eventLoop, logger, cmdCache, clientSrvOpts)
+	blockChain := blockchain.New(protocolInvoker, eventLoop, logger)
+	committer := committer.New(blockChain, clientSrv, logger)
+	certAuthority := certauth.NewCache(cryptoImpl, blockChain, netConfiguration, 100) // TODO: consider making this configurable
+	csus := consensus.New(
+		consensusRules,
+		leaderRotation,
+		blockChain,
+		committer,
+		cmdCache,
+		netConfiguration,
+		protocolInvoker,
+		certAuthority,
+		eventLoop,
+		logger,
+		builderOpt,
+	)
+	synch := synchronizer.New(leaderRotation, duration, blockChain, csus, certAuthority, netConfiguration, protocolInvoker, eventLoop, logger, builderOpt)
+	votingMachine := consensus.NewVotingMachine(blockChain, netConfiguration, certAuthority, eventLoop, logger, synch, builderOpt)
+
 	builder.Add(
 		consensusRules,
 		duration,
 		leaderRotation,
+		netConfiguration,
+		eventLoop,
+		logger,
+		protocolInvoker,
+		cmdCache,
+		clientSrv,
+		blockChain,
+		committer,
+		certAuthority,
+		csus,
+		synch,
+		votingMachine,
 
-		core.NewEventLoop(1000),
-		consensus.New(),
-		consensus.NewVotingMachine(),
-		committer.New(),
-		certauth.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
-		synchronizer.New(),
 		w.metricsLogger,
-		blockchain.New(),
-		logging.New("hs"+strconv.Itoa(int(opts.GetID()))),
 	)
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
 	if w.measurementInterval > 0 {
@@ -223,19 +288,17 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		}
 		builder.Add(m)
 	}
-	c := hotstuff.ReplicaConfig{
-		ID:          hotstuff.ID(opts.GetID()),
-		PrivateKey:  privKey,
-		TLS:         opts.GetUseTLS(),
-		Certificate: &certificate,
-		RootCAs:     rootCAs,
-		Locations:   opts.GetLocations(),
-		BatchSize:   opts.GetBatchSize(),
-		ManagerOptions: []gorums.ManagerOption{
-			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
-		},
-	}
-	return replica.New(c, builder), nil
+
+	return replica.New(
+		netConfiguration,
+		blockChain,
+		eventLoop,
+		logger,
+		clientSrv,
+		protocolInvoker,
+
+		conf,
+		builder), nil
 }
 
 func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {
@@ -301,7 +364,9 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
 		mods := core.NewBuilder(hotstuff.ID(opts.GetID()), nil)
-		mods.Add(core.NewEventLoop(1000))
+		buildOpt := mods.Options()
+		eventLoop := core.NewEventLoop(1000)
+		mods.Add(eventLoop)
 
 		if w.measurementInterval > 0 {
 			clientMetrics := metrics.GetClientMetrics(w.metrics...)
@@ -310,8 +375,14 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		}
 
 		mods.Add(w.metricsLogger)
-		mods.Add(logging.New("cli" + strconv.Itoa(int(opts.GetID()))))
-		cli := client.New(c, mods)
+		logger := logging.New("cli" + strconv.Itoa(int(opts.GetID())))
+		mods.Add(logger)
+		cli := client.New(
+			eventLoop,
+			logger,
+			buildOpt,
+			c,
+			mods)
 		cfg, err := getConfiguration(req.GetConfiguration(), true)
 		if err != nil {
 			return nil, err

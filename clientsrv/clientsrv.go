@@ -22,34 +22,33 @@ import (
 type ClientServer struct {
 	eventLoop *core.EventLoop
 	logger    logging.Logger
+	cmdCache  *CmdCache
 
 	mut          sync.Mutex
 	srv          *gorums.Server
 	awaitingCmds map[CmdID]chan<- error
-	cmdCache     *CmdCache
 	hash         hash.Hash
 	cmdCount     uint32
 }
 
 // NewClientServer returns a new client server.
-func NewClientServer(conf hotstuff.ReplicaConfig, srvOpts []gorums.ServerOption) (srv *ClientServer) {
+func NewClientServer(
+	eventLoop *core.EventLoop,
+	logger logging.Logger,
+	cmdCache *CmdCache,
+
+	srvOpts []gorums.ServerOption) (srv *ClientServer) {
 	srv = &ClientServer{
+		eventLoop: eventLoop,
+		logger:    logger,
+		cmdCache:  cmdCache,
+
 		awaitingCmds: make(map[CmdID]chan<- error),
 		srv:          gorums.NewServer(srvOpts...),
-		cmdCache:     NewCmdCache(int(conf.BatchSize)),
 		hash:         sha256.New(),
 	}
 	clientpb.RegisterClientServer(srv.srv, srv)
 	return srv
-}
-
-// InitModule gives the module access to the other modules.
-func (srv *ClientServer) InitModule(mods *core.Core) {
-	mods.Get(
-		&srv.eventLoop,
-		&srv.logger,
-	)
-	srv.cmdCache.InitModule(mods)
 }
 
 func (srv *ClientServer) Start(addr string) error {

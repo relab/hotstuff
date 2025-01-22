@@ -31,19 +31,20 @@ type CmdCache struct {
 	unmarshaler   proto.UnmarshalOptions
 }
 
-func NewCmdCache(batchSize int) *CmdCache {
+func NewCmdCache(
+	logger logging.Logger,
+
+	batchSize int,
+) *CmdCache {
 	return &CmdCache{
+		logger: logger,
+
 		c:             make(chan struct{}),
 		batchSize:     batchSize,
 		serialNumbers: make(map[uint32]uint64),
 		marshaler:     proto.MarshalOptions{Deterministic: true},
 		unmarshaler:   proto.UnmarshalOptions{DiscardUnknown: true},
 	}
-}
-
-// InitModule gives the module access to the other modules.
-func (c *CmdCache) InitModule(mods *core.Core) {
-	mods.Get(&c.logger)
 }
 
 func (c *CmdCache) addCommand(cmd *clientpb.Command) {

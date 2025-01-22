@@ -28,18 +28,18 @@ type BlockChain struct {
 	pendingFetch   map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
 }
 
-func (chain *BlockChain) InitModule(mods *core.Core) {
-	mods.Get(
-		&chain.invoker,
-		&chain.eventLoop,
-		&chain.logger,
-	)
-}
-
 // New creates a new blockChain with a maximum size.
 // Blocks are dropped in least recently used order.
-func New() *BlockChain {
+func New(
+	invoker *invoker.Invoker,
+	eventLoop *core.EventLoop,
+	logger logging.Logger,
+) *BlockChain {
 	bc := &BlockChain{
+		invoker:   invoker,
+		eventLoop: eventLoop,
+		logger:    logger,
+
 		blocks:         make(map[hotstuff.Hash]*hotstuff.Block),
 		blocksAtHeight: make(map[hotstuff.View][]*hotstuff.Block),
 		pendingFetch:   make(map[hotstuff.Hash]context.CancelFunc),

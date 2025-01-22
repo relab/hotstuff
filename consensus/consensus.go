@@ -6,7 +6,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/clientsrv"
 	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/core"
@@ -50,7 +49,7 @@ type Consensus struct {
 	commandCache  *clientsrv.CmdCache
 	configuration *netconfig.Config
 	invoker       *invoker.Invoker
-	crypto        *certauth.CertAuth
+	crypto        core.CertAuth
 	eventLoop     *core.EventLoop
 	logger        logging.Logger
 	opts          *core.Options
@@ -64,34 +63,43 @@ type Consensus struct {
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
-func New() *Consensus {
-	return &Consensus{
+func New(
+	impl Rules,
+	leaderRotation modules.LeaderRotation,
+
+	blockChain *blockchain.BlockChain,
+	committer *committer.Committer,
+	commandCache *clientsrv.CmdCache,
+	configuration *netconfig.Config,
+	invoker *invoker.Invoker,
+	crypto core.CertAuth,
+	eventLoop *core.EventLoop,
+	logger logging.Logger,
+	opts *core.Options,
+) *Consensus {
+	cs := &Consensus{
+		impl:           impl,
+		leaderRotation: leaderRotation,
+
+		blockChain:    blockChain,
+		committer:     committer,
+		commandCache:  commandCache,
+		configuration: configuration,
+		invoker:       invoker,
+		crypto:        crypto,
+		eventLoop:     eventLoop,
+		logger:        logger,
+		opts:          opts,
+
 		lastVote: 0,
 	}
-}
-
-// InitModule initializes the module.
-func (cs *Consensus) InitModule(mods *core.Core) {
-	mods.Get(
-		&cs.blockChain,
-		&cs.commandCache,
-		&cs.committer,
-		&cs.configuration,
-		&cs.crypto,
-		&cs.eventLoop,
-		&cs.leaderRotation,
-		&cs.invoker,
-		&cs.logger,
-		&cs.opts,
-		&cs.impl,
-	)
-
-	mods.TryGet(&cs.handel)
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		// TODO: determine potential bugs
 		cs.OnPropose(cs.view, event.(hotstuff.ProposeMsg))
 	})
+
+	return cs
 }
 
 func (cs *Consensus) CommittedBlock() *hotstuff.Block {

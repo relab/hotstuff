@@ -21,94 +21,94 @@ type Committer struct {
 }
 
 // Basic committer implements commit logic without pipelining.
-func New() *Committer {
+func New(
+	blockChain *blockchain.BlockChain,
+	clientSrv *clientsrv.ClientServer,
+	logger logging.Logger,
+) *Committer {
 	return &Committer{
+		blockChain: blockChain,
+		clientSrv:  clientSrv,
+		logger:     logger,
+
 		bExec: hotstuff.GetGenesis(),
 	}
 }
 
-func (bb *Committer) InitModule(mods *core.Core) {
-	mods.Get(
-		&bb.clientSrv,
-		&bb.blockChain,
-		&bb.logger,
-	)
-}
-
 // Stores the block before further execution.
-func (bb *Committer) Commit(committedHeight hotstuff.View, block *hotstuff.Block) {
-	err := bb.commit(block)
+func (cm *Committer) Commit(committedHeight hotstuff.View, block *hotstuff.Block) {
+	err := cm.commit(block)
 	if err != nil {
-		bb.logger.Warnf("failed to commit: %v", err)
+		cm.logger.Warnf("failed to commit: %v", err)
 		return
 	}
 
 	// prune the blockchain and handle forked blocks
-	prunedBlocks := bb.blockChain.PruneToHeight(block.View())
-	forkedBlocks := bb.findForks(committedHeight, block.View(), prunedBlocks)
+	prunedBlocks := cm.blockChain.PruneToHeight(block.View())
+	forkedBlocks := cm.findForks(committedHeight, block.View(), prunedBlocks)
 	for _, block := range forkedBlocks {
-		bb.clientSrv.Fork(block.Command())
+		cm.clientSrv.Fork(block.Command())
 	}
 }
 
-func (bb *Committer) commit(block *hotstuff.Block) error {
-	bb.mut.Lock()
+func (cm *Committer) commit(block *hotstuff.Block) error {
+	cm.mut.Lock()
 	// can't recurse due to requiring the mutex, so we use a helper instead.
-	err := bb.commitInner(block)
-	bb.mut.Unlock()
+	err := cm.commitInner(block)
+	cm.mut.Unlock()
 	return err
 }
 
 // recursive helper for commit
-func (bb *Committer) commitInner(block *hotstuff.Block) error {
-	if bb.bExec.View() >= block.View() {
+func (cm *Committer) commitInner(block *hotstuff.Block) error {
+	if cm.bExec.View() >= block.View() {
 		return nil
 	}
-	if parent, ok := bb.blockChain.Get(block.Parent()); ok {
-		err := bb.commitInner(parent)
+	if parent, ok := cm.blockChain.Get(block.Parent()); ok {
+		err := cm.commitInner(parent)
 		if err != nil {
 			return err
 		}
 	} else {
 		return fmt.Errorf("failed to locate block: %s", block.Parent())
 	}
-	bb.logger.Debug("EXEC: ", block)
-	bb.clientSrv.Exec(block.Command())
-	bb.bExec = block
+	cm.logger.Debug("EXEC: ", block)
+	cm.clientSrv.Exec(block.Command())
+	cm.bExec = block
 	return nil
 }
 
 // Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
-func (bb *Committer) CommittedBlock() *hotstuff.Block {
-	bb.mut.Lock()
-	defer bb.mut.Unlock()
-	return bb.bExec
+func (cm *Committer) CommittedBlock() *hotstuff.Block {
+	cm.mut.Lock()
+	defer cm.mut.Unlock()
+	return cm.bExec
 }
 
-func (bb *Committer) findForks(committedHeight, height hotstuff.View, blocksAtHeight map[hotstuff.View][]*hotstuff.Block) (forkedBlocks []*hotstuff.Block) {
+func (cm *Committer) findForks(committedHeight, height hotstuff.View, blocksAtHeight map[hotstuff.View][]*hotstuff.Block) (forkedBlocks []*hotstuff.Block) {
 
 	committedViews := make(map[hotstuff.View]bool)
 
 	// This is a hacky value: chain.prevPruneHeight, but it works.
-	for h := committedHeight; h >= bb.blockChain.PruneHeight(); {
+	for h := committedHeight; h >= cm.blockChain.PruneHeight(); {
 		blocks, ok := blocksAtHeight[h]
 		if !ok {
 			break
 		}
 		block := blocks[0]
-		parent, ok := bb.blockChain.LocalGet(block.Parent())
-		if !ok || parent.View() < bb.blockChain.PruneHeight() {
+		parent, ok := cm.blockChain.LocalGet(block.Parent())
+		if !ok || parent.View() < cm.blockChain.PruneHeight() {
 			break
 		}
 		h = parent.View()
 		committedViews[h] = true
 	}
 
-	for h := height; h > bb.blockChain.PruneHeight(); h-- {
+	for h := height; h > cm.blockChain.PruneHeight(); h-- {
 		if !committedViews[h] {
 			blocks, ok := blocksAtHeight[h]
 			if ok {
-				bb.logger.Debugf("PruneToHeight: found forked blocks: %v", blocks)
+				cm.logger.Debugf("PruneToHeight: found forked blocks: %v", blocks)
 				block := blocks[0]
 				forkedBlocks = append(forkedBlocks, block)
 			}

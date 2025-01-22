@@ -26,28 +26,30 @@ type Server struct {
 	configuration *netconfig.Config
 	eventLoop     *core.EventLoop
 	logger        logging.Logger
-	id            hotstuff.ID
-	lm            latency.Matrix
-	gorumsSrv     *gorums.Server
-}
 
-// InitModule initializes the Server.
-func (srv *Server) InitModule(mods *core.Core) {
-	mods.Get(
-		&srv.eventLoop,
-		&srv.configuration,
-		&srv.blockChain,
-		&srv.logger,
-	)
+	id        hotstuff.ID
+	lm        latency.Matrix
+	gorumsSrv *gorums.Server
 }
 
 // NewServer creates a new Server.
-func NewServer(opts ...ServerOptions) *Server {
+func NewServer(
+	blockChain *blockchain.BlockChain,
+	configuration *netconfig.Config,
+	eventLoop *core.EventLoop,
+	logger logging.Logger,
+	opts ...ServerOptions,
+) *Server {
 	options := &backendOptions{}
 	for _, opt := range opts {
 		opt(options)
 	}
 	srv := &Server{
+		blockChain:    blockChain,
+		configuration: configuration,
+		eventLoop:     eventLoop,
+		logger:        logger,
+
 		id: options.id,
 		lm: options.latencyMatrix,
 	}
