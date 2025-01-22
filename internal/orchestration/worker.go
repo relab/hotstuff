@@ -31,6 +31,7 @@ import (
 	"github.com/relab/hotstuff/netconfig"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/synchronizer"
+	"github.com/relab/hotstuff/voting"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -229,6 +230,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 
 	builderOpt := builder.Options()
+	builderOpt.SetSharedRandomSeed(opts.GetSharedSeed())
+
 	netConfiguration := netconfig.NewConfig()
 	eventLoop := core.NewEventLoop(1000)
 	logger := logging.New("hs" + strconv.Itoa(int(opts.GetID())))
@@ -253,12 +256,13 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		builderOpt,
 	)
 	synch := synchronizer.New(leaderRotation, duration, blockChain, csus, certAuthority, netConfiguration, protocolInvoker, eventLoop, logger, builderOpt)
-	votingMachine := consensus.NewVotingMachine(blockChain, netConfiguration, certAuthority, eventLoop, logger, synch, builderOpt)
+	votingMachine := voting.NewVotingMachine(blockChain, netConfiguration, certAuthority, eventLoop, logger, synch, builderOpt)
 
 	builder.Add(
 		consensusRules,
 		duration,
 		leaderRotation,
+
 		netConfiguration,
 		eventLoop,
 		logger,
@@ -274,7 +278,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 
 		w.metricsLogger,
 	)
-	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
 		builder.Add(replicaMetrics...)

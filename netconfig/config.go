@@ -9,14 +9,16 @@ import (
 // Config holds information about the current configuration of replicas that participate in the protocol,
 // and some information about the local replica.
 type Config struct {
-	replicas map[hotstuff.ID]hotstuff.ReplicaInfo
+	replicaCount int
+	replicas     map[hotstuff.ID]hotstuff.ReplicaInfo
 }
 
 // NewConfig creates a new configuration.
 func NewConfig() *Config {
 	// initialization will be finished by InitModule
 	cfg := &Config{
-		replicas: make(map[hotstuff.ID]hotstuff.ReplicaInfo),
+		replicaCount: 0,
+		replicas:     make(map[hotstuff.ID]hotstuff.ReplicaInfo),
 	}
 	return cfg
 }
@@ -48,6 +50,7 @@ func (cfg *Config) QuorumSize() int {
 // Custom methods not part of core.Configuration interface.
 
 func (cfg *Config) AddReplica(replicaInfo hotstuff.ReplicaInfo) {
+	cfg.replicaCount++
 	cfg.replicas[replicaInfo.ID] = replicaInfo
 }
 

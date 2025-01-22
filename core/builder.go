@@ -29,8 +29,8 @@ func (b *Builder) Options() *Options {
 // Add adds module to the builder.
 func (b *Builder) Add(module ...any) {
 	b.core.modules = append(b.core.modules, module...)
-	for _, module := range module {
-		if m, ok := module.(Module); ok {
+	for _, mod := range module {
+		if m, ok := mod.(Module); ok {
 			b.modules = append(b.modules, m)
 		}
 	}
