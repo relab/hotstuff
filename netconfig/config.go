@@ -79,6 +79,3 @@ func (cfg *Config) AddReplica(replicaInfo hotstuff.ReplicaInfo) {
 }
 
 var _ core.Configuration = (*Config)(nil)
-
-// ConnectedEvent is sent when the configuration has connected to the other replicas.
-type ConnectedEvent struct{}
