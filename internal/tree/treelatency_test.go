@@ -8,7 +8,7 @@ import (
 	"github.com/relab/hotstuff/internal/latency"
 )
 
-func TestTreeLatency(t *testing.T) {
+func TestWaitTime(t *testing.T) {
 	var (
 		cities07 = []string{
 			"Melbourne", "Toronto", "Prague", "Paris",
@@ -51,7 +51,7 @@ func TestTreeLatency(t *testing.T) {
 		treePos := DefaultTreePos(len(test.locs))
 		tree := CreateTree(test.id, bf, treePos)
 		lm := latency.MatrixFrom(test.locs)
-		got := tree.Latency(lm, test.delta, test.latType)
+		got := tree.WaitTime(lm, test.delta, test.latType)
 		if got != test.want {
 			t.Errorf("tree.Latency(_, %v, %v) = %v, want %v", test.delta, test.latType, got, test.want)
 		}

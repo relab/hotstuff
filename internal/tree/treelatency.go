@@ -16,14 +16,12 @@ const (
 	FixedLatency
 )
 
-func (t *Tree) Latency(lm latency.Matrix, delta time.Duration, latType LatencyType) time.Duration {
-	switch latType {
-	case AggregationLatency:
+// WaitTime returns the expected time to wait for the aggregation of votes.
+func (t *Tree) WaitTime(lm latency.Matrix, delta time.Duration, latType LatencyType) time.Duration {
+	if latType == AggregationLatency {
 		return t.aggregationLatency(t.id, lm, delta)
-	case FixedLatency:
-		return t.fixedAggDuration(delta)
 	}
-	return 0
+	return t.fixedAggDuration(delta)
 }
 
 func (t *Tree) WaitTimerDuration(lm latency.Matrix, opts *modules.Options) time.Duration {
