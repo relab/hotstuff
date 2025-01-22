@@ -35,7 +35,7 @@ type Invoker struct {
 	pbCfg *hotstuffpb.Configuration
 }
 
-func NewInvoker(creds credentials.TransportCredentials, opts ...gorums.ManagerOption) *Invoker {
+func New(creds credentials.TransportCredentials, opts ...gorums.ManagerOption) *Invoker {
 	if creds == nil {
 		creds = insecure.NewCredentials()
 	}

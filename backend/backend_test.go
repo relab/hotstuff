@@ -38,10 +38,10 @@ func TestConnect(t *testing.T) {
 		td.builders.Build()
 
 		cfg := netconfig.NewConfig()
-		inv := invoker.NewInvoker(td.creds, gorums.WithDialTimeout(time.Second))
+		inv := invoker.New(td.creds, gorums.WithDialTimeout(time.Second))
 		td.builders[0].Add(cfg, inv)
 
-		builder.Add(cfg)
+		builder.Add(cfg, inv)
 		builder.Build()
 
 		err := inv.Connect(td.replicas)
@@ -53,7 +53,7 @@ func TestConnect(t *testing.T) {
 }
 
 // testBase is a generic test for a unicast/multicast call
-func testBase(t *testing.T, typ any, send func(core.Configuration), handle core.EventHandler) {
+func testBase(t *testing.T, typ any, send func(core.ProtocolInvoker), handle core.EventHandler) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		ctrl := gomock.NewController(t)
@@ -63,7 +63,7 @@ func testBase(t *testing.T, typ any, send func(core.Configuration), handle core.
 		defer serverTeardown()
 
 		cfg := netconfig.NewConfig()
-		inv := invoker.NewInvoker(td.creds, gorums.WithDialTimeout(time.Second))
+		inv := invoker.New(td.creds, gorums.WithDialTimeout(time.Second))
 		td.builders[0].Add(cfg, inv)
 		hl := td.builders.Build()
 
@@ -84,7 +84,7 @@ func testBase(t *testing.T, typ any, send func(core.Configuration), handle core.
 			synchronizer.Start(ctx)
 			go eventLoop.Run(ctx)
 		}
-		send(cfg)
+		send(inv)
 		cancel()
 	}
 	runBoth(t, run)
@@ -100,9 +100,9 @@ func TestPropose(t *testing.T) {
 			"foo", 1, 1,
 		),
 	}
-	testBase(t, want, func(cfg core.Configuration) {
+	testBase(t, want, func(inv core.ProtocolInvoker) {
 		wg.Add(3)
-		cfg.Propose(want)
+		inv.Propose(want)
 		wg.Wait()
 	}, func(event any) {
 		got := event.(hotstuff.ProposeMsg)
@@ -124,9 +124,9 @@ func TestTimeout(t *testing.T) {
 		ViewSignature: nil,
 		SyncInfo:      hotstuff.NewSyncInfo(),
 	}
-	testBase(t, want, func(cfg core.Configuration) {
+	testBase(t, want, func(inv core.ProtocolInvoker) {
 		wg.Add(3)
-		cfg.Timeout(want)
+		inv.Timeout(want)
 		wg.Wait()
 	}, func(event any) {
 		got := event.(hotstuff.TimeoutMsg)
