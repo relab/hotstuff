@@ -3,12 +3,16 @@ package hotstuff
 import (
 	"bytes"
 	"crypto"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/relab/gorums"
 )
 
 // IDSet implements a set of replica IDs. It is used to show which replicas participated in some event.
@@ -391,4 +395,28 @@ type ReplicaInfo struct {
 	PubKey   PublicKey
 	Location string
 	MetaData map[string]string
+}
+
+// Config configures a replica.
+type ReplicaConfig struct {
+	// The id of the replica.
+	ID ID
+	// The private key of the replica.
+	PrivateKey PrivateKey
+	// Controls whether TLS is used.
+	TLS bool
+	// The TLS certificate.
+	Certificate *tls.Certificate
+	// The root certificates trusted by the replica.
+	RootCAs *x509.CertPool
+	// The number of client commands that should be batched together in a block.
+	BatchSize uint32
+	// Options for the client server.
+	ClientServerOptions []gorums.ServerOption
+	// Options for the replica server.
+	ReplicaServerOptions []gorums.ServerOption
+	// Options for the replica manager.
+	ManagerOptions []gorums.ManagerOption
+	// Location names of all replicas.
+	Locations []string
 }

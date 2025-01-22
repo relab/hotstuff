@@ -1,4 +1,4 @@
-package replica
+package clientsrv
 
 import (
 	"container/list"
@@ -12,6 +12,12 @@ import (
 	"github.com/relab/hotstuff/logging"
 	"google.golang.org/protobuf/proto"
 )
+
+// CmdID is a unique identifier for a command
+type CmdID struct {
+	clientID    uint32
+	sequenceNum uint64
+}
 
 type CmdCache struct {
 	logger logging.Logger

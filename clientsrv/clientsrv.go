@@ -1,4 +1,4 @@
-package replica
+package clientsrv
 
 import (
 	"crypto/sha256"
@@ -25,16 +25,16 @@ type ClientServer struct {
 
 	mut          sync.Mutex
 	srv          *gorums.Server
-	awaitingCmds map[cmdID]chan<- error
+	awaitingCmds map[CmdID]chan<- error
 	cmdCache     *CmdCache
 	hash         hash.Hash
 	cmdCount     uint32
 }
 
 // NewClientServer returns a new client server.
-func NewClientServer(conf Config, srvOpts []gorums.ServerOption) (srv *ClientServer) {
+func NewClientServer(conf hotstuff.ReplicaConfig, srvOpts []gorums.ServerOption) (srv *ClientServer) {
 	srv = &ClientServer{
-		awaitingCmds: make(map[cmdID]chan<- error),
+		awaitingCmds: make(map[CmdID]chan<- error),
 		srv:          gorums.NewServer(srvOpts...),
 		cmdCache:     NewCmdCache(int(conf.BatchSize)),
 		hash:         sha256.New(),
@@ -74,8 +74,20 @@ func (srv *ClientServer) Stop() {
 	srv.srv.Stop()
 }
 
+func (srv *ClientServer) CmdCache() *CmdCache {
+	return srv.cmdCache
+}
+
+func (srv *ClientServer) Hash() hash.Hash {
+	return srv.hash
+}
+
+func (srv *ClientServer) CmdCount() uint32 {
+	return srv.cmdCount
+}
+
 func (srv *ClientServer) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*emptypb.Empty, error) {
-	id := cmdID{cmd.ClientID, cmd.SequenceNumber}
+	id := CmdID{cmd.ClientID, cmd.SequenceNumber}
 
 	c := make(chan error)
 	srv.mut.Lock()
@@ -102,7 +114,7 @@ func (srv *ClientServer) Exec(cmd hotstuff.Command) {
 		_, _ = srv.hash.Write(cmd.Data)
 		srv.cmdCount++
 		srv.mut.Lock()
-		id := cmdID{cmd.GetClientID(), cmd.GetSequenceNumber()}
+		id := CmdID{cmd.GetClientID(), cmd.GetSequenceNumber()}
 		if done, ok := srv.awaitingCmds[id]; ok {
 			done <- nil
 			delete(srv.awaitingCmds, id)
@@ -123,7 +135,7 @@ func (srv *ClientServer) Fork(cmd hotstuff.Command) {
 
 	for _, cmd := range batch.GetCommands() {
 		srv.mut.Lock()
-		id := cmdID{cmd.GetClientID(), cmd.GetSequenceNumber()}
+		id := CmdID{cmd.GetClientID(), cmd.GetSequenceNumber()}
 		if done, ok := srv.awaitingCmds[id]; ok {
 			done <- status.Error(codes.Aborted, "blockchain was forked")
 			delete(srv.awaitingCmds, id)

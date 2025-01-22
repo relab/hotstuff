@@ -7,13 +7,13 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/certauth"
+	"github.com/relab/hotstuff/clientsrv"
 	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/invoker"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/netconfig"
-	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/synctools"
 )
 
@@ -47,7 +47,7 @@ type Consensus struct {
 
 	blockChain    *blockchain.BlockChain
 	committer     *committer.Committer
-	commandCache  *replica.CmdCache
+	commandCache  *clientsrv.CmdCache
 	configuration *netconfig.Config
 	invoker       *invoker.Invoker
 	crypto        *certauth.CertAuth

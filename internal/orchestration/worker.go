@@ -223,7 +223,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		}
 		builder.Add(m)
 	}
-	c := replica.Config{
+	c := hotstuff.ReplicaConfig{
 		ID:          hotstuff.ID(opts.GetID()),
 		PrivateKey:  privKey,
 		TLS:         opts.GetUseTLS(),

@@ -4,12 +4,13 @@ package replica
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"net"
 
+	"github.com/relab/hotstuff/clientsrv"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/invoker"
 	"github.com/relab/hotstuff/netconfig"
+	"github.com/relab/hotstuff/synchronizer"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -19,51 +20,21 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// cmdID is a unique identifier for a command
-type cmdID struct {
-	clientID    uint32
-	sequenceNum uint64
-}
-
-// Config configures a replica.
-type Config struct {
-	// The id of the replica.
-	ID hotstuff.ID
-	// The private key of the replica.
-	PrivateKey hotstuff.PrivateKey
-	// Controls whether TLS is used.
-	TLS bool
-	// The TLS certificate.
-	Certificate *tls.Certificate
-	// The root certificates trusted by the replica.
-	RootCAs *x509.CertPool
-	// The number of client commands that should be batched together in a block.
-	BatchSize uint32
-	// Options for the client server.
-	ClientServerOptions []gorums.ServerOption
-	// Options for the replica server.
-	ReplicaServerOptions []gorums.ServerOption
-	// Options for the replica manager.
-	ManagerOptions []gorums.ManagerOption
-	// Location names of all replicas.
-	Locations []string
-}
-
 // Replica is a participant in the consensus protocol.
 type Replica struct {
-	clientSrv *ClientServer
+	clientSrv *clientsrv.ClientServer
 	cfg       *netconfig.Config
 	hsSrv     *backend.Server
 	hs        *core.Core
 	invoker   *invoker.Invoker
 
-	execHandlers map[cmdID]func(*emptypb.Empty, error)
+	execHandlers map[clientsrv.CmdID]func(*emptypb.Empty, error)
 	cancel       context.CancelFunc
 	done         chan struct{}
 }
 
 // New returns a new replica.
-func New(conf Config, builder core.Builder) (replica *Replica) {
+func New(conf hotstuff.ReplicaConfig, builder core.Builder) (replica *Replica) {
 	clientSrvOpts := conf.ClientServerOptions
 
 	if conf.TLS {
@@ -72,11 +43,11 @@ func New(conf Config, builder core.Builder) (replica *Replica) {
 		))
 	}
 
-	clientSrv := NewClientServer(conf, clientSrvOpts)
+	clientSrv := clientsrv.NewClientServer(conf, clientSrvOpts)
 
 	srv := &Replica{
 		clientSrv:    clientSrv,
-		execHandlers: make(map[cmdID]func(*emptypb.Empty, error)),
+		execHandlers: make(map[clientsrv.CmdID]func(*emptypb.Empty, error)),
 		cancel:       func() {},
 		done:         make(chan struct{}),
 	}
@@ -115,7 +86,7 @@ func New(conf Config, builder core.Builder) (replica *Replica) {
 		srv.invoker,
 
 		srv.clientSrv,
-		srv.clientSrv.cmdCache,
+		srv.clientSrv.CmdCache(),
 	)
 	srv.hs = builder.Build()
 
@@ -158,7 +129,7 @@ func (srv *Replica) Stop() {
 // Run runs the replica until the context is canceled.
 func (srv *Replica) Run(ctx context.Context) {
 	var (
-		synchronizer core.Synchronizer
+		synchronizer *synchronizer.Synchronizer
 		eventLoop    *core.EventLoop
 	)
 	srv.hs.Get(&synchronizer, &eventLoop)
@@ -176,10 +147,10 @@ func (srv *Replica) Close() {
 
 // GetHash returns the hash of all executed commands.
 func (srv *Replica) GetHash() (b []byte) {
-	return srv.clientSrv.hash.Sum(b)
+	return srv.clientSrv.Hash().Sum(b)
 }
 
 // GetCmdCount returns the count of all executed commands.
 func (srv *Replica) GetCmdCount() (c uint32) {
-	return srv.clientSrv.cmdCount
+	return srv.clientSrv.CmdCount()
 }

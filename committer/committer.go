@@ -6,14 +6,14 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
+	"github.com/relab/hotstuff/clientsrv"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/replica"
 )
 
 type Committer struct {
 	blockChain *blockchain.BlockChain
-	clientSrv  *replica.ClientServer
+	clientSrv  *clientsrv.ClientServer
 	logger     logging.Logger
 
 	mut   sync.Mutex
