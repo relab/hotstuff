@@ -6,14 +6,13 @@ import (
 	"strconv"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 )
 
-// GetPeerIDFromContext extracts the ID of the peer from the context.
-func GetPeerIDFromContext(ctx context.Context, cfg core.Configuration) (hotstuff.ID, error) {
+// PeerIDFromContext extracts the ID of the peer from the context.
+func (cfg *Config) PeerIDFromContext(ctx context.Context) (hotstuff.ID, error) {
 	peerInfo, ok := peer.FromContext(ctx)
 	if !ok {
 		return 0, fmt.Errorf("peerInfo not available")

@@ -143,7 +143,7 @@ func (inv *Invoker) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
 		return
 	}
 
-	id, err := netconfig.GetPeerIDFromContext(c.Ctx, inv.configuration)
+	id, err := inv.configuration.PeerIDFromContext(c.Ctx)
 	if err != nil {
 		inv.logger.Warnf("Failed to get id for %v: %v", info.Addr, err)
 		return

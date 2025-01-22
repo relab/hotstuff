@@ -107,7 +107,7 @@ type serviceImpl struct {
 
 // Propose handles a replica's response to the Propose QC from the leader.
 func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
-	id, err := netconfig.GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := impl.srv.configuration.PeerIDFromContext(ctx)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
@@ -121,7 +121,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 
 // Vote handles an incoming vote message.
 func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
-	id, err := netconfig.GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := impl.srv.configuration.PeerIDFromContext(ctx)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
@@ -135,7 +135,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
 func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo) {
-	id, err := netconfig.GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := impl.srv.configuration.PeerIDFromContext(ctx)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
@@ -164,7 +164,7 @@ func (impl *serviceImpl) Fetch(_ gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*h
 
 // Timeout handles an incoming TimeoutMsg.
 func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
-	id, err := netconfig.GetPeerIDFromContext(ctx, impl.srv.configuration)
+	id, err := impl.srv.configuration.PeerIDFromContext(ctx)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 	}
