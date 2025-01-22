@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/cryptomod"
 	"github.com/relab/hotstuff/modules"
 
 	"github.com/relab/hotstuff"
@@ -40,7 +40,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 	commandQ := mocks.NewMockCommandQueue(ctrl)
 	commandQ.EXPECT().Get(gomock.Any()).AnyTimes().Return(hotstuff.Command("foo"), true)
 
-	signer := cryptomod.NewCache(ecdsa.New(), 10)
+	signer := certauth.NewCache(ecdsa.New(), 10)
 
 	config := mocks.NewMockConfiguration(ctrl)
 	config.EXPECT().Len().AnyTimes().Return(1)
@@ -81,8 +81,8 @@ func (bl BuilderList) Build() HotStuffList {
 }
 
 // Signers returns the set of signers from all of the HotStuff instances.
-func (hl HotStuffList) Signers() (signers []core.Crypto) {
-	signers = make([]core.Crypto, len(hl))
+func (hl HotStuffList) Signers() (signers []core.CertAuth) {
+	signers = make([]core.CertAuth, len(hl))
 	for i, hs := range hl {
 		hs.Get(&signers[i])
 	}
@@ -90,8 +90,8 @@ func (hl HotStuffList) Signers() (signers []core.Crypto) {
 }
 
 // Verifiers returns the set of verifiers from all of the HotStuff instances.
-func (hl HotStuffList) Verifiers() (verifiers []core.Crypto) {
-	verifiers = make([]core.Crypto, len(hl))
+func (hl HotStuffList) Verifiers() (verifiers []core.CertAuth) {
+	verifiers = make([]core.CertAuth, len(hl))
 	for i, hs := range hl {
 		hs.Get(&verifiers[i])
 	}
@@ -143,7 +143,7 @@ func CreateTCPListener(t *testing.T) net.Listener {
 }
 
 // Sign creates a signature using the given signer.
-func Sign(t *testing.T, message []byte, signer core.Crypto) hotstuff.QuorumSignature {
+func Sign(t *testing.T, message []byte, signer core.CertAuth) hotstuff.QuorumSignature {
 	t.Helper()
 	sig, err := signer.Sign(message)
 	if err != nil {
@@ -153,7 +153,7 @@ func Sign(t *testing.T, message []byte, signer core.Crypto) hotstuff.QuorumSigna
 }
 
 // CreateSignatures creates partial certificates from multiple signers.
-func CreateSignatures(t *testing.T, message []byte, signers []core.Crypto) []hotstuff.QuorumSignature {
+func CreateSignatures(t *testing.T, message []byte, signers []core.CertAuth) []hotstuff.QuorumSignature {
 	t.Helper()
 	sigs := make([]hotstuff.QuorumSignature, 0, len(signers))
 	for _, signer := range signers {
@@ -172,7 +172,7 @@ func signer(s hotstuff.QuorumSignature) hotstuff.ID {
 }
 
 // CreateTimeouts creates a set of TimeoutMsg messages from the given signers.
-func CreateTimeouts(t *testing.T, view hotstuff.View, signers []core.Crypto) (timeouts []hotstuff.TimeoutMsg) {
+func CreateTimeouts(t *testing.T, view hotstuff.View, signers []core.CertAuth) (timeouts []hotstuff.TimeoutMsg) {
 	t.Helper()
 	timeouts = make([]hotstuff.TimeoutMsg, 0, len(signers))
 	viewSigs := CreateSignatures(t, view.ToBytes(), signers)
@@ -191,7 +191,7 @@ func CreateTimeouts(t *testing.T, view hotstuff.View, signers []core.Crypto) (ti
 }
 
 // CreatePC creates a partial certificate using the given signer.
-func CreatePC(t *testing.T, block *hotstuff.Block, signer core.Crypto) hotstuff.PartialCert {
+func CreatePC(t *testing.T, block *hotstuff.Block, signer core.CertAuth) hotstuff.PartialCert {
 	t.Helper()
 	pc, err := signer.CreatePartialCert(block)
 	if err != nil {
@@ -201,7 +201,7 @@ func CreatePC(t *testing.T, block *hotstuff.Block, signer core.Crypto) hotstuff.
 }
 
 // CreatePCs creates one partial certificate using each of the given signers.
-func CreatePCs(t *testing.T, block *hotstuff.Block, signers []core.Crypto) []hotstuff.PartialCert {
+func CreatePCs(t *testing.T, block *hotstuff.Block, signers []core.CertAuth) []hotstuff.PartialCert {
 	t.Helper()
 	pcs := make([]hotstuff.PartialCert, 0, len(signers))
 	for _, signer := range signers {
@@ -211,7 +211,7 @@ func CreatePCs(t *testing.T, block *hotstuff.Block, signers []core.Crypto) []hot
 }
 
 // CreateQC creates a QC using the given signers.
-func CreateQC(t *testing.T, block *hotstuff.Block, signers []core.Crypto) hotstuff.QuorumCert {
+func CreateQC(t *testing.T, block *hotstuff.Block, signers []core.CertAuth) hotstuff.QuorumCert {
 	t.Helper()
 	if len(signers) == 0 {
 		return hotstuff.QuorumCert{}
@@ -224,7 +224,7 @@ func CreateQC(t *testing.T, block *hotstuff.Block, signers []core.Crypto) hotstu
 }
 
 // CreateTC generates a TC using the given signers.
-func CreateTC(t *testing.T, view hotstuff.View, signers []core.Crypto) hotstuff.TimeoutCert {
+func CreateTC(t *testing.T, view hotstuff.View, signers []core.CertAuth) hotstuff.TimeoutCert {
 	t.Helper()
 	if len(signers) == 0 {
 		return hotstuff.TimeoutCert{}

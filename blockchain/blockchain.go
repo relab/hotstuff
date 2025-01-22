@@ -8,6 +8,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/invoker"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/synctools"
 )
@@ -15,7 +16,7 @@ import (
 // BlockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type BlockChain struct {
-	invoker   core.ProtocolInvoker
+	invoker   *invoker.Invoker
 	eventLoop *core.EventLoop
 	logger    logging.Logger
 

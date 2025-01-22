@@ -1,5 +1,5 @@
 // Package crypto provides implementations of the Crypto interface.
-package cryptomod
+package certauth
 
 import (
 	"github.com/relab/hotstuff"
@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/netconfig"
 )
 
-type cryptoModule struct {
+type CertAuth struct {
 	blockChain    *blockchain.BlockChain
 	configuration *netconfig.Config
 
@@ -18,13 +18,13 @@ type cryptoModule struct {
 
 // New returns a new implementation of the Crypto interface. It will use the given CryptoBase to create and verify
 // signatures.
-func New(impl modules.CryptoBase) core.Crypto {
-	return &cryptoModule{CryptoBase: impl}
+func New(impl modules.CryptoBase) core.CertAuth {
+	return &CertAuth{CryptoBase: impl}
 }
 
 // InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (c *cryptoModule) InitModule(mods *core.Core) {
+func (c *CertAuth) InitModule(mods *core.Core) {
 	mods.Get(
 		&c.blockChain,
 		&c.configuration,
@@ -36,7 +36,7 @@ func (c *cryptoModule) InitModule(mods *core.Core) {
 }
 
 // CreatePartialCert signs a single block and returns the partial certificate.
-func (c cryptoModule) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
+func (c CertAuth) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
 	sig, err := c.Sign(block.ToBytes())
 	if err != nil {
 		return hotstuff.PartialCert{}, err
@@ -45,7 +45,7 @@ func (c cryptoModule) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.Pa
 }
 
 // CreateQuorumCert creates a quorum certificate from a list of partial certificates.
-func (c cryptoModule) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
+func (c CertAuth) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
 	// genesis QC is always valid.
 	if block.Hash() == hotstuff.GetGenesis().Hash() {
 		return hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), nil
@@ -62,7 +62,7 @@ func (c cryptoModule) CreateQuorumCert(block *hotstuff.Block, signatures []hotst
 }
 
 // CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
-func (c cryptoModule) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (cert hotstuff.TimeoutCert, err error) {
+func (c CertAuth) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (cert hotstuff.TimeoutCert, err error) {
 	// view 0 is always valid.
 	if view == 0 {
 		return hotstuff.NewTimeoutCert(nil, 0), nil
@@ -79,7 +79,7 @@ func (c cryptoModule) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff.
 }
 
 // CreateAggregateQC creates an AggregateQC from the given timeout messages.
-func (c cryptoModule) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (aggQC hotstuff.AggregateQC, err error) {
+func (c CertAuth) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (aggQC hotstuff.AggregateQC, err error) {
 	qcs := make(map[hotstuff.ID]hotstuff.QuorumCert)
 	sigs := make([]hotstuff.QuorumSignature, 0, len(timeouts))
 	for _, timeout := range timeouts {
@@ -98,7 +98,7 @@ func (c cryptoModule) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.
 }
 
 // VerifyPartialCert verifies a single partial certificate.
-func (c cryptoModule) VerifyPartialCert(cert hotstuff.PartialCert) bool {
+func (c CertAuth) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 	block, ok := c.blockChain.Get(cert.BlockHash())
 	if !ok {
 		return false
@@ -107,7 +107,7 @@ func (c cryptoModule) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
-func (c cryptoModule) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
+func (c CertAuth) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 	// genesis QC is always valid.
 	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
 		return true
@@ -123,7 +123,7 @@ func (c cryptoModule) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 }
 
 // VerifyTimeoutCert verifies a timeout certificate.
-func (c cryptoModule) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
+func (c CertAuth) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
 	// view 0 TC is always valid.
 	if tc.View() == 0 {
 		return true
@@ -135,7 +135,7 @@ func (c cryptoModule) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
 }
 
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
-func (c cryptoModule) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, ok bool) {
+func (c CertAuth) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, ok bool) {
 	messages := make(map[hotstuff.ID][]byte)
 	for id, qc := range aggQC.QCs() {
 		if highQC.View() < qc.View() || highQC == (hotstuff.QuorumCert{}) {

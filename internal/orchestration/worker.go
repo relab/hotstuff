@@ -13,13 +13,13 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
+	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/consensus/byzantine"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/cryptomod"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/logging"
@@ -203,7 +203,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		consensus.New(),
 		consensus.NewVotingMachine(),
 		committer.New(),
-		cryptomod.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
+		certauth.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
 		synchronizer.New(),
 		w.metricsLogger,
 		blockchain.New(),

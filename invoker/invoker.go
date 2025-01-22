@@ -191,7 +191,7 @@ func (inv *Invoker) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Bl
 	return convert.BlockFromProto(protoBlock), true
 }
 
-func (inv *Invoker) ReplicaNode(id hotstuff.ID) (core.Replica, bool) {
+func (inv *Invoker) ReplicaNode(id hotstuff.ID) (*Replica, bool) {
 	rep, ok := inv.replicas[id]
 	if !ok {
 		return nil, false

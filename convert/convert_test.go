@@ -7,9 +7,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/convert"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/cryptomod"
 
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
@@ -25,7 +25,7 @@ func TestConvertPartialCert(t *testing.T) {
 	testutil.TestModules(t, ctrl, 1, key, &builder)
 	hs := builder.Build()
 
-	var signer core.Crypto
+	var signer core.CertAuth
 	hs.Get(&signer)
 
 	want, err := signer.CreatePartialCert(hotstuff.GetGenesis())
@@ -51,7 +51,7 @@ func TestConvertQuorumCert(t *testing.T) {
 
 	signatures := testutil.CreatePCs(t, b1, hl.Signers())
 
-	var signer core.Crypto
+	var signer core.CertAuth
 	hl[0].Get(&signer)
 
 	want, err := signer.CreateQuorumCert(b1, signatures)
@@ -83,7 +83,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 
 	builders := testutil.CreateBuilders(t, ctrl, 4, testutil.GenerateKeys(t, 4, testutil.GenerateBLS12Key)...)
 	for i := range builders {
-		builders[i].Add(cryptomod.New(bls12.New()))
+		builders[i].Add(certauth.New(bls12.New()))
 	}
 	hl := builders.Build()
 
@@ -92,7 +92,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 	pb := convert.TimeoutCertToProto(tc1)
 	tc2 := convert.TimeoutCertFromProto(pb)
 
-	var signer core.Crypto
+	var signer core.CertAuth
 	hl[0].Get(&signer)
 
 	if !signer.VerifyTimeoutCert(tc2) {

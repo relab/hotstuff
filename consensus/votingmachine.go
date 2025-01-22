@@ -14,7 +14,7 @@ import (
 type VotingMachine struct {
 	blockChain    *blockchain.BlockChain
 	configuration *netconfig.Config
-	crypto        core.Crypto
+	crypto        core.CertAuth
 	eventLoop     *core.EventLoop
 	logger        logging.Logger
 	synchronizer  core.Synchronizer

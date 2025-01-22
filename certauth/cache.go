@@ -1,4 +1,4 @@
-package cryptomod
+package certauth
 
 import (
 	"container/list"
@@ -23,7 +23,7 @@ type cache struct {
 
 // NewCache returns a new Crypto instance that caches the results of the operations of the given CryptoBase.
 // implementation.
-func NewCache(impl modules.CryptoBase, capacity int) core.Crypto {
+func NewCache(impl modules.CryptoBase, capacity int) core.CertAuth {
 	return New(&cache{
 		impl:     impl,
 		capacity: capacity,
