@@ -14,6 +14,7 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/netconfig"
 )
 
 func init() {
@@ -141,7 +142,7 @@ func firstParticipant(participants hotstuff.IDSet) hotstuff.ID {
 }
 
 type bls12Base struct {
-	configuration core.Configuration
+	configuration *netconfig.Config
 	logger        logging.Logger
 	opts          *core.Options
 
@@ -177,14 +178,14 @@ func (bls *bls12Base) privateKey() *PrivateKey {
 
 func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *PublicKey, ok bool) {
 	if replica, ok := bls.configuration.Replica(id); ok {
-		if replica.ID() != bls.opts.ID() && !bls.checkPop(replica) {
+		if replica.ID != bls.opts.ID() && !bls.checkPop(replica) {
 			bls.logger.Warnf("Invalid POP for replica %d", id)
 			return nil, false
 		}
-		if pubKey, ok = replica.PublicKey().(*PublicKey); ok {
+		if pubKey, ok = replica.PubKey.(*PublicKey); ok {
 			return pubKey, true
 		}
-		bls.logger.Errorf("Unsupported public key type: %T", replica.PublicKey())
+		bls.logger.Errorf("Unsupported public key type: %T", replica.PubKey)
 	}
 	return nil, false
 }
@@ -236,22 +237,22 @@ func (bls *bls12Base) popVerify(pubKey *PublicKey, proof *bls12.PointG2) bool {
 	return bls.coreVerify(pubKey, pubKey.ToBytes(), proof, domainPOP)
 }
 
-func (bls *bls12Base) checkPop(replica core.Replica) (valid bool) {
+func (bls *bls12Base) checkPop(replica hotstuff.ReplicaInfo) (valid bool) {
 	defer func() {
 		if !valid {
-			bls.logger.Warnf("Invalid proof-of-possession for replica %d", replica.ID())
+			bls.logger.Warnf("Invalid proof-of-possession for replica %d", replica.ID)
 		}
 	}()
 
-	popBytes, ok := replica.Metadata()[popMetadataKey]
+	popBytes, ok := replica.MetaData[popMetadataKey]
 	if !ok {
-		bls.logger.Warnf("Missing proof-of-possession for replica: %d", replica.ID())
+		bls.logger.Warnf("Missing proof-of-possession for replica: %d", replica.ID)
 		return false
 	}
 
 	var key strings.Builder
 	key.WriteString(popBytes)
-	_, _ = key.Write(replica.PublicKey().(*PublicKey).ToBytes())
+	_, _ = key.Write(replica.PubKey.(*PublicKey).ToBytes())
 
 	bls.mut.RLock()
 	valid, ok = bls.popCache[key.String()]
@@ -265,7 +266,7 @@ func (bls *bls12Base) checkPop(replica core.Replica) (valid bool) {
 		return false
 	}
 
-	valid = bls.popVerify(replica.PublicKey().(*PublicKey), proof)
+	valid = bls.popVerify(replica.PubKey.(*PublicKey), proof)
 
 	bls.mut.Lock()
 	bls.popCache[key.String()] = valid

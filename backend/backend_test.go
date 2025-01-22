@@ -12,6 +12,7 @@ import (
 
 	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/invoker"
 	"github.com/relab/hotstuff/netconfig"
 
 	"github.com/relab/gorums"
@@ -36,12 +37,14 @@ func TestConnect(t *testing.T) {
 		defer teardown()
 		td.builders.Build()
 
-		cfg := netconfig.NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
+		cfg := netconfig.NewConfig()
+		inv := invoker.NewInvoker(td.creds, gorums.WithDialTimeout(time.Second))
+		td.builders[0].Add(cfg, inv)
 
 		builder.Add(cfg)
 		builder.Build()
 
-		err := cfg.Connect(td.replicas)
+		err := inv.Connect(td.replicas)
 		if err != nil {
 			t.Error(err)
 		}
@@ -59,15 +62,16 @@ func testBase(t *testing.T, typ any, send func(core.Configuration), handle core.
 		serverTeardown := createServers(t, td, ctrl)
 		defer serverTeardown()
 
-		cfg := netconfig.NewConfig(td.creds, gorums.WithDialTimeout(time.Second))
-		td.builders[0].Add(cfg)
+		cfg := netconfig.NewConfig()
+		inv := invoker.NewInvoker(td.creds, gorums.WithDialTimeout(time.Second))
+		td.builders[0].Add(cfg, inv)
 		hl := td.builders.Build()
 
-		err := cfg.Connect(td.replicas)
+		err := inv.Connect(td.replicas)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer cfg.Close()
+		defer inv.Close()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		for _, hs := range hl[1:] {
@@ -139,7 +143,7 @@ func TestTimeout(t *testing.T) {
 type testData struct {
 	n         int
 	creds     credentials.TransportCredentials
-	replicas  []netconfig.ReplicaInfo
+	replicas  []hotstuff.ReplicaInfo
 	listeners []net.Listener
 	keys      []hotstuff.PrivateKey
 	builders  testutil.BuilderList
@@ -152,13 +156,13 @@ func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
 
 	listeners := make([]net.Listener, n)
 	keys := make([]hotstuff.PrivateKey, 0, n)
-	replicas := make([]netconfig.ReplicaInfo, 0, n)
+	replicas := make([]hotstuff.ReplicaInfo, 0, n)
 
 	// generate keys and replicaInfo
 	for i := 0; i < n; i++ {
 		listeners[i] = testutil.CreateTCPListener(t)
 		keys = append(keys, testutil.GenerateECDSAKey(t))
-		replicas = append(replicas, netconfig.ReplicaInfo{
+		replicas = append(replicas, hotstuff.ReplicaInfo{
 			ID:      hotstuff.ID(i) + 1,
 			Address: listeners[i].Addr().String(),
 			PubKey:  keys[i].Public(),

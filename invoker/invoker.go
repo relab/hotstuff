@@ -29,7 +29,8 @@ type Invoker struct {
 	mgrOpts   []gorums.ManagerOption
 	connected bool
 
-	mgr *hotstuffpb.Manager
+	mgr      *hotstuffpb.Manager
+	replicas map[hotstuff.ID]*Replica
 
 	pbCfg *hotstuffpb.Configuration
 }
@@ -45,7 +46,8 @@ func NewInvoker(creds credentials.TransportCredentials, opts ...gorums.ManagerOp
 
 	// initialization will be finished by InitModule
 	return &Invoker{
-		mgrOpts: opts,
+		mgrOpts:  opts,
+		replicas: make(map[hotstuff.ID]*Replica),
 	}
 }
 
@@ -67,7 +69,19 @@ func (inv *Invoker) InitModule(mods *core.Core) {
 	})
 }
 
-func (inv *Invoker) Connect(replicas []netconfig.ReplicaInfo) (err error) {
+/*
+func (cfg *Config) SetReplicaNode(id hotstuff.ID, node *hotstuffpb.Node) {
+	replica := cfg.replicas[id].(*Replica)
+	replica.node = node
+}
+
+func (cfg *Config) SetReplicaMetaData(id hotstuff.ID, metaData map[string]string) {
+	replica := cfg.replicas[id].(*Replica)
+	replica.md = metaData
+}
+*/
+
+func (inv *Invoker) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 	mgrOpts := inv.mgrOpts
 	// TODO(AlanRostem): this was here when subConfig existed. Check if doing this is valid
 	// cfg.opts = nil // options are not needed beyond this point, so we delete them.
@@ -85,11 +99,15 @@ func (inv *Invoker) Connect(replicas []netconfig.ReplicaInfo) (err error) {
 	idMapping := make(map[string]uint32, len(replicas))
 	for _, replica := range replicas {
 		// also initialize Replica structures
-		inv.configuration.AddReplica(
-			replica.ID,
-			inv.eventLoop,
-			replica.PubKey,
-		)
+		realReplica := &Replica{
+			eventLoop: inv.eventLoop,
+			id:        replica.ID,
+			pubKey:    replica.PubKey,
+			// node and metaData is set later
+		}
+		inv.replicas[replica.ID] = realReplica
+		// add the info to the config
+		inv.configuration.AddReplica(replica)
 		// we do not want to connect to ourself
 		if replica.ID != inv.opts.ID() {
 			idMapping[replica.Address] = uint32(replica.ID)
@@ -107,7 +125,8 @@ func (inv *Invoker) Connect(replicas []netconfig.ReplicaInfo) (err error) {
 		// the node ID should correspond with the replica ID
 		// because we already configured an ID mapping for gorums to use.
 		id := hotstuff.ID(node.ID())
-		inv.configuration.SetReplicaNode(id, node)
+		replica := inv.replicas[id]
+		replica.node = node
 	}
 
 	inv.connected = true
@@ -148,7 +167,8 @@ func (inv *Invoker) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
 		return
 	}
 
-	inv.configuration.SetReplicaMetaData(id, readMetadata(md))
+	replica := inv.replicas[id]
+	replica.md = readMetadata(md)
 
 	inv.logger.Debugf("Replica %d connected from address %v", id, info.Addr)
 }
@@ -181,6 +201,14 @@ func (inv *Invoker) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Bl
 		return nil, false
 	}
 	return convert.BlockFromProto(protoBlock), true
+}
+
+func (inv *Invoker) ReplicaNode(id hotstuff.ID) (core.Replica, bool) {
+	rep, ok := inv.replicas[id]
+	if !ok {
+		return nil, false
+	}
+	return rep, ok
 }
 
 // Close closes all connections made by this configuration.

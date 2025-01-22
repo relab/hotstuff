@@ -196,6 +196,6 @@ func (ec *ecdsaBase) verifySingle(sig *Signature, hash hotstuff.Hash) bool {
 		ec.logger.Warnf("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
 		return false
 	}
-	pk := replica.PublicKey().(*ecdsa.PublicKey)
+	pk := replica.PubKey.(*ecdsa.PublicKey)
 	return ecdsa.Verify(pk, hash[:], sig.R(), sig.S())
 }

@@ -112,9 +112,9 @@ type Replica interface {
 // Configuration holds information about the current configuration of replicas that participate in the protocol,
 type Configuration interface {
 	// Replicas returns all of the replicas in the configuration.
-	Replicas() map[hotstuff.ID]Replica
+	Replicas() map[hotstuff.ID]hotstuff.ReplicaInfo
 	// Replica returns a replica if present in the configuration.
-	Replica(hotstuff.ID) (replica Replica, ok bool)
+	Replica(hotstuff.ID) (replica hotstuff.ReplicaInfo, ok bool)
 	// Len returns the number of replicas in the configuration.
 	Len() int
 	// QuorumSize returns the size of a quorum.
@@ -135,6 +135,8 @@ type ProtocolInvoker interface {
 	Timeout(msg hotstuff.TimeoutMsg)
 	// Fetch requests a block from all the replicas in the configuration.
 	Fetch(ctx context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool)
+	// ReplicaNode returns the internal replica with methods to invoke the protocol
+	ReplicaNode(id hotstuff.ID) (Replica, bool)
 }
 
 //go:generate mockgen -destination=../internal/mocks/consensus_mock.go -package=mocks . Consensus

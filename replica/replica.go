@@ -135,7 +135,7 @@ func (srv *Replica) StartServers(replicaListen, clientListen net.Listener) {
 }
 
 // Connect connects to the other replicas.
-func (srv *Replica) Connect(replicas []netconfig.ReplicaInfo) error {
+func (srv *Replica) Connect(replicas []hotstuff.ReplicaInfo) error {
 	return srv.invoker.Connect(replicas)
 }
 

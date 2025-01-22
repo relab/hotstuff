@@ -2,7 +2,6 @@ package netconfig
 
 import (
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 
 	"github.com/relab/hotstuff/logging"
 
@@ -16,7 +15,7 @@ type Config struct {
 	logger    logging.Logger
 	opts      *core.Options
 
-	replicas map[hotstuff.ID]core.Replica
+	replicas map[hotstuff.ID]hotstuff.ReplicaInfo
 }
 
 // InitModule initializes the configuration.
@@ -32,28 +31,23 @@ func (cfg *Config) InitModule(mods *core.Core) {
 func NewConfig() *Config {
 	// initialization will be finished by InitModule
 	cfg := &Config{
-		replicas: make(map[hotstuff.ID]core.Replica),
+		replicas: make(map[hotstuff.ID]hotstuff.ReplicaInfo),
 	}
 	return cfg
 }
 
-// ReplicaInfo holds information about a replica.
-type ReplicaInfo struct {
-	ID       hotstuff.ID
-	Address  string
-	PubKey   hotstuff.PublicKey
-	Location string
-}
-
 // Replicas returns all of the replicas in the configuration.
-func (cfg *Config) Replicas() map[hotstuff.ID]core.Replica {
+func (cfg *Config) Replicas() map[hotstuff.ID]hotstuff.ReplicaInfo {
 	return cfg.replicas
 }
 
 // Replica returns a replica if it is present in the configuration.
-func (cfg *Config) Replica(id hotstuff.ID) (replica core.Replica, ok bool) {
-	replica, ok = cfg.replicas[id]
-	return
+func (cfg *Config) Replica(id hotstuff.ID) (replica hotstuff.ReplicaInfo, ok bool) {
+	r, ok := cfg.replicas[id]
+	if !ok {
+		return hotstuff.ReplicaInfo{}, false
+	}
+	return r, true
 }
 
 // GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
@@ -90,27 +84,8 @@ func (cfg *Config) QuorumSize() int {
 
 // Custom methods not part of core.Configuration interface.
 
-func (cfg *Config) AddReplica(
-	id hotstuff.ID,
-	eventLoop *core.EventLoop,
-	pubKey hotstuff.PublicKey,
-) {
-	cfg.replicas[id] = &Replica{
-		eventLoop: eventLoop,
-		id:        id,
-		pubKey:    pubKey,
-		md:        make(map[string]string),
-	}
-}
-
-func (cfg *Config) SetReplicaNode(id hotstuff.ID, node *hotstuffpb.Node) {
-	replica := cfg.replicas[id].(*Replica)
-	replica.node = node
-}
-
-func (cfg *Config) SetReplicaMetaData(id hotstuff.ID, metaData map[string]string) {
-	replica := cfg.replicas[id].(*Replica)
-	replica.md = metaData
+func (cfg *Config) AddReplica(replicaInfo hotstuff.ReplicaInfo) {
+	cfg.replicas[replicaInfo.ID] = replicaInfo
 }
 
 var _ core.Configuration = (*Config)(nil)

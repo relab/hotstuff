@@ -383,3 +383,12 @@ func writeParticipants(wr io.Writer, participants IDSet) (err error) {
 	})
 	return err
 }
+
+// ReplicaInfo holds information about a replica.
+type ReplicaInfo struct {
+	ID       ID
+	Address  string
+	PubKey   PublicKey
+	Location string
+	MetaData map[string]string
+}

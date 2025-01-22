@@ -351,7 +351,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		if ok {
 			s.AdvanceView(sInfo)
 		}
-	} else if replica, ok := s.configuration.Replica(leader); ok {
+	} else if replica, ok := s.invoker.ReplicaNode(leader); ok {
 		replica.NewView(syncInfo)
 	}
 }

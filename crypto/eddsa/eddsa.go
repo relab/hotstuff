@@ -174,6 +174,6 @@ func (ed *eddsaBase) verifySingle(sig *Signature, message []byte) bool {
 		ed.logger.Warnf("eddsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
 		return false
 	}
-	pk := replica.PublicKey().(ed25519.PublicKey)
+	pk := replica.PubKey.(ed25519.PublicKey)
 	return ed25519.Verify(pk, message, sig.sign)
 }

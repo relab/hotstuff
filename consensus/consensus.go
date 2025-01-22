@@ -244,7 +244,7 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 		return
 	}
 
-	leader, ok := cs.configuration.Replica(leaderID)
+	leader, ok := cs.invoker.ReplicaNode(leaderID)
 	if !ok {
 		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
 		return

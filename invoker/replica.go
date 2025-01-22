@@ -1,4 +1,4 @@
-package netconfig
+package invoker
 
 import (
 	"github.com/relab/hotstuff"

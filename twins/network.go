@@ -283,26 +283,24 @@ func (c *configuration) shouldDrop(id NodeID, message any) bool {
 }
 
 // Replicas returns all of the replicas in the configuration.
-func (c *configuration) Replicas() map[hotstuff.ID]core.Replica {
-	m := make(map[hotstuff.ID]core.Replica)
+func (c *configuration) Replicas() map[hotstuff.ID]hotstuff.ReplicaInfo {
+	m := make(map[hotstuff.ID]hotstuff.ReplicaInfo)
 	for id := range c.network.replicas {
-		m[id] = &replica{
-			config: c,
-			id:     id,
+		m[id] = hotstuff.ReplicaInfo{
+			ID: id, // TODO: More fields
 		}
 	}
 	return m
 }
 
 // Replica returns a replica if present in the configuration.
-func (c *configuration) Replica(id hotstuff.ID) (r core.Replica, ok bool) {
+func (c *configuration) Replica(id hotstuff.ID) (r hotstuff.ReplicaInfo, ok bool) {
 	if _, ok = c.network.replicas[id]; ok {
-		return &replica{
-			config: c,
-			id:     id,
+		return hotstuff.ReplicaInfo{
+			ID: id, // TODO: More fields
 		}, true
 	}
-	return nil, false
+	return hotstuff.ReplicaInfo{}, false
 }
 
 // GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
