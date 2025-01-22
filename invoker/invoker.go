@@ -62,24 +62,12 @@ func (inv *Invoker) InitModule(mods *core.Core) {
 	// We delay processing `replicaConnected` events until after the configurations `connected` event has occurred.
 	inv.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(event any) {
 		if !inv.connected {
-			inv.eventLoop.DelayUntil(netconfig.ConnectedEvent{}, event)
+			inv.eventLoop.DelayUntil(ConnectedEvent{}, event)
 			return
 		}
 		inv.replicaConnected(event.(hotstuff.ReplicaConnectedEvent))
 	})
 }
-
-/*
-func (cfg *Config) SetReplicaNode(id hotstuff.ID, node *hotstuffpb.Node) {
-	replica := cfg.replicas[id].(*Replica)
-	replica.node = node
-}
-
-func (cfg *Config) SetReplicaMetaData(id hotstuff.ID, metaData map[string]string) {
-	replica := cfg.replicas[id].(*Replica)
-	replica.md = metaData
-}
-*/
 
 func (inv *Invoker) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 	mgrOpts := inv.mgrOpts
@@ -132,7 +120,7 @@ func (inv *Invoker) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 	inv.connected = true
 
 	// this event is sent so that any delayed `replicaConnected` events can be processed.
-	inv.eventLoop.AddEvent(netconfig.ConnectedEvent{})
+	inv.eventLoop.AddEvent(ConnectedEvent{})
 
 	return nil
 }
@@ -251,3 +239,6 @@ func (q qspec) FetchQF(in *hotstuffpb.BlockHash, replies map[uint32]*hotstuffpb.
 	}
 	return nil, false
 }
+
+// ConnectedEvent is sent when the configuration has connected to the other replicas.
+type ConnectedEvent struct{}

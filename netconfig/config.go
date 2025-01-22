@@ -3,28 +3,18 @@ package netconfig
 import (
 	"github.com/relab/hotstuff/core"
 
-	"github.com/relab/hotstuff/logging"
-
 	"github.com/relab/hotstuff"
 )
 
 // Config holds information about the current configuration of replicas that participate in the protocol,
-// and some information about the local replica. It also provides methods to send messages to the other replicas.
+// and some information about the local replica.
 type Config struct {
-	eventLoop *core.EventLoop
-	logger    logging.Logger
-	opts      *core.Options
-
 	replicas map[hotstuff.ID]hotstuff.ReplicaInfo
 }
 
 // InitModule initializes the configuration.
 func (cfg *Config) InitModule(mods *core.Core) {
-	mods.Get(
-		&cfg.eventLoop,
-		&cfg.logger,
-		&cfg.opts,
-	)
+
 }
 
 // NewConfig creates a new configuration.

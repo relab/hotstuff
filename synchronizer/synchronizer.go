@@ -11,6 +11,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/netconfig"
 
 	"github.com/relab/hotstuff"
 )
@@ -20,7 +21,7 @@ type Synchronizer struct {
 	blockChain     *blockchain.BlockChain
 	consensus      core.Consensus
 	crypto         core.Crypto
-	configuration  core.Configuration
+	configuration  *netconfig.Config
 	invoker        core.ProtocolInvoker
 	eventLoop      *core.EventLoop
 	leaderRotation modules.LeaderRotation

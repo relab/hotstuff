@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/netconfig"
 )
 
 func init() {
@@ -19,7 +20,7 @@ func init() {
 type carousel struct {
 	blockChain     *blockchain.BlockChain
 	consensusRules modules.Rules
-	configuration  core.Configuration
+	configuration  *netconfig.Config
 	committer      core.Committer
 	opts           *core.Options
 	logger         logging.Logger

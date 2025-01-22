@@ -4,6 +4,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/netconfig"
 )
 
 func init() {
@@ -11,7 +12,7 @@ func init() {
 }
 
 type roundRobin struct {
-	configuration core.Configuration
+	configuration *netconfig.Config
 }
 
 func (rr *roundRobin) InitModule(mods *core.Core) {

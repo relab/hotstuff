@@ -13,6 +13,7 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/netconfig"
 )
 
 func init() {
@@ -68,7 +69,7 @@ func (sig Signature) ToBytes() []byte {
 }
 
 type ecdsaBase struct {
-	configuration core.Configuration
+	configuration *netconfig.Config
 	logger        logging.Logger
 	opts          *core.Options
 }
