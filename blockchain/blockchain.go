@@ -144,25 +144,37 @@ func (chain *BlockChain) Extends(block, target *hotstuff.Block) bool {
 	return ok && current.Hash() == target.Hash()
 }
 
-func (chain *BlockChain) PruneToHeight(height hotstuff.View) (prunedBlocks map[hotstuff.View]*hotstuff.Block) {
+func (chain *BlockChain) PruneToHeight(committedHeight, height hotstuff.View) (forkedBlocks []*hotstuff.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
-	prunedBlocks = make(map[hotstuff.View]*hotstuff.Block)
 
-	for h := height; h > chain.pruneHeight; h-- {
+	committedViews := make(map[hotstuff.View]bool)
+	committedViews[committedHeight] = true
+	for h := committedHeight; h >= chain.pruneHeight; {
 		block, ok := chain.blockAtHeight[h]
 		if !ok {
-			continue
+			break
 		}
-		// Add pruned blocks to list and go back a height
-		// prunedBlocks = append(prunedBlocks, block)
-		prunedBlocks[block.View()] = block
-		delete(chain.blockAtHeight, h)
+		parent, ok := chain.blocks[block.Parent()]
+		if !ok || parent.View() < chain.pruneHeight {
+			break
+		}
+		h = parent.View()
+		committedViews[h] = true
 	}
 
+	for h := height; h > chain.pruneHeight; h-- {
+		if !committedViews[h] {
+			block, ok := chain.blockAtHeight[h]
+			if ok {
+				chain.logger.Debugf("PruneToHeight: found forked block: %v", block)
+				forkedBlocks = append(forkedBlocks, block)
+			}
+		}
+		delete(chain.blockAtHeight, h)
+	}
 	chain.pruneHeight = height
-
-	return
+	return forkedBlocks
 }
 
 func (chain *BlockChain) PruneHeight() hotstuff.View {

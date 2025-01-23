@@ -155,7 +155,7 @@ type Consensus interface {
 // Committer is a helper module which handles block commits and forks.
 type Committer interface {
 	// Stores the block before further execution.
-	Commit(committedHeight hotstuff.View, block *hotstuff.Block)
+	Commit(block *hotstuff.Block)
 
 	// CommittedBlock returns the most recently committed block.
 	CommittedBlock() *hotstuff.Block
