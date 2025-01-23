@@ -96,7 +96,7 @@ func run(t *testing.T, cfg *config.ExperimentConfig) {
 
 func TestOrchestration(t *testing.T) {
 	fork := map[string][]uint32{"fork": {1}}
-	silent := map[string][]uint32{"silent": {1}}
+	silence := map[string][]uint32{"silence": {1}}
 
 	tests := []struct {
 		consensus    string
@@ -117,7 +117,7 @@ func TestOrchestration(t *testing.T) {
 		{consensus: "simplehotstuff", crypto: "eddsa", replicas: 4},
 		{consensus: "simplehotstuff", crypto: "bls12", replicas: 4},
 		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: fork, replicas: 4},
-		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: silent, replicas: 4},
+		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: silence, replicas: 4},
 		{consensus: "chainedhotstuff", crypto: "ecdsa", mods: []string{"kauri"}, replicas: 7, branchFactor: 2},
 		{consensus: "chainedhotstuff", crypto: "bls12", mods: []string{"kauri"}, replicas: 7, branchFactor: 2},
 		{consensus: "chainedhotstuff", crypto: "ecdsa", mods: []string{"kauri"}, replicas: 7, branchFactor: 2, randomTree: true},
