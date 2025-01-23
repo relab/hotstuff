@@ -10,7 +10,7 @@ import "google/protobuf/duration.proto";
 /*                              General messages                              */
 /* -------------------------------------------------------------------------- */
 
-// ReplicaOpts contains the confiugration options for a replica.
+// ReplicaOpts contains the configuration options for a replica.
 message ReplicaOpts {
   // The replica's ID.
   uint32 ID = 1;
@@ -55,6 +55,10 @@ message ReplicaOpts {
   repeated string Locations = 22;
   // Tree positions of the replica.
   repeated uint32 TreePositions = 23;
+  // Branch Factor in tree communication
+  uint32 BranchFactor = 24;
+  // Tree Duration in tree communication
+  google.protobuf.Duration TreeDelta = 25;
 }
 
 // ReplicaInfo is the information that the replicas need about each other.

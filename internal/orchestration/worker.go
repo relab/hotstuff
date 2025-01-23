@@ -45,6 +45,7 @@ import (
 	_ "github.com/relab/hotstuff/crypto/bls12"
 	_ "github.com/relab/hotstuff/crypto/ecdsa"
 	_ "github.com/relab/hotstuff/crypto/eddsa"
+	_ "github.com/relab/hotstuff/kauri"
 	_ "github.com/relab/hotstuff/leaderrotation"
 )
 
@@ -151,6 +152,7 @@ func (w *Worker) createReplicas(req *orchestrationpb.CreateReplicaRequest) (*orc
 
 func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Replica, error) {
 	w.metricsLogger.Log(opts)
+	logger := logging.New("hs" + strconv.Itoa(int(opts.GetID())))
 
 	// get private key and certificates
 	privKey, err := keygen.ParsePrivateKey(opts.GetPrivateKey())
@@ -175,9 +177,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
 	}
 
-	if opts.GetByzantineStrategy() != "" {
-		if byz, ok := modules.GetModule[byzantine.Byzantine](opts.GetByzantineStrategy()); ok {
+	strategy := opts.GetByzantineStrategy()
+	if strategy != "" {
+		if byz, ok := modules.GetModule[byzantine.Byzantine](strategy); ok {
 			consensusRules = byz.Wrap(consensusRules)
+			logger.Infof("assigned byzantine strategy: %s", strategy)
+
 		} else {
 			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
 		}
@@ -193,12 +198,17 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
 
-	duration := synchronizer.NewViewDuration(
-		uint64(opts.GetTimeoutSamples()),
-		float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-		float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-		float64(opts.GetTimeoutMultiplier()),
-	)
+	var duration modules.ViewDuration
+	if opts.GetLeaderRotation() == "tree-leader" {
+		duration = synchronizer.NewFixedViewDuration(opts.GetInitialTimeout().AsDuration())
+	} else {
+		duration = synchronizer.NewViewDuration(
+			uint64(opts.GetTimeoutSamples()),
+			float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
+			float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
+			float64(opts.GetTimeoutMultiplier()),
+		)
+	}
 
 	conf := hotstuff.ReplicaConfig{
 		ID:          hotstuff.ID(opts.GetID()),
@@ -231,17 +241,17 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 
 	builderOpt := builder.Options()
 	builderOpt.SetSharedRandomSeed(opts.GetSharedSeed())
+	builderOpt.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
 
 	netConfiguration := netconfig.NewConfig()
-	eventLoop := core.NewEventLoop(1000)
-	logger := logging.New("hs" + strconv.Itoa(int(opts.GetID())))
+	eventLoop := core.NewEventLoop(logger, 1000)
 	protocolInvoker := invoker.New(netConfiguration, eventLoop, logger, builderOpt, creds, managerOpts...)
 
 	cmdCache := clientsrv.NewCmdCache(logger, int(conf.BatchSize))
 	clientSrv := clientsrv.NewClientServer(eventLoop, logger, cmdCache, clientSrvOpts)
 	blockChain := blockchain.New(protocolInvoker, eventLoop, logger)
 	committer := committer.New(blockChain, clientSrv, logger)
-	certAuthority := certauth.NewCache(cryptoImpl, blockChain, netConfiguration, 100) // TODO: consider making this configurable
+	certAuthority := certauth.NewCache(cryptoImpl, blockChain, netConfiguration, logger, 100) // TODO: consider making this configurable
 	csus := consensus.New(
 		consensusRules,
 		leaderRotation,
@@ -300,6 +310,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 		clientSrv,
 		protocolInvoker,
+		builderOpt,
 
 		conf,
 		builder), nil
@@ -369,7 +380,8 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		}
 		mods := core.NewBuilder(hotstuff.ID(opts.GetID()), nil)
 		buildOpt := mods.Options()
-		eventLoop := core.NewEventLoop(1000)
+		logger := logging.New("cli" + strconv.Itoa(int(opts.GetID())))
+		eventLoop := core.NewEventLoop(logger, 1000)
 		mods.Add(eventLoop)
 
 		if w.measurementInterval > 0 {
@@ -379,7 +391,6 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		}
 
 		mods.Add(w.metricsLogger)
-		logger := logging.New("cli" + strconv.Itoa(int(opts.GetID())))
 		mods.Add(logger)
 		cli := client.New(
 			eventLoop,

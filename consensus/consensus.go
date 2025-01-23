@@ -56,6 +56,8 @@ type Consensus struct {
 
 	handel core.Handel
 
+	kauri modules.Kauri
+
 	lastVote hotstuff.View
 	view     hotstuff.View
 
@@ -163,8 +165,10 @@ func (cs *Consensus) Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncIn
 	}
 
 	cs.blockChain.Store(proposal.Block)
-
-	cs.invoker.Propose(proposal)
+	// kauri sends the proposal to only the children
+	if cs.kauri == nil {
+		cs.invoker.Propose(proposal)
+	}
 	// self vote
 	return cs.OnPropose(view, proposal)
 }
@@ -242,12 +246,10 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 
 	cs.lastVote = block.View()
 
-	if cs.handel != nil {
-		// let Handel handle the voting
-		cs.handel.Begin(pc)
+	if cs.kauri != nil {
+		cs.kauri.Begin(pc, proposal)
 		return
 	}
-
 	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
 	if leaderID == cs.opts.ID() {
 		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})

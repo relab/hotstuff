@@ -13,6 +13,10 @@ type Queue struct {
 }
 
 func NewQueue(capacity uint) Queue {
+	if capacity == 0 {
+		panic("capacity must be greater than 0")
+	}
+
 	return Queue{
 		entries:   make([]any, capacity),
 		head:      -1,
@@ -21,13 +25,11 @@ func NewQueue(capacity uint) Queue {
 	}
 }
 
-func (q *Queue) Push(entry any) {
+// Push adds an entry to the buffer in a FIFO fashion. If the queue is full, the first
+// entry is dropped to make space for the newest entry and returns true.
+func (q *Queue) Push(entry any) (droppedEvent any) {
 	q.mut.Lock()
 	defer q.mut.Unlock()
-
-	if len(q.entries) == 0 {
-		panic("cannot push to a queue with capacity 0")
-	}
 
 	pos := q.tail + 1
 	if pos == len(q.entries) {
@@ -39,6 +41,7 @@ func (q *Queue) Push(entry any) {
 		if q.head == len(q.entries) {
 			q.head = 0
 		}
+		droppedEvent = q.entries[q.head]
 	}
 	q.entries[pos] = entry
 	q.tail = pos
@@ -51,8 +54,11 @@ func (q *Queue) Push(entry any) {
 	case q.readyChan <- struct{}{}:
 	default:
 	}
+	return droppedEvent
 }
 
+// pop removes the first entry and returns it.
+// If the buffer is empty, nil and false is returned.
 func (q *Queue) Pop() (entry any, ok bool) {
 	q.mut.Lock()
 	defer q.mut.Unlock()
@@ -76,6 +82,7 @@ func (q *Queue) Pop() (entry any, ok bool) {
 	return entry, true
 }
 
+// len returns the number of entries in the buffer.
 func (q *Queue) Len() int {
 	q.mut.Lock()
 	defer q.mut.Unlock()
@@ -91,6 +98,8 @@ func (q *Queue) Len() int {
 	return len(q.entries) - q.head + q.tail + 1
 }
 
+// ready returns a channel that can block when the buffer
+// contains at least one item.
 func (q *Queue) Ready() <-chan struct{} {
 	return q.readyChan
 }

@@ -13,7 +13,7 @@ var schemaFile string
 
 // Load loads a cue configuration from filename and returns a Config struct.
 // The configuration is validated against the schema embedded in the binary.
-func Load(filename string) (*Config, error) {
+func Load(filename string) (*HostConfig, error) {
 	ctx := cuecontext.New()
 	schema := ctx.CompileString(schemaFile).LookupPath(cue.ParsePath("config"))
 	if schema.Err() != nil {
@@ -31,7 +31,7 @@ func Load(filename string) (*Config, error) {
 	if err := unified.Validate(cue.Concrete(true)); err != nil {
 		return nil, err
 	}
-	conf := &Config{}
+	conf := &HostConfig{}
 	if err := cfg.Decode(conf); err != nil {
 		return nil, err
 	}

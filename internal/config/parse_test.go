@@ -18,21 +18,21 @@ func TestLoad(t *testing.T) {
 		"silent": {2, 5},
 		"slow":   {4},
 	}
-	validLocOnlyCfg := &config.Config{
+	validLocOnlyCfg := &config.HostConfig{
 		ReplicaHosts: replicaHosts,
 		ClientHosts:  clientHosts,
 		Replicas:     10,
 		Clients:      2,
 		Locations:    locations,
 	}
-	validLocOnlyDupEntriesCfg := &config.Config{
+	validLocOnlyDupEntriesCfg := &config.HostConfig{
 		ReplicaHosts: replicaHosts,
 		ClientHosts:  clientHosts,
 		Replicas:     10,
 		Clients:      2,
 		Locations:    locationsWithDuplicates,
 	}
-	validLocTreeCfg := &config.Config{
+	validLocTreeCfg := &config.HostConfig{
 		ReplicaHosts:  replicaHosts,
 		ClientHosts:   clientHosts,
 		Replicas:      10,
@@ -41,7 +41,7 @@ func TestLoad(t *testing.T) {
 		TreePositions: treePositions,
 		BranchFactor:  5,
 	}
-	validLocTreeByzCfg := &config.Config{
+	validLocTreeByzCfg := &config.HostConfig{
 		ReplicaHosts:      replicaHosts,
 		ClientHosts:       clientHosts,
 		Replicas:          10,
@@ -51,14 +51,14 @@ func TestLoad(t *testing.T) {
 		BranchFactor:      5,
 		ByzantineStrategy: byzantineStrategy,
 	}
-	valid2LocOnlyCfg := &config.Config{
+	valid2LocOnlyCfg := &config.HostConfig{
 		ReplicaHosts: []string{"relab1"},
 		ClientHosts:  []string{"relab2"},
 		Replicas:     3,
 		Clients:      2,
 		Locations:    []string{"paris", "rome", "oslo"},
 	}
-	valid2LocTreeCfg := &config.Config{
+	valid2LocTreeCfg := &config.HostConfig{
 		ReplicaHosts:  []string{"relab1"},
 		ClientHosts:   []string{"relab2"},
 		Replicas:      5,
@@ -67,7 +67,7 @@ func TestLoad(t *testing.T) {
 		TreePositions: []uint32{3, 2, 1, 4, 5},
 		BranchFactor:  2,
 	}
-	valid2NoLocNoTree := &config.Config{
+	valid2NoLocNoTree := &config.HostConfig{
 		ReplicaHosts: []string{"relab1"},
 		ClientHosts:  []string{"relab2"},
 		Replicas:     3,
@@ -76,7 +76,7 @@ func TestLoad(t *testing.T) {
 	tests := []struct {
 		name     string
 		filename string
-		wantCfg  *config.Config
+		wantCfg  *config.HostConfig
 		wantErr  bool
 	}{
 		{name: "ValidLocationsOnly", filename: "valid-loc-only.cue", wantCfg: validLocOnlyCfg, wantErr: false},

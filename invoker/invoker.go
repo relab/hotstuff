@@ -208,6 +208,31 @@ func (inv *Invoker) Close() {
 	inv.mgr.Close()
 }
 
+func (inv *Invoker) GorumsConfig() gorums.RawConfiguration {
+	return inv.pbCfg.RawConfiguration
+}
+
+// Sub returns an Invoker copy dedicated to the replica IDs provided.
+func (inv *Invoker) Sub(ids []hotstuff.ID) (*Invoker, error) {
+	replicas := make(map[hotstuff.ID]*Replica)
+	nids := make([]uint32, len(ids))
+	for i, id := range ids {
+		nids[i] = uint32(id)
+		replicas[id] = inv.replicas[id]
+	}
+	newCfg, err := inv.mgr.NewConfiguration(qspec{}, gorums.WithNodeIDs(nids))
+	if err != nil {
+		return nil, err
+	}
+	return &Invoker{
+		eventLoop: inv.eventLoop,
+		logger:    inv.logger,
+		opts:      inv.opts,
+		pbCfg:     newCfg,
+		replicas:  replicas,
+	}, nil
+}
+
 const keyPrefix = "hotstuff-"
 
 func mapToMetadata(m map[string]string) metadata.MD {

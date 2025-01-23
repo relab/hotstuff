@@ -3,6 +3,7 @@ package core
 import (
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/relab/hotstuff"
 )
@@ -42,6 +43,9 @@ type Options struct {
 
 	sharedRandomSeed   int64
 	connectionMetadata map[string]string
+
+	treeConfig    *TreeConfig
+	shouldUseTree bool
 }
 
 func (opts *Options) ensureSpace(id OptionID) {
@@ -50,6 +54,37 @@ func (opts *Options) ensureSpace(id OptionID) {
 		copy(newOpts, opts.options)
 		opts.options = newOpts
 	}
+}
+
+// TreeConfig stores the tree configuration
+type TreeConfig struct {
+	bf            int
+	treePos       []hotstuff.ID
+	treeWaitDelta time.Duration
+}
+
+// BranchFactor returns the branch factor of the tree.
+func (tc *TreeConfig) BranchFactor() int {
+	return tc.bf
+}
+
+// TreePos returns the tree positions of the replicas.
+func (tc *TreeConfig) TreePos() []hotstuff.ID {
+	return tc.treePos
+}
+
+// TreeWaitDelta returns the time to wait for a tree node to be ready.
+func (tc *TreeConfig) TreeWaitDelta() time.Duration {
+	return tc.treeWaitDelta
+}
+
+// SetShouldUseTree sets the ShouldUseTree setting to true.
+func (opts *Options) SetShouldUseTree() {
+	opts.shouldUseTree = true
+}
+
+func (opts *Options) ShouldUseTree() bool {
+	return opts.shouldUseTree
 }
 
 // Get returns the value associated with the given option ID.
@@ -78,6 +113,11 @@ func (opts *Options) ID() hotstuff.ID {
 // PrivateKey returns the private key.
 func (opts *Options) PrivateKey() hotstuff.PrivateKey {
 	return opts.privateKey
+}
+
+// TreeConfig returns the tree config
+func (opts *Options) TreeConfig() *TreeConfig {
+	return opts.treeConfig
 }
 
 // ShouldUseAggQC returns true if aggregated quorum certificates should be used.
@@ -110,6 +150,14 @@ func (opts *Options) SetShouldUseAggQC() {
 // SetShouldVerifyVotesSync sets the ShouldVerifyVotesSync setting to true.
 func (opts *Options) SetShouldVerifyVotesSync() {
 	opts.shouldVerifyVotesSync = true
+}
+
+func (opts *Options) SetTreeConfig(bf uint32, treePos []hotstuff.ID, treeWaitDelta time.Duration) {
+	opts.treeConfig = &TreeConfig{
+		bf:            int(bf),
+		treePos:       treePos,
+		treeWaitDelta: treeWaitDelta,
+	}
 }
 
 // SetSharedRandomSeed sets the shared random seed.

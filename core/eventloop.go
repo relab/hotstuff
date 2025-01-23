@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/util/gpool"
 	"github.com/relab/hotstuff/util/queue"
 )
@@ -52,6 +53,8 @@ type handler struct {
 
 // EventLoop accepts events of any type and executes registered event handlers.
 type EventLoop struct {
+	logger logging.Logger
+
 	eventQ queue.Queue
 
 	mut sync.Mutex // protects the following:
@@ -67,8 +70,13 @@ type EventLoop struct {
 }
 
 // New returns a new event loop with the requested buffer size.
-func NewEventLoop(bufferSize uint) *EventLoop {
+func NewEventLoop(
+	logger logging.Logger,
+	bufferSize uint,
+) *EventLoop {
 	el := &EventLoop{
+		logger: logger,
+
 		ctx:           context.Background(),
 		eventQ:        queue.NewQueue(bufferSize),
 		waitingEvents: make(map[reflect.Type][]any),
@@ -130,7 +138,10 @@ func (el *EventLoop) AddEvent(event any) {
 	if event != nil {
 		// run handlers with runInAddEvent option
 		el.processEvent(event, true)
-		el.eventQ.Push(event)
+		droppedEvent := el.eventQ.Push(event)
+		if droppedEvent != nil {
+			el.logger.Warnf("event queue is full, dropped event: %v", droppedEvent)
+		}
 	}
 }
 
@@ -309,7 +320,10 @@ func (el *EventLoop) AddTicker(interval time.Duration, callback func(tick time.T
 
 	// We want the ticker to inherit the context of the event loop,
 	// so we need to start the ticker from the run loop.
-	el.eventQ.Push(startTickerEvent{id})
+	droppedEvent := el.eventQ.Push(startTickerEvent{id})
+	if droppedEvent != nil {
+		el.logger.Warnf("event queue is full, dropped event: %v", droppedEvent)
+	}
 
 	return id
 }

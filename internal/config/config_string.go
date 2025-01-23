@@ -11,7 +11,7 @@ func join[T any](a []T, sep string) string {
 	return strings.Trim(strings.ReplaceAll(fmt.Sprint(a), " ", sep), "[]")
 }
 
-func (c *Config) String() string {
+func (c *HostConfig) String() string {
 	s := strings.Builder{}
 	s.WriteString("ReplicaHosts: ")
 	s.WriteString(strings.Join(c.ReplicaHosts, ", "))
@@ -36,7 +36,7 @@ func (c *Config) String() string {
 		s.WriteString(join(c.TreePositions, ", "))
 		s.WriteString(", ")
 		s.WriteString("BranchFactor: ")
-		s.WriteString(strconv.Itoa(c.BranchFactor))
+		s.WriteString(strconv.Itoa(int(c.BranchFactor)))
 	}
 	if len(c.ByzantineStrategy) == 0 {
 		return s.String()

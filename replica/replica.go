@@ -44,6 +44,7 @@ func New(
 	logger logging.Logger,
 	clientSrv *clientsrv.ClientServer,
 	invoker *invoker.Invoker,
+	opts *core.Options,
 
 	conf hotstuff.ReplicaConfig,
 	builder core.Builder) (replica *Replica) {
@@ -72,6 +73,7 @@ func New(
 		configuration,
 		eventLoop,
 		logger,
+		opts,
 
 		backend.WithLatencies(conf.ID, conf.Locations),
 		backend.WithGorumsServerOptions(replicaSrvOpts...),

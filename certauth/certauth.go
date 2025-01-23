@@ -4,7 +4,7 @@ package certauth
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/netconfig"
 )
@@ -12,6 +12,7 @@ import (
 type CertAuthority struct {
 	impl modules.CryptoBase
 
+	logger        logging.Logger
 	blockChain    *blockchain.BlockChain
 	configuration *netconfig.Config
 }
@@ -23,20 +24,14 @@ func New(
 
 	blockChain *blockchain.BlockChain,
 	configuration *netconfig.Config,
+	logger logging.Logger,
 ) *CertAuthority {
 	return &CertAuthority{
 		impl: impl,
 
+		logger:        logger,
 		blockChain:    blockChain,
 		configuration: configuration,
-	}
-}
-
-// InitModule gives the module a reference to the Core object.
-// It also allows the module to set module options using the OptionsBuilder.
-func (c *CertAuthority) InitModule(mods *core.Core) {
-	if mod, ok := c.impl.(core.Module); ok {
-		mod.InitModule(mods)
 	}
 }
 
@@ -117,7 +112,15 @@ func (c CertAuthority) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
 		return true
 	}
-	if qc.Signature().Participants().Len() < c.configuration.QuorumSize() {
+
+	// TODO: FIX BUG - qcSignature can be nil when a leader is byzantine.
+	qcSignature := qc.Signature()
+	if qcSignature == nil {
+		c.logger.DPanicf("quorum certificate has nil signature (view=%d)", qc.View())
+	}
+
+	participants := qcSignature.Participants()
+	if participants.Len() < c.configuration.QuorumSize() {
 		return false
 	}
 	block, ok := c.blockChain.Get(qc.BlockHash())

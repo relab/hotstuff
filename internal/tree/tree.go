@@ -165,3 +165,21 @@ func (t *Tree) heightOf(replicaID hotstuff.ID) int {
 func (t *Tree) replicaPosition(id hotstuff.ID) int {
 	return slices.Index(t.treePosToID, id)
 }
+
+// DefaultTreePos returns the tree positions of the replicas.
+func DefaultTreePos(size int) []hotstuff.ID {
+	ids := make([]hotstuff.ID, size)
+	for i := range size {
+		ids[i] = hotstuff.ID(i + 1)
+	}
+	return ids
+}
+
+// DefaultTreePosUint32 returns the tree positions of the replicas.
+func DefaultTreePosUint32(size int) []uint32 {
+	ids := make([]uint32, size)
+	for i := range size {
+		ids[i] = uint32(i + 1)
+	}
+	return ids
+}

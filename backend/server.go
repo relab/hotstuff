@@ -26,6 +26,7 @@ type Server struct {
 	configuration *netconfig.Config
 	eventLoop     *core.EventLoop
 	logger        logging.Logger
+	opts          *core.Options
 
 	id        hotstuff.ID
 	lm        latency.Matrix
@@ -38,10 +39,12 @@ func NewServer(
 	configuration *netconfig.Config,
 	eventLoop *core.EventLoop,
 	logger logging.Logger,
-	opts ...ServerOptions,
+	opts *core.Options,
+
+	srvOpts ...ServerOptions,
 ) *Server {
 	options := &backendOptions{}
-	for _, opt := range opts {
+	for _, opt := range srvOpts {
 		opt(options)
 	}
 	srv := &Server{
@@ -49,6 +52,7 @@ func NewServer(
 		configuration: configuration,
 		eventLoop:     eventLoop,
 		logger:        logger,
+		opts:          opts,
 
 		id: options.id,
 		lm: options.latencyMatrix,
@@ -113,6 +117,9 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
+	}
+	if impl.srv.opts.ShouldUseTree() {
+		id = hotstuff.ID(proposal.Block.Proposer)
 	}
 	proposal.Block.Proposer = uint32(id)
 	proposeMsg := convert.ProposalFromProto(proposal)
