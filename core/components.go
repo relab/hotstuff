@@ -111,9 +111,9 @@ type Replica interface {
 // Configuration holds information about the current configuration of replicas that participate in the protocol,
 type Configuration interface {
 	// Replicas returns all of the replicas in the configuration.
-	Replicas() map[hotstuff.ID]hotstuff.ReplicaInfo
+	Replicas() map[hotstuff.ID]*hotstuff.ReplicaInfo
 	// Replica returns a replica if present in the configuration.
-	Replica(hotstuff.ID) (replica hotstuff.ReplicaInfo, ok bool)
+	Replica(hotstuff.ID) (replica *hotstuff.ReplicaInfo, ok bool)
 	// Len returns the number of replicas in the configuration.
 	Len() int
 	// QuorumSize returns the size of a quorum.

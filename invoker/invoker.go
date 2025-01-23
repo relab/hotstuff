@@ -98,7 +98,7 @@ func (inv *Invoker) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 		}
 		inv.replicas[replica.ID] = realReplica
 		// add the info to the config
-		inv.configuration.AddReplica(replica)
+		inv.configuration.AddReplica(&replica)
 		// we do not want to connect to ourself
 		if replica.ID != inv.opts.ID() {
 			idMapping[replica.Address] = uint32(replica.ID)
@@ -160,6 +160,7 @@ func (inv *Invoker) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
 
 	replica := inv.replicas[id]
 	replica.md = readMetadata(md)
+	inv.configuration.SetReplicaMetaData(replica.id, replica.md)
 
 	inv.logger.Debugf("Replica %d connected from address %v", id, info.Addr)
 }

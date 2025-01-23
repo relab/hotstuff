@@ -237,7 +237,7 @@ func (bls *bls12Base) popVerify(pubKey *PublicKey, proof *bls12.PointG2) bool {
 	return bls.coreVerify(pubKey, pubKey.ToBytes(), proof, domainPOP)
 }
 
-func (bls *bls12Base) checkPop(replica hotstuff.ReplicaInfo) (valid bool) {
+func (bls *bls12Base) checkPop(replica *hotstuff.ReplicaInfo) (valid bool) {
 	defer func() {
 		if !valid {
 			bls.logger.Warnf("Invalid proof-of-possession for replica %d", replica.ID)
