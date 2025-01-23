@@ -75,6 +75,7 @@ type ExperimentConfig struct {
 	Trace             bool
 	Worker            bool
 	LogLevel          string
+	UseTLS            bool
 }
 
 // TreePosIDs returns a slice of hotstuff.IDs ordered by the tree positions.
@@ -176,7 +177,7 @@ func (c *ExperimentConfig) AllHosts() []string {
 // CreateReplicaOpts creates a new ReplicaOpts based on the experiment configuration.
 func (c *ExperimentConfig) CreateReplicaOpts() *orchestrationpb.ReplicaOpts {
 	return &orchestrationpb.ReplicaOpts{
-		UseTLS:            true,
+		UseTLS:            c.UseTLS,
 		BatchSize:         c.BatchSize,
 		TimeoutMultiplier: float32(c.TimeoutMultiplier),
 		Consensus:         c.Consensus,
@@ -197,7 +198,7 @@ func (c *ExperimentConfig) CreateReplicaOpts() *orchestrationpb.ReplicaOpts {
 // CreateClientOpts creates a new ClientOpts based on the experiment configuration.
 func (c *ExperimentConfig) CreateClientOpts() *orchestrationpb.ClientOpts {
 	return &orchestrationpb.ClientOpts{
-		UseTLS:           true,
+		UseTLS:           c.UseTLS,
 		ConnectTimeout:   durationpb.New(c.ConnectTimeout),
 		PayloadSize:      c.PayloadSize,
 		MaxConcurrent:    c.MaxConcurrent,
