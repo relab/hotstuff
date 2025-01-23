@@ -23,9 +23,9 @@ type BlockChain struct {
 	mut         sync.Mutex
 	pruneHeight hotstuff.View
 	blocks      map[hotstuff.Hash]*hotstuff.Block
-	// blocksAtHeight map[hotstuff.View][]*hotstuff.Block
-	blocksAtHeight map[hotstuff.View][]*hotstuff.Block
-	pendingFetch   map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
+	// blockAtHeight map[hotstuff.View][]*hotstuff.Block
+	blockAtHeight map[hotstuff.View]*hotstuff.Block
+	pendingFetch  map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
 }
 
 // New creates a new blockChain with a maximum size.
@@ -40,9 +40,9 @@ func New(
 		eventLoop: eventLoop,
 		logger:    logger,
 
-		blocks:         make(map[hotstuff.Hash]*hotstuff.Block),
-		blocksAtHeight: make(map[hotstuff.View][]*hotstuff.Block),
-		pendingFetch:   make(map[hotstuff.Hash]context.CancelFunc),
+		blocks:        make(map[hotstuff.Hash]*hotstuff.Block),
+		blockAtHeight: make(map[hotstuff.View]*hotstuff.Block),
+		pendingFetch:  make(map[hotstuff.Hash]context.CancelFunc),
 	}
 	bc.Store(hotstuff.GetGenesis())
 	return bc
@@ -54,7 +54,7 @@ func (chain *BlockChain) Store(block *hotstuff.Block) {
 	defer chain.mut.Unlock()
 
 	chain.blocks[block.Hash()] = block
-	chain.blocksAtHeight[block.View()] = append(chain.blocksAtHeight[block.View()], block)
+	chain.blockAtHeight[block.View()] = block
 
 	// cancel any pending fetch operations
 	if cancel, ok := chain.pendingFetch[block.Hash()]; ok {
@@ -76,20 +76,15 @@ func (chain *BlockChain) LocalGet(hash hotstuff.Hash) (*hotstuff.Block, bool) {
 }
 
 func (chain *BlockChain) DeleteAtHeight(height hotstuff.View, blockHash hotstuff.Hash) error {
-	blocks, ok := chain.blocksAtHeight[height]
+	block, ok := chain.blockAtHeight[height]
 	if !ok {
 		return fmt.Errorf("no blocks at height %d", height)
 	}
 
 	strHash := blockHash.String()
-	for i, block := range blocks {
-		if block.Hash().String() == strHash {
-			chain.blocksAtHeight[height] = append(chain.blocksAtHeight[height][:i], chain.blocksAtHeight[height][i+1:]...)
-			if len(blocks) == 0 {
-				delete(chain.blocksAtHeight, height)
-			}
-			return nil
-		}
+	if block.Hash().String() == strHash {
+		delete(chain.blockAtHeight, height)
+		return nil
 	}
 	return fmt.Errorf("block not found at height %d", height)
 }
@@ -127,7 +122,7 @@ func (chain *BlockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 	chain.logger.Debugf("Successfully fetched block: %.8s", hash)
 
 	chain.blocks[hash] = block
-	chain.blocksAtHeight[block.View()] = append(chain.blocksAtHeight[block.View()], block)
+	chain.blockAtHeight[block.View()] = block
 
 done:
 	chain.mut.Unlock()
@@ -149,22 +144,20 @@ func (chain *BlockChain) Extends(block, target *hotstuff.Block) bool {
 	return ok && current.Hash() == target.Hash()
 }
 
-func (chain *BlockChain) PruneToHeight(height hotstuff.View) (prunedBlocks map[hotstuff.View][]*hotstuff.Block) {
+func (chain *BlockChain) PruneToHeight(height hotstuff.View) (prunedBlocks map[hotstuff.View]*hotstuff.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
-	prunedBlocks = make(map[hotstuff.View][]*hotstuff.Block)
+	prunedBlocks = make(map[hotstuff.View]*hotstuff.Block)
 
 	for h := height; h > chain.pruneHeight; h-- {
-		blocks, ok := chain.blocksAtHeight[h]
+		block, ok := chain.blockAtHeight[h]
 		if !ok {
 			continue
 		}
-		for _, block := range blocks {
-			// Add pruned blocks to list and go back a height
-			// prunedBlocks = append(prunedBlocks, block)
-			prunedBlocks[block.View()] = append(prunedBlocks[block.View()], block)
-		}
-		delete(chain.blocksAtHeight, h)
+		// Add pruned blocks to list and go back a height
+		// prunedBlocks = append(prunedBlocks, block)
+		prunedBlocks[block.View()] = block
+		delete(chain.blockAtHeight, h)
 	}
 
 	chain.pruneHeight = height

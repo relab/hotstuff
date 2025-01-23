@@ -43,9 +43,11 @@ func (cm *Committer) Commit(committedHeight hotstuff.View, block *hotstuff.Block
 		return
 	}
 
+	// Store the previous prune height before pruning.
+	pruneHeight := cm.blockChain.PruneHeight()
 	// prune the blockchain and handle forked blocks
 	prunedBlocks := cm.blockChain.PruneToHeight(block.View())
-	forkedBlocks := cm.findForks(committedHeight, block.View(), prunedBlocks)
+	forkedBlocks := cm.findForks(committedHeight, pruneHeight, block.View(), prunedBlocks)
 	for _, block := range forkedBlocks {
 		cm.clientSrv.Fork(block.Command())
 	}
@@ -85,31 +87,29 @@ func (cm *Committer) CommittedBlock() *hotstuff.Block {
 	return cm.bExec
 }
 
-func (cm *Committer) findForks(committedHeight, height hotstuff.View, blocksAtHeight map[hotstuff.View][]*hotstuff.Block) (forkedBlocks []*hotstuff.Block) {
+func (cm *Committer) findForks(committedHeight, pruneHeight, height hotstuff.View, blocksAtHeight map[hotstuff.View]*hotstuff.Block) (forkedBlocks []*hotstuff.Block) {
 
 	committedViews := make(map[hotstuff.View]bool)
 
 	// This is a hacky value: chain.prevPruneHeight, but it works.
-	for h := committedHeight; h >= cm.blockChain.PruneHeight(); {
-		blocks, ok := blocksAtHeight[h]
+	for h := committedHeight; h >= pruneHeight; {
+		block, ok := blocksAtHeight[h]
 		if !ok {
 			break
 		}
-		block := blocks[0]
 		parent, ok := cm.blockChain.LocalGet(block.Parent())
-		if !ok || parent.View() < cm.blockChain.PruneHeight() {
+		if !ok || parent.View() < pruneHeight {
 			break
 		}
 		h = parent.View()
 		committedViews[h] = true
 	}
 
-	for h := height; h > cm.blockChain.PruneHeight(); h-- {
+	for h := height; h > pruneHeight; h-- {
 		if !committedViews[h] {
-			blocks, ok := blocksAtHeight[h]
+			block, ok := blocksAtHeight[h]
 			if ok {
-				cm.logger.Debugf("PruneToHeight: found forked blocks: %v", blocks)
-				block := blocks[0]
+				cm.logger.Debugf("PruneToHeight: found forked block: %v", block)
 				forkedBlocks = append(forkedBlocks, block)
 			}
 		}
