@@ -245,13 +245,41 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 
 	netConfiguration := netconfig.NewConfig()
 	eventLoop := core.NewEventLoop(logger, 1000)
-	protocolInvoker := invoker.New(netConfiguration, eventLoop, logger, builderOpt, creds, managerOpts...)
-
-	cmdCache := clientsrv.NewCmdCache(logger, int(conf.BatchSize))
-	clientSrv := clientsrv.NewClientServer(eventLoop, logger, cmdCache, clientSrvOpts)
-	blockChain := blockchain.New(protocolInvoker, eventLoop, logger)
-	committer := committer.New(blockChain, clientSrv, logger)
-	certAuthority := certauth.NewCache(cryptoImpl, blockChain, netConfiguration, logger, 100) // TODO: consider making this configurable
+	protocolInvoker := invoker.New(
+		netConfiguration,
+		eventLoop,
+		logger,
+		builderOpt,
+		creds,
+		managerOpts...,
+	)
+	cmdCache := clientsrv.NewCmdCache(
+		logger,
+		int(conf.BatchSize),
+	)
+	clientSrv := clientsrv.NewClientServer(
+		eventLoop,
+		logger,
+		cmdCache,
+		clientSrvOpts,
+	)
+	blockChain := blockchain.New(
+		protocolInvoker,
+		eventLoop,
+		logger,
+	)
+	committer := committer.New(
+		blockChain,
+		clientSrv,
+		logger,
+	)
+	certAuthority := certauth.NewCache(
+		cryptoImpl,
+		blockChain,
+		netConfiguration,
+		logger,
+		100, // TODO: consider making this configurable
+	)
 	csus := consensus.New(
 		consensusRules,
 		leaderRotation,
@@ -265,9 +293,28 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 		builderOpt,
 	)
-	synch := synchronizer.New(cryptoImpl, leaderRotation, duration, blockChain, csus, certAuthority, netConfiguration, protocolInvoker, eventLoop, logger, builderOpt)
-	votingMachine := voting.NewVotingMachine(blockChain, netConfiguration, certAuthority, eventLoop, logger, synch, builderOpt)
-
+	synch := synchronizer.New(
+		cryptoImpl,
+		leaderRotation,
+		duration,
+		blockChain,
+		csus,
+		certAuthority,
+		netConfiguration,
+		protocolInvoker,
+		eventLoop,
+		logger,
+		builderOpt,
+	)
+	votingMachine := voting.NewVotingMachine(
+		blockChain,
+		netConfiguration,
+		certAuthority,
+		eventLoop,
+		logger,
+		synch,
+		builderOpt,
+	)
 	builder.Add(
 		consensusRules,
 		duration,
@@ -294,7 +341,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		builder.Add(replicaMetrics...)
 		builder.Add(metrics.NewTicker(w.measurementInterval))
 	}
-
 	for _, n := range opts.GetModules() {
 		m, ok := modules.GetModuleUntyped(n)
 		if !ok {
@@ -302,7 +348,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		}
 		builder.Add(m)
 	}
-
 	return replica.New(
 		netConfiguration,
 		blockChain,
