@@ -10,10 +10,10 @@ import (
 )
 
 type CertAuthority struct {
+	impl modules.CryptoBase
+
 	blockChain    *blockchain.BlockChain
 	configuration *netconfig.Config
-
-	modules.CryptoBase
 }
 
 // New returns a CertAuthority. It will use the given CryptoBase to create and verify
@@ -23,9 +23,9 @@ func New(
 
 	blockChain *blockchain.BlockChain,
 	configuration *netconfig.Config,
-) core.CertAuth {
+) *CertAuthority {
 	return &CertAuthority{
-		CryptoBase: impl,
+		impl: impl,
 
 		blockChain:    blockChain,
 		configuration: configuration,
@@ -35,14 +35,14 @@ func New(
 // InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
 func (c *CertAuthority) InitModule(mods *core.Core) {
-	if mod, ok := c.CryptoBase.(core.Module); ok {
+	if mod, ok := c.impl.(core.Module); ok {
 		mod.InitModule(mods)
 	}
 }
 
 // CreatePartialCert signs a single block and returns the partial certificate.
 func (c CertAuthority) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
-	sig, err := c.Sign(block.ToBytes())
+	sig, err := c.impl.Sign(block.ToBytes())
 	if err != nil {
 		return hotstuff.PartialCert{}, err
 	}
@@ -59,7 +59,7 @@ func (c CertAuthority) CreateQuorumCert(block *hotstuff.Block, signatures []hots
 	for _, sig := range signatures {
 		sigs = append(sigs, sig.Signature())
 	}
-	sig, err := c.Combine(sigs...)
+	sig, err := c.impl.Combine(sigs...)
 	if err != nil {
 		return hotstuff.QuorumCert{}, err
 	}
@@ -76,7 +76,7 @@ func (c CertAuthority) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff
 	for _, timeout := range timeouts {
 		sigs = append(sigs, timeout.ViewSignature)
 	}
-	sig, err := c.Combine(sigs...)
+	sig, err := c.impl.Combine(sigs...)
 	if err != nil {
 		return hotstuff.TimeoutCert{}, err
 	}
@@ -95,7 +95,7 @@ func (c CertAuthority) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff
 			sigs = append(sigs, timeout.MsgSignature)
 		}
 	}
-	sig, err := c.Combine(sigs...)
+	sig, err := c.impl.Combine(sigs...)
 	if err != nil {
 		return hotstuff.AggregateQC{}, err
 	}
@@ -108,7 +108,7 @@ func (c CertAuthority) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 	if !ok {
 		return false
 	}
-	return c.Verify(cert.Signature(), block.ToBytes())
+	return c.impl.Verify(cert.Signature(), block.ToBytes())
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
@@ -124,7 +124,7 @@ func (c CertAuthority) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 	if !ok {
 		return false
 	}
-	return c.Verify(qc.Signature(), block.ToBytes())
+	return c.impl.Verify(qc.Signature(), block.ToBytes())
 }
 
 // VerifyTimeoutCert verifies a timeout certificate.
@@ -136,7 +136,7 @@ func (c CertAuthority) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
 	if tc.Signature().Participants().Len() < c.configuration.QuorumSize() {
 		return false
 	}
-	return c.Verify(tc.Signature(), tc.View().ToBytes())
+	return c.impl.Verify(tc.Signature(), tc.View().ToBytes())
 }
 
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
@@ -157,7 +157,7 @@ func (c CertAuthority) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hot
 		return hotstuff.QuorumCert{}, false
 	}
 	// both the batched aggQC signatures and the highQC must be verified
-	if c.BatchVerify(aggQC.Sig(), messages) && c.VerifyQuorumCert(highQC) {
+	if c.impl.BatchVerify(aggQC.Sig(), messages) && c.VerifyQuorumCert(highQC) {
 		return highQC, true
 	}
 	return hotstuff.QuorumCert{}, false

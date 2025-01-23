@@ -255,13 +255,14 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 		builderOpt,
 	)
-	synch := synchronizer.New(leaderRotation, duration, blockChain, csus, certAuthority, netConfiguration, protocolInvoker, eventLoop, logger, builderOpt)
+	synch := synchronizer.New(cryptoImpl, leaderRotation, duration, blockChain, csus, certAuthority, netConfiguration, protocolInvoker, eventLoop, logger, builderOpt)
 	votingMachine := voting.NewVotingMachine(blockChain, netConfiguration, certAuthority, eventLoop, logger, synch, builderOpt)
 
 	builder.Add(
 		consensusRules,
 		duration,
 		leaderRotation,
+		cryptoImpl,
 
 		netConfiguration,
 		eventLoop,

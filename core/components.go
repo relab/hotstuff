@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/modules"
 )
 
 // Component interfaces
@@ -184,7 +183,6 @@ type Synchronizer interface {
 // CertAuth implements the methods required to create and verify signatures and certificates.
 // This is a higher level interface that is implemented by the crypto package itself.
 type CertAuth interface {
-	modules.CryptoBase // TODO: Remove inheritance
 	// CreatePartialCert signs a single block and returns the partial certificate.
 	CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error)
 	// CreateQuorumCert creates a quorum certificate from a list of partial certificates.

@@ -15,7 +15,7 @@ import (
 	"github.com/relab/hotstuff/netconfig"
 )
 
-type cache struct {
+type Cache struct {
 	impl        modules.CryptoBase
 	mut         sync.Mutex
 	capacity    int
@@ -30,8 +30,8 @@ func NewCache(
 	blockChain *blockchain.BlockChain,
 	configuration *netconfig.Config,
 
-	capacity int) core.CertAuth {
-	return New(&cache{
+	capacity int) *CertAuthority {
+	return New(&Cache{
 		impl:     impl,
 		capacity: capacity,
 		entries:  make(map[string]*list.Element, capacity),
@@ -43,13 +43,13 @@ func NewCache(
 
 // InitModule gives the module a reference to the Core object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (cache *cache) InitModule(mods *core.Core) {
+func (cache *Cache) InitModule(mods *core.Core) {
 	if mod, ok := cache.impl.(core.Module); ok {
 		mod.InitModule(mods)
 	}
 }
 
-func (cache *cache) insert(key string) {
+func (cache *Cache) insert(key string) {
 	cache.mut.Lock()
 	defer cache.mut.Unlock()
 	elem, ok := cache.entries[key]
@@ -62,7 +62,7 @@ func (cache *cache) insert(key string) {
 	cache.entries[key] = elem
 }
 
-func (cache *cache) check(key string) bool {
+func (cache *Cache) check(key string) bool {
 	cache.mut.Lock()
 	defer cache.mut.Unlock()
 	elem, ok := cache.entries[key]
@@ -73,7 +73,7 @@ func (cache *cache) check(key string) bool {
 	return true
 }
 
-func (cache *cache) evict() {
+func (cache *Cache) evict() {
 	if len(cache.entries) < cache.capacity {
 		return
 	}
@@ -82,7 +82,7 @@ func (cache *cache) evict() {
 }
 
 // Sign signs a message and adds it to the cache for use during verification.
-func (cache *cache) Sign(message []byte) (sig hotstuff.QuorumSignature, err error) {
+func (cache *Cache) Sign(message []byte) (sig hotstuff.QuorumSignature, err error) {
 	sig, err = cache.impl.Sign(message)
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func (cache *cache) Sign(message []byte) (sig hotstuff.QuorumSignature, err erro
 }
 
 // Verify verifies the given quorum signature against the message.
-func (cache *cache) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
+func (cache *Cache) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
 	var key strings.Builder
 	hash := sha256.Sum256(message)
 	_, _ = key.Write(hash[:])
@@ -115,7 +115,7 @@ func (cache *cache) Verify(signature hotstuff.QuorumSignature, message []byte) b
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
-func (cache *cache) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
+func (cache *Cache) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
 	// sort the list of ids from the batch map
 	ids := slices.Sorted(maps.Keys(batch))
 	var hash hotstuff.Hash
@@ -143,7 +143,7 @@ func (cache *cache) BatchVerify(signature hotstuff.QuorumSignature, batch map[ho
 }
 
 // Combine combines multiple signatures together into a single signature.
-func (cache *cache) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
+func (cache *Cache) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
 	// we don't cache the result of this operation, because it is not guaranteed to be valid.
 	return cache.impl.Combine(signatures...)
 }

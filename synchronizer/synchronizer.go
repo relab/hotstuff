@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/blockchain"
+	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/invoker"
@@ -22,10 +23,11 @@ import (
 type Synchronizer struct {
 	duration       modules.ViewDuration
 	leaderRotation modules.LeaderRotation
+	crypto         modules.CryptoBase
 
 	blockChain    *blockchain.BlockChain
 	consensus     *consensus.Consensus
-	crypto        core.CertAuth
+	auth          *certauth.CertAuthority
 	configuration *netconfig.Config
 	invoker       *invoker.Invoker
 	eventLoop     *core.EventLoop
@@ -50,12 +52,13 @@ type Synchronizer struct {
 
 // New creates a new Synchronizer.
 func New(
+	crypto modules.CryptoBase,
 	leaderRotation modules.LeaderRotation,
 	duration modules.ViewDuration,
 
 	blockChain *blockchain.BlockChain,
 	consensus *consensus.Consensus,
-	crypto core.CertAuth,
+	auth *certauth.CertAuthority,
 	configuration *netconfig.Config,
 	invoker *invoker.Invoker,
 	eventLoop *core.EventLoop,
@@ -65,10 +68,11 @@ func New(
 	s := &Synchronizer{
 		duration:       duration,
 		leaderRotation: leaderRotation,
+		crypto:         crypto,
 
 		blockChain:    blockChain,
 		consensus:     consensus,
-		crypto:        crypto,
+		auth:          auth,
 		configuration: configuration,
 		invoker:       invoker,
 		eventLoop:     eventLoop,
@@ -99,11 +103,11 @@ func New(
 	})
 
 	var err error
-	s.highQC, err = s.crypto.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+	s.highQC, err = s.auth.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
 	if err != nil {
 		panic(fmt.Errorf("unable to create empty quorum cert for genesis block: %v", err))
 	}
-	s.highTC, err = s.crypto.CreateTimeoutCert(hotstuff.View(0), []hotstuff.TimeoutMsg{})
+	s.highTC, err = s.auth.CreateTimeoutCert(hotstuff.View(0), []hotstuff.TimeoutMsg{})
 	if err != nil {
 		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
 	}
@@ -257,7 +261,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		timeoutList = append(timeoutList, t)
 	}
 
-	tc, err := s.crypto.CreateTimeoutCert(timeout.View, timeoutList)
+	tc, err := s.auth.CreateTimeoutCert(timeout.View, timeoutList)
 	if err != nil {
 		s.logger.Debugf("Failed to create timeout certificate: %v", err)
 		return
@@ -266,7 +270,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	si := s.SyncInfo().WithTC(tc)
 
 	if s.opts.ShouldUseAggQC() {
-		aggQC, err := s.crypto.CreateAggregateQC(currView, timeoutList)
+		aggQC, err := s.auth.CreateAggregateQC(currView, timeoutList)
 		if err != nil {
 			s.logger.Debugf("Failed to create aggregateQC: %v", err)
 		} else {
@@ -292,7 +296,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 
 	// check for a TC
 	if tc, ok := syncInfo.TC(); ok {
-		if !s.crypto.VerifyTimeoutCert(tc) {
+		if !s.auth.VerifyTimeoutCert(tc) {
 			s.logger.Info("Timeout Certificate could not be verified!")
 			return
 		}
@@ -309,7 +313,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 
 	// check for an AggQC or QC
 	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.opts.ShouldUseAggQC() {
-		highQC, ok := s.crypto.VerifyAggregateQC(aggQC)
+		highQC, ok := s.auth.VerifyAggregateQC(aggQC)
 		if !ok {
 			s.logger.Info("Aggregated Quorum Certificate could not be verified")
 			return
@@ -322,7 +326,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		syncInfo = syncInfo.WithQC(highQC)
 		qc = highQC
 	} else if qc, haveQC = syncInfo.QC(); haveQC {
-		if !s.crypto.VerifyQuorumCert(qc) {
+		if !s.auth.VerifyQuorumCert(qc) {
 			s.logger.Info("Quorum Certificate could not be verified!")
 			return
 		}
