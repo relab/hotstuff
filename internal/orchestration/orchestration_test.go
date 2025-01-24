@@ -26,7 +26,8 @@ import (
 
 func makeCfg(
 	replicas, clients int,
-	consensusImpl, crypto, leaderRotation, byzantine string,
+	consensusImpl, crypto, leaderRotation string,
+	byzantine map[string][]uint32,
 	branchFactor uint32,
 	randomTree bool,
 	mods ...string,
@@ -40,7 +41,7 @@ func makeCfg(
 		Consensus:         consensusImpl,
 		Crypto:            crypto,
 		LeaderRotation:    leaderRotation,
-		ByzantineStrategy: map[string][]uint32{byzantine: {1}},
+		ByzantineStrategy: byzantine,
 		Modules:           mods,
 
 		// Common default values:
@@ -94,10 +95,13 @@ func run(t *testing.T, cfg *config.ExperimentConfig) {
 }
 
 func TestOrchestration(t *testing.T) {
+	fork := map[string][]uint32{"fork": {1}}
+	silence := map[string][]uint32{"silence": {1}}
+
 	tests := []struct {
 		consensus    string
 		crypto       string
-		byzantine    string
+		byzantine    map[string][]uint32
 		mods         []string
 		replicas     int
 		branchFactor uint32
@@ -112,8 +116,8 @@ func TestOrchestration(t *testing.T) {
 		{consensus: "simplehotstuff", crypto: "ecdsa", replicas: 4},
 		{consensus: "simplehotstuff", crypto: "eddsa", replicas: 4},
 		{consensus: "simplehotstuff", crypto: "bls12", replicas: 4},
-		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "fork", replicas: 4},
-		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: "silence", replicas: 4},
+		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: fork, replicas: 4},
+		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: silence, replicas: 4},
 		{consensus: "chainedhotstuff", crypto: "ecdsa", mods: []string{"kauri"}, replicas: 7, branchFactor: 2},
 		{consensus: "chainedhotstuff", crypto: "bls12", mods: []string{"kauri"}, replicas: 7, branchFactor: 2},
 		{consensus: "chainedhotstuff", crypto: "ecdsa", mods: []string{"kauri"}, replicas: 7, branchFactor: 2, randomTree: true},
