@@ -12,7 +12,8 @@
 			"program": "${workspaceRoot}/cmd/hotstuff/main.go",
 			"cwd": "${workspaceRoot}",
 			"args": [
-				"run"
+				"run",
+				"--cue=scripts/local_config.cue"
 			]
 		},
 		{

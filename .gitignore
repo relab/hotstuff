@@ -21,7 +21,6 @@ __debug_bin
 /hotstuff
 /plot
 
-
 # other
 *.in
 
@@ -35,3 +34,5 @@ measurements.json
 *.pdf
 
 twins.json
+internal/tree/benchmarkdata/*
+eventloop/benchmarkdata/*

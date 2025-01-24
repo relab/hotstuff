@@ -18,21 +18,21 @@ func TestLoad(t *testing.T) {
 		"silent": {2, 5},
 		"slow":   {4},
 	}
-	validLocOnlyCfg := &config.HostConfig{
+	validLocOnlyCfg := &config.ExperimentConfig{
 		ReplicaHosts: replicaHosts,
 		ClientHosts:  clientHosts,
 		Replicas:     10,
 		Clients:      2,
 		Locations:    locations,
 	}
-	validLocOnlyDupEntriesCfg := &config.HostConfig{
+	validLocOnlyDupEntriesCfg := &config.ExperimentConfig{
 		ReplicaHosts: replicaHosts,
 		ClientHosts:  clientHosts,
 		Replicas:     10,
 		Clients:      2,
 		Locations:    locationsWithDuplicates,
 	}
-	validLocTreeCfg := &config.HostConfig{
+	validLocTreeCfg := &config.ExperimentConfig{
 		ReplicaHosts:  replicaHosts,
 		ClientHosts:   clientHosts,
 		Replicas:      10,
@@ -41,7 +41,7 @@ func TestLoad(t *testing.T) {
 		TreePositions: treePositions,
 		BranchFactor:  5,
 	}
-	validLocTreeByzCfg := &config.HostConfig{
+	validLocTreeByzCfg := &config.ExperimentConfig{
 		ReplicaHosts:      replicaHosts,
 		ClientHosts:       clientHosts,
 		Replicas:          10,
@@ -51,14 +51,14 @@ func TestLoad(t *testing.T) {
 		BranchFactor:      5,
 		ByzantineStrategy: byzantineStrategy,
 	}
-	valid2LocOnlyCfg := &config.HostConfig{
+	valid2LocOnlyCfg := &config.ExperimentConfig{
 		ReplicaHosts: []string{"relab1"},
 		ClientHosts:  []string{"relab2"},
 		Replicas:     3,
 		Clients:      2,
 		Locations:    []string{"paris", "rome", "oslo"},
 	}
-	valid2LocTreeCfg := &config.HostConfig{
+	valid2LocTreeCfg := &config.ExperimentConfig{
 		ReplicaHosts:  []string{"relab1"},
 		ClientHosts:   []string{"relab2"},
 		Replicas:      5,
@@ -67,7 +67,7 @@ func TestLoad(t *testing.T) {
 		TreePositions: []uint32{3, 2, 1, 4, 5},
 		BranchFactor:  2,
 	}
-	valid2NoLocNoTree := &config.HostConfig{
+	valid2NoLocNoTree := &config.ExperimentConfig{
 		ReplicaHosts: []string{"relab1"},
 		ClientHosts:  []string{"relab2"},
 		Replicas:     3,
@@ -76,7 +76,7 @@ func TestLoad(t *testing.T) {
 	tests := []struct {
 		name     string
 		filename string
-		wantCfg  *config.HostConfig
+		wantCfg  *config.ExperimentConfig
 		wantErr  bool
 	}{
 		{name: "ValidLocationsOnly", filename: "valid-loc-only.cue", wantCfg: validLocOnlyCfg, wantErr: false},
@@ -92,7 +92,7 @@ func TestLoad(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotCfg, err := config.Load(filepath.Join("testdata", tt.filename))
+			gotCfg, err := config.NewCue(filepath.Join("testdata", tt.filename), nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Load(%s) error = %v, wantErr %v", tt.filename, err, tt.wantErr)
 				return
