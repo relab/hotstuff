@@ -204,7 +204,7 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 	cs.blockChain.Store(block)
 
 	if b := cs.impl.CommitRule(block); b != nil {
-		cs.committer.Commit(block)
+		cs.committer.Commit(b)
 	}
 
 	// Tells the synchronizer to advance the view
