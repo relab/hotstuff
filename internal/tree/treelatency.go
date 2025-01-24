@@ -24,11 +24,13 @@ func (t *Tree) WaitTime(lm latency.Matrix, delta time.Duration, latType LatencyT
 	return t.fixedAggDuration(delta)
 }
 
-func (t *Tree) WaitTimerDuration(lm latency.Matrix, opts *modules.Options) time.Duration {
-	if opts.TreeConfig().WaitTimerType() == modules.WaitTimerAgg {
-		return t.aggregationLatency(t.id, lm, opts.TreeConfig().TreeWaitDelta())
+// WaitTimerDuration returns the expected time to wait for the aggregation of votes at internal nodes.
+// Fixed aggregation duration is the default mechanism
+func (t *Tree) WaitTimerDuration(lm latency.Matrix, treeWaitDelta time.Duration, waitTimerType modules.WaitTimerType) time.Duration {
+	if waitTimerType == modules.WaitTimerAgg {
+		return t.aggregationLatency(t.id, lm, treeWaitDelta)
 	}
-	return t.fixedAggDuration(opts.TreeConfig().TreeWaitDelta())
+	return t.fixedAggDuration(treeWaitDelta)
 }
 
 // aggregationLatency returns the highest latency path from node id to its leaf nodes.

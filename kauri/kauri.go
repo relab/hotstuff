@@ -71,6 +71,9 @@ func (k *Kauri) InitModule(mods *modules.Core) {
 	k.eventLoop.RegisterHandler(ContributionRecvEvent{}, func(event any) {
 		k.OnContributionRecv(event.(ContributionRecvEvent))
 	})
+	k.eventLoop.RegisterHandler(WaitTimerExpiredEvent{}, func(event any) {
+		k.OnWaitTimerExpired(event.(WaitTimerExpiredEvent))
+	})
 }
 
 func (k *Kauri) postInit() {
@@ -109,15 +112,12 @@ func (k *Kauri) reset() {
 	k.aggSent = false
 }
 
-func (k *Kauri) WaitToAggregate(waitTime time.Duration, view hotstuff.View) {
+func (k *Kauri) WaitToAggregate() {
+	waitTime := k.tree.WaitTimerDuration(k.server.LatencyMatrix(),
+		k.opts.TreeConfig().TreeWaitDelta(), k.opts.TreeConfig().WaitTimerType())
+	view := k.currentView
 	time.Sleep(waitTime)
-	if k.currentView != view {
-		return
-	}
-	if !k.aggSent {
-		k.SendContributionToParent()
-		k.reset()
-	}
+	k.eventLoop.AddEvent(WaitTimerExpiredEvent{currentView: view})
 }
 
 // SendProposalToChildren sends the proposal to the children.
@@ -131,8 +131,7 @@ func (k *Kauri) SendProposalToChildren(p hotstuff.ProposeMsg) {
 		}
 		k.logger.Debug("Sending proposal to children ", children)
 		config.Propose(p)
-		waitTime := k.tree.WaitTimerDuration(k.server.LatencyMatrix(), k.opts)
-		go k.WaitToAggregate(waitTime, k.currentView)
+		go k.WaitToAggregate()
 	} else {
 		k.SendContributionToParent()
 		k.aggSent = true
@@ -171,6 +170,16 @@ func (k *Kauri) SendContributionToParent() {
 				View:      uint64(k.currentView),
 			})
 		}
+	}
+}
+
+func (k *Kauri) OnWaitTimerExpired(event WaitTimerExpiredEvent) {
+	if k.currentView != event.currentView {
+		return
+	}
+	if !k.aggSent {
+		k.SendContributionToParent()
+		k.reset()
 	}
 }
 
@@ -250,4 +259,8 @@ func isSubSet(a, b []hotstuff.ID) bool {
 		}
 	}
 	return true
+}
+
+type WaitTimerExpiredEvent struct {
+	currentView hotstuff.View
 }
