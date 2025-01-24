@@ -173,6 +173,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	moduleOpt := core.NewOptions(hotstuff.ID(opts.GetID()), privKey)
 	moduleOpt.SetSharedRandomSeed(opts.GetSharedSeed())
 	moduleOpt.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
+
 	var duration modules.ViewDuration
 	if opts.GetLeaderRotation() == "tree-leader" {
 		duration = synchronizer.NewFixedViewDuration(opts.GetInitialTimeout().AsDuration())
@@ -275,17 +276,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if !ok {
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
 	}
-	// TODO: Fix cyclic ref with byzantine and synchronizer
-	// strategy := opts.GetByzantineStrategy()
-	// if strategy != "" {
-	// 	if byz, ok := getByzantine(strategy, consensusRules, blockChain, synch, builderOpt); ok {
-	// 		consensusRules = byz.Wrap(consensusRules)
-	// 		logger.Infof("assigned byzantine strategy: %s", strategy)
-	//
-	// 	} else {
-	// 		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
-	// 	}
-	// }
 	leaderRotation, ok := getLeaderRotation(
 		opts.GetLeaderRotation(),
 		consensusRules.ChainLength(),
@@ -340,7 +330,20 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 		moduleOpt,
 	)
-	/*votingMachine :=*/ voting.NewVotingMachine(
+	strategy := opts.GetByzantineStrategy()
+	if strategy != "" {
+		if byz, ok := getByzantine(strategy, consensusRules, blockChain, synch, moduleOpt); ok {
+			consensusRules = byz.Wrap(consensusRules)
+			csus.SetByzantine(consensusRules)
+			logger.Infof("assigned byzantine strategy: %s", strategy)
+
+		} else {
+			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
+		}
+	}
+	// No need to store votingMachine since it's not a dependency.
+	// Constructor adds event handlers that enables voting logic.
+	voting.NewVotingMachine(
 		blockChain,
 		netConfiguration,
 		certAuthority,

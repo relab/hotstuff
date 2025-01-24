@@ -247,4 +247,9 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 	return
 }
 
+// SetByzantine changes the rule implementation to a byzantine ruleset.
+func (cs *Consensus) SetByzantine(byzRules modules.Rules) {
+	cs.impl = byzRules
+}
+
 var _ core.Consensus = (*Consensus)(nil)
