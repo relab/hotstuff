@@ -28,7 +28,6 @@ type Kauri struct {
 	crypto         modules.Crypto
 	synchronizer   modules.Synchronizer
 	leaderRotation modules.LeaderRotation
-	treeConfig     *modules.TreeConfig
 	opts           *modules.Options
 	eventLoop      *eventloop.EventLoop
 	configuration  *backend.Config
@@ -42,7 +41,10 @@ type Kauri struct {
 	initDone    bool
 	nodes       map[hotstuff.ID]*kauripb.Node
 	senders     []hotstuff.ID
-	tree        tree.Tree
+
+	tree          tree.Tree
+	treeWaitDelta time.Duration
+	treeDelayType tree.DelayType
 }
 
 // New initializes the kauri structure
@@ -87,8 +89,10 @@ func (k *Kauri) initializeConfiguration() {
 	for _, n := range kauriCfg.Nodes() {
 		k.nodes[hotstuff.ID(n.ID())] = n
 	}
-	k.treeConfig = k.opts.TreeConfig()
-	k.tree = *tree.CreateTree(k.opts.ID(), k.treeConfig.BranchFactor(), k.treeConfig.TreePos())
+	treeConfig := k.opts.TreeConfig()
+	k.treeWaitDelta = treeConfig.TreeWaitDelta()
+	k.treeDelayType = treeConfig.DelayType()
+	k.tree = *tree.CreateTree(k.opts.ID(), treeConfig.BranchFactor(), treeConfig.TreePos())
 	k.initDone = true
 	k.senders = make([]hotstuff.ID, 0)
 }
@@ -113,8 +117,7 @@ func (k *Kauri) reset() {
 }
 
 func (k *Kauri) WaitToAggregate() {
-	waitTime := k.tree.WaitTime(k.server.LatencyMatrix(),
-		k.opts.TreeConfig().TreeWaitDelta(), k.opts.TreeConfig().LatType())
+	waitTime := k.tree.WaitTime(k.server.LatencyMatrix(), k.treeWaitDelta, k.treeDelayType)
 	view := k.currentView
 	time.Sleep(waitTime)
 	k.eventLoop.AddEvent(WaitTimerExpiredEvent{currentView: view})
