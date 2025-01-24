@@ -12,30 +12,16 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/backend"
-	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/client"
-	"github.com/relab/hotstuff/clientsrv"
-	"github.com/relab/hotstuff/committer"
-	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
-	"github.com/relab/hotstuff/invoker"
-	"github.com/relab/hotstuff/kauri"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
-	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/netconfig"
 	"github.com/relab/hotstuff/replica"
-	"github.com/relab/hotstuff/synchronizer"
-	"github.com/relab/hotstuff/voting"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
@@ -173,193 +159,17 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	moduleOpt := core.NewOptions(hotstuff.ID(opts.GetID()), privKey)
 	moduleOpt.SetSharedRandomSeed(opts.GetSharedSeed())
 	moduleOpt.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
-
-	var duration modules.ViewDuration
-	if opts.GetLeaderRotation() == "tree-leader" {
-		duration = synchronizer.NewFixedViewDuration(opts.GetInitialTimeout().AsDuration())
-	} else {
-		duration = synchronizer.NewViewDuration(
-			uint64(opts.GetTimeoutSamples()),
-			float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-			float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-			float64(opts.GetTimeoutMultiplier()),
-		)
+	mods, err := setupModules(opts, logger, privKey, certificate, rootCAs)
+	if err != nil {
+		return nil, err
 	}
-	conf := hotstuff.ReplicaConfig{
-		ID:          hotstuff.ID(opts.GetID()),
-		PrivateKey:  privKey,
-		TLS:         opts.GetUseTLS(),
-		Certificate: &certificate,
-		RootCAs:     rootCAs,
-		Locations:   opts.GetLocations(),
-		BatchSize:   opts.GetBatchSize(),
-		ManagerOptions: []gorums.ManagerOption{
-			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
-		},
-	}
-	var creds credentials.TransportCredentials
-	managerOpts := conf.ManagerOptions
-	if conf.TLS {
-		creds = credentials.NewTLS(&tls.Config{
-			RootCAs:      conf.RootCAs,
-			Certificates: []tls.Certificate{*conf.Certificate},
-		})
-	}
-	clientSrvOpts := conf.ClientServerOptions
-	if conf.TLS {
-		clientSrvOpts = append(clientSrvOpts, gorums.WithGRPCServerOptions(
-			grpc.Creds(credentials.NewServerTLSFromCert(conf.Certificate)),
-		))
-	}
-	replicaSrvOpts := conf.ReplicaServerOptions
-	if conf.TLS {
-		replicaSrvOpts = append(replicaSrvOpts, gorums.WithGRPCServerOptions(
-			grpc.Creds(credentials.NewTLS(&tls.Config{
-				Certificates: []tls.Certificate{*conf.Certificate},
-				ClientCAs:    conf.RootCAs,
-				ClientAuth:   tls.RequireAndVerifyClientCert,
-			})),
-		))
-	}
-	netConfiguration := netconfig.NewConfig()
-	cryptoImpl, ok := getCrypto(opts.GetCrypto(), netConfiguration, logger, moduleOpt)
-	if !ok {
-		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
-	}
-	eventLoop := core.NewEventLoop(logger, 1000)
-	protocolInvoker := invoker.New(
-		netConfiguration,
-		eventLoop,
-		logger,
-		moduleOpt,
-		creds,
-		managerOpts...,
-	)
-	cmdCache := clientsrv.NewCmdCache(
-		logger,
-		int(conf.BatchSize),
-	)
-	clientSrv := clientsrv.NewClientServer(
-		eventLoop,
-		logger,
-		cmdCache,
-		clientSrvOpts,
-	)
-	blockChain := blockchain.New(
-		protocolInvoker,
-		eventLoop,
-		logger,
-	)
-	server := backend.NewServer(
-		blockChain,
-		netConfiguration,
-		eventLoop,
-		logger,
-		moduleOpt,
-
-		backend.WithLatencies(conf.ID, conf.Locations),
-		backend.WithGorumsServerOptions(replicaSrvOpts...),
-	)
-	committer := committer.New(
-		blockChain,
-		clientSrv,
-		logger,
-	)
-	certAuthority := certauth.NewCache(
-		cryptoImpl,
-		blockChain,
-		netConfiguration,
-		logger,
-		100, // TODO: consider making this configurable
-	)
-	consensusRules, ok := getConsensusRules(opts.GetConsensus(), blockChain, logger, moduleOpt)
-	if !ok {
-		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
-	}
-	leaderRotation, ok := getLeaderRotation(
-		opts.GetLeaderRotation(),
-		consensusRules.ChainLength(),
-		blockChain,
-		netConfiguration,
-		committer,
-		logger,
-		moduleOpt,
-	)
-	if !ok {
-		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
-	}
-	var kauriModule *kauri.Kauri
-	if opts.GetKauri() {
-		kauriModule = kauri.New(
-			cryptoImpl,
-			leaderRotation,
-			blockChain,
-			moduleOpt.TreeConfig(),
-			moduleOpt,
-			eventLoop,
-			netConfiguration,
-			protocolInvoker,
-			server,
-			logger,
-		)
-	}
-	csus := consensus.New(
-		consensusRules,
-		leaderRotation,
-		blockChain,
-		committer,
-		cmdCache,
-		netConfiguration,
-		protocolInvoker,
-		kauriModule,
-		certAuthority,
-		eventLoop,
-		logger,
-		moduleOpt,
-	)
-	synch := synchronizer.New(
-		cryptoImpl,
-		leaderRotation,
-		duration,
-		blockChain,
-		csus,
-		certAuthority,
-		netConfiguration,
-		protocolInvoker,
-		eventLoop,
-		logger,
-		moduleOpt,
-	)
-	strategy := opts.GetByzantineStrategy()
-	if strategy != "" {
-		if byz, ok := getByzantine(strategy, consensusRules, blockChain, synch, moduleOpt); ok {
-			consensusRules = byz.Wrap(consensusRules)
-			csus.SetByzantine(consensusRules)
-			logger.Infof("assigned byzantine strategy: %s", strategy)
-
-		} else {
-			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
-		}
-	}
-	// No need to store votingMachine since it's not a dependency.
-	// Constructor adds event handlers that enables voting logic.
-	voting.NewVotingMachine(
-		blockChain,
-		netConfiguration,
-		certAuthority,
-		eventLoop,
-		logger,
-		synch,
-		moduleOpt,
-	)
-
 	if w.measurementInterval > 0 {
 		// Initializes the metrics modules. This does not need to be stored
 		// anywhere since they all add handlers to the eventloop.
 		// TODO: Rework the metrics logging.
 		metricsBuilder := core.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 		metricsBuilder.Add(
-			eventLoop,
+			mods.eventLoop,
 			w.metricsLogger,
 			logger,
 		)
@@ -369,11 +179,11 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		metricsBuilder.Build()
 	}
 	return replica.New(
-		clientSrv,
-		server,
-		protocolInvoker,
-		eventLoop,
-		synch,
+		mods.clientSrv,
+		mods.server,
+		mods.protocolInvoker,
+		mods.eventLoop,
+		mods.synchronizer,
 	), nil
 }
 

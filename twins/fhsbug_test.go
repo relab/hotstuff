@@ -9,15 +9,10 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/consensus/fasthotstuff"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/twins"
 )
-
-func init() {
-	modules.RegisterModule(vulnerableModule, func() modules.Rules { return &vulnerableFHS{} })
-}
 
 const vulnerableModule = "vulnerableFHS"
 
@@ -142,18 +137,21 @@ type vulnerableFHS struct {
 	inner      fasthotstuff.FastHotStuff
 }
 
-func (fhs *vulnerableFHS) InitModule(mods *core.Core) {
-	mods.Get(
-		&fhs.logger,
-		&fhs.blockChain,
-	)
-
-	fhs.inner.InitModule(mods)
+func NewVulnFHS(
+	logger logging.Logger,
+	blockChain *blockchain.BlockChain,
+	inner fasthotstuff.FastHotStuff,
+) modules.Rules {
+	return &vulnerableFHS{
+		logger:     logger,
+		blockChain: blockChain,
+		inner:      inner,
+	}
 }
 
 // VoteRule decides whether to vote for the block.
-func (fhs *vulnerableFHS) VoteRule(proposal hotstuff.ProposeMsg) bool {
-	return fhs.inner.VoteRule(proposal)
+func (fhs *vulnerableFHS) VoteRule(view hotstuff.View, proposal hotstuff.ProposeMsg) bool {
+	return fhs.inner.VoteRule(view, proposal)
 }
 
 func (fhs *vulnerableFHS) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
