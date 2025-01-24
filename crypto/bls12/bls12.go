@@ -17,9 +17,7 @@ import (
 	"github.com/relab/hotstuff/netconfig"
 )
 
-func init() {
-	modules.RegisterModule("bls12", New)
-}
+const ModuleName = "bls12"
 
 const (
 	// PrivateKeyFileType is the PEM type for a private key.
@@ -152,24 +150,23 @@ type bls12Base struct {
 }
 
 // New returns a new instance of the BLS12 CryptoBase implementation.
-func New() modules.CryptoBase {
-	return &bls12Base{
+func New(
+	configuration *netconfig.Config,
+	logger logging.Logger,
+	opts *core.Options,
+) modules.CryptoBase {
+	bls := &bls12Base{
+		configuration: configuration,
+		logger:        logger,
+		opts:          opts,
+
 		popCache: make(map[string]bool),
 	}
-}
-
-// InitModule gives the module a reference to the Core object.
-// It also allows the module to set module options using the OptionsBuilder.
-func (bls *bls12Base) InitModule(mods *core.Core) {
-	mods.Get(
-		&bls.configuration,
-		&bls.logger,
-		&bls.opts,
-	)
 
 	pop := bls.popProve()
 	b := bls12.NewG2().ToCompressed(pop)
 	bls.opts.SetConnectionMetadata(popMetadataKey, string(b))
+	return bls
 }
 
 func (bls *bls12Base) privateKey() *PrivateKey {

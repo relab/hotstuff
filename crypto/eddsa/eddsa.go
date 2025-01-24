@@ -13,9 +13,7 @@ import (
 	"github.com/relab/hotstuff/netconfig"
 )
 
-func init() {
-	modules.RegisterModule("eddsa", New)
-}
+const ModuleName = "eddsa"
 
 const (
 	// PrivateKeyFileType is the PEM type for a private key.
@@ -61,18 +59,16 @@ type eddsaBase struct {
 }
 
 // New returns a new instance of the EDDSA CryptoBase implementation.
-func New() modules.CryptoBase {
-	return &eddsaBase{}
-}
-
-// InitModule gives the module a reference to the Core object.
-// It also allows the module to set module options using the OptionsBuilder.
-func (ed *eddsaBase) InitModule(mods *core.Core) {
-	mods.Get(
-		&ed.configuration,
-		&ed.logger,
-		&ed.opts,
-	)
+func New(
+	configuration *netconfig.Config,
+	logger logging.Logger,
+	opts *core.Options,
+) modules.CryptoBase {
+	return &eddsaBase{
+		configuration: configuration,
+		logger:        logger,
+		opts:          opts,
+	}
 }
 
 func (ed *eddsaBase) privateKey() ed25519.PrivateKey {

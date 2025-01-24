@@ -16,9 +16,7 @@ import (
 	"github.com/relab/hotstuff/netconfig"
 )
 
-func init() {
-	modules.RegisterModule("ecdsa", New)
-}
+const ModuleName = "ecdsa"
 
 const (
 	// PrivateKeyFileType is the PEM type for a private key.
@@ -75,8 +73,16 @@ type ecdsaBase struct {
 }
 
 // New returns a new instance of the ECDSA CryptoBase implementation.
-func New() modules.CryptoBase {
-	return &ecdsaBase{}
+func New(
+	configuration *netconfig.Config,
+	logger logging.Logger,
+	opts *core.Options,
+) modules.CryptoBase {
+	return &ecdsaBase{
+		configuration: configuration,
+		logger:        logger,
+		opts:          opts,
+	}
 }
 
 // InitModule gives the module a reference to the Core object.

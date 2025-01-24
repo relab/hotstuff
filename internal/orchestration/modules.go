@@ -9,6 +9,9 @@ import (
 	"github.com/relab/hotstuff/consensus/fasthotstuff"
 	"github.com/relab/hotstuff/consensus/simplehotstuff"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/crypto/bls12"
+	"github.com/relab/hotstuff/crypto/ecdsa"
+	"github.com/relab/hotstuff/crypto/eddsa"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/leaderrotation"
 	"github.com/relab/hotstuff/logging"
@@ -90,7 +93,26 @@ func getLeaderRotation(
 	return
 }
 
-func getCrypto(name string) (crypto modules.CryptoBase) {
+func getCrypto(
+	name string,
+	configuration *netconfig.Config,
+	logger logging.Logger,
+	opts *core.Options,
+) (crypto modules.CryptoBase, ok bool) {
+	ok = true
+	switch name {
+	case bls12.ModuleName:
+		crypto = bls12.New(configuration, logger, opts)
+		break
+	case ecdsa.ModuleName:
+		crypto = ecdsa.New(configuration, logger, opts)
+		break
+	case eddsa.ModuleName:
+		crypto = eddsa.New(configuration, logger, opts)
+		break
+	default:
+		return nil, false
+	}
 	return
 }
 

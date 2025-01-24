@@ -171,11 +171,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	// prepare modules
 	builder := core.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 
-	cryptoImpl, ok := modules.GetModule[modules.CryptoBase](opts.GetCrypto())
-	if !ok {
-		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
-	}
-
 	var duration modules.ViewDuration
 	if opts.GetLeaderRotation() == "tree-leader" {
 		duration = synchronizer.NewFixedViewDuration(opts.GetInitialTimeout().AsDuration())
@@ -222,6 +217,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	builderOpt.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
 
 	netConfiguration := netconfig.NewConfig()
+
+	cryptoImpl, ok := getCrypto(opts.GetCrypto(), netConfiguration, logger, builderOpt)
+	if !ok {
+		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
+	}
+
 	eventLoop := core.NewEventLoop(logger, 1000)
 	protocolInvoker := invoker.New(
 		netConfiguration,
@@ -258,6 +259,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 		100, // TODO: consider making this configurable
 	)
+
 	consensusRules, ok := getConsensusRules(opts.GetConsensus(), blockChain, logger, builderOpt)
 	if !ok {
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
@@ -284,6 +286,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 		builderOpt,
 	)
+
 	if !ok {
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
