@@ -45,13 +45,10 @@ func getConsensusRules(
 	switch name {
 	case fasthotstuff.ModuleName:
 		rules = fasthotstuff.New(blockChain, logger, opts)
-		break
 	case simplehotstuff.ModuleName:
 		rules = simplehotstuff.New(blockChain, logger)
-		break
 	case chainedhotstuff.ModuleName:
 		rules = chainedhotstuff.New(blockChain, logger)
-		break
 	default:
 		return nil, false
 	}
@@ -69,10 +66,8 @@ func getByzantine(
 	switch name {
 	case byzantine.SilenceModuleName:
 		byz = byzantine.NewSilence(rules)
-		break
 	case byzantine.ForkModuleName:
 		byz = byzantine.NewFork(rules, blockChain, synchronizer, opts)
-		break
 	default:
 		return nil, false
 	}
@@ -93,19 +88,14 @@ func getLeaderRotation(
 	switch name {
 	case leaderrotation.CarouselModuleName:
 		ld = leaderrotation.NewCarousel(chainLength, blockChain, config, committer, opts, logger)
-		break
 	case leaderrotation.ReputationModuleName:
 		ld = leaderrotation.NewRepBased(chainLength, config, committer, opts, logger)
-		break
 	case leaderrotation.RoundRobinModuleName:
 		ld = leaderrotation.NewRoundRobin(config)
-		break
 	case leaderrotation.FixedModuleName:
 		ld = leaderrotation.NewFixed(hotstuff.ID(1))
-		break
 	case leaderrotation.TreeLeaderModuleName:
 		ld = leaderrotation.NewTreeLeader(opts)
-		break
 	default:
 		return nil, false
 	}
@@ -122,13 +112,10 @@ func getCrypto(
 	switch name {
 	case bls12.ModuleName:
 		crypto = bls12.New(configuration, logger, opts)
-		break
 	case ecdsa.ModuleName:
 		crypto = ecdsa.New(configuration, logger, opts)
-		break
 	case eddsa.ModuleName:
 		crypto = eddsa.New(configuration, logger, opts)
-		break
 	default:
 		return nil, false
 	}
@@ -165,38 +152,23 @@ func setupModules(
 			float64(opts.GetTimeoutMultiplier()),
 		)
 	}
-	conf := hotstuff.ReplicaConfig{
-		ID:          hotstuff.ID(opts.GetID()),
-		PrivateKey:  privKey,
-		TLS:         opts.GetUseTLS(),
-		Certificate: &certificate,
-		RootCAs:     rootCAs,
-		Locations:   opts.GetLocations(),
-		BatchSize:   opts.GetBatchSize(),
-		ManagerOptions: []gorums.ManagerOption{
-			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
-		},
-	}
 	var creds credentials.TransportCredentials
-	managerOpts := conf.ManagerOptions
-	if conf.TLS {
+	clientSrvOpts := []gorums.ServerOption{}
+	replicaSrvOpts := []gorums.ServerOption{}
+	if opts.GetUseTLS() {
 		creds = credentials.NewTLS(&tls.Config{
-			RootCAs:      conf.RootCAs,
-			Certificates: []tls.Certificate{*conf.Certificate},
+			RootCAs:      rootCAs,
+			Certificates: []tls.Certificate{certificate},
 		})
-	}
-	clientSrvOpts := conf.ClientServerOptions
-	if conf.TLS {
+
 		clientSrvOpts = append(clientSrvOpts, gorums.WithGRPCServerOptions(
-			grpc.Creds(credentials.NewServerTLSFromCert(conf.Certificate)),
+			grpc.Creds(credentials.NewServerTLSFromCert(&certificate)),
 		))
-	}
-	replicaSrvOpts := conf.ReplicaServerOptions
-	if conf.TLS {
+
 		replicaSrvOpts = append(replicaSrvOpts, gorums.WithGRPCServerOptions(
 			grpc.Creds(credentials.NewTLS(&tls.Config{
-				Certificates: []tls.Certificate{*conf.Certificate},
-				ClientCAs:    conf.RootCAs,
+				Certificates: []tls.Certificate{certificate},
+				ClientCAs:    rootCAs,
 				ClientAuth:   tls.RequireAndVerifyClientCert,
 			})),
 		))
@@ -213,11 +185,11 @@ func setupModules(
 		logger,
 		moduleOpt,
 		creds,
-		managerOpts...,
+		gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 	)
 	cmdCache := clientsrv.NewCmdCache(
 		logger,
-		int(conf.BatchSize),
+		int(opts.GetBatchSize()),
 	)
 	clientSrv := clientsrv.NewClientServer(
 		eventLoop,
@@ -237,7 +209,7 @@ func setupModules(
 		logger,
 		moduleOpt,
 
-		backend.WithLatencies(conf.ID, conf.Locations),
+		backend.WithLatencies(hotstuff.ID(opts.GetID()), opts.GetLocations()),
 		backend.WithGorumsServerOptions(replicaSrvOpts...),
 	)
 	committer := committer.New(
@@ -316,7 +288,6 @@ func setupModules(
 			consensusRules = byz.Wrap(consensusRules)
 			csus.SetByzantine(consensusRules)
 			logger.Infof("assigned byzantine strategy: %s", strategy)
-
 		} else {
 			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
 		}
