@@ -10,7 +10,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/netconfig"
@@ -42,14 +41,6 @@ func NewCache(
 		configuration,
 		logger,
 	)
-}
-
-// InitModule gives the module a reference to the Core object.
-// It also allows the module to set module options using the OptionsBuilder.
-func (cache *Cache) InitModule(mods *core.Core) {
-	if mod, ok := cache.impl.(core.Module); ok {
-		mod.InitModule(mods)
-	}
 }
 
 func (cache *Cache) insert(key string) {

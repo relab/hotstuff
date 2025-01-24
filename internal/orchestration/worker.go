@@ -304,7 +304,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 		builderOpt,
 	)
-
 	synch := synchronizer.New(
 		cryptoImpl,
 		leaderRotation,

@@ -85,16 +85,6 @@ func New(
 	}
 }
 
-// InitModule gives the module a reference to the Core object.
-// It also allows the module to set module options using the OptionsBuilder.
-func (ec *ecdsaBase) InitModule(mods *core.Core) {
-	mods.Get(
-		&ec.configuration,
-		&ec.logger,
-		&ec.opts,
-	)
-}
-
 func (ec *ecdsaBase) privateKey() *ecdsa.PrivateKey {
 	return ec.opts.PrivateKey().(*ecdsa.PrivateKey)
 }
