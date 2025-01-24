@@ -216,9 +216,9 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 	)
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
-	// default to the Fixed latency type need a parameter in config for this
+	// default to fixed tree height-based wait time TODO: need a parameter in ReplicaOpts for this
 	builder.Options().SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(),
-		opts.TreeDeltaDuration(), tree.FixedLatency)
+		opts.TreeDeltaDuration(), tree.TreeHeightTime)
 
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)

@@ -57,23 +57,16 @@ func (opts *Options) ensureSpace(id OptionID) {
 	}
 }
 
-type WaitTimerType int
-
-const (
-	WaitTimerFixed WaitTimerType = iota
-	WaitTimerAgg   WaitTimerType = iota + 1
-)
-
 // TreeConfig stores the tree configuration
 type TreeConfig struct {
 	bf            int
 	treePos       []hotstuff.ID
-	latType       tree.LatencyType
+	delayType     tree.DelayType
 	treeWaitDelta time.Duration
 }
 
-func (tc *TreeConfig) LatType() tree.LatencyType {
-	return tc.latType
+func (tc *TreeConfig) DelayType() tree.DelayType {
+	return tc.delayType
 }
 
 // BranchFactor returns the branch factor of the tree.
@@ -165,11 +158,11 @@ func (opts *Options) SetShouldVerifyVotesSync() {
 	opts.shouldVerifyVotesSync = true
 }
 
-func (opts *Options) SetTreeConfig(bf uint32, treePos []hotstuff.ID, treeWaitDelta time.Duration, latType tree.LatencyType) {
+func (opts *Options) SetTreeConfig(bf uint32, treePos []hotstuff.ID, treeWaitDelta time.Duration, delayType tree.DelayType) {
 	opts.treeConfig = &TreeConfig{
 		bf:            int(bf),
 		treePos:       treePos,
-		latType:       latType,
+		delayType:     delayType,
 		treeWaitDelta: treeWaitDelta,
 	}
 }
