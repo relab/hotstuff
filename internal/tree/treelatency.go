@@ -13,7 +13,6 @@ type DelayType int
 
 const (
 	// AggregationTime is the delay type for setting a wait time based on the latency of links in the tree.
-	// based on the latency of each node in the tree.
 	AggregationTime DelayType = iota
 	// TreeHeightTime is the delay type for the time to wait based on the height of the tree.
 	TreeHeightTime
