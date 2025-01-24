@@ -8,23 +8,23 @@ import (
 	"github.com/relab/hotstuff/internal/latency"
 )
 
-// DelayType is the type of delay to use when calculating the time to wait.
-type DelayType int
-
-const (
-	// AggregationTime is the delay type for setting a wait time based on the latency of links in the tree.
-	AggregationTime DelayType = iota
-	// TreeHeightTime is the delay type for setting a wait time only based on the height of the tree.
-	TreeHeightTime
-)
-
 // WaitTime returns the expected time to wait for the aggregation of votes.
-// The default delay type is TreeHeightTime.
-func (t *Tree) WaitTime(lm latency.Matrix, delta time.Duration, delayType DelayType) time.Duration {
-	if delayType == AggregationTime {
-		return t.aggregationTime(t.id, lm, delta)
-	}
-	return t.treeHeightTime(delta)
+func (t *Tree) WaitTime() time.Duration {
+	return t.waitTime
+}
+
+// SetAggregationWaitTime sets the wait time for the aggregation of votes based on the
+// highest latency path from node id to its leaf nodes.
+// Only one of SetAggregationWaitTime or SetTreeHeightWaitTime should be called.
+func (t *Tree) SetAggregationWaitTime(lm latency.Matrix, delta time.Duration) {
+	t.waitTime = t.aggregationTime(t.id, lm, delta)
+}
+
+// SetTreeHeightWaitTime sets the wait time for the aggregation of votes based on the
+// height of the tree.
+// Only one of SetAggregationWaitTime or SetTreeHeightWaitTime should be called.
+func (t *Tree) SetTreeHeightWaitTime(delta time.Duration) {
+	t.waitTime = t.treeHeightTime(delta)
 }
 
 // aggregationTime returns the time to wait for the aggregation of votes based on the

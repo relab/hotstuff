@@ -2,6 +2,7 @@ package tree
 
 import (
 	"slices"
+	"time"
 
 	"github.com/relab/hotstuff"
 )
@@ -13,6 +14,7 @@ type Tree struct {
 	height       int
 	branchFactor int
 	treePosToID  []hotstuff.ID
+	waitTime     time.Duration
 }
 
 // CreateTree creates the tree configuration.
