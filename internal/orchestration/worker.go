@@ -12,6 +12,7 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/client"
@@ -23,6 +24,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/invoker"
+	"github.com/relab/hotstuff/kauri"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
@@ -212,6 +214,17 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		))
 	}
 
+	replicaSrvOpts := conf.ReplicaServerOptions
+	if conf.TLS {
+		replicaSrvOpts = append(replicaSrvOpts, gorums.WithGRPCServerOptions(
+			grpc.Creds(credentials.NewTLS(&tls.Config{
+				Certificates: []tls.Certificate{*conf.Certificate},
+				ClientCAs:    conf.RootCAs,
+				ClientAuth:   tls.RequireAndVerifyClientCert,
+			})),
+		))
+	}
+
 	builderOpt := builder.Options()
 	builderOpt.SetSharedRandomSeed(opts.GetSharedSeed())
 	builderOpt.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
@@ -242,10 +255,21 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		cmdCache,
 		clientSrvOpts,
 	)
+
 	blockChain := blockchain.New(
 		protocolInvoker,
 		eventLoop,
 		logger,
+	)
+	server := backend.NewServer(
+		blockChain,
+		netConfiguration,
+		eventLoop,
+		logger,
+		builderOpt,
+
+		backend.WithLatencies(conf.ID, conf.Locations),
+		backend.WithGorumsServerOptions(replicaSrvOpts...),
 	)
 	committer := committer.New(
 		blockChain,
@@ -291,6 +315,22 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
 
+	var kauriModule *kauri.Kauri
+	if opts.GetKauri() {
+		kauriModule = kauri.New(
+			cryptoImpl,
+			leaderRotation,
+			blockChain,
+			builderOpt.TreeConfig(),
+			builderOpt,
+			eventLoop,
+			netConfiguration,
+			protocolInvoker,
+			server,
+			logger,
+		)
+	}
+
 	csus := consensus.New(
 		consensusRules,
 		leaderRotation,
@@ -299,6 +339,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		cmdCache,
 		netConfiguration,
 		protocolInvoker,
+		kauriModule,
 		certAuthority,
 		eventLoop,
 		logger,
@@ -360,15 +401,9 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		builder.Add(m)
 	}
 	return replica.New(
-		netConfiguration,
-		blockChain,
-		eventLoop,
-		logger,
 		clientSrv,
+		server,
 		protocolInvoker,
-		builderOpt,
-
-		conf,
 		builder), nil
 }
 

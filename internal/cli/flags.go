@@ -72,6 +72,7 @@ func init() {
 	runCmd.Flags().Bool("random-tree", false, "randomize tree positions, tree-pos is ignored if set")
 
 	runCmd.Flags().String("cue", "", "Cue-based host config")
+	runCmd.Flags().Bool("kauri", false, "enable Kauri protocol")
 
 	err := viper.BindPFlags(runCmd.Flags())
 	if err != nil {

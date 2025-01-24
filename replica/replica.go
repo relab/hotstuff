@@ -3,22 +3,16 @@ package replica
 
 import (
 	"context"
-	"crypto/tls"
 	"net"
 
-	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/clientsrv"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/invoker"
-	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/netconfig"
 	"github.com/relab/hotstuff/synchronizer"
 
-	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -38,46 +32,20 @@ type Replica struct {
 
 // New returns a new replica.
 func New(
-	configuration *netconfig.Config,
-	blockChain *blockchain.BlockChain,
-	eventLoop *core.EventLoop,
-	logger logging.Logger,
 	clientSrv *clientsrv.ClientServer,
+	server *backend.Server,
 	invoker *invoker.Invoker,
-	opts *core.Options,
 
-	conf hotstuff.ReplicaConfig,
 	builder core.Builder) (replica *Replica) {
 	srv := &Replica{
 		clientSrv: clientSrv,
 		invoker:   invoker,
+		hsSrv:     server,
 
 		execHandlers: make(map[clientsrv.CmdID]func(*emptypb.Empty, error)),
 		cancel:       func() {},
 		done:         make(chan struct{}),
 	}
-
-	replicaSrvOpts := conf.ReplicaServerOptions
-	if conf.TLS {
-		replicaSrvOpts = append(replicaSrvOpts, gorums.WithGRPCServerOptions(
-			grpc.Creds(credentials.NewTLS(&tls.Config{
-				Certificates: []tls.Certificate{*conf.Certificate},
-				ClientCAs:    conf.RootCAs,
-				ClientAuth:   tls.RequireAndVerifyClientCert,
-			})),
-		))
-	}
-
-	srv.hsSrv = backend.NewServer(
-		blockChain,
-		configuration,
-		eventLoop,
-		logger,
-		opts,
-
-		backend.WithLatencies(conf.ID, conf.Locations),
-		backend.WithGorumsServerOptions(replicaSrvOpts...),
-	)
 
 	builder.Add(
 		srv.cfg,   // configuration

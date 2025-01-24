@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/invoker"
+	"github.com/relab/hotstuff/kauri"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/netconfig"
@@ -52,6 +53,7 @@ func New(
 	commandCache *clientsrv.CmdCache,
 	configuration *netconfig.Config,
 	invoker *invoker.Invoker,
+	kauri *kauri.Kauri,
 	crypto core.CertAuth,
 	eventLoop *core.EventLoop,
 	logger logging.Logger,

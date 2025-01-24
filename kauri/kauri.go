@@ -19,12 +19,9 @@ import (
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/netconfig"
-	"github.com/relab/hotstuff/synchronizer"
 )
 
-func init() {
-	modules.RegisterModule("kauri", New)
-}
+const ModuleName = "kauri"
 
 // Kauri structure contains the modules for kauri protocol implementation.
 type Kauri struct {
@@ -32,7 +29,6 @@ type Kauri struct {
 	leaderRotation modules.LeaderRotation
 
 	blockChain    *blockchain.BlockChain
-	synchronizer  *synchronizer.Synchronizer
 	treeConfig    *core.TreeConfig
 	opts          *core.Options
 	eventLoop     *core.EventLoop
@@ -52,31 +48,43 @@ type Kauri struct {
 }
 
 // New initializes the kauri structure
-func New() modules.Kauri {
-	return &Kauri{nodes: make(map[hotstuff.ID]*kauripb.Node)}
-}
+func New(
+	crypto modules.CryptoBase,
+	leaderRotation modules.LeaderRotation,
 
-// InitModule initializes the Handel module.
-func (k *Kauri) InitModule(mods *core.Core) {
-	mods.Get(
-		&k.configuration,
-		&k.server,
-		&k.blockChain,
-		&k.eventLoop,
-		&k.logger,
-		&k.opts,
-		&k.leaderRotation,
-		&k.synchronizer,
-		&k.invoker,
-		&k.crypto,
-	)
+	blockChain *blockchain.BlockChain,
+	treeConfig *core.TreeConfig,
+	opts *core.Options,
+	eventLoop *core.EventLoop,
+	configuration *netconfig.Config,
+	invoker *invoker.Invoker,
+	server *backend.Server,
+	logger logging.Logger,
+) *Kauri {
+	k := &Kauri{
+		crypto:         crypto,
+		leaderRotation: leaderRotation,
+
+		blockChain:    blockChain,
+		treeConfig:    treeConfig,
+		opts:          opts,
+		eventLoop:     eventLoop,
+		configuration: configuration,
+		invoker:       invoker,
+		server:        server,
+		logger:        logger,
+
+		nodes: make(map[hotstuff.ID]*kauripb.Node),
+	}
+
 	k.opts.SetShouldUseTree()
-	k.eventLoop.RegisterHandler(invoker.ConnectedEvent{}, func(_ any) {
+	k.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(_ any) {
 		k.postInit()
 	}, core.Prioritize())
 	k.eventLoop.RegisterHandler(ContributionRecvEvent{}, func(event any) {
 		k.OnContributionRecv(event.(ContributionRecvEvent))
 	})
+	return k
 }
 
 func (k *Kauri) postInit() {
