@@ -59,6 +59,8 @@ message ReplicaOpts {
   uint32 BranchFactor = 24;
   // Tree Duration in tree communication
   google.protobuf.Duration TreeDelta = 25;
+  // Enable Kauri
+  bool Kauri = 26;
 }
 
 // ReplicaInfo is the information that the replicas need about each other.

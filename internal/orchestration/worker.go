@@ -268,7 +268,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	// TODO: Fix cyclic ref with byzantine and synchronizer
 	// strategy := opts.GetByzantineStrategy()
 	// if strategy != "" {
-	// 	if byz, ok := getByzantine(strategy, consensusRules, blockChain, sync, builderOpt); ok {
+	// 	if byz, ok := getByzantine(strategy, consensusRules, blockChain, synch, builderOpt); ok {
 	// 		consensusRules = byz.Wrap(consensusRules)
 	// 		logger.Infof("assigned byzantine strategy: %s", strategy)
 	//

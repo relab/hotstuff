@@ -14,6 +14,7 @@ import (
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/internal/tree"
+	"github.com/relab/hotstuff/leaderrotation"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/iago"
@@ -32,6 +33,10 @@ func runController() {
 
 	if cfg.RandomTree {
 		tree.Shuffle(cfg.TreePositions)
+	}
+
+	if cfg.Kauri {
+		cfg.LeaderRotation = leaderrotation.TreeLeaderModuleName
 	}
 
 	// If the config is set to run locally, `hosts` will be nil (empty)

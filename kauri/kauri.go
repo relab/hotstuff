@@ -10,6 +10,7 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/convert"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/proto/kauripb"
@@ -17,6 +18,8 @@ import (
 	"github.com/relab/hotstuff/invoker"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/netconfig"
+	"github.com/relab/hotstuff/synchronizer"
 )
 
 func init() {
@@ -25,25 +28,27 @@ func init() {
 
 // Kauri structure contains the modules for kauri protocol implementation.
 type Kauri struct {
-	blockChain     core.BlockChain
 	crypto         modules.CryptoBase
-	synchronizer   core.Synchronizer
 	leaderRotation modules.LeaderRotation
-	treeConfig     *core.TreeConfig
-	opts           *core.Options
-	eventLoop      *core.EventLoop
-	configuration  core.Configuration
-	invoker        *invoker.Invoker
-	server         *backend.Server
-	logger         logging.Logger
-	nodes          map[hotstuff.ID]*kauripb.Node
-	tree           tree.Tree
-	initDone       bool
-	aggContrib     hotstuff.QuorumSignature
-	blockHash      hotstuff.Hash
-	currentView    hotstuff.View
-	senders        []hotstuff.ID
-	aggSent        bool
+
+	blockChain    *blockchain.BlockChain
+	synchronizer  *synchronizer.Synchronizer
+	treeConfig    *core.TreeConfig
+	opts          *core.Options
+	eventLoop     *core.EventLoop
+	configuration *netconfig.Config
+	invoker       *invoker.Invoker
+	server        *backend.Server
+	logger        logging.Logger
+
+	nodes       map[hotstuff.ID]*kauripb.Node
+	tree        tree.Tree
+	initDone    bool
+	aggContrib  hotstuff.QuorumSignature
+	blockHash   hotstuff.Hash
+	currentView hotstuff.View
+	senders     []hotstuff.ID
+	aggSent     bool
 }
 
 // New initializes the kauri structure
