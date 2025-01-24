@@ -257,6 +257,8 @@ func createTree(replicaOpts *orchestrationpb.ReplicaOpts) tree.Tree {
 	case replicaOpts.GetAggregationTime():
 		tree.SetAggregationWaitTime(latency.MatrixFrom(replicaOpts.GetLocations()), replicaOpts.TreeDeltaDuration())
 	case replicaOpts.GetTreeHeightTime():
+		fallthrough
+	default:
 		tree.SetTreeHeightWaitTime(replicaOpts.TreeDeltaDuration())
 	}
 	return tree
