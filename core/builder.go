@@ -26,6 +26,14 @@ func (b *Builder) Options() *Options {
 	return b.opts
 }
 
+func NewOptions(id hotstuff.ID, pk hotstuff.PrivateKey) *Options {
+	return &Options{
+		id:                 id,
+		privateKey:         pk,
+		connectionMetadata: make(map[string]string),
+	}
+}
+
 // Add adds module to the builder.
 func (b *Builder) Add(module ...any) {
 	b.core.modules = append(b.core.modules, module...)

@@ -18,12 +18,12 @@ import (
 
 // Replica is a participant in the consensus protocol.
 type Replica struct {
-	clientSrv *clientsrv.ClientServer
-	cfg       *netconfig.Config
-	hsSrv     *backend.Server
-	invoker   *invoker.Invoker
-
-	hs *core.Core
+	clientSrv    *clientsrv.ClientServer
+	cfg          *netconfig.Config
+	hsSrv        *backend.Server
+	invoker      *invoker.Invoker
+	eventLoop    *core.EventLoop
+	synchronizer *synchronizer.Synchronizer
 
 	execHandlers map[clientsrv.CmdID]func(*emptypb.Empty, error)
 	cancel       context.CancelFunc
@@ -35,31 +35,22 @@ func New(
 	clientSrv *clientsrv.ClientServer,
 	server *backend.Server,
 	invoker *invoker.Invoker,
-
-	builder core.Builder) (replica *Replica) {
+	eventLoop *core.EventLoop,
+	synchronizer *synchronizer.Synchronizer,
+) (replica *Replica) {
 	srv := &Replica{
-		clientSrv: clientSrv,
-		invoker:   invoker,
-		hsSrv:     server,
+		clientSrv:    clientSrv,
+		invoker:      invoker,
+		hsSrv:        server,
+		eventLoop:    eventLoop,
+		synchronizer: synchronizer,
 
 		execHandlers: make(map[clientsrv.CmdID]func(*emptypb.Empty, error)),
 		cancel:       func() {},
 		done:         make(chan struct{}),
 	}
 
-	builder.Add(
-		srv.cfg,   // configuration
-		srv.hsSrv, // event handling
-		srv.invoker,
-	)
-	srv.hs = builder.Build()
-
 	return srv
-}
-
-// Modules returns the Modules object of this replica.
-func (srv *Replica) Modules() *core.Core {
-	return srv.hs
 }
 
 // StartServers starts the client and replica servers.
@@ -92,14 +83,8 @@ func (srv *Replica) Stop() {
 
 // Run runs the replica until the context is canceled.
 func (srv *Replica) Run(ctx context.Context) {
-	var (
-		synchronizer *synchronizer.Synchronizer
-		eventLoop    *core.EventLoop
-	)
-	srv.hs.Get(&synchronizer, &eventLoop)
-
-	synchronizer.Start(ctx)
-	eventLoop.Run(ctx)
+	srv.synchronizer.Start(ctx)
+	srv.eventLoop.Run(ctx)
 }
 
 // Close closes the connections and stops the servers used by the replica.

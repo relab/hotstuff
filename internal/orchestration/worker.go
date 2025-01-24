@@ -154,7 +154,6 @@ func (w *Worker) createReplicas(req *orchestrationpb.CreateReplicaRequest) (*orc
 func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Replica, error) {
 	w.metricsLogger.Log(opts)
 	logger := logging.New("hs" + strconv.Itoa(int(opts.GetID())))
-
 	// get private key and certificates
 	privKey, err := keygen.ParsePrivateKey(opts.GetPrivateKey())
 	if err != nil {
@@ -171,8 +170,9 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 	}
 	// prepare modules
-	builder := core.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
-
+	builderOpt := core.NewOptions(hotstuff.ID(opts.GetID()), privKey)
+	builderOpt.SetSharedRandomSeed(opts.GetSharedSeed())
+	builderOpt.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
 	var duration modules.ViewDuration
 	if opts.GetLeaderRotation() == "tree-leader" {
 		duration = synchronizer.NewFixedViewDuration(opts.GetInitialTimeout().AsDuration())
@@ -184,7 +184,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			float64(opts.GetTimeoutMultiplier()),
 		)
 	}
-
 	conf := hotstuff.ReplicaConfig{
 		ID:          hotstuff.ID(opts.GetID()),
 		PrivateKey:  privKey,
@@ -197,7 +196,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 		},
 	}
-
 	var creds credentials.TransportCredentials
 	managerOpts := conf.ManagerOptions
 	if conf.TLS {
@@ -206,14 +204,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			Certificates: []tls.Certificate{*conf.Certificate},
 		})
 	}
-
 	clientSrvOpts := conf.ClientServerOptions
 	if conf.TLS {
 		clientSrvOpts = append(clientSrvOpts, gorums.WithGRPCServerOptions(
 			grpc.Creds(credentials.NewServerTLSFromCert(conf.Certificate)),
 		))
 	}
-
 	replicaSrvOpts := conf.ReplicaServerOptions
 	if conf.TLS {
 		replicaSrvOpts = append(replicaSrvOpts, gorums.WithGRPCServerOptions(
@@ -224,18 +220,11 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			})),
 		))
 	}
-
-	builderOpt := builder.Options()
-	builderOpt.SetSharedRandomSeed(opts.GetSharedSeed())
-	builderOpt.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
-
 	netConfiguration := netconfig.NewConfig()
-
 	cryptoImpl, ok := getCrypto(opts.GetCrypto(), netConfiguration, logger, builderOpt)
 	if !ok {
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
 	}
-
 	eventLoop := core.NewEventLoop(logger, 1000)
 	protocolInvoker := invoker.New(
 		netConfiguration,
@@ -255,7 +244,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		cmdCache,
 		clientSrvOpts,
 	)
-
 	blockChain := blockchain.New(
 		protocolInvoker,
 		eventLoop,
@@ -283,12 +271,10 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 		100, // TODO: consider making this configurable
 	)
-
 	consensusRules, ok := getConsensusRules(opts.GetConsensus(), blockChain, logger, builderOpt)
 	if !ok {
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
 	}
-
 	// TODO: Fix cyclic ref with byzantine and synchronizer
 	// strategy := opts.GetByzantineStrategy()
 	// if strategy != "" {
@@ -300,7 +286,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	// 		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
 	// 	}
 	// }
-
 	leaderRotation, ok := getLeaderRotation(
 		opts.GetLeaderRotation(),
 		consensusRules.ChainLength(),
@@ -310,11 +295,9 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 		builderOpt,
 	)
-
 	if !ok {
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
-
 	var kauriModule *kauri.Kauri
 	if opts.GetKauri() {
 		kauriModule = kauri.New(
@@ -330,7 +313,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			logger,
 		)
 	}
-
 	csus := consensus.New(
 		consensusRules,
 		leaderRotation,
@@ -358,7 +340,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 		builderOpt,
 	)
-	votingMachine := voting.NewVotingMachine(
+	/*votingMachine :=*/ voting.NewVotingMachine(
 		blockChain,
 		netConfiguration,
 		certAuthority,
@@ -367,44 +349,29 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		synch,
 		builderOpt,
 	)
-	builder.Add(
-		consensusRules,
-		duration,
-		leaderRotation,
-		cryptoImpl,
 
-		netConfiguration,
-		eventLoop,
-		logger,
-		protocolInvoker,
-		cmdCache,
-		clientSrv,
-		blockChain,
-		committer,
-		certAuthority,
-		csus,
-		synch,
-		votingMachine,
-
-		w.metricsLogger,
-	)
 	if w.measurementInterval > 0 {
+		// Initializes the metrics modules. This does not need to be stored
+		// anywhere since they all add handlers to the eventloop.
+		// TODO: Rework the metrics logging.
+		metricsBuilder := core.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
+		metricsBuilder.Add(
+			eventLoop,
+			w.metricsLogger,
+			logger,
+		)
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
-		builder.Add(replicaMetrics...)
-		builder.Add(metrics.NewTicker(w.measurementInterval))
-	}
-	for _, n := range opts.GetModules() {
-		m, ok := modules.GetModuleUntyped(n)
-		if !ok {
-			return nil, fmt.Errorf("no module named '%s'", n)
-		}
-		builder.Add(m)
+		metricsBuilder.Add(replicaMetrics...)
+		metricsBuilder.Add(metrics.NewTicker(w.measurementInterval))
+		metricsBuilder.Build()
 	}
 	return replica.New(
 		clientSrv,
 		server,
 		protocolInvoker,
-		builder), nil
+		eventLoop,
+		synch,
+	), nil
 }
 
 func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {
