@@ -77,6 +77,7 @@ type ExperimentConfig struct {
 	// MemProfile enables memory profiling if true.
 	MemProfile bool
 
+	// DurationSamples is the number of previous views to consider when predicting view duration.
 	DurationSamples uint32
 
 	// # Client-based configuration value below:
