@@ -63,6 +63,11 @@ func (t Tree) Parent() (hotstuff.ID, bool) {
 	return t.treePosToID[parentPos], true
 }
 
+// Root returns the ID of the root of the tree.
+func (t Tree) Root() hotstuff.ID {
+	return t.treePosToID[0]
+}
+
 // IsRoot return true if the replica is at root of the tree.
 func (t Tree) IsRoot(replicaID hotstuff.ID) bool {
 	return t.replicaPosition(replicaID) == 0
