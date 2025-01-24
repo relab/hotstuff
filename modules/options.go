@@ -57,33 +57,6 @@ func (opts *Options) ensureSpace(id OptionID) {
 	}
 }
 
-// TreeConfig stores the tree configuration
-type TreeConfig struct {
-	bf            int
-	treePos       []hotstuff.ID
-	delayType     tree.DelayType
-	treeWaitDelta time.Duration
-}
-
-func (tc *TreeConfig) DelayType() tree.DelayType {
-	return tc.delayType
-}
-
-// BranchFactor returns the branch factor of the tree.
-func (tc *TreeConfig) BranchFactor() int {
-	return tc.bf
-}
-
-// TreePos returns the tree positions of the replicas.
-func (tc *TreeConfig) TreePos() []hotstuff.ID {
-	return tc.treePos
-}
-
-// TreeWaitDelta returns the time to wait for a tree node to be ready.
-func (tc *TreeConfig) TreeWaitDelta() time.Duration {
-	return tc.treeWaitDelta
-}
-
 // SetShouldUseTree sets the ShouldUseTree setting to true.
 func (opts *Options) SetShouldUseTree() {
 	opts.shouldUseTree = true
@@ -158,15 +131,6 @@ func (opts *Options) SetShouldVerifyVotesSync() {
 	opts.shouldVerifyVotesSync = true
 }
 
-func (opts *Options) SetTreeConfig(bf uint32, treePos []hotstuff.ID, treeWaitDelta time.Duration, delayType tree.DelayType) {
-	opts.treeConfig = &TreeConfig{
-		bf:            int(bf),
-		treePos:       treePos,
-		delayType:     delayType,
-		treeWaitDelta: treeWaitDelta,
-	}
-}
-
 // SetSharedRandomSeed sets the shared random seed.
 func (opts *Options) SetSharedRandomSeed(seed int64) {
 	opts.sharedRandomSeed = seed
@@ -179,6 +143,43 @@ func (opts *Options) SetSharedRandomSeed(seed int64) {
 // See: https://github.com/grpc/grpc-go/blob/master/Documentation/grpc-metadata.md#storing-binary-data-in-metadata
 func (opts *Options) SetConnectionMetadata(key string, value string) {
 	opts.connectionMetadata[key] = value
+}
+
+// SetTreeConfig sets the tree configuration.
+func (opts *Options) SetTreeConfig(bf uint32, treePos []hotstuff.ID, treeWaitDelta time.Duration, delayType tree.DelayType) {
+	opts.treeConfig = &TreeConfig{
+		bf:            int(bf),
+		treePos:       treePos,
+		delayType:     delayType,
+		treeWaitDelta: treeWaitDelta,
+	}
+}
+
+// TreeConfig stores the tree configuration
+type TreeConfig struct {
+	bf            int
+	treePos       []hotstuff.ID
+	delayType     tree.DelayType
+	treeWaitDelta time.Duration
+}
+
+func (tc *TreeConfig) DelayType() tree.DelayType {
+	return tc.delayType
+}
+
+// BranchFactor returns the branch factor of the tree.
+func (tc *TreeConfig) BranchFactor() int {
+	return tc.bf
+}
+
+// TreePos returns the tree positions of the replicas.
+func (tc *TreeConfig) TreePos() []hotstuff.ID {
+	return tc.treePos
+}
+
+// TreeWaitDelta returns the time to wait for a tree node to be ready.
+func (tc *TreeConfig) TreeWaitDelta() time.Duration {
+	return tc.treeWaitDelta
 }
 
 // OptionsWithID meant to be used in tests
