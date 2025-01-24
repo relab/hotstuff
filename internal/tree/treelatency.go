@@ -6,7 +6,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/latency"
-	"github.com/relab/hotstuff/modules"
 )
 
 type LatencyType int
@@ -17,20 +16,12 @@ const (
 )
 
 // WaitTime returns the expected time to wait for the aggregation of votes.
+// Fixed latency is default mechanism
 func (t *Tree) WaitTime(lm latency.Matrix, delta time.Duration, latType LatencyType) time.Duration {
 	if latType == AggregationLatency {
 		return t.aggregationLatency(t.id, lm, delta)
 	}
 	return t.fixedAggDuration(delta)
-}
-
-// WaitTimerDuration returns the expected time to wait for the aggregation of votes at internal nodes.
-// Fixed aggregation duration is the default mechanism
-func (t *Tree) WaitTimerDuration(lm latency.Matrix, treeWaitDelta time.Duration, waitTimerType modules.WaitTimerType) time.Duration {
-	if waitTimerType == modules.WaitTimerAgg {
-		return t.aggregationLatency(t.id, lm, treeWaitDelta)
-	}
-	return t.fixedAggDuration(treeWaitDelta)
 }
 
 // aggregationLatency returns the highest latency path from node id to its leaf nodes.

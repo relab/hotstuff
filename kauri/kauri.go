@@ -113,8 +113,8 @@ func (k *Kauri) reset() {
 }
 
 func (k *Kauri) WaitToAggregate() {
-	waitTime := k.tree.WaitTimerDuration(k.server.LatencyMatrix(),
-		k.opts.TreeConfig().TreeWaitDelta(), k.opts.TreeConfig().WaitTimerType())
+	waitTime := k.tree.WaitTime(k.server.LatencyMatrix(),
+		k.opts.TreeConfig().TreeWaitDelta(), k.opts.TreeConfig().LatType())
 	view := k.currentView
 	time.Sleep(waitTime)
 	k.eventLoop.AddEvent(WaitTimerExpiredEvent{currentView: view})

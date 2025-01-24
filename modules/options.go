@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/tree"
 )
 
 // OptionID is the ID of an option.
@@ -67,12 +68,12 @@ const (
 type TreeConfig struct {
 	bf            int
 	treePos       []hotstuff.ID
+	latType       tree.LatencyType
 	treeWaitDelta time.Duration
-	waitTimerType WaitTimerType
 }
 
-func (tc *TreeConfig) WaitTimerType() WaitTimerType {
-	return tc.waitTimerType
+func (tc *TreeConfig) LatType() tree.LatencyType {
+	return tc.latType
 }
 
 // BranchFactor returns the branch factor of the tree.
@@ -164,12 +165,12 @@ func (opts *Options) SetShouldVerifyVotesSync() {
 	opts.shouldVerifyVotesSync = true
 }
 
-func (opts *Options) SetTreeConfig(bf uint32, treePos []hotstuff.ID, treeWaitDelta time.Duration, timerType WaitTimerType) {
+func (opts *Options) SetTreeConfig(bf uint32, treePos []hotstuff.ID, treeWaitDelta time.Duration, latType tree.LatencyType) {
 	opts.treeConfig = &TreeConfig{
 		bf:            int(bf),
 		treePos:       treePos,
+		latType:       latType,
 		treeWaitDelta: treeWaitDelta,
-		waitTimerType: timerType,
 	}
 }
 

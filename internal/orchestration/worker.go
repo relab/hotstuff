@@ -22,6 +22,7 @@ import (
 	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
@@ -215,9 +216,9 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 	)
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
-	// default to the waitTimer need a parameter in config for this
+	// default to the Fixed latency type need a parameter in config for this
 	builder.Options().SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(),
-		opts.TreeDeltaDuration(), modules.WaitTimerFixed)
+		opts.TreeDeltaDuration(), tree.FixedLatency)
 
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
