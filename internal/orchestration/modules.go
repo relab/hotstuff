@@ -87,6 +87,9 @@ func getLeaderRotation(
 	case leaderrotation.FixedModuleName:
 		ld = leaderrotation.NewFixed(hotstuff.ID(1))
 		break
+	case leaderrotation.TreeLeaderModuleName:
+		ld = leaderrotation.NewTreeLeader(opts)
+		break
 	default:
 		return nil, false
 	}
