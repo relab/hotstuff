@@ -181,8 +181,3 @@ func (tc *TreeConfig) TreePos() []hotstuff.ID {
 func (tc *TreeConfig) TreeWaitDelta() time.Duration {
 	return tc.treeWaitDelta
 }
-
-// OptionsWithID meant to be used in tests
-func OptionsWithID(id hotstuff.ID) *Options {
-	return &Options{id: id}
-}
