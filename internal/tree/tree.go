@@ -15,7 +15,7 @@ type Tree struct {
 }
 
 // CreateTree creates the tree configuration.
-func CreateTree(myID hotstuff.ID, bf int, ids []hotstuff.ID) *Tree {
+func CreateTree(myID hotstuff.ID, bf int, ids []hotstuff.ID) Tree {
 	if bf < 2 {
 		panic("Branch factor must be greater than 1")
 	}
@@ -23,7 +23,7 @@ func CreateTree(myID hotstuff.ID, bf int, ids []hotstuff.ID) *Tree {
 		panic("Replica ID not found in tree configuration")
 	}
 
-	return &Tree{
+	return Tree{
 		id:           myID,
 		height:       treeHeight(len(ids), bf),
 		branchFactor: bf,

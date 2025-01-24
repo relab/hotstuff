@@ -92,7 +92,7 @@ func (k *Kauri) initializeConfiguration() {
 	treeConfig := k.opts.TreeConfig()
 	k.treeWaitDelta = treeConfig.TreeWaitDelta()
 	k.treeDelayType = treeConfig.DelayType()
-	k.tree = *tree.CreateTree(k.opts.ID(), treeConfig.BranchFactor(), treeConfig.TreePos())
+	k.tree = tree.CreateTree(k.opts.ID(), treeConfig.BranchFactor(), treeConfig.TreePos())
 	k.initDone = true
 	k.senders = make([]hotstuff.ID, 0)
 }
