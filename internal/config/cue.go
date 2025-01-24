@@ -11,9 +11,11 @@ import (
 //go:embed schema.cue
 var schemaFile string
 
-// Load loads a cue configuration from filename and returns a Config struct.
+// NewCue loads a cue configuration from filename and returns a ExperimentConfig struct.
 // The configuration is validated against the schema embedded in the binary.
-func Load(filename string) (*HostConfig, error) {
+// One can specify the `base` config to overwrite its values from the Cue config.
+// Leave `base` nil to construct a Cue config from scratch.
+func NewCue(filename string, base *ExperimentConfig) (*ExperimentConfig, error) {
 	ctx := cuecontext.New()
 	schema := ctx.CompileString(schemaFile).LookupPath(cue.ParsePath("config"))
 	if schema.Err() != nil {
@@ -31,9 +33,13 @@ func Load(filename string) (*HostConfig, error) {
 	if err := unified.Validate(cue.Concrete(true)); err != nil {
 		return nil, err
 	}
-	conf := &HostConfig{}
-	if err := cfg.Decode(conf); err != nil {
+
+	if base == nil {
+		base = &ExperimentConfig{}
+	}
+
+	if err := cfg.Decode(base); err != nil {
 		return nil, err
 	}
-	return conf, nil
+	return base, nil
 }

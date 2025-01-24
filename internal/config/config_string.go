@@ -11,7 +11,7 @@ func join[T any](a []T, sep string) string {
 	return strings.Trim(strings.ReplaceAll(fmt.Sprint(a), " ", sep), "[]")
 }
 
-func (c *HostConfig) String() string {
+func (c *ExperimentConfig) String() string {
 	s := strings.Builder{}
 	s.WriteString("ReplicaHosts: ")
 	s.WriteString(strings.Join(c.ReplicaHosts, ", "))

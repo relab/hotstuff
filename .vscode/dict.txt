@@ -2,6 +2,7 @@ anypb
 Bano
 Baudet
 bbchain
+benchmarkdata
 BFT's
 Bitfield
 bitmask
