@@ -11,6 +11,8 @@ import (
 
 // ExperimentConfig holds the configuration for an experiment.
 type ExperimentConfig struct {
+	// # Host-based configuration values below
+
 	// ReplicaHosts is a list of hosts that will run replicas.
 	ReplicaHosts []string
 	// ClientHosts is a list of hosts that will run clients.
@@ -24,6 +26,11 @@ type ExperimentConfig struct {
 	// The locations are indexed by the replica ID.
 	// Entries in Locations must exist in the latency matrix.
 	Locations []string
+	// ByzantineStrategy is a map from each strategy to a list of replica IDs exhibiting that strategy.
+	ByzantineStrategy map[string][]uint32
+
+	// # Tree-based configuration values below:
+
 	// TreePositions is a list of tree positions for the replicas (optional).
 	// The length of TreePositions must be equal to the number of replicas and the entries must be unique.
 	// The tree positions are indexed by the replica ID.
@@ -32,50 +39,94 @@ type ExperimentConfig struct {
 	TreePositions []uint32
 	// BranchFactor is the branch factor for the tree (required if TreePositions is set).
 	BranchFactor uint32
-	// ByzantineStrategy is a map from each strategy to a list of replica IDs exhibiting that strategy.
-	ByzantineStrategy map[string][]uint32
 	// TreeDelta is the waiting time for intermediate nodes in the tree.
 	TreeDelta time.Duration
+	// Shuffles the tree exisiting positions if true.
+	RandomTree bool
 
-	// TODO: Add field descriptions.
+	// # Module strings below:
 
-	BatchSize uint32
-
-	ClientTimeout       time.Duration
-	ConnectTimeout      time.Duration
-	Duration            time.Duration
-	MeasurementInterval time.Duration
-	ViewTimeout         time.Duration
-	MaxTimeout          time.Duration
-
-	Consensus      string
-	Crypto         string
+	// Consensus is the name of the consensus implementation to use.
+	Consensus string
+	// Crypto is the name of the crypto implementation to use.
+	Crypto string
+	// LeaderRotation is the name of the leader rotation algorithm to use.
 	LeaderRotation string
-	Modules        []string
-
+	// Modules is a list of additional modules to load.
+	Modules []string
+	// Metrics is a list of metrics to log.
 	Metrics []string
 
-	Cue       string
-	Exe       string
-	Output    string
+	// # File path strings below:
+
+	// Cue is the path to optional .cue config file.
+	Cue string
+	// Exe is the path to the executable deployed to remote hosts.
+	Exe string
+	// Output is the path to the experiment data output directory.
+	Output string
+	// SshConfig is the path to the SSH config file.
 	SshConfig string
 
-	CpuProfile        bool
-	DurationSamples   uint32
-	FgProfProfile     bool
-	MaxConcurrent     uint32
-	MemProfile        bool
-	PayloadSize       uint32
-	RandomTree        bool
-	RateLimit         float64
-	RateStep          float64
-	RateStepInterval  time.Duration
-	SharedSeed        int64
+	// # Profiling flags below:
+
+	// CpuProfile enables CPU profiling if true.
+	CpuProfile bool
+	// FgProfProfile enables fgprof library if true.
+	FgProfProfile bool
+	// MemProfile enables memory profiling if true.
+	MemProfile bool
+
+	DurationSamples uint32
+
+	// # Client-based configuration value below:
+
+	// MaxConcurrent is the maximum number of commands sent concurrently by each client.
+	MaxConcurrent uint32
+	// PayloadSize is the fixed size, in bytes, of each command sent in a batch by the client.
+	PayloadSize uint32
+	// RateLimit is the maximum commands per second a client is allowed to send.
+	RateLimit float64
+	// RateStep is the number of commands per second that the client can increase to up its rate.
+	RateStep float64
+	// The number of client commands that should be batched together.
+	BatchSize uint32
+
+	// # Other values:
+
+	// TimeoutMultiplies is the number to multiply the view duration by in case of a timeout.
 	TimeoutMultiplier float64
-	Trace             bool
-	Worker            bool
-	LogLevel          string
-	UseTLS            bool
+
+	// Worker spawns a local worker on the controller.
+	Worker bool
+
+	// SharedSeed is the random number generator seed shared across nodes.
+	SharedSeed int64
+	// Trace enables runtime tracing.
+	Trace bool
+	// LogLevel is the string specifying the log level.
+	LogLevel string
+	// UseTLS enables TLS.
+	UseTLS bool
+
+	// # Duration values are separated here for easily adding compatibility with Cue.
+	// NOTE: Cue does not support time.Duration and must be implemented manually.
+
+	// ClientTimeout specifies the timeout duration of a client.
+	ClientTimeout time.Duration
+	// ConnectTimeout specifies the duration of the initial connection timeout.
+	ConnectTimeout time.Duration
+	// RateStepInterval is how often the client rate limit should be increased.
+	RateStepInterval time.Duration
+	// MeasurementInterval is the time interval between measurements
+	MeasurementInterval time.Duration
+
+	// Duration specifies the entire duration of the experiment.
+	Duration time.Duration
+	// ViewTimeout is the duration of the first view.
+	ViewTimeout time.Duration
+	// MaxTimeout is the upper limit on view timeouts.
+	MaxTimeout time.Duration
 }
 
 // TreePosIDs returns a slice of hotstuff.IDs ordered by the tree positions.
