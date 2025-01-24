@@ -2,21 +2,14 @@ package leaderrotation
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/netconfig"
 )
 
-func init() {
-	modules.RegisterModule("round-robin", NewRoundRobin)
-}
+const RoundRobinModuleName = "round-robin"
 
 type roundRobin struct {
 	configuration *netconfig.Config
-}
-
-func (rr *roundRobin) InitModule(mods *core.Core) {
-	mods.Get(&rr.configuration)
 }
 
 // GetLeader returns the id of the leader in the given view
@@ -27,8 +20,8 @@ func (rr roundRobin) GetLeader(view hotstuff.View) hotstuff.ID {
 }
 
 // NewRoundRobin returns a new round-robin leader rotation implementation.
-func NewRoundRobin() modules.LeaderRotation {
-	return &roundRobin{}
+func NewRoundRobin(configuration *netconfig.Config) modules.LeaderRotation {
+	return &roundRobin{configuration: configuration}
 }
 
 func chooseRoundRobin(view hotstuff.View, numReplicas int) hotstuff.ID {

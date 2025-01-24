@@ -9,29 +9,27 @@ import (
 	"github.com/relab/hotstuff/modules"
 )
 
-func init() {
-	modules.RegisterModule("fasthotstuff", New)
-}
+const ModuleName = "fasthotstuff"
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {
-	blockChain   *blockchain.BlockChain
-	logger       logging.Logger
-	synchronizer core.Synchronizer
+	blockChain *blockchain.BlockChain
+	logger     logging.Logger
 }
 
 // New returns a new FastHotStuff instance.
-func New() modules.Rules {
-	return &FastHotStuff{}
-}
-
-// InitModule initializes the module.
-func (fhs *FastHotStuff) InitModule(mods *core.Core) {
-	var opts *core.Options
-
-	mods.Get(&opts, &fhs.blockChain, &fhs.logger, &fhs.synchronizer)
+func New(
+	blockChain *blockchain.BlockChain,
+	logger logging.Logger,
+	opts *core.Options,
+) modules.Rules {
+	fhs := &FastHotStuff{
+		blockChain: blockChain,
+		logger:     logger,
+	}
 
 	opts.SetShouldUseAggQC()
+	return fhs
 }
 
 func (fhs *FastHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
@@ -61,14 +59,14 @@ func (fhs *FastHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 }
 
 // VoteRule decides whether to vote for the proposal or not.
-func (fhs *FastHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
+func (fhs *FastHotStuff) VoteRule(view hotstuff.View, proposal hotstuff.ProposeMsg) bool {
 	// The base implementation verifies both regular QCs and AggregateQCs, and asserts that the QC embedded in the
 	// block is the same as the highQC found in the aggregateQC.
 	if proposal.AggregateQC != nil {
 		hqcBlock, ok := fhs.blockChain.Get(proposal.Block.QuorumCert().BlockHash())
 		return ok && fhs.blockChain.Extends(proposal.Block, hqcBlock)
 	}
-	return proposal.Block.View() >= fhs.synchronizer.View() &&
+	return proposal.Block.View() >= view &&
 		proposal.Block.View() == proposal.Block.QuorumCert().View()+1
 }
 

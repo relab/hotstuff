@@ -8,10 +8,10 @@ import (
 	"github.com/relab/hotstuff/modules"
 )
 
-func init() {
-	modules.RegisterModule("silence", func() Byzantine { return &silence{} })
-	modules.RegisterModule("fork", func() Byzantine { return &fork{} })
-}
+const (
+	SilenceModuleName = "silence"
+	ForkModuleName    = "fork"
+)
 
 // Byzantine wraps a consensus rules implementation and alters its behavior.
 type Byzantine interface {
@@ -21,12 +21,6 @@ type Byzantine interface {
 
 type silence struct {
 	modules.Rules
-}
-
-func (s *silence) InitModule(mods *core.Core) {
-	if mod, ok := s.Rules.(core.Module); ok {
-		mod.InitModule(mods)
-	}
 }
 
 func (s *silence) ProposeRule(_ hotstuff.SyncInfo, _ hotstuff.Command) (hotstuff.ProposeMsg, bool) {
@@ -39,8 +33,8 @@ func (s *silence) Wrap(rules modules.Rules) modules.Rules {
 }
 
 // NewSilence returns a byzantine replica that will never propose.
-func NewSilence(c modules.Rules) modules.Rules {
-	return &silence{Rules: c}
+func NewSilence(rules modules.Rules) Byzantine {
+	return &silence{Rules: rules}
 }
 
 type fork struct {
@@ -48,18 +42,6 @@ type fork struct {
 	synchronizer core.Synchronizer
 	opts         *core.Options
 	modules.Rules
-}
-
-func (f *fork) InitModule(mods *core.Core) {
-	mods.Get(
-		&f.blockChain,
-		&f.synchronizer,
-		&f.opts,
-	)
-
-	if mod, ok := f.Rules.(core.Module); ok {
-		mod.InitModule(mods)
-	}
 }
 
 func (f *fork) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
@@ -93,8 +75,20 @@ func (f *fork) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (propos
 }
 
 // NewFork returns a byzantine replica that will try to fork the chain.
-func NewFork(rules modules.Rules) modules.Rules {
-	return &fork{Rules: rules}
+func NewFork(
+	rules modules.Rules,
+
+	blockChain *blockchain.BlockChain,
+	synchronizer core.Synchronizer,
+	opts *core.Options,
+) Byzantine {
+	return &fork{
+		Rules: rules,
+
+		blockChain:   blockChain,
+		synchronizer: synchronizer,
+		opts:         opts,
+	}
 }
 
 func (f *fork) Wrap(rules modules.Rules) modules.Rules {

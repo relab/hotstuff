@@ -13,7 +13,7 @@ import (
 // as this is handled by the ConsensusBase struct.
 type Rules interface {
 	// VoteRule decides whether to vote for the block.
-	VoteRule(proposal hotstuff.ProposeMsg) bool
+	VoteRule(view hotstuff.View, proposal hotstuff.ProposeMsg) bool
 	// CommitRule decides whether any ancestor of the block can be committed.
 	// Returns the youngest ancestor of the block that can be committed.
 	CommitRule(*hotstuff.Block) *hotstuff.Block

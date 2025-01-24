@@ -4,45 +4,42 @@ package simplehotstuff
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
 
-func init() {
-	modules.RegisterModule("simplehotstuff", New)
-}
+const ModuleName = "simplehotstuff"
 
 // SimpleHotStuff implements a simplified version of the HotStuff algorithm.
 //
 // Based on the simplified algorithm described in the paper
 // "Formal Verification of HotStuff" by Leander Jehl.
 type SimpleHotStuff struct {
-	blockChain   *blockchain.BlockChain
-	logger       logging.Logger
-	synchronizer core.Synchronizer
+	blockChain *blockchain.BlockChain
+	logger     logging.Logger
 
 	locked *hotstuff.Block
 }
 
 // New returns a new SimpleHotStuff instance.
-func New() modules.Rules {
+func New(
+	blockChain *blockchain.BlockChain,
+	logger logging.Logger,
+) modules.Rules {
 	return &SimpleHotStuff{
+		blockChain: blockChain,
+		logger:     logger,
+
 		locked: hotstuff.GetGenesis(),
 	}
 }
 
-// InitModule initializes the module.
-func (hs *SimpleHotStuff) InitModule(mods *core.Core) {
-	mods.Get(&hs.blockChain, &hs.logger, &hs.synchronizer)
-}
-
 // VoteRule decides if the replica should vote for the given block.
-func (hs *SimpleHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
+func (hs *SimpleHotStuff) VoteRule(view hotstuff.View, proposal hotstuff.ProposeMsg) bool {
 	block := proposal.Block
 
 	// Rule 1: can only vote in increasing rounds
-	if block.View() < hs.synchronizer.View() {
+	if block.View() < view {
 		hs.logger.Info("VoteRule: block view too low")
 		return false
 	}

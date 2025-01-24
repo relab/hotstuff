@@ -5,11 +5,7 @@ import (
 	"github.com/relab/hotstuff/modules"
 )
 
-func init() {
-	modules.RegisterModule("fixed", func() modules.LeaderRotation {
-		return NewFixed(1)
-	})
-}
+const FixedModuleName = "fixed"
 
 type fixed struct {
 	leader hotstuff.ID

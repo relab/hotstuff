@@ -14,32 +14,19 @@ import (
 	"github.com/relab/hotstuff/netconfig"
 )
 
-func init() {
-	modules.RegisterModule("reputation", NewRepBased)
-}
+const ReputationModuleName = "reputation"
 
 type reputationsMap map[hotstuff.ID]float64
 
 type repBased struct {
-	configuration  *netconfig.Config
-	consensusRules modules.Rules
-	committer      *committer.Committer
-	opts           *core.Options
-	logger         logging.Logger
+	configuration *netconfig.Config
+	committer     *committer.Committer
+	opts          *core.Options
+	logger        logging.Logger
+
+	chainLength    int
 	prevCommitHead *hotstuff.Block
 	reputations    reputationsMap // latest reputations
-}
-
-// InitModule gives the module a reference to the Core object.
-// It also allows the module to set module options using the OptionsBuilder
-func (r *repBased) InitModule(mods *core.Core) {
-	mods.Get(
-		&r.configuration,
-		&r.consensusRules,
-		&r.committer,
-		&r.opts,
-		&r.logger,
-	)
 }
 
 // TODO: should GetLeader be thread-safe?
@@ -47,7 +34,7 @@ func (r *repBased) InitModule(mods *core.Core) {
 // GetLeader returns the id of the leader in the given view
 func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 	block := r.committer.CommittedBlock()
-	if block.View() > view-hotstuff.View(r.consensusRules.ChainLength()) {
+	if block.View() > view-hotstuff.View(r.chainLength) {
 		// TODO: it could be possible to lookup leaders for older views if we
 		// store a copy of the reputations in a metadata field of each block.
 		r.logger.Error("looking up leaders of old views is not supported")
@@ -104,8 +91,21 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 }
 
 // NewRepBased returns a new random reputation-based leader rotation implementation
-func NewRepBased() modules.LeaderRotation {
+func NewRepBased(
+	chainLength int,
+
+	configuration *netconfig.Config,
+	committer *committer.Committer,
+	opts *core.Options,
+	logger logging.Logger,
+) modules.LeaderRotation {
 	return &repBased{
+		configuration: configuration,
+		committer:     committer,
+		opts:          opts,
+		logger:        logger,
+
+		chainLength:    chainLength,
 		reputations:    make(reputationsMap),
 		prevCommitHead: hotstuff.GetGenesis(),
 	}

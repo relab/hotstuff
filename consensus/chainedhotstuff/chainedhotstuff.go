@@ -4,14 +4,11 @@ package chainedhotstuff
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 )
 
-func init() {
-	modules.RegisterModule("chainedhotstuff", New)
-}
+const ModuleName = "chainedhotstuff"
 
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {
@@ -24,15 +21,16 @@ type ChainedHotStuff struct {
 }
 
 // New returns a new chainedhotstuff instance.
-func New() modules.Rules {
+func New(
+	blockChain *blockchain.BlockChain,
+	logger logging.Logger,
+) modules.Rules {
 	return &ChainedHotStuff{
+		blockChain: blockChain,
+		logger:     logger,
+
 		bLock: hotstuff.GetGenesis(),
 	}
-}
-
-// InitModule initializes the module.
-func (hs *ChainedHotStuff) InitModule(mods *core.Core) {
-	mods.Get(&hs.blockChain, &hs.logger)
 }
 
 func (hs *ChainedHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
@@ -77,7 +75,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 }
 
 // VoteRule decides whether to vote for the proposal or not.
-func (hs *ChainedHotStuff) VoteRule(proposal hotstuff.ProposeMsg) bool {
+func (hs *ChainedHotStuff) VoteRule(_ hotstuff.View, proposal hotstuff.ProposeMsg) bool {
 	block := proposal.Block
 
 	qcBlock, haveQCBlock := hs.blockChain.Get(block.QuorumCert().BlockHash())

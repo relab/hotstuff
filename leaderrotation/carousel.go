@@ -14,28 +14,16 @@ import (
 	"github.com/relab/hotstuff/netconfig"
 )
 
-func init() {
-	modules.RegisterModule("carousel", NewCarousel)
-}
+const CarouselModuleName = "carousel"
 
 type carousel struct {
-	blockChain     *blockchain.BlockChain
-	consensusRules modules.Rules
-	configuration  *netconfig.Config
-	committer      *committer.Committer
-	opts           *core.Options
-	logger         logging.Logger
-}
+	blockChain    *blockchain.BlockChain
+	configuration *netconfig.Config
+	committer     *committer.Committer
+	opts          *core.Options
+	logger        logging.Logger
 
-func (c *carousel) InitModule(mods *core.Core) {
-	mods.Get(
-		&c.blockChain,
-		&c.consensusRules,
-		&c.configuration,
-		&c.committer,
-		&c.opts,
-		&c.logger,
-	)
+	chainLength int
 }
 
 func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
@@ -46,7 +34,7 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 		return chooseRoundRobin(round, c.configuration.Len())
 	}
 
-	if commitHead.View() != round-hotstuff.View(c.consensusRules.ChainLength()) {
+	if commitHead.View() != round-hotstuff.View(c.chainLength) {
 		c.logger.Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.View())
 		return chooseRoundRobin(round, c.configuration.Len())
 	}
@@ -86,6 +74,21 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 }
 
 // NewCarousel returns a new instance of the Carousel leader-election algorithm.
-func NewCarousel() modules.LeaderRotation {
-	return &carousel{}
+func NewCarousel(
+	chainLength int,
+
+	blockChain *blockchain.BlockChain,
+	configuration *netconfig.Config,
+	committer *committer.Committer,
+	opts *core.Options,
+	logger logging.Logger,
+) modules.LeaderRotation {
+	return &carousel{
+		blockChain:    blockChain,
+		chainLength:   chainLength,
+		configuration: configuration,
+		committer:     committer,
+		opts:          opts,
+		logger:        logger,
+	}
 }

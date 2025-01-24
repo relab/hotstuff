@@ -16,32 +16,10 @@ import (
 	"github.com/relab/hotstuff/synctools"
 )
 
-// Rules is the minimum interface that a consensus implementations must implement.
-// Implementations of this interface can be wrapped in the ConsensusBase struct.
-// Together, these provide an implementation of the main Consensus interface.
-// Implementors do not need to verify certificates or interact with other core,
-// as this is handled by the ConsensusBase struct.
-type Rules interface {
-	// VoteRule decides whether to vote for the block.
-	VoteRule(proposal hotstuff.ProposeMsg) bool
-	// CommitRule decides whether any ancestor of the block can be committed.
-	// Returns the youngest ancestor of the block that can be committed.
-	CommitRule(*hotstuff.Block) *hotstuff.Block
-	// ChainLength returns the number of blocks that need to be chained together in order to commit.
-	ChainLength() int
-}
-
-// ProposeRuler is an optional interface that adds a ProposeRule method.
-// This allows implementors to specify how new blocks are created.
-type ProposeRuler interface {
-	// ProposeRule creates a new proposal.
-	ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool)
-}
-
 // Consensus provides a default implementation of the Consensus interface
 // for implementations of the ConsensusImpl interface.
 type Consensus struct {
-	impl           Rules
+	impl           modules.Rules
 	leaderRotation modules.LeaderRotation
 
 	blockChain    *blockchain.BlockChain
@@ -66,7 +44,7 @@ type Consensus struct {
 
 // New returns a new Consensus instance based on the given Rules implementation.
 func New(
-	impl Rules,
+	impl modules.Rules,
 	leaderRotation modules.LeaderRotation,
 
 	blockChain *blockchain.BlockChain,
@@ -141,7 +119,7 @@ func (cs *Consensus) Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncIn
 	}
 
 	var proposal hotstuff.ProposeMsg
-	if proposer, ok := cs.impl.(ProposeRuler); ok {
+	if proposer, ok := cs.impl.(modules.ProposeRuler); ok {
 		proposal, ok = proposer.ProposeRule(cert, cmd)
 		if !ok {
 			cs.logger.Debug("Propose: No block")
@@ -203,7 +181,7 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 		return
 	}
 
-	if !cs.impl.VoteRule(proposal) {
+	if !cs.impl.VoteRule(view, proposal) {
 		cs.logger.Infof("OnPropose[p=%d, view=%d]: Block not voted for", view)
 		return
 	}
@@ -265,11 +243,6 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 	cs.logger.Debugf("OnPropose[view=%d]: voting for %.8s -> %.8x", view, block.Hash(), block.Command())
 	leader.Vote(pc)
 	return
-}
-
-// ChainLength returns the number of blocks that need to be chained together in order to commit.
-func (cs *Consensus) ChainLength() int {
-	return cs.impl.ChainLength()
 }
 
 var _ core.Consensus = (*Consensus)(nil)

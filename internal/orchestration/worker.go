@@ -18,7 +18,6 @@ import (
 	"github.com/relab/hotstuff/clientsrv"
 	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/consensus/byzantine"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
@@ -172,30 +171,9 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	// prepare modules
 	builder := core.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 
-	consensusRules, ok := modules.GetModule[modules.Rules](opts.GetConsensus())
-	if !ok {
-		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
-	}
-
-	strategy := opts.GetByzantineStrategy()
-	if strategy != "" {
-		if byz, ok := modules.GetModule[byzantine.Byzantine](strategy); ok {
-			consensusRules = byz.Wrap(consensusRules)
-			logger.Infof("assigned byzantine strategy: %s", strategy)
-
-		} else {
-			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
-		}
-	}
-
 	cryptoImpl, ok := modules.GetModule[modules.CryptoBase](opts.GetCrypto())
 	if !ok {
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
-	}
-
-	leaderRotation, ok := modules.GetModule[modules.LeaderRotation](opts.GetLeaderRotation())
-	if !ok {
-		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
 
 	var duration modules.ViewDuration
@@ -280,6 +258,36 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 		100, // TODO: consider making this configurable
 	)
+	consensusRules, ok := getConsensusRules(opts.GetConsensus(), blockChain, logger, builderOpt)
+	if !ok {
+		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
+	}
+
+	// TODO: Fix cyclic ref with byzantine and synchronizer
+	// strategy := opts.GetByzantineStrategy()
+	// if strategy != "" {
+	// 	if byz, ok := getByzantine(strategy, consensusRules, blockChain, sync, builderOpt); ok {
+	// 		consensusRules = byz.Wrap(consensusRules)
+	// 		logger.Infof("assigned byzantine strategy: %s", strategy)
+	//
+	// 	} else {
+	// 		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
+	// 	}
+	// }
+
+	leaderRotation, ok := getLeaderRotation(
+		opts.GetLeaderRotation(),
+		consensusRules.ChainLength(),
+		blockChain,
+		netConfiguration,
+		committer,
+		logger,
+		builderOpt,
+	)
+	if !ok {
+		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
+	}
+
 	csus := consensus.New(
 		consensusRules,
 		leaderRotation,
@@ -293,6 +301,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 		builderOpt,
 	)
+
 	synch := synchronizer.New(
 		cryptoImpl,
 		leaderRotation,
