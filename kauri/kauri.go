@@ -41,10 +41,7 @@ type Kauri struct {
 	initDone    bool
 	nodes       map[hotstuff.ID]*kauripb.Node
 	senders     []hotstuff.ID
-
-	tree          tree.Tree
-	treeWaitDelta time.Duration
-	treeDelayType tree.DelayType
+	tree        tree.Tree
 }
 
 // New initializes the kauri structure
@@ -89,10 +86,7 @@ func (k *Kauri) initializeConfiguration() {
 	for _, n := range kauriCfg.Nodes() {
 		k.nodes[hotstuff.ID(n.ID())] = n
 	}
-	treeConfig := k.opts.TreeConfig()
-	k.treeWaitDelta = treeConfig.TreeWaitDelta()
-	k.treeDelayType = treeConfig.DelayType()
-	k.tree = tree.CreateTree(k.opts.ID(), treeConfig.BranchFactor(), treeConfig.TreePos())
+	k.tree = k.opts.Tree()
 	k.initDone = true
 	k.senders = make([]hotstuff.ID, 0)
 }
@@ -117,9 +111,8 @@ func (k *Kauri) reset() {
 }
 
 func (k *Kauri) WaitToAggregate() {
-	waitTime := k.tree.WaitTime(k.server.LatencyMatrix(), k.treeWaitDelta, k.treeDelayType)
 	view := k.currentView
-	time.Sleep(waitTime)
+	time.Sleep(k.tree.WaitTime())
 	k.eventLoop.AddEvent(WaitTimerExpiredEvent{currentView: view})
 }
 

@@ -20,6 +20,7 @@ import (
 	"github.com/relab/hotstuff/crypto"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/eventloop"
+	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/internal/tree"
@@ -194,6 +195,10 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 	var viewDuration synchronizer.ViewDuration
 	if opts.GetLeaderRotation() == "tree-leader" {
+		// TODO(meling): Temporary default; should be configurable and moved to the appropriate place.
+		opts.SetTreeHeightWaitTime()
+		// create tree only if we are using tree leader (Kauri)
+		builder.Options().SetTree(createTree(opts))
 		viewDuration = synchronizer.NewFixedViewDuration(opts.GetInitialTimeout().AsDuration())
 	} else {
 		viewDuration = synchronizer.NewViewDuration(
@@ -216,9 +221,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		logger,
 	)
 	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
-	// default to fixed tree height-based wait time TODO: need a parameter in ReplicaOpts for this
-	builder.Options().SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(),
-		opts.TreeDeltaDuration(), tree.TreeHeightTime)
 
 	if w.measurementInterval > 0 {
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
@@ -246,6 +248,18 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		},
 	}
 	return replica.New(c, builder), nil
+}
+
+// createTree creates a tree based on the given replica options.
+func createTree(replicaOpts *orchestrationpb.ReplicaOpts) tree.Tree {
+	tree := tree.CreateTree(replicaOpts.HotstuffID(), int(replicaOpts.GetBranchFactor()), replicaOpts.TreePositionIDs())
+	switch {
+	case replicaOpts.GetAggregationTime():
+		tree.SetAggregationWaitTime(latency.MatrixFrom(replicaOpts.GetLocations()), replicaOpts.TreeDeltaDuration())
+	case replicaOpts.GetTreeHeightTime():
+		tree.SetTreeHeightWaitTime(replicaOpts.TreeDeltaDuration())
+	}
+	return tree
 }
 
 func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {

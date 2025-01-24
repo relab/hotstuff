@@ -3,7 +3,6 @@ package modules
 import (
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/tree"
@@ -45,7 +44,7 @@ type Options struct {
 	sharedRandomSeed   int64
 	connectionMetadata map[string]string
 
-	treeConfig    *TreeConfig
+	tree          tree.Tree
 	shouldUseTree bool
 }
 
@@ -94,11 +93,6 @@ func (opts *Options) PrivateKey() hotstuff.PrivateKey {
 	return opts.privateKey
 }
 
-// TreeConfig returns the tree config
-func (opts *Options) TreeConfig() *TreeConfig {
-	return opts.treeConfig
-}
-
 // ShouldUseAggQC returns true if aggregated quorum certificates should be used.
 // This is true for Fast-Hotstuff: https://arxiv.org/abs/2010.11454
 func (opts *Options) ShouldUseAggQC() bool {
@@ -145,39 +139,11 @@ func (opts *Options) SetConnectionMetadata(key string, value string) {
 	opts.connectionMetadata[key] = value
 }
 
-// SetTreeConfig sets the tree configuration.
-func (opts *Options) SetTreeConfig(bf uint32, treePos []hotstuff.ID, treeWaitDelta time.Duration, delayType tree.DelayType) {
-	opts.treeConfig = &TreeConfig{
-		bf:            int(bf),
-		treePos:       treePos,
-		delayType:     delayType,
-		treeWaitDelta: treeWaitDelta,
-	}
+func (opts *Options) SetTree(t tree.Tree) {
+	opts.tree = t
 }
 
-// TreeConfig stores the tree configuration
-type TreeConfig struct {
-	bf            int
-	treePos       []hotstuff.ID
-	delayType     tree.DelayType
-	treeWaitDelta time.Duration
-}
-
-func (tc *TreeConfig) DelayType() tree.DelayType {
-	return tc.delayType
-}
-
-// BranchFactor returns the branch factor of the tree.
-func (tc *TreeConfig) BranchFactor() int {
-	return tc.bf
-}
-
-// TreePos returns the tree positions of the replicas.
-func (tc *TreeConfig) TreePos() []hotstuff.ID {
-	return tc.treePos
-}
-
-// TreeWaitDelta returns the time to wait for a tree node to be ready.
-func (tc *TreeConfig) TreeWaitDelta() time.Duration {
-	return tc.treeWaitDelta
+// Tree returns the tree configuration.
+func (opts *Options) Tree() tree.Tree {
+	return opts.tree
 }
