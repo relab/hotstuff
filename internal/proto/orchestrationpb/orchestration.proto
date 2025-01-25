@@ -59,6 +59,13 @@ message ReplicaOpts {
   uint32 BranchFactor = 24;
   // Tree Duration in tree communication
   google.protobuf.Duration TreeDelta = 25;
+  // DelayType is the type of delay to use for the wait time.
+  oneof DelayType {
+    // AggregationTime computes the wait time based on the latency of links in the tree.
+    bool AggregationTime = 26;
+    // TreeHeightTime computes the wait time only based on the height of the tree.
+    bool TreeHeightTime = 27;
+  }
 }
 
 // ReplicaInfo is the information that the replicas need about each other.

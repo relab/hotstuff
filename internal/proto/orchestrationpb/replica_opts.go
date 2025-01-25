@@ -38,6 +38,14 @@ func (x *ReplicaOpts) TreeDeltaDuration() time.Duration {
 	return x.GetTreeDelta().AsDuration()
 }
 
+func (x *ReplicaOpts) SetAggregationWaitTime() {
+	x.DelayType = &ReplicaOpts_AggregationTime{AggregationTime: true}
+}
+
+func (x *ReplicaOpts) SetTreeHeightWaitTime() {
+	x.DelayType = &ReplicaOpts_TreeHeightTime{TreeHeightTime: true}
+}
+
 func (x *ReplicaOpts) SetTreeOptions(branchFactor uint32, positions []uint32, treeDelta time.Duration) {
 	x.TreePositions = positions
 	x.BranchFactor = branchFactor
