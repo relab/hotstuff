@@ -30,7 +30,6 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/netconfig"
 	"github.com/relab/hotstuff/synchronizer"
-	"github.com/relab/hotstuff/voting"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -268,7 +267,7 @@ func setupModules(
 		logger,
 		moduleOpt,
 	)
-	synchronizer := synchronizer.New(
+	synch := synchronizer.New(
 		cryptoImpl,
 		leaderRotation,
 		duration,
@@ -283,7 +282,7 @@ func setupModules(
 	)
 	strategy := opts.GetByzantineStrategy()
 	if strategy != "" {
-		if byz, ok := getByzantine(strategy, consensusRules, blockChain, synchronizer, moduleOpt); ok {
+		if byz, ok := getByzantine(strategy, consensusRules, blockChain, synch, moduleOpt); ok {
 			consensusRules = byz.Wrap(consensusRules)
 			csus.SetByzantine(consensusRules)
 			logger.Infof("assigned byzantine strategy: %s", strategy)
@@ -293,13 +292,13 @@ func setupModules(
 	}
 	// No need to store votingMachine since it's not a dependency.
 	// The constructor adds event handlers that enables voting logic.
-	voting.NewVotingMachine(
+	synchronizer.NewVotingMachine(
 		blockChain,
 		netConfiguration,
 		certAuthority,
 		eventLoop,
 		logger,
-		synchronizer,
+		synch,
 		moduleOpt,
 	)
 	return &moduleList{
@@ -307,6 +306,6 @@ func setupModules(
 		server:          server,
 		protocolInvoker: protocolInvoker,
 		eventLoop:       eventLoop,
-		synchronizer:    synchronizer,
+		synchronizer:    synch,
 	}, nil
 }

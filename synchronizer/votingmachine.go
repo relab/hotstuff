@@ -1,4 +1,4 @@
-package voting
+package synchronizer
 
 import (
 	"sync"
@@ -9,7 +9,6 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/netconfig"
-	"github.com/relab/hotstuff/synchronizer"
 )
 
 // VotingMachine collects votes.
@@ -19,7 +18,7 @@ type VotingMachine struct {
 	crypto        *certauth.CertAuthority
 	eventLoop     *core.EventLoop
 	logger        logging.Logger
-	synchronizer  *synchronizer.Synchronizer
+	synchronizer  *Synchronizer
 	opts          *core.Options
 
 	mut           sync.Mutex
@@ -33,7 +32,7 @@ func NewVotingMachine(
 	crypto *certauth.CertAuthority,
 	eventLoop *core.EventLoop,
 	logger logging.Logger,
-	synchronizer *synchronizer.Synchronizer,
+	synchronizer *Synchronizer,
 	opts *core.Options,
 ) *VotingMachine {
 	vm := &VotingMachine{
