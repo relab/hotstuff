@@ -67,6 +67,7 @@ func New(
 		committer:     committer,
 		commandCache:  commandCache,
 		configuration: configuration,
+		kauri:         kauri,
 		invoker:       invoker,
 		crypto:        crypto,
 		eventLoop:     eventLoop,
@@ -77,7 +78,6 @@ func New(
 	}
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
-		// TODO: determine potential bugs
 		cs.OnPropose(cs.view, event.(hotstuff.ProposeMsg))
 	})
 
@@ -247,7 +247,7 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 	return
 }
 
-// SetByzantine changes the rule implementation to a byzantine ruleset.
+// SetByzantine wraps the existing rule implementation to a byzantine ruleset.
 func (cs *Consensus) SetByzantine(byzRules modules.Rules) {
 	cs.impl = byzRules
 }
