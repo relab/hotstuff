@@ -12,7 +12,7 @@ import (
 	"github.com/relab/hotstuff/synchronizer"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/backend"
+	"github.com/relab/hotstuff/server"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -20,7 +20,7 @@ import (
 type Replica struct {
 	clientSrv    *clientsrv.ClientServer
 	cfg          *netconfig.Config
-	hsSrv        *backend.Server
+	hsSrv        *server.Server
 	sender       *sender.Sender
 	eventLoop    *core.EventLoop
 	synchronizer *synchronizer.Synchronizer
@@ -33,7 +33,7 @@ type Replica struct {
 // New returns a new replica.
 func New(
 	clientSrv *clientsrv.ClientServer,
-	server *backend.Server,
+	server *server.Server,
 	sender *sender.Sender,
 	eventLoop *core.EventLoop,
 	synchronizer *synchronizer.Synchronizer,

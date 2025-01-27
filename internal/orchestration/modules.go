@@ -8,7 +8,6 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/clientsrv"
@@ -29,6 +28,7 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/netconfig"
 	"github.com/relab/hotstuff/sender"
+	"github.com/relab/hotstuff/server"
 	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -123,7 +123,7 @@ func getCrypto(
 
 type moduleList struct {
 	clientSrv    *clientsrv.ClientServer
-	server       *backend.Server
+	server       *server.Server
 	sender       *sender.Sender
 	eventLoop    *core.EventLoop
 	synchronizer *synchronizer.Synchronizer
@@ -201,15 +201,15 @@ func setupModules(
 		eventLoop,
 		logger,
 	)
-	server := backend.NewServer(
+	server := server.NewServer(
 		blockChain,
 		netConfiguration,
 		eventLoop,
 		logger,
 		moduleOpt,
 
-		backend.WithLatencies(hotstuff.ID(opts.GetID()), opts.GetLocations()),
-		backend.WithGorumsServerOptions(replicaSrvOpts...),
+		server.WithLatencies(hotstuff.ID(opts.GetID()), opts.GetLocations()),
+		server.WithGorumsServerOptions(replicaSrvOpts...),
 	)
 	committer := committer.New(
 		blockChain,

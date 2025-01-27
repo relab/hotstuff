@@ -9,7 +9,6 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
@@ -19,6 +18,7 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/netconfig"
 	"github.com/relab/hotstuff/sender"
+	"github.com/relab/hotstuff/server"
 )
 
 const ModuleName = "kauri"
@@ -34,7 +34,7 @@ type Kauri struct {
 	eventLoop     *core.EventLoop
 	configuration *netconfig.Config
 	sender        *sender.Sender
-	server        *backend.Server
+	server        *server.Server
 	logger        logging.Logger
 
 	nodes       map[hotstuff.ID]*kauripb.Node
@@ -58,7 +58,7 @@ func New(
 	eventLoop *core.EventLoop,
 	configuration *netconfig.Config,
 	sender *sender.Sender,
-	server *backend.Server,
+	server *server.Server,
 	logger logging.Logger,
 ) *Kauri {
 	k := &Kauri{

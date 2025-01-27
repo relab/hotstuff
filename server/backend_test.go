@@ -1,4 +1,4 @@
-package backend_test
+package server_test
 
 import (
 	"context"
@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/netconfig"
 	"github.com/relab/hotstuff/sender"
+	"github.com/relab/hotstuff/server"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -229,9 +229,9 @@ func runBoth(t *testing.T, run func(*testing.T, setupFunc)) {
 
 func createServers(t *testing.T, td testData, _ *gomock.Controller) (teardown func()) {
 	t.Helper()
-	servers := make([]*backend.Server, td.n)
+	servers := make([]*server.Server, td.n)
 	for i := range servers {
-		servers[i] = backend.NewServer(backend.WithGorumsServerOptions(gorums.WithGRPCServerOptions(grpc.Creds(td.creds))))
+		servers[i] = server.NewServer(server.WithGorumsServerOptions(gorums.WithGRPCServerOptions(grpc.Creds(td.creds))))
 		servers[i].StartOnListener(td.listeners[i])
 		td.builders[i].Add(servers[i])
 	}
