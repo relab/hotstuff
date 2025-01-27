@@ -38,14 +38,13 @@ func NewSilence(rules modules.Rules) Byzantine {
 }
 
 type fork struct {
-	blockChain   *blockchain.BlockChain
-	synchronizer core.Synchronizer
-	opts         *core.Options
+	blockChain *blockchain.BlockChain
+	opts       *core.Options
 	modules.Rules
 }
 
-func (f *fork) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
-	block, ok := f.blockChain.Get(f.synchronizer.HighQC().BlockHash())
+func (f *fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
+	block, ok := f.blockChain.Get(highQC.BlockHash())
 	if !ok {
 		return proposal, false
 	}
@@ -64,7 +63,7 @@ func (f *fork) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (propos
 			grandparent.Hash(),
 			grandparent.QuorumCert(),
 			cmd,
-			f.synchronizer.View(),
+			view,
 			f.opts.ID(),
 		),
 	}
@@ -79,15 +78,13 @@ func NewFork(
 	rules modules.Rules,
 
 	blockChain *blockchain.BlockChain,
-	synchronizer core.Synchronizer,
 	opts *core.Options,
 ) Byzantine {
 	return &fork{
 		Rules: rules,
 
-		blockChain:   blockChain,
-		synchronizer: synchronizer,
-		opts:         opts,
+		blockChain: blockChain,
+		opts:       opts,
 	}
 }
 

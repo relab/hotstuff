@@ -91,7 +91,7 @@ func (cs *Consensus) StopVoting(view hotstuff.View) {
 }
 
 // Propose creates a new proposal.
-func (cs *Consensus) Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncInfo hotstuff.SyncInfo, advance bool) {
+func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo) (syncInfo hotstuff.SyncInfo, advance bool) {
 	cs.logger.Debugf("Propose")
 	cs.view = view
 
@@ -116,7 +116,7 @@ func (cs *Consensus) Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncIn
 
 	var proposal hotstuff.ProposeMsg
 	if proposer, ok := cs.impl.(modules.ProposeRuler); ok {
-		proposal, ok = proposer.ProposeRule(cert, cmd)
+		proposal, ok = proposer.ProposeRule(view, highQC, cert, cmd)
 		if !ok {
 			cs.logger.Debug("Propose: No block")
 			return
@@ -250,4 +250,4 @@ func (cs *Consensus) SetByzantine(byzRules modules.Rules) {
 	cs.impl = byzRules
 }
 
-var _ core.Consensus = (*Consensus)(nil)
+// var _ core.Consensus = (*Consensus)(nil)

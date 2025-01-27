@@ -10,7 +10,6 @@ config: {
 	treePositions: [3, 2, 1, 4, 5]
 	branchFactor: 2
 	byzantineStrategy: {
-		silence: [1, 2]
-		fork: [3]
+		silence: [1]
 	}
 }

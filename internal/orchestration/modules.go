@@ -58,7 +58,6 @@ func getByzantine(
 	name string,
 	rules modules.Rules,
 	blockChain *blockchain.BlockChain,
-	synchronizer core.Synchronizer,
 	opts *core.Options,
 ) (byz byzantine.Byzantine, ok bool) {
 	ok = true
@@ -66,7 +65,7 @@ func getByzantine(
 	case byzantine.SilenceModuleName:
 		byz = byzantine.NewSilence(rules)
 	case byzantine.ForkModuleName:
-		byz = byzantine.NewFork(rules, blockChain, synchronizer, opts)
+		byz = byzantine.NewFork(rules, blockChain, opts)
 	default:
 		return nil, false
 	}
@@ -254,6 +253,15 @@ func setupModules(
 			logger,
 		)
 	}
+	strategy := opts.GetByzantineStrategy()
+	if strategy != "" {
+		if byz, ok := getByzantine(strategy, consensusRules, blockChain, moduleOpt); ok {
+			consensusRules = byz.Wrap(consensusRules)
+			logger.Infof("assigned byzantine strategy: %s", strategy)
+		} else {
+			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
+		}
+	}
 	csus := consensus.New(
 		consensusRules,
 		leaderRotation,
@@ -280,16 +288,6 @@ func setupModules(
 		logger,
 		moduleOpt,
 	)
-	strategy := opts.GetByzantineStrategy()
-	if strategy != "" {
-		if byz, ok := getByzantine(strategy, consensusRules, blockChain, synch, moduleOpt); ok {
-			consensusRules = byz.Wrap(consensusRules)
-			csus.SetByzantine(consensusRules)
-			logger.Infof("assigned byzantine strategy: %s", strategy)
-		} else {
-			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
-		}
-	}
 	// No need to store votingMachine since it's not a dependency.
 	// The constructor adds event handlers that enables voting logic.
 	synchronizer.NewVotingMachine(
