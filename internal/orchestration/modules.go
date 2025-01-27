@@ -240,7 +240,7 @@ func setupModules(
 	if !ok {
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
 	}
-	var kauriModule *kauri.Kauri
+	var kauriModule *kauri.Kauri = nil
 	if opts.GetKauri() {
 		kauriModule = kauri.New(
 			cryptoImpl,

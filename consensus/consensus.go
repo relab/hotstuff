@@ -27,7 +27,7 @@ type Consensus struct {
 	committer    *committer.Committer
 	commandCache *clientsrv.CmdCache
 	invoker      *invoker.Invoker
-	crypto       *certauth.CertAuthority
+	auth         *certauth.CertAuthority
 	eventLoop    *core.EventLoop
 	logger       logging.Logger
 	opts         *core.Options
@@ -52,7 +52,7 @@ func New(
 	commandCache *clientsrv.CmdCache,
 	invoker *invoker.Invoker,
 	kauri *kauri.Kauri,
-	crypto *certauth.CertAuthority,
+	auth *certauth.CertAuthority,
 	eventLoop *core.EventLoop,
 	logger logging.Logger,
 	opts *core.Options,
@@ -64,14 +64,17 @@ func New(
 		blockChain:   blockChain,
 		committer:    committer,
 		commandCache: commandCache,
-		kauri:        kauri,
 		invoker:      invoker,
-		crypto:       crypto,
+		auth:         auth,
 		eventLoop:    eventLoop,
 		logger:       logger,
 		opts:         opts,
 
 		lastVote: 0,
+	}
+
+	if kauri != nil {
+		cs.kauri = kauri
 	}
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
@@ -157,7 +160,7 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 	block := proposal.Block
 
 	if cs.opts.ShouldUseAggQC() && proposal.AggregateQC != nil {
-		highQC, ok := cs.crypto.VerifyAggregateQC(*proposal.AggregateQC)
+		highQC, ok := cs.auth.VerifyAggregateQC(*proposal.AggregateQC)
 		if !ok {
 			cs.logger.Warnf("OnPropose[view=%d]: failed to verify aggregate QC", view)
 			return
@@ -169,7 +172,7 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 		}
 	}
 
-	if !cs.crypto.VerifyQuorumCert(block.QuorumCert()) {
+	if !cs.auth.VerifyQuorumCert(block.QuorumCert()) {
 		cs.logger.Infof("OnPropose[view=%d]: invalid QC", view)
 		return
 	}
@@ -215,14 +218,13 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 		return
 	}
 
-	pc, err := cs.crypto.CreatePartialCert(block)
+	pc, err := cs.auth.CreatePartialCert(block)
 	if err != nil {
 		cs.logger.Errorf("OnPropose[view=%d]: failed to sign block: ", view, err)
 		return
 	}
 
 	cs.lastVote = block.View()
-
 	if cs.kauri != nil {
 		cs.kauri.Begin(pc, proposal)
 		return
