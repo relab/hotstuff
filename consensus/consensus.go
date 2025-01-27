@@ -6,6 +6,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
+	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/clientsrv"
 	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/core"
@@ -26,7 +27,7 @@ type Consensus struct {
 	committer    *committer.Committer
 	commandCache *clientsrv.CmdCache
 	invoker      *invoker.Invoker
-	crypto       core.CertAuth
+	crypto       *certauth.CertAuthority
 	eventLoop    *core.EventLoop
 	logger       logging.Logger
 	opts         *core.Options
@@ -51,7 +52,7 @@ func New(
 	commandCache *clientsrv.CmdCache,
 	invoker *invoker.Invoker,
 	kauri *kauri.Kauri,
-	crypto core.CertAuth,
+	crypto *certauth.CertAuthority,
 	eventLoop *core.EventLoop,
 	logger logging.Logger,
 	opts *core.Options,
