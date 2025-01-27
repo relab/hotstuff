@@ -32,8 +32,6 @@ type Consensus struct {
 	logger       logging.Logger
 	opts         *core.Options
 
-	handel core.Handel
-
 	kauri modules.Kauri
 
 	lastVote hotstuff.View
@@ -82,10 +80,6 @@ func New(
 	})
 
 	return cs
-}
-
-func (cs *Consensus) CommittedBlock() *hotstuff.Block {
-	return cs.committer.CommittedBlock()
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
@@ -153,80 +147,61 @@ func (cs *Consensus) Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncIn
 	return cs.OnPropose(view, proposal)
 }
 
-func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) { //nolint:gocyclo
-	// TODO: extract parts of this method into helper functions maybe?
-	cs.logger.Debugf("OnPropose[view=%d]: %.8s -> %.8x", view, proposal.Block.Hash(), proposal.Block.Command())
-
+func (cs *Consensus) checkQC(view hotstuff.View, proposal *hotstuff.ProposeMsg) bool {
 	block := proposal.Block
-
 	if cs.opts.ShouldUseAggQC() && proposal.AggregateQC != nil {
 		highQC, ok := cs.auth.VerifyAggregateQC(*proposal.AggregateQC)
 		if !ok {
-			cs.logger.Warnf("OnPropose[view=%d]: failed to verify aggregate QC", view)
-			return
+			cs.logger.Warnf("checkQC[view=%d]: failed to verify aggregate QC", view)
+			return false
 		}
 		// NOTE: for simplicity, we require that the highQC found in the AggregateQC equals the QC embedded in the block.
 		if !block.QuorumCert().Equals(highQC) {
-			cs.logger.Warnf("OnPropose[view=%d]: block QC does not equal highQC", view)
-			return
+			cs.logger.Warnf("checkQC[view=%d]: block QC does not equal highQC", view)
+			return false
 		}
 	}
-
 	if !cs.auth.VerifyQuorumCert(block.QuorumCert()) {
-		cs.logger.Infof("OnPropose[view=%d]: invalid QC", view)
-		return
+		cs.logger.Infof("checkQC[view=%d]: invalid QC", view)
+		return false
 	}
+	return true
+}
 
+func (cs *Consensus) acceptProposal(view hotstuff.View, proposal *hotstuff.ProposeMsg) bool {
+	block := proposal.Block
 	// ensure the block came from the leader.
 	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
 		cs.logger.Infof("OnPropose[p=%d, view=%d]: block was not proposed by the expected leader", view)
-		return
+		return false
 	}
-
-	if !cs.impl.VoteRule(view, proposal) {
+	if !cs.impl.VoteRule(view, *proposal) {
 		cs.logger.Infof("OnPropose[p=%d, view=%d]: Block not voted for", view)
-		return
+		return false
 	}
-
 	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
 		cs.commandCache.Proposed(qcBlock.Command())
 	} else {
 		cs.logger.Infof("OnPropose[view=%d]: Failed to fetch qcBlock", view)
 	}
-
 	cmd := block.Command()
 	if !cs.commandCache.Accept(cmd) {
 		cs.logger.Infof("OnPropose[view=%d]: block rejected: %.8s -> %.8x", view, block.Hash(), block.Command())
-		return
+		return false
 	}
+	return true
+}
 
-	cs.logger.Debugf("OnPropose[view=%d]: block accepted: %.8s -> %.8x", view, block.Hash(), block.Command())
-
-	// block is safe and was accepted
-	cs.blockChain.Store(block)
-
-	if b := cs.impl.CommitRule(block); b != nil {
-		cs.committer.Commit(b)
-	}
-
-	// Tells the synchronizer to advance the view
-	advance = true
-	syncInfo = hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
-
-	if block.View() <= cs.lastVote {
-		cs.logger.Info(fmt.Sprintf("OnPropose[view=%d]: block view too old for %.8s -> %.8x (diff=%d)", view, block.Hash(), block.Command(), cs.lastVote-block.View()))
-		return
-	}
-
+func (cs *Consensus) voteFor(view hotstuff.View, proposal *hotstuff.ProposeMsg) {
+	block := proposal.Block
 	pc, err := cs.auth.CreatePartialCert(block)
 	if err != nil {
 		cs.logger.Errorf("OnPropose[view=%d]: failed to sign block: ", view, err)
 		return
 	}
-
 	cs.lastVote = block.View()
 	if cs.kauri != nil {
-		cs.kauri.Begin(pc, proposal)
+		cs.kauri.Begin(pc, *proposal)
 		return
 	}
 	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
@@ -234,15 +209,39 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})
 		return
 	}
-
 	leader, ok := cs.sender.ReplicaNode(leaderID)
 	if !ok {
 		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
 		return
 	}
-
 	cs.logger.Debugf("OnPropose[view=%d]: voting for %.8s -> %.8x", view, block.Hash(), block.Command())
 	leader.Vote(pc)
+}
+
+func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) {
+	// TODO: extract parts of this method into helper functions maybe?
+	cs.logger.Debugf("OnPropose[view=%d]: %.8s -> %.8x", view, proposal.Block.Hash(), proposal.Block.Command())
+	block := proposal.Block
+	if !cs.checkQC(view, &proposal) {
+		return
+	}
+	if !cs.acceptProposal(view, &proposal) {
+		return
+	}
+	cs.logger.Debugf("OnPropose[view=%d]: block accepted: %.8s -> %.8x", view, block.Hash(), block.Command())
+	// block is safe and was accepted
+	cs.blockChain.Store(block)
+	if b := cs.impl.CommitRule(block); b != nil {
+		cs.committer.Commit(b)
+	}
+	// Tells the synchronizer to advance the view
+	advance = true
+	syncInfo = hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
+	if block.View() <= cs.lastVote {
+		cs.logger.Info(fmt.Sprintf("OnPropose[view=%d]: block view too old for %.8s -> %.8x (diff=%d)", view, block.Hash(), block.Command(), cs.lastVote-block.View()))
+		return
+	}
+	cs.voteFor(view, &proposal)
 	return
 }
 
