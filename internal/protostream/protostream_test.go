@@ -6,14 +6,13 @@ import (
 
 	"github.com/relab/hotstuff"
 
-	"github.com/relab/hotstuff/convert"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/protostream"
 )
 
 func TestProtostream(t *testing.T) {
-	var buf bytes.Buffer                               // in-memory stream
-	msg := convert.BlockToProto(hotstuff.GetGenesis()) // test message
+	var buf bytes.Buffer                                  // in-memory stream
+	msg := hotstuffpb.BlockToProto(hotstuff.GetGenesis()) // test message
 
 	writer := protostream.NewWriter(&buf)
 	reader := protostream.NewReader(&buf)
@@ -33,7 +32,7 @@ func TestProtostream(t *testing.T) {
 		t.Fatalf("wrong message type returned: got: %T, want: %T", got, msg)
 	}
 
-	gotBlock := convert.BlockFromProto(got)
+	gotBlock := hotstuffpb.BlockFromProto(got)
 	if gotBlock.Hash() != hotstuff.GetGenesis().Hash() {
 		t.Fatalf("message hash did not match")
 	}

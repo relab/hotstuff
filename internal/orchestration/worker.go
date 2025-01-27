@@ -181,7 +181,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	return replica.New(
 		mods.clientSrv,
 		mods.server,
-		mods.protocolInvoker,
+		mods.sender,
 		mods.eventLoop,
 		mods.synchronizer,
 	), nil

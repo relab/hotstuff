@@ -138,7 +138,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 		netConfiguration := netconfig.NewConfig()
 		eventLoop := core.NewEventLoop(1000)
 		logger := logging.New("hs" + strconv.Itoa(int(opts.GetID())))
-		protocolInvoker := invoker.New(netConfiguration, eventLoop, logger, builderOpt, creds, managerOpts...)
+		protocolInvoker := sender.New(netConfiguration, eventLoop, logger, builderOpt, creds, managerOpts...)
 
 		cmdCache := clientsrv.NewCmdCache(logger, int(conf.BatchSize))
 		clientSrv := clientsrv.NewClientServer(eventLoop, logger, cmdCache, clientSrvOpts)

@@ -23,12 +23,12 @@ import (
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/eddsa"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
-	"github.com/relab/hotstuff/invoker"
 	"github.com/relab/hotstuff/kauri"
 	"github.com/relab/hotstuff/leaderrotation"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/netconfig"
+	"github.com/relab/hotstuff/sender"
 	"github.com/relab/hotstuff/synchronizer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -122,11 +122,11 @@ func getCrypto(
 }
 
 type moduleList struct {
-	clientSrv       *clientsrv.ClientServer
-	server          *backend.Server
-	protocolInvoker *invoker.Invoker
-	eventLoop       *core.EventLoop
-	synchronizer    *synchronizer.Synchronizer
+	clientSrv    *clientsrv.ClientServer
+	server       *backend.Server
+	sender       *sender.Sender
+	eventLoop    *core.EventLoop
+	synchronizer *synchronizer.Synchronizer
 }
 
 func setupModules(
@@ -178,7 +178,7 @@ func setupModules(
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
 	}
 	eventLoop := core.NewEventLoop(logger, 1000)
-	protocolInvoker := invoker.New(
+	sender := sender.New(
 		netConfiguration,
 		eventLoop,
 		logger,
@@ -197,7 +197,7 @@ func setupModules(
 		clientSrvOpts,
 	)
 	blockChain := blockchain.New(
-		protocolInvoker,
+		sender,
 		eventLoop,
 		logger,
 	)
@@ -249,7 +249,7 @@ func setupModules(
 			moduleOpt,
 			eventLoop,
 			netConfiguration,
-			protocolInvoker,
+			sender,
 			server,
 			logger,
 		)
@@ -260,7 +260,7 @@ func setupModules(
 		blockChain,
 		committer,
 		cmdCache,
-		protocolInvoker,
+		sender,
 		kauriModule,
 		certAuthority,
 		eventLoop,
@@ -275,7 +275,7 @@ func setupModules(
 		csus,
 		certAuthority,
 		netConfiguration,
-		protocolInvoker,
+		sender,
 		eventLoop,
 		logger,
 		moduleOpt,
@@ -302,10 +302,10 @@ func setupModules(
 		moduleOpt,
 	)
 	return &moduleList{
-		clientSrv:       clientSrv,
-		server:          server,
-		protocolInvoker: protocolInvoker,
-		eventLoop:       eventLoop,
-		synchronizer:    synch,
+		clientSrv:    clientSrv,
+		server:       server,
+		sender:       sender,
+		eventLoop:    eventLoop,
+		synchronizer: synch,
 	}, nil
 }

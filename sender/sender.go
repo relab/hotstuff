@@ -1,4 +1,4 @@
-package invoker
+package sender
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/convert"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/logging"
@@ -20,7 +19,7 @@ import (
 	"google.golang.org/grpc/peer"
 )
 
-type Invoker struct {
+type Sender struct {
 	configuration *netconfig.Config
 	eventLoop     *core.EventLoop
 	logger        logging.Logger
@@ -42,7 +41,7 @@ func New(
 	opts *core.Options,
 
 	creds credentials.TransportCredentials,
-	mgrOpts ...gorums.ManagerOption) *Invoker {
+	mgrOpts ...gorums.ManagerOption) *Sender {
 	if creds == nil {
 		creds = insecure.NewCredentials()
 	}
@@ -51,7 +50,7 @@ func New(
 	}
 	mgrOpts = append(mgrOpts, gorums.WithGrpcDialOptions(grpcOpts...))
 
-	inv := &Invoker{
+	inv := &Sender{
 		configuration: configuration,
 		eventLoop:     eventLoop,
 		logger:        logger,
@@ -72,7 +71,7 @@ func New(
 	return inv
 }
 
-func (inv *Invoker) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
+func (inv *Sender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 	mgrOpts := inv.mgrOpts
 	// TODO(AlanRostem): this was here when subConfig existed. Check if doing this is valid
 	// cfg.opts = nil // options are not needed beyond this point, so we delete them.
@@ -129,17 +128,17 @@ func (inv *Invoker) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 }
 
 // Propose sends the block to all replicas in the configuration
-func (inv *Invoker) Propose(proposal hotstuff.ProposeMsg) {
+func (inv *Sender) Propose(proposal hotstuff.ProposeMsg) {
 	cfg := inv.pbCfg
 	ctx, cancel := synctools.TimeoutContext(inv.eventLoop.Context(), inv.eventLoop)
 	defer cancel()
 	cfg.Propose(
 		ctx,
-		convert.ProposalToProto(proposal),
+		hotstuffpb.ProposalToProto(proposal),
 	)
 }
 
-func (inv *Invoker) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
+func (inv *Sender) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
 	info, peerok := peer.FromContext(c.Ctx)
 	md, mdok := metadata.FromIncomingContext(c.Ctx)
 	if !peerok || !mdok {
@@ -166,7 +165,7 @@ func (inv *Invoker) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
 }
 
 // Timeout sends the timeout message to all replicas.
-func (inv *Invoker) Timeout(msg hotstuff.TimeoutMsg) {
+func (inv *Sender) Timeout(msg hotstuff.TimeoutMsg) {
 	cfg := inv.pbCfg
 
 	// will wait until the second timeout before canceling
@@ -175,12 +174,12 @@ func (inv *Invoker) Timeout(msg hotstuff.TimeoutMsg) {
 
 	cfg.Timeout(
 		ctx,
-		convert.TimeoutMsgToProto(msg),
+		hotstuffpb.TimeoutMsgToProto(msg),
 	)
 }
 
 // Fetch requests a block from all the replicas in the configuration
-func (inv *Invoker) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
+func (inv *Sender) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	cfg := inv.pbCfg
 
 	protoBlock, err := cfg.Fetch(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
@@ -192,10 +191,10 @@ func (inv *Invoker) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Bl
 		}
 		return nil, false
 	}
-	return convert.BlockFromProto(protoBlock), true
+	return hotstuffpb.BlockFromProto(protoBlock), true
 }
 
-func (inv *Invoker) ReplicaNode(id hotstuff.ID) (*Replica, bool) {
+func (inv *Sender) ReplicaNode(id hotstuff.ID) (*Replica, bool) {
 	rep, ok := inv.replicas[id]
 	if !ok {
 		return nil, false
@@ -204,16 +203,16 @@ func (inv *Invoker) ReplicaNode(id hotstuff.ID) (*Replica, bool) {
 }
 
 // Close closes all connections made by this configuration.
-func (inv *Invoker) Close() {
+func (inv *Sender) Close() {
 	inv.mgr.Close()
 }
 
-func (inv *Invoker) GorumsConfig() gorums.RawConfiguration {
+func (inv *Sender) GorumsConfig() gorums.RawConfiguration {
 	return inv.pbCfg.RawConfiguration
 }
 
-// Sub returns an Invoker copy dedicated to the replica IDs provided.
-func (inv *Invoker) Sub(ids []hotstuff.ID) (*Invoker, error) {
+// Sub returns a copy of self dedicated to the replica IDs provided.
+func (inv *Sender) Sub(ids []hotstuff.ID) (*Sender, error) {
 	replicas := make(map[hotstuff.ID]*Replica)
 	nids := make([]uint32, len(ids))
 	for i, id := range ids {
@@ -224,7 +223,7 @@ func (inv *Invoker) Sub(ids []hotstuff.ID) (*Invoker, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Invoker{
+	return &Sender{
 		eventLoop: inv.eventLoop,
 		logger:    inv.logger,
 		opts:      inv.opts,
@@ -261,7 +260,7 @@ func (q qspec) FetchQF(in *hotstuffpb.BlockHash, replies map[uint32]*hotstuffpb.
 	var h hotstuff.Hash
 	copy(h[:], in.GetHash())
 	for _, b := range replies {
-		block := convert.BlockFromProto(b)
+		block := hotstuffpb.BlockFromProto(b)
 		if h == block.Hash() {
 			return b, true
 		}

@@ -6,7 +6,6 @@ import (
 	"net"
 
 	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/convert"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/netconfig"
@@ -122,7 +121,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 		id = hotstuff.ID(proposal.Block.Proposer)
 	}
 	proposal.Block.Proposer = uint32(id)
-	proposeMsg := convert.ProposalFromProto(proposal)
+	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
 	proposeMsg.ID = id
 	impl.srv.addNetworkDelay(id)
 	impl.srv.eventLoop.AddEvent(proposeMsg)
@@ -138,7 +137,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 	impl.srv.addNetworkDelay(id)
 	impl.srv.eventLoop.AddEvent(hotstuff.VoteMsg{
 		ID:          id,
-		PartialCert: convert.PartialCertFromProto(cert),
+		PartialCert: hotstuffpb.PartialCertFromProto(cert),
 	})
 }
 
@@ -152,7 +151,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 	impl.srv.addNetworkDelay(id)
 	impl.srv.eventLoop.AddEvent(hotstuff.NewViewMsg{
 		ID:       id,
-		SyncInfo: convert.SyncInfoFromProto(msg),
+		SyncInfo: hotstuffpb.SyncInfoFromProto(msg),
 	})
 }
 
@@ -168,7 +167,7 @@ func (impl *serviceImpl) Fetch(_ gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*h
 
 	impl.srv.logger.Debugf("OnFetch: %.8s", hash)
 
-	return convert.BlockToProto(block), nil
+	return hotstuffpb.BlockToProto(block), nil
 }
 
 // Timeout handles an incoming TimeoutMsg.
@@ -177,7 +176,7 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 	}
-	timeoutMsg := convert.TimeoutMsgFromProto(msg)
+	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
 	timeoutMsg.ID = id
 	impl.srv.addNetworkDelay(id)
 	impl.srv.eventLoop.AddEvent(timeoutMsg)

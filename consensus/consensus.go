@@ -10,10 +10,10 @@ import (
 	"github.com/relab/hotstuff/clientsrv"
 	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/invoker"
 	"github.com/relab/hotstuff/kauri"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/sender"
 	"github.com/relab/hotstuff/synctools"
 )
 
@@ -26,7 +26,7 @@ type Consensus struct {
 	blockChain   *blockchain.BlockChain
 	committer    *committer.Committer
 	commandCache *clientsrv.CmdCache
-	invoker      *invoker.Invoker
+	sender       *sender.Sender
 	auth         *certauth.CertAuthority
 	eventLoop    *core.EventLoop
 	logger       logging.Logger
@@ -50,7 +50,7 @@ func New(
 	blockChain *blockchain.BlockChain,
 	committer *committer.Committer,
 	commandCache *clientsrv.CmdCache,
-	invoker *invoker.Invoker,
+	sender *sender.Sender,
 	kauri *kauri.Kauri,
 	auth *certauth.CertAuthority,
 	eventLoop *core.EventLoop,
@@ -64,7 +64,7 @@ func New(
 		blockChain:   blockChain,
 		committer:    committer,
 		commandCache: commandCache,
-		invoker:      invoker,
+		sender:       sender,
 		auth:         auth,
 		eventLoop:    eventLoop,
 		logger:       logger,
@@ -147,7 +147,7 @@ func (cs *Consensus) Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncIn
 	cs.blockChain.Store(proposal.Block)
 	// kauri sends the proposal to only the children
 	if cs.kauri == nil {
-		cs.invoker.Propose(proposal)
+		cs.sender.Propose(proposal)
 	}
 	// self vote
 	return cs.OnPropose(view, proposal)
@@ -235,7 +235,7 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 		return
 	}
 
-	leader, ok := cs.invoker.ReplicaNode(leaderID)
+	leader, ok := cs.sender.ReplicaNode(leaderID)
 	if !ok {
 		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
 		return

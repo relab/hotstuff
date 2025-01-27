@@ -1,8 +1,7 @@
-package invoker
+package sender
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/convert"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/synctools"
@@ -34,7 +33,7 @@ func (r *Replica) Vote(cert hotstuff.PartialCert) {
 	}
 	ctx, cancel := synctools.TimeoutContext(r.eventLoop.Context(), r.eventLoop)
 	defer cancel()
-	pCert := convert.PartialCertToProto(cert)
+	pCert := hotstuffpb.PartialCertToProto(cert)
 	r.node.Vote(ctx, pCert)
 }
 
@@ -45,7 +44,7 @@ func (r *Replica) NewView(msg hotstuff.SyncInfo) {
 	}
 	ctx, cancel := synctools.TimeoutContext(r.eventLoop.Context(), r.eventLoop)
 	defer cancel()
-	r.node.NewView(ctx, convert.SyncInfoToProto(msg))
+	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(msg))
 }
 
 // Metadata returns the gRPC metadata from this replica's connection.

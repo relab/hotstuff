@@ -8,15 +8,15 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/invoker"
 	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/sender"
 	"github.com/relab/hotstuff/synctools"
 )
 
 // BlockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type BlockChain struct {
-	invoker   *invoker.Invoker
+	sender    *sender.Sender
 	eventLoop *core.EventLoop
 	logger    logging.Logger
 
@@ -31,12 +31,12 @@ type BlockChain struct {
 // New creates a new blockChain with a maximum size.
 // Blocks are dropped in least recently used order.
 func New(
-	invoker *invoker.Invoker,
+	sender *sender.Sender,
 	eventLoop *core.EventLoop,
 	logger logging.Logger,
 ) *BlockChain {
 	bc := &BlockChain{
-		invoker:   invoker,
+		sender:    sender,
 		eventLoop: eventLoop,
 		logger:    logger,
 
@@ -109,7 +109,7 @@ func (chain *BlockChain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 
 	chain.mut.Unlock()
 	chain.logger.Debugf("Attempting to fetch block: %.8s", hash)
-	block, ok = chain.invoker.Fetch(ctx, hash)
+	block, ok = chain.sender.Fetch(ctx, hash)
 	chain.mut.Lock()
 
 	delete(chain.pendingFetch, hash)

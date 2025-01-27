@@ -11,14 +11,14 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/convert"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/proto/kauripb"
 	"github.com/relab/hotstuff/internal/tree"
-	"github.com/relab/hotstuff/invoker"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/netconfig"
+	"github.com/relab/hotstuff/sender"
 )
 
 const ModuleName = "kauri"
@@ -33,7 +33,7 @@ type Kauri struct {
 	opts          *core.Options
 	eventLoop     *core.EventLoop
 	configuration *netconfig.Config
-	invoker       *invoker.Invoker
+	sender        *sender.Sender
 	server        *backend.Server
 	logger        logging.Logger
 
@@ -57,7 +57,7 @@ func New(
 	opts *core.Options,
 	eventLoop *core.EventLoop,
 	configuration *netconfig.Config,
-	invoker *invoker.Invoker,
+	sender *sender.Sender,
 	server *backend.Server,
 	logger logging.Logger,
 ) *Kauri {
@@ -70,7 +70,7 @@ func New(
 		opts:          opts,
 		eventLoop:     eventLoop,
 		configuration: configuration,
-		invoker:       invoker,
+		sender:        sender,
 		server:        server,
 		logger:        logger,
 
@@ -94,7 +94,7 @@ func (k *Kauri) postInit() {
 }
 
 func (k *Kauri) initializeConfiguration() {
-	kauriCfg := kauripb.ConfigurationFromRaw(k.invoker.GorumsConfig(), nil)
+	kauriCfg := kauripb.ConfigurationFromRaw(k.sender.GorumsConfig(), nil)
 	for _, n := range kauriCfg.Nodes() {
 		k.nodes[hotstuff.ID(n.ID())] = n
 	}
@@ -107,7 +107,7 @@ func (k *Kauri) initializeConfiguration() {
 // Begin starts dissemination of proposal and aggregation of votes.
 func (k *Kauri) Begin(pc hotstuff.PartialCert, p hotstuff.ProposeMsg) {
 	if !k.initDone {
-		k.eventLoop.DelayUntil(invoker.ConnectedEvent{}, func() { k.Begin(pc, p) })
+		k.eventLoop.DelayUntil(sender.ConnectedEvent{}, func() { k.Begin(pc, p) })
 		return
 	}
 	k.reset()
@@ -138,7 +138,7 @@ func (k *Kauri) WaitToAggregate(waitTime time.Duration, view hotstuff.View) {
 func (k *Kauri) SendProposalToChildren(p hotstuff.ProposeMsg) {
 	children := k.tree.ReplicaChildren()
 	if len(children) != 0 {
-		config, err := k.invoker.Sub(children)
+		config, err := k.sender.Sub(children)
 		if err != nil {
 			k.logger.Errorf("Unable to send the proposal to children: %v", err)
 			return
@@ -161,7 +161,7 @@ func (k *Kauri) OnContributionRecv(event ContributionRecvEvent) {
 	}
 	contribution := event.Contribution
 	k.logger.Debugf("Processing the contribution from %d", contribution.ID)
-	currentSignature := convert.QuorumSignatureFromProto(contribution.Signature)
+	currentSignature := hotstuffpb.QuorumSignatureFromProto(contribution.Signature)
 	err := k.mergeContribution(currentSignature)
 	if err != nil {
 		k.logger.Errorf("Failed to merge contribution from %d: %v", contribution.ID, err)
@@ -182,7 +182,7 @@ func (k *Kauri) SendContributionToParent() {
 		if isPresent {
 			node.SendContribution(context.Background(), &kauripb.Contribution{
 				ID:        uint32(k.opts.ID()),
-				Signature: convert.QuorumSignatureToProto(k.aggContrib),
+				Signature: hotstuffpb.QuorumSignatureToProto(k.aggContrib),
 				View:      uint64(k.currentView),
 			})
 		}

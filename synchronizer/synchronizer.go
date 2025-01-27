@@ -11,10 +11,10 @@ import (
 	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/invoker"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/netconfig"
+	"github.com/relab/hotstuff/sender"
 
 	"github.com/relab/hotstuff"
 )
@@ -29,7 +29,7 @@ type Synchronizer struct {
 	consensus     *consensus.Consensus
 	auth          *certauth.CertAuthority
 	configuration *netconfig.Config
-	invoker       *invoker.Invoker
+	sender        *sender.Sender
 	eventLoop     *core.EventLoop
 	logger        logging.Logger
 	opts          *core.Options
@@ -60,7 +60,7 @@ func New(
 	consensus *consensus.Consensus,
 	auth *certauth.CertAuthority,
 	configuration *netconfig.Config,
-	invoker *invoker.Invoker,
+	sender *sender.Sender,
 	eventLoop *core.EventLoop,
 	logger logging.Logger,
 	opts *core.Options,
@@ -74,7 +74,7 @@ func New(
 		consensus:     consensus,
 		auth:          auth,
 		configuration: configuration,
-		invoker:       invoker,
+		sender:        sender,
 		eventLoop:     eventLoop,
 		logger:        logger,
 		opts:          opts,
@@ -183,7 +183,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	view := s.View()
 
 	if s.lastTimeout != nil && s.lastTimeout.View == view {
-		s.invoker.Timeout(*s.lastTimeout)
+		s.sender.Timeout(*s.lastTimeout)
 		return
 	}
 
@@ -215,7 +215,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	// stop voting for current view
 	s.consensus.StopVoting(view)
 
-	s.invoker.Timeout(timeoutMsg)
+	s.sender.Timeout(timeoutMsg)
 	s.OnRemoteTimeout(timeoutMsg)
 }
 
@@ -369,7 +369,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
 		if ok {
 			s.AdvanceView(sInfo)
 		}
-	} else if replica, ok := s.invoker.ReplicaNode(leader); ok {
+	} else if replica, ok := s.sender.ReplicaNode(leader); ok {
 		replica.NewView(syncInfo)
 	}
 }

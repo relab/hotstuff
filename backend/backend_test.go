@@ -12,8 +12,8 @@ import (
 
 	"github.com/relab/hotstuff/backend"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/invoker"
 	"github.com/relab/hotstuff/netconfig"
+	"github.com/relab/hotstuff/sender"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -38,7 +38,7 @@ func TestConnect(t *testing.T) {
 		td.builders.Build()
 
 		cfg := netconfig.NewConfig()
-		inv := invoker.New(
+		inv := sender.New(
 			td.creds,
 			gorums.WithDialTimeout(time.Second),
 		)
@@ -56,7 +56,7 @@ func TestConnect(t *testing.T) {
 }
 
 // testBase is a generic test for a unicast/multicast call
-func testBase(t *testing.T, typ any, send func(*invoker.Invoker), handle core.EventHandler) {
+func testBase(t *testing.T, typ any, send func(*sender.Sender), handle core.EventHandler) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		ctrl := gomock.NewController(t)
@@ -66,7 +66,7 @@ func testBase(t *testing.T, typ any, send func(*invoker.Invoker), handle core.Ev
 		defer serverTeardown()
 
 		cfg := netconfig.NewConfig()
-		inv := invoker.New(td.creds, gorums.WithDialTimeout(time.Second))
+		inv := sender.New(td.creds, gorums.WithDialTimeout(time.Second))
 		td.builders[0].Add(cfg, inv)
 		hl := td.builders.Build()
 
@@ -103,7 +103,7 @@ func TestPropose(t *testing.T) {
 			"foo", 1, 1,
 		),
 	}
-	testBase(t, want, func(inv *invoker.Invoker) {
+	testBase(t, want, func(inv *sender.Sender) {
 		wg.Add(3)
 		inv.Propose(want)
 		wg.Wait()
@@ -127,7 +127,7 @@ func TestTimeout(t *testing.T) {
 		ViewSignature: nil,
 		SyncInfo:      hotstuff.NewSyncInfo(),
 	}
-	testBase(t, want, func(inv core.ProtocolInvoker) {
+	testBase(t, want, func(inv core.Sender) {
 		wg.Add(3)
 		inv.Timeout(want)
 		wg.Wait()

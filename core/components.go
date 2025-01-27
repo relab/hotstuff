@@ -121,11 +121,11 @@ type Configuration interface {
 	// GetSubConfig(ids []hotstuff.ID) (sub Configuration, err error)
 }
 
-//go:generate mockgen -destination=../internal/mocks/protocolinvoker_mock.go -package=mocks . ProtocolInvoker
+//go:generate mockgen -destination=../internal/mocks/sender_mock.go -package=mocks . Sender
 
-// ProtocolInvoker provides methods to send messages to the other replicas through
+// Sender provides methods to send messages to the other replicas through
 // knowledge of the configuration of participant replicas in the protocol.
-type ProtocolInvoker interface {
+type Sender interface {
 	// Propose sends the block to all replicas in the configuration.
 	Propose(proposal hotstuff.ProposeMsg)
 	// Timeout sends the timeout message to all replicas.

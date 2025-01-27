@@ -7,8 +7,8 @@ import (
 
 	"github.com/relab/hotstuff/clientsrv"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/invoker"
 	"github.com/relab/hotstuff/netconfig"
+	"github.com/relab/hotstuff/sender"
 	"github.com/relab/hotstuff/synchronizer"
 
 	"github.com/relab/hotstuff"
@@ -21,7 +21,7 @@ type Replica struct {
 	clientSrv    *clientsrv.ClientServer
 	cfg          *netconfig.Config
 	hsSrv        *backend.Server
-	invoker      *invoker.Invoker
+	sender       *sender.Sender
 	eventLoop    *core.EventLoop
 	synchronizer *synchronizer.Synchronizer
 
@@ -34,13 +34,13 @@ type Replica struct {
 func New(
 	clientSrv *clientsrv.ClientServer,
 	server *backend.Server,
-	invoker *invoker.Invoker,
+	sender *sender.Sender,
 	eventLoop *core.EventLoop,
 	synchronizer *synchronizer.Synchronizer,
 ) (replica *Replica) {
 	srv := &Replica{
 		clientSrv:    clientSrv,
-		invoker:      invoker,
+		sender:       sender,
 		hsSrv:        server,
 		eventLoop:    eventLoop,
 		synchronizer: synchronizer,
@@ -61,7 +61,7 @@ func (srv *Replica) StartServers(replicaListen, clientListen net.Listener) {
 
 // Connect connects to the other replicas.
 func (srv *Replica) Connect(replicas []hotstuff.ReplicaInfo) error {
-	return srv.invoker.Connect(replicas)
+	return srv.sender.Connect(replicas)
 }
 
 // Start runs the replica in a goroutine.
@@ -90,7 +90,7 @@ func (srv *Replica) Run(ctx context.Context) {
 // Close closes the connections and stops the servers used by the replica.
 func (srv *Replica) Close() {
 	srv.clientSrv.Stop()
-	srv.invoker.Close()
+	srv.sender.Close()
 	srv.hsSrv.Stop()
 }
 
