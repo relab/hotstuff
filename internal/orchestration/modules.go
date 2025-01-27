@@ -261,7 +261,6 @@ func setupModules(
 		blockChain,
 		committer,
 		cmdCache,
-		netConfiguration,
 		protocolInvoker,
 		kauriModule,
 		certAuthority,

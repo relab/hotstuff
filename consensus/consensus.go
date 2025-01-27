@@ -13,7 +13,6 @@ import (
 	"github.com/relab/hotstuff/kauri"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/netconfig"
 	"github.com/relab/hotstuff/synctools"
 )
 
@@ -23,15 +22,14 @@ type Consensus struct {
 	impl           modules.Rules
 	leaderRotation modules.LeaderRotation
 
-	blockChain    *blockchain.BlockChain
-	committer     *committer.Committer
-	commandCache  *clientsrv.CmdCache
-	configuration *netconfig.Config
-	invoker       *invoker.Invoker
-	crypto        core.CertAuth
-	eventLoop     *core.EventLoop
-	logger        logging.Logger
-	opts          *core.Options
+	blockChain   *blockchain.BlockChain
+	committer    *committer.Committer
+	commandCache *clientsrv.CmdCache
+	invoker      *invoker.Invoker
+	crypto       core.CertAuth
+	eventLoop    *core.EventLoop
+	logger       logging.Logger
+	opts         *core.Options
 
 	handel core.Handel
 
@@ -51,7 +49,6 @@ func New(
 	blockChain *blockchain.BlockChain,
 	committer *committer.Committer,
 	commandCache *clientsrv.CmdCache,
-	configuration *netconfig.Config,
 	invoker *invoker.Invoker,
 	kauri *kauri.Kauri,
 	crypto core.CertAuth,
@@ -63,16 +60,15 @@ func New(
 		impl:           impl,
 		leaderRotation: leaderRotation,
 
-		blockChain:    blockChain,
-		committer:     committer,
-		commandCache:  commandCache,
-		configuration: configuration,
-		kauri:         kauri,
-		invoker:       invoker,
-		crypto:        crypto,
-		eventLoop:     eventLoop,
-		logger:        logger,
-		opts:          opts,
+		blockChain:   blockChain,
+		committer:    committer,
+		commandCache: commandCache,
+		kauri:        kauri,
+		invoker:      invoker,
+		crypto:       crypto,
+		eventLoop:    eventLoop,
+		logger:       logger,
+		opts:         opts,
 
 		lastVote: 0,
 	}
