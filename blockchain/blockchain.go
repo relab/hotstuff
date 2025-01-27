@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/sender"
 	"github.com/relab/hotstuff/synctools"
@@ -17,7 +17,7 @@ import (
 // blocks are evicted in LRU order.
 type BlockChain struct {
 	sender    *sender.Sender
-	eventLoop *core.EventLoop
+	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
 
 	mut         sync.Mutex
@@ -32,7 +32,7 @@ type BlockChain struct {
 // Blocks are dropped in least recently used order.
 func New(
 	sender *sender.Sender,
-	eventLoop *core.EventLoop,
+	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 ) *BlockChain {
 	bc := &BlockChain{

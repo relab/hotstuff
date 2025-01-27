@@ -7,6 +7,7 @@ import (
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/netconfig"
 )
@@ -16,7 +17,7 @@ type VotingMachine struct {
 	blockChain    *blockchain.BlockChain
 	configuration *netconfig.Config
 	crypto        *certauth.CertAuthority
-	eventLoop     *core.EventLoop
+	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
 	synchronizer  *Synchronizer
 	opts          *core.Options
@@ -30,7 +31,7 @@ func NewVotingMachine(
 	blockChain *blockchain.BlockChain,
 	configuration *netconfig.Config,
 	crypto *certauth.CertAuthority,
-	eventLoop *core.EventLoop,
+	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	synchronizer *Synchronizer,
 	opts *core.Options,

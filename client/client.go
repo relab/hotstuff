@@ -15,6 +15,7 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/logging"
 	"golang.org/x/time/rate"
@@ -58,7 +59,7 @@ type Config struct {
 
 // Client is a hotstuff client.
 type Client struct {
-	eventLoop *core.EventLoop
+	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
 	opts      *core.Options
 
@@ -79,7 +80,7 @@ type Client struct {
 
 // New returns a new Client.
 func New(
-	eventLoop *core.EventLoop,
+	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	opts *core.Options,
 

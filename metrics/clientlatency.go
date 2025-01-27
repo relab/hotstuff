@@ -5,6 +5,7 @@ import (
 
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics/types"
 )
@@ -26,7 +27,7 @@ type ClientLatency struct {
 // InitModule gives the module access to the other modules.
 func (lr *ClientLatency) InitModule(mods *core.Core) {
 	var (
-		eventLoop *core.EventLoop
+		eventLoop *eventloop.EventLoop
 		logger    logging.Logger
 	)
 
@@ -44,7 +45,7 @@ func (lr *ClientLatency) InitModule(mods *core.Core) {
 
 	eventLoop.RegisterHandler(types.TickEvent{}, func(event any) {
 		lr.tick(event.(types.TickEvent))
-	}, core.Prioritize())
+	}, eventloop.Prioritize())
 
 	logger.Info("Client Latency metric enabled")
 }

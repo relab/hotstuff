@@ -8,6 +8,7 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/netconfig"
@@ -21,7 +22,7 @@ import (
 
 type Sender struct {
 	configuration *netconfig.Config
-	eventLoop     *core.EventLoop
+	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
 	opts          *core.Options
 
@@ -36,7 +37,7 @@ type Sender struct {
 
 func New(
 	configuration *netconfig.Config,
-	eventLoop *core.EventLoop,
+	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	opts *core.Options,
 

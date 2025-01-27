@@ -11,6 +11,7 @@ import (
 	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/netconfig"
@@ -30,7 +31,7 @@ type Synchronizer struct {
 	auth          *certauth.CertAuthority
 	configuration *netconfig.Config
 	sender        *sender.Sender
-	eventLoop     *core.EventLoop
+	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
 	opts          *core.Options
 
@@ -61,7 +62,7 @@ func New(
 	auth *certauth.CertAuthority,
 	configuration *netconfig.Config,
 	sender *sender.Sender,
-	eventLoop *core.EventLoop,
+	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	opts *core.Options,
 ) *Synchronizer {

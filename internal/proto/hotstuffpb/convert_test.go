@@ -7,8 +7,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/netconfig"
 
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
@@ -82,7 +85,19 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 
 	builders := testutil.CreateBuilders(t, ctrl, 4, testutil.GenerateKeys(t, 4, testutil.GenerateBLS12Key)...)
 	for i := range builders {
-		builders[i].Add(certauth.New(bls12.New()))
+		opt := builders[i].Options()
+		var cfg *netconfig.Config
+		var blockChain *blockchain.BlockChain
+		logger := logging.New("test")
+		builders[i].Add(certauth.New(bls12.New(
+			cfg,
+			logger,
+			opt,
+		),
+			blockChain,
+			cfg,
+			logger,
+		))
 	}
 	hl := builders.Build()
 

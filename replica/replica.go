@@ -6,7 +6,7 @@ import (
 	"net"
 
 	"github.com/relab/hotstuff/clientsrv"
-	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/netconfig"
 	"github.com/relab/hotstuff/sender"
 	"github.com/relab/hotstuff/synchronizer"
@@ -22,7 +22,7 @@ type Replica struct {
 	cfg          *netconfig.Config
 	hsSrv        *server.Server
 	sender       *sender.Sender
-	eventLoop    *core.EventLoop
+	eventLoop    *eventloop.EventLoop
 	synchronizer *synchronizer.Synchronizer
 
 	execHandlers map[clientsrv.CmdID]func(*emptypb.Empty, error)
@@ -35,7 +35,7 @@ func New(
 	clientSrv *clientsrv.ClientServer,
 	server *server.Server,
 	sender *sender.Sender,
-	eventLoop *core.EventLoop,
+	eventLoop *eventloop.EventLoop,
 	synchronizer *synchronizer.Synchronizer,
 ) (replica *Replica) {
 	srv := &Replica{

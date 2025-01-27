@@ -7,6 +7,7 @@ import (
 
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/netconfig"
 
@@ -23,7 +24,7 @@ import (
 type Server struct {
 	blockChain    *blockchain.BlockChain
 	configuration *netconfig.Config
-	eventLoop     *core.EventLoop
+	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
 	opts          *core.Options
 
@@ -36,7 +37,7 @@ type Server struct {
 func NewServer(
 	blockChain *blockchain.BlockChain,
 	configuration *netconfig.Config,
-	eventLoop *core.EventLoop,
+	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	opts *core.Options,
 

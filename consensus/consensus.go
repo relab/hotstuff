@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/clientsrv"
 	"github.com/relab/hotstuff/committer"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/kauri"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
@@ -28,7 +29,7 @@ type Consensus struct {
 	commandCache *clientsrv.CmdCache
 	sender       *sender.Sender
 	auth         *certauth.CertAuthority
-	eventLoop    *core.EventLoop
+	eventLoop    *eventloop.EventLoop
 	logger       logging.Logger
 	opts         *core.Options
 
@@ -51,7 +52,7 @@ func New(
 	sender *sender.Sender,
 	kauri *kauri.Kauri,
 	auth *certauth.CertAuthority,
-	eventLoop *core.EventLoop,
+	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	opts *core.Options,
 ) *Consensus {

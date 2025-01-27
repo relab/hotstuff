@@ -13,6 +13,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/synchronizer"
@@ -33,7 +34,7 @@ func (id NodeID) String() string {
 type node struct {
 	blockChain     *blockchain.BlockChain
 	consensus      core.Consensus
-	eventLoop      *core.EventLoop
+	eventLoop      *eventloop.EventLoop
 	leaderRotation modules.LeaderRotation
 	synchronizer   core.Synchronizer
 	opts           *core.Options
@@ -453,7 +454,7 @@ type tick struct{}
 
 type timeoutManager struct {
 	synchronizer core.Synchronizer
-	eventLoop    *core.EventLoop
+	eventLoop    *eventloop.EventLoop
 
 	node      *node
 	network   *Network
@@ -493,10 +494,10 @@ func (tm *timeoutManager) InitModule(mods *core.Core) {
 
 	tm.eventLoop.RegisterHandler(tick{}, func(_ any) {
 		tm.advance()
-	}, core.Prioritize())
+	}, eventloop.Prioritize())
 	tm.eventLoop.RegisterHandler(hotstuff.ViewChangeEvent{}, func(event any) {
 		tm.viewChange(event.(hotstuff.ViewChangeEvent))
-	}, core.Prioritize())
+	}, eventloop.Prioritize())
 }
 
 // FixedTimeout returns an ExponentialTimeout with a max exponent of 0.

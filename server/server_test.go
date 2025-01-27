@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/netconfig"
 	"github.com/relab/hotstuff/sender"
 	"github.com/relab/hotstuff/server"
@@ -79,7 +80,7 @@ func testBase(t *testing.T, typ any, send func(*sender.Sender), handle core.Even
 		ctx, cancel := context.WithCancel(context.Background())
 		for _, hs := range hl[1:] {
 			var (
-				eventLoop    *core.EventLoop
+				eventLoop    *eventloop.EventLoop
 				synchronizer core.Synchronizer
 			)
 			hs.Get(&eventLoop, &synchronizer)

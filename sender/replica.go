@@ -2,14 +2,14 @@ package sender
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/synctools"
 )
 
 // Replica provides methods used by hotstuff to send messages to replicas.
 type Replica struct {
-	eventLoop *core.EventLoop
+	eventLoop *eventloop.EventLoop
 	node      *hotstuffpb.Node
 	id        hotstuff.ID
 	pubKey    hotstuff.PublicKey

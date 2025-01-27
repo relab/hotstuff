@@ -15,6 +15,7 @@ import (
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/logging"
@@ -252,7 +253,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		mods := core.NewBuilder(hotstuff.ID(opts.GetID()), nil)
 		buildOpt := mods.Options()
 		logger := logging.New("cli" + strconv.Itoa(int(opts.GetID())))
-		eventLoop := core.NewEventLoop(logger, 1000)
+		eventLoop := eventloop.NewEventLoop(logger, 1000)
 		mods.Add(eventLoop)
 
 		if w.measurementInterval > 0 {

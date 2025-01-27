@@ -11,6 +11,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/proto/kauripb"
 	"github.com/relab/hotstuff/internal/tree"
@@ -31,7 +32,7 @@ type Kauri struct {
 	blockChain    *blockchain.BlockChain
 	treeConfig    *core.TreeConfig
 	opts          *core.Options
-	eventLoop     *core.EventLoop
+	eventLoop     *eventloop.EventLoop
 	configuration *netconfig.Config
 	sender        *sender.Sender
 	server        *server.Server
@@ -55,7 +56,7 @@ func New(
 	blockChain *blockchain.BlockChain,
 	treeConfig *core.TreeConfig,
 	opts *core.Options,
-	eventLoop *core.EventLoop,
+	eventLoop *eventloop.EventLoop,
 	configuration *netconfig.Config,
 	sender *sender.Sender,
 	server *server.Server,
@@ -80,7 +81,7 @@ func New(
 	k.opts.SetShouldUseTree()
 	k.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(_ any) {
 		k.postInit()
-	}, core.Prioritize())
+	}, eventloop.Prioritize())
 	k.eventLoop.RegisterHandler(ContributionRecvEvent{}, func(event any) {
 		k.OnContributionRecv(event.(ContributionRecvEvent))
 	})
@@ -190,7 +191,7 @@ func (k *Kauri) SendContributionToParent() {
 }
 
 type serviceImpl struct {
-	eventLoop *core.EventLoop
+	eventLoop *eventloop.EventLoop
 }
 
 func (i serviceImpl) SendContribution(_ gorums.ServerCtx, request *kauripb.Contribution) {

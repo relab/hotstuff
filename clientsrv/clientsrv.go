@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff"
 
 	"github.com/relab/gorums"
-	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/logging"
 	"google.golang.org/grpc/codes"
@@ -20,7 +20,7 @@ import (
 
 // ClientServer serves a client.
 type ClientServer struct {
-	eventLoop *core.EventLoop
+	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
 	cmdCache  *CmdCache
 
@@ -33,7 +33,7 @@ type ClientServer struct {
 
 // NewClientServer returns a new client server.
 func NewClientServer(
-	eventLoop *core.EventLoop,
+	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	cmdCache *CmdCache,
 

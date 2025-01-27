@@ -21,6 +21,7 @@ import (
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/eddsa"
+	"github.com/relab/hotstuff/eventloop"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/kauri"
 	"github.com/relab/hotstuff/leaderrotation"
@@ -124,7 +125,7 @@ type moduleList struct {
 	clientSrv    *clientsrv.ClientServer
 	server       *server.Server
 	sender       *sender.Sender
-	eventLoop    *core.EventLoop
+	eventLoop    *eventloop.EventLoop
 	synchronizer *synchronizer.Synchronizer
 }
 
@@ -176,7 +177,7 @@ func setupModules(
 	if !ok {
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
 	}
-	eventLoop := core.NewEventLoop(logger, 1000)
+	eventLoop := eventloop.NewEventLoop(logger, 1000)
 	sender := sender.New(
 		netConfiguration,
 		eventLoop,

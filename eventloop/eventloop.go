@@ -4,7 +4,7 @@
 //
 // The event loop can accept events of any type.
 // It uses reflection to determine what handler function to execute based on the type of an event.
-package core
+package eventloop
 
 import (
 	"context"
