@@ -16,7 +16,7 @@ const (
 // Byzantine wraps a consensus rules implementation and alters its behavior.
 type Byzantine interface {
 	// Wrap wraps the rules and returns an altered rules implementation.
-	Wrap(modules.Rules) modules.Rules
+	Wrap() modules.Rules
 }
 
 type silence struct {
@@ -27,8 +27,7 @@ func (s *silence) ProposeRule(_ hotstuff.SyncInfo, _ hotstuff.Command) (hotstuff
 	return hotstuff.ProposeMsg{}, false
 }
 
-func (s *silence) Wrap(rules modules.Rules) modules.Rules {
-	s.Rules = rules
+func (s *silence) Wrap() modules.Rules {
 	return s
 }
 
@@ -88,7 +87,6 @@ func NewFork(
 	}
 }
 
-func (f *fork) Wrap(rules modules.Rules) modules.Rules {
-	f.Rules = rules
+func (f *fork) Wrap() modules.Rules {
 	return f
 }

@@ -256,7 +256,7 @@ func setupModules(
 	strategy := opts.GetByzantineStrategy()
 	if strategy != "" {
 		if byz, ok := getByzantine(strategy, consensusRules, blockChain, moduleOpt); ok {
-			consensusRules = byz.Wrap(consensusRules)
+			consensusRules = byz.Wrap()
 			logger.Infof("assigned byzantine strategy: %s", strategy)
 		} else {
 			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
