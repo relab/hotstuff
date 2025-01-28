@@ -50,7 +50,6 @@ func New(
 	committer *committer.Committer,
 	commandCache *clientsrv.CmdCache,
 	sender *sender.Sender,
-	kauri *kauri.Kauri,
 	auth *certauth.CertAuthority,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
@@ -72,15 +71,16 @@ func New(
 		lastVote: 0,
 	}
 
-	if kauri != nil {
-		cs.kauri = kauri
-	}
-
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.OnPropose(cs.view, event.(hotstuff.ProposeMsg))
 	})
 
 	return cs
+}
+
+// SetKauri adds the Kauri protocol to the consensus logic.
+func (cs *Consensus) SetKauri(k *kauri.Kauri) {
+	cs.kauri = k
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.

@@ -194,12 +194,11 @@ func NewSecurityComponents(
 		coreComps.Logger,
 		100, // TODO: consider making this configurable
 	)
-	comps := &SecurityComponents{
+	return &SecurityComponents{
 		BlockChain: blockChain,
 		CryptoImpl: cryptoImpl,
 		CertAuth:   certAuthority,
-	}
-	return comps, nil
+	}, nil
 }
 
 type ServiceComponents struct {
@@ -229,19 +228,131 @@ func NewServiceComponents(
 		clientSrv,
 		coreComps.Logger,
 	)
-
-	comps := &ServiceComponents{
+	return &ServiceComponents{
 		CmdCache:  cmdCache,
 		ClientSrv: clientSrv,
 		Committer: committer,
 	}
-	return comps
+}
+
+type ProtocolModules struct {
+	ConsensusRules modules.Rules
+	LeaderRotation modules.LeaderRotation
+	ViewDuration   modules.ViewDuration
+}
+
+type ViewDurationOptions struct {
+	SampleSize   uint64
+	StartTimeout float64
+	MaxTimeout   float64
+	Multiplier   float64
+}
+
+func NewProtocolModules(
+	coreComps *CoreComponents,
+	netComps *NetworkedComponents,
+	secureComps *SecurityComponents,
+	srvComps *ServiceComponents,
+
+	opts *orchestrationpb.ReplicaOpts, // TODO: avoid modifying this so it doesn't depend on orchestrationpb
+	consensusName, leaderRotationName, byzantineName string,
+	vdOpt ViewDurationOptions,
+) (*ProtocolModules, error) {
+	consensusRules, ok := getConsensusRules(consensusName, secureComps.BlockChain, coreComps.Logger, coreComps.Options)
+	if !ok {
+		return nil, fmt.Errorf("invalid consensus name: '%s'", consensusName)
+	}
+	leaderRotation, ok := getLeaderRotation(
+		leaderRotationName,
+		consensusRules.ChainLength(),
+		secureComps.BlockChain,
+		netComps.Config,
+		srvComps.Committer,
+		coreComps.Logger,
+		coreComps.Options,
+	)
+	if !ok {
+		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", leaderRotationName)
+	}
+	var duration modules.ViewDuration
+	if leaderRotationName == "tree-leader" {
+		// TODO(meling): Temporary default; should be configurable and moved to the appropriate place.
+		opts.SetTreeHeightWaitTime()
+		// create tree only if we are using tree leader (Kauri)
+		coreComps.Options.SetTree(createTree(opts))
+		duration = synchronizer.NewFixedViewDuration(opts.GetInitialTimeout().AsDuration())
+	} else {
+		duration = synchronizer.NewViewDuration(
+			vdOpt.SampleSize, vdOpt.StartTimeout, vdOpt.MaxTimeout, vdOpt.Multiplier,
+		)
+	}
+	if byzantineName != "" {
+		if byz, ok := getByzantine(byzantineName, consensusRules, secureComps.BlockChain, coreComps.Options); ok {
+			consensusRules = byz.Wrap()
+			coreComps.Logger.Infof("assigned byzantine strategy: %s", byzantineName)
+		} else {
+			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", byzantineName)
+		}
+	}
+	return &ProtocolModules{
+		ConsensusRules: consensusRules,
+		LeaderRotation: leaderRotation,
+		ViewDuration:   duration,
+	}, nil
 }
 
 type ProtocolComponents struct {
 	Consensus    *consensus.Consensus
 	Synchronizer *synchronizer.Synchronizer
-	Kauri        *kauri.Kauri
+}
+
+func NewProtocolComponents(
+	coreComps *CoreComponents,
+	netComps *NetworkedComponents,
+	secureComps *SecurityComponents,
+	srvComps *ServiceComponents,
+	mods *ProtocolModules,
+) *ProtocolComponents {
+	csus := consensus.New(
+		mods.ConsensusRules,
+		mods.LeaderRotation,
+		secureComps.BlockChain,
+		srvComps.Committer,
+		srvComps.CmdCache,
+		netComps.Sender,
+		secureComps.CertAuth,
+		coreComps.EventLoop,
+		coreComps.Logger,
+		coreComps.Options,
+	)
+	synch := synchronizer.New(
+		secureComps.CryptoImpl,
+		mods.LeaderRotation,
+		mods.ViewDuration,
+		secureComps.BlockChain,
+		csus,
+		secureComps.CertAuth,
+		netComps.Config,
+		netComps.Sender,
+		coreComps.EventLoop,
+		coreComps.Logger,
+		coreComps.Options,
+	)
+	// No need to store votingMachine since it's not a dependency.
+	// The constructor adds event handlers that enables voting logic.
+	synchronizer.NewVotingMachine(
+		secureComps.BlockChain,
+		netComps.Config,
+		secureComps.CertAuth,
+		coreComps.EventLoop,
+		coreComps.Logger,
+		synch,
+		coreComps.Options,
+	)
+	return &ProtocolComponents{
+		Consensus:    csus,
+		Synchronizer: synch,
+	}
 }
 
 type compList struct {
@@ -286,33 +397,31 @@ func setupComps(
 	// TODO: Upon a merge with master, this doesn't compile.
 	// coreComps.Options.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
 
-	var duration modules.ViewDuration
-	if opts.GetLeaderRotation() == "tree-leader" {
-		// TODO(meling): Temporary default; should be configurable and moved to the appropriate place.
-		opts.SetTreeHeightWaitTime()
-		// create tree only if we are using tree leader (Kauri)
-		coreComps.Options.SetTree(createTree(opts))
-		duration = synchronizer.NewFixedViewDuration(opts.GetInitialTimeout().AsDuration())
-	} else {
-		duration = synchronizer.NewViewDuration(
-			uint64(opts.GetTimeoutSamples()),
-			float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-			float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-			float64(opts.GetTimeoutMultiplier()),
-		)
-	}
-
 	netComps := NewNetworkedComponents(
 		coreComps,
 		creds,
-		gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()))
+		gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
+	)
 	secureComps, err := NewSecurityComponents(coreComps, netComps, opts.GetCrypto())
 	if err != nil {
 		return nil, err
 	}
 	srvComps := NewServiceComponents(coreComps, secureComps, int(opts.GetBatchSize()), clientSrvOpts)
-	id := opts.HotstuffID()
-	locations := opts.GetLocations()
+
+	durationOpts := ViewDurationOptions{
+		SampleSize:   uint64(opts.GetTimeoutSamples()),
+		StartTimeout: float64(opts.GetInitialTimeout().AsDuration().Nanoseconds()) / float64(time.Millisecond),
+		MaxTimeout:   float64(opts.GetMaxTimeout().AsDuration().Nanoseconds()) / float64(time.Millisecond),
+		Multiplier:   float64(opts.GetTimeoutMultiplier()),
+	}
+	protocolMods, err := NewProtocolModules(
+		coreComps, netComps, secureComps, srvComps, opts,
+		opts.GetConsensus(), opts.GetLeaderRotation(), opts.GetByzantineStrategy(),
+		durationOpts)
+	if err != nil {
+		return nil, err
+	}
+	protocolComps := NewProtocolComponents(coreComps, netComps, secureComps, srvComps, protocolMods)
 	server := server.NewServer(
 		secureComps.BlockChain,
 		netComps.Config,
@@ -320,31 +429,16 @@ func setupComps(
 		coreComps.Logger,
 		coreComps.Options,
 
-		server.WithLatencies(id, locations),
+		server.WithLatencies(opts.HotstuffID(), opts.GetLocations()),
 		server.WithGorumsServerOptions(replicaSrvOpts...),
 	)
 
-	consensusRules, ok := getConsensusRules(opts.GetConsensus(), secureComps.BlockChain, coreComps.Logger, coreComps.Options)
-	if !ok {
-		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
-	}
-	leaderRotation, ok := getLeaderRotation(
-		opts.GetLeaderRotation(),
-		consensusRules.ChainLength(),
-		secureComps.BlockChain,
-		netComps.Config,
-		srvComps.Committer,
-		coreComps.Logger,
-		coreComps.Options,
-	)
-	if !ok {
-		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
-	}
-	var kauriModule *kauri.Kauri = nil
+	// Putting it here for now since it breaks consistency with component categorization.
+	// TODO(AlanRostem): figure out a better way to enable Kauri. Problem is that it needs server
 	if opts.GetKauri() {
-		kauriModule = kauri.New(
+		protocolComps.Consensus.SetKauri(kauri.New(
 			secureComps.CryptoImpl,
-			leaderRotation,
+			protocolMods.LeaderRotation,
 			secureComps.BlockChain,
 			coreComps.Options,
 			coreComps.EventLoop,
@@ -352,59 +446,13 @@ func setupComps(
 			netComps.Sender,
 			server,
 			coreComps.Logger,
-		)
+		))
 	}
-	strategy := opts.GetByzantineStrategy()
-	if strategy != "" {
-		if byz, ok := getByzantine(strategy, consensusRules, secureComps.BlockChain, coreComps.Options); ok {
-			consensusRules = byz.Wrap()
-			coreComps.Logger.Infof("assigned byzantine strategy: %s", strategy)
-		} else {
-			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
-		}
-	}
-	csus := consensus.New(
-		consensusRules,
-		leaderRotation,
-		secureComps.BlockChain,
-		srvComps.Committer,
-		srvComps.CmdCache,
-		netComps.Sender,
-		kauriModule,
-		secureComps.CertAuth,
-		coreComps.EventLoop,
-		coreComps.Logger,
-		coreComps.Options,
-	)
-	synch := synchronizer.New(
-		secureComps.CryptoImpl,
-		leaderRotation,
-		duration,
-		secureComps.BlockChain,
-		csus,
-		secureComps.CertAuth,
-		netComps.Config,
-		netComps.Sender,
-		coreComps.EventLoop,
-		coreComps.Logger,
-		coreComps.Options,
-	)
-	// No need to store votingMachine since it's not a dependency.
-	// The constructor adds event handlers that enables voting logic.
-	synchronizer.NewVotingMachine(
-		secureComps.BlockChain,
-		netComps.Config,
-		secureComps.CertAuth,
-		coreComps.EventLoop,
-		coreComps.Logger,
-		synch,
-		coreComps.Options,
-	)
 	return &compList{
 		clientSrv:    srvComps.ClientSrv,
 		server:       server,
 		sender:       netComps.Sender,
-		synchronizer: synch,
+		synchronizer: protocolComps.Synchronizer,
 		coreComps:    coreComps,
 	}, nil
 }
