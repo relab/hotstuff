@@ -132,15 +132,12 @@ func NewCoreComponents(
 	logTag string,
 	privKey hotstuff.PrivateKey,
 ) *CoreComponents {
-	opts := core.NewOptions(id, privKey)
 	logger := logging.New(fmt.Sprintf("%s%d", logTag, id))
-	eventLoop := eventloop.New(logger, 100)
-	comps := &CoreComponents{
-		Options:   opts,
+	return &CoreComponents{
+		Options:   core.NewOptions(id, privKey),
+		EventLoop: eventloop.New(logger, 100),
 		Logger:    logger,
-		EventLoop: eventLoop,
 	}
-	return comps
 }
 
 type NetworkedComponents struct {
@@ -163,25 +160,24 @@ func NewNetworkedComponents(
 		mgrOpts...,
 	)
 
-	comps := &NetworkedComponents{
+	return &NetworkedComponents{
 		Config: cfg,
 		Sender: send,
 	}
-	return comps
 }
 
-type SecureComponents struct {
+type SecurityComponents struct {
 	BlockChain *blockchain.BlockChain
 	CryptoImpl modules.CryptoBase
 	CertAuth   *certauth.CertAuthority
 }
 
-func NewSecureComponents(
+func NewSecurityComponents(
 	coreComps *CoreComponents,
 	netComps *NetworkedComponents,
 	cryptoName string,
 
-) (*SecureComponents, error) {
+) (*SecurityComponents, error) {
 	blockChain := blockchain.New(
 		netComps.Sender,
 		coreComps.EventLoop,
@@ -198,7 +194,7 @@ func NewSecureComponents(
 		coreComps.Logger,
 		100, // TODO: consider making this configurable
 	)
-	comps := &SecureComponents{
+	comps := &SecurityComponents{
 		BlockChain: blockChain,
 		CryptoImpl: cryptoImpl,
 		CertAuth:   certAuthority,
@@ -208,20 +204,15 @@ func NewSecureComponents(
 
 type ServiceComponents struct {
 	CmdCache  *clientsrv.CmdCache
-	Server    *server.Server
 	ClientSrv *clientsrv.ClientServer
 	Committer *committer.Committer
 }
 
 func NewServiceComponents(
 	coreComps *CoreComponents,
-	netComps *NetworkedComponents,
-	secureComps *SecureComponents,
-	id hotstuff.ID,
+	secureComps *SecurityComponents,
 	batchSize int,
-	locations []string,
 	clientSrvOpts []gorums.ServerOption,
-	replicaSrvOpts []gorums.ServerOption,
 ) *ServiceComponents {
 	cmdCache := clientsrv.NewCmdCache(
 		coreComps.Logger,
@@ -238,23 +229,19 @@ func NewServiceComponents(
 		clientSrv,
 		coreComps.Logger,
 	)
-	server := server.NewServer(
-		secureComps.BlockChain,
-		netComps.Config,
-		coreComps.EventLoop,
-		coreComps.Logger,
-		coreComps.Options,
 
-		server.WithLatencies(id, locations),
-		server.WithGorumsServerOptions(replicaSrvOpts...),
-	)
 	comps := &ServiceComponents{
 		CmdCache:  cmdCache,
 		ClientSrv: clientSrv,
 		Committer: committer,
-		Server:    server,
 	}
 	return comps
+}
+
+type ProtocolComponents struct {
+	Consensus    *consensus.Consensus
+	Synchronizer *synchronizer.Synchronizer
+	Kauri        *kauri.Kauri
 }
 
 type compList struct {
@@ -313,15 +300,24 @@ func setupComps(
 		coreComps,
 		creds,
 		gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()))
-	secureComps, err := NewSecureComponents(coreComps, netComps, opts.GetCrypto())
+	secureComps, err := NewSecurityComponents(coreComps, netComps, opts.GetCrypto())
 	if err != nil {
 		return nil, err
 	}
-	srvComps := NewServiceComponents(
-		coreComps, netComps, secureComps,
-		opts.HotstuffID(), int(opts.GetBatchSize()), opts.GetLocations(),
-		clientSrvOpts, replicaSrvOpts,
+	srvComps := NewServiceComponents(coreComps, secureComps, int(opts.GetBatchSize()), clientSrvOpts)
+	id := opts.HotstuffID()
+	locations := opts.GetLocations()
+	server := server.NewServer(
+		secureComps.BlockChain,
+		netComps.Config,
+		coreComps.EventLoop,
+		coreComps.Logger,
+		coreComps.Options,
+
+		server.WithLatencies(id, locations),
+		server.WithGorumsServerOptions(replicaSrvOpts...),
 	)
+
 	consensusRules, ok := getConsensusRules(opts.GetConsensus(), secureComps.BlockChain, coreComps.Logger, coreComps.Options)
 	if !ok {
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
@@ -349,7 +345,7 @@ func setupComps(
 			coreComps.EventLoop,
 			netComps.Config,
 			netComps.Sender,
-			srvComps.Server,
+			server,
 			coreComps.Logger,
 		)
 	}
@@ -401,7 +397,7 @@ func setupComps(
 	)
 	return &compList{
 		clientSrv:    srvComps.ClientSrv,
-		server:       srvComps.Server,
+		server:       server,
 		sender:       netComps.Sender,
 		synchronizer: synch,
 		coreComps:    coreComps,
