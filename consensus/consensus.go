@@ -166,14 +166,59 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 }
 
 func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocyclo
-	// TODO: extract parts of this method into helper functions maybe?
 	cs.logger.Debugf("OnPropose: %v", proposal.Block)
+
+	if !cs.check(proposal) {
+		return
+	}
 
 	block := proposal.Block
 
+	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
+		cs.acceptor.Proposed(qcBlock.Command())
+	} else {
+		cs.logger.Info("OnPropose: Failed to fetch qcBlock")
+	}
+
+	// block is safe and was accepted
+	cs.blockChain.Store(block)
+
+	if b := cs.impl.CommitRule(block); b != nil {
+		cs.commit(b)
+	}
+
+	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+
+	pc, ok := cs.createVote(proposal)
+	if !ok {
+		return
+	}
+
+	if cs.kauri != nil {
+		cs.kauri.Begin(pc, proposal)
+		return
+	}
+	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
+	if leaderID == cs.opts.ID() {
+		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})
+		return
+	}
+
+	leader, ok := cs.configuration.Replica(leaderID)
+	if !ok {
+		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
+		return
+	}
+
+	leader.Vote(pc)
+}
+
+func (cs *consensusBase) check(proposal hotstuff.ProposeMsg) (ok bool) {
+	block := proposal.Block
+
 	if cs.opts.ShouldUseAggQC() && proposal.AggregateQC != nil {
-		highQC, ok := cs.crypto.VerifyAggregateQC(*proposal.AggregateQC)
-		if !ok {
+		highQC, okk := cs.crypto.VerifyAggregateQC(*proposal.AggregateQC)
+		if !okk {
 			cs.logger.Warn("OnPropose: failed to verify aggregate QC")
 			return
 		}
@@ -195,29 +240,22 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 		return
 	}
 
-	if !cs.impl.VoteRule(proposal) {
-		cs.logger.Info("OnPropose: Block not voted for")
-		return
-	}
-
-	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
-		cs.acceptor.Proposed(qcBlock.Command())
-	} else {
-		cs.logger.Info("OnPropose: Failed to fetch qcBlock")
-	}
-
 	if !cs.acceptor.Accept(block.Command()) {
 		cs.logger.Info("OnPropose: command not accepted")
 		return
 	}
 
-	// block is safe and was accepted
-	cs.blockChain.Store(block)
+	return true
+}
 
-	if b := cs.impl.CommitRule(block); b != nil {
-		cs.commit(b)
+func (cs *consensusBase) createVote(proposal hotstuff.ProposeMsg) (pc hotstuff.PartialCert, ok bool) {
+
+	if !cs.impl.VoteRule(proposal) {
+		cs.logger.Info("OnPropose: Block not voted for")
+		return
 	}
-	cs.synchronizer.AdvanceView(hotstuff.NewSyncInfo().WithQC(block.QuorumCert()))
+
+	block := proposal.Block
 
 	if block.View() <= cs.lastVote {
 		cs.logger.Info("OnPropose: block view too old")
@@ -232,23 +270,7 @@ func (cs *consensusBase) OnPropose(proposal hotstuff.ProposeMsg) { //nolint:gocy
 
 	cs.lastVote = block.View()
 
-	if cs.kauri != nil {
-		cs.kauri.Begin(pc, proposal)
-		return
-	}
-	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
-	if leaderID == cs.opts.ID() {
-		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.opts.ID(), PartialCert: pc})
-		return
-	}
-
-	leader, ok := cs.configuration.Replica(leaderID)
-	if !ok {
-		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
-		return
-	}
-
-	leader.Vote(pc)
+	return pc, true
 }
 
 func (cs *consensusBase) commit(block *hotstuff.Block) {
