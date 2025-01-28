@@ -13,7 +13,7 @@ import (
 // TestViewContext tests that a view context is canceled after receiving a view change event.
 func TestViewContext(t *testing.T) {
 	logger := logging.New("test")
-	eventloop := eventloop.NewEventLoop(logger, 10)
+	eventloop := eventloop.New(logger, 10)
 	ctx, cancel := view.Context(context.Background(), eventloop, nil)
 	defer cancel()
 
@@ -27,7 +27,7 @@ func TestViewContext(t *testing.T) {
 // TestViewContextEarlierView tests that a view context is not canceled when receiving a view change event for an earlier view.
 func TestViewContextEarlierView(t *testing.T) {
 	logger := logging.New("test")
-	eventloop := eventloop.NewEventLoop(logger, 10)
+	eventloop := eventloop.New(logger, 10)
 	v := hotstuff.View(1)
 	ctx, cancel := view.Context(context.Background(), eventloop, &v)
 	defer cancel()

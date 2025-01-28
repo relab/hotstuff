@@ -13,7 +13,7 @@ import (
 // TestTimeoutContext tests that a timeout context is canceled after receiving a timeout event.
 func TestTimeoutContext(t *testing.T) {
 	logger := logging.New("test")
-	eventloop := eventloop.NewEventLoop(logger, 10)
+	eventloop := eventloop.New(logger, 10)
 	ctx, cancel := timeout.Context(context.Background(), eventloop)
 	defer cancel()
 
@@ -27,7 +27,7 @@ func TestTimeoutContext(t *testing.T) {
 // TestTimeoutContextView tests that a timeout context is canceled after receiving a view change event.
 func TestTimeoutContextView(t *testing.T) {
 	logger := logging.New("test")
-	eventloop := eventloop.NewEventLoop(logger, 10)
+	eventloop := eventloop.New(logger, 10)
 	ctx, cancel := timeout.Context(context.Background(), eventloop)
 	defer cancel()
 

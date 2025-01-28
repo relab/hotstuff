@@ -177,7 +177,7 @@ func setupModules(
 	if !ok {
 		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
 	}
-	eventLoop := eventloop.NewEventLoop(logger, 1000)
+	eventLoop := eventloop.New(logger, 1000)
 	sender := sender.New(
 		netConfiguration,
 		eventLoop,

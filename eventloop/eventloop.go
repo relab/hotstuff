@@ -70,7 +70,7 @@ type EventLoop struct {
 }
 
 // New returns a new event loop with the requested buffer size.
-func NewEventLoop(
+func New(
 	logger logging.Logger,
 	bufferSize uint,
 ) *EventLoop {

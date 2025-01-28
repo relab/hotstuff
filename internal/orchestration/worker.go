@@ -253,7 +253,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		mods := core.NewBuilder(hotstuff.ID(opts.GetID()), nil)
 		buildOpt := mods.Options()
 		logger := logging.New("cli" + strconv.Itoa(int(opts.GetID())))
-		eventLoop := eventloop.NewEventLoop(logger, 1000)
+		eventLoop := eventloop.New(logger, 1000)
 		mods.Add(eventLoop)
 
 		if w.measurementInterval > 0 {
