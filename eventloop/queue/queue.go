@@ -12,7 +12,7 @@ type Queue struct {
 	readyChan chan struct{}
 }
 
-func NewQueue(capacity uint) Queue {
+func New(capacity uint) Queue {
 	if capacity == 0 {
 		panic("capacity must be greater than 0")
 	}

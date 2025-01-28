@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/relab/hotstuff/eventloop/gpool"
+	"github.com/relab/hotstuff/eventloop/queue"
 	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/util/gpool"
-	"github.com/relab/hotstuff/util/queue"
 )
 
 type handlerOpts struct {
@@ -78,7 +78,7 @@ func NewEventLoop(
 		logger: logger,
 
 		ctx:           context.Background(),
-		eventQ:        queue.NewQueue(bufferSize),
+		eventQ:        queue.New(bufferSize),
 		waitingEvents: make(map[reflect.Type][]any),
 		handlers:      make(map[reflect.Type][]handler),
 		tickers:       make(map[int]*ticker),

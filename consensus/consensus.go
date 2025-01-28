@@ -15,7 +15,7 @@ import (
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/sender"
-	"github.com/relab/hotstuff/synctools"
+	"github.com/relab/hotstuff/synchronizer/timeout"
 )
 
 // Consensus provides a default implementation of the Consensus interface
@@ -106,7 +106,7 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cer
 		}
 	}
 
-	ctx, cancel := synctools.TimeoutContext(cs.eventLoop.Context(), cs.eventLoop)
+	ctx, cancel := timeout.Context(cs.eventLoop.Context(), cs.eventLoop)
 	defer cancel()
 
 	cmd, ok := cs.commandCache.Get(ctx)
