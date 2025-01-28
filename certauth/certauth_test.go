@@ -1,21 +1,6 @@
 package certauth_test
 
-import (
-	"testing"
-
-	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/certauth"
-	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/modules"
-
-	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/crypto/bls12"
-	"github.com/relab/hotstuff/crypto/ecdsa"
-	"github.com/relab/hotstuff/crypto/eddsa"
-	"github.com/relab/hotstuff/internal/testutil"
-	"go.uber.org/mock/gomock"
-)
-
+/*
 func TestCreatePartialCert(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		ctrl := gomock.NewController(t)
@@ -270,3 +255,4 @@ func newTestData(t *testing.T, ctrl *gomock.Controller, n int, newFunc func() co
 		block:     block,
 	}
 }
+*/

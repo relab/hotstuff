@@ -57,7 +57,7 @@ func TestConnect(t *testing.T) {
 }
 
 // testBase is a generic test for a unicast/multicast call
-func testBase(t *testing.T, typ any, send func(*sender.Sender), handle core.EventHandler) {
+func testBase(t *testing.T, typ any, send func(*sender.Sender), handle eventloop.EventHandler) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		ctrl := gomock.NewController(t)

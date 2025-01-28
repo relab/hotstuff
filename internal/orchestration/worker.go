@@ -140,7 +140,6 @@ func (w *Worker) createReplicas(req *orchestrationpb.CreateReplicaRequest) (*orc
 
 func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Replica, error) {
 	w.metricsLogger.Log(opts)
-	logger := logging.New("hs" + strconv.Itoa(int(opts.GetID())))
 	// get private key and certificates
 	privKey, err := keygen.ParsePrivateKey(opts.GetPrivateKey())
 	if err != nil {
@@ -160,7 +159,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	moduleOpt := core.NewOptions(hotstuff.ID(opts.GetID()), privKey)
 	moduleOpt.SetSharedRandomSeed(opts.GetSharedSeed())
 	moduleOpt.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
-	mods, err := setupModules(opts, logger, privKey, certificate, rootCAs)
+	mods, err := setupComps(opts, privKey, certificate, rootCAs)
 	if err != nil {
 		return nil, err
 	}
@@ -170,9 +169,9 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		// TODO: Rework the metrics logging.
 		metricsBuilder := core.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 		metricsBuilder.Add(
-			mods.eventLoop,
+			mods.coreComps.EventLoop,
+			mods.coreComps.Logger,
 			w.metricsLogger,
-			logger,
 		)
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
 		metricsBuilder.Add(replicaMetrics...)
@@ -183,7 +182,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		mods.clientSrv,
 		mods.server,
 		mods.sender,
-		mods.eventLoop,
+		mods.coreComps.EventLoop,
 		mods.synchronizer,
 	), nil
 }

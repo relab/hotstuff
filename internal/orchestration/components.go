@@ -121,24 +121,156 @@ func getCrypto(
 	return
 }
 
-type moduleList struct {
+type CoreComponents struct {
+	Options   *core.Options
+	EventLoop *eventloop.EventLoop
+	Logger    logging.Logger
+}
+
+func NewCoreComponents(
+	id hotstuff.ID,
+	logTag string,
+	privKey hotstuff.PrivateKey,
+) *CoreComponents {
+	opts := core.NewOptions(id, privKey)
+	logger := logging.New(fmt.Sprintf("%s%d", logTag, id))
+	eventLoop := eventloop.New(logger, 100)
+	comps := &CoreComponents{
+		Options:   opts,
+		Logger:    logger,
+		EventLoop: eventLoop,
+	}
+	return comps
+}
+
+type NetworkedComponents struct {
+	Config *netconfig.Config
+	Sender *sender.Sender
+}
+
+func NewNetworkedComponents(
+	coreComps *CoreComponents,
+	creds credentials.TransportCredentials,
+	mgrOpts ...gorums.ManagerOption,
+) *NetworkedComponents {
+	cfg := netconfig.NewConfig()
+	send := sender.New(
+		cfg,
+		coreComps.EventLoop,
+		coreComps.Logger,
+		coreComps.Options,
+		creds,
+		mgrOpts...,
+	)
+
+	comps := &NetworkedComponents{
+		Config: cfg,
+		Sender: send,
+	}
+	return comps
+}
+
+type SecureComponents struct {
+	BlockChain *blockchain.BlockChain
+	CryptoImpl modules.CryptoBase
+	CertAuth   *certauth.CertAuthority
+}
+
+func NewSecureComponents(
+	coreComps *CoreComponents,
+	netComps *NetworkedComponents,
+	cryptoName string,
+
+) (*SecureComponents, error) {
+	blockChain := blockchain.New(
+		netComps.Sender,
+		coreComps.EventLoop,
+		coreComps.Logger,
+	)
+	cryptoImpl, ok := getCrypto(cryptoName, netComps.Config, coreComps.Logger, coreComps.Options)
+	if !ok {
+		return nil, fmt.Errorf("invalid crypto name: '%s'", cryptoName)
+	}
+	certAuthority := certauth.NewCache(
+		cryptoImpl,
+		blockChain,
+		netComps.Config,
+		coreComps.Logger,
+		100, // TODO: consider making this configurable
+	)
+	comps := &SecureComponents{
+		BlockChain: blockChain,
+		CryptoImpl: cryptoImpl,
+		CertAuth:   certAuthority,
+	}
+	return comps, nil
+}
+
+type ServiceComponents struct {
+	CmdCache  *clientsrv.CmdCache
+	Server    *server.Server
+	ClientSrv *clientsrv.ClientServer
+	Committer *committer.Committer
+}
+
+func NewServiceComponents(
+	coreComps *CoreComponents,
+	netComps *NetworkedComponents,
+	secureComps *SecureComponents,
+	id hotstuff.ID,
+	batchSize int,
+	locations []string,
+	clientSrvOpts []gorums.ServerOption,
+	replicaSrvOpts []gorums.ServerOption,
+) *ServiceComponents {
+	cmdCache := clientsrv.NewCmdCache(
+		coreComps.Logger,
+		batchSize,
+	)
+	clientSrv := clientsrv.NewClientServer(
+		coreComps.EventLoop,
+		coreComps.Logger,
+		cmdCache,
+		clientSrvOpts,
+	)
+	committer := committer.New(
+		secureComps.BlockChain,
+		clientSrv,
+		coreComps.Logger,
+	)
+	server := server.NewServer(
+		secureComps.BlockChain,
+		netComps.Config,
+		coreComps.EventLoop,
+		coreComps.Logger,
+		coreComps.Options,
+
+		server.WithLatencies(id, locations),
+		server.WithGorumsServerOptions(replicaSrvOpts...),
+	)
+	comps := &ServiceComponents{
+		CmdCache:  cmdCache,
+		ClientSrv: clientSrv,
+		Committer: committer,
+		Server:    server,
+	}
+	return comps
+}
+
+type compList struct {
 	clientSrv    *clientsrv.ClientServer
 	server       *server.Server
 	sender       *sender.Sender
-	eventLoop    *eventloop.EventLoop
 	synchronizer *synchronizer.Synchronizer
+	coreComps    *CoreComponents
 }
 
-func setupModules(
+func setupComps(
 	opts *orchestrationpb.ReplicaOpts,
-	logger logging.Logger,
 	privKey hotstuff.PrivateKey,
 	certificate tls.Certificate,
 	rootCAs *x509.CertPool,
-) (*moduleList, error) {
-	moduleOpt := core.NewOptions(hotstuff.ID(opts.GetID()), privKey)
-	moduleOpt.SetSharedRandomSeed(opts.GetSharedSeed())
-	moduleOpt.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
+) (*compList, error) {
 
 	var duration modules.ViewDuration
 	if opts.GetLeaderRotation() == "tree-leader" {
@@ -172,69 +304,36 @@ func setupModules(
 			})),
 		))
 	}
-	netConfiguration := netconfig.NewConfig()
-	cryptoImpl, ok := getCrypto(opts.GetCrypto(), netConfiguration, logger, moduleOpt)
-	if !ok {
-		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
-	}
-	eventLoop := eventloop.New(logger, 1000)
-	sender := sender.New(
-		netConfiguration,
-		eventLoop,
-		logger,
-		moduleOpt,
-		creds,
-		gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
-	)
-	cmdCache := clientsrv.NewCmdCache(
-		logger,
-		int(opts.GetBatchSize()),
-	)
-	clientSrv := clientsrv.NewClientServer(
-		eventLoop,
-		logger,
-		cmdCache,
-		clientSrvOpts,
-	)
-	blockChain := blockchain.New(
-		sender,
-		eventLoop,
-		logger,
-	)
-	server := server.NewServer(
-		blockChain,
-		netConfiguration,
-		eventLoop,
-		logger,
-		moduleOpt,
 
-		server.WithLatencies(hotstuff.ID(opts.GetID()), opts.GetLocations()),
-		server.WithGorumsServerOptions(replicaSrvOpts...),
+	coreComps := NewCoreComponents(opts.HotstuffID(), "hs", privKey)
+	coreComps.Options.SetSharedRandomSeed(opts.GetSharedSeed())
+	coreComps.Options.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
+
+	netComps := NewNetworkedComponents(
+		coreComps,
+		creds,
+		gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()))
+	secureComps, err := NewSecureComponents(coreComps, netComps, opts.GetCrypto())
+	if err != nil {
+		return nil, err
+	}
+	srvComps := NewServiceComponents(
+		coreComps, netComps, secureComps,
+		opts.HotstuffID(), int(opts.GetBatchSize()), opts.GetLocations(),
+		clientSrvOpts, replicaSrvOpts,
 	)
-	committer := committer.New(
-		blockChain,
-		clientSrv,
-		logger,
-	)
-	certAuthority := certauth.NewCache(
-		cryptoImpl,
-		blockChain,
-		netConfiguration,
-		logger,
-		100, // TODO: consider making this configurable
-	)
-	consensusRules, ok := getConsensusRules(opts.GetConsensus(), blockChain, logger, moduleOpt)
+	consensusRules, ok := getConsensusRules(opts.GetConsensus(), secureComps.BlockChain, coreComps.Logger, coreComps.Options)
 	if !ok {
 		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
 	}
 	leaderRotation, ok := getLeaderRotation(
 		opts.GetLeaderRotation(),
 		consensusRules.ChainLength(),
-		blockChain,
-		netConfiguration,
-		committer,
-		logger,
-		moduleOpt,
+		secureComps.BlockChain,
+		netComps.Config,
+		srvComps.Committer,
+		coreComps.Logger,
+		coreComps.Options,
 	)
 	if !ok {
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
@@ -242,23 +341,23 @@ func setupModules(
 	var kauriModule *kauri.Kauri = nil
 	if opts.GetKauri() {
 		kauriModule = kauri.New(
-			cryptoImpl,
+			secureComps.CryptoImpl,
 			leaderRotation,
-			blockChain,
-			moduleOpt.TreeConfig(),
-			moduleOpt,
-			eventLoop,
-			netConfiguration,
-			sender,
-			server,
-			logger,
+			secureComps.BlockChain,
+			coreComps.Options.TreeConfig(),
+			coreComps.Options,
+			coreComps.EventLoop,
+			netComps.Config,
+			netComps.Sender,
+			srvComps.Server,
+			coreComps.Logger,
 		)
 	}
 	strategy := opts.GetByzantineStrategy()
 	if strategy != "" {
-		if byz, ok := getByzantine(strategy, consensusRules, blockChain, moduleOpt); ok {
+		if byz, ok := getByzantine(strategy, consensusRules, secureComps.BlockChain, coreComps.Options); ok {
 			consensusRules = byz.Wrap()
-			logger.Infof("assigned byzantine strategy: %s", strategy)
+			coreComps.Logger.Infof("assigned byzantine strategy: %s", strategy)
 		} else {
 			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
 		}
@@ -266,45 +365,45 @@ func setupModules(
 	csus := consensus.New(
 		consensusRules,
 		leaderRotation,
-		blockChain,
-		committer,
-		cmdCache,
-		sender,
+		secureComps.BlockChain,
+		srvComps.Committer,
+		srvComps.CmdCache,
+		netComps.Sender,
 		kauriModule,
-		certAuthority,
-		eventLoop,
-		logger,
-		moduleOpt,
+		secureComps.CertAuth,
+		coreComps.EventLoop,
+		coreComps.Logger,
+		coreComps.Options,
 	)
 	synch := synchronizer.New(
-		cryptoImpl,
+		secureComps.CryptoImpl,
 		leaderRotation,
 		duration,
-		blockChain,
+		secureComps.BlockChain,
 		csus,
-		certAuthority,
-		netConfiguration,
-		sender,
-		eventLoop,
-		logger,
-		moduleOpt,
+		secureComps.CertAuth,
+		netComps.Config,
+		netComps.Sender,
+		coreComps.EventLoop,
+		coreComps.Logger,
+		coreComps.Options,
 	)
 	// No need to store votingMachine since it's not a dependency.
 	// The constructor adds event handlers that enables voting logic.
 	synchronizer.NewVotingMachine(
-		blockChain,
-		netConfiguration,
-		certAuthority,
-		eventLoop,
-		logger,
+		secureComps.BlockChain,
+		netComps.Config,
+		secureComps.CertAuth,
+		coreComps.EventLoop,
+		coreComps.Logger,
 		synch,
-		moduleOpt,
+		coreComps.Options,
 	)
-	return &moduleList{
-		clientSrv:    clientSrv,
-		server:       server,
-		sender:       sender,
-		eventLoop:    eventLoop,
+	return &compList{
+		clientSrv:    srvComps.ClientSrv,
+		server:       srvComps.Server,
+		sender:       netComps.Sender,
 		synchronizer: synch,
+		coreComps:    coreComps,
 	}, nil
 }

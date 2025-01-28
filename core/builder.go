@@ -47,10 +47,9 @@ func (b *Builder) Add(module ...any) {
 // Build initializes all added module and returns the Core object.
 func (b *Builder) Build() *Core {
 	// reverse the order of the added module so that TryGet will find the latest first.
-	// TODO: This causes some modules (specifically netconfig.Config) to be nil on TryGet
-	// for i, j := 0, len(b.core.modules)-1; i < j; i, j = i+1, j-1 {
-	// 	b.core.modules[i], b.core.modules[j] = b.core.modules[j], b.core.modules[i]
-	// }
+	for i, j := 0, len(b.core.modules)-1; i < j; i, j = i+1, j-1 {
+		b.core.modules[i], b.core.modules[j] = b.core.modules[j], b.core.modules[i]
+	}
 	// add the Options last so that it can be overridden by user.
 	b.Add(b.opts)
 	for _, mod := range b.modules {
