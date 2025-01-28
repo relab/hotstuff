@@ -1,42 +1,108 @@
 package certauth_test
 
-/*
+import (
+	"testing"
+
+	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/orchestration"
+	"github.com/relab/hotstuff/internal/testutil"
+)
+
 func TestCreatePartialCert(t *testing.T) {
-	run := func(t *testing.T, setup setupFunc) {
-		ctrl := gomock.NewController(t)
+	testData := []struct {
+		cryptoName string
+		privKey    hotstuff.PrivateKey
+		cached     bool
+	}{
+		{cryptoName: "ecdsa", privKey: testutil.GenerateECDSAKey(t)},
+		{cryptoName: "eddsa", privKey: testutil.GenerateEDDSAKey(t)},
+		{cryptoName: "bls12", privKey: testutil.GenerateBLS12Key(t)},
 
-		td := setup(t, ctrl, 1)
+		{cryptoName: "ecdsa", privKey: testutil.GenerateECDSAKey(t), cached: true},
+		{cryptoName: "eddsa", privKey: testutil.GenerateEDDSAKey(t), cached: true},
+		{cryptoName: "bls12", privKey: testutil.GenerateBLS12Key(t), cached: true},
+	}
+	for _, td := range testData {
+		id := 1
+		core := orchestration.NewCoreComponents(hotstuff.ID(id), "test", td.privKey)
+		net := orchestration.NewNetworkComponents(core, nil)
+		sec, err := orchestration.NewSecurityComponents(core, net, td.cryptoName, td.cached)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
 
-		partialCert, err := td.signers[0].CreatePartialCert(td.block)
+		block, ok := sec.BlockChain.Get(hotstuff.GetGenesis().Hash())
+		if !ok {
+			t.Errorf("no block")
+		}
+
+		partialCert, err := sec.CertAuth.CreatePartialCert(block)
 		if err != nil {
 			t.Fatalf("Failed to create partial certificate: %v", err)
 		}
 
-		if partialCert.BlockHash() != td.block.Hash() {
+		if partialCert.BlockHash() != block.Hash() {
 			t.Error("Partial certificate hash does not match block hash!")
 		}
 
-		if signerID := partialCert.Signer(); signerID != hotstuff.ID(1) {
-			t.Errorf("Wrong ID for signer in partial certificate: got: %d, want: %d", signerID, hotstuff.ID(1))
+		if signerID := partialCert.Signer(); signerID != hotstuff.ID(id) {
+			t.Errorf("Wrong ID for signer in partial certificate: got: %d, want: %d", signerID, hotstuff.ID(id))
 		}
 	}
-	runAll(t, run)
 }
 
 func TestVerifyPartialCert(t *testing.T) {
-	run := func(t *testing.T, setup setupFunc) {
-		ctrl := gomock.NewController(t)
+	testData := []struct {
+		cryptoName string
+		privKey    hotstuff.PrivateKey
+		cached     bool
+		block      *hotstuff.Block
+	}{
+		{
+			cryptoName: "ecdsa",
+			privKey:    testutil.GenerateECDSAKey(t),
+			cached:     true,
+			block: hotstuff.NewBlock(
+				hotstuff.GetGenesis().Hash(),
+				hotstuff.GetGenesis().QuorumCert(),
+				"hello",
+				1, 1,
+			),
+		},
+	}
 
-		td := setup(t, ctrl, 1)
-		partialCert := testutil.CreatePC(t, td.block, td.signers[0])
+	for _, td := range testData {
+		id := 1
+		core := orchestration.NewCoreComponents(hotstuff.ID(id), "test", td.privKey)
+		net := orchestration.NewNetworkComponents(core, nil)
+		sec, err := orchestration.NewSecurityComponents(core, net, td.cryptoName, td.cached)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
 
-		if !td.verifiers[0].VerifyPartialCert(partialCert) {
+		n := 2
+		replicas := make([]hotstuff.ReplicaInfo, 0)
+		for i := range n {
+			replicas = append(replicas, hotstuff.ReplicaInfo{
+				ID:      hotstuff.ID(i + 1),
+				Address: "127.0.0.1:80",
+			})
+		}
+
+		err = net.Sender.Connect(replicas)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+
+		partialCert := testutil.CreatePC(t, td.block, sec.CertAuth)
+
+		if !sec.CertAuth.VerifyPartialCert(partialCert) {
 			t.Error("Partial Certificate was not verified.")
 		}
 	}
-	runAll(t, run)
 }
 
+/*
 func TestCreateQuorumCert(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		ctrl := gomock.NewController(t)

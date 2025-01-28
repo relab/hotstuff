@@ -176,6 +176,7 @@ func NewSecurityComponents(
 	coreComps *CoreComponents,
 	netComps *NetworkComponents,
 	cryptoName string,
+	cachedCertAuth bool,
 ) (*SecurityComponents, error) {
 	blockChain := blockchain.New(
 		netComps.Sender,
@@ -186,13 +187,23 @@ func NewSecurityComponents(
 	if !ok {
 		return nil, fmt.Errorf("invalid crypto name: '%s'", cryptoName)
 	}
-	certAuthority := certauth.NewCached(
-		cryptoImpl,
-		blockChain,
-		netComps.Config,
-		coreComps.Logger,
-		100, // TODO: consider making this configurable
-	)
+	var certAuthority *certauth.CertAuthority
+	if cachedCertAuth {
+		certAuthority = certauth.NewCached(
+			cryptoImpl,
+			blockChain,
+			netComps.Config,
+			coreComps.Logger,
+			100, // TODO: consider making this configurable
+		)
+	} else {
+		certAuthority = certauth.New(
+			cryptoImpl,
+			blockChain,
+			netComps.Config,
+			coreComps.Logger,
+		)
+	}
 	return &SecurityComponents{
 		BlockChain: blockChain,
 		CryptoImpl: cryptoImpl,
@@ -403,7 +414,7 @@ func newReplicaComponents(
 		creds,
 		gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 	)
-	secureComps, err := NewSecurityComponents(coreComps, netComps, opts.GetCrypto())
+	secureComps, err := NewSecurityComponents(coreComps, netComps, opts.GetCrypto(), true)
 	if err != nil {
 		return nil, err
 	}
