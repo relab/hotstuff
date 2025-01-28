@@ -26,26 +26,24 @@ const ModuleName = "kauri"
 
 // Kauri structure contains the modules for kauri protocol implementation.
 type Kauri struct {
+	blockChain     *blockchain.BlockChain
 	crypto         modules.CryptoBase
 	leaderRotation modules.LeaderRotation
+	opts           *core.Options
+	eventLoop      *eventloop.EventLoop
+	configuration  *netconfig.Config
+	sender         *sender.Sender
+	server         *server.Server
+	logger         logging.Logger
 
-	blockChain    *blockchain.BlockChain
-	treeConfig    *core.TreeConfig
-	opts          *core.Options
-	eventLoop     *eventloop.EventLoop
-	configuration *netconfig.Config
-	sender        *sender.Sender
-	server        *server.Server
-	logger        logging.Logger
-
-	nodes       map[hotstuff.ID]*kauripb.Node
-	tree        tree.Tree
-	initDone    bool
 	aggContrib  hotstuff.QuorumSignature
+	aggSent     bool
 	blockHash   hotstuff.Hash
 	currentView hotstuff.View
+	initDone    bool
+	nodes       map[hotstuff.ID]*kauripb.Node
 	senders     []hotstuff.ID
-	aggSent     bool
+	tree        tree.Tree
 }
 
 // New initializes the kauri structure
@@ -54,7 +52,6 @@ func New(
 	leaderRotation modules.LeaderRotation,
 
 	blockChain *blockchain.BlockChain,
-	treeConfig *core.TreeConfig,
 	opts *core.Options,
 	eventLoop *eventloop.EventLoop,
 	configuration *netconfig.Config,
@@ -63,17 +60,15 @@ func New(
 	logger logging.Logger,
 ) *Kauri {
 	k := &Kauri{
+		blockChain:     blockChain,
 		crypto:         crypto,
 		leaderRotation: leaderRotation,
-
-		blockChain:    blockChain,
-		treeConfig:    treeConfig,
-		opts:          opts,
-		eventLoop:     eventLoop,
-		configuration: configuration,
-		sender:        sender,
-		server:        server,
-		logger:        logger,
+		opts:           opts,
+		eventLoop:      eventLoop,
+		configuration:  configuration,
+		sender:         sender,
+		server:         server,
+		logger:         logger,
 
 		nodes: make(map[hotstuff.ID]*kauripb.Node),
 	}
@@ -84,6 +79,9 @@ func New(
 	}, eventloop.Prioritize())
 	k.eventLoop.RegisterHandler(ContributionRecvEvent{}, func(event any) {
 		k.OnContributionRecv(event.(ContributionRecvEvent))
+	})
+	k.eventLoop.RegisterHandler(WaitTimerExpiredEvent{}, func(event any) {
+		k.OnWaitTimerExpired(event.(WaitTimerExpiredEvent))
 	})
 	return k
 }
@@ -99,8 +97,7 @@ func (k *Kauri) initializeConfiguration() {
 	for _, n := range kauriCfg.Nodes() {
 		k.nodes[hotstuff.ID(n.ID())] = n
 	}
-	k.treeConfig = k.opts.TreeConfig()
-	k.tree = *tree.CreateTree(k.opts.ID(), k.treeConfig.BranchFactor(), k.treeConfig.TreePos())
+	k.tree = k.opts.Tree()
 	k.initDone = true
 	k.senders = make([]hotstuff.ID, 0)
 }
@@ -124,15 +121,10 @@ func (k *Kauri) reset() {
 	k.aggSent = false
 }
 
-func (k *Kauri) WaitToAggregate(waitTime time.Duration, view hotstuff.View) {
-	time.Sleep(waitTime)
-	if k.currentView != view {
-		return
-	}
-	if !k.aggSent {
-		k.SendContributionToParent()
-		k.reset()
-	}
+func (k *Kauri) WaitToAggregate() {
+	view := k.currentView
+	time.Sleep(k.tree.WaitTime())
+	k.eventLoop.AddEvent(WaitTimerExpiredEvent{currentView: view})
 }
 
 // SendProposalToChildren sends the proposal to the children.
@@ -146,9 +138,7 @@ func (k *Kauri) SendProposalToChildren(p hotstuff.ProposeMsg) {
 		}
 		k.logger.Debug("Sending proposal to children ", children)
 		config.Propose(p)
-		// delta is the network delay between two processes, at root it is 2*(3-1)*delta
-		waitTime := time.Duration(2*(k.tree.TreeHeight()-1)) * k.treeConfig.TreeWaitDelta()
-		go k.WaitToAggregate(waitTime, k.currentView)
+		go k.WaitToAggregate()
 	} else {
 		k.SendContributionToParent()
 		k.aggSent = true
@@ -187,6 +177,16 @@ func (k *Kauri) SendContributionToParent() {
 				View:      uint64(k.currentView),
 			})
 		}
+	}
+}
+
+func (k *Kauri) OnWaitTimerExpired(event WaitTimerExpiredEvent) {
+	if k.currentView != event.currentView {
+		return
+	}
+	if !k.aggSent {
+		k.SendContributionToParent()
+		k.reset()
 	}
 }
 
@@ -266,4 +266,8 @@ func isSubSet(a, b []hotstuff.ID) bool {
 		}
 	}
 	return true
+}
+
+type WaitTimerExpiredEvent struct {
+	currentView hotstuff.View
 }

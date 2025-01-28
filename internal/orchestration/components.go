@@ -259,17 +259,6 @@ func setupComps(
 	rootCAs *x509.CertPool,
 ) (*compList, error) {
 
-	var duration modules.ViewDuration
-	if opts.GetLeaderRotation() == "tree-leader" {
-		duration = synchronizer.NewFixedViewDuration(opts.GetInitialTimeout().AsDuration())
-	} else {
-		duration = synchronizer.NewViewDuration(
-			uint64(opts.GetTimeoutSamples()),
-			float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-			float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-			float64(opts.GetTimeoutMultiplier()),
-		)
-	}
 	var creds credentials.TransportCredentials
 	clientSrvOpts := []gorums.ServerOption{}
 	replicaSrvOpts := []gorums.ServerOption{}
@@ -294,7 +283,24 @@ func setupComps(
 
 	coreComps := NewCoreComponents(opts.HotstuffID(), "hs", privKey)
 	coreComps.Options.SetSharedRandomSeed(opts.GetSharedSeed())
-	coreComps.Options.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
+	// TODO: Upon a merge with master, this doesn't compile.
+	// coreComps.Options.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
+
+	var duration modules.ViewDuration
+	if opts.GetLeaderRotation() == "tree-leader" {
+		// TODO(meling): Temporary default; should be configurable and moved to the appropriate place.
+		opts.SetTreeHeightWaitTime()
+		// create tree only if we are using tree leader (Kauri)
+		coreComps.Options.SetTree(createTree(opts))
+		duration = synchronizer.NewFixedViewDuration(opts.GetInitialTimeout().AsDuration())
+	} else {
+		duration = synchronizer.NewViewDuration(
+			uint64(opts.GetTimeoutSamples()),
+			float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
+			float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
+			float64(opts.GetTimeoutMultiplier()),
+		)
+	}
 
 	netComps := NewNetworkedComponents(
 		coreComps,
@@ -340,7 +346,6 @@ func setupComps(
 			secureComps.CryptoImpl,
 			leaderRotation,
 			secureComps.BlockChain,
-			coreComps.Options.TreeConfig(),
 			coreComps.Options,
 			coreComps.EventLoop,
 			netComps.Config,

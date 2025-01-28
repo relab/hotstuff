@@ -16,8 +16,10 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/crypto/keygen"
 	"github.com/relab/hotstuff/eventloop"
+	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
@@ -156,9 +158,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 	}
 	// prepare modules
-	moduleOpt := core.NewOptions(hotstuff.ID(opts.GetID()), privKey)
-	moduleOpt.SetSharedRandomSeed(opts.GetSharedSeed())
-	moduleOpt.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
 	mods, err := setupComps(opts, privKey, certificate, rootCAs)
 	if err != nil {
 		return nil, err
@@ -185,6 +184,20 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		mods.coreComps.EventLoop,
 		mods.synchronizer,
 	), nil
+}
+
+// createTree creates a tree based on the given replica options.
+func createTree(replicaOpts *orchestrationpb.ReplicaOpts) tree.Tree {
+	tree := tree.CreateTree(replicaOpts.HotstuffID(), int(replicaOpts.GetBranchFactor()), replicaOpts.TreePositionIDs())
+	switch {
+	case replicaOpts.GetAggregationTime():
+		tree.SetAggregationWaitTime(latency.MatrixFrom(replicaOpts.GetLocations()), replicaOpts.TreeDeltaDuration())
+	case replicaOpts.GetTreeHeightTime():
+		fallthrough
+	default:
+		tree.SetTreeHeightWaitTime(replicaOpts.TreeDeltaDuration())
+	}
+	return tree
 }
 
 func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {

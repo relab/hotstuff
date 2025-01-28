@@ -22,9 +22,8 @@ func (t *treeLeader) GetLeader(_ hotstuff.View) hotstuff.ID {
 		panic("oops")
 	}
 
-	treeConfig := t.opts.TreeConfig()
-	if treeConfig == nil {
+	if !t.opts.ShouldUseTree() {
 		return 1
 	}
-	return treeConfig.TreePos()[0]
+	return t.opts.Tree().Root()
 }
