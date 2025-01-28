@@ -6,12 +6,12 @@ import (
 	"github.com/relab/hotstuff"
 )
 
-// Rules is the minimum interface that a consensus implementations must implement.
+// ConsensusRules is the minimum interface that a consensus implementations must implement.
 // Implementations of this interface can be wrapped in the ConsensusBase struct.
 // Together, these provide an implementation of the main Consensus interface.
 // Implementors do not need to verify certificates or interact with other modules,
 // as this is handled by the ConsensusBase struct.
-type Rules interface {
+type ConsensusRules interface {
 	// VoteRule decides whether to vote for the block.
 	VoteRule(view hotstuff.View, proposal hotstuff.ProposeMsg) bool
 	// CommitRule decides whether any ancestor of the block can be committed.

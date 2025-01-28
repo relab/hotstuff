@@ -23,9 +23,9 @@ type Cache struct {
 	accessOrder list.List
 }
 
-// NewCache returns a new Crypto instance that caches the results of the operations of the given CryptoBase.
+// NewCached returns a new CertAuth instance that caches the results of the operations of the given CryptoBase.
 // implementation.
-func NewCache(
+func NewCached(
 	impl modules.CryptoBase,
 	blockChain *blockchain.BlockChain,
 	configuration *netconfig.Config,

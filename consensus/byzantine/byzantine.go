@@ -16,30 +16,30 @@ const (
 // Byzantine wraps a consensus rules implementation and alters its behavior.
 type Byzantine interface {
 	// Wrap wraps the rules and returns an altered rules implementation.
-	Wrap() modules.Rules
+	Wrap() modules.ConsensusRules
 }
 
 type silence struct {
-	modules.Rules
+	modules.ConsensusRules
 }
 
 func (s *silence) ProposeRule(_ hotstuff.SyncInfo, _ hotstuff.Command) (hotstuff.ProposeMsg, bool) {
 	return hotstuff.ProposeMsg{}, false
 }
 
-func (s *silence) Wrap() modules.Rules {
+func (s *silence) Wrap() modules.ConsensusRules {
 	return s
 }
 
 // NewSilence returns a byzantine replica that will never propose.
-func NewSilence(rules modules.Rules) Byzantine {
-	return &silence{Rules: rules}
+func NewSilence(rules modules.ConsensusRules) Byzantine {
+	return &silence{ConsensusRules: rules}
 }
 
 type fork struct {
 	blockChain *blockchain.BlockChain
 	opts       *core.Options
-	modules.Rules
+	modules.ConsensusRules
 }
 
 func (f *fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
@@ -74,19 +74,19 @@ func (f *fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert 
 
 // NewFork returns a byzantine replica that will try to fork the chain.
 func NewFork(
-	rules modules.Rules,
+	rules modules.ConsensusRules,
 
 	blockChain *blockchain.BlockChain,
 	opts *core.Options,
 ) Byzantine {
 	return &fork{
-		Rules: rules,
+		ConsensusRules: rules,
 
 		blockChain: blockChain,
 		opts:       opts,
 	}
 }
 
-func (f *fork) Wrap() modules.Rules {
+func (f *fork) Wrap() modules.ConsensusRules {
 	return f
 }

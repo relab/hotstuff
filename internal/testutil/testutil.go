@@ -40,7 +40,7 @@ func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstu
 	commandQ := mocks.NewMockCommandQueue(ctrl)
 	commandQ.EXPECT().Get(gomock.Any()).AnyTimes().Return(hotstuff.Command("foo"), true)
 
-	signer := certauth.NewCache(ecdsa.New(), 10)
+	signer := certauth.NewCached(ecdsa.New(), 10)
 
 	config := mocks.NewMockConfiguration(ctrl)
 	config.EXPECT().Len().AnyTimes().Return(1)

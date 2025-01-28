@@ -21,7 +21,7 @@ import (
 // Consensus provides a default implementation of the Consensus interface
 // for implementations of the ConsensusImpl interface.
 type Consensus struct {
-	impl           modules.Rules
+	impl           modules.ConsensusRules
 	leaderRotation modules.LeaderRotation
 
 	blockChain   *blockchain.BlockChain
@@ -43,7 +43,7 @@ type Consensus struct {
 
 // New returns a new Consensus instance based on the given Rules implementation.
 func New(
-	impl modules.Rules,
+	impl modules.ConsensusRules,
 	leaderRotation modules.LeaderRotation,
 
 	blockChain *blockchain.BlockChain,

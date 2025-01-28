@@ -141,7 +141,7 @@ func NewVulnFHS(
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
 	inner fasthotstuff.FastHotStuff,
-) modules.Rules {
+) modules.ConsensusRules {
 	return &vulnerableFHS{
 		logger:     logger,
 		blockChain: blockChain,

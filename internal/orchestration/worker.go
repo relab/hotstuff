@@ -157,8 +157,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rootCAs = x509.NewCertPool()
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 	}
-	// prepare modules
-	mods, err := setupComps(opts, privKey, certificate, rootCAs)
+	// prepare components and modules
+	comps, err := newReplicaComponents(opts, privKey, certificate, rootCAs)
 	if err != nil {
 		return nil, err
 	}
@@ -168,8 +168,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		// TODO: Rework the metrics logging.
 		metricsBuilder := core.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 		metricsBuilder.Add(
-			mods.coreComps.EventLoop,
-			mods.coreComps.Logger,
+			comps.eventLoop,
+			comps.logger,
 			w.metricsLogger,
 		)
 		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
@@ -178,11 +178,11 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		metricsBuilder.Build()
 	}
 	return replica.New(
-		mods.clientSrv,
-		mods.server,
-		mods.sender,
-		mods.coreComps.EventLoop,
-		mods.synchronizer,
+		comps.clientSrv,
+		comps.server,
+		comps.sender,
+		comps.eventLoop,
+		comps.synchronizer,
 	), nil
 }
 

@@ -22,7 +22,7 @@ func New(
 	blockChain *blockchain.BlockChain,
 	logger logging.Logger,
 	opts *core.Options,
-) modules.Rules {
+) modules.ConsensusRules {
 	fhs := &FastHotStuff{
 		blockChain: blockChain,
 		logger:     logger,

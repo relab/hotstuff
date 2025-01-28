@@ -40,7 +40,7 @@ func getConsensusRules(
 	blockChain *blockchain.BlockChain,
 	logger logging.Logger,
 	opts *core.Options,
-) (rules modules.Rules, ok bool) {
+) (rules modules.ConsensusRules, ok bool) {
 	ok = true
 	switch name {
 	case fasthotstuff.ModuleName:
@@ -57,7 +57,7 @@ func getConsensusRules(
 
 func getByzantine(
 	name string,
-	rules modules.Rules,
+	rules modules.ConsensusRules,
 	blockChain *blockchain.BlockChain,
 	opts *core.Options,
 ) (byz byzantine.Byzantine, ok bool) {
@@ -140,16 +140,16 @@ func NewCoreComponents(
 	}
 }
 
-type NetworkedComponents struct {
+type NetworkComponents struct {
 	Config *netconfig.Config
 	Sender *sender.Sender
 }
 
-func NewNetworkedComponents(
+func NewNetworkComponents(
 	coreComps *CoreComponents,
 	creds credentials.TransportCredentials,
 	mgrOpts ...gorums.ManagerOption,
-) *NetworkedComponents {
+) *NetworkComponents {
 	cfg := netconfig.NewConfig()
 	send := sender.New(
 		cfg,
@@ -160,7 +160,7 @@ func NewNetworkedComponents(
 		mgrOpts...,
 	)
 
-	return &NetworkedComponents{
+	return &NetworkComponents{
 		Config: cfg,
 		Sender: send,
 	}
@@ -174,9 +174,8 @@ type SecurityComponents struct {
 
 func NewSecurityComponents(
 	coreComps *CoreComponents,
-	netComps *NetworkedComponents,
+	netComps *NetworkComponents,
 	cryptoName string,
-
 ) (*SecurityComponents, error) {
 	blockChain := blockchain.New(
 		netComps.Sender,
@@ -187,7 +186,7 @@ func NewSecurityComponents(
 	if !ok {
 		return nil, fmt.Errorf("invalid crypto name: '%s'", cryptoName)
 	}
-	certAuthority := certauth.NewCache(
+	certAuthority := certauth.NewCached(
 		cryptoImpl,
 		blockChain,
 		netComps.Config,
@@ -236,7 +235,7 @@ func NewServiceComponents(
 }
 
 type ProtocolModules struct {
-	ConsensusRules modules.Rules
+	ConsensusRules modules.ConsensusRules
 	LeaderRotation modules.LeaderRotation
 	ViewDuration   modules.ViewDuration
 }
@@ -250,7 +249,7 @@ type ViewDurationOptions struct {
 
 func NewProtocolModules(
 	coreComps *CoreComponents,
-	netComps *NetworkedComponents,
+	netComps *NetworkComponents,
 	secureComps *SecurityComponents,
 	srvComps *ServiceComponents,
 
@@ -308,7 +307,7 @@ type ProtocolComponents struct {
 
 func NewProtocolComponents(
 	coreComps *CoreComponents,
-	netComps *NetworkedComponents,
+	netComps *NetworkComponents,
 	secureComps *SecurityComponents,
 	srvComps *ServiceComponents,
 	mods *ProtocolModules,
@@ -340,6 +339,7 @@ func NewProtocolComponents(
 	)
 	// No need to store votingMachine since it's not a dependency.
 	// The constructor adds event handlers that enables voting logic.
+	// The registered event handlers also prevent this object from being disposed.
 	synchronizer.NewVotingMachine(
 		secureComps.BlockChain,
 		netComps.Config,
@@ -355,20 +355,21 @@ func NewProtocolComponents(
 	}
 }
 
-type compList struct {
+type replicaComponents struct {
 	clientSrv    *clientsrv.ClientServer
 	server       *server.Server
 	sender       *sender.Sender
 	synchronizer *synchronizer.Synchronizer
-	coreComps    *CoreComponents
+	eventLoop    *eventloop.EventLoop
+	logger       logging.Logger
 }
 
-func setupComps(
+func newReplicaComponents(
 	opts *orchestrationpb.ReplicaOpts,
 	privKey hotstuff.PrivateKey,
 	certificate tls.Certificate,
 	rootCAs *x509.CertPool,
-) (*compList, error) {
+) (*replicaComponents, error) {
 
 	var creds credentials.TransportCredentials
 	clientSrvOpts := []gorums.ServerOption{}
@@ -397,7 +398,7 @@ func setupComps(
 	// TODO: Upon a merge with master, this doesn't compile.
 	// coreComps.Options.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
 
-	netComps := NewNetworkedComponents(
+	netComps := NewNetworkComponents(
 		coreComps,
 		creds,
 		gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
@@ -434,7 +435,7 @@ func setupComps(
 	)
 
 	// Putting it here for now since it breaks consistency with component categorization.
-	// TODO(AlanRostem): figure out a better way to enable Kauri. Problem is that it needs server
+	// TODO(AlanRostem): figure out a better way to enable Kauri. Problem is that it needs server, making categorization harder.
 	if opts.GetKauri() {
 		protocolComps.Consensus.SetKauri(kauri.New(
 			secureComps.CryptoImpl,
@@ -448,11 +449,12 @@ func setupComps(
 			coreComps.Logger,
 		))
 	}
-	return &compList{
+	return &replicaComponents{
 		clientSrv:    srvComps.ClientSrv,
 		server:       server,
 		sender:       netComps.Sender,
 		synchronizer: protocolComps.Synchronizer,
-		coreComps:    coreComps,
+		eventLoop:    coreComps.EventLoop,
+		logger:       coreComps.Logger,
 	}, nil
 }
