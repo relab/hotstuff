@@ -5,10 +5,10 @@ import (
 	"math/big"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/crypto"
-	"github.com/relab/hotstuff/crypto/bls12"
-	"github.com/relab/hotstuff/crypto/ecdsa"
-	"github.com/relab/hotstuff/crypto/eddsa"
+	"github.com/relab/hotstuff/security/crypto"
+	"github.com/relab/hotstuff/security/crypto/bls12"
+	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto/eddsa"
 )
 
 // QuorumSignatureToProto converts a threshold signature to a protocol buffers message.

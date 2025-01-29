@@ -9,14 +9,14 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/config"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/internal/tree"
-	"github.com/relab/hotstuff/leaderrotation"
-	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/iago"
 	"github.com/spf13/viper"
 )

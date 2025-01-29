@@ -3,8 +3,8 @@ package metrics
 import (
 	"time"
 
-	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
+	"github.com/relab/hotstuff/builder"
+	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/metrics/types"
 )
 
@@ -21,7 +21,7 @@ func NewTicker(interval time.Duration) *Ticker {
 }
 
 // InitModule gives the module access to the other modules.
-func (t *Ticker) InitModule(mods *core.Core) {
+func (t *Ticker) InitModule(mods *builder.Core) {
 	var eventLoop *eventloop.EventLoop
 
 	mods.Get(&eventLoop)

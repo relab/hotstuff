@@ -3,10 +3,11 @@ package metrics
 import (
 	"time"
 
+	"github.com/relab/hotstuff/builder"
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/metrics/types"
 )
 
@@ -25,7 +26,7 @@ type ClientLatency struct {
 }
 
 // InitModule gives the module access to the other modules.
-func (lr *ClientLatency) InitModule(mods *core.Core) {
+func (lr *ClientLatency) InitModule(mods *builder.Core) {
 	var (
 		eventLoop *eventloop.EventLoop
 		logger    logging.Logger

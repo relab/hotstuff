@@ -14,10 +14,11 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/builder"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
+	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/logging"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -85,7 +86,7 @@ func New(
 	opts *core.Options,
 
 	conf Config,
-	builder core.Builder,
+	builder builder.Builder,
 ) (client *Client) {
 	client = &Client{
 		eventLoop: eventLoop,

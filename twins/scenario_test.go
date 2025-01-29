@@ -3,7 +3,7 @@ package twins
 import (
 	"testing"
 
-	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
+	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 )
 
 func TestBasicScenario(t *testing.T) {

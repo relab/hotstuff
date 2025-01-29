@@ -48,6 +48,14 @@ type Options struct {
 	shouldUseTree bool
 }
 
+func NewOptions(id hotstuff.ID, pk hotstuff.PrivateKey) *Options {
+	return &Options{
+		id:                 id,
+		privateKey:         pk,
+		connectionMetadata: make(map[string]string),
+	}
+}
+
 func (opts *Options) ensureSpace(id OptionID) {
 	if int(id) >= len(opts.options) {
 		newOpts := make([]any, id+1)

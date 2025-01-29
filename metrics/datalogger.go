@@ -5,8 +5,8 @@ import (
 	"io"
 	"sync"
 
-	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/builder"
+	"github.com/relab/hotstuff/core/logging"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -36,7 +36,7 @@ func NewJSONLogger(wr io.Writer) (Logger, error) {
 }
 
 // InitModule initializes the metrics logger module.
-func (dl *jsonLogger) InitModule(mods *core.Core) {
+func (dl *jsonLogger) InitModule(mods *builder.Core) {
 	mods.Get(&dl.logger)
 }
 

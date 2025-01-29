@@ -7,15 +7,15 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/certauth"
-	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/netconfig"
+	"github.com/relab/hotstuff/builder"
+	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/network/netconfig"
+	"github.com/relab/hotstuff/security/blockchain"
+	"github.com/relab/hotstuff/security/certauth"
 
-	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/testutil"
+	"github.com/relab/hotstuff/security/crypto/bls12"
 	"go.uber.org/mock/gomock"
 )
 
@@ -23,11 +23,11 @@ func TestConvertPartialCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	key := testutil.GenerateECDSAKey(t)
-	builder := core.NewBuilder(1, key)
-	testutil.TestModules(t, ctrl, 1, key, &builder)
-	hs := builder.Build()
+	bld := builder.NewBuilder(1, key)
+	testutil.TestModules(t, ctrl, 1, key, &bld)
+	hs := bld.Build()
 
-	var signer core.CertAuth
+	var signer builder.CertAuth
 	hs.Get(&signer)
 
 	want, err := signer.CreatePartialCert(hotstuff.GetGenesis())
@@ -53,7 +53,7 @@ func TestConvertQuorumCert(t *testing.T) {
 
 	signatures := testutil.CreatePCs(t, b1, hl.Signers())
 
-	var signer core.CertAuth
+	var signer builder.CertAuth
 	hl[0].Get(&signer)
 
 	want, err := signer.CreateQuorumCert(b1, signatures)
@@ -106,7 +106,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 	pb := hotstuffpb.TimeoutCertToProto(tc1)
 	tc2 := hotstuffpb.TimeoutCertFromProto(pb)
 
-	var signer core.CertAuth
+	var signer builder.CertAuth
 	hl[0].Get(&signer)
 
 	if !signer.VerifyTimeoutCert(tc2) {

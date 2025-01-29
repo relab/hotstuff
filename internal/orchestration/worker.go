@@ -12,31 +12,32 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/builder"
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/eventloop"
+	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/internal/tree"
-	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
-	"github.com/relab/hotstuff/replica"
+	"github.com/relab/hotstuff/security/crypto/keygen"
+	"github.com/relab/hotstuff/service/replica"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
 	// imported modules
-	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
-	_ "github.com/relab/hotstuff/consensus/fasthotstuff"
-	_ "github.com/relab/hotstuff/consensus/simplehotstuff"
-	_ "github.com/relab/hotstuff/crypto/bls12"
-	_ "github.com/relab/hotstuff/crypto/ecdsa"
-	_ "github.com/relab/hotstuff/crypto/eddsa"
-	_ "github.com/relab/hotstuff/kauri"
-	_ "github.com/relab/hotstuff/leaderrotation"
+	_ "github.com/relab/hotstuff/protocol/kauri"
+	_ "github.com/relab/hotstuff/protocol/leaderrotation"
+	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
+	_ "github.com/relab/hotstuff/protocol/rules/fasthotstuff"
+	_ "github.com/relab/hotstuff/protocol/rules/simplehotstuff"
+	_ "github.com/relab/hotstuff/security/crypto/bls12"
+	_ "github.com/relab/hotstuff/security/crypto/ecdsa"
+	_ "github.com/relab/hotstuff/security/crypto/eddsa"
 )
 
 // Worker starts and runs clients and replicas based on commands from the controller.
@@ -166,7 +167,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		// Initializes the metrics modules. This does not need to be stored
 		// anywhere since they all add handlers to the eventloop.
 		// TODO: Rework the metrics logging.
-		metricsBuilder := core.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
+		metricsBuilder := builder.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
 		metricsBuilder.Add(
 			comps.eventLoop,
 			comps.logger,
@@ -262,8 +263,8 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		mods := core.NewBuilder(hotstuff.ID(opts.GetID()), nil)
-		buildOpt := mods.Options()
+		mods := builder.NewBuilder(hotstuff.ID(opts.GetID()), nil)
+		buildOpt := core.NewOptions(hotstuff.ID(opts.GetID()), nil)
 		logger := logging.New("cli" + strconv.Itoa(int(opts.GetID())))
 		eventLoop := eventloop.New(logger, 1000)
 		mods.Add(eventLoop)

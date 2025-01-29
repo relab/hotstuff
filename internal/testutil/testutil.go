@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/relab/hotstuff/certauth"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/security/certauth"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/crypto/bls12"
-	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/security/crypto/bls12"
+	"github.com/relab/hotstuff/security/crypto/keygen"
 	"github.com/relab/hotstuff/twins"
 )
 

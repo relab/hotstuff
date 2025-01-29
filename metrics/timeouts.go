@@ -4,9 +4,10 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/builder"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/metrics/types"
 )
 
@@ -26,7 +27,7 @@ type ViewTimeouts struct {
 }
 
 // InitModule gives the module access to the other modules.
-func (vt *ViewTimeouts) InitModule(mods *core.Core) {
+func (vt *ViewTimeouts) InitModule(mods *builder.Core) {
 	var (
 		eventLoop *eventloop.EventLoop
 		logger    logging.Logger

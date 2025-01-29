@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/consensus/fasthotstuff"
-	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
+	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/twins"
 )
 

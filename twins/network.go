@@ -11,12 +11,13 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/blockchain"
+	"github.com/relab/hotstuff/builder"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/synchronizer"
+	"github.com/relab/hotstuff/protocol/synchronizer"
+	"github.com/relab/hotstuff/security/blockchain"
 )
 
 // NodeID is an ID that is unique to a node in the network.
@@ -33,10 +34,10 @@ func (id NodeID) String() string {
 
 type node struct {
 	blockChain     *blockchain.BlockChain
-	consensus      core.Consensus
+	consensus      builder.Consensus
 	eventLoop      *eventloop.EventLoop
 	leaderRotation modules.LeaderRotation
-	synchronizer   core.Synchronizer
+	synchronizer   builder.Synchronizer
 	opts           *core.Options
 
 	id             NodeID
@@ -45,7 +46,7 @@ type node struct {
 	log            strings.Builder
 }
 
-func (n *node) InitModule(mods *core.Core) {
+func (n *node) InitModule(mods *builder.Core) {
 	mods.Get(
 		&n.blockChain,
 		&n.consensus,
@@ -105,13 +106,13 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 }
 
 // GetNodeBuilder returns a consensus.Builder instance for a node in the network.
-func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) core.Builder {
+func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) builder.Builder {
 	node := node{
 		id: id,
 	}
 	n.nodes[id.NetworkID] = &node
 	n.replicas[id.ReplicaID] = append(n.replicas[id.ReplicaID], &node)
-	builder := core.NewBuilder(id.ReplicaID, pk)
+	builder := builder.NewBuilder(id.ReplicaID, pk)
 	// register node as an anonymous module because that allows configuration to obtain it.
 	builder.Add(&node)
 	return builder
@@ -135,7 +136,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
 		}
 
-		builderOpt := builder.Options()
+		builderOpt := core.Options()
 		netConfiguration := netconfig.NewConfig()
 		eventLoop := core.NewEventLoop(1000)
 		logger := logging.New("hs" + strconv.Itoa(int(opts.GetID())))
@@ -179,7 +180,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 			leaderRotation(n.views),
 			&commandModule{commandGenerator: cg, node: node},
 		)
-		builder.Options().SetShouldVerifyVotesSync()
+		core.Options().SetShouldVerifyVotesSync()
 		builder.Build()
 	}*/
 	return nil // TODO: Fix the problems with the above code.
@@ -252,7 +253,7 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 }
 
 // NewConfiguration returns a new Configuration module for this network.
-func (n *Network) NewConfiguration() core.Configuration {
+func (n *Network) NewConfiguration() builder.Configuration {
 	return &configuration{network: n}
 }
 
@@ -263,7 +264,7 @@ type configuration struct {
 }
 
 // alternative way to get a pointer to the node.
-func (c *configuration) InitModule(mods *core.Core) {
+func (c *configuration) InitModule(mods *builder.Core) {
 	if c.node == nil {
 		mods.TryGet(&c.node)
 	}
@@ -329,7 +330,7 @@ func (c *configuration) Replica(id hotstuff.ID) (r *hotstuff.ReplicaInfo, ok boo
 }
 
 // GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
-func (c *configuration) GetSubConfig(ids []hotstuff.ID) (sub core.Configuration, err error) {
+func (c *configuration) GetSubConfig(ids []hotstuff.ID) (sub builder.Configuration, err error) {
 	subConfig := hotstuff.NewIDSet()
 	for _, id := range ids {
 		subConfig.Add(id)
@@ -453,7 +454,7 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 type tick struct{}
 
 type timeoutManager struct {
-	synchronizer core.Synchronizer
+	synchronizer builder.Synchronizer
 	eventLoop    *eventloop.EventLoop
 
 	node      *node
@@ -486,7 +487,7 @@ func (tm *timeoutManager) viewChange(event hotstuff.ViewChangeEvent) {
 
 // InitModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (tm *timeoutManager) InitModule(mods *core.Core) {
+func (tm *timeoutManager) InitModule(mods *builder.Core) {
 	mods.Get(
 		&tm.synchronizer,
 		&tm.eventLoop,

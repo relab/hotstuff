@@ -5,9 +5,10 @@ import (
 
 	"github.com/relab/hotstuff"
 
+	"github.com/relab/hotstuff/builder"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/metrics/types"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
@@ -28,7 +29,7 @@ type Throughput struct {
 }
 
 // InitModule gives the module access to the other modules.
-func (t *Throughput) InitModule(mods *core.Core) {
+func (t *Throughput) InitModule(mods *builder.Core) {
 	var (
 		eventLoop *eventloop.EventLoop
 		logger    logging.Logger

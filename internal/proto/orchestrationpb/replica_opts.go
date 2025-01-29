@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/security/crypto/keygen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 )

@@ -8,29 +8,29 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/certauth"
-	"github.com/relab/hotstuff/clientsrv"
-	"github.com/relab/hotstuff/committer"
-	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/consensus/byzantine"
-	"github.com/relab/hotstuff/consensus/chainedhotstuff"
-	"github.com/relab/hotstuff/consensus/fasthotstuff"
-	"github.com/relab/hotstuff/consensus/simplehotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/crypto/bls12"
-	"github.com/relab/hotstuff/crypto/ecdsa"
-	"github.com/relab/hotstuff/crypto/eddsa"
-	"github.com/relab/hotstuff/eventloop"
+	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
-	"github.com/relab/hotstuff/kauri"
-	"github.com/relab/hotstuff/leaderrotation"
-	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/netconfig"
-	"github.com/relab/hotstuff/sender"
-	"github.com/relab/hotstuff/server"
-	"github.com/relab/hotstuff/synchronizer"
+	"github.com/relab/hotstuff/network/netconfig"
+	"github.com/relab/hotstuff/network/sender"
+	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/protocol/kauri"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
+	"github.com/relab/hotstuff/protocol/rules/byzantine"
+	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
+	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
+	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
+	"github.com/relab/hotstuff/protocol/synchronizer"
+	"github.com/relab/hotstuff/security/blockchain"
+	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/security/crypto/bls12"
+	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto/eddsa"
+	"github.com/relab/hotstuff/service/clientsrv"
+	"github.com/relab/hotstuff/service/committer"
+	"github.com/relab/hotstuff/service/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -176,7 +176,7 @@ func NewSecurityComponents(
 	coreComps *CoreComponents,
 	netComps *NetworkComponents,
 	cryptoName string,
-	cachedCertAuth bool,
+	cacheSize int,
 ) (*SecurityComponents, error) {
 	blockChain := blockchain.New(
 		netComps.Sender,
@@ -188,13 +188,13 @@ func NewSecurityComponents(
 		return nil, fmt.Errorf("invalid crypto name: '%s'", cryptoName)
 	}
 	var certAuthority *certauth.CertAuthority
-	if cachedCertAuth {
+	if cacheSize > 0 {
 		certAuthority = certauth.NewCached(
 			cryptoImpl,
 			blockChain,
 			netComps.Config,
 			coreComps.Logger,
-			100, // TODO: consider making this configurable
+			cacheSize,
 		)
 	} else {
 		certAuthority = certauth.New(
@@ -414,7 +414,8 @@ func newReplicaComponents(
 		creds,
 		gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 	)
-	secureComps, err := NewSecurityComponents(coreComps, netComps, opts.GetCrypto(), true)
+	cacheSize := 100 // TODO: consider making this configurable
+	secureComps, err := NewSecurityComponents(coreComps, netComps, opts.GetCrypto(), cacheSize)
 	if err != nil {
 		return nil, err
 	}

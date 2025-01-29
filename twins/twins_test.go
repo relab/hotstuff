@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
-	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/core/logging"
+	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/twins"
 )
 
