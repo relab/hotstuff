@@ -6,7 +6,6 @@ import (
 	"net"
 
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/network/sender"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/service/clientsrv"
@@ -19,7 +18,6 @@ import (
 // Replica is a participant in the consensus protocol.
 type Replica struct {
 	clientSrv    *clientsrv.ClientServer
-	cfg          *netconfig.Config
 	hsSrv        *server.Server
 	sender       *sender.Sender
 	eventLoop    *eventloop.EventLoop
@@ -49,7 +47,6 @@ func New(
 		cancel:       func() {},
 		done:         make(chan struct{}),
 	}
-
 	return srv
 }
 

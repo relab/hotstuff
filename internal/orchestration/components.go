@@ -365,7 +365,7 @@ func NewProtocolComponents(
 	}
 }
 
-type replicaComponents struct {
+type ReplicaComponents struct {
 	clientSrv    *clientsrv.ClientServer
 	server       *server.Server
 	sender       *sender.Sender
@@ -374,12 +374,12 @@ type replicaComponents struct {
 	logger       logging.Logger
 }
 
-func newReplicaComponents(
+func NewReplicaComponents(
 	opts *orchestrationpb.ReplicaOpts,
 	privKey hotstuff.PrivateKey,
 	certificate tls.Certificate,
 	rootCAs *x509.CertPool,
-) (*replicaComponents, error) {
+) (*ReplicaComponents, error) {
 
 	var creds credentials.TransportCredentials
 	clientSrvOpts := []gorums.ServerOption{}
@@ -460,7 +460,7 @@ func newReplicaComponents(
 			coreComps.Logger,
 		))
 	}
-	return &replicaComponents{
+	return &ReplicaComponents{
 		clientSrv:    srvComps.ClientSrv,
 		server:       server,
 		sender:       netComps.Sender,

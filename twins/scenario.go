@@ -1,11 +1,8 @@
 package twins
 
 import (
-	"context"
 	"fmt"
-	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/relab/hotstuff"
 )
@@ -117,7 +114,7 @@ func checkCommits(network *Network) (safe bool, commits int) {
 	return true, i
 }
 
-type leaderRotation []View
+/*type leaderRotation []View
 
 // GetLeader returns the id of the leader in the given view.
 func (lr leaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
@@ -128,7 +125,7 @@ func (lr leaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
 	}
 	// default to 0 (which is an invalid id)
 	return 0
-}
+}*/
 
 func getBlocks(network *Network) map[NodeID][]*hotstuff.Block {
 	m := make(map[NodeID][]*hotstuff.Block)
@@ -138,7 +135,7 @@ func getBlocks(network *Network) map[NodeID][]*hotstuff.Block {
 	return m
 }
 
-type commandGenerator struct {
+/*type commandGenerator struct {
 	mut     sync.Mutex
 	nextCmd uint64
 }
@@ -177,4 +174,4 @@ func (cm commandModule) Exec(block *hotstuff.Block) {
 	cm.node.executedBlocks = append(cm.node.executedBlocks, block)
 }
 
-func (commandModule) Fork(_ *hotstuff.Block) {}
+func (commandModule) Fork(_ *hotstuff.Block) {}*/

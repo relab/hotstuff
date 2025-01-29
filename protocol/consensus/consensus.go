@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
@@ -39,8 +38,6 @@ type Consensus struct {
 
 	lastVote hotstuff.View
 	view     hotstuff.View
-
-	mut sync.Mutex
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.

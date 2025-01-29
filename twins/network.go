@@ -118,72 +118,8 @@ func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) builder.Buil
 	return builder
 }
 
-func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName string) error {
-	/*cg := &commandGenerator{}
-	for _, nodeID := range nodes {
-
-		var err error
-		pk, err := keygen.GenerateECDSAPrivateKey()
-		if err != nil {
-			return err
-		}
-
-		builder := n.GetNodeBuilder(nodeID, pk)
-		node := n.nodes[nodeID.NetworkID]
-
-		consensusRules, ok := modules.GetModule[modules.Rules](consensusName)
-		if !ok {
-			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
-		}
-
-		builderOpt := core.Options()
-		netConfiguration := netconfig.NewConfig()
-		eventLoop := core.NewEventLoop(1000)
-		logger := logging.New("hs" + strconv.Itoa(int(opts.GetID())))
-		protocolInvoker := sender.New(netConfiguration, eventLoop, logger, builderOpt, creds, managerOpts...)
-
-		cmdCache := clientsrv.NewCmdCache(logger, int(conf.BatchSize))
-		clientSrv := clientsrv.NewClientServer(eventLoop, logger, cmdCache, clientSrvOpts)
-		blockChain := blockchain.New(protocolInvoker, eventLoop, logger)
-		committer := committer.New(blockChain, clientSrv, logger)
-		certAuthority := certauth.NewCache(cryptoImpl, blockChain, netConfiguration, 100) // TODO: consider making this configurable
-		csus := consensus.New(
-			consensusRules,
-			node.leaderRotation,
-			blockChain,
-			committer,
-			cmdCache,
-			netConfiguration,
-			protocolInvoker,
-			certAuthority,
-			eventLoop,
-			logger,
-			builderOpt,
-		)
-		synch := synchronizer.New(leaderRotation, blockChain, csus, certAuthority, netConfiguration, protocolInvoker, eventLoop, logger, builderOpt)
-		votingMachine := consensus.NewVotingMachine(blockChain, netConfiguration, certAuthority, eventLoop, logger, synch, builderOpt)
-
-		builder.Add(
-			consensusRules,
-			FixedTimeout(1*time.Millisecond),
-
-			core.NewEventLoop(100),
-			blockchain.New(),
-			consensus.New(),
-			consensus.NewVotingMachine(),
-			certauth.NewCache(ecdsa.New(), 100),
-			synchronizer.New(),
-			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
-			// twins-specific:
-			&configuration{network: n, node: node},
-			&timeoutManager{network: n, node: node, timeout: 5},
-			leaderRotation(n.views),
-			&commandModule{commandGenerator: cg, node: node},
-		)
-		core.Options().SetShouldVerifyVotesSync()
-		builder.Build()
-	}*/
-	return nil // TODO: Fix the problems with the above code.
+func (n *Network) createTwinsNodes(_ []NodeID, _ Scenario, _ string) error {
+	return nil // TODO: Scrap twins or reimplement this function
 }
 
 func (n *Network) run(ticks int) {
@@ -378,7 +314,7 @@ func (c *configuration) Fetch(_ context.Context, hash hotstuff.Hash) (block *hot
 	return nil, false
 }
 
-type replica struct {
+/*type replica struct {
 	// pointer to the node that wants to contact this replica.
 	config *configuration
 	// id of the replica.
@@ -413,7 +349,7 @@ func (r *replica) NewView(si hotstuff.SyncInfo) {
 
 func (r *replica) Metadata() map[string]string {
 	return r.config.network.replicas[r.id][0].opts.ConnectionMetadata()
-}
+}*/
 
 // NodeSet is a set of network ids.
 type NodeSet map[uint32]struct{}
@@ -453,7 +389,7 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 
 type tick struct{}
 
-type timeoutManager struct {
+/*type timeoutManager struct {
 	synchronizer builder.Synchronizer
 	eventLoop    *eventloop.EventLoop
 
@@ -499,7 +435,7 @@ func (tm *timeoutManager) InitModule(mods *builder.Core) {
 	tm.eventLoop.RegisterHandler(hotstuff.ViewChangeEvent{}, func(event any) {
 		tm.viewChange(event.(hotstuff.ViewChangeEvent))
 	}, eventloop.Prioritize())
-}
+}*/
 
 // FixedTimeout returns an ExponentialTimeout with a max exponent of 0.
 func FixedTimeout(timeout time.Duration) modules.ViewDuration {

@@ -292,7 +292,7 @@ func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
 
 // AdvanceView attempts to advance to the next view using the given QC.
 // qc must be either a regular quorum certificate, or a timeout certificate.
-func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) {
+func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocyclo
 	v := hotstuff.View(0)
 	timeout := false
 
