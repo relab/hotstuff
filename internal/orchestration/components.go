@@ -192,7 +192,6 @@ func NewSecurityComponents(
 		certAuthority = certauth.NewCached(
 			cryptoImpl,
 			blockChain,
-			netComps.Config,
 			coreComps.Logger,
 			cacheSize,
 		)
@@ -200,7 +199,6 @@ func NewSecurityComponents(
 		certAuthority = certauth.New(
 			cryptoImpl,
 			blockChain,
-			netComps.Config,
 			coreComps.Logger,
 		)
 	}
@@ -331,6 +329,7 @@ func NewProtocolComponents(
 		srvComps.CmdCache,
 		netComps.Sender,
 		secureComps.CertAuth,
+		netComps.Config,
 		coreComps.EventLoop,
 		coreComps.Logger,
 		coreComps.Options,

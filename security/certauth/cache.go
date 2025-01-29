@@ -11,7 +11,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -28,7 +27,6 @@ type Cache struct {
 func NewCached(
 	impl modules.CryptoBase,
 	blockChain *blockchain.BlockChain,
-	configuration *netconfig.Config,
 	logger logging.Logger,
 
 	capacity int) *CertAuthority {
@@ -38,7 +36,6 @@ func NewCached(
 		entries:  make(map[string]*list.Element, capacity),
 	},
 		blockChain,
-		configuration,
 		logger,
 	)
 }

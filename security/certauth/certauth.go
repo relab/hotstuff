@@ -5,16 +5,14 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
 type CertAuthority struct {
 	impl modules.CryptoBase
 
-	logger        logging.Logger
-	blockChain    *blockchain.BlockChain
-	configuration *netconfig.Config
+	logger     logging.Logger
+	blockChain *blockchain.BlockChain
 }
 
 // New returns a CertAuthority. It will use the given CryptoBase to create and verify
@@ -23,15 +21,13 @@ func New(
 	impl modules.CryptoBase,
 
 	blockChain *blockchain.BlockChain,
-	configuration *netconfig.Config,
 	logger logging.Logger,
 ) *CertAuthority {
 	return &CertAuthority{
 		impl: impl,
 
-		logger:        logger,
-		blockChain:    blockChain,
-		configuration: configuration,
+		logger:     logger,
+		blockChain: blockChain,
 	}
 }
 
@@ -107,7 +103,7 @@ func (c CertAuthority) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
-func (c CertAuthority) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
+func (c CertAuthority) VerifyQuorumCert(quorumSize int, qc hotstuff.QuorumCert) bool {
 	// genesis QC is always valid.
 	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
 		return true
@@ -120,7 +116,7 @@ func (c CertAuthority) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 	}
 
 	participants := qcSignature.Participants()
-	if participants.Len() < c.configuration.QuorumSize() {
+	if participants.Len() < quorumSize {
 		return false
 	}
 	block, ok := c.blockChain.Get(qc.BlockHash())
@@ -131,19 +127,19 @@ func (c CertAuthority) VerifyQuorumCert(qc hotstuff.QuorumCert) bool {
 }
 
 // VerifyTimeoutCert verifies a timeout certificate.
-func (c CertAuthority) VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool {
+func (c CertAuthority) VerifyTimeoutCert(quorumSize int, tc hotstuff.TimeoutCert) bool {
 	// view 0 TC is always valid.
 	if tc.View() == 0 {
 		return true
 	}
-	if tc.Signature().Participants().Len() < c.configuration.QuorumSize() {
+	if tc.Signature().Participants().Len() < quorumSize {
 		return false
 	}
 	return c.impl.Verify(tc.Signature(), tc.View().ToBytes())
 }
 
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
-func (c CertAuthority) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, ok bool) {
+func (c CertAuthority) VerifyAggregateQC(quorumSize int, aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, ok bool) {
 	messages := make(map[hotstuff.ID][]byte)
 	for id, qc := range aggQC.QCs() {
 		if highQC.View() < qc.View() || highQC == (hotstuff.QuorumCert{}) {
@@ -156,11 +152,11 @@ func (c CertAuthority) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hot
 			SyncInfo: hotstuff.NewSyncInfo().WithQC(qc),
 		}.ToBytes()
 	}
-	if aggQC.Sig().Participants().Len() < c.configuration.QuorumSize() {
+	if aggQC.Sig().Participants().Len() < quorumSize {
 		return hotstuff.QuorumCert{}, false
 	}
 	// both the batched aggQC signatures and the highQC must be verified
-	if c.impl.BatchVerify(aggQC.Sig(), messages) && c.VerifyQuorumCert(highQC) {
+	if c.impl.BatchVerify(aggQC.Sig(), messages) && c.VerifyQuorumCert(quorumSize, highQC) {
 		return highQC, true
 	}
 	return hotstuff.QuorumCert{}, false

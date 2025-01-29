@@ -9,6 +9,7 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/network/sender"
 	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
@@ -24,14 +25,15 @@ type Consensus struct {
 	impl           modules.ConsensusRules
 	leaderRotation modules.LeaderRotation
 
-	blockChain   *blockchain.BlockChain
-	committer    *committer.Committer
-	commandCache *clientsrv.CmdCache
-	sender       *sender.Sender
-	auth         *certauth.CertAuthority
-	eventLoop    *eventloop.EventLoop
-	logger       logging.Logger
-	opts         *core.Options
+	blockChain    *blockchain.BlockChain
+	committer     *committer.Committer
+	commandCache  *clientsrv.CmdCache
+	sender        *sender.Sender
+	auth          *certauth.CertAuthority
+	configuration *netconfig.Config
+	eventLoop     *eventloop.EventLoop
+	logger        logging.Logger
+	opts          *core.Options
 
 	kauri modules.Kauri
 
@@ -51,6 +53,7 @@ func New(
 	commandCache *clientsrv.CmdCache,
 	sender *sender.Sender,
 	auth *certauth.CertAuthority,
+	configuration *netconfig.Config,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	opts *core.Options,
@@ -59,14 +62,15 @@ func New(
 		impl:           impl,
 		leaderRotation: leaderRotation,
 
-		blockChain:   blockChain,
-		committer:    committer,
-		commandCache: commandCache,
-		sender:       sender,
-		auth:         auth,
-		eventLoop:    eventLoop,
-		logger:       logger,
-		opts:         opts,
+		blockChain:    blockChain,
+		committer:     committer,
+		commandCache:  commandCache,
+		sender:        sender,
+		auth:          auth,
+		configuration: configuration,
+		eventLoop:     eventLoop,
+		logger:        logger,
+		opts:          opts,
 
 		lastVote: 0,
 	}
@@ -151,7 +155,7 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cer
 func (cs *Consensus) checkQC(view hotstuff.View, proposal *hotstuff.ProposeMsg) bool {
 	block := proposal.Block
 	if cs.opts.ShouldUseAggQC() && proposal.AggregateQC != nil {
-		highQC, ok := cs.auth.VerifyAggregateQC(*proposal.AggregateQC)
+		highQC, ok := cs.auth.VerifyAggregateQC(cs.configuration.QuorumSize(), *proposal.AggregateQC)
 		if !ok {
 			cs.logger.Warnf("checkQC[view=%d]: failed to verify aggregate QC", view)
 			return false
@@ -162,7 +166,7 @@ func (cs *Consensus) checkQC(view hotstuff.View, proposal *hotstuff.ProposeMsg) 
 			return false
 		}
 	}
-	if !cs.auth.VerifyQuorumCert(block.QuorumCert()) {
+	if !cs.auth.VerifyQuorumCert(cs.configuration.QuorumSize(), block.QuorumCert()) {
 		cs.logger.Infof("checkQC[view=%d]: invalid QC", view)
 		return false
 	}
