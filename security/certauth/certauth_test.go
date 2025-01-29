@@ -6,37 +6,88 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/testutil"
+	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/security/crypto/bls12"
+	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto/eddsa"
 )
+
+type dummyReplica struct {
+	netComps *orchestration.NetworkComponents
+	secComps *orchestration.SecurityComponents
+}
+
+func genKey(t *testing.T, cryptoName string) hotstuff.PrivateKey {
+	switch cryptoName {
+	case ecdsa.ModuleName:
+		return testutil.GenerateECDSAKey(t)
+	case eddsa.ModuleName:
+		return testutil.GenerateEDDSAKey(t)
+	case bls12.ModuleName:
+		return testutil.GenerateBLS12Key(t)
+	}
+	return nil
+}
+
+func createComponents(t *testing.T, id int, cryptoName string, privKey hotstuff.PrivateKey, cacheSize int) *dummyReplica {
+	t.Helper()
+	core := orchestration.NewCoreComponents(hotstuff.ID(id), "test", privKey)
+	net := orchestration.NewNetworkComponents(core, nil)
+	sec, err := orchestration.NewSecurityComponents(core, net, cryptoName, cacheSize)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	return &dummyReplica{
+		secComps: sec,
+		netComps: net,
+	}
+}
+
+func createDummyReplicas(t *testing.T, n int, cryptoName string, cacheSize int) (dummies []*dummyReplica) {
+	dummies = make([]*dummyReplica, 0, n)
+	replicas := make([]hotstuff.ReplicaInfo, 0, n)
+	for id := range n {
+		privKey := genKey(t, cryptoName)
+		dummy := createComponents(t, id+1, cryptoName, privKey, cacheSize)
+		dummies = append(dummies, dummy)
+		replicas = append(replicas, hotstuff.ReplicaInfo{
+			ID:     hotstuff.ID(id + 1),
+			PubKey: privKey.Public(),
+		})
+	}
+
+	for _, dummy := range dummies {
+		for _, replica := range replicas {
+			dummy.netComps.Config.AddReplica(&replica)
+		}
+	}
+
+	return
+}
 
 func TestCreatePartialCert(t *testing.T) {
 	testData := []struct {
 		cryptoName string
-		privKey    hotstuff.PrivateKey
 		cacheSize  int
 	}{
-		{cryptoName: "ecdsa", privKey: testutil.GenerateECDSAKey(t)},
-		{cryptoName: "eddsa", privKey: testutil.GenerateEDDSAKey(t)},
-		{cryptoName: "bls12", privKey: testutil.GenerateBLS12Key(t)},
+		{cryptoName: ecdsa.ModuleName},
+		{cryptoName: eddsa.ModuleName},
+		{cryptoName: bls12.ModuleName},
 
-		{cryptoName: "ecdsa", privKey: testutil.GenerateECDSAKey(t), cacheSize: 10},
-		{cryptoName: "eddsa", privKey: testutil.GenerateEDDSAKey(t), cacheSize: 10},
-		{cryptoName: "bls12", privKey: testutil.GenerateBLS12Key(t), cacheSize: 10},
+		{cryptoName: ecdsa.ModuleName, cacheSize: 10},
+		{cryptoName: eddsa.ModuleName, cacheSize: 10},
+		{cryptoName: bls12.ModuleName, cacheSize: 10},
 	}
 	for _, td := range testData {
 		id := 1
-		core := orchestration.NewCoreComponents(hotstuff.ID(id), "test", td.privKey)
-		net := orchestration.NewNetworkComponents(core, nil)
-		sec, err := orchestration.NewSecurityComponents(core, net, td.cryptoName, td.cacheSize)
-		if err != nil {
-			t.Fatalf("%v", err)
-		}
+		dummies := createDummyReplicas(t, 2, td.cryptoName, td.cacheSize)
 
-		block, ok := sec.BlockChain.Get(hotstuff.GetGenesis().Hash())
+		block, ok := dummies[0].secComps.BlockChain.Get(hotstuff.GetGenesis().Hash())
 		if !ok {
 			t.Errorf("no block")
 		}
 
-		partialCert, err := sec.CertAuth.CreatePartialCert(block)
+		partialCert, err := dummies[0].secComps.CertAuth.CreatePartialCert(block)
 		if err != nil {
 			t.Fatalf("Failed to create partial certificate: %v", err)
 		}
@@ -51,68 +102,71 @@ func TestCreatePartialCert(t *testing.T) {
 	}
 }
 
-/*
-
 func TestVerifyPartialCert(t *testing.T) {
+	block := hotstuff.NewBlock(
+		hotstuff.GetGenesis().Hash(),
+		hotstuff.GetGenesis().QuorumCert(),
+		"hello",
+		1, 1,
+	)
 	testData := []struct {
 		cryptoName string
-		privKey    hotstuff.PrivateKey
-		cached     bool
+		cacheSize  int
 		block      *hotstuff.Block
 	}{
-		{
-			cryptoName: "ecdsa",
-			privKey:    testutil.GenerateECDSAKey(t),
-			cached:     true,
-			block: hotstuff.NewBlock(
-				hotstuff.GetGenesis().Hash(),
-				hotstuff.GetGenesis().QuorumCert(),
-				"hello",
-				1, 1,
-			),
-		},
+		{cryptoName: ecdsa.ModuleName, block: block},
+		{cryptoName: eddsa.ModuleName, block: block},
+		{cryptoName: bls12.ModuleName, block: block},
+		{cryptoName: ecdsa.ModuleName, cacheSize: 10, block: block},
+		{cryptoName: eddsa.ModuleName, cacheSize: 10, block: block},
+		{cryptoName: bls12.ModuleName, cacheSize: 10, block: block},
 	}
 
 	for _, td := range testData {
-		id := 1
-		core := orchestration.NewCoreComponents(hotstuff.ID(id), "test", td.privKey)
-		net := orchestration.NewNetworkComponents(core, nil)
-		sec, err := orchestration.NewSecurityComponents(core, net, td.cryptoName, td.cached)
-		if err != nil {
-			t.Fatalf("%v", err)
-		}
+		dummies := createDummyReplicas(t, 2, td.cryptoName, td.cacheSize)
+		dummy := dummies[0]
+		dummy.secComps.BlockChain.Store(td.block)
 
-		n := 2
-		replicas := make([]hotstuff.ReplicaInfo, 0)
-		for i := range n {
-			replicas = append(replicas, hotstuff.ReplicaInfo{
-				ID:      hotstuff.ID(i + 1),
-				Address: "127.0.0.1:80",
-			})
-		}
+		partialCert := testutil.CreatePC(t, td.block, dummy.secComps.CertAuth)
 
-		err = net.Sender.Connect(replicas)
-		if err != nil {
-			t.Fatalf("%v", err)
-		}
-
-		partialCert := testutil.CreatePC(t, td.block, sec.CertAuth)
-
-		if !sec.CertAuth.VerifyPartialCert(partialCert) {
+		if !dummy.secComps.CertAuth.VerifyPartialCert(partialCert) {
 			t.Error("Partial Certificate was not verified.")
 		}
 	}
 }
 
 func TestCreateQuorumCert(t *testing.T) {
-	run := func(t *testing.T, setup setupFunc) {
-		ctrl := gomock.NewController(t)
 
-		td := setup(t, ctrl, 4)
+	block := hotstuff.NewBlock(
+		hotstuff.GetGenesis().Hash(),
+		hotstuff.GetGenesis().QuorumCert(),
+		"hello",
+		1, 1,
+	)
+	testData := []struct {
+		cryptoName string
+		cacheSize  int
+		block      *hotstuff.Block
+	}{
+		{cryptoName: ecdsa.ModuleName, block: block},
+		{cryptoName: eddsa.ModuleName, block: block},
+		{cryptoName: bls12.ModuleName, block: block},
+		{cryptoName: ecdsa.ModuleName, cacheSize: 10, block: block},
+		{cryptoName: eddsa.ModuleName, cacheSize: 10, block: block},
+		{cryptoName: bls12.ModuleName, cacheSize: 10, block: block},
+	}
 
-		pcs := testutil.CreatePCs(t, td.block, td.signers)
+	for _, td := range testData {
+		const n = 2
+		dummies := createDummyReplicas(t, n, td.cryptoName, td.cacheSize)
+		signers := make([]*certauth.CertAuthority, 0)
+		for _, dummy := range dummies {
+			signers = append(signers, dummy.secComps.CertAuth)
+		}
 
-		qc, err := td.signers[0].CreateQuorumCert(td.block, pcs)
+		pcs := testutil.CreatePCs(t, td.block, signers)
+
+		qc, err := signers[0].CreateQuorumCert(td.block, pcs)
 		if err != nil {
 			t.Fatalf("Failed to create QC: %v", err)
 		}
@@ -121,8 +175,9 @@ func TestCreateQuorumCert(t *testing.T) {
 			t.Error("Quorum certificate hash does not match block hash!")
 		}
 	}
-	runAll(t, run)
 }
+
+/*
 
 func TestCreateTimeoutCert(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
@@ -143,6 +198,7 @@ func TestCreateTimeoutCert(t *testing.T) {
 	}
 	runAll(t, run)
 }
+
 
 func TestCreateQCWithOneSig(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
@@ -245,6 +301,8 @@ func TestVerifyAggregateQC(t *testing.T) {
 	runAll(t, run)
 }
 
+
+////////////////////////////////// UTILS BEYOND HERE //////////////////////////////////
 func runAll(t *testing.T, run func(*testing.T, setupFunc)) {
 	t.Helper()
 	t.Run("Ecdsa", func(t *testing.T) { run(t, setup(NewBase(ecdsa.New), testutil.GenerateECDSAKey)) })

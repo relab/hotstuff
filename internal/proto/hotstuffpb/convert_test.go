@@ -95,7 +95,6 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 			opt,
 		),
 			blockChain,
-			cfg,
 			logger,
 		))
 	}
