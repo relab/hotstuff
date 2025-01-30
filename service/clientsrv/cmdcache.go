@@ -7,7 +7,6 @@ import (
 
 	"github.com/relab/hotstuff"
 
-	"github.com/relab/hotstuff/components"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"google.golang.org/protobuf/proto"
@@ -156,5 +155,3 @@ func (c *CmdCache) Proposed(cmd hotstuff.Command) {
 		}
 	}
 }
-
-var _ components.Acceptor = (*CmdCache)(nil)

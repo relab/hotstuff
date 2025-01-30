@@ -1,8 +1,6 @@
 package netconfig
 
 import (
-	"github.com/relab/hotstuff/components"
-
 	"github.com/relab/hotstuff"
 )
 
@@ -54,5 +52,3 @@ func (cfg *Config) AddReplica(replicaInfo *hotstuff.ReplicaInfo) {
 func (cfg *Config) SetReplicaMetaData(id hotstuff.ID, metaData map[string]string) {
 	cfg.replicas[id].MetaData = metaData
 }
-
-var _ components.Configuration = (*Config)(nil)
