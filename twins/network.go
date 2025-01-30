@@ -12,7 +12,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/components"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
@@ -38,7 +37,7 @@ type node struct {
 	eventLoop      *eventloop.EventLoop
 	leaderRotation modules.LeaderRotation
 	synchronizer   components.Synchronizer
-	opts           *core.Options
+	// opts           *core.Options
 
 	id             NodeID
 	executedBlocks []*hotstuff.Block
