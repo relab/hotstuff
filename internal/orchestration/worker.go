@@ -12,7 +12,6 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/builder"
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
@@ -260,11 +259,9 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		mods := builder.NewBuilder(hotstuff.ID(opts.GetID()), nil)
 		buildOpt := core.NewOptions(hotstuff.ID(opts.GetID()), nil)
 		logger := logging.New("cli" + strconv.Itoa(int(opts.GetID())))
 		eventLoop := eventloop.New(logger, 1000)
-		mods.Add(eventLoop)
 
 		if w.measurementInterval > 0 {
 			metrics.InitMeasurements(
@@ -277,14 +274,12 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			)
 		}
 
-		mods.Add(w.metricsLogger)
-		mods.Add(logger)
 		cli := client.New(
 			eventLoop,
 			logger,
 			buildOpt,
 			c,
-			mods)
+		)
 		cfg, err := getConfiguration(req.GetConfiguration(), true)
 		if err != nil {
 			return nil, err

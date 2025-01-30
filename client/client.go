@@ -14,7 +14,6 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/builder"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
@@ -86,7 +85,6 @@ func New(
 	opts *core.Options,
 
 	conf Config,
-	builder builder.Builder,
 ) (client *Client) {
 	client = &Client{
 		eventLoop: eventLoop,
@@ -103,10 +101,6 @@ func New(
 		stepUpInterval:   conf.RateStepInterval,
 		timeout:          conf.Timeout,
 	}
-
-	builder.Add(client)
-
-	builder.Build()
 
 	var creds credentials.TransportCredentials
 	if conf.TLS {

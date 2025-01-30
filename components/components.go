@@ -1,4 +1,4 @@
-package builder
+package components
 
 import (
 	"context"
@@ -197,42 +197,4 @@ type CertAuth interface {
 	VerifyTimeoutCert(tc hotstuff.TimeoutCert) bool
 	// VerifyAggregateQC verifies an AggregateQC.
 	VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, ok bool)
-}
-
-// ExtendedExecutor turns the given Executor into an ExecutorExt.
-func ExtendedExecutor(executor Executor) ExecutorExt {
-	return executorWrapper{executor}
-}
-
-type executorWrapper struct {
-	executor Executor
-}
-
-func (ew executorWrapper) InitModule(mods *Core) {
-	if m, ok := ew.executor.(Module); ok {
-		m.InitModule(mods)
-	}
-}
-
-func (ew executorWrapper) Exec(block *hotstuff.Block) {
-	ew.executor.Exec(block.Command())
-}
-
-// ExtendedForkHandler turns the given ForkHandler into a ForkHandlerExt.
-func ExtendedForkHandler(forkHandler ForkHandler) ForkHandlerExt {
-	return forkHandlerWrapper{forkHandler}
-}
-
-type forkHandlerWrapper struct {
-	forkHandler ForkHandler
-}
-
-func (fhw forkHandlerWrapper) InitModule(mods *Core) {
-	if m, ok := fhw.forkHandler.(Module); ok {
-		m.InitModule(mods)
-	}
-}
-
-func (fhw forkHandlerWrapper) Fork(block *hotstuff.Block) {
-	fhw.forkHandler.Fork(block.Command())
 }

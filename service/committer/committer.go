@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/builder"
+	"github.com/relab/hotstuff/components"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/service/clientsrv"
@@ -86,4 +86,4 @@ func (cm *Committer) CommittedBlock() *hotstuff.Block {
 	return cm.bExec
 }
 
-var _ builder.Committer = (*Committer)(nil)
+var _ components.Committer = (*Committer)(nil)

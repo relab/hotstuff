@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/builder"
+	"github.com/relab/hotstuff/components"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
@@ -34,10 +34,10 @@ func (id NodeID) String() string {
 
 type node struct {
 	blockChain     *blockchain.BlockChain
-	consensus      builder.Consensus
+	consensus      components.Consensus
 	eventLoop      *eventloop.EventLoop
 	leaderRotation modules.LeaderRotation
-	synchronizer   builder.Synchronizer
+	synchronizer   components.Synchronizer
 	opts           *core.Options
 
 	id             NodeID
@@ -46,7 +46,7 @@ type node struct {
 	log            strings.Builder
 }
 
-func (n *node) InitModule(mods *builder.Core) {
+/*func (n *node) InitModule(mods *builder.Core) {
 	mods.Get(
 		&n.blockChain,
 		&n.consensus,
@@ -55,7 +55,7 @@ func (n *node) InitModule(mods *builder.Core) {
 		&n.synchronizer,
 		&n.opts,
 	)
-}
+}*/
 
 type pendingMessage struct {
 	message  any
@@ -106,7 +106,7 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 }
 
 // GetNodeBuilder returns a consensus.Builder instance for a node in the network.
-func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) builder.Builder {
+/*func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) builder.Builder {
 	node := node{
 		id: id,
 	}
@@ -116,7 +116,7 @@ func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) builder.Buil
 	// register node as an anonymous module because that allows configuration to obtain it.
 	builder.Add(&node)
 	return builder
-}
+}*/
 
 func (n *Network) createTwinsNodes(_ []NodeID, _ Scenario, _ string) error {
 	return nil // TODO: Scrap twins or reimplement this function
@@ -189,7 +189,7 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 }
 
 // NewConfiguration returns a new Configuration module for this network.
-func (n *Network) NewConfiguration() builder.Configuration {
+func (n *Network) NewConfiguration() components.Configuration {
 	return &configuration{network: n}
 }
 
@@ -200,11 +200,11 @@ type configuration struct {
 }
 
 // alternative way to get a pointer to the node.
-func (c *configuration) InitModule(mods *builder.Core) {
+/*func (c *configuration) InitModule(mods *builder.Core) {
 	if c.node == nil {
 		mods.TryGet(&c.node)
 	}
-}
+}*/
 
 func (c *configuration) broadcastMessage(message any) {
 	for id := range c.network.replicas {
@@ -266,7 +266,7 @@ func (c *configuration) Replica(id hotstuff.ID) (r *hotstuff.ReplicaInfo, ok boo
 }
 
 // GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
-func (c *configuration) GetSubConfig(ids []hotstuff.ID) (sub builder.Configuration, err error) {
+func (c *configuration) GetSubConfig(ids []hotstuff.ID) (sub components.Configuration, err error) {
 	subConfig := hotstuff.NewIDSet()
 	for _, id := range ids {
 		subConfig.Add(id)

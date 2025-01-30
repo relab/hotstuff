@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/relab/hotstuff/builder"
+	"github.com/relab/hotstuff/components"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
@@ -400,4 +400,4 @@ func (s *Synchronizer) updateHighTC(tc hotstuff.TimeoutCert) {
 	}
 }
 
-var _ builder.Synchronizer = (*Synchronizer)(nil)
+var _ components.Synchronizer = (*Synchronizer)(nil)
