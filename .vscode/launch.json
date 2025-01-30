@@ -13,7 +13,8 @@
 			"cwd": "${workspaceRoot}",
 			"args": [
 				"run",
-				"--kauri"
+				"--measurement-interval=1s",
+				"--output=.scratch",
 			]
 		},
 		{

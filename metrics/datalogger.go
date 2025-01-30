@@ -5,7 +5,6 @@ import (
 	"io"
 	"sync"
 
-	"github.com/relab/hotstuff/builder"
 	"github.com/relab/hotstuff/core/logging"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -27,17 +26,12 @@ type jsonLogger struct {
 }
 
 // NewJSONLogger returns a new metrics logger that logs to the specified writer.
-func NewJSONLogger(wr io.Writer) (Logger, error) {
+func NewJSONLogger(wr io.Writer, logger logging.Logger) (Logger, error) {
 	_, err := io.WriteString(wr, "[\n")
 	if err != nil {
 		return nil, fmt.Errorf("failed to write start of JSON array: %v", err)
 	}
-	return &jsonLogger{wr: wr, first: true}, nil
-}
-
-// InitModule initializes the metrics logger module.
-func (dl *jsonLogger) InitModule(mods *builder.Core) {
-	mods.Get(&dl.logger)
+	return &jsonLogger{logger: logger, wr: wr, first: true}, nil
 }
 
 func (dl *jsonLogger) Log(msg proto.Message) {

@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/protostream"
@@ -71,7 +72,7 @@ func runWorker() {
 		f, err := os.OpenFile(dataPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 		checkf("failed to create data path: %v", err)
 		writer := bufio.NewWriter(f)
-		metricsLogger, err = metrics.NewJSONLogger(writer)
+		metricsLogger, err = metrics.NewJSONLogger(writer, logging.New("json"))
 		defer func() {
 			err = metricsLogger.Close()
 			checkf("failed to close metrics logger: %v", err)

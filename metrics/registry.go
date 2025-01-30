@@ -1,6 +1,13 @@
 package metrics
 
-import "sync"
+import (
+	"sync"
+	"time"
+
+	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/logging"
+)
 
 // This file implements a registry for metrics.
 // The purpose of the registry is to make it possible to instantiate multiple metrics based on their names only.
@@ -12,18 +19,24 @@ var (
 	replicaMetrics = map[string]func() any{}
 )
 
-// RegisterClientMetric registers the constructor of a client metric.
-func RegisterClientMetric(name string, constructor func() any) {
-	registryMut.Lock()
-	defer registryMut.Unlock()
-	clientMetrics[name] = constructor
-}
-
-// RegisterReplicaMetric registers the constructor of a replica metric.
-func RegisterReplicaMetric(name string, constructor func() any) {
-	registryMut.Lock()
-	defer registryMut.Unlock()
-	replicaMetrics[name] = constructor
+func InitMeasurements(
+	eventLoop *eventloop.EventLoop,
+	logger logging.Logger,
+	metricsLogger Logger,
+	opts *core.Options,
+	measurementInterval time.Duration,
+	names ...string) {
+	for _, name := range names {
+		switch name {
+		case NameClientLatency:
+			NewClientLatency(eventLoop, logger, opts, metricsLogger)
+		case NameViewTimeouts:
+			NewViewTimeouts(eventLoop, logger, metricsLogger, opts)
+		case NameThroughput:
+			NewThroughput(eventLoop, logger, metricsLogger, opts)
+		}
+	}
+	NewTicker(eventLoop, measurementInterval)
 }
 
 // GetClientMetrics constructs a new instance of each named metric.

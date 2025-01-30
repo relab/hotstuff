@@ -4,18 +4,13 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/builder"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/metrics/types"
 )
 
-func init() {
-	RegisterReplicaMetric("timeouts", func() any {
-		return &ViewTimeouts{}
-	})
-}
+const NameViewTimeouts = "timeouts"
 
 // ViewTimeouts is a metric that measures the number of view timeouts that happen.
 type ViewTimeouts struct {
@@ -26,20 +21,16 @@ type ViewTimeouts struct {
 	numTimeouts uint64
 }
 
-// InitModule gives the module access to the other modules.
-func (vt *ViewTimeouts) InitModule(mods *builder.Core) {
-	var (
-		eventLoop *eventloop.EventLoop
-		logger    logging.Logger
-	)
-
-	mods.Get(
-		&vt.metricsLogger,
-		&vt.opts,
-		&eventLoop,
-		&logger,
-	)
-
+func NewViewTimeouts(
+	eventLoop *eventloop.EventLoop,
+	logger logging.Logger,
+	metricsLogger Logger,
+	opts *core.Options,
+) *ViewTimeouts {
+	vt := &ViewTimeouts{
+		metricsLogger: metricsLogger,
+		opts:          opts,
+	}
 	logger.Info("ViewTimeouts metric enabled.")
 
 	eventLoop.RegisterHandler(hotstuff.ViewChangeEvent{}, func(event any) {
@@ -49,6 +40,7 @@ func (vt *ViewTimeouts) InitModule(mods *builder.Core) {
 	eventLoop.RegisterHandler(types.TickEvent{}, func(event any) {
 		vt.tick(event.(types.TickEvent))
 	}, eventloop.Prioritize())
+	return vt
 }
 
 func (vt *ViewTimeouts) viewChange(event hotstuff.ViewChangeEvent) {

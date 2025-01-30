@@ -3,7 +3,6 @@ package metrics
 import (
 	"time"
 
-	"github.com/relab/hotstuff/builder"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/metrics/types"
 )
@@ -16,17 +15,10 @@ type Ticker struct {
 }
 
 // NewTicker returns a new ticker.
-func NewTicker(interval time.Duration) *Ticker {
-	return &Ticker{interval: interval}
-}
-
-// InitModule gives the module access to the other modules.
-func (t *Ticker) InitModule(mods *builder.Core) {
-	var eventLoop *eventloop.EventLoop
-
-	mods.Get(&eventLoop)
-
+func NewTicker(eventLoop *eventloop.EventLoop, interval time.Duration) *Ticker {
+	t := &Ticker{interval: interval}
 	t.tickerID = eventLoop.AddTicker(t.interval, t.tick)
+	return t
 }
 
 func (t *Ticker) tick(tickTime time.Time) any {

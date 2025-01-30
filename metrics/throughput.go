@@ -5,7 +5,6 @@ import (
 
 	"github.com/relab/hotstuff"
 
-	"github.com/relab/hotstuff/builder"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
@@ -13,11 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
-func init() {
-	RegisterReplicaMetric("throughput", func() any {
-		return &Throughput{}
-	})
-}
+const NameThroughput = "throughput"
 
 // Throughput measures throughput in commits per second, and commands per second.
 type Throughput struct {
@@ -28,20 +23,16 @@ type Throughput struct {
 	commandCount uint64
 }
 
-// InitModule gives the module access to the other modules.
-func (t *Throughput) InitModule(mods *builder.Core) {
-	var (
-		eventLoop *eventloop.EventLoop
-		logger    logging.Logger
-	)
-
-	mods.Get(
-		&t.metricsLogger,
-		&t.opts,
-		&eventLoop,
-		&logger,
-	)
-
+func NewThroughput(
+	eventLoop *eventloop.EventLoop,
+	logger logging.Logger,
+	metricsLogger Logger,
+	opts *core.Options,
+) *Throughput {
+	t := &Throughput{
+		metricsLogger: metricsLogger,
+		opts:          opts,
+	}
 	eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
 		commitEvent := event.(hotstuff.CommitEvent)
 		t.recordCommit(commitEvent.Commands)
@@ -52,6 +43,7 @@ func (t *Throughput) InitModule(mods *builder.Core) {
 	}, eventloop.Prioritize())
 
 	logger.Info("Throughput metric enabled")
+	return t
 }
 
 func (t *Throughput) recordCommit(commands int) {

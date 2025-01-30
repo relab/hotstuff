@@ -166,17 +166,14 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if w.measurementInterval > 0 {
 		// Initializes the metrics modules. This does not need to be stored
 		// anywhere since they all add handlers to the eventloop.
-		// TODO: Rework the metrics logging.
-		metricsBuilder := builder.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
-		metricsBuilder.Add(
+		metrics.InitMeasurements(
 			comps.eventLoop,
 			comps.logger,
 			w.metricsLogger,
+			comps.options,
+			w.measurementInterval,
+			w.metrics...,
 		)
-		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
-		metricsBuilder.Add(replicaMetrics...)
-		metricsBuilder.Add(metrics.NewTicker(w.measurementInterval))
-		metricsBuilder.Build()
 	}
 	return replica.New(
 		comps.clientSrv,
@@ -270,9 +267,14 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		mods.Add(eventLoop)
 
 		if w.measurementInterval > 0 {
-			clientMetrics := metrics.GetClientMetrics(w.metrics...)
-			mods.Add(clientMetrics...)
-			mods.Add(metrics.NewTicker(w.measurementInterval))
+			metrics.InitMeasurements(
+				eventLoop,
+				logger,
+				w.metricsLogger,
+				buildOpt,
+				w.measurementInterval,
+				w.metrics...,
+			)
 		}
 
 		mods.Add(w.metricsLogger)

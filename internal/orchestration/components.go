@@ -372,6 +372,7 @@ type ReplicaComponents struct {
 	synchronizer *synchronizer.Synchronizer
 	eventLoop    *eventloop.EventLoop
 	logger       logging.Logger
+	options      *core.Options
 }
 
 func NewReplicaComponents(
@@ -467,5 +468,6 @@ func NewReplicaComponents(
 		synchronizer: protocolComps.Synchronizer,
 		eventLoop:    coreComps.EventLoop,
 		logger:       coreComps.Logger,
+		options:      coreComps.Options,
 	}, nil
 }

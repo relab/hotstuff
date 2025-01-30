@@ -143,7 +143,7 @@ func localWorker(globalOutput string, enableMetrics []string, interval time.Dura
 			wr := bufio.NewWriter(f)
 			defer func() { checkf("failed to flush writer: %v", wr.Flush()) }()
 
-			logger, err = metrics.NewJSONLogger(wr)
+			logger, err = metrics.NewJSONLogger(wr, logging.New("json"))
 			checkf("failed to create JSON logger: %v", err)
 			defer func() { checkf("failed to close logger: %v", logger.Close()) }()
 		} else {
