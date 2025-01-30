@@ -15,7 +15,7 @@ binaries := hotstuff plot
 
 CSV ?= wonderproxy.csv
 
-.PHONY: all aws wonderproxy latencies debug clean protos mocks download tools $(binaries)
+.PHONY: all aws wonderproxy latencies debug clean protos download tools $(binaries)
 
 all: $(binaries)
 

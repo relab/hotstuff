@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/components"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
@@ -31,12 +30,50 @@ func (id NodeID) String() string {
 	return fmt.Sprintf("r%dn%d", id.ReplicaID, id.NetworkID)
 }
 
+// Consensus implements the general logic of a byzantine consensus protocol.
+// It contains the protocol data for a single replica.
+// The methods OnPropose, OnVote, OnNewView, and OnDeliver should be called upon receiving a corresponding message.
+type Consensus interface {
+	// StopVoting ensures that no voting happens in a view earlier than `view`.
+	StopVoting(view hotstuff.View)
+	// Propose starts a new proposal. The command is fetched from the command queue.
+	Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncInfo hotstuff.SyncInfo, advance bool)
+}
+
+// Synchronizer synchronizes replicas to the same view.
+type Synchronizer interface {
+	// AdvanceView attempts to advance to the next view using the given QC.
+	// qc must be either a regular quorum certificate, or a timeout certificate.
+	AdvanceView(hotstuff.SyncInfo)
+	// View returns the current view.
+	View() hotstuff.View
+	// HighQC returns the highest known QC.
+	HighQC() hotstuff.QuorumCert
+	// Start starts the synchronizer with the given context.
+	Start(context.Context)
+}
+
+// Configuration holds information about the current configuration of replicas that participate in the protocol,
+type Configuration interface {
+	// Replicas returns all of the replicas in the configuration.
+	Replicas() map[hotstuff.ID]*hotstuff.ReplicaInfo
+	// Replica returns a replica if present in the configuration.
+	Replica(hotstuff.ID) (replica *hotstuff.ReplicaInfo, ok bool)
+	// Len returns the number of replicas in the configuration.
+	Len() int
+	// QuorumSize returns the size of a quorum.
+	QuorumSize() int
+	// GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
+	// TODO: is this really needed?
+	// GetSubConfig(ids []hotstuff.ID) (sub Configuration, err error)
+}
+
 type node struct {
 	blockChain     *blockchain.BlockChain
-	consensus      components.Consensus
+	consensus      Consensus
 	eventLoop      *eventloop.EventLoop
 	leaderRotation modules.LeaderRotation
-	synchronizer   components.Synchronizer
+	synchronizer   Synchronizer
 	// opts           *core.Options
 
 	id             NodeID
@@ -188,7 +225,7 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 }
 
 // NewConfiguration returns a new Configuration module for this network.
-func (n *Network) NewConfiguration() components.Configuration {
+func (n *Network) NewConfiguration() Configuration {
 	return &configuration{network: n}
 }
 
@@ -265,7 +302,7 @@ func (c *configuration) Replica(id hotstuff.ID) (r *hotstuff.ReplicaInfo, ok boo
 }
 
 // GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
-func (c *configuration) GetSubConfig(ids []hotstuff.ID) (sub components.Configuration, err error) {
+func (c *configuration) GetSubConfig(ids []hotstuff.ID) (sub Configuration, err error) {
 	subConfig := hotstuff.NewIDSet()
 	for _, id := range ids {
 		subConfig.Add(id)
