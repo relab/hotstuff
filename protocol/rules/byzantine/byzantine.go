@@ -17,7 +17,7 @@ type silence struct {
 	modules.ConsensusRules
 }
 
-func (s *silence) ProposeRule(_ hotstuff.SyncInfo, _ hotstuff.Command) (hotstuff.ProposeMsg, bool) {
+func (s *silence) ProposeRule(_ hotstuff.View, _ hotstuff.QuorumCert, _ hotstuff.SyncInfo, _ hotstuff.Command) (hotstuff.ProposeMsg, bool) {
 	return hotstuff.ProposeMsg{}, false
 }
 
