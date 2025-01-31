@@ -35,5 +35,5 @@ measurements.json
 
 twins.json
 internal/tree/benchmarkdata/*
-eventloop/benchmarkdata/*
+core/eventloop/benchmarkdata/*
 scratch/*

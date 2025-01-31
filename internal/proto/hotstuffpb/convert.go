@@ -1,4 +1,4 @@
-// Package hotstuffpb contains conversion methods between protocol buffer message types and HotStuff protocol message structures.
+// Package hotstuffpb contains conversion functions between protocol buffer message types and HotStuff protocol message structures.
 package hotstuffpb
 
 import (
@@ -85,7 +85,7 @@ func PartialCertToProto(cert hotstuff.PartialCert) *PartialCert {
 	}
 }
 
-// PartialCertFromProto converts a PartialCert to an ecdsa.PartialCert.
+// PartialCertFromProto converts a PartialCert to a hotstuff.PartialCert.
 func PartialCertFromProto(cert *PartialCert) hotstuff.PartialCert {
 	var h hotstuff.Hash
 	copy(h[:], cert.GetHash())
@@ -102,14 +102,14 @@ func QuorumCertToProto(qc hotstuff.QuorumCert) *QuorumCert {
 	}
 }
 
-// QuorumCertFromProto converts a QuorumCert to an ecdsa.QuorumCert.
+// QuorumCertFromProto converts a QuorumCert to a hotstuff.QuorumCert.
 func QuorumCertFromProto(qc *QuorumCert) hotstuff.QuorumCert {
 	var h hotstuff.Hash
 	copy(h[:], qc.GetHash())
 	return hotstuff.NewQuorumCert(QuorumSignatureFromProto(qc.GetSig()), hotstuff.View(qc.GetView()), h)
 }
 
-// ProposalToProto converts a ProposeMsg to a protobuf message.
+// ProposalToProto converts a hotstuff.ProposeMsg to a Proposal.
 func ProposalToProto(proposal hotstuff.ProposeMsg) *Proposal {
 	p := &Proposal{
 		Block: BlockToProto(proposal.Block),
@@ -120,7 +120,7 @@ func ProposalToProto(proposal hotstuff.ProposeMsg) *Proposal {
 	return p
 }
 
-// ProposalFromProto converts a protobuf message to a ProposeMsg.
+// ProposalFromProto converts a Proposal to a hotstuff.ProposeMsg.
 func ProposalFromProto(p *Proposal) (proposal hotstuff.ProposeMsg) {
 	proposal.Block = BlockFromProto(p.GetBlock())
 	if p.GetAggQC() != nil {
@@ -155,7 +155,7 @@ func BlockFromProto(block *Block) *hotstuff.Block {
 	)
 }
 
-// TimeoutMsgFromProto converts a TimeoutMsg proto to the hotstuff type.
+// TimeoutMsgFromProto converts a TimeoutMsg to a hotstuff.TimeoutMsg.
 func TimeoutMsgFromProto(m *TimeoutMsg) hotstuff.TimeoutMsg {
 	timeoutMsg := hotstuff.TimeoutMsg{
 		View:          hotstuff.View(m.GetView()),
@@ -168,7 +168,7 @@ func TimeoutMsgFromProto(m *TimeoutMsg) hotstuff.TimeoutMsg {
 	return timeoutMsg
 }
 
-// TimeoutMsgToProto converts a TimeoutMsg to the protobuf type.
+// TimeoutMsgToProto converts a hotstuff.TimeoutMsg to a TimeoutMsg.
 func TimeoutMsgToProto(timeoutMsg hotstuff.TimeoutMsg) *TimeoutMsg {
 	tm := &TimeoutMsg{
 		View:     uint64(timeoutMsg.View),
@@ -181,12 +181,12 @@ func TimeoutMsgToProto(timeoutMsg hotstuff.TimeoutMsg) *TimeoutMsg {
 	return tm
 }
 
-// TimeoutCertFromProto converts a timeout certificate from the protobuf type to the hotstuff type.
+// TimeoutCertFromProto converts a TimeoutCert to a hotstuff.TimeoutCert.
 func TimeoutCertFromProto(m *TimeoutCert) hotstuff.TimeoutCert {
 	return hotstuff.NewTimeoutCert(QuorumSignatureFromProto(m.GetSig()), hotstuff.View(m.GetView()))
 }
 
-// TimeoutCertToProto converts a timeout certificate from the hotstuff type to the protobuf type.
+// TimeoutCertToProto converts a hotstuff.TimeoutCert to a TimeoutCert.
 func TimeoutCertToProto(timeoutCert hotstuff.TimeoutCert) *TimeoutCert {
 	return &TimeoutCert{
 		View: uint64(timeoutCert.View()),
@@ -194,7 +194,7 @@ func TimeoutCertToProto(timeoutCert hotstuff.TimeoutCert) *TimeoutCert {
 	}
 }
 
-// AggregateQCFromProto converts an AggregateQC from the protobuf type to the hotstuff type.
+// AggregateQCFromProto converts an AggQC to a hotstuff.AggregateQC.
 func AggregateQCFromProto(m *AggQC) hotstuff.AggregateQC {
 	qcs := make(map[hotstuff.ID]hotstuff.QuorumCert)
 	for id, pQC := range m.GetQCs() {
@@ -203,7 +203,7 @@ func AggregateQCFromProto(m *AggQC) hotstuff.AggregateQC {
 	return hotstuff.NewAggregateQC(qcs, QuorumSignatureFromProto(m.GetSig()), hotstuff.View(m.GetView()))
 }
 
-// AggregateQCToProto converts an AggregateQC from the hotstuff type to the protobuf type.
+// AggregateQCToProto converts a hotstuff.AggregateQC to an AggQC.
 func AggregateQCToProto(aggQC hotstuff.AggregateQC) *AggQC {
 	pQCs := make(map[uint32]*QuorumCert, len(aggQC.QCs()))
 	for id, qc := range aggQC.QCs() {
@@ -212,7 +212,7 @@ func AggregateQCToProto(aggQC hotstuff.AggregateQC) *AggQC {
 	return &AggQC{QCs: pQCs, Sig: QuorumSignatureToProto(aggQC.Sig()), View: uint64(aggQC.View())}
 }
 
-// SyncInfoFromProto converts a SyncInfo struct from the protobuf type to the hotstuff type.
+// SyncInfoFromProto converts a SyncInfo message to a hotstuff.SyncInfo.
 func SyncInfoFromProto(m *SyncInfo) hotstuff.SyncInfo {
 	si := hotstuff.NewSyncInfo()
 	if qc := m.GetQC(); qc != nil {
@@ -227,7 +227,7 @@ func SyncInfoFromProto(m *SyncInfo) hotstuff.SyncInfo {
 	return si
 }
 
-// SyncInfoToProto converts a SyncInfo struct from the hotstuff type to the protobuf type.
+// SyncInfoToProto converts a hotstuff.SyncInfo to a SyncInfo message.
 func SyncInfoToProto(syncInfo hotstuff.SyncInfo) *SyncInfo {
 	m := &SyncInfo{}
 	if qc, ok := syncInfo.QC(); ok {
