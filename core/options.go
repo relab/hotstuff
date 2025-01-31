@@ -1,7 +1,6 @@
 package core
 
 import (
-	"sync"
 	"sync/atomic"
 
 	"github.com/relab/hotstuff"
@@ -32,7 +31,6 @@ func NewOption() OptionID {
 
 // Options stores runtime configuration settings.
 type Options struct {
-	mut     sync.Mutex
 	options []any
 
 	id         hotstuff.ID
