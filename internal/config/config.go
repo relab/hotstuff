@@ -52,6 +52,8 @@ type ExperimentConfig struct {
 	Crypto string
 	// LeaderRotation is the name of the leader rotation algorithm to use.
 	LeaderRotation string
+	// Kauri enables Kauri protocol.
+	Kauri bool
 	// Modules is a list of additional modules to load.
 	Modules []string
 	// Metrics is a list of metrics to log.
@@ -244,6 +246,7 @@ func (c *ExperimentConfig) CreateReplicaOpts() *orchestrationpb.ReplicaOpts {
 		BranchFactor:      c.BranchFactor,
 		TreePositions:     c.TreePositions,
 		TreeDelta:         durationpb.New(c.TreeDelta),
+		Kauri:             c.Kauri,
 	}
 }
 

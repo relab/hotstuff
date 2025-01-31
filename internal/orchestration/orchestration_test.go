@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/config"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/internal/test"
 	"github.com/relab/hotstuff/internal/tree"
-	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/iago/iagotest"
 )

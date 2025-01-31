@@ -11,15 +11,11 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/blockchain"
-	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/crypto"
-	"github.com/relab/hotstuff/crypto/ecdsa"
-	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/synchronizer"
+	"github.com/relab/hotstuff/protocol/synchronizer"
+	"github.com/relab/hotstuff/security/blockchain"
 )
 
 // NodeID is an ID that is unique to a node in the network.
@@ -34,13 +30,51 @@ func (id NodeID) String() string {
 	return fmt.Sprintf("r%dn%d", id.ReplicaID, id.NetworkID)
 }
 
+// Consensus implements the general logic of a byzantine consensus protocol.
+// It contains the protocol data for a single replica.
+// The methods OnPropose, OnVote, OnNewView, and OnDeliver should be called upon receiving a corresponding message.
+type Consensus interface {
+	// StopVoting ensures that no voting happens in a view earlier than `view`.
+	StopVoting(view hotstuff.View)
+	// Propose starts a new proposal. The command is fetched from the command queue.
+	Propose(view hotstuff.View, cert hotstuff.SyncInfo) (syncInfo hotstuff.SyncInfo, advance bool)
+}
+
+// Synchronizer synchronizes replicas to the same view.
+type Synchronizer interface {
+	// AdvanceView attempts to advance to the next view using the given QC.
+	// qc must be either a regular quorum certificate, or a timeout certificate.
+	AdvanceView(hotstuff.SyncInfo)
+	// View returns the current view.
+	View() hotstuff.View
+	// HighQC returns the highest known QC.
+	HighQC() hotstuff.QuorumCert
+	// Start starts the synchronizer with the given context.
+	Start(context.Context)
+}
+
+// Configuration holds information about the current configuration of replicas that participate in the protocol,
+type Configuration interface {
+	// Replicas returns all of the replicas in the configuration.
+	Replicas() map[hotstuff.ID]*hotstuff.ReplicaInfo
+	// Replica returns a replica if present in the configuration.
+	Replica(hotstuff.ID) (replica *hotstuff.ReplicaInfo, ok bool)
+	// Len returns the number of replicas in the configuration.
+	Len() int
+	// QuorumSize returns the size of a quorum.
+	QuorumSize() int
+	// GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
+	// TODO: is this really needed?
+	// GetSubConfig(ids []hotstuff.ID) (sub Configuration, err error)
+}
+
 type node struct {
-	blockChain     modules.BlockChain
-	consensus      modules.Consensus
+	blockChain     *blockchain.BlockChain
+	consensus      Consensus
 	eventLoop      *eventloop.EventLoop
 	leaderRotation modules.LeaderRotation
-	synchronizer   modules.Synchronizer
-	opts           *modules.Options
+	synchronizer   Synchronizer
+	// opts           *core.Options
 
 	id             NodeID
 	executedBlocks []*hotstuff.Block
@@ -48,7 +82,7 @@ type node struct {
 	log            strings.Builder
 }
 
-func (n *node) InitModule(mods *modules.Core) {
+/*func (n *node) InitModule(mods *builder.Core) {
 	mods.Get(
 		&n.blockChain,
 		&n.consensus,
@@ -57,7 +91,7 @@ func (n *node) InitModule(mods *modules.Core) {
 		&n.synchronizer,
 		&n.opts,
 	)
-}
+}*/
 
 type pendingMessage struct {
 	message  any
@@ -108,60 +142,28 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 }
 
 // GetNodeBuilder returns a consensus.Builder instance for a node in the network.
-func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) modules.Builder {
+/*func (n *Network) GetNodeBuilder(id NodeID, pk hotstuff.PrivateKey) builder.Builder {
 	node := node{
 		id: id,
 	}
 	n.nodes[id.NetworkID] = &node
 	n.replicas[id.ReplicaID] = append(n.replicas[id.ReplicaID], &node)
-	builder := modules.NewBuilder(id.ReplicaID, pk)
+	builder := builder.NewBuilder(id.ReplicaID, pk)
 	// register node as an anonymous module because that allows configuration to obtain it.
 	builder.Add(&node)
 	return builder
-}
+}*/
 
-func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName string) error {
-	cg := &commandGenerator{}
-	for _, nodeID := range nodes {
-
-		var err error
-		pk, err := keygen.GenerateECDSAPrivateKey()
-		if err != nil {
-			return err
-		}
-
-		builder := n.GetNodeBuilder(nodeID, pk)
-		node := n.nodes[nodeID.NetworkID]
-
-		consensusModule, ok := modules.GetModule[consensus.Rules](consensusName)
-		if !ok {
-			return fmt.Errorf("unknown consensus module: '%s'", consensusName)
-		}
-		builder.Add(
-			eventloop.New(100),
-			blockchain.New(),
-			consensus.New(consensusModule),
-			consensus.NewVotingMachine(),
-			crypto.NewCache(ecdsa.New(), 100),
-			synchronizer.New(FixedTimeout(1*time.Millisecond)),
-			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
-			// twins-specific:
-			&configuration{network: n, node: node},
-			&timeoutManager{network: n, node: node, timeout: 5},
-			leaderRotation(n.views),
-			&commandModule{commandGenerator: cg, node: node},
-		)
-		builder.Options().SetShouldVerifyVotesSync()
-		builder.Build()
-	}
-	return nil
+func (n *Network) createTwinsNodes(_ []NodeID, _ Scenario, _ string) error {
+	return nil // TODO: Scrap twins or reimplement this function
 }
 
 func (n *Network) run(ticks int) {
 	// kick off the initial proposal(s)
 	for _, node := range n.nodes {
 		if node.leaderRotation.GetLeader(1) == node.id.ReplicaID {
-			node.consensus.Propose(node.synchronizer.(*synchronizer.Synchronizer).SyncInfo())
+			s := node.synchronizer.(*synchronizer.Synchronizer)
+			node.consensus.Propose(s.View(), s.SyncInfo())
 		}
 	}
 
@@ -223,7 +225,7 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 }
 
 // NewConfiguration returns a new Configuration module for this network.
-func (n *Network) NewConfiguration() modules.Configuration {
+func (n *Network) NewConfiguration() Configuration {
 	return &configuration{network: n}
 }
 
@@ -234,11 +236,11 @@ type configuration struct {
 }
 
 // alternative way to get a pointer to the node.
-func (c *configuration) InitModule(mods *modules.Core) {
+/*func (c *configuration) InitModule(mods *builder.Core) {
 	if c.node == nil {
 		mods.TryGet(&c.node)
 	}
-}
+}*/
 
 func (c *configuration) broadcastMessage(message any) {
 	for id := range c.network.replicas {
@@ -279,30 +281,28 @@ func (c *configuration) shouldDrop(id NodeID, message any) bool {
 }
 
 // Replicas returns all of the replicas in the configuration.
-func (c *configuration) Replicas() map[hotstuff.ID]modules.Replica {
-	m := make(map[hotstuff.ID]modules.Replica)
+func (c *configuration) Replicas() map[hotstuff.ID]*hotstuff.ReplicaInfo {
+	m := make(map[hotstuff.ID]*hotstuff.ReplicaInfo)
 	for id := range c.network.replicas {
-		m[id] = &replica{
-			config: c,
-			id:     id,
+		m[id] = &hotstuff.ReplicaInfo{
+			ID: id, // TODO: More fields
 		}
 	}
 	return m
 }
 
 // Replica returns a replica if present in the configuration.
-func (c *configuration) Replica(id hotstuff.ID) (r modules.Replica, ok bool) {
+func (c *configuration) Replica(id hotstuff.ID) (r *hotstuff.ReplicaInfo, ok bool) {
 	if _, ok = c.network.replicas[id]; ok {
-		return &replica{
-			config: c,
-			id:     id,
+		return &hotstuff.ReplicaInfo{
+			ID: id, // TODO: More fields
 		}, true
 	}
 	return nil, false
 }
 
-// SubConfig returns a subconfiguration containing the replicas specified in the ids slice.
-func (c *configuration) SubConfig(ids []hotstuff.ID) (sub modules.Configuration, err error) {
+// GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
+func (c *configuration) GetSubConfig(ids []hotstuff.ID) (sub Configuration, err error) {
 	subConfig := hotstuff.NewIDSet()
 	for _, id := range ids {
 		subConfig.Add(id)
@@ -350,7 +350,7 @@ func (c *configuration) Fetch(_ context.Context, hash hotstuff.Hash) (block *hot
 	return nil, false
 }
 
-type replica struct {
+/*type replica struct {
 	// pointer to the node that wants to contact this replica.
 	config *configuration
 	// id of the replica.
@@ -385,7 +385,7 @@ func (r *replica) NewView(si hotstuff.SyncInfo) {
 
 func (r *replica) Metadata() map[string]string {
 	return r.config.network.replicas[r.id][0].opts.ConnectionMetadata()
-}
+}*/
 
 // NodeSet is a set of network ids.
 type NodeSet map[uint32]struct{}
@@ -425,8 +425,8 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 
 type tick struct{}
 
-type timeoutManager struct {
-	synchronizer modules.Synchronizer
+/*type timeoutManager struct {
+	synchronizer builder.Synchronizer
 	eventLoop    *eventloop.EventLoop
 
 	node      *node
@@ -439,7 +439,7 @@ func (tm *timeoutManager) advance() {
 	tm.countdown--
 	if tm.countdown == 0 {
 		view := tm.synchronizer.View()
-		tm.eventLoop.AddEvent(synchronizer.TimeoutEvent{View: view})
+		tm.eventLoop.AddEvent(hotstuff.TimeoutEvent{View: view})
 		tm.countdown = tm.timeout
 		if tm.node.effectiveView <= view {
 			tm.node.effectiveView = view + 1
@@ -448,7 +448,7 @@ func (tm *timeoutManager) advance() {
 	}
 }
 
-func (tm *timeoutManager) viewChange(event synchronizer.ViewChangeEvent) {
+func (tm *timeoutManager) viewChange(event hotstuff.ViewChangeEvent) {
 	tm.countdown = tm.timeout
 	if event.Timeout {
 		tm.network.logger.Infof("node %v entered view %d after timeout", tm.node.id, event.View)
@@ -459,7 +459,7 @@ func (tm *timeoutManager) viewChange(event synchronizer.ViewChangeEvent) {
 
 // InitModule gives the module a reference to the Modules object.
 // It also allows the module to set module options using the OptionsBuilder.
-func (tm *timeoutManager) InitModule(mods *modules.Core) {
+func (tm *timeoutManager) InitModule(mods *builder.Core) {
 	mods.Get(
 		&tm.synchronizer,
 		&tm.eventLoop,
@@ -468,13 +468,13 @@ func (tm *timeoutManager) InitModule(mods *modules.Core) {
 	tm.eventLoop.RegisterHandler(tick{}, func(_ any) {
 		tm.advance()
 	}, eventloop.Prioritize())
-	tm.eventLoop.RegisterHandler(synchronizer.ViewChangeEvent{}, func(event any) {
-		tm.viewChange(event.(synchronizer.ViewChangeEvent))
+	tm.eventLoop.RegisterHandler(hotstuff.ViewChangeEvent{}, func(event any) {
+		tm.viewChange(event.(hotstuff.ViewChangeEvent))
 	}, eventloop.Prioritize())
-}
+}*/
 
 // FixedTimeout returns an ExponentialTimeout with a max exponent of 0.
-func FixedTimeout(timeout time.Duration) synchronizer.ViewDuration {
+func FixedTimeout(timeout time.Duration) modules.ViewDuration {
 	return fixedDuration{timeout}
 }
 

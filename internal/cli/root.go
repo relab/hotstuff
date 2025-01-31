@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/spf13/cobra"
 

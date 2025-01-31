@@ -13,11 +13,11 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/config"
 	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
-	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/security/crypto/keygen"
 	"google.golang.org/protobuf/proto"
 )
 

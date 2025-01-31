@@ -9,13 +9,14 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/config"
 	"github.com/relab/hotstuff/internal/orchestration"
 	"github.com/relab/hotstuff/internal/profiling"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/internal/tree"
-	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/iago"
 	"github.com/spf13/viper"
 )
@@ -32,6 +33,10 @@ func runController() {
 
 	if cfg.RandomTree {
 		tree.Shuffle(cfg.TreePositions)
+	}
+
+	if cfg.Kauri {
+		cfg.LeaderRotation = leaderrotation.TreeLeaderModuleName
 	}
 
 	// If the config is set to run locally, `hosts` will be nil (empty)
@@ -138,7 +143,7 @@ func localWorker(globalOutput string, enableMetrics []string, interval time.Dura
 			wr := bufio.NewWriter(f)
 			defer func() { checkf("failed to flush writer: %v", wr.Flush()) }()
 
-			logger, err = metrics.NewJSONLogger(wr)
+			logger, err = metrics.NewJSONLogger(wr, logging.New("json"))
 			checkf("failed to create JSON logger: %v", err)
 			defer func() { checkf("failed to close logger: %v", logger.Close()) }()
 		} else {
