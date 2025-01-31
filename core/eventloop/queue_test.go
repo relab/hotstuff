@@ -1,32 +1,30 @@
-package eventloop_test
+package eventloop
 
 import (
 	"testing"
-
-	"github.com/relab/hotstuff/core/eventloop"
 )
 
 func TestPopEmptyQueue(t *testing.T) {
-	q := eventloop.NewQueue(1)
-	elem, ok := q.Pop()
+	q := newQueue(1)
+	elem, ok := q.pop()
 	if elem != nil || ok {
 		t.Error("expected q.Pop() to return nil, false")
 	}
 }
 
 func TestEmptyLen(t *testing.T) {
-	q := eventloop.NewQueue(1)
+	q := newQueue(1)
 
-	if q.Len() != 0 {
+	if q.len() != 0 {
 		t.Error("expected q.Len() to return 0")
 	}
 }
 
 func TestPushAndPopWithCapacity1(t *testing.T) {
-	q := eventloop.NewQueue(1)
-	q.Push("hello")
+	q := newQueue(1)
+	q.push("hello")
 
-	elem, ok := q.Pop()
+	elem, ok := q.pop()
 
 	if elem.(string) != "hello" || !ok {
 		t.Errorf("expected q.Pop() to return \"hello\", true")
@@ -34,80 +32,79 @@ func TestPushAndPopWithCapacity1(t *testing.T) {
 }
 
 func TestPushAndThenLen(t *testing.T) {
-	q := eventloop.NewQueue(1)
-	q.Push("hello")
+	q := newQueue(1)
+	q.push("hello")
 
-	if q.Len() != 1 {
+	if q.len() != 1 {
 		t.Errorf("expected q.Len() to return 1")
 	}
 }
 
 func TestPushAndThenPopTwice(t *testing.T) {
-	q := eventloop.NewQueue(1)
-	q.Push("hello")
+	q := newQueue(1)
+	q.push("hello")
 
-	elem, ok := q.Pop()
+	elem, ok := q.pop()
 	if elem.(string) != "hello" || !ok {
 		t.Errorf("expected q.Pop() to return \"hello\", true")
 	}
 
-	elem, ok = q.Pop()
+	elem, ok = q.pop()
 	if elem != nil || ok {
 		t.Error("expected q.Pop() to return nil, false")
 	}
 }
 
 func TestPushWhenFull(t *testing.T) {
-	q := eventloop.NewQueue(1)
-	q.Push("hello")
-	q.Push("world")
+	q := newQueue(1)
+	q.push("hello")
+	q.push("world")
 
-	elem, ok := q.Pop()
+	elem, ok := q.pop()
 	if elem.(string) != "world" || !ok {
 		t.Errorf("expected q.Pop() to return \"world\", true")
 	}
 }
 
 func TestPushMultiple(t *testing.T) {
-	q := eventloop.NewQueue(2)
-	q.Push("hello")
-	q.Push("world")
+	q := newQueue(2)
+	q.push("hello")
+	q.push("world")
 
-	elem, ok := q.Pop()
+	elem, ok := q.pop()
 	if elem.(string) != "hello" || !ok {
 		t.Errorf("expected q.Pop() to return \"hello\", true")
 	}
 
-	elem, ok = q.Pop()
+	elem, ok = q.pop()
 	if elem.(string) != "world" || !ok {
 		t.Errorf("expected q.Pop() to return \"world\", true")
 	}
 }
 
 func TestLenWhenTailInFrontOfHead(t *testing.T) {
-	q := eventloop.NewQueue(2)
+	q := newQueue(2)
 
-	q.Push("hello")
-	q.Push("world")
-	q.Pop()
-	q.Push("foo")
+	q.push("hello")
+	q.push("world")
+	q.pop()
+	q.push("foo")
 
-	if q.Len() != 2 {
+	if q.len() != 2 {
 		t.Error("expected q.Len() to return 2")
 	}
 }
 
 func TestPopWhenTailInFrontOfHead(t *testing.T) {
-	q := eventloop.NewQueue(2)
+	q := newQueue(2)
 
-	q.Push("hello")
-	q.Push("world")
-	q.Pop()
-	q.Push("test")
+	q.push("hello")
+	q.push("world")
+	q.pop()
+	q.push("test")
 
-	elem, ok := q.Pop()
+	elem, ok := q.pop()
 	if elem.(string) != "world" || !ok {
 		t.Errorf("expected q.Pop() to return \"world\", true")
 	}
-
 }

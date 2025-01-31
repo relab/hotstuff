@@ -53,7 +53,7 @@ type handler struct {
 type EventLoop struct {
 	logger logging.Logger
 
-	eventQ Queue
+	eventQ queue
 
 	mut sync.Mutex // protects the following:
 
@@ -76,7 +76,7 @@ func New(
 		logger: logger,
 
 		ctx:           context.Background(),
-		eventQ:        NewQueue(bufferSize),
+		eventQ:        newQueue(bufferSize),
 		waitingEvents: make(map[reflect.Type][]any),
 		handlers:      make(map[reflect.Type][]handler),
 		tickers:       make(map[int]*ticker),
@@ -136,7 +136,7 @@ func (el *EventLoop) AddEvent(event any) {
 	if event != nil {
 		// run handlers with runInAddEvent option
 		el.processEvent(event, true)
-		droppedEvent := el.eventQ.Push(event)
+		droppedEvent := el.eventQ.push(event)
 		if droppedEvent != nil {
 			el.logger.Warnf("event queue is full, dropped event: %v", droppedEvent)
 		}
@@ -169,10 +169,10 @@ func (el *EventLoop) Run(ctx context.Context) {
 
 loop:
 	for {
-		event, ok := el.eventQ.Pop()
+		event, ok := el.eventQ.pop()
 		if !ok {
 			select {
-			case <-el.eventQ.Ready():
+			case <-el.eventQ.ready():
 				continue loop
 			case <-ctx.Done():
 				break loop
@@ -186,9 +186,9 @@ loop:
 	}
 
 	// HACK: when we get canceled, we will handle the events that were in the queue at that time before quitting.
-	l := el.eventQ.Len()
+	l := el.eventQ.len()
 	for i := 0; i < l; i++ {
-		event, _ := el.eventQ.Pop()
+		event, _ := el.eventQ.pop()
 		el.processEvent(event, false)
 	}
 }
@@ -197,7 +197,7 @@ loop:
 func (el *EventLoop) Tick(ctx context.Context) bool {
 	el.setContext(ctx)
 
-	event, ok := el.eventQ.Pop()
+	event, ok := el.eventQ.pop()
 	if !ok {
 		return false
 	}
@@ -318,7 +318,7 @@ func (el *EventLoop) AddTicker(interval time.Duration, callback func(tick time.T
 
 	// We want the ticker to inherit the context of the event loop,
 	// so we need to start the ticker from the run loop.
-	droppedEvent := el.eventQ.Push(startTickerEvent{id})
+	droppedEvent := el.eventQ.push(startTickerEvent{id})
 	if droppedEvent != nil {
 		el.logger.Warnf("event queue is full, dropped event: %v", droppedEvent)
 	}

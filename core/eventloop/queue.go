@@ -2,9 +2,9 @@ package eventloop
 
 import "sync"
 
-// Queue is a bounded circular buffer.
-// If an entry is pushed to the Queue when it is full, the oldest entry will be dropped.
-type Queue struct {
+// queue is a bounded circular buffer.
+// If an entry is pushed to the queue when it is full, the oldest entry will be dropped.
+type queue struct {
 	mut       sync.Mutex
 	entries   []any
 	head      int
@@ -12,12 +12,12 @@ type Queue struct {
 	readyChan chan struct{}
 }
 
-func NewQueue(capacity uint) Queue {
+func newQueue(capacity uint) queue {
 	if capacity == 0 {
 		panic("capacity must be greater than 0")
 	}
 
-	return Queue{
+	return queue{
 		entries:   make([]any, capacity),
 		head:      -1,
 		tail:      -1,
@@ -25,9 +25,9 @@ func NewQueue(capacity uint) Queue {
 	}
 }
 
-// Push adds an entry to the buffer in a FIFO fashion. If the queue is full, the first
+// push adds an entry to the buffer in a FIFO fashion. If the queue is full, the first
 // entry is dropped to make space for the newest entry and returns true.
-func (q *Queue) Push(entry any) (droppedEvent any) {
+func (q *queue) push(entry any) (droppedEvent any) {
 	q.mut.Lock()
 	defer q.mut.Unlock()
 
@@ -59,7 +59,7 @@ func (q *Queue) Push(entry any) (droppedEvent any) {
 
 // pop removes the first entry and returns it.
 // If the buffer is empty, nil and false is returned.
-func (q *Queue) Pop() (entry any, ok bool) {
+func (q *queue) pop() (entry any, ok bool) {
 	q.mut.Lock()
 	defer q.mut.Unlock()
 
@@ -83,7 +83,7 @@ func (q *Queue) Pop() (entry any, ok bool) {
 }
 
 // len returns the number of entries in the buffer.
-func (q *Queue) Len() int {
+func (q *queue) len() int {
 	q.mut.Lock()
 	defer q.mut.Unlock()
 
@@ -100,6 +100,6 @@ func (q *Queue) Len() int {
 
 // ready returns a channel that can block when the buffer
 // contains at least one item.
-func (q *Queue) Ready() <-chan struct{} {
+func (q *queue) ready() <-chan struct{} {
 	return q.readyChan
 }
