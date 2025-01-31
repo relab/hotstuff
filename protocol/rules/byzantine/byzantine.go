@@ -74,3 +74,10 @@ func NewFork(
 		opts:           opts,
 	}
 }
+
+var (
+	_ modules.ConsensusRules = (*silence)(nil)
+	_ modules.ProposeRuler   = (*silence)(nil)
+	_ modules.ConsensusRules = (*fork)(nil)
+	_ modules.ProposeRuler   = (*fork)(nil)
+)
