@@ -31,8 +31,6 @@ func NewOption() OptionID {
 
 // Options stores runtime configuration settings.
 type Options struct {
-	options []any
-
 	id         hotstuff.ID
 	privateKey hotstuff.PrivateKey
 
