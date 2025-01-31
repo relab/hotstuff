@@ -149,8 +149,9 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cer
 	return cs.OnPropose(view, proposal)
 }
 
-func (cs *Consensus) checkQC(view hotstuff.View, proposal *hotstuff.ProposeMsg) bool {
+func (cs *Consensus) checkQC(proposal *hotstuff.ProposeMsg) bool {
 	block := proposal.Block
+	view := block.View()
 	if cs.opts.ShouldUseAggQC() && proposal.AggregateQC != nil {
 		highQC, ok := cs.auth.VerifyAggregateQC(cs.configuration.QuorumSize(), *proposal.AggregateQC)
 		if !ok {
@@ -170,8 +171,9 @@ func (cs *Consensus) checkQC(view hotstuff.View, proposal *hotstuff.ProposeMsg) 
 	return true
 }
 
-func (cs *Consensus) acceptProposal(view hotstuff.View, proposal *hotstuff.ProposeMsg) bool {
+func (cs *Consensus) acceptProposal(proposal *hotstuff.ProposeMsg) bool {
 	block := proposal.Block
+	view := block.View()
 	// ensure the block came from the leader.
 	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
 		cs.logger.Infof("OnPropose[p=%d, view=%d]: block was not proposed by the expected leader", view)
@@ -192,6 +194,33 @@ func (cs *Consensus) acceptProposal(view hotstuff.View, proposal *hotstuff.Propo
 		return false
 	}
 	return true
+}
+
+func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) {
+	// TODO: extract parts of this method into helper functions maybe?
+	cs.logger.Debugf("OnPropose[view=%d]: %.8s -> %.8x", view, proposal.Block.Hash(), proposal.Block.Command())
+	block := proposal.Block
+	if !cs.checkQC(&proposal) {
+		return
+	}
+	if !cs.acceptProposal(&proposal) {
+		return
+	}
+	cs.logger.Debugf("OnPropose[view=%d]: block accepted.", view)
+	// block is safe and was accepted
+	cs.blockChain.Store(block)
+	if b := cs.impl.CommitRule(block); b != nil {
+		cs.committer.Commit(b)
+	}
+	// Tells the synchronizer to advance the view
+	advance = true
+	syncInfo = hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
+	if block.View() <= cs.lastVote {
+		cs.logger.Info(fmt.Sprintf("OnPropose[view=%d]: block view too old for.", view))
+		return
+	}
+	cs.voteFor(view, &proposal)
+	return
 }
 
 func (cs *Consensus) voteFor(view hotstuff.View, proposal *hotstuff.ProposeMsg) {
@@ -219,32 +248,3 @@ func (cs *Consensus) voteFor(view hotstuff.View, proposal *hotstuff.ProposeMsg) 
 	cs.logger.Debugf("OnPropose[view=%d]: voting for %.8s -> %.8x", view, block.Hash(), block.Command())
 	leader.Vote(pc)
 }
-
-func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) {
-	// TODO: extract parts of this method into helper functions maybe?
-	cs.logger.Debugf("OnPropose[view=%d]: %.8s -> %.8x", view, proposal.Block.Hash(), proposal.Block.Command())
-	block := proposal.Block
-	if !cs.checkQC(view, &proposal) {
-		return
-	}
-	if !cs.acceptProposal(view, &proposal) {
-		return
-	}
-	cs.logger.Debugf("OnPropose[view=%d]: block accepted: %.8s -> %.8x", view, block.Hash(), block.Command())
-	// block is safe and was accepted
-	cs.blockChain.Store(block)
-	if b := cs.impl.CommitRule(block); b != nil {
-		cs.committer.Commit(b)
-	}
-	// Tells the synchronizer to advance the view
-	advance = true
-	syncInfo = hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
-	if block.View() <= cs.lastVote {
-		cs.logger.Info(fmt.Sprintf("OnPropose[view=%d]: block view too old for %.8s -> %.8x (diff=%d)", view, block.Hash(), block.Command(), cs.lastVote-block.View()))
-		return
-	}
-	cs.voteFor(view, &proposal)
-	return
-}
-
-// var _ core.Consensus = (*Consensus)(nil)
