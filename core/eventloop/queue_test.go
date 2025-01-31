@@ -1,8 +1,6 @@
 package eventloop
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestPopEmptyQueue(t *testing.T) {
 	q := newQueue(1)
@@ -58,6 +56,10 @@ func TestPushAndThenPopTwice(t *testing.T) {
 func TestPushWhenFull(t *testing.T) {
 	q := newQueue(1)
 	q.push("hello")
+	dropped := q.push("world")
+	if dropped.(string) != "hello" {
+		t.Errorf("expected q.push() to return \"hello\"")
+	}
 	q.push("world")
 
 	elem, ok := q.pop()
