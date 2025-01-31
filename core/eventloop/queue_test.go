@@ -60,7 +60,6 @@ func TestPushWhenFull(t *testing.T) {
 	if dropped.(string) != "hello" {
 		t.Errorf("expected q.push() to return \"hello\"")
 	}
-	q.push("world")
 
 	elem, ok := q.pop()
 	if elem.(string) != "world" || !ok {
