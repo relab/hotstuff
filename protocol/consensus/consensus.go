@@ -72,7 +72,13 @@ func New(
 	}
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
-		cs.OnPropose(event.(hotstuff.ProposeMsg))
+		sInfo, advance := cs.OnPropose(event.(hotstuff.ProposeMsg))
+		if advance {
+			cs.eventLoop.AddEvent(hotstuff.NewViewMsg{
+				ID:       cs.opts.ID(),
+				SyncInfo: sInfo,
+			})
+		}
 	})
 
 	return cs
