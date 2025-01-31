@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/relab/hotstuff/core/eventloop/gpool"
-	"github.com/relab/hotstuff/core/eventloop/queue"
 	"github.com/relab/hotstuff/core/logging"
 )
 
@@ -55,7 +53,7 @@ type handler struct {
 type EventLoop struct {
 	logger logging.Logger
 
-	eventQ queue.Queue
+	eventQ Queue
 
 	mut sync.Mutex // protects the following:
 
@@ -78,7 +76,7 @@ func New(
 		logger: logger,
 
 		ctx:           context.Background(),
-		eventQ:        queue.New(bufferSize),
+		eventQ:        NewQueue(bufferSize),
 		waitingEvents: make(map[reflect.Type][]any),
 		handlers:      make(map[reflect.Type][]handler),
 		tickers:       make(map[int]*ticker),
@@ -213,7 +211,7 @@ func (el *EventLoop) Tick(ctx context.Context) bool {
 	return true
 }
 
-var handlerListPool = gpool.New(func() []EventHandler { return make([]EventHandler, 0, 10) })
+var handlerListPool = newPool(func() []EventHandler { return make([]EventHandler, 0, 10) })
 
 // processEvent dispatches the event to the correct handler.
 func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {

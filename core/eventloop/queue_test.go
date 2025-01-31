@@ -1,13 +1,13 @@
-package queue_test
+package eventloop_test
 
 import (
 	"testing"
 
-	"github.com/relab/hotstuff/core/eventloop/queue"
+	"github.com/relab/hotstuff/core/eventloop"
 )
 
 func TestPopEmptyQueue(t *testing.T) {
-	q := queue.New(1)
+	q := eventloop.NewQueue(1)
 	elem, ok := q.Pop()
 	if elem != nil || ok {
 		t.Error("expected q.Pop() to return nil, false")
@@ -15,7 +15,7 @@ func TestPopEmptyQueue(t *testing.T) {
 }
 
 func TestEmptyLen(t *testing.T) {
-	q := queue.New(1)
+	q := eventloop.NewQueue(1)
 
 	if q.Len() != 0 {
 		t.Error("expected q.Len() to return 0")
@@ -23,7 +23,7 @@ func TestEmptyLen(t *testing.T) {
 }
 
 func TestPushAndPopWithCapacity1(t *testing.T) {
-	q := queue.New(1)
+	q := eventloop.NewQueue(1)
 	q.Push("hello")
 
 	elem, ok := q.Pop()
@@ -34,7 +34,7 @@ func TestPushAndPopWithCapacity1(t *testing.T) {
 }
 
 func TestPushAndThenLen(t *testing.T) {
-	q := queue.New(1)
+	q := eventloop.NewQueue(1)
 	q.Push("hello")
 
 	if q.Len() != 1 {
@@ -43,7 +43,7 @@ func TestPushAndThenLen(t *testing.T) {
 }
 
 func TestPushAndThenPopTwice(t *testing.T) {
-	q := queue.New(1)
+	q := eventloop.NewQueue(1)
 	q.Push("hello")
 
 	elem, ok := q.Pop()
@@ -58,7 +58,7 @@ func TestPushAndThenPopTwice(t *testing.T) {
 }
 
 func TestPushWhenFull(t *testing.T) {
-	q := queue.New(1)
+	q := eventloop.NewQueue(1)
 	q.Push("hello")
 	q.Push("world")
 
@@ -69,7 +69,7 @@ func TestPushWhenFull(t *testing.T) {
 }
 
 func TestPushMultiple(t *testing.T) {
-	q := queue.New(2)
+	q := eventloop.NewQueue(2)
 	q.Push("hello")
 	q.Push("world")
 
@@ -85,7 +85,7 @@ func TestPushMultiple(t *testing.T) {
 }
 
 func TestLenWhenTailInFrontOfHead(t *testing.T) {
-	q := queue.New(2)
+	q := eventloop.NewQueue(2)
 
 	q.Push("hello")
 	q.Push("world")
@@ -98,7 +98,7 @@ func TestLenWhenTailInFrontOfHead(t *testing.T) {
 }
 
 func TestPopWhenTailInFrontOfHead(t *testing.T) {
-	q := queue.New(2)
+	q := eventloop.NewQueue(2)
 
 	q.Push("hello")
 	q.Push("world")

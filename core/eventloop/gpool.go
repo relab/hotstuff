@@ -1,24 +1,23 @@
-// Package gpool provides a generic sync.Pool.
-package gpool
+package eventloop
 
 import "sync"
 
-// Pool is a generic sync.Pool.
-type Pool[T any] sync.Pool
+// pool is a generic sync.pool.
+type pool[T any] sync.Pool
 
 // New returns an initialized generic sync.Pool.
-func New[T any](newFunc func() T) Pool[T] {
+func newPool[T any](newFunc func() T) pool[T] {
 	if newFunc != nil {
-		return Pool[T](sync.Pool{
+		return pool[T](sync.Pool{
 			New: func() any { return newFunc() },
 		})
 	}
-	return Pool[T]{}
+	return pool[T]{}
 }
 
 // Get retrieves a resource from the pool.
 // Returns the zero value of T if no resource is available and no New func is specified.
-func (p *Pool[T]) Get() (val T) {
+func (p *pool[T]) Get() (val T) {
 	sp := (*sync.Pool)(p)
 	v := sp.Get()
 	if v != nil {
@@ -28,7 +27,7 @@ func (p *Pool[T]) Get() (val T) {
 }
 
 // Put puts the resource into the pool.
-func (p *Pool[T]) Put(val T) {
+func (p *pool[T]) Put(val T) {
 	sp := (*sync.Pool)(p)
 	sp.Put(val)
 }

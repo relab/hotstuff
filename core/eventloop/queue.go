@@ -1,4 +1,4 @@
-package queue
+package eventloop
 
 import "sync"
 
@@ -12,7 +12,7 @@ type Queue struct {
 	readyChan chan struct{}
 }
 
-func New(capacity uint) Queue {
+func NewQueue(capacity uint) Queue {
 	if capacity == 0 {
 		panic("capacity must be greater than 0")
 	}
