@@ -198,7 +198,6 @@ func (cs *Consensus) acceptProposal(proposal *hotstuff.ProposeMsg) bool {
 
 func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) {
 	// TODO: extract parts of this method into helper functions maybe?
-	cs.logger.Debugf("OnPropose[view=%d]: %.8s -> %.8x", view, proposal.Block.Hash(), proposal.Block.Command())
 	block := proposal.Block
 	if !cs.checkQC(&proposal) {
 		return
@@ -219,12 +218,13 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 		cs.logger.Info(fmt.Sprintf("OnPropose[view=%d]: block view too old for.", view))
 		return
 	}
-	cs.voteFor(view, &proposal)
+	cs.voteFor(&proposal)
 	return
 }
 
-func (cs *Consensus) voteFor(view hotstuff.View, proposal *hotstuff.ProposeMsg) {
+func (cs *Consensus) voteFor(proposal *hotstuff.ProposeMsg) {
 	block := proposal.Block
+	view := block.View()
 	pc, err := cs.auth.CreatePartialCert(block)
 	if err != nil {
 		cs.logger.Errorf("OnPropose[view=%d]: failed to sign block: ", view, err)
