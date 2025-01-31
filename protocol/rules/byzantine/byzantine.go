@@ -1,4 +1,4 @@
-// Package byzantine contiains byzantine behaviors that can be applied to the consensus protocols.
+// Package byzantine contains Byzantine consensus rules.
 package byzantine
 
 import (
@@ -19,10 +19,6 @@ type silence struct {
 
 func (s *silence) ProposeRule(_ hotstuff.SyncInfo, _ hotstuff.Command) (hotstuff.ProposeMsg, bool) {
 	return hotstuff.ProposeMsg{}, false
-}
-
-func (s *silence) Wrap() modules.ConsensusRules {
-	return s
 }
 
 // NewSilence returns a byzantine replica that will never propose.
@@ -69,18 +65,12 @@ func (f *fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert 
 // NewFork returns a byzantine replica that will try to fork the chain.
 func NewFork(
 	rules modules.ConsensusRules,
-
 	blockChain *blockchain.BlockChain,
 	opts *core.Options,
 ) modules.ConsensusRules {
 	return &fork{
 		ConsensusRules: rules,
-
-		blockChain: blockChain,
-		opts:       opts,
+		blockChain:     blockChain,
+		opts:           opts,
 	}
-}
-
-func (f *fork) Wrap() modules.ConsensusRules {
-	return f
 }
