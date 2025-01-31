@@ -13,12 +13,6 @@ const (
 	ForkModuleName    = "fork"
 )
 
-// Byzantine wraps a consensus rules implementation and alters its behavior.
-type Byzantine interface {
-	// Wrap wraps the rules and returns an altered rules implementation.
-	Wrap() modules.ConsensusRules
-}
-
 type silence struct {
 	modules.ConsensusRules
 }
@@ -32,7 +26,7 @@ func (s *silence) Wrap() modules.ConsensusRules {
 }
 
 // NewSilence returns a byzantine replica that will never propose.
-func NewSilence(rules modules.ConsensusRules) Byzantine {
+func NewSilence(rules modules.ConsensusRules) modules.ConsensusRules {
 	return &silence{ConsensusRules: rules}
 }
 
@@ -78,7 +72,7 @@ func NewFork(
 
 	blockChain *blockchain.BlockChain,
 	opts *core.Options,
-) Byzantine {
+) modules.ConsensusRules {
 	return &fork{
 		ConsensusRules: rules,
 

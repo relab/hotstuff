@@ -56,14 +56,6 @@ func NewOptions(id hotstuff.ID, pk hotstuff.PrivateKey) *Options {
 	}
 }
 
-func (opts *Options) ensureSpace(id OptionID) {
-	if int(id) >= len(opts.options) {
-		newOpts := make([]any, id+1)
-		copy(newOpts, opts.options)
-		opts.options = newOpts
-	}
-}
-
 // SetShouldUseTree sets the ShouldUseTree setting to true.
 func (opts *Options) SetShouldUseTree() {
 	opts.shouldUseTree = true
@@ -71,24 +63,6 @@ func (opts *Options) SetShouldUseTree() {
 
 func (opts *Options) ShouldUseTree() bool {
 	return opts.shouldUseTree
-}
-
-// Get returns the value associated with the given option ID.
-func (opts *Options) Get(id OptionID) any {
-	opts.mut.Lock()
-	defer opts.mut.Unlock()
-	if len(opts.options) <= int(id) {
-		return nil
-	}
-	return opts.options[id]
-}
-
-// Set sets the value of the given option ID.
-func (opts *Options) Set(id OptionID, value any) {
-	opts.mut.Lock()
-	defer opts.mut.Unlock()
-	opts.ensureSpace(id)
-	opts.options[id] = value
 }
 
 // ID returns the ID.

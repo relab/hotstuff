@@ -40,8 +40,7 @@ func getConsensusRules(
 	blockChain *blockchain.BlockChain,
 	logger logging.Logger,
 	opts *core.Options,
-) (rules modules.ConsensusRules, ok bool) {
-	ok = true
+) (rules modules.ConsensusRules, err error) {
 	switch name {
 	case fasthotstuff.ModuleName:
 		rules = fasthotstuff.New(blockChain, logger, opts)
@@ -50,7 +49,7 @@ func getConsensusRules(
 	case chainedhotstuff.ModuleName:
 		rules = chainedhotstuff.New(blockChain, logger)
 	default:
-		return nil, false
+		return nil, fmt.Errorf("invalid consensus name: '%s'", name)
 	}
 	return
 }
@@ -60,30 +59,27 @@ func getByzantine(
 	rules modules.ConsensusRules,
 	blockChain *blockchain.BlockChain,
 	opts *core.Options,
-) (byz byzantine.Byzantine, ok bool) {
-	ok = true
+) (byzRules modules.ConsensusRules, err error) {
 	switch name {
 	case byzantine.SilenceModuleName:
-		byz = byzantine.NewSilence(rules)
+		byzRules = byzantine.NewSilence(rules)
 	case byzantine.ForkModuleName:
-		byz = byzantine.NewFork(rules, blockChain, opts)
+		byzRules = byzantine.NewFork(rules, blockChain, opts)
 	default:
-		return nil, false
+		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", name)
 	}
 	return
 }
 
 func getLeaderRotation(
 	name string,
-
 	chainLength int,
 	blockChain *blockchain.BlockChain,
 	config *netconfig.Config,
 	committer *committer.Committer,
 	logger logging.Logger,
 	opts *core.Options,
-) (ld modules.LeaderRotation, ok bool) {
-	ok = true
+) (ld modules.LeaderRotation, err error) {
 	switch name {
 	case leaderrotation.CarouselModuleName:
 		ld = leaderrotation.NewCarousel(chainLength, blockChain, config, committer, opts, logger)
@@ -96,7 +92,7 @@ func getLeaderRotation(
 	case leaderrotation.TreeLeaderModuleName:
 		ld = leaderrotation.NewTreeLeader(opts)
 	default:
-		return nil, false
+		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", name)
 	}
 	return
 }
@@ -106,8 +102,7 @@ func getCrypto(
 	configuration *netconfig.Config,
 	logger logging.Logger,
 	opts *core.Options,
-) (crypto modules.CryptoBase, ok bool) {
-	ok = true
+) (crypto modules.CryptoBase, err error) {
 	switch name {
 	case bls12.ModuleName:
 		crypto = bls12.New(configuration, logger, opts)
@@ -116,7 +111,7 @@ func getCrypto(
 	case eddsa.ModuleName:
 		crypto = eddsa.New(configuration, logger, opts)
 	default:
-		return nil, false
+		return nil, fmt.Errorf("invalid crypto name: '%s'", name)
 	}
 	return
 }
@@ -183,9 +178,9 @@ func NewSecurityComponents(
 		coreComps.EventLoop,
 		coreComps.Logger,
 	)
-	cryptoImpl, ok := getCrypto(cryptoName, netComps.Config, coreComps.Logger, coreComps.Options)
-	if !ok {
-		return nil, fmt.Errorf("invalid crypto name: '%s'", cryptoName)
+	cryptoImpl, err := getCrypto(cryptoName, netComps.Config, coreComps.Logger, coreComps.Options)
+	if err != nil {
+		return nil, err
 	}
 	var certAuthority *certauth.CertAuthority
 	if cacheSize > 0 {
@@ -266,11 +261,11 @@ func NewProtocolModules(
 	consensusName, leaderRotationName, byzantineName string,
 	vdOpt ViewDurationOptions,
 ) (*ProtocolModules, error) {
-	consensusRules, ok := getConsensusRules(consensusName, secureComps.BlockChain, coreComps.Logger, coreComps.Options)
-	if !ok {
+	consensusRules, err := getConsensusRules(consensusName, secureComps.BlockChain, coreComps.Logger, coreComps.Options)
+	if err != nil {
 		return nil, fmt.Errorf("invalid consensus name: '%s'", consensusName)
 	}
-	leaderRotation, ok := getLeaderRotation(
+	leaderRotation, err := getLeaderRotation(
 		leaderRotationName,
 		consensusRules.ChainLength(),
 		secureComps.BlockChain,
@@ -279,11 +274,11 @@ func NewProtocolModules(
 		coreComps.Logger,
 		coreComps.Options,
 	)
-	if !ok {
-		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", leaderRotationName)
+	if err != nil {
+		return nil, err
 	}
 	var duration modules.ViewDuration
-	if leaderRotationName == "tree-leader" {
+	if leaderRotationName == leaderrotation.TreeLeaderModuleName {
 		// TODO(meling): Temporary default; should be configurable and moved to the appropriate place.
 		opts.SetTreeHeightWaitTime()
 		// create tree only if we are using tree leader (Kauri)
@@ -295,11 +290,11 @@ func NewProtocolModules(
 		)
 	}
 	if byzantineName != "" {
-		if byz, ok := getByzantine(byzantineName, consensusRules, secureComps.BlockChain, coreComps.Options); ok {
-			consensusRules = byz.Wrap()
+		if byz, err := getByzantine(byzantineName, consensusRules, secureComps.BlockChain, coreComps.Options); err == nil {
+			consensusRules = byz
 			coreComps.Logger.Infof("assigned byzantine strategy: %s", byzantineName)
 		} else {
-			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", byzantineName)
+			return nil, err
 		}
 	}
 	return &ProtocolModules{

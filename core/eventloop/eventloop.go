@@ -1,4 +1,4 @@
-// Eventloop provides an event loop which is widely used by modules.
+// Package eventloop provides an event loop which is widely used by modules.
 // The use of the event loop enables many of the modules to run synchronously, thus removing the need for thread safety.
 // This simplifies the implementation of modules and reduces the risks of race conditions.
 //

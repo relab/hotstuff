@@ -1,4 +1,4 @@
-// Package convert contains conversion methods between protocol buffer message types and HotStuff protocol message structures.
+// Package hotstuffpb contains conversion methods between protocol buffer message types and HotStuff protocol message structures.
 package hotstuffpb
 
 import (
@@ -76,7 +76,7 @@ func QuorumSignatureFromProto(sig *QuorumSignature) hotstuff.QuorumSignature {
 	return nil
 }
 
-// PartialCertToProto converts a consensus.PartialCert to a PartialCert.
+// PartialCertToProto converts a hotstuff.PartialCert to a PartialCert.
 func PartialCertToProto(cert hotstuff.PartialCert) *PartialCert {
 	hash := cert.BlockHash()
 	return &PartialCert{
@@ -92,7 +92,7 @@ func PartialCertFromProto(cert *PartialCert) hotstuff.PartialCert {
 	return hotstuff.NewPartialCert(QuorumSignatureFromProto(cert.GetSig()), h)
 }
 
-// QuorumCertToProto converts a consensus.QuorumCert to a QuorumCert.
+// QuorumCertToProto converts a hotstuff.QuorumCert to a QuorumCert.
 func QuorumCertToProto(qc hotstuff.QuorumCert) *QuorumCert {
 	hash := qc.BlockHash()
 	return &QuorumCert{
@@ -130,7 +130,7 @@ func ProposalFromProto(p *Proposal) (proposal hotstuff.ProposeMsg) {
 	return
 }
 
-// BlockToProto converts a consensus.Block to a Block.
+// BlockToProto converts a hotstuff.Block to a Block.
 func BlockToProto(block *hotstuff.Block) *Block {
 	parentHash := block.Parent()
 	return &Block{
@@ -142,7 +142,7 @@ func BlockToProto(block *hotstuff.Block) *Block {
 	}
 }
 
-// BlockFromProto converts a Block to a consensus.Block.
+// BlockFromProto converts a Block to a hotstuff.Block.
 func BlockFromProto(block *Block) *hotstuff.Block {
 	var p hotstuff.Hash
 	copy(p[:], block.GetParent())
