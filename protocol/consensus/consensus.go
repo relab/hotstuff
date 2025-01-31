@@ -37,7 +37,6 @@ type Consensus struct {
 	kauri modules.Kauri
 
 	lastVote hotstuff.View
-	view     hotstuff.View
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
@@ -73,7 +72,7 @@ func New(
 	}
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
-		cs.OnPropose(cs.view, event.(hotstuff.ProposeMsg))
+		cs.OnPropose(event.(hotstuff.ProposeMsg))
 	})
 
 	return cs
@@ -95,7 +94,6 @@ func (cs *Consensus) StopVoting(view hotstuff.View) {
 // Propose creates a new proposal.
 func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo) (syncInfo hotstuff.SyncInfo, advance bool) {
 	cs.logger.Debugf("Propose")
-	cs.view = view
 
 	qc, ok := cert.QC()
 	if ok {
@@ -146,7 +144,7 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cer
 		cs.sender.Propose(proposal)
 	}
 	// self vote
-	return cs.OnPropose(view, proposal)
+	return cs.OnPropose(proposal)
 }
 
 func (cs *Consensus) checkQC(proposal *hotstuff.ProposeMsg) bool {
@@ -196,7 +194,7 @@ func (cs *Consensus) acceptProposal(proposal *hotstuff.ProposeMsg) bool {
 	return true
 }
 
-func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) {
+func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) {
 	// TODO: extract parts of this method into helper functions maybe?
 	block := proposal.Block
 	if !cs.checkQC(&proposal) {
@@ -205,6 +203,8 @@ func (cs *Consensus) OnPropose(view hotstuff.View, proposal hotstuff.ProposeMsg)
 	if !cs.acceptProposal(&proposal) {
 		return
 	}
+
+	view := block.View()
 	cs.logger.Debugf("OnPropose[view=%d]: block accepted.", view)
 	// block is safe and was accepted
 	cs.blockChain.Store(block)
