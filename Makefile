@@ -9,8 +9,6 @@ gorums_go := internal/proto/clientpb/client_gorums.pb.go \
 		internal/proto/hotstuffpb/hotstuff_gorums.pb.go  \
 		internal/proto/kauripb/kauri_gorums.pb.go
 
-mock_input_go := ./modules/./... ./core/./...
-
 binaries := hotstuff plot
 
 CSV ?= wonderproxy.csv
@@ -26,9 +24,6 @@ $(binaries): protos
 	@go build -o ./$@ $(GCFLAGS) ./cmd/$@
 
 protos: $(proto_go) $(gorums_go)
-
-mocks:
-	@go generate $(mock_input_go)
 
 download:
 	@go mod download
