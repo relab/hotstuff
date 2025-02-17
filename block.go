@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"time"
 )
 
 // Block contains a propsed "command", metadata for the protocol, and a link to the "parent" block.
@@ -15,6 +16,7 @@ type Block struct {
 	cmd      Command
 	cert     QuorumCert
 	view     View
+	ts       time.Time
 }
 
 // NewBlock creates a new Block
@@ -25,6 +27,7 @@ func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID)
 		cmd:      cmd,
 		view:     view,
 		proposer: proposer,
+		ts:       time.Now(),
 	}
 	// cache the hash immediately because it is too racy to do it in Hash()
 	b.hash = sha256.Sum256(b.ToBytes())
@@ -70,6 +73,11 @@ func (b *Block) QuorumCert() QuorumCert {
 // View returns the view in which the Block was proposed
 func (b *Block) View() View {
 	return b.view
+}
+
+// TS returns the timestamp of the block
+func (b *Block) TS() time.Time {
+	return b.ts
 }
 
 // ToBytes returns the raw byte form of the Block, to be used for hashing, etc.
