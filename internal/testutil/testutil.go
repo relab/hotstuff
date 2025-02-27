@@ -133,22 +133,16 @@ func CreateTCPListener(t *testing.T) net.Listener {
 	return lis
 }
 
-// Sign creates a signature using the given signer.
-func Sign(t *testing.T, message []byte, signer modules.CryptoBase) hotstuff.QuorumSignature {
-	t.Helper()
-	sig, err := signer.Sign(message)
-	if err != nil {
-		t.Fatalf("Failed to sign block: %v", err)
-	}
-	return sig
-}
-
 // CreateSignatures creates partial certificates from multiple signers.
 func CreateSignatures(t *testing.T, message []byte, signers []modules.CryptoBase) []hotstuff.QuorumSignature {
 	t.Helper()
 	sigs := make([]hotstuff.QuorumSignature, 0, len(signers))
 	for _, signer := range signers {
-		sigs = append(sigs, Sign(t, message, signer))
+		sig, err := signer.Sign(message)
+		if err != nil {
+			t.Fatalf("Failed to sign block: %v", err)
+		}
+		sigs = append(sigs, sig)
 	}
 	return sigs
 }
@@ -176,7 +170,11 @@ func CreateTimeouts(t *testing.T, view hotstuff.View, signers []modules.CryptoBa
 		})
 	}
 	for i := range timeouts {
-		timeouts[i].MsgSignature = Sign(t, timeouts[i].ToBytes(), signers[i])
+		sig, err := signers[i].Sign(timeouts[i].ToBytes())
+		if err != nil {
+			t.Fatalf("Failed to sign timeout message: %v", err)
+		}
+		timeouts[i].MsgSignature = sig
 	}
 	return timeouts
 }
@@ -221,6 +219,21 @@ func CreateTC(t *testing.T, view hotstuff.View, signers0 []*certauth.CertAuthori
 		return hotstuff.TimeoutCert{}
 	}
 	tc, err := signers0[0].CreateTimeoutCert(view, CreateTimeouts(t, view, signers1))
+	if err != nil {
+		t.Fatalf("Failed to create TC: %v", err)
+	}
+	return tc
+}
+
+// TODO(meling): Currently only used from disabledTestConvertTimeoutCertBLS12.
+// Ideally, we should replace CreateTC above with this function since it avoids two arguments with the same signers.
+func CreateTCOld(t *testing.T, view hotstuff.View, signers []modules.CryptoBase) hotstuff.TimeoutCert {
+	t.Helper()
+	if len(signers) == 0 {
+		return hotstuff.TimeoutCert{}
+	}
+	x := signers[0].(*certauth.CertAuthority)
+	tc, err := x.CreateTimeoutCert(view, CreateTimeouts(t, view, signers))
 	if err != nil {
 		t.Fatalf("Failed to create TC: %v", err)
 	}
