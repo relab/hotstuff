@@ -376,7 +376,6 @@ func NewReplicaComponents(
 	certificate tls.Certificate,
 	rootCAs *x509.CertPool,
 ) (*ReplicaComponents, error) {
-
 	var creds credentials.TransportCredentials
 	clientSrvOpts := []gorums.ServerOption{}
 	replicaSrvOpts := []gorums.ServerOption{}
