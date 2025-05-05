@@ -78,6 +78,8 @@ func TestConvertBlock(t *testing.T) {
 }
 
 // TODO(meling): disabled since it fails after the package-restructuring and I haven't been able to fix it yet.
+// TODO(AlanRostem): discovered the bug - the metadata per replica is nil and is needed by BLS12 to generate public keys.
+// This bug was introduced since we are not setting up connections like the old test, so we need to manually add them.
 func disabledTestConvertTimeoutCertBLS12(t *testing.T) {
 	n := 4
 	cfg := netconfig.NewConfig()
