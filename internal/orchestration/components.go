@@ -295,7 +295,7 @@ func NewProtocolModules(
 			consensusRules,
 			secureComps.BlockChain,
 			coreComps.Options)
-		if err == nil {
+		if err != nil {
 			return nil, err
 		}
 		consensusRules = byz
