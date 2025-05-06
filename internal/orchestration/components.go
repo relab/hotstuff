@@ -258,12 +258,12 @@ func NewProtocolModules(
 	srvComps *ServiceComponents,
 
 	opts *orchestrationpb.ReplicaOpts, // TODO: avoid modifying this so it doesn't depend on orchestrationpb
-	consensusName, leaderRotationName, byzantineName string,
+	consensusName, leaderRotationName, byzantineStrategy string,
 	vdOpt ViewDurationOptions,
 ) (*ProtocolModules, error) {
 	consensusRules, err := getConsensusRules(consensusName, secureComps.BlockChain, coreComps.Logger, coreComps.Options)
 	if err != nil {
-		return nil, fmt.Errorf("invalid consensus name: '%s'", consensusName)
+		return nil, err
 	}
 	leaderRotation, err := getLeaderRotation(
 		leaderRotationName,
@@ -289,13 +289,17 @@ func NewProtocolModules(
 			vdOpt.SampleSize, vdOpt.StartTimeout, vdOpt.MaxTimeout, vdOpt.Multiplier,
 		)
 	}
-	if byzantineName != "" {
-		if byz, err := getByzantine(byzantineName, consensusRules, secureComps.BlockChain, coreComps.Options); err == nil {
-			consensusRules = byz
-			coreComps.Logger.Infof("assigned byzantine strategy: %s", byzantineName)
-		} else {
+	if byzantineStrategy != "" {
+		byz, err := getByzantine(
+			byzantineStrategy,
+			consensusRules,
+			secureComps.BlockChain,
+			coreComps.Options)
+		if err == nil {
 			return nil, err
 		}
+		consensusRules = byz
+		coreComps.Logger.Infof("assigned byzantine strategy: %s", byzantineStrategy)
 	}
 	return &ProtocolModules{
 		ConsensusRules: consensusRules,
@@ -406,7 +410,6 @@ func NewReplicaComponents(
 	netComps := NewNetworkComponents(
 		coreComps,
 		creds,
-		gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
 	)
 	cacheSize := 100 // TODO: consider making this configurable
 	secureComps, err := NewSecurityComponents(coreComps, netComps, opts.GetCrypto(), cacheSize)
