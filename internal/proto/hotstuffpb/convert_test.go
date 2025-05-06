@@ -77,10 +77,7 @@ func TestConvertBlock(t *testing.T) {
 	}
 }
 
-// TODO(meling): disabled since it fails after the package-restructuring and I haven't been able to fix it yet.
-// TODO(AlanRostem): discovered the bug - the metadata per replica is nil and is needed by BLS12 to generate public keys.
-// This bug was introduced since we are not setting up connections like the old test, so we need to manually add them.
-func disabledTestConvertTimeoutCertBLS12(t *testing.T) {
+func TestConvertTimeoutCertBLS12(t *testing.T) {
 	n := 4
 	cfg := netconfig.NewConfig()
 	opts := make([]*core.Options, n)
@@ -88,15 +85,23 @@ func disabledTestConvertTimeoutCertBLS12(t *testing.T) {
 		id := hotstuff.ID(i + 1)
 		key := testutil.GenerateBLS12Key(t)
 		opts[i] = core.NewOptions(id, key)
-		cfg.AddReplica(&hotstuff.ReplicaInfo{ID: id, PubKey: key.Public()})
+		pub := key.Public()
+		cfg.AddReplica(&hotstuff.ReplicaInfo{ID: id, PubKey: pub})
+
 	}
 
 	signers := make([]modules.CryptoBase, n)
 	for i := range n {
+		id := hotstuff.ID(i + 1)
 		logger := logging.New("test")
 		crypt := bls12.New(cfg, logger, opts[i])
 		signer := certauth.New(crypt, nil, logger)
 		signers[i] = signer
+		meta := opts[i].ConnectionMetadata()
+		pop := meta["bls12-pop-bin"]
+		cfg.SetReplicaMetaData(id, map[string]string{
+			"bls12-pop-bin": pop,
+		})
 	}
 
 	tc1 := testutil.CreateTCOld(t, 1, signers)

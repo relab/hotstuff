@@ -13,8 +13,6 @@
 			"cwd": "${workspaceRoot}",
 			"args": [
 				"run",
-				"--measurement-interval=1s",
-				"--output=.scratch",
 			]
 		},
 		{

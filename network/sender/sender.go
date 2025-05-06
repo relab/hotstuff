@@ -140,9 +140,9 @@ func (inv *Sender) Propose(proposal hotstuff.ProposeMsg) {
 }
 
 func (inv *Sender) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
-	info, peerok := peer.FromContext(c.Ctx)
-	md, mdok := metadata.FromIncomingContext(c.Ctx)
-	if !peerok || !mdok {
+	info, peerOk := peer.FromContext(c.Ctx)
+	md, mdOk := metadata.FromIncomingContext(c.Ctx)
+	if !peerOk || !mdOk {
 		return
 	}
 
