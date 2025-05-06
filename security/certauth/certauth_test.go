@@ -14,6 +14,7 @@ import (
 )
 
 type dummyReplica struct {
+	connMd   map[string]string
 	netComps *orchestration.NetworkComponents
 	secComps *orchestration.SecurityComponents
 }
@@ -38,7 +39,10 @@ func createComponents(t *testing.T, id int, cryptoName string, privKey hotstuff.
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
+	// Needed for bls12 tests:
+	metaData := core.Options.ConnectionMetadata()
 	return &dummyReplica{
+		connMd:   metaData,
 		secComps: sec,
 		netComps: net,
 	}
@@ -52,8 +56,9 @@ func createDummyReplicas(t *testing.T, n int, cryptoName string, cacheSize int) 
 		dummy := createComponents(t, id+1, cryptoName, privKey, cacheSize)
 		dummies = append(dummies, dummy)
 		replicas = append(replicas, hotstuff.ReplicaInfo{
-			ID:     hotstuff.ID(id + 1),
-			PubKey: privKey.Public(),
+			ID:       hotstuff.ID(id + 1),
+			PubKey:   privKey.Public(),
+			MetaData: dummy.connMd,
 		})
 	}
 	for _, dummy := range dummies {
@@ -82,10 +87,10 @@ var testData = []struct {
 }{
 	{cryptoName: ecdsa.ModuleName},
 	{cryptoName: eddsa.ModuleName},
-	// {cryptoName: bls12.ModuleName}, // TODO: make this pass
+	{cryptoName: bls12.ModuleName},
 	{cryptoName: ecdsa.ModuleName, cacheSize: 10},
 	{cryptoName: eddsa.ModuleName, cacheSize: 10},
-	// {cryptoName: bls12.ModuleName, cacheSize: 10}, // TODO: make this pass
+	{cryptoName: bls12.ModuleName, cacheSize: 10},
 }
 
 func TestCreatePartialCert(t *testing.T) {

@@ -98,10 +98,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 		signer := certauth.New(crypt, nil, logger)
 		signers[i] = signer
 		meta := opts[i].ConnectionMetadata()
-		pop := meta["bls12-pop-bin"]
-		cfg.SetReplicaMetaData(id, map[string]string{
-			"bls12-pop-bin": pop,
-		})
+		cfg.SetReplicaMetaData(id, meta)
 	}
 
 	tc1 := testutil.CreateTCOld(t, 1, signers)
