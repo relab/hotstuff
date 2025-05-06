@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	"sync"
+	"fmt"
 	"time"
 
 	"github.com/relab/hotstuff/core"
@@ -9,58 +9,31 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 )
 
-// This file implements a registry for metrics.
-// The purpose of the registry is to make it possible to instantiate multiple metrics based on their names only.
-// We distinguish between client metrics and replica metrics, but a single metric could work on both.
+// This file implements a method to enable metrics
 
-var (
-	registryMut    sync.Mutex
-	clientMetrics  = map[string]func() any{}
-	replicaMetrics = map[string]func() any{}
-)
-
-func InitMeasurements(
+// Enable injects necessary dependencies to enable the metrics the user wants to measure.
+func Enable(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	metricsLogger Logger,
 	opts *core.Options,
 	measurementInterval time.Duration,
-	names ...string) {
-	for _, name := range names {
+	metricNames ...string) error {
+	if len(metricNames) == 0 {
+		return fmt.Errorf("no metric names provided")
+	}
+	for _, name := range metricNames {
 		switch name {
 		case NameClientLatency:
-			NewClientLatency(eventLoop, logger, opts, metricsLogger)
+			enableClientLatency(eventLoop, logger, opts, metricsLogger)
 		case NameViewTimeouts:
-			NewViewTimeouts(eventLoop, logger, metricsLogger, opts)
+			enableViewTimeouts(eventLoop, logger, metricsLogger, opts)
 		case NameThroughput:
-			NewThroughput(eventLoop, logger, metricsLogger, opts)
+			enableThroughput(eventLoop, logger, metricsLogger, opts)
+		default:
+			return fmt.Errorf("invalid metric: %s", name)
 		}
 	}
-	NewTicker(eventLoop, measurementInterval)
-}
-
-// GetClientMetrics constructs a new instance of each named metric.
-func GetClientMetrics(names ...string) (metrics []any) {
-	registryMut.Lock()
-	defer registryMut.Unlock()
-
-	for _, name := range names {
-		if constructor, ok := clientMetrics[name]; ok {
-			metrics = append(metrics, constructor())
-		}
-	}
-	return
-}
-
-// GetReplicaMetrics constructs a new instance of each named metric.
-func GetReplicaMetrics(names ...string) (metrics []any) {
-	registryMut.Lock()
-	defer registryMut.Unlock()
-
-	for _, name := range names {
-		if constructor, ok := replicaMetrics[name]; ok {
-			metrics = append(metrics, constructor())
-		}
-	}
-	return
+	addTicker(eventLoop, measurementInterval)
+	return nil
 }

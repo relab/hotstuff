@@ -165,7 +165,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if w.measurementInterval > 0 {
 		// Initializes the metrics modules. This does not need to be stored
 		// anywhere since they all add handlers to the eventloop.
-		metrics.InitMeasurements(
+		err = metrics.Enable(
 			comps.eventLoop,
 			comps.logger,
 			w.metricsLogger,
@@ -173,6 +173,10 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			w.measurementInterval,
 			w.metrics...,
 		)
+
+		if err != nil {
+			return nil, err
+		}
 	}
 	return replica.New(
 		comps.clientSrv,
@@ -264,7 +268,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		eventLoop := eventloop.New(logger, 1000)
 
 		if w.measurementInterval > 0 {
-			metrics.InitMeasurements(
+			err := metrics.Enable(
 				eventLoop,
 				logger,
 				w.metricsLogger,
@@ -272,6 +276,9 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 				w.measurementInterval,
 				w.metrics...,
 			)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		cli := client.New(

@@ -14,8 +14,8 @@ import (
 
 const NameThroughput = "throughput"
 
-// Throughput measures throughput in commits per second, and commands per second.
-type Throughput struct {
+// throughput measures throughput in commits per second, and commands per second.
+type throughput struct {
 	metricsLogger Logger
 	opts          *core.Options
 
@@ -23,13 +23,13 @@ type Throughput struct {
 	commandCount uint64
 }
 
-func NewThroughput(
+func enableThroughput(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	metricsLogger Logger,
 	opts *core.Options,
-) *Throughput {
-	t := &Throughput{
+) {
+	t := &throughput{
 		metricsLogger: metricsLogger,
 		opts:          opts,
 	}
@@ -43,15 +43,14 @@ func NewThroughput(
 	}, eventloop.Prioritize())
 
 	logger.Info("Throughput metric enabled")
-	return t
 }
 
-func (t *Throughput) recordCommit(commands int) {
+func (t *throughput) recordCommit(commands int) {
 	t.commitCount++
 	t.commandCount += uint64(commands)
 }
 
-func (t *Throughput) tick(tick types.TickEvent) {
+func (t *throughput) tick(tick types.TickEvent) {
 	now := time.Now()
 	event := &types.ThroughputMeasurement{
 		Event:    types.NewReplicaEvent(uint32(t.opts.ID()), now),

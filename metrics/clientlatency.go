@@ -12,21 +12,21 @@ import (
 
 const NameClientLatency = "client-latency"
 
-// ClientLatency processes LatencyMeasurementEvents, and writes LatencyMeasurements to the metrics logger.
-type ClientLatency struct {
+// clientLatency processes LatencyMeasurementEvents, and writes LatencyMeasurements to the metrics logger.
+type clientLatency struct {
 	metricsLogger Logger
 	opts          *core.Options
 
 	wf Welford
 }
 
-func NewClientLatency(
+func enableClientLatency(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	opts *core.Options,
 	metricsLogger Logger,
-) *ClientLatency {
-	lr := &ClientLatency{
+) {
+	lr := &clientLatency{
 		opts:          opts,
 		metricsLogger: metricsLogger,
 	}
@@ -41,16 +41,15 @@ func NewClientLatency(
 	}, eventloop.Prioritize())
 
 	logger.Info("Client Latency metric enabled")
-	return lr
 }
 
 // AddLatency adds a latency data point to the current measurement.
-func (lr *ClientLatency) addLatency(latency time.Duration) {
+func (lr *clientLatency) addLatency(latency time.Duration) {
 	millis := float64(latency) / float64(time.Millisecond)
 	lr.wf.Update(millis)
 }
 
-func (lr *ClientLatency) tick(_ types.TickEvent) {
+func (lr *clientLatency) tick(_ types.TickEvent) {
 	mean, variance, count := lr.wf.Get()
 	event := &types.LatencyMeasurement{
 		Event:    types.NewClientEvent(uint32(lr.opts.ID()), time.Now()),

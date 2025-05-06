@@ -1,4 +1,4 @@
-// Package metrics contains modules that collect data or metrics from other modules.
+// Package metrics enables modules that collect data or metrics from other modules.
 //
 // The preferred way to collect metrics is to send an event from the target module onto the event loop,
 // which can then be received by a metric module for processing before being written to a data file using the
