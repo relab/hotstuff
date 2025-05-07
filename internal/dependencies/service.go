@@ -13,25 +13,25 @@ type Service struct {
 }
 
 func NewService(
-	coreComps *Core,
-	secureComps *Security,
+	depsCore *Core,
+	depsSecure *Security,
 	batchSize int,
 	clientSrvOpts []gorums.ServerOption,
 ) *Service {
 	cmdCache := clientsrv.NewCmdCache(
-		coreComps.Logger,
+		depsCore.Logger,
 		batchSize,
 	)
 	clientSrv := clientsrv.NewClientServer(
-		coreComps.EventLoop,
-		coreComps.Logger,
+		depsCore.EventLoop,
+		depsCore.Logger,
 		cmdCache,
 		clientSrvOpts,
 	)
 	committer := committer.New(
-		secureComps.BlockChain,
+		depsSecure.BlockChain,
 		clientSrv,
-		coreComps.Logger,
+		depsCore.Logger,
 	)
 	return &Service{
 		CmdCache:  cmdCache,

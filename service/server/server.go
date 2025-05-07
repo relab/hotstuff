@@ -35,11 +35,11 @@ type Server struct {
 
 // NewServer creates a new Server.
 func NewServer(
-	blockChain *blockchain.BlockChain,
-	configuration *netconfig.Config,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	opts *core.Options,
+	configuration *netconfig.Config,
+	blockChain *blockchain.BlockChain,
 
 	srvOpts ...ServerOptions,
 ) *Server {

@@ -1,13 +1,11 @@
 package dependencies
 
 import (
-	"github.com/relab/hotstuff/internal/latency"
-	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
-	"github.com/relab/hotstuff/internal/tree"
+	"time"
+
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/kauri"
-	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 )
 
@@ -19,6 +17,7 @@ type protocolModules struct {
 }
 
 type ViewDurationOptions struct {
+	IsFixed      bool
 	SampleSize   uint64
 	StartTimeout float64
 	MaxTimeout   float64
@@ -31,9 +30,7 @@ func newProtocolModules(
 	depsSecure *Security,
 	depsSrv *Service,
 
-	// TODO: avoid modifying this so it doesn't depend on orchestrationpb
-	opts *orchestrationpb.ReplicaOpts,
-	// TODO: consider using the ReplicaOpts instead of passing names individually.
+	useKauri bool,
 	consensusName,
 	leaderRotationName,
 	byzantineStrategy string,
@@ -58,7 +55,7 @@ func newProtocolModules(
 
 	var kauriOptional modules.Kauri = nil
 
-	if opts.GetKauri() {
+	if useKauri {
 		kauriOptional = kauri.New(
 			depsSecure.CryptoImpl,
 			leaderRotation,
@@ -72,12 +69,8 @@ func newProtocolModules(
 	}
 
 	var duration modules.ViewDuration
-	if leaderRotationName == leaderrotation.TreeLeaderModuleName {
-		// TODO(meling): Temporary default; should be configurable and moved to the appropriate place.
-		opts.SetTreeHeightWaitTime()
-		// create tree only if we are using tree leader (Kauri)
-		depsCore.Options.SetTree(createTree(opts))
-		duration = synchronizer.NewFixedViewDuration(opts.GetInitialTimeout().AsDuration())
+	if vdOpt.IsFixed {
+		duration = synchronizer.NewFixedViewDuration(time.Duration(vdOpt.StartTimeout * float64(time.Millisecond)))
 	} else {
 		duration = synchronizer.NewViewDuration(
 			vdOpt.SampleSize, vdOpt.StartTimeout, vdOpt.MaxTimeout, vdOpt.Multiplier,
@@ -114,7 +107,7 @@ func NewProtocol(
 	depsSecure *Security,
 	depsSrv *Service,
 
-	opts *orchestrationpb.ReplicaOpts,
+	useKauri bool,
 	consensusName,
 	leaderRotationName,
 	byzantineStrategy string,
@@ -125,7 +118,7 @@ func NewProtocol(
 		depsNet,
 		depsSecure,
 		depsSrv,
-		opts,
+		useKauri,
 		consensusName,
 		leaderRotationName,
 		byzantineStrategy,
@@ -165,18 +158,4 @@ func NewProtocol(
 		Consensus:    csus,
 		Synchronizer: synch,
 	}, nil
-}
-
-// createTree creates a tree based on the given replica options.
-func createTree(replicaOpts *orchestrationpb.ReplicaOpts) tree.Tree {
-	tree := tree.CreateTree(replicaOpts.HotstuffID(), int(replicaOpts.GetBranchFactor()), replicaOpts.TreePositionIDs())
-	switch {
-	case replicaOpts.GetAggregationTime():
-		tree.SetAggregationWaitTime(latency.MatrixFrom(replicaOpts.GetLocations()), replicaOpts.TreeDeltaDuration())
-	case replicaOpts.GetTreeHeightTime():
-		fallthrough
-	default:
-		tree.SetTreeHeightWaitTime(replicaOpts.TreeDeltaDuration())
-	}
-	return tree
 }

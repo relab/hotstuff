@@ -11,9 +11,12 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/dependencies"
+	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
+	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/network/sender"
 	"github.com/relab/hotstuff/protocol/kauri"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/service/clientsrv"
 	"github.com/relab/hotstuff/service/server"
@@ -61,8 +64,14 @@ func NewReplicaDependencies(
 
 	depsCore := dependencies.NewCore(opts.HotstuffID(), "hs", privKey)
 	depsCore.Options.SetSharedRandomSeed(opts.GetSharedSeed())
-	// TODO: Upon a merge with master, this doesn't compile.
-	// coreComps.Options.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
+
+	if opts.GetKauri() {
+		// TODO(meling): Temporary default; should be configurable and moved to the appropriate place.
+		opts.SetTreeHeightWaitTime()
+		// create tree only if we are using tree leader (Kauri)
+		t := createTree(opts)
+		depsCore.Options.SetTree(t)
+	}
 
 	depsNet := dependencies.NewNetwork(
 		depsCore,
@@ -73,7 +82,11 @@ func NewReplicaDependencies(
 	if err != nil {
 		return nil, err
 	}
-	depsSrv := dependencies.NewService(depsCore, depsSecure, int(opts.GetBatchSize()), clientSrvOpts)
+	depsSrv := dependencies.NewService(
+		depsCore,
+		depsSecure,
+		int(opts.GetBatchSize()),
+		clientSrvOpts)
 	durationOpts := dependencies.ViewDurationOptions{
 		SampleSize:   uint64(opts.GetTimeoutSamples()),
 		StartTimeout: float64(opts.GetInitialTimeout().AsDuration().Nanoseconds()) / float64(time.Millisecond),
@@ -81,12 +94,16 @@ func NewReplicaDependencies(
 		Multiplier:   float64(opts.GetTimeoutMultiplier()),
 	}
 
+	// TODO(AlanRostem): find a cleaner way to do this.
+	// This is needed for the tree-leader to work properly.
+	durationOpts.IsFixed = opts.GetLeaderRotation() == leaderrotation.TreeLeaderModuleName
+
 	depsProtocol, err := dependencies.NewProtocol(
 		depsCore,
 		depsNet,
 		depsSecure,
 		depsSrv,
-		opts,
+		opts.GetKauri(),
 		opts.GetConsensus(),
 		opts.GetLeaderRotation(),
 		opts.GetByzantineStrategy(),
@@ -95,17 +112,17 @@ func NewReplicaDependencies(
 		return nil, err
 	}
 	server := server.NewServer(
-		depsSecure.BlockChain,
-		depsNet.Config,
 		depsCore.EventLoop,
 		depsCore.Logger,
 		depsCore.Options,
+		depsNet.Config,
+		depsSecure.BlockChain,
 
 		server.WithLatencies(opts.HotstuffID(), opts.GetLocations()),
 		server.WithGorumsServerOptions(replicaSrvOpts...),
 	)
 	if opts.GetKauri() {
-		// TODO: cannot check if Kauri is enabled when encapsulating protocol modules.
+		// TODO: cannot check if Kauri is enabled when hiding protocol module initialization. Find a workaround.
 		// if modsProtocol.Kauri == nil {
 		// 	return nil, fmt.Errorf("kauri was enabled but its module was not initialized")
 		// }
@@ -121,4 +138,18 @@ func NewReplicaDependencies(
 		logger:       depsCore.Logger,
 		options:      depsCore.Options,
 	}, nil
+}
+
+// createTree creates a tree based on the given replica options.
+func createTree(replicaOpts *orchestrationpb.ReplicaOpts) tree.Tree {
+	tree := tree.CreateTree(replicaOpts.HotstuffID(), int(replicaOpts.GetBranchFactor()), replicaOpts.TreePositionIDs())
+	switch {
+	case replicaOpts.GetAggregationTime():
+		tree.SetAggregationWaitTime(latency.MatrixFrom(replicaOpts.GetLocations()), replicaOpts.TreeDeltaDuration())
+	case replicaOpts.GetTreeHeightTime():
+		fallthrough
+	default:
+		tree.SetTreeHeightWaitTime(replicaOpts.TreeDeltaDuration())
+	}
+	return tree
 }

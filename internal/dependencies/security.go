@@ -13,17 +13,17 @@ type Security struct {
 }
 
 func NewSecurity(
-	coreComps *Core,
-	netComps *Network,
+	depsCore *Core,
+	depsNet *Network,
 	cryptoName string,
 	cacheSize int,
 ) (*Security, error) {
 	blockChain := blockchain.New(
-		netComps.Sender,
-		coreComps.EventLoop,
-		coreComps.Logger,
+		depsNet.Sender,
+		depsCore.EventLoop,
+		depsCore.Logger,
 	)
-	cryptoImpl, err := newCryptoModule(cryptoName, netComps.Config, coreComps.Logger, coreComps.Options)
+	cryptoImpl, err := newCryptoModule(cryptoName, depsNet.Config, depsCore.Logger, depsCore.Options)
 	if err != nil {
 		return nil, err
 	}
@@ -32,14 +32,14 @@ func NewSecurity(
 		certAuthority = certauth.NewCached(
 			cryptoImpl,
 			blockChain,
-			coreComps.Logger,
+			depsCore.Logger,
 			cacheSize,
 		)
 	} else {
 		certAuthority = certauth.New(
 			cryptoImpl,
 			blockChain,
-			coreComps.Logger,
+			depsCore.Logger,
 		)
 	}
 	return &Security{
