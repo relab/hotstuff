@@ -112,7 +112,15 @@ func New(
 	if err != nil {
 		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
 	}
-
+	registerVoteHandlers(
+		blockChain,
+		configuration,
+		auth,
+		eventLoop,
+		logger,
+		s,
+		opts,
+	)
 	return s
 }
 

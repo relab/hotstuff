@@ -346,18 +346,6 @@ func NewProtocolComponents(
 		coreComps.Logger,
 		coreComps.Options,
 	)
-	// No need to store votingMachine since it's not a dependency.
-	// The constructor adds event handlers that enables voting logic.
-	// The registered event handlers also prevent this object from being disposed.
-	synchronizer.NewVotingMachine(
-		secureComps.BlockChain,
-		netComps.Config,
-		secureComps.CertAuth,
-		coreComps.EventLoop,
-		coreComps.Logger,
-		synch,
-		coreComps.Options,
-	)
 	return &ProtocolComponents{
 		Consensus:    csus,
 		Synchronizer: synch,
