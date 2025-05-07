@@ -153,7 +153,7 @@ func NewServiceComponents(
 
 type ProtocolModules struct {
 	ConsensusRules modules.ConsensusRules
-	Kauri          *kauri.Kauri
+	Kauri          modules.Kauri
 	LeaderRotation modules.LeaderRotation
 	ViewDuration   modules.ViewDuration
 }
@@ -192,7 +192,7 @@ func NewProtocolModules(
 		return nil, err
 	}
 
-	var kauriOptional *kauri.Kauri = nil
+	var kauriOptional modules.Kauri = nil
 
 	if opts.GetKauri() {
 		kauriOptional = kauri.New(
@@ -363,6 +363,9 @@ func NewReplicaComponents(
 		server.WithGorumsServerOptions(replicaSrvOpts...),
 	)
 	if opts.GetKauri() {
+		if protocolMods.Kauri == nil {
+			return nil, fmt.Errorf("kauri was enabled but its module was not initialized")
+		}
 		kauri.RegisterService(coreComps.EventLoop, coreComps.Logger, server)
 	}
 
