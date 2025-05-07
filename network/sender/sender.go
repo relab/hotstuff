@@ -74,7 +74,7 @@ func New(
 
 func (inv *Sender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 	mgrOpts := inv.mgrOpts
-	// TODO(AlanRostem): this was here when subConfig existed. Check if doing this is valid
+	// TODO(AlanRostem): this was here when the subConfig pattern was in use. Check if doing this is valid
 	// cfg.opts = nil // options are not needed beyond this point, so we delete them.
 
 	md := mapToMetadata(inv.opts.ConnectionMetadata())
