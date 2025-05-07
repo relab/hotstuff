@@ -16,10 +16,8 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
-	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/security/crypto/keygen"
@@ -158,7 +156,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 	}
 	// prepare components and modules
-	comps, err := NewReplicaDependencies(opts, privKey, certificate, rootCAs)
+	deps, err := NewReplicaDependencies(opts, privKey, certificate, rootCAs)
 	if err != nil {
 		return nil, err
 	}
@@ -166,10 +164,10 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		// Initializes the metrics modules. This does not need to be stored
 		// anywhere since they all add handlers to the eventloop.
 		err = metrics.Enable(
-			comps.eventLoop,
-			comps.logger,
+			deps.eventLoop,
+			deps.logger,
 			w.metricsLogger,
-			comps.options,
+			deps.options,
 			w.measurementInterval,
 			w.metrics...,
 		)
@@ -179,26 +177,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		}
 	}
 	return replica.New(
-		comps.clientSrv,
-		comps.server,
-		comps.sender,
-		comps.eventLoop,
-		comps.synchronizer,
+		deps.clientSrv,
+		deps.server,
+		deps.sender,
+		deps.eventLoop,
+		deps.synchronizer,
 	), nil
-}
-
-// createTree creates a tree based on the given replica options.
-func createTree(replicaOpts *orchestrationpb.ReplicaOpts) tree.Tree {
-	tree := tree.CreateTree(replicaOpts.HotstuffID(), int(replicaOpts.GetBranchFactor()), replicaOpts.TreePositionIDs())
-	switch {
-	case replicaOpts.GetAggregationTime():
-		tree.SetAggregationWaitTime(latency.MatrixFrom(replicaOpts.GetLocations()), replicaOpts.TreeDeltaDuration())
-	case replicaOpts.GetTreeHeightTime():
-		fallthrough
-	default:
-		tree.SetTreeHeightWaitTime(replicaOpts.TreeDeltaDuration())
-	}
-	return tree
 }
 
 func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {
