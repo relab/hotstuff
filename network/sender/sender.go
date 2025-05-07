@@ -41,15 +41,13 @@ func New(
 	logger logging.Logger,
 	opts *core.Options,
 
-	creds credentials.TransportCredentials,
-	mgrOpts ...gorums.ManagerOption) *Sender {
+	creds credentials.TransportCredentials) *Sender {
 	if creds == nil {
 		creds = insecure.NewCredentials()
 	}
 	grpcOpts := []grpc.DialOption{
 		grpc.WithTransportCredentials(creds),
 	}
-	mgrOpts = append(mgrOpts, gorums.WithGrpcDialOptions(grpcOpts...))
 
 	inv := &Sender{
 		configuration: configuration,
@@ -57,7 +55,7 @@ func New(
 		logger:        logger,
 		opts:          opts,
 
-		mgrOpts:  mgrOpts,
+		mgrOpts:  []gorums.ManagerOption{gorums.WithGrpcDialOptions(grpcOpts...)},
 		replicas: make(map[hotstuff.ID]*Replica),
 	}
 

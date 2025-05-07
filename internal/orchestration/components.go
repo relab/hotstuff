@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"time"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -35,7 +34,7 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-func getConsensusRules(
+func newConsensusRules(
 	name string,
 	blockChain *blockchain.BlockChain,
 	logger logging.Logger,
@@ -54,7 +53,7 @@ func getConsensusRules(
 	return
 }
 
-func getByzantine(
+func newByzantine(
 	name string,
 	rules modules.ConsensusRules,
 	blockChain *blockchain.BlockChain,
@@ -71,7 +70,7 @@ func getByzantine(
 	return
 }
 
-func getLeaderRotation(
+func newLeaderRotation(
 	name string,
 	chainLength int,
 	blockChain *blockchain.BlockChain,
@@ -97,7 +96,7 @@ func getLeaderRotation(
 	return
 }
 
-func getCrypto(
+func newCrypto(
 	name string,
 	configuration *netconfig.Config,
 	logger logging.Logger,
@@ -143,7 +142,6 @@ type NetworkComponents struct {
 func NewNetworkComponents(
 	coreComps *CoreComponents,
 	creds credentials.TransportCredentials,
-	mgrOpts ...gorums.ManagerOption,
 ) *NetworkComponents {
 	cfg := netconfig.NewConfig()
 	send := sender.New(
@@ -152,7 +150,6 @@ func NewNetworkComponents(
 		coreComps.Logger,
 		coreComps.Options,
 		creds,
-		mgrOpts...,
 	)
 
 	return &NetworkComponents{
@@ -178,7 +175,7 @@ func NewSecurityComponents(
 		coreComps.EventLoop,
 		coreComps.Logger,
 	)
-	cryptoImpl, err := getCrypto(cryptoName, netComps.Config, coreComps.Logger, coreComps.Options)
+	cryptoImpl, err := newCrypto(cryptoName, netComps.Config, coreComps.Logger, coreComps.Options)
 	if err != nil {
 		return nil, err
 	}
@@ -261,11 +258,11 @@ func NewProtocolModules(
 	consensusName, leaderRotationName, byzantineStrategy string,
 	vdOpt ViewDurationOptions,
 ) (*ProtocolModules, error) {
-	consensusRules, err := getConsensusRules(consensusName, secureComps.BlockChain, coreComps.Logger, coreComps.Options)
+	consensusRules, err := newConsensusRules(consensusName, secureComps.BlockChain, coreComps.Logger, coreComps.Options)
 	if err != nil {
 		return nil, err
 	}
-	leaderRotation, err := getLeaderRotation(
+	leaderRotation, err := newLeaderRotation(
 		leaderRotationName,
 		consensusRules.ChainLength(),
 		secureComps.BlockChain,
@@ -290,7 +287,7 @@ func NewProtocolModules(
 		)
 	}
 	if byzantineStrategy != "" {
-		byz, err := getByzantine(
+		byz, err := newByzantine(
 			byzantineStrategy,
 			consensusRules,
 			secureComps.BlockChain,
@@ -346,25 +343,13 @@ func NewProtocolComponents(
 		coreComps.Logger,
 		coreComps.Options,
 	)
-	// No need to store votingMachine since it's not a dependency.
-	// The constructor adds event handlers that enables voting logic.
-	// The registered event handlers also prevent this object from being disposed.
-	synchronizer.NewVotingMachine(
-		secureComps.BlockChain,
-		netComps.Config,
-		secureComps.CertAuth,
-		coreComps.EventLoop,
-		coreComps.Logger,
-		synch,
-		coreComps.Options,
-	)
 	return &ProtocolComponents{
 		Consensus:    csus,
 		Synchronizer: synch,
 	}
 }
 
-type ReplicaComponents struct {
+type Orchestrator struct {
 	clientSrv    *clientsrv.ClientServer
 	server       *server.Server
 	sender       *sender.Sender
@@ -374,12 +359,13 @@ type ReplicaComponents struct {
 	options      *core.Options
 }
 
-func NewReplicaComponents(
+func NewOrchestrator(
+	coreOpt *core.Options,
+	blockChain *blockchain.BlockChain,
 	opts *orchestrationpb.ReplicaOpts,
-	privKey hotstuff.PrivateKey,
 	certificate tls.Certificate,
 	rootCAs *x509.CertPool,
-) (*ReplicaComponents, error) {
+) (*Orchestrator, error) {
 	var creds credentials.TransportCredentials
 	clientSrvOpts := []gorums.ServerOption{}
 	replicaSrvOpts := []gorums.ServerOption{}
@@ -402,36 +388,17 @@ func NewReplicaComponents(
 		))
 	}
 
-	coreComps := NewCoreComponents(opts.HotstuffID(), "hs", privKey)
-	coreComps.Options.SetSharedRandomSeed(opts.GetSharedSeed())
+	coreOpt.SetSharedRandomSeed(opts.GetSharedSeed())
 	// TODO: Upon a merge with master, this doesn't compile.
 	// coreComps.Options.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
 
-	netComps := NewNetworkComponents(
-		coreComps,
-		creds,
-	)
-	cacheSize := 100 // TODO: consider making this configurable
-	secureComps, err := NewSecurityComponents(coreComps, netComps, opts.GetCrypto(), cacheSize)
-	if err != nil {
-		return nil, err
-	}
-	srvComps := NewServiceComponents(coreComps, secureComps, int(opts.GetBatchSize()), clientSrvOpts)
+	// durationOpts := ViewDurationOptions{
+	// 	SampleSize:   uint64(opts.GetTimeoutSamples()),
+	// 	StartTimeout: float64(opts.GetInitialTimeout().AsDuration().Nanoseconds()) / float64(time.Millisecond),
+	// 	MaxTimeout:   float64(opts.GetMaxTimeout().AsDuration().Nanoseconds()) / float64(time.Millisecond),
+	// 	Multiplier:   float64(opts.GetTimeoutMultiplier()),
+	// }
 
-	durationOpts := ViewDurationOptions{
-		SampleSize:   uint64(opts.GetTimeoutSamples()),
-		StartTimeout: float64(opts.GetInitialTimeout().AsDuration().Nanoseconds()) / float64(time.Millisecond),
-		MaxTimeout:   float64(opts.GetMaxTimeout().AsDuration().Nanoseconds()) / float64(time.Millisecond),
-		Multiplier:   float64(opts.GetTimeoutMultiplier()),
-	}
-	protocolMods, err := NewProtocolModules(
-		coreComps, netComps, secureComps, srvComps, opts,
-		opts.GetConsensus(), opts.GetLeaderRotation(), opts.GetByzantineStrategy(),
-		durationOpts)
-	if err != nil {
-		return nil, err
-	}
-	protocolComps := NewProtocolComponents(coreComps, netComps, secureComps, srvComps, protocolMods)
 	server := server.NewServer(
 		secureComps.BlockChain,
 		netComps.Config,
@@ -458,7 +425,7 @@ func NewReplicaComponents(
 			coreComps.Logger,
 		))
 	}
-	return &ReplicaComponents{
+	return &Orchestrator{
 		clientSrv:    srvComps.ClientSrv,
 		server:       server,
 		sender:       netComps.Sender,

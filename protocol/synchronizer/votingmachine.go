@@ -12,8 +12,8 @@ import (
 	"github.com/relab/hotstuff/security/certauth"
 )
 
-// VotingMachine collects votes.
-type VotingMachine struct {
+// votingMachine collects votes.
+type votingMachine struct {
 	blockChain    *blockchain.BlockChain
 	configuration *netconfig.Config
 	crypto        *certauth.CertAuthority
@@ -26,8 +26,8 @@ type VotingMachine struct {
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
 }
 
-// NewVotingMachine returns a new VotingMachine.
-func NewVotingMachine(
+// registerVotingHandlers returns a new VotingMachine.
+func registerVotingHandlers(
 	blockChain *blockchain.BlockChain,
 	configuration *netconfig.Config,
 	crypto *certauth.CertAuthority,
@@ -35,8 +35,8 @@ func NewVotingMachine(
 	logger logging.Logger,
 	synchronizer *Synchronizer,
 	opts *core.Options,
-) *VotingMachine {
-	vm := &VotingMachine{
+) {
+	vm := &votingMachine{
 		blockChain:    blockChain,
 		configuration: configuration,
 		crypto:        crypto,
@@ -48,12 +48,10 @@ func NewVotingMachine(
 		verifiedVotes: make(map[hotstuff.Hash][]hotstuff.PartialCert),
 	}
 	vm.eventLoop.RegisterHandler(hotstuff.VoteMsg{}, func(event any) { vm.OnVote(event.(hotstuff.VoteMsg)) })
-
-	return vm
 }
 
 // OnVote handles an incoming vote.
-func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
+func (vm *votingMachine) OnVote(vote hotstuff.VoteMsg) {
 	cert := vote.PartialCert
 	vm.logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
 
@@ -94,7 +92,7 @@ func (vm *VotingMachine) OnVote(vote hotstuff.VoteMsg) {
 	}
 }
 
-func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
+func (vm *votingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
 	if !vm.crypto.VerifyPartialCert(cert) {
 		vm.logger.Info("OnVote: Vote could not be verified!")
 		return
