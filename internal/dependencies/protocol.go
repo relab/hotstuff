@@ -11,7 +11,7 @@ import (
 	"github.com/relab/hotstuff/protocol/synchronizer"
 )
 
-type modSetProtocol struct {
+type protocolModules struct {
 	ConsensusRules modules.ConsensusRules
 	Kauri          modules.Kauri
 	LeaderRotation modules.LeaderRotation
@@ -26,10 +26,10 @@ type ViewDurationOptions struct {
 }
 
 func newProtocolModules(
-	depsCore *DepSetCore,
-	depsNet *DepSetNetwork,
-	depsSecure *DepSetSecurity,
-	depsSrv *DepSetService,
+	depsCore *Core,
+	depsNet *Network,
+	depsSecure *Security,
+	depsSrv *Service,
 
 	// TODO: avoid modifying this so it doesn't depend on orchestrationpb
 	opts *orchestrationpb.ReplicaOpts,
@@ -38,7 +38,7 @@ func newProtocolModules(
 	leaderRotationName,
 	byzantineStrategy string,
 	vdOpt ViewDurationOptions,
-) (*modSetProtocol, error) {
+) (*protocolModules, error) {
 	consensusRules, err := newConsensusRulesModule(consensusName, depsSecure.BlockChain, depsCore.Logger, depsCore.Options)
 	if err != nil {
 		return nil, err
@@ -95,7 +95,7 @@ func newProtocolModules(
 		consensusRules = byz
 		depsCore.Logger.Infof("assigned byzantine strategy: %s", byzantineStrategy)
 	}
-	return &modSetProtocol{
+	return &protocolModules{
 		ConsensusRules: consensusRules,
 		Kauri:          kauriOptional,
 		LeaderRotation: leaderRotation,
@@ -103,23 +103,23 @@ func newProtocolModules(
 	}, nil
 }
 
-type DepSetProtocol struct {
+type Protocol struct {
 	Consensus    *consensus.Consensus
 	Synchronizer *synchronizer.Synchronizer
 }
 
 func NewProtocol(
-	depsCore *DepSetCore,
-	depsNet *DepSetNetwork,
-	depsSecure *DepSetSecurity,
-	depsSrv *DepSetService,
+	depsCore *Core,
+	depsNet *Network,
+	depsSecure *Security,
+	depsSrv *Service,
 
 	opts *orchestrationpb.ReplicaOpts,
 	consensusName,
 	leaderRotationName,
 	byzantineStrategy string,
 	vdOpt ViewDurationOptions,
-) (*DepSetProtocol, error) {
+) (*Protocol, error) {
 	mods, err := newProtocolModules(
 		depsCore,
 		depsNet,
@@ -161,7 +161,7 @@ func NewProtocol(
 		depsCore.Logger,
 		depsCore.Options,
 	)
-	return &DepSetProtocol{
+	return &Protocol{
 		Consensus:    csus,
 		Synchronizer: synch,
 	}, nil

@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 )
 
-type DepSetCore struct {
+type Core struct {
 	Options   *core.Options
 	EventLoop *eventloop.EventLoop
 	Logger    logging.Logger
@@ -19,9 +19,9 @@ func NewCore(
 	id hotstuff.ID,
 	logTag string,
 	privKey hotstuff.PrivateKey,
-) *DepSetCore {
+) *Core {
 	logger := logging.New(fmt.Sprintf("%s%d", logTag, id))
-	return &DepSetCore{
+	return &Core{
 		Options:   core.NewOptions(id, privKey),
 		EventLoop: eventloop.New(logger, 100),
 		Logger:    logger,

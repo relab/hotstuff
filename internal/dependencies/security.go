@@ -6,18 +6,18 @@ import (
 	"github.com/relab/hotstuff/security/certauth"
 )
 
-type DepSetSecurity struct {
+type Security struct {
 	BlockChain *blockchain.BlockChain
 	CryptoImpl modules.CryptoBase
 	CertAuth   *certauth.CertAuthority
 }
 
 func NewSecurity(
-	coreComps *DepSetCore,
-	netComps *DepSetNetwork,
+	coreComps *Core,
+	netComps *Network,
 	cryptoName string,
 	cacheSize int,
-) (*DepSetSecurity, error) {
+) (*Security, error) {
 	blockChain := blockchain.New(
 		netComps.Sender,
 		coreComps.EventLoop,
@@ -42,7 +42,7 @@ func NewSecurity(
 			coreComps.Logger,
 		)
 	}
-	return &DepSetSecurity{
+	return &Security{
 		BlockChain: blockChain,
 		CryptoImpl: cryptoImpl,
 		CertAuth:   certAuthority,

@@ -7,16 +7,16 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-type DepSetNetwork struct {
+type Network struct {
 	Config *netconfig.Config
 	Sender *sender.Sender
 }
 
 func NewNetwork(
-	depsCore *DepSetCore,
+	depsCore *Core,
 	creds credentials.TransportCredentials,
 	mgrOpts ...gorums.ManagerOption,
-) *DepSetNetwork {
+) *Network {
 	cfg := netconfig.NewConfig()
 	send := sender.New(
 		cfg,
@@ -27,7 +27,7 @@ func NewNetwork(
 		mgrOpts...,
 	)
 
-	return &DepSetNetwork{
+	return &Network{
 		Config: cfg,
 		Sender: send,
 	}

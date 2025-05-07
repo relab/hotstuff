@@ -6,18 +6,18 @@ import (
 	"github.com/relab/hotstuff/service/committer"
 )
 
-type DepSetService struct {
+type Service struct {
 	CmdCache  *clientsrv.CmdCache
 	ClientSrv *clientsrv.ClientServer
 	Committer *committer.Committer
 }
 
 func NewService(
-	coreComps *DepSetCore,
-	secureComps *DepSetSecurity,
+	coreComps *Core,
+	secureComps *Security,
 	batchSize int,
 	clientSrvOpts []gorums.ServerOption,
-) *DepSetService {
+) *Service {
 	cmdCache := clientsrv.NewCmdCache(
 		coreComps.Logger,
 		batchSize,
@@ -33,7 +33,7 @@ func NewService(
 		clientSrv,
 		coreComps.Logger,
 	)
-	return &DepSetService{
+	return &Service{
 		CmdCache:  cmdCache,
 		ClientSrv: clientSrv,
 		Committer: committer,
