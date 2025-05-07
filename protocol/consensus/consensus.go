@@ -10,7 +10,6 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/network/sender"
-	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
@@ -22,6 +21,7 @@ import (
 // for implementations of the ConsensusImpl interface.
 type Consensus struct {
 	impl           modules.ConsensusRules
+	kauri          modules.Kauri
 	leaderRotation modules.LeaderRotation
 
 	blockChain    *blockchain.BlockChain
@@ -34,8 +34,6 @@ type Consensus struct {
 	logger        logging.Logger
 	opts          *core.Options
 
-	kauri modules.Kauri
-
 	lastVote hotstuff.View
 }
 
@@ -43,6 +41,7 @@ type Consensus struct {
 func New(
 	impl modules.ConsensusRules,
 	leaderRotation modules.LeaderRotation,
+	kauri modules.Kauri,
 
 	blockChain *blockchain.BlockChain,
 	committer *committer.Committer,
@@ -57,6 +56,7 @@ func New(
 	cs := &Consensus{
 		impl:           impl,
 		leaderRotation: leaderRotation,
+		kauri:          kauri,
 
 		blockChain:    blockChain,
 		committer:     committer,
@@ -82,11 +82,6 @@ func New(
 	})
 
 	return cs
-}
-
-// SetKauri adds the Kauri protocol to the consensus logic.
-func (cs *Consensus) SetKauri(k *kauri.Kauri) {
-	cs.kauri = k
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.

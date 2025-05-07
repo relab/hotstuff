@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
@@ -19,7 +18,6 @@ import (
 	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/network/sender"
 	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/service/server"
 )
 
 const ModuleName = "kauri"
@@ -33,7 +31,6 @@ type Kauri struct {
 	eventLoop      *eventloop.EventLoop
 	configuration  *netconfig.Config
 	sender         *sender.Sender
-	server         *server.Server
 	logger         logging.Logger
 
 	aggContrib  hotstuff.QuorumSignature
@@ -56,7 +53,6 @@ func New(
 	eventLoop *eventloop.EventLoop,
 	configuration *netconfig.Config,
 	sender *sender.Sender,
-	server *server.Server,
 	logger logging.Logger,
 ) *Kauri {
 	k := &Kauri{
@@ -67,7 +63,6 @@ func New(
 		eventLoop:      eventLoop,
 		configuration:  configuration,
 		sender:         sender,
-		server:         server,
 		logger:         logger,
 
 		nodes: make(map[hotstuff.ID]*kauripb.Node),
@@ -88,7 +83,6 @@ func New(
 
 func (k *Kauri) postInit() {
 	k.logger.Info("Kauri: Initializing")
-	kauripb.RegisterKauriServer(k.server.GetGorumsServer(), serviceImpl{k.eventLoop})
 	k.initializeConfiguration()
 }
 
@@ -188,19 +182,6 @@ func (k *Kauri) OnWaitTimerExpired(event WaitTimerExpiredEvent) {
 		k.SendContributionToParent()
 		k.reset()
 	}
-}
-
-type serviceImpl struct {
-	eventLoop *eventloop.EventLoop
-}
-
-func (i serviceImpl) SendContribution(_ gorums.ServerCtx, request *kauripb.Contribution) {
-	i.eventLoop.AddEvent(ContributionRecvEvent{Contribution: request})
-}
-
-// ContributionRecvEvent is raised when a contribution is received.
-type ContributionRecvEvent struct {
-	Contribution *kauripb.Contribution
 }
 
 // canMergeContributions returns nil if the contributions are non-overlapping.

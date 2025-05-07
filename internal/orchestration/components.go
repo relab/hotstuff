@@ -11,6 +11,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/orchestration/components"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network/netconfig"
@@ -18,103 +19,15 @@ import (
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
-	"github.com/relab/hotstuff/protocol/rules/byzantine"
-	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
-	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
-	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
-	"github.com/relab/hotstuff/security/crypto/bls12"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
-	"github.com/relab/hotstuff/security/crypto/eddsa"
 	"github.com/relab/hotstuff/service/clientsrv"
 	"github.com/relab/hotstuff/service/committer"
 	"github.com/relab/hotstuff/service/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
-
-func getConsensusRules(
-	name string,
-	blockChain *blockchain.BlockChain,
-	logger logging.Logger,
-	opts *core.Options,
-) (rules modules.ConsensusRules, err error) {
-	switch name {
-	case fasthotstuff.ModuleName:
-		rules = fasthotstuff.New(blockChain, logger, opts)
-	case simplehotstuff.ModuleName:
-		rules = simplehotstuff.New(blockChain, logger)
-	case chainedhotstuff.ModuleName:
-		rules = chainedhotstuff.New(blockChain, logger)
-	default:
-		return nil, fmt.Errorf("invalid consensus name: '%s'", name)
-	}
-	return
-}
-
-func getByzantine(
-	name string,
-	rules modules.ConsensusRules,
-	blockChain *blockchain.BlockChain,
-	opts *core.Options,
-) (byzRules modules.ConsensusRules, err error) {
-	switch name {
-	case byzantine.SilenceModuleName:
-		byzRules = byzantine.NewSilence(rules)
-	case byzantine.ForkModuleName:
-		byzRules = byzantine.NewFork(rules, blockChain, opts)
-	default:
-		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", name)
-	}
-	return
-}
-
-func getLeaderRotation(
-	name string,
-	chainLength int,
-	blockChain *blockchain.BlockChain,
-	config *netconfig.Config,
-	committer *committer.Committer,
-	logger logging.Logger,
-	opts *core.Options,
-) (ld modules.LeaderRotation, err error) {
-	switch name {
-	case leaderrotation.CarouselModuleName:
-		ld = leaderrotation.NewCarousel(chainLength, blockChain, config, committer, opts, logger)
-	case leaderrotation.ReputationModuleName:
-		ld = leaderrotation.NewRepBased(chainLength, config, committer, opts, logger)
-	case leaderrotation.RoundRobinModuleName:
-		ld = leaderrotation.NewRoundRobin(config)
-	case leaderrotation.FixedModuleName:
-		ld = leaderrotation.NewFixed(hotstuff.ID(1))
-	case leaderrotation.TreeLeaderModuleName:
-		ld = leaderrotation.NewTreeLeader(opts)
-	default:
-		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", name)
-	}
-	return
-}
-
-func getCrypto(
-	name string,
-	configuration *netconfig.Config,
-	logger logging.Logger,
-	opts *core.Options,
-) (crypto modules.CryptoBase, err error) {
-	switch name {
-	case bls12.ModuleName:
-		crypto = bls12.New(configuration, logger, opts)
-	case ecdsa.ModuleName:
-		crypto = ecdsa.New(configuration, logger, opts)
-	case eddsa.ModuleName:
-		crypto = eddsa.New(configuration, logger, opts)
-	default:
-		return nil, fmt.Errorf("invalid crypto name: '%s'", name)
-	}
-	return
-}
 
 type CoreComponents struct {
 	Options   *core.Options
@@ -178,7 +91,7 @@ func NewSecurityComponents(
 		coreComps.EventLoop,
 		coreComps.Logger,
 	)
-	cryptoImpl, err := getCrypto(cryptoName, netComps.Config, coreComps.Logger, coreComps.Options)
+	cryptoImpl, err := components.NewCryptoImpl(cryptoName, netComps.Config, coreComps.Logger, coreComps.Options)
 	if err != nil {
 		return nil, err
 	}
@@ -240,6 +153,7 @@ func NewServiceComponents(
 
 type ProtocolModules struct {
 	ConsensusRules modules.ConsensusRules
+	Kauri          *kauri.Kauri
 	LeaderRotation modules.LeaderRotation
 	ViewDuration   modules.ViewDuration
 }
@@ -261,11 +175,11 @@ func NewProtocolModules(
 	consensusName, leaderRotationName, byzantineStrategy string,
 	vdOpt ViewDurationOptions,
 ) (*ProtocolModules, error) {
-	consensusRules, err := getConsensusRules(consensusName, secureComps.BlockChain, coreComps.Logger, coreComps.Options)
+	consensusRules, err := components.NewConsensusRules(consensusName, secureComps.BlockChain, coreComps.Logger, coreComps.Options)
 	if err != nil {
 		return nil, err
 	}
-	leaderRotation, err := getLeaderRotation(
+	leaderRotation, err := components.NewLeaderRotation(
 		leaderRotationName,
 		consensusRules.ChainLength(),
 		secureComps.BlockChain,
@@ -277,6 +191,22 @@ func NewProtocolModules(
 	if err != nil {
 		return nil, err
 	}
+
+	var kauriOptional *kauri.Kauri = nil
+
+	if opts.GetKauri() {
+		kauriOptional = kauri.New(
+			secureComps.CryptoImpl,
+			leaderRotation,
+			secureComps.BlockChain,
+			coreComps.Options,
+			coreComps.EventLoop,
+			netComps.Config,
+			netComps.Sender,
+			coreComps.Logger,
+		)
+	}
+
 	var duration modules.ViewDuration
 	if leaderRotationName == leaderrotation.TreeLeaderModuleName {
 		// TODO(meling): Temporary default; should be configurable and moved to the appropriate place.
@@ -290,7 +220,7 @@ func NewProtocolModules(
 		)
 	}
 	if byzantineStrategy != "" {
-		byz, err := getByzantine(
+		byz, err := components.NewByzantineStrategy(
 			byzantineStrategy,
 			consensusRules,
 			secureComps.BlockChain,
@@ -303,6 +233,7 @@ func NewProtocolModules(
 	}
 	return &ProtocolModules{
 		ConsensusRules: consensusRules,
+		Kauri:          kauriOptional,
 		LeaderRotation: leaderRotation,
 		ViewDuration:   duration,
 	}, nil
@@ -323,6 +254,7 @@ func NewProtocolComponents(
 	csus := consensus.New(
 		mods.ConsensusRules,
 		mods.LeaderRotation,
+		mods.Kauri,
 		secureComps.BlockChain,
 		srvComps.Committer,
 		srvComps.CmdCache,
@@ -430,22 +362,10 @@ func NewReplicaComponents(
 		server.WithLatencies(opts.HotstuffID(), opts.GetLocations()),
 		server.WithGorumsServerOptions(replicaSrvOpts...),
 	)
-
-	// Putting it here for now since it breaks consistency with component categorization.
-	// TODO(AlanRostem): figure out a better way to enable Kauri. Problem is that it needs server, making categorization harder.
 	if opts.GetKauri() {
-		protocolComps.Consensus.SetKauri(kauri.New(
-			secureComps.CryptoImpl,
-			protocolMods.LeaderRotation,
-			secureComps.BlockChain,
-			coreComps.Options,
-			coreComps.EventLoop,
-			netComps.Config,
-			netComps.Sender,
-			server,
-			coreComps.Logger,
-		))
+		kauri.RegisterService(coreComps.EventLoop, coreComps.Logger, server)
 	}
+
 	return &ReplicaComponents{
 		clientSrv:    srvComps.ClientSrv,
 		server:       server,
