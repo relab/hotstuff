@@ -15,8 +15,8 @@ import (
 
 type dummyReplica struct {
 	connMd   map[string]string
-	netComps *orchestration.NetworkComponents
-	secComps *orchestration.SecurityComponents
+	netComps *orchestration.NetworkDependencies
+	secComps *orchestration.SecurityDependencies
 }
 
 func genKey(t *testing.T, cryptoName string) hotstuff.PrivateKey {
@@ -31,11 +31,11 @@ func genKey(t *testing.T, cryptoName string) hotstuff.PrivateKey {
 	return nil
 }
 
-func createComponents(t *testing.T, id int, cryptoName string, privKey hotstuff.PrivateKey, cacheSize int) *dummyReplica {
+func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuff.PrivateKey, cacheSize int) *dummyReplica {
 	t.Helper()
-	core := orchestration.NewCoreComponents(hotstuff.ID(id), "test", privKey)
-	net := orchestration.NewNetworkComponents(core, nil)
-	sec, err := orchestration.NewSecurityComponents(core, net, cryptoName, cacheSize)
+	core := orchestration.NewCoreDependencies(hotstuff.ID(id), "test", privKey)
+	net := orchestration.NewNetworkDependencies(core, nil)
+	sec, err := orchestration.NewSecurityDependencies(core, net, cryptoName, cacheSize)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -53,7 +53,7 @@ func createDummyReplicas(t *testing.T, n int, cryptoName string, cacheSize int) 
 	replicas := make([]hotstuff.ReplicaInfo, 0, n)
 	for id := range n {
 		privKey := genKey(t, cryptoName)
-		dummy := createComponents(t, id+1, cryptoName, privKey, cacheSize)
+		dummy := createDependencies(t, id+1, cryptoName, privKey, cacheSize)
 		dummies = append(dummies, dummy)
 		replicas = append(replicas, hotstuff.ReplicaInfo{
 			ID:       hotstuff.ID(id + 1),

@@ -13,7 +13,8 @@ type treeLeader struct {
 }
 
 func NewTreeLeader(opts *core.Options) *treeLeader {
-	return &treeLeader{opts: opts, leader: 1}
+	t := &treeLeader{opts: opts, leader: 1}
+	return t
 }
 
 // GetLeader returns the id of the leader in the given view

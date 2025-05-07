@@ -11,7 +11,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/internal/orchestration/components"
+	"github.com/relab/hotstuff/internal/orchestration/dependencies"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network/netconfig"
@@ -29,35 +29,35 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-type CoreComponents struct {
+type CoreDependencies struct {
 	Options   *core.Options
 	EventLoop *eventloop.EventLoop
 	Logger    logging.Logger
 }
 
-func NewCoreComponents(
+func NewCoreDependencies(
 	id hotstuff.ID,
 	logTag string,
 	privKey hotstuff.PrivateKey,
-) *CoreComponents {
+) *CoreDependencies {
 	logger := logging.New(fmt.Sprintf("%s%d", logTag, id))
-	return &CoreComponents{
+	return &CoreDependencies{
 		Options:   core.NewOptions(id, privKey),
 		EventLoop: eventloop.New(logger, 100),
 		Logger:    logger,
 	}
 }
 
-type NetworkComponents struct {
+type NetworkDependencies struct {
 	Config *netconfig.Config
 	Sender *sender.Sender
 }
 
-func NewNetworkComponents(
-	coreComps *CoreComponents,
+func NewNetworkDependencies(
+	coreComps *CoreDependencies,
 	creds credentials.TransportCredentials,
 	mgrOpts ...gorums.ManagerOption,
-) *NetworkComponents {
+) *NetworkDependencies {
 	cfg := netconfig.NewConfig()
 	send := sender.New(
 		cfg,
@@ -68,30 +68,30 @@ func NewNetworkComponents(
 		mgrOpts...,
 	)
 
-	return &NetworkComponents{
+	return &NetworkDependencies{
 		Config: cfg,
 		Sender: send,
 	}
 }
 
-type SecurityComponents struct {
+type SecurityDependencies struct {
 	BlockChain *blockchain.BlockChain
 	CryptoImpl modules.CryptoBase
 	CertAuth   *certauth.CertAuthority
 }
 
-func NewSecurityComponents(
-	coreComps *CoreComponents,
-	netComps *NetworkComponents,
+func NewSecurityDependencies(
+	coreComps *CoreDependencies,
+	netComps *NetworkDependencies,
 	cryptoName string,
 	cacheSize int,
-) (*SecurityComponents, error) {
+) (*SecurityDependencies, error) {
 	blockChain := blockchain.New(
 		netComps.Sender,
 		coreComps.EventLoop,
 		coreComps.Logger,
 	)
-	cryptoImpl, err := components.NewCryptoImpl(cryptoName, netComps.Config, coreComps.Logger, coreComps.Options)
+	cryptoImpl, err := dependencies.NewCryptoImpl(cryptoName, netComps.Config, coreComps.Logger, coreComps.Options)
 	if err != nil {
 		return nil, err
 	}
@@ -110,25 +110,25 @@ func NewSecurityComponents(
 			coreComps.Logger,
 		)
 	}
-	return &SecurityComponents{
+	return &SecurityDependencies{
 		BlockChain: blockChain,
 		CryptoImpl: cryptoImpl,
 		CertAuth:   certAuthority,
 	}, nil
 }
 
-type ServiceComponents struct {
+type ServiceDependencies struct {
 	CmdCache  *clientsrv.CmdCache
 	ClientSrv *clientsrv.ClientServer
 	Committer *committer.Committer
 }
 
-func NewServiceComponents(
-	coreComps *CoreComponents,
-	secureComps *SecurityComponents,
+func NewServiceDependencies(
+	coreComps *CoreDependencies,
+	secureComps *SecurityDependencies,
 	batchSize int,
 	clientSrvOpts []gorums.ServerOption,
-) *ServiceComponents {
+) *ServiceDependencies {
 	cmdCache := clientsrv.NewCmdCache(
 		coreComps.Logger,
 		batchSize,
@@ -144,7 +144,7 @@ func NewServiceComponents(
 		clientSrv,
 		coreComps.Logger,
 	)
-	return &ServiceComponents{
+	return &ServiceDependencies{
 		CmdCache:  cmdCache,
 		ClientSrv: clientSrv,
 		Committer: committer,
@@ -166,20 +166,20 @@ type ViewDurationOptions struct {
 }
 
 func NewProtocolModules(
-	coreComps *CoreComponents,
-	netComps *NetworkComponents,
-	secureComps *SecurityComponents,
-	srvComps *ServiceComponents,
+	coreComps *CoreDependencies,
+	netComps *NetworkDependencies,
+	secureComps *SecurityDependencies,
+	srvComps *ServiceDependencies,
 
 	opts *orchestrationpb.ReplicaOpts, // TODO: avoid modifying this so it doesn't depend on orchestrationpb
 	consensusName, leaderRotationName, byzantineStrategy string,
 	vdOpt ViewDurationOptions,
 ) (*ProtocolModules, error) {
-	consensusRules, err := components.NewConsensusRules(consensusName, secureComps.BlockChain, coreComps.Logger, coreComps.Options)
+	consensusRules, err := dependencies.NewConsensusRules(consensusName, secureComps.BlockChain, coreComps.Logger, coreComps.Options)
 	if err != nil {
 		return nil, err
 	}
-	leaderRotation, err := components.NewLeaderRotation(
+	leaderRotation, err := dependencies.NewLeaderRotation(
 		leaderRotationName,
 		consensusRules.ChainLength(),
 		secureComps.BlockChain,
@@ -220,7 +220,7 @@ func NewProtocolModules(
 		)
 	}
 	if byzantineStrategy != "" {
-		byz, err := components.NewByzantineStrategy(
+		byz, err := dependencies.NewByzantineStrategy(
 			byzantineStrategy,
 			consensusRules,
 			secureComps.BlockChain,
@@ -239,18 +239,18 @@ func NewProtocolModules(
 	}, nil
 }
 
-type ProtocolComponents struct {
+type ProtocolDependencies struct {
 	Consensus    *consensus.Consensus
 	Synchronizer *synchronizer.Synchronizer
 }
 
-func NewProtocolComponents(
-	coreComps *CoreComponents,
-	netComps *NetworkComponents,
-	secureComps *SecurityComponents,
-	srvComps *ServiceComponents,
+func NewProtocolDependencies(
+	coreComps *CoreDependencies,
+	netComps *NetworkDependencies,
+	secureComps *SecurityDependencies,
+	srvComps *ServiceDependencies,
 	mods *ProtocolModules,
-) *ProtocolComponents {
+) *ProtocolDependencies {
 	csus := consensus.New(
 		mods.ConsensusRules,
 		mods.LeaderRotation,
@@ -278,13 +278,13 @@ func NewProtocolComponents(
 		coreComps.Logger,
 		coreComps.Options,
 	)
-	return &ProtocolComponents{
+	return &ProtocolDependencies{
 		Consensus:    csus,
 		Synchronizer: synch,
 	}
 }
 
-type ReplicaComponents struct {
+type ReplicaDependencies struct {
 	clientSrv    *clientsrv.ClientServer
 	server       *server.Server
 	sender       *sender.Sender
@@ -294,12 +294,12 @@ type ReplicaComponents struct {
 	options      *core.Options
 }
 
-func NewReplicaComponents(
+func NewReplicaDependencies(
 	opts *orchestrationpb.ReplicaOpts,
 	privKey hotstuff.PrivateKey,
 	certificate tls.Certificate,
 	rootCAs *x509.CertPool,
-) (*ReplicaComponents, error) {
+) (*ReplicaDependencies, error) {
 	var creds credentials.TransportCredentials
 	clientSrvOpts := []gorums.ServerOption{}
 	replicaSrvOpts := []gorums.ServerOption{}
@@ -322,21 +322,21 @@ func NewReplicaComponents(
 		))
 	}
 
-	coreComps := NewCoreComponents(opts.HotstuffID(), "hs", privKey)
+	coreComps := NewCoreDependencies(opts.HotstuffID(), "hs", privKey)
 	coreComps.Options.SetSharedRandomSeed(opts.GetSharedSeed())
 	// TODO: Upon a merge with master, this doesn't compile.
 	// coreComps.Options.SetTreeConfig(opts.GetBranchFactor(), opts.TreePositionIDs(), opts.TreeDeltaDuration())
 
-	netComps := NewNetworkComponents(
+	netComps := NewNetworkDependencies(
 		coreComps,
 		creds,
 	)
 	cacheSize := 100 // TODO: consider making this configurable
-	secureComps, err := NewSecurityComponents(coreComps, netComps, opts.GetCrypto(), cacheSize)
+	secureComps, err := NewSecurityDependencies(coreComps, netComps, opts.GetCrypto(), cacheSize)
 	if err != nil {
 		return nil, err
 	}
-	srvComps := NewServiceComponents(coreComps, secureComps, int(opts.GetBatchSize()), clientSrvOpts)
+	srvComps := NewServiceDependencies(coreComps, secureComps, int(opts.GetBatchSize()), clientSrvOpts)
 
 	durationOpts := ViewDurationOptions{
 		SampleSize:   uint64(opts.GetTimeoutSamples()),
@@ -351,7 +351,7 @@ func NewReplicaComponents(
 	if err != nil {
 		return nil, err
 	}
-	protocolComps := NewProtocolComponents(coreComps, netComps, secureComps, srvComps, protocolMods)
+	protocolComps := NewProtocolDependencies(coreComps, netComps, secureComps, srvComps, protocolMods)
 	server := server.NewServer(
 		secureComps.BlockChain,
 		netComps.Config,
@@ -369,7 +369,7 @@ func NewReplicaComponents(
 		kauri.RegisterService(coreComps.EventLoop, coreComps.Logger, server)
 	}
 
-	return &ReplicaComponents{
+	return &ReplicaDependencies{
 		clientSrv:    srvComps.ClientSrv,
 		server:       server,
 		sender:       netComps.Sender,
