@@ -123,20 +123,19 @@ func NewProtocol(
 		depsCore.Logger,
 		depsCore.Options,
 	)
-	synch := synchronizer.New(
-		depsSecure.CryptoImpl,
-		mods.LeaderRotation,
-		depsSecure.BlockChain,
-		csus,
-		depsSecure.CertAuth,
-		depsNet.Config,
-		depsNet.Sender,
-		depsCore.EventLoop,
-		depsCore.Logger,
-		depsCore.Options,
-	)
 	return &Protocol{
-		Consensus:    csus,
-		Synchronizer: synch,
+		Consensus: csus,
+		Synchronizer: synchronizer.New(
+			depsSecure.CryptoImpl,
+			mods.LeaderRotation,
+			depsSecure.BlockChain,
+			csus,
+			depsSecure.CertAuth,
+			depsNet.Config,
+			depsNet.Sender,
+			depsCore.EventLoop,
+			depsCore.Logger,
+			depsCore.Options,
+		),
 	}, nil
 }

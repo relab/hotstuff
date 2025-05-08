@@ -18,17 +18,15 @@ func NewNetwork(
 	mgrOpts ...gorums.ManagerOption,
 ) *Network {
 	cfg := netconfig.NewConfig()
-	send := sender.New(
-		cfg,
-		depsCore.EventLoop,
-		depsCore.Logger,
-		depsCore.Options,
-		creds,
-		mgrOpts...,
-	)
-
 	return &Network{
 		Config: cfg,
-		Sender: send,
+		Sender: sender.New(
+			cfg,
+			depsCore.EventLoop,
+			depsCore.Logger,
+			depsCore.Options,
+			creds,
+			mgrOpts...,
+		),
 	}
 }
