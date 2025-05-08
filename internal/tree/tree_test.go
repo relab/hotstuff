@@ -24,7 +24,7 @@ func TestCreateTree(t *testing.T) {
 		{size: 111, id: 1, branchFactor: 3, wantHeight: 5},
 	}
 	for _, test := range tests {
-		tree := CreateTree(test.id, test.branchFactor, DefaultTreePos(test.size))
+		tree := Create(test.id, test.branchFactor, DefaultTreePos(test.size))
 		if tree.TreeHeight() != test.wantHeight {
 			t.Errorf("CreateTree(%d, %d, %d).GetTreeHeight() = %d, want %d",
 				test.size, test.id, test.branchFactor, tree.TreeHeight(), test.wantHeight)
@@ -35,14 +35,14 @@ func TestCreateTree(t *testing.T) {
 func TestCreateTreeNegativeBF(t *testing.T) {
 	defer func() { _ = recover() }()
 	ids := []hotstuff.ID{1, 2, 3, 4, 5}
-	tree := CreateTree(1, -1, ids)
+	tree := Create(1, -1, ids)
 	t.Errorf("CreateTree should panic, got %v", tree)
 }
 
 func TestCreateTreeInvalidID(t *testing.T) {
 	defer func() { _ = recover() }()
 	ids := []hotstuff.ID{1, 2, 3, 4, 5}
-	tree := CreateTree(10, 2, ids)
+	tree := Create(10, 2, ids)
 	t.Errorf("CreateTree should panic, got %v", tree)
 }
 
@@ -66,7 +66,7 @@ func TestHeight(t *testing.T) {
 		{size: 21, id: 10, branchFactor: 4, wantTreeHeight: 3},
 	}
 	for _, test := range treeTestData {
-		tree := CreateTree(test.id, test.branchFactor, DefaultTreePos(test.size))
+		tree := Create(test.id, test.branchFactor, DefaultTreePos(test.size))
 		gotTreeHeight := tree.TreeHeight()
 		if gotTreeHeight != test.wantTreeHeight {
 			t.Errorf("TreeHeight() = %d, want %d", gotTreeHeight, test.wantTreeHeight)
@@ -99,7 +99,7 @@ func TestReplicaChildren(t *testing.T) {
 		{size: 21, id: 5, branchFactor: 4, wantChildren: []hotstuff.ID{18, 19, 20, 21}},
 	}
 	for _, test := range treeConfigTestData {
-		tree := CreateTree(test.id, test.branchFactor, DefaultTreePos(test.size))
+		tree := Create(test.id, test.branchFactor, DefaultTreePos(test.size))
 		gotChildren := tree.ReplicaChildren()
 		slices.Sort(gotChildren)
 		if !slices.Equal(gotChildren, test.wantChildren) {
@@ -133,7 +133,7 @@ func TestSubTree(t *testing.T) {
 		{size: 21, id: 5, branchFactor: 4, wantSubTree: []hotstuff.ID{18, 19, 20, 21}},
 	}
 	for _, test := range treeConfigTestData {
-		tree := CreateTree(test.id, test.branchFactor, DefaultTreePos(test.size))
+		tree := Create(test.id, test.branchFactor, DefaultTreePos(test.size))
 		gotSubTree := tree.SubTree()
 		slices.Sort(gotSubTree)
 		if !slices.Equal(gotSubTree, test.wantSubTree) {
@@ -167,7 +167,7 @@ func TestParent(t *testing.T) {
 		{size: 21, id: 5, branchFactor: 4, wantParent: 1},
 	}
 	for _, test := range treeConfigTestData {
-		tree := CreateTree(test.id, test.branchFactor, DefaultTreePos(test.size))
+		tree := Create(test.id, test.branchFactor, DefaultTreePos(test.size))
 
 		if gotParent, ok := tree.Parent(); ok {
 			if gotParent != test.wantParent {
@@ -202,7 +202,7 @@ func TestIsRoot(t *testing.T) {
 		{size: 21, id: 5, branchFactor: 4, wantIsRoot: false},
 	}
 	for _, test := range treeConfigTestData {
-		tree := CreateTree(test.id, test.branchFactor, DefaultTreePos(test.size))
+		tree := Create(test.id, test.branchFactor, DefaultTreePos(test.size))
 		gotIsRoot := tree.IsRoot(test.id)
 		if gotIsRoot != test.wantIsRoot {
 			t.Errorf("IsRoot() = %t, want %t", gotIsRoot, test.wantIsRoot)
@@ -235,7 +235,7 @@ func TestReplicaHeight(t *testing.T) {
 		{size: 21, id: 5, branchFactor: 4, wantReplicaHeight: 2},
 	}
 	for _, test := range treeConfigTestData {
-		tree := CreateTree(test.id, test.branchFactor, DefaultTreePos(test.size))
+		tree := Create(test.id, test.branchFactor, DefaultTreePos(test.size))
 		gotReplicaHeight := tree.ReplicaHeight()
 		if gotReplicaHeight != test.wantReplicaHeight {
 			t.Errorf("ReplicaHeight() = %d, want %d", gotReplicaHeight, test.wantReplicaHeight)
@@ -268,7 +268,7 @@ func TestPeersOf(t *testing.T) {
 		{size: 21, id: 5, branchFactor: 4, wantPeers: []hotstuff.ID{2, 3, 4, 5}},
 	}
 	for _, test := range treeConfigTestData {
-		tree := CreateTree(test.id, test.branchFactor, DefaultTreePos(test.size))
+		tree := Create(test.id, test.branchFactor, DefaultTreePos(test.size))
 		gotPeers := tree.PeersOf()
 		slices.Sort(gotPeers)
 		if !slices.Equal(gotPeers, test.wantPeers) {
@@ -290,7 +290,7 @@ func BenchmarkReplicaChildren(b *testing.B) {
 	}
 	for _, bm := range benchmarks {
 		b.Run(fmt.Sprintf("size=%d/bf=%d", bm.size, bm.bf), func(b *testing.B) {
-			tree := CreateTree(1, bm.bf, DefaultTreePos(bm.size))
+			tree := Create(1, bm.bf, DefaultTreePos(bm.size))
 			// replace `for range b.N` with `for b.Loop()` when go 1.24 released (in release candidate as of writing)
 			// for b.Loop() {
 			for range b.N {

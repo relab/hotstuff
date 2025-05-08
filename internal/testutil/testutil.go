@@ -289,6 +289,10 @@ type leaderRotation struct {
 	order []hotstuff.ID
 }
 
+func (l leaderRotation) ViewDuration() modules.ViewDuration {
+	return FixedTimeout(0) // TODO(AlanRostem): return proper value
+}
+
 // GetLeader returns the id of the leader in the given view.
 func (l leaderRotation) GetLeader(v hotstuff.View) hotstuff.ID {
 	l.t.Helper()

@@ -4,12 +4,18 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network/netconfig"
+	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 )
 
 const RoundRobinModuleName = "round-robin"
 
 type roundRobin struct {
 	configuration *netconfig.Config
+	viewDuration  modules.ViewDuration
+}
+
+func (rr roundRobin) ViewDuration() modules.ViewDuration {
+	return rr.viewDuration
 }
 
 // GetLeader returns the id of the leader in the given view
@@ -20,8 +26,14 @@ func (rr roundRobin) GetLeader(view hotstuff.View) hotstuff.ID {
 }
 
 // NewRoundRobin returns a new round-robin leader rotation implementation.
-func NewRoundRobin(configuration *netconfig.Config) modules.LeaderRotation {
-	return &roundRobin{configuration: configuration}
+func NewRoundRobin(
+	opt viewduration.Options,
+	configuration *netconfig.Config,
+) modules.LeaderRotation {
+	return &roundRobin{
+		configuration: configuration,
+		viewDuration:  viewduration.NewDynamic(opt),
+	}
 }
 
 func chooseRoundRobin(view hotstuff.View, numReplicas int) hotstuff.ID {

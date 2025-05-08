@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/latency"
 )
 
 // Tree contains the local replica's ID which must be part of the tree.
@@ -17,9 +18,31 @@ type Tree struct {
 	waitTime     time.Duration
 }
 
-// CreateTree creates the tree configuration.
-func CreateTree(myID hotstuff.ID, bf int, ids []hotstuff.ID) Tree {
-	if bf < 2 {
+// TODO(AlanRostem): rename
+func New(
+	id hotstuff.ID,
+	useAggTime bool,
+	useTreeHeightTime bool,
+	branchFactor int,
+	latencyMatrix latency.Matrix,
+	treePositionIDs []hotstuff.ID,
+	delta time.Duration,
+) Tree {
+	tree := Create(id, branchFactor, treePositionIDs)
+	switch {
+	case useAggTime:
+		tree.SetAggregationWaitTime(latencyMatrix, delta)
+	case useTreeHeightTime:
+		fallthrough
+	default:
+		tree.SetTreeHeightWaitTime(delta)
+	}
+	return tree
+}
+
+// Create creates the tree configuration.
+func Create(myID hotstuff.ID, branchFactor int, ids []hotstuff.ID) Tree {
+	if branchFactor < 2 {
 		panic("Branch factor must be greater than 1")
 	}
 	if slices.Index(ids, myID) == -1 {
@@ -28,8 +51,8 @@ func CreateTree(myID hotstuff.ID, bf int, ids []hotstuff.ID) Tree {
 
 	return Tree{
 		id:           myID,
-		height:       treeHeight(len(ids), bf),
-		branchFactor: bf,
+		height:       treeHeight(len(ids), branchFactor),
+		branchFactor: branchFactor,
 		treePosToID:  ids,
 	}
 }

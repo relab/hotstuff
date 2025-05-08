@@ -1,4 +1,4 @@
-package synchronizer
+package viewduration
 
 import (
 	"time"
@@ -11,7 +11,7 @@ type fixedViewDuration struct {
 }
 
 // NewFixedViewDuration returns a ViewDuration with a fixed duration.
-func NewFixedViewDuration(duration time.Duration) modules.ViewDuration {
+func NewFixed(duration time.Duration) modules.ViewDuration {
 	return &fixedViewDuration{
 		duration: duration,
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network/netconfig"
+	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/service/committer"
 )
 
@@ -23,6 +24,7 @@ type repBased struct {
 	committer     *committer.Committer
 	opts          *core.Options
 	logger        logging.Logger
+	viewDuration  modules.ViewDuration
 
 	chainLength    int
 	prevCommitHead *hotstuff.Block
@@ -30,6 +32,10 @@ type repBased struct {
 }
 
 // TODO: should GetLeader be thread-safe?
+
+func (r *repBased) ViewDuration() modules.ViewDuration {
+	return r.viewDuration
+}
 
 // GetLeader returns the id of the leader in the given view
 func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
@@ -93,6 +99,7 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 // NewRepBased returns a new random reputation-based leader rotation implementation
 func NewRepBased(
 	chainLength int,
+	vdOpt viewduration.Options,
 
 	configuration *netconfig.Config,
 	committer *committer.Committer,
@@ -104,6 +111,7 @@ func NewRepBased(
 		committer:     committer,
 		opts:          opts,
 		logger:        logger,
+		viewDuration:  viewduration.NewDynamic(vdOpt),
 
 		chainLength:    chainLength,
 		reputations:    make(reputationsMap),

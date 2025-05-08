@@ -16,8 +16,8 @@ import (
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/network/sender"
 	"github.com/relab/hotstuff/protocol/kauri"
-	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/synchronizer"
+	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/service/clientsrv"
 	"github.com/relab/hotstuff/service/server"
 	"google.golang.org/grpc"
@@ -66,10 +66,16 @@ func NewReplicaDependencies(
 	depsCore.Options.SetSharedRandomSeed(opts.GetSharedSeed())
 
 	if opts.GetKauri() {
-		// TODO(meling): Temporary default; should be configurable and moved to the appropriate place.
-		opts.SetTreeHeightWaitTime()
 		// create tree only if we are using tree leader (Kauri)
-		t := createTree(opts)
+		t := tree.New(
+			opts.HotstuffID(),
+			opts.GetAggregationTime(),
+			true, // TODO(AlanRostem): Temporary default; should be configurable and moved to the appropriate place.
+			int(opts.GetBranchFactor()),
+			latency.MatrixFrom(opts.GetLocations()),
+			opts.TreePositionIDs(),
+			opts.GetTreeDelta().AsDuration(),
+		)
 		depsCore.Options.SetTree(t)
 	}
 
@@ -87,16 +93,12 @@ func NewReplicaDependencies(
 		depsSecure,
 		int(opts.GetBatchSize()),
 		clientSrvOpts)
-	durationOpts := dependencies.ViewDurationOptions{
+	durationOpts := viewduration.Options{
 		SampleSize:   uint64(opts.GetTimeoutSamples()),
 		StartTimeout: float64(opts.GetInitialTimeout().AsDuration().Nanoseconds()) / float64(time.Millisecond),
 		MaxTimeout:   float64(opts.GetMaxTimeout().AsDuration().Nanoseconds()) / float64(time.Millisecond),
 		Multiplier:   float64(opts.GetTimeoutMultiplier()),
 	}
-
-	// TODO(AlanRostem): find a cleaner way to do this.
-	// This is needed for the tree-leader to work properly.
-	durationOpts.IsFixed = opts.GetLeaderRotation() == leaderrotation.TreeLeaderModuleName
 
 	depsProtocol, err := dependencies.NewProtocol(
 		depsCore,
@@ -130,26 +132,12 @@ func NewReplicaDependencies(
 	}
 
 	return &ReplicaDependencies{
-		clientSrv:    depsSrv.ClientSrv,
-		server:       server,
-		sender:       depsNet.Sender,
-		synchronizer: depsProtocol.Synchronizer,
 		eventLoop:    depsCore.EventLoop,
 		logger:       depsCore.Logger,
 		options:      depsCore.Options,
+		sender:       depsNet.Sender,
+		clientSrv:    depsSrv.ClientSrv,
+		synchronizer: depsProtocol.Synchronizer,
+		server:       server,
 	}, nil
-}
-
-// createTree creates a tree based on the given replica options.
-func createTree(replicaOpts *orchestrationpb.ReplicaOpts) tree.Tree {
-	tree := tree.CreateTree(replicaOpts.HotstuffID(), int(replicaOpts.GetBranchFactor()), replicaOpts.TreePositionIDs())
-	switch {
-	case replicaOpts.GetAggregationTime():
-		tree.SetAggregationWaitTime(latency.MatrixFrom(replicaOpts.GetLocations()), replicaOpts.TreeDeltaDuration())
-	case replicaOpts.GetTreeHeightTime():
-		fallthrough
-	default:
-		tree.SetTreeHeightWaitTime(replicaOpts.TreeDeltaDuration())
-	}
-	return tree
 }

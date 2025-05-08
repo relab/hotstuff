@@ -1,27 +1,17 @@
 package dependencies
 
 import (
-	"time"
-
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/synchronizer"
+	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 )
 
 type protocolModules struct {
 	ConsensusRules modules.ConsensusRules
 	Kauri          modules.Kauri
 	LeaderRotation modules.LeaderRotation
-	ViewDuration   modules.ViewDuration
-}
-
-type ViewDurationOptions struct {
-	IsFixed      bool
-	SampleSize   uint64
-	StartTimeout float64
-	MaxTimeout   float64
-	Multiplier   float64
 }
 
 func newProtocolModules(
@@ -34,7 +24,7 @@ func newProtocolModules(
 	consensusName,
 	leaderRotationName,
 	byzantineStrategy string,
-	vdOpt ViewDurationOptions,
+	vdOpt viewduration.Options,
 ) (*protocolModules, error) {
 	consensusRules, err := newConsensusRulesModule(consensusName, depsSecure.BlockChain, depsCore.Logger, depsCore.Options)
 	if err != nil {
@@ -43,6 +33,7 @@ func newProtocolModules(
 	leaderRotation, err := newLeaderRotationModule(
 		leaderRotationName,
 		consensusRules.ChainLength(),
+		vdOpt,
 		depsSecure.BlockChain,
 		depsNet.Config,
 		depsSrv.Committer,
@@ -68,14 +59,6 @@ func newProtocolModules(
 		)
 	}
 
-	var duration modules.ViewDuration
-	if vdOpt.IsFixed {
-		duration = synchronizer.NewFixedViewDuration(time.Duration(vdOpt.StartTimeout * float64(time.Millisecond)))
-	} else {
-		duration = synchronizer.NewViewDuration(
-			vdOpt.SampleSize, vdOpt.StartTimeout, vdOpt.MaxTimeout, vdOpt.Multiplier,
-		)
-	}
 	if byzantineStrategy != "" {
 		byz, err := newByzantineStrategyModule(
 			byzantineStrategy,
@@ -92,7 +75,6 @@ func newProtocolModules(
 		ConsensusRules: consensusRules,
 		Kauri:          kauriOptional,
 		LeaderRotation: leaderRotation,
-		ViewDuration:   duration,
 	}, nil
 }
 
@@ -111,7 +93,7 @@ func NewProtocol(
 	consensusName,
 	leaderRotationName,
 	byzantineStrategy string,
-	vdOpt ViewDurationOptions,
+	vdOpt viewduration.Options,
 ) (*Protocol, error) {
 	mods, err := newProtocolModules(
 		depsCore,
@@ -144,7 +126,6 @@ func NewProtocol(
 	synch := synchronizer.New(
 		depsSecure.CryptoImpl,
 		mods.LeaderRotation,
-		mods.ViewDuration,
 		depsSecure.BlockChain,
 		csus,
 		depsSecure.CertAuth,

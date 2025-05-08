@@ -40,7 +40,7 @@ func TestAggregationWaitTime(t *testing.T) {
 	for _, test := range testDataAggregationTime {
 		bf := 2
 		treePos := DefaultTreePos(len(test.locs))
-		tree := CreateTree(test.id, bf, treePos)
+		tree := Create(test.id, bf, treePos)
 		lm := latency.MatrixFrom(test.locs)
 		tree.SetAggregationWaitTime(lm, test.delta)
 		got := tree.WaitTime()
@@ -70,7 +70,7 @@ func TestTreeHeightWaitTime(t *testing.T) {
 	for _, test := range testDataTreeHeightTime {
 		bf := 2
 		treePos := DefaultTreePos(len(test.locs))
-		tree := CreateTree(test.id, bf, treePos)
+		tree := Create(test.id, bf, treePos)
 		tree.SetTreeHeightWaitTime(test.delta)
 		got := tree.WaitTime()
 		if got != test.want {

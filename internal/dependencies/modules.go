@@ -2,6 +2,7 @@ package dependencies
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
@@ -13,6 +14,7 @@ import (
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
+	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
@@ -78,6 +80,7 @@ func newCryptoModule(
 func newLeaderRotationModule(
 	name string,
 	chainLength int,
+	vdOpt viewduration.Options,
 	blockChain *blockchain.BlockChain,
 	config *netconfig.Config,
 	committer *committer.Committer,
@@ -86,15 +89,15 @@ func newLeaderRotationModule(
 ) (ld modules.LeaderRotation, err error) {
 	switch name {
 	case leaderrotation.CarouselModuleName:
-		ld = leaderrotation.NewCarousel(chainLength, blockChain, config, committer, opts, logger)
+		ld = leaderrotation.NewCarousel(chainLength, vdOpt, blockChain, config, committer, opts, logger)
 	case leaderrotation.ReputationModuleName:
-		ld = leaderrotation.NewRepBased(chainLength, config, committer, opts, logger)
+		ld = leaderrotation.NewRepBased(chainLength, vdOpt, config, committer, opts, logger)
 	case leaderrotation.RoundRobinModuleName:
-		ld = leaderrotation.NewRoundRobin(config)
+		ld = leaderrotation.NewRoundRobin(vdOpt, config)
 	case leaderrotation.FixedModuleName:
-		ld = leaderrotation.NewFixed(hotstuff.ID(1))
+		ld = leaderrotation.NewFixed(hotstuff.ID(1), vdOpt)
 	case leaderrotation.TreeLeaderModuleName:
-		ld = leaderrotation.NewTreeLeader(opts)
+		ld = leaderrotation.NewTreeLeader(time.Duration(vdOpt.StartTimeout)*time.Millisecond, opts)
 	default:
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", name)
 	}

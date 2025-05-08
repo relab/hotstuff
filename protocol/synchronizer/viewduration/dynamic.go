@@ -1,4 +1,4 @@
-package synchronizer
+package viewduration
 
 import (
 	"math"
@@ -7,16 +7,16 @@ import (
 	"github.com/relab/hotstuff/modules"
 )
 
-// NewViewDuration returns a ViewDuration that approximates the view duration based on durations of previous views.
+// NewDynamic returns a ViewDuration that approximates the view duration based on durations of previous views.
 // sampleSize determines the number of previous views that should be considered.
 // startTimeout determines the view duration of the first views.
 // When a timeout occurs, the next view duration will be multiplied by the multiplier.
-func NewViewDuration(sampleSize uint64, startTimeout, maxTimeout, multiplier float64) modules.ViewDuration {
+func NewDynamic(opt Options) modules.ViewDuration {
 	return &viewDuration{
-		limit: sampleSize,
-		mean:  startTimeout,
-		max:   maxTimeout,
-		mul:   multiplier,
+		limit: opt.SampleSize,
+		mean:  opt.StartTimeout,
+		max:   opt.MaxTimeout,
+		mul:   opt.Multiplier,
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/synchronizer"
+	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
@@ -53,8 +54,7 @@ func TestVote(t *testing.T) {
 		depsProtocol, err := dependencies.NewProtocol(
 			depsCore, depsNet, depsSecure, depsService,
 			false, consensusName, leaderRotationName, "",
-			dependencies.ViewDurationOptions{
-				IsFixed:      true,
+			viewduration.Options{
 				StartTimeout: float64(1 * time.Millisecond),
 			})
 		if err != nil {

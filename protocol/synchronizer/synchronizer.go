@@ -55,7 +55,6 @@ type Synchronizer struct {
 func New(
 	crypto modules.CryptoBase,
 	leaderRotation modules.LeaderRotation,
-	duration modules.ViewDuration,
 
 	blockChain *blockchain.BlockChain,
 	consensus *consensus.Consensus,
@@ -67,7 +66,7 @@ func New(
 	opts *core.Options,
 ) *Synchronizer {
 	s := &Synchronizer{
-		duration:       duration,
+		duration:       leaderRotation.ViewDuration(),
 		leaderRotation: leaderRotation,
 		crypto:         crypto,
 
@@ -137,8 +136,9 @@ func (s *Synchronizer) startTimeoutTimer() {
 	// Store the view in a local variable to avoid calling s.View() in the closure below,
 	// thus avoiding a data race.
 	view := s.View()
+	d := s.duration.Duration()
 	// It is important that the timer is NOT reused because then the view would be wrong.
-	s.timer = oneShotTimer{time.AfterFunc(s.duration.Duration(), func() {
+	s.timer = oneShotTimer{time.AfterFunc(d, func() {
 		// The event loop will execute onLocalTimeout for us.
 		s.eventLoop.AddEvent(hotstuff.TimeoutEvent{View: view})
 	})}
