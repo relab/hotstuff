@@ -18,42 +18,49 @@ type Tree struct {
 	waitTime     time.Duration
 }
 
-// TODO(AlanRostem): rename
-func New(
+type DelayMode int
+
+const (
+	DelayModeNone = DelayMode(iota)
+	DelayModeAggregation
+	DelayModeTreeHeight
+)
+
+// NewDelayed creates a tree with wait times.
+func NewDelayed(
 	id hotstuff.ID,
-	useAggTime bool,
-	useTreeHeightTime bool,
+	delayMode DelayMode,
 	branchFactor int,
 	latencyMatrix latency.Matrix,
 	treePositionIDs []hotstuff.ID,
 	delta time.Duration,
 ) Tree {
-	tree := Create(id, branchFactor, treePositionIDs)
-	switch {
-	case useAggTime:
-		tree.SetAggregationWaitTime(latencyMatrix, delta)
-	case useTreeHeightTime:
+	t := NewSimple(id, branchFactor, treePositionIDs)
+	switch delayMode {
+	case DelayModeAggregation:
+		t.SetAggregationWaitTime(latencyMatrix, delta)
+	case DelayModeTreeHeight:
 		fallthrough
 	default:
-		tree.SetTreeHeightWaitTime(delta)
+		t.SetTreeHeightWaitTime(delta)
 	}
-	return tree
+	return t
 }
 
-// Create creates the tree configuration.
-func Create(myID hotstuff.ID, branchFactor int, ids []hotstuff.ID) Tree {
+// NewSimple creates a simple tree configuration.
+func NewSimple(id hotstuff.ID, branchFactor int, treePositionIDs []hotstuff.ID) Tree {
 	if branchFactor < 2 {
 		panic("Branch factor must be greater than 1")
 	}
-	if slices.Index(ids, myID) == -1 {
+	if slices.Index(treePositionIDs, id) == -1 {
 		panic("Replica ID not found in tree configuration")
 	}
 
 	return Tree{
-		id:           myID,
-		height:       treeHeight(len(ids), branchFactor),
+		id:           id,
+		height:       treeHeight(len(treePositionIDs), branchFactor),
 		branchFactor: branchFactor,
-		treePosToID:  ids,
+		treePosToID:  treePositionIDs,
 	}
 }
 

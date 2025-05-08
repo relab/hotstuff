@@ -54,9 +54,8 @@ func TestVote(t *testing.T) {
 		depsProtocol, err := dependencies.NewProtocol(
 			depsCore, depsNet, depsSecure, depsService,
 			false, consensusName, leaderRotationName, "",
-			viewduration.Options{
-				StartTimeout: float64(1 * time.Millisecond),
-			})
+			viewduration.NewOptions(0, 1*time.Millisecond, 0, 0), // TODO(AlanRostem): ensure test values are correct
+		)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}

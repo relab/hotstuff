@@ -13,8 +13,8 @@ import (
 // When a timeout occurs, the next view duration will be multiplied by the multiplier.
 func NewDynamic(opt Options) modules.ViewDuration {
 	return &viewDuration{
-		limit: opt.SampleSize,
-		mean:  opt.StartTimeout,
+		limit: opt.sampleSize,
+		mean:  opt.startTimeout,
 		max:   opt.MaxTimeout,
 		mul:   opt.Multiplier,
 	}

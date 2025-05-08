@@ -3,7 +3,6 @@ package orchestration
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"time"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
@@ -66,11 +65,17 @@ func NewReplicaDependencies(
 	depsCore.Options.SetSharedRandomSeed(opts.GetSharedSeed())
 
 	if opts.GetKauri() {
+		// meling's todo was removed and replaced with this way to configure it: "Temporary default; should be configurable and moved to the appropriate place."
+		// TODO(AlanRostem): find out if this is valid
+		delayMode := tree.DelayModeNone
+		if opts.GetAggregationTime() {
+			delayMode = tree.DelayModeAggregation
+		}
+
 		// create tree only if we are using tree leader (Kauri)
-		t := tree.New(
+		t := tree.NewDelayed(
 			opts.HotstuffID(),
-			opts.GetAggregationTime(),
-			true, // TODO(AlanRostem): Temporary default; should be configurable and moved to the appropriate place.
+			delayMode,
 			int(opts.GetBranchFactor()),
 			latency.MatrixFrom(opts.GetLocations()),
 			opts.TreePositionIDs(),
@@ -93,12 +98,13 @@ func NewReplicaDependencies(
 		depsSecure,
 		int(opts.GetBatchSize()),
 		clientSrvOpts)
-	durationOpts := viewduration.Options{
-		SampleSize:   uint64(opts.GetTimeoutSamples()),
-		StartTimeout: float64(opts.GetInitialTimeout().AsDuration().Nanoseconds()) / float64(time.Millisecond),
-		MaxTimeout:   float64(opts.GetMaxTimeout().AsDuration().Nanoseconds()) / float64(time.Millisecond),
-		Multiplier:   float64(opts.GetTimeoutMultiplier()),
-	}
+
+	durationOpts := viewduration.NewOptions(
+		opts.GetTimeoutSamples(),
+		opts.GetInitialTimeout().AsDuration(),
+		opts.GetMaxTimeout().AsDuration(),
+		opts.GetTimeoutMultiplier(),
+	)
 
 	depsProtocol, err := dependencies.NewProtocol(
 		depsCore,

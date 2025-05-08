@@ -2,7 +2,6 @@ package dependencies
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
@@ -97,7 +96,7 @@ func newLeaderRotationModule(
 	case leaderrotation.FixedModuleName:
 		ld = leaderrotation.NewFixed(hotstuff.ID(1), vdOpt)
 	case leaderrotation.TreeLeaderModuleName:
-		ld = leaderrotation.NewTreeLeader(time.Duration(vdOpt.StartTimeout)*time.Millisecond, opts)
+		ld = leaderrotation.NewTreeLeader(vdOpt.StartTimeout(), opts)
 	default:
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", name)
 	}
