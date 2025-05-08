@@ -28,14 +28,13 @@ func NewService(
 		cmdCache,
 		clientSrvOpts,
 	)
-	committer := committer.New(
-		depsSecure.BlockChain,
-		clientSrv,
-		depsCore.Logger,
-	)
 	return &Service{
 		CmdCache:  cmdCache,
 		ClientSrv: clientSrv,
-		Committer: committer,
+		Committer: committer.New(
+			depsSecure.BlockChain,
+			clientSrv,
+			depsCore.Logger,
+		),
 	}
 }
