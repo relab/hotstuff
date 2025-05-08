@@ -67,9 +67,9 @@ func NewReplicaDependencies(
 	if opts.GetKauri() {
 		// meling's todo was removed and replaced with this way to configure it: "Temporary default; should be configurable and moved to the appropriate place."
 		// TODO(AlanRostem): find out if this is valid
-		delayMode := tree.DelayModeNone
+		delayMode := tree.DelayTypeNone
 		if opts.GetAggregationTime() {
-			delayMode = tree.DelayModeAggregation
+			delayMode = tree.DelayTypeAggregation
 		}
 
 		// create tree only if we are using tree leader (Kauri)
@@ -105,7 +105,6 @@ func NewReplicaDependencies(
 		opts.GetMaxTimeout().AsDuration(),
 		opts.GetTimeoutMultiplier(),
 	)
-
 	depsProtocol, err := dependencies.NewProtocol(
 		depsCore,
 		depsNet,

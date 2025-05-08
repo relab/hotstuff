@@ -18,18 +18,19 @@ type Tree struct {
 	waitTime     time.Duration
 }
 
-type DelayMode int
+type DelayType int
 
 const (
-	DelayModeNone = DelayMode(iota)
-	DelayModeAggregation
-	DelayModeTreeHeight
+	DelayTypeNone = DelayType(iota)
+	DelayTypeAggregation
+	DelayTypeTreeHeight
 )
 
 // NewDelayed creates a tree with wait times.
+// TODO(AlanRostem): elaborate
 func NewDelayed(
 	id hotstuff.ID,
-	delayMode DelayMode,
+	delayMode DelayType,
 	branchFactor int,
 	latencyMatrix latency.Matrix,
 	treePositionIDs []hotstuff.ID,
@@ -37,9 +38,9 @@ func NewDelayed(
 ) Tree {
 	t := NewSimple(id, branchFactor, treePositionIDs)
 	switch delayMode {
-	case DelayModeAggregation:
+	case DelayTypeAggregation:
 		t.SetAggregationWaitTime(latencyMatrix, delta)
-	case DelayModeTreeHeight:
+	case DelayTypeTreeHeight:
 		fallthrough
 	default:
 		t.SetTreeHeightWaitTime(delta)
