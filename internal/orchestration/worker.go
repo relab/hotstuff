@@ -112,17 +112,9 @@ func (w *Worker) createReplicas(req *orchestrationpb.CreateReplicaRequest) (*orc
 		if err != nil {
 			return nil, fmt.Errorf("failed to create listener: %w", err)
 		}
-		replicaPort, err := getPort(replicaListener)
-		if err != nil {
-			return nil, err
-		}
 		clientListener, err := net.Listen("tcp", ":0")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create listener: %w", err)
-		}
-		clientPort, err := getPort(clientListener)
-		if err != nil {
-			return nil, err
 		}
 
 		r.StartServers(replicaListener, clientListener)
@@ -131,8 +123,8 @@ func (w *Worker) createReplicas(req *orchestrationpb.CreateReplicaRequest) (*orc
 		resp.Replicas[cfg.GetID()] = &orchestrationpb.ReplicaInfo{
 			ID:          cfg.GetID(),
 			PublicKey:   cfg.GetPublicKey(),
-			ReplicaPort: replicaPort,
-			ClientPort:  clientPort,
+			ReplicaPort: uint32(replicaListener.Addr().(*net.TCPAddr).Port),
+			ClientPort:  uint32(clientListener.Addr().(*net.TCPAddr).Port),
 		}
 	}
 	return resp, nil
@@ -317,16 +309,4 @@ func getConfiguration(conf map[uint32]*orchestrationpb.ReplicaInfo, client bool)
 		})
 	}
 	return replicas, nil
-}
-
-func getPort(lis net.Listener) (uint32, error) {
-	_, portStr, err := net.SplitHostPort(lis.Addr().String())
-	if err != nil {
-		return 0, err
-	}
-	port, err := strconv.ParseUint(portStr, 10, 32)
-	if err != nil {
-		return 0, err
-	}
-	return uint32(port), nil
 }
