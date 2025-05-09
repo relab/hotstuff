@@ -24,6 +24,7 @@ import (
 
 type replicaOptions struct {
 	isSecure      bool
+	useKauri      bool
 	clientServer  gorums.ServerOption
 	replicaServer gorums.ServerOption
 	credentials   credentials.TransportCredentials
@@ -50,6 +51,12 @@ func WithTLS(certificate tls.Certificate, rootCAs *x509.CertPool) ReplicaOption 
 	}
 }
 
+func WithKauri(tree tree.Tree) ReplicaOption {
+	return func(ro *replicaOptions) {
+
+	}
+}
+
 type ReplicaDependencies struct {
 	clientSrv    *clientsrv.ClientServer
 	server       *server.Server
@@ -60,23 +67,25 @@ type ReplicaDependencies struct {
 	options      *core.Options
 }
 
+// TODO(AlanRostem): decouple the majority of dependency creation and pass dependency sets instead
 func NewReplicaDependencies(
 	opts *orchestrationpb.ReplicaOpts,
 	privKey hotstuff.PrivateKey,
 	repOpts ...ReplicaOption,
 ) (*ReplicaDependencies, error) {
-	// TODO(AlanRostem): refactor this out of the function
 	var rOpt replicaOptions
 	for _, opt := range repOpts {
 		opt(&rOpt)
 	}
 
-	depsCore := dependencies.NewCore(opts.HotstuffID(), "hs", privKey)
-	depsCore.Options.SetSharedRandomSeed(opts.GetSharedSeed())
+	id := opts.HotstuffID()
+	seed := opts.GetSharedSeed()
 
+	depsCore := dependencies.NewCore(id, "hs", privKey)
+	depsCore.Options.SetSharedRandomSeed(seed)
+
+	// TODO(AlanRostem): make this case into an option
 	if opts.GetKauri() {
-		// meling's todo was removed and replaced with this way to configure it: "Temporary default; should be configurable and moved to the appropriate place."
-		// TODO(AlanRostem): find out if this is valid
 		delayMode := tree.DelayTypeNone
 		if opts.GetAggregationTime() {
 			delayMode = tree.DelayTypeAggregation

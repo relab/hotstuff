@@ -73,7 +73,7 @@ func TestModules(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		depsSrv := dependencies.NewService(depsCore, depsSecure, 1, nil)
+		depsSrv := dependencies.NewService(depsCore, depsSecure, 1)
 		_, err = dependencies.NewProtocol(
 			depsCore, depsNet, depsSecure, depsSrv,
 			false, td.consensusName, td.leaderRotationName, td.byzantineStrategy,
