@@ -5,7 +5,6 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/kauripb"
-	"github.com/relab/hotstuff/service/server"
 )
 
 type serviceImpl struct {
@@ -16,11 +15,11 @@ type serviceImpl struct {
 func RegisterService(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	server *server.Server,
+	gorumsSrv *gorums.Server,
 ) {
 	i := &serviceImpl{eventLoop: eventLoop}
 	logger.Infof("Kauripb: Service registered.")
-	kauripb.RegisterKauriServer(server.GetGorumsServer(), i)
+	kauripb.RegisterKauriServer(gorumsSrv, i)
 }
 
 func (i serviceImpl) SendContribution(_ gorums.ServerCtx, request *kauripb.Contribution) {

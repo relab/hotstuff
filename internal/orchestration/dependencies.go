@@ -14,7 +14,6 @@ import (
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/network/sender"
-	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/service/clientsrv"
@@ -118,23 +117,21 @@ func NewReplicaDependencies(
 	if err != nil {
 		return nil, err
 	}
+	srvOpt := []server.ServerOptions{
+		server.WithLatencies(opts.HotstuffID(), opts.GetLocations()),
+		server.WithGorumsServerOptions(replicaSrvOpts...),
+	}
+	if opts.GetKauri() {
+		srvOpt = append(srvOpt, server.WithKauri())
+	}
 	server := server.NewServer(
 		depsCore.EventLoop,
 		depsCore.Logger,
 		depsCore.Options,
 		depsNet.Config,
 		depsSecure.BlockChain,
-
-		server.WithLatencies(opts.HotstuffID(), opts.GetLocations()),
-		server.WithGorumsServerOptions(replicaSrvOpts...),
+		srvOpt...,
 	)
-	if opts.GetKauri() {
-		// TODO: cannot check if Kauri is enabled when hiding protocol module initialization. Find a workaround.
-		// if modsProtocol.Kauri == nil {
-		// 	return nil, fmt.Errorf("kauri was enabled but its module was not initialized")
-		// }
-		kauri.RegisterService(depsCore.EventLoop, depsCore.Logger, server)
-	}
 
 	return &ReplicaDependencies{
 		eventLoop:    depsCore.EventLoop,

@@ -9,6 +9,7 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/network/netconfig"
+	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/security/blockchain"
 
 	"github.com/relab/gorums"
@@ -40,7 +41,6 @@ func NewServer(
 	opts *core.Options,
 	configuration *netconfig.Config,
 	blockChain *blockchain.BlockChain,
-
 	srvOpts ...ServerOptions,
 ) *Server {
 	options := &backendOptions{}
@@ -61,6 +61,9 @@ func NewServer(
 		srv.eventLoop.AddEvent(hotstuff.ReplicaConnectedEvent{Ctx: ctx})
 	}))
 	srv.gorumsSrv = gorums.NewServer(options.gorumsSrvOpts...)
+	if options.registerKauri {
+		kauri.RegisterService(eventLoop, logger, srv.gorumsSrv)
+	}
 	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, &serviceImpl{srv})
 	return srv
 }
