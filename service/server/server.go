@@ -41,9 +41,9 @@ func NewServer(
 	globals *core.Globals,
 	configuration *netconfig.Config,
 	blockChain *blockchain.BlockChain,
-	srvOpts ...ServerOptions,
+	srvOpts ...ServerOption,
 ) *Server {
-	options := &backendOptions{}
+	options := &serverOptions{}
 	for _, opt := range srvOpts {
 		opt(options)
 	}

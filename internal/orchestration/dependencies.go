@@ -62,36 +62,28 @@ type ReplicaDependencies struct {
 
 // TODO(AlanRostem): decouple the majority of dependency creation and pass dependency sets instead
 func NewReplicaDependencies(
-	opts *orchestrationpb.ReplicaOpts,
+	opts *orchestrationpb.ReplicaOpts, // TODO(AlanRostem): remove dependency on this
+	id hotstuff.ID,
 	privKey hotstuff.PrivateKey,
 	vdParams viewduration.Params,
 	globalOpts []core.GlobalsOption,
+	clientSrvOpt []clientsrv.CacheOption,
+	serverOpts []server.ServerOption,
 	repOpts ...ReplicaOption,
 ) (*ReplicaDependencies, error) {
 	var rOpt replicaOptions
 	for _, opt := range repOpts {
 		opt(&rOpt)
 	}
-
 	if !rOpt.isSecure {
 		rOpt.credentials = insecure.NewCredentials()
 	}
-
 	// TODO(AlanRostem): remove direct dependency on these values. I am putting these here to visualize the dependency on *orchestrationpb.ReplicaOpts for now.
-	id := opts.HotstuffID()
-	seed := opts.GetSharedSeed()
-	locations := opts.GetLocations()
-	batchSize := opts.GetBatchSize()
 	moduleNameCrypto := opts.GetCrypto()
 	moduleNameConsensus := opts.GetConsensus()
 	moduleNameLeaderRotation := opts.GetLeaderRotation()
 	moduleNameByzantineStrategy := opts.GetByzantineStrategy()
-
-	// TODO(AlanRostem): consider removing this and assign the seed in a layer above this
-	globalOpts = append(globalOpts, core.WithSharedRandomSeed(seed))
-
 	depsCore := dependencies.NewCore(id, "hs", privKey, globalOpts...)
-
 	depsNet := dependencies.NewNetwork(
 		depsCore,
 		rOpt.credentials,
@@ -106,17 +98,12 @@ func NewReplicaDependencies(
 	if err != nil {
 		return nil, err
 	}
-	clientSrvOpt := []clientsrv.CacheOption{}
-	if batchSize > 1 {
-		clientSrvOpt = append(clientSrvOpt, clientsrv.WithBatching(batchSize))
-	}
 	depsSrv := dependencies.NewService(
 		depsCore,
 		depsSecure,
 		clientSrvOpt,
 		rOpt.clientServerOpts...,
 	)
-
 	depsProtocol, err := dependencies.NewProtocol(
 		depsCore,
 		depsNet,
@@ -130,14 +117,14 @@ func NewReplicaDependencies(
 	if err != nil {
 		return nil, err
 	}
+	serverOpts = append(serverOpts, server.WithGorumsServerOptions(rOpt.replicaServerOpts...))
 	server := server.NewServer(
 		depsCore.EventLoop,
 		depsCore.Logger,
 		depsCore.Globals,
 		depsNet.Config,
 		depsSecure.BlockChain,
-		server.WithLatencies(id, locations),
-		server.WithGorumsServerOptions(rOpt.replicaServerOpts...),
+		serverOpts...,
 	)
 	return &ReplicaDependencies{
 		eventLoop:    depsCore.EventLoop,

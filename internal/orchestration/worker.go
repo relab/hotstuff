@@ -23,7 +23,9 @@ import (
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/security/crypto/keygen"
+	"github.com/relab/hotstuff/service/clientsrv"
 	"github.com/relab/hotstuff/service/replica"
+	"github.com/relab/hotstuff/service/server"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -171,9 +173,13 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		globalOpts = append(globalOpts, core.WithKauri(t))
 	}
 
-	// prepare components and modules
+	globalOpts = append(globalOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
+	clientSrvOpts := []clientsrv.CacheOption{clientsrv.WithBatching(opts.GetBatchSize())}
+	serverOpts := []server.ServerOption{server.WithLatencies(opts.HotstuffID(), opts.GetLocations())}
+	// prepare dependencies
 	deps, err := NewReplicaDependencies(
-		opts,
+		opts, // TODO: remove dependency
+		opts.HotstuffID(),
 		privKey,
 		viewduration.NewParams(
 			opts.GetTimeoutSamples(),
@@ -182,6 +188,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			opts.GetTimeoutMultiplier(),
 		),
 		globalOpts,
+		clientSrvOpts,
+		serverOpts,
 		rOpts...)
 	if err != nil {
 		return nil, err
