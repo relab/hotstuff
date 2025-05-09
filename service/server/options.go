@@ -10,18 +10,10 @@ type backendOptions struct {
 	id            hotstuff.ID
 	latencyMatrix latency.Matrix
 	gorumsSrvOpts []gorums.ServerOption
-	registerKauri bool
 }
 
 // ServerOptions is a function for configuring the Server.
 type ServerOptions func(*backendOptions)
-
-// WithKauri registers a service implementation for Gorums which allows sending kauri.ContributionRecvEvent.
-func WithKauri() ServerOptions {
-	return func(opts *backendOptions) {
-		opts.registerKauri = true
-	}
-}
 
 // WithLatencies sets the locations assigned to the replicas and
 // constructs the corresponding latency matrix.

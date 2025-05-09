@@ -67,7 +67,7 @@ func TestModules(t *testing.T) {
 		case eddsa.ModuleName:
 			pk = testutil.GenerateEDDSAKey(t)
 		}
-		depsCore := dependencies.NewCore(hotstuff.ID(1), "test", pk, 0)
+		depsCore := dependencies.NewCore(hotstuff.ID(1), "test", pk)
 		depsNet := dependencies.NewNetwork(depsCore, insecure.NewCredentials())
 		depsSecure, err := dependencies.NewSecurity(depsCore, depsNet, td.cryptoName, 100)
 		if err != nil {

@@ -7,13 +7,14 @@ import (
 
 type Option func(*Consensus)
 
+// TODO(AlanRostem): consider removing this since it's usage is moved to core.Globals
 func WithKauri(tree *tree.Tree) Option {
 	return func(cs *Consensus) {
 		cs.kauri = kauri.New(
 			cs.auth,
 			cs.leaderRotation,
 			cs.blockChain,
-			cs.opts,
+			cs.globals,
 			cs.eventLoop,
 			cs.configuration,
 			cs.sender,

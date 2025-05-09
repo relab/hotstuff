@@ -19,12 +19,11 @@ func NewCore(
 	id hotstuff.ID,
 	logTag string,
 	privKey hotstuff.PrivateKey,
-	seed int64,
 	gOpt ...core.GlobalsOption,
 ) *Core {
 	logger := logging.New(fmt.Sprintf("%s%d", logTag, id))
 	return &Core{
-		Globals:   core.NewGlobals(id, privKey, seed, gOpt...),
+		Globals:   core.NewGlobals(id, privKey, gOpt...),
 		EventLoop: eventloop.New(logger, 100),
 		Logger:    logger,
 	}

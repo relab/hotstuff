@@ -75,7 +75,6 @@ func NewProtocol(
 	leaderRotationName,
 	byzantineStrategy string,
 	vdParams viewduration.Params,
-	consensusOpt ...consensus.Option,
 ) (*Protocol, error) {
 	mods, err := newProtocolModules(
 		depsCore,
@@ -102,7 +101,6 @@ func NewProtocol(
 		depsCore.EventLoop,
 		depsCore.Logger,
 		depsCore.Globals,
-		consensusOpt...,
 	)
 	return &Protocol{
 		Consensus: csus,

@@ -42,13 +42,13 @@ type Globals struct {
 
 	tree          tree.Tree
 	shouldUseTree bool
+	useKauri      bool
 }
 
-func NewGlobals(id hotstuff.ID, pk hotstuff.PrivateKey, seed int64, opts ...GlobalsOption) *Globals {
+func NewGlobals(id hotstuff.ID, pk hotstuff.PrivateKey, opts ...GlobalsOption) *Globals {
 	g := &Globals{
 		id:                 id,
 		privateKey:         pk,
-		sharedRandomSeed:   seed,
 		connectionMetadata: make(map[string]string),
 	}
 	for _, opt := range opts {
@@ -103,6 +103,12 @@ func (g *Globals) ConnectionMetadata() map[string]string {
 // SetSharedRandomSeed sets the shared random seed.
 func (g *Globals) SetSharedRandomSeed(seed int64) {
 	g.sharedRandomSeed = seed
+}
+
+// ShouldEnableKauri returns true if Kauri will be integrated to the consensus logic and
+// Kauri-specific RPC methods are getting enabled.
+func (g *Globals) ShouldEnableKauri() bool {
+	return g.useKauri
 }
 
 // Tree returns the tree configuration.

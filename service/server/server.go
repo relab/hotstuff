@@ -61,7 +61,7 @@ func NewServer(
 		srv.eventLoop.AddEvent(hotstuff.ReplicaConnectedEvent{Ctx: ctx})
 	}))
 	srv.gorumsSrv = gorums.NewServer(options.gorumsSrvOpts...)
-	if options.registerKauri {
+	if globals.ShouldEnableKauri() {
 		kauri.RegisterService(eventLoop, logger, srv.gorumsSrv)
 	}
 	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, &serviceImpl{srv})

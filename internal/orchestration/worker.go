@@ -34,6 +34,7 @@ import (
 	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	_ "github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	_ "github.com/relab/hotstuff/protocol/rules/simplehotstuff"
+	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	_ "github.com/relab/hotstuff/security/crypto/bls12"
 	_ "github.com/relab/hotstuff/security/crypto/ecdsa"
 	_ "github.com/relab/hotstuff/security/crypto/eddsa"
@@ -173,6 +174,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	deps, err := NewReplicaDependencies(
 		opts,
 		privKey,
+		viewduration.NewParams(
+			opts.GetTimeoutSamples(),
+			opts.GetInitialTimeout().AsDuration(),
+			opts.GetMaxTimeout().AsDuration(),
+			opts.GetTimeoutMultiplier(),
+		),
 		rOpts...)
 	if err != nil {
 		return nil, err
@@ -264,7 +271,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		buildOpt := core.NewGlobals(hotstuff.ID(opts.GetID()), nil, 0) // TODO(AlanRostem): can seed be zero?
+		buildOpt := core.NewGlobals(hotstuff.ID(opts.GetID()), nil)
 		logger := logging.New("cli" + strconv.Itoa(int(opts.GetID())))
 		eventLoop := eventloop.New(logger, 1000)
 

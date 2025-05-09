@@ -43,7 +43,7 @@ func TestVote(t *testing.T) {
 		cacheSize := 100
 		batchSize := 1
 
-		depsCore := dependencies.NewCore(id, fmt.Sprintf("hs%d", id), testutil.GenerateECDSAKey(t), 0)
+		depsCore := dependencies.NewCore(id, fmt.Sprintf("hs%d", id), testutil.GenerateECDSAKey(t))
 		depsNet := dependencies.NewNetwork(depsCore, nil)
 		depsSecure, err := dependencies.NewSecurity(depsCore, depsNet, cryptoName, cacheSize)
 		if err != nil {

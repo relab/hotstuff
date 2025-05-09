@@ -13,7 +13,6 @@ import (
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/network/sender"
-	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/service/clientsrv"
@@ -75,6 +74,7 @@ type ReplicaDependencies struct {
 func NewReplicaDependencies(
 	opts *orchestrationpb.ReplicaOpts,
 	privKey hotstuff.PrivateKey,
+	vdParams viewduration.Params,
 	repOpts ...ReplicaOption,
 ) (*ReplicaDependencies, error) {
 	var rOpt replicaOptions
@@ -86,23 +86,22 @@ func NewReplicaDependencies(
 		rOpt.credentials = insecure.NewCredentials()
 	}
 
-	// TODO(AlanRostem): remove direct dependency on these values. I am putting these here to visualize the dependency on *orchestrationpb.ReplicaOpts.
+	// TODO(AlanRostem): remove direct dependency on these values. I am putting these here to visualize the dependency on *orchestrationpb.ReplicaOpts for now.
 	id := opts.HotstuffID()
 	seed := opts.GetSharedSeed()
 	locations := opts.GetLocations()
 
 	cryptoName := opts.GetCrypto()
 
-	globalOpts := []core.GlobalsOption{}
-	consensusOpts := []consensus.Option{}
-
-	// TODO(AlanRostem): consider refactoring the code so that core.Globals is not needed
-	if rOpt.useKauri {
-		globalOpts = append(globalOpts, core.WithKauri(&rOpt.kauriTree))
-		consensusOpts = append(consensusOpts, consensus.WithKauri(&rOpt.kauriTree))
+	globalOpts := []core.GlobalsOption{
+		core.WithSharedRandomSeed(seed),
 	}
 
-	depsCore := dependencies.NewCore(id, "hs", privKey, seed, globalOpts...)
+	if rOpt.useKauri {
+		globalOpts = append(globalOpts, core.WithKauri(&rOpt.kauriTree))
+	}
+
+	depsCore := dependencies.NewCore(id, "hs", privKey, globalOpts...)
 
 	depsNet := dependencies.NewNetwork(
 		depsCore,
@@ -119,12 +118,6 @@ func NewReplicaDependencies(
 		int(opts.GetBatchSize()),
 		rOpt.clientServerOpts...)
 
-	durationParams := viewduration.NewParams(
-		opts.GetTimeoutSamples(),
-		opts.GetInitialTimeout().AsDuration(),
-		opts.GetMaxTimeout().AsDuration(),
-		opts.GetTimeoutMultiplier(),
-	)
 	depsProtocol, err := dependencies.NewProtocol(
 		depsCore,
 		depsNet,
@@ -133,18 +126,14 @@ func NewReplicaDependencies(
 		opts.GetConsensus(),
 		opts.GetLeaderRotation(),
 		opts.GetByzantineStrategy(),
-		durationParams,
-		consensusOpts...,
+		vdParams,
 	)
 	if err != nil {
 		return nil, err
 	}
-	serverSrvOpt := []server.ServerOptions{
+	srvOpt := []server.ServerOptions{
 		server.WithLatencies(id, locations),
 		server.WithGorumsServerOptions(rOpt.replicaServerOpts...),
-	}
-	if rOpt.useKauri {
-		serverSrvOpt = append(serverSrvOpt, server.WithKauri())
 	}
 	server := server.NewServer(
 		depsCore.EventLoop,
@@ -152,7 +141,7 @@ func NewReplicaDependencies(
 		depsCore.Globals,
 		depsNet.Config,
 		depsSecure.BlockChain,
-		serverSrvOpt...,
+		srvOpt...,
 	)
 
 	return &ReplicaDependencies{
