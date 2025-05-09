@@ -99,7 +99,7 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 // NewRepBased returns a new random reputation-based leader rotation implementation
 func NewRepBased(
 	chainLength int,
-	vdOpt viewduration.Params,
+	vdParams viewduration.Params,
 
 	configuration *netconfig.Config,
 	committer *committer.Committer,
@@ -111,7 +111,7 @@ func NewRepBased(
 		committer:     committer,
 		globals:       globals,
 		logger:        logger,
-		viewDuration:  viewduration.NewDynamic(vdOpt),
+		viewDuration:  viewduration.NewDynamic(vdParams),
 
 		chainLength:    chainLength,
 		reputations:    make(reputationsMap),

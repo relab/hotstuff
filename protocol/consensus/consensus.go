@@ -41,7 +41,6 @@ type Consensus struct {
 func New(
 	impl modules.ConsensusRules,
 	leaderRotation modules.LeaderRotation,
-	kauri modules.Kauri,
 
 	blockChain *blockchain.BlockChain,
 	committer *committer.Committer,
@@ -57,7 +56,7 @@ func New(
 	cs := &Consensus{
 		impl:           impl,
 		leaderRotation: leaderRotation,
-		kauri:          kauri,
+		kauri:          nil, // this is set in the options later
 
 		blockChain:    blockChain,
 		committer:     committer,

@@ -15,8 +15,8 @@ func NewDynamic(opt Params) modules.ViewDuration {
 	return &viewDuration{
 		limit: opt.sampleSize,
 		mean:  opt.startTimeout,
-		max:   opt.MaxTimeout,
-		mul:   opt.Multiplier,
+		max:   opt.maxTimeout,
+		mul:   opt.multiplier,
 	}
 }
 

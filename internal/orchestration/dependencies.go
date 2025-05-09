@@ -86,7 +86,7 @@ func NewReplicaDependencies(
 		rOpt.credentials = insecure.NewCredentials()
 	}
 
-	// TODO(AlanRostem): remove direct dependency on these values I am putting these here to visualize the dependency on *orchestrationpb.ReplicaOpts.
+	// TODO(AlanRostem): remove direct dependency on these values. I am putting these here to visualize the dependency on *orchestrationpb.ReplicaOpts.
 	id := opts.HotstuffID()
 	seed := opts.GetSharedSeed()
 	locations := opts.GetLocations()

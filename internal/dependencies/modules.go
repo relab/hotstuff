@@ -79,7 +79,7 @@ func newCryptoModule(
 func newLeaderRotationModule(
 	name string,
 	chainLength int,
-	vdOpt viewduration.Params,
+	vdParams viewduration.Params,
 	blockChain *blockchain.BlockChain,
 	config *netconfig.Config,
 	committer *committer.Committer,
@@ -88,15 +88,15 @@ func newLeaderRotationModule(
 ) (ld modules.LeaderRotation, err error) {
 	switch name {
 	case leaderrotation.CarouselModuleName:
-		ld = leaderrotation.NewCarousel(chainLength, vdOpt, blockChain, config, committer, globals, logger)
+		ld = leaderrotation.NewCarousel(chainLength, vdParams, blockChain, config, committer, globals, logger)
 	case leaderrotation.ReputationModuleName:
-		ld = leaderrotation.NewRepBased(chainLength, vdOpt, config, committer, globals, logger)
+		ld = leaderrotation.NewRepBased(chainLength, vdParams, config, committer, globals, logger)
 	case leaderrotation.RoundRobinModuleName:
-		ld = leaderrotation.NewRoundRobin(vdOpt, config)
+		ld = leaderrotation.NewRoundRobin(vdParams, config)
 	case leaderrotation.FixedModuleName:
-		ld = leaderrotation.NewFixed(hotstuff.ID(1), vdOpt)
+		ld = leaderrotation.NewFixed(hotstuff.ID(1), vdParams)
 	case leaderrotation.TreeLeaderModuleName:
-		ld = leaderrotation.NewTreeLeader(vdOpt.StartTimeout(), globals)
+		ld = leaderrotation.NewTreeLeader(vdParams.StartTimeout(), globals)
 	default:
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", name)
 	}

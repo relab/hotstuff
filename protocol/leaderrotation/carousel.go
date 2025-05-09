@@ -82,7 +82,7 @@ func (c carousel) ViewDuration() modules.ViewDuration {
 // NewCarousel returns a new instance of the Carousel leader-election algorithm.
 func NewCarousel(
 	chainLength int,
-	vdOpt viewduration.Params,
+	vdParams viewduration.Params,
 
 	blockChain *blockchain.BlockChain,
 	configuration *netconfig.Config,
@@ -97,6 +97,6 @@ func NewCarousel(
 		committer:     committer,
 		globals:       globals,
 		logger:        logger,
-		viewDuration:  viewduration.NewDynamic(vdOpt),
+		viewDuration:  viewduration.NewDynamic(vdParams),
 	}
 }

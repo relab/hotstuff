@@ -22,7 +22,7 @@ func newProtocolModules(
 	consensusName,
 	leaderRotationName,
 	byzantineStrategy string,
-	vdOpt viewduration.Params,
+	vdParams viewduration.Params,
 ) (*protocolModules, error) {
 	consensusRules, err := newConsensusRulesModule(consensusName, depsSecure.BlockChain, depsCore.Logger, depsCore.Globals)
 	if err != nil {
@@ -31,7 +31,7 @@ func newProtocolModules(
 	leaderRotation, err := newLeaderRotationModule(
 		leaderRotationName,
 		consensusRules.ChainLength(),
-		vdOpt,
+		vdParams,
 		depsSecure.BlockChain,
 		depsNet.Config,
 		depsSrv.Committer,
@@ -74,7 +74,7 @@ func NewProtocol(
 	consensusName,
 	leaderRotationName,
 	byzantineStrategy string,
-	vdOpt viewduration.Params,
+	vdParams viewduration.Params,
 	consensusOpt ...consensus.Option,
 ) (*Protocol, error) {
 	mods, err := newProtocolModules(
@@ -85,7 +85,7 @@ func NewProtocol(
 		consensusName,
 		leaderRotationName,
 		byzantineStrategy,
-		vdOpt,
+		vdParams,
 	)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,6 @@ func NewProtocol(
 	csus := consensus.New(
 		mods.ConsensusRules,
 		mods.LeaderRotation,
-		mods.Kauri,
 		depsSecure.BlockChain,
 		depsSrv.Committer,
 		depsSrv.CmdCache,
