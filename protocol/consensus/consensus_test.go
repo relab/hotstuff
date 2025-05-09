@@ -41,15 +41,14 @@ func TestVote(t *testing.T) {
 		consensusName := chainedhotstuff.ModuleName
 		leaderRotationName := leaderrotation.RoundRobinModuleName
 		cacheSize := 100
-		batchSize := 1
 
 		depsCore := dependencies.NewCore(id, fmt.Sprintf("hs%d", id), testutil.GenerateECDSAKey(t))
 		depsNet := dependencies.NewNetwork(depsCore, nil)
-		depsSecure, err := dependencies.NewSecurity(depsCore, depsNet, cryptoName, cacheSize)
+		depsSecure, err := dependencies.NewSecurity(depsCore, depsNet, cryptoName, certauth.WithCache(cacheSize))
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		depsService := dependencies.NewService(depsCore, depsSecure, batchSize)
+		depsService := dependencies.NewService(depsCore, depsSecure, nil)
 		depsProtocol, err := dependencies.NewProtocol(
 			depsCore, depsNet, depsSecure, depsService,
 			consensusName, leaderRotationName, "",

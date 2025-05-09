@@ -22,17 +22,22 @@ func New(
 
 	blockChain *blockchain.BlockChain,
 	logger logging.Logger,
+	opts ...Option,
 ) *CertAuthority {
-	return &CertAuthority{
+	ca := &CertAuthority{
 		CryptoBase: impl,
 
 		logger:     logger,
 		blockChain: blockChain,
 	}
+	for _, opt := range opts {
+		opt(ca)
+	}
+	return ca
 }
 
 // CreatePartialCert signs a single block and returns the partial certificate.
-func (c CertAuthority) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
+func (c *CertAuthority) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.PartialCert, err error) {
 	sig, err := c.Sign(block.ToBytes())
 	if err != nil {
 		return hotstuff.PartialCert{}, err
@@ -41,7 +46,7 @@ func (c CertAuthority) CreatePartialCert(block *hotstuff.Block) (cert hotstuff.P
 }
 
 // CreateQuorumCert creates a quorum certificate from a list of partial certificates.
-func (c CertAuthority) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
+func (c *CertAuthority) CreateQuorumCert(block *hotstuff.Block, signatures []hotstuff.PartialCert) (cert hotstuff.QuorumCert, err error) {
 	// genesis QC is always valid.
 	if block.Hash() == hotstuff.GetGenesis().Hash() {
 		return hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), nil
@@ -58,7 +63,7 @@ func (c CertAuthority) CreateQuorumCert(block *hotstuff.Block, signatures []hots
 }
 
 // CreateTimeoutCert creates a timeout certificate from a list of timeout messages.
-func (c CertAuthority) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (cert hotstuff.TimeoutCert, err error) {
+func (c *CertAuthority) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (cert hotstuff.TimeoutCert, err error) {
 	// view 0 is always valid.
 	if view == 0 {
 		return hotstuff.NewTimeoutCert(nil, 0), nil
@@ -75,7 +80,7 @@ func (c CertAuthority) CreateTimeoutCert(view hotstuff.View, timeouts []hotstuff
 }
 
 // CreateAggregateQC creates an AggregateQC from the given timeout messages.
-func (c CertAuthority) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (aggQC hotstuff.AggregateQC, err error) {
+func (c *CertAuthority) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.TimeoutMsg) (aggQC hotstuff.AggregateQC, err error) {
 	qcs := make(map[hotstuff.ID]hotstuff.QuorumCert)
 	sigs := make([]hotstuff.QuorumSignature, 0, len(timeouts))
 	for _, timeout := range timeouts {
@@ -94,7 +99,7 @@ func (c CertAuthority) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff
 }
 
 // VerifyPartialCert verifies a single partial certificate.
-func (c CertAuthority) VerifyPartialCert(cert hotstuff.PartialCert) bool {
+func (c *CertAuthority) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 	block, ok := c.blockChain.Get(cert.BlockHash())
 	if !ok {
 		return false
@@ -103,7 +108,7 @@ func (c CertAuthority) VerifyPartialCert(cert hotstuff.PartialCert) bool {
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
-func (c CertAuthority) VerifyQuorumCert(quorumSize int, qc hotstuff.QuorumCert) bool {
+func (c *CertAuthority) VerifyQuorumCert(quorumSize int, qc hotstuff.QuorumCert) bool {
 	// genesis QC is always valid.
 	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
 		return true
@@ -127,7 +132,7 @@ func (c CertAuthority) VerifyQuorumCert(quorumSize int, qc hotstuff.QuorumCert) 
 }
 
 // VerifyTimeoutCert verifies a timeout certificate.
-func (c CertAuthority) VerifyTimeoutCert(quorumSize int, tc hotstuff.TimeoutCert) bool {
+func (c *CertAuthority) VerifyTimeoutCert(quorumSize int, tc hotstuff.TimeoutCert) bool {
 	// view 0 TC is always valid.
 	if tc.View() == 0 {
 		return true
@@ -139,7 +144,7 @@ func (c CertAuthority) VerifyTimeoutCert(quorumSize int, tc hotstuff.TimeoutCert
 }
 
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
-func (c CertAuthority) VerifyAggregateQC(quorumSize int, aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, ok bool) {
+func (c *CertAuthority) VerifyAggregateQC(quorumSize int, aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, ok bool) {
 	messages := make(map[hotstuff.ID][]byte)
 	for id, qc := range aggQC.QCs() {
 		if highQC.View() < qc.View() || highQC == (hotstuff.QuorumCert{}) {

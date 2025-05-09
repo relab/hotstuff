@@ -152,6 +152,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rOpts = append(rOpts, WithTLS(certificate, rootCAs))
 	}
 
+	globalOpts := []core.GlobalsOption{}
 	if opts.GetKauri() {
 		delayMode := tree.DelayTypeNone
 		if opts.GetAggregationTime() {
@@ -167,7 +168,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			opts.TreePositionIDs(),
 			opts.GetTreeDelta().AsDuration(),
 		)
-		rOpts = append(rOpts, WithKauri(t))
+		globalOpts = append(globalOpts, core.WithKauri(t))
 	}
 
 	// prepare components and modules
@@ -180,6 +181,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			opts.GetMaxTimeout().AsDuration(),
 			opts.GetTimeoutMultiplier(),
 		),
+		globalOpts,
 		rOpts...)
 	if err != nil {
 		return nil, err

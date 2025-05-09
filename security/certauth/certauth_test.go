@@ -35,7 +35,11 @@ func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuf
 	t.Helper()
 	core := dependencies.NewCore(hotstuff.ID(id), "test", privKey)
 	net := dependencies.NewNetwork(core, nil)
-	sec, err := dependencies.NewSecurity(core, net, cryptoName, cacheSize)
+	opts := []certauth.Option{}
+	if cacheSize > 0 {
+		opts = append(opts, certauth.WithCache(cacheSize))
+	}
+	sec, err := dependencies.NewSecurity(core, net, cryptoName, opts...)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

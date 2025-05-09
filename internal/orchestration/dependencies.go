@@ -11,10 +11,10 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/dependencies"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
-	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/network/sender"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
+	"github.com/relab/hotstuff/security/certauth"
 	"github.com/relab/hotstuff/service/clientsrv"
 	"github.com/relab/hotstuff/service/server"
 	"google.golang.org/grpc"
@@ -27,9 +27,6 @@ type replicaOptions struct {
 	clientServerOpts  []gorums.ServerOption
 	replicaServerOpts []gorums.ServerOption
 	credentials       credentials.TransportCredentials
-
-	useKauri  bool
-	kauriTree tree.Tree
 }
 
 type ReplicaOption func(*replicaOptions)
@@ -53,13 +50,6 @@ func WithTLS(certificate tls.Certificate, rootCAs *x509.CertPool) ReplicaOption 
 	}
 }
 
-func WithKauri(tree tree.Tree) ReplicaOption {
-	return func(ro *replicaOptions) {
-		ro.useKauri = true
-		ro.kauriTree = tree
-	}
-}
-
 type ReplicaDependencies struct {
 	clientSrv    *clientsrv.ClientServer
 	server       *server.Server
@@ -75,6 +65,7 @@ func NewReplicaDependencies(
 	opts *orchestrationpb.ReplicaOpts,
 	privKey hotstuff.PrivateKey,
 	vdParams viewduration.Params,
+	globalOpts []core.GlobalsOption,
 	repOpts ...ReplicaOption,
 ) (*ReplicaDependencies, error) {
 	var rOpt replicaOptions
@@ -90,16 +81,14 @@ func NewReplicaDependencies(
 	id := opts.HotstuffID()
 	seed := opts.GetSharedSeed()
 	locations := opts.GetLocations()
+	batchSize := opts.GetBatchSize()
+	moduleNameCrypto := opts.GetCrypto()
+	moduleNameConsensus := opts.GetConsensus()
+	moduleNameLeaderRotation := opts.GetLeaderRotation()
+	moduleNameByzantineStrategy := opts.GetByzantineStrategy()
 
-	cryptoName := opts.GetCrypto()
-
-	globalOpts := []core.GlobalsOption{
-		core.WithSharedRandomSeed(seed),
-	}
-
-	if rOpt.useKauri {
-		globalOpts = append(globalOpts, core.WithKauri(&rOpt.kauriTree))
-	}
+	// TODO(AlanRostem): consider removing this and assign the seed in a layer above this
+	globalOpts = append(globalOpts, core.WithSharedRandomSeed(seed))
 
 	depsCore := dependencies.NewCore(id, "hs", privKey, globalOpts...)
 
@@ -108,32 +97,38 @@ func NewReplicaDependencies(
 		rOpt.credentials,
 	)
 	cacheSize := 100 // TODO: consider making this configurable
-	depsSecure, err := dependencies.NewSecurity(depsCore, depsNet, cryptoName, cacheSize)
+	depsSecure, err := dependencies.NewSecurity(
+		depsCore,
+		depsNet,
+		moduleNameCrypto,
+		certauth.WithCache(cacheSize),
+	)
 	if err != nil {
 		return nil, err
+	}
+	clientSrvOpt := []clientsrv.CacheOption{}
+	if batchSize > 1 {
+		clientSrvOpt = append(clientSrvOpt, clientsrv.WithBatching(batchSize))
 	}
 	depsSrv := dependencies.NewService(
 		depsCore,
 		depsSecure,
-		int(opts.GetBatchSize()),
-		rOpt.clientServerOpts...)
+		clientSrvOpt,
+		rOpt.clientServerOpts...,
+	)
 
 	depsProtocol, err := dependencies.NewProtocol(
 		depsCore,
 		depsNet,
 		depsSecure,
 		depsSrv,
-		opts.GetConsensus(),
-		opts.GetLeaderRotation(),
-		opts.GetByzantineStrategy(),
+		moduleNameConsensus,
+		moduleNameLeaderRotation,
+		moduleNameByzantineStrategy,
 		vdParams,
 	)
 	if err != nil {
 		return nil, err
-	}
-	srvOpt := []server.ServerOptions{
-		server.WithLatencies(id, locations),
-		server.WithGorumsServerOptions(rOpt.replicaServerOpts...),
 	}
 	server := server.NewServer(
 		depsCore.EventLoop,
@@ -141,9 +136,9 @@ func NewReplicaDependencies(
 		depsCore.Globals,
 		depsNet.Config,
 		depsSecure.BlockChain,
-		srvOpt...,
+		server.WithLatencies(id, locations),
+		server.WithGorumsServerOptions(rOpt.replicaServerOpts...),
 	)
-
 	return &ReplicaDependencies{
 		eventLoop:    depsCore.EventLoop,
 		logger:       depsCore.Logger,

@@ -16,7 +16,7 @@ func NewSecurity(
 	depsCore *Core,
 	depsNet *Network,
 	cryptoName string,
-	cacheSize int,
+	opts ...certauth.Option,
 ) (*Security, error) {
 	blockChain := blockchain.New(
 		depsNet.Sender,
@@ -27,24 +27,14 @@ func NewSecurity(
 	if err != nil {
 		return nil, err
 	}
-	var certAuthority *certauth.CertAuthority
-	if cacheSize > 0 {
-		certAuthority = certauth.NewCached(
-			cryptoImpl,
-			blockChain,
-			depsCore.Logger,
-			cacheSize,
-		)
-	} else {
-		certAuthority = certauth.New(
-			cryptoImpl,
-			blockChain,
-			depsCore.Logger,
-		)
-	}
 	return &Security{
 		BlockChain: blockChain,
 		CryptoImpl: cryptoImpl,
-		CertAuth:   certAuthority,
+		CertAuth: certauth.New(
+			cryptoImpl,
+			blockChain,
+			depsCore.Logger,
+			opts...,
+		),
 	}, nil
 }

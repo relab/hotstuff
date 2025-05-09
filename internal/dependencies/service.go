@@ -15,12 +15,12 @@ type Service struct {
 func NewService(
 	depsCore *Core,
 	depsSecure *Security,
-	batchSize int,
+	cacheOpt []clientsrv.CacheOption,
 	clientSrvOpts ...gorums.ServerOption,
 ) *Service {
 	cmdCache := clientsrv.NewCmdCache(
 		depsCore.Logger,
-		batchSize,
+		cacheOpt...,
 	)
 	clientSrv := clientsrv.NewClientServer(
 		depsCore.EventLoop,

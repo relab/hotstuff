@@ -32,18 +32,23 @@ type CmdCache struct {
 
 func NewCmdCache(
 	logger logging.Logger,
-
-	batchSize int,
+	opts ...CacheOption,
 ) *CmdCache {
-	return &CmdCache{
+	c := &CmdCache{
 		logger: logger,
 
 		c:             make(chan struct{}),
-		batchSize:     batchSize,
+		batchSize:     1,
 		serialNumbers: make(map[uint32]uint64),
 		marshaler:     proto.MarshalOptions{Deterministic: true},
 		unmarshaler:   proto.UnmarshalOptions{DiscardUnknown: true},
 	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c
 }
 
 func (c *CmdCache) addCommand(cmd *clientpb.Command) {

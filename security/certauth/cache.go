@@ -9,9 +9,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/security/blockchain"
 )
 
 type Cache struct {
@@ -20,24 +18,6 @@ type Cache struct {
 	capacity    int
 	entries     map[string]*list.Element
 	accessOrder list.List
-}
-
-// NewCached returns a new CertAuth instance that caches the results of the operations of the given CryptoBase.
-// implementation.
-func NewCached(
-	impl modules.CryptoBase,
-	blockChain *blockchain.BlockChain,
-	logger logging.Logger,
-
-	capacity int) *CertAuthority {
-	return New(&Cache{
-		impl:     impl,
-		capacity: capacity,
-		entries:  make(map[string]*list.Element, capacity),
-	},
-		blockChain,
-		logger,
-	)
 }
 
 func (cache *Cache) insert(key string) {

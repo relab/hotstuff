@@ -35,7 +35,7 @@ func NewDelayed(
 	latencyMatrix latency.Matrix,
 	treePositionIDs []hotstuff.ID,
 	delta time.Duration,
-) Tree {
+) *Tree {
 	t := NewSimple(id, branchFactor, treePositionIDs)
 	switch delayMode {
 	case DelayTypeAggregation:
@@ -49,7 +49,7 @@ func NewDelayed(
 }
 
 // NewSimple creates a simple tree configuration.
-func NewSimple(id hotstuff.ID, branchFactor int, treePositionIDs []hotstuff.ID) Tree {
+func NewSimple(id hotstuff.ID, branchFactor int, treePositionIDs []hotstuff.ID) *Tree {
 	if branchFactor < 2 {
 		panic("Branch factor must be greater than 1")
 	}
@@ -57,7 +57,7 @@ func NewSimple(id hotstuff.ID, branchFactor int, treePositionIDs []hotstuff.ID) 
 		panic("Replica ID not found in tree configuration")
 	}
 
-	return Tree{
+	return &Tree{
 		id:           id,
 		height:       treeHeight(len(treePositionIDs), branchFactor),
 		branchFactor: branchFactor,

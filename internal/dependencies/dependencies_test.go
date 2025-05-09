@@ -12,6 +12,7 @@ import (
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
+	"github.com/relab/hotstuff/security/certauth"
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/security/crypto/eddsa"
@@ -69,11 +70,11 @@ func TestModules(t *testing.T) {
 		}
 		depsCore := dependencies.NewCore(hotstuff.ID(1), "test", pk)
 		depsNet := dependencies.NewNetwork(depsCore, insecure.NewCredentials())
-		depsSecure, err := dependencies.NewSecurity(depsCore, depsNet, td.cryptoName, 100)
+		depsSecure, err := dependencies.NewSecurity(depsCore, depsNet, td.cryptoName, certauth.WithCache(100))
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		depsSrv := dependencies.NewService(depsCore, depsSecure, 1)
+		depsSrv := dependencies.NewService(depsCore, depsSecure, nil)
 		_, err = dependencies.NewProtocol(
 			depsCore, depsNet, depsSecure, depsSrv,
 			td.consensusName, td.leaderRotationName, td.byzantineStrategy,
