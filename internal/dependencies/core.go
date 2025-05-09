@@ -10,7 +10,7 @@ import (
 )
 
 type Core struct {
-	Options   *core.Options
+	Globals   *core.Globals
 	EventLoop *eventloop.EventLoop
 	Logger    logging.Logger
 }
@@ -19,10 +19,12 @@ func NewCore(
 	id hotstuff.ID,
 	logTag string,
 	privKey hotstuff.PrivateKey,
+	seed int64,
+	gOpt ...core.GlobalsOption,
 ) *Core {
 	logger := logging.New(fmt.Sprintf("%s%d", logTag, id))
 	return &Core{
-		Options:   core.NewOptions(id, privKey),
+		Globals:   core.NewGlobals(id, privKey, seed, gOpt...),
 		EventLoop: eventloop.New(logger, 100),
 		Logger:    logger,
 	}

@@ -11,7 +11,7 @@ import (
 // sampleSize determines the number of previous views that should be considered.
 // startTimeout determines the view duration of the first views.
 // When a timeout occurs, the next view duration will be multiplied by the multiplier.
-func NewDynamic(opt Options) modules.ViewDuration {
+func NewDynamic(opt Params) modules.ViewDuration {
 	return &viewDuration{
 		limit: opt.sampleSize,
 		mean:  opt.startTimeout,

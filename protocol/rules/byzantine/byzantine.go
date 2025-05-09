@@ -28,7 +28,7 @@ func NewSilence(rules modules.ConsensusRules) modules.ConsensusRules {
 
 type fork struct {
 	blockChain *blockchain.BlockChain
-	opts       *core.Options
+	globals    *core.Globals
 	modules.ConsensusRules
 }
 
@@ -47,16 +47,16 @@ func (f *fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert 
 	}
 
 	proposal = hotstuff.ProposeMsg{
-		ID: f.opts.ID(),
+		ID: f.globals.ID(),
 		Block: hotstuff.NewBlock(
 			grandparent.Hash(),
 			grandparent.QuorumCert(),
 			cmd,
 			view,
-			f.opts.ID(),
+			f.globals.ID(),
 		),
 	}
-	if aggQC, ok := cert.AggQC(); f.opts.ShouldUseAggQC() && ok {
+	if aggQC, ok := cert.AggQC(); f.globals.ShouldUseAggQC() && ok {
 		proposal.AggregateQC = &aggQC
 	}
 	return proposal, true
@@ -66,12 +66,12 @@ func (f *fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert 
 func NewFork(
 	rules modules.ConsensusRules,
 	blockChain *blockchain.BlockChain,
-	opts *core.Options,
+	globals *core.Globals,
 ) modules.ConsensusRules {
 	return &fork{
 		ConsensusRules: rules,
 		blockChain:     blockChain,
-		opts:           opts,
+		globals:        globals,
 	}
 }
 

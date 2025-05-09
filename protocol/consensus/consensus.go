@@ -32,7 +32,7 @@ type Consensus struct {
 	configuration *netconfig.Config
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
-	opts          *core.Options
+	opts          *core.Globals
 
 	lastVote hotstuff.View
 }
@@ -51,7 +51,8 @@ func New(
 	configuration *netconfig.Config,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	opts *core.Options,
+	globals *core.Globals,
+	opts ...Option,
 ) *Consensus {
 	cs := &Consensus{
 		impl:           impl,
@@ -66,9 +67,13 @@ func New(
 		configuration: configuration,
 		eventLoop:     eventLoop,
 		logger:        logger,
-		opts:          opts,
+		opts:          globals,
 
 		lastVote: 0,
+	}
+
+	for _, opt := range opts {
+		opt(cs)
 	}
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {

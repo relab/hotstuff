@@ -43,7 +43,7 @@ func TestVote(t *testing.T) {
 		cacheSize := 100
 		batchSize := 1
 
-		depsCore := dependencies.NewCore(id, fmt.Sprintf("hs%d", id), testutil.GenerateECDSAKey(t))
+		depsCore := dependencies.NewCore(id, fmt.Sprintf("hs%d", id), testutil.GenerateECDSAKey(t), 0)
 		depsNet := dependencies.NewNetwork(depsCore, nil)
 		depsSecure, err := dependencies.NewSecurity(depsCore, depsNet, cryptoName, cacheSize)
 		if err != nil {
@@ -52,8 +52,8 @@ func TestVote(t *testing.T) {
 		depsService := dependencies.NewService(depsCore, depsSecure, batchSize)
 		depsProtocol, err := dependencies.NewProtocol(
 			depsCore, depsNet, depsSecure, depsService,
-			false, consensusName, leaderRotationName, "",
-			viewduration.NewOptions(0, 1*time.Millisecond, 0, 0), // TODO(AlanRostem): ensure test values are correct
+			consensusName, leaderRotationName, "",
+			viewduration.NewParams(0, 1*time.Millisecond, 0, 0), // TODO(AlanRostem): ensure test values are correct
 		)
 		if err != nil {
 			t.Fatalf("%v", err)

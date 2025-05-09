@@ -25,11 +25,11 @@ func newConsensusRulesModule(
 	name string,
 	blockChain *blockchain.BlockChain,
 	logger logging.Logger,
-	opts *core.Options,
+	globals *core.Globals,
 ) (rules modules.ConsensusRules, err error) {
 	switch name {
 	case fasthotstuff.ModuleName:
-		rules = fasthotstuff.New(blockChain, logger, opts)
+		rules = fasthotstuff.New(blockChain, logger, globals)
 	case simplehotstuff.ModuleName:
 		rules = simplehotstuff.New(blockChain, logger)
 	case chainedhotstuff.ModuleName:
@@ -44,13 +44,13 @@ func newByzantineStrategyModule(
 	name string,
 	rules modules.ConsensusRules,
 	blockChain *blockchain.BlockChain,
-	opts *core.Options,
+	globals *core.Globals,
 ) (byzRules modules.ConsensusRules, err error) {
 	switch name {
 	case byzantine.SilenceModuleName:
 		byzRules = byzantine.NewSilence(rules)
 	case byzantine.ForkModuleName:
-		byzRules = byzantine.NewFork(rules, blockChain, opts)
+		byzRules = byzantine.NewFork(rules, blockChain, globals)
 	default:
 		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", name)
 	}
@@ -61,15 +61,15 @@ func newCryptoModule(
 	name string,
 	configuration *netconfig.Config,
 	logger logging.Logger,
-	opts *core.Options,
+	globals *core.Globals,
 ) (impl modules.CryptoBase, err error) {
 	switch name {
 	case bls12.ModuleName:
-		impl = bls12.New(configuration, logger, opts)
+		impl = bls12.New(configuration, logger, globals)
 	case ecdsa.ModuleName:
-		impl = ecdsa.New(configuration, logger, opts)
+		impl = ecdsa.New(configuration, logger, globals)
 	case eddsa.ModuleName:
-		impl = eddsa.New(configuration, logger, opts)
+		impl = eddsa.New(configuration, logger, globals)
 	default:
 		return nil, fmt.Errorf("invalid crypto name: '%s'", name)
 	}
@@ -79,24 +79,24 @@ func newCryptoModule(
 func newLeaderRotationModule(
 	name string,
 	chainLength int,
-	vdOpt viewduration.Options,
+	vdOpt viewduration.Params,
 	blockChain *blockchain.BlockChain,
 	config *netconfig.Config,
 	committer *committer.Committer,
 	logger logging.Logger,
-	opts *core.Options,
+	globals *core.Globals,
 ) (ld modules.LeaderRotation, err error) {
 	switch name {
 	case leaderrotation.CarouselModuleName:
-		ld = leaderrotation.NewCarousel(chainLength, vdOpt, blockChain, config, committer, opts, logger)
+		ld = leaderrotation.NewCarousel(chainLength, vdOpt, blockChain, config, committer, globals, logger)
 	case leaderrotation.ReputationModuleName:
-		ld = leaderrotation.NewRepBased(chainLength, vdOpt, config, committer, opts, logger)
+		ld = leaderrotation.NewRepBased(chainLength, vdOpt, config, committer, globals, logger)
 	case leaderrotation.RoundRobinModuleName:
 		ld = leaderrotation.NewRoundRobin(vdOpt, config)
 	case leaderrotation.FixedModuleName:
 		ld = leaderrotation.NewFixed(hotstuff.ID(1), vdOpt)
 	case leaderrotation.TreeLeaderModuleName:
-		ld = leaderrotation.NewTreeLeader(vdOpt.StartTimeout(), opts)
+		ld = leaderrotation.NewTreeLeader(vdOpt.StartTimeout(), globals)
 	default:
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", name)
 	}

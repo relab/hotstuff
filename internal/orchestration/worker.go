@@ -16,8 +16,10 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
+	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/security/crypto/keygen"
@@ -136,6 +138,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if err != nil {
 		return nil, err
 	}
+	rOpts := []ReplicaOption{}
 	var certificate tls.Certificate
 	var rootCAs *x509.CertPool
 	if opts.GetUseTLS() {
@@ -145,9 +148,32 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		}
 		rootCAs = x509.NewCertPool()
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
+		rOpts = append(rOpts, WithTLS(certificate, rootCAs))
 	}
+
+	if opts.GetKauri() {
+		delayMode := tree.DelayTypeNone
+		if opts.GetAggregationTime() {
+			delayMode = tree.DelayTypeAggregation
+		}
+
+		// create tree only if we are using tree leader (Kauri)
+		t := tree.NewDelayed(
+			opts.HotstuffID(),
+			delayMode,
+			int(opts.GetBranchFactor()),
+			latency.MatrixFrom(opts.GetLocations()),
+			opts.TreePositionIDs(),
+			opts.GetTreeDelta().AsDuration(),
+		)
+		rOpts = append(rOpts, WithKauri(t))
+	}
+
 	// prepare components and modules
-	deps, err := NewReplicaDependencies(opts, privKey, WithTLS(certificate, rootCAs)) // TODO(AlanRostem): TLS should not be default
+	deps, err := NewReplicaDependencies(
+		opts,
+		privKey,
+		rOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +264,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		buildOpt := core.NewOptions(hotstuff.ID(opts.GetID()), nil)
+		buildOpt := core.NewGlobals(hotstuff.ID(opts.GetID()), nil, 0) // TODO(AlanRostem): can seed be zero?
 		logger := logging.New("cli" + strconv.Itoa(int(opts.GetID())))
 		eventLoop := eventloop.New(logger, 1000)
 

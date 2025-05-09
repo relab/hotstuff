@@ -16,7 +16,7 @@ func Enable(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	metricsLogger Logger,
-	opts *core.Options,
+	globals *core.Globals,
 	measurementInterval time.Duration,
 	metricNames ...string) error {
 	if len(metricNames) == 0 {
@@ -25,11 +25,11 @@ func Enable(
 	for _, name := range metricNames {
 		switch name {
 		case NameClientLatency:
-			enableClientLatency(eventLoop, logger, opts, metricsLogger)
+			enableClientLatency(eventLoop, logger, metricsLogger, globals)
 		case NameViewTimeouts:
-			enableViewTimeouts(eventLoop, logger, metricsLogger, opts)
+			enableViewTimeouts(eventLoop, logger, metricsLogger, globals)
 		case NameThroughput:
-			enableThroughput(eventLoop, logger, metricsLogger, opts)
+			enableThroughput(eventLoop, logger, metricsLogger, globals)
 		default:
 			return fmt.Errorf("invalid metric: %s", name)
 		}

@@ -27,7 +27,7 @@ type Kauri struct {
 	blockChain     *blockchain.BlockChain
 	crypto         modules.CryptoBase
 	leaderRotation modules.LeaderRotation
-	opts           *core.Options
+	globals        *core.Globals
 	eventLoop      *eventloop.EventLoop
 	configuration  *netconfig.Config
 	sender         *sender.Sender
@@ -40,35 +40,36 @@ type Kauri struct {
 	initDone    bool
 	nodes       map[hotstuff.ID]*kauripb.Node
 	senders     []hotstuff.ID
-	tree        tree.Tree
+	tree        *tree.Tree
 }
 
 // New initializes the kauri structure
 func New(
 	crypto modules.CryptoBase,
 	leaderRotation modules.LeaderRotation,
-
 	blockChain *blockchain.BlockChain,
-	opts *core.Options,
+	globals *core.Globals,
 	eventLoop *eventloop.EventLoop,
 	configuration *netconfig.Config,
 	sender *sender.Sender,
 	logger logging.Logger,
+	tree *tree.Tree,
 ) *Kauri {
 	k := &Kauri{
 		blockChain:     blockChain,
 		crypto:         crypto,
 		leaderRotation: leaderRotation,
-		opts:           opts,
+		globals:        globals,
 		eventLoop:      eventLoop,
 		configuration:  configuration,
 		sender:         sender,
 		logger:         logger,
 
 		nodes: make(map[hotstuff.ID]*kauripb.Node),
+		tree:  tree,
 	}
 
-	k.opts.SetShouldUseTree()
+	// k.opts.SetShouldUseTree() // TODO(AlanRostem): construct Kauri inside consensus to avoid this
 	k.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(_ any) {
 		k.postInit()
 	}, eventloop.Prioritize())
@@ -91,7 +92,7 @@ func (k *Kauri) initializeConfiguration() {
 	for _, n := range kauriCfg.Nodes() {
 		k.nodes[hotstuff.ID(n.ID())] = n
 	}
-	k.tree = k.opts.Tree()
+	k.tree = k.globals.Tree()
 	k.initDone = true
 	k.senders = make([]hotstuff.ID, 0)
 }
@@ -166,7 +167,7 @@ func (k *Kauri) SendContributionToParent() {
 		node, isPresent := k.nodes[parent]
 		if isPresent {
 			node.SendContribution(context.Background(), &kauripb.Contribution{
-				ID:        uint32(k.opts.ID()),
+				ID:        uint32(k.globals.ID()),
 				Signature: hotstuffpb.QuorumSignatureToProto(k.aggContrib),
 				View:      uint64(k.currentView),
 			})

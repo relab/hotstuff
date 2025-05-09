@@ -27,7 +27,7 @@ func (rr roundRobin) GetLeader(view hotstuff.View) hotstuff.ID {
 
 // NewRoundRobin returns a new round-robin leader rotation implementation.
 func NewRoundRobin(
-	opt viewduration.Options,
+	opt viewduration.Params,
 	configuration *netconfig.Config,
 ) modules.LeaderRotation {
 	return &roundRobin{

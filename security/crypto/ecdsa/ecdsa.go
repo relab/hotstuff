@@ -69,24 +69,24 @@ func (sig Signature) ToBytes() []byte {
 type ecdsaBase struct {
 	configuration *netconfig.Config
 	logger        logging.Logger
-	opts          *core.Options
+	globals       *core.Globals
 }
 
 // New returns a new instance of the ECDSA CryptoBase implementation.
 func New(
 	configuration *netconfig.Config,
 	logger logging.Logger,
-	opts *core.Options,
+	globals *core.Globals,
 ) modules.CryptoBase {
 	return &ecdsaBase{
 		configuration: configuration,
 		logger:        logger,
-		opts:          opts,
+		globals:       globals,
 	}
 }
 
 func (ec *ecdsaBase) privateKey() *ecdsa.PrivateKey {
-	return ec.opts.PrivateKey().(*ecdsa.PrivateKey)
+	return ec.globals.PrivateKey().(*ecdsa.PrivateKey)
 }
 
 // Sign creates a cryptographic signature of the given message.
@@ -96,10 +96,10 @@ func (ec *ecdsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, e
 	if err != nil {
 		return nil, fmt.Errorf("ecdsa: sign failed: %w", err)
 	}
-	return crypto.Multi[*Signature]{ec.opts.ID(): &Signature{
+	return crypto.Multi[*Signature]{ec.globals.ID(): &Signature{
 		r:      r,
 		s:      s,
-		signer: ec.opts.ID(),
+		signer: ec.globals.ID(),
 	}}, nil
 }
 

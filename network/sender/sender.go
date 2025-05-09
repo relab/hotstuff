@@ -24,7 +24,7 @@ type Sender struct {
 	configuration *netconfig.Config
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
-	opts          *core.Options
+	globals       *core.Globals
 
 	mgrOpts   []gorums.ManagerOption
 	connected bool
@@ -39,7 +39,7 @@ func New(
 	configuration *netconfig.Config,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	opts *core.Options,
+	globals *core.Globals,
 
 	creds credentials.TransportCredentials,
 	mgrOpts ...gorums.ManagerOption) *Sender {
@@ -55,7 +55,7 @@ func New(
 		configuration: configuration,
 		eventLoop:     eventLoop,
 		logger:        logger,
-		opts:          opts,
+		globals:       globals,
 
 		mgrOpts:  mgrOpts,
 		replicas: make(map[hotstuff.ID]*Replica),
@@ -77,10 +77,10 @@ func (inv *Sender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 	// TODO(AlanRostem): this was here when the subConfig pattern was in use. Check if doing this is valid
 	// cfg.opts = nil // options are not needed beyond this point, so we delete them.
 
-	md := mapToMetadata(inv.opts.ConnectionMetadata())
+	md := mapToMetadata(inv.globals.ConnectionMetadata())
 
 	// embed own ID to allow other replicas to identify messages from this replica
-	md.Set("id", fmt.Sprintf("%d", inv.opts.ID()))
+	md.Set("id", fmt.Sprintf("%d", inv.globals.ID()))
 
 	mgrOpts = append(mgrOpts, gorums.WithMetadata(md))
 
@@ -100,7 +100,7 @@ func (inv *Sender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 		// add the info to the config
 		inv.configuration.AddReplica(&replica)
 		// we do not want to connect to ourself
-		if replica.ID != inv.opts.ID() {
+		if replica.ID != inv.globals.ID() {
 			idMapping[replica.Address] = uint32(replica.ID)
 		}
 	}
@@ -227,7 +227,7 @@ func (inv *Sender) Sub(ids []hotstuff.ID) (*Sender, error) {
 	return &Sender{
 		eventLoop: inv.eventLoop,
 		logger:    inv.logger,
-		opts:      inv.opts,
+		globals:   inv.globals,
 		pbCfg:     newCfg,
 		replicas:  replicas,
 	}, nil

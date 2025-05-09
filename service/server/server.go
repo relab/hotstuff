@@ -27,7 +27,7 @@ type Server struct {
 	configuration *netconfig.Config
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
-	opts          *core.Options
+	globals       *core.Globals
 
 	id        hotstuff.ID
 	lm        latency.Matrix
@@ -38,7 +38,7 @@ type Server struct {
 func NewServer(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	opts *core.Options,
+	globals *core.Globals,
 	configuration *netconfig.Config,
 	blockChain *blockchain.BlockChain,
 	srvOpts ...ServerOptions,
@@ -52,7 +52,7 @@ func NewServer(
 		configuration: configuration,
 		eventLoop:     eventLoop,
 		logger:        logger,
-		opts:          opts,
+		globals:       globals,
 
 		id: options.id,
 		lm: options.latencyMatrix,
@@ -121,7 +121,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
 	}
-	if impl.srv.opts.ShouldUseTree() {
+	if impl.srv.globals.ShouldUseTree() {
 		id = hotstuff.ID(proposal.Block.Proposer)
 	}
 	proposal.Block.Proposer = uint32(id)

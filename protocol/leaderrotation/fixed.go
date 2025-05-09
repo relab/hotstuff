@@ -25,7 +25,7 @@ func (f fixed) GetLeader(_ hotstuff.View) hotstuff.ID {
 // NewFixed returns a new fixed-leader leader rotation implementation.
 func NewFixed(
 	leader hotstuff.ID,
-	opt viewduration.Options,
+	opt viewduration.Params,
 ) modules.LeaderRotation {
 	return fixed{
 		leader:       leader,

@@ -142,7 +142,7 @@ func firstParticipant(participants hotstuff.IDSet) hotstuff.ID {
 type bls12Base struct {
 	configuration *netconfig.Config
 	logger        logging.Logger
-	opts          *core.Options
+	globals       *core.Globals
 
 	mut sync.RWMutex
 	// popCache caches the proof-of-possession results of popVerify for each public key.
@@ -153,29 +153,29 @@ type bls12Base struct {
 func New(
 	configuration *netconfig.Config,
 	logger logging.Logger,
-	opts *core.Options,
+	globals *core.Globals,
 ) modules.CryptoBase {
 	bls := &bls12Base{
 		configuration: configuration,
 		logger:        logger,
-		opts:          opts,
+		globals:       globals,
 
 		popCache: make(map[string]bool),
 	}
 
 	pop := bls.popProve()
 	b := bls12.NewG2().ToCompressed(pop)
-	bls.opts.SetConnectionMetadata(popMetadataKey, string(b))
+	bls.globals.SetConnectionMetadata(popMetadataKey, string(b))
 	return bls
 }
 
 func (bls *bls12Base) privateKey() *PrivateKey {
-	return bls.opts.PrivateKey().(*PrivateKey)
+	return bls.globals.PrivateKey().(*PrivateKey)
 }
 
 func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *PublicKey, ok bool) {
 	if replica, ok := bls.configuration.Replica(id); ok {
-		if replica.ID != bls.opts.ID() && !bls.checkPop(replica) {
+		if replica.ID != bls.globals.ID() && !bls.checkPop(replica) {
 			bls.logger.Warnf("Invalid POP for replica %d", id)
 			return nil, false
 		}
@@ -326,7 +326,7 @@ func (bls *bls12Base) Sign(message []byte) (signature hotstuff.QuorumSignature, 
 		return nil, fmt.Errorf("bls12: coreSign failed: %w", err)
 	}
 	bf := crypto.Bitfield{}
-	bf.Add(bls.opts.ID())
+	bf.Add(bls.globals.ID())
 	return &AggregateSignature{sig: *p, participants: bf}, nil
 }
 

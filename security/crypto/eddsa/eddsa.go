@@ -55,31 +55,31 @@ func (sig Signature) ToBytes() []byte {
 type eddsaBase struct {
 	configuration *netconfig.Config
 	logger        logging.Logger
-	opts          *core.Options
+	globals       *core.Globals
 }
 
 // New returns a new instance of the EDDSA CryptoBase implementation.
 func New(
 	configuration *netconfig.Config,
 	logger logging.Logger,
-	opts *core.Options,
+	globals *core.Globals,
 ) modules.CryptoBase {
 	return &eddsaBase{
 		configuration: configuration,
 		logger:        logger,
-		opts:          opts,
+		globals:       globals,
 	}
 }
 
 func (ed *eddsaBase) privateKey() ed25519.PrivateKey {
-	return ed.opts.PrivateKey().(ed25519.PrivateKey)
+	return ed.globals.PrivateKey().(ed25519.PrivateKey)
 }
 
 // Sign creates a cryptographic signature of the given message.
 func (ed *eddsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
 	sign := ed25519.Sign(ed.privateKey(), message)
-	eddsaSign := &Signature{signer: ed.opts.ID(), sign: sign}
-	return crypto.Multi[*Signature]{ed.opts.ID(): eddsaSign}, nil
+	eddsaSign := &Signature{signer: ed.globals.ID(), sign: sign}
+	return crypto.Multi[*Signature]{ed.globals.ID(): eddsaSign}, nil
 }
 
 // Combine combines multiple signatures into a single signature.

@@ -20,7 +20,7 @@ type votingMachine struct {
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
 	synchronizer  *Synchronizer
-	opts          *core.Options
+	globals       *core.Globals
 
 	mut           sync.Mutex
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
@@ -34,7 +34,7 @@ func registerVoteHandlers(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	synchronizer *Synchronizer,
-	opts *core.Options,
+	globals *core.Globals,
 ) {
 	vm := &votingMachine{
 		blockChain:    blockChain,
@@ -43,7 +43,7 @@ func registerVoteHandlers(
 		eventLoop:     eventLoop,
 		logger:        logger,
 		synchronizer:  synchronizer,
-		opts:          opts,
+		globals:       globals,
 
 		verifiedVotes: make(map[hotstuff.Hash][]hotstuff.PartialCert),
 	}
@@ -85,7 +85,7 @@ func (vm *votingMachine) onVote(vote hotstuff.VoteMsg) {
 		return
 	}
 
-	if vm.opts.ShouldVerifyVotesSync() {
+	if vm.globals.ShouldVerifyVotesSync() {
 		vm.verifyCert(cert, block)
 	} else {
 		go vm.verifyCert(cert, block)
@@ -130,5 +130,5 @@ func (vm *votingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
 
-	vm.eventLoop.AddEvent(hotstuff.NewViewMsg{ID: vm.opts.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
+	vm.eventLoop.AddEvent(hotstuff.NewViewMsg{ID: vm.globals.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
 }

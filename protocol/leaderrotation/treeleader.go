@@ -13,16 +13,16 @@ const TreeLeaderModuleName = "tree-leader"
 
 type treeLeader struct {
 	leader       hotstuff.ID
-	opts         *core.Options
+	globals      *core.Globals
 	viewDuration modules.ViewDuration
 }
 
 func NewTreeLeader(
 	viewDuration time.Duration,
-	opts *core.Options,
+	globals *core.Globals,
 ) modules.LeaderRotation {
 	return &treeLeader{
-		opts:         opts,
+		globals:      globals,
 		leader:       1,
 		viewDuration: viewduration.NewFixed(viewDuration),
 	}
@@ -34,12 +34,12 @@ func (t *treeLeader) ViewDuration() modules.ViewDuration {
 
 // GetLeader returns the id of the leader in the given view
 func (t *treeLeader) GetLeader(_ hotstuff.View) hotstuff.ID {
-	if t.opts == nil {
+	if t.globals == nil {
 		panic("oops")
 	}
 
-	if !t.opts.ShouldUseTree() {
+	if !t.globals.ShouldUseTree() {
 		return 1
 	}
-	return t.opts.Tree().Root()
+	return t.globals.Tree().Root()
 }

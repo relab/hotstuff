@@ -21,7 +21,7 @@ type carousel struct {
 	blockChain    *blockchain.BlockChain
 	configuration *netconfig.Config
 	committer     *committer.Committer
-	opts          *core.Options
+	globals       *core.Globals
 	logger        logging.Logger
 	viewDuration  modules.ViewDuration
 
@@ -66,7 +66,7 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 	})
 	slices.Sort(candidates)
 
-	seed := c.opts.SharedRandomSeed() + int64(round)
+	seed := c.globals.SharedRandomSeed() + int64(round)
 	rnd := rand.New(rand.NewSource(seed))
 
 	leader := candidates[rnd.Int()%len(candidates)]
@@ -82,12 +82,12 @@ func (c carousel) ViewDuration() modules.ViewDuration {
 // NewCarousel returns a new instance of the Carousel leader-election algorithm.
 func NewCarousel(
 	chainLength int,
-	vdOpt viewduration.Options,
+	vdOpt viewduration.Params,
 
 	blockChain *blockchain.BlockChain,
 	configuration *netconfig.Config,
 	committer *committer.Committer,
-	opts *core.Options,
+	globals *core.Globals,
 	logger logging.Logger,
 ) modules.LeaderRotation {
 	return &carousel{
@@ -95,7 +95,7 @@ func NewCarousel(
 		chainLength:   chainLength,
 		configuration: configuration,
 		committer:     committer,
-		opts:          opts,
+		globals:       globals,
 		logger:        logger,
 		viewDuration:  viewduration.NewDynamic(vdOpt),
 	}

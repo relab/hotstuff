@@ -33,14 +33,14 @@ func genKey(t *testing.T, cryptoName string) hotstuff.PrivateKey {
 
 func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuff.PrivateKey, cacheSize int) *dummyReplica {
 	t.Helper()
-	core := dependencies.NewCore(hotstuff.ID(id), "test", privKey)
+	core := dependencies.NewCore(hotstuff.ID(id), "test", privKey, 0)
 	net := dependencies.NewNetwork(core, nil)
 	sec, err := dependencies.NewSecurity(core, net, cryptoName, cacheSize)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	// Needed for bls12 tests:
-	metaData := core.Options.ConnectionMetadata()
+	metaData := core.Globals.ConnectionMetadata()
 	return &dummyReplica{
 		connMd:     metaData,
 		depsSecure: sec,

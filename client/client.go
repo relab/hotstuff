@@ -61,7 +61,7 @@ type Config struct {
 type Client struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
-	opts      *core.Options
+	globals   *core.Globals
 
 	mut              sync.Mutex
 	mgr              *clientpb.Manager
@@ -82,14 +82,14 @@ type Client struct {
 func New(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	opts *core.Options,
+	globals *core.Globals,
 
 	conf Config,
 ) (client *Client) {
 	client = &Client{
 		eventLoop: eventLoop,
 		logger:    logger,
-		opts:      opts,
+		globals:   globals,
 
 		pendingCmds:      make(chan pendingCmd, conf.MaxConcurrent),
 		highestCommitted: 1,
@@ -231,7 +231,7 @@ loop:
 		}
 
 		cmd := &clientpb.Command{
-			ClientID:       uint32(c.opts.ID()),
+			ClientID:       uint32(c.globals.ID()),
 			SequenceNumber: num,
 			Data:           data[:n],
 		}

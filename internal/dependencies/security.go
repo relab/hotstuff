@@ -23,7 +23,7 @@ func NewSecurity(
 		depsCore.EventLoop,
 		depsCore.Logger,
 	)
-	cryptoImpl, err := newCryptoModule(cryptoName, depsNet.Config, depsCore.Logger, depsCore.Options)
+	cryptoImpl, err := newCryptoModule(cryptoName, depsNet.Config, depsCore.Logger, depsCore.Globals)
 	if err != nil {
 		return nil, err
 	}

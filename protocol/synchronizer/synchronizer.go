@@ -33,7 +33,7 @@ type Synchronizer struct {
 	sender        *sender.Sender
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
-	opts          *core.Options
+	globals       *core.Globals
 
 	mut         sync.RWMutex // to protect the following
 	currentView hotstuff.View
@@ -63,7 +63,7 @@ func New(
 	sender *sender.Sender,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	opts *core.Options,
+	globals *core.Globals,
 ) *Synchronizer {
 	s := &Synchronizer{
 		duration:       leaderRotation.ViewDuration(),
@@ -77,7 +77,7 @@ func New(
 		sender:        sender,
 		eventLoop:     eventLoop,
 		logger:        logger,
-		opts:          opts,
+		globals:       globals,
 
 		currentView: 1,
 
@@ -118,7 +118,7 @@ func New(
 		eventLoop,
 		logger,
 		s,
-		opts,
+		globals,
 	)
 	return s
 }
@@ -158,7 +158,7 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	}()
 
 	// start the initial proposal
-	if view := s.View(); view == 1 && s.leaderRotation.GetLeader(view) == s.opts.ID() {
+	if view := s.View(); view == 1 && s.leaderRotation.GetLeader(view) == s.globals.ID() {
 		sInfo, ok := s.consensus.Propose(s.View(), s.highQC, s.SyncInfo())
 		if ok {
 			s.AdvanceView(sInfo)
@@ -205,13 +205,13 @@ func (s *Synchronizer) OnLocalTimeout() {
 		return
 	}
 	timeoutMsg := hotstuff.TimeoutMsg{
-		ID:            s.opts.ID(),
+		ID:            s.globals.ID(),
 		View:          view,
 		SyncInfo:      s.SyncInfo(),
 		ViewSignature: sig,
 	}
 
-	if s.opts.ShouldUseAggQC() {
+	if s.globals.ShouldUseAggQC() {
 		// generate a second signature that will become part of the aggregateQC
 		sig, err := s.crypto.Sign(timeoutMsg.ToBytes())
 		if err != nil {
@@ -278,7 +278,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 
 	si := s.SyncInfo().WithTC(tc)
 
-	if s.opts.ShouldUseAggQC() {
+	if s.globals.ShouldUseAggQC() {
 		aggQC, err := s.auth.CreateAggregateQC(currView, timeoutList)
 		if err != nil {
 			s.logger.Debugf("Failed to create aggregateQC: %v", err)
@@ -321,7 +321,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	)
 
 	// check for an AggQC or QC
-	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.opts.ShouldUseAggQC() {
+	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.globals.ShouldUseAggQC() {
 		highQC, ok := s.auth.VerifyAggregateQC(s.configuration.QuorumSize(), aggQC)
 		if !ok {
 			s.logger.Info("Aggregated Quorum Certificate could not be verified")
@@ -373,7 +373,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	s.eventLoop.AddEvent(hotstuff.ViewChangeEvent{View: newView, Timeout: timeout})
 
 	leader := s.leaderRotation.GetLeader(newView)
-	if leader == s.opts.ID() {
+	if leader == s.globals.ID() {
 		sInfo, ok := s.consensus.Propose(s.View(), s.highQC, syncInfo)
 		if ok {
 			s.AdvanceView(sInfo)

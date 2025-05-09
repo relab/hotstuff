@@ -15,7 +15,7 @@ const NameClientLatency = "client-latency"
 // clientLatency processes LatencyMeasurementEvents, and writes LatencyMeasurements to the metrics logger.
 type clientLatency struct {
 	metricsLogger Logger
-	opts          *core.Options
+	globals       *core.Globals
 
 	wf Welford
 }
@@ -23,11 +23,11 @@ type clientLatency struct {
 func enableClientLatency(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	opts *core.Options,
 	metricsLogger Logger,
+	globals *core.Globals,
 ) {
 	lr := &clientLatency{
-		opts:          opts,
+		globals:       globals,
 		metricsLogger: metricsLogger,
 	}
 
@@ -52,7 +52,7 @@ func (lr *clientLatency) addLatency(latency time.Duration) {
 func (lr *clientLatency) tick(_ types.TickEvent) {
 	mean, variance, count := lr.wf.Get()
 	event := &types.LatencyMeasurement{
-		Event:    types.NewClientEvent(uint32(lr.opts.ID()), time.Now()),
+		Event:    types.NewClientEvent(uint32(lr.globals.ID()), time.Now()),
 		Latency:  mean,
 		Variance: variance,
 		Count:    count,

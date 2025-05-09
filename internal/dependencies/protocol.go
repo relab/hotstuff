@@ -3,7 +3,6 @@ package dependencies
 import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 )
@@ -20,13 +19,12 @@ func newProtocolModules(
 	depsSecure *Security,
 	depsSrv *Service,
 
-	useKauri bool,
 	consensusName,
 	leaderRotationName,
 	byzantineStrategy string,
-	vdOpt viewduration.Options,
+	vdOpt viewduration.Params,
 ) (*protocolModules, error) {
-	consensusRules, err := newConsensusRulesModule(consensusName, depsSecure.BlockChain, depsCore.Logger, depsCore.Options)
+	consensusRules, err := newConsensusRulesModule(consensusName, depsSecure.BlockChain, depsCore.Logger, depsCore.Globals)
 	if err != nil {
 		return nil, err
 	}
@@ -38,25 +36,10 @@ func newProtocolModules(
 		depsNet.Config,
 		depsSrv.Committer,
 		depsCore.Logger,
-		depsCore.Options,
+		depsCore.Globals,
 	)
 	if err != nil {
 		return nil, err
-	}
-
-	var kauriOptional modules.Kauri = nil
-
-	if useKauri {
-		kauriOptional = kauri.New(
-			depsSecure.CryptoImpl,
-			leaderRotation,
-			depsSecure.BlockChain,
-			depsCore.Options,
-			depsCore.EventLoop,
-			depsNet.Config,
-			depsNet.Sender,
-			depsCore.Logger,
-		)
 	}
 
 	if byzantineStrategy != "" {
@@ -64,7 +47,7 @@ func newProtocolModules(
 			byzantineStrategy,
 			consensusRules,
 			depsSecure.BlockChain,
-			depsCore.Options)
+			depsCore.Globals)
 		if err != nil {
 			return nil, err
 		}
@@ -73,7 +56,6 @@ func newProtocolModules(
 	}
 	return &protocolModules{
 		ConsensusRules: consensusRules,
-		Kauri:          kauriOptional,
 		LeaderRotation: leaderRotation,
 	}, nil
 }
@@ -89,18 +71,17 @@ func NewProtocol(
 	depsSecure *Security,
 	depsSrv *Service,
 
-	useKauri bool,
 	consensusName,
 	leaderRotationName,
 	byzantineStrategy string,
-	vdOpt viewduration.Options,
+	vdOpt viewduration.Params,
+	consensusOpt ...consensus.Option,
 ) (*Protocol, error) {
 	mods, err := newProtocolModules(
 		depsCore,
 		depsNet,
 		depsSecure,
 		depsSrv,
-		useKauri,
 		consensusName,
 		leaderRotationName,
 		byzantineStrategy,
@@ -121,7 +102,8 @@ func NewProtocol(
 		depsNet.Config,
 		depsCore.EventLoop,
 		depsCore.Logger,
-		depsCore.Options,
+		depsCore.Globals,
+		consensusOpt...,
 	)
 	return &Protocol{
 		Consensus: csus,
@@ -135,7 +117,7 @@ func NewProtocol(
 			depsNet.Sender,
 			depsCore.EventLoop,
 			depsCore.Logger,
-			depsCore.Options,
+			depsCore.Globals,
 		),
 	}, nil
 }

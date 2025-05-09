@@ -22,7 +22,7 @@ type reputationsMap map[hotstuff.ID]float64
 type repBased struct {
 	configuration *netconfig.Config
 	committer     *committer.Committer
-	opts          *core.Options
+	globals       *core.Globals
 	logger        logging.Logger
 	viewDuration  modules.ViewDuration
 
@@ -87,7 +87,7 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 		return 0
 	}
 
-	seed := r.opts.SharedRandomSeed() + int64(view)
+	seed := r.globals.SharedRandomSeed() + int64(view)
 	rnd := rand.New(rand.NewSource(seed))
 
 	leader := chooser.PickSource(rnd).(hotstuff.ID)
@@ -99,17 +99,17 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 // NewRepBased returns a new random reputation-based leader rotation implementation
 func NewRepBased(
 	chainLength int,
-	vdOpt viewduration.Options,
+	vdOpt viewduration.Params,
 
 	configuration *netconfig.Config,
 	committer *committer.Committer,
-	opts *core.Options,
+	globals *core.Globals,
 	logger logging.Logger,
 ) modules.LeaderRotation {
 	return &repBased{
 		configuration: configuration,
 		committer:     committer,
-		opts:          opts,
+		globals:       globals,
 		logger:        logger,
 		viewDuration:  viewduration.NewDynamic(vdOpt),
 

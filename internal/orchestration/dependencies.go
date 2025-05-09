@@ -10,24 +10,27 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/dependencies"
-	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/network/sender"
+	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/service/clientsrv"
 	"github.com/relab/hotstuff/service/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type replicaOptions struct {
-	isSecure      bool
-	useKauri      bool
-	clientServer  gorums.ServerOption
-	replicaServer gorums.ServerOption
-	credentials   credentials.TransportCredentials
+	isSecure          bool
+	clientServerOpts  []gorums.ServerOption
+	replicaServerOpts []gorums.ServerOption
+	credentials       credentials.TransportCredentials
+
+	useKauri  bool
+	kauriTree tree.Tree
 }
 
 type ReplicaOption func(*replicaOptions)
@@ -39,21 +42,22 @@ func WithTLS(certificate tls.Certificate, rootCAs *x509.CertPool) ReplicaOption 
 			RootCAs:      rootCAs,
 			Certificates: []tls.Certificate{certificate},
 		})
-		ro.clientServer = gorums.WithGRPCServerOptions(
+		ro.clientServerOpts = append(ro.clientServerOpts, gorums.WithGRPCServerOptions(
 			grpc.Creds(credentials.NewServerTLSFromCert(&certificate)),
-		)
-		ro.replicaServer = gorums.WithGRPCServerOptions(grpc.Creds(credentials.NewTLS(&tls.Config{
+		))
+		ro.replicaServerOpts = append(ro.replicaServerOpts, gorums.WithGRPCServerOptions(grpc.Creds(credentials.NewTLS(&tls.Config{
 			Certificates: []tls.Certificate{certificate},
 			ClientCAs:    rootCAs,
 			ClientAuth:   tls.RequireAndVerifyClientCert,
-		})))
+		}))))
 		ro.credentials = creds
 	}
 }
 
 func WithKauri(tree tree.Tree) ReplicaOption {
 	return func(ro *replicaOptions) {
-
+		ro.useKauri = true
+		ro.kauriTree = tree
 	}
 }
 
@@ -64,7 +68,7 @@ type ReplicaDependencies struct {
 	synchronizer *synchronizer.Synchronizer
 	eventLoop    *eventloop.EventLoop
 	logger       logging.Logger
-	options      *core.Options
+	options      *core.Globals
 }
 
 // TODO(AlanRostem): decouple the majority of dependency creation and pass dependency sets instead
@@ -78,37 +82,34 @@ func NewReplicaDependencies(
 		opt(&rOpt)
 	}
 
+	if !rOpt.isSecure {
+		rOpt.credentials = insecure.NewCredentials()
+	}
+
+	// TODO(AlanRostem): remove direct dependency on these values I am putting these here to visualize the dependency on *orchestrationpb.ReplicaOpts.
 	id := opts.HotstuffID()
 	seed := opts.GetSharedSeed()
+	locations := opts.GetLocations()
 
-	depsCore := dependencies.NewCore(id, "hs", privKey)
-	depsCore.Options.SetSharedRandomSeed(seed)
+	cryptoName := opts.GetCrypto()
 
-	// TODO(AlanRostem): make this case into an option
-	if opts.GetKauri() {
-		delayMode := tree.DelayTypeNone
-		if opts.GetAggregationTime() {
-			delayMode = tree.DelayTypeAggregation
-		}
+	globalOpts := []core.GlobalsOption{}
+	consensusOpts := []consensus.Option{}
 
-		// create tree only if we are using tree leader (Kauri)
-		t := tree.NewDelayed(
-			opts.HotstuffID(),
-			delayMode,
-			int(opts.GetBranchFactor()),
-			latency.MatrixFrom(opts.GetLocations()),
-			opts.TreePositionIDs(),
-			opts.GetTreeDelta().AsDuration(),
-		)
-		depsCore.Options.SetTree(t)
+	// TODO(AlanRostem): consider refactoring the code so that core.Globals is not needed
+	if rOpt.useKauri {
+		globalOpts = append(globalOpts, core.WithKauri(&rOpt.kauriTree))
+		consensusOpts = append(consensusOpts, consensus.WithKauri(&rOpt.kauriTree))
 	}
+
+	depsCore := dependencies.NewCore(id, "hs", privKey, seed, globalOpts...)
 
 	depsNet := dependencies.NewNetwork(
 		depsCore,
 		rOpt.credentials,
 	)
 	cacheSize := 100 // TODO: consider making this configurable
-	depsSecure, err := dependencies.NewSecurity(depsCore, depsNet, opts.GetCrypto(), cacheSize)
+	depsSecure, err := dependencies.NewSecurity(depsCore, depsNet, cryptoName, cacheSize)
 	if err != nil {
 		return nil, err
 	}
@@ -116,9 +117,9 @@ func NewReplicaDependencies(
 		depsCore,
 		depsSecure,
 		int(opts.GetBatchSize()),
-		rOpt.clientServer)
+		rOpt.clientServerOpts...)
 
-	durationOpts := viewduration.NewOptions(
+	durationParams := viewduration.NewParams(
 		opts.GetTimeoutSamples(),
 		opts.GetInitialTimeout().AsDuration(),
 		opts.GetMaxTimeout().AsDuration(),
@@ -129,25 +130,26 @@ func NewReplicaDependencies(
 		depsNet,
 		depsSecure,
 		depsSrv,
-		opts.GetKauri(),
 		opts.GetConsensus(),
 		opts.GetLeaderRotation(),
 		opts.GetByzantineStrategy(),
-		durationOpts)
+		durationParams,
+		consensusOpts...,
+	)
 	if err != nil {
 		return nil, err
 	}
 	serverSrvOpt := []server.ServerOptions{
-		server.WithLatencies(opts.HotstuffID(), opts.GetLocations()),
-		server.WithGorumsServerOptions(rOpt.replicaServer),
+		server.WithLatencies(id, locations),
+		server.WithGorumsServerOptions(rOpt.replicaServerOpts...),
 	}
-	if opts.GetKauri() {
+	if rOpt.useKauri {
 		serverSrvOpt = append(serverSrvOpt, server.WithKauri())
 	}
 	server := server.NewServer(
 		depsCore.EventLoop,
 		depsCore.Logger,
-		depsCore.Options,
+		depsCore.Globals,
 		depsNet.Config,
 		depsSecure.BlockChain,
 		serverSrvOpt...,
@@ -156,7 +158,7 @@ func NewReplicaDependencies(
 	return &ReplicaDependencies{
 		eventLoop:    depsCore.EventLoop,
 		logger:       depsCore.Logger,
-		options:      depsCore.Options,
+		options:      depsCore.Globals,
 		sender:       depsNet.Sender,
 		clientSrv:    depsSrv.ClientSrv,
 		synchronizer: depsProtocol.Synchronizer,

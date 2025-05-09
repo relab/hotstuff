@@ -24,7 +24,7 @@ func NewNetwork(
 			cfg,
 			depsCore.EventLoop,
 			depsCore.Logger,
-			depsCore.Options,
+			depsCore.Globals,
 			creds,
 			mgrOpts...,
 		),

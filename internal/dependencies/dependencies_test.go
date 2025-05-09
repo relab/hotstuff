@@ -67,7 +67,7 @@ func TestModules(t *testing.T) {
 		case eddsa.ModuleName:
 			pk = testutil.GenerateEDDSAKey(t)
 		}
-		depsCore := dependencies.NewCore(hotstuff.ID(1), "test", pk)
+		depsCore := dependencies.NewCore(hotstuff.ID(1), "test", pk, 0)
 		depsNet := dependencies.NewNetwork(depsCore, insecure.NewCredentials())
 		depsSecure, err := dependencies.NewSecurity(depsCore, depsNet, td.cryptoName, 100)
 		if err != nil {
@@ -76,8 +76,8 @@ func TestModules(t *testing.T) {
 		depsSrv := dependencies.NewService(depsCore, depsSecure, 1)
 		_, err = dependencies.NewProtocol(
 			depsCore, depsNet, depsSecure, depsSrv,
-			false, td.consensusName, td.leaderRotationName, td.byzantineStrategy,
-			viewduration.NewOptions(0, 0, 0, 0))
+			td.consensusName, td.leaderRotationName, td.byzantineStrategy,
+			viewduration.NewParams(0, 0, 0, 0))
 		if err != nil {
 			t.Fatalf("%v", err)
 		}

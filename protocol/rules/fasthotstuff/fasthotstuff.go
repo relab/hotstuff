@@ -21,14 +21,14 @@ type FastHotStuff struct {
 func New(
 	blockChain *blockchain.BlockChain,
 	logger logging.Logger,
-	opts *core.Options,
+	globals *core.Globals,
 ) modules.ConsensusRules {
 	fhs := &FastHotStuff{
 		blockChain: blockChain,
 		logger:     logger,
 	}
 
-	opts.SetShouldUseAggQC()
+	globals.SetShouldUseAggQC() // TODO(AlanRostem): avoid this coupling
 	return fhs
 }
 

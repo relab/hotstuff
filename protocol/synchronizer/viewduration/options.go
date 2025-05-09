@@ -2,20 +2,20 @@ package viewduration
 
 import "time"
 
-type Options struct {
+type Params struct {
 	sampleSize   uint64
 	startTimeout float64
 	MaxTimeout   float64
 	Multiplier   float64
 }
 
-func NewOptions(
+func NewParams(
 	sampleSize uint32,
 	startTimeout time.Duration,
 	maxTimeout time.Duration,
 	multiplier float32,
-) Options {
-	return Options{
+) Params {
+	return Params{
 		sampleSize:   uint64(sampleSize),
 		startTimeout: float64(startTimeout.Nanoseconds()) / float64(time.Millisecond),
 		MaxTimeout:   float64(maxTimeout.Nanoseconds()) / float64(time.Millisecond),
@@ -24,6 +24,6 @@ func NewOptions(
 }
 
 // StartTimeout returns the initial timeout duration.
-func (opt Options) StartTimeout() time.Duration {
+func (opt Params) StartTimeout() time.Duration {
 	return time.Duration(opt.startTimeout) * time.Millisecond
 }
