@@ -147,7 +147,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 	}
 	// prepare components and modules
-	deps, err := NewReplicaDependencies(opts, privKey, certificate, rootCAs)
+	deps, err := NewReplicaDependencies(opts, privKey, WithTLS(certificate, rootCAs))
 	if err != nil {
 		return nil, err
 	}

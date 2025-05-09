@@ -16,7 +16,7 @@ type backendOptions struct {
 // ServerOptions is a function for configuring the Server.
 type ServerOptions func(*backendOptions)
 
-// WithKauri registers a service implementation for Gorums which allows sending hotstuff.ContributionRecvEvent.
+// WithKauri registers a service implementation for Gorums which allows sending kauri.ContributionRecvEvent.
 func WithKauri() ServerOptions {
 	return func(opts *backendOptions) {
 		opts.registerKauri = true

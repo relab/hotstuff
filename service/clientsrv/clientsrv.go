@@ -37,7 +37,8 @@ func NewClientServer(
 	logger logging.Logger,
 	cmdCache *CmdCache,
 
-	srvOpts []gorums.ServerOption) (srv *ClientServer) {
+	srvOpts ...gorums.ServerOption,
+) (srv *ClientServer) {
 	srv = &ClientServer{
 		eventLoop: eventLoop,
 		logger:    logger,

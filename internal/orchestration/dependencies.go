@@ -22,6 +22,34 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
+type replicaOptions struct {
+	isSecure      bool
+	clientServer  gorums.ServerOption
+	replicaServer gorums.ServerOption
+	credentials   credentials.TransportCredentials
+}
+
+type ReplicaOption func(*replicaOptions)
+
+func WithTLS(certificate tls.Certificate, rootCAs *x509.CertPool) ReplicaOption {
+	return func(ro *replicaOptions) {
+		ro.isSecure = true
+		creds := credentials.NewTLS(&tls.Config{
+			RootCAs:      rootCAs,
+			Certificates: []tls.Certificate{certificate},
+		})
+		ro.clientServer = gorums.WithGRPCServerOptions(
+			grpc.Creds(credentials.NewServerTLSFromCert(&certificate)),
+		)
+		ro.replicaServer = gorums.WithGRPCServerOptions(grpc.Creds(credentials.NewTLS(&tls.Config{
+			Certificates: []tls.Certificate{certificate},
+			ClientCAs:    rootCAs,
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+		})))
+		ro.credentials = creds
+	}
+}
+
 type ReplicaDependencies struct {
 	clientSrv    *clientsrv.ClientServer
 	server       *server.Server
@@ -35,29 +63,12 @@ type ReplicaDependencies struct {
 func NewReplicaDependencies(
 	opts *orchestrationpb.ReplicaOpts,
 	privKey hotstuff.PrivateKey,
-	certificate tls.Certificate,
-	rootCAs *x509.CertPool,
+	repOpts ...ReplicaOption,
 ) (*ReplicaDependencies, error) {
-	var creds credentials.TransportCredentials
-	clientSrvOpts := []gorums.ServerOption{}
-	replicaSrvOpts := []gorums.ServerOption{}
-	if opts.GetUseTLS() {
-		creds = credentials.NewTLS(&tls.Config{
-			RootCAs:      rootCAs,
-			Certificates: []tls.Certificate{certificate},
-		})
-
-		clientSrvOpts = append(clientSrvOpts, gorums.WithGRPCServerOptions(
-			grpc.Creds(credentials.NewServerTLSFromCert(&certificate)),
-		))
-
-		replicaSrvOpts = append(replicaSrvOpts, gorums.WithGRPCServerOptions(
-			grpc.Creds(credentials.NewTLS(&tls.Config{
-				Certificates: []tls.Certificate{certificate},
-				ClientCAs:    rootCAs,
-				ClientAuth:   tls.RequireAndVerifyClientCert,
-			})),
-		))
+	// TODO(AlanRostem): refactor this out of the function
+	var rOpt replicaOptions
+	for _, opt := range repOpts {
+		opt(&rOpt)
 	}
 
 	depsCore := dependencies.NewCore(opts.HotstuffID(), "hs", privKey)
@@ -85,7 +96,7 @@ func NewReplicaDependencies(
 
 	depsNet := dependencies.NewNetwork(
 		depsCore,
-		creds,
+		rOpt.credentials,
 	)
 	cacheSize := 100 // TODO: consider making this configurable
 	depsSecure, err := dependencies.NewSecurity(depsCore, depsNet, opts.GetCrypto(), cacheSize)
@@ -96,7 +107,7 @@ func NewReplicaDependencies(
 		depsCore,
 		depsSecure,
 		int(opts.GetBatchSize()),
-		clientSrvOpts)
+		rOpt.clientServer)
 
 	durationOpts := viewduration.NewOptions(
 		opts.GetTimeoutSamples(),
@@ -117,12 +128,12 @@ func NewReplicaDependencies(
 	if err != nil {
 		return nil, err
 	}
-	srvOpt := []server.ServerOptions{
+	serverSrvOpt := []server.ServerOptions{
 		server.WithLatencies(opts.HotstuffID(), opts.GetLocations()),
-		server.WithGorumsServerOptions(replicaSrvOpts...),
+		server.WithGorumsServerOptions(rOpt.replicaServer),
 	}
 	if opts.GetKauri() {
-		srvOpt = append(srvOpt, server.WithKauri())
+		serverSrvOpt = append(serverSrvOpt, server.WithKauri())
 	}
 	server := server.NewServer(
 		depsCore.EventLoop,
@@ -130,7 +141,7 @@ func NewReplicaDependencies(
 		depsCore.Options,
 		depsNet.Config,
 		depsSecure.BlockChain,
-		srvOpt...,
+		serverSrvOpt...,
 	)
 
 	return &ReplicaDependencies{

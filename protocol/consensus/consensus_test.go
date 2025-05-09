@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/internal/dependencies"
@@ -50,7 +49,7 @@ func TestVote(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		depsService := dependencies.NewService(depsCore, depsSecure, batchSize, []gorums.ServerOption{})
+		depsService := dependencies.NewService(depsCore, depsSecure, batchSize)
 		depsProtocol, err := dependencies.NewProtocol(
 			depsCore, depsNet, depsSecure, depsService,
 			false, consensusName, leaderRotationName, "",

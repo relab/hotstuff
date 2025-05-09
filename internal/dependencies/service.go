@@ -16,7 +16,7 @@ func NewService(
 	depsCore *Core,
 	depsSecure *Security,
 	batchSize int,
-	clientSrvOpts []gorums.ServerOption,
+	clientSrvOpts ...gorums.ServerOption,
 ) *Service {
 	cmdCache := clientsrv.NewCmdCache(
 		depsCore.Logger,
@@ -26,7 +26,7 @@ func NewService(
 		depsCore.EventLoop,
 		depsCore.Logger,
 		cmdCache,
-		clientSrvOpts,
+		clientSrvOpts...,
 	)
 	return &Service{
 		CmdCache:  cmdCache,
