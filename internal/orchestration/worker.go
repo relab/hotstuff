@@ -154,9 +154,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 		replicaOpts = append(replicaOpts, WithTLS(certificate, rootCAs))
 	}
-
-	globalOpts := []core.GlobalsOption{}
-
+	globalOpts := []core.GlobalOption{}
 	if opts.GetLeaderRotation() == leaderrotation.TreeLeaderModuleName {
 		delayMode := tree.DelayTypeNone
 		if opts.GetAggregationTime() {
@@ -172,33 +170,29 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		)
 		globalOpts = append(globalOpts, core.WithTree(t))
 	}
-
 	if opts.GetKauri() {
 		globalOpts = append(globalOpts, core.WithKauri())
 	}
-
 	globalOpts = append(globalOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
-	cmdCacheOpts := []cmdcache.Option{cmdcache.WithBatching(opts.GetBatchSize())}
-	serverOpts := []server.ServerOption{server.WithLatencies(opts.HotstuffID(), opts.GetLocations())}
+	replicaOpts = append(replicaOpts,
+		WithGlobalOptions(globalOpts...),
+		WithCmdCacheOptions(cmdcache.WithBatching(opts.GetBatchSize())),
+		WithServerOptions(server.WithLatencies(opts.HotstuffID(), opts.GetLocations())),
+		OverrideCrypto(opts.GetCrypto()),
+		OverrideConsensusRules(opts.GetConsensus()),
+		OverrideLeaderRotation(opts.GetLeaderRotation()),
+		WithByzantineStrategy(opts.GetByzantineStrategy()),
+	)
 	// prepare dependencies
 	deps, err := NewReplicaDependencies(
 		opts.HotstuffID(),
 		privKey,
-		ModuleNames{
-			Crypto:            opts.GetCrypto(),
-			Consensus:         opts.GetConsensus(),
-			LeaderRotation:    opts.GetLeaderRotation(),
-			ByzantineStrategy: opts.GetByzantineStrategy(),
-		},
 		viewduration.NewParams(
 			opts.GetTimeoutSamples(),
 			opts.GetInitialTimeout().AsDuration(),
 			opts.GetMaxTimeout().AsDuration(),
 			opts.GetTimeoutMultiplier(),
 		),
-		globalOpts,
-		cmdCacheOpts,
-		serverOpts,
 		replicaOpts...,
 	)
 	if err != nil {

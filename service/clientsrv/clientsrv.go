@@ -32,8 +32,8 @@ type ClientServer struct {
 	cmdCount     uint32
 }
 
-// NewClientServer returns a new client server.
-func NewClientServer(
+// New returns a new client server.
+func New(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	cmdCache *cmdcache.Cache,

@@ -45,7 +45,7 @@ type Globals struct {
 	useKauri      bool
 }
 
-func NewGlobals(id hotstuff.ID, pk hotstuff.PrivateKey, opts ...GlobalsOption) *Globals {
+func NewGlobals(id hotstuff.ID, pk hotstuff.PrivateKey, opts ...GlobalOption) *Globals {
 	g := &Globals{
 		id:                 id,
 		privateKey:         pk,

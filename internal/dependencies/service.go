@@ -23,7 +23,7 @@ func NewService(
 		depsCore.Logger,
 		cacheOpt...,
 	)
-	clientSrv := clientsrv.NewClientServer(
+	clientSrv := clientsrv.New(
 		depsCore.EventLoop,
 		depsCore.Logger,
 		cmdCache,

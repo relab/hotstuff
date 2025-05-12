@@ -19,7 +19,7 @@ func NewCore(
 	id hotstuff.ID,
 	logTag string,
 	privKey hotstuff.PrivateKey,
-	gOpt ...core.GlobalsOption,
+	gOpt ...core.GlobalOption,
 ) *Core {
 	logger := logging.New(fmt.Sprintf("%s%d", logTag, id))
 	return &Core{

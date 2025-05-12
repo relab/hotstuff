@@ -11,9 +11,12 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/dependencies"
 	"github.com/relab/hotstuff/network/sender"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
+	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/service/clientsrv"
 	"github.com/relab/hotstuff/service/cmdcache"
 	"github.com/relab/hotstuff/service/server"
@@ -22,14 +25,74 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+type moduleNames struct {
+	crypto,
+	consensus,
+	leaderRotation,
+	byzantineStrategy string
+}
+
 type replicaOptions struct {
 	isSecure          bool
+	credentials       credentials.TransportCredentials
 	clientServerOpts  []gorums.ServerOption
 	replicaServerOpts []gorums.ServerOption
-	credentials       credentials.TransportCredentials
+	globalOpts        []core.GlobalOption
+	cmdCacheOpts      []cmdcache.Option
+	serverOpts        []server.ServerOption
+	moduleNames       moduleNames
 }
 
 type ReplicaOption func(*replicaOptions)
+
+// OverrideCrypto changes the crypto implementation to the one specified by name.
+// Default: "ecdsa"
+func OverrideCrypto(moduleName string) ReplicaOption {
+	return func(ro *replicaOptions) {
+		ro.moduleNames.crypto = moduleName
+	}
+}
+
+// OverrideCrypto changes the consensus rules to the one specified by name.
+// Default: "chainedhotstuff"
+func OverrideConsensusRules(moduleName string) ReplicaOption {
+	return func(ro *replicaOptions) {
+		ro.moduleNames.consensus = moduleName
+	}
+}
+
+// OverrideCrypto changes the leader rotation scheme to the one specified by name.
+// Default: "round-robin"
+func OverrideLeaderRotation(moduleName string) ReplicaOption {
+	return func(ro *replicaOptions) {
+		ro.moduleNames.leaderRotation = moduleName
+	}
+}
+
+// WithByzantineStrategy wraps the existing consensus rules to a byzantine ruleset specified by name.
+func WithByzantineStrategy(strategyName string) ReplicaOption {
+	return func(ro *replicaOptions) {
+		ro.moduleNames.byzantineStrategy = strategyName
+	}
+}
+
+func WithGlobalOptions(opts ...core.GlobalOption) ReplicaOption {
+	return func(ro *replicaOptions) {
+		ro.globalOpts = append(ro.globalOpts, opts...)
+	}
+}
+
+func WithCmdCacheOptions(opts ...cmdcache.Option) ReplicaOption {
+	return func(ro *replicaOptions) {
+		ro.cmdCacheOpts = append(ro.cmdCacheOpts, opts...)
+	}
+}
+
+func WithServerOptions(opts ...server.ServerOption) ReplicaOption {
+	return func(ro *replicaOptions) {
+		ro.serverOpts = append(ro.serverOpts, opts...)
+	}
+}
 
 func WithTLS(certificate tls.Certificate, rootCAs *x509.CertPool) ReplicaOption {
 	return func(ro *replicaOptions) {
@@ -60,43 +123,38 @@ type ReplicaDependencies struct {
 	options      *core.Globals
 }
 
-type ModuleNames struct {
-	Crypto,
-	Consensus,
-	LeaderRotation,
-	ByzantineStrategy string
-}
-
 // TODO(AlanRostem): put this in "dependencies" package
-// TODO(AlanRostem): consider joining the options into the same struct.
 func NewReplicaDependencies(
 	id hotstuff.ID,
 	privKey hotstuff.PrivateKey,
-	names ModuleNames,
 	vdParams viewduration.Params,
-	globalOpts []core.GlobalsOption,
-	cmdCacheOpts []cmdcache.Option,
-	serverOpts []server.ServerOption,
 	repOpts ...ReplicaOption,
 ) (*ReplicaDependencies, error) {
 	var rOpt replicaOptions
+	names := &rOpt.moduleNames
+	*names = moduleNames{
+		crypto:            ecdsa.ModuleName,
+		consensus:         chainedhotstuff.ModuleName,
+		leaderRotation:    leaderrotation.RoundRobinModuleName,
+		byzantineStrategy: "",
+	}
+
 	for _, opt := range repOpts {
 		opt(&rOpt)
 	}
 	if !rOpt.isSecure {
 		rOpt.credentials = insecure.NewCredentials()
 	}
-	depsCore := dependencies.NewCore(id, "hs", privKey, globalOpts...)
+	depsCore := dependencies.NewCore(id, "hs", privKey, rOpt.globalOpts...)
 	depsNet := dependencies.NewNetwork(
 		depsCore,
 		rOpt.credentials,
 	)
-	cacheSize := 100 // TODO: consider making this configurable
 	depsSecure, err := dependencies.NewSecurity(
 		depsCore,
 		depsNet,
-		names.Crypto,
-		certauth.WithCache(cacheSize),
+		names.crypto,
+		certauth.WithCache(100), // TODO: consider making this configurable
 	)
 	if err != nil {
 		return nil, err
@@ -104,7 +162,7 @@ func NewReplicaDependencies(
 	depsSrv := dependencies.NewService(
 		depsCore,
 		depsSecure,
-		cmdCacheOpts,
+		rOpt.cmdCacheOpts,
 		rOpt.clientServerOpts...,
 	)
 	depsProtocol, err := dependencies.NewProtocol(
@@ -112,22 +170,22 @@ func NewReplicaDependencies(
 		depsNet,
 		depsSecure,
 		depsSrv,
-		names.Consensus,
-		names.LeaderRotation,
-		names.ByzantineStrategy,
+		names.consensus,
+		names.leaderRotation,
+		names.byzantineStrategy,
 		vdParams,
 	)
 	if err != nil {
 		return nil, err
 	}
-	serverOpts = append(serverOpts, server.WithGorumsServerOptions(rOpt.replicaServerOpts...))
+	rOpt.serverOpts = append(rOpt.serverOpts, server.WithGorumsServerOptions(rOpt.replicaServerOpts...))
 	server := server.NewServer(
 		depsCore.EventLoop,
 		depsCore.Logger,
 		depsCore.Globals,
 		depsNet.Config,
 		depsSecure.BlockChain,
-		serverOpts...,
+		rOpt.serverOpts...,
 	)
 	return &ReplicaDependencies{
 		eventLoop:    depsCore.EventLoop,
