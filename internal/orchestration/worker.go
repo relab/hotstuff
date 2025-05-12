@@ -178,9 +178,14 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	serverOpts := []server.ServerOption{server.WithLatencies(opts.HotstuffID(), opts.GetLocations())}
 	// prepare dependencies
 	deps, err := NewReplicaDependencies(
-		opts, // TODO: remove dependency
 		opts.HotstuffID(),
 		privKey,
+		ModuleNames{
+			Crypto:            opts.GetCrypto(),
+			Consensus:         opts.GetConsensus(),
+			LeaderRotation:    opts.GetLeaderRotation(),
+			ByzantineStrategy: opts.GetByzantineStrategy(),
+		},
 		viewduration.NewParams(
 			opts.GetTimeoutSamples(),
 			opts.GetInitialTimeout().AsDuration(),

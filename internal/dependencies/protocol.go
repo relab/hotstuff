@@ -13,6 +13,7 @@ type protocolModules struct {
 	LeaderRotation modules.LeaderRotation
 }
 
+// TODO: Add option for byzantineStrategy instead of passing string
 func newProtocolModules(
 	depsCore *Core,
 	depsNet *Network,

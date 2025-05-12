@@ -10,7 +10,6 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/dependencies"
-	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/network/sender"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
@@ -60,11 +59,19 @@ type ReplicaDependencies struct {
 	options      *core.Globals
 }
 
-// TODO(AlanRostem): decouple the majority of dependency creation and pass dependency sets instead
+type ModuleNames struct {
+	Crypto,
+	Consensus,
+	LeaderRotation,
+	ByzantineStrategy string
+}
+
+// TODO(AlanRostem): put this in "dependencies" package
+// TODO(AlanRostem): consider joining the options into the same struct.
 func NewReplicaDependencies(
-	opts *orchestrationpb.ReplicaOpts, // TODO(AlanRostem): remove dependency on this
 	id hotstuff.ID,
 	privKey hotstuff.PrivateKey,
+	names ModuleNames,
 	vdParams viewduration.Params,
 	globalOpts []core.GlobalsOption,
 	clientSrvOpt []clientsrv.CacheOption,
@@ -78,11 +85,6 @@ func NewReplicaDependencies(
 	if !rOpt.isSecure {
 		rOpt.credentials = insecure.NewCredentials()
 	}
-	// TODO(AlanRostem): remove direct dependency on these values. I am putting these here to visualize the dependency on *orchestrationpb.ReplicaOpts for now.
-	moduleNameCrypto := opts.GetCrypto()
-	moduleNameConsensus := opts.GetConsensus()
-	moduleNameLeaderRotation := opts.GetLeaderRotation()
-	moduleNameByzantineStrategy := opts.GetByzantineStrategy()
 	depsCore := dependencies.NewCore(id, "hs", privKey, globalOpts...)
 	depsNet := dependencies.NewNetwork(
 		depsCore,
@@ -92,7 +94,7 @@ func NewReplicaDependencies(
 	depsSecure, err := dependencies.NewSecurity(
 		depsCore,
 		depsNet,
-		moduleNameCrypto,
+		names.Crypto,
 		certauth.WithCache(cacheSize),
 	)
 	if err != nil {
@@ -109,9 +111,9 @@ func NewReplicaDependencies(
 		depsNet,
 		depsSecure,
 		depsSrv,
-		moduleNameConsensus,
-		moduleNameLeaderRotation,
-		moduleNameByzantineStrategy,
+		names.Consensus,
+		names.LeaderRotation,
+		names.ByzantineStrategy,
 		vdParams,
 	)
 	if err != nil {
