@@ -11,7 +11,7 @@ import (
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/sender"
+	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
@@ -28,7 +28,7 @@ type Synchronizer struct {
 	blockChain *blockchain.BlockChain
 	consensus  *consensus.Consensus
 	auth       *certauth.CertAuthority
-	sender     *sender.Sender
+	sender     *network.Sender
 	eventLoop  *eventloop.EventLoop
 	logger     logging.Logger
 	globals    *globals.Globals
@@ -57,7 +57,7 @@ func New(
 	blockChain *blockchain.BlockChain,
 	consensus *consensus.Consensus,
 	auth *certauth.CertAuthority,
-	sender *sender.Sender,
+	sender *network.Sender,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	globals *globals.Globals,

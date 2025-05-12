@@ -1,4 +1,4 @@
-package sender
+package network
 
 import (
 	"github.com/relab/hotstuff"

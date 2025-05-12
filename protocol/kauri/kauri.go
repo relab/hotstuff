@@ -15,7 +15,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/kauripb"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/sender"
+	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -28,7 +28,7 @@ type Kauri struct {
 	leaderRotation modules.LeaderRotation
 	globals        *globals.Globals
 	eventLoop      *eventloop.EventLoop
-	sender         *sender.Sender
+	sender         *network.Sender
 	logger         logging.Logger
 
 	aggContrib  hotstuff.QuorumSignature
@@ -48,7 +48,7 @@ func New(
 	blockChain *blockchain.BlockChain,
 	globals *globals.Globals,
 	eventLoop *eventloop.EventLoop,
-	sender *sender.Sender,
+	sender *network.Sender,
 	logger logging.Logger,
 	tree *tree.Tree,
 ) *Kauri {
@@ -96,7 +96,7 @@ func (k *Kauri) initializeConfiguration() {
 // Begin starts dissemination of proposal and aggregation of votes.
 func (k *Kauri) Begin(pc hotstuff.PartialCert, p hotstuff.ProposeMsg) {
 	if !k.initDone {
-		k.eventLoop.DelayUntil(sender.ConnectedEvent{}, func() { k.Begin(pc, p) })
+		k.eventLoop.DelayUntil(network.ConnectedEvent{}, func() { k.Begin(pc, p) })
 		return
 	}
 	k.reset()

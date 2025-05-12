@@ -1,4 +1,4 @@
-package sender
+package network
 
 import (
 	"context"
@@ -33,7 +33,7 @@ type Sender struct {
 	pbCfg *hotstuffpb.Configuration
 }
 
-func New(
+func NewSender(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	globals *globals.Globals,

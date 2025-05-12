@@ -5,12 +5,13 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/network/sender"
+	"github.com/relab/hotstuff/network"
 	"google.golang.org/grpc/credentials"
 )
 
+// TODO(AlanRostem): consider removing this
 type Network struct {
-	sender *sender.Sender
+	sender *network.Sender
 }
 
 func NewNetwork(
@@ -21,7 +22,7 @@ func NewNetwork(
 	mgrOpts ...gorums.ManagerOption,
 ) *Network {
 	return &Network{
-		sender: sender.New(
+		sender: network.NewSender(
 			eventLoop,
 			logger,
 			globals,
@@ -32,6 +33,6 @@ func NewNetwork(
 }
 
 // Sender returns the sender instance.
-func (n *Network) Sender() *sender.Sender {
+func (n *Network) Sender() *network.Sender {
 	return n.sender
 }

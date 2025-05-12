@@ -7,7 +7,7 @@ import (
 
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/dependencies"
-	"github.com/relab/hotstuff/network/sender"
+	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/certauth"
@@ -24,7 +24,7 @@ type Replica struct {
 	eventLoop    *eventloop.EventLoop
 	clientSrv    *clientsrv.Server
 	hsSrv        *server.Server
-	sender       *sender.Sender
+	sender       *network.Sender
 	synchronizer *synchronizer.Synchronizer
 
 	execHandlers map[cmdcache.CmdID]func(*emptypb.Empty, error)

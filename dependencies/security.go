@@ -5,7 +5,7 @@ import (
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/sender"
+	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
 )
@@ -21,7 +21,7 @@ func NewSecurity(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	globals *globals.Globals,
-	sender *sender.Sender,
+	sender *network.Sender,
 	cryptoName string,
 	opts ...certauth.Option,
 ) (*Security, error) {

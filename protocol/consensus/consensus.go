@@ -8,7 +8,7 @@ import (
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/sender"
+	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 	"github.com/relab/hotstuff/security/blockchain"
@@ -27,7 +27,7 @@ type Consensus struct {
 	blockChain   *blockchain.BlockChain
 	committer    *committer.Committer
 	commandCache *cmdcache.Cache
-	sender       *sender.Sender
+	sender       *network.Sender
 	auth         *certauth.CertAuthority
 	eventLoop    *eventloop.EventLoop
 	logger       logging.Logger
@@ -44,7 +44,7 @@ func New(
 	blockChain *blockchain.BlockChain,
 	committer *committer.Committer,
 	commandCache *cmdcache.Cache,
-	sender *sender.Sender,
+	sender *network.Sender,
 	auth *certauth.CertAuthority,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
