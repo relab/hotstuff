@@ -32,6 +32,7 @@ import (
 
 	// imported modules
 	_ "github.com/relab/hotstuff/protocol/kauri"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	_ "github.com/relab/hotstuff/protocol/leaderrotation"
 	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	_ "github.com/relab/hotstuff/protocol/rules/fasthotstuff"
@@ -155,13 +156,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 
 	globalOpts := []core.GlobalsOption{}
-	if opts.GetKauri() { // TODO(AlanRostem): shouldn't this also be added if tree-leader is chosen without Kauri?
+
+	if opts.GetLeaderRotation() == leaderrotation.TreeLeaderModuleName {
 		delayMode := tree.DelayTypeNone
 		if opts.GetAggregationTime() {
 			delayMode = tree.DelayTypeAggregation
 		}
-
-		// create tree only if we are using tree leader (Kauri)
 		t := tree.NewDelayed(
 			opts.HotstuffID(),
 			delayMode,
@@ -170,7 +170,11 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			opts.TreePositionIDs(),
 			opts.GetTreeDelta().AsDuration(),
 		)
-		globalOpts = append(globalOpts, core.WithKauri(t))
+		globalOpts = append(globalOpts, core.WithTree(t))
+	}
+
+	if opts.GetKauri() {
+		globalOpts = append(globalOpts, core.WithKauri())
 	}
 
 	globalOpts = append(globalOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))

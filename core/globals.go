@@ -40,7 +40,7 @@ type Globals struct {
 	sharedRandomSeed   int64
 	connectionMetadata map[string]string
 
-	tree          tree.Tree
+	tree          *tree.Tree
 	shouldUseTree bool
 	useKauri      bool
 }
@@ -113,7 +113,7 @@ func (g *Globals) ShouldEnableKauri() bool {
 
 // Tree returns the tree configuration.
 func (g *Globals) Tree() *tree.Tree {
-	return &g.tree
+	return g.tree
 }
 
 // WithMetaData sets the value of a key in the connection metadata map.
