@@ -60,9 +60,9 @@ func TestVote(t *testing.T) {
 		replicas = append(replicas, replica{
 			eventLoop:    depsCore.EventLoop(),
 			blockChain:   depsSecure.BlockChain,
-			consensus:    depsProtocol.Consensus,
+			consensus:    depsProtocol.Consensus(),
 			certAuth:     depsSecure.CertAuth,
-			synchronizer: depsProtocol.Synchronizer,
+			synchronizer: depsProtocol.Synchronizer(),
 		})
 	}
 

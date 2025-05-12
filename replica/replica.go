@@ -88,7 +88,7 @@ func New(
 		eventLoop:    depsCore.EventLoop(),
 		clientSrv:    depsSrv.ClientSrv,
 		sender:       depsNet.Sender(),
-		synchronizer: depsProtocol.Synchronizer,
+		synchronizer: depsProtocol.Synchronizer(),
 		hsSrv:        server,
 
 		execHandlers: make(map[cmdcache.CmdID]func(*emptypb.Empty, error)),

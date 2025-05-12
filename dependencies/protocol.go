@@ -8,9 +8,9 @@ import (
 )
 
 type protocolModules struct {
-	ConsensusRules modules.ConsensusRules
-	Kauri          modules.Kauri
-	LeaderRotation modules.LeaderRotation
+	consensusRules modules.ConsensusRules
+	kauri          modules.Kauri
+	leaderRotation modules.LeaderRotation
 }
 
 // TODO: Add option for byzantineStrategy instead of passing string
@@ -61,14 +61,14 @@ func newProtocolModules(
 		depsCore.Logger().Infof("assigned byzantine strategy: %s", byzantineStrategy)
 	}
 	return &protocolModules{
-		ConsensusRules: consensusRules,
-		LeaderRotation: leaderRotation,
+		consensusRules: consensusRules,
+		leaderRotation: leaderRotation,
 	}, nil
 }
 
 type Protocol struct {
-	Consensus    *consensus.Consensus
-	Synchronizer *synchronizer.Synchronizer
+	consensus    *consensus.Consensus
+	synchronizer *synchronizer.Synchronizer
 }
 
 func NewProtocol(
@@ -96,8 +96,8 @@ func NewProtocol(
 		return nil, err
 	}
 	csus := consensus.New(
-		mods.ConsensusRules,
-		mods.LeaderRotation,
+		mods.consensusRules,
+		mods.leaderRotation,
 		depsSecure.BlockChain,
 		depsSrv.Committer,
 		depsSrv.CmdCache,
@@ -109,10 +109,10 @@ func NewProtocol(
 		depsCore.Globals(),
 	)
 	return &Protocol{
-		Consensus: csus,
-		Synchronizer: synchronizer.New(
+		consensus: csus,
+		synchronizer: synchronizer.New(
 			depsSecure.CryptoImpl,
-			mods.LeaderRotation,
+			mods.leaderRotation,
 			depsSecure.BlockChain,
 			csus,
 			depsSecure.CertAuth,
@@ -123,4 +123,12 @@ func NewProtocol(
 			depsCore.Globals(),
 		),
 	}, nil
+}
+
+func (p *Protocol) Consensus() *consensus.Consensus {
+	return p.consensus
+}
+
+func (p *Protocol) Synchronizer() *synchronizer.Synchronizer {
+	return p.synchronizer
 }
