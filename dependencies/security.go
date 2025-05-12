@@ -12,6 +12,7 @@ type Security struct {
 	certAuth   *certauth.CertAuthority
 }
 
+// NewSecurity returns a set of dependencies necessary for application security and integrity.
 func NewSecurity(
 	depsCore *Core,
 	depsNet *Network,
@@ -44,17 +45,17 @@ func NewSecurity(
 	}, nil
 }
 
-// GetBlockChain returns the blockchain instance.
+// BlockChain returns the blockchain instance.
 func (s *Security) BlockChain() *blockchain.BlockChain {
 	return s.blockChain
 }
 
-// GetCryptoImpl returns the crypto implementation.
+// CryptoImpl returns the crypto implementation.
 func (s *Security) CryptoImpl() modules.CryptoBase {
 	return s.cryptoImpl
 }
 
-// GetCertAuth returns the certificate authority.
+// CertAuth returns the certificate authority.
 func (s *Security) CertAuth() *certauth.CertAuthority {
 	return s.certAuth
 }

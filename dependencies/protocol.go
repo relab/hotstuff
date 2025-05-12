@@ -125,10 +125,12 @@ func NewProtocol(
 	}, nil
 }
 
+// Consensus returns the consensus protocol instance.
 func (p *Protocol) Consensus() *consensus.Consensus {
 	return p.consensus
 }
 
+// Synchronizer returns the synchronizer instance.
 func (p *Protocol) Synchronizer() *synchronizer.Synchronizer {
 	return p.synchronizer
 }

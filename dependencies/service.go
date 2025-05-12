@@ -13,10 +13,12 @@ type Service struct {
 	committer *committer.Committer
 }
 
+// NewService returns a set of dependencies managing application service, such as serving clients through the
+// network and committing and executing requests.
 func NewService(
 	depsCore *Core,
 	depsSecure *Security,
-	cacheOpt []cmdcache.Option,
+	cacheOpt []cmdcache.Option, // TODO: Join this into single option type
 	clientSrvOpts ...gorums.ServerOption,
 ) *Service {
 	cmdCache := cmdcache.New(
@@ -40,17 +42,17 @@ func NewService(
 	}
 }
 
-// GetCmdCache returns the command cache.
+// CmdCache returns the command cache.
 func (s *Service) CmdCache() *cmdcache.Cache {
 	return s.cmdCache
 }
 
-// GetClientSrv returns the client server.
+// ClientSrv returns the client server.
 func (s *Service) ClientSrv() *clientsrv.Server {
 	return s.clientSrv
 }
 
-// GetCommitter returns the committer.
+// Committer returns the committer.
 func (s *Service) Committer() *committer.Committer {
 	return s.committer
 }

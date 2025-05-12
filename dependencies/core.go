@@ -29,14 +29,17 @@ func NewCore(
 	}
 }
 
+// Globals returns the global variables and configurations.
 func (c *Core) Globals() *globals.Globals {
 	return c.globals
 }
 
+// EventLoop returns the eventloop instance.
 func (c *Core) EventLoop() *eventloop.EventLoop {
 	return c.eventLoop
 }
 
+// Logger returns the logger instance.
 func (c *Core) Logger() logging.Logger {
 	return c.logger
 }

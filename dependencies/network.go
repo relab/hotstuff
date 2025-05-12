@@ -31,10 +31,12 @@ func NewNetwork(
 	}
 }
 
+// Config returns the network configuration.
 func (n *Network) Config() *netconfig.Config {
 	return n.config
 }
 
+// Sender returns the sender instance.
 func (n *Network) Sender() *sender.Sender {
 	return n.sender
 }
