@@ -12,6 +12,7 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/service/cmdcache"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -22,11 +23,11 @@ import (
 type ClientServer struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
-	cmdCache  *CmdCache
+	cmdCache  *cmdcache.Cache
 
 	mut          sync.Mutex
 	srv          *gorums.Server
-	awaitingCmds map[CmdID]chan<- error
+	awaitingCmds map[cmdcache.CmdID]chan<- error
 	hash         hash.Hash
 	cmdCount     uint32
 }
@@ -35,7 +36,7 @@ type ClientServer struct {
 func NewClientServer(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	cmdCache *CmdCache,
+	cmdCache *cmdcache.Cache,
 
 	srvOpts ...gorums.ServerOption,
 ) (srv *ClientServer) {
@@ -44,7 +45,7 @@ func NewClientServer(
 		logger:    logger,
 		cmdCache:  cmdCache,
 
-		awaitingCmds: make(map[CmdID]chan<- error),
+		awaitingCmds: make(map[cmdcache.CmdID]chan<- error),
 		srv:          gorums.NewServer(srvOpts...),
 		hash:         sha256.New(),
 	}
@@ -74,7 +75,7 @@ func (srv *ClientServer) Stop() {
 	srv.srv.Stop()
 }
 
-func (srv *ClientServer) CmdCache() *CmdCache {
+func (srv *ClientServer) CmdCache() *cmdcache.Cache {
 	return srv.cmdCache
 }
 
@@ -87,14 +88,17 @@ func (srv *ClientServer) CmdCount() uint32 {
 }
 
 func (srv *ClientServer) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*emptypb.Empty, error) {
-	id := CmdID{cmd.ClientID, cmd.SequenceNumber}
+	id := cmdcache.CmdID{
+		ClientID:    cmd.ClientID,
+		SequenceNum: cmd.SequenceNumber,
+	}
 
 	c := make(chan error)
 	srv.mut.Lock()
 	srv.awaitingCmds[id] = c
 	srv.mut.Unlock()
 
-	srv.cmdCache.addCommand(cmd)
+	srv.cmdCache.Add(cmd)
 	ctx.Release()
 	err := <-c
 	return &emptypb.Empty{}, err
@@ -114,7 +118,10 @@ func (srv *ClientServer) Exec(cmd hotstuff.Command) {
 		_, _ = srv.hash.Write(cmd.Data)
 		srv.cmdCount++
 		srv.mut.Lock()
-		id := CmdID{cmd.GetClientID(), cmd.GetSequenceNumber()}
+		id := cmdcache.CmdID{
+			ClientID:    cmd.GetClientID(),
+			SequenceNum: cmd.GetSequenceNumber(),
+		}
 		if done, ok := srv.awaitingCmds[id]; ok {
 			done <- nil
 			delete(srv.awaitingCmds, id)
@@ -135,7 +142,10 @@ func (srv *ClientServer) Fork(cmd hotstuff.Command) {
 
 	for _, cmd := range batch.GetCommands() {
 		srv.mut.Lock()
-		id := CmdID{cmd.GetClientID(), cmd.GetSequenceNumber()}
+		id := cmdcache.CmdID{
+			ClientID:    cmd.GetClientID(),
+			SequenceNum: cmd.GetSequenceNumber(),
+		}
 		if done, ok := srv.awaitingCmds[id]; ok {
 			done <- status.Error(codes.Aborted, "blockchain was forked")
 			delete(srv.awaitingCmds, id)

@@ -9,6 +9,7 @@ import (
 	"github.com/relab/hotstuff/network/sender"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/service/clientsrv"
+	"github.com/relab/hotstuff/service/cmdcache"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/service/server"
@@ -23,7 +24,7 @@ type Replica struct {
 	eventLoop    *eventloop.EventLoop
 	synchronizer *synchronizer.Synchronizer
 
-	execHandlers map[clientsrv.CmdID]func(*emptypb.Empty, error)
+	execHandlers map[cmdcache.CmdID]func(*emptypb.Empty, error)
 	cancel       context.CancelFunc
 	done         chan struct{}
 }
@@ -43,7 +44,7 @@ func New(
 		eventLoop:    eventLoop,
 		synchronizer: synchronizer,
 
-		execHandlers: make(map[clientsrv.CmdID]func(*emptypb.Empty, error)),
+		execHandlers: make(map[cmdcache.CmdID]func(*emptypb.Empty, error)),
 		cancel:       func() {},
 		done:         make(chan struct{}),
 	}

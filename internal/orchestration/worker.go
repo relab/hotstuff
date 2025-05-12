@@ -23,7 +23,7 @@ import (
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/security/crypto/keygen"
-	"github.com/relab/hotstuff/service/clientsrv"
+	"github.com/relab/hotstuff/service/cmdcache"
 	"github.com/relab/hotstuff/service/replica"
 	"github.com/relab/hotstuff/service/server"
 	"google.golang.org/grpc/codes"
@@ -141,7 +141,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if err != nil {
 		return nil, err
 	}
-	rOpts := []ReplicaOption{}
+	replicaOpts := []ReplicaOption{}
 	var certificate tls.Certificate
 	var rootCAs *x509.CertPool
 	if opts.GetUseTLS() {
@@ -151,7 +151,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		}
 		rootCAs = x509.NewCertPool()
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
-		rOpts = append(rOpts, WithTLS(certificate, rootCAs))
+		replicaOpts = append(replicaOpts, WithTLS(certificate, rootCAs))
 	}
 
 	globalOpts := []core.GlobalsOption{}
@@ -174,7 +174,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 
 	globalOpts = append(globalOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
-	clientSrvOpts := []clientsrv.CacheOption{clientsrv.WithBatching(opts.GetBatchSize())}
+	cmdCacheOpts := []cmdcache.Option{cmdcache.WithBatching(opts.GetBatchSize())}
 	serverOpts := []server.ServerOption{server.WithLatencies(opts.HotstuffID(), opts.GetLocations())}
 	// prepare dependencies
 	deps, err := NewReplicaDependencies(
@@ -193,15 +193,15 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			opts.GetTimeoutMultiplier(),
 		),
 		globalOpts,
-		clientSrvOpts,
+		cmdCacheOpts,
 		serverOpts,
-		rOpts...)
+		replicaOpts...,
+	)
 	if err != nil {
 		return nil, err
 	}
 	if w.measurementInterval > 0 {
-		// Initializes the metrics modules. This does not need to be stored
-		// anywhere since they all add handlers to the eventloop.
+		// Initializes the metrics modules internally.
 		err = metrics.Enable(
 			deps.eventLoop,
 			deps.logger,
@@ -210,7 +210,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			w.measurementInterval,
 			w.metrics...,
 		)
-
 		if err != nil {
 			return nil, err
 		}

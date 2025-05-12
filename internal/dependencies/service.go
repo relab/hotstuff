@@ -3,11 +3,12 @@ package dependencies
 import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/service/clientsrv"
+	"github.com/relab/hotstuff/service/cmdcache"
 	"github.com/relab/hotstuff/service/committer"
 )
 
 type Service struct {
-	CmdCache  *clientsrv.CmdCache
+	CmdCache  *cmdcache.Cache
 	ClientSrv *clientsrv.ClientServer
 	Committer *committer.Committer
 }
@@ -15,10 +16,10 @@ type Service struct {
 func NewService(
 	depsCore *Core,
 	depsSecure *Security,
-	cacheOpt []clientsrv.CacheOption,
+	cacheOpt []cmdcache.Option,
 	clientSrvOpts ...gorums.ServerOption,
 ) *Service {
-	cmdCache := clientsrv.NewCmdCache(
+	cmdCache := cmdcache.New(
 		depsCore.Logger,
 		cacheOpt...,
 	)

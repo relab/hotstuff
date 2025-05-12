@@ -1,4 +1,4 @@
-package clientsrv
+package cmdcache
 
 import (
 	"container/list"
@@ -14,11 +14,11 @@ import (
 
 // CmdID is a unique identifier for a command
 type CmdID struct {
-	clientID    uint32
-	sequenceNum uint64
+	ClientID    uint32
+	SequenceNum uint64
 }
 
-type CmdCache struct {
+type Cache struct {
 	logger logging.Logger
 
 	mut           sync.Mutex
@@ -30,11 +30,11 @@ type CmdCache struct {
 	unmarshaler   proto.UnmarshalOptions
 }
 
-func NewCmdCache(
+func New(
 	logger logging.Logger,
-	opts ...CacheOption,
-) *CmdCache {
-	c := &CmdCache{
+	opts ...Option,
+) *Cache {
+	c := &Cache{
 		logger: logger,
 
 		c:             make(chan struct{}),
@@ -51,7 +51,7 @@ func NewCmdCache(
 	return c
 }
 
-func (c *CmdCache) addCommand(cmd *clientpb.Command) {
+func (c *Cache) Add(cmd *clientpb.Command) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
@@ -69,7 +69,7 @@ func (c *CmdCache) addCommand(cmd *clientpb.Command) {
 }
 
 // Get returns a batch of commands to propose.
-func (c *CmdCache) Get(ctx context.Context) (cmd hotstuff.Command, ok bool) {
+func (c *Cache) Get(ctx context.Context) (cmd hotstuff.Command, ok bool) {
 	batch := new(clientpb.Batch)
 
 	c.mut.Lock()
@@ -121,7 +121,7 @@ awaitBatch:
 }
 
 // Accept returns true if the replica can accept the batch.
-func (c *CmdCache) Accept(cmd hotstuff.Command) bool {
+func (c *Cache) Accept(cmd hotstuff.Command) bool {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -143,7 +143,7 @@ func (c *CmdCache) Accept(cmd hotstuff.Command) bool {
 }
 
 // Proposed updates the serial numbers such that we will not accept the given batch again.
-func (c *CmdCache) Proposed(cmd hotstuff.Command) {
+func (c *Cache) Proposed(cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {

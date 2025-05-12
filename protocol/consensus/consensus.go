@@ -14,7 +14,7 @@ import (
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
-	"github.com/relab/hotstuff/service/clientsrv"
+	"github.com/relab/hotstuff/service/cmdcache"
 	"github.com/relab/hotstuff/service/committer"
 )
 
@@ -27,7 +27,7 @@ type Consensus struct {
 
 	blockChain    *blockchain.BlockChain
 	committer     *committer.Committer
-	commandCache  *clientsrv.CmdCache
+	commandCache  *cmdcache.Cache
 	sender        *sender.Sender
 	auth          *certauth.CertAuthority
 	configuration *netconfig.Config
@@ -45,7 +45,7 @@ func New(
 
 	blockChain *blockchain.BlockChain,
 	committer *committer.Committer,
-	commandCache *clientsrv.CmdCache,
+	commandCache *cmdcache.Cache,
 	sender *sender.Sender,
 	auth *certauth.CertAuthority,
 	configuration *netconfig.Config,

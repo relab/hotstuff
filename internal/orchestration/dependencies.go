@@ -15,6 +15,7 @@ import (
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/certauth"
 	"github.com/relab/hotstuff/service/clientsrv"
+	"github.com/relab/hotstuff/service/cmdcache"
 	"github.com/relab/hotstuff/service/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -74,7 +75,7 @@ func NewReplicaDependencies(
 	names ModuleNames,
 	vdParams viewduration.Params,
 	globalOpts []core.GlobalsOption,
-	clientSrvOpt []clientsrv.CacheOption,
+	cmdCacheOpts []cmdcache.Option,
 	serverOpts []server.ServerOption,
 	repOpts ...ReplicaOption,
 ) (*ReplicaDependencies, error) {
@@ -103,7 +104,7 @@ func NewReplicaDependencies(
 	depsSrv := dependencies.NewService(
 		depsCore,
 		depsSecure,
-		clientSrvOpt,
+		cmdCacheOpts,
 		rOpt.clientServerOpts...,
 	)
 	depsProtocol, err := dependencies.NewProtocol(
