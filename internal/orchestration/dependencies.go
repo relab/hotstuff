@@ -53,7 +53,7 @@ func OverrideCrypto(moduleName string) ReplicaOption {
 	}
 }
 
-// OverrideCrypto changes the consensus rules to the one specified by name.
+// OverrideConsensusRules changes the consensus rules to the one specified by name.
 // Default: "chainedhotstuff"
 func OverrideConsensusRules(moduleName string) ReplicaOption {
 	return func(ro *replicaOptions) {
@@ -61,7 +61,7 @@ func OverrideConsensusRules(moduleName string) ReplicaOption {
 	}
 }
 
-// OverrideCrypto changes the leader rotation scheme to the one specified by name.
+// OverrideLeaderRotation changes the leader rotation scheme to the one specified by name.
 // Default: "round-robin"
 func OverrideLeaderRotation(moduleName string) ReplicaOption {
 	return func(ro *replicaOptions) {
