@@ -2,6 +2,9 @@ package dependencies
 
 import (
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/service/clientsrv"
 	"github.com/relab/hotstuff/service/cmdcache"
 	"github.com/relab/hotstuff/service/committer"
@@ -16,18 +19,19 @@ type Service struct {
 // NewService returns a set of dependencies managing application service, such as serving clients through the
 // network and committing and executing requests.
 func NewService(
-	depsCore *Core,
-	depsSecure *Security,
+	logger logging.Logger,
+	eventLoop *eventloop.EventLoop,
+	blockChain *blockchain.BlockChain,
 	cacheOpt []cmdcache.Option, // TODO: Join this into single option type
 	clientSrvOpts ...gorums.ServerOption,
 ) *Service {
 	cmdCache := cmdcache.New(
-		depsCore.Logger(),
+		logger,
 		cacheOpt...,
 	)
 	clientSrv := clientsrv.New(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
+		eventLoop,
+		logger,
 		cmdCache,
 		clientSrvOpts...,
 	)
@@ -35,9 +39,9 @@ func NewService(
 		cmdCache:  cmdCache,
 		clientSrv: clientSrv,
 		committer: committer.New(
-			depsSecure.BlockChain(),
+			blockChain,
 			clientSrv,
-			depsCore.Logger(),
+			logger,
 		),
 	}
 }

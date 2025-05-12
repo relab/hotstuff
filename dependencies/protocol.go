@@ -9,7 +9,6 @@ import (
 
 type protocolModules struct {
 	consensusRules modules.ConsensusRules
-	kauri          modules.Kauri
 	leaderRotation modules.LeaderRotation
 }
 

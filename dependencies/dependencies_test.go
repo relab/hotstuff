@@ -69,12 +69,30 @@ func TestModules(t *testing.T) {
 			pk = testutil.GenerateEDDSAKey(t)
 		}
 		depsCore := dependencies.NewCore(hotstuff.ID(1), "test", pk)
-		depsNet := dependencies.NewNetwork(depsCore, insecure.NewCredentials())
-		depsSecure, err := dependencies.NewSecurity(depsCore, depsNet, td.cryptoName, certauth.WithCache(100))
+		depsNet := dependencies.NewNetwork(
+			depsCore.EventLoop(),
+			depsCore.Logger(),
+			depsCore.Globals(),
+			insecure.NewCredentials(),
+		)
+		depsSecure, err := dependencies.NewSecurity(
+			depsCore.Logger(),
+			depsCore.EventLoop(),
+			depsCore.Globals(),
+			depsNet.Config(),
+			depsNet.Sender(),
+			td.cryptoName,
+			certauth.WithCache(100),
+		)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		depsSrv := dependencies.NewService(depsCore, depsSecure, nil)
+		depsSrv := dependencies.NewService(
+			depsCore.Logger(),
+			depsCore.EventLoop(),
+			depsSecure.BlockChain(),
+			nil,
+		)
 		_, err = dependencies.NewProtocol(
 			depsCore, depsNet, depsSecure, depsSrv,
 			td.consensusName, td.leaderRotationName, td.byzantineStrategy,

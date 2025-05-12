@@ -44,12 +44,17 @@ func New(
 		opt(rOpt)
 	}
 	depsNet := dependencies.NewNetwork(
-		depsCore,
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.Globals(),
 		rOpt.credentials,
 	)
 	depsSecure, err := dependencies.NewSecurity(
-		depsCore,
-		depsNet,
+		depsCore.Logger(),
+		depsCore.EventLoop(),
+		depsCore.Globals(),
+		depsNet.Config(),
+		depsNet.Sender(),
 		names.crypto,
 		certauth.WithCache(100), // TODO: consider making this configurable
 	)
@@ -57,8 +62,9 @@ func New(
 		return nil, err
 	}
 	depsSrv := dependencies.NewService(
-		depsCore,
-		depsSecure,
+		depsCore.Logger(),
+		depsCore.EventLoop(),
+		depsSecure.BlockChain(),
 		rOpt.cmdCacheOpts,
 		rOpt.clientGorumsSrvOpts...,
 	)

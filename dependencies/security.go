@@ -1,7 +1,12 @@
 package dependencies
 
 import (
+	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/globals"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/network/netconfig"
+	"github.com/relab/hotstuff/network/sender"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
 )
@@ -14,21 +19,24 @@ type Security struct {
 
 // NewSecurity returns a set of dependencies necessary for application security and integrity.
 func NewSecurity(
-	depsCore *Core,
-	depsNet *Network,
+	logger logging.Logger,
+	eventLoop *eventloop.EventLoop,
+	globals *globals.Globals,
+	config *netconfig.Config,
+	sender *sender.Sender,
 	cryptoName string,
 	opts ...certauth.Option,
 ) (*Security, error) {
 	blockChain := blockchain.New(
-		depsNet.Sender(),
-		depsCore.EventLoop(),
-		depsCore.Logger(),
+		sender,
+		eventLoop,
+		logger,
 	)
 	cryptoImpl, err := newCryptoModule(
 		cryptoName,
-		depsNet.Config(),
-		depsCore.Logger(),
-		depsCore.Globals(),
+		config,
+		logger,
+		globals,
 	)
 	if err != nil {
 		return nil, err
@@ -39,7 +47,7 @@ func NewSecurity(
 		certAuth: certauth.New(
 			cryptoImpl,
 			blockChain,
-			depsCore.Logger(),
+			logger,
 			opts...,
 		),
 	}, nil

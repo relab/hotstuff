@@ -43,12 +43,30 @@ func TestVote(t *testing.T) {
 		cacheSize := 100
 
 		depsCore := dependencies.NewCore(id, fmt.Sprintf("hs%d", id), testutil.GenerateECDSAKey(t))
-		depsNet := dependencies.NewNetwork(depsCore, nil)
-		depsSecure, err := dependencies.NewSecurity(depsCore, depsNet, cryptoName, certauth.WithCache(cacheSize))
+		depsNet := dependencies.NewNetwork(
+			depsCore.EventLoop(),
+			depsCore.Logger(),
+			depsCore.Globals(),
+			nil,
+		)
+		depsSecure, err := dependencies.NewSecurity(
+			depsCore.Logger(),
+			depsCore.EventLoop(),
+			depsCore.Globals(),
+			depsNet.Config(),
+			depsNet.Sender(),
+			cryptoName,
+			certauth.WithCache(cacheSize),
+		)
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		depsService := dependencies.NewService(depsCore, depsSecure, nil)
+		depsService := dependencies.NewService(
+			depsCore.Logger(),
+			depsCore.EventLoop(),
+			depsSecure.BlockChain(),
+			nil,
+		)
 		depsProtocol, err := dependencies.NewProtocol(
 			depsCore, depsNet, depsSecure, depsService,
 			consensusName, leaderRotationName, "",

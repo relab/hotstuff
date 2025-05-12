@@ -4,6 +4,7 @@ import (
 	"github.com/relab/hotstuff"
 )
 
+// TODO: maybe make this a part of globals?
 // Config holds information about the current configuration of replicas that participate in the protocol,
 // and some information about the local replica.
 type Config struct {

@@ -34,12 +34,25 @@ func genKey(t *testing.T, cryptoName string) hotstuff.PrivateKey {
 func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuff.PrivateKey, cacheSize int) *dummyReplica {
 	t.Helper()
 	core := dependencies.NewCore(hotstuff.ID(id), "test", privKey)
-	net := dependencies.NewNetwork(core, nil)
+	net := dependencies.NewNetwork(
+		core.EventLoop(),
+		core.Logger(),
+		core.Globals(),
+		nil,
+	)
 	opts := []certauth.Option{}
 	if cacheSize > 0 {
 		opts = append(opts, certauth.WithCache(cacheSize))
 	}
-	sec, err := dependencies.NewSecurity(core, net, cryptoName, opts...)
+	sec, err := dependencies.NewSecurity(
+		core.Logger(),
+		core.EventLoop(),
+		core.Globals(),
+		net.Config(),
+		net.Sender(),
+		cryptoName,
+		opts...,
+	)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
