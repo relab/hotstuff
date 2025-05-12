@@ -27,6 +27,7 @@ func newConsensusRulesModule(
 	logger logging.Logger,
 	globals *core.Globals,
 ) (rules modules.ConsensusRules, err error) {
+	logger.Debugf("Initializing module (consensus rules): %s", name)
 	switch name {
 	case fasthotstuff.ModuleName:
 		rules = fasthotstuff.New(blockChain, logger, globals)
@@ -46,6 +47,7 @@ func newByzantineStrategyModule(
 	blockChain *blockchain.BlockChain,
 	globals *core.Globals,
 ) (byzRules modules.ConsensusRules, err error) {
+	// logger.Debugf("Initializing module (byzantine strategy): %s", name)
 	switch name {
 	case byzantine.SilenceModuleName:
 		byzRules = byzantine.NewSilence(rules)
@@ -63,6 +65,7 @@ func newCryptoModule(
 	logger logging.Logger,
 	globals *core.Globals,
 ) (impl modules.CryptoBase, err error) {
+	logger.Debugf("Initializing module (crypto): %s", name)
 	switch name {
 	case bls12.ModuleName:
 		impl = bls12.New(configuration, logger, globals)
@@ -86,6 +89,7 @@ func newLeaderRotationModule(
 	logger logging.Logger,
 	globals *core.Globals,
 ) (ld modules.LeaderRotation, err error) {
+	logger.Debugf("Initializing module (leader rotation): %s", name)
 	switch name {
 	case leaderrotation.CarouselModuleName:
 		ld = leaderrotation.NewCarousel(chainLength, vdParams, blockChain, config, committer, globals, logger)

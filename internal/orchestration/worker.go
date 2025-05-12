@@ -155,7 +155,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 
 	globalOpts := []core.GlobalsOption{}
-	if opts.GetKauri() {
+	if opts.GetKauri() { // TODO(AlanRostem): shouldn't this also be added if tree-leader is chosen without Kauri?
 		delayMode := tree.DelayTypeNone
 		if opts.GetAggregationTime() {
 			delayMode = tree.DelayTypeAggregation
