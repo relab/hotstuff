@@ -9,7 +9,7 @@ import (
 
 type Service struct {
 	CmdCache  *cmdcache.Cache
-	ClientSrv *clientsrv.ClientServer
+	ClientSrv *clientsrv.Server
 	Committer *committer.Committer
 }
 

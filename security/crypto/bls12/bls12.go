@@ -10,7 +10,7 @@ import (
 
 	bls12 "github.com/kilic/bls12-381"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network/netconfig"
@@ -142,7 +142,7 @@ func firstParticipant(participants hotstuff.IDSet) hotstuff.ID {
 type bls12Base struct {
 	configuration *netconfig.Config
 	logger        logging.Logger
-	globals       *core.Globals
+	globals       *globals.Globals
 
 	mut sync.RWMutex
 	// popCache caches the proof-of-possession results of popVerify for each public key.
@@ -153,7 +153,7 @@ type bls12Base struct {
 func New(
 	configuration *netconfig.Config,
 	logger logging.Logger,
-	globals *core.Globals,
+	globals *globals.Globals,
 ) modules.CryptoBase {
 	bls := &bls12Base{
 		configuration: configuration,

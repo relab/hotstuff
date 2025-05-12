@@ -13,18 +13,19 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/client"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/dependencies"
 	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
+	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 	"github.com/relab/hotstuff/service/cmdcache"
-	"github.com/relab/hotstuff/service/replica"
 	"github.com/relab/hotstuff/service/server"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -142,19 +143,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if err != nil {
 		return nil, err
 	}
-	replicaOpts := []ReplicaOption{}
-	var certificate tls.Certificate
-	var rootCAs *x509.CertPool
-	if opts.GetUseTLS() {
-		certificate, err = tls.X509KeyPair(opts.GetCertificate(), opts.GetCertificateKey())
-		if err != nil {
-			return nil, err
-		}
-		rootCAs = x509.NewCertPool()
-		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
-		replicaOpts = append(replicaOpts, WithTLS(certificate, rootCAs))
-	}
-	globalOpts := []core.GlobalOption{}
+	// setup core - used in replica and measurement framework
+	globalOpts := []globals.GlobalOption{}
 	if opts.GetLeaderRotation() == leaderrotation.TreeLeaderModuleName {
 		delayMode := tree.DelayTypeNone
 		if opts.GetAggregationTime() {
@@ -168,25 +158,51 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			opts.TreePositionIDs(),
 			opts.GetTreeDelta().AsDuration(),
 		)
-		globalOpts = append(globalOpts, core.WithTree(t))
+		globalOpts = append(globalOpts, globals.WithTree(t))
 	}
 	if opts.GetKauri() {
-		globalOpts = append(globalOpts, core.WithKauri())
+		globalOpts = append(globalOpts, globals.WithKauri())
 	}
-	globalOpts = append(globalOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
+	globalOpts = append(globalOpts, globals.WithSharedRandomSeed(opts.GetSharedSeed()))
+	depsCore := dependencies.NewCore(opts.HotstuffID(), "hs", privKey, globalOpts...)
+	// check if measurements should be enabled
+	if w.measurementInterval > 0 {
+		// Initializes the metrics modules internally.
+		err = metrics.Enable(
+			depsCore.EventLoop,
+			depsCore.Logger,
+			w.metricsLogger,
+			depsCore.Globals,
+			w.measurementInterval,
+			w.metrics...,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+	// setup replica
+	replicaOpts := []replica.Option{}
+	var certificate tls.Certificate
+	var rootCAs *x509.CertPool
+	if opts.GetUseTLS() {
+		certificate, err = tls.X509KeyPair(opts.GetCertificate(), opts.GetCertificateKey())
+		if err != nil {
+			return nil, err
+		}
+		rootCAs = x509.NewCertPool()
+		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
+		replicaOpts = append(replicaOpts, replica.WithTLS(certificate, rootCAs))
+	}
 	replicaOpts = append(replicaOpts,
-		WithGlobalOptions(globalOpts...),
-		WithCmdCacheOptions(cmdcache.WithBatching(opts.GetBatchSize())),
-		WithServerOptions(server.WithLatencies(opts.HotstuffID(), opts.GetLocations())),
-		OverrideCrypto(opts.GetCrypto()),
-		OverrideConsensusRules(opts.GetConsensus()),
-		OverrideLeaderRotation(opts.GetLeaderRotation()),
-		WithByzantineStrategy(opts.GetByzantineStrategy()),
+		replica.OverrideCrypto(opts.GetCrypto()),
+		replica.OverrideConsensusRules(opts.GetConsensus()),
+		replica.OverrideLeaderRotation(opts.GetLeaderRotation()),
+		replica.WithByzantineStrategy(opts.GetByzantineStrategy()),
+		replica.WithCmdCacheOptions(cmdcache.WithBatching(opts.GetBatchSize())),
+		replica.WithServerOptions(server.WithLatencies(opts.HotstuffID(), opts.GetLocations())),
 	)
-	// prepare dependencies
-	deps, err := NewReplicaDependencies(
-		opts.HotstuffID(),
-		privKey,
+	return replica.New(
+		depsCore,
 		viewduration.NewParams(
 			opts.GetTimeoutSamples(),
 			opts.GetInitialTimeout().AsDuration(),
@@ -195,30 +211,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		),
 		replicaOpts...,
 	)
-	if err != nil {
-		return nil, err
-	}
-	if w.measurementInterval > 0 {
-		// Initializes the metrics modules internally.
-		err = metrics.Enable(
-			deps.eventLoop,
-			deps.logger,
-			w.metricsLogger,
-			deps.options,
-			w.measurementInterval,
-			w.metrics...,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return replica.New(
-		deps.clientSrv,
-		deps.server,
-		deps.sender,
-		deps.eventLoop,
-		deps.synchronizer,
-	), nil
 }
 
 func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {
@@ -283,7 +275,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		buildOpt := core.NewGlobals(hotstuff.ID(opts.GetID()), nil)
+		buildOpt := globals.NewGlobals(hotstuff.ID(opts.GetID()), nil)
 		logger := logging.New("cli" + strconv.Itoa(int(opts.GetID())))
 		eventLoop := eventloop.New(logger, 1000)
 

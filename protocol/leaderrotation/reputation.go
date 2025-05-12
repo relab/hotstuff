@@ -7,7 +7,7 @@ import (
 	wr "github.com/mroth/weightedrand"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network/netconfig"
@@ -22,7 +22,7 @@ type reputationsMap map[hotstuff.ID]float64
 type repBased struct {
 	configuration *netconfig.Config
 	committer     *committer.Committer
-	globals       *core.Globals
+	globals       *globals.Globals
 	logger        logging.Logger
 	viewDuration  modules.ViewDuration
 
@@ -103,7 +103,7 @@ func NewRepBased(
 
 	configuration *netconfig.Config,
 	committer *committer.Committer,
-	globals *core.Globals,
+	globals *globals.Globals,
 	logger logging.Logger,
 ) modules.LeaderRotation {
 	return &repBased{

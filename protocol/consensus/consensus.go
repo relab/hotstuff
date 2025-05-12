@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network/netconfig"
@@ -33,7 +33,7 @@ type Consensus struct {
 	configuration *netconfig.Config
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
-	globals       *core.Globals
+	globals       *globals.Globals
 
 	lastVote hotstuff.View
 }
@@ -51,7 +51,7 @@ func New(
 	configuration *netconfig.Config,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	globals *core.Globals,
+	globals *globals.Globals,
 	// opts ...Option,
 ) *Consensus {
 	cs := &Consensus{

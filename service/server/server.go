@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/protocol/kauri"
@@ -27,7 +27,7 @@ type Server struct {
 	configuration *netconfig.Config
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
-	globals       *core.Globals
+	globals       *globals.Globals
 
 	id        hotstuff.ID
 	lm        latency.Matrix
@@ -38,7 +38,7 @@ type Server struct {
 func NewServer(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	globals *core.Globals,
+	globals *globals.Globals,
 	configuration *netconfig.Config,
 	blockChain *blockchain.BlockChain,
 	srvOpts ...ServerOption,

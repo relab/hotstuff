@@ -5,8 +5,8 @@ import (
 
 	"github.com/relab/hotstuff"
 
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/metrics/types"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -17,7 +17,7 @@ const NameThroughput = "throughput"
 // throughput measures throughput in commits per second, and commands per second.
 type throughput struct {
 	metricsLogger Logger
-	globals       *core.Globals
+	globals       *globals.Globals
 
 	commitCount  uint64
 	commandCount uint64
@@ -27,7 +27,7 @@ func enableThroughput(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	metricsLogger Logger,
-	globals *core.Globals,
+	globals *globals.Globals,
 ) {
 	t := &throughput{
 		metricsLogger: metricsLogger,

@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network/netconfig"
@@ -21,7 +21,7 @@ type carousel struct {
 	blockChain    *blockchain.BlockChain
 	configuration *netconfig.Config
 	committer     *committer.Committer
-	globals       *core.Globals
+	globals       *globals.Globals
 	logger        logging.Logger
 	viewDuration  modules.ViewDuration
 
@@ -87,7 +87,7 @@ func NewCarousel(
 	blockChain *blockchain.BlockChain,
 	configuration *netconfig.Config,
 	committer *committer.Committer,
-	globals *core.Globals,
+	globals *globals.Globals,
 	logger logging.Logger,
 ) modules.LeaderRotation {
 	return &carousel{

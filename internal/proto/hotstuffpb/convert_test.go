@@ -7,7 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network/netconfig"
@@ -21,7 +21,7 @@ import (
 
 func TestConvertPartialCert(t *testing.T) {
 	key := testutil.GenerateECDSAKey(t)
-	opts := core.NewGlobals(1, key)
+	opts := globals.NewGlobals(1, key)
 	crypt := ecdsa.New(nil, nil, opts)
 	signer := certauth.New(crypt, nil, nil)
 
@@ -43,7 +43,7 @@ func TestConvertQuorumCert(t *testing.T) {
 	signers := make([]*certauth.CertAuthority, n)
 	for i := range n {
 		key := testutil.GenerateECDSAKey(t)
-		opts := core.NewGlobals(hotstuff.ID(i+1), key)
+		opts := globals.NewGlobals(hotstuff.ID(i+1), key)
 		crypt := ecdsa.New(nil, nil, opts)
 		signer := certauth.New(crypt, nil, nil)
 		signers[i] = signer
@@ -80,11 +80,11 @@ func TestConvertBlock(t *testing.T) {
 func TestConvertTimeoutCertBLS12(t *testing.T) {
 	n := 4
 	cfg := netconfig.NewConfig()
-	opts := make([]*core.Globals, n)
+	opts := make([]*globals.Globals, n)
 	for i := range n {
 		id := hotstuff.ID(i + 1)
 		key := testutil.GenerateBLS12Key(t)
-		opts[i] = core.NewGlobals(id, key)
+		opts[i] = globals.NewGlobals(id, key)
 		pub := key.Public()
 		cfg.AddReplica(&hotstuff.ReplicaInfo{ID: id, PubKey: pub})
 

@@ -1,4 +1,4 @@
-package core
+package globals
 
 import "github.com/relab/hotstuff/internal/tree"
 

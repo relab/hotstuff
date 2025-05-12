@@ -6,8 +6,11 @@ import (
 	"net"
 
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/internal/dependencies"
 	"github.com/relab/hotstuff/network/sender"
 	"github.com/relab/hotstuff/protocol/synchronizer"
+	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
+	"github.com/relab/hotstuff/security/certauth"
 	"github.com/relab/hotstuff/service/clientsrv"
 	"github.com/relab/hotstuff/service/cmdcache"
 
@@ -18,10 +21,10 @@ import (
 
 // Replica is a participant in the consensus protocol.
 type Replica struct {
-	clientSrv    *clientsrv.ClientServer
+	eventLoop    *eventloop.EventLoop
+	clientSrv    *clientsrv.Server
 	hsSrv        *server.Server
 	sender       *sender.Sender
-	eventLoop    *eventloop.EventLoop
 	synchronizer *synchronizer.Synchronizer
 
 	execHandlers map[cmdcache.CmdID]func(*emptypb.Empty, error)
@@ -31,24 +34,68 @@ type Replica struct {
 
 // New returns a new replica.
 func New(
-	clientSrv *clientsrv.ClientServer,
-	server *server.Server,
-	sender *sender.Sender,
-	eventLoop *eventloop.EventLoop,
-	synchronizer *synchronizer.Synchronizer,
-) (replica *Replica) {
+	depsCore *dependencies.Core,
+	vdParams viewduration.Params,
+	opts ...Option,
+) (replica *Replica, err error) {
+	rOpt := newDefaultOpts()
+	names := &rOpt.moduleNames
+	for _, opt := range opts {
+		opt(rOpt)
+	}
+	depsNet := dependencies.NewNetwork(
+		depsCore,
+		rOpt.credentials,
+	)
+	depsSecure, err := dependencies.NewSecurity(
+		depsCore,
+		depsNet,
+		names.crypto,
+		certauth.WithCache(100), // TODO: consider making this configurable
+	)
+	if err != nil {
+		return nil, err
+	}
+	depsSrv := dependencies.NewService(
+		depsCore,
+		depsSecure,
+		rOpt.cmdCacheOpts,
+		rOpt.clientServerOpts...,
+	)
+	depsProtocol, err := dependencies.NewProtocol(
+		depsCore,
+		depsNet,
+		depsSecure,
+		depsSrv,
+		names.consensus,
+		names.leaderRotation,
+		names.byzantineStrategy,
+		vdParams,
+	)
+	if err != nil {
+		return nil, err
+	}
+	rOpt.serverOpts = append(rOpt.serverOpts, server.WithGorumsServerOptions(rOpt.replicaServerOpts...))
+	server := server.NewServer(
+		depsCore.EventLoop,
+		depsCore.Logger,
+		depsCore.Globals,
+		depsNet.Config,
+		depsSecure.BlockChain,
+		rOpt.serverOpts...,
+	)
 	srv := &Replica{
-		clientSrv:    clientSrv,
-		sender:       sender,
+		eventLoop:    depsCore.EventLoop,
+		clientSrv:    depsSrv.ClientSrv,
+		sender:       depsNet.Sender,
+		synchronizer: depsProtocol.Synchronizer,
 		hsSrv:        server,
-		eventLoop:    eventLoop,
-		synchronizer: synchronizer,
 
 		execHandlers: make(map[cmdcache.CmdID]func(*emptypb.Empty, error)),
 		cancel:       func() {},
 		done:         make(chan struct{}),
 	}
-	return srv
+	return srv, nil
 }
 
 // StartServers starts the client and replica servers.

@@ -3,7 +3,7 @@ package byzantine
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
 )
@@ -28,7 +28,7 @@ func NewSilence(rules modules.ConsensusRules) modules.ConsensusRules {
 
 type fork struct {
 	blockChain *blockchain.BlockChain
-	globals    *core.Globals
+	globals    *globals.Globals
 	modules.ConsensusRules
 }
 
@@ -66,7 +66,7 @@ func (f *fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert 
 func NewFork(
 	rules modules.ConsensusRules,
 	blockChain *blockchain.BlockChain,
-	globals *core.Globals,
+	globals *globals.Globals,
 ) modules.ConsensusRules {
 	return &fork{
 		ConsensusRules: rules,

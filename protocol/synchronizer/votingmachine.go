@@ -4,8 +4,8 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/security/blockchain"
@@ -20,7 +20,7 @@ type votingMachine struct {
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
 	synchronizer  *Synchronizer
-	globals       *core.Globals
+	globals       *globals.Globals
 
 	mut           sync.Mutex
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
@@ -34,7 +34,7 @@ func registerVoteHandlers(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	synchronizer *Synchronizer,
-	globals *core.Globals,
+	globals *globals.Globals,
 ) {
 	vm := &votingMachine{
 		blockChain:    blockChain,

@@ -1,4 +1,4 @@
-package core
+package globals
 
 import (
 	"sync/atomic"

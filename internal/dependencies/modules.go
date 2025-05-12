@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network/netconfig"
@@ -25,7 +25,7 @@ func newConsensusRulesModule(
 	name string,
 	blockChain *blockchain.BlockChain,
 	logger logging.Logger,
-	globals *core.Globals,
+	globals *globals.Globals,
 ) (rules modules.ConsensusRules, err error) {
 	logger.Debugf("Initializing module (consensus rules): %s", name)
 	switch name {
@@ -45,7 +45,7 @@ func newByzantineStrategyModule(
 	name string,
 	rules modules.ConsensusRules,
 	blockChain *blockchain.BlockChain,
-	globals *core.Globals,
+	globals *globals.Globals,
 ) (byzRules modules.ConsensusRules, err error) {
 	// logger.Debugf("Initializing module (byzantine strategy): %s", name)
 	switch name {
@@ -63,7 +63,7 @@ func newCryptoModule(
 	name string,
 	configuration *netconfig.Config,
 	logger logging.Logger,
-	globals *core.Globals,
+	globals *globals.Globals,
 ) (impl modules.CryptoBase, err error) {
 	logger.Debugf("Initializing module (crypto): %s", name)
 	switch name {
@@ -87,7 +87,7 @@ func newLeaderRotationModule(
 	config *netconfig.Config,
 	committer *committer.Committer,
 	logger logging.Logger,
-	globals *core.Globals,
+	globals *globals.Globals,
 ) (ld modules.LeaderRotation, err error) {
 	logger.Debugf("Initializing module (leader rotation): %s", name)
 	switch name {

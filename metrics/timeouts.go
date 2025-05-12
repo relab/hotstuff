@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/metrics/types"
 )
@@ -15,7 +15,7 @@ const NameViewTimeouts = "timeouts"
 // viewTimeouts is a metric that measures the number of view timeouts that happen.
 type viewTimeouts struct {
 	metricsLogger Logger
-	globals       *core.Globals
+	globals       *globals.Globals
 
 	numViews    uint64
 	numTimeouts uint64
@@ -25,7 +25,7 @@ func enableViewTimeouts(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	metricsLogger Logger,
-	globals *core.Globals,
+	globals *globals.Globals,
 ) {
 	vt := &viewTimeouts{
 		metricsLogger: metricsLogger,

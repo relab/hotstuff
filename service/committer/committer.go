@@ -12,7 +12,7 @@ import (
 
 type Committer struct {
 	blockChain *blockchain.BlockChain
-	clientSrv  *clientsrv.ClientServer
+	clientSrv  *clientsrv.Server
 	logger     logging.Logger
 
 	mut   sync.Mutex
@@ -22,7 +22,7 @@ type Committer struct {
 // Basic committer implements commit logic without pipelining.
 func New(
 	blockChain *blockchain.BlockChain,
-	clientSrv *clientsrv.ClientServer,
+	clientSrv *clientsrv.Server,
 	logger logging.Logger,
 ) *Committer {
 	return &Committer{

@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network/netconfig"
@@ -55,14 +55,14 @@ func (sig Signature) ToBytes() []byte {
 type eddsaBase struct {
 	configuration *netconfig.Config
 	logger        logging.Logger
-	globals       *core.Globals
+	globals       *globals.Globals
 }
 
 // New returns a new instance of the EDDSA CryptoBase implementation.
 func New(
 	configuration *netconfig.Config,
 	logger logging.Logger,
-	globals *core.Globals,
+	globals *globals.Globals,
 ) modules.CryptoBase {
 	return &eddsaBase{
 		configuration: configuration,

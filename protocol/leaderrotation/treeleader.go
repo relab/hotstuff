@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 )
@@ -13,13 +13,13 @@ const TreeLeaderModuleName = "tree-leader"
 
 type treeLeader struct {
 	leader       hotstuff.ID
-	globals      *core.Globals
+	globals      *globals.Globals
 	viewDuration modules.ViewDuration
 }
 
 func NewTreeLeader(
 	viewDuration time.Duration,
-	globals *core.Globals,
+	globals *globals.Globals,
 ) modules.LeaderRotation {
 	return &treeLeader{
 		globals:      globals,

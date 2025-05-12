@@ -14,8 +14,8 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"golang.org/x/time/rate"
@@ -61,7 +61,7 @@ type Config struct {
 type Client struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
-	globals   *core.Globals
+	globals   *globals.Globals
 
 	mut              sync.Mutex
 	mgr              *clientpb.Manager
@@ -82,7 +82,7 @@ type Client struct {
 func New(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	globals *core.Globals,
+	globals *globals.Globals,
 
 	conf Config,
 ) (client *Client) {

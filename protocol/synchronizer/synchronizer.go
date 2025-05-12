@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network/netconfig"
@@ -33,7 +33,7 @@ type Synchronizer struct {
 	sender        *sender.Sender
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
-	globals       *core.Globals
+	globals       *globals.Globals
 
 	mut         sync.RWMutex // to protect the following
 	currentView hotstuff.View
@@ -63,7 +63,7 @@ func New(
 	sender *sender.Sender,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	globals *core.Globals,
+	globals *globals.Globals,
 ) *Synchronizer {
 	s := &Synchronizer{
 		duration:       leaderRotation.ViewDuration(),

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/proto/kauripb"
@@ -27,7 +27,7 @@ type Kauri struct {
 	blockChain     *blockchain.BlockChain
 	crypto         modules.CryptoBase
 	leaderRotation modules.LeaderRotation
-	globals        *core.Globals
+	globals        *globals.Globals
 	eventLoop      *eventloop.EventLoop
 	configuration  *netconfig.Config
 	sender         *sender.Sender
@@ -48,7 +48,7 @@ func New(
 	crypto modules.CryptoBase,
 	leaderRotation modules.LeaderRotation,
 	blockChain *blockchain.BlockChain,
-	globals *core.Globals,
+	globals *globals.Globals,
 	eventLoop *eventloop.EventLoop,
 	configuration *netconfig.Config,
 	sender *sender.Sender,

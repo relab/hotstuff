@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 )
 
@@ -16,7 +16,7 @@ func Enable(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	metricsLogger Logger,
-	globals *core.Globals,
+	globals *globals.Globals,
 	measurementInterval time.Duration,
 	metricNames ...string) error {
 	if len(metricNames) == 0 {

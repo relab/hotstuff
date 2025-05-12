@@ -7,8 +7,8 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/network/netconfig"
@@ -24,7 +24,7 @@ type Sender struct {
 	configuration *netconfig.Config
 	eventLoop     *eventloop.EventLoop
 	logger        logging.Logger
-	globals       *core.Globals
+	globals       *globals.Globals
 
 	mgrOpts   []gorums.ManagerOption
 	connected bool
@@ -39,7 +39,7 @@ func New(
 	configuration *netconfig.Config,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	globals *core.Globals,
+	globals *globals.Globals,
 
 	creds credentials.TransportCredentials,
 	mgrOpts ...gorums.ManagerOption) *Sender {

@@ -3,7 +3,7 @@ package fasthotstuff
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
@@ -21,7 +21,7 @@ type FastHotStuff struct {
 func New(
 	blockChain *blockchain.BlockChain,
 	logger logging.Logger,
-	globals *core.Globals,
+	globals *globals.Globals,
 ) modules.ConsensusRules {
 	fhs := &FastHotStuff{
 		blockChain: blockChain,

@@ -19,8 +19,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// ClientServer serves a client.
-type ClientServer struct {
+// Server serves a client.
+type Server struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
 	cmdCache  *cmdcache.Cache
@@ -39,8 +39,8 @@ func New(
 	cmdCache *cmdcache.Cache,
 
 	srvOpts ...gorums.ServerOption,
-) (srv *ClientServer) {
-	srv = &ClientServer{
+) (srv *Server) {
+	srv = &Server{
 		eventLoop: eventLoop,
 		logger:    logger,
 		cmdCache:  cmdCache,
@@ -53,7 +53,7 @@ func New(
 	return srv
 }
 
-func (srv *ClientServer) Start(addr string) error {
+func (srv *Server) Start(addr string) error {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -62,7 +62,7 @@ func (srv *ClientServer) Start(addr string) error {
 	return nil
 }
 
-func (srv *ClientServer) StartOnListener(lis net.Listener) {
+func (srv *Server) StartOnListener(lis net.Listener) {
 	go func() {
 		err := srv.srv.Serve(lis)
 		if err != nil {
@@ -71,23 +71,23 @@ func (srv *ClientServer) StartOnListener(lis net.Listener) {
 	}()
 }
 
-func (srv *ClientServer) Stop() {
+func (srv *Server) Stop() {
 	srv.srv.Stop()
 }
 
-func (srv *ClientServer) CmdCache() *cmdcache.Cache {
+func (srv *Server) CmdCache() *cmdcache.Cache {
 	return srv.cmdCache
 }
 
-func (srv *ClientServer) Hash() hash.Hash {
+func (srv *Server) Hash() hash.Hash {
 	return srv.hash
 }
 
-func (srv *ClientServer) CmdCount() uint32 {
+func (srv *Server) CmdCount() uint32 {
 	return srv.cmdCount
 }
 
-func (srv *ClientServer) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*emptypb.Empty, error) {
+func (srv *Server) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*emptypb.Empty, error) {
 	id := cmdcache.CmdID{
 		ClientID:    cmd.ClientID,
 		SequenceNum: cmd.SequenceNumber,
@@ -104,7 +104,7 @@ func (srv *ClientServer) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command
 	return &emptypb.Empty{}, err
 }
 
-func (srv *ClientServer) Exec(cmd hotstuff.Command) {
+func (srv *Server) Exec(cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -132,7 +132,7 @@ func (srv *ClientServer) Exec(cmd hotstuff.Command) {
 	srv.logger.Debugf("Hash: %.8x", srv.hash.Sum(nil))
 }
 
-func (srv *ClientServer) Fork(cmd hotstuff.Command) {
+func (srv *Server) Fork(cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {
