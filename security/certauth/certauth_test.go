@@ -102,12 +102,12 @@ func TestCreatePartialCert(t *testing.T) {
 		id := 1
 		dummies := createDummyReplicas(t, 4, td.cryptoName, td.cacheSize)
 
-		block, ok := dummies[0].depsSecure.BlockChain.Get(hotstuff.GetGenesis().Hash())
+		block, ok := dummies[0].depsSecure.BlockChain().Get(hotstuff.GetGenesis().Hash())
 		if !ok {
 			t.Errorf("no block")
 		}
 
-		partialCert, err := dummies[0].depsSecure.CertAuth.CreatePartialCert(block)
+		partialCert, err := dummies[0].depsSecure.CertAuth().CreatePartialCert(block)
 		if err != nil {
 			t.Fatalf("Failed to create partial certificate: %v", err)
 		}
@@ -126,12 +126,12 @@ func TestVerifyPartialCert(t *testing.T) {
 	for _, td := range testData {
 		dummies := createDummyReplicas(t, 2, td.cryptoName, td.cacheSize)
 		dummy := dummies[0]
-		block := createBlock(t, dummy.depsSecure.CertAuth)
-		dummy.depsSecure.BlockChain.Store(block)
+		block := createBlock(t, dummy.depsSecure.CertAuth())
+		dummy.depsSecure.BlockChain().Store(block)
 
-		partialCert := testutil.CreatePC(t, block, dummy.depsSecure.CertAuth)
+		partialCert := testutil.CreatePC(t, block, dummy.depsSecure.CertAuth())
 
-		if !dummy.depsSecure.CertAuth.VerifyPartialCert(partialCert) {
+		if !dummy.depsSecure.CertAuth().VerifyPartialCert(partialCert) {
 			t.Error("Partial Certificate was not verified.")
 		}
 	}
@@ -143,10 +143,10 @@ func TestCreateQuorumCert(t *testing.T) {
 		dummies := createDummyReplicas(t, n, td.cryptoName, td.cacheSize)
 		signers := make([]*certauth.CertAuthority, 0)
 		for _, dummy := range dummies {
-			signers = append(signers, dummy.depsSecure.CertAuth)
+			signers = append(signers, dummy.depsSecure.CertAuth())
 		}
 		dummy := dummies[0]
-		block := createBlock(t, dummy.depsSecure.CertAuth)
+		block := createBlock(t, dummy.depsSecure.CertAuth())
 		pcs := testutil.CreatePCs(t, block, signers)
 
 		qc, err := signers[0].CreateQuorumCert(block, pcs)
@@ -166,12 +166,12 @@ func TestCreateTimeoutCert(t *testing.T) {
 		dummies := createDummyReplicas(t, n, td.cryptoName, td.cacheSize)
 		signers := make([]modules.CryptoBase, 0)
 		for _, dummy := range dummies {
-			signers = append(signers, dummy.depsSecure.CryptoImpl)
+			signers = append(signers, dummy.depsSecure.CryptoImpl())
 		}
 
 		timeouts := testutil.CreateTimeouts(t, 1, signers)
 
-		tc, err := dummies[0].depsSecure.CertAuth.CreateTimeoutCert(1, timeouts)
+		tc, err := dummies[0].depsSecure.CertAuth().CreateTimeoutCert(1, timeouts)
 		if err != nil {
 			t.Fatalf("Failed to create QC: %v", err)
 		}
@@ -188,10 +188,10 @@ func TestCreateQCWithOneSig(t *testing.T) {
 		dummies := createDummyReplicas(t, n, td.cryptoName, td.cacheSize)
 		signers := make([]*certauth.CertAuthority, 0)
 		for _, dummy := range dummies {
-			signers = append(signers, dummy.depsSecure.CertAuth)
+			signers = append(signers, dummy.depsSecure.CertAuth())
 		}
 		dummy := dummies[0]
-		block := createBlock(t, dummy.depsSecure.CertAuth)
+		block := createBlock(t, dummy.depsSecure.CertAuth())
 		pcs := testutil.CreatePCs(t, block, signers)
 		_, err := signers[0].CreateQuorumCert(block, pcs[:1])
 		if err == nil {
@@ -206,10 +206,10 @@ func TestCreateQCWithOverlappingSigs(t *testing.T) {
 		dummies := createDummyReplicas(t, n, td.cryptoName, td.cacheSize)
 		signers := make([]*certauth.CertAuthority, 0)
 		for _, dummy := range dummies {
-			signers = append(signers, dummy.depsSecure.CertAuth)
+			signers = append(signers, dummy.depsSecure.CertAuth())
 		}
 		dummy := dummies[0]
-		block := createBlock(t, dummy.depsSecure.CertAuth)
+		block := createBlock(t, dummy.depsSecure.CertAuth())
 		pcs := testutil.CreatePCs(t, block, signers)
 		pcs = append(pcs, pcs[0])
 		_, err := signers[0].CreateQuorumCert(block, pcs)
@@ -225,7 +225,7 @@ func TestVerifyGenesisQC(t *testing.T) {
 		dummies := createDummyReplicas(t, n, td.cryptoName, td.cacheSize)
 		signers := make([]*certauth.CertAuthority, 0)
 		for _, dummy := range dummies {
-			signers = append(signers, dummy.depsSecure.CertAuth)
+			signers = append(signers, dummy.depsSecure.CertAuth())
 		}
 
 		genesisQC, err := signers[0].CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
@@ -243,10 +243,10 @@ func TestVerifyQuorumCert(t *testing.T) {
 		const n = 4
 		dummies := createDummyReplicas(t, n, td.cryptoName, td.cacheSize)
 		signers := make([]*certauth.CertAuthority, 0)
-		signedBlock := createBlock(t, dummies[0].depsSecure.CertAuth)
+		signedBlock := createBlock(t, dummies[0].depsSecure.CertAuth())
 		for _, dummy := range dummies {
-			signers = append(signers, dummy.depsSecure.CertAuth)
-			dummy.depsSecure.BlockChain.Store(signedBlock)
+			signers = append(signers, dummy.depsSecure.CertAuth())
+			dummy.depsSecure.BlockChain().Store(signedBlock)
 		}
 
 		qc := testutil.CreateQC(t, signedBlock, signers)
@@ -266,11 +266,11 @@ func TestVerifyTimeoutCert(t *testing.T) {
 		dummies := createDummyReplicas(t, n, td.cryptoName, td.cacheSize)
 		signers0 := make([]*certauth.CertAuthority, 0)
 		signers1 := make([]modules.CryptoBase, 0)
-		signedBlock := createBlock(t, dummies[0].depsSecure.CertAuth)
+		signedBlock := createBlock(t, dummies[0].depsSecure.CertAuth())
 		for _, dummy := range dummies {
-			signers0 = append(signers0, dummy.depsSecure.CertAuth)
-			signers1 = append(signers1, dummy.depsSecure.CryptoImpl)
-			dummy.depsSecure.BlockChain.Store(signedBlock)
+			signers0 = append(signers0, dummy.depsSecure.CertAuth())
+			signers1 = append(signers1, dummy.depsSecure.CryptoImpl())
+			dummy.depsSecure.BlockChain().Store(signedBlock)
 		}
 
 		tc := testutil.CreateTC(t, 1, signers0, signers1)
@@ -289,11 +289,11 @@ func TestVerifyAggregateQC(t *testing.T) {
 		dummies := createDummyReplicas(t, n, td.cryptoName, td.cacheSize)
 		signers0 := make([]*certauth.CertAuthority, 0)
 		signers1 := make([]modules.CryptoBase, 0)
-		signedBlock := createBlock(t, dummies[0].depsSecure.CertAuth)
+		signedBlock := createBlock(t, dummies[0].depsSecure.CertAuth())
 		for _, dummy := range dummies {
-			signers0 = append(signers0, dummy.depsSecure.CertAuth)
-			signers1 = append(signers1, dummy.depsSecure.CryptoImpl)
-			dummy.depsSecure.BlockChain.Store(signedBlock)
+			signers0 = append(signers0, dummy.depsSecure.CertAuth())
+			signers1 = append(signers1, dummy.depsSecure.CryptoImpl())
+			dummy.depsSecure.BlockChain().Store(signedBlock)
 		}
 
 		timeouts := testutil.CreateTimeouts(t, 1, signers1)

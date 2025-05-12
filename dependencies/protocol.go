@@ -27,7 +27,7 @@ func newProtocolModules(
 ) (*protocolModules, error) {
 	consensusRules, err := newConsensusRulesModule(
 		consensusName,
-		depsSecure.BlockChain,
+		depsSecure.BlockChain(),
 		depsCore.Logger(),
 		depsCore.Globals(),
 	)
@@ -38,9 +38,9 @@ func newProtocolModules(
 		leaderRotationName,
 		consensusRules.ChainLength(),
 		vdParams,
-		depsSecure.BlockChain,
+		depsSecure.BlockChain(),
 		depsNet.Config(),
-		depsSrv.Committer,
+		depsSrv.Committer(),
 		depsCore.Logger(),
 		depsCore.Globals(),
 	)
@@ -52,7 +52,7 @@ func newProtocolModules(
 		byz, err := newByzantineStrategyModule(
 			byzantineStrategy,
 			consensusRules,
-			depsSecure.BlockChain,
+			depsSecure.BlockChain(),
 			depsCore.Globals())
 		if err != nil {
 			return nil, err
@@ -98,11 +98,11 @@ func NewProtocol(
 	csus := consensus.New(
 		mods.consensusRules,
 		mods.leaderRotation,
-		depsSecure.BlockChain,
-		depsSrv.Committer,
-		depsSrv.CmdCache,
+		depsSecure.BlockChain(),
+		depsSrv.Committer(),
+		depsSrv.CmdCache(),
 		depsNet.Sender(),
-		depsSecure.CertAuth,
+		depsSecure.CertAuth(),
 		depsNet.Config(),
 		depsCore.EventLoop(),
 		depsCore.Logger(),
@@ -111,11 +111,11 @@ func NewProtocol(
 	return &Protocol{
 		consensus: csus,
 		synchronizer: synchronizer.New(
-			depsSecure.CryptoImpl,
+			depsSecure.CryptoImpl(),
 			mods.leaderRotation,
-			depsSecure.BlockChain,
+			depsSecure.BlockChain(),
 			csus,
-			depsSecure.CertAuth,
+			depsSecure.CertAuth(),
 			depsNet.Config(),
 			depsNet.Sender(),
 			depsCore.EventLoop(),

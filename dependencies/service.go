@@ -8,9 +8,9 @@ import (
 )
 
 type Service struct {
-	CmdCache  *cmdcache.Cache
-	ClientSrv *clientsrv.Server
-	Committer *committer.Committer
+	cmdCache  *cmdcache.Cache
+	clientSrv *clientsrv.Server
+	committer *committer.Committer
 }
 
 func NewService(
@@ -30,12 +30,27 @@ func NewService(
 		clientSrvOpts...,
 	)
 	return &Service{
-		CmdCache:  cmdCache,
-		ClientSrv: clientSrv,
-		Committer: committer.New(
-			depsSecure.BlockChain,
+		cmdCache:  cmdCache,
+		clientSrv: clientSrv,
+		committer: committer.New(
+			depsSecure.BlockChain(),
 			clientSrv,
 			depsCore.Logger(),
 		),
 	}
+}
+
+// GetCmdCache returns the command cache.
+func (s *Service) CmdCache() *cmdcache.Cache {
+	return s.cmdCache
+}
+
+// GetClientSrv returns the client server.
+func (s *Service) ClientSrv() *clientsrv.Server {
+	return s.clientSrv
+}
+
+// GetCommitter returns the committer.
+func (s *Service) Committer() *committer.Committer {
+	return s.committer
 }

@@ -7,9 +7,9 @@ import (
 )
 
 type Security struct {
-	BlockChain *blockchain.BlockChain
-	CryptoImpl modules.CryptoBase
-	CertAuth   *certauth.CertAuthority
+	blockChain *blockchain.BlockChain
+	cryptoImpl modules.CryptoBase
+	certAuth   *certauth.CertAuthority
 }
 
 func NewSecurity(
@@ -33,13 +33,28 @@ func NewSecurity(
 		return nil, err
 	}
 	return &Security{
-		BlockChain: blockChain,
-		CryptoImpl: cryptoImpl,
-		CertAuth: certauth.New(
+		blockChain: blockChain,
+		cryptoImpl: cryptoImpl,
+		certAuth: certauth.New(
 			cryptoImpl,
 			blockChain,
 			depsCore.Logger(),
 			opts...,
 		),
 	}, nil
+}
+
+// GetBlockChain returns the blockchain instance.
+func (s *Security) BlockChain() *blockchain.BlockChain {
+	return s.blockChain
+}
+
+// GetCryptoImpl returns the crypto implementation.
+func (s *Security) CryptoImpl() modules.CryptoBase {
+	return s.cryptoImpl
+}
+
+// GetCertAuth returns the certificate authority.
+func (s *Security) CertAuth() *certauth.CertAuthority {
+	return s.certAuth
 }

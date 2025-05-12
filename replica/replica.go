@@ -81,12 +81,12 @@ func New(
 		depsCore.Logger(),
 		depsCore.Globals(),
 		depsNet.Config(),
-		depsSecure.BlockChain,
+		depsSecure.BlockChain(),
 		rOpt.serverOpts...,
 	)
 	srv := &Replica{
 		eventLoop:    depsCore.EventLoop(),
-		clientSrv:    depsSrv.ClientSrv,
+		clientSrv:    depsSrv.ClientSrv(),
 		sender:       depsNet.Sender(),
 		synchronizer: depsProtocol.Synchronizer(),
 		hsSrv:        server,
