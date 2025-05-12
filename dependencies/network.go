@@ -8,8 +8,8 @@ import (
 )
 
 type Network struct {
-	Config *netconfig.Config
-	Sender *sender.Sender
+	config *netconfig.Config
+	sender *sender.Sender
 }
 
 func NewNetwork(
@@ -19,8 +19,8 @@ func NewNetwork(
 ) *Network {
 	cfg := netconfig.NewConfig()
 	return &Network{
-		Config: cfg,
-		Sender: sender.New(
+		config: cfg,
+		sender: sender.New(
 			cfg,
 			depsCore.EventLoop(),
 			depsCore.Logger(),
@@ -29,4 +29,12 @@ func NewNetwork(
 			mgrOpts...,
 		),
 	}
+}
+
+func (n *Network) Config() *netconfig.Config {
+	return n.config
+}
+
+func (n *Network) Sender() *sender.Sender {
+	return n.sender
 }

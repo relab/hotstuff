@@ -67,7 +67,7 @@ func createDummyReplicas(t *testing.T, n int, cryptoName string, cacheSize int) 
 	}
 	for _, dummy := range dummies {
 		for _, replica := range replicas {
-			dummy.depsNet.Config.AddReplica(&replica)
+			dummy.depsNet.Config().AddReplica(&replica)
 		}
 	}
 	return
@@ -232,7 +232,7 @@ func TestVerifyGenesisQC(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !signers[1].VerifyQuorumCert(dummies[0].depsNet.Config.QuorumSize(), genesisQC) {
+		if !signers[1].VerifyQuorumCert(dummies[0].depsNet.Config().QuorumSize(), genesisQC) {
 			t.Error("Genesis QC was not verified!")
 		}
 	}
@@ -252,7 +252,7 @@ func TestVerifyQuorumCert(t *testing.T) {
 		qc := testutil.CreateQC(t, signedBlock, signers)
 
 		for i, verifier := range signers {
-			qSize := dummies[i].depsNet.Config.QuorumSize()
+			qSize := dummies[i].depsNet.Config().QuorumSize()
 			if !verifier.VerifyQuorumCert(qSize, qc) {
 				t.Errorf("verifier %d failed to verify QC! (qsize=%d)", i+1, qSize)
 			}
@@ -276,7 +276,7 @@ func TestVerifyTimeoutCert(t *testing.T) {
 		tc := testutil.CreateTC(t, 1, signers0, signers1)
 
 		for i, verifier := range signers0 {
-			if !verifier.VerifyTimeoutCert(dummies[0].depsNet.Config.QuorumSize(), tc) {
+			if !verifier.VerifyTimeoutCert(dummies[0].depsNet.Config().QuorumSize(), tc) {
 				t.Errorf("verifier %d failed to verify TC!", i+1)
 			}
 		}
@@ -302,7 +302,7 @@ func TestVerifyAggregateQC(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		highQC, ok := signers0[0].VerifyAggregateQC(dummies[0].depsNet.Config.QuorumSize(), aggQC)
+		highQC, ok := signers0[0].VerifyAggregateQC(dummies[0].depsNet.Config().QuorumSize(), aggQC)
 		if !ok {
 			t.Fatal("AggregateQC was not verified")
 		}

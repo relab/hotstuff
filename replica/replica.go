@@ -80,14 +80,14 @@ func New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.Globals(),
-		depsNet.Config,
+		depsNet.Config(),
 		depsSecure.BlockChain,
 		rOpt.serverOpts...,
 	)
 	srv := &Replica{
 		eventLoop:    depsCore.EventLoop(),
 		clientSrv:    depsSrv.ClientSrv,
-		sender:       depsNet.Sender,
+		sender:       depsNet.Sender(),
 		synchronizer: depsProtocol.Synchronizer,
 		hsSrv:        server,
 

@@ -19,13 +19,13 @@ func NewSecurity(
 	opts ...certauth.Option,
 ) (*Security, error) {
 	blockChain := blockchain.New(
-		depsNet.Sender,
+		depsNet.Sender(),
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 	)
 	cryptoImpl, err := newCryptoModule(
 		cryptoName,
-		depsNet.Config,
+		depsNet.Config(),
 		depsCore.Logger(),
 		depsCore.Globals(),
 	)
