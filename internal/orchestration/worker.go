@@ -16,7 +16,7 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/internal/dependencies"
+	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
@@ -169,10 +169,10 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if w.measurementInterval > 0 {
 		// Initializes the metrics modules internally.
 		err = metrics.Enable(
-			depsCore.EventLoop,
-			depsCore.Logger,
+			depsCore.EventLoop(),
+			depsCore.Logger(),
 			w.metricsLogger,
-			depsCore.Globals,
+			depsCore.Globals(),
 			w.measurementInterval,
 			w.metrics...,
 		)

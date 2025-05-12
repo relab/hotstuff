@@ -20,10 +20,15 @@ func NewSecurity(
 ) (*Security, error) {
 	blockChain := blockchain.New(
 		depsNet.Sender,
-		depsCore.EventLoop,
-		depsCore.Logger,
+		depsCore.EventLoop(),
+		depsCore.Logger(),
 	)
-	cryptoImpl, err := newCryptoModule(cryptoName, depsNet.Config, depsCore.Logger, depsCore.Globals)
+	cryptoImpl, err := newCryptoModule(
+		cryptoName,
+		depsNet.Config,
+		depsCore.Logger(),
+		depsCore.Globals(),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +38,7 @@ func NewSecurity(
 		CertAuth: certauth.New(
 			cryptoImpl,
 			blockChain,
-			depsCore.Logger,
+			depsCore.Logger(),
 			opts...,
 		),
 	}, nil

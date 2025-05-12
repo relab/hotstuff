@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/internal/dependencies"
+	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/certauth"
@@ -44,7 +44,7 @@ func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuf
 		t.Fatalf("%v", err)
 	}
 	// Needed for bls12 tests:
-	metaData := core.Globals.ConnectionMetadata()
+	metaData := core.Globals().ConnectionMetadata()
 	return &dummyReplica{
 		connMd:     metaData,
 		depsSecure: sec,

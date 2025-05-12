@@ -25,7 +25,12 @@ func newProtocolModules(
 	byzantineStrategy string,
 	vdParams viewduration.Params,
 ) (*protocolModules, error) {
-	consensusRules, err := newConsensusRulesModule(consensusName, depsSecure.BlockChain, depsCore.Logger, depsCore.Globals)
+	consensusRules, err := newConsensusRulesModule(
+		consensusName,
+		depsSecure.BlockChain,
+		depsCore.Logger(),
+		depsCore.Globals(),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -36,8 +41,8 @@ func newProtocolModules(
 		depsSecure.BlockChain,
 		depsNet.Config,
 		depsSrv.Committer,
-		depsCore.Logger,
-		depsCore.Globals,
+		depsCore.Logger(),
+		depsCore.Globals(),
 	)
 	if err != nil {
 		return nil, err
@@ -48,12 +53,12 @@ func newProtocolModules(
 			byzantineStrategy,
 			consensusRules,
 			depsSecure.BlockChain,
-			depsCore.Globals)
+			depsCore.Globals())
 		if err != nil {
 			return nil, err
 		}
 		consensusRules = byz
-		depsCore.Logger.Infof("assigned byzantine strategy: %s", byzantineStrategy)
+		depsCore.Logger().Infof("assigned byzantine strategy: %s", byzantineStrategy)
 	}
 	return &protocolModules{
 		ConsensusRules: consensusRules,
@@ -99,9 +104,9 @@ func NewProtocol(
 		depsNet.Sender,
 		depsSecure.CertAuth,
 		depsNet.Config,
-		depsCore.EventLoop,
-		depsCore.Logger,
-		depsCore.Globals,
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.Globals(),
 	)
 	return &Protocol{
 		Consensus: csus,
@@ -113,9 +118,9 @@ func NewProtocol(
 			depsSecure.CertAuth,
 			depsNet.Config,
 			depsNet.Sender,
-			depsCore.EventLoop,
-			depsCore.Logger,
-			depsCore.Globals,
+			depsCore.EventLoop(),
+			depsCore.Logger(),
+			depsCore.Globals(),
 		),
 	}, nil
 }

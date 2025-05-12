@@ -20,12 +20,12 @@ func NewService(
 	clientSrvOpts ...gorums.ServerOption,
 ) *Service {
 	cmdCache := cmdcache.New(
-		depsCore.Logger,
+		depsCore.Logger(),
 		cacheOpt...,
 	)
 	clientSrv := clientsrv.New(
-		depsCore.EventLoop,
-		depsCore.Logger,
+		depsCore.EventLoop(),
+		depsCore.Logger(),
 		cmdCache,
 		clientSrvOpts...,
 	)
@@ -35,7 +35,7 @@ func NewService(
 		Committer: committer.New(
 			depsSecure.BlockChain,
 			clientSrv,
-			depsCore.Logger,
+			depsCore.Logger(),
 		),
 	}
 }

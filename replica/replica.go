@@ -6,7 +6,7 @@ import (
 	"net"
 
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/internal/dependencies"
+	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/network/sender"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
@@ -60,7 +60,7 @@ func New(
 		depsCore,
 		depsSecure,
 		rOpt.cmdCacheOpts,
-		rOpt.clientServerOpts...,
+		rOpt.clientGorumsSrvOpts...,
 	)
 	depsProtocol, err := dependencies.NewProtocol(
 		depsCore,
@@ -75,17 +75,17 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	rOpt.serverOpts = append(rOpt.serverOpts, server.WithGorumsServerOptions(rOpt.replicaServerOpts...))
+	rOpt.serverOpts = append(rOpt.serverOpts, server.WithGorumsServerOptions(rOpt.replicaGorumsSrvOpts...))
 	server := server.NewServer(
-		depsCore.EventLoop,
-		depsCore.Logger,
-		depsCore.Globals,
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.Globals(),
 		depsNet.Config,
 		depsSecure.BlockChain,
 		rOpt.serverOpts...,
 	)
 	srv := &Replica{
-		eventLoop:    depsCore.EventLoop,
+		eventLoop:    depsCore.EventLoop(),
 		clientSrv:    depsSrv.ClientSrv,
 		sender:       depsNet.Sender,
 		synchronizer: depsProtocol.Synchronizer,

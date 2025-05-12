@@ -10,9 +10,9 @@ import (
 )
 
 type Core struct {
-	Globals   *globals.Globals
-	EventLoop *eventloop.EventLoop
-	Logger    logging.Logger
+	globals   *globals.Globals
+	eventLoop *eventloop.EventLoop
+	logger    logging.Logger
 }
 
 func NewCore(
@@ -23,8 +23,20 @@ func NewCore(
 ) *Core {
 	logger := logging.New(fmt.Sprintf("%s%d", logTag, id))
 	return &Core{
-		Globals:   globals.NewGlobals(id, privKey, gOpt...),
-		EventLoop: eventloop.New(logger, 100),
-		Logger:    logger,
+		globals:   globals.NewGlobals(id, privKey, gOpt...),
+		eventLoop: eventloop.New(logger, 100),
+		logger:    logger,
 	}
+}
+
+func (c *Core) Globals() *globals.Globals {
+	return c.globals
+}
+
+func (c *Core) EventLoop() *eventloop.EventLoop {
+	return c.eventLoop
+}
+
+func (c *Core) Logger() logging.Logger {
+	return c.logger
 }

@@ -22,9 +22,9 @@ func NewNetwork(
 		Config: cfg,
 		Sender: sender.New(
 			cfg,
-			depsCore.EventLoop,
-			depsCore.Logger,
-			depsCore.Globals,
+			depsCore.EventLoop(),
+			depsCore.Logger(),
+			depsCore.Globals(),
 			creds,
 			mgrOpts...,
 		),

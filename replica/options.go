@@ -23,13 +23,12 @@ type moduleNames struct {
 }
 
 type replicaOptions struct {
-	isSecure          bool
-	credentials       credentials.TransportCredentials
-	clientServerOpts  []gorums.ServerOption
-	replicaServerOpts []gorums.ServerOption
-	cmdCacheOpts      []cmdcache.Option
-	serverOpts        []server.ServerOption
-	moduleNames       moduleNames
+	credentials          credentials.TransportCredentials
+	clientGorumsSrvOpts  []gorums.ServerOption
+	replicaGorumsSrvOpts []gorums.ServerOption
+	cmdCacheOpts         []cmdcache.Option
+	serverOpts           []server.ServerOption
+	moduleNames          moduleNames
 }
 
 func newDefaultOpts() *replicaOptions {
@@ -91,15 +90,14 @@ func WithServerOptions(opts ...server.ServerOption) Option {
 
 func WithTLS(certificate tls.Certificate, rootCAs *x509.CertPool) Option {
 	return func(ro *replicaOptions) {
-		ro.isSecure = true
 		creds := credentials.NewTLS(&tls.Config{
 			RootCAs:      rootCAs,
 			Certificates: []tls.Certificate{certificate},
 		})
-		ro.clientServerOpts = append(ro.clientServerOpts, gorums.WithGRPCServerOptions(
+		ro.clientGorumsSrvOpts = append(ro.clientGorumsSrvOpts, gorums.WithGRPCServerOptions(
 			grpc.Creds(credentials.NewServerTLSFromCert(&certificate)),
 		))
-		ro.replicaServerOpts = append(ro.replicaServerOpts, gorums.WithGRPCServerOptions(grpc.Creds(credentials.NewTLS(&tls.Config{
+		ro.replicaGorumsSrvOpts = append(ro.replicaGorumsSrvOpts, gorums.WithGRPCServerOptions(grpc.Creds(credentials.NewTLS(&tls.Config{
 			Certificates: []tls.Certificate{certificate},
 			ClientCAs:    rootCAs,
 			ClientAuth:   tls.RequireAndVerifyClientCert,

@@ -8,7 +8,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/internal/dependencies"
+	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
@@ -58,7 +58,7 @@ func TestVote(t *testing.T) {
 			t.Fatalf("%v", err)
 		}
 		replicas = append(replicas, replica{
-			eventLoop:    depsCore.EventLoop,
+			eventLoop:    depsCore.EventLoop(),
 			blockChain:   depsSecure.BlockChain,
 			consensus:    depsProtocol.Consensus,
 			certAuth:     depsSecure.CertAuth,

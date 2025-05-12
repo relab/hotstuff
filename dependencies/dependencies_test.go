@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/internal/dependencies"
+	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
