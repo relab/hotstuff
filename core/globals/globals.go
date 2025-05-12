@@ -37,28 +37,27 @@ type Globals struct {
 	shouldUseAggQC        bool
 	shouldVerifyVotesSync bool
 
-	sharedRandomSeed   int64
+	sharedRandomSeed int64
+
 	connectionMetadata map[string]string
+	replicas           map[hotstuff.ID]*hotstuff.ReplicaInfo
 
 	tree          *tree.Tree
 	shouldUseTree bool
 	useKauri      bool
 }
 
-func NewGlobals(id hotstuff.ID, pk hotstuff.PrivateKey, opts ...GlobalOption) *Globals {
+func NewGlobals(id hotstuff.ID, pk hotstuff.PrivateKey, opts ...Option) *Globals {
 	g := &Globals{
 		id:                 id,
 		privateKey:         pk,
 		connectionMetadata: make(map[string]string),
+		replicas:           make(map[hotstuff.ID]*hotstuff.ReplicaInfo),
 	}
 	for _, opt := range opts {
 		opt(g)
 	}
 	return g
-}
-
-func (g *Globals) ShouldUseTree() bool {
-	return g.shouldUseTree
 }
 
 // ID returns the ID.
@@ -95,32 +94,17 @@ func (g *Globals) SharedRandomSeed() int64 {
 	return g.sharedRandomSeed
 }
 
-// ConnectionMetadata returns the metadata map that is sent when connecting to other replicas.
-func (g *Globals) ConnectionMetadata() map[string]string {
-	return g.connectionMetadata
-}
-
-// SetSharedRandomSeed sets the shared random seed.
-func (g *Globals) SetSharedRandomSeed(seed int64) {
-	g.sharedRandomSeed = seed
-}
-
 // ShouldEnableKauri returns true if Kauri will be integrated to the consensus logic and
 // Kauri-specific RPC methods are getting enabled.
 func (g *Globals) ShouldEnableKauri() bool {
 	return g.useKauri
 }
 
+func (g *Globals) ShouldUseTree() bool {
+	return g.shouldUseTree
+}
+
 // Tree returns the tree configuration.
 func (g *Globals) Tree() *tree.Tree {
 	return g.tree
-}
-
-// WithMetaData sets the value of a key in the connection metadata map.
-//
-// NOTE: if the value contains binary data, the key must have the "-bin" suffix.
-// This is to make it compatible with GRPC metadata.
-// See: https://github.com/grpc/grpc-go/blob/master/Documentation/grpc-metadata.md#storing-binary-data-in-metadata
-func (g *Globals) SetConnectionMetadata(key string, value string) {
-	g.connectionMetadata[key] = value
 }

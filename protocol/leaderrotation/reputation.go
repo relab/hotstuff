@@ -10,7 +10,6 @@ import (
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/service/committer"
 )
@@ -20,11 +19,10 @@ const ReputationModuleName = "reputation"
 type reputationsMap map[hotstuff.ID]float64
 
 type repBased struct {
-	configuration *netconfig.Config
-	committer     *committer.Committer
-	globals       *globals.Globals
-	logger        logging.Logger
-	viewDuration  modules.ViewDuration
+	committer    *committer.Committer
+	globals      *globals.Globals
+	logger       logging.Logger
+	viewDuration modules.ViewDuration
 
 	chainLength    int
 	prevCommitHead *hotstuff.Block
@@ -47,7 +45,7 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 		return 0
 	}
 
-	numReplicas := r.configuration.Len()
+	numReplicas := r.globals.ReplicaCount()
 	// use round-robin for the first few views until we get a signature
 	if block.QuorumCert().Signature() == nil {
 		return chooseRoundRobin(view, numReplicas)
@@ -101,17 +99,15 @@ func NewRepBased(
 	chainLength int,
 	vdParams viewduration.Params,
 
-	configuration *netconfig.Config,
 	committer *committer.Committer,
 	globals *globals.Globals,
 	logger logging.Logger,
 ) modules.LeaderRotation {
 	return &repBased{
-		configuration: configuration,
-		committer:     committer,
-		globals:       globals,
-		logger:        logger,
-		viewDuration:  viewduration.NewDynamic(vdParams),
+		committer:    committer,
+		globals:      globals,
+		logger:       logger,
+		viewDuration: viewduration.NewDynamic(vdParams),
 
 		chainLength:    chainLength,
 		reputations:    make(reputationsMap),

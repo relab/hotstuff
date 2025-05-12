@@ -144,7 +144,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, err
 	}
 	// setup core - used in replica and measurement framework
-	globalOpts := []globals.GlobalOption{}
+	globalOpts := []globals.Option{}
 	if opts.GetLeaderRotation() == leaderrotation.TreeLeaderModuleName {
 		delayMode := tree.DelayTypeNone
 		if opts.GetAggregationTime() {

@@ -2,17 +2,19 @@ package globals
 
 import "github.com/relab/hotstuff/internal/tree"
 
-type GlobalOption func(*Globals)
+type Option func(*Globals)
 
-func WithTree(t *tree.Tree) GlobalOption {
+// WithTree adds a tree to the globals to be used by a tree-leader.
+func WithTree(t *tree.Tree) Option {
 	return func(g *Globals) {
 		g.shouldUseTree = true
 		g.tree = t
 	}
 }
 
-// WithKauri enables Kauri protocol. If WithTree was not used then it panics.
-func WithKauri() GlobalOption {
+// WithKauri enables Kauri protocol.
+// NOTE: Requires WithTree. If not used then it panics.
+func WithKauri() Option {
 	return func(g *Globals) {
 		if !g.shouldUseTree {
 			panic("no tree was set")
@@ -21,7 +23,8 @@ func WithKauri() GlobalOption {
 	}
 }
 
-func WithSharedRandomSeed(seed int64) GlobalOption {
+// WithSharedRandomSeed adds a seed shared among replicas.
+func WithSharedRandomSeed(seed int64) Option {
 	return func(g *Globals) {
 		g.sharedRandomSeed = seed
 	}

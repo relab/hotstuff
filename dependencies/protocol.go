@@ -15,7 +15,6 @@ type protocolModules struct {
 // TODO: Add option for byzantineStrategy instead of passing string
 func newProtocolModules(
 	depsCore *Core,
-	depsNet *Network,
 	depsSecure *Security,
 	depsSrv *Service,
 
@@ -38,7 +37,6 @@ func newProtocolModules(
 		consensusRules.ChainLength(),
 		vdParams,
 		depsSecure.BlockChain(),
-		depsNet.Config(),
 		depsSrv.Committer(),
 		depsCore.Logger(),
 		depsCore.Globals(),
@@ -83,7 +81,6 @@ func NewProtocol(
 ) (*Protocol, error) {
 	mods, err := newProtocolModules(
 		depsCore,
-		depsNet,
 		depsSecure,
 		depsSrv,
 		consensusName,
@@ -102,7 +99,6 @@ func NewProtocol(
 		depsSrv.CmdCache(),
 		depsNet.Sender(),
 		depsSecure.CertAuth(),
-		depsNet.Config(),
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.Globals(),
@@ -115,7 +111,6 @@ func NewProtocol(
 			depsSecure.BlockChain(),
 			csus,
 			depsSecure.CertAuth(),
-			depsNet.Config(),
 			depsNet.Sender(),
 			depsCore.EventLoop(),
 			depsCore.Logger(),

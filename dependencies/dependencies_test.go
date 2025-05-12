@@ -79,7 +79,6 @@ func TestModules(t *testing.T) {
 			depsCore.Logger(),
 			depsCore.EventLoop(),
 			depsCore.Globals(),
-			depsNet.Config(),
 			depsNet.Sender(),
 			td.cryptoName,
 			certauth.WithCache(100),

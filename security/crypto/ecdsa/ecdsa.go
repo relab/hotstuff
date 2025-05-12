@@ -12,7 +12,6 @@ import (
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/security/crypto"
 )
 
@@ -67,21 +66,18 @@ func (sig Signature) ToBytes() []byte {
 }
 
 type ecdsaBase struct {
-	configuration *netconfig.Config
-	logger        logging.Logger
-	globals       *globals.Globals
+	logger  logging.Logger
+	globals *globals.Globals
 }
 
 // New returns a new instance of the ECDSA CryptoBase implementation.
 func New(
-	configuration *netconfig.Config,
 	logger logging.Logger,
 	globals *globals.Globals,
 ) modules.CryptoBase {
 	return &ecdsaBase{
-		configuration: configuration,
-		logger:        logger,
-		globals:       globals,
+		logger:  logger,
+		globals: globals,
 	}
 }
 
@@ -188,7 +184,7 @@ func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 }
 
 func (ec *ecdsaBase) verifySingle(sig *Signature, hash hotstuff.Hash) bool {
-	replica, ok := ec.configuration.Replica(sig.Signer())
+	replica, ok := ec.globals.ReplicaInfo(sig.Signer())
 	if !ok {
 		ec.logger.Warnf("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
 		return false

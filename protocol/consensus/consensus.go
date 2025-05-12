@@ -8,7 +8,6 @@ import (
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/network/sender"
 	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
@@ -25,15 +24,14 @@ type Consensus struct {
 	kauri          modules.Kauri
 	leaderRotation modules.LeaderRotation
 
-	blockChain    *blockchain.BlockChain
-	committer     *committer.Committer
-	commandCache  *cmdcache.Cache
-	sender        *sender.Sender
-	auth          *certauth.CertAuthority
-	configuration *netconfig.Config
-	eventLoop     *eventloop.EventLoop
-	logger        logging.Logger
-	globals       *globals.Globals
+	blockChain   *blockchain.BlockChain
+	committer    *committer.Committer
+	commandCache *cmdcache.Cache
+	sender       *sender.Sender
+	auth         *certauth.CertAuthority
+	eventLoop    *eventloop.EventLoop
+	logger       logging.Logger
+	globals      *globals.Globals
 
 	lastVote hotstuff.View
 }
@@ -48,7 +46,6 @@ func New(
 	commandCache *cmdcache.Cache,
 	sender *sender.Sender,
 	auth *certauth.CertAuthority,
-	configuration *netconfig.Config,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	globals *globals.Globals,
@@ -59,15 +56,14 @@ func New(
 		leaderRotation: leaderRotation,
 		kauri:          nil, // this is set in the options later
 
-		blockChain:    blockChain,
-		committer:     committer,
-		commandCache:  commandCache,
-		sender:        sender,
-		auth:          auth,
-		configuration: configuration,
-		eventLoop:     eventLoop,
-		logger:        logger,
-		globals:       globals,
+		blockChain:   blockChain,
+		committer:    committer,
+		commandCache: commandCache,
+		sender:       sender,
+		auth:         auth,
+		eventLoop:    eventLoop,
+		logger:       logger,
+		globals:      globals,
 
 		lastVote: 0,
 	}
@@ -83,7 +79,6 @@ func New(
 			blockChain,
 			globals,
 			eventLoop,
-			configuration,
 			sender,
 			logger,
 			globals.Tree(),
@@ -171,7 +166,7 @@ func (cs *Consensus) checkQC(proposal *hotstuff.ProposeMsg) bool {
 	block := proposal.Block
 	view := block.View()
 	if cs.globals.ShouldUseAggQC() && proposal.AggregateQC != nil {
-		highQC, ok := cs.auth.VerifyAggregateQC(cs.configuration.QuorumSize(), *proposal.AggregateQC)
+		highQC, ok := cs.auth.VerifyAggregateQC(cs.globals.QuorumSize(), *proposal.AggregateQC)
 		if !ok {
 			cs.logger.Warnf("checkQC[view=%d]: failed to verify aggregate QC", view)
 			return false
@@ -182,7 +177,7 @@ func (cs *Consensus) checkQC(proposal *hotstuff.ProposeMsg) bool {
 			return false
 		}
 	}
-	if !cs.auth.VerifyQuorumCert(cs.configuration.QuorumSize(), block.QuorumCert()) {
+	if !cs.auth.VerifyQuorumCert(cs.globals.QuorumSize(), block.QuorumCert()) {
 		cs.logger.Infof("checkQC[view=%d]: invalid QC", view)
 		return false
 	}

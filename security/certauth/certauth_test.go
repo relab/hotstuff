@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/modules"
@@ -14,6 +15,7 @@ import (
 )
 
 type dummyReplica struct {
+	globals    *globals.Globals
 	connMd     map[string]string
 	depsNet    *dependencies.Network
 	depsSecure *dependencies.Security
@@ -48,7 +50,6 @@ func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuf
 		core.Logger(),
 		core.EventLoop(),
 		core.Globals(),
-		net.Config(),
 		net.Sender(),
 		cryptoName,
 		opts...,
@@ -59,6 +60,7 @@ func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuf
 	// Needed for bls12 tests:
 	metaData := core.Globals().ConnectionMetadata()
 	return &dummyReplica{
+		globals:    core.Globals(),
 		connMd:     metaData,
 		depsSecure: sec,
 		depsNet:    net,
@@ -80,7 +82,7 @@ func createDummyReplicas(t *testing.T, n int, cryptoName string, cacheSize int) 
 	}
 	for _, dummy := range dummies {
 		for _, replica := range replicas {
-			dummy.depsNet.Config().AddReplica(&replica)
+			dummy.globals.AddReplica(&replica)
 		}
 	}
 	return
@@ -245,7 +247,7 @@ func TestVerifyGenesisQC(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !signers[1].VerifyQuorumCert(dummies[0].depsNet.Config().QuorumSize(), genesisQC) {
+		if !signers[1].VerifyQuorumCert(dummies[0].globals.QuorumSize(), genesisQC) {
 			t.Error("Genesis QC was not verified!")
 		}
 	}
@@ -265,7 +267,7 @@ func TestVerifyQuorumCert(t *testing.T) {
 		qc := testutil.CreateQC(t, signedBlock, signers)
 
 		for i, verifier := range signers {
-			qSize := dummies[i].depsNet.Config().QuorumSize()
+			qSize := dummies[i].globals.QuorumSize()
 			if !verifier.VerifyQuorumCert(qSize, qc) {
 				t.Errorf("verifier %d failed to verify QC! (qsize=%d)", i+1, qSize)
 			}
@@ -289,7 +291,7 @@ func TestVerifyTimeoutCert(t *testing.T) {
 		tc := testutil.CreateTC(t, 1, signers0, signers1)
 
 		for i, verifier := range signers0 {
-			if !verifier.VerifyTimeoutCert(dummies[0].depsNet.Config().QuorumSize(), tc) {
+			if !verifier.VerifyTimeoutCert(dummies[0].globals.QuorumSize(), tc) {
 				t.Errorf("verifier %d failed to verify TC!", i+1)
 			}
 		}
@@ -315,7 +317,7 @@ func TestVerifyAggregateQC(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		highQC, ok := signers0[0].VerifyAggregateQC(dummies[0].depsNet.Config().QuorumSize(), aggQC)
+		highQC, ok := signers0[0].VerifyAggregateQC(dummies[0].globals.QuorumSize(), aggQC)
 		if !ok {
 			t.Fatal("AggregateQC was not verified")
 		}

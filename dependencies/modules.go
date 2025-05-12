@@ -7,7 +7,6 @@ import (
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
@@ -61,18 +60,17 @@ func newByzantineStrategyModule(
 
 func newCryptoModule(
 	name string,
-	configuration *netconfig.Config,
 	logger logging.Logger,
 	globals *globals.Globals,
 ) (impl modules.CryptoBase, err error) {
 	logger.Debugf("Initializing module (crypto): %s", name)
 	switch name {
 	case bls12.ModuleName:
-		impl = bls12.New(configuration, logger, globals)
+		impl = bls12.New(logger, globals)
 	case ecdsa.ModuleName:
-		impl = ecdsa.New(configuration, logger, globals)
+		impl = ecdsa.New(logger, globals)
 	case eddsa.ModuleName:
-		impl = eddsa.New(configuration, logger, globals)
+		impl = eddsa.New(logger, globals)
 	default:
 		return nil, fmt.Errorf("invalid crypto name: '%s'", name)
 	}
@@ -84,7 +82,6 @@ func newLeaderRotationModule(
 	chainLength int,
 	vdParams viewduration.Params,
 	blockChain *blockchain.BlockChain,
-	config *netconfig.Config,
 	committer *committer.Committer,
 	logger logging.Logger,
 	globals *globals.Globals,
@@ -92,11 +89,11 @@ func newLeaderRotationModule(
 	logger.Debugf("Initializing module (leader rotation): %s", name)
 	switch name {
 	case leaderrotation.CarouselModuleName:
-		ld = leaderrotation.NewCarousel(chainLength, vdParams, blockChain, config, committer, globals, logger)
+		ld = leaderrotation.NewCarousel(chainLength, vdParams, blockChain, committer, globals, logger)
 	case leaderrotation.ReputationModuleName:
-		ld = leaderrotation.NewRepBased(chainLength, vdParams, config, committer, globals, logger)
+		ld = leaderrotation.NewRepBased(chainLength, vdParams, committer, globals, logger)
 	case leaderrotation.RoundRobinModuleName:
-		ld = leaderrotation.NewRoundRobin(vdParams, config)
+		ld = leaderrotation.NewRoundRobin(globals, vdParams)
 	case leaderrotation.FixedModuleName:
 		ld = leaderrotation.NewFixed(hotstuff.ID(1), vdParams)
 	case leaderrotation.TreeLeaderModuleName:

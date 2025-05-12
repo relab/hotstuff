@@ -9,7 +9,6 @@ import (
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/service/committer"
@@ -18,12 +17,11 @@ import (
 const CarouselModuleName = "carousel"
 
 type carousel struct {
-	blockChain    *blockchain.BlockChain
-	configuration *netconfig.Config
-	committer     *committer.Committer
-	globals       *globals.Globals
-	logger        logging.Logger
-	viewDuration  modules.ViewDuration
+	blockChain   *blockchain.BlockChain
+	committer    *committer.Committer
+	globals      *globals.Globals
+	logger       logging.Logger
+	viewDuration modules.ViewDuration
 
 	chainLength int
 }
@@ -33,19 +31,19 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 
 	if commitHead.QuorumCert().Signature() == nil {
 		c.logger.Debug("in startup; using round-robin")
-		return chooseRoundRobin(round, c.configuration.Len())
+		return chooseRoundRobin(round, c.globals.ReplicaCount())
 	}
 
 	if commitHead.View() != round-hotstuff.View(c.chainLength) {
 		c.logger.Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.View())
-		return chooseRoundRobin(round, c.configuration.Len())
+		return chooseRoundRobin(round, c.globals.ReplicaCount())
 	}
 
 	c.logger.Debug("proceeding with carousel")
 
 	var (
 		block       = commitHead
-		f           = hotstuff.NumFaulty(c.configuration.Len())
+		f           = hotstuff.NumFaulty(c.globals.ReplicaCount())
 		i           = 0
 		lastAuthors = hotstuff.NewIDSet()
 		ok          = true
@@ -57,7 +55,7 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 		i++
 	}
 
-	candidates := make([]hotstuff.ID, 0, c.configuration.Len()-f)
+	candidates := make([]hotstuff.ID, 0, c.globals.ReplicaCount()-f)
 
 	commitHead.QuorumCert().Signature().Participants().ForEach(func(id hotstuff.ID) {
 		if !lastAuthors.Contains(id) {
@@ -85,18 +83,16 @@ func NewCarousel(
 	vdParams viewduration.Params,
 
 	blockChain *blockchain.BlockChain,
-	configuration *netconfig.Config,
 	committer *committer.Committer,
 	globals *globals.Globals,
 	logger logging.Logger,
 ) modules.LeaderRotation {
 	return &carousel{
-		blockChain:    blockChain,
-		chainLength:   chainLength,
-		configuration: configuration,
-		committer:     committer,
-		globals:       globals,
-		logger:        logger,
-		viewDuration:  viewduration.NewDynamic(vdParams),
+		blockChain:   blockChain,
+		chainLength:  chainLength,
+		committer:    committer,
+		globals:      globals,
+		logger:       logger,
+		viewDuration: viewduration.NewDynamic(vdParams),
 	}
 }

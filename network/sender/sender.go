@@ -11,7 +11,6 @@ import (
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -21,10 +20,9 @@ import (
 )
 
 type Sender struct {
-	configuration *netconfig.Config
-	eventLoop     *eventloop.EventLoop
-	logger        logging.Logger
-	globals       *globals.Globals
+	eventLoop *eventloop.EventLoop
+	logger    logging.Logger
+	globals   *globals.Globals
 
 	mgrOpts   []gorums.ManagerOption
 	connected bool
@@ -36,7 +34,6 @@ type Sender struct {
 }
 
 func New(
-	configuration *netconfig.Config,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	globals *globals.Globals,
@@ -52,10 +49,9 @@ func New(
 	mgrOpts = append(mgrOpts, gorums.WithGrpcDialOptions(grpcOpts...))
 
 	inv := &Sender{
-		configuration: configuration,
-		eventLoop:     eventLoop,
-		logger:        logger,
-		globals:       globals,
+		eventLoop: eventLoop,
+		logger:    logger,
+		globals:   globals,
 
 		mgrOpts:  mgrOpts,
 		replicas: make(map[hotstuff.ID]*Replica),
@@ -98,7 +94,7 @@ func (inv *Sender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 		}
 		inv.replicas[replica.ID] = realReplica
 		// add the info to the config
-		inv.configuration.AddReplica(&replica)
+		inv.globals.AddReplica(&replica)
 		// we do not want to connect to ourself
 		if replica.ID != inv.globals.ID() {
 			idMapping[replica.Address] = uint32(replica.ID)
@@ -146,13 +142,13 @@ func (inv *Sender) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
 		return
 	}
 
-	id, err := inv.configuration.PeerIDFromContext(c.Ctx)
+	id, err := inv.globals.PeerIDFromContext(c.Ctx)
 	if err != nil {
 		inv.logger.Warnf("Failed to get id for %v: %v", info.Addr, err)
 		return
 	}
 
-	_, ok := inv.configuration.Replica(id)
+	_, ok := inv.globals.ReplicaInfo(id)
 	if !ok {
 		inv.logger.Warnf("Replica with id %d was not found", id)
 		return
@@ -160,7 +156,7 @@ func (inv *Sender) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
 
 	replica := inv.replicas[id]
 	replica.md = readMetadata(md)
-	inv.configuration.SetReplicaMetaData(replica.id, replica.md)
+	inv.globals.SetReplicaMetaData(replica.id, replica.md)
 
 	inv.logger.Debugf("Replica %d connected from address %v", id, info.Addr)
 }

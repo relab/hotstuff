@@ -11,7 +11,6 @@ import (
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/network/sender"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/security/blockchain"
@@ -26,14 +25,13 @@ type Synchronizer struct {
 	leaderRotation modules.LeaderRotation
 	crypto         modules.CryptoBase
 
-	blockChain    *blockchain.BlockChain
-	consensus     *consensus.Consensus
-	auth          *certauth.CertAuthority
-	configuration *netconfig.Config
-	sender        *sender.Sender
-	eventLoop     *eventloop.EventLoop
-	logger        logging.Logger
-	globals       *globals.Globals
+	blockChain *blockchain.BlockChain
+	consensus  *consensus.Consensus
+	auth       *certauth.CertAuthority
+	sender     *sender.Sender
+	eventLoop  *eventloop.EventLoop
+	logger     logging.Logger
+	globals    *globals.Globals
 
 	mut         sync.RWMutex // to protect the following
 	currentView hotstuff.View
@@ -59,7 +57,6 @@ func New(
 	blockChain *blockchain.BlockChain,
 	consensus *consensus.Consensus,
 	auth *certauth.CertAuthority,
-	configuration *netconfig.Config,
 	sender *sender.Sender,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
@@ -70,14 +67,13 @@ func New(
 		leaderRotation: leaderRotation,
 		crypto:         crypto,
 
-		blockChain:    blockChain,
-		consensus:     consensus,
-		auth:          auth,
-		configuration: configuration,
-		sender:        sender,
-		eventLoop:     eventLoop,
-		logger:        logger,
-		globals:       globals,
+		blockChain: blockChain,
+		consensus:  consensus,
+		auth:       auth,
+		sender:     sender,
+		eventLoop:  eventLoop,
+		logger:     logger,
+		globals:    globals,
 
 		currentView: 1,
 
@@ -113,7 +109,6 @@ func New(
 	}
 	registerVoteHandlers(
 		blockChain,
-		configuration,
 		auth,
 		eventLoop,
 		logger,
@@ -259,7 +254,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		timeouts[timeout.ID] = timeout
 	}
 
-	if len(timeouts) < s.configuration.QuorumSize() {
+	if len(timeouts) < s.globals.QuorumSize() {
 		return
 	}
 
@@ -305,7 +300,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	// check for a TC
 	if tc, ok := syncInfo.TC(); ok {
-		if !s.auth.VerifyTimeoutCert(s.configuration.QuorumSize(), tc) {
+		if !s.auth.VerifyTimeoutCert(s.globals.QuorumSize(), tc) {
 			s.logger.Info("Timeout Certificate could not be verified!")
 			return
 		}
@@ -322,7 +317,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	// check for an AggQC or QC
 	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.globals.ShouldUseAggQC() {
-		highQC, ok := s.auth.VerifyAggregateQC(s.configuration.QuorumSize(), aggQC)
+		highQC, ok := s.auth.VerifyAggregateQC(s.globals.QuorumSize(), aggQC)
 		if !ok {
 			s.logger.Info("Aggregated Quorum Certificate could not be verified")
 			return
@@ -335,7 +330,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		syncInfo = syncInfo.WithQC(highQC)
 		qc = highQC
 	} else if qc, haveQC = syncInfo.QC(); haveQC {
-		if !s.auth.VerifyQuorumCert(s.configuration.QuorumSize(), qc) {
+		if !s.auth.VerifyQuorumCert(s.globals.QuorumSize(), qc) {
 			s.logger.Info("Quorum Certificate could not be verified!")
 			return
 		}

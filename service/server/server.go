@@ -8,7 +8,6 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/security/blockchain"
 
@@ -23,11 +22,10 @@ import (
 // Server is the Server-side of the gorums backend.
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
-	blockChain    *blockchain.BlockChain
-	configuration *netconfig.Config
-	eventLoop     *eventloop.EventLoop
-	logger        logging.Logger
-	globals       *globals.Globals
+	blockChain *blockchain.BlockChain
+	eventLoop  *eventloop.EventLoop
+	logger     logging.Logger
+	globals    *globals.Globals
 
 	id        hotstuff.ID
 	lm        latency.Matrix
@@ -39,7 +37,6 @@ func NewServer(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	globals *globals.Globals,
-	configuration *netconfig.Config,
 	blockChain *blockchain.BlockChain,
 	srvOpts ...ServerOption,
 ) *Server {
@@ -48,11 +45,10 @@ func NewServer(
 		opt(options)
 	}
 	srv := &Server{
-		blockChain:    blockChain,
-		configuration: configuration,
-		eventLoop:     eventLoop,
-		logger:        logger,
-		globals:       globals,
+		blockChain: blockChain,
+		eventLoop:  eventLoop,
+		logger:     logger,
+		globals:    globals,
 
 		id: options.id,
 		lm: options.latencyMatrix,
@@ -116,7 +112,7 @@ type serviceImpl struct {
 
 // Propose handles a replica's response to the Propose QC from the leader.
 func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
-	id, err := impl.srv.configuration.PeerIDFromContext(ctx)
+	id, err := impl.srv.globals.PeerIDFromContext(ctx)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
@@ -133,7 +129,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 
 // Vote handles an incoming vote message.
 func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
-	id, err := impl.srv.configuration.PeerIDFromContext(ctx)
+	id, err := impl.srv.globals.PeerIDFromContext(ctx)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
@@ -147,7 +143,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
 func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo) {
-	id, err := impl.srv.configuration.PeerIDFromContext(ctx)
+	id, err := impl.srv.globals.PeerIDFromContext(ctx)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
@@ -176,7 +172,7 @@ func (impl *serviceImpl) Fetch(_ gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*h
 
 // Timeout handles an incoming TimeoutMsg.
 func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
-	id, err := impl.srv.configuration.PeerIDFromContext(ctx)
+	id, err := impl.srv.globals.PeerIDFromContext(ctx)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 	}

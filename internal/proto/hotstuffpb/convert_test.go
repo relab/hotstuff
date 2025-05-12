@@ -10,7 +10,6 @@ import (
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/security/certauth"
 
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
@@ -21,8 +20,8 @@ import (
 
 func TestConvertPartialCert(t *testing.T) {
 	key := testutil.GenerateECDSAKey(t)
-	opts := globals.NewGlobals(1, key)
-	crypt := ecdsa.New(nil, nil, opts)
+	globs := globals.NewGlobals(1, key)
+	crypt := ecdsa.New(nil, globs) // TODO: why is logger nil?
 	signer := certauth.New(crypt, nil, nil)
 
 	want, err := signer.CreatePartialCert(hotstuff.GetGenesis())
@@ -43,8 +42,8 @@ func TestConvertQuorumCert(t *testing.T) {
 	signers := make([]*certauth.CertAuthority, n)
 	for i := range n {
 		key := testutil.GenerateECDSAKey(t)
-		opts := globals.NewGlobals(hotstuff.ID(i+1), key)
-		crypt := ecdsa.New(nil, nil, opts)
+		globs := globals.NewGlobals(hotstuff.ID(i+1), key)
+		crypt := ecdsa.New(nil, globs)
 		signer := certauth.New(crypt, nil, nil)
 		signers[i] = signer
 	}
@@ -79,26 +78,32 @@ func TestConvertBlock(t *testing.T) {
 
 func TestConvertTimeoutCertBLS12(t *testing.T) {
 	n := 4
-	cfg := netconfig.NewConfig()
-	opts := make([]*globals.Globals, n)
+	globs := make(map[hotstuff.ID]*globals.Globals)
+	replicaInfos := make(map[hotstuff.ID]*hotstuff.ReplicaInfo)
 	for i := range n {
 		id := hotstuff.ID(i + 1)
 		key := testutil.GenerateBLS12Key(t)
-		opts[i] = globals.NewGlobals(id, key)
+		globs[id] = globals.NewGlobals(id, key)
 		pub := key.Public()
-		cfg.AddReplica(&hotstuff.ReplicaInfo{ID: id, PubKey: pub})
-
+		replicaInfos[id] = &hotstuff.ReplicaInfo{ID: id, PubKey: pub}
+	}
+	// add info about each replica to each other
+	for i := range n {
+		id := hotstuff.ID(i + 1)
+		for id2 := range replicaInfos {
+			globs[id].AddReplica(replicaInfos[id2])
+		}
 	}
 
 	signers := make([]modules.CryptoBase, n)
 	for i := range n {
 		id := hotstuff.ID(i + 1)
 		logger := logging.New("test")
-		crypt := bls12.New(cfg, logger, opts[i])
+		crypt := bls12.New(logger, globs[id])
 		signer := certauth.New(crypt, nil, logger)
 		signers[i] = signer
-		meta := opts[i].ConnectionMetadata()
-		cfg.SetReplicaMetaData(id, meta)
+		meta := globs[id].ConnectionMetadata()
+		globs[id].SetReplicaMetaData(id, meta)
 	}
 
 	tc1 := testutil.CreateTCOld(t, 1, signers)
@@ -108,7 +113,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 
 	signer := signers[0].(*certauth.CertAuthority)
 
-	if !signer.VerifyTimeoutCert(cfg.QuorumSize(), tc2) {
+	if !signer.VerifyTimeoutCert(globs[1].QuorumSize(), tc2) {
 		t.Fatal("Failed to verify timeout cert")
 	}
 }

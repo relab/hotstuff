@@ -5,7 +5,6 @@ import (
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/network/sender"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
@@ -22,7 +21,6 @@ func NewSecurity(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	globals *globals.Globals,
-	config *netconfig.Config,
 	sender *sender.Sender,
 	cryptoName string,
 	opts ...certauth.Option,
@@ -34,7 +32,6 @@ func NewSecurity(
 	)
 	cryptoImpl, err := newCryptoModule(
 		cryptoName,
-		config,
 		logger,
 		globals,
 	)

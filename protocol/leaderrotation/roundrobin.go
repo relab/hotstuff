@@ -2,16 +2,16 @@ package leaderrotation
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 )
 
 const RoundRobinModuleName = "round-robin"
 
 type roundRobin struct {
-	configuration *netconfig.Config
-	viewDuration  modules.ViewDuration
+	globals      *globals.Globals
+	viewDuration modules.ViewDuration
 }
 
 func (rr roundRobin) ViewDuration() modules.ViewDuration {
@@ -22,17 +22,14 @@ func (rr roundRobin) ViewDuration() modules.ViewDuration {
 func (rr roundRobin) GetLeader(view hotstuff.View) hotstuff.ID {
 	// TODO: does not support reconfiguration
 	// assume IDs start at 1
-	return chooseRoundRobin(view, rr.configuration.Len())
+	return chooseRoundRobin(view, rr.globals.ReplicaCount())
 }
 
 // NewRoundRobin returns a new round-robin leader rotation implementation.
-func NewRoundRobin(
-	opt viewduration.Params,
-	configuration *netconfig.Config,
-) modules.LeaderRotation {
+func NewRoundRobin(globals *globals.Globals, params viewduration.Params) modules.LeaderRotation {
 	return &roundRobin{
-		configuration: configuration,
-		viewDuration:  viewduration.NewDynamic(opt),
+		globals:      globals,
+		viewDuration: viewduration.NewDynamic(params),
 	}
 }
 

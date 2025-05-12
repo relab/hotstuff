@@ -7,20 +7,18 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
 )
 
 // votingMachine collects votes.
 type votingMachine struct {
-	blockChain    *blockchain.BlockChain
-	configuration *netconfig.Config
-	crypto        *certauth.CertAuthority
-	eventLoop     *eventloop.EventLoop
-	logger        logging.Logger
-	synchronizer  *Synchronizer
-	globals       *globals.Globals
+	blockChain   *blockchain.BlockChain
+	crypto       *certauth.CertAuthority
+	eventLoop    *eventloop.EventLoop
+	logger       logging.Logger
+	synchronizer *Synchronizer
+	globals      *globals.Globals
 
 	mut           sync.Mutex
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
@@ -29,7 +27,6 @@ type votingMachine struct {
 // registerVoteHandlers injects dependencies to a voting machine object and registers event handlers for `hotstuff.VoteMsg`.
 func registerVoteHandlers(
 	blockChain *blockchain.BlockChain,
-	configuration *netconfig.Config,
 	crypto *certauth.CertAuthority,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
@@ -37,13 +34,12 @@ func registerVoteHandlers(
 	globals *globals.Globals,
 ) {
 	vm := &votingMachine{
-		blockChain:    blockChain,
-		configuration: configuration,
-		crypto:        crypto,
-		eventLoop:     eventLoop,
-		logger:        logger,
-		synchronizer:  synchronizer,
-		globals:       globals,
+		blockChain:   blockChain,
+		crypto:       crypto,
+		eventLoop:    eventLoop,
+		logger:       logger,
+		synchronizer: synchronizer,
+		globals:      globals,
 
 		verifiedVotes: make(map[hotstuff.Hash][]hotstuff.PartialCert),
 	}
@@ -119,7 +115,7 @@ func (vm *votingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	votes = append(votes, cert)
 	vm.verifiedVotes[cert.BlockHash()] = votes
 
-	if len(votes) < vm.configuration.QuorumSize() {
+	if len(votes) < vm.globals.QuorumSize() {
 		return
 	}
 

@@ -53,7 +53,6 @@ func New(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsCore.Globals(),
-		depsNet.Config(),
 		depsNet.Sender(),
 		names.crypto,
 		certauth.WithCache(100), // TODO: consider making this configurable
@@ -86,7 +85,6 @@ func New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.Globals(),
-		depsNet.Config(),
 		depsSecure.BlockChain(),
 		rOpt.serverOpts...,
 	)

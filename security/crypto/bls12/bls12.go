@@ -13,7 +13,6 @@ import (
 	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/security/crypto"
 )
 
@@ -140,9 +139,8 @@ func firstParticipant(participants hotstuff.IDSet) hotstuff.ID {
 }
 
 type bls12Base struct {
-	configuration *netconfig.Config
-	logger        logging.Logger
-	globals       *globals.Globals
+	logger  logging.Logger
+	globals *globals.Globals
 
 	mut sync.RWMutex
 	// popCache caches the proof-of-possession results of popVerify for each public key.
@@ -151,14 +149,12 @@ type bls12Base struct {
 
 // New returns a new instance of the BLS12 CryptoBase implementation.
 func New(
-	configuration *netconfig.Config,
 	logger logging.Logger,
 	globals *globals.Globals,
 ) modules.CryptoBase {
 	bls := &bls12Base{
-		configuration: configuration,
-		logger:        logger,
-		globals:       globals,
+		logger:  logger,
+		globals: globals,
 
 		popCache: make(map[string]bool),
 	}
@@ -174,7 +170,7 @@ func (bls *bls12Base) privateKey() *PrivateKey {
 }
 
 func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *PublicKey, ok bool) {
-	if replica, ok := bls.configuration.Replica(id); ok {
+	if replica, ok := bls.globals.ReplicaInfo(id); ok {
 		if replica.ID != bls.globals.ID() && !bls.checkPop(replica) {
 			bls.logger.Warnf("Invalid POP for replica %d", id)
 			return nil, false

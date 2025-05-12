@@ -53,7 +53,6 @@ func TestVote(t *testing.T) {
 			depsCore.Logger(),
 			depsCore.EventLoop(),
 			depsCore.Globals(),
-			depsNet.Config(),
 			depsNet.Sender(),
 			cryptoName,
 			certauth.WithCache(cacheSize),

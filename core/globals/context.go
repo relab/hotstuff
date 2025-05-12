@@ -1,4 +1,4 @@
-package netconfig
+package globals
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 )
 
 // PeerIDFromContext extracts the ID of the peer from the context.
-func (cfg *Config) PeerIDFromContext(ctx context.Context) (hotstuff.ID, error) {
+func (g *Globals) PeerIDFromContext(ctx context.Context) (hotstuff.ID, error) {
 	peerInfo, ok := peer.FromContext(ctx)
 	if !ok {
 		return 0, fmt.Errorf("peerInfo not available")
@@ -25,7 +25,7 @@ func (cfg *Config) PeerIDFromContext(ctx context.Context) (hotstuff.ID, error) {
 		}
 		if len(tlsInfo.State.PeerCertificates) > 0 {
 			cert := tlsInfo.State.PeerCertificates[0]
-			for replicaID := range cfg.Replicas() {
+			for replicaID := range g.replicas {
 				if subject, err := strconv.Atoi(cert.Subject.CommonName); err == nil && hotstuff.ID(subject) == replicaID {
 					return replicaID, nil
 				}

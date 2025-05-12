@@ -15,7 +15,6 @@ import (
 	"github.com/relab/hotstuff/internal/proto/kauripb"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network/netconfig"
 	"github.com/relab/hotstuff/network/sender"
 	"github.com/relab/hotstuff/security/blockchain"
 )
@@ -29,7 +28,6 @@ type Kauri struct {
 	leaderRotation modules.LeaderRotation
 	globals        *globals.Globals
 	eventLoop      *eventloop.EventLoop
-	configuration  *netconfig.Config
 	sender         *sender.Sender
 	logger         logging.Logger
 
@@ -50,7 +48,6 @@ func New(
 	blockChain *blockchain.BlockChain,
 	globals *globals.Globals,
 	eventLoop *eventloop.EventLoop,
-	configuration *netconfig.Config,
 	sender *sender.Sender,
 	logger logging.Logger,
 	tree *tree.Tree,
@@ -61,7 +58,6 @@ func New(
 		leaderRotation: leaderRotation,
 		globals:        globals,
 		eventLoop:      eventLoop,
-		configuration:  configuration,
 		sender:         sender,
 		logger:         logger,
 
@@ -223,7 +219,7 @@ func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) err
 		return fmt.Errorf("failed to combine signatures: %v", err)
 	}
 	k.aggContrib = combSignature
-	if combSignature.Participants().Len() >= k.configuration.QuorumSize() {
+	if combSignature.Participants().Len() >= k.globals.QuorumSize() {
 		k.logger.Debug("Aggregated Complete QC and sending the event")
 		k.eventLoop.AddEvent(hotstuff.NewViewMsg{
 			SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(
