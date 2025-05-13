@@ -59,6 +59,11 @@ type ExperimentConfig struct {
 	// Metrics is a list of metrics to log.
 	Metrics []string
 
+	// # Protocol-specific values:
+
+	// UseAggQC indicates whether or not to use aggregated QCs.
+	UseAggQC bool
+
 	// # File path strings below:
 
 	// Cue is the path to optional .cue config file.
@@ -247,6 +252,7 @@ func (c *ExperimentConfig) CreateReplicaOpts() *orchestrationpb.ReplicaOpts {
 		TreePositions:     c.TreePositions,
 		TreeDelta:         durationpb.New(c.TreeDelta),
 		Kauri:             c.Kauri,
+		UseAggQC:          c.UseAggQC,
 	}
 }
 

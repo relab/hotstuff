@@ -17,6 +17,7 @@ import (
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
+	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	"github.com/relab/iago"
 	"github.com/spf13/viper"
 )
@@ -33,6 +34,11 @@ func runController() {
 
 	if cfg.RandomTree {
 		tree.Shuffle(cfg.TreePositions)
+	}
+
+	// fasthotstuff strictly requires QC aggregation.
+	if cfg.Consensus == fasthotstuff.ModuleName {
+		cfg.UseAggQC = true
 	}
 
 	if cfg.Kauri {

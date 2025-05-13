@@ -52,6 +52,10 @@ func (x *ReplicaOpts) SetTreeOptions(branchFactor uint32, positions []uint32, tr
 	x.TreeDelta = durationpb.New(treeDelta)
 }
 
+func (x *ReplicaOpts) TreeEnabled() bool {
+	return len(x.TreePositions) > 0 && x.BranchFactor > 0 && x.TreeDelta.IsValid()
+}
+
 func (x *ReplicaOpts) SetByzantineStrategy(strategy string) {
 	x.ByzantineStrategy = strategy
 }

@@ -23,6 +23,9 @@ type RuntimeConfig struct {
 }
 
 func NewRuntimeConfig(id hotstuff.ID, pk hotstuff.PrivateKey, opts ...RuntimeOption) *RuntimeConfig {
+	if id == hotstuff.ID(0) {
+		panic("id must be greater than zero")
+	}
 	g := &RuntimeConfig{
 		id:                 id,
 		privateKey:         pk,

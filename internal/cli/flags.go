@@ -73,6 +73,7 @@ func init() {
 
 	runCmd.Flags().String("cue", "", "Cue-based host config")
 	runCmd.Flags().Bool("kauri", false, "enable Kauri protocol")
+	runCmd.Flags().Bool("agg-qc", false, "enable QC aggregation")
 
 	err := viper.BindPFlags(runCmd.Flags())
 	if err != nil {

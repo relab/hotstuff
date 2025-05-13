@@ -68,6 +68,8 @@ message ReplicaOpts {
     // TreeHeightTime computes the wait time only based on the height of the tree.
     bool TreeHeightTime = 28;
   }
+  // UseAggQC is true if aggregate quorum certs should be used by the protocol.
+  bool UseAggQC = 29;
 }
 
 // ReplicaInfo is the information that the replicas need about each other.

@@ -33,10 +33,8 @@ import (
 
 	// imported modules
 	_ "github.com/relab/hotstuff/protocol/kauri"
-	"github.com/relab/hotstuff/protocol/leaderrotation"
 	_ "github.com/relab/hotstuff/protocol/leaderrotation"
 	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
-	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	_ "github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	_ "github.com/relab/hotstuff/protocol/rules/simplehotstuff"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
@@ -147,7 +145,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	// setup core - used in replica and measurement framework
 	runtimeOpts := []core.RuntimeOption{}
 	// treeleader needs a tree
-	if opts.GetLeaderRotation() == leaderrotation.TreeLeaderModuleName {
+	if opts.TreeEnabled() {
 		delayMode := tree.DelayTypeNone
 		if opts.GetAggregationTime() {
 			delayMode = tree.DelayTypeAggregation
@@ -167,7 +165,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 	runtimeOpts = append(runtimeOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
 	// fasthotstuff requires that aggQC is enabled or else it panics
-	if opts.GetConsensus() == fasthotstuff.ModuleName {
+	if opts.GetUseAggQC() {
 		runtimeOpts = append(runtimeOpts, core.WithAggregateQC())
 	}
 	depsCore := dependencies.NewCore(opts.HotstuffID(), "hs", privKey, runtimeOpts...)
@@ -285,7 +283,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		buildOpt := core.NewRuntimeConfig(hotstuff.ID(opts.GetID()), nil)
+		runtimeCfg := core.NewRuntimeConfig(hotstuff.ID(opts.GetID()), nil)
 		logger := logging.New("cli" + strconv.Itoa(int(opts.GetID())))
 		eventLoop := eventloop.New(logger, 1000)
 
@@ -294,7 +292,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 				eventLoop,
 				logger,
 				w.metricsLogger,
-				buildOpt,
+				runtimeCfg,
 				w.measurementInterval,
 				w.metrics...,
 			)
@@ -306,7 +304,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		cli := client.New(
 			eventLoop,
 			logger,
-			buildOpt,
+			runtimeCfg,
 			c,
 		)
 		cfg, err := getConfiguration(req.GetConfiguration(), true)
