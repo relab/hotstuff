@@ -1,10 +1,14 @@
 package dependencies
 
 import (
+	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
+	"github.com/relab/hotstuff/security/blockchain"
+	"github.com/relab/hotstuff/service/committer"
 )
 
 type protocolModules struct {
@@ -12,11 +16,11 @@ type protocolModules struct {
 	leaderRotation modules.LeaderRotation
 }
 
-// TODO: Add option for byzantineStrategy instead of passing string
 func newProtocolModules(
-	depsCore *Core,
-	depsSecure *Security,
-	depsSrv *Service,
+	logger logging.Logger,
+	config *core.RuntimeConfig,
+	blockChain *blockchain.BlockChain,
+	committer *committer.Committer,
 
 	consensusName,
 	leaderRotationName,
@@ -24,38 +28,38 @@ func newProtocolModules(
 	vdParams viewduration.Params,
 ) (*protocolModules, error) {
 	consensusRules, err := newConsensusRulesModule(
+		logger,
+		config,
+		blockChain,
 		consensusName,
-		depsSecure.BlockChain(),
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
 	)
 	if err != nil {
 		return nil, err
 	}
 	leaderRotation, err := newLeaderRotationModule(
+		logger,
+		config,
+		blockChain,
+		committer,
+		vdParams,
 		leaderRotationName,
 		consensusRules.ChainLength(),
-		vdParams,
-		depsSecure.BlockChain(),
-		depsSrv.Committer(),
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
 	)
 	if err != nil {
 		return nil, err
 	}
-
 	if byzantineStrategy != "" {
 		byz, err := newByzantineStrategyModule(
-			byzantineStrategy,
+			config,
+			blockChain,
 			consensusRules,
-			depsSecure.BlockChain(),
-			depsCore.RuntimeCfg())
+			byzantineStrategy,
+		)
 		if err != nil {
 			return nil, err
 		}
 		consensusRules = byz
-		depsCore.Logger().Infof("assigned byzantine strategy: %s", byzantineStrategy)
+		logger.Infof("assigned byzantine strategy: %s", byzantineStrategy)
 	}
 	return &protocolModules{
 		consensusRules: consensusRules,
@@ -68,6 +72,7 @@ type Protocol struct {
 	synchronizer *synchronizer.Synchronizer
 }
 
+// TODO(AlanRostem): explore ways to simplify consensus and synchronizer so that this method takes in less dependencies.
 func NewProtocol(
 	depsCore *Core,
 	depsNet *Network,
@@ -80,9 +85,10 @@ func NewProtocol(
 	vdParams viewduration.Params,
 ) (*Protocol, error) {
 	mods, err := newProtocolModules(
-		depsCore,
-		depsSecure,
-		depsSrv,
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		depsSecure.BlockChain(),
+		depsSrv.Committer(),
 		consensusName,
 		leaderRotationName,
 		byzantineStrategy,
@@ -92,29 +98,29 @@ func NewProtocol(
 		return nil, err
 	}
 	csus := consensus.New(
-		mods.consensusRules,
-		mods.leaderRotation,
-		depsSecure.BlockChain(),
-		depsSrv.Committer(),
-		depsSrv.CmdCache(),
-		depsNet.Sender(),
-		depsSecure.CertAuth(),
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
+		depsSecure.BlockChain(),
+		depsSecure.CertAuth(),
+		mods.leaderRotation,
+		mods.consensusRules,
+		depsSrv.Committer(),
+		depsSrv.CmdCache(),
+		depsNet.Sender(),
 	)
 	return &Protocol{
 		consensus: csus,
 		synchronizer: synchronizer.New(
-			depsSecure.CryptoImpl(),
-			mods.leaderRotation,
-			depsSecure.BlockChain(),
-			csus,
-			depsSecure.CertAuth(),
-			depsNet.Sender(),
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
+			depsSecure.BlockChain(),
+			depsSecure.CryptoImpl(),
+			depsSecure.CertAuth(),
+			mods.leaderRotation,
+			csus,
+			depsNet.Sender(),
 		),
 	}, nil
 }

@@ -21,9 +21,9 @@ type Committer struct {
 
 // Basic committer implements commit logic without pipelining.
 func New(
+	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
 	clientSrv *clientsrv.Server,
-	logger logging.Logger,
 ) *Committer {
 	return &Committer{
 		blockChain: blockChain,

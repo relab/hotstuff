@@ -98,8 +98,13 @@ func TestModules(t *testing.T) {
 			nil,
 		)
 		_, err = dependencies.NewProtocol(
-			depsCore, depsNet, depsSecure, depsSrv,
-			td.consensusName, td.leaderRotationName, td.byzantineStrategy,
+			depsCore,
+			depsNet,
+			depsSecure,
+			depsSrv,
+			td.consensusName,
+			td.leaderRotationName,
+			td.byzantineStrategy,
 			viewduration.NewParams(0, 0, 0, 0))
 		if err != nil {
 			t.Fatalf("%v", err)

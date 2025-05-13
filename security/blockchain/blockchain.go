@@ -31,9 +31,9 @@ type BlockChain struct {
 // New creates a new blockChain with a maximum size.
 // Blocks are dropped in least recently used order.
 func New(
-	sender *network.Sender,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
+	sender *network.Sender,
 ) *BlockChain {
 	bc := &BlockChain{
 		sender:    sender,

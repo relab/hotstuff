@@ -22,7 +22,8 @@ func NewService(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	blockChain *blockchain.BlockChain,
-	cacheOpt []cmdcache.Option, // TODO: Join this into single option type
+	// TODO: Join these into single option type
+	cacheOpt []cmdcache.Option,
 	clientSrvOpts ...gorums.ServerOption,
 ) *Service {
 	cmdCache := cmdcache.New(
@@ -39,9 +40,9 @@ func NewService(
 		cmdCache:  cmdCache,
 		clientSrv: clientSrv,
 		committer: committer.New(
+			logger,
 			blockChain,
 			clientSrv,
-			logger,
 		),
 	}
 }

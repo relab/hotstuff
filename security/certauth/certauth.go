@@ -18,10 +18,9 @@ type CertAuthority struct {
 // New returns a CertAuthority. It will use the given CryptoBase to create and verify
 // signatures.
 func New(
-	impl modules.CryptoBase,
-
-	blockChain *blockchain.BlockChain,
 	logger logging.Logger,
+	blockChain *blockchain.BlockChain,
+	impl modules.CryptoBase,
 	opts ...Option,
 ) *CertAuthority {
 	ca := &CertAuthority{

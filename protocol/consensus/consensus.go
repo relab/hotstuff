@@ -38,17 +38,25 @@ type Consensus struct {
 
 // New returns a new Consensus instance based on the given Rules implementation.
 func New(
-	impl modules.ConsensusRules,
-	leaderRotation modules.LeaderRotation,
-
-	blockChain *blockchain.BlockChain,
-	committer *committer.Committer,
-	commandCache *cmdcache.Cache,
-	sender *network.Sender,
-	auth *certauth.CertAuthority,
+	// core stuff
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
+
+	// security stuff
+	blockChain *blockchain.BlockChain,
+	auth *certauth.CertAuthority,
+
+	// protocol stuff
+	leaderRotation modules.LeaderRotation,
+	impl modules.ConsensusRules,
+
+	// service stuff
+	committer *committer.Committer,
+	commandCache *cmdcache.Cache,
+
+	// network stuff
+	sender *network.Sender,
 ) *Consensus {
 	cs := &Consensus{
 		impl:           impl,

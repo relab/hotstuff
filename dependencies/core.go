@@ -10,9 +10,9 @@ import (
 )
 
 type Core struct {
-	config    *core.RuntimeConfig
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
+	config    *core.RuntimeConfig
 }
 
 func NewCore(
@@ -29,11 +29,6 @@ func NewCore(
 	}
 }
 
-// RuntimeCfg returns the global variables and configurations.
-func (c *Core) RuntimeCfg() *core.RuntimeConfig {
-	return c.config
-}
-
 // EventLoop returns the eventloop instance.
 func (c *Core) EventLoop() *eventloop.EventLoop {
 	return c.eventLoop
@@ -42,4 +37,9 @@ func (c *Core) EventLoop() *eventloop.EventLoop {
 // Logger returns the logger instance.
 func (c *Core) Logger() logging.Logger {
 	return c.logger
+}
+
+// RuntimeCfg returns the runtime configuration.
+func (c *Core) RuntimeCfg() *core.RuntimeConfig {
+	return c.config
 }

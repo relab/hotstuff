@@ -51,16 +51,22 @@ type Synchronizer struct {
 
 // New creates a new Synchronizer.
 func New(
-	crypto modules.CryptoBase,
-	leaderRotation modules.LeaderRotation,
-
-	blockChain *blockchain.BlockChain,
-	consensus *consensus.Consensus,
-	auth *certauth.CertAuthority,
-	sender *network.Sender,
+	// core stuff
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
+
+	// security stuff
+	blockChain *blockchain.BlockChain,
+	crypto modules.CryptoBase,
+	auth *certauth.CertAuthority,
+
+	// protocol stuff
+	leaderRotation modules.LeaderRotation,
+	consensus *consensus.Consensus,
+
+	// network stuff
+	sender *network.Sender,
 ) *Synchronizer {
 	s := &Synchronizer{
 		duration:       leaderRotation.ViewDuration(),

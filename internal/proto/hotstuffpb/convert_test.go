@@ -20,9 +20,9 @@ import (
 
 func TestConvertPartialCert(t *testing.T) {
 	key := testutil.GenerateECDSAKey(t)
-	globs := core.NewRuntimeConfig(1, key)
-	crypt := ecdsa.New(nil, globs) // TODO: why is logger nil?
-	signer := certauth.New(crypt, nil, nil)
+	cfg := core.NewRuntimeConfig(1, key)
+	crypt := ecdsa.New(nil, cfg) // TODO: why is logger nil?
+	signer := certauth.New(nil, nil, crypt)
 
 	want, err := signer.CreatePartialCert(hotstuff.GetGenesis())
 	if err != nil {
@@ -42,9 +42,9 @@ func TestConvertQuorumCert(t *testing.T) {
 	signers := make([]*certauth.CertAuthority, n)
 	for i := range n {
 		key := testutil.GenerateECDSAKey(t)
-		globs := core.NewRuntimeConfig(hotstuff.ID(i+1), key)
-		crypt := ecdsa.New(nil, globs)
-		signer := certauth.New(crypt, nil, nil)
+		cfg := core.NewRuntimeConfig(hotstuff.ID(i+1), key)
+		crypt := ecdsa.New(nil, cfg)
+		signer := certauth.New(nil, nil, crypt)
 		signers[i] = signer
 	}
 
@@ -78,12 +78,12 @@ func TestConvertBlock(t *testing.T) {
 
 func TestConvertTimeoutCertBLS12(t *testing.T) {
 	n := 4
-	globs := make(map[hotstuff.ID]*core.RuntimeConfig)
+	cfgs := make(map[hotstuff.ID]*core.RuntimeConfig)
 	replicaInfos := make(map[hotstuff.ID]*hotstuff.ReplicaInfo)
 	for i := range n {
 		id := hotstuff.ID(i + 1)
 		key := testutil.GenerateBLS12Key(t)
-		globs[id] = core.NewRuntimeConfig(id, key)
+		cfgs[id] = core.NewRuntimeConfig(id, key)
 		pub := key.Public()
 		replicaInfos[id] = &hotstuff.ReplicaInfo{ID: id, PubKey: pub}
 	}
@@ -91,7 +91,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 	for i := range n {
 		id := hotstuff.ID(i + 1)
 		for id2 := range replicaInfos {
-			globs[id].AddReplica(replicaInfos[id2])
+			cfgs[id].AddReplica(replicaInfos[id2])
 		}
 	}
 
@@ -99,11 +99,11 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 	for i := range n {
 		id := hotstuff.ID(i + 1)
 		logger := logging.New("test")
-		crypt := bls12.New(logger, globs[id])
-		signer := certauth.New(crypt, nil, logger)
+		crypt := bls12.New(logger, cfgs[id])
+		signer := certauth.New(logger, nil, crypt)
 		signers[i] = signer
-		meta := globs[id].ConnectionMetadata()
-		globs[id].SetReplicaMetaData(id, meta)
+		meta := cfgs[id].ConnectionMetadata()
+		cfgs[id].SetReplicaMetaData(id, meta)
 	}
 
 	tc1 := testutil.CreateTCOld(t, 1, signers)
@@ -113,7 +113,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 
 	signer := signers[0].(*certauth.CertAuthority)
 
-	if !signer.VerifyTimeoutCert(globs[1].QuorumSize(), tc2) {
+	if !signer.VerifyTimeoutCert(cfgs[1].QuorumSize(), tc2) {
 		t.Fatal("Failed to verify timeout cert")
 	}
 }

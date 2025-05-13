@@ -26,14 +26,14 @@ func NewSecurity(
 	opts ...certauth.Option,
 ) (*Security, error) {
 	blockChain := blockchain.New(
-		sender,
 		eventLoop,
 		logger,
+		sender,
 	)
 	cryptoImpl, err := newCryptoModule(
-		cryptoName,
 		logger,
 		config,
+		cryptoName,
 	)
 	if err != nil {
 		return nil, err
@@ -42,9 +42,9 @@ func NewSecurity(
 		blockChain: blockChain,
 		cryptoImpl: cryptoImpl,
 		certAuth: certauth.New(
-			cryptoImpl,
-			blockChain,
 			logger,
+			blockChain,
+			cryptoImpl,
 			opts...,
 		),
 	}, nil

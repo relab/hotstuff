@@ -21,10 +21,10 @@ import (
 )
 
 func newConsensusRulesModule(
-	name string,
-	blockChain *blockchain.BlockChain,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
+	blockChain *blockchain.BlockChain,
+	name string,
 ) (rules modules.ConsensusRules, err error) {
 	logger.Debugf("Initializing module (consensus rules): %s", name)
 	switch name {
@@ -41,10 +41,10 @@ func newConsensusRulesModule(
 }
 
 func newByzantineStrategyModule(
-	name string,
-	rules modules.ConsensusRules,
-	blockChain *blockchain.BlockChain,
 	config *core.RuntimeConfig,
+	blockChain *blockchain.BlockChain,
+	rules modules.ConsensusRules,
+	name string,
 ) (byzRules modules.ConsensusRules, err error) {
 	// logger.Debugf("Initializing module (byzantine strategy): %s", name)
 	switch name {
@@ -59,9 +59,9 @@ func newByzantineStrategyModule(
 }
 
 func newCryptoModule(
-	name string,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
+	name string,
 ) (impl modules.CryptoBase, err error) {
 	logger.Debugf("Initializing module (crypto): %s", name)
 	switch name {
@@ -78,13 +78,13 @@ func newCryptoModule(
 }
 
 func newLeaderRotationModule(
-	name string,
-	chainLength int,
-	vdParams viewduration.Params,
-	blockChain *blockchain.BlockChain,
-	committer *committer.Committer,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
+	blockChain *blockchain.BlockChain,
+	committer *committer.Committer,
+	vdParams viewduration.Params,
+	name string,
+	chainLength int,
 ) (ld modules.LeaderRotation, err error) {
 	logger.Debugf("Initializing module (leader rotation): %s", name)
 	switch name {
