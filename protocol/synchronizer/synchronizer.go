@@ -154,10 +154,8 @@ func (s *Synchronizer) Start(ctx context.Context) {
 
 	// start the initial proposal
 	if view := s.View(); view == 1 && s.leaderRotation.GetLeader(view) == s.config.ID() {
-		sInfo, ok := s.consensus.Propose(s.View(), s.highQC, s.SyncInfo())
-		if ok {
-			s.AdvanceView(sInfo)
-		}
+		syncInfo := s.SyncInfo()
+		s.consensus.Propose(s.View(), s.highQC, syncInfo)
 	}
 }
 
@@ -369,10 +367,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.config.ID() {
-		sInfo, ok := s.consensus.Propose(s.View(), s.highQC, syncInfo)
-		if ok {
-			s.AdvanceView(sInfo)
-		}
+		s.consensus.Propose(s.View(), s.highQC, syncInfo)
 	} else if replica, ok := s.sender.ReplicaNode(leader); ok {
 		replica.NewView(syncInfo)
 	}

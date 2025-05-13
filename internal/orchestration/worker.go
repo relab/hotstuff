@@ -36,6 +36,7 @@ import (
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	_ "github.com/relab/hotstuff/protocol/leaderrotation"
 	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
+	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	_ "github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	_ "github.com/relab/hotstuff/protocol/rules/simplehotstuff"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
@@ -144,7 +145,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, err
 	}
 	// setup core - used in replica and measurement framework
-	globalOpts := []core.Option{}
+	runtimeOpts := []core.RuntimeOption{}
+	// treeleader needs a tree
 	if opts.GetLeaderRotation() == leaderrotation.TreeLeaderModuleName {
 		delayMode := tree.DelayTypeNone
 		if opts.GetAggregationTime() {
@@ -158,13 +160,17 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			opts.TreePositionIDs(),
 			opts.GetTreeDelta().AsDuration(),
 		)
-		globalOpts = append(globalOpts, core.WithTree(t))
+		runtimeOpts = append(runtimeOpts, core.WithTree(t))
 	}
 	if opts.GetKauri() {
-		globalOpts = append(globalOpts, core.WithKauri())
+		runtimeOpts = append(runtimeOpts, core.WithKauri())
 	}
-	globalOpts = append(globalOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
-	depsCore := dependencies.NewCore(opts.HotstuffID(), "hs", privKey, globalOpts...)
+	runtimeOpts = append(runtimeOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
+	// fasthotstuff requires that aggQC is enabled or else it panics
+	if opts.GetConsensus() == fasthotstuff.ModuleName {
+		runtimeOpts = append(runtimeOpts, core.WithAggregateQC())
+	}
+	depsCore := dependencies.NewCore(opts.HotstuffID(), "hs", privKey, runtimeOpts...)
 	// check if measurements should be enabled
 	if w.measurementInterval > 0 {
 		// Initializes the metrics modules internally.
@@ -193,12 +199,16 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 		replicaOpts = append(replicaOpts, replica.WithTLS(certificate, rootCAs))
 	}
+	if opts.GetBatchSize() > 1 {
+		replicaOpts = append(replicaOpts,
+			replica.WithCmdCacheOptions(cmdcache.WithBatching(opts.GetBatchSize())),
+		)
+	}
 	replicaOpts = append(replicaOpts,
 		replica.OverrideCrypto(opts.GetCrypto()),
 		replica.OverrideConsensusRules(opts.GetConsensus()),
 		replica.OverrideLeaderRotation(opts.GetLeaderRotation()),
 		replica.WithByzantineStrategy(opts.GetByzantineStrategy()),
-		replica.WithCmdCacheOptions(cmdcache.WithBatching(opts.GetBatchSize())),
 		replica.WithServerOptions(server.WithLatencies(opts.HotstuffID(), opts.GetLocations())),
 	)
 	return replica.New(

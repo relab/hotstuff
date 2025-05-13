@@ -47,7 +47,7 @@ type RuntimeConfig struct {
 	tree         *tree.Tree
 }
 
-func NewRuntimeConfig(id hotstuff.ID, pk hotstuff.PrivateKey, opts ...Option) *RuntimeConfig {
+func NewRuntimeConfig(id hotstuff.ID, pk hotstuff.PrivateKey, opts ...RuntimeOption) *RuntimeConfig {
 	g := &RuntimeConfig{
 		id:                 id,
 		privateKey:         pk,

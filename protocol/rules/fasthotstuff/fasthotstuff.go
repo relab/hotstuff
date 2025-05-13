@@ -23,12 +23,13 @@ func New(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 ) modules.ConsensusRules {
+	if !config.HasAggregateQC() {
+		panic("aggregate qc must be enabled for fasthotstuff")
+	}
 	fhs := &FastHotStuff{
 		blockChain: blockChain,
 		logger:     logger,
 	}
-
-	config.EnableAggregateQC() // TODO(AlanRostem): avoid this coupling
 	return fhs
 }
 

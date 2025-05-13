@@ -107,7 +107,7 @@ func (cs *Consensus) StopVoting(view hotstuff.View) {
 }
 
 // Propose creates a new proposal.
-func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo) (syncInfo hotstuff.SyncInfo, advance bool) {
+func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo) {
 	cs.logger.Debugf("Propose")
 
 	qc, ok := cert.QC()
@@ -159,7 +159,7 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cer
 		cs.sender.Propose(proposal)
 	}
 	// self vote
-	return cs.OnPropose(proposal)
+	cs.OnPropose(proposal)
 }
 
 func (cs *Consensus) checkQC(proposal *hotstuff.ProposeMsg) bool {
