@@ -53,6 +53,12 @@ func (chain *BlockChain) Store(block *hotstuff.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
 
+	// do not store existing blocks, otherwise something is terribly wrong.
+	// AlanRostem: I added this here in package-restructuring branch.
+	if _, ok := chain.blocks[block.Hash()]; ok {
+		panic(fmt.Sprintf("block already exists: %s", block.String()))
+	}
+
 	chain.blocks[block.Hash()] = block
 	chain.blockAtHeight[block.View()] = block
 

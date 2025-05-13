@@ -3,7 +3,6 @@ package simplehotstuff
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
@@ -25,7 +24,6 @@ type SimpleHotStuff struct {
 // New returns a new SimpleHotStuff instance.
 func New(
 	logger logging.Logger,
-	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
 ) modules.ConsensusRules {
 	return &SimpleHotStuff{

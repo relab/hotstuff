@@ -31,7 +31,7 @@ func newConsensusRulesModule(
 	case fasthotstuff.ModuleName:
 		rules = fasthotstuff.New(logger, config, blockChain)
 	case simplehotstuff.ModuleName:
-		rules = simplehotstuff.New(logger, config, blockChain)
+		rules = simplehotstuff.New(logger, blockChain)
 	case chainedhotstuff.ModuleName:
 		rules = chainedhotstuff.New(logger, blockChain)
 	default:

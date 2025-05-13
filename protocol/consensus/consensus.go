@@ -95,6 +95,7 @@ func New(
 		)
 	}
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
+		cs.logger.Debugf("On event (hotstuff.ProposeMsg) call OnPropose.")
 		sInfo, advance := cs.OnPropose(event.(hotstuff.ProposeMsg))
 		if advance {
 			cs.eventLoop.AddEvent(hotstuff.NewViewMsg{
@@ -114,10 +115,38 @@ func (cs *Consensus) StopVoting(view hotstuff.View) {
 	}
 }
 
+func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) {
+	// TODO: extract parts of this method into helper functions maybe?
+	block := proposal.Block
+	if !cs.checkQC(&proposal) {
+		return
+	}
+	if !cs.acceptProposal(&proposal) {
+		return
+	}
+	view := block.View()
+	cs.logger.Debugf("OnPropose[view=%d]: block accepted.", view)
+	cs.logger.Debugf("OnPropose: store block:", proposal.Block.Hash().String()[:10])
+	cs.blockChain.Store(block)
+	if b := cs.impl.CommitRule(block); b != nil {
+		cs.committer.Commit(b)
+	}
+	// Tells the synchronizer to advance the view
+	advance = true
+	syncInfo = hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
+	if block.View() <= cs.lastVote {
+		cs.logger.Info(fmt.Sprintf("OnPropose[view=%d]: block view too old for.", view))
+		return
+	}
+	cs.voteFor(&proposal)
+	return
+}
+
 // Propose creates a new proposal.
 func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo) {
 	cs.logger.Debugf("Propose")
 
+	// TODO(AlanRostem): why the previous proposal need to be marked as accepted? Shouldn't this happen on execution?
 	qc, ok := cert.QC()
 	if ok {
 		// tell the acceptor that the previous proposal succeeded.
@@ -144,14 +173,32 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cer
 		return
 	}
 
-	// TODO(AlanRostem): block is already being stored in OnPropose again. Shouldn't this be removed?
-	cs.blockChain.Store(proposal.Block)
+	// TODO(AlanRostem): discuss if this removal is valid. Adding a panic in blockchain seems to be the correct way.
+	// cs.blockChain.Store(proposal.Block)
 	// kauri sends the proposal to only the children
 	if cs.kauri == nil {
 		cs.sender.Propose(proposal)
 	}
 	// self vote - can discard return value since the syncinfo is already the recent one
 	cs.OnPropose(proposal)
+}
+
+func (cs *Consensus) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
+	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
+	proposal = hotstuff.ProposeMsg{
+		ID: cs.config.ID(),
+		Block: hotstuff.NewBlock(
+			qc.BlockHash(),
+			qc,
+			cmd,
+			view,
+			cs.config.ID(),
+		),
+	}
+	if aggQC, ok := cert.AggQC(); ok && cs.config.HasAggregateQC() {
+		proposal.AggregateQC = &aggQC
+	}
+	return proposal, true
 }
 
 func (cs *Consensus) checkQC(proposal *hotstuff.ProposeMsg) bool {
@@ -201,34 +248,6 @@ func (cs *Consensus) acceptProposal(proposal *hotstuff.ProposeMsg) bool {
 	return true
 }
 
-func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) {
-	// TODO: extract parts of this method into helper functions maybe?
-	block := proposal.Block
-	if !cs.checkQC(&proposal) {
-		return
-	}
-	if !cs.acceptProposal(&proposal) {
-		return
-	}
-
-	view := block.View()
-	cs.logger.Debugf("OnPropose[view=%d]: block accepted.", view)
-	// block is safe and was accepted
-	cs.blockChain.Store(block)
-	if b := cs.impl.CommitRule(block); b != nil {
-		cs.committer.Commit(b)
-	}
-	// Tells the synchronizer to advance the view
-	advance = true
-	syncInfo = hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
-	if block.View() <= cs.lastVote {
-		cs.logger.Info(fmt.Sprintf("OnPropose[view=%d]: block view too old for.", view))
-		return
-	}
-	cs.voteFor(&proposal)
-	return
-}
-
 func (cs *Consensus) voteFor(proposal *hotstuff.ProposeMsg) {
 	block := proposal.Block
 	view := block.View()
@@ -253,24 +272,6 @@ func (cs *Consensus) voteFor(proposal *hotstuff.ProposeMsg) {
 	}
 	cs.logger.Debugf("OnPropose[view=%d]: voting for %.8s -> %.8x", view, block.Hash(), block.Command())
 	cs.sender.SendVote(leaderID, pc)
-}
-
-func (cs *Consensus) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
-	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
-	proposal = hotstuff.ProposeMsg{
-		ID: cs.config.ID(),
-		Block: hotstuff.NewBlock(
-			qc.BlockHash(),
-			qc,
-			cmd,
-			view,
-			cs.config.ID(),
-		),
-	}
-	if aggQC, ok := cert.AggQC(); ok && cs.config.HasAggregateQC() {
-		proposal.AggregateQC = &aggQC
-	}
-	return proposal, true
 }
 
 var _ modules.ProposeRuler = (*Consensus)(nil)
