@@ -29,11 +29,11 @@ func newConsensusRulesModule(
 	logger.Debugf("Initializing module (consensus rules): %s", name)
 	switch name {
 	case fasthotstuff.ModuleName:
-		rules = fasthotstuff.New(blockChain, logger, config)
+		rules = fasthotstuff.New(logger, config, blockChain)
 	case simplehotstuff.ModuleName:
-		rules = simplehotstuff.New(blockChain, logger)
+		rules = simplehotstuff.New(logger, config, blockChain)
 	case chainedhotstuff.ModuleName:
-		rules = chainedhotstuff.New(blockChain, logger)
+		rules = chainedhotstuff.New(logger, blockChain)
 	default:
 		return nil, fmt.Errorf("invalid consensus name: '%s'", name)
 	}

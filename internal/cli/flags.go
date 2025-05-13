@@ -45,7 +45,6 @@ func init() {
 	runCmd.Flags().String("crypto", "ecdsa", "name of the crypto implementation")
 	runCmd.Flags().String("leader-rotation", "round-robin", "name of the leader rotation algorithm")
 	runCmd.Flags().Int64("shared-seed", 0, "Shared random number generator seed")
-	runCmd.Flags().StringSlice("modules", nil, "Name additional modules to be loaded.")
 
 	runCmd.Flags().Bool("worker", false, "run a local worker")
 	runCmd.Flags().StringSlice("replica-hosts", nil, "the remote hosts to run replicas on via ssh")
@@ -64,7 +63,6 @@ func init() {
 	runCmd.Flags().Float64("rate-limit", math.Inf(1), "rate limit for clients (in commands/second)")
 	runCmd.Flags().Float64("rate-step", 0, "rate limit step up for clients (in commands/second)")
 	runCmd.Flags().Duration("rate-step-interval", time.Hour, "how often the client rate limit should be increased")
-	runCmd.Flags().StringSlice("byzantine", nil, "byzantine strategies to use, as a comma separated list of 'name:count'")
 	// tree config parameter
 	runCmd.Flags().Int("bf", 2, "branch factor of the tree")
 	runCmd.Flags().IntSlice("tree-pos", []int{}, "tree positions of the replicas")

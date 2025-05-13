@@ -51,21 +51,21 @@ type Synchronizer struct {
 
 // New creates a new Synchronizer.
 func New(
-	// core stuff
+	// core dependencies
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 
-	// security stuff
+	// security dependencies
 	blockChain *blockchain.BlockChain,
 	crypto modules.CryptoBase,
 	auth *certauth.CertAuthority,
 
-	// protocol stuff
+	// protocol dependencies
 	leaderRotation modules.LeaderRotation,
 	consensus *consensus.Consensus,
 
-	// network stuff
+	// network dependencies
 	sender *network.Sender,
 ) *Synchronizer {
 	s := &Synchronizer{

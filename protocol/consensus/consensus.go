@@ -21,6 +21,7 @@ import (
 // for implementations of the ConsensusImpl interface.
 type Consensus struct {
 	impl           modules.ConsensusRules
+	ruler          modules.ProposeRuler
 	kauri          modules.Kauri
 	leaderRotation modules.LeaderRotation
 
@@ -38,30 +39,33 @@ type Consensus struct {
 
 // New returns a new Consensus instance based on the given Rules implementation.
 func New(
-	// core stuff
+	// core dependencies
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 
-	// security stuff
+	// security dependencies
 	blockChain *blockchain.BlockChain,
 	auth *certauth.CertAuthority,
 
-	// protocol stuff
+	// protocol dependencies
 	leaderRotation modules.LeaderRotation,
 	impl modules.ConsensusRules,
 
-	// service stuff
+	// service dependencies
 	committer *committer.Committer,
 	commandCache *cmdcache.Cache,
 
-	// network stuff
+	// network dependencies
 	sender *network.Sender,
+
+	// options
+	opts ...Option,
 ) *Consensus {
 	cs := &Consensus{
 		impl:           impl,
 		leaderRotation: leaderRotation,
-		kauri:          nil, // this is set in the options later
+		kauri:          nil, // this is set later based on config
 
 		blockChain:   blockChain,
 		committer:    committer,
@@ -74,7 +78,10 @@ func New(
 
 		lastVote: 0,
 	}
-
+	cs.ruler = cs
+	for _, opt := range opts {
+		opt(cs)
+	}
 	if config.KauriEnabled() {
 		cs.kauri = kauri.New(
 			auth,
@@ -87,7 +94,6 @@ func New(
 			config.Tree(),
 		)
 	}
-
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		sInfo, advance := cs.OnPropose(event.(hotstuff.ProposeMsg))
 		if advance {
@@ -97,7 +103,6 @@ func New(
 			})
 		}
 	})
-
 	return cs
 }
 
@@ -133,35 +138,19 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cer
 	}
 
 	var proposal hotstuff.ProposeMsg
-	if proposer, ok := cs.impl.(modules.ProposeRuler); ok {
-		proposal, ok = proposer.ProposeRule(view, highQC, cert, cmd)
-		if !ok {
-			cs.logger.Debug("Propose: No block")
-			return
-		}
-	} else {
-		proposal = hotstuff.ProposeMsg{
-			ID: cs.config.ID(),
-			Block: hotstuff.NewBlock(
-				qc.BlockHash(),
-				qc,
-				cmd,
-				view,
-				cs.config.ID(),
-			),
-		}
-
-		if aggQC, ok := cert.AggQC(); ok && cs.config.HasAggregateQC() {
-			proposal.AggregateQC = &aggQC
-		}
+	proposal, ok = cs.ruler.ProposeRule(view, highQC, cert, cmd)
+	if !ok {
+		cs.logger.Debug("Propose: No block")
+		return
 	}
 
+	// TODO(AlanRostem): block is already being stored in OnPropose again. Shouldn't this be removed?
 	cs.blockChain.Store(proposal.Block)
 	// kauri sends the proposal to only the children
 	if cs.kauri == nil {
 		cs.sender.Propose(proposal)
 	}
-	// self vote
+	// self vote - can discard return value since the syncinfo is already the recent one
 	cs.OnPropose(proposal)
 }
 
@@ -265,3 +254,23 @@ func (cs *Consensus) voteFor(proposal *hotstuff.ProposeMsg) {
 	cs.logger.Debugf("OnPropose[view=%d]: voting for %.8s -> %.8x", view, block.Hash(), block.Command())
 	cs.sender.SendVote(leaderID, pc)
 }
+
+func (cs *Consensus) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
+	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
+	proposal = hotstuff.ProposeMsg{
+		ID: cs.config.ID(),
+		Block: hotstuff.NewBlock(
+			qc.BlockHash(),
+			qc,
+			cmd,
+			view,
+			cs.config.ID(),
+		),
+	}
+	if aggQC, ok := cert.AggQC(); ok && cs.config.HasAggregateQC() {
+		proposal.AggregateQC = &aggQC
+	}
+	return proposal, true
+}
+
+var _ modules.ProposeRuler = (*Consensus)(nil)

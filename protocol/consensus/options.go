@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"github.com/relab/hotstuff/internal/tree"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/kauri"
 )
 
@@ -20,5 +21,11 @@ func WithKauri(tree *tree.Tree) Option {
 			cs.logger,
 			tree,
 		)
+	}
+}
+
+func OverrideProposeRule(impl modules.ProposeRuler) Option {
+	return func(c *Consensus) {
+		c.ruler = impl
 	}
 }

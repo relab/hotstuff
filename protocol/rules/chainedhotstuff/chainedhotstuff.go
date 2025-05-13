@@ -12,8 +12,8 @@ const ModuleName = "chainedhotstuff"
 
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {
-	blockChain *blockchain.BlockChain
 	logger     logging.Logger
+	blockChain *blockchain.BlockChain
 
 	// protocol variables
 
@@ -22,8 +22,8 @@ type ChainedHotStuff struct {
 
 // New returns a new chainedhotstuff instance.
 func New(
-	blockChain *blockchain.BlockChain,
 	logger logging.Logger,
+	blockChain *blockchain.BlockChain,
 ) modules.ConsensusRules {
 	return &ChainedHotStuff{
 		blockChain: blockChain,

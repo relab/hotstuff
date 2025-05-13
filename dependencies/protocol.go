@@ -97,6 +97,10 @@ func NewProtocol(
 	if err != nil {
 		return nil, err
 	}
+	opts := []consensus.Option{}
+	if ruler, ok := mods.consensusRules.(modules.ProposeRuler); ok {
+		opts = append(opts, consensus.OverrideProposeRule(ruler))
+	}
 	csus := consensus.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
@@ -108,6 +112,7 @@ func NewProtocol(
 		depsSrv.Committer(),
 		depsSrv.CmdCache(),
 		depsNet.Sender(),
+		opts...,
 	)
 	return &Protocol{
 		consensus: csus,

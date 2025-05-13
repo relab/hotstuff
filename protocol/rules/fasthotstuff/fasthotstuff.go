@@ -19,9 +19,9 @@ type FastHotStuff struct {
 
 // New returns a new FastHotStuff instance.
 func New(
-	blockChain *blockchain.BlockChain,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
+	blockChain *blockchain.BlockChain,
 ) modules.ConsensusRules {
 	if !config.HasAggregateQC() {
 		panic("aggregate qc must be enabled for fasthotstuff")
