@@ -7,6 +7,6 @@ func WithBatching(batchSize uint32) Option {
 		panic("batch size must be higher than zero")
 	}
 	return func(cmdCache *Cache) {
-		cmdCache.batchSize = int(batchSize)
+		cmdCache.batchSize = batchSize
 	}
 }
