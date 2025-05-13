@@ -374,8 +374,8 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.config.ID() {
 		s.consensus.Propose(s.View(), s.highQC, syncInfo)
-	} else if replica, ok := s.sender.ReplicaNode(leader); ok {
-		replica.NewView(syncInfo)
+	} else if s.sender.ReplicaExists(leader) {
+		s.sender.SendNewView(leader, syncInfo)
 	}
 }
 

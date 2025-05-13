@@ -28,7 +28,7 @@ type Sender struct {
 	connected bool
 
 	mgr      *hotstuffpb.Manager
-	replicas map[hotstuff.ID]*Replica
+	replicas map[hotstuff.ID]*replicaNode
 
 	pbCfg *hotstuffpb.Configuration
 }
@@ -48,86 +48,86 @@ func NewSender(
 	}
 	mgrOpts = append(mgrOpts, gorums.WithGrpcDialOptions(grpcOpts...))
 
-	inv := &Sender{
+	s := &Sender{
 		eventLoop: eventLoop,
 		logger:    logger,
 		config:    config,
 
 		mgrOpts:  mgrOpts,
-		replicas: make(map[hotstuff.ID]*Replica),
+		replicas: make(map[hotstuff.ID]*replicaNode),
 	}
 
 	// We delay processing `replicaConnected` events until after the configurations `connected` event has occurred.
-	inv.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(event any) {
-		if !inv.connected {
-			inv.eventLoop.DelayUntil(ConnectedEvent{}, event)
+	s.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(event any) {
+		if !s.connected {
+			s.eventLoop.DelayUntil(ConnectedEvent{}, event)
 			return
 		}
-		inv.replicaConnected(event.(hotstuff.ReplicaConnectedEvent))
+		s.replicaConnected(event.(hotstuff.ReplicaConnectedEvent))
 	})
-	return inv
+	return s
 }
 
-func (inv *Sender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
-	mgrOpts := inv.mgrOpts
+func (s *Sender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
+	mgrOpts := s.mgrOpts
 	// TODO(AlanRostem): this was here when the subConfig pattern was in use. Check if doing this is valid
 	// cfg.opts = nil // options are not needed beyond this point, so we delete them.
 
-	md := mapToMetadata(inv.config.ConnectionMetadata())
+	md := mapToMetadata(s.config.ConnectionMetadata())
 
 	// embed own ID to allow other replicas to identify messages from this replica
-	md.Set("id", fmt.Sprintf("%d", inv.config.ID()))
+	md.Set("id", fmt.Sprintf("%d", s.config.ID()))
 
 	mgrOpts = append(mgrOpts, gorums.WithMetadata(md))
 
-	inv.mgr = hotstuffpb.NewManager(mgrOpts...)
+	s.mgr = hotstuffpb.NewManager(mgrOpts...)
 
 	// set up an ID mapping to give to gorums
 	idMapping := make(map[string]uint32, len(replicas))
 	for _, replica := range replicas {
 		// also initialize Replica structures
-		realReplica := &Replica{
-			eventLoop: inv.eventLoop,
+		realReplica := &replicaNode{
+			eventLoop: s.eventLoop,
 			id:        replica.ID,
 			pubKey:    replica.PubKey,
 			// node and metaData is set later
 		}
-		inv.replicas[replica.ID] = realReplica
+		s.replicas[replica.ID] = realReplica
 		// add the info to the config
-		inv.config.AddReplica(&replica)
+		s.config.AddReplica(&replica)
 		// we do not want to connect to ourself
-		if replica.ID != inv.config.ID() {
+		if replica.ID != s.config.ID() {
 			idMapping[replica.Address] = uint32(replica.ID)
 		}
 	}
 
 	// this will connect to the replicas
-	inv.pbCfg, err = inv.mgr.NewConfiguration(qspec{}, gorums.WithNodeMap(idMapping))
+	s.pbCfg, err = s.mgr.NewConfiguration(qspec{}, gorums.WithNodeMap(idMapping))
 	if err != nil {
 		return fmt.Errorf("failed to create configuration: %w", err)
 	}
 
 	// now we need to update the "node" field of each replica we connected to
-	for _, node := range inv.pbCfg.Nodes() {
+	for _, node := range s.pbCfg.Nodes() {
 		// the node ID should correspond with the replica ID
 		// because we already configured an ID mapping for gorums to use.
 		id := hotstuff.ID(node.ID())
-		replica := inv.replicas[id]
+		replica := s.replicas[id]
 		replica.node = node
 	}
 
-	inv.connected = true
+	s.connected = true
 
 	// this event is sent so that any delayed `replicaConnected` events can be processed.
-	inv.eventLoop.AddEvent(ConnectedEvent{})
+	s.eventLoop.AddEvent(ConnectedEvent{})
 
 	return nil
 }
 
 // Propose sends the block to all replicas in the configuration
-func (inv *Sender) Propose(proposal hotstuff.ProposeMsg) {
-	cfg := inv.pbCfg
-	ctx, cancel := timeout.Context(inv.eventLoop.Context(), inv.eventLoop)
+func (s *Sender) Propose(proposal hotstuff.ProposeMsg) {
+	cfg := s.pbCfg
+	ctx, cancel := timeout.Context(s.eventLoop.Context(), s.eventLoop)
 	defer cancel()
 	cfg.Propose(
 		ctx,
@@ -135,38 +135,38 @@ func (inv *Sender) Propose(proposal hotstuff.ProposeMsg) {
 	)
 }
 
-func (inv *Sender) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
+func (s *Sender) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
 	info, peerOk := peer.FromContext(c.Ctx)
 	md, mdOk := metadata.FromIncomingContext(c.Ctx)
 	if !peerOk || !mdOk {
 		return
 	}
 
-	id, err := inv.config.PeerIDFromContext(c.Ctx)
+	id, err := s.config.PeerIDFromContext(c.Ctx)
 	if err != nil {
-		inv.logger.Warnf("Failed to get id for %v: %v", info.Addr, err)
+		s.logger.Warnf("Failed to get id for %v: %v", info.Addr, err)
 		return
 	}
 
-	_, ok := inv.config.ReplicaInfo(id)
+	_, ok := s.config.ReplicaInfo(id)
 	if !ok {
-		inv.logger.Warnf("Replica with id %d was not found", id)
+		s.logger.Warnf("Replica with id %d was not found", id)
 		return
 	}
 
-	replica := inv.replicas[id]
+	replica := s.replicas[id]
 	replica.md = readMetadata(md)
-	inv.config.SetReplicaMetaData(replica.id, replica.md)
+	s.config.SetReplicaMetaData(replica.id, replica.md)
 
-	inv.logger.Debugf("Replica %d connected from address %v", id, info.Addr)
+	s.logger.Debugf("Replica %d connected from address %v", id, info.Addr)
 }
 
 // Timeout sends the timeout message to all replicas.
-func (inv *Sender) Timeout(msg hotstuff.TimeoutMsg) {
-	cfg := inv.pbCfg
+func (s *Sender) Timeout(msg hotstuff.TimeoutMsg) {
+	cfg := s.pbCfg
 
 	// will wait until the second timeout before canceling
-	ctx, cancel := timeout.Context(inv.eventLoop.Context(), inv.eventLoop)
+	ctx, cancel := timeout.Context(s.eventLoop.Context(), s.eventLoop)
 	defer cancel()
 
 	cfg.Timeout(
@@ -175,55 +175,70 @@ func (inv *Sender) Timeout(msg hotstuff.TimeoutMsg) {
 	)
 }
 
-// Fetch requests a block from all the replicas in the configuration
-func (inv *Sender) Fetch(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
-	cfg := inv.pbCfg
-
+// RequestBlock requests a block from all the replicas in the configuration
+func (s *Sender) RequestBlock(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
+	cfg := s.pbCfg
+	// TODO(AlanRostem): consider changing the proto service name as well
 	protoBlock, err := cfg.Fetch(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
 	if err != nil {
 		qcErr, ok := err.(gorums.QuorumCallError)
 		// filter out context errors
 		if !ok || (qcErr.Reason != context.Canceled.Error() && qcErr.Reason != context.DeadlineExceeded.Error()) {
-			inv.logger.Infof("Failed to fetch block: %v", err)
+			s.logger.Infof("Failed to fetch block: %v", err)
 		}
 		return nil, false
 	}
 	return hotstuffpb.BlockFromProto(protoBlock), true
 }
 
-func (inv *Sender) ReplicaNode(id hotstuff.ID) (*Replica, bool) {
-	rep, ok := inv.replicas[id]
+func (s *Sender) ReplicaExists(id hotstuff.ID) bool {
+	_, ok := s.replicas[id]
+	return ok
+}
+
+// SendNewView sends the quorum certificate to the other replica.
+func (s *Sender) SendNewView(id hotstuff.ID, msg hotstuff.SyncInfo) {
+	r, ok := s.replicas[id]
 	if !ok {
-		return nil, false
+		panic(fmt.Sprintf("replica does not exist (id=%d)", id))
 	}
-	return rep, ok
+	r.newView(msg)
+}
+
+// SendVote sends the partial certificate to the other replica.
+func (s *Sender) SendVote(id hotstuff.ID, cert hotstuff.PartialCert) {
+	r, ok := s.replicas[id]
+	if !ok {
+		panic(fmt.Sprintf("replica does not exist (id=%d)", id))
+	}
+	r.vote(cert)
 }
 
 // Close closes all connections made by this configuration.
-func (inv *Sender) Close() {
-	inv.mgr.Close()
+func (s *Sender) Close() {
+	s.mgr.Close()
 }
 
-func (inv *Sender) GorumsConfig() gorums.RawConfiguration {
-	return inv.pbCfg.RawConfiguration
+func (s *Sender) GorumsConfig() gorums.RawConfiguration {
+	return s.pbCfg.RawConfiguration
 }
 
 // Sub returns a copy of self dedicated to the replica IDs provided.
-func (inv *Sender) Sub(ids []hotstuff.ID) (*Sender, error) {
-	replicas := make(map[hotstuff.ID]*Replica)
+func (s *Sender) Sub(ids []hotstuff.ID) (*Sender, error) {
+	replicas := make(map[hotstuff.ID]*replicaNode)
 	nids := make([]uint32, len(ids))
 	for i, id := range ids {
 		nids[i] = uint32(id)
-		replicas[id] = inv.replicas[id]
+		replicas[id] = s.replicas[id]
 	}
-	newCfg, err := inv.mgr.NewConfiguration(qspec{}, gorums.WithNodeIDs(nids))
+	newCfg, err := s.mgr.NewConfiguration(qspec{}, gorums.WithNodeIDs(nids))
 	if err != nil {
 		return nil, err
 	}
 	return &Sender{
-		eventLoop: inv.eventLoop,
-		logger:    inv.logger,
-		config:    inv.config,
+		eventLoop: s.eventLoop,
+		logger:    s.logger,
+		config:    s.config,
 		pbCfg:     newCfg,
 		replicas:  replicas,
 	}, nil

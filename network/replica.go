@@ -7,8 +7,8 @@ import (
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 )
 
-// Replica provides methods used by hotstuff to send messages to replicas.
-type Replica struct {
+// replicaNode provides methods used by hotstuff to send messages to replicas.
+type replicaNode struct {
 	eventLoop *eventloop.EventLoop
 	node      *hotstuffpb.Node
 	id        hotstuff.ID
@@ -16,18 +16,8 @@ type Replica struct {
 	md        map[string]string
 }
 
-// ID returns the replica's ID.
-func (r *Replica) ID() hotstuff.ID {
-	return r.id
-}
-
-// PublicKey returns the replica's public key.
-func (r *Replica) PublicKey() hotstuff.PublicKey {
-	return r.pubKey
-}
-
-// Vote sends the partial certificate to the other replica.
-func (r *Replica) Vote(cert hotstuff.PartialCert) {
+// vote sends the partial certificate to the other replica.
+func (r *replicaNode) vote(cert hotstuff.PartialCert) {
 	if r.node == nil {
 		return
 	}
@@ -37,17 +27,12 @@ func (r *Replica) Vote(cert hotstuff.PartialCert) {
 	r.node.Vote(ctx, pCert)
 }
 
-// NewView sends the quorum certificate to the other replica.
-func (r *Replica) NewView(msg hotstuff.SyncInfo) {
+// newView sends the quorum certificate to the other replica.
+func (r *replicaNode) newView(msg hotstuff.SyncInfo) {
 	if r.node == nil {
 		return
 	}
 	ctx, cancel := timeout.Context(r.eventLoop.Context(), r.eventLoop)
 	defer cancel()
 	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(msg))
-}
-
-// Metadata returns the gRPC metadata from this replica's connection.
-func (r *Replica) Metadata() map[string]string {
-	return r.md
 }

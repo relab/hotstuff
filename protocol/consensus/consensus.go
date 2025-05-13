@@ -258,11 +258,10 @@ func (cs *Consensus) voteFor(proposal *hotstuff.ProposeMsg) {
 		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
 		return
 	}
-	leader, ok := cs.sender.ReplicaNode(leaderID)
-	if !ok {
+	if !cs.sender.ReplicaExists(leaderID) {
 		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
 		return
 	}
 	cs.logger.Debugf("OnPropose[view=%d]: voting for %.8s -> %.8x", view, block.Hash(), block.Command())
-	leader.Vote(pc)
+	cs.sender.SendVote(leaderID, pc)
 }
