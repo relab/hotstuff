@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
@@ -68,7 +69,11 @@ func TestModules(t *testing.T) {
 		case eddsa.ModuleName:
 			pk = testutil.GenerateEDDSAKey(t)
 		}
-		depsCore := dependencies.NewCore(hotstuff.ID(1), "test", pk)
+		runtimeOpts := []core.RuntimeOption{}
+		if td.consensusName == fasthotstuff.ModuleName {
+			runtimeOpts = append(runtimeOpts, core.WithAggregateQC())
+		}
+		depsCore := dependencies.NewCore(hotstuff.ID(1), "test", pk, runtimeOpts...)
 		depsNet := dependencies.NewNetwork(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
