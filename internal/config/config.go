@@ -52,10 +52,6 @@ type ExperimentConfig struct {
 	Crypto string
 	// LeaderRotation is the name of the leader rotation algorithm to use.
 	LeaderRotation string
-	// Kauri enables Kauri protocol.
-	Kauri bool
-	// Modules is a list of additional modules to load.
-	Modules []string
 	// Metrics is a list of metrics to log.
 	Metrics []string
 
@@ -63,6 +59,8 @@ type ExperimentConfig struct {
 
 	// UseAggQC indicates whether or not to use aggregated QCs.
 	UseAggQC bool
+	// Kauri enables Kauri protocol.
+	Kauri bool
 
 	// # File path strings below:
 
@@ -247,7 +245,6 @@ func (c *ExperimentConfig) CreateReplicaOpts() *orchestrationpb.ReplicaOpts {
 		TimeoutSamples:    c.DurationSamples,
 		MaxTimeout:        durationpb.New(c.MaxTimeout),
 		SharedSeed:        c.SharedSeed,
-		Modules:           c.Modules,
 		BranchFactor:      c.BranchFactor,
 		TreePositions:     c.TreePositions,
 		TreeDelta:         durationpb.New(c.TreeDelta),

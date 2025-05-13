@@ -59,7 +59,6 @@ func NewViper() (*ExperimentConfig, error) {
 		DurationSamples:     viper.GetUint32("duration-samples"),
 		MaxTimeout:          viper.GetDuration("max-timeout"),
 		SharedSeed:          viper.GetInt64("shared-seed"),
-		Modules:             viper.GetStringSlice("modules"),
 		PayloadSize:         viper.GetUint32("payload-size"),
 		MaxConcurrent:       viper.GetUint32("max-concurrent"),
 		RateLimit:           viper.GetFloat64("rate-limit"),

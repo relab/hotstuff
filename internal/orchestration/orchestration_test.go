@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -21,6 +20,13 @@ import (
 	"github.com/relab/hotstuff/internal/test"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/metrics"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
+	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
+	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
+	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
+	"github.com/relab/hotstuff/security/crypto/bls12"
+	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto/eddsa"
 	"github.com/relab/iago/iagotest"
 )
 
@@ -30,8 +36,9 @@ func makeCfg(
 	byzantine map[string][]uint32,
 	branchFactor uint32,
 	randomTree bool,
-	mods ...string,
+	kauri bool,
 ) *config.ExperimentConfig {
+	useAggQC := consensusImpl == fasthotstuff.ModuleName
 	cfg := &config.ExperimentConfig{
 		Replicas:          replicas,
 		Clients:           clients,
@@ -42,7 +49,8 @@ func makeCfg(
 		Crypto:            crypto,
 		LeaderRotation:    leaderRotation,
 		ByzantineStrategy: byzantine,
-		Modules:           mods,
+		Kauri:             kauri,
+		UseAggQC:          useAggQC,
 
 		// Common default values:
 		ReplicaHosts:      []string{"localhost"},
@@ -102,35 +110,35 @@ func TestOrchestration(t *testing.T) {
 		consensus    string
 		crypto       string
 		byzantine    map[string][]uint32
-		mods         []string
+		kauri        bool
 		replicas     int
 		branchFactor uint32
 		randomTree   bool
 	}{
-		{consensus: "chainedhotstuff", crypto: "ecdsa", replicas: 4},
-		{consensus: "chainedhotstuff", crypto: "eddsa", replicas: 4},
-		{consensus: "chainedhotstuff", crypto: "bls12", replicas: 4},
-		{consensus: "fasthotstuff", crypto: "ecdsa", replicas: 4},
-		{consensus: "fasthotstuff", crypto: "eddsa", replicas: 4},
-		{consensus: "fasthotstuff", crypto: "bls12", replicas: 4},
-		{consensus: "simplehotstuff", crypto: "ecdsa", replicas: 4},
-		{consensus: "simplehotstuff", crypto: "eddsa", replicas: 4},
-		{consensus: "simplehotstuff", crypto: "bls12", replicas: 4},
-		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: fork, replicas: 4},
-		{consensus: "chainedhotstuff", crypto: "ecdsa", byzantine: silence, replicas: 4},
-		{consensus: "chainedhotstuff", crypto: "ecdsa", mods: []string{"kauri"}, replicas: 7, branchFactor: 2},
-		{consensus: "chainedhotstuff", crypto: "bls12", mods: []string{"kauri"}, replicas: 7, branchFactor: 2},
-		{consensus: "chainedhotstuff", crypto: "ecdsa", mods: []string{"kauri"}, replicas: 7, branchFactor: 2, randomTree: true},
-		{consensus: "chainedhotstuff", crypto: "bls12", mods: []string{"kauri"}, replicas: 7, branchFactor: 2, randomTree: true},
+		{consensus: chainedhotstuff.ModuleName, crypto: ecdsa.ModuleName, replicas: 4},
+		{consensus: chainedhotstuff.ModuleName, crypto: eddsa.ModuleName, replicas: 4},
+		{consensus: chainedhotstuff.ModuleName, crypto: bls12.ModuleName, replicas: 4},
+		{consensus: fasthotstuff.ModuleName, crypto: ecdsa.ModuleName, replicas: 4},
+		{consensus: fasthotstuff.ModuleName, crypto: eddsa.ModuleName, replicas: 4},
+		{consensus: fasthotstuff.ModuleName, crypto: bls12.ModuleName, replicas: 4},
+		{consensus: simplehotstuff.ModuleName, crypto: ecdsa.ModuleName, replicas: 4},
+		{consensus: simplehotstuff.ModuleName, crypto: eddsa.ModuleName, replicas: 4},
+		{consensus: simplehotstuff.ModuleName, crypto: bls12.ModuleName, replicas: 4},
+		{consensus: chainedhotstuff.ModuleName, crypto: ecdsa.ModuleName, byzantine: fork, replicas: 4},
+		{consensus: chainedhotstuff.ModuleName, crypto: ecdsa.ModuleName, byzantine: silence, replicas: 4},
+		{consensus: chainedhotstuff.ModuleName, crypto: ecdsa.ModuleName, kauri: true, replicas: 7, branchFactor: 2},
+		{consensus: chainedhotstuff.ModuleName, crypto: bls12.ModuleName, kauri: true, replicas: 7, branchFactor: 2},
+		{consensus: chainedhotstuff.ModuleName, crypto: ecdsa.ModuleName, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
+		{consensus: chainedhotstuff.ModuleName, crypto: bls12.ModuleName, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
 	}
 
 	for _, tt := range tests {
-		t.Run(test.Name([]string{"consensus", "crypto", "byzantine", "mods"}, tt.consensus, tt.crypto, tt.byzantine, tt.mods), func(t *testing.T) {
+		t.Run(test.Name([]string{"consensus", "crypto", "byzantine", "kauri"}, tt.consensus, tt.crypto, tt.byzantine, tt.kauri), func(t *testing.T) {
 			var leaderRotation string
-			if slices.Contains(tt.mods, "kauri") {
-				leaderRotation = "tree-leader"
+			if tt.kauri {
+				leaderRotation = leaderrotation.TreeLeaderModuleName
 			} else {
-				leaderRotation = "round-robin"
+				leaderRotation = leaderrotation.RoundRobinModuleName
 			}
 			cfg := makeCfg(
 				tt.replicas, 2,
@@ -140,7 +148,7 @@ func TestOrchestration(t *testing.T) {
 				tt.byzantine,
 				tt.branchFactor,
 				tt.randomTree,
-				tt.mods...,
+				tt.kauri,
 			)
 			run(t, cfg)
 		})
@@ -218,8 +226,8 @@ func TestDeployment(t *testing.T) {
 		ViewTimeout:       100 * time.Millisecond,
 		DurationSamples:   1000,
 		TimeoutMultiplier: 1.2,
-		Consensus:         "chainedhotstuff",
-		Crypto:            "ecdsa",
+		Consensus:         chainedhotstuff.ModuleName,
+		Crypto:            ecdsa.ModuleName,
 		LeaderRotation:    "round-robin",
 	}
 
