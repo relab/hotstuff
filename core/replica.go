@@ -28,12 +28,12 @@ func (g *RuntimeConfig) SetReplicaMetaData(id hotstuff.ID, metaData map[string]s
 	g.replicas[id].MetaData = metaData
 }
 
-// SetConnectionMetadata sets the value of a key in the connection metadata map.
+// AddConnectionMetadata sets the value of a key in the connection metadata map.
 //
 // NOTE: if the value contains binary data, the key must have the "-bin" suffix.
 // This is to make it compatible with GRPC metadata.
 // See: https://github.com/grpc/grpc-go/blob/master/Documentation/grpc-metadata.md#storing-binary-data-in-metadata
-func (g *RuntimeConfig) SetConnectionMetadata(key string, value string) {
+func (g *RuntimeConfig) AddConnectionMetadata(key string, value string) {
 	g.connectionMetadata[key] = value
 }
 

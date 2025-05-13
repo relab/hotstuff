@@ -161,7 +161,7 @@ func New(
 
 	pop := bls.popProve()
 	b := bls12.NewG2().ToCompressed(pop)
-	bls.config.SetConnectionMetadata(popMetadataKey, string(b))
+	bls.config.AddConnectionMetadata(popMetadataKey, string(b))
 	return bls
 }
 
