@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core/globals"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
@@ -24,12 +24,12 @@ func newConsensusRulesModule(
 	name string,
 	blockChain *blockchain.BlockChain,
 	logger logging.Logger,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 ) (rules modules.ConsensusRules, err error) {
 	logger.Debugf("Initializing module (consensus rules): %s", name)
 	switch name {
 	case fasthotstuff.ModuleName:
-		rules = fasthotstuff.New(blockChain, logger, globals)
+		rules = fasthotstuff.New(blockChain, logger, config)
 	case simplehotstuff.ModuleName:
 		rules = simplehotstuff.New(blockChain, logger)
 	case chainedhotstuff.ModuleName:
@@ -44,14 +44,14 @@ func newByzantineStrategyModule(
 	name string,
 	rules modules.ConsensusRules,
 	blockChain *blockchain.BlockChain,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 ) (byzRules modules.ConsensusRules, err error) {
 	// logger.Debugf("Initializing module (byzantine strategy): %s", name)
 	switch name {
 	case byzantine.SilenceModuleName:
 		byzRules = byzantine.NewSilence(rules)
 	case byzantine.ForkModuleName:
-		byzRules = byzantine.NewFork(rules, blockChain, globals)
+		byzRules = byzantine.NewFork(rules, blockChain, config)
 	default:
 		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", name)
 	}
@@ -61,16 +61,16 @@ func newByzantineStrategyModule(
 func newCryptoModule(
 	name string,
 	logger logging.Logger,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 ) (impl modules.CryptoBase, err error) {
 	logger.Debugf("Initializing module (crypto): %s", name)
 	switch name {
 	case bls12.ModuleName:
-		impl = bls12.New(logger, globals)
+		impl = bls12.New(logger, config)
 	case ecdsa.ModuleName:
-		impl = ecdsa.New(logger, globals)
+		impl = ecdsa.New(logger, config)
 	case eddsa.ModuleName:
-		impl = eddsa.New(logger, globals)
+		impl = eddsa.New(logger, config)
 	default:
 		return nil, fmt.Errorf("invalid crypto name: '%s'", name)
 	}
@@ -84,20 +84,20 @@ func newLeaderRotationModule(
 	blockChain *blockchain.BlockChain,
 	committer *committer.Committer,
 	logger logging.Logger,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 ) (ld modules.LeaderRotation, err error) {
 	logger.Debugf("Initializing module (leader rotation): %s", name)
 	switch name {
 	case leaderrotation.CarouselModuleName:
-		ld = leaderrotation.NewCarousel(chainLength, vdParams, blockChain, committer, globals, logger)
+		ld = leaderrotation.NewCarousel(chainLength, vdParams, blockChain, committer, config, logger)
 	case leaderrotation.ReputationModuleName:
-		ld = leaderrotation.NewRepBased(chainLength, vdParams, committer, globals, logger)
+		ld = leaderrotation.NewRepBased(chainLength, vdParams, committer, config, logger)
 	case leaderrotation.RoundRobinModuleName:
-		ld = leaderrotation.NewRoundRobin(globals, vdParams)
+		ld = leaderrotation.NewRoundRobin(config, vdParams)
 	case leaderrotation.FixedModuleName:
 		ld = leaderrotation.NewFixed(hotstuff.ID(1), vdParams)
 	case leaderrotation.TreeLeaderModuleName:
-		ld = leaderrotation.NewTreeLeader(vdParams.StartTimeout(), globals)
+		ld = leaderrotation.NewTreeLeader(vdParams.StartTimeout(), config)
 	default:
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", name)
 	}

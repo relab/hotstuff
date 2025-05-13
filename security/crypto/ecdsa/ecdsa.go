@@ -9,7 +9,7 @@ import (
 	"math/big"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core/globals"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/crypto"
@@ -66,23 +66,23 @@ func (sig Signature) ToBytes() []byte {
 }
 
 type ecdsaBase struct {
-	logger  logging.Logger
-	globals *globals.Globals
+	logger logging.Logger
+	config *core.RuntimeConfig
 }
 
 // New returns a new instance of the ECDSA CryptoBase implementation.
 func New(
 	logger logging.Logger,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 ) modules.CryptoBase {
 	return &ecdsaBase{
-		logger:  logger,
-		globals: globals,
+		logger: logger,
+		config: config,
 	}
 }
 
 func (ec *ecdsaBase) privateKey() *ecdsa.PrivateKey {
-	return ec.globals.PrivateKey().(*ecdsa.PrivateKey)
+	return ec.config.PrivateKey().(*ecdsa.PrivateKey)
 }
 
 // Sign creates a cryptographic signature of the given message.
@@ -92,10 +92,10 @@ func (ec *ecdsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, e
 	if err != nil {
 		return nil, fmt.Errorf("ecdsa: sign failed: %w", err)
 	}
-	return crypto.Multi[*Signature]{ec.globals.ID(): &Signature{
+	return crypto.Multi[*Signature]{ec.config.ID(): &Signature{
 		r:      r,
 		s:      s,
-		signer: ec.globals.ID(),
+		signer: ec.config.ID(),
 	}}, nil
 }
 
@@ -184,7 +184,7 @@ func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 }
 
 func (ec *ecdsaBase) verifySingle(sig *Signature, hash hotstuff.Hash) bool {
-	replica, ok := ec.globals.ReplicaInfo(sig.Signer())
+	replica, ok := ec.config.ReplicaInfo(sig.Signer())
 	if !ok {
 		ec.logger.Warnf("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
 		return false

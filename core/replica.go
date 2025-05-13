@@ -1,30 +1,30 @@
-package globals
+package core
 
 import "github.com/relab/hotstuff"
 
 // ReplicaInfo returns a replica if it is present in the configuration.
-func (g *Globals) ReplicaInfo(id hotstuff.ID) (replica *hotstuff.ReplicaInfo, ok bool) {
+func (g *RuntimeConfig) ReplicaInfo(id hotstuff.ID) (replica *hotstuff.ReplicaInfo, ok bool) {
 	replica, ok = g.replicas[id]
 	return
 }
 
 // ReplicaCount returns the number of replicas in the configuration.
-func (g *Globals) ReplicaCount() int {
+func (g *RuntimeConfig) ReplicaCount() int {
 	return len(g.replicas)
 }
 
 // QuorumSize returns the size of a quorum
-func (g *Globals) QuorumSize() int {
+func (g *RuntimeConfig) QuorumSize() int {
 	return hotstuff.QuorumSize(g.ReplicaCount())
 }
 
 // AddReplica adds information about the replica.
-func (g *Globals) AddReplica(replicaInfo *hotstuff.ReplicaInfo) {
+func (g *RuntimeConfig) AddReplica(replicaInfo *hotstuff.ReplicaInfo) {
 	g.replicas[replicaInfo.ID] = replicaInfo
 }
 
 // TODO(AlanRostem): can this be avoided by integrating it into SetConnectionMetadata?
-func (g *Globals) SetReplicaMetaData(id hotstuff.ID, metaData map[string]string) {
+func (g *RuntimeConfig) SetReplicaMetaData(id hotstuff.ID, metaData map[string]string) {
 	g.replicas[id].MetaData = metaData
 }
 
@@ -33,11 +33,11 @@ func (g *Globals) SetReplicaMetaData(id hotstuff.ID, metaData map[string]string)
 // NOTE: if the value contains binary data, the key must have the "-bin" suffix.
 // This is to make it compatible with GRPC metadata.
 // See: https://github.com/grpc/grpc-go/blob/master/Documentation/grpc-metadata.md#storing-binary-data-in-metadata
-func (g *Globals) SetConnectionMetadata(key string, value string) {
+func (g *RuntimeConfig) SetConnectionMetadata(key string, value string) {
 	g.connectionMetadata[key] = value
 }
 
 // ConnectionMetadata returns the metadata map that is sent when connecting to other replicas.
-func (g *Globals) ConnectionMetadata() map[string]string {
+func (g *RuntimeConfig) ConnectionMetadata() map[string]string {
 	return g.connectionMetadata
 }

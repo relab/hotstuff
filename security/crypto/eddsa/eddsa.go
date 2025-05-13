@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core/globals"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/crypto"
@@ -52,30 +52,30 @@ func (sig Signature) ToBytes() []byte {
 }
 
 type eddsaBase struct {
-	logger  logging.Logger
-	globals *globals.Globals
+	logger logging.Logger
+	config *core.RuntimeConfig
 }
 
 // New returns a new instance of the EDDSA CryptoBase implementation.
 func New(
 	logger logging.Logger,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 ) modules.CryptoBase {
 	return &eddsaBase{
-		logger:  logger,
-		globals: globals,
+		logger: logger,
+		config: config,
 	}
 }
 
 func (ed *eddsaBase) privateKey() ed25519.PrivateKey {
-	return ed.globals.PrivateKey().(ed25519.PrivateKey)
+	return ed.config.PrivateKey().(ed25519.PrivateKey)
 }
 
 // Sign creates a cryptographic signature of the given message.
 func (ed *eddsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
 	sign := ed25519.Sign(ed.privateKey(), message)
-	eddsaSign := &Signature{signer: ed.globals.ID(), sign: sign}
-	return crypto.Multi[*Signature]{ed.globals.ID(): eddsaSign}, nil
+	eddsaSign := &Signature{signer: ed.config.ID(), sign: sign}
+	return crypto.Multi[*Signature]{ed.config.ID(): eddsaSign}, nil
 }
 
 // Combine combines multiple signatures into a single signature.
@@ -162,7 +162,7 @@ func (ed *eddsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 }
 
 func (ed *eddsaBase) verifySingle(sig *Signature, message []byte) bool {
-	replica, ok := ed.globals.ReplicaInfo(sig.Signer())
+	replica, ok := ed.config.ReplicaInfo(sig.Signer())
 	if !ok {
 		ed.logger.Warnf("eddsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
 		return false

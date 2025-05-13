@@ -7,7 +7,7 @@ import (
 	wr "github.com/mroth/weightedrand"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core/globals"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
@@ -20,7 +20,7 @@ type reputationsMap map[hotstuff.ID]float64
 
 type repBased struct {
 	committer    *committer.Committer
-	globals      *globals.Globals
+	config       *core.RuntimeConfig
 	logger       logging.Logger
 	viewDuration modules.ViewDuration
 
@@ -45,7 +45,7 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 		return 0
 	}
 
-	numReplicas := r.globals.ReplicaCount()
+	numReplicas := r.config.ReplicaCount()
 	// use round-robin for the first few views until we get a signature
 	if block.QuorumCert().Signature() == nil {
 		return chooseRoundRobin(view, numReplicas)
@@ -85,7 +85,7 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 		return 0
 	}
 
-	seed := r.globals.SharedRandomSeed() + int64(view)
+	seed := r.config.SharedRandomSeed() + int64(view)
 	rnd := rand.New(rand.NewSource(seed))
 
 	leader := chooser.PickSource(rnd).(hotstuff.ID)
@@ -100,12 +100,12 @@ func NewRepBased(
 	vdParams viewduration.Params,
 
 	committer *committer.Committer,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 	logger logging.Logger,
 ) modules.LeaderRotation {
 	return &repBased{
 		committer:    committer,
-		globals:      globals,
+		config:       config,
 		logger:       logger,
 		viewDuration: viewduration.NewDynamic(vdParams),
 

@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/client"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/metrics/types"
 )
@@ -15,7 +15,7 @@ const NameClientLatency = "client-latency"
 // clientLatency processes LatencyMeasurementEvents, and writes LatencyMeasurements to the metrics logger.
 type clientLatency struct {
 	metricsLogger Logger
-	globals       *globals.Globals
+	config        *core.RuntimeConfig
 
 	wf Welford
 }
@@ -24,10 +24,10 @@ func enableClientLatency(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	metricsLogger Logger,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 ) {
 	lr := &clientLatency{
-		globals:       globals,
+		config:        config,
 		metricsLogger: metricsLogger,
 	}
 
@@ -52,7 +52,7 @@ func (lr *clientLatency) addLatency(latency time.Duration) {
 func (lr *clientLatency) tick(_ types.TickEvent) {
 	mean, variance, count := lr.wf.Get()
 	event := &types.LatencyMeasurement{
-		Event:    types.NewClientEvent(uint32(lr.globals.ID()), time.Now()),
+		Event:    types.NewClientEvent(uint32(lr.config.ID()), time.Now()),
 		Latency:  mean,
 		Variance: variance,
 		Count:    count,

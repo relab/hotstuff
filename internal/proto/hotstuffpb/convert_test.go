@@ -7,7 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core/globals"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/certauth"
@@ -20,7 +20,7 @@ import (
 
 func TestConvertPartialCert(t *testing.T) {
 	key := testutil.GenerateECDSAKey(t)
-	globs := globals.NewGlobals(1, key)
+	globs := core.NewRuntimeConfig(1, key)
 	crypt := ecdsa.New(nil, globs) // TODO: why is logger nil?
 	signer := certauth.New(crypt, nil, nil)
 
@@ -42,7 +42,7 @@ func TestConvertQuorumCert(t *testing.T) {
 	signers := make([]*certauth.CertAuthority, n)
 	for i := range n {
 		key := testutil.GenerateECDSAKey(t)
-		globs := globals.NewGlobals(hotstuff.ID(i+1), key)
+		globs := core.NewRuntimeConfig(hotstuff.ID(i+1), key)
 		crypt := ecdsa.New(nil, globs)
 		signer := certauth.New(crypt, nil, nil)
 		signers[i] = signer
@@ -78,12 +78,12 @@ func TestConvertBlock(t *testing.T) {
 
 func TestConvertTimeoutCertBLS12(t *testing.T) {
 	n := 4
-	globs := make(map[hotstuff.ID]*globals.Globals)
+	globs := make(map[hotstuff.ID]*core.RuntimeConfig)
 	replicaInfos := make(map[hotstuff.ID]*hotstuff.ReplicaInfo)
 	for i := range n {
 		id := hotstuff.ID(i + 1)
 		key := testutil.GenerateBLS12Key(t)
-		globs[id] = globals.NewGlobals(id, key)
+		globs[id] = core.NewRuntimeConfig(id, key)
 		pub := key.Public()
 		replicaInfos[id] = &hotstuff.ReplicaInfo{ID: id, PubKey: pub}
 	}

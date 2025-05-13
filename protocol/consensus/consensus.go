@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
@@ -31,7 +31,7 @@ type Consensus struct {
 	auth         *certauth.CertAuthority
 	eventLoop    *eventloop.EventLoop
 	logger       logging.Logger
-	globals      *globals.Globals
+	config       *core.RuntimeConfig
 
 	lastVote hotstuff.View
 }
@@ -48,7 +48,7 @@ func New(
 	auth *certauth.CertAuthority,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 	// opts ...Option,
 ) *Consensus {
 	cs := &Consensus{
@@ -63,7 +63,7 @@ func New(
 		auth:         auth,
 		eventLoop:    eventLoop,
 		logger:       logger,
-		globals:      globals,
+		config:       config,
 
 		lastVote: 0,
 	}
@@ -72,16 +72,16 @@ func New(
 	// 	opt(cs)
 	// }
 
-	if globals.ShouldEnableKauri() {
+	if config.KauriEnabled() {
 		cs.kauri = kauri.New(
 			auth,
 			leaderRotation,
 			blockChain,
-			globals,
+			config,
 			eventLoop,
 			sender,
 			logger,
-			globals.Tree(),
+			config.Tree(),
 		)
 	}
 
@@ -89,7 +89,7 @@ func New(
 		sInfo, advance := cs.OnPropose(event.(hotstuff.ProposeMsg))
 		if advance {
 			cs.eventLoop.AddEvent(hotstuff.NewViewMsg{
-				ID:       cs.globals.ID(),
+				ID:       cs.config.ID(),
 				SyncInfo: sInfo,
 			})
 		}
@@ -138,17 +138,17 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cer
 		}
 	} else {
 		proposal = hotstuff.ProposeMsg{
-			ID: cs.globals.ID(),
+			ID: cs.config.ID(),
 			Block: hotstuff.NewBlock(
 				qc.BlockHash(),
 				qc,
 				cmd,
 				view,
-				cs.globals.ID(),
+				cs.config.ID(),
 			),
 		}
 
-		if aggQC, ok := cert.AggQC(); ok && cs.globals.ShouldUseAggQC() {
+		if aggQC, ok := cert.AggQC(); ok && cs.config.HasAggregateQC() {
 			proposal.AggregateQC = &aggQC
 		}
 	}
@@ -165,8 +165,8 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cer
 func (cs *Consensus) checkQC(proposal *hotstuff.ProposeMsg) bool {
 	block := proposal.Block
 	view := block.View()
-	if cs.globals.ShouldUseAggQC() && proposal.AggregateQC != nil {
-		highQC, ok := cs.auth.VerifyAggregateQC(cs.globals.QuorumSize(), *proposal.AggregateQC)
+	if cs.config.HasAggregateQC() && proposal.AggregateQC != nil {
+		highQC, ok := cs.auth.VerifyAggregateQC(cs.config.QuorumSize(), *proposal.AggregateQC)
 		if !ok {
 			cs.logger.Warnf("checkQC[view=%d]: failed to verify aggregate QC", view)
 			return false
@@ -177,7 +177,7 @@ func (cs *Consensus) checkQC(proposal *hotstuff.ProposeMsg) bool {
 			return false
 		}
 	}
-	if !cs.auth.VerifyQuorumCert(cs.globals.QuorumSize(), block.QuorumCert()) {
+	if !cs.auth.VerifyQuorumCert(cs.config.QuorumSize(), block.QuorumCert()) {
 		cs.logger.Infof("checkQC[view=%d]: invalid QC", view)
 		return false
 	}
@@ -251,8 +251,8 @@ func (cs *Consensus) voteFor(proposal *hotstuff.ProposeMsg) {
 		return
 	}
 	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
-	if leaderID == cs.globals.ID() {
-		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.globals.ID(), PartialCert: pc})
+	if leaderID == cs.config.ID() {
+		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
 		return
 	}
 	leader, ok := cs.sender.ReplicaNode(leaderID)

@@ -7,8 +7,8 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
@@ -22,7 +22,7 @@ import (
 type Sender struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
-	globals   *globals.Globals
+	config    *core.RuntimeConfig
 
 	mgrOpts   []gorums.ManagerOption
 	connected bool
@@ -36,7 +36,7 @@ type Sender struct {
 func NewSender(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 
 	creds credentials.TransportCredentials,
 	mgrOpts ...gorums.ManagerOption) *Sender {
@@ -51,7 +51,7 @@ func NewSender(
 	inv := &Sender{
 		eventLoop: eventLoop,
 		logger:    logger,
-		globals:   globals,
+		config:    config,
 
 		mgrOpts:  mgrOpts,
 		replicas: make(map[hotstuff.ID]*Replica),
@@ -73,10 +73,10 @@ func (inv *Sender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 	// TODO(AlanRostem): this was here when the subConfig pattern was in use. Check if doing this is valid
 	// cfg.opts = nil // options are not needed beyond this point, so we delete them.
 
-	md := mapToMetadata(inv.globals.ConnectionMetadata())
+	md := mapToMetadata(inv.config.ConnectionMetadata())
 
 	// embed own ID to allow other replicas to identify messages from this replica
-	md.Set("id", fmt.Sprintf("%d", inv.globals.ID()))
+	md.Set("id", fmt.Sprintf("%d", inv.config.ID()))
 
 	mgrOpts = append(mgrOpts, gorums.WithMetadata(md))
 
@@ -94,9 +94,9 @@ func (inv *Sender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 		}
 		inv.replicas[replica.ID] = realReplica
 		// add the info to the config
-		inv.globals.AddReplica(&replica)
+		inv.config.AddReplica(&replica)
 		// we do not want to connect to ourself
-		if replica.ID != inv.globals.ID() {
+		if replica.ID != inv.config.ID() {
 			idMapping[replica.Address] = uint32(replica.ID)
 		}
 	}
@@ -142,13 +142,13 @@ func (inv *Sender) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
 		return
 	}
 
-	id, err := inv.globals.PeerIDFromContext(c.Ctx)
+	id, err := inv.config.PeerIDFromContext(c.Ctx)
 	if err != nil {
 		inv.logger.Warnf("Failed to get id for %v: %v", info.Addr, err)
 		return
 	}
 
-	_, ok := inv.globals.ReplicaInfo(id)
+	_, ok := inv.config.ReplicaInfo(id)
 	if !ok {
 		inv.logger.Warnf("Replica with id %d was not found", id)
 		return
@@ -156,7 +156,7 @@ func (inv *Sender) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
 
 	replica := inv.replicas[id]
 	replica.md = readMetadata(md)
-	inv.globals.SetReplicaMetaData(replica.id, replica.md)
+	inv.config.SetReplicaMetaData(replica.id, replica.md)
 
 	inv.logger.Debugf("Replica %d connected from address %v", id, info.Addr)
 }
@@ -223,7 +223,7 @@ func (inv *Sender) Sub(ids []hotstuff.ID) (*Sender, error) {
 	return &Sender{
 		eventLoop: inv.eventLoop,
 		logger:    inv.logger,
-		globals:   inv.globals,
+		config:    inv.config,
 		pbCfg:     newCfg,
 		replicas:  replicas,
 	}, nil

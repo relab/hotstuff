@@ -14,8 +14,8 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"golang.org/x/time/rate"
@@ -61,7 +61,7 @@ type Config struct {
 type Client struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
-	globals   *globals.Globals
+	config    *core.RuntimeConfig
 
 	mut              sync.Mutex
 	mgr              *clientpb.Manager
@@ -82,14 +82,14 @@ type Client struct {
 func New(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 
 	conf Config,
 ) (client *Client) {
 	client = &Client{
 		eventLoop: eventLoop,
 		logger:    logger,
-		globals:   globals,
+		config:    config,
 
 		pendingCmds:      make(chan pendingCmd, conf.MaxConcurrent),
 		highestCommitted: 1,
@@ -231,7 +231,7 @@ loop:
 		}
 
 		cmd := &clientpb.Command{
-			ClientID:       uint32(c.globals.ID()),
+			ClientID:       uint32(c.config.ID()),
 			SequenceNumber: num,
 			Data:           data[:n],
 		}

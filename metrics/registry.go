@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 )
 
@@ -16,7 +16,7 @@ func Enable(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	metricsLogger Logger,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 	measurementInterval time.Duration,
 	metricNames ...string) error {
 	if len(metricNames) == 0 {
@@ -25,11 +25,11 @@ func Enable(
 	for _, name := range metricNames {
 		switch name {
 		case NameClientLatency:
-			enableClientLatency(eventLoop, logger, metricsLogger, globals)
+			enableClientLatency(eventLoop, logger, metricsLogger, config)
 		case NameViewTimeouts:
-			enableViewTimeouts(eventLoop, logger, metricsLogger, globals)
+			enableViewTimeouts(eventLoop, logger, metricsLogger, config)
 		case NameThroughput:
-			enableThroughput(eventLoop, logger, metricsLogger, globals)
+			enableThroughput(eventLoop, logger, metricsLogger, config)
 		default:
 			return fmt.Errorf("invalid metric: %s", name)
 		}

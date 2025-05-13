@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core/globals"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 )
@@ -13,16 +13,16 @@ const TreeLeaderModuleName = "tree-leader"
 
 type treeLeader struct {
 	leader       hotstuff.ID
-	globals      *globals.Globals
+	config       *core.RuntimeConfig
 	viewDuration modules.ViewDuration
 }
 
 func NewTreeLeader(
 	viewDuration time.Duration,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 ) modules.LeaderRotation {
 	return &treeLeader{
-		globals:      globals,
+		config:       config,
 		leader:       1,
 		viewDuration: viewduration.NewFixed(viewDuration),
 	}
@@ -34,12 +34,12 @@ func (t *treeLeader) ViewDuration() modules.ViewDuration {
 
 // GetLeader returns the id of the leader in the given view
 func (t *treeLeader) GetLeader(_ hotstuff.View) hotstuff.ID {
-	if t.globals == nil {
+	if t.config == nil {
 		panic("oops")
 	}
 
-	if !t.globals.ShouldUseTree() {
+	if !t.config.HasTree() {
 		return 1
 	}
-	return t.globals.Tree().Root()
+	return t.config.Tree().Root()
 }

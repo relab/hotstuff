@@ -1,8 +1,8 @@
 package dependencies
 
 import (
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
@@ -20,7 +20,7 @@ type Security struct {
 func NewSecurity(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 	sender *network.Sender,
 	cryptoName string,
 	opts ...certauth.Option,
@@ -33,7 +33,7 @@ func NewSecurity(
 	cryptoImpl, err := newCryptoModule(
 		cryptoName,
 		logger,
-		globals,
+		config,
 	)
 	if err != nil {
 		return nil, err

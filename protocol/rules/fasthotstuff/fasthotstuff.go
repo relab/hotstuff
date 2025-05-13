@@ -3,7 +3,7 @@ package fasthotstuff
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core/globals"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
@@ -21,14 +21,14 @@ type FastHotStuff struct {
 func New(
 	blockChain *blockchain.BlockChain,
 	logger logging.Logger,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 ) modules.ConsensusRules {
 	fhs := &FastHotStuff{
 		blockChain: blockChain,
 		logger:     logger,
 	}
 
-	globals.SetShouldUseAggQC() // TODO(AlanRostem): avoid this coupling
+	config.EnableAggregateQC() // TODO(AlanRostem): avoid this coupling
 	return fhs
 }
 

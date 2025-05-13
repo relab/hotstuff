@@ -13,8 +13,8 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/client"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/latency"
@@ -144,7 +144,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, err
 	}
 	// setup core - used in replica and measurement framework
-	globalOpts := []globals.Option{}
+	globalOpts := []core.Option{}
 	if opts.GetLeaderRotation() == leaderrotation.TreeLeaderModuleName {
 		delayMode := tree.DelayTypeNone
 		if opts.GetAggregationTime() {
@@ -158,12 +158,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			opts.TreePositionIDs(),
 			opts.GetTreeDelta().AsDuration(),
 		)
-		globalOpts = append(globalOpts, globals.WithTree(t))
+		globalOpts = append(globalOpts, core.WithTree(t))
 	}
 	if opts.GetKauri() {
-		globalOpts = append(globalOpts, globals.WithKauri())
+		globalOpts = append(globalOpts, core.WithKauri())
 	}
-	globalOpts = append(globalOpts, globals.WithSharedRandomSeed(opts.GetSharedSeed()))
+	globalOpts = append(globalOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
 	depsCore := dependencies.NewCore(opts.HotstuffID(), "hs", privKey, globalOpts...)
 	// check if measurements should be enabled
 	if w.measurementInterval > 0 {
@@ -275,7 +275,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		buildOpt := globals.NewGlobals(hotstuff.ID(opts.GetID()), nil)
+		buildOpt := core.NewRuntimeConfig(hotstuff.ID(opts.GetID()), nil)
 		logger := logging.New("cli" + strconv.Itoa(int(opts.GetID())))
 		eventLoop := eventloop.New(logger, 1000)
 

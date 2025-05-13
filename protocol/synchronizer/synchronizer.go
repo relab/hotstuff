@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
@@ -31,7 +31,7 @@ type Synchronizer struct {
 	sender     *network.Sender
 	eventLoop  *eventloop.EventLoop
 	logger     logging.Logger
-	globals    *globals.Globals
+	config     *core.RuntimeConfig
 
 	mut         sync.RWMutex // to protect the following
 	currentView hotstuff.View
@@ -60,7 +60,7 @@ func New(
 	sender *network.Sender,
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 ) *Synchronizer {
 	s := &Synchronizer{
 		duration:       leaderRotation.ViewDuration(),
@@ -73,7 +73,7 @@ func New(
 		sender:     sender,
 		eventLoop:  eventLoop,
 		logger:     logger,
-		globals:    globals,
+		config:     config,
 
 		currentView: 1,
 
@@ -113,7 +113,7 @@ func New(
 		eventLoop,
 		logger,
 		s,
-		globals,
+		config,
 	)
 	return s
 }
@@ -153,7 +153,7 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	}()
 
 	// start the initial proposal
-	if view := s.View(); view == 1 && s.leaderRotation.GetLeader(view) == s.globals.ID() {
+	if view := s.View(); view == 1 && s.leaderRotation.GetLeader(view) == s.config.ID() {
 		sInfo, ok := s.consensus.Propose(s.View(), s.highQC, s.SyncInfo())
 		if ok {
 			s.AdvanceView(sInfo)
@@ -200,13 +200,13 @@ func (s *Synchronizer) OnLocalTimeout() {
 		return
 	}
 	timeoutMsg := hotstuff.TimeoutMsg{
-		ID:            s.globals.ID(),
+		ID:            s.config.ID(),
 		View:          view,
 		SyncInfo:      s.SyncInfo(),
 		ViewSignature: sig,
 	}
 
-	if s.globals.ShouldUseAggQC() {
+	if s.config.HasAggregateQC() {
 		// generate a second signature that will become part of the aggregateQC
 		sig, err := s.crypto.Sign(timeoutMsg.ToBytes())
 		if err != nil {
@@ -254,7 +254,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		timeouts[timeout.ID] = timeout
 	}
 
-	if len(timeouts) < s.globals.QuorumSize() {
+	if len(timeouts) < s.config.QuorumSize() {
 		return
 	}
 
@@ -273,7 +273,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 
 	si := s.SyncInfo().WithTC(tc)
 
-	if s.globals.ShouldUseAggQC() {
+	if s.config.HasAggregateQC() {
 		aggQC, err := s.auth.CreateAggregateQC(currView, timeoutList)
 		if err != nil {
 			s.logger.Debugf("Failed to create aggregateQC: %v", err)
@@ -300,7 +300,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	// check for a TC
 	if tc, ok := syncInfo.TC(); ok {
-		if !s.auth.VerifyTimeoutCert(s.globals.QuorumSize(), tc) {
+		if !s.auth.VerifyTimeoutCert(s.config.QuorumSize(), tc) {
 			s.logger.Info("Timeout Certificate could not be verified!")
 			return
 		}
@@ -316,8 +316,8 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	)
 
 	// check for an AggQC or QC
-	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.globals.ShouldUseAggQC() {
-		highQC, ok := s.auth.VerifyAggregateQC(s.globals.QuorumSize(), aggQC)
+	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.config.HasAggregateQC() {
+		highQC, ok := s.auth.VerifyAggregateQC(s.config.QuorumSize(), aggQC)
 		if !ok {
 			s.logger.Info("Aggregated Quorum Certificate could not be verified")
 			return
@@ -330,7 +330,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		syncInfo = syncInfo.WithQC(highQC)
 		qc = highQC
 	} else if qc, haveQC = syncInfo.QC(); haveQC {
-		if !s.auth.VerifyQuorumCert(s.globals.QuorumSize(), qc) {
+		if !s.auth.VerifyQuorumCert(s.config.QuorumSize(), qc) {
 			s.logger.Info("Quorum Certificate could not be verified!")
 			return
 		}
@@ -368,7 +368,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	s.eventLoop.AddEvent(hotstuff.ViewChangeEvent{View: newView, Timeout: timeout})
 
 	leader := s.leaderRotation.GetLeader(newView)
-	if leader == s.globals.ID() {
+	if leader == s.config.ID() {
 		sInfo, ok := s.consensus.Propose(s.View(), s.highQC, syncInfo)
 		if ok {
 			s.AdvanceView(sInfo)

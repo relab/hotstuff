@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/security/blockchain"
@@ -25,7 +25,7 @@ type Server struct {
 	blockChain *blockchain.BlockChain
 	eventLoop  *eventloop.EventLoop
 	logger     logging.Logger
-	globals    *globals.Globals
+	config     *core.RuntimeConfig
 
 	id        hotstuff.ID
 	lm        latency.Matrix
@@ -36,7 +36,7 @@ type Server struct {
 func NewServer(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
 	srvOpts ...ServerOption,
 ) *Server {
@@ -48,7 +48,7 @@ func NewServer(
 		blockChain: blockChain,
 		eventLoop:  eventLoop,
 		logger:     logger,
-		globals:    globals,
+		config:     config,
 
 		id: options.id,
 		lm: options.latencyMatrix,
@@ -57,7 +57,7 @@ func NewServer(
 		srv.eventLoop.AddEvent(hotstuff.ReplicaConnectedEvent{Ctx: ctx})
 	}))
 	srv.gorumsSrv = gorums.NewServer(options.gorumsSrvOpts...)
-	if globals.ShouldEnableKauri() {
+	if config.KauriEnabled() {
 		kauri.RegisterService(eventLoop, logger, srv.gorumsSrv)
 	}
 	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, &serviceImpl{srv})
@@ -112,12 +112,12 @@ type serviceImpl struct {
 
 // Propose handles a replica's response to the Propose QC from the leader.
 func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
-	id, err := impl.srv.globals.PeerIDFromContext(ctx)
+	id, err := impl.srv.config.PeerIDFromContext(ctx)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
 	}
-	if impl.srv.globals.ShouldUseTree() {
+	if impl.srv.config.HasTree() {
 		id = hotstuff.ID(proposal.Block.Proposer)
 	}
 	proposal.Block.Proposer = uint32(id)
@@ -129,7 +129,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 
 // Vote handles an incoming vote message.
 func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
-	id, err := impl.srv.globals.PeerIDFromContext(ctx)
+	id, err := impl.srv.config.PeerIDFromContext(ctx)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
@@ -143,7 +143,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 
 // NewView handles the leader's response to receiving a NewView rpc from a replica.
 func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo) {
-	id, err := impl.srv.globals.PeerIDFromContext(ctx)
+	id, err := impl.srv.config.PeerIDFromContext(ctx)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
@@ -172,7 +172,7 @@ func (impl *serviceImpl) Fetch(_ gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*h
 
 // Timeout handles an incoming TimeoutMsg.
 func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
-	id, err := impl.srv.globals.PeerIDFromContext(ctx)
+	id, err := impl.srv.config.PeerIDFromContext(ctx)
 	if err != nil {
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 	}

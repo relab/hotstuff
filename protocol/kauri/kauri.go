@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/proto/kauripb"
@@ -26,7 +26,7 @@ type Kauri struct {
 	blockChain     *blockchain.BlockChain
 	crypto         modules.CryptoBase
 	leaderRotation modules.LeaderRotation
-	globals        *globals.Globals
+	config         *core.RuntimeConfig
 	eventLoop      *eventloop.EventLoop
 	sender         *network.Sender
 	logger         logging.Logger
@@ -46,7 +46,7 @@ func New(
 	crypto modules.CryptoBase,
 	leaderRotation modules.LeaderRotation,
 	blockChain *blockchain.BlockChain,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 	eventLoop *eventloop.EventLoop,
 	sender *network.Sender,
 	logger logging.Logger,
@@ -56,7 +56,7 @@ func New(
 		blockChain:     blockChain,
 		crypto:         crypto,
 		leaderRotation: leaderRotation,
-		globals:        globals,
+		config:         config,
 		eventLoop:      eventLoop,
 		sender:         sender,
 		logger:         logger,
@@ -88,7 +88,7 @@ func (k *Kauri) initializeConfiguration() {
 	for _, n := range kauriCfg.Nodes() {
 		k.nodes[hotstuff.ID(n.ID())] = n
 	}
-	k.tree = k.globals.Tree()
+	k.tree = k.config.Tree()
 	k.initDone = true
 	k.senders = make([]hotstuff.ID, 0)
 }
@@ -163,7 +163,7 @@ func (k *Kauri) SendContributionToParent() {
 		node, isPresent := k.nodes[parent]
 		if isPresent {
 			node.SendContribution(context.Background(), &kauripb.Contribution{
-				ID:        uint32(k.globals.ID()),
+				ID:        uint32(k.config.ID()),
 				Signature: hotstuffpb.QuorumSignatureToProto(k.aggContrib),
 				View:      uint64(k.currentView),
 			})
@@ -219,7 +219,7 @@ func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) err
 		return fmt.Errorf("failed to combine signatures: %v", err)
 	}
 	k.aggContrib = combSignature
-	if combSignature.Participants().Len() >= k.globals.QuorumSize() {
+	if combSignature.Participants().Len() >= k.config.QuorumSize() {
 		k.logger.Debug("Aggregated Complete QC and sending the event")
 		k.eventLoop.AddEvent(hotstuff.NewViewMsg{
 			SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(

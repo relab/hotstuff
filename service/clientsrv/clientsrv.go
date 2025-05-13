@@ -139,7 +139,6 @@ func (srv *Server) Fork(cmd hotstuff.Command) {
 		srv.logger.Errorf("Failed to unmarshal command: %v", err)
 		return
 	}
-
 	for _, cmd := range batch.GetCommands() {
 		srv.mut.Lock()
 		id := cmdcache.CmdID{

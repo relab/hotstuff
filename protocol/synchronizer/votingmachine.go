@@ -4,8 +4,8 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/globals"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
@@ -18,7 +18,7 @@ type votingMachine struct {
 	eventLoop    *eventloop.EventLoop
 	logger       logging.Logger
 	synchronizer *Synchronizer
-	globals      *globals.Globals
+	config       *core.RuntimeConfig
 
 	mut           sync.Mutex
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
@@ -31,7 +31,7 @@ func registerVoteHandlers(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	synchronizer *Synchronizer,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 ) {
 	vm := &votingMachine{
 		blockChain:   blockChain,
@@ -39,7 +39,7 @@ func registerVoteHandlers(
 		eventLoop:    eventLoop,
 		logger:       logger,
 		synchronizer: synchronizer,
-		globals:      globals,
+		config:       config,
 
 		verifiedVotes: make(map[hotstuff.Hash][]hotstuff.PartialCert),
 	}
@@ -81,7 +81,7 @@ func (vm *votingMachine) onVote(vote hotstuff.VoteMsg) {
 		return
 	}
 
-	if vm.globals.ShouldVerifyVotesSync() {
+	if vm.config.SyncVoteVerification() {
 		vm.verifyCert(cert, block)
 	} else {
 		go vm.verifyCert(cert, block)
@@ -115,7 +115,7 @@ func (vm *votingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	votes = append(votes, cert)
 	vm.verifiedVotes[cert.BlockHash()] = votes
 
-	if len(votes) < vm.globals.QuorumSize() {
+	if len(votes) < vm.config.QuorumSize() {
 		return
 	}
 
@@ -126,5 +126,5 @@ func (vm *votingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
 
-	vm.eventLoop.AddEvent(hotstuff.NewViewMsg{ID: vm.globals.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
+	vm.eventLoop.AddEvent(hotstuff.NewViewMsg{ID: vm.config.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
 }

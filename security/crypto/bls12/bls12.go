@@ -10,7 +10,7 @@ import (
 
 	bls12 "github.com/kilic/bls12-381"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core/globals"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/crypto"
@@ -139,8 +139,8 @@ func firstParticipant(participants hotstuff.IDSet) hotstuff.ID {
 }
 
 type bls12Base struct {
-	logger  logging.Logger
-	globals *globals.Globals
+	logger logging.Logger
+	config *core.RuntimeConfig
 
 	mut sync.RWMutex
 	// popCache caches the proof-of-possession results of popVerify for each public key.
@@ -150,28 +150,28 @@ type bls12Base struct {
 // New returns a new instance of the BLS12 CryptoBase implementation.
 func New(
 	logger logging.Logger,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 ) modules.CryptoBase {
 	bls := &bls12Base{
-		logger:  logger,
-		globals: globals,
+		logger: logger,
+		config: config,
 
 		popCache: make(map[string]bool),
 	}
 
 	pop := bls.popProve()
 	b := bls12.NewG2().ToCompressed(pop)
-	bls.globals.SetConnectionMetadata(popMetadataKey, string(b))
+	bls.config.SetConnectionMetadata(popMetadataKey, string(b))
 	return bls
 }
 
 func (bls *bls12Base) privateKey() *PrivateKey {
-	return bls.globals.PrivateKey().(*PrivateKey)
+	return bls.config.PrivateKey().(*PrivateKey)
 }
 
 func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *PublicKey, ok bool) {
-	if replica, ok := bls.globals.ReplicaInfo(id); ok {
-		if replica.ID != bls.globals.ID() && !bls.checkPop(replica) {
+	if replica, ok := bls.config.ReplicaInfo(id); ok {
+		if replica.ID != bls.config.ID() && !bls.checkPop(replica) {
 			bls.logger.Warnf("Invalid POP for replica %d", id)
 			return nil, false
 		}
@@ -322,7 +322,7 @@ func (bls *bls12Base) Sign(message []byte) (signature hotstuff.QuorumSignature, 
 		return nil, fmt.Errorf("bls12: coreSign failed: %w", err)
 	}
 	bf := crypto.Bitfield{}
-	bf.Add(bls.globals.ID())
+	bf.Add(bls.config.ID())
 	return &AggregateSignature{sig: *p, participants: bf}, nil
 }
 

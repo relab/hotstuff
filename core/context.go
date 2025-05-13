@@ -1,4 +1,4 @@
-package globals
+package core
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 )
 
 // PeerIDFromContext extracts the ID of the peer from the context.
-func (g *Globals) PeerIDFromContext(ctx context.Context) (hotstuff.ID, error) {
+func (g *RuntimeConfig) PeerIDFromContext(ctx context.Context) (hotstuff.ID, error) {
 	peerInfo, ok := peer.FromContext(ctx)
 	if !ok {
 		return 0, fmt.Errorf("peerInfo not available")

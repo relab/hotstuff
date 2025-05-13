@@ -3,7 +3,7 @@ package byzantine
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core/globals"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
 )
@@ -28,7 +28,7 @@ func NewSilence(rules modules.ConsensusRules) modules.ConsensusRules {
 
 type fork struct {
 	blockChain *blockchain.BlockChain
-	globals    *globals.Globals
+	config     *core.RuntimeConfig
 	modules.ConsensusRules
 }
 
@@ -47,16 +47,16 @@ func (f *fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert 
 	}
 
 	proposal = hotstuff.ProposeMsg{
-		ID: f.globals.ID(),
+		ID: f.config.ID(),
 		Block: hotstuff.NewBlock(
 			grandparent.Hash(),
 			grandparent.QuorumCert(),
 			cmd,
 			view,
-			f.globals.ID(),
+			f.config.ID(),
 		),
 	}
-	if aggQC, ok := cert.AggQC(); f.globals.ShouldUseAggQC() && ok {
+	if aggQC, ok := cert.AggQC(); f.config.HasAggregateQC() && ok {
 		proposal.AggregateQC = &aggQC
 	}
 	return proposal, true
@@ -66,12 +66,12 @@ func (f *fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert 
 func NewFork(
 	rules modules.ConsensusRules,
 	blockChain *blockchain.BlockChain,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 ) modules.ConsensusRules {
 	return &fork{
 		ConsensusRules: rules,
 		blockChain:     blockChain,
-		globals:        globals,
+		config:         config,
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core/globals"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
@@ -19,7 +19,7 @@ const CarouselModuleName = "carousel"
 type carousel struct {
 	blockChain   *blockchain.BlockChain
 	committer    *committer.Committer
-	globals      *globals.Globals
+	config       *core.RuntimeConfig
 	logger       logging.Logger
 	viewDuration modules.ViewDuration
 
@@ -31,19 +31,19 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 
 	if commitHead.QuorumCert().Signature() == nil {
 		c.logger.Debug("in startup; using round-robin")
-		return chooseRoundRobin(round, c.globals.ReplicaCount())
+		return chooseRoundRobin(round, c.config.ReplicaCount())
 	}
 
 	if commitHead.View() != round-hotstuff.View(c.chainLength) {
 		c.logger.Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.View())
-		return chooseRoundRobin(round, c.globals.ReplicaCount())
+		return chooseRoundRobin(round, c.config.ReplicaCount())
 	}
 
 	c.logger.Debug("proceeding with carousel")
 
 	var (
 		block       = commitHead
-		f           = hotstuff.NumFaulty(c.globals.ReplicaCount())
+		f           = hotstuff.NumFaulty(c.config.ReplicaCount())
 		i           = 0
 		lastAuthors = hotstuff.NewIDSet()
 		ok          = true
@@ -55,7 +55,7 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 		i++
 	}
 
-	candidates := make([]hotstuff.ID, 0, c.globals.ReplicaCount()-f)
+	candidates := make([]hotstuff.ID, 0, c.config.ReplicaCount()-f)
 
 	commitHead.QuorumCert().Signature().Participants().ForEach(func(id hotstuff.ID) {
 		if !lastAuthors.Contains(id) {
@@ -64,7 +64,7 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 	})
 	slices.Sort(candidates)
 
-	seed := c.globals.SharedRandomSeed() + int64(round)
+	seed := c.config.SharedRandomSeed() + int64(round)
 	rnd := rand.New(rand.NewSource(seed))
 
 	leader := candidates[rnd.Int()%len(candidates)]
@@ -84,14 +84,14 @@ func NewCarousel(
 
 	blockChain *blockchain.BlockChain,
 	committer *committer.Committer,
-	globals *globals.Globals,
+	config *core.RuntimeConfig,
 	logger logging.Logger,
 ) modules.LeaderRotation {
 	return &carousel{
 		blockChain:   blockChain,
 		chainLength:  chainLength,
 		committer:    committer,
-		globals:      globals,
+		config:       config,
 		logger:       logger,
 		viewDuration: viewduration.NewDynamic(vdParams),
 	}
