@@ -39,7 +39,7 @@ func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuf
 	net := dependencies.NewNetwork(
 		core.EventLoop(),
 		core.Logger(),
-		core.Globals(),
+		core.RuntimeCfg(),
 		nil,
 	)
 	opts := []certauth.Option{}
@@ -49,7 +49,7 @@ func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuf
 	sec, err := dependencies.NewSecurity(
 		core.Logger(),
 		core.EventLoop(),
-		core.Globals(),
+		core.RuntimeCfg(),
 		net.Sender(),
 		cryptoName,
 		opts...,
@@ -58,9 +58,9 @@ func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuf
 		t.Fatalf("%v", err)
 	}
 	// Needed for bls12 tests:
-	metaData := core.Globals().ConnectionMetadata()
+	metaData := core.RuntimeCfg().ConnectionMetadata()
 	return &dummyReplica{
-		config:     core.Globals(),
+		config:     core.RuntimeCfg(),
 		connMd:     metaData,
 		depsSecure: sec,
 		depsNet:    net,

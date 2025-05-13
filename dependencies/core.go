@@ -29,8 +29,8 @@ func NewCore(
 	}
 }
 
-// Globals returns the global variables and configurations.
-func (c *Core) Globals() *core.RuntimeConfig {
+// RuntimeCfg returns the global variables and configurations.
+func (c *Core) RuntimeCfg() *core.RuntimeConfig {
 	return c.config
 }
 

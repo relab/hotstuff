@@ -27,7 +27,7 @@ func newProtocolModules(
 		consensusName,
 		depsSecure.BlockChain(),
 		depsCore.Logger(),
-		depsCore.Globals(),
+		depsCore.RuntimeCfg(),
 	)
 	if err != nil {
 		return nil, err
@@ -39,7 +39,7 @@ func newProtocolModules(
 		depsSecure.BlockChain(),
 		depsSrv.Committer(),
 		depsCore.Logger(),
-		depsCore.Globals(),
+		depsCore.RuntimeCfg(),
 	)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func newProtocolModules(
 			byzantineStrategy,
 			consensusRules,
 			depsSecure.BlockChain(),
-			depsCore.Globals())
+			depsCore.RuntimeCfg())
 		if err != nil {
 			return nil, err
 		}
@@ -101,7 +101,7 @@ func NewProtocol(
 		depsSecure.CertAuth(),
 		depsCore.EventLoop(),
 		depsCore.Logger(),
-		depsCore.Globals(),
+		depsCore.RuntimeCfg(),
 	)
 	return &Protocol{
 		consensus: csus,
@@ -114,7 +114,7 @@ func NewProtocol(
 			depsNet.Sender(),
 			depsCore.EventLoop(),
 			depsCore.Logger(),
-			depsCore.Globals(),
+			depsCore.RuntimeCfg(),
 		),
 	}, nil
 }

@@ -46,13 +46,13 @@ func TestVote(t *testing.T) {
 		depsNet := dependencies.NewNetwork(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
-			depsCore.Globals(),
+			depsCore.RuntimeCfg(),
 			nil,
 		)
 		depsSecure, err := dependencies.NewSecurity(
 			depsCore.Logger(),
 			depsCore.EventLoop(),
-			depsCore.Globals(),
+			depsCore.RuntimeCfg(),
 			depsNet.Sender(),
 			cryptoName,
 			certauth.WithCache(cacheSize),

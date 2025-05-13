@@ -174,7 +174,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			w.metricsLogger,
-			depsCore.Globals(),
+			depsCore.RuntimeCfg(),
 			w.measurementInterval,
 			w.metrics...,
 		)

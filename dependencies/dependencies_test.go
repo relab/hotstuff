@@ -72,13 +72,13 @@ func TestModules(t *testing.T) {
 		depsNet := dependencies.NewNetwork(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
-			depsCore.Globals(),
+			depsCore.RuntimeCfg(),
 			insecure.NewCredentials(),
 		)
 		depsSecure, err := dependencies.NewSecurity(
 			depsCore.Logger(),
 			depsCore.EventLoop(),
-			depsCore.Globals(),
+			depsCore.RuntimeCfg(),
 			depsNet.Sender(),
 			td.cryptoName,
 			certauth.WithCache(100),

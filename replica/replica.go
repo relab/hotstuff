@@ -46,13 +46,13 @@ func New(
 	depsNet := dependencies.NewNetwork(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
-		depsCore.Globals(),
+		depsCore.RuntimeCfg(),
 		rOpt.credentials,
 	)
 	depsSecure, err := dependencies.NewSecurity(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
-		depsCore.Globals(),
+		depsCore.RuntimeCfg(),
 		depsNet.Sender(),
 		names.crypto,
 		certauth.WithCache(100), // TODO: consider making this configurable
@@ -84,7 +84,7 @@ func New(
 	server := server.NewServer(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
-		depsCore.Globals(),
+		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
 		rOpt.serverOpts...,
 	)
