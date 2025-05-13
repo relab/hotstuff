@@ -144,7 +144,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 	// setup core - used in replica and measurement framework
 	runtimeOpts := []core.RuntimeOption{}
-	// treeleader needs a tree
 	if opts.TreeEnabled() {
 		delayMode := tree.DelayTypeNone
 		if opts.GetAggregationTime() {
@@ -164,7 +163,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		runtimeOpts = append(runtimeOpts, core.WithKauri())
 	}
 	runtimeOpts = append(runtimeOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
-	// fasthotstuff requires that aggQC is enabled or else it panics
 	if opts.GetUseAggQC() {
 		runtimeOpts = append(runtimeOpts, core.WithAggregateQC())
 	}
