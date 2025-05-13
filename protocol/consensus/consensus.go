@@ -49,7 +49,6 @@ func New(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-	// opts ...Option,
 ) *Consensus {
 	cs := &Consensus{
 		impl:           impl,
@@ -67,10 +66,6 @@ func New(
 
 		lastVote: 0,
 	}
-
-	// for _, opt := range opts {
-	// 	opt(cs)
-	// }
 
 	if config.KauriEnabled() {
 		cs.kauri = kauri.New(
