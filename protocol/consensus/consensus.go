@@ -126,7 +126,6 @@ func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) (syncInfo hotstuff.
 	}
 	view := block.View()
 	cs.logger.Debugf("OnPropose[view=%d]: block accepted.", view)
-	cs.logger.Debugf("OnPropose: store block:", proposal.Block.Hash().String()[:10])
 	cs.blockChain.Store(block)
 	if b := cs.impl.CommitRule(block); b != nil {
 		cs.committer.Commit(b)
