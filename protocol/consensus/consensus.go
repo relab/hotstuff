@@ -117,7 +117,7 @@ func (cs *Consensus) StopVoting(view hotstuff.View) {
 
 func (cs *Consensus) ReceivePropose(proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) {
 	advance = false // won't advance when the below if-statements return
-	if !cs.checkQC(&proposal) {
+	if !cs.auth.VerifyProposal(&proposal) {
 		return
 	}
 	if !cs.acceptProposal(&proposal) {
@@ -212,29 +212,6 @@ func (cs *Consensus) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert
 		proposal.AggregateQC = &aggQC
 	}
 	return proposal, true
-}
-
-// TODO(AlanRostem): this should be in CertAuth.
-func (cs *Consensus) checkQC(proposal *hotstuff.ProposeMsg) bool {
-	block := proposal.Block
-	view := block.View()
-	if cs.config.HasAggregateQC() && proposal.AggregateQC != nil {
-		highQC, ok := cs.auth.VerifyAggregateQC(cs.config.QuorumSize(), *proposal.AggregateQC)
-		if !ok {
-			cs.logger.Warnf("checkQC[view=%d]: failed to verify aggregate QC", view)
-			return false
-		}
-		// NOTE: for simplicity, we require that the highQC found in the AggregateQC equals the QC embedded in the block.
-		if !block.QuorumCert().Equals(highQC) {
-			cs.logger.Warnf("checkQC[view=%d]: block QC does not equal highQC", view)
-			return false
-		}
-	}
-	if !cs.auth.VerifyQuorumCert(cs.config.QuorumSize(), block.QuorumCert()) {
-		cs.logger.Infof("checkQC[view=%d]: invalid QC", view)
-		return false
-	}
-	return true
 }
 
 func (cs *Consensus) acceptProposal(proposal *hotstuff.ProposeMsg) bool {

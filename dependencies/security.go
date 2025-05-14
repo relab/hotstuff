@@ -42,6 +42,7 @@ func NewSecurity(
 		blockChain: blockChain,
 		cryptoImpl: cryptoImpl,
 		certAuth: certauth.New(
+			config,
 			logger,
 			blockChain,
 			cryptoImpl,

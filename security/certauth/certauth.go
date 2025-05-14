@@ -3,6 +3,7 @@ package certauth
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
@@ -10,14 +11,15 @@ import (
 
 type CertAuthority struct {
 	modules.CryptoBase // embedded to avoid having to implement forwarding methods
-
-	logger     logging.Logger
-	blockChain *blockchain.BlockChain
+	config             *core.RuntimeConfig
+	logger             logging.Logger
+	blockChain         *blockchain.BlockChain
 }
 
 // New returns a CertAuthority. It will use the given CryptoBase to create and verify
 // signatures.
 func New(
+	config *core.RuntimeConfig,
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
 	impl modules.CryptoBase,
@@ -25,7 +27,7 @@ func New(
 ) *CertAuthority {
 	ca := &CertAuthority{
 		CryptoBase: impl,
-
+		config:     config,
 		logger:     logger,
 		blockChain: blockChain,
 	}
@@ -164,4 +166,28 @@ func (c *CertAuthority) VerifyAggregateQC(quorumSize int, aggQC hotstuff.Aggrega
 		return highQC, true
 	}
 	return hotstuff.QuorumCert{}, false
+}
+
+// VerifyProposal is a helper that verifies the QC of the block in the proposal message.
+// TODO(AlanRostem): add a test case for this method.
+func (c *CertAuthority) VerifyProposal(proposal *hotstuff.ProposeMsg) bool {
+	block := proposal.Block
+	view := block.View()
+	if c.config.HasAggregateQC() && proposal.AggregateQC != nil {
+		highQC, ok := c.VerifyAggregateQC(c.config.QuorumSize(), *proposal.AggregateQC)
+		if !ok {
+			c.logger.Warnf("VerifyProposal[view=%d]: failed to verify aggregate QC", view)
+			return false
+		}
+		// NOTE: for simplicity, we require that the highQC found in the AggregateQC equals the QC embedded in the block.
+		if !block.QuorumCert().Equals(highQC) {
+			c.logger.Warnf("VerifyProposal[view=%d]: block QC does not equal highQC", view)
+			return false
+		}
+	}
+	if !c.VerifyQuorumCert(c.config.QuorumSize(), block.QuorumCert()) {
+		c.logger.Infof("VerifyProposal[view=%d]: invalid QC", view)
+		return false
+	}
+	return true
 }
