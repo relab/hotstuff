@@ -96,11 +96,11 @@ func New(
 	}
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.logger.Debugf("On event (hotstuff.ProposeMsg) call OnPropose.")
-		sInfo, advance := cs.OnPropose(event.(hotstuff.ProposeMsg))
+		newInfo, advance := cs.ReceivePropose(event.(hotstuff.ProposeMsg))
 		if advance {
 			cs.eventLoop.AddEvent(hotstuff.NewViewMsg{
 				ID:       cs.config.ID(),
-				SyncInfo: sInfo,
+				SyncInfo: newInfo,
 			})
 		}
 	})
@@ -115,38 +115,49 @@ func (cs *Consensus) StopVoting(view hotstuff.View) {
 	}
 }
 
-func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) {
-	// TODO: extract parts of this method into helper functions maybe?
-	block := proposal.Block
+func (cs *Consensus) ReceivePropose(proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) {
+	advance = false // won't advance when the below if-statements return
 	if !cs.checkQC(&proposal) {
 		return
 	}
 	if !cs.acceptProposal(&proposal) {
 		return
 	}
+	cs.tryCommit(&proposal)
+	syncInfo = cs.tryVote(&proposal)
+	advance = true // Tells the synchronizer to advance the view
+	return
+}
+
+func (cs *Consensus) tryCommit(proposal *hotstuff.ProposeMsg) bool {
+	block := proposal.Block
 	view := block.View()
-	cs.logger.Debugf("OnPropose[view=%d]: block accepted.", view)
+	cs.logger.Debugf("tryCommit[view=%d]: block accepted.", view)
 	cs.blockChain.Store(block)
 	if b := cs.impl.CommitRule(block); b != nil {
 		cs.committer.Commit(b)
+		return false
 	}
-	// Tells the synchronizer to advance the view
-	advance = true
+	return true
+}
+
+func (cs *Consensus) tryVote(proposal *hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo) {
+	block := proposal.Block
+	view := block.View()
 	syncInfo = hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
 	if block.View() <= cs.lastVote {
 		cs.logger.Info(fmt.Sprintf("OnPropose[view=%d]: block view too old for.", view))
 		return
 	}
-	cs.voteFor(&proposal)
+	cs.voteFor(proposal)
 	return
 }
 
 // Propose creates a new proposal.
-func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo) {
+func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syncInfo hotstuff.SyncInfo) {
 	cs.logger.Debugf("Propose")
 
-	// TODO(AlanRostem): why the previous proposal need to be marked as accepted? Shouldn't this happen on execution?
-	qc, ok := cert.QC()
+	qc, ok := syncInfo.QC()
 	if ok {
 		// tell the acceptor that the previous proposal succeeded.
 		if qcBlock, ok := cs.blockChain.Get(qc.BlockHash()); ok {
@@ -166,7 +177,7 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cer
 	}
 
 	var proposal hotstuff.ProposeMsg
-	proposal, ok = cs.ruler.ProposeRule(view, highQC, cert, cmd)
+	proposal, ok = cs.ruler.ProposeRule(view, highQC, syncInfo, cmd)
 	if !ok {
 		cs.logger.Debug("Propose: No block")
 		return
@@ -174,14 +185,17 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, cer
 
 	// TODO(AlanRostem): discuss if this removal is valid. Adding a panic in blockchain seems to be the correct way.
 	// cs.blockChain.Store(proposal.Block)
+
 	// kauri sends the proposal to only the children
 	if cs.kauri == nil {
 		cs.sender.Propose(proposal)
 	}
-	// self vote - can discard return value since the syncinfo is already the recent one
-	cs.OnPropose(proposal)
+	// as leader, I can commit and vote for my own proposal
+	cs.tryCommit(&proposal)
+	cs.tryVote(&proposal)
 }
 
+// ProposeRule implements the default propose ruler.
 func (cs *Consensus) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
 	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
 	proposal = hotstuff.ProposeMsg{
@@ -200,6 +214,7 @@ func (cs *Consensus) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert
 	return proposal, true
 }
 
+// TODO(AlanRostem): this should be in CertAuth.
 func (cs *Consensus) checkQC(proposal *hotstuff.ProposeMsg) bool {
 	block := proposal.Block
 	view := block.View()
@@ -252,7 +267,7 @@ func (cs *Consensus) voteFor(proposal *hotstuff.ProposeMsg) {
 	view := block.View()
 	pc, err := cs.auth.CreatePartialCert(block)
 	if err != nil {
-		cs.logger.Errorf("OnPropose[view=%d]: failed to sign block: ", view, err)
+		cs.logger.Errorf("OnPropose[view=%d]: failed to sign block: %v", view, err)
 		return
 	}
 	cs.lastVote = block.View()
@@ -269,7 +284,7 @@ func (cs *Consensus) voteFor(proposal *hotstuff.ProposeMsg) {
 		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
 		return
 	}
-	cs.logger.Debugf("OnPropose[view=%d]: voting for %.8s -> %.8x", view, block.Hash(), block.Command())
+	cs.logger.Debugf("OnPropose[view=%d]: voting for %v", view, block)
 	cs.sender.SendVote(leaderID, pc)
 }
 
