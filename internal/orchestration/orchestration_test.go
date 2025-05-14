@@ -157,6 +157,7 @@ func TestOrchestration(t *testing.T) {
 
 func TestDeployment(t *testing.T) {
 	if os.Getenv("GITHUB_ACTIONS") != "" && runtime.GOOS != "linux" {
+		t.Log("WARNING: This test was skipped.")
 		t.Skip("GitHub Actions only supports linux containers on linux runners.")
 	}
 

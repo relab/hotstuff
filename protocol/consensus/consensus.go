@@ -96,7 +96,7 @@ func New(
 	}
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.logger.Debugf("On event (hotstuff.ProposeMsg) call OnPropose.")
-		newInfo, advance := cs.ReceivePropose(event.(hotstuff.ProposeMsg))
+		newInfo, advance := cs.ReceiveProposal(event.(hotstuff.ProposeMsg))
 		if advance {
 			cs.eventLoop.AddEvent(hotstuff.NewViewMsg{
 				ID:       cs.config.ID(),
@@ -115,7 +115,7 @@ func (cs *Consensus) StopVoting(view hotstuff.View) {
 	}
 }
 
-func (cs *Consensus) ReceivePropose(proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) {
+func (cs *Consensus) ReceiveProposal(proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) {
 	advance = false // won't advance when the below if-statements return
 	if !cs.auth.VerifyProposal(&proposal) {
 		return
@@ -134,10 +134,11 @@ func (cs *Consensus) tryCommit(proposal *hotstuff.ProposeMsg) bool {
 	view := block.View()
 	cs.logger.Debugf("tryCommit[view=%d]: block accepted.", view)
 	cs.blockChain.Store(block)
-	if b := cs.impl.CommitRule(block); b != nil {
-		cs.committer.Commit(b)
+	// overwrite the block variable. If it was nil, dont't commit.
+	if block = cs.impl.CommitRule(block); block == nil {
 		return false
 	}
+	cs.committer.Commit(block)
 	return true
 }
 
