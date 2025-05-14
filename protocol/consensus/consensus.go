@@ -192,8 +192,9 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 		cs.sender.Propose(proposal)
 	}
 	// as leader, I can commit and vote for my own proposal
-	cs.tryCommit(&proposal)
-	cs.tryVote(&proposal)
+	// cs.tryCommit(&proposal)
+	// cs.tryVote(&proposal)
+	cs.ReceiveProposal(proposal)
 }
 
 // ProposeRule implements the default propose ruler.
