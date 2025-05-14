@@ -56,7 +56,8 @@ func (chain *BlockChain) Store(block *hotstuff.Block) {
 	// do not store existing blocks, otherwise something is terribly wrong.
 	// AlanRostem: I added this here in package-restructuring branch.
 	if _, ok := chain.blocks[block.Hash()]; ok {
-		panic(fmt.Sprintf("block already exists: %s", block.String()))
+		chain.logger.DPanicf("block already exists: %s", block.String())
+		return
 	}
 
 	chain.blocks[block.Hash()] = block

@@ -233,7 +233,7 @@ func (cs *Consensus) acceptProposal(proposal *hotstuff.ProposeMsg) bool {
 	}
 	cmd := block.Command()
 	if !cs.commandCache.Accept(cmd) {
-		cs.logger.Infof("OnPropose[view=%d]: block rejected: %.8s -> %.8x", view, block.Hash(), block.Command())
+		cs.logger.Infof("OnPropose[view=%d]: block rejected: %s", view, block)
 		return false
 	}
 	return true
