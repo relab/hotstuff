@@ -85,18 +85,18 @@ func (cs *Voter) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
 	}
 	// ensure the block came from the leader.
 	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
-		cs.logger.Infof("OnPropose[p=%d, view=%d]: block was not proposed by the expected leader", view)
-		return
+		cs.logger.Infof("TryAccept[p=%d, view=%d]: block was not proposed by the expected leader", view)
+		// return
 	}
 	cmd := block.Command()
 	if !cs.commandCache.Accept(cmd) {
-		cs.logger.Infof("OnPropose[view=%d]: block rejected: %s", view, block)
+		cs.logger.Infof("TryAccept[view=%d]: block rejected: %s", view, block)
 		return
 	}
 	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
 		cs.commandCache.Update(qcBlock.Command())
 	} else {
-		cs.logger.Infof("OnPropose[view=%d]: Failed to fetch qcBlock", view)
+		cs.logger.Infof("TryAccept[view=%d]: Failed to fetch qcBlock", view)
 	}
 	return true
 }

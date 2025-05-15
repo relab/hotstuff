@@ -60,8 +60,3 @@ type CryptoBase interface {
 	// BatchVerify verifies the given quorum signature against the batch of messages.
 	BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool
 }
-
-// Kauri module implements the Kauri protocol
-type Kauri interface {
-	Begin(s hotstuff.PartialCert, p hotstuff.ProposeMsg)
-}

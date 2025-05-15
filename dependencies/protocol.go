@@ -101,6 +101,15 @@ func NewProtocol(
 	if ruler, ok := mods.consensusRules.(modules.ProposeRuler); ok {
 		opts = append(opts, consensus.OverrideProposeRule(ruler))
 	}
+	voter := consensus.NewVoter(
+		depsCore.Logger(),
+		depsCore.EventLoop(),
+		depsCore.RuntimeCfg(),
+		mods.leaderRotation,
+		depsSecure.BlockChain(),
+		depsSecure.CertAuth(),
+		depsSrv.CmdCache(),
+	)
 	csus := consensus.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
@@ -109,6 +118,7 @@ func NewProtocol(
 		depsSecure.CertAuth(),
 		mods.leaderRotation,
 		mods.consensusRules,
+		voter,
 		depsSrv.Committer(),
 		depsSrv.CmdCache(),
 		depsNet.Sender(),

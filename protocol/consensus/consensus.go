@@ -20,7 +20,7 @@ import (
 type Consensus struct {
 	impl           modules.ConsensusRules
 	ruler          modules.ProposeRuler
-	kauri          modules.Kauri
+	kauri          *kauri.Kauri
 	leaderRotation modules.LeaderRotation
 
 	blockChain   *blockchain.BlockChain
@@ -49,6 +49,7 @@ func New(
 	// protocol dependencies
 	leaderRotation modules.LeaderRotation,
 	impl modules.ConsensusRules,
+	voter *Voter,
 
 	// service dependencies
 	committer *committer.Committer,
@@ -74,16 +75,7 @@ func New(
 		logger:       logger,
 		config:       config,
 
-		// TODO(AlanRostem): inject this dependency after testing/debugging.
-		voter: NewVoter(
-			logger,
-			eventLoop,
-			config,
-			leaderRotation,
-			blockChain,
-			auth,
-			commandCache,
-		),
+		voter: voter,
 	}
 	cs.ruler = cs
 	for _, opt := range opts {
@@ -139,7 +131,12 @@ func (cs *Consensus) ProcessProposal(proposal hotstuff.ProposeMsg) (advance bool
 	if !ok {
 		return
 	}
-	cs.tryVote(proposal, pc)
+	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
+	if leaderID == cs.config.ID() {
+		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
+		return
+	}
+	cs.sendVote(leaderID, proposal, pc)
 	return
 }
 
@@ -219,7 +216,7 @@ func (cs *Consensus) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert
 	return proposal, true
 }
 
-func (cs *Consensus) tryVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (cs *Consensus) sendVote(leaderID hotstuff.ID, proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	block := proposal.Block
 	view := block.View()
 	if cs.kauri != nil {
@@ -228,11 +225,6 @@ func (cs *Consensus) tryVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCe
 		return
 	}
 
-	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
-	if leaderID == cs.config.ID() {
-		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
-		return
-	}
 	if !cs.sender.ReplicaExists(leaderID) {
 		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
 		return
