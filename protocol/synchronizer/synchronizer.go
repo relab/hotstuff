@@ -102,15 +102,6 @@ func New(
 		timeoutMsg := event.(hotstuff.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
 	})
-
-	registerVoteHandlers(
-		logger,
-		eventLoop,
-		config,
-		blockChain,
-		auth,
-	)
-
 	return s
 }
 

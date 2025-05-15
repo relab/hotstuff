@@ -32,7 +32,8 @@ type Consensus struct {
 	logger       logging.Logger
 	config       *core.RuntimeConfig
 
-	voter *Voter
+	voter  *Voter
+	leader *Leader
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
@@ -50,6 +51,7 @@ func New(
 	leaderRotation modules.LeaderRotation,
 	impl modules.ConsensusRules,
 	voter *Voter,
+	leader *Leader,
 
 	// service dependencies
 	committer *committer.Committer,
@@ -75,7 +77,8 @@ func New(
 		logger:       logger,
 		config:       config,
 
-		voter: voter,
+		voter:  voter,
+		leader: leader,
 	}
 	cs.ruler = cs
 	for _, opt := range opts {
@@ -216,7 +219,7 @@ func (cs *Consensus) sendVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialC
 	view := block.View()
 	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
 	if leaderID == cs.config.ID() {
-		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
+		cs.leader.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
 		return
 	}
 

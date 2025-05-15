@@ -110,6 +110,13 @@ func NewProtocol(
 		depsSecure.CertAuth(),
 		depsSrv.CmdCache(),
 	)
+	leader := consensus.NewLeader(
+		depsCore.Logger(),
+		depsCore.EventLoop(),
+		depsCore.RuntimeCfg(),
+		depsSecure.BlockChain(),
+		depsSecure.CertAuth(),
+	)
 	csus := consensus.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
@@ -119,6 +126,7 @@ func NewProtocol(
 		mods.leaderRotation,
 		mods.consensusRules,
 		voter,
+		leader,
 		depsSrv.Committer(),
 		depsSrv.CmdCache(),
 		depsNet.Sender(),

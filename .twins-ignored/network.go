@@ -69,10 +69,10 @@ type Configuration interface {
 
 type node struct {
 	blockChain *blockchain.BlockChain
-	// consensus      Consensus // temporary lint fix
-	eventLoop      *eventloop.EventLoop
-	leaderRotation modules.LeaderRotation
-	synchronizer   Synchronizer
+	// consensus      Consensus // TODO: temporary lint fix
+	eventLoop *eventloop.EventLoop
+	// leaderRotation modules.LeaderRotation // TODO: temporary lint fix
+	synchronizer Synchronizer
 	// opts           *core.Options
 
 	id             NodeID
