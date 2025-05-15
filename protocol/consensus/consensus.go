@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"fmt"
-
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
@@ -123,9 +121,38 @@ func (cs *Consensus) ReceiveProposal(proposal hotstuff.ProposeMsg) (syncInfo hot
 	if !cs.acceptProposal(&proposal) {
 		return
 	}
+	block := proposal.Block
+	view := block.View()
+	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
+		cs.commandCache.Proposed(qcBlock.Command())
+	} else {
+		cs.logger.Infof("OnPropose[view=%d]: Failed to fetch qcBlock", view)
+	}
+
 	cs.tryCommit(&proposal)
-	syncInfo = cs.tryVote(&proposal)
+
+	syncInfo = hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
 	advance = true // Tells the synchronizer to advance the view
+	pc, ok := cs.createVote(view, proposal)
+	if !ok {
+		return
+	}
+	if cs.kauri != nil {
+		// disseminate proposal and aggregate votes.
+		cs.kauri.Begin(pc, proposal)
+		return
+	}
+	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
+	if leaderID == cs.config.ID() {
+		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
+		return
+	}
+	if !cs.sender.ReplicaExists(leaderID) {
+		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
+		return
+	}
+	cs.logger.Debugf("OnPropose[view=%d]: voting for %v", view, block)
+	cs.sender.SendVote(leaderID, pc)
 	return
 }
 
@@ -142,22 +169,12 @@ func (cs *Consensus) tryCommit(proposal *hotstuff.ProposeMsg) bool {
 	return true
 }
 
-func (cs *Consensus) tryVote(proposal *hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo) {
-	block := proposal.Block
-	view := block.View()
-	syncInfo = hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
-	if block.View() <= cs.lastVote {
-		cs.logger.Info(fmt.Sprintf("OnPropose[view=%d]: block view too old for.", view))
-		return
-	}
-	cs.voteFor(proposal)
-	return
-}
-
 // Propose creates a new proposal.
 func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syncInfo hotstuff.SyncInfo) {
 	cs.logger.Debugf("Propose")
 
+	// TODO(AlanRostem): related to this comment: https://github.com/relab/hotstuff/pull/182/files#r1932600780
+	// I tried removing this, but the command count decreased by 50%. Needs to be investigated.
 	qc, ok := syncInfo.QC()
 	if ok {
 		// tell the acceptor that the previous proposal succeeded.
@@ -223,15 +240,6 @@ func (cs *Consensus) acceptProposal(proposal *hotstuff.ProposeMsg) bool {
 		cs.logger.Infof("OnPropose[p=%d, view=%d]: block was not proposed by the expected leader", view)
 		return false
 	}
-	if !cs.impl.VoteRule(view, *proposal) {
-		cs.logger.Infof("OnPropose[p=%d, view=%d]: Block not voted for", view)
-		return false
-	}
-	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
-		cs.commandCache.Proposed(qcBlock.Command())
-	} else {
-		cs.logger.Infof("OnPropose[view=%d]: Failed to fetch qcBlock", view)
-	}
 	cmd := block.Command()
 	if !cs.commandCache.Accept(cmd) {
 		cs.logger.Infof("OnPropose[view=%d]: block rejected: %s", view, block)
@@ -240,30 +248,28 @@ func (cs *Consensus) acceptProposal(proposal *hotstuff.ProposeMsg) bool {
 	return true
 }
 
-func (cs *Consensus) voteFor(proposal *hotstuff.ProposeMsg) {
+func (cs *Consensus) createVote(view hotstuff.View, proposal hotstuff.ProposeMsg) (pc hotstuff.PartialCert, ok bool) {
+	if !cs.impl.VoteRule(view, proposal) {
+		cs.logger.Info("OnPropose: Block not voted for")
+		return
+	}
+
 	block := proposal.Block
-	view := block.View()
+
+	if block.View() <= cs.lastVote {
+		cs.logger.Info("OnPropose: block view too old")
+		return
+	}
+
 	pc, err := cs.auth.CreatePartialCert(block)
 	if err != nil {
-		cs.logger.Errorf("OnPropose[view=%d]: failed to sign block: %v", view, err)
+		cs.logger.Error("OnPropose: failed to sign block: ", err)
 		return
 	}
+
 	cs.lastVote = block.View()
-	if cs.kauri != nil {
-		cs.kauri.Begin(pc, *proposal)
-		return
-	}
-	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
-	if leaderID == cs.config.ID() {
-		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
-		return
-	}
-	if !cs.sender.ReplicaExists(leaderID) {
-		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
-		return
-	}
-	cs.logger.Debugf("OnPropose[view=%d]: voting for %v", view, block)
-	cs.sender.SendVote(leaderID, pc)
+
+	return pc, true
 }
 
 var _ modules.ProposeRuler = (*Consensus)(nil)
