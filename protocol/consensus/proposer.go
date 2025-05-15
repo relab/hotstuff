@@ -2,13 +2,13 @@ package consensus
 
 import "github.com/relab/hotstuff"
 
-type Proposer struct {
+type Leader struct {
 }
 
-func NewProposer() *Proposer {
-	return &Proposer{}
+func NewLeader() *Leader {
+	return &Leader{}
 }
 
-func Propose(proposal hotstuff.ProposeMsg) {
+func Propose(_ hotstuff.ProposeMsg) {
 
 }

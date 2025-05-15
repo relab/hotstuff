@@ -32,7 +32,7 @@ type Consensus struct {
 	logger       logging.Logger
 	config       *core.RuntimeConfig
 
-	lastVote hotstuff.View
+	voter *Voter
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
@@ -74,7 +74,16 @@ func New(
 		logger:       logger,
 		config:       config,
 
-		lastVote: 0,
+		// TODO(AlanRostem): inject this dependency after testing/debugging.
+		voter: NewVoter(
+			logger,
+			eventLoop,
+			config,
+			leaderRotation,
+			blockChain,
+			auth,
+			commandCache,
+		),
 	}
 	cs.ruler = cs
 	for _, opt := range opts {
@@ -92,6 +101,7 @@ func New(
 			config.Tree(),
 		)
 	}
+
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.logger.Debugf("On event (hotstuff.ProposeMsg) call OnPropose.")
 		newInfo, advance := cs.ReceiveProposal(event.(hotstuff.ProposeMsg))
@@ -105,54 +115,29 @@ func New(
 	return cs
 }
 
-// StopVoting ensures that no voting happens in a view earlier than `view`.
-func (cs *Consensus) StopVoting(view hotstuff.View) {
-	if cs.lastVote < view {
-		cs.logger.Debugf("stopped voting on view %d and changed view to %d", cs.lastVote, view)
-		cs.lastVote = view
-	}
+func (cs *Consensus) Voter() *Voter {
+	return cs.voter
 }
 
 func (cs *Consensus) ReceiveProposal(proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) {
-	advance = false // won't advance when the below if-statements return
-	if !cs.auth.VerifyProposal(&proposal) {
-		return
-	}
-	if !cs.acceptProposal(&proposal) {
-		return
-	}
 	block := proposal.Block
 	view := block.View()
-	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
-		cs.commandCache.Proposed(qcBlock.Command())
-	} else {
-		cs.logger.Infof("OnPropose[view=%d]: Failed to fetch qcBlock", view)
+	advance = false // won't advance when the below if-statements return
+	if !cs.impl.VoteRule(view, proposal) {
+		cs.logger.Info("OnPropose: Block not voted for")
+		return
 	}
-
+	if !cs.voter.Accept(&proposal) {
+		return
+	}
 	cs.tryCommit(&proposal)
-
 	syncInfo = hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
 	advance = true // Tells the synchronizer to advance the view
-	pc, ok := cs.createVote(view, proposal)
+	pc, ok := cs.voter.CreateVote(view, proposal)
 	if !ok {
 		return
 	}
-	if cs.kauri != nil {
-		// disseminate proposal and aggregate votes.
-		cs.kauri.Begin(pc, proposal)
-		return
-	}
-	leaderID := cs.leaderRotation.GetLeader(cs.lastVote + 1)
-	if leaderID == cs.config.ID() {
-		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
-		return
-	}
-	if !cs.sender.ReplicaExists(leaderID) {
-		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
-		return
-	}
-	cs.logger.Debugf("OnPropose[view=%d]: voting for %v", view, block)
-	cs.sender.SendVote(leaderID, pc)
+	cs.tryVote(proposal, pc)
 	return
 }
 
@@ -232,44 +217,26 @@ func (cs *Consensus) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert
 	return proposal, true
 }
 
-func (cs *Consensus) acceptProposal(proposal *hotstuff.ProposeMsg) bool {
+func (cs *Consensus) tryVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	block := proposal.Block
 	view := block.View()
-	// ensure the block came from the leader.
-	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
-		cs.logger.Infof("OnPropose[p=%d, view=%d]: block was not proposed by the expected leader", view)
-		return false
-	}
-	cmd := block.Command()
-	if !cs.commandCache.Accept(cmd) {
-		cs.logger.Infof("OnPropose[view=%d]: block rejected: %s", view, block)
-		return false
-	}
-	return true
-}
-
-func (cs *Consensus) createVote(view hotstuff.View, proposal hotstuff.ProposeMsg) (pc hotstuff.PartialCert, ok bool) {
-	if !cs.impl.VoteRule(view, proposal) {
-		cs.logger.Info("OnPropose: Block not voted for")
+	if cs.kauri != nil {
+		// disseminate proposal and aggregate votes.
+		cs.kauri.Begin(pc, proposal)
 		return
 	}
 
-	block := proposal.Block
-
-	if block.View() <= cs.lastVote {
-		cs.logger.Info("OnPropose: block view too old")
+	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
+	if leaderID == cs.config.ID() {
+		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
 		return
 	}
-
-	pc, err := cs.auth.CreatePartialCert(block)
-	if err != nil {
-		cs.logger.Error("OnPropose: failed to sign block: ", err)
+	if !cs.sender.ReplicaExists(leaderID) {
+		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
 		return
 	}
-
-	cs.lastVote = block.View()
-
-	return pc, true
+	cs.logger.Debugf("TryVote[view=%d]: voting for %v", view, block)
+	cs.sender.SendVote(leaderID, pc)
 }
 
 var _ modules.ProposeRuler = (*Consensus)(nil)

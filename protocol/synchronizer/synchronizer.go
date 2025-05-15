@@ -221,7 +221,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	}
 	s.lastTimeout = &timeoutMsg
 	// stop voting for current view
-	s.consensus.StopVoting(view)
+	s.consensus.Voter().StopVoting(view)
 
 	s.sender.Timeout(timeoutMsg)
 	s.OnRemoteTimeout(timeoutMsg)
