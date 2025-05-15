@@ -3,7 +3,6 @@ package synchronizer
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -37,8 +36,6 @@ type Synchronizer struct {
 
 	mut         sync.RWMutex // to protect the following
 	currentView hotstuff.View
-	highTC      hotstuff.TimeoutCert
-	highQC      hotstuff.QuorumCert
 
 	// A pointer to the last timeout message that we sent.
 	// If a timeout happens again before we advance to the next view,
@@ -106,23 +103,14 @@ func New(
 		s.OnRemoteTimeout(timeoutMsg)
 	})
 
-	var err error
-	s.highQC, err = s.auth.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
-	if err != nil {
-		panic(fmt.Errorf("unable to create empty quorum cert for genesis block: %v", err))
-	}
-	s.highTC, err = s.auth.CreateTimeoutCert(hotstuff.View(0), []hotstuff.TimeoutMsg{})
-	if err != nil {
-		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
-	}
 	registerVoteHandlers(
+		logger,
+		eventLoop,
+		config,
 		blockChain,
 		auth,
-		eventLoop,
-		logger,
-		s,
-		config,
 	)
+
 	return s
 }
 
@@ -163,13 +151,8 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	// start the initial proposal
 	if view := s.View(); view == 1 && s.leaderRotation.GetLeader(view) == s.config.ID() {
 		syncInfo := s.SyncInfo()
-		s.consensus.Propose(s.View(), s.highQC, syncInfo)
+		s.consensus.Propose(s.View(), s.auth.HighQC(), syncInfo)
 	}
-}
-
-// HighQC returns the highest known QC.
-func (s *Synchronizer) HighQC() hotstuff.QuorumCert {
-	return s.highQC
 }
 
 // View returns the current view.
@@ -183,7 +166,7 @@ func (s *Synchronizer) View() hotstuff.View {
 func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
 	s.mut.RLock()
 	defer s.mut.RUnlock()
-	return hotstuff.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
+	return hotstuff.NewSyncInfo().WithQC(s.auth.HighQC()).WithTC(s.auth.HighTC())
 }
 
 // OnLocalTimeout is called when a local timeout happens.
@@ -374,7 +357,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.config.ID() {
-		s.consensus.Propose(s.View(), s.highQC, syncInfo)
+		s.consensus.Propose(s.View(), s.auth.HighQC(), syncInfo)
 	} else if s.sender.ReplicaExists(leader) {
 		s.sender.SendNewView(leader, syncInfo)
 	}

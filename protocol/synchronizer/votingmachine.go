@@ -13,12 +13,12 @@ import (
 
 // votingMachine collects votes.
 type votingMachine struct {
-	blockChain   *blockchain.BlockChain
-	crypto       *certauth.CertAuthority
-	eventLoop    *eventloop.EventLoop
-	logger       logging.Logger
-	synchronizer *Synchronizer
-	config       *core.RuntimeConfig
+	logger logging.Logger
+	config *core.RuntimeConfig
+
+	blockChain *blockchain.BlockChain
+	auth       *certauth.CertAuthority
+	eventLoop  *eventloop.EventLoop
 
 	mut           sync.Mutex
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert // verified votes that could become a QC
@@ -26,28 +26,26 @@ type votingMachine struct {
 
 // registerVoteHandlers injects dependencies to a voting machine object and registers event handlers for `hotstuff.VoteMsg`.
 func registerVoteHandlers(
-	blockChain *blockchain.BlockChain,
-	crypto *certauth.CertAuthority,
-	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	synchronizer *Synchronizer,
+	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
+	blockChain *blockchain.BlockChain,
+	auth *certauth.CertAuthority,
 ) {
 	vm := &votingMachine{
-		blockChain:   blockChain,
-		crypto:       crypto,
-		eventLoop:    eventLoop,
-		logger:       logger,
-		synchronizer: synchronizer,
-		config:       config,
+		blockChain: blockChain,
+		auth:       auth,
+		eventLoop:  eventLoop,
+		logger:     logger,
+		config:     config,
 
 		verifiedVotes: make(map[hotstuff.Hash][]hotstuff.PartialCert),
 	}
-	vm.eventLoop.RegisterHandler(hotstuff.VoteMsg{}, func(event any) { vm.onVote(event.(hotstuff.VoteMsg)) })
+	vm.eventLoop.RegisterHandler(hotstuff.VoteMsg{}, func(event any) { vm.ProcessVote(event.(hotstuff.VoteMsg)) })
 }
 
-// onVote handles an incoming vote.
-func (vm *votingMachine) onVote(vote hotstuff.VoteMsg) {
+// ProcessVote handles an incoming vote.
+func (vm *votingMachine) ProcessVote(vote hotstuff.VoteMsg) {
 	cert := vote.PartialCert
 	vm.logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
 
@@ -76,7 +74,7 @@ func (vm *votingMachine) onVote(vote hotstuff.VoteMsg) {
 		}
 	}
 
-	if block.View() <= vm.synchronizer.HighQC().View() {
+	if block.View() <= vm.auth.HighQC().View() {
 		// too old
 		return
 	}
@@ -89,7 +87,7 @@ func (vm *votingMachine) onVote(vote hotstuff.VoteMsg) {
 }
 
 func (vm *votingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
-	if !vm.crypto.VerifyPartialCert(cert) {
+	if !vm.auth.VerifyPartialCert(cert) {
 		vm.logger.Info("OnVote: Vote could not be verified!")
 		return
 	}
@@ -102,7 +100,7 @@ func (vm *votingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 		// delete any pending QCs with lower height than bLeaf
 		for k := range vm.verifiedVotes {
 			if block, ok := vm.blockChain.LocalGet(k); ok {
-				if block.View() <= vm.synchronizer.HighQC().View() {
+				if block.View() <= vm.auth.HighQC().View() {
 					delete(vm.verifiedVotes, k)
 				}
 			} else {
@@ -119,7 +117,7 @@ func (vm *votingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 		return
 	}
 
-	qc, err := vm.crypto.CreateQuorumCert(block, votes)
+	qc, err := vm.auth.CreateQuorumCert(block, votes)
 	if err != nil {
 		vm.logger.Info("OnVote: could not create QC for block: ", err)
 		return

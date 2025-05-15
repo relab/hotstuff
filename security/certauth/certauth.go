@@ -2,6 +2,8 @@
 package certauth
 
 import (
+	"fmt"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
@@ -37,6 +39,16 @@ func New(
 	}
 	for _, opt := range opts {
 		opt(ca)
+	}
+
+	var err error
+	ca.highQC, err = ca.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+	if err != nil {
+		panic(fmt.Errorf("unable to create empty quorum cert for genesis block: %v", err))
+	}
+	ca.highTC, err = ca.CreateTimeoutCert(hotstuff.View(0), []hotstuff.TimeoutMsg{})
+	if err != nil {
+		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
 	}
 	return ca
 }

@@ -14,7 +14,6 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -162,8 +161,9 @@ func (n *Network) run(ticks int) {
 	// kick off the initial proposal(s)
 	for _, node := range n.nodes {
 		if node.leaderRotation.GetLeader(1) == node.id.ReplicaID {
-			s := node.synchronizer.(*synchronizer.Synchronizer)
-			node.consensus.Propose(s.View(), s.SyncInfo())
+			// TODO(AlanRostem): fix this
+			// s := node.synchronizer.(*synchronizer.Synchronizer)
+			// node.consensus.Propose(s.View(), s.SyncInfo())
 		}
 	}
 
