@@ -9,11 +9,15 @@ import (
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
+// TODO(AlanRostem): propose better name: CertMgr
 type CertAuthority struct {
 	modules.CryptoBase // embedded to avoid having to implement forwarding methods
 	config             *core.RuntimeConfig
 	logger             logging.Logger
 	blockChain         *blockchain.BlockChain
+
+	highTC hotstuff.TimeoutCert
+	highQC hotstuff.QuorumCert
 }
 
 // New returns a CertAuthority. It will use the given CryptoBase to create and verify
@@ -190,4 +194,38 @@ func (c *CertAuthority) VerifyProposal(proposal *hotstuff.ProposeMsg) bool {
 		return false
 	}
 	return true
+}
+
+// updateHighQC attempts to update the highQC, but does not verify the qc first.
+// This method is meant to be used instead of the exported UpdateHighQC internally
+// in this package when the qc has already been verified.
+// TODO(AlanRostem): this was in synchronizer, make tests.
+func (s *CertAuthority) UpdateHighQC(qc hotstuff.QuorumCert) {
+	newBlock, ok := s.blockChain.Get(qc.BlockHash())
+	if !ok {
+		s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
+		return
+	}
+
+	if newBlock.View() > s.highQC.View() {
+		s.highQC = qc
+		s.logger.Debug("HighQC updated")
+	}
+}
+
+// updateHighTC attempts to update the highTC, but does not verify the tc first.
+// TODO(AlanRostem): this was in synchronizer, make tests.
+func (s *CertAuthority) UpdateHighTC(tc hotstuff.TimeoutCert) {
+	if tc.View() > s.highTC.View() {
+		s.highTC = tc
+		s.logger.Debug("HighTC updated")
+	}
+}
+
+func (s *CertAuthority) HighQC() hotstuff.QuorumCert {
+	return s.highQC
+}
+
+func (s *CertAuthority) HighTC() hotstuff.TimeoutCert {
+	return s.highTC
 }

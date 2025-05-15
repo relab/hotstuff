@@ -125,6 +125,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 	proposeMsg.ID = id
 	impl.srv.addNetworkDelay(id)
 	impl.srv.eventLoop.AddEvent(proposeMsg)
+
 }
 
 // Vote handles an incoming vote message.

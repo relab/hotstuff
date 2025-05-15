@@ -26,7 +26,6 @@ type Synchronizer struct {
 	config    *core.RuntimeConfig
 
 	blockChain *blockchain.BlockChain
-	crypto     modules.CryptoBase
 	auth       *certauth.CertAuthority
 
 	duration       modules.ViewDuration
@@ -61,12 +60,11 @@ func New(
 
 	// security dependencies
 	blockChain *blockchain.BlockChain,
-	crypto modules.CryptoBase,
 	auth *certauth.CertAuthority,
 
 	// protocol dependencies
 	leaderRotation modules.LeaderRotation,
-	consensus *consensus.Consensus,
+	logic *consensus.Consensus,
 	voter *consensus.Voter,
 
 	// network dependencies
@@ -75,10 +73,9 @@ func New(
 	s := &Synchronizer{
 		duration:       leaderRotation.ViewDuration(),
 		leaderRotation: leaderRotation,
-		crypto:         crypto,
 
 		blockChain: blockChain,
-		consensus:  consensus,
+		consensus:  logic,
 		auth:       auth,
 		sender:     sender,
 		eventLoop:  eventLoop,
@@ -203,7 +200,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	s.duration.ViewTimeout() // increase the duration of the next view
 	s.logger.Debugf("OnLocalTimeout: %v", view)
 
-	sig, err := s.crypto.Sign(view.ToBytes())
+	sig, err := s.auth.Sign(view.ToBytes())
 	if err != nil {
 		s.logger.Warnf("Failed to sign view: %v", err)
 		return
@@ -217,7 +214,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 
 	if s.config.HasAggregateQC() {
 		// generate a second signature that will become part of the aggregateQC
-		sig, err := s.crypto.Sign(timeoutMsg.ToBytes())
+		sig, err := s.auth.Sign(timeoutMsg.ToBytes())
 		if err != nil {
 			s.logger.Warnf("Failed to sign timeout message: %v", err)
 			return
@@ -245,8 +242,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		}
 	}()
 
-	verifier := s.crypto
-	if !verifier.Verify(timeout.ViewSignature, timeout.View.ToBytes()) {
+	if !s.auth.Verify(timeout.ViewSignature, timeout.View.ToBytes()) {
 		return
 	}
 	s.logger.Debug("OnRemoteTimeout: ", timeout)
@@ -313,7 +309,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 			s.logger.Info("Timeout Certificate could not be verified!")
 			return
 		}
-		s.updateHighTC(tc)
+		s.auth.UpdateHighTC(tc)
 		v = tc.View()
 		timeout = true
 	}
@@ -346,7 +342,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	}
 
 	if haveQC {
-		s.updateHighQC(qc)
+		s.auth.UpdateHighQC(qc)
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
 		if qc.View() >= v {
 			v = qc.View()
@@ -381,29 +377,5 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		s.consensus.Propose(s.View(), s.highQC, syncInfo)
 	} else if s.sender.ReplicaExists(leader) {
 		s.sender.SendNewView(leader, syncInfo)
-	}
-}
-
-// updateHighQC attempts to update the highQC, but does not verify the qc first.
-// This method is meant to be used instead of the exported UpdateHighQC internally
-// in this package when the qc has already been verified.
-func (s *Synchronizer) updateHighQC(qc hotstuff.QuorumCert) {
-	newBlock, ok := s.blockChain.Get(qc.BlockHash())
-	if !ok {
-		s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
-		return
-	}
-
-	if newBlock.View() > s.highQC.View() {
-		s.highQC = qc
-		s.logger.Debug("HighQC updated")
-	}
-}
-
-// updateHighTC attempts to update the highTC, but does not verify the tc first.
-func (s *Synchronizer) updateHighTC(tc hotstuff.TimeoutCert) {
-	if tc.View() > s.highTC.View() {
-		s.highTC = tc
-		s.logger.Debug("HighTC updated")
 	}
 }

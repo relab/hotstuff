@@ -131,7 +131,6 @@ func NewProtocol(
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
 			depsSecure.BlockChain(),
-			depsSecure.CryptoImpl(),
 			depsSecure.CertAuth(),
 			mods.leaderRotation,
 			csus,

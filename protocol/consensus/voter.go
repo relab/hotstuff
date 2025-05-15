@@ -86,7 +86,7 @@ func (cs *Voter) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
 	// ensure the block came from the leader.
 	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
 		cs.logger.Infof("TryAccept[p=%d, view=%d]: block was not proposed by the expected leader", view)
-		// return
+		return
 	}
 	cmd := block.Command()
 	if !cs.commandCache.Accept(cmd) {
