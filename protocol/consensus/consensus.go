@@ -126,12 +126,12 @@ func (cs *Consensus) ProcessProposal(proposal hotstuff.ProposeMsg) (advance bool
 	if !ok {
 		return
 	}
-	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
-	if leaderID == cs.config.ID() {
-		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
+	if cs.kauri != nil {
+		// disseminate proposal and aggregate votes.
+		cs.kauri.Begin(pc, proposal)
 		return
 	}
-	cs.sendVote(leaderID, proposal, pc)
+	cs.sendVote(proposal, pc)
 	return
 }
 
@@ -211,12 +211,12 @@ func (cs *Consensus) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert
 	return proposal, true
 }
 
-func (cs *Consensus) sendVote(leaderID hotstuff.ID, proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (cs *Consensus) sendVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	block := proposal.Block
 	view := block.View()
-	if cs.kauri != nil {
-		// disseminate proposal and aggregate votes.
-		cs.kauri.Begin(pc, proposal)
+	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
+	if leaderID == cs.config.ID() {
+		cs.eventLoop.AddEvent(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
 		return
 	}
 
