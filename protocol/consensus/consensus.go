@@ -133,7 +133,7 @@ func (cs *Consensus) ReceiveProposal(proposal hotstuff.ProposeMsg) (syncInfo hot
 	cs.tryCommit(&proposal)
 	syncInfo = hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
 	advance = true // Tells the synchronizer to advance the view
-	pc, ok := cs.voter.CreateVote(view, proposal)
+	pc, ok := cs.voter.CreateVote(block)
 	if !ok {
 		return
 	}

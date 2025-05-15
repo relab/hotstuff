@@ -61,22 +61,17 @@ func (v *Voter) StopVoting(view hotstuff.View) {
 	}
 }
 
-func (v *Voter) CreateVote(view hotstuff.View, proposal hotstuff.ProposeMsg) (pc hotstuff.PartialCert, ok bool) {
-	block := proposal.Block
-
+func (v *Voter) CreateVote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
 	if block.View() <= v.lastVote {
 		v.logger.Info("OnPropose: block view too old")
 		return
 	}
-
 	pc, err := v.auth.CreatePartialCert(block)
 	if err != nil {
 		v.logger.Error("OnPropose: failed to sign block: ", err)
 		return
 	}
-
 	v.lastVote = block.View()
-
 	return pc, true
 }
 
