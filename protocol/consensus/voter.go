@@ -16,7 +16,6 @@ type Voter struct {
 	eventLoop *eventloop.EventLoop
 	config    *core.RuntimeConfig
 
-	impl           modules.ConsensusRules
 	leaderRotation modules.LeaderRotation
 
 	blockChain *blockchain.BlockChain
