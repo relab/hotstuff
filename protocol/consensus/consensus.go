@@ -103,14 +103,17 @@ func New(
 	}
 
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
-		cs.logger.Debugf("On event (hotstuff.ProposeMsg) call OnPropose.")
-		newInfo, advance := cs.ReceiveProposal(event.(hotstuff.ProposeMsg))
-		if advance {
-			cs.eventLoop.AddEvent(hotstuff.NewViewMsg{
-				ID:       cs.config.ID(),
-				SyncInfo: newInfo,
-			})
+		cs.logger.Debugf("On event (hotstuff.ProposeMsg).")
+		proposal := event.(hotstuff.ProposeMsg)
+		if !cs.ProcessProposal(proposal) {
+			// if it failed to process the proposal, don't advance the view
+			return
 		}
+		newInfo := hotstuff.NewSyncInfo().WithQC(proposal.Block.QuorumCert())
+		cs.eventLoop.AddEvent(hotstuff.NewViewMsg{
+			ID:       cs.config.ID(),
+			SyncInfo: newInfo,
+		})
 	})
 	return cs
 }
@@ -119,7 +122,7 @@ func (cs *Consensus) Voter() *Voter {
 	return cs.voter
 }
 
-func (cs *Consensus) ReceiveProposal(proposal hotstuff.ProposeMsg) (syncInfo hotstuff.SyncInfo, advance bool) {
+func (cs *Consensus) ProcessProposal(proposal hotstuff.ProposeMsg) (advance bool) {
 	block := proposal.Block
 	view := block.View()
 	advance = false // won't advance when the below if-statements return
@@ -127,12 +130,11 @@ func (cs *Consensus) ReceiveProposal(proposal hotstuff.ProposeMsg) (syncInfo hot
 		cs.logger.Info("OnPropose: Block not voted for")
 		return
 	}
-	if !cs.voter.Accept(&proposal) {
+	if !cs.voter.TryAccept(&proposal) {
 		return
 	}
 	cs.tryCommit(&proposal)
-	syncInfo = hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
-	advance = true // Tells the synchronizer to advance the view
+	advance = true // Tells the synchronizer to advance the view, even if vote creation failed.
 	pc, ok := cs.voter.CreateVote(block)
 	if !ok {
 		return
@@ -164,7 +166,7 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 	if ok {
 		// tell the acceptor that the previous proposal succeeded.
 		if qcBlock, ok := cs.blockChain.Get(qc.BlockHash()); ok {
-			cs.commandCache.Proposed(qcBlock.Command())
+			cs.commandCache.Update(qcBlock.Command())
 		} else {
 			cs.logger.Errorf("Could not find block for QC: %s", qc)
 		}
@@ -195,7 +197,7 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 	}
 	// as leader, I can commit and vote for my own proposal
 	// TODO(AlanRostem): can this be avoided and just vote + commit directly as leader?
-	cs.ReceiveProposal(proposal)
+	cs.ProcessProposal(proposal)
 }
 
 // ProposeRule implements the default propose ruler.

@@ -62,6 +62,7 @@ func (v *Voter) StopVoting(view hotstuff.View) {
 }
 
 func (v *Voter) CreateVote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
+	ok = false
 	if block.View() <= v.lastVote {
 		v.logger.Info("OnPropose: block view too old")
 		return
@@ -75,7 +76,7 @@ func (v *Voter) CreateVote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok b
 	return pc, true
 }
 
-func (cs *Voter) Accept(proposal *hotstuff.ProposeMsg) (accepted bool) {
+func (cs *Voter) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
 	block := proposal.Block
 	view := block.View()
 	accepted = false
@@ -93,7 +94,7 @@ func (cs *Voter) Accept(proposal *hotstuff.ProposeMsg) (accepted bool) {
 		return
 	}
 	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
-		cs.commandCache.Proposed(qcBlock.Command())
+		cs.commandCache.Update(qcBlock.Command())
 	} else {
 		cs.logger.Infof("OnPropose[view=%d]: Failed to fetch qcBlock", view)
 	}

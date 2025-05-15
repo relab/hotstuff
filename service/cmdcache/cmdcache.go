@@ -146,8 +146,8 @@ func (c *Cache) Accept(cmd hotstuff.Command) bool {
 	return true
 }
 
-// Proposed updates the serial numbers such that we will not accept the given batch again.
-func (c *Cache) Proposed(cmd hotstuff.Command) {
+// Update updates the serial numbers such that we will not accept the given batch again.
+func (c *Cache) Update(cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
