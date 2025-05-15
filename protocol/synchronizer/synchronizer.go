@@ -21,17 +21,20 @@ import (
 
 // Synchronizer synchronizes replicas to the same view.
 type Synchronizer struct {
-	duration       modules.ViewDuration
-	leaderRotation modules.LeaderRotation
-	crypto         modules.CryptoBase
+	eventLoop *eventloop.EventLoop
+	logger    logging.Logger
+	config    *core.RuntimeConfig
 
 	blockChain *blockchain.BlockChain
-	consensus  *consensus.Consensus
+	crypto     modules.CryptoBase
 	auth       *certauth.CertAuthority
-	sender     *network.Sender
-	eventLoop  *eventloop.EventLoop
-	logger     logging.Logger
-	config     *core.RuntimeConfig
+
+	duration       modules.ViewDuration
+	leaderRotation modules.LeaderRotation
+	voter          *consensus.Voter
+	consensus      *consensus.Consensus
+
+	sender *network.Sender
 
 	mut         sync.RWMutex // to protect the following
 	currentView hotstuff.View
@@ -64,6 +67,7 @@ func New(
 	// protocol dependencies
 	leaderRotation modules.LeaderRotation,
 	consensus *consensus.Consensus,
+	voter *consensus.Voter,
 
 	// network dependencies
 	sender *network.Sender,
@@ -80,6 +84,7 @@ func New(
 		eventLoop:  eventLoop,
 		logger:     logger,
 		config:     config,
+		voter:      voter,
 
 		currentView: 1,
 
@@ -221,7 +226,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	}
 	s.lastTimeout = &timeoutMsg
 	// stop voting for current view
-	s.consensus.Voter().StopVoting(view)
+	s.voter.StopVoting(view)
 
 	s.sender.Timeout(timeoutMsg)
 	s.OnRemoteTimeout(timeoutMsg)

@@ -109,11 +109,6 @@ func New(
 	})
 	return cs
 }
-
-func (cs *Consensus) Voter() *Voter {
-	return cs.voter
-}
-
 func (cs *Consensus) ProcessProposal(proposal hotstuff.ProposeMsg) (advance bool) {
 	block := proposal.Block
 	view := block.View()

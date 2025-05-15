@@ -135,6 +135,7 @@ func NewProtocol(
 			depsSecure.CertAuth(),
 			mods.leaderRotation,
 			csus,
+			voter,
 			depsNet.Sender(),
 		),
 	}, nil
