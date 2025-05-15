@@ -68,8 +68,8 @@ type Configuration interface {
 }
 
 type node struct {
-	blockChain     *blockchain.BlockChain
-	consensus      Consensus
+	blockChain *blockchain.BlockChain
+	// consensus      Consensus // temporary lint fix
 	eventLoop      *eventloop.EventLoop
 	leaderRotation modules.LeaderRotation
 	synchronizer   Synchronizer
@@ -159,13 +159,13 @@ func (n *Network) createTwinsNodes(_ []NodeID, _ Scenario, _ string) error {
 
 func (n *Network) run(ticks int) {
 	// kick off the initial proposal(s)
-	for _, node := range n.nodes {
-		if node.leaderRotation.GetLeader(1) == node.id.ReplicaID {
-			// TODO(AlanRostem): fix this
-			// s := node.synchronizer.(*synchronizer.Synchronizer)
-			// node.consensus.Propose(s.View(), s.SyncInfo())
-		}
-	}
+	// TODO(AlanRostem): fix this
+	// for _, node := range n.nodes {
+	// 	if node.leaderRotation.GetLeader(1) == node.id.ReplicaID {
+	// 		s := node.synchronizer.(*synchronizer.Synchronizer)
+	// 		node.consensus.Propose(s.View(), s.SyncInfo())
+	// 	}
+	// }
 
 	for tick := 0; tick < ticks; tick++ {
 		n.tick()
