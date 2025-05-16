@@ -115,7 +115,8 @@ func New(
 func (cs *Consensus) ProcessProposal(proposal hotstuff.ProposeMsg) (advance bool) {
 	block := proposal.Block
 	view := block.View()
-	advance = false // won't advance when the below if-statements return
+	advance = false // won't increment the view when the below if-statements return
+	// ensure that I can vote in this view based on the protocol's rule.
 	if !cs.impl.VoteRule(view, proposal) {
 		cs.logger.Info("OnPropose: Block not voted for")
 		return
@@ -125,15 +126,18 @@ func (cs *Consensus) ProcessProposal(proposal hotstuff.ProposeMsg) (advance bool
 	}
 	cs.tryCommit(&proposal)
 	advance = true // Tells the synchronizer to advance the view, even if vote creation failed.
+	// try to vote for the block and retrieve its partial certificate.
 	pc, ok := cs.voter.CreateVote(block)
 	if !ok {
 		return
 	}
+	// kauri will handle sending over the wire differently, so we return here.
 	if cs.kauri != nil {
 		// disseminate proposal and aggregate votes.
 		cs.kauri.Begin(pc, proposal)
 		return
 	}
+	// if the proposal was voted for (state is updated internally), we send it over the wire.
 	cs.sendVote(proposal, pc)
 	return
 }
@@ -156,7 +160,7 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 	cs.logger.Debugf("Propose")
 
 	// TODO(AlanRostem): related to this comment: https://github.com/relab/hotstuff/pull/182/files#r1932600780
-	// I tried removing this, but the command count decreased by 50%. Needs to be investigated.
+	// I tried removing this, but the command count decreased by ~50%. Needs to be investigated.
 	qc, ok := syncInfo.QC()
 	if ok {
 		// tell the acceptor that the previous proposal succeeded.
@@ -170,12 +174,14 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 	ctx, cancel := timeout.Context(cs.eventLoop.Context(), cs.eventLoop)
 	defer cancel()
 
+	// find a value to propose.
 	cmd, ok := cs.commandCache.Get(ctx)
 	if !ok {
 		cs.logger.Debugf("Propose[view=%d]: No command", view)
 		return
 	}
 
+	// ensure that a proposal can be sent based on the protocol's rule.
 	var proposal hotstuff.ProposeMsg
 	proposal, ok = cs.ruler.ProposeRule(view, highQC, syncInfo, cmd)
 	if !ok {
@@ -183,7 +189,8 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 		return
 	}
 
-	// TODO(AlanRostem): discuss if this removal is valid. Adding a panic in blockchain seems to be the correct way.
+	// TODO(AlanRostem): Why is here? Commented it out since it essentially stores the same block twice.
+	// I added a panic in blockchain, as well. Seems to be the correct way.
 	// cs.blockChain.Store(proposal.Block)
 
 	// kauri sends the proposal to only the children
@@ -217,12 +224,13 @@ func (cs *Consensus) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert
 func (cs *Consensus) sendVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	block := proposal.Block
 	view := block.View()
+	// if I am the leader in the next view, collect the vote for myself beforehand.
 	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
 	if leaderID == cs.config.ID() {
 		cs.leader.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
 		return
 	}
-
+	// if I am the one voting, sent the vote to next leader over the wire.
 	if !cs.sender.ReplicaExists(leaderID) {
 		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
 		return

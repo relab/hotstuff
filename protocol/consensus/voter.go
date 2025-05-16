@@ -62,15 +62,20 @@ func (v *Voter) StopVoting(view hotstuff.View) {
 
 func (v *Voter) CreateVote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
 	ok = false
+	// if the given block is too old, reject it.
+	// TODO(AlanRostem): is this not already checked with impl.VoteRule()?
 	if block.View() <= v.lastVote {
 		v.logger.Info("OnPropose: block view too old")
 		return
 	}
+	// try to sign the block. Abort if this fails.
 	pc, err := v.auth.CreatePartialCert(block)
 	if err != nil {
 		v.logger.Error("OnPropose: failed to sign block: ", err)
 		return
 	}
+	// block is safe, so we update the view we voted for
+	// i.e., we voted for this block!
 	v.lastVote = block.View()
 	return pc, true
 }
@@ -79,19 +84,25 @@ func (cs *Voter) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
 	block := proposal.Block
 	view := block.View()
 	accepted = false
+	// verify the proposal's QC.
 	if !cs.auth.VerifyProposal(proposal) {
 		return
 	}
-	// ensure the block came from the leader.
+	// ensure the block came from the expected leader.
 	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
 		cs.logger.Infof("TryAccept[p=%d, view=%d]: block was not proposed by the expected leader", view)
 		return
 	}
+	// now the proposal is valid, so we can increment the view, but the command may
+	// still be too old to execute
 	cmd := block.Command()
+	// verify the command's "age"
 	if !cs.commandCache.Accept(cmd) {
 		cs.logger.Infof("TryAccept[view=%d]: block rejected: %s", view, block)
 		return
 	}
+	// ensure that the block's QC is present on the chain.
+	// if it is, then we tell the cmdcache to update its timeline.
 	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
 		cs.commandCache.Update(qcBlock.Command())
 	} else {

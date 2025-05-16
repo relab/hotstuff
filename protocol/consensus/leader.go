@@ -44,9 +44,9 @@ func NewLeader(
 }
 
 // CollectVote handles an incoming vote.
-func (vm *Leader) CollectVote(vote hotstuff.VoteMsg) {
+func (ld *Leader) CollectVote(vote hotstuff.VoteMsg) {
 	cert := vote.PartialCert
-	vm.logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
+	ld.logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
 
 	var (
 		block *hotstuff.Block
@@ -55,75 +55,75 @@ func (vm *Leader) CollectVote(vote hotstuff.VoteMsg) {
 
 	if !vote.Deferred {
 		// first, try to get the block from the local cache
-		block, ok = vm.blockChain.LocalGet(cert.BlockHash())
+		block, ok = ld.blockChain.LocalGet(cert.BlockHash())
 		if !ok {
 			// if that does not work, we will try to handle this event later.
 			// hopefully, the block has arrived by then.
-			vm.logger.Debugf("Local cache miss for block: %.8s", cert.BlockHash())
+			ld.logger.Debugf("Local cache miss for block: %.8s", cert.BlockHash())
 			vote.Deferred = true
-			vm.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, vote)
+			ld.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, vote)
 			return
 		}
 	} else {
 		// if the block has not arrived at this point we will try to fetch it.
-		block, ok = vm.blockChain.Get(cert.BlockHash())
+		block, ok = ld.blockChain.Get(cert.BlockHash())
 		if !ok {
-			vm.logger.Debugf("Could not find block for vote: %.8s.", cert.BlockHash())
+			ld.logger.Debugf("Could not find block for vote: %.8s.", cert.BlockHash())
 			return
 		}
 	}
 
-	if block.View() <= vm.auth.HighQC().View() {
+	if block.View() <= ld.auth.HighQC().View() {
 		// too old
 		return
 	}
 
-	if vm.config.SyncVoteVerification() {
-		vm.verifyCert(cert, block)
+	if ld.config.SyncVoteVerification() {
+		ld.verifyCert(cert, block)
 	} else {
-		go vm.verifyCert(cert, block)
+		go ld.verifyCert(cert, block)
 	}
 }
 
-func (vm *Leader) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
-	if !vm.auth.VerifyPartialCert(cert) {
-		vm.logger.Info("OnVote: Vote could not be verified!")
+func (ld *Leader) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
+	if !ld.auth.VerifyPartialCert(cert) {
+		ld.logger.Info("OnVote: Vote could not be verified!")
 		return
 	}
 
-	vm.mut.Lock()
-	defer vm.mut.Unlock()
+	ld.mut.Lock()
+	defer ld.mut.Unlock()
 
 	// this defer will clean up any old votes in verifiedVotes
 	defer func() {
 		// delete any pending QCs with lower height than bLeaf
-		for k := range vm.verifiedVotes {
-			if block, ok := vm.blockChain.LocalGet(k); ok {
-				if block.View() <= vm.auth.HighQC().View() {
-					delete(vm.verifiedVotes, k)
+		for k := range ld.verifiedVotes {
+			if block, ok := ld.blockChain.LocalGet(k); ok {
+				if block.View() <= ld.auth.HighQC().View() {
+					delete(ld.verifiedVotes, k)
 				}
 			} else {
-				delete(vm.verifiedVotes, k)
+				delete(ld.verifiedVotes, k)
 			}
 		}
 	}()
 
-	votes := vm.verifiedVotes[cert.BlockHash()]
+	votes := ld.verifiedVotes[cert.BlockHash()]
 	votes = append(votes, cert)
-	vm.verifiedVotes[cert.BlockHash()] = votes
+	ld.verifiedVotes[cert.BlockHash()] = votes
 
-	if len(votes) < vm.config.QuorumSize() {
+	if len(votes) < ld.config.QuorumSize() {
 		return
 	}
 
-	qc, err := vm.auth.CreateQuorumCert(block, votes)
+	qc, err := ld.auth.CreateQuorumCert(block, votes)
 	if err != nil {
-		vm.logger.Info("OnVote: could not create QC for block: ", err)
+		ld.logger.Info("OnVote: could not create QC for block: ", err)
 		return
 	}
-	delete(vm.verifiedVotes, cert.BlockHash())
+	delete(ld.verifiedVotes, cert.BlockHash())
 
-	vm.eventLoop.AddEvent(hotstuff.NewViewMsg{ID: vm.config.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
+	ld.eventLoop.AddEvent(hotstuff.NewViewMsg{ID: ld.config.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
 }
 
 func Propose(_ hotstuff.ProposeMsg) {

@@ -12,7 +12,6 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
 
 	"github.com/relab/hotstuff"
@@ -24,8 +23,7 @@ type Synchronizer struct {
 	logger    logging.Logger
 	config    *core.RuntimeConfig
 
-	blockChain *blockchain.BlockChain
-	auth       *certauth.CertAuthority
+	auth *certauth.CertAuthority
 
 	duration       modules.ViewDuration
 	leaderRotation modules.LeaderRotation
@@ -56,7 +54,6 @@ func New(
 	config *core.RuntimeConfig,
 
 	// security dependencies
-	blockChain *blockchain.BlockChain,
 	auth *certauth.CertAuthority,
 
 	// protocol dependencies
@@ -71,14 +68,13 @@ func New(
 		duration:       leaderRotation.ViewDuration(),
 		leaderRotation: leaderRotation,
 
-		blockChain: blockChain,
-		consensus:  logic,
-		auth:       auth,
-		sender:     sender,
-		eventLoop:  eventLoop,
-		logger:     logger,
-		config:     config,
-		voter:      voter,
+		consensus: logic,
+		auth:      auth,
+		sender:    sender,
+		eventLoop: eventLoop,
+		logger:    logger,
+		config:    config,
+		voter:     voter,
 
 		currentView: 1,
 
