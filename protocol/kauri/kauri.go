@@ -14,22 +14,21 @@ import (
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/proto/kauripb"
 	"github.com/relab/hotstuff/internal/tree"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/security/blockchain"
+	"github.com/relab/hotstuff/security/certauth"
 )
 
 const ModuleName = "kauri"
 
 // Kauri structure contains the modules for kauri protocol implementation.
 type Kauri struct {
-	blockChain     *blockchain.BlockChain
-	crypto         modules.CryptoBase
-	leaderRotation modules.LeaderRotation
-	config         *core.RuntimeConfig
-	eventLoop      *eventloop.EventLoop
-	sender         *network.Sender
-	logger         logging.Logger
+	logger     logging.Logger
+	eventLoop  *eventloop.EventLoop
+	config     *core.RuntimeConfig
+	blockChain *blockchain.BlockChain
+	auth       *certauth.CertAuthority
+	sender     *network.Sender
 
 	aggContrib  hotstuff.QuorumSignature
 	aggSent     bool
@@ -43,29 +42,24 @@ type Kauri struct {
 
 // New initializes the kauri structure
 func New(
-	crypto modules.CryptoBase,
-	leaderRotation modules.LeaderRotation,
-	blockChain *blockchain.BlockChain,
-	config *core.RuntimeConfig,
-	eventLoop *eventloop.EventLoop,
-	sender *network.Sender,
 	logger logging.Logger,
-	tree *tree.Tree,
+	eventLoop *eventloop.EventLoop,
+	config *core.RuntimeConfig,
+	blockChain *blockchain.BlockChain,
+	auth *certauth.CertAuthority,
+	sender *network.Sender,
 ) *Kauri {
 	k := &Kauri{
-		blockChain:     blockChain,
-		crypto:         crypto,
-		leaderRotation: leaderRotation,
-		config:         config,
-		eventLoop:      eventLoop,
-		sender:         sender,
-		logger:         logger,
+		blockChain: blockChain,
+		auth:       auth,
+		config:     config,
+		eventLoop:  eventLoop,
+		sender:     sender,
+		logger:     logger,
 
 		nodes: make(map[hotstuff.ID]*kauripb.Node),
-		tree:  tree,
+		tree:  nil, // is set later
 	}
-
-	// k.opts.SetShouldUseTree() // TODO(AlanRostem): construct Kauri inside consensus to avoid this
 	k.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(_ any) {
 		k.postInit()
 	}, eventloop.Prioritize())
@@ -203,7 +197,7 @@ func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) err
 	if !ok {
 		return fmt.Errorf("failed to fetch block %v", k.blockHash)
 	}
-	if !k.crypto.Verify(currentSignature, block.ToBytes()) {
+	if !k.auth.Verify(currentSignature, block.ToBytes()) {
 		return fmt.Errorf("cannot verify contribution for view %d from participants %v", k.currentView, currentSignature.Participants())
 	}
 	if k.aggContrib == nil {
@@ -214,7 +208,7 @@ func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) err
 	if err := canMergeContributions(currentSignature, k.aggContrib); err != nil {
 		return err
 	}
-	combSignature, err := k.crypto.Combine(currentSignature, k.aggContrib)
+	combSignature, err := k.auth.Combine(currentSignature, k.aggContrib)
 	if err != nil {
 		return fmt.Errorf("failed to combine signatures: %v", err)
 	}

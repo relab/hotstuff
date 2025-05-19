@@ -86,17 +86,14 @@ func New(
 	}
 	if config.KauriEnabled() {
 		cs.kauri = kauri.New(
-			auth,
-			leaderRotation,
-			blockChain,
-			config,
-			eventLoop,
-			sender,
 			logger,
-			config.Tree(),
+			eventLoop,
+			config,
+			blockChain,
+			auth,
+			sender,
 		)
 	}
-
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.logger.Debugf("On event (hotstuff.ProposeMsg).")
 		proposal := event.(hotstuff.ProposeMsg)
@@ -112,6 +109,7 @@ func New(
 	})
 	return cs
 }
+
 func (cs *Consensus) ProcessProposal(proposal hotstuff.ProposeMsg) (advance bool) {
 	block := proposal.Block
 	view := block.View()
@@ -147,7 +145,7 @@ func (cs *Consensus) tryCommit(proposal *hotstuff.ProposeMsg) bool {
 	view := block.View()
 	cs.logger.Debugf("tryCommit[view=%d]: block accepted.", view)
 	cs.blockChain.Store(block)
-	// overwrite the block variable. If it was nil, dont't commit.
+	// NOTE: this overwrites the block variable. If it was nil, dont't commit.
 	if block = cs.impl.CommitRule(block); block == nil {
 		return false
 	}
