@@ -62,7 +62,7 @@ func (v *Voter) StopVoting(view hotstuff.View) {
 func (v *Voter) CreateVote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
 	ok = false
 	// if the given block is too old, reject it.
-	// TODO(AlanRostem): is this not already checked with impl.VoteRule()?
+	// TODO(AlanRostem): is this not already checked with rules.VoteRule()?
 	// if block.View() <= v.lastVote {
 	// 	v.logger.Info("OnPropose: block view too old")
 	// 	return
@@ -87,7 +87,6 @@ func (v *Voter) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
 		v.logger.Info("OnPropose: Block not voted for")
 		return
 	}
-
 	accepted = false
 	// verify the proposal's QC.
 	if !v.auth.VerifyProposal(proposal) {

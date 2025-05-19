@@ -18,22 +18,24 @@ import (
 // Consensus provides a default implementation of the Consensus interface
 // for implementations of the ConsensusImpl interface.
 type Consensus struct {
-	impl           modules.ConsensusRules
-	ruler          modules.ProposeRuler
-	kauri          *kauri.Kauri
-	leaderRotation modules.LeaderRotation
+	eventLoop *eventloop.EventLoop
+	logger    logging.Logger
+	config    *core.RuntimeConfig
 
-	blockChain   *blockchain.BlockChain
+	blockChain *blockchain.BlockChain
+	auth       *certauth.CertAuthority
+
 	committer    *committer.Committer
 	commandCache *cmdcache.Cache
-	sender       *network.Sender
-	auth         *certauth.CertAuthority
-	eventLoop    *eventloop.EventLoop
-	logger       logging.Logger
-	config       *core.RuntimeConfig
 
-	voter  *Voter
-	leader *Leader
+	impl           modules.ConsensusRules
+	ruler          modules.ProposeRuler
+	leaderRotation modules.LeaderRotation
+	voter          *Voter
+	leader         *Leader
+	kauri          *kauri.Kauri
+
+	sender *network.Sender
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
@@ -146,9 +148,9 @@ func (cs *Consensus) tryCommit(proposal *hotstuff.ProposeMsg) bool {
 	view := block.View()
 	cs.logger.Debugf("tryCommit[view=%d]: block accepted.", view)
 	cs.blockChain.Store(block)
-	// TODO(AlanRostem): verify if this is the line below is a solution to this comment: https://github.com/relab/hotstuff/pull/182/files#r1932600780
+	// TODO(AlanRostem): verify if the line below is a solution to this comment: https://github.com/relab/hotstuff/pull/182/files#r1932600780
 	cs.commandCache.Update(block.Command()) // update the cache before committing.
-	// NOTE: this overwrites the block variable. If it was nil, dont't commit.
+	// NOTE: this overwrites the block variable. If it was nil, simply don't commit.
 	if block = cs.impl.CommitRule(block); block == nil {
 		return false
 	}
@@ -179,7 +181,6 @@ func (cs *Consensus) tryCache(proposal *hotstuff.ProposeMsg) bool {
 // Propose creates a new proposal.
 func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syncInfo hotstuff.SyncInfo) {
 	cs.logger.Debugf("Propose")
-
 	// TODO(AlanRostem): related to this comment: https://github.com/relab/hotstuff/pull/182/files#r1932600780
 	// I removed this and moved the update directory to tryCommit. Seems to work smoothly.
 	// qc, ok := syncInfo.QC()
@@ -191,10 +192,8 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 	// 		cs.logger.Errorf("Could not find block for QC: %s", qc)
 	// 	}
 	// }
-
 	ctx, cancel := timeout.Context(cs.eventLoop.Context(), cs.eventLoop)
 	defer cancel()
-
 	// find a value to propose.
 	// NOTE: this is blocking until a batch is present in the cache.
 	cmd, ok := cs.commandCache.Get(ctx)
@@ -202,7 +201,6 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 		cs.logger.Debugf("Propose[view=%d]: No command", view)
 		return
 	}
-
 	// ensure that a proposal can be sent based on the protocol's rule.
 	var proposal hotstuff.ProposeMsg
 	proposal, ok = cs.ruler.ProposeRule(view, highQC, syncInfo, cmd)
@@ -210,18 +208,15 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 		cs.logger.Debug("Propose: No block")
 		return
 	}
-
 	// TODO(AlanRostem): Why is here? Commented it out since it essentially stores the same block twice.
 	// I added a panic in blockchain, as well. Seems to be the correct way.
 	// cs.blockChain.Store(proposal.Block)
-
 	// kauri sends the proposal to only the children
 	if cs.kauri == nil {
 		cs.sender.Propose(proposal)
 	}
 	// as leader, I can commit and vote for my own proposal
-	// TODO(AlanRostem): can this be avoided and just vote + commit directly as leader?
-	cs.ProcessProposal(proposal)
+	cs.voteSelf(proposal)
 }
 
 // ProposeRule implements the default propose ruler.
@@ -241,6 +236,26 @@ func (cs *Consensus) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert
 		proposal.AggregateQC = &aggQC
 	}
 	return proposal, true
+}
+
+func (cs *Consensus) voteSelf(proposal hotstuff.ProposeMsg) {
+	if !cs.tryCache(&proposal) {
+		return
+	}
+	cs.tryCommit(&proposal)
+	block := proposal.Block
+	pc, ok := cs.voter.CreateVote(block)
+	if !ok {
+		cs.logger.Warnf("voteSelf[v=%d]: could not vote for my own proposal.", block.View())
+		return
+	}
+	cs.leader.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
+	// kauri will handle sending over the wire differently, so we return here.
+	if cs.kauri != nil {
+		// disseminate proposal and aggregate votes.
+		cs.kauri.Begin(pc, proposal)
+		return
+	}
 }
 
 func (cs *Consensus) sendVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
