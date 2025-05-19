@@ -112,13 +112,8 @@ func New(
 
 func (cs *Consensus) ProcessProposal(proposal hotstuff.ProposeMsg) (advance bool) {
 	block := proposal.Block
-	view := block.View()
 	advance = false // won't increment the view when the below if-statements return
 	// ensure that I can vote in this view based on the protocol's rule.
-	if !cs.impl.VoteRule(view, proposal) {
-		cs.logger.Info("OnPropose: Block not voted for")
-		return
-	}
 	if !cs.voter.TryAccept(&proposal) {
 		return
 	}
@@ -251,9 +246,9 @@ func (cs *Consensus) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert
 func (cs *Consensus) sendVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	block := proposal.Block
 	view := block.View()
-	// if I am the leader in the next view, collect the vote for myself beforehand.
 	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
 	if leaderID == cs.config.ID() {
+		// if I am the leader in the next view, collect the vote for myself beforehand.
 		cs.leader.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
 		return
 	}

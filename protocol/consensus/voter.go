@@ -8,7 +8,6 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
-	"github.com/relab/hotstuff/service/cmdcache"
 )
 
 type Voter struct {
@@ -17,11 +16,10 @@ type Voter struct {
 	config    *core.RuntimeConfig
 
 	leaderRotation modules.LeaderRotation
+	rules          modules.ConsensusRules
 
 	blockChain *blockchain.BlockChain
 	auth       *certauth.CertAuthority
-
-	commandCache *cmdcache.Cache
 
 	lastVote hotstuff.View
 }
@@ -32,6 +30,7 @@ func NewVoter(
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
 	leaderRotation modules.LeaderRotation,
+	rules modules.ConsensusRules,
 	blockChain *blockchain.BlockChain,
 	auth *certauth.CertAuthority,
 ) *Voter {
@@ -41,6 +40,7 @@ func NewVoter(
 		config:    config,
 
 		leaderRotation: leaderRotation,
+		rules:          rules,
 
 		blockChain: blockChain,
 		auth:       auth,
@@ -57,14 +57,16 @@ func (v *Voter) StopVoting(view hotstuff.View) {
 	}
 }
 
+// CreateVote votes for and signs the block, returning a partial certificate
+// if the vote was successful.
 func (v *Voter) CreateVote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
 	ok = false
 	// if the given block is too old, reject it.
 	// TODO(AlanRostem): is this not already checked with impl.VoteRule()?
-	if block.View() <= v.lastVote {
-		v.logger.Info("OnPropose: block view too old")
-		return
-	}
+	// if block.View() <= v.lastVote {
+	// 	v.logger.Info("OnPropose: block view too old")
+	// 	return
+	// }
 	// try to sign the block. Abort if this fails.
 	pc, err := v.auth.CreatePartialCert(block)
 	if err != nil {
@@ -77,17 +79,23 @@ func (v *Voter) CreateVote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok b
 	return pc, true
 }
 
-func (cs *Voter) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
+// TryAccept verifies the proposal and returns true if it can be voted for.
+func (v *Voter) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
 	block := proposal.Block
 	view := block.View()
+	if !v.rules.VoteRule(view, *proposal) {
+		v.logger.Info("OnPropose: Block not voted for")
+		return
+	}
+
 	accepted = false
 	// verify the proposal's QC.
-	if !cs.auth.VerifyProposal(proposal) {
+	if !v.auth.VerifyProposal(proposal) {
 		return
 	}
 	// ensure the block came from the expected leader.
-	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
-		cs.logger.Infof("TryAccept[p=%d, view=%d]: block was not proposed by the expected leader", view)
+	if proposal.ID != v.leaderRotation.GetLeader(block.View()) {
+		v.logger.Infof("TryAccept[p=%d, view=%d]: block was not proposed by the expected leader", view)
 		return
 	}
 	return true
