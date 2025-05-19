@@ -108,7 +108,6 @@ func NewProtocol(
 		mods.leaderRotation,
 		depsSecure.BlockChain(),
 		depsSecure.CertAuth(),
-		depsSrv.CmdCache(),
 	)
 	leader := consensus.NewLeader(
 		depsCore.Logger(),

@@ -122,6 +122,12 @@ func (cs *Consensus) ProcessProposal(proposal hotstuff.ProposeMsg) (advance bool
 	if !cs.voter.TryAccept(&proposal) {
 		return
 	}
+	// now the proposal is valid, so we can increment the view, but the command may
+	// still be too old to execute
+	if !cs.tryCache(&proposal) {
+		return
+	}
+
 	cs.tryCommit(&proposal)
 	advance = true // Tells the synchronizer to advance the view, even if vote creation failed.
 	// try to vote for the block and retrieve its partial certificate.
@@ -145,11 +151,33 @@ func (cs *Consensus) tryCommit(proposal *hotstuff.ProposeMsg) bool {
 	view := block.View()
 	cs.logger.Debugf("tryCommit[view=%d]: block accepted.", view)
 	cs.blockChain.Store(block)
+	// TODO(AlanRostem): verify if this is the line below is a solution to this comment: https://github.com/relab/hotstuff/pull/182/files#r1932600780
+	cs.commandCache.Update(block.Command()) // update the cache before committing.
 	// NOTE: this overwrites the block variable. If it was nil, dont't commit.
 	if block = cs.impl.CommitRule(block); block == nil {
 		return false
 	}
-	cs.committer.Commit(block)
+	cs.committer.Commit(block) // committer will eventually execute the command.
+	return true
+}
+
+// TODO(AlanRostem): find a better name for this method.
+func (cs *Consensus) tryCache(proposal *hotstuff.ProposeMsg) bool {
+	block := proposal.Block
+	view := block.View()
+	cmd := block.Command()
+	// verify the command's "age"
+	if !cs.commandCache.Accept(cmd) {
+		cs.logger.Infof("TryAccept[view=%d]: block rejected: %s", view, block)
+		return false
+	}
+	// ensure that the block's QC is present on the chain.
+	// if it is, then we tell the cmdcache to update its timeline.
+	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
+		cs.commandCache.Update(qcBlock.Command())
+	} else {
+		cs.logger.Infof("TryAccept[view=%d]: Failed to fetch qcBlock", view)
+	}
 	return true
 }
 
@@ -158,21 +186,22 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 	cs.logger.Debugf("Propose")
 
 	// TODO(AlanRostem): related to this comment: https://github.com/relab/hotstuff/pull/182/files#r1932600780
-	// I tried removing this, but the command count decreased by ~50%. Needs to be investigated.
-	qc, ok := syncInfo.QC()
-	if ok {
-		// tell the acceptor that the previous proposal succeeded.
-		if qcBlock, ok := cs.blockChain.Get(qc.BlockHash()); ok {
-			cs.commandCache.Update(qcBlock.Command())
-		} else {
-			cs.logger.Errorf("Could not find block for QC: %s", qc)
-		}
-	}
+	// I removed this and moved the update directory to tryCommit. Seems to work smoothly.
+	// qc, ok := syncInfo.QC()
+	// if ok {
+	// 	// tell the acceptor that the previous proposal succeeded.
+	// 	if qcBlock, ok := cs.blockChain.Get(qc.BlockHash()); ok {
+	// 		cs.commandCache.Update(qcBlock.Command())
+	// 	} else {
+	// 		cs.logger.Errorf("Could not find block for QC: %s", qc)
+	// 	}
+	// }
 
 	ctx, cancel := timeout.Context(cs.eventLoop.Context(), cs.eventLoop)
 	defer cancel()
 
 	// find a value to propose.
+	// NOTE: this is blocking until a batch is present in the cache.
 	cmd, ok := cs.commandCache.Get(ctx)
 	if !ok {
 		cs.logger.Debugf("Propose[view=%d]: No command", view)

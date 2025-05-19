@@ -34,7 +34,6 @@ func NewVoter(
 	leaderRotation modules.LeaderRotation,
 	blockChain *blockchain.BlockChain,
 	auth *certauth.CertAuthority,
-	commandCache *cmdcache.Cache,
 ) *Voter {
 	return &Voter{
 		logger:    logger,
@@ -45,8 +44,6 @@ func NewVoter(
 
 		blockChain: blockChain,
 		auth:       auth,
-
-		commandCache: commandCache,
 
 		lastVote: 0,
 	}
@@ -92,21 +89,6 @@ func (cs *Voter) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
 	if proposal.ID != cs.leaderRotation.GetLeader(block.View()) {
 		cs.logger.Infof("TryAccept[p=%d, view=%d]: block was not proposed by the expected leader", view)
 		return
-	}
-	// now the proposal is valid, so we can increment the view, but the command may
-	// still be too old to execute
-	cmd := block.Command()
-	// verify the command's "age"
-	if !cs.commandCache.Accept(cmd) {
-		cs.logger.Infof("TryAccept[view=%d]: block rejected: %s", view, block)
-		return
-	}
-	// ensure that the block's QC is present on the chain.
-	// if it is, then we tell the cmdcache to update its timeline.
-	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
-		cs.commandCache.Update(qcBlock.Command())
-	} else {
-		cs.logger.Infof("TryAccept[view=%d]: Failed to fetch qcBlock", view)
 	}
 	return true
 }
