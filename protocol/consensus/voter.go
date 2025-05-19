@@ -57,9 +57,9 @@ func (v *Voter) StopVoting(view hotstuff.View) {
 	}
 }
 
-// CreateVote votes for and signs the block, returning a partial certificate
+// Vote votes for and signs the block, returning a partial certificate
 // if the vote was successful.
-func (v *Voter) CreateVote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
+func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
 	ok = false
 	// if the given block is too old, reject it.
 	// TODO(AlanRostem): is this not already checked with rules.VoteRule()?

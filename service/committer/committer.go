@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/service/clientsrv"
 )
 
+// Committer commits the correct block for a view.
 type Committer struct {
 	blockChain *blockchain.BlockChain
 	clientSrv  *clientsrv.Server
@@ -19,7 +20,6 @@ type Committer struct {
 	bExec *hotstuff.Block
 }
 
-// Basic committer implements commit logic without pipelining.
 func New(
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
@@ -35,11 +35,10 @@ func New(
 }
 
 // Stores the block before further execution.
-func (cm *Committer) Commit(block *hotstuff.Block) {
+func (cm *Committer) Commit(block *hotstuff.Block) error {
 	err := cm.commit(block)
 	if err != nil {
-		cm.logger.Warnf("failed to commit: %v", err)
-		return
+		return err
 	}
 
 	forkedBlocks := cm.blockChain.PruneToHeight(
@@ -49,6 +48,7 @@ func (cm *Committer) Commit(block *hotstuff.Block) {
 	for _, block := range forkedBlocks {
 		cm.clientSrv.Fork(block.Command())
 	}
+	return nil
 }
 
 func (cm *Committer) commit(block *hotstuff.Block) error {

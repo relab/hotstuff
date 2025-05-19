@@ -110,7 +110,7 @@ func NewProtocol(
 		depsSecure.BlockChain(),
 		depsSecure.CertAuth(),
 	)
-	leader := consensus.NewLeader(
+	leader := consensus.NewAggretor(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsCore.RuntimeCfg(),

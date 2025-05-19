@@ -32,7 +32,7 @@ type Consensus struct {
 	ruler          modules.ProposeRuler
 	leaderRotation modules.LeaderRotation
 	voter          *Voter
-	leader         *Leader
+	leader         *Aggregator
 	kauri          *kauri.Kauri
 
 	sender *network.Sender
@@ -53,7 +53,7 @@ func New(
 	leaderRotation modules.LeaderRotation,
 	impl modules.ConsensusRules,
 	voter *Voter,
-	leader *Leader,
+	leader *Aggregator,
 
 	// service dependencies
 	committer *committer.Committer,
@@ -121,14 +121,13 @@ func (cs *Consensus) ProcessProposal(proposal hotstuff.ProposeMsg) (advance bool
 	}
 	// now the proposal is valid, so we can increment the view, but the command may
 	// still be too old to execute
-	if !cs.tryCache(&proposal) {
+	if !cs.tryCommit(&proposal) {
 		return
 	}
 
-	cs.tryCommit(&proposal)
 	advance = true // Tells the synchronizer to advance the view, even if vote creation failed.
 	// try to vote for the block and retrieve its partial certificate.
-	pc, ok := cs.voter.CreateVote(block)
+	pc, ok := cs.voter.Vote(block)
 	if !ok {
 		return
 	}
@@ -143,23 +142,8 @@ func (cs *Consensus) ProcessProposal(proposal hotstuff.ProposeMsg) (advance bool
 	return
 }
 
+// TODO(AlanRostem): put this in the Committer. Hard to do now since leader-rotation requires this.
 func (cs *Consensus) tryCommit(proposal *hotstuff.ProposeMsg) bool {
-	block := proposal.Block
-	view := block.View()
-	cs.logger.Debugf("tryCommit[view=%d]: block accepted.", view)
-	cs.blockChain.Store(block)
-	// TODO(AlanRostem): verify if the line below is a solution to this comment: https://github.com/relab/hotstuff/pull/182/files#r1932600780
-	cs.commandCache.Update(block.Command()) // update the cache before committing.
-	// NOTE: this overwrites the block variable. If it was nil, simply don't commit.
-	if block = cs.impl.CommitRule(block); block == nil {
-		return false
-	}
-	cs.committer.Commit(block) // committer will eventually execute the command.
-	return true
-}
-
-// TODO(AlanRostem): find a better name for this method.
-func (cs *Consensus) tryCache(proposal *hotstuff.ProposeMsg) bool {
 	block := proposal.Block
 	view := block.View()
 	cmd := block.Command()
@@ -174,6 +158,17 @@ func (cs *Consensus) tryCache(proposal *hotstuff.ProposeMsg) bool {
 		cs.commandCache.Update(qcBlock.Command())
 	} else {
 		cs.logger.Infof("TryAccept[view=%d]: Failed to fetch qcBlock", view)
+	}
+	cs.logger.Debugf("tryCommit[view=%d]: block accepted.", view)
+	cs.blockChain.Store(block)
+	cs.commandCache.Update(block.Command()) // update the cache before committing.
+	// TODO(AlanRostem): verify if the line below is a solution to this comment: https://github.com/relab/hotstuff/pull/182/files#r1932600780
+	// NOTE: this overwrites the block variable. If it was nil, simply don't commit.
+	if block = cs.impl.CommitRule(block); block != nil {
+		err := cs.committer.Commit(block) // committer will eventually execute the command.
+		if err != nil {
+			cs.logger.Warnf("failed to commit: %v", err)
+		}
 	}
 	return true
 }
@@ -202,8 +197,7 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 		return
 	}
 	// ensure that a proposal can be sent based on the protocol's rule.
-	var proposal hotstuff.ProposeMsg
-	proposal, ok = cs.ruler.ProposeRule(view, highQC, syncInfo, cmd)
+	proposal, ok := cs.ruler.ProposeRule(view, highQC, syncInfo, cmd)
 	if !ok {
 		cs.logger.Debug("Propose: No block")
 		return
@@ -215,7 +209,7 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 	if cs.kauri == nil {
 		cs.sender.Propose(proposal)
 	}
-	// as leader, I can commit and vote for my own proposal
+	// as proposer, I can commit and vote for my own proposal
 	cs.voteSelf(proposal)
 }
 
@@ -239,22 +233,21 @@ func (cs *Consensus) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert
 }
 
 func (cs *Consensus) voteSelf(proposal hotstuff.ProposeMsg) {
-	if !cs.tryCache(&proposal) {
+	if !cs.tryCommit(&proposal) {
 		return
 	}
-	cs.tryCommit(&proposal)
 	block := proposal.Block
-	pc, ok := cs.voter.CreateVote(block)
+	pc, ok := cs.voter.Vote(block)
 	if !ok {
 		cs.logger.Warnf("voteSelf[v=%d]: could not vote for my own proposal.", block.View())
 		return
 	}
+	// can collect the vote already since we proposed.
 	cs.leader.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
-	// kauri will handle sending over the wire differently, so we return here.
+	// kauri will handle sending over the wire differently.
 	if cs.kauri != nil {
 		// disseminate proposal and aggregate votes.
 		cs.kauri.Begin(pc, proposal)
-		return
 	}
 }
 

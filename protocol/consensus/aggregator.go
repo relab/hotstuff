@@ -11,7 +11,8 @@ import (
 	"github.com/relab/hotstuff/security/certauth"
 )
 
-type Leader struct {
+// Aggregator collects and verifies votes.
+type Aggregator struct {
 	logger     logging.Logger
 	eventLoop  *eventloop.EventLoop
 	config     *core.RuntimeConfig
@@ -22,14 +23,14 @@ type Leader struct {
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert
 }
 
-func NewLeader(
+func NewAggretor(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
 	auth *certauth.CertAuthority,
-) *Leader {
-	ld := &Leader{
+) *Aggregator {
+	ld := &Aggregator{
 		blockChain:    blockChain,
 		auth:          auth,
 		eventLoop:     eventLoop,
@@ -44,7 +45,7 @@ func NewLeader(
 }
 
 // CollectVote handles an incoming vote.
-func (ld *Leader) CollectVote(vote hotstuff.VoteMsg) {
+func (ld *Aggregator) CollectVote(vote hotstuff.VoteMsg) {
 	cert := vote.PartialCert
 	ld.logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
 
@@ -85,7 +86,7 @@ func (ld *Leader) CollectVote(vote hotstuff.VoteMsg) {
 	}
 }
 
-func (ld *Leader) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
+func (ld *Aggregator) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
 	if !ld.auth.VerifyPartialCert(cert) {
 		ld.logger.Info("OnVote: Vote could not be verified!")
 		return
