@@ -99,7 +99,7 @@ func New(
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.logger.Debugf("On event (hotstuff.ProposeMsg).")
 		proposal := event.(hotstuff.ProposeMsg)
-		if !cs.ProcessProposal(proposal) {
+		if !cs.OnPropose(proposal) {
 			// if it failed to process the proposal, don't advance the view
 			return
 		}
@@ -112,7 +112,8 @@ func New(
 	return cs
 }
 
-func (cs *Consensus) ProcessProposal(proposal hotstuff.ProposeMsg) (advance bool) {
+// OnPropose is called when receiving a proposal from a leader.
+func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) (advance bool) {
 	block := proposal.Block
 	advance = false // won't increment the view when the below if-statements return
 	// ensure that I can vote in this view based on the protocol's rule.
@@ -165,7 +166,7 @@ func (cs *Consensus) tryCommit(proposal *hotstuff.ProposeMsg) bool {
 	return true
 }
 
-// Propose creates a new proposal.
+// Propose creates a new outgoing proposal.
 func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syncInfo hotstuff.SyncInfo) {
 	cs.logger.Debugf("Propose")
 	ctx, cancel := timeout.Context(cs.eventLoop.Context(), cs.eventLoop)
@@ -190,7 +191,7 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 	if cs.kauri == nil {
 		cs.sender.Propose(proposal)
 	}
-	// as proposer, I can commit and vote for my own proposal
+	// as proposer, I can vote for my own proposal
 	cs.voteSelf(proposal)
 }
 

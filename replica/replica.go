@@ -60,6 +60,30 @@ func New(
 	if err != nil {
 		return nil, err
 	}
+	rules, err := dependencies.NewConsensusRules(
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		depsSecure.BlockChain(),
+		rOpt.moduleNames.consensus,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	byzStrat := rOpt.moduleNames.byzantineStrategy
+	if byzStrat != "" {
+		byz, err := dependencies.WrapByzantineStrategy(
+			depsCore.RuntimeCfg(),
+			depsSecure.BlockChain(),
+			rules,
+			byzStrat,
+		)
+		if err != nil {
+			return nil, err
+		}
+		rules = byz
+		depsCore.Logger().Infof("assigned byzantine strategy: %s", byzStrat)
+	}
 	depsSrv := dependencies.NewService(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
@@ -67,15 +91,25 @@ func New(
 		rOpt.cmdCacheOpts,
 		rOpt.clientGorumsSrvOpts...,
 	)
+	leader, err := dependencies.NewLeaderRotation(
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		depsSecure.BlockChain(),
+		depsSrv.Committer(),
+		vdParams,
+		rOpt.moduleNames.leaderRotation,
+		rules.ChainLength(),
+	)
+	if err != nil {
+		return nil, err
+	}
 	depsProtocol, err := dependencies.NewProtocol(
 		depsCore,
 		depsNet,
 		depsSecure,
 		depsSrv,
-		names.consensus,
-		names.leaderRotation,
-		names.byzantineStrategy,
-		vdParams,
+		rules,
+		leader,
 	)
 	if err != nil {
 		return nil, err

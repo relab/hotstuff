@@ -20,7 +20,7 @@ import (
 	"github.com/relab/hotstuff/service/committer"
 )
 
-func newConsensusRulesModule(
+func NewConsensusRules(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
@@ -40,7 +40,7 @@ func newConsensusRulesModule(
 	return
 }
 
-func newByzantineStrategyModule(
+func WrapByzantineStrategy(
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
 	rules modules.ConsensusRules,
@@ -77,7 +77,7 @@ func newCryptoModule(
 	return
 }
 
-func newLeaderRotationModule(
+func NewLeaderRotation(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,

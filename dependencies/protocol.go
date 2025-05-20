@@ -1,72 +1,11 @@
 package dependencies
 
 import (
-	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/synchronizer"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/protocol/viewstates"
-	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/service/committer"
 )
-
-type protocolModules struct {
-	consensusRules modules.ConsensusRules
-	leaderRotation modules.LeaderRotation
-}
-
-func newProtocolModules(
-	logger logging.Logger,
-	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
-	committer *committer.Committer,
-
-	consensusName,
-	leaderRotationName,
-	byzantineStrategy string,
-	vdParams viewduration.Params,
-) (*protocolModules, error) {
-	consensusRules, err := newConsensusRulesModule(
-		logger,
-		config,
-		blockChain,
-		consensusName,
-	)
-	if err != nil {
-		return nil, err
-	}
-	leaderRotation, err := newLeaderRotationModule(
-		logger,
-		config,
-		blockChain,
-		committer,
-		vdParams,
-		leaderRotationName,
-		consensusRules.ChainLength(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	if byzantineStrategy != "" {
-		byz, err := newByzantineStrategyModule(
-			config,
-			blockChain,
-			consensusRules,
-			byzantineStrategy,
-		)
-		if err != nil {
-			return nil, err
-		}
-		consensusRules = byz
-		logger.Infof("assigned byzantine strategy: %s", byzantineStrategy)
-	}
-	return &protocolModules{
-		consensusRules: consensusRules,
-		leaderRotation: leaderRotation,
-	}, nil
-}
 
 type Protocol struct {
 	consensus    *consensus.Consensus
@@ -79,27 +18,11 @@ func NewProtocol(
 	depsNet *Network,
 	depsSecure *Security,
 	depsSrv *Service,
-
-	consensusName,
-	leaderRotationName,
-	byzantineStrategy string,
-	vdParams viewduration.Params,
+	consensusRulesModule modules.ConsensusRules,
+	leaderRotationModule modules.LeaderRotation,
 ) (*Protocol, error) {
-	mods, err := newProtocolModules(
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		depsSecure.BlockChain(),
-		depsSrv.Committer(),
-		consensusName,
-		leaderRotationName,
-		byzantineStrategy,
-		vdParams,
-	)
-	if err != nil {
-		return nil, err
-	}
 	opts := []consensus.Option{}
-	if ruler, ok := mods.consensusRules.(modules.ProposeRuler); ok {
+	if ruler, ok := consensusRulesModule.(modules.ProposeRuler); ok {
 		opts = append(opts, consensus.OverrideProposeRule(ruler))
 	}
 	state := viewstates.New(
@@ -111,12 +34,12 @@ func NewProtocol(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsCore.RuntimeCfg(),
-		mods.leaderRotation,
-		mods.consensusRules,
+		leaderRotationModule,
+		consensusRulesModule,
 		depsSecure.BlockChain(),
 		depsSecure.CertAuth(),
 	)
-	leader := consensus.NewVotingMachine(
+	vm := consensus.NewVotingMachine(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsCore.RuntimeCfg(),
@@ -130,10 +53,10 @@ func NewProtocol(
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
 		depsSecure.CertAuth(),
-		mods.leaderRotation,
-		mods.consensusRules,
+		leaderRotationModule,
+		consensusRulesModule,
 		voter,
-		leader,
+		vm,
 		depsSrv.Committer(),
 		depsSrv.CmdCache(),
 		depsNet.Sender(),
@@ -146,7 +69,7 @@ func NewProtocol(
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
 			depsSecure.CertAuth(),
-			mods.leaderRotation,
+			leaderRotationModule,
 			csus,
 			voter,
 			state,
