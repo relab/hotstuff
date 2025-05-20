@@ -7,6 +7,7 @@ import (
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
+	"github.com/relab/hotstuff/protocol/viewstates"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/service/committer"
 )
@@ -101,6 +102,11 @@ func NewProtocol(
 	if ruler, ok := mods.consensusRules.(modules.ProposeRuler); ok {
 		opts = append(opts, consensus.OverrideProposeRule(ruler))
 	}
+	state := viewstates.New(
+		depsCore.Logger(),
+		depsSecure.BlockChain(),
+		depsSecure.CertAuth(),
+	)
 	voter := consensus.NewVoter(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
@@ -110,12 +116,13 @@ func NewProtocol(
 		depsSecure.BlockChain(),
 		depsSecure.CertAuth(),
 	)
-	leader := consensus.NewAggretor(
+	leader := consensus.NewVotingMachine(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
 		depsSecure.CertAuth(),
+		state,
 	)
 	csus := consensus.New(
 		depsCore.EventLoop(),
@@ -142,6 +149,7 @@ func NewProtocol(
 			mods.leaderRotation,
 			csus,
 			voter,
+			state,
 			depsNet.Sender(),
 		),
 	}, nil

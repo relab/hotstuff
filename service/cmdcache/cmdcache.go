@@ -124,7 +124,7 @@ awaitBatch:
 	return cmd, true
 }
 
-// Accept returns true if the replica can accept the batch.
+// Accept returns true if the batch is new.
 func (c *Cache) Accept(cmd hotstuff.Command) bool {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
@@ -146,8 +146,8 @@ func (c *Cache) Accept(cmd hotstuff.Command) bool {
 	return true
 }
 
-// Update updates the serial numbers such that we will not accept the given batch again.
-func (c *Cache) Update(cmd hotstuff.Command) {
+// Proposed updates the serial numbers such that we will not accept the given batch again.
+func (c *Cache) Proposed(cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {

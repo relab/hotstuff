@@ -32,7 +32,7 @@ type Consensus struct {
 	ruler          modules.ProposeRuler
 	leaderRotation modules.LeaderRotation
 	voter          *Voter
-	leader         *Aggregator
+	leader         *VotingMachine
 	kauri          *kauri.Kauri
 
 	sender *network.Sender
@@ -53,7 +53,7 @@ func New(
 	leaderRotation modules.LeaderRotation,
 	impl modules.ConsensusRules,
 	voter *Voter,
-	leader *Aggregator,
+	leader *VotingMachine,
 
 	// service dependencies
 	committer *committer.Committer,
@@ -142,7 +142,7 @@ func (cs *Consensus) ProcessProposal(proposal hotstuff.ProposeMsg) (advance bool
 	return
 }
 
-// TODO(AlanRostem): put this in the Committer. Hard to do now since leader-rotation requires this.
+// TODO(AlanRostem): put this in the Committer. Hard to do now since leader-rotation depends on it.
 func (cs *Consensus) tryCommit(proposal *hotstuff.ProposeMsg) bool {
 	block := proposal.Block
 	view := block.View()
@@ -152,17 +152,9 @@ func (cs *Consensus) tryCommit(proposal *hotstuff.ProposeMsg) bool {
 		cs.logger.Infof("TryAccept[view=%d]: block rejected: %s", view, block)
 		return false
 	}
-	// ensure that the block's QC is present on the chain.
-	// if it is, then we tell the cmdcache to update its timeline.
-	if qcBlock, ok := cs.blockChain.Get(block.QuorumCert().BlockHash()); ok {
-		cs.commandCache.Update(qcBlock.Command())
-	} else {
-		cs.logger.Infof("TryAccept[view=%d]: Failed to fetch qcBlock", view)
-	}
 	cs.logger.Debugf("tryCommit[view=%d]: block accepted.", view)
 	cs.blockChain.Store(block)
-	cs.commandCache.Update(block.Command()) // update the cache before committing.
-	// TODO(AlanRostem): verify if the line below is a solution to this comment: https://github.com/relab/hotstuff/pull/182/files#r1932600780
+	cs.commandCache.Proposed(block.Command()) // update the cache before committing.
 	// NOTE: this overwrites the block variable. If it was nil, simply don't commit.
 	if block = cs.impl.CommitRule(block); block != nil {
 		err := cs.committer.Commit(block) // committer will eventually execute the command.
@@ -176,17 +168,6 @@ func (cs *Consensus) tryCommit(proposal *hotstuff.ProposeMsg) bool {
 // Propose creates a new proposal.
 func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syncInfo hotstuff.SyncInfo) {
 	cs.logger.Debugf("Propose")
-	// TODO(AlanRostem): related to this comment: https://github.com/relab/hotstuff/pull/182/files#r1932600780
-	// I removed this and moved the update directory to tryCommit. Seems to work smoothly.
-	// qc, ok := syncInfo.QC()
-	// if ok {
-	// 	// tell the acceptor that the previous proposal succeeded.
-	// 	if qcBlock, ok := cs.blockChain.Get(qc.BlockHash()); ok {
-	// 		cs.commandCache.Update(qcBlock.Command())
-	// 	} else {
-	// 		cs.logger.Errorf("Could not find block for QC: %s", qc)
-	// 	}
-	// }
 	ctx, cancel := timeout.Context(cs.eventLoop.Context(), cs.eventLoop)
 	defer cancel()
 	// find a value to propose.
@@ -242,7 +223,7 @@ func (cs *Consensus) voteSelf(proposal hotstuff.ProposeMsg) {
 		cs.logger.Warnf("voteSelf[v=%d]: could not vote for my own proposal.", block.View())
 		return
 	}
-	// can collect the vote already since we proposed.
+	// can collect my own vote.
 	cs.leader.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
 	// kauri will handle sending over the wire differently.
 	if cs.kauri != nil {

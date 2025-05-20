@@ -12,6 +12,7 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/protocol/viewstates"
 	"github.com/relab/hotstuff/security/certauth"
 
 	"github.com/relab/hotstuff"
@@ -29,6 +30,7 @@ type Synchronizer struct {
 	leaderRotation modules.LeaderRotation
 	voter          *consensus.Voter
 	consensus      *consensus.Consensus
+	state          *viewstates.States
 
 	sender *network.Sender
 
@@ -60,6 +62,7 @@ func New(
 	leaderRotation modules.LeaderRotation,
 	logic *consensus.Consensus,
 	voter *consensus.Voter,
+	state *viewstates.States,
 
 	// network dependencies
 	sender *network.Sender,
@@ -75,6 +78,7 @@ func New(
 		logger:    logger,
 		config:    config,
 		voter:     voter,
+		state:     state,
 
 		currentView: 1,
 
@@ -138,7 +142,7 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	// start the initial proposal
 	if view := s.View(); view == 1 && s.leaderRotation.GetLeader(view) == s.config.ID() {
 		syncInfo := s.SyncInfo()
-		s.consensus.Propose(s.View(), s.auth.HighQC(), syncInfo)
+		s.consensus.Propose(s.View(), s.state.HighQC(), syncInfo)
 	}
 }
 
@@ -153,7 +157,7 @@ func (s *Synchronizer) View() hotstuff.View {
 func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
 	s.mut.RLock()
 	defer s.mut.RUnlock()
-	return hotstuff.NewSyncInfo().WithQC(s.auth.HighQC()).WithTC(s.auth.HighTC())
+	return hotstuff.NewSyncInfo().WithQC(s.state.HighQC()).WithTC(s.state.HighTC())
 }
 
 // OnLocalTimeout is called when a local timeout happens.
@@ -279,7 +283,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 			s.logger.Info("Timeout Certificate could not be verified!")
 			return
 		}
-		s.auth.UpdateHighTC(tc)
+		s.state.UpdateHighTC(tc)
 		view = tc.View()
 		timeout = true
 	}
@@ -312,7 +316,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	}
 
 	if haveQC {
-		s.auth.UpdateHighQC(qc)
+		s.state.UpdateHighQC(qc)
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
 		if qc.View() >= view {
 			view = qc.View()
@@ -344,7 +348,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.config.ID() {
-		s.consensus.Propose(s.View(), s.auth.HighQC(), syncInfo)
+		s.consensus.Propose(s.View(), s.state.HighQC(), syncInfo)
 	} else if s.sender.ReplicaExists(leader) {
 		s.sender.SendNewView(leader, syncInfo)
 	}

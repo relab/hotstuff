@@ -61,12 +61,11 @@ func (v *Voter) StopVoting(view hotstuff.View) {
 // if the vote was successful.
 func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
 	ok = false
-	// if the given block is too old, reject it.
-	// TODO(AlanRostem): is this not already checked with rules.VoteRule()?
-	// if block.View() <= v.lastVote {
-	// 	v.logger.Info("OnPropose: block view too old")
-	// 	return
-	// }
+	// cannot vote for an old block.
+	if block.View() <= v.lastVote {
+		v.logger.Info("TryAccept: block view too old")
+		return
+	}
 	// try to sign the block. Abort if this fails.
 	pc, err := v.auth.CreatePartialCert(block)
 	if err != nil {
@@ -84,17 +83,18 @@ func (v *Voter) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
 	block := proposal.Block
 	view := block.View()
 	if !v.rules.VoteRule(view, *proposal) {
-		v.logger.Info("OnPropose: Block not voted for")
+		v.logger.Info("TryAccept: Block not voted for")
 		return
 	}
 	accepted = false
 	// verify the proposal's QC.
-	if !v.auth.VerifyProposal(proposal) {
+	qc := proposal.Block.QuorumCert()
+	if !v.auth.VerifyAnyQC(&qc, proposal.AggregateQC) {
 		return
 	}
 	// ensure the block came from the expected leader.
 	if proposal.ID != v.leaderRotation.GetLeader(block.View()) {
-		v.logger.Infof("TryAccept[p=%d, view=%d]: block was not proposed by the expected leader", view)
+		v.logger.Infof("TryAccept[view=%d]: block was not proposed by the expected leader", view)
 		return
 	}
 	return true

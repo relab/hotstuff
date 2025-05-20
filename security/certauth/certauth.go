@@ -2,8 +2,6 @@
 package certauth
 
 import (
-	"fmt"
-
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
@@ -17,9 +15,6 @@ type CertAuthority struct {
 	config             *core.RuntimeConfig
 	logger             logging.Logger
 	blockChain         *blockchain.BlockChain
-
-	highTC hotstuff.TimeoutCert
-	highQC hotstuff.QuorumCert
 }
 
 // New returns a CertAuthority. It will use the given CryptoBase to create and verify
@@ -39,16 +34,6 @@ func New(
 	}
 	for _, opt := range opts {
 		opt(ca)
-	}
-
-	var err error
-	ca.highQC, err = ca.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
-	if err != nil {
-		panic(fmt.Errorf("unable to create empty quorum cert for genesis block: %v", err))
-	}
-	ca.highTC, err = ca.CreateTimeoutCert(hotstuff.View(0), []hotstuff.TimeoutMsg{})
-	if err != nil {
-		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
 	}
 	return ca
 }
@@ -184,60 +169,24 @@ func (c *CertAuthority) VerifyAggregateQC(quorumSize int, aggQC hotstuff.Aggrega
 	return hotstuff.QuorumCert{}, false
 }
 
-// VerifyProposal is a helper that verifies the QC of the block in the proposal message.
+// VerifyAnyQC is a helper that verifies either a QC or the aggregateQC.
 // TODO(AlanRostem): add a test case for this method.
-func (c *CertAuthority) VerifyProposal(proposal *hotstuff.ProposeMsg) bool {
-	block := proposal.Block
-	view := block.View()
-	if c.config.HasAggregateQC() && proposal.AggregateQC != nil {
-		highQC, ok := c.VerifyAggregateQC(c.config.QuorumSize(), *proposal.AggregateQC)
+func (c *CertAuthority) VerifyAnyQC(qc *hotstuff.QuorumCert, aggQC *hotstuff.AggregateQC) bool {
+	if c.config.HasAggregateQC() && aggQC != nil {
+		highQC, ok := c.VerifyAggregateQC(c.config.QuorumSize(), *aggQC)
 		if !ok {
-			c.logger.Warnf("VerifyProposal[view=%d]: failed to verify aggregate QC", view)
+			c.logger.Warnf("VerifyAnyQC: failed to verify aggregate QC")
 			return false
 		}
 		// NOTE: for simplicity, we require that the highQC found in the AggregateQC equals the QC embedded in the block.
-		if !block.QuorumCert().Equals(highQC) {
-			c.logger.Warnf("VerifyProposal[view=%d]: block QC does not equal highQC", view)
+		if !qc.Equals(highQC) {
+			c.logger.Warnf("VerifyAnyQC: block QC does not equal highQC")
 			return false
 		}
 	}
-	if !c.VerifyQuorumCert(c.config.QuorumSize(), block.QuorumCert()) {
-		c.logger.Infof("VerifyProposal[view=%d]: invalid QC", view)
+	if !c.VerifyQuorumCert(c.config.QuorumSize(), *qc) {
+		c.logger.Infof("VerifyAnyQC: invalid QC")
 		return false
 	}
 	return true
-}
-
-// updateHighQC attempts to update the highQC, but does not verify the qc first.
-// This method is meant to be used instead of the exported UpdateHighQC internally
-// in this package when the qc has already been verified.
-// TODO(AlanRostem): this was in synchronizer, make tests.
-func (s *CertAuthority) UpdateHighQC(qc hotstuff.QuorumCert) {
-	newBlock, ok := s.blockChain.Get(qc.BlockHash())
-	if !ok {
-		s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
-		return
-	}
-
-	if newBlock.View() > s.highQC.View() {
-		s.highQC = qc
-		s.logger.Debug("HighQC updated")
-	}
-}
-
-// updateHighTC attempts to update the highTC, but does not verify the tc first.
-// TODO(AlanRostem): this was in synchronizer, make tests.
-func (s *CertAuthority) UpdateHighTC(tc hotstuff.TimeoutCert) {
-	if tc.View() > s.highTC.View() {
-		s.highTC = tc
-		s.logger.Debug("HighTC updated")
-	}
-}
-
-func (s *CertAuthority) HighQC() hotstuff.QuorumCert {
-	return s.highQC
-}
-
-func (s *CertAuthority) HighTC() hotstuff.TimeoutCert {
-	return s.highTC
 }
