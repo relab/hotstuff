@@ -7,8 +7,10 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
+	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 	"github.com/relab/hotstuff/security/blockchain"
+	"github.com/relab/hotstuff/security/certauth"
 	"github.com/relab/hotstuff/service/cmdcache"
 	"github.com/relab/hotstuff/service/committer"
 )
@@ -30,7 +32,7 @@ type Consensus struct {
 	leaderRotation modules.LeaderRotation
 	voter          *Voter
 	votingMachine  *VotingMachine
-	disseminator   modules.Disseminator
+	kauri          *kauri.Kauri
 
 	sender *network.Sender
 }
@@ -44,6 +46,7 @@ func New(
 
 	// security dependencies
 	blockChain *blockchain.BlockChain,
+	auth *certauth.CertAuthority,
 
 	// protocol dependencies
 	leaderRotation modules.LeaderRotation,
@@ -57,11 +60,14 @@ func New(
 
 	// network dependencies
 	sender *network.Sender,
+
+	// options
 	opts ...Option,
 ) *Consensus {
 	cs := &Consensus{
 		impl:           impl,
 		leaderRotation: leaderRotation,
+		kauri:          nil, // this is set later based on config
 
 		blockChain:   blockChain,
 		committer:    committer,
@@ -73,7 +79,20 @@ func New(
 
 		voter:         voter,
 		votingMachine: votingMachine,
-		disseminator:  nil,
+	}
+	cs.ruler = cs
+	for _, opt := range opts {
+		opt(cs)
+	}
+	if config.KauriEnabled() {
+		cs.kauri = kauri.New(
+			logger,
+			eventLoop,
+			config,
+			blockChain,
+			auth,
+			sender,
+		)
 	}
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.logger.Debugf("On event (hotstuff.ProposeMsg).")
@@ -88,15 +107,6 @@ func New(
 			SyncInfo: newInfo,
 		})
 	})
-	for _, opt := range opts {
-		opt(cs)
-	}
-	if cs.disseminator == nil {
-		cs.disseminator = cs
-	}
-	if cs.ruler == nil {
-		cs.ruler = cs
-	}
 	return cs
 }
 
@@ -119,8 +129,14 @@ func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) (advance bool) {
 	if !ok {
 		return
 	}
+	// kauri will handle sending over the wire differently, so we return here.
+	if cs.kauri != nil {
+		// disseminate proposal and aggregate votes.
+		cs.kauri.Begin(pc, proposal)
+		return
+	}
 	// if the proposal was voted for (state is updated internally), we send it over the wire.
-	cs.disseminator.Disseminate(proposal, pc)
+	cs.sendVote(proposal, pc)
 	return
 }
 
@@ -142,11 +158,11 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 		cs.logger.Debug("Propose: No block")
 		return
 	}
-	// TODO(AlanRostem): Why was this here? Commented it out since it essentially stores the same block twice.
+	// TODO(AlanRostem): Why is here? Commented it out since it essentially stores the same block twice.
 	// I added a panic in blockchain, as well. Seems to be the correct way.
 	// cs.blockChain.Store(proposal.Block)
-	// for example, kauri sends the proposal to only the children.
-	if cs.disseminator.PerformOnVote() {
+	// kauri sends the proposal to only the children
+	if cs.kauri == nil {
 		cs.sender.Propose(proposal)
 	}
 	// as proposer, I can vote for my own proposal
@@ -184,24 +200,20 @@ func (cs *Consensus) voteSelf(proposal hotstuff.ProposeMsg) {
 	}
 	// can collect my own vote.
 	cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
-	// for example, kauri needs to disseminate as leader.
-	if !cs.disseminator.PerformOnVote() {
+	// kauri will handle sending over the wire differently.
+	if cs.kauri != nil {
 		// disseminate proposal and aggregate votes.
-		cs.disseminator.Disseminate(proposal, pc)
+		cs.kauri.Begin(pc, proposal)
 	}
 }
 
-func (cs *Consensus) PerformOnVote() bool {
-	return true
-}
-
-func (cs *Consensus) Disseminate(proposal hotstuff.ProposeMsg, cert hotstuff.PartialCert) {
+func (cs *Consensus) sendVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	block := proposal.Block
 	view := block.View()
 	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
 	if leaderID == cs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.
-		cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: cert})
+		cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
 		return
 	}
 	// if I am the one voting, sent the vote to next leader over the wire.
@@ -209,9 +221,8 @@ func (cs *Consensus) Disseminate(proposal hotstuff.ProposeMsg, cert hotstuff.Par
 		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
 		return
 	}
-	cs.logger.Debugf("Disseminate[view=%d]: voting for %v", view, block)
-	cs.sender.SendVote(leaderID, cert)
+	cs.logger.Debugf("TryVote[view=%d]: voting for %v", view, block)
+	cs.sender.SendVote(leaderID, pc)
 }
 
 var _ modules.ProposeRuler = (*Consensus)(nil)
-var _ modules.Disseminator = (*Consensus)(nil)

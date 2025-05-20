@@ -20,14 +20,22 @@ func NewProtocol(
 	depsSrv *Service,
 	consensusRulesModule modules.ConsensusRules,
 	leaderRotationModule modules.LeaderRotation,
-	consensusOpts ...consensus.Option,
 ) (*Protocol, error) {
-	ruler, ok := consensusRulesModule.(modules.ProposeRuler)
-	if ok {
-		consensusOpts = append(consensusOpts, consensus.OverrideProposeRule(ruler))
+	opts := []consensus.Option{}
+	if ruler, ok := consensusRulesModule.(modules.ProposeRuler); ok {
+		opts = append(opts, consensus.OverrideProposeRule(ruler))
 	}
 	state := viewstates.New(
 		depsCore.Logger(),
+		depsSecure.BlockChain(),
+		depsSecure.CertAuth(),
+	)
+	voter := consensus.NewVoter(
+		depsCore.Logger(),
+		depsCore.EventLoop(),
+		depsCore.RuntimeCfg(),
+		leaderRotationModule,
+		consensusRulesModule,
 		depsSecure.BlockChain(),
 		depsSecure.CertAuth(),
 	)
@@ -39,20 +47,12 @@ func NewProtocol(
 		depsSecure.CertAuth(),
 		state,
 	)
-	voter := consensus.NewVoter(
-		depsCore.Logger(),
-		depsCore.EventLoop(),
-		depsCore.RuntimeCfg(),
-		leaderRotationModule,
-		consensusRulesModule,
-		depsSecure.BlockChain(),
-		depsSecure.CertAuth(),
-	)
 	csus := consensus.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
+		depsSecure.CertAuth(),
 		leaderRotationModule,
 		consensusRulesModule,
 		voter,
@@ -60,7 +60,7 @@ func NewProtocol(
 		depsSrv.Committer(),
 		depsSrv.CmdCache(),
 		depsNet.Sender(),
-		consensusOpts...,
+		opts...,
 	)
 	return &Protocol{
 		consensus: csus,

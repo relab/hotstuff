@@ -8,8 +8,6 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/network"
-	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/certauth"
@@ -106,17 +104,6 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	csOpts := []consensus.Option{}
-	if rOpt.withKauri {
-		csOpts = append(csOpts, consensus.WithKauri(kauri.New(
-			depsCore.Logger(),
-			depsCore.EventLoop(),
-			depsCore.RuntimeCfg(),
-			depsSecure.BlockChain(),
-			depsSecure.CertAuth(),
-			depsNet.Sender(),
-		)))
-	}
 	depsProtocol, err := dependencies.NewProtocol(
 		depsCore,
 		depsNet,
@@ -124,7 +111,6 @@ func New(
 		depsSrv,
 		rules,
 		leader,
-		csOpts...,
 	)
 	if err != nil {
 		return nil, err
