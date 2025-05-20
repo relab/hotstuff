@@ -23,7 +23,6 @@ type Consensus struct {
 	config    *core.RuntimeConfig
 
 	blockChain *blockchain.BlockChain
-	auth       *certauth.CertAuthority
 
 	committer    *committer.Committer
 	commandCache *cmdcache.Cache
@@ -32,7 +31,7 @@ type Consensus struct {
 	ruler          modules.ProposeRuler
 	leaderRotation modules.LeaderRotation
 	voter          *Voter
-	leader         *VotingMachine
+	votingMachine  *VotingMachine
 	kauri          *kauri.Kauri
 
 	sender *network.Sender
@@ -53,7 +52,7 @@ func New(
 	leaderRotation modules.LeaderRotation,
 	impl modules.ConsensusRules,
 	voter *Voter,
-	leader *VotingMachine,
+	votingMachine *VotingMachine,
 
 	// service dependencies
 	committer *committer.Committer,
@@ -73,14 +72,12 @@ func New(
 		blockChain:   blockChain,
 		committer:    committer,
 		commandCache: commandCache,
-		sender:       sender,
-		auth:         auth,
 		eventLoop:    eventLoop,
 		logger:       logger,
 		config:       config,
 
-		voter:  voter,
-		leader: leader,
+		voter:         voter,
+		votingMachine: votingMachine,
 	}
 	cs.ruler = cs
 	for _, opt := range opts {
@@ -125,7 +122,6 @@ func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) (advance bool) {
 	if !cs.committer.TryCommit(proposal.Block) {
 		return
 	}
-
 	advance = true // Tells the synchronizer to advance the view, even if vote creation failed.
 	// try to vote for the block and retrieve its partial certificate.
 	pc, ok := cs.voter.Vote(block)
@@ -202,7 +198,7 @@ func (cs *Consensus) voteSelf(proposal hotstuff.ProposeMsg) {
 		return
 	}
 	// can collect my own vote.
-	cs.leader.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
+	cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
 	// kauri will handle sending over the wire differently.
 	if cs.kauri != nil {
 		// disseminate proposal and aggregate votes.
@@ -216,7 +212,7 @@ func (cs *Consensus) sendVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialC
 	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
 	if leaderID == cs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.
-		cs.leader.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
+		cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
 		return
 	}
 	// if I am the one voting, sent the vote to next leader over the wire.

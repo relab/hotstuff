@@ -60,7 +60,7 @@ func New(
 
 	// protocol dependencies
 	leaderRotation modules.LeaderRotation,
-	logic *consensus.Consensus,
+	consensus *consensus.Consensus,
 	voter *consensus.Voter,
 	state *viewstates.States,
 
@@ -71,7 +71,7 @@ func New(
 		duration:       leaderRotation.ViewDuration(),
 		leaderRotation: leaderRotation,
 
-		consensus: logic,
+		consensus: consensus,
 		auth:      auth,
 		sender:    sender,
 		eventLoop: eventLoop,
