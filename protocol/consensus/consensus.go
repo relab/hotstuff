@@ -75,6 +75,7 @@ func New(
 		eventLoop:    eventLoop,
 		logger:       logger,
 		config:       config,
+		sender:       sender,
 
 		voter:         voter,
 		votingMachine: votingMachine,
