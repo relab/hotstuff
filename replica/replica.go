@@ -88,6 +88,7 @@ func New(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsSecure.BlockChain(),
+		rules,
 		rOpt.cmdCacheOpts,
 		rOpt.clientGorumsSrvOpts...,
 	)

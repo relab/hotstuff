@@ -56,15 +56,15 @@ func TestVote(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%v", err)
 		}
-		depsService := dependencies.NewService(
+		_ = depsSecure
+		// TODO(AlanRostem): fix
+		/*depsService := dependencies.NewService(
 			depsCore.Logger(),
 			depsCore.EventLoop(),
 			depsSecure.BlockChain(),
 			nil,
 		)
-		_ = depsService
-		// TODO(AlanRostem): fix
-		/*depsProtocol, err := dependencies.NewProtocol(
+		depsProtocol, err := dependencies.NewProtocol(
 			depsCore, depsNet, depsSecure, depsService,
 			consensusName, leaderRotationName, "",
 			viewduration.NewParams(0, 1*time.Millisecond, 0, 0), // TODO(AlanRostem): ensure test values are correct

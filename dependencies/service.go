@@ -4,6 +4,7 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/service/clientsrv"
 	"github.com/relab/hotstuff/service/cmdcache"
@@ -22,6 +23,7 @@ func NewService(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	blockChain *blockchain.BlockChain,
+	rules modules.ConsensusRules,
 	// TODO: Join these into single option type
 	cacheOpt []cmdcache.Option,
 	clientSrvOpts ...gorums.ServerOption,
@@ -42,7 +44,9 @@ func NewService(
 		committer: committer.New(
 			logger,
 			blockChain,
+			rules,
 			clientSrv,
+			cmdCache,
 		),
 	}
 }

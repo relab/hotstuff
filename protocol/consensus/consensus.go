@@ -122,7 +122,7 @@ func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) (advance bool) {
 	}
 	// now the proposal is valid, so we can increment the view, but the command may
 	// still be too old to execute
-	if !cs.tryCommit(&proposal) {
+	if !cs.committer.TryCommit(proposal.Block) {
 		return
 	}
 
@@ -141,29 +141,6 @@ func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) (advance bool) {
 	// if the proposal was voted for (state is updated internally), we send it over the wire.
 	cs.sendVote(proposal, pc)
 	return
-}
-
-// TODO(AlanRostem): put this in the Committer. Hard to do now since leader-rotation depends on it.
-func (cs *Consensus) tryCommit(proposal *hotstuff.ProposeMsg) bool {
-	block := proposal.Block
-	view := block.View()
-	cmd := block.Command()
-	// verify the command's "age"
-	if !cs.commandCache.Accept(cmd) {
-		cs.logger.Infof("TryAccept[view=%d]: block rejected: %s", view, block)
-		return false
-	}
-	cs.logger.Debugf("tryCommit[view=%d]: block accepted.", view)
-	cs.blockChain.Store(block)
-	cs.commandCache.Proposed(block.Command()) // update the cache before committing.
-	// NOTE: this overwrites the block variable. If it was nil, simply don't commit.
-	if block = cs.impl.CommitRule(block); block != nil {
-		err := cs.committer.Commit(block) // committer will eventually execute the command.
-		if err != nil {
-			cs.logger.Warnf("failed to commit: %v", err)
-		}
-	}
-	return true
 }
 
 // Propose creates a new outgoing proposal.
@@ -215,7 +192,7 @@ func (cs *Consensus) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert
 }
 
 func (cs *Consensus) voteSelf(proposal hotstuff.ProposeMsg) {
-	if !cs.tryCommit(&proposal) {
+	if !cs.committer.TryCommit(proposal.Block) {
 		return
 	}
 	block := proposal.Block
