@@ -14,6 +14,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/proto/kauripb"
 	"github.com/relab/hotstuff/internal/tree"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
@@ -87,10 +88,10 @@ func (k *Kauri) initializeConfiguration() {
 	k.senders = make([]hotstuff.ID, 0)
 }
 
-// Begin starts dissemination of proposal and aggregation of votes.
-func (k *Kauri) Begin(pc hotstuff.PartialCert, p hotstuff.ProposeMsg) {
+// Disseminate starts dissemination of proposal and aggregation of votes.
+func (k *Kauri) Disseminate(p hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	if !k.initDone {
-		k.eventLoop.DelayUntil(network.ConnectedEvent{}, func() { k.Begin(pc, p) })
+		k.eventLoop.DelayUntil(network.ConnectedEvent{}, func() { k.Disseminate(p, pc) })
 		return
 	}
 	k.reset()
@@ -98,6 +99,10 @@ func (k *Kauri) Begin(pc hotstuff.PartialCert, p hotstuff.ProposeMsg) {
 	k.currentView = p.Block.View()
 	k.aggContrib = pc.Signature()
 	k.SendProposalToChildren(p)
+}
+
+func (k *Kauri) PerformOnVote() bool {
+	return false
 }
 
 func (k *Kauri) reset() {
@@ -116,13 +121,13 @@ func (k *Kauri) WaitToAggregate() {
 func (k *Kauri) SendProposalToChildren(p hotstuff.ProposeMsg) {
 	children := k.tree.ReplicaChildren()
 	if len(children) != 0 {
-		config, err := k.sender.Sub(children)
+		subSender, err := k.sender.Sub(children)
 		if err != nil {
 			k.logger.Errorf("Unable to send the proposal to children: %v", err)
 			return
 		}
 		k.logger.Debug("Sending proposal to children ", children)
-		config.Propose(p)
+		subSender.Propose(p)
 		go k.WaitToAggregate()
 	} else {
 		k.SendContributionToParent()
@@ -243,3 +248,5 @@ func isSubSet(a, b []hotstuff.ID) bool {
 type WaitTimerExpiredEvent struct {
 	currentView hotstuff.View
 }
+
+var _ modules.Disseminator = (*Kauri)(nil)

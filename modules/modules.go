@@ -36,6 +36,11 @@ type LeaderRotation interface {
 	ViewDuration() ViewDuration
 }
 
+type Disseminator interface {
+	PerformOnVote() bool // TODO(AlanRostem): find a better solution
+	Disseminate(hotstuff.ProposeMsg, hotstuff.PartialCert)
+}
+
 // ViewDuration determines the duration of a view.
 // The view synchronizer uses this interface to set its timeouts.
 type ViewDuration interface {

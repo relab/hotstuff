@@ -29,6 +29,7 @@ type replicaOptions struct {
 	cmdCacheOpts         []cmdcache.Option
 	serverOpts           []server.ServerOption
 	moduleNames          moduleNames
+	withKauri            bool
 }
 
 func newDefaultOpts() *replicaOptions {
@@ -40,6 +41,7 @@ func newDefaultOpts() *replicaOptions {
 			leaderRotation:    leaderrotation.RoundRobinModuleName,
 			byzantineStrategy: "",
 		},
+		withKauri: false,
 	}
 }
 
@@ -103,5 +105,11 @@ func WithTLS(certificate tls.Certificate, rootCAs *x509.CertPool) Option {
 			ClientAuth:   tls.RequireAndVerifyClientCert,
 		}))))
 		ro.credentials = creds
+	}
+}
+
+func WithKauri() Option {
+	return func(ro *replicaOptions) {
+		ro.withKauri = true
 	}
 }
