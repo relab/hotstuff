@@ -11,6 +11,7 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
+	"github.com/relab/hotstuff/protocol/acceptor"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/viewstates"
 	"github.com/relab/hotstuff/security/certauth"
@@ -28,7 +29,7 @@ type Synchronizer struct {
 
 	duration       modules.ViewDuration
 	leaderRotation modules.LeaderRotation
-	voter          *consensus.Voter
+	acceptor       *acceptor.Acceptor
 	consensus      *consensus.Consensus
 	state          *viewstates.States
 
@@ -61,7 +62,7 @@ func New(
 	// protocol dependencies
 	leaderRotation modules.LeaderRotation,
 	consensus *consensus.Consensus,
-	voter *consensus.Voter,
+	acceptor *acceptor.Acceptor,
 	state *viewstates.States,
 
 	// network dependencies
@@ -77,7 +78,7 @@ func New(
 		eventLoop: eventLoop,
 		logger:    logger,
 		config:    config,
-		voter:     voter,
+		acceptor:  acceptor,
 		state:     state,
 
 		currentView: 1,
@@ -197,7 +198,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	}
 	s.lastTimeout = &timeoutMsg
 	// stop voting for current view
-	s.voter.StopVoting(view)
+	s.acceptor.StopVoting(view)
 
 	s.sender.Timeout(timeoutMsg)
 	s.OnRemoteTimeout(timeoutMsg)

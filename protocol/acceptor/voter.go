@@ -1,4 +1,4 @@
-package consensus
+package acceptor
 
 import (
 	"github.com/relab/hotstuff"
@@ -10,7 +10,7 @@ import (
 	"github.com/relab/hotstuff/security/certauth"
 )
 
-type Voter struct {
+type Acceptor struct {
 	logger    logging.Logger
 	eventLoop *eventloop.EventLoop
 	config    *core.RuntimeConfig
@@ -25,7 +25,7 @@ type Voter struct {
 }
 
 // TODO(AlanRostem): finish up this class.
-func NewVoter(
+func New(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
@@ -33,8 +33,8 @@ func NewVoter(
 	rules modules.ConsensusRules,
 	blockChain *blockchain.BlockChain,
 	auth *certauth.CertAuthority,
-) *Voter {
-	return &Voter{
+) *Acceptor {
+	return &Acceptor{
 		logger:    logger,
 		eventLoop: eventLoop,
 		config:    config,
@@ -50,7 +50,7 @@ func NewVoter(
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
-func (v *Voter) StopVoting(view hotstuff.View) {
+func (v *Acceptor) StopVoting(view hotstuff.View) {
 	if v.lastVote < view {
 		v.logger.Debugf("stopped voting on view %d and changed view to %d", v.lastVote, view)
 		v.lastVote = view
@@ -59,7 +59,7 @@ func (v *Voter) StopVoting(view hotstuff.View) {
 
 // Vote votes for and signs the block, returning a partial certificate
 // if the vote was successful.
-func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
+func (v *Acceptor) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
 	ok = false
 	// cannot vote for an old block.
 	if block.View() <= v.lastVote {
@@ -79,7 +79,7 @@ func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
 }
 
 // TryAccept verifies the proposal and returns true if it can be voted for.
-func (v *Voter) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
+func (v *Acceptor) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
 	block := proposal.Block
 	view := block.View()
 	if !v.rules.VoteRule(view, *proposal) {
@@ -100,6 +100,6 @@ func (v *Voter) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
 	return true
 }
 
-func (v *Voter) LastVote() hotstuff.View {
+func (v *Acceptor) LastVote() hotstuff.View {
 	return v.lastVote
 }

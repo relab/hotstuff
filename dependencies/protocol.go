@@ -2,9 +2,11 @@ package dependencies
 
 import (
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/acceptor"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/viewstates"
+	"github.com/relab/hotstuff/protocol/votingmachine"
 )
 
 type Protocol struct {
@@ -30,7 +32,7 @@ func NewProtocol(
 		depsSecure.BlockChain(),
 		depsSecure.CertAuth(),
 	)
-	voter := consensus.NewVoter(
+	acceptor := acceptor.New(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsCore.RuntimeCfg(),
@@ -39,7 +41,7 @@ func NewProtocol(
 		depsSecure.BlockChain(),
 		depsSecure.CertAuth(),
 	)
-	vm := consensus.NewVotingMachine(
+	votingMachine := votingmachine.New(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsCore.RuntimeCfg(),
@@ -55,8 +57,8 @@ func NewProtocol(
 		depsSecure.CertAuth(),
 		leaderRotationModule,
 		consensusRulesModule,
-		voter,
-		vm,
+		acceptor,
+		votingMachine,
 		depsSrv.Committer(),
 		depsSrv.CmdCache(),
 		depsNet.Sender(),
@@ -71,7 +73,7 @@ func NewProtocol(
 			depsSecure.CertAuth(),
 			leaderRotationModule,
 			csus,
-			voter,
+			acceptor,
 			state,
 			depsNet.Sender(),
 		),
