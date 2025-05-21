@@ -21,7 +21,6 @@ import (
 
 const ModuleName = "kauri"
 
-// TODO(AlanRostem): maybe create an "Aggregator" module?
 // Kauri structure contains the modules for kauri protocol implementation.
 type Kauri struct {
 	logger     logging.Logger

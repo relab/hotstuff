@@ -38,7 +38,6 @@ func NewProtocol(
 		depsCore.RuntimeCfg(),
 		leaderRotationModule,
 		consensusRulesModule,
-		depsSecure.BlockChain(),
 		depsSecure.CertAuth(),
 	)
 	votingMachine := votingmachine.New(

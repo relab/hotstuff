@@ -1,4 +1,4 @@
-package leaderrotation
+package fixedleader
 
 import (
 	"github.com/relab/hotstuff"
@@ -6,7 +6,7 @@ import (
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 )
 
-const FixedModuleName = "fixed"
+const ModuleName = "fixed"
 
 type fixed struct {
 	leader       hotstuff.ID
@@ -23,7 +23,7 @@ func (f fixed) GetLeader(_ hotstuff.View) hotstuff.ID {
 }
 
 // NewFixed returns a new fixed-leader leader rotation implementation.
-func NewFixed(
+func New(
 	leader hotstuff.ID,
 	opt viewduration.Params,
 ) modules.LeaderRotation {

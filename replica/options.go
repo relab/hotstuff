@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 
 	"github.com/relab/gorums"
-	"github.com/relab/hotstuff/protocol/leaderrotation"
+	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/service/cmdcache"
@@ -37,7 +37,7 @@ func newDefaultOpts() *replicaOptions {
 		moduleNames: moduleNames{
 			crypto:            ecdsa.ModuleName,
 			consensus:         chainedhotstuff.ModuleName,
-			leaderRotation:    leaderrotation.RoundRobinModuleName,
+			leaderRotation:    roundrobin.ModuleName,
 			byzantineStrategy: "",
 		},
 	}

@@ -7,7 +7,11 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/leaderrotation"
+	"github.com/relab/hotstuff/protocol/leaderrotation/carousel"
+	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
+	"github.com/relab/hotstuff/protocol/leaderrotation/reputation"
+	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
+	"github.com/relab/hotstuff/protocol/leaderrotation/treeleader"
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
@@ -88,16 +92,16 @@ func NewLeaderRotation(
 ) (ld modules.LeaderRotation, err error) {
 	logger.Debugf("Initializing module (leader rotation): %s", name)
 	switch name {
-	case leaderrotation.CarouselModuleName:
-		ld = leaderrotation.NewCarousel(chainLength, vdParams, blockChain, committer, config, logger)
-	case leaderrotation.ReputationModuleName:
-		ld = leaderrotation.NewRepBased(chainLength, vdParams, committer, config, logger)
-	case leaderrotation.RoundRobinModuleName:
-		ld = leaderrotation.NewRoundRobin(config, vdParams)
-	case leaderrotation.FixedModuleName:
-		ld = leaderrotation.NewFixed(hotstuff.ID(1), vdParams)
-	case leaderrotation.TreeLeaderModuleName:
-		ld = leaderrotation.NewTreeLeader(vdParams.StartTimeout(), config)
+	case carousel.ModuleName:
+		ld = carousel.New(chainLength, vdParams, blockChain, committer, config, logger)
+	case reputation.ModuleName:
+		ld = reputation.New(chainLength, vdParams, committer, config, logger)
+	case roundrobin.ModuleName:
+		ld = roundrobin.New(config, vdParams)
+	case fixedleader.ModuleName:
+		ld = fixedleader.New(hotstuff.ID(1), vdParams)
+	case treeleader.ModuleName:
+		ld = treeleader.New(vdParams.StartTimeout(), config)
 	default:
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", name)
 	}

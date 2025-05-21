@@ -24,8 +24,6 @@ type Consensus struct {
 	logger    logging.Logger
 	config    *core.RuntimeConfig
 
-	blockChain *blockchain.BlockChain
-
 	committer    *committer.Committer
 	commandCache *cmdcache.Cache
 
@@ -71,7 +69,6 @@ func New(
 		leaderRotation: leaderRotation,
 		kauri:          nil, // this is set later based on config
 
-		blockChain:   blockChain,
 		committer:    committer,
 		commandCache: commandCache,
 		eventLoop:    eventLoop,

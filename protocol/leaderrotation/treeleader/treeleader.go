@@ -1,4 +1,4 @@
-package leaderrotation
+package treeleader
 
 import (
 	"time"
@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 )
 
-const TreeLeaderModuleName = "tree-leader"
+const ModuleName = "tree-leader"
 
 type treeLeader struct {
 	leader       hotstuff.ID
@@ -17,7 +17,7 @@ type treeLeader struct {
 	viewDuration modules.ViewDuration
 }
 
-func NewTreeLeader(
+func New(
 	viewDuration time.Duration,
 	config *core.RuntimeConfig,
 ) modules.LeaderRotation {

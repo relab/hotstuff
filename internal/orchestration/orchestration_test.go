@@ -20,7 +20,8 @@ import (
 	"github.com/relab/hotstuff/internal/test"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/metrics"
-	"github.com/relab/hotstuff/protocol/leaderrotation"
+	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
+	"github.com/relab/hotstuff/protocol/leaderrotation/treeleader"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
@@ -136,9 +137,9 @@ func TestOrchestration(t *testing.T) {
 		t.Run(test.Name([]string{"consensus", "crypto", "byzantine", "kauri"}, tt.consensus, tt.crypto, tt.byzantine, tt.kauri), func(t *testing.T) {
 			var leaderRotation string
 			if tt.kauri {
-				leaderRotation = leaderrotation.TreeLeaderModuleName
+				leaderRotation = treeleader.ModuleName
 			} else {
-				leaderRotation = leaderrotation.RoundRobinModuleName
+				leaderRotation = roundrobin.ModuleName
 			}
 			cfg := makeCfg(
 				tt.replicas, 2,

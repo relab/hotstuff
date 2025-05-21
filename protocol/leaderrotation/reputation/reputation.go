@@ -1,4 +1,4 @@
-package leaderrotation
+package reputation
 
 import (
 	"math/rand"
@@ -10,11 +10,12 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/service/committer"
 )
 
-const ReputationModuleName = "reputation"
+const ModuleName = "reputation"
 
 type reputationsMap map[hotstuff.ID]float64
 
@@ -48,7 +49,7 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 	numReplicas := r.config.ReplicaCount()
 	// use round-robin for the first few views until we get a signature
 	if block.QuorumCert().Signature() == nil {
-		return chooseRoundRobin(view, numReplicas)
+		return leaderrotation.ChooseRoundRobin(view, numReplicas)
 	}
 
 	voters := block.QuorumCert().Signature().Participants()
@@ -95,7 +96,7 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 }
 
 // NewRepBased returns a new random reputation-based leader rotation implementation
-func NewRepBased(
+func New(
 	chainLength int,
 	vdParams viewduration.Params,
 

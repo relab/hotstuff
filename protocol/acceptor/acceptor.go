@@ -6,7 +6,6 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
 )
 
@@ -18,8 +17,7 @@ type Acceptor struct {
 	leaderRotation modules.LeaderRotation
 	rules          modules.ConsensusRules
 
-	blockChain *blockchain.BlockChain
-	auth       *certauth.CertAuthority
+	auth *certauth.CertAuthority
 
 	lastVote hotstuff.View
 }
@@ -31,7 +29,6 @@ func New(
 	config *core.RuntimeConfig,
 	leaderRotation modules.LeaderRotation,
 	rules modules.ConsensusRules,
-	blockChain *blockchain.BlockChain,
 	auth *certauth.CertAuthority,
 ) *Acceptor {
 	return &Acceptor{
@@ -42,8 +39,7 @@ func New(
 		leaderRotation: leaderRotation,
 		rules:          rules,
 
-		blockChain: blockChain,
-		auth:       auth,
+		auth: auth,
 
 		lastVote: 0,
 	}

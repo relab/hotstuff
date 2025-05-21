@@ -1,5 +1,5 @@
 // Package leaderrotation provide various leader rotation algorithms.
-package leaderrotation
+package carousel
 
 import (
 	"math/rand"
@@ -9,12 +9,13 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/service/committer"
 )
 
-const CarouselModuleName = "carousel"
+const ModuleName = "carousel"
 
 type carousel struct {
 	blockChain   *blockchain.BlockChain
@@ -26,17 +27,37 @@ type carousel struct {
 	chainLength int
 }
 
+// New returns a new instance of the Carousel leader-election algorithm.
+func New(
+	chainLength int,
+	vdParams viewduration.Params,
+
+	blockChain *blockchain.BlockChain,
+	committer *committer.Committer,
+	config *core.RuntimeConfig,
+	logger logging.Logger,
+) modules.LeaderRotation {
+	return &carousel{
+		blockChain:   blockChain,
+		chainLength:  chainLength,
+		committer:    committer,
+		config:       config,
+		logger:       logger,
+		viewDuration: viewduration.NewDynamic(vdParams),
+	}
+}
+
 func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 	commitHead := c.committer.CommittedBlock()
 
 	if commitHead.QuorumCert().Signature() == nil {
 		c.logger.Debug("in startup; using round-robin")
-		return chooseRoundRobin(round, c.config.ReplicaCount())
+		return leaderrotation.ChooseRoundRobin(round, c.config.ReplicaCount())
 	}
 
 	if commitHead.View() != round-hotstuff.View(c.chainLength) {
 		c.logger.Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.View())
-		return chooseRoundRobin(round, c.config.ReplicaCount())
+		return leaderrotation.ChooseRoundRobin(round, c.config.ReplicaCount())
 	}
 
 	c.logger.Debug("proceeding with carousel")
@@ -75,24 +96,4 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 
 func (c carousel) ViewDuration() modules.ViewDuration {
 	return c.viewDuration
-}
-
-// NewCarousel returns a new instance of the Carousel leader-election algorithm.
-func NewCarousel(
-	chainLength int,
-	vdParams viewduration.Params,
-
-	blockChain *blockchain.BlockChain,
-	committer *committer.Committer,
-	config *core.RuntimeConfig,
-	logger logging.Logger,
-) modules.LeaderRotation {
-	return &carousel{
-		blockChain:   blockChain,
-		chainLength:  chainLength,
-		committer:    committer,
-		config:       config,
-		logger:       logger,
-		viewDuration: viewduration.NewDynamic(vdParams),
-	}
 }
