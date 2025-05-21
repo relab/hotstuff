@@ -1,4 +1,4 @@
-package acceptor
+package voter
 
 import (
 	"github.com/relab/hotstuff"
@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/security/certauth"
 )
 
-type Acceptor struct {
+type Voter struct {
 	logger    logging.Logger
 	eventLoop *eventloop.EventLoop
 	config    *core.RuntimeConfig
@@ -30,8 +30,8 @@ func New(
 	leaderRotation modules.LeaderRotation,
 	rules modules.ConsensusRules,
 	auth *certauth.CertAuthority,
-) *Acceptor {
-	return &Acceptor{
+) *Voter {
+	return &Voter{
 		logger:    logger,
 		eventLoop: eventLoop,
 		config:    config,
@@ -46,7 +46,7 @@ func New(
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
-func (v *Acceptor) StopVoting(view hotstuff.View) {
+func (v *Voter) StopVoting(view hotstuff.View) {
 	if v.lastVote < view {
 		v.logger.Debugf("stopped voting on view %d and changed view to %d", v.lastVote, view)
 		v.lastVote = view
@@ -55,7 +55,7 @@ func (v *Acceptor) StopVoting(view hotstuff.View) {
 
 // Vote votes for and signs the block, returning a partial certificate
 // if the vote was successful.
-func (v *Acceptor) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
+func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
 	ok = false
 	// cannot vote for an old block.
 	if block.View() <= v.lastVote {
@@ -75,7 +75,7 @@ func (v *Acceptor) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool
 }
 
 // TryAccept verifies the proposal and returns true if it can be voted for.
-func (v *Acceptor) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
+func (v *Voter) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
 	block := proposal.Block
 	view := block.View()
 	if !v.rules.VoteRule(view, *proposal) {
@@ -96,6 +96,6 @@ func (v *Acceptor) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
 	return true
 }
 
-func (v *Acceptor) LastVote() hotstuff.View {
+func (v *Voter) LastVote() hotstuff.View {
 	return v.lastVote
 }

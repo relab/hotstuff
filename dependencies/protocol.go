@@ -2,10 +2,10 @@ package dependencies
 
 import (
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/acceptor"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/viewstates"
+	"github.com/relab/hotstuff/protocol/voter"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 )
 
@@ -32,7 +32,7 @@ func NewProtocol(
 		depsSecure.BlockChain(),
 		depsSecure.CertAuth(),
 	)
-	acceptor := acceptor.New(
+	voter := voter.New(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsCore.RuntimeCfg(),
@@ -56,7 +56,7 @@ func NewProtocol(
 		depsSecure.CertAuth(),
 		leaderRotationModule,
 		consensusRulesModule,
-		acceptor,
+		voter,
 		votingMachine,
 		depsSrv.Committer(),
 		depsSrv.CmdCache(),
@@ -72,7 +72,7 @@ func NewProtocol(
 			depsSecure.CertAuth(),
 			leaderRotationModule,
 			csus,
-			acceptor,
+			voter,
 			state,
 			depsNet.Sender(),
 		),

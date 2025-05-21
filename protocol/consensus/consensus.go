@@ -7,9 +7,9 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
-	"github.com/relab/hotstuff/protocol/acceptor"
 	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
+	"github.com/relab/hotstuff/protocol/voter"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
@@ -30,7 +30,7 @@ type Consensus struct {
 	impl           modules.ConsensusRules
 	ruler          modules.ProposeRuler
 	leaderRotation modules.LeaderRotation
-	acceptor       *acceptor.Acceptor
+	voter          *voter.Voter
 	votingMachine  *votingmachine.VotingMachine
 	kauri          *kauri.Kauri
 
@@ -51,7 +51,7 @@ func New(
 	// protocol dependencies
 	leaderRotation modules.LeaderRotation,
 	impl modules.ConsensusRules,
-	acceptor *acceptor.Acceptor,
+	voter *voter.Voter,
 	votingMachine *votingmachine.VotingMachine,
 
 	// service dependencies
@@ -76,7 +76,7 @@ func New(
 		config:       config,
 		sender:       sender,
 
-		acceptor:      acceptor,
+		voter:         voter,
 		votingMachine: votingMachine,
 	}
 	cs.ruler = cs
@@ -114,7 +114,7 @@ func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) (advance bool) {
 	block := proposal.Block
 	advance = false // won't increment the view when the below if-statements return
 	// ensure that I can vote in this view based on the protocol's rule.
-	if !cs.acceptor.TryAccept(&proposal) {
+	if !cs.voter.TryAccept(&proposal) {
 		return
 	}
 	// now the proposal is valid, so we can increment the view, but the command may
@@ -124,7 +124,7 @@ func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) (advance bool) {
 	}
 	advance = true // Tells the synchronizer to advance the view, even if vote creation failed.
 	// try to vote for the block and retrieve its partial certificate.
-	pc, ok := cs.acceptor.Vote(block)
+	pc, ok := cs.voter.Vote(block)
 	if !ok {
 		return
 	}
@@ -192,7 +192,7 @@ func (cs *Consensus) voteSelf(proposal hotstuff.ProposeMsg) {
 		return
 	}
 	block := proposal.Block
-	pc, ok := cs.acceptor.Vote(block)
+	pc, ok := cs.voter.Vote(block)
 	if !ok {
 		cs.logger.Warnf("voteSelf[v=%d]: could not vote for my own proposal.", block.View())
 		return
@@ -209,7 +209,7 @@ func (cs *Consensus) voteSelf(proposal hotstuff.ProposeMsg) {
 func (cs *Consensus) sendVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	block := proposal.Block
 	view := block.View()
-	leaderID := cs.leaderRotation.GetLeader(cs.acceptor.LastVote() + 1)
+	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
 	if leaderID == cs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.
 		cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})

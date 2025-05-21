@@ -19,9 +19,9 @@ import (
 /*func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *core.Builder) {
 	t.Helper()
 
-	acceptor := mocks.NewMockAcceptor(ctrl)
-	acceptor.EXPECT().Accept(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes().Return(true)
-	acceptor.EXPECT().Proposed(gomock.Any()).AnyTimes()
+	voter := mocks.NewMockAcceptor(ctrl)
+	voter.EXPECT().Accept(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes().Return(true)
+	voter.EXPECT().Proposed(gomock.Any()).AnyTimes()
 
 	executor := mocks.NewMockExecutor(ctrl)
 	executor.EXPECT().Exec(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes()
@@ -49,7 +49,7 @@ import (
 		synchronizer,
 		config,
 		signer,
-		acceptor,
+		voter,
 		core.ExtendedExecutor(executor),
 		commandQ,
 		core.ExtendedForkHandler(forkHandler),

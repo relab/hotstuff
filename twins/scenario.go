@@ -158,7 +158,7 @@ func (commandModule) Accept(_ hotstuff.Command) bool {
 	return true
 }
 
-// Proposed tells the acceptor that the propose phase for the given command succeeded, and it should no longer be
+// Proposed tells the voter that the propose phase for the given command succeeded, and it should no longer be
 // accepted in the future.
 func (commandModule) Proposed(_ hotstuff.Command) {}
 
