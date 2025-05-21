@@ -78,7 +78,7 @@ func TestModules(t *testing.T) {
 			runtimeOpts = append(runtimeOpts, core.WithAggregateQC())
 		}
 		depsCore := dependencies.NewCore(hotstuff.ID(1), "test", pk, runtimeOpts...)
-		sender := network.NewSender(
+		sender := network.NewGorumsSender(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),

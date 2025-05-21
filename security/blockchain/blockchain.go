@@ -9,14 +9,14 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/network"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 )
 
 // BlockChain stores a limited amount of blocks in a map.
 // blocks are evicted in LRU order.
 type BlockChain struct {
-	sender    *network.Sender
+	sender    modules.Sender
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
 
@@ -33,7 +33,7 @@ type BlockChain struct {
 func New(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	sender *network.Sender,
+	sender modules.Sender,
 ) *BlockChain {
 	bc := &BlockChain{
 		sender:    sender,

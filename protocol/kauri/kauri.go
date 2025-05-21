@@ -28,7 +28,7 @@ type Kauri struct {
 	config     *core.RuntimeConfig
 	blockChain *blockchain.BlockChain
 	auth       *certauth.CertAuthority
-	sender     *network.Sender
+	sender     *network.GorumsSender
 
 	aggContrib  hotstuff.QuorumSignature
 	aggSent     bool
@@ -47,7 +47,7 @@ func New(
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
 	auth *certauth.CertAuthority,
-	sender *network.Sender,
+	sender *network.GorumsSender,
 ) *Kauri {
 	k := &Kauri{
 		blockChain: blockChain,
@@ -77,6 +77,7 @@ func (k *Kauri) postInit() {
 	k.initializeConfiguration()
 }
 
+// TODO(AlanRostem): avoid using raw nodes.
 func (k *Kauri) initializeConfiguration() {
 	kauriCfg := kauripb.ConfigurationFromRaw(k.sender.GorumsConfig(), nil)
 	for _, n := range kauriCfg.Nodes() {

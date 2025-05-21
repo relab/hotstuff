@@ -20,7 +20,7 @@ func NewProtocol(
 	depsCore *Core,
 	depsSecure *Security,
 	depsSrv *Service,
-	sender *network.Sender,
+	sender modules.Sender,
 	consensusRulesModule modules.ConsensusRules,
 	leaderRotationModule modules.LeaderRotation,
 ) (*Protocol, error) {
@@ -61,7 +61,7 @@ func NewProtocol(
 		votingMachine,
 		depsSrv.Committer(),
 		depsSrv.CmdCache(),
-		sender,
+		sender.(*network.GorumsSender), // TODO(AlanRostem): remove this after decoupling kauri
 		opts...,
 	)
 	return &Protocol{

@@ -41,7 +41,7 @@ func TestVote(t *testing.T) {
 		cacheSize := 100
 
 		depsCore := dependencies.NewCore(id, fmt.Sprintf("hs%d", id), testutil.GenerateECDSAKey(t))
-		sender := network.NewSender(
+		sender := network.NewGorumsSender(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),

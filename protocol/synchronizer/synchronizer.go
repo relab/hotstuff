@@ -10,7 +10,6 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/viewstates"
 	"github.com/relab/hotstuff/protocol/voter"
@@ -33,7 +32,7 @@ type Synchronizer struct {
 	consensus      *consensus.Consensus
 	state          *viewstates.States
 
-	sender *network.Sender
+	sender modules.Sender
 
 	mut         sync.RWMutex // to protect the following
 	currentView hotstuff.View
@@ -66,7 +65,7 @@ func New(
 	state *viewstates.States,
 
 	// network dependencies
-	sender *network.Sender,
+	sender modules.Sender,
 ) *Synchronizer {
 	s := &Synchronizer{
 		duration:       leaderRotation.ViewDuration(),
@@ -352,7 +351,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		s.consensus.Propose(s.View(), s.state.HighQC(), syncInfo)
 		return
 	}
-	err := s.sender.SendNewView(leader, syncInfo)
+	err := s.sender.NewView(leader, syncInfo)
 	if err != nil {
 		s.logger.Warnf("%v", err)
 	}

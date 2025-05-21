@@ -11,6 +11,7 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -19,7 +20,7 @@ import (
 	"google.golang.org/grpc/peer"
 )
 
-type Sender struct {
+type GorumsSender struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
 	config    *core.RuntimeConfig
@@ -33,14 +34,14 @@ type Sender struct {
 	pbCfg *hotstuffpb.Configuration
 }
 
-func NewSender(
+func NewGorumsSender(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 
 	creds credentials.TransportCredentials,
 	mgrOpts ...gorums.ManagerOption,
-) *Sender {
+) *GorumsSender {
 	if creds == nil {
 		creds = insecure.NewCredentials()
 	}
@@ -49,7 +50,7 @@ func NewSender(
 	}
 	mgrOpts = append(mgrOpts, gorums.WithGrpcDialOptions(grpcOpts...))
 
-	s := &Sender{
+	s := &GorumsSender{
 		eventLoop: eventLoop,
 		logger:    logger,
 		config:    config,
@@ -69,7 +70,7 @@ func NewSender(
 	return s
 }
 
-func (s *Sender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
+func (s *GorumsSender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 	mgrOpts := s.mgrOpts
 	// TODO(AlanRostem): this was here when the subConfig pattern was in use. Check if doing this is valid
 	// cfg.opts = nil // options are not needed beyond this point, so we delete them.
@@ -126,7 +127,7 @@ func (s *Sender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 }
 
 // Propose sends the block to all replicas in the configuration
-func (s *Sender) Propose(proposal hotstuff.ProposeMsg) {
+func (s *GorumsSender) Propose(proposal hotstuff.ProposeMsg) {
 	cfg := s.pbCfg
 	ctx, cancel := timeout.Context(s.eventLoop.Context(), s.eventLoop)
 	defer cancel()
@@ -136,7 +137,7 @@ func (s *Sender) Propose(proposal hotstuff.ProposeMsg) {
 	)
 }
 
-func (s *Sender) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
+func (s *GorumsSender) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
 	info, peerOk := peer.FromContext(c.Ctx)
 	md, mdOk := metadata.FromIncomingContext(c.Ctx)
 	if !peerOk || !mdOk {
@@ -163,7 +164,7 @@ func (s *Sender) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
 }
 
 // Timeout sends the timeout message to all replicas.
-func (s *Sender) Timeout(msg hotstuff.TimeoutMsg) {
+func (s *GorumsSender) Timeout(msg hotstuff.TimeoutMsg) {
 	cfg := s.pbCfg
 
 	// will wait until the second timeout before canceling
@@ -177,7 +178,7 @@ func (s *Sender) Timeout(msg hotstuff.TimeoutMsg) {
 }
 
 // RequestBlock requests a block from all the replicas in the configuration
-func (s *Sender) RequestBlock(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
+func (s *GorumsSender) RequestBlock(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	cfg := s.pbCfg
 	// TODO(AlanRostem): consider changing the proto service name as well
 	protoBlock, err := cfg.Fetch(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
@@ -192,13 +193,13 @@ func (s *Sender) RequestBlock(ctx context.Context, hash hotstuff.Hash) (*hotstuf
 	return hotstuffpb.BlockFromProto(protoBlock), true
 }
 
-func (s *Sender) ReplicaExists(id hotstuff.ID) bool {
+func (s *GorumsSender) ReplicaExists(id hotstuff.ID) bool {
 	_, ok := s.replicas[id]
 	return ok
 }
 
-// SendNewView sends the quorum certificate to the other replica.
-func (s *Sender) SendNewView(id hotstuff.ID, msg hotstuff.SyncInfo) error {
+// NewView sends the quorum certificate to the other replica.
+func (s *GorumsSender) NewView(id hotstuff.ID, msg hotstuff.SyncInfo) error {
 	r, ok := s.replicas[id]
 	if !ok {
 		return fmt.Errorf("replica does not exist (id=%d)", id)
@@ -207,8 +208,8 @@ func (s *Sender) SendNewView(id hotstuff.ID, msg hotstuff.SyncInfo) error {
 	return nil
 }
 
-// SendVote sends the partial certificate to the other replica.
-func (s *Sender) SendVote(id hotstuff.ID, cert hotstuff.PartialCert) error {
+// Vote sends the partial certificate to the other replica.
+func (s *GorumsSender) Vote(id hotstuff.ID, cert hotstuff.PartialCert) error {
 	r, ok := s.replicas[id]
 	if !ok {
 		return fmt.Errorf("replica does not exist (id=%d)", id)
@@ -218,16 +219,16 @@ func (s *Sender) SendVote(id hotstuff.ID, cert hotstuff.PartialCert) error {
 }
 
 // Close closes all connections made by this configuration.
-func (s *Sender) Close() {
+func (s *GorumsSender) Close() {
 	s.mgr.Close()
 }
 
-func (s *Sender) GorumsConfig() gorums.RawConfiguration {
+func (s *GorumsSender) GorumsConfig() gorums.RawConfiguration {
 	return s.pbCfg.RawConfiguration
 }
 
 // Sub returns a copy of self dedicated to the replica IDs provided.
-func (s *Sender) Sub(ids []hotstuff.ID) (*Sender, error) {
+func (s *GorumsSender) Sub(ids []hotstuff.ID) (*GorumsSender, error) {
 	replicas := make(map[hotstuff.ID]*replicaNode)
 	nids := make([]uint32, len(ids))
 	for i, id := range ids {
@@ -238,7 +239,7 @@ func (s *Sender) Sub(ids []hotstuff.ID) (*Sender, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Sender{
+	return &GorumsSender{
 		eventLoop: s.eventLoop,
 		logger:    s.logger,
 		config:    s.config,
@@ -285,3 +286,5 @@ func (q qspec) FetchQF(in *hotstuffpb.BlockHash, replies map[uint32]*hotstuffpb.
 
 // ConnectedEvent is sent when the configuration has connected to the other replicas.
 type ConnectedEvent struct{}
+
+var _ modules.Sender = (*GorumsSender)(nil)

@@ -34,7 +34,7 @@ type Consensus struct {
 	votingMachine  *votingmachine.VotingMachine
 	kauri          *kauri.Kauri
 
-	sender *network.Sender
+	sender modules.Sender
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
@@ -59,7 +59,7 @@ func New(
 	commandCache *cmdcache.Cache,
 
 	// network dependencies
-	sender *network.Sender,
+	sender *network.GorumsSender,
 
 	// options
 	opts ...Option,
@@ -216,7 +216,7 @@ func (cs *Consensus) sendVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialC
 		return
 	}
 	// if I am the one voting, sent the vote to next leader over the wire.
-	err := cs.sender.SendVote(leaderID, pc)
+	err := cs.sender.Vote(leaderID, pc)
 	if err != nil {
 		cs.logger.Warnf("%v", err)
 		return

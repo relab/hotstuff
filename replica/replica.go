@@ -24,7 +24,7 @@ type Replica struct {
 	eventLoop    *eventloop.EventLoop
 	clientSrv    *clientsrv.Server
 	hsSrv        *server.Server
-	sender       *network.Sender
+	sender       *network.GorumsSender
 	synchronizer *synchronizer.Synchronizer
 
 	execHandlers map[cmdcache.CmdID]func(*emptypb.Empty, error)
@@ -43,7 +43,7 @@ func New(
 	for _, opt := range opts {
 		opt(rOpt)
 	}
-	sender := network.NewSender(
+	sender := network.NewGorumsSender(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),

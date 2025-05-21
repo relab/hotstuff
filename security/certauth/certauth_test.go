@@ -19,7 +19,7 @@ import (
 type dummyReplica struct {
 	config     *core.RuntimeConfig
 	connMd     map[string]string
-	sender     *network.Sender
+	sender     modules.Sender
 	depsSecure *dependencies.Security
 }
 
@@ -38,7 +38,7 @@ func genKey(t *testing.T, cryptoName string) hotstuff.PrivateKey {
 func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuff.PrivateKey, cacheSize int) *dummyReplica {
 	t.Helper()
 	core := dependencies.NewCore(hotstuff.ID(id), "test", privKey)
-	sender := network.NewSender(
+	sender := network.NewGorumsSender(
 		core.EventLoop(),
 		core.Logger(),
 		core.RuntimeCfg(),

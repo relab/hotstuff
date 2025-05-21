@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"context"
 	"time"
 
 	"github.com/relab/hotstuff"
@@ -59,4 +60,12 @@ type CryptoBase interface {
 	Verify(signature hotstuff.QuorumSignature, message []byte) bool
 	// BatchVerify verifies the given quorum signature against the batch of messages.
 	BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool
+}
+
+type Sender interface {
+	NewView(id hotstuff.ID, msg hotstuff.SyncInfo) error
+	Vote(id hotstuff.ID, cert hotstuff.PartialCert) error
+	Timeout(msg hotstuff.TimeoutMsg)
+	Propose(proposal hotstuff.ProposeMsg)
+	RequestBlock(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool)
 }
