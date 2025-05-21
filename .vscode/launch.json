@@ -13,7 +13,6 @@
 			"cwd": "${workspaceRoot}",
 			"args": [
 				"run",
-				"--kauri"
 			]
 		},
 		{

@@ -7,6 +7,7 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/service/committer"
 )
 
 type Voter struct {
@@ -16,6 +17,7 @@ type Voter struct {
 
 	leaderRotation modules.LeaderRotation
 	rules          modules.ConsensusRules
+	committer      *committer.Committer
 
 	auth *certauth.CertAuthority
 
@@ -29,6 +31,7 @@ func New(
 	config *core.RuntimeConfig,
 	leaderRotation modules.LeaderRotation,
 	rules modules.ConsensusRules,
+	committer *committer.Committer,
 	auth *certauth.CertAuthority,
 ) *Voter {
 	return &Voter{
@@ -38,6 +41,7 @@ func New(
 
 		leaderRotation: leaderRotation,
 		rules:          rules,
+		committer:      committer,
 
 		auth: auth,
 
@@ -57,6 +61,10 @@ func (v *Voter) StopVoting(view hotstuff.View) {
 // if the vote was successful.
 func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
 	ok = false
+	// if we can't commit the block, don't vote for it.
+	if !v.committer.TryCommit(block) {
+		return
+	}
 	// cannot vote for an old block.
 	if block.View() <= v.lastVote {
 		v.logger.Info("TryAccept: block view too old")
@@ -74,8 +82,8 @@ func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
 	return pc, true
 }
 
-// TryAccept verifies the proposal and returns true if it can be voted for.
-func (v *Voter) TryAccept(proposal *hotstuff.ProposeMsg) (accepted bool) {
+// verify verifies the proposal and returns true if it can be voted for.
+func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (accepted bool) {
 	block := proposal.Block
 	view := block.View()
 	if !v.rules.VoteRule(view, *proposal) {

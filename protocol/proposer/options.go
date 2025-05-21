@@ -1,13 +1,13 @@
-package consensus
+package proposer
 
 import (
 	"github.com/relab/hotstuff/modules"
 )
 
-type Option func(*Consensus)
+type Option func(*Proposer)
 
 func OverrideProposeRule(impl modules.ProposeRuler) Option {
-	return func(c *Consensus) {
+	return func(c *Proposer) {
 		c.ruler = impl
 	}
 }

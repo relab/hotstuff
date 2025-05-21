@@ -4,6 +4,7 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/protocol/proposer"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/viewstates"
 	"github.com/relab/hotstuff/protocol/voter"
@@ -24,9 +25,9 @@ func NewProtocol(
 	consensusRulesModule modules.ConsensusRules,
 	leaderRotationModule modules.LeaderRotation,
 ) (*Protocol, error) {
-	opts := []consensus.Option{}
+	opts := []proposer.Option{}
 	if ruler, ok := consensusRulesModule.(modules.ProposeRuler); ok {
-		opts = append(opts, consensus.OverrideProposeRule(ruler))
+		opts = append(opts, proposer.OverrideProposeRule(ruler))
 	}
 	state := viewstates.New(
 		depsCore.Logger(),
@@ -39,7 +40,15 @@ func NewProtocol(
 		depsCore.RuntimeCfg(),
 		leaderRotationModule,
 		consensusRulesModule,
+		depsSrv.Committer(),
 		depsSecure.CertAuth(),
+	)
+	proposer := proposer.New(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		depsSrv.cmdCache,
+		opts...,
 	)
 	votingMachine := votingmachine.New(
 		depsCore.Logger(),
@@ -57,12 +66,12 @@ func NewProtocol(
 		depsSecure.CertAuth(),
 		leaderRotationModule,
 		consensusRulesModule,
+		proposer,
 		voter,
 		votingMachine,
 		depsSrv.Committer(),
 		depsSrv.CmdCache(),
 		sender.(*network.GorumsSender), // TODO(AlanRostem): remove this after decoupling kauri
-		opts...,
 	)
 	return &Protocol{
 		consensus: csus,
