@@ -216,12 +216,12 @@ func (cs *Consensus) sendVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialC
 		return
 	}
 	// if I am the one voting, sent the vote to next leader over the wire.
-	if !cs.sender.ReplicaExists(leaderID) {
-		cs.logger.Warnf("Replica with ID %d was not found!", leaderID)
+	err := cs.sender.SendVote(leaderID, pc)
+	if err != nil {
+		cs.logger.Warnf("%v", err)
 		return
 	}
 	cs.logger.Debugf("TryVote[view=%d]: voting for %v", view, block)
-	cs.sender.SendVote(leaderID, pc)
 }
 
 var _ modules.ProposeRuler = (*Consensus)(nil)

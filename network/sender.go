@@ -197,21 +197,23 @@ func (s *Sender) ReplicaExists(id hotstuff.ID) bool {
 }
 
 // SendNewView sends the quorum certificate to the other replica.
-func (s *Sender) SendNewView(id hotstuff.ID, msg hotstuff.SyncInfo) {
+func (s *Sender) SendNewView(id hotstuff.ID, msg hotstuff.SyncInfo) error {
 	r, ok := s.replicas[id]
 	if !ok {
-		panic(fmt.Sprintf("replica does not exist (id=%d)", id))
+		return fmt.Errorf("replica does not exist (id=%d)", id)
 	}
 	r.newView(msg)
+	return nil
 }
 
 // SendVote sends the partial certificate to the other replica.
-func (s *Sender) SendVote(id hotstuff.ID, cert hotstuff.PartialCert) {
+func (s *Sender) SendVote(id hotstuff.ID, cert hotstuff.PartialCert) error {
 	r, ok := s.replicas[id]
 	if !ok {
-		panic(fmt.Sprintf("replica does not exist (id=%d)", id))
+		return fmt.Errorf("replica does not exist (id=%d)", id)
 	}
 	r.vote(cert)
+	return nil
 }
 
 // Close closes all connections made by this configuration.

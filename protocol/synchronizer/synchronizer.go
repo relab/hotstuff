@@ -350,7 +350,10 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.config.ID() {
 		s.consensus.Propose(s.View(), s.state.HighQC(), syncInfo)
-	} else if s.sender.ReplicaExists(leader) {
-		s.sender.SendNewView(leader, syncInfo)
+		return
+	}
+	err := s.sender.SendNewView(leader, syncInfo)
+	if err != nil {
+		s.logger.Warnf("%v", err)
 	}
 }
