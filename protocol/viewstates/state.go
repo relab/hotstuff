@@ -50,7 +50,6 @@ func (s *States) UpdateHighQC(qc hotstuff.QuorumCert) {
 		s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
 		return
 	}
-
 	if newBlock.View() > s.highQC.View() {
 		s.highQC = qc
 		s.logger.Debug("HighQC updated")

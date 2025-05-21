@@ -43,7 +43,7 @@ func New(
 	for _, opt := range opts {
 		opt(rOpt)
 	}
-	depsNet := dependencies.NewNetwork(
+	sender := network.NewSender(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
@@ -53,7 +53,7 @@ func New(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsCore.RuntimeCfg(),
-		depsNet.Sender(),
+		sender,
 		names.crypto,
 		certauth.WithCache(100), // TODO: consider making this configurable
 	)
@@ -106,9 +106,9 @@ func New(
 	}
 	depsProtocol, err := dependencies.NewProtocol(
 		depsCore,
-		depsNet,
 		depsSecure,
 		depsSrv,
+		sender,
 		rules,
 		leader,
 	)
@@ -126,7 +126,7 @@ func New(
 	srv := &Replica{
 		eventLoop:    depsCore.EventLoop(),
 		clientSrv:    depsSrv.ClientSrv(),
-		sender:       depsNet.Sender(),
+		sender:       sender,
 		synchronizer: depsProtocol.Synchronizer(),
 		hsSrv:        server,
 

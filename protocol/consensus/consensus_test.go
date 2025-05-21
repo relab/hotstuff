@@ -9,11 +9,13 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/testutil"
+	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // TestVote checks that a leader can collect votes on a proposal to form a QC
@@ -39,17 +41,17 @@ func TestVote(t *testing.T) {
 		cacheSize := 100
 
 		depsCore := dependencies.NewCore(id, fmt.Sprintf("hs%d", id), testutil.GenerateECDSAKey(t))
-		depsNet := dependencies.NewNetwork(
+		sender := network.NewSender(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
-			nil,
+			insecure.NewCredentials(),
 		)
 		depsSecure, err := dependencies.NewSecurity(
 			depsCore.Logger(),
 			depsCore.EventLoop(),
 			depsCore.RuntimeCfg(),
-			depsNet.Sender(),
+			sender,
 			cryptoName,
 			certauth.WithCache(cacheSize),
 		)

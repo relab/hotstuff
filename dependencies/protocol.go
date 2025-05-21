@@ -2,6 +2,7 @@ package dependencies
 
 import (
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/viewstates"
@@ -17,9 +18,9 @@ type Protocol struct {
 // TODO(AlanRostem): explore ways to simplify consensus and synchronizer so that this method takes in less dependencies.
 func NewProtocol(
 	depsCore *Core,
-	depsNet *Network,
 	depsSecure *Security,
 	depsSrv *Service,
+	sender *network.Sender,
 	consensusRulesModule modules.ConsensusRules,
 	leaderRotationModule modules.LeaderRotation,
 ) (*Protocol, error) {
@@ -60,7 +61,7 @@ func NewProtocol(
 		votingMachine,
 		depsSrv.Committer(),
 		depsSrv.CmdCache(),
-		depsNet.Sender(),
+		sender,
 		opts...,
 	)
 	return &Protocol{
@@ -74,7 +75,7 @@ func NewProtocol(
 			csus,
 			voter,
 			state,
-			depsNet.Sender(),
+			sender,
 		),
 	}, nil
 }

@@ -8,16 +8,18 @@ import (
 	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/security/certauth"
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/security/crypto/eddsa"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type dummyReplica struct {
 	config     *core.RuntimeConfig
 	connMd     map[string]string
-	depsNet    *dependencies.Network
+	sender     *network.Sender
 	depsSecure *dependencies.Security
 }
 
@@ -36,11 +38,11 @@ func genKey(t *testing.T, cryptoName string) hotstuff.PrivateKey {
 func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuff.PrivateKey, cacheSize int) *dummyReplica {
 	t.Helper()
 	core := dependencies.NewCore(hotstuff.ID(id), "test", privKey)
-	net := dependencies.NewNetwork(
+	sender := network.NewSender(
 		core.EventLoop(),
 		core.Logger(),
 		core.RuntimeCfg(),
-		nil,
+		insecure.NewCredentials(),
 	)
 	opts := []certauth.Option{}
 	if cacheSize > 0 {
@@ -50,7 +52,7 @@ func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuf
 		core.Logger(),
 		core.EventLoop(),
 		core.RuntimeCfg(),
-		net.Sender(),
+		sender,
 		cryptoName,
 		opts...,
 	)
@@ -63,7 +65,7 @@ func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuf
 		config:     core.RuntimeCfg(),
 		connMd:     metaData,
 		depsSecure: sec,
-		depsNet:    net,
+		sender:     sender,
 	}
 }
 

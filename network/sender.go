@@ -39,7 +39,8 @@ func NewSender(
 	config *core.RuntimeConfig,
 
 	creds credentials.TransportCredentials,
-	mgrOpts ...gorums.ManagerOption) *Sender {
+	mgrOpts ...gorums.ManagerOption,
+) *Sender {
 	if creds == nil {
 		creds = insecure.NewCredentials()
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/testutil"
+	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/leaderrotation/carousel"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/leaderrotation/reputation"
@@ -77,7 +78,7 @@ func TestModules(t *testing.T) {
 			runtimeOpts = append(runtimeOpts, core.WithAggregateQC())
 		}
 		depsCore := dependencies.NewCore(hotstuff.ID(1), "test", pk, runtimeOpts...)
-		depsNet := dependencies.NewNetwork(
+		sender := network.NewSender(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
@@ -87,7 +88,7 @@ func TestModules(t *testing.T) {
 			depsCore.Logger(),
 			depsCore.EventLoop(),
 			depsCore.RuntimeCfg(),
-			depsNet.Sender(),
+			sender,
 			td.cryptoName,
 			certauth.WithCache(100),
 		)
