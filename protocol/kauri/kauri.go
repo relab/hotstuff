@@ -90,9 +90,9 @@ func (k *Kauri) initializeConfiguration() {
 }
 
 // Begin starts dissemination of proposal and aggregation of votes.
-func (k *Kauri) Begin(pc hotstuff.PartialCert, p hotstuff.ProposeMsg) {
+func (k *Kauri) Begin(p *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	if !k.initDone {
-		k.eventLoop.DelayUntil(network.ConnectedEvent{}, func() { k.Begin(pc, p) })
+		k.eventLoop.DelayUntil(network.ConnectedEvent{}, func() { k.Begin(p, pc) })
 		return
 	}
 	k.reset()
@@ -108,12 +108,12 @@ func (k *Kauri) reset() {
 	k.aggSent = false
 }
 
-func (k *Kauri) ExtOnPropose(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
-	k.Begin(pc, proposal)
+func (k *Kauri) OnPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+	k.Begin(proposal, pc)
 }
 
-func (k *Kauri) ExtDisseminatePropose(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
-	k.Begin(pc, proposal)
+func (k *Kauri) DisseminateProposal(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+	k.Begin(proposal, pc)
 }
 
 func (k *Kauri) WaitToAggregate() {
@@ -123,7 +123,7 @@ func (k *Kauri) WaitToAggregate() {
 }
 
 // SendProposalToChildren sends the proposal to the children.
-func (k *Kauri) SendProposalToChildren(p hotstuff.ProposeMsg) {
+func (k *Kauri) SendProposalToChildren(p *hotstuff.ProposeMsg) {
 	children := k.tree.ReplicaChildren()
 	if len(children) != 0 {
 		config, err := k.sender.Sub(children)

@@ -21,14 +21,11 @@ type Consensus struct {
 
 	committer *committer.Committer
 
-	leaderRotation modules.LeaderRotation
-	extHandler     modules.ExtProposeHandler
+	extHandler modules.ExtProposeHandler
 
 	voter         *voter.Voter
 	votingMachine *votingmachine.VotingMachine
 	proposer      *proposer.Proposer
-
-	sender modules.Sender
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
@@ -39,48 +36,38 @@ func New(
 	config *core.RuntimeConfig,
 
 	// protocol dependencies
-	leaderRotation modules.LeaderRotation,
+	extHandler modules.ExtProposeHandler,
 	proposer *proposer.Proposer,
 	voter *voter.Voter,
 	votingMachine *votingmachine.VotingMachine,
 
 	// service dependencies
 	committer *committer.Committer,
-
-	// network dependencies
-	sender modules.Sender,
-
-	// options
-	opts ...Option,
 ) *Consensus {
 	cs := &Consensus{
-		leaderRotation: leaderRotation,
-		committer:      committer,
-		eventLoop:      eventLoop,
-		logger:         logger,
-		config:         config,
-		sender:         sender,
-		proposer:       proposer,
+		eventLoop: eventLoop,
+		logger:    logger,
+		config:    config,
 
+		extHandler:    extHandler,
+		proposer:      proposer,
 		voter:         voter,
 		votingMachine: votingMachine,
-	}
-	cs.extHandler = cs
-	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
-		cs.OnPropose(event.(hotstuff.ProposeMsg))
-	})
 
-	for _, opt := range opts {
-		opt(cs)
+		committer: committer,
 	}
+	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
+		p := event.(hotstuff.ProposeMsg)
+		cs.OnPropose(&p)
+	})
 	return cs
 }
 
 // OnPropose is called when receiving a proposal from a leader and returns true if the proposal was voted for.
-func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) {
+func (cs *Consensus) OnPropose(proposal *hotstuff.ProposeMsg) {
 	block := proposal.Block
 	// ensure that I can vote in this view based on the protocol's rule.
-	err := cs.voter.Verify(&proposal)
+	err := cs.voter.Verify(proposal)
 	if err != nil {
 		cs.logger.Errorf("failed to verify incoming vote: %v", err)
 		return
@@ -102,7 +89,7 @@ func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) {
 		cs.logger.Errorf("failed to vote: %v", err)
 		return
 	}
-	cs.extHandler.ExtOnPropose(proposal, pc)
+	cs.extHandler.OnPropose(proposal, pc)
 }
 
 // Propose creates a new outgoing proposal.
@@ -123,27 +110,5 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 	}
 	// can collect my own vote as leader
 	cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
-	cs.extHandler.ExtDisseminatePropose(proposal, pc)
+	cs.extHandler.DisseminateProposal(&proposal, pc)
 }
-
-func (cs *Consensus) ExtDisseminatePropose(proposal hotstuff.ProposeMsg, _ hotstuff.PartialCert) {
-	cs.sender.Propose(proposal)
-}
-
-func (cs *Consensus) ExtOnPropose(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
-	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
-	if leaderID == cs.config.ID() {
-		// if I am the leader in the next view, collect the vote for myself beforehand.
-		cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
-		return
-	}
-	// if I am the one voting, send the vote to next leader over the wire.
-	err := cs.sender.Vote(leaderID, pc)
-	if err != nil {
-		cs.logger.Warnf("%v", err)
-		return
-	}
-	cs.logger.Debugf("voting for %v", proposal)
-}
-
-var _ modules.ExtProposeHandler = (*Consensus)(nil)

@@ -1,0 +1,59 @@
+package consensus
+
+import (
+	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/voter"
+	"github.com/relab/hotstuff/protocol/votingmachine"
+)
+
+type hotstuffProposeHandler struct {
+	logger         logging.Logger
+	config         *core.RuntimeConfig
+	voter          *voter.Voter
+	votingMachine  *votingmachine.VotingMachine
+	leaderRotation modules.LeaderRotation
+	sender         modules.Sender
+}
+
+func NewHotStuffProposeHandler(
+	logger logging.Logger,
+	config *core.RuntimeConfig,
+	voter *voter.Voter,
+	votingMachine *votingmachine.VotingMachine,
+	leaderRotation modules.LeaderRotation,
+	sender modules.Sender,
+) modules.ExtProposeHandler {
+	return &hotstuffProposeHandler{
+		logger:         logger,
+		config:         config,
+		voter:          voter,
+		votingMachine:  votingMachine,
+		leaderRotation: leaderRotation,
+		sender:         sender,
+	}
+}
+
+func (cs *hotstuffProposeHandler) DisseminateProposal(proposal *hotstuff.ProposeMsg, _ hotstuff.PartialCert) {
+	cs.sender.Propose(proposal)
+}
+
+func (cs *hotstuffProposeHandler) OnPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
+	if leaderID == cs.config.ID() {
+		// if I am the leader in the next view, collect the vote for myself beforehand.
+		cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
+		return
+	}
+	// if I am the one voting, send the vote to next leader over the wire.
+	err := cs.sender.Vote(leaderID, pc)
+	if err != nil {
+		cs.logger.Warnf("%v", err)
+		return
+	}
+	cs.logger.Debugf("voting for %v", proposal)
+}
+
+var _ modules.ExtProposeHandler = (*hotstuffProposeHandler)(nil)

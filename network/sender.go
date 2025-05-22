@@ -127,13 +127,13 @@ func (s *GorumsSender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 }
 
 // Propose sends the block to all replicas in the configuration
-func (s *GorumsSender) Propose(proposal hotstuff.ProposeMsg) {
+func (s *GorumsSender) Propose(proposal *hotstuff.ProposeMsg) {
 	cfg := s.pbCfg
 	ctx, cancel := timeout.Context(s.eventLoop.Context(), s.eventLoop)
 	defer cancel()
 	cfg.Propose(
 		ctx,
-		hotstuffpb.ProposalToProto(proposal),
+		hotstuffpb.ProposalToProto(*proposal),
 	)
 }
 

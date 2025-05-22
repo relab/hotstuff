@@ -4,6 +4,7 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/proposer"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/viewstates"
@@ -56,29 +57,36 @@ func NewProtocol(
 		depsSecure.CertAuth(),
 		state,
 	)
-	consensusOpts := []consensus.Option{}
+	var handler modules.ExtProposeHandler
 	// TODO(AlanRostem): avoid using runtime cfg to set kauri.
 	if depsCore.RuntimeCfg().KauriEnabled() {
-		consensusOpts = append(consensusOpts, consensus.WithKauri(
+		handler = kauri.New(
 			depsCore.Logger(),
 			depsCore.EventLoop(),
 			depsCore.RuntimeCfg(),
 			depsSecure.BlockChain(),
 			depsSecure.CertAuth(),
 			sender.(*network.GorumsSender), // TODO(AlanRostem): avoid cast
-		))
+		)
+	} else {
+		handler = consensus.NewHotStuffProposeHandler(
+			depsCore.Logger(),
+			depsCore.RuntimeCfg(),
+			voter,
+			votingMachine,
+			leaderRotationModule,
+			sender,
+		)
 	}
 	csus := consensus.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
-		leaderRotationModule,
+		handler,
 		proposer,
 		voter,
 		votingMachine,
 		depsSrv.Committer(),
-		sender,
-		consensusOpts...,
 	)
 	return &Protocol{
 		consensus: csus,

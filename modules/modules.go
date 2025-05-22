@@ -67,14 +67,14 @@ type Sender interface {
 	NewView(id hotstuff.ID, msg hotstuff.SyncInfo) error
 	Vote(id hotstuff.ID, cert hotstuff.PartialCert) error
 	Timeout(msg hotstuff.TimeoutMsg)
-	Propose(proposal hotstuff.ProposeMsg)
+	Propose(proposal *hotstuff.ProposeMsg)
 	RequestBlock(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool)
 }
 
 // ExtProposeHandler is an extension for handling proposals as the voter or proposer.
 type ExtProposeHandler interface {
-	// ExtOnPropose handles incoming proposals.
-	ExtOnPropose(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert)
-	// ExtDisseminatePropose disseminates the proposal from the proposer.
-	ExtDisseminatePropose(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert)
+	// OnPropose handles incoming proposals.
+	OnPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
+	// DisseminateProposal disseminates the proposal from the proposer.
+	DisseminateProposal(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
 }

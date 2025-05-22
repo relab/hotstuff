@@ -19,7 +19,7 @@ type States struct {
 	highQC hotstuff.QuorumCert
 	view   hotstuff.View
 
-	mut sync.RWMutex
+	mut sync.RWMutex // to protect the following
 }
 
 func New(

@@ -3,7 +3,6 @@ package synchronizer
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/relab/hotstuff/core"
@@ -33,8 +32,6 @@ type Synchronizer struct {
 	state          *viewstates.States
 
 	sender modules.Sender
-
-	mut sync.RWMutex // to protect the following
 
 	// A pointer to the last timeout message that we sent.
 	// If a timeout happens again before we advance to the next view,
@@ -143,17 +140,13 @@ func (s *Synchronizer) Start(ctx context.Context) {
 // OnLocalTimeout is called when a local timeout happens.
 func (s *Synchronizer) OnLocalTimeout() {
 	s.startTimeoutTimer()
-
 	view := s.state.View()
-
 	if s.lastTimeout != nil && s.lastTimeout.View == view {
 		s.sender.Timeout(*s.lastTimeout)
 		return
 	}
-
 	s.duration.ViewTimeout() // increase the duration of the next view
 	s.logger.Debugf("OnLocalTimeout: %v", view)
-
 	sig, err := s.auth.Sign(view.ToBytes())
 	if err != nil {
 		s.logger.Warnf("Failed to sign view: %v", err)
@@ -165,7 +158,6 @@ func (s *Synchronizer) OnLocalTimeout() {
 		SyncInfo:      s.state.SyncInfo(),
 		ViewSignature: sig,
 	}
-
 	if s.config.HasAggregateQC() {
 		// generate a second signature that will become part of the aggregateQC
 		sig, err := s.auth.Sign(timeoutMsg.ToBytes())
@@ -178,7 +170,6 @@ func (s *Synchronizer) OnLocalTimeout() {
 	s.lastTimeout = &timeoutMsg
 	// stop voting for current view
 	s.voter.StopVoting(view)
-
 	s.sender.Timeout(timeoutMsg)
 	s.OnRemoteTimeout(timeoutMsg)
 }
@@ -186,7 +177,6 @@ func (s *Synchronizer) OnLocalTimeout() {
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
 func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	currView := s.state.View()
-
 	defer func() {
 		// cleanup old timeouts
 		for view := range s.timeouts {
@@ -195,43 +185,34 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 			}
 		}
 	}()
-
 	if !s.auth.Verify(timeout.ViewSignature, timeout.View.ToBytes()) {
 		return
 	}
 	s.logger.Debug("OnRemoteTimeout: ", timeout)
-
 	s.AdvanceView(timeout.SyncInfo)
-
 	timeouts, ok := s.timeouts[timeout.View]
 	if !ok {
 		timeouts = make(map[hotstuff.ID]hotstuff.TimeoutMsg)
 		s.timeouts[timeout.View] = timeouts
 	}
-
 	if _, ok := timeouts[timeout.ID]; !ok {
 		timeouts[timeout.ID] = timeout
 	}
-
 	if len(timeouts) < s.config.QuorumSize() {
 		return
 	}
-
 	// TODO: should probably change CreateTimeoutCert and maybe also CreateQuorumCert
 	// to use maps instead of slices
 	timeoutList := make([]hotstuff.TimeoutMsg, 0, len(timeouts))
 	for _, t := range timeouts {
 		timeoutList = append(timeoutList, t)
 	}
-
 	tc, err := s.auth.CreateTimeoutCert(timeout.View, timeoutList)
 	if err != nil {
 		s.logger.Debugf("Failed to create timeout certificate: %v", err)
 		return
 	}
-
 	si := s.state.SyncInfo().WithTC(tc)
-
 	if s.config.HasAggregateQC() {
 		aggQC, err := s.auth.CreateAggregateQC(currView, timeoutList)
 		if err != nil {
@@ -240,9 +221,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 			si = si.WithAggQC(aggQC)
 		}
 	}
-
 	delete(s.timeouts, timeout.View)
-
 	s.AdvanceView(si)
 }
 
