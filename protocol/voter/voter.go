@@ -7,7 +7,6 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/certauth"
-	"github.com/relab/hotstuff/service/committer"
 )
 
 type Voter struct {
@@ -17,7 +16,6 @@ type Voter struct {
 
 	leaderRotation modules.LeaderRotation
 	rules          modules.ConsensusRules
-	committer      *committer.Committer
 
 	auth *certauth.CertAuthority
 
@@ -31,7 +29,6 @@ func New(
 	config *core.RuntimeConfig,
 	leaderRotation modules.LeaderRotation,
 	rules modules.ConsensusRules,
-	committer *committer.Committer,
 	auth *certauth.CertAuthority,
 ) *Voter {
 	return &Voter{
@@ -41,7 +38,6 @@ func New(
 
 		leaderRotation: leaderRotation,
 		rules:          rules,
-		committer:      committer,
 
 		auth: auth,
 
@@ -58,18 +54,9 @@ func (v *Voter) StopVoting(view hotstuff.View) {
 }
 
 // Vote votes for and signs the block, returning a partial certificate
-// if the vote was successful.
+// and updates the last vote view if the signature was successful.
 func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
 	ok = false
-	// if we can't commit the block, don't vote for it.
-	if !v.committer.TryCommit(block) {
-		return
-	}
-	// cannot vote for an old block.
-	if block.View() <= v.lastVote {
-		v.logger.Info("TryAccept: block view too old")
-		return
-	}
 	// try to sign the block. Abort if this fails.
 	pc, err := v.auth.CreatePartialCert(block)
 	if err != nil {
@@ -83,14 +70,20 @@ func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
 }
 
 // verify verifies the proposal and returns true if it can be voted for.
-func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (accepted bool) {
+func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (ok bool) {
 	block := proposal.Block
 	view := block.View()
+	// cannot vote for an old block.
+	if block.View() <= v.lastVote {
+		v.logger.Info("TryAccept: block view too old")
+		return
+	}
+
 	if !v.rules.VoteRule(view, *proposal) {
 		v.logger.Info("TryAccept: Block not voted for")
 		return
 	}
-	accepted = false
+	ok = false
 	// verify the proposal's QC.
 	qc := proposal.Block.QuorumCert()
 	if !v.auth.VerifyAnyQC(&qc, proposal.AggregateQC) {

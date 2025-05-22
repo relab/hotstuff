@@ -40,7 +40,6 @@ func NewProtocol(
 		depsCore.RuntimeCfg(),
 		leaderRotationModule,
 		consensusRulesModule,
-		depsSrv.Committer(),
 		depsSecure.CertAuth(),
 	)
 	proposer := proposer.New(

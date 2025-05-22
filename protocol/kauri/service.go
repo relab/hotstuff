@@ -18,7 +18,7 @@ func RegisterService(
 	gorumsSrv *gorums.Server,
 ) {
 	i := &serviceImpl{eventLoop: eventLoop}
-	logger.Infof("Kauripb: Service registered.")
+	logger.Debug("Kauripb: Service registered.")
 	kauripb.RegisterKauriServer(gorumsSrv, i)
 }
 

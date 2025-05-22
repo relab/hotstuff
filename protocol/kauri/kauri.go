@@ -73,7 +73,7 @@ func New(
 }
 
 func (k *Kauri) postInit() {
-	k.logger.Info("Kauri: Initializing")
+	k.logger.Debug("Kauri: Initializing")
 	k.initializeConfiguration()
 }
 

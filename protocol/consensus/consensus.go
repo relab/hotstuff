@@ -91,45 +91,43 @@ func New(
 		)
 	}
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
-		cs.logger.Debugf("On event (hotstuff.ProposeMsg).")
-		proposal := event.(hotstuff.ProposeMsg)
-		if !cs.OnPropose(proposal) {
-			// if it failed to process the proposal, don't advance the view
-			return
-		}
-		newInfo := hotstuff.NewSyncInfo().WithQC(proposal.Block.QuorumCert())
-		cs.eventLoop.AddEvent(hotstuff.NewViewMsg{
-			ID:       cs.config.ID(),
-			SyncInfo: newInfo,
-		})
+		cs.OnPropose(event.(hotstuff.ProposeMsg))
 	})
 	return cs
 }
 
 // OnPropose is called when receiving a proposal from a leader and returns true if the proposal was voted for.
-func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) (advance bool) {
+func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) {
 	block := proposal.Block
-	advance = false // won't increment the view when the below if-statements return
 	// ensure that I can vote in this view based on the protocol's rule.
 	if !cs.voter.Verify(&proposal) {
 		return
 	}
-	// kauri will handle sending over the wire differently, so we return here.
+	// if we can't commit the block, don't vote for it.
+	if !cs.committer.TryCommit(block) {
+		return
+	}
+	// even if voting fails, we should be able to go to the next view.
+	newInfo := hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
+	cs.eventLoop.AddEvent(hotstuff.NewViewMsg{
+		ID:       cs.config.ID(),
+		SyncInfo: newInfo,
+	})
 	// try to vote for the block and retrieve its partial certificate.
-	pc, advance := cs.voter.Vote(block)
+	pc, ok := cs.voter.Vote(block)
+	// don't send the vote if it failed
+	if !ok {
+		return
+	}
+	// TODO(AlanRostem): make the below if-else block into an interface
+	// kauri will handle sending over the wire differently, so we return here.
 	if cs.kauri != nil {
 		// disseminate proposal and aggregate votes.
 		cs.kauri.Begin(pc, proposal)
-		return
+	} else {
+		// if the proposal was voted for (state is updated internally), we send it over the wire.
+		cs.sendVote(proposal, pc)
 	}
-	// TODO(AlanRostem): before this commit, advance was set to true despite the vote failing.
-	// Not sure if that was correct behavior.
-	// advance tells the synchronizer to advance the view
-	if !advance {
-		return
-	}
-	// if the proposal was voted for (state is updated internally), we send it over the wire.
-	cs.sendVote(proposal, pc)
 	return
 }
 
@@ -139,23 +137,24 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 	if !ok {
 		return
 	}
-	// kauri sends the proposal to only the children
-	if cs.kauri == nil {
-		cs.sender.Propose(proposal)
-	}
 	block := proposal.Block
-	// as proposer, I can vote for my own proposal without verifying
+	// as proposer, I can vote for my own proposal without verifying.
+	// NOTE: this vote call is not likely to fail since the leader does it.
 	pc, ok := cs.voter.Vote(block)
 	if !ok {
 		cs.logger.Warnf("voteSelf[v=%d]: could not vote for my own proposal.", block.View())
 		return
 	}
-	// can collect my own vote.
+	// can collect my own vote as leader
 	cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
+	// TODO(AlanRostem): make the below if-else block into an interface
 	// kauri will handle sending over the wire differently.
 	if cs.kauri != nil {
 		// disseminate proposal and aggregate votes.
 		cs.kauri.Begin(pc, proposal)
+	} else {
+		// kauri sends the proposal to only the children
+		cs.sender.Propose(proposal)
 	}
 }
 
@@ -175,4 +174,12 @@ func (cs *Consensus) sendVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialC
 		return
 	}
 	cs.logger.Debugf("TryVote[view=%d]: voting for %v", view, block)
+}
+
+type ProposeHandler interface {
+	HandlePropose(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert)
+}
+
+type ProposeDisseminator interface {
+	DisseminatePropose(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert)
 }
