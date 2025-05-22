@@ -6,14 +6,9 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/network"
-	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/proposer"
 	"github.com/relab/hotstuff/protocol/voter"
 	"github.com/relab/hotstuff/protocol/votingmachine"
-	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/security/certauth"
-	"github.com/relab/hotstuff/service/cmdcache"
 	"github.com/relab/hotstuff/service/committer"
 )
 
@@ -24,17 +19,15 @@ type Consensus struct {
 	logger    logging.Logger
 	config    *core.RuntimeConfig
 
-	committer    *committer.Committer
-	commandCache *cmdcache.Cache
+	committer *committer.Committer
 
-	impl           modules.ConsensusRules
-	leaderRotation modules.LeaderRotation
+	leaderRotation  modules.LeaderRotation
+	extDisseminator modules.ExtProposeDisseminator
+	extHandler      modules.ExtProposeHandler
 
 	voter         *voter.Voter
 	votingMachine *votingmachine.VotingMachine
 	proposer      *proposer.Proposer
-
-	kauri *kauri.Kauri
 
 	sender modules.Sender
 }
@@ -46,53 +39,42 @@ func New(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 
-	// security dependencies
-	blockChain *blockchain.BlockChain,
-	auth *certauth.CertAuthority,
-
 	// protocol dependencies
 	leaderRotation modules.LeaderRotation,
-	impl modules.ConsensusRules,
 	proposer *proposer.Proposer,
 	voter *voter.Voter,
 	votingMachine *votingmachine.VotingMachine,
 
 	// service dependencies
 	committer *committer.Committer,
-	commandCache *cmdcache.Cache,
 
 	// network dependencies
-	sender *network.GorumsSender,
+	sender modules.Sender,
+
+	// options
+	opts ...Option,
 ) *Consensus {
 	cs := &Consensus{
-		impl:           impl,
 		leaderRotation: leaderRotation,
-		kauri:          nil, // this is set later based on config
-
-		committer:    committer,
-		commandCache: commandCache,
-		eventLoop:    eventLoop,
-		logger:       logger,
-		config:       config,
-		sender:       sender,
-		proposer:     proposer,
+		committer:      committer,
+		eventLoop:      eventLoop,
+		logger:         logger,
+		config:         config,
+		sender:         sender,
+		proposer:       proposer,
 
 		voter:         voter,
 		votingMachine: votingMachine,
 	}
-	if config.KauriEnabled() {
-		cs.kauri = kauri.New(
-			logger,
-			eventLoop,
-			config,
-			blockChain,
-			auth,
-			sender,
-		)
-	}
+	cs.extDisseminator = cs
+	cs.extHandler = cs
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.OnPropose(event.(hotstuff.ProposeMsg))
 	})
+
+	for _, opt := range opts {
+		opt(cs)
+	}
 	return cs
 }
 
@@ -119,21 +101,13 @@ func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) {
 	if !ok {
 		return
 	}
-	// TODO(AlanRostem): make the below if-else block into an interface
-	// kauri will handle sending over the wire differently, so we return here.
-	if cs.kauri != nil {
-		// disseminate proposal and aggregate votes.
-		cs.kauri.Begin(pc, proposal)
-	} else {
-		// if the proposal was voted for (state is updated internally), we send it over the wire.
-		cs.sendVote(proposal, pc)
-	}
+	cs.extHandler.Handle(proposal, pc)
 	return
 }
 
 // Propose creates a new outgoing proposal.
 func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syncInfo hotstuff.SyncInfo) {
-	proposal, ok := cs.proposer.TryPropose(view, highQC, syncInfo)
+	proposal, ok := cs.proposer.CreateProposal(view, highQC, syncInfo)
 	if !ok {
 		return
 	}
@@ -147,18 +121,14 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 	}
 	// can collect my own vote as leader
 	cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
-	// TODO(AlanRostem): make the below if-else block into an interface
-	// kauri will handle sending over the wire differently.
-	if cs.kauri != nil {
-		// disseminate proposal and aggregate votes.
-		cs.kauri.Begin(pc, proposal)
-	} else {
-		// kauri sends the proposal to only the children
-		cs.sender.Propose(proposal)
-	}
+	cs.extDisseminator.Disseminate(proposal, pc)
 }
 
-func (cs *Consensus) sendVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (cs *Consensus) Disseminate(proposal hotstuff.ProposeMsg, _ hotstuff.PartialCert) {
+	cs.sender.Propose(proposal)
+}
+
+func (cs *Consensus) Handle(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	block := proposal.Block
 	view := block.View()
 	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
@@ -176,10 +146,5 @@ func (cs *Consensus) sendVote(proposal hotstuff.ProposeMsg, pc hotstuff.PartialC
 	cs.logger.Debugf("TryVote[view=%d]: voting for %v", view, block)
 }
 
-type ProposeHandler interface {
-	HandlePropose(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert)
-}
-
-type ProposeDisseminator interface {
-	DisseminatePropose(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert)
-}
+var _ modules.ExtProposeDisseminator = (*Consensus)(nil)
+var _ modules.ExtProposeHandler = (*Consensus)(nil)

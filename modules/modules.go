@@ -62,10 +62,21 @@ type CryptoBase interface {
 	BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool
 }
 
+// Sender handles the network layer of the consensus protocol by methods for sending specific messages.
 type Sender interface {
 	NewView(id hotstuff.ID, msg hotstuff.SyncInfo) error
 	Vote(id hotstuff.ID, cert hotstuff.PartialCert) error
 	Timeout(msg hotstuff.TimeoutMsg)
 	Propose(proposal hotstuff.ProposeMsg)
 	RequestBlock(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool)
+}
+
+// ExtProposeHandler is an extension for handling proposals as the voter.
+type ExtProposeHandler interface {
+	Handle(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert)
+}
+
+// ExtProposeDisseminator is an extension for disseminating proposals as the proposer.
+type ExtProposeDisseminator interface {
+	Disseminate(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert)
 }

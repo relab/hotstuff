@@ -25,10 +25,6 @@ func NewProtocol(
 	consensusRulesModule modules.ConsensusRules,
 	leaderRotationModule modules.LeaderRotation,
 ) (*Protocol, error) {
-	opts := []proposer.Option{}
-	if ruler, ok := consensusRulesModule.(modules.ProposeRuler); ok {
-		opts = append(opts, proposer.OverrideProposeRule(ruler))
-	}
 	state := viewstates.New(
 		depsCore.Logger(),
 		depsSecure.BlockChain(),
@@ -42,12 +38,16 @@ func NewProtocol(
 		consensusRulesModule,
 		depsSecure.CertAuth(),
 	)
+	proposerOpts := []proposer.Option{}
+	if ruler, ok := consensusRulesModule.(modules.ProposeRuler); ok {
+		proposerOpts = append(proposerOpts, proposer.OverrideProposeRule(ruler))
+	}
 	proposer := proposer.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSrv.cmdCache,
-		opts...,
+		proposerOpts...,
 	)
 	votingMachine := votingmachine.New(
 		depsCore.Logger(),
@@ -57,20 +57,29 @@ func NewProtocol(
 		depsSecure.CertAuth(),
 		state,
 	)
+	consensusOpts := []consensus.Option{}
+	// TODO(AlanRostem): avoid using runtime cfg to set kauri.
+	if depsCore.RuntimeCfg().KauriEnabled() {
+		consensusOpts = append(consensusOpts, consensus.WithKauri(
+			depsCore.Logger(),
+			depsCore.EventLoop(),
+			depsCore.RuntimeCfg(),
+			depsSecure.BlockChain(),
+			depsSecure.CertAuth(),
+			sender.(*network.GorumsSender), // TODO(AlanRostem): avoid cast
+		))
+	}
 	csus := consensus.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
-		depsSecure.BlockChain(),
-		depsSecure.CertAuth(),
 		leaderRotationModule,
-		consensusRulesModule,
 		proposer,
 		voter,
 		votingMachine,
 		depsSrv.Committer(),
-		depsSrv.CmdCache(),
-		sender.(*network.GorumsSender), // TODO(AlanRostem): remove this after decoupling kauri
+		sender,
+		consensusOpts...,
 	)
 	return &Protocol{
 		consensus: csus,

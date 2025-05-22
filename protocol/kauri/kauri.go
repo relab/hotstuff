@@ -14,6 +14,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/proto/kauripb"
 	"github.com/relab/hotstuff/internal/tree"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
@@ -105,6 +106,14 @@ func (k *Kauri) reset() {
 	k.aggContrib = nil
 	k.senders = make([]hotstuff.ID, 0)
 	k.aggSent = false
+}
+
+func (k *Kauri) Handle(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+	k.Begin(pc, proposal)
+}
+
+func (k *Kauri) Disseminate(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+	k.Begin(pc, proposal)
 }
 
 func (k *Kauri) WaitToAggregate() {
@@ -244,3 +253,6 @@ func isSubSet(a, b []hotstuff.ID) bool {
 type WaitTimerExpiredEvent struct {
 	currentView hotstuff.View
 }
+
+var _ modules.ExtProposeDisseminator = (*Kauri)(nil)
+var _ modules.ExtProposeHandler = (*Kauri)(nil)

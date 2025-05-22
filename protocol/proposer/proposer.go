@@ -39,8 +39,8 @@ func New(
 	return p
 }
 
-// TryPropose attempts to create a new outgoing proposal if a command exists and the protocol's rule is satisfied.
-func (cs *Proposer) TryPropose(view hotstuff.View, highQC hotstuff.QuorumCert, syncInfo hotstuff.SyncInfo) (proposal hotstuff.ProposeMsg, ok bool) {
+// CreateProposal attempts to create a new outgoing proposal if a command exists and the protocol's rule is satisfied.
+func (cs *Proposer) CreateProposal(view hotstuff.View, highQC hotstuff.QuorumCert, syncInfo hotstuff.SyncInfo) (proposal hotstuff.ProposeMsg, ok bool) {
 	ok = false
 	cs.logger.Debugf("Propose")
 	ctx, cancel := timeout.Context(cs.eventLoop.Context(), cs.eventLoop)
