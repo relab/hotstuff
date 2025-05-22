@@ -71,12 +71,10 @@ type Sender interface {
 	RequestBlock(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool)
 }
 
-// ExtProposeHandler is an extension for handling proposals as the voter.
+// ExtProposeHandler is an extension for handling proposals as the voter or proposer.
 type ExtProposeHandler interface {
-	Handle(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert)
-}
-
-// ExtProposeDisseminator is an extension for disseminating proposals as the proposer.
-type ExtProposeDisseminator interface {
-	Disseminate(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert)
+	// ExtOnPropose handles incoming proposals.
+	ExtOnPropose(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert)
+	// ExtDisseminatePropose disseminates the proposal from the proposer.
+	ExtDisseminatePropose(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert)
 }

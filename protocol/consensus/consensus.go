@@ -21,9 +21,8 @@ type Consensus struct {
 
 	committer *committer.Committer
 
-	leaderRotation  modules.LeaderRotation
-	extDisseminator modules.ExtProposeDisseminator
-	extHandler      modules.ExtProposeHandler
+	leaderRotation modules.LeaderRotation
+	extHandler     modules.ExtProposeHandler
 
 	voter         *voter.Voter
 	votingMachine *votingmachine.VotingMachine
@@ -66,7 +65,6 @@ func New(
 		voter:         voter,
 		votingMachine: votingMachine,
 	}
-	cs.extDisseminator = cs
 	cs.extHandler = cs
 	cs.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		cs.OnPropose(event.(hotstuff.ProposeMsg))
@@ -101,7 +99,7 @@ func (cs *Consensus) OnPropose(proposal hotstuff.ProposeMsg) {
 	if !ok {
 		return
 	}
-	cs.extHandler.Handle(proposal, pc)
+	cs.extHandler.ExtOnPropose(proposal, pc)
 	return
 }
 
@@ -121,14 +119,14 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 	}
 	// can collect my own vote as leader
 	cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
-	cs.extDisseminator.Disseminate(proposal, pc)
+	cs.extHandler.ExtDisseminatePropose(proposal, pc)
 }
 
-func (cs *Consensus) Disseminate(proposal hotstuff.ProposeMsg, _ hotstuff.PartialCert) {
+func (cs *Consensus) ExtDisseminatePropose(proposal hotstuff.ProposeMsg, _ hotstuff.PartialCert) {
 	cs.sender.Propose(proposal)
 }
 
-func (cs *Consensus) Handle(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (cs *Consensus) ExtOnPropose(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	block := proposal.Block
 	view := block.View()
 	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
@@ -146,5 +144,4 @@ func (cs *Consensus) Handle(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCer
 	cs.logger.Debugf("TryVote[view=%d]: voting for %v", view, block)
 }
 
-var _ modules.ExtProposeDisseminator = (*Consensus)(nil)
 var _ modules.ExtProposeHandler = (*Consensus)(nil)

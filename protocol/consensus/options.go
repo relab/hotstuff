@@ -22,7 +22,7 @@ func WithKauri(
 	sender *network.GorumsSender,
 ) Option {
 	return func(cs *Consensus) {
-		k := kauri.New(
+		cs.extHandler = kauri.New(
 			logger,
 			eventLoop,
 			config,
@@ -30,7 +30,5 @@ func WithKauri(
 			auth,
 			sender,
 		)
-		cs.extDisseminator = k
-		cs.extHandler = k
 	}
 }

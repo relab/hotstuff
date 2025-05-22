@@ -108,11 +108,11 @@ func (k *Kauri) reset() {
 	k.aggSent = false
 }
 
-func (k *Kauri) Handle(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (k *Kauri) ExtOnPropose(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	k.Begin(pc, proposal)
 }
 
-func (k *Kauri) Disseminate(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (k *Kauri) ExtDisseminatePropose(proposal hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	k.Begin(pc, proposal)
 }
 
@@ -254,5 +254,4 @@ type WaitTimerExpiredEvent struct {
 	currentView hotstuff.View
 }
 
-var _ modules.ExtProposeDisseminator = (*Kauri)(nil)
 var _ modules.ExtProposeHandler = (*Kauri)(nil)
