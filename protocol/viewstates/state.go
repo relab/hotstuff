@@ -2,6 +2,7 @@ package viewstates
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/logging"
@@ -16,6 +17,9 @@ type States struct {
 
 	highTC hotstuff.TimeoutCert
 	highQC hotstuff.QuorumCert
+	view   hotstuff.View
+
+	mut sync.RWMutex
 }
 
 func New(
@@ -27,6 +31,8 @@ func New(
 		logger:     logger,
 		blockChain: blockChain,
 		auth:       auth,
+
+		view: 1,
 	}
 	var err error
 	s.highQC, err = s.auth.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
@@ -66,9 +72,30 @@ func (s *States) UpdateHighTC(tc hotstuff.TimeoutCert) {
 }
 
 func (s *States) HighQC() hotstuff.QuorumCert {
+	s.mut.RLock()
+	defer s.mut.RUnlock()
 	return s.highQC
 }
 
 func (s *States) HighTC() hotstuff.TimeoutCert {
+	s.mut.RLock()
+	defer s.mut.RUnlock()
 	return s.highTC
+}
+
+func (s *States) UpdateView(v hotstuff.View) {
+	s.view = v
+}
+
+func (s *States) View() hotstuff.View {
+	s.mut.RLock()
+	defer s.mut.RUnlock()
+	return s.view
+}
+
+// SyncInfo returns the highest known QC or TC.
+func (s *States) SyncInfo() hotstuff.SyncInfo {
+	s.mut.RLock()
+	defer s.mut.RUnlock()
+	return hotstuff.NewSyncInfo().WithQC(s.HighQC()).WithTC(s.HighTC())
 }

@@ -34,8 +34,7 @@ type Synchronizer struct {
 
 	sender modules.Sender
 
-	mut         sync.RWMutex // to protect the following
-	currentView hotstuff.View
+	mut sync.RWMutex // to protect the following
 
 	// A pointer to the last timeout message that we sent.
 	// If a timeout happens again before we advance to the next view,
@@ -80,24 +79,19 @@ func New(
 		voter:     voter,
 		state:     state,
 
-		currentView: 1,
-
 		timer:    oneShotTimer{time.AfterFunc(0, func() {})}, // dummy timer that will be replaced after start() is called
 		timeouts: make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
 	}
-
 	s.eventLoop.RegisterHandler(hotstuff.TimeoutEvent{}, func(event any) {
 		timeoutView := event.(hotstuff.TimeoutEvent).View
-		if s.View() == timeoutView {
+		if s.state.View() == timeoutView {
 			s.OnLocalTimeout()
 		}
 	})
-
 	s.eventLoop.RegisterHandler(hotstuff.NewViewMsg{}, func(event any) {
 		newViewMsg := event.(hotstuff.NewViewMsg)
 		s.OnNewView(newViewMsg)
 	})
-
 	s.eventLoop.RegisterHandler(hotstuff.TimeoutMsg{}, func(event any) {
 		timeoutMsg := event.(hotstuff.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
@@ -117,7 +111,7 @@ func (t oneShotTimer) Stop() bool {
 func (s *Synchronizer) startTimeoutTimer() {
 	// Store the view in a local variable to avoid calling s.View() in the closure below,
 	// thus avoiding a data race.
-	view := s.View()
+	view := s.state.View()
 	d := s.duration.Duration()
 	// It is important that the timer is NOT reused because then the view would be wrong.
 	s.timer = oneShotTimer{time.AfterFunc(d, func() {
@@ -140,31 +134,17 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	}()
 
 	// start the initial proposal
-	if view := s.View(); view == 1 && s.leaderRotation.GetLeader(view) == s.config.ID() {
-		syncInfo := s.SyncInfo()
-		s.consensus.Propose(s.View(), s.state.HighQC(), syncInfo)
+	if view := s.state.View(); view == 1 && s.leaderRotation.GetLeader(view) == s.config.ID() {
+		syncInfo := s.state.SyncInfo()
+		s.consensus.Propose(s.state.View(), s.state.HighQC(), syncInfo)
 	}
-}
-
-// View returns the current view.
-func (s *Synchronizer) View() hotstuff.View {
-	s.mut.RLock()
-	defer s.mut.RUnlock()
-	return s.currentView
-}
-
-// SyncInfo returns the highest known QC or TC.
-func (s *Synchronizer) SyncInfo() hotstuff.SyncInfo {
-	s.mut.RLock()
-	defer s.mut.RUnlock()
-	return hotstuff.NewSyncInfo().WithQC(s.state.HighQC()).WithTC(s.state.HighTC())
 }
 
 // OnLocalTimeout is called when a local timeout happens.
 func (s *Synchronizer) OnLocalTimeout() {
 	s.startTimeoutTimer()
 
-	view := s.View()
+	view := s.state.View()
 
 	if s.lastTimeout != nil && s.lastTimeout.View == view {
 		s.sender.Timeout(*s.lastTimeout)
@@ -182,7 +162,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 	timeoutMsg := hotstuff.TimeoutMsg{
 		ID:            s.config.ID(),
 		View:          view,
-		SyncInfo:      s.SyncInfo(),
+		SyncInfo:      s.state.SyncInfo(),
 		ViewSignature: sig,
 	}
 
@@ -205,7 +185,7 @@ func (s *Synchronizer) OnLocalTimeout() {
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
 func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
-	currView := s.View()
+	currView := s.state.View()
 
 	defer func() {
 		// cleanup old timeouts
@@ -250,7 +230,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		return
 	}
 
-	si := s.SyncInfo().WithTC(tc)
+	si := s.state.SyncInfo().WithTC(tc)
 
 	if s.config.HasAggregateQC() {
 		aggQC, err := s.auth.CreateAggregateQC(currView, timeoutList)
@@ -324,7 +304,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		}
 	}
 
-	if view < s.View() {
+	if view < s.state.View() {
 		return
 	}
 
@@ -334,9 +314,9 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		s.duration.ViewSucceeded()
 	}
 
-	newView := view + 1
+	newView := s.state.View() + 1
 
-	s.currentView = newView
+	s.state.UpdateView(newView)
 
 	s.lastTimeout = nil
 	s.duration.ViewStarted()
@@ -348,7 +328,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.config.ID() {
-		s.consensus.Propose(s.View(), s.state.HighQC(), syncInfo)
+		s.consensus.Propose(s.state.View(), s.state.HighQC(), syncInfo)
 		return
 	}
 	err := s.sender.NewView(leader, syncInfo)
