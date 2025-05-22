@@ -44,7 +44,6 @@ func NewProtocol(
 	}
 	proposer := proposer.New(
 		depsCore.EventLoop(),
-		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSrv.cmdCache,
 		proposerOpts...,

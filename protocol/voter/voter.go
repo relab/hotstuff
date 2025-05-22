@@ -1,6 +1,8 @@
 package voter
 
 import (
+	"fmt"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
@@ -55,46 +57,39 @@ func (v *Voter) StopVoting(view hotstuff.View) {
 
 // Vote votes for and signs the block, returning a partial certificate
 // and updates the last vote view if the signature was successful.
-func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, ok bool) {
-	ok = false
+func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, err error) {
 	// try to sign the block. Abort if this fails.
-	pc, err := v.auth.CreatePartialCert(block)
+	pc, err = v.auth.CreatePartialCert(block)
 	if err != nil {
-		v.logger.Error("OnPropose: failed to sign block: ", err)
-		return
+		return pc, err
 	}
 	// block is safe, so we update the view we voted for
 	// i.e., we voted for this block!
 	v.lastVote = block.View()
-	return pc, true
+	return pc, nil
 }
 
 // verify verifies the proposal and returns true if it can be voted for.
-func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (ok bool) {
+func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 	block := proposal.Block
 	view := block.View()
 	// cannot vote for an old block.
 	if block.View() <= v.lastVote {
-		v.logger.Info("TryAccept: block view too old")
-		return
+		return fmt.Errorf("block view too old")
 	}
-
 	if !v.rules.VoteRule(view, *proposal) {
-		v.logger.Info("TryAccept: Block not voted for")
-		return
+		return fmt.Errorf("vote rule not satisfied")
 	}
-	ok = false
 	// verify the proposal's QC.
 	qc := proposal.Block.QuorumCert()
 	if !v.auth.VerifyAnyQC(&qc, proposal.AggregateQC) {
-		return
+		return fmt.Errorf("invalid qc")
 	}
 	// ensure the block came from the expected leader.
 	if proposal.ID != v.leaderRotation.GetLeader(block.View()) {
-		v.logger.Infof("TryAccept[view=%d]: block was not proposed by the expected leader", view)
-		return
+		return fmt.Errorf("unexpected leader")
 	}
-	return true
+	return nil
 }
 
 func (v *Voter) LastVote() hotstuff.View {
