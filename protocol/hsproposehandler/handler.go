@@ -1,4 +1,4 @@
-package consensus
+package hsproposehandler
 
 import (
 	"github.com/relab/hotstuff"
@@ -18,7 +18,7 @@ type hotstuffProposeHandler struct {
 	sender         modules.Sender
 }
 
-func NewHotStuffProposeHandler(
+func New(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	voter *voter.Voter,
