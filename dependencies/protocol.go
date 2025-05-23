@@ -4,7 +4,6 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/hsproposehandler"
 	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/proposer"
 	"github.com/relab/hotstuff/protocol/synchronizer"
@@ -58,7 +57,7 @@ func NewProtocol(
 		depsSecure.CertAuth(),
 		state,
 	)
-	var handler modules.ExtProposeHandler
+	var handler modules.ProposeHandler
 	// TODO(AlanRostem): add module logic for this.
 	if depsCore.RuntimeCfg().KauriEnabled() {
 		handler = kauri.New(
@@ -70,7 +69,7 @@ func NewProtocol(
 			sender.(*network.GorumsSender), // TODO(AlanRostem): avoid cast
 		)
 	} else {
-		handler = hsproposehandler.New(
+		handler = consensus.NewHotStuff(
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
 			voter,
@@ -86,7 +85,6 @@ func NewProtocol(
 		handler,
 		proposer,
 		voter,
-		votingMachine,
 		depsSrv.Committer(),
 	)
 	return &Protocol{

@@ -8,7 +8,6 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/proposer"
 	"github.com/relab/hotstuff/protocol/voter"
-	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/service/committer"
 )
 
@@ -21,11 +20,10 @@ type Consensus struct {
 
 	committer *committer.Committer
 
-	extHandler modules.ExtProposeHandler
+	extHandler modules.ProposeHandler
 
-	voter         *voter.Voter
-	votingMachine *votingmachine.VotingMachine
-	proposer      *proposer.Proposer
+	voter    *voter.Voter
+	proposer *proposer.Proposer
 }
 
 // New returns a new Consensus instance based on the given Rules implementation.
@@ -36,10 +34,9 @@ func New(
 	config *core.RuntimeConfig,
 
 	// protocol dependencies
-	extHandler modules.ExtProposeHandler,
+	extHandler modules.ProposeHandler,
 	proposer *proposer.Proposer,
 	voter *voter.Voter,
-	votingMachine *votingmachine.VotingMachine,
 
 	// service dependencies
 	committer *committer.Committer,
@@ -49,10 +46,9 @@ func New(
 		logger:    logger,
 		config:    config,
 
-		extHandler:    extHandler,
-		proposer:      proposer,
-		voter:         voter,
-		votingMachine: votingMachine,
+		extHandler: extHandler,
+		proposer:   proposer,
+		voter:      voter,
 
 		committer: committer,
 	}
@@ -108,7 +104,7 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 		cs.logger.Errorf("failed to vote for my own proposal: %v", err)
 		return
 	}
-	// can collect my own vote as leader
-	cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
-	cs.extHandler.DisseminateProposal(&proposal, pc)
+	// TODO(AlanRostem): moved this line to HotStuff since Kauri already sends a new view in its own logic.
+	// cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
+	cs.extHandler.Propose(&proposal, pc)
 }

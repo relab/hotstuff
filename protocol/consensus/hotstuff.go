@@ -1,4 +1,4 @@
-package hsproposehandler
+package consensus
 
 import (
 	"github.com/relab/hotstuff"
@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/protocol/votingmachine"
 )
 
-type hotstuffProposeHandler struct {
+type HotStuff struct {
 	logger         logging.Logger
 	config         *core.RuntimeConfig
 	voter          *voter.Voter
@@ -18,15 +18,15 @@ type hotstuffProposeHandler struct {
 	sender         modules.Sender
 }
 
-func New(
+func NewHotStuff(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	voter *voter.Voter,
 	votingMachine *votingmachine.VotingMachine,
 	leaderRotation modules.LeaderRotation,
 	sender modules.Sender,
-) modules.ExtProposeHandler {
-	return &hotstuffProposeHandler{
+) modules.ProposeHandler {
+	return &HotStuff{
 		logger:         logger,
 		config:         config,
 		voter:          voter,
@@ -36,11 +36,12 @@ func New(
 	}
 }
 
-func (cs *hotstuffProposeHandler) DisseminateProposal(proposal *hotstuff.ProposeMsg, _ hotstuff.PartialCert) {
+func (cs *HotStuff) Propose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+	cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
 	cs.sender.Propose(proposal)
 }
 
-func (cs *hotstuffProposeHandler) OnPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (cs *HotStuff) OnPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
 	if leaderID == cs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.
@@ -56,4 +57,4 @@ func (cs *hotstuffProposeHandler) OnPropose(proposal *hotstuff.ProposeMsg, pc ho
 	cs.logger.Debugf("voting for %v", proposal)
 }
 
-var _ modules.ExtProposeHandler = (*hotstuffProposeHandler)(nil)
+var _ modules.ProposeHandler = (*HotStuff)(nil)

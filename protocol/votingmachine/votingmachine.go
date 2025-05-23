@@ -12,6 +12,7 @@ import (
 	"github.com/relab/hotstuff/security/certauth"
 )
 
+// TODO(AlanRostem): move this to HotStuff since it's not needed in Kauri.
 // VotingMachine collects and verifies votes.
 type VotingMachine struct {
 	logger     logging.Logger

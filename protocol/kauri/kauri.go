@@ -112,7 +112,7 @@ func (k *Kauri) OnPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert
 	k.Begin(proposal, pc)
 }
 
-func (k *Kauri) DisseminateProposal(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (k *Kauri) Propose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	k.Begin(proposal, pc)
 }
 
@@ -254,4 +254,4 @@ type WaitTimerExpiredEvent struct {
 	currentView hotstuff.View
 }
 
-var _ modules.ExtProposeHandler = (*Kauri)(nil)
+var _ modules.ProposeHandler = (*Kauri)(nil)
