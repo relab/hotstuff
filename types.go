@@ -385,6 +385,6 @@ func writeParticipants(wr io.Writer, participants IDSet) (err error) {
 	return err
 }
 
-type ConsensusLatencyMeasurementEvent struct {
+type ConsensusLatencyEvent struct {
 	Latency time.Duration
 }

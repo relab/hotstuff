@@ -283,7 +283,7 @@ func (cs *consensusBase) commitInner(block *hotstuff.Block) error {
 	} else {
 		return fmt.Errorf("failed to locate block: %s", block.Parent())
 	}
-	cs.eventLoop.AddEvent(hotstuff.ConsensusLatencyMeasurementEvent{Latency: time.Since(block.TS())})
+	cs.eventLoop.AddEvent(hotstuff.ConsensusLatencyEvent{Latency: time.Since(block.TimeStamp())})
 	cs.logger.Debug("EXEC: ", block)
 	cs.executor.Exec(block)
 	cs.bExec = block

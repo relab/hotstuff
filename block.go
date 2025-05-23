@@ -75,8 +75,8 @@ func (b *Block) View() View {
 	return b.view
 }
 
-// TS returns the timestamp of the block
-func (b *Block) TS() time.Time {
+// TimeStamp returns the timestamp of the block
+func (b *Block) TimeStamp() time.Time {
 	return b.ts
 }
 
