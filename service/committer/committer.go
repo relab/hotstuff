@@ -9,16 +9,14 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/service/clientsrv"
-	"github.com/relab/hotstuff/service/cmdcache"
 )
 
 // Committer commits the correct block for a view.
 type Committer struct {
-	logger       logging.Logger
-	blockChain   *blockchain.BlockChain
-	rules        modules.ConsensusRules
-	clientSrv    *clientsrv.Server
-	commandCache *cmdcache.Cache
+	logger     logging.Logger
+	blockChain *blockchain.BlockChain
+	rules      modules.ConsensusRules
+	clientSrv  *clientsrv.Server
 
 	mut   sync.Mutex
 	bExec *hotstuff.Block
@@ -29,14 +27,12 @@ func New(
 	blockChain *blockchain.BlockChain,
 	rules modules.ConsensusRules,
 	clientSrv *clientsrv.Server,
-	cmdCache *cmdcache.Cache,
 ) *Committer {
 	return &Committer{
-		blockChain:   blockChain,
-		rules:        rules,
-		clientSrv:    clientSrv,
-		logger:       logger,
-		commandCache: cmdCache,
+		blockChain: blockChain,
+		rules:      rules,
+		clientSrv:  clientSrv,
+		logger:     logger,
 
 		bExec: hotstuff.GetGenesis(),
 	}
@@ -62,11 +58,9 @@ func (cm *Committer) commit(block *hotstuff.Block) error {
 	return nil
 }
 
-func (cm *Committer) Commit(block *hotstuff.Block) {
+func (cm *Committer) Update(block *hotstuff.Block) {
 	cm.logger.Debugf("block accepted: %v", block)
 	cm.blockChain.Store(block)
-	// TODO(AlanRostem): create a method to discard duplicate commands in cmdcache to avoid doing this.
-	cm.commandCache.Proposed(block.Command()) // update the cache before committing.
 	// NOTE: this overwrites the block variable. If it was nil, simply don't commit.
 	if block = cm.rules.CommitRule(block); block != nil {
 		err := cm.commit(block) // committer will eventually execute the command.

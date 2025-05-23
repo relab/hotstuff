@@ -46,7 +46,6 @@ func NewService(
 			blockChain,
 			rules,
 			clientSrv,
-			cmdCache,
 		),
 	}
 }

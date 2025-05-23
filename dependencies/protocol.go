@@ -86,6 +86,7 @@ func NewProtocol(
 		handler,
 		proposer,
 		voter,
+		depsSrv.CmdCache(),
 		depsSrv.Committer(),
 	)
 	return &Protocol{
