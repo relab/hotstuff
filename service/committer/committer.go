@@ -62,16 +62,10 @@ func (cm *Committer) commit(block *hotstuff.Block) error {
 	return nil
 }
 
-func (cm *Committer) TryCommit(block *hotstuff.Block) bool {
-	view := block.View()
-	cmd := block.Command()
-	// verify the command's "age"
-	if !cm.commandCache.Accept(cmd) {
-		cm.logger.Infof("TryAccept[view=%d]: block rejected: %s", view, block)
-		return false
-	}
-	cm.logger.Debugf("tryCommit[view=%d]: block accepted.", view)
+func (cm *Committer) Commit(block *hotstuff.Block) {
+	cm.logger.Debugf("block accepted: %v", block)
 	cm.blockChain.Store(block)
+	// TODO(AlanRostem): create a method to discard duplicate commands in cmdcache to avoid doing this.
 	cm.commandCache.Proposed(block.Command()) // update the cache before committing.
 	// NOTE: this overwrites the block variable. If it was nil, simply don't commit.
 	if block = cm.rules.CommitRule(block); block != nil {
@@ -80,7 +74,6 @@ func (cm *Committer) TryCommit(block *hotstuff.Block) bool {
 			cm.logger.Warnf("failed to commit: %v", err)
 		}
 	}
-	return true
 }
 
 // recursive helper for commit

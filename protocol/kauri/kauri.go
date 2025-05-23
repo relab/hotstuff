@@ -108,11 +108,11 @@ func (k *Kauri) reset() {
 	k.aggSent = false
 }
 
-func (k *Kauri) OnPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (k *Kauri) SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	k.Begin(proposal, pc)
 }
 
-func (k *Kauri) Propose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (k *Kauri) SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	k.Begin(proposal, pc)
 }
 
@@ -254,4 +254,4 @@ type WaitTimerExpiredEvent struct {
 	currentView hotstuff.View
 }
 
-var _ modules.ProposeHandler = (*Kauri)(nil)
+var _ modules.ConsensusSender = (*Kauri)(nil)

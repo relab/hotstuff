@@ -71,10 +71,10 @@ type Sender interface {
 	RequestBlock(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool)
 }
 
-// ProposeHandler is an extension for handling proposals as either the voter or proposer.
-type ProposeHandler interface {
-	// OnPropose handles incoming proposals.
-	OnPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
-	// Propose disseminates the proposal from the proposer.
-	Propose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
+// ConsensusSender is an extension for handling proposals as either the voter or proposer.
+type ConsensusSender interface {
+	// SendVote handles incoming proposals and replies with a vote.
+	SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
+	// SendPropose disseminates the proposal from the proposer.
+	SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
 }

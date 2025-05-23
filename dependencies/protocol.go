@@ -38,6 +38,7 @@ func NewProtocol(
 		leaderRotationModule,
 		consensusRulesModule,
 		depsSecure.CertAuth(),
+		depsSrv.CmdCache(),
 	)
 	proposerOpts := []proposer.Option{}
 	if ruler, ok := consensusRulesModule.(modules.ProposeRuler); ok {
@@ -57,7 +58,7 @@ func NewProtocol(
 		depsSecure.CertAuth(),
 		state,
 	)
-	var handler modules.ProposeHandler
+	var handler modules.ConsensusSender
 	// TODO(AlanRostem): add module logic for this.
 	if depsCore.RuntimeCfg().KauriEnabled() {
 		handler = kauri.New(

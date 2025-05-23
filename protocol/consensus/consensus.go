@@ -20,7 +20,7 @@ type Consensus struct {
 
 	committer *committer.Committer
 
-	extHandler modules.ProposeHandler
+	sender modules.ConsensusSender
 
 	voter    *voter.Voter
 	proposer *proposer.Proposer
@@ -34,7 +34,7 @@ func New(
 	config *core.RuntimeConfig,
 
 	// protocol dependencies
-	extHandler modules.ProposeHandler,
+	sender modules.ConsensusSender,
 	proposer *proposer.Proposer,
 	voter *voter.Voter,
 
@@ -46,9 +46,9 @@ func New(
 		logger:    logger,
 		config:    config,
 
-		extHandler: extHandler,
-		proposer:   proposer,
-		voter:      voter,
+		sender:   sender,
+		proposer: proposer,
+		voter:    voter,
 
 		committer: committer,
 	}
@@ -65,27 +65,21 @@ func (cs *Consensus) OnPropose(proposal *hotstuff.ProposeMsg) {
 	// ensure that I can vote in this view based on the protocol's rule.
 	err := cs.voter.Verify(proposal)
 	if err != nil {
-		cs.logger.Errorf("failed to verify incoming vote: %v", err)
+		cs.logger.Infof("failed to verify incoming vote: %v", err)
 		return
 	}
-	// if we can't commit the block yet, don't vote for it.
-	if !cs.committer.TryCommit(block) {
-		return
+	cs.committer.Commit(block) // commit the valid block
+	pc, err := cs.voter.Vote(block)
+	if err != nil {
+		cs.logger.Errorf("failed to vote: %v", err)
 	}
-	// even if voting fails, we should be able to go to the next view.
+	// send the vote and advance the view
+	cs.sender.SendVote(proposal, pc)
 	newInfo := hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
 	cs.eventLoop.AddEvent(hotstuff.NewViewMsg{
 		ID:       cs.config.ID(),
 		SyncInfo: newInfo,
 	})
-	// try to vote for the block and retrieve its partial certificate.
-	pc, err := cs.voter.Vote(block)
-	// don't send the vote if it failed
-	if err != nil {
-		cs.logger.Errorf("failed to vote: %v", err)
-		return
-	}
-	cs.extHandler.OnPropose(proposal, pc)
 }
 
 // Propose creates a new outgoing proposal.
@@ -97,14 +91,14 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 		return
 	}
 	block := proposal.Block
+	cs.committer.Commit(block) // commit the valid block
 	// as proposer, I can vote for my own proposal without verifying.
 	// NOTE: this vote call is not likely to fail since the leader does it, otherwise something went terribly wrong...
 	pc, err := cs.voter.Vote(block)
 	if err != nil {
 		cs.logger.Errorf("failed to vote for my own proposal: %v", err)
-		return
 	}
-	// TODO(AlanRostem): moved this line to HotStuff since Kauri already sends a new view in its own logic.
+	// TODO(AlanRostem): moved this line to HotStuff since Kauri already sends a new view in its own logic. Check if this is valid.
 	// cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
-	cs.extHandler.Propose(&proposal, pc)
+	cs.sender.SendPropose(&proposal, pc)
 }

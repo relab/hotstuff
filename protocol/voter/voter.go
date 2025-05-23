@@ -9,6 +9,7 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/service/cmdcache"
 )
 
 type Voter struct {
@@ -19,7 +20,8 @@ type Voter struct {
 	leaderRotation modules.LeaderRotation
 	rules          modules.ConsensusRules
 
-	auth *certauth.CertAuthority
+	auth         *certauth.CertAuthority
+	commandCache *cmdcache.Cache
 
 	lastVote hotstuff.View
 }
@@ -32,6 +34,7 @@ func New(
 	leaderRotation modules.LeaderRotation,
 	rules modules.ConsensusRules,
 	auth *certauth.CertAuthority,
+	commandCache *cmdcache.Cache,
 ) *Voter {
 	return &Voter{
 		logger:    logger,
@@ -42,6 +45,8 @@ func New(
 		rules:          rules,
 
 		auth: auth,
+
+		commandCache: commandCache,
 
 		lastVote: 0,
 	}
@@ -76,6 +81,10 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 	// cannot vote for an old block.
 	if block.View() <= v.lastVote {
 		return fmt.Errorf("block view too old")
+	}
+	// cannot vote for old commands
+	if !v.commandCache.Accept(block.Command()) {
+		return fmt.Errorf("command too old")
 	}
 	if !v.rules.VoteRule(view, *proposal) {
 		return fmt.Errorf("vote rule not satisfied")
