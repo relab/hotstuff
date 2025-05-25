@@ -3,7 +3,6 @@ package hotstuffpb
 
 import (
 	"math/big"
-	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
@@ -157,11 +156,7 @@ func BlockFromProto(block *Block) *hotstuff.Block {
 		hotstuff.View(block.GetView()),
 		hotstuff.ID(block.GetProposer()),
 	)
-	if ts := block.GetTimestamp(); ts != nil {
-		b.SetTimestamp(ts.AsTime())
-	} else {
-		b.SetTimestamp(time.Now())
-	}
+	b.SetTimestamp(block.Timestamp.AsTime())
 	return b
 }
 
