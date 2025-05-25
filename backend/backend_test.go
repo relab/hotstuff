@@ -90,7 +90,7 @@ func TestPropose(t *testing.T) {
 		Block: hotstuff.NewBlock(
 			hotstuff.GetGenesis().Hash(),
 			hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
-			"foo", 1, 1, time.Now(),
+			"foo", 1, 1,
 		),
 	}
 	testBase(t, want, func(cfg modules.Configuration) {

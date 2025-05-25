@@ -2,7 +2,6 @@ package crypto_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/relab/hotstuff/modules"
 
@@ -210,7 +209,7 @@ func createBlock(t *testing.T, signer modules.Crypto) *hotstuff.Block {
 		t.Errorf("Could not create empty QC for genesis: %v", err)
 	}
 
-	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "foo", 42, 1, time.Now())
+	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "foo", 42, 1)
 	return b
 }
 

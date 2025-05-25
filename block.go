@@ -20,18 +20,24 @@ type Block struct {
 }
 
 // NewBlock creates a new Block
-func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID, ts time.Time) *Block {
+func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID) *Block {
 	b := &Block{
 		parent:   parent,
 		cert:     cert,
 		cmd:      cmd,
 		view:     view,
 		proposer: proposer,
-		ts:       ts,
+		ts:       time.Now(),
 	}
 	// cache the hash immediately because it is too racy to do it in Hash()
 	b.hash = sha256.Sum256(b.ToBytes())
 	return b
+}
+
+func (b *Block) SetTimestamp(ts time.Time) {
+	b.ts = ts
+	// recalculate the hash since the timestamp is part of the block
+	b.hash = sha256.Sum256(b.ToBytes())
 }
 
 func (b *Block) String() string {

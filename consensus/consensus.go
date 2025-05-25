@@ -149,7 +149,6 @@ func (cs *consensusBase) Propose(cert hotstuff.SyncInfo) {
 				cmd,
 				cs.synchronizer.View(),
 				cs.opts.ID(),
-				time.Now(),
 			),
 		}
 

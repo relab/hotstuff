@@ -3,6 +3,7 @@ package hotstuffpb
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/crypto"
@@ -148,14 +149,20 @@ func BlockToProto(block *hotstuff.Block) *Block {
 func BlockFromProto(block *Block) *hotstuff.Block {
 	var p hotstuff.Hash
 	copy(p[:], block.GetParent())
-	return hotstuff.NewBlock(
+
+	b := hotstuff.NewBlock(
 		p,
 		QuorumCertFromProto(block.GetQC()),
 		hotstuff.Command(block.GetCommand()),
 		hotstuff.View(block.GetView()),
 		hotstuff.ID(block.GetProposer()),
-		block.Timestamp.AsTime(),
 	)
+	if ts := block.GetTimestamp(); ts != nil {
+		b.SetTimestamp(ts.AsTime())
+	} else {
+		b.SetTimestamp(time.Now())
+	}
+	return b
 }
 
 // TimeoutMsgFromProto converts a TimeoutMsg proto to the hotstuff type.
