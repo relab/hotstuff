@@ -6,6 +6,8 @@ import "gorums.proto";
 
 import "google/protobuf/empty.proto";
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/relab/hotstuff/internal/proto/hotstuffpb";
 
 service Hotstuff {
@@ -41,6 +43,7 @@ message Block {
   uint64 View = 3;
   bytes Command = 4;
   uint32 Proposer = 5;
+  google.protobuf.Timestamp Timestamp =6;
 }
 
 message ECDSASignature {

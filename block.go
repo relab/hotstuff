@@ -20,14 +20,14 @@ type Block struct {
 }
 
 // NewBlock creates a new Block
-func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID) *Block {
+func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID, ts time.Time) *Block {
 	b := &Block{
 		parent:   parent,
 		cert:     cert,
 		cmd:      cmd,
 		view:     view,
 		proposer: proposer,
-		ts:       time.Now(),
+		ts:       ts,
 	}
 	// cache the hash immediately because it is too racy to do it in Hash()
 	b.hash = sha256.Sum256(b.ToBytes())
@@ -91,5 +91,8 @@ func (b *Block) ToBytes() []byte {
 	buf = append(buf, viewBuf[:]...)
 	buf = append(buf, []byte(b.cmd)...)
 	buf = append(buf, b.cert.ToBytes()...)
+	var tsBuf [8]byte
+	binary.LittleEndian.PutUint64(tsBuf[:], uint64(b.ts.UnixNano()))
+	buf = append(buf, tsBuf[:]...)
 	return buf
 }

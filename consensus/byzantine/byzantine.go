@@ -2,6 +2,8 @@
 package byzantine
 
 import (
+	"time"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/consensus"
 	"github.com/relab/hotstuff/modules"
@@ -83,6 +85,7 @@ func (f *fork) ProposeRule(cert hotstuff.SyncInfo, cmd hotstuff.Command) (propos
 			cmd,
 			f.synchronizer.View(),
 			f.opts.ID(),
+			time.Now(),
 		),
 	}
 	if aggQC, ok := cert.AggQC(); f.opts.ShouldUseAggQC() && ok {

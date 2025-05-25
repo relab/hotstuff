@@ -278,7 +278,7 @@ func GenerateKeys(t *testing.T, n int, keyFunc func(t *testing.T) hotstuff.Priva
 
 // NewProposeMsg wraps a new block in a ProposeMsg.
 func NewProposeMsg(parent hotstuff.Hash, qc hotstuff.QuorumCert, cmd hotstuff.Command, view hotstuff.View, id hotstuff.ID) hotstuff.ProposeMsg {
-	return hotstuff.ProposeMsg{ID: id, Block: hotstuff.NewBlock(parent, qc, cmd, view, id)}
+	return hotstuff.ProposeMsg{ID: id, Block: hotstuff.NewBlock(parent, qc, cmd, view, id, time.Now())}
 }
 
 type leaderRotation struct {

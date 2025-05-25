@@ -2,6 +2,7 @@ package synchronizer_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/relab/hotstuff"
 
@@ -29,6 +30,7 @@ func TestAdvanceViewQC(t *testing.T) {
 		"foo",
 		1,
 		2,
+		time.Now(),
 	)
 
 	var blockChain modules.BlockChain
