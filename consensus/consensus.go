@@ -3,6 +3,7 @@ package consensus
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/eventloop"
@@ -282,6 +283,7 @@ func (cs *consensusBase) commitInner(block *hotstuff.Block) error {
 	} else {
 		return fmt.Errorf("failed to locate block: %s", block.Parent())
 	}
+	cs.eventLoop.AddEvent(hotstuff.ConsensusLatencyEvent{Latency: time.Since(block.TimeStamp())})
 	cs.logger.Debug("EXEC: ", block)
 	cs.executor.Exec(block)
 	cs.bExec = block

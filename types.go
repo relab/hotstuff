@@ -9,6 +9,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // IDSet implements a set of replica IDs. It is used to show which replicas participated in some event.
@@ -382,4 +383,8 @@ func writeParticipants(wr io.Writer, participants IDSet) (err error) {
 		return err == nil
 	})
 	return err
+}
+
+type ConsensusLatencyEvent struct {
+	Latency time.Duration
 }
