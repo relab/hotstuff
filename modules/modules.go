@@ -90,3 +90,14 @@ type ConsensusProtocol interface {
 	// SendPropose disseminates the proposal from the proposer.
 	SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
 }
+
+type CommandGenerator interface {
+	Accept(cmd hotstuff.Command) bool
+	Get(ctx context.Context) (cmd hotstuff.Command, ok bool)
+	MarkProposed(cmd hotstuff.Command)
+}
+
+type CommandExecutor interface {
+	Execute(cmd hotstuff.Command)
+	Fork(cmd hotstuff.Command)
+}

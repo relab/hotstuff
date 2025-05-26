@@ -10,7 +10,6 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/proposer"
 	"github.com/relab/hotstuff/protocol/voter"
-	"github.com/relab/hotstuff/service/cmdcache"
 	"github.com/relab/hotstuff/service/committer"
 )
 
@@ -21,8 +20,8 @@ type Consensus struct {
 	logger    logging.Logger
 	config    *core.RuntimeConfig
 
-	committer    *committer.Committer
-	commandCache *cmdcache.Cache
+	committer *committer.Committer
+	cmdGen    modules.CommandGenerator
 
 	protocol modules.ConsensusProtocol
 
@@ -43,7 +42,7 @@ func New(
 	voter *voter.Voter,
 
 	// service dependencies
-	commandCache *cmdcache.Cache,
+	commandCache modules.CommandGenerator,
 	committer *committer.Committer,
 ) *Consensus {
 	cs := &Consensus{
@@ -51,10 +50,10 @@ func New(
 		logger:    logger,
 		config:    config,
 
-		protocol:     protocol,
-		proposer:     proposer,
-		voter:        voter,
-		commandCache: commandCache,
+		protocol: protocol,
+		proposer: proposer,
+		voter:    voter,
+		cmdGen:   commandCache,
 
 		committer: committer,
 	}
@@ -70,7 +69,7 @@ func (cs *Consensus) internalVote(block *hotstuff.Block) (pc hotstuff.PartialCer
 	cs.committer.Update(block)
 	// TODO(AlanRostem): solve issue #191
 	// update the command's age before voting.
-	cs.commandCache.Proposed(block.Command())
+	cs.cmdGen.MarkProposed(block.Command())
 	pc, err = cs.voter.Vote(block)
 	if err != nil {
 		// if the block is invalid, reject it. This means the command is also discarded.

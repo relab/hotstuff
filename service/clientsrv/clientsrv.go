@@ -12,6 +12,7 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/service/cmdcache"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -104,7 +105,7 @@ func (srv *Server) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*em
 	return &emptypb.Empty{}, err
 }
 
-func (srv *Server) Exec(cmd hotstuff.Command) {
+func (srv *Server) Execute(cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
 	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -152,3 +153,5 @@ func (srv *Server) Fork(cmd hotstuff.Command) {
 		srv.mut.Unlock()
 	}
 }
+
+var _ modules.CommandExecutor = (*Server)(nil)

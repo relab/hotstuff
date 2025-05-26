@@ -9,6 +9,7 @@ import (
 
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/modules"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -146,8 +147,8 @@ func (c *Cache) Accept(cmd hotstuff.Command) bool {
 	return true
 }
 
-// Proposed updates the serial numbers such that we will not accept the given batch again.
-func (c *Cache) Proposed(cmd hotstuff.Command) {
+// MarkProposed updates the serial numbers such that we will not accept the given batch again.
+func (c *Cache) MarkProposed(cmd hotstuff.Command) {
 	batch := new(clientpb.Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
@@ -164,3 +165,5 @@ func (c *Cache) Proposed(cmd hotstuff.Command) {
 		}
 	}
 }
+
+var _ modules.CommandGenerator = (*Cache)(nil)

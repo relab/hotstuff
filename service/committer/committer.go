@@ -10,7 +10,6 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/service/clientsrv"
 )
 
 // Committer commits the correct block for a view.
@@ -19,7 +18,7 @@ type Committer struct {
 	logger     logging.Logger
 	blockChain *blockchain.BlockChain
 	rules      modules.CommitRuler
-	clientSrv  *clientsrv.Server
+	cmdExec    modules.CommandExecutor
 
 	mut   sync.Mutex
 	bExec *hotstuff.Block
@@ -30,13 +29,13 @@ func New(
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
 	rules modules.CommitRuler,
-	clientSrv *clientsrv.Server,
+	cmdExec modules.CommandExecutor,
 ) *Committer {
 	return &Committer{
 		eventLoop:  eventLoop,
 		blockChain: blockChain,
 		rules:      rules,
-		clientSrv:  clientSrv,
+		cmdExec:    cmdExec,
 		logger:     logger,
 
 		bExec: hotstuff.GetGenesis(),
@@ -58,7 +57,7 @@ func (cm *Committer) commit(block *hotstuff.Block) error {
 		block.View(),
 	)
 	for _, block := range forkedBlocks {
-		cm.clientSrv.Fork(block.Command())
+		cm.cmdExec.Fork(block.Command())
 	}
 	return nil
 }
@@ -89,7 +88,7 @@ func (cm *Committer) commitInner(block *hotstuff.Block) error {
 		return fmt.Errorf("failed to locate block: %s", block.Parent())
 	}
 	cm.logger.Debug("EXEC: ", block)
-	cm.clientSrv.Exec(block.Command())
+	cm.cmdExec.Execute(block.Command())
 	cm.eventLoop.AddEvent(hotstuff.ConsensusLatencyEvent{Latency: time.Since(block.TimeStamp())})
 	cm.bExec = block
 	return nil

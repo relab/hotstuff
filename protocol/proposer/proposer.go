@@ -8,27 +8,26 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
-	"github.com/relab/hotstuff/service/cmdcache"
 )
 
 type Proposer struct {
-	eventLoop    *eventloop.EventLoop
-	config       *core.RuntimeConfig
-	ruler        modules.ProposeRuler
-	commandCache *cmdcache.Cache
+	eventLoop *eventloop.EventLoop
+	config    *core.RuntimeConfig
+	ruler     modules.ProposeRuler
+	cmdGen    modules.CommandGenerator
 }
 
 func New(
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
-	commandCache *cmdcache.Cache,
+	cmdGen modules.CommandGenerator,
 	opts ...Option,
 ) *Proposer {
 	p := &Proposer{
-		eventLoop:    eventLoop,
-		config:       config,
-		ruler:        nil,
-		commandCache: commandCache,
+		eventLoop: eventLoop,
+		config:    config,
+		ruler:     nil,
+		cmdGen:    cmdGen,
 	}
 	p.ruler = p
 	for _, opt := range opts {
@@ -44,7 +43,7 @@ func (cs *Proposer) CreateProposal(view hotstuff.View, highQC hotstuff.QuorumCer
 	defer cancel()
 	// find a value to propose.
 	// NOTE: this is blocking until a batch is present in the cache.
-	cmd, ok := cs.commandCache.Get(ctx)
+	cmd, ok := cs.cmdGen.Get(ctx)
 	if !ok {
 		return proposal, fmt.Errorf("no command")
 	}
