@@ -7,6 +7,7 @@ import (
 
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/dependencies"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/consensus"
@@ -16,7 +17,6 @@ import (
 	"github.com/relab/hotstuff/protocol/viewstates"
 	"github.com/relab/hotstuff/security/certauth"
 	"github.com/relab/hotstuff/service/clientsrv"
-	"github.com/relab/hotstuff/service/cmdcache"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/service/server"
@@ -31,7 +31,7 @@ type Replica struct {
 	sender       *network.GorumsSender
 	synchronizer *synchronizer.Synchronizer
 
-	execHandlers map[cmdcache.CmdID]func(*emptypb.Empty, error)
+	execHandlers map[clientpb.MessageID]func(*emptypb.Empty, error)
 	cancel       context.CancelFunc
 	done         chan struct{}
 }
@@ -188,7 +188,7 @@ func New(
 		synchronizer: synchronizer,
 		hsSrv:        server,
 
-		execHandlers: make(map[cmdcache.CmdID]func(*emptypb.Empty, error)),
+		execHandlers: make(map[clientpb.MessageID]func(*emptypb.Empty, error)),
 		cancel:       func() {},
 		done:         make(chan struct{}),
 	}

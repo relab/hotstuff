@@ -12,12 +12,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// CmdID is a unique identifier for a command
-type CmdID struct {
-	ClientID    uint32
-	SequenceNum uint64
-}
-
 type Cache struct {
 	logger logging.Logger
 

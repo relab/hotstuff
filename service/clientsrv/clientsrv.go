@@ -27,7 +27,7 @@ type Server struct {
 
 	mut          sync.Mutex
 	srv          *gorums.Server
-	awaitingCmds map[cmdcache.CmdID]chan<- error
+	awaitingCmds map[clientpb.MessageID]chan<- error
 	hash         hash.Hash
 	cmdCount     uint32
 }
@@ -45,7 +45,7 @@ func New(
 		logger:    logger,
 		cmdCache:  cmdCache,
 
-		awaitingCmds: make(map[cmdcache.CmdID]chan<- error),
+		awaitingCmds: make(map[clientpb.MessageID]chan<- error),
 		srv:          gorums.NewServer(srvOpts...),
 		hash:         sha256.New(),
 	}
@@ -88,12 +88,9 @@ func (srv *Server) CmdCount() uint32 {
 }
 
 func (srv *Server) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*emptypb.Empty, error) {
-	id := cmdcache.CmdID{
-		ClientID:    cmd.ClientID,
-		SequenceNum: cmd.SequenceNumber,
-	}
-
+	id := cmd.ID()
 	c := make(chan error)
+
 	srv.mut.Lock()
 	srv.awaitingCmds[id] = c
 	srv.mut.Unlock()
@@ -115,13 +112,12 @@ func (srv *Server) Exec(cmd hotstuff.Command) {
 	srv.eventLoop.AddEvent(hotstuff.CommitEvent{Commands: len(batch.GetCommands())})
 
 	for _, cmd := range batch.GetCommands() {
+		id := cmd.ID()
+
+		srv.mut.Lock()
+		// TODO(meling): ASKING: previously the hash.Write and srv.cmdCount++ were outside the critical section, shouldn't they be inside?
 		_, _ = srv.hash.Write(cmd.Data)
 		srv.cmdCount++
-		srv.mut.Lock()
-		id := cmdcache.CmdID{
-			ClientID:    cmd.GetClientID(),
-			SequenceNum: cmd.GetSequenceNumber(),
-		}
 		if done, ok := srv.awaitingCmds[id]; ok {
 			done <- nil
 			delete(srv.awaitingCmds, id)
@@ -140,11 +136,9 @@ func (srv *Server) Fork(cmd hotstuff.Command) {
 		return
 	}
 	for _, cmd := range batch.GetCommands() {
+		id := cmd.ID()
+
 		srv.mut.Lock()
-		id := cmdcache.CmdID{
-			ClientID:    cmd.GetClientID(),
-			SequenceNum: cmd.GetSequenceNumber(),
-		}
 		if done, ok := srv.awaitingCmds[id]; ok {
 			done <- status.Error(codes.Aborted, "blockchain was forked")
 			delete(srv.awaitingCmds, id)
