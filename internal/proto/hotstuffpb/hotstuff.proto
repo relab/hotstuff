@@ -8,7 +8,7 @@ import "google/protobuf/empty.proto";
 
 option go_package = "github.com/relab/hotstuff/internal/proto/hotstuffpb";
 
-service Hotstuff {
+service Consensus {
   rpc Propose(Proposal) returns (google.protobuf.Empty) {
     option (gorums.multicast) = true;
   }

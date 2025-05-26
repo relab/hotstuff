@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"fmt"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
@@ -63,15 +65,18 @@ func New(
 	return cs
 }
 
-func (cs *Consensus) commit(block *hotstuff.Block) hotstuff.PartialCert {
-	cs.committer.Update(block) // commit the valid block
-	// TODO(AlanRostem): create a method to discard duplicate commands in cmdcache to avoid doing this.
-	cs.commandCache.Proposed(block.Command()) // update the cache before committing.
-	pc, err := cs.voter.Vote(block)
+func (cs *Consensus) internalVote(block *hotstuff.Block) (pc hotstuff.PartialCert, err error) {
+	// store the valid block, it may commit the block or its ancestors
+	cs.committer.Update(block)
+	// TODO(AlanRostem): solve issue #191
+	// update the command's age before voting.
+	cs.commandCache.Proposed(block.Command())
+	pc, err = cs.voter.Vote(block)
 	if err != nil {
-		cs.logger.Errorf("failed to vote: %v", err)
+		// if the block is invalid, reject it. This means the command is also discarded.
+		return pc, fmt.Errorf("failed to vote: %v", err)
 	}
-	return pc
+	return pc, nil
 }
 
 // OnPropose is called when receiving a proposal from a leader and returns true if the proposal was voted for.
@@ -83,9 +88,14 @@ func (cs *Consensus) OnPropose(proposal *hotstuff.ProposeMsg) {
 		cs.logger.Infof("failed to verify incoming vote: %v", err)
 		return
 	}
-	pc := cs.commit(block)
-	// send the vote and advance the view
-	cs.protocol.SendVote(proposal, pc)
+	pc, err := cs.internalVote(block)
+	if err != nil {
+		cs.logger.Infof("%v", err)
+	} else {
+		// send the vote if it was successful
+		cs.protocol.SendVote(proposal, pc)
+	}
+	// advance the view regardless of vote success/failure
 	newInfo := hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
 	cs.eventLoop.AddEvent(hotstuff.NewViewMsg{
 		ID:       cs.config.ID(),
@@ -97,15 +107,19 @@ func (cs *Consensus) OnPropose(proposal *hotstuff.ProposeMsg) {
 func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syncInfo hotstuff.SyncInfo) {
 	proposal, err := cs.proposer.CreateProposal(view, highQC, syncInfo)
 	if err != nil {
-		// NOTE: errors frequently come from this method, so we just debug log here.
+		// do not send or vote interally for the proposal if it could not be created successfully
 		cs.logger.Debugf("could not create proposal: %v", err)
 		return
 	}
 	block := proposal.Block
-	pc := cs.commit(block)
-	// as proposer, I can vote for my own proposal without verifying.
-	// NOTE: this vote call is not likely to fail since the leader does it, otherwise something went terribly wrong...
+	pc, err := cs.internalVote(block)
+	if err != nil {
+		// this is never going to happen, but it's nice to log in case of a bug
+		cs.logger.Errorf("critical error at proposer: %v", err)
+		return
+	}
 	// TODO(AlanRostem): moved this line to HotStuff since Kauri already sends a new view in its own logic. Check if this is valid.
 	// cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
+	// as proposer, I can vote for my own proposal without verifying.
 	cs.protocol.SendPropose(&proposal, pc)
 }

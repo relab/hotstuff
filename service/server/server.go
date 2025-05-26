@@ -60,7 +60,7 @@ func NewServer(
 	if config.KauriEnabled() {
 		kauri.RegisterService(eventLoop, logger, srv.gorumsSrv)
 	}
-	hotstuffpb.RegisterHotstuffServer(srv.gorumsSrv, &serviceImpl{srv})
+	hotstuffpb.RegisterConsensusServer(srv.gorumsSrv, &serviceImpl{srv})
 	return srv
 }
 
