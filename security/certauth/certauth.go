@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
-// TODO(AlanRostem): propose better name: CertMgr
+// TODO(AlanRostem): find a better name (CertMgr?)
 type CertAuthority struct {
 	modules.CryptoBase // embedded to avoid having to implement forwarding methods
 	config             *core.RuntimeConfig

@@ -26,8 +26,7 @@ const (
 	DelayTypeTreeHeight
 )
 
-// NewDelayed creates a tree with wait times.
-// TODO(AlanRostem): elaborate
+// NewDelayed creates a tree with wait times for the aggregation of votes.
 func NewDelayed(
 	id hotstuff.ID,
 	delayMode DelayType,

@@ -72,18 +72,11 @@ func NewGorumsSender(
 
 func (s *GorumsSender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 	mgrOpts := s.mgrOpts
-	// TODO(AlanRostem): this was here when the subConfig pattern was in use. Check if doing this is valid
-	// cfg.opts = nil // options are not needed beyond this point, so we delete them.
-
 	md := mapToMetadata(s.config.ConnectionMetadata())
-
 	// embed own ID to allow other replicas to identify messages from this replica
 	md.Set("id", fmt.Sprintf("%d", s.config.ID()))
-
 	mgrOpts = append(mgrOpts, gorums.WithMetadata(md))
-
 	s.mgr = hotstuffpb.NewManager(mgrOpts...)
-
 	// set up an ID mapping to give to gorums
 	idMapping := make(map[string]uint32, len(replicas))
 	for _, replica := range replicas {
@@ -102,13 +95,11 @@ func (s *GorumsSender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 			idMapping[replica.Address] = uint32(replica.ID)
 		}
 	}
-
 	// this will connect to the replicas
 	s.pbCfg, err = s.mgr.NewConfiguration(qspec{}, gorums.WithNodeMap(idMapping))
 	if err != nil {
 		return fmt.Errorf("failed to create configuration: %w", err)
 	}
-
 	// now we need to update the "node" field of each replica we connected to
 	for _, node := range s.pbCfg.Nodes() {
 		// the node ID should correspond with the replica ID
@@ -117,12 +108,9 @@ func (s *GorumsSender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 		replica := s.replicas[id]
 		replica.node = node
 	}
-
 	s.connected = true
-
 	// this event is sent so that any delayed `replicaConnected` events can be processed.
 	s.eventLoop.AddEvent(ConnectedEvent{})
-
 	return nil
 }
 
@@ -158,7 +146,10 @@ func (s *GorumsSender) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
 
 	replica := s.replicas[id]
 	replica.md = readMetadata(md)
-	s.config.SetReplicaMetaData(replica.id, replica.md)
+	if err := s.config.SetReplicaMetaData(replica.id, replica.md); err != nil {
+		s.logger.Errorf("failed to set replica metadata: %v", err)
+		return
+	}
 
 	s.logger.Debugf("Replica %d connected from address %v", id, info.Addr)
 }

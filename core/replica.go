@@ -1,6 +1,10 @@
 package core
 
-import "github.com/relab/hotstuff"
+import (
+	"fmt"
+
+	"github.com/relab/hotstuff"
+)
 
 // ReplicaInfo returns a replica if it is present in the configuration.
 func (g *RuntimeConfig) ReplicaInfo(id hotstuff.ID) (replica *hotstuff.ReplicaInfo, ok bool) {
@@ -23,9 +27,13 @@ func (g *RuntimeConfig) AddReplica(replicaInfo *hotstuff.ReplicaInfo) {
 	g.replicas[replicaInfo.ID] = replicaInfo
 }
 
-// TODO(AlanRostem): can this be avoided by integrating it into SetConnectionMetadata?
-func (g *RuntimeConfig) SetReplicaMetaData(id hotstuff.ID, metaData map[string]string) {
+// SetReplicaMetaData sets the metadata for a replica based on id.
+func (g *RuntimeConfig) SetReplicaMetaData(id hotstuff.ID, metaData map[string]string) error {
+	if _, ok := g.replicas[id]; !ok {
+		return fmt.Errorf("replica %d does not exist", id)
+	}
 	g.replicas[id].MetaData = metaData
+	return nil
 }
 
 // AddConnectionMetadata sets the value of a key in the connection metadata map.

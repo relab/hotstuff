@@ -26,7 +26,6 @@ type Voter struct {
 	lastVote hotstuff.View
 }
 
-// TODO(AlanRostem): finish up this class.
 func New(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
