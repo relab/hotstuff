@@ -4,9 +4,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/metrics/types"
 )
 
@@ -15,7 +13,7 @@ const NameViewTimeouts = "timeouts"
 // viewTimeouts is a metric that measures the number of view timeouts that happen.
 type viewTimeouts struct {
 	metricsLogger Logger
-	config        *core.RuntimeConfig
+	id            hotstuff.ID
 
 	numViews    uint64
 	numTimeouts uint64
@@ -23,15 +21,13 @@ type viewTimeouts struct {
 
 func enableViewTimeouts(
 	eventLoop *eventloop.EventLoop,
-	logger logging.Logger,
 	metricsLogger Logger,
-	config *core.RuntimeConfig,
+	id hotstuff.ID,
 ) {
 	vt := &viewTimeouts{
 		metricsLogger: metricsLogger,
-		config:        config,
+		id:            id,
 	}
-	logger.Info("ViewTimeouts metric enabled.")
 
 	eventLoop.RegisterHandler(hotstuff.ViewChangeEvent{}, func(event any) {
 		vt.viewChange(event.(hotstuff.ViewChangeEvent))
@@ -51,7 +47,7 @@ func (vt *viewTimeouts) viewChange(event hotstuff.ViewChangeEvent) {
 
 func (vt *viewTimeouts) tick(_ types.TickEvent) {
 	vt.metricsLogger.Log(&types.ViewTimeouts{
-		Event:    types.NewReplicaEvent(uint32(vt.config.ID()), time.Now()),
+		Event:    types.NewReplicaEvent(uint32(vt.id), time.Now()),
 		Views:    vt.numViews,
 		Timeouts: vt.numTimeouts,
 	})

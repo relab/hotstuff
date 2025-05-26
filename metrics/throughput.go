@@ -5,9 +5,7 @@ import (
 
 	"github.com/relab/hotstuff"
 
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/metrics/types"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
@@ -17,7 +15,7 @@ const NameThroughput = "throughput"
 // throughput measures throughput in commits per second, and commands per second.
 type throughput struct {
 	metricsLogger Logger
-	config        *core.RuntimeConfig
+	id            hotstuff.ID
 
 	commitCount  uint64
 	commandCount uint64
@@ -25,13 +23,12 @@ type throughput struct {
 
 func enableThroughput(
 	eventLoop *eventloop.EventLoop,
-	logger logging.Logger,
 	metricsLogger Logger,
-	config *core.RuntimeConfig,
+	id hotstuff.ID,
 ) {
 	t := &throughput{
 		metricsLogger: metricsLogger,
-		config:        config,
+		id:            id,
 	}
 	eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
 		commitEvent := event.(hotstuff.CommitEvent)
@@ -42,7 +39,6 @@ func enableThroughput(
 		t.tick(event.(types.TickEvent))
 	}, eventloop.Prioritize())
 
-	logger.Info("Throughput metric enabled")
 }
 
 func (t *throughput) recordCommit(commands int) {
@@ -53,7 +49,7 @@ func (t *throughput) recordCommit(commands int) {
 func (t *throughput) tick(tick types.TickEvent) {
 	now := time.Now()
 	event := &types.ThroughputMeasurement{
-		Event:    types.NewReplicaEvent(uint32(t.config.ID()), now),
+		Event:    types.NewReplicaEvent(uint32(t.id), now),
 		Commits:  t.commitCount,
 		Commands: t.commandCount,
 		Duration: durationpb.New(now.Sub(tick.LastTick)),

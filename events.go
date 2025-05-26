@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 )
 
 // ProposeMsg is broadcast when a leader makes a proposal.
@@ -78,4 +79,8 @@ type TimeoutEvent struct {
 
 type ReplicaConnectedEvent struct {
 	Ctx context.Context
+}
+
+type ConsensusLatencyEvent struct {
+	Latency time.Duration
 }

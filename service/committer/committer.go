@@ -3,8 +3,10 @@ package committer
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
@@ -13,6 +15,7 @@ import (
 
 // Committer commits the correct block for a view.
 type Committer struct {
+	eventLoop  *eventloop.EventLoop
 	logger     logging.Logger
 	blockChain *blockchain.BlockChain
 	rules      modules.CommitRuler
@@ -23,12 +26,14 @@ type Committer struct {
 }
 
 func New(
+	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
 	rules modules.CommitRuler,
 	clientSrv *clientsrv.Server,
 ) *Committer {
 	return &Committer{
+		eventLoop:  eventLoop,
 		blockChain: blockChain,
 		rules:      rules,
 		clientSrv:  clientSrv,
@@ -85,6 +90,7 @@ func (cm *Committer) commitInner(block *hotstuff.Block) error {
 	}
 	cm.logger.Debug("EXEC: ", block)
 	cm.clientSrv.Exec(block.Command())
+	cm.eventLoop.AddEvent(hotstuff.ConsensusLatencyEvent{Latency: time.Since(block.TimeStamp())})
 	cm.bExec = block
 	return nil
 }

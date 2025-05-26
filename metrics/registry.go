@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 )
@@ -16,7 +16,7 @@ func Enable(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	metricsLogger Logger,
-	config *core.RuntimeConfig,
+	id hotstuff.ID,
 	measurementInterval time.Duration,
 	metricNames ...string) error {
 	if len(metricNames) == 0 {
@@ -25,14 +25,17 @@ func Enable(
 	for _, name := range metricNames {
 		switch name {
 		case NameClientLatency:
-			enableClientLatency(eventLoop, logger, metricsLogger, config)
+			enableClientLatency(eventLoop, metricsLogger, id)
 		case NameViewTimeouts:
-			enableViewTimeouts(eventLoop, logger, metricsLogger, config)
+			enableViewTimeouts(eventLoop, metricsLogger, id)
 		case NameThroughput:
-			enableThroughput(eventLoop, logger, metricsLogger, config)
+			enableThroughput(eventLoop, metricsLogger, id)
+		case NameConsensusLatency:
+			enableConsensusLatency(eventLoop, metricsLogger, id)
 		default:
 			return fmt.Errorf("invalid metric: %s", name)
 		}
+		logger.Infof("metric enabled: %s", name)
 	}
 	addTicker(eventLoop, measurementInterval)
 	return nil

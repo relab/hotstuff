@@ -42,6 +42,7 @@ func NewService(
 		cmdCache:  cmdCache,
 		clientSrv: clientSrv,
 		committer: committer.New(
+			eventLoop,
 			logger,
 			blockChain,
 			rules,

@@ -174,7 +174,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			w.metricsLogger,
-			depsCore.RuntimeCfg(),
+			depsCore.RuntimeCfg().ID(),
 			w.measurementInterval,
 			w.metrics...,
 		)
@@ -290,7 +290,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 				eventLoop,
 				logger,
 				w.metricsLogger,
-				runtimeCfg,
+				runtimeCfg.ID(),
 				w.measurementInterval,
 				w.metrics...,
 			)
