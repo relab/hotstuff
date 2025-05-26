@@ -390,5 +390,5 @@ type ReplicaInfo struct {
 	Address  string
 	PubKey   PublicKey
 	Location string
-	MetaData map[string]string
+	Metadata map[string]string
 }

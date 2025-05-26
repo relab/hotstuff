@@ -79,7 +79,7 @@ func createDummyReplicas(t *testing.T, n int, cryptoName string, cacheSize int) 
 		replicas = append(replicas, hotstuff.ReplicaInfo{
 			ID:       hotstuff.ID(id + 1),
 			PubKey:   privKey.Public(),
-			MetaData: dummy.connMd,
+			Metadata: dummy.connMd,
 		})
 	}
 	for _, dummy := range dummies {

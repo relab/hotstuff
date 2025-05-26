@@ -103,7 +103,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 		signer := certauth.New(cfgs[id], logger, nil, crypt)
 		signers[i] = signer
 		meta := cfgs[id].ConnectionMetadata()
-		err := cfgs[id].SetReplicaMetaData(id, meta)
+		err := cfgs[id].SetReplicaMetadata(id, meta)
 		if err != nil {
 			t.Fatal(err)
 		}

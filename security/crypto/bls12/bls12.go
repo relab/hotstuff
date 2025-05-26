@@ -237,7 +237,7 @@ func (bls *bls12Base) checkPop(replica *hotstuff.ReplicaInfo) (valid bool) {
 		}
 	}()
 
-	popBytes, ok := replica.MetaData[popMetadataKey]
+	popBytes, ok := replica.Metadata[popMetadataKey]
 	if !ok {
 		bls.logger.Warnf("Missing proof-of-possession for replica: %d", replica.ID)
 		return false
