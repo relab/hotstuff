@@ -115,7 +115,6 @@ func New(
 		depsSecure.CertAuth(),
 	)
 	var protocol modules.ConsensusProtocol
-	// TODO(AlanRostem): add module logic for this.
 	if depsCore.RuntimeCfg().KauriEnabled() {
 		protocol = kauri.New(
 			depsCore.Logger(),
