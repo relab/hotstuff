@@ -74,10 +74,17 @@ type Sender interface {
 	Timeout(msg hotstuff.TimeoutMsg)
 	Propose(proposal *hotstuff.ProposeMsg)
 	RequestBlock(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool)
+	Sub(ids []hotstuff.ID) (Sender, error)
 }
 
-// ConsensusSender is an extension for handling proposals as either the voter or proposer.
-type ConsensusSender interface {
+// KauriSender is an extension of Sender allowing to send contribution messages to parent nodes.
+type KauriSender interface {
+	Sender
+	SendContributionToParent(view hotstuff.View, qc hotstuff.QuorumSignature)
+}
+
+// ConsensusProtocol is an interface sending proposals and votes.
+type ConsensusProtocol interface {
 	// SendVote handles incoming proposals and replies with a vote.
 	SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
 	// SendPropose disseminates the proposal from the proposer.

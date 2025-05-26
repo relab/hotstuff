@@ -29,7 +29,7 @@ func NewHotStuff(
 	states *viewstates.States,
 	leaderRotation modules.LeaderRotation,
 	sender modules.Sender,
-) modules.ConsensusSender {
+) modules.ConsensusProtocol {
 	return &HotStuff{
 		logger: logger,
 		config: config,
@@ -68,4 +68,4 @@ func (cs *HotStuff) SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialC
 	cs.logger.Debugf("voting for %v", proposal)
 }
 
-var _ modules.ConsensusSender = (*HotStuff)(nil)
+var _ modules.ConsensusProtocol = (*HotStuff)(nil)

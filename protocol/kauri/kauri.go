@@ -59,7 +59,7 @@ func New(
 		logger:     logger,
 
 		nodes: make(map[hotstuff.ID]*kauripb.Node),
-		tree:  nil, // is set later
+		tree:  config.Tree(),
 	}
 	k.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(_ any) {
 		k.postInit()
@@ -84,7 +84,6 @@ func (k *Kauri) initializeConfiguration() {
 	for _, n := range kauriCfg.Nodes() {
 		k.nodes[hotstuff.ID(n.ID())] = n
 	}
-	k.tree = k.config.Tree()
 	k.initDone = true
 	k.senders = make([]hotstuff.ID, 0)
 }
@@ -254,4 +253,4 @@ type WaitTimerExpiredEvent struct {
 	currentView hotstuff.View
 }
 
-var _ modules.ConsensusSender = (*Kauri)(nil)
+var _ modules.ConsensusProtocol = (*Kauri)(nil)

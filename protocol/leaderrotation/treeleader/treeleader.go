@@ -34,10 +34,6 @@ func (t *treeLeader) ViewDuration() modules.ViewDuration {
 
 // GetLeader returns the id of the leader in the given view
 func (t *treeLeader) GetLeader(_ hotstuff.View) hotstuff.ID {
-	if t.config == nil {
-		panic("oops")
-	}
-
 	if !t.config.HasTree() {
 		return 1
 	}

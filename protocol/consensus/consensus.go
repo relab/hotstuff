@@ -22,7 +22,7 @@ type Consensus struct {
 	committer    *committer.Committer
 	commandCache *cmdcache.Cache
 
-	sender modules.ConsensusSender
+	protocol modules.ConsensusProtocol
 
 	voter    *voter.Voter
 	proposer *proposer.Proposer
@@ -36,7 +36,7 @@ func New(
 	config *core.RuntimeConfig,
 
 	// protocol dependencies
-	sender modules.ConsensusSender,
+	protocol modules.ConsensusProtocol,
 	proposer *proposer.Proposer,
 	voter *voter.Voter,
 
@@ -49,7 +49,7 @@ func New(
 		logger:    logger,
 		config:    config,
 
-		sender:       sender,
+		protocol:     protocol,
 		proposer:     proposer,
 		voter:        voter,
 		commandCache: commandCache,
@@ -85,7 +85,7 @@ func (cs *Consensus) OnPropose(proposal *hotstuff.ProposeMsg) {
 	}
 	pc := cs.commit(block)
 	// send the vote and advance the view
-	cs.sender.SendVote(proposal, pc)
+	cs.protocol.SendVote(proposal, pc)
 	newInfo := hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
 	cs.eventLoop.AddEvent(hotstuff.NewViewMsg{
 		ID:       cs.config.ID(),
@@ -107,5 +107,5 @@ func (cs *Consensus) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syn
 	// NOTE: this vote call is not likely to fail since the leader does it, otherwise something went terribly wrong...
 	// TODO(AlanRostem): moved this line to HotStuff since Kauri already sends a new view in its own logic. Check if this is valid.
 	// cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
-	cs.sender.SendPropose(&proposal, pc)
+	cs.protocol.SendPropose(&proposal, pc)
 }

@@ -49,10 +49,10 @@ func NewProtocol(
 		depsSrv.cmdCache,
 		proposerOpts...,
 	)
-	var handler modules.ConsensusSender
+	var protocol modules.ConsensusProtocol
 	// TODO(AlanRostem): add module logic for this.
 	if depsCore.RuntimeCfg().KauriEnabled() {
-		handler = kauri.New(
+		protocol = kauri.New(
 			depsCore.Logger(),
 			depsCore.EventLoop(),
 			depsCore.RuntimeCfg(),
@@ -61,7 +61,7 @@ func NewProtocol(
 			sender.(*network.GorumsSender), // TODO(AlanRostem): avoid cast
 		)
 	} else {
-		handler = consensus.NewHotStuff(
+		protocol = consensus.NewHotStuff(
 			depsCore.Logger(),
 			depsCore.EventLoop(),
 			depsCore.RuntimeCfg(),
@@ -76,7 +76,7 @@ func NewProtocol(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
-		handler,
+		protocol,
 		proposer,
 		voter,
 		depsSrv.CmdCache(),

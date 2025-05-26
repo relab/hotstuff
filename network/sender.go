@@ -228,7 +228,7 @@ func (s *GorumsSender) GorumsConfig() gorums.RawConfiguration {
 }
 
 // Sub returns a copy of self dedicated to the replica IDs provided.
-func (s *GorumsSender) Sub(ids []hotstuff.ID) (*GorumsSender, error) {
+func (s *GorumsSender) Sub(ids []hotstuff.ID) (modules.Sender, error) {
 	replicas := make(map[hotstuff.ID]*replicaNode)
 	nids := make([]uint32, len(ids))
 	for i, id := range ids {
