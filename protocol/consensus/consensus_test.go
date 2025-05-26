@@ -48,8 +48,8 @@ func TestVote(t *testing.T) {
 			insecure.NewCredentials(),
 		)
 		depsSecure, err := dependencies.NewSecurity(
-			depsCore.Logger(),
 			depsCore.EventLoop(),
+			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
 			sender,
 			cryptoName,

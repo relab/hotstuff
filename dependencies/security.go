@@ -17,8 +17,8 @@ type Security struct {
 
 // NewSecurity returns a set of dependencies necessary for application security and integrity.
 func NewSecurity(
-	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
+	logger logging.Logger,
 	config *core.RuntimeConfig,
 	sender modules.Sender,
 	cryptoName string,

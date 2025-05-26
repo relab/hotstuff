@@ -49,8 +49,8 @@ func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuf
 		opts = append(opts, certauth.WithCache(cacheSize))
 	}
 	sec, err := dependencies.NewSecurity(
-		core.Logger(),
 		core.EventLoop(),
+		core.Logger(),
 		core.RuntimeCfg(),
 		sender,
 		cryptoName,

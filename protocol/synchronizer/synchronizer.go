@@ -29,7 +29,7 @@ type Synchronizer struct {
 	leaderRotation modules.LeaderRotation
 	voter          *voter.Voter
 	consensus      *consensus.Consensus
-	state          *viewstates.States
+	state          *viewstates.ViewStates
 
 	sender modules.Sender
 
@@ -58,7 +58,7 @@ func New(
 	leaderRotation modules.LeaderRotation,
 	consensus *consensus.Consensus,
 	voter *voter.Voter,
-	state *viewstates.States,
+	state *viewstates.ViewStates,
 
 	// network dependencies
 	sender modules.Sender,

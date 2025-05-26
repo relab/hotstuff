@@ -7,9 +7,13 @@ import (
 
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/dependencies"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
+	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
+	"github.com/relab/hotstuff/protocol/viewstates"
 	"github.com/relab/hotstuff/security/certauth"
 	"github.com/relab/hotstuff/service/clientsrv"
 	"github.com/relab/hotstuff/service/cmdcache"
@@ -50,8 +54,8 @@ func New(
 		rOpt.credentials,
 	)
 	depsSecure, err := dependencies.NewSecurity(
-		depsCore.Logger(),
 		depsCore.EventLoop(),
+		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		sender,
 		names.crypto,
@@ -104,17 +108,72 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	depsProtocol, err := dependencies.NewProtocol(
-		depsCore,
-		depsSecure,
-		depsSrv,
-		sender,
+	// TODO(AlanRostem): avoid creating viewstates here.
+	viewStates := viewstates.New(
+		depsCore.Logger(),
+		depsSecure.BlockChain(),
+		depsSecure.CertAuth(),
+	)
+	var protocol modules.ConsensusProtocol
+	// TODO(AlanRostem): add module logic for this.
+	if depsCore.RuntimeCfg().KauriEnabled() {
+		protocol = kauri.New(
+			depsCore.Logger(),
+			depsCore.EventLoop(),
+			depsCore.RuntimeCfg(),
+			depsSecure.BlockChain(),
+			depsSecure.CertAuth(),
+			kauri.NewExtendedGorumsSender(
+				depsCore.EventLoop(),
+				depsCore.Logger(),
+				depsCore.RuntimeCfg(),
+				sender,
+			),
+		)
+	} else {
+		protocol = consensus.NewHotStuff(
+			depsCore.Logger(),
+			depsCore.EventLoop(),
+			depsCore.RuntimeCfg(),
+			depsSecure.BlockChain(),
+			depsSecure.CertAuth(),
+			viewStates,
+			leader,
+			sender,
+		)
+	}
+	depsProtocol := dependencies.NewConsensus(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		depsSecure.CertAuth(),
+		depsSrv.CmdCache(),
 		rules,
 		leader,
 	)
-	if err != nil {
-		return nil, err
-	}
+	// TODO(AlanRostem): explore ways to simplify consensus and synchronizer so that they take in less dependencies.
+	consensus := consensus.New(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		protocol,
+		depsProtocol.Proposer(),
+		depsProtocol.Voter(),
+		depsSrv.CmdCache(),
+		depsSrv.Committer(),
+	)
+	// TODO(AlanRostem): consder a way to move consensus flow from synchronzier to consensus
+	synchronizer := synchronizer.New(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		depsSecure.CertAuth(),
+		leader,
+		consensus,
+		depsProtocol.Voter(),
+		viewStates,
+		sender,
+	)
 	rOpt.serverOpts = append(rOpt.serverOpts, server.WithGorumsServerOptions(rOpt.replicaGorumsSrvOpts...))
 	server := server.NewServer(
 		depsCore.EventLoop(),
@@ -127,7 +186,7 @@ func New(
 		eventLoop:    depsCore.EventLoop(),
 		clientSrv:    depsSrv.ClientSrv(),
 		sender:       sender,
-		synchronizer: depsProtocol.Synchronizer(),
+		synchronizer: synchronizer,
 		hsSrv:        server,
 
 		execHandlers: make(map[cmdcache.CmdID]func(*emptypb.Empty, error)),

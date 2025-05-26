@@ -28,8 +28,8 @@ type Voter struct {
 
 // TODO(AlanRostem): finish up this class.
 func New(
-	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
+	logger logging.Logger,
 	config *core.RuntimeConfig,
 	leaderRotation modules.LeaderRotation,
 	rules modules.VoteRuler,

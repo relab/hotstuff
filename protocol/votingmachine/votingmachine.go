@@ -20,7 +20,7 @@ type VotingMachine struct {
 	config     *core.RuntimeConfig
 	blockChain *blockchain.BlockChain
 	auth       *certauth.CertAuthority
-	state      *viewstates.States
+	state      *viewstates.ViewStates
 
 	mut           sync.Mutex
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert
@@ -32,7 +32,7 @@ func New(
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
 	auth *certauth.CertAuthority,
-	state *viewstates.States,
+	state *viewstates.ViewStates,
 ) *VotingMachine {
 	vm := &VotingMachine{
 		blockChain:    blockChain,

@@ -26,7 +26,7 @@ func NewHotStuff(
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
 	auth *certauth.CertAuthority,
-	states *viewstates.States,
+	states *viewstates.ViewStates,
 	leaderRotation modules.LeaderRotation,
 	sender modules.Sender,
 ) modules.ConsensusProtocol {
