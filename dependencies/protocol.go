@@ -58,7 +58,12 @@ func NewProtocol(
 			depsCore.RuntimeCfg(),
 			depsSecure.BlockChain(),
 			depsSecure.CertAuth(),
-			sender.(*network.GorumsSender), // TODO(AlanRostem): avoid cast
+			kauri.NewExtendedGorumsSender(
+				depsCore.EventLoop(),
+				depsCore.Logger(),
+				depsCore.RuntimeCfg(),
+				sender.(*network.GorumsSender), // TODO(AlanRostem): avoid cast
+			),
 		)
 	} else {
 		protocol = consensus.NewHotStuff(

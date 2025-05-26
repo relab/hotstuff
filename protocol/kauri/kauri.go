@@ -2,7 +2,6 @@
 package kauri
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
-	"github.com/relab/hotstuff/internal/proto/kauripb"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
@@ -29,14 +27,13 @@ type Kauri struct {
 	config     *core.RuntimeConfig
 	blockChain *blockchain.BlockChain
 	auth       *certauth.CertAuthority
-	sender     *network.GorumsSender
+	sender     modules.KauriSender
 
 	aggContrib  hotstuff.QuorumSignature
 	aggSent     bool
 	blockHash   hotstuff.Hash
 	currentView hotstuff.View
 	initDone    bool
-	nodes       map[hotstuff.ID]*kauripb.Node
 	senders     []hotstuff.ID
 	tree        *tree.Tree
 }
@@ -48,7 +45,7 @@ func New(
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
 	auth *certauth.CertAuthority,
-	sender *network.GorumsSender,
+	sender modules.KauriSender,
 ) *Kauri {
 	k := &Kauri{
 		blockChain: blockChain,
@@ -58,12 +55,12 @@ func New(
 		sender:     sender,
 		logger:     logger,
 
-		nodes: make(map[hotstuff.ID]*kauripb.Node),
-		tree:  config.Tree(),
+		senders: make([]hotstuff.ID, 0),
+		tree:    config.Tree(),
 	}
 	k.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(_ any) {
-		k.postInit()
-	}, eventloop.Prioritize())
+		k.initDone = true // this signals that
+	})
 	k.eventLoop.RegisterHandler(ContributionRecvEvent{}, func(event any) {
 		k.OnContributionRecv(event.(ContributionRecvEvent))
 	})
@@ -71,21 +68,6 @@ func New(
 		k.OnWaitTimerExpired(event.(WaitTimerExpiredEvent))
 	})
 	return k
-}
-
-func (k *Kauri) postInit() {
-	k.logger.Debug("Kauri: Initializing")
-	k.initializeConfiguration()
-}
-
-// TODO(AlanRostem): avoid using raw nodes.
-func (k *Kauri) initializeConfiguration() {
-	kauriCfg := kauripb.ConfigurationFromRaw(k.sender.GorumsConfig(), nil)
-	for _, n := range kauriCfg.Nodes() {
-		k.nodes[hotstuff.ID(n.ID())] = n
-	}
-	k.initDone = true
-	k.senders = make([]hotstuff.ID, 0)
 }
 
 // Begin starts dissemination of proposal and aggregation of votes.
@@ -125,16 +107,16 @@ func (k *Kauri) WaitToAggregate() {
 func (k *Kauri) SendProposalToChildren(p *hotstuff.ProposeMsg) {
 	children := k.tree.ReplicaChildren()
 	if len(children) != 0 {
-		config, err := k.sender.Sub(children)
+		childSender, err := k.sender.Sub(children)
 		if err != nil {
 			k.logger.Errorf("Unable to send the proposal to children: %v", err)
 			return
 		}
 		k.logger.Debug("Sending proposal to children ", children)
-		config.Propose(p)
+		childSender.Propose(p)
 		go k.WaitToAggregate()
 	} else {
-		k.SendContributionToParent()
+		k.sender.SendContributionToParent(k.currentView, k.aggContrib)
 		k.aggSent = true
 	}
 }
@@ -154,23 +136,8 @@ func (k *Kauri) OnContributionRecv(event ContributionRecvEvent) {
 	}
 	k.senders = append(k.senders, hotstuff.ID(contribution.ID))
 	if isSubSet(k.tree.SubTree(), k.senders) {
-		k.SendContributionToParent()
+		k.sender.SendContributionToParent(k.currentView, k.aggContrib)
 		k.aggSent = true
-	}
-}
-
-// SendContributionToParent sends contribution to the parent node.
-func (k *Kauri) SendContributionToParent() {
-	parent, ok := k.tree.Parent()
-	if ok {
-		node, isPresent := k.nodes[parent]
-		if isPresent {
-			node.SendContribution(context.Background(), &kauripb.Contribution{
-				ID:        uint32(k.config.ID()),
-				Signature: hotstuffpb.QuorumSignatureToProto(k.aggContrib),
-				View:      uint64(k.currentView),
-			})
-		}
 	}
 }
 
@@ -179,7 +146,7 @@ func (k *Kauri) OnWaitTimerExpired(event WaitTimerExpiredEvent) {
 		return
 	}
 	if !k.aggSent {
-		k.SendContributionToParent()
+		k.sender.SendContributionToParent(k.currentView, k.aggContrib)
 		k.reset()
 	}
 }

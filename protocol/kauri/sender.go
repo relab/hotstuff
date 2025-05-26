@@ -14,43 +14,41 @@ import (
 	"github.com/relab/hotstuff/network"
 )
 
-type gorumsSender struct {
+type kauriGorumsSender struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
 	config    *core.RuntimeConfig
-	base      *network.GorumsSender
 	modules.Sender
 
-	nodes   map[hotstuff.ID]*kauripb.Node
-	senders []hotstuff.ID
-	tree    *tree.Tree
+	nodes map[hotstuff.ID]*kauripb.Node
+	tree  *tree.Tree
 }
 
 func NewExtendedGorumsSender(
 	eventLoop *eventloop.EventLoop,
+	logger logging.Logger,
+	config *core.RuntimeConfig,
 	base *network.GorumsSender,
 ) modules.KauriSender {
-	s := &gorumsSender{
+	s := &kauriGorumsSender{
 		eventLoop: eventLoop,
-		Sender:    base,
-	}
+		logger:    logger,
+		config:    config,
+		Sender:    base, // important: extend the base
 
+		nodes: make(map[hotstuff.ID]*kauripb.Node),
+		tree:  config.Tree(),
+	}
 	s.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(_ any) {
-		s.postInit()
+		kauriCfg := kauripb.ConfigurationFromRaw(base.GorumsConfig(), nil)
+		for _, n := range kauriCfg.Nodes() {
+			s.nodes[hotstuff.ID(n.ID())] = n
+		}
 	}, eventloop.Prioritize())
 	return s
 }
 
-func (s *gorumsSender) postInit() {
-	kauriCfg := kauripb.ConfigurationFromRaw(s.base.GorumsConfig(), nil)
-	for _, n := range kauriCfg.Nodes() {
-		s.nodes[hotstuff.ID(n.ID())] = n
-	}
-	s.tree = s.config.Tree()
-	s.senders = make([]hotstuff.ID, 0)
-}
-
-func (k *gorumsSender) SendContributionToParent(view hotstuff.View, qc hotstuff.QuorumSignature) {
+func (k *kauriGorumsSender) SendContributionToParent(view hotstuff.View, qc hotstuff.QuorumSignature) {
 	parent, ok := k.tree.Parent()
 	if ok {
 		node, isPresent := k.nodes[parent]
