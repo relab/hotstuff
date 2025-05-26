@@ -23,7 +23,7 @@ func NewService(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	blockChain *blockchain.BlockChain,
-	rules modules.ConsensusRules,
+	rules modules.HotstuffRuleset,
 	// TODO: Join these into single option type
 	cacheOpt []cmdcache.Option,
 	clientSrvOpts ...gorums.ServerOption,

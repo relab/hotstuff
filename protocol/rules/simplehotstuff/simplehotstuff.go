@@ -25,7 +25,7 @@ type SimpleHotStuff struct {
 func New(
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
-) modules.ConsensusRules {
+) modules.HotstuffRuleset {
 	return &SimpleHotStuff{
 		blockChain: blockChain,
 		logger:     logger,

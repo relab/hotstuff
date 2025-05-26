@@ -29,7 +29,7 @@ func NewConsensusRules(
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
 	name string,
-) (rules modules.ConsensusRules, err error) {
+) (rules modules.HotstuffRuleset, err error) {
 	logger.Debugf("Initializing module (consensus rules): %s", name)
 	switch name {
 	case fasthotstuff.ModuleName:
@@ -47,9 +47,9 @@ func NewConsensusRules(
 func WrapByzantineStrategy(
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
-	rules modules.ConsensusRules,
+	rules modules.HotstuffRuleset,
 	name string,
-) (byzRules modules.ConsensusRules, err error) {
+) (byzRules modules.HotstuffRuleset, err error) {
 	// logger.Debugf("Initializing module (byzantine strategy): %s", name)
 	switch name {
 	case byzantine.SilenceModuleName:

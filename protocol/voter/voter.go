@@ -18,7 +18,7 @@ type Voter struct {
 	config    *core.RuntimeConfig
 
 	leaderRotation modules.LeaderRotation
-	rules          modules.ConsensusRules
+	ruler          modules.VoteRuler
 
 	auth         *certauth.CertAuthority
 	commandCache *cmdcache.Cache
@@ -32,7 +32,7 @@ func New(
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
 	leaderRotation modules.LeaderRotation,
-	rules modules.ConsensusRules,
+	rules modules.VoteRuler,
 	auth *certauth.CertAuthority,
 	commandCache *cmdcache.Cache,
 ) *Voter {
@@ -42,7 +42,7 @@ func New(
 		config:    config,
 
 		leaderRotation: leaderRotation,
-		rules:          rules,
+		ruler:          rules,
 
 		auth: auth,
 
@@ -86,7 +86,8 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 	if !v.commandCache.Accept(block.Command()) {
 		return fmt.Errorf("command too old")
 	}
-	if !v.rules.VoteRule(view, *proposal) {
+	// vote rule must be valid
+	if !v.ruler.VoteRule(view, *proposal) {
 		return fmt.Errorf("vote rule not satisfied")
 	}
 	// verify the proposal's QC.

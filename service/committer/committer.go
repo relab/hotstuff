@@ -15,7 +15,7 @@ import (
 type Committer struct {
 	logger     logging.Logger
 	blockChain *blockchain.BlockChain
-	rules      modules.ConsensusRules
+	rules      modules.CommitRuler
 	clientSrv  *clientsrv.Server
 
 	mut   sync.Mutex
@@ -25,7 +25,7 @@ type Committer struct {
 func New(
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
-	rules modules.ConsensusRules,
+	rules modules.CommitRuler,
 	clientSrv *clientsrv.Server,
 ) *Committer {
 	return &Committer{

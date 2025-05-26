@@ -24,7 +24,7 @@ type ChainedHotStuff struct {
 func New(
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
-) modules.ConsensusRules {
+) modules.HotstuffRuleset {
 	return &ChainedHotStuff{
 		blockChain: blockChain,
 		logger:     logger,

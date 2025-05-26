@@ -22,7 +22,7 @@ func NewProtocol(
 	depsSecure *Security,
 	depsSrv *Service,
 	sender modules.Sender,
-	consensusRulesModule modules.ConsensusRules,
+	consensusRulesModule modules.HotstuffRuleset,
 	leaderRotationModule modules.LeaderRotation,
 ) (*Protocol, error) {
 	state := viewstates.New(
@@ -68,7 +68,6 @@ func NewProtocol(
 			depsSecure.BlockChain(),
 			depsSecure.CertAuth(),
 			state,
-			voter,
 			leaderRotationModule,
 			sender,
 		)

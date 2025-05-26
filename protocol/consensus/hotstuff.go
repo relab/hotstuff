@@ -7,7 +7,6 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/viewstates"
-	"github.com/relab/hotstuff/protocol/voter"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
@@ -16,7 +15,6 @@ import (
 type HotStuff struct {
 	logger         logging.Logger
 	config         *core.RuntimeConfig
-	voter          *voter.Voter
 	votingMachine  *votingmachine.VotingMachine
 	leaderRotation modules.LeaderRotation
 	sender         modules.Sender
@@ -29,14 +27,12 @@ func NewHotStuff(
 	blockChain *blockchain.BlockChain,
 	auth *certauth.CertAuthority,
 	states *viewstates.States,
-	voter *voter.Voter,
 	leaderRotation modules.LeaderRotation,
 	sender modules.Sender,
 ) modules.ConsensusSender {
 	return &HotStuff{
 		logger: logger,
 		config: config,
-		voter:  voter,
 		votingMachine: votingmachine.New(
 			logger,
 			eventLoop,
@@ -55,8 +51,9 @@ func (cs *HotStuff) SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.Parti
 	cs.sender.Propose(proposal)
 }
 
+// SendVote disseminates or stores a valid vote depending on replica being voter or leader in the next view.
 func (cs *HotStuff) SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
-	leaderID := cs.leaderRotation.GetLeader(cs.voter.LastVote() + 1)
+	leaderID := cs.leaderRotation.GetLeader(proposal.Block.View() + 1)
 	if leaderID == cs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.
 		cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})

@@ -7,22 +7,27 @@ import (
 	"github.com/relab/hotstuff"
 )
 
-// ConsensusRules is the minimum interface that a consensus implementations must implement.
-// Implementations of this interface can be wrapped in the ConsensusBase struct.
-// Together, these provide an implementation of the main Consensus interface.
-// Implementors do not need to verify certificates or interact with other modules,
-// as this is handled by the ConsensusBase struct.
-type ConsensusRules interface {
-	// VoteRule decides whether to vote for the block.
-	VoteRule(view hotstuff.View, proposal hotstuff.ProposeMsg) bool
-	// CommitRule decides whether any ancestor of the block can be committed.
-	// Returns the youngest ancestor of the block that can be committed.
-	CommitRule(*hotstuff.Block) *hotstuff.Block
+// HotstuffRuleset is the minimum interface that a Hotstuff variant implements.
+// It must implement the vote and commit rules, but the propose rule is optional.
+type HotstuffRuleset interface {
+	VoteRuler
+	CommitRuler
 	// ChainLength returns the number of blocks that need to be chained together in order to commit.
 	ChainLength() int
 }
 
-// ProposeRuler is an optional interface that adds a ProposeRule method.
+type VoteRuler interface {
+	// VoteRule decides whether to vote for the block.
+	VoteRule(view hotstuff.View, proposal hotstuff.ProposeMsg) bool
+}
+
+type CommitRuler interface {
+	// CommitRule decides whether any ancestor of the block can be committed.
+	// Returns the youngest ancestor of the block that can be committed.
+	CommitRule(*hotstuff.Block) *hotstuff.Block
+}
+
+// ProposeRuler is an interface that adds a ProposeRule method.
 // This allows implementors to specify how new blocks are created.
 type ProposeRuler interface {
 	// ProposeRule creates a new proposal.

@@ -22,7 +22,7 @@ func New(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
-) modules.ConsensusRules {
+) modules.HotstuffRuleset {
 	if !config.HasAggregateQC() {
 		panic("aggregate qc must be enabled for fasthotstuff")
 	}

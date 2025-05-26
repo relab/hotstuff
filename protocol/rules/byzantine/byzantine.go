@@ -14,7 +14,7 @@ const (
 )
 
 type silence struct {
-	modules.ConsensusRules
+	modules.HotstuffRuleset
 }
 
 func (s *silence) ProposeRule(_ hotstuff.View, _ hotstuff.QuorumCert, _ hotstuff.SyncInfo, _ hotstuff.Command) (hotstuff.ProposeMsg, bool) {
@@ -22,14 +22,14 @@ func (s *silence) ProposeRule(_ hotstuff.View, _ hotstuff.QuorumCert, _ hotstuff
 }
 
 // NewSilence returns a byzantine replica that will never propose.
-func NewSilence(rules modules.ConsensusRules) modules.ConsensusRules {
-	return &silence{ConsensusRules: rules}
+func NewSilence(rules modules.HotstuffRuleset) modules.HotstuffRuleset {
+	return &silence{HotstuffRuleset: rules}
 }
 
 type fork struct {
 	blockChain *blockchain.BlockChain
 	config     *core.RuntimeConfig
-	modules.ConsensusRules
+	modules.HotstuffRuleset
 }
 
 func (f *fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
@@ -64,20 +64,20 @@ func (f *fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert 
 
 // NewFork returns a byzantine replica that will try to fork the chain.
 func NewFork(
-	rules modules.ConsensusRules,
+	rules modules.HotstuffRuleset,
 	blockChain *blockchain.BlockChain,
 	config *core.RuntimeConfig,
-) modules.ConsensusRules {
+) modules.HotstuffRuleset {
 	return &fork{
-		ConsensusRules: rules,
-		blockChain:     blockChain,
-		config:         config,
+		HotstuffRuleset: rules,
+		blockChain:      blockChain,
+		config:          config,
 	}
 }
 
 var (
-	_ modules.ConsensusRules = (*silence)(nil)
-	_ modules.ProposeRuler   = (*silence)(nil)
-	_ modules.ConsensusRules = (*fork)(nil)
-	_ modules.ProposeRuler   = (*fork)(nil)
+	_ modules.HotstuffRuleset = (*silence)(nil)
+	_ modules.ProposeRuler    = (*silence)(nil)
+	_ modules.HotstuffRuleset = (*fork)(nil)
+	_ modules.ProposeRuler    = (*fork)(nil)
 )
