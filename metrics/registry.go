@@ -35,8 +35,8 @@ func Enable(
 		default:
 			return fmt.Errorf("invalid metric: %s", name)
 		}
-		logger.Infof("metric enabled: %s", name)
 	}
+	logger.Infof("metrics enabled: %v", metricNames)
 	addTicker(eventLoop, measurementInterval)
 	return nil
 }
