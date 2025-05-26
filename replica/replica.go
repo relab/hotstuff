@@ -141,7 +141,7 @@ func New(
 			sender,
 		)
 	}
-	depsProtocol := dependencies.NewConsensus(
+	depsConsensus := dependencies.NewConsensus(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
@@ -156,12 +156,12 @@ func New(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		protocol,
-		depsProtocol.Proposer(),
-		depsProtocol.Voter(),
+		depsConsensus.Proposer(),
+		depsConsensus.Voter(),
 		depsSrv.CmdCache(),
 		depsSrv.Committer(),
 	)
-	// TODO(AlanRostem): consder a way to move consensus flow from synchronzier to consensus
+	// TODO(AlanRostem): consder a way to move the consensus flow from Synchronzier to Consensus
 	synchronizer := synchronizer.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
@@ -169,7 +169,7 @@ func New(
 		depsSecure.CertAuth(),
 		leader,
 		consensus,
-		depsProtocol.Voter(),
+		depsConsensus.Voter(),
 		viewStates,
 		sender,
 	)

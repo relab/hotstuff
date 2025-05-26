@@ -12,7 +12,6 @@ import (
 	"github.com/relab/hotstuff/security/certauth"
 )
 
-// TODO(AlanRostem): move this to HotStuff since it's not needed in Kauri.
 // VotingMachine collects and verifies votes.
 type VotingMachine struct {
 	logger     logging.Logger
@@ -53,12 +52,10 @@ func New(
 func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 	cert := vote.PartialCert
 	vm.logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
-
 	var (
 		block *hotstuff.Block
 		ok    bool
 	)
-
 	if !vote.Deferred {
 		// first, try to get the block from the local cache
 		block, ok = vm.blockChain.LocalGet(cert.BlockHash())
@@ -78,12 +75,10 @@ func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 			return
 		}
 	}
-
 	if block.View() <= vm.state.HighQC().View() {
-		// too old
+		vm.logger.Info("block too old")
 		return
 	}
-
 	if vm.config.SyncVoteVerification() {
 		vm.verifyCert(cert, block)
 	} else {
@@ -96,10 +91,8 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 		vm.logger.Info("OnVote: Vote could not be verified!")
 		return
 	}
-
 	vm.mut.Lock()
 	defer vm.mut.Unlock()
-
 	// this defer will clean up any old votes in verifiedVotes
 	defer func() {
 		// delete any pending QCs with lower height than bLeaf
@@ -113,21 +106,17 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 			}
 		}
 	}()
-
 	votes := vm.verifiedVotes[cert.BlockHash()]
 	votes = append(votes, cert)
 	vm.verifiedVotes[cert.BlockHash()] = votes
-
 	if len(votes) < vm.config.QuorumSize() {
 		return
 	}
-
 	qc, err := vm.auth.CreateQuorumCert(block, votes)
 	if err != nil {
 		vm.logger.Info("OnVote: could not create QC for block: ", err)
 		return
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
-
 	vm.eventLoop.AddEvent(hotstuff.NewViewMsg{ID: vm.config.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
 }

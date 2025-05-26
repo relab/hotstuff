@@ -15,11 +15,11 @@ type ViewStates struct {
 	blockChain *blockchain.BlockChain
 	auth       *certauth.CertAuthority
 
+	mut sync.RWMutex // to protect the following
+
 	highTC hotstuff.TimeoutCert
 	highQC hotstuff.QuorumCert
 	view   hotstuff.View
-
-	mut sync.RWMutex // to protect the following
 }
 
 func New(
