@@ -3,10 +3,14 @@ package consensus
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/viewstates"
 	"github.com/relab/hotstuff/protocol/voter"
 	"github.com/relab/hotstuff/protocol/votingmachine"
+	"github.com/relab/hotstuff/security/blockchain"
+	"github.com/relab/hotstuff/security/certauth"
 )
 
 type HotStuff struct {
@@ -20,17 +24,27 @@ type HotStuff struct {
 
 func NewHotStuff(
 	logger logging.Logger,
+	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
+	blockChain *blockchain.BlockChain,
+	auth *certauth.CertAuthority,
+	states *viewstates.States,
 	voter *voter.Voter,
-	votingMachine *votingmachine.VotingMachine,
 	leaderRotation modules.LeaderRotation,
 	sender modules.Sender,
 ) modules.ConsensusSender {
 	return &HotStuff{
-		logger:         logger,
-		config:         config,
-		voter:          voter,
-		votingMachine:  votingMachine,
+		logger: logger,
+		config: config,
+		voter:  voter,
+		votingMachine: votingmachine.New(
+			logger,
+			eventLoop,
+			config,
+			blockChain,
+			auth,
+			states,
+		),
 		leaderRotation: leaderRotation,
 		sender:         sender,
 	}

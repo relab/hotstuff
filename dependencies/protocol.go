@@ -9,7 +9,6 @@ import (
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/viewstates"
 	"github.com/relab/hotstuff/protocol/voter"
-	"github.com/relab/hotstuff/protocol/votingmachine"
 )
 
 type Protocol struct {
@@ -50,14 +49,6 @@ func NewProtocol(
 		depsSrv.cmdCache,
 		proposerOpts...,
 	)
-	votingMachine := votingmachine.New(
-		depsCore.Logger(),
-		depsCore.EventLoop(),
-		depsCore.RuntimeCfg(),
-		depsSecure.BlockChain(),
-		depsSecure.CertAuth(),
-		state,
-	)
 	var handler modules.ConsensusSender
 	// TODO(AlanRostem): add module logic for this.
 	if depsCore.RuntimeCfg().KauriEnabled() {
@@ -72,9 +63,12 @@ func NewProtocol(
 	} else {
 		handler = consensus.NewHotStuff(
 			depsCore.Logger(),
+			depsCore.EventLoop(),
 			depsCore.RuntimeCfg(),
+			depsSecure.BlockChain(),
+			depsSecure.CertAuth(),
+			state,
 			voter,
-			votingMachine,
 			leaderRotationModule,
 			sender,
 		)
