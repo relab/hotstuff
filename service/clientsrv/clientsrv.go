@@ -51,15 +51,6 @@ func New(
 	return srv
 }
 
-func (srv *Server) Start(addr string) error {
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		return err
-	}
-	srv.StartOnListener(lis)
-	return nil
-}
-
 func (srv *Server) StartOnListener(lis net.Listener) {
 	go func() {
 		err := srv.srv.Serve(lis)
@@ -71,10 +62,6 @@ func (srv *Server) StartOnListener(lis net.Listener) {
 
 func (srv *Server) Stop() {
 	srv.srv.Stop()
-}
-
-func (srv *Server) CmdCache() *clientpb.Cache {
-	return srv.cmdCache
 }
 
 func (srv *Server) Hash() hash.Hash {
