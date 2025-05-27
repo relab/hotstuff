@@ -32,7 +32,7 @@ func TestAddGetCommand(t *testing.T) {
 			if err != nil {
 				t.Errorf("Get() error: %v", err)
 			}
-			batch, err := cache.getCommands(cmd)
+			batch, err := cache.GetCommands(cmd)
 			if err != nil {
 				t.Errorf("Batch() error: %v", err)
 			}

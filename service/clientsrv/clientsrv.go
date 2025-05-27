@@ -14,7 +14,6 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -101,20 +100,20 @@ func (srv *Server) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*em
 }
 
 func (srv *Server) Exec(cmd hotstuff.Command) {
-	batch := new(clientpb.Batch)
-	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
+	batch, err := srv.cmdCache.GetCommands(cmd)
 	if err != nil {
-		srv.logger.Errorf("Failed to unmarshal command: %v", err)
+		srv.logger.Error(err)
 		return
 	}
 
-	srv.eventLoop.AddEvent(hotstuff.CommitEvent{Commands: len(batch.GetCommands())})
+	srv.eventLoop.AddEvent(hotstuff.CommitEvent{Commands: len(batch)})
 
-	for _, cmd := range batch.GetCommands() {
+	for _, cmd := range batch {
 		id := cmd.ID()
 
 		srv.mut.Lock()
 		// TODO(meling): ASKING: previously the hash.Write and srv.cmdCount++ were outside the critical section, shouldn't they be inside?
+		// TODO(meling): We should add a concurrency test for this logic to check that the hash doesn't get corrupted.
 		_, _ = srv.hash.Write(cmd.Data)
 		srv.cmdCount++
 		if done, ok := srv.awaitingCmds[id]; ok {
@@ -128,13 +127,12 @@ func (srv *Server) Exec(cmd hotstuff.Command) {
 }
 
 func (srv *Server) Fork(cmd hotstuff.Command) {
-	batch := new(clientpb.Batch)
-	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
+	batch, err := srv.cmdCache.GetCommands(cmd)
 	if err != nil {
-		srv.logger.Errorf("Failed to unmarshal command: %v", err)
+		srv.logger.Error(err)
 		return
 	}
-	for _, cmd := range batch.GetCommands() {
+	for _, cmd := range batch {
 		id := cmd.ID()
 
 		srv.mut.Lock()

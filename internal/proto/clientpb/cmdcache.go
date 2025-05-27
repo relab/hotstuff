@@ -28,7 +28,7 @@ func New(
 		batchSize:     1,
 		serialNumbers: make(map[uint32]uint64),
 		marshaler:     proto.MarshalOptions{Deterministic: true},
-		unmarshaler:   proto.UnmarshalOptions{DiscardUnknown: true},
+		unmarshaler:   proto.UnmarshalOptions{DiscardUnknown: true, AllowPartial: true},
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -76,15 +76,14 @@ awaitBatch:
 		c.mut.Lock()
 	}
 
-	// Get the batch. Note that we may not be able to fill the batch, but that should be fine as long as we can send
-	// at least one command.
+	// Get the batch. Note that we may not be able to fill the batch,
+	// but that's okay as long as we can send at least one command.
 	for i := uint32(0); i < c.batchSize; i++ {
 		elem := c.cache.Front()
 		if elem == nil {
 			break
 		}
-		c.cache.Remove(elem)
-		cmd := elem.Value.(*Command)
+		cmd := c.cache.Remove(elem).(*Command)
 		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
 			// command is too old
 			i--
@@ -111,7 +110,7 @@ awaitBatch:
 
 // Accept returns an error if the given command batch is too old to be accepted.
 func (c *Cache) Accept(cmd hotstuff.Command) error {
-	batch, err := c.getCommands(cmd)
+	batch, err := c.GetCommands(cmd)
 	if err != nil {
 		return err
 	}
@@ -129,7 +128,7 @@ func (c *Cache) Accept(cmd hotstuff.Command) error {
 
 // Proposed updates the serial numbers such that we will not accept the given batch again.
 func (c *Cache) Proposed(cmd hotstuff.Command) error {
-	batch, err := c.getCommands(cmd)
+	batch, err := c.GetCommands(cmd)
 	if err != nil {
 		return err
 	}
@@ -145,8 +144,8 @@ func (c *Cache) Proposed(cmd hotstuff.Command) error {
 	return nil
 }
 
-// getCommands unmarshals the given command returns its batch of commands.
-func (c *Cache) getCommands(cmd hotstuff.Command) ([]*Command, error) {
+// GetCommands unmarshals the given command returns its batch of commands.
+func (c *Cache) GetCommands(cmd hotstuff.Command) ([]*Command, error) {
 	batch := new(Batch)
 	if err := c.unmarshaler.Unmarshal([]byte(cmd), batch); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal batch: %w", err)
