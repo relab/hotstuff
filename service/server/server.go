@@ -57,7 +57,7 @@ func NewServer(
 		srv.eventLoop.AddEvent(hotstuff.ReplicaConnectedEvent{Ctx: ctx})
 	}))
 	srv.gorumsSrv = gorums.NewServer(options.gorumsSrvOpts...)
-	if config.KauriEnabled() {
+	if config.HasKauriTree() {
 		kauri.RegisterService(eventLoop, logger, srv.gorumsSrv)
 	}
 	hotstuffpb.RegisterConsensusServer(srv.gorumsSrv, &serviceImpl{srv})
@@ -117,7 +117,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
 		return
 	}
-	if impl.srv.config.HasTree() {
+	if impl.srv.config.HasKauriTree() {
 		id = hotstuff.ID(proposal.Block.Proposer)
 	}
 	proposal.Block.Proposer = uint32(id)

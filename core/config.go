@@ -10,9 +10,8 @@ type RuntimeConfig struct {
 	id         hotstuff.ID
 	privateKey hotstuff.PrivateKey
 
-	aggQCEnabled                bool
-	kauriEnabled                bool
-	syncVoteVerificationEnabled bool
+	aggQC                bool
+	syncVoteVerification bool
 
 	connectionMetadata map[string]string
 	replicas           map[hotstuff.ID]*hotstuff.ReplicaInfo
@@ -51,13 +50,13 @@ func (g *RuntimeConfig) PrivateKey() hotstuff.PrivateKey {
 // HasAggregateQC returns true if aggregated quorum certificates should be used.
 // This is true for Fast-Hotstuff: https://arxiv.org/abs/2010.11454
 func (g *RuntimeConfig) HasAggregateQC() bool {
-	return g.aggQCEnabled
+	return g.aggQC
 }
 
 // SyncVoteVerification returns true if votes should be verified synchronously.
 // Enabling this should make the voting machine process votes synchronously.
 func (g *RuntimeConfig) SyncVoteVerification() bool {
-	return g.syncVoteVerificationEnabled
+	return g.syncVoteVerification
 }
 
 // SharedRandomSeed returns a random number that is shared between all replicas.
@@ -65,14 +64,9 @@ func (g *RuntimeConfig) SharedRandomSeed() int64 {
 	return g.sharedRandomSeed
 }
 
-// KauriEnabled returns true if Kauri will be integrated to the consensus logic and
-// Kauri-specific RPC methods should be registered.
-func (g *RuntimeConfig) KauriEnabled() bool {
-	return g.kauriEnabled
-}
-
-// HasTree returns true if a tree was set for the tree-based leader scheme.
-func (g *RuntimeConfig) HasTree() bool {
+// HasKauriTree returns true if a tree was set for the tree-based leader scheme used in Kauri.
+// This method also signifies that Kauri is enabled.
+func (g *RuntimeConfig) HasKauriTree() bool {
 	return g.tree != nil
 }
 
