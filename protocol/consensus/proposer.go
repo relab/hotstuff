@@ -64,7 +64,9 @@ func (cs *Proposer) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, sync
 	cs.committer.Update(block)
 	// TODO(AlanRostem): solve issue #191
 	// update the command's age before voting.
-	cs.commandCache.Proposed(block.Command())
+	if err := cs.commandCache.Proposed(block.Command()); err != nil {
+		cs.logger.Error(err) // only unmarshal error
+	}
 	pc, err := cs.voter.Vote(block)
 	if err != nil {
 		// if the block is invalid, reject it. This means the command is also discarded.
@@ -84,13 +86,13 @@ func (cs *Proposer) CreateProposal(view hotstuff.View, highQC hotstuff.QuorumCer
 	defer cancel()
 	// find a value to propose.
 	// NOTE: this is blocking until a batch is present in the cache.
-	cmd, ok := cs.commandCache.Get(ctx)
-	if !ok {
-		return proposal, fmt.Errorf("no command")
+	cmdBatch, err := cs.commandCache.Get(ctx)
+	if err != nil {
+		return proposal, fmt.Errorf("no command batch: %w", err)
 	}
 	// ensure that a proposal can be sent based on the protocol's rule.
 	// NOTE: the ruler will create the proposal too.
-	proposal, ok = cs.ruler.ProposeRule(view, highQC, syncInfo, cmd)
+	proposal, ok := cs.ruler.ProposeRule(view, highQC, syncInfo, cmdBatch)
 	if !ok {
 		return proposal, fmt.Errorf("propose rule not satisfied")
 	}

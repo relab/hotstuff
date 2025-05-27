@@ -29,7 +29,6 @@ func NewService(
 	clientSrvOpts ...gorums.ServerOption,
 ) *Service {
 	cmdCache := clientpb.New(
-		logger,
 		cacheOpt...,
 	)
 	clientSrv := clientsrv.New(

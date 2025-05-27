@@ -75,7 +75,9 @@ func (cs *Voter) OnPropose(proposal *hotstuff.ProposeMsg) {
 	cs.committer.Update(block)
 	// TODO(AlanRostem): solve issue #191
 	// update the command's age before voting.
-	cs.commandCache.Proposed(block.Command())
+	if err := cs.commandCache.Proposed(block.Command()); err != nil {
+		cs.logger.Error(err) // only unmarshal error
+	}
 	pc, err := cs.Vote(block)
 	if err != nil {
 		// if the block is invalid, reject it. This means the command is also discarded.
@@ -123,8 +125,8 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 		return fmt.Errorf("block view too old")
 	}
 	// cannot vote for old commands
-	if !v.commandCache.Accept(block.Command()) {
-		return fmt.Errorf("command too old")
+	if err := v.commandCache.Accept(block.Command()); err != nil {
+		return err
 	}
 	// vote rule must be valid
 	if !v.ruler.VoteRule(view, *proposal) {

@@ -3,18 +3,14 @@ package clientpb
 import (
 	"container/list"
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/relab/hotstuff"
-
-	"github.com/relab/hotstuff/core/logging"
-
 	"google.golang.org/protobuf/proto"
 )
 
 type Cache struct {
-	logger logging.Logger
-
 	mut           sync.Mutex
 	c             chan struct{}
 	batchSize     uint32
@@ -25,23 +21,18 @@ type Cache struct {
 }
 
 func New(
-	logger logging.Logger,
 	opts ...Option,
 ) *Cache {
 	c := &Cache{
-		logger: logger,
-
 		c:             make(chan struct{}),
 		batchSize:     1,
 		serialNumbers: make(map[uint32]uint64),
 		marshaler:     proto.MarshalOptions{Deterministic: true},
 		unmarshaler:   proto.UnmarshalOptions{DiscardUnknown: true},
 	}
-
 	for _, opt := range opts {
 		opt(c)
 	}
-
 	return c
 }
 
@@ -67,7 +58,9 @@ func (c *Cache) Add(cmd *Command) {
 }
 
 // Get returns a batch of commands to propose.
-func (c *Cache) Get(ctx context.Context) (cmd hotstuff.Command, ok bool) {
+// It blocks until it can return a batch of commands, or the context is done.
+// If the context is done, it returns an error.
+func (c *Cache) Get(ctx context.Context) (hotstuff.Command, error) {
 	batch := new(Batch)
 
 	c.mut.Lock()
@@ -78,7 +71,7 @@ awaitBatch:
 		select {
 		case <-c.c:
 		case <-ctx.Done():
-			return
+			return "", ctx.Err()
 		}
 		c.mut.Lock()
 	}
@@ -110,21 +103,17 @@ awaitBatch:
 	// otherwise, we should have at least one command
 	b, err := c.marshaler.Marshal(batch)
 	if err != nil {
-		c.logger.Errorf("Failed to marshal batch: %v", err)
-		return "", false
+		return "", fmt.Errorf("failed to marshal batch: %w", err)
 	}
 
-	cmd = hotstuff.Command(b)
-	return cmd, true
+	return hotstuff.Command(b), nil
 }
 
-// Accept returns true if the batch is new.
-func (c *Cache) Accept(cmd hotstuff.Command) bool {
-	batch := new(Batch)
-	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
+// Accept returns an error if the given command batch is too old to be accepted.
+func (c *Cache) Accept(cmd hotstuff.Command) error {
+	batch, err := c.unmarshal(cmd)
 	if err != nil {
-		c.logger.Errorf("Failed to unmarshal batch: %v", err)
-		return false
+		return err
 	}
 
 	c.mut.Lock()
@@ -132,21 +121,17 @@ func (c *Cache) Accept(cmd hotstuff.Command) bool {
 
 	for _, cmd := range batch.GetCommands() {
 		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
-			// command is too old, can't accept
-			return false
+			return fmt.Errorf("command too old")
 		}
 	}
-
-	return true
+	return nil
 }
 
 // Proposed updates the serial numbers such that we will not accept the given batch again.
-func (c *Cache) Proposed(cmd hotstuff.Command) {
-	batch := new(Batch)
-	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
+func (c *Cache) Proposed(cmd hotstuff.Command) error {
+	batch, err := c.unmarshal(cmd)
 	if err != nil {
-		c.logger.Errorf("Failed to unmarshal batch: %v", err)
-		return
+		return err
 	}
 
 	c.mut.Lock()
@@ -157,4 +142,14 @@ func (c *Cache) Proposed(cmd hotstuff.Command) {
 			c.serialNumbers[cmd.GetClientID()] = cmd.GetSequenceNumber()
 		}
 	}
+	return nil
+}
+
+// unmarshal unmarshals the given command into a Batch.
+func (c *Cache) unmarshal(cmd hotstuff.Command) (batch *Batch, err error) {
+	batch = new(Batch)
+	if err = c.unmarshaler.Unmarshal([]byte(cmd), batch); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal batch: %w", err)
+	}
+	return batch, nil
 }
