@@ -7,9 +7,9 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/certauth"
-	"github.com/relab/hotstuff/service/cmdcache"
 	"github.com/relab/hotstuff/service/committer"
 )
 
@@ -23,7 +23,7 @@ type Voter struct {
 	protocol       modules.ConsensusProtocol
 
 	auth         *certauth.CertAuthority
-	commandCache *cmdcache.Cache
+	commandCache *clientpb.Cache
 	committer    *committer.Committer
 
 	lastVote hotstuff.View
@@ -37,7 +37,7 @@ func NewVoter(
 	rules modules.VoteRuler,
 	protocol modules.ConsensusProtocol,
 	auth *certauth.CertAuthority,
-	commandCache *cmdcache.Cache,
+	commandCache *clientpb.Cache,
 	committer *committer.Committer,
 ) *Voter {
 	v := &Voter{

@@ -7,9 +7,9 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
-	"github.com/relab/hotstuff/service/cmdcache"
 	"github.com/relab/hotstuff/service/committer"
 )
 
@@ -20,7 +20,7 @@ type Proposer struct {
 	ruler        modules.ProposeRuler
 	protocol     modules.ConsensusProtocol
 	voter        *Voter
-	commandCache *cmdcache.Cache
+	commandCache *clientpb.Cache
 	committer    *committer.Committer
 }
 
@@ -30,7 +30,7 @@ func NewProposer(
 	config *core.RuntimeConfig,
 	protocol modules.ConsensusProtocol,
 	voter *Voter,
-	commandCache *cmdcache.Cache,
+	commandCache *clientpb.Cache,
 	committer *committer.Committer,
 	opts ...ProposerOption,
 ) *Proposer {

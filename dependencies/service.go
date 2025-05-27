@@ -4,15 +4,15 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/service/clientsrv"
-	"github.com/relab/hotstuff/service/cmdcache"
 	"github.com/relab/hotstuff/service/committer"
 )
 
 type Service struct {
-	cmdCache  *cmdcache.Cache
+	cmdCache  *clientpb.Cache
 	clientSrv *clientsrv.Server
 	committer *committer.Committer
 }
@@ -25,10 +25,10 @@ func NewService(
 	blockChain *blockchain.BlockChain,
 	rules modules.HotstuffRuleset,
 	// TODO: Join these into single option type
-	cacheOpt []cmdcache.Option,
+	cacheOpt []clientpb.Option,
 	clientSrvOpts ...gorums.ServerOption,
 ) *Service {
-	cmdCache := cmdcache.New(
+	cmdCache := clientpb.New(
 		logger,
 		cacheOpt...,
 	)
@@ -52,7 +52,7 @@ func NewService(
 }
 
 // CmdCache returns the command cache.
-func (s *Service) CmdCache() *cmdcache.Cache {
+func (s *Service) CmdCache() *clientpb.Cache {
 	return s.cmdCache
 }
 
