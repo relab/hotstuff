@@ -66,7 +66,7 @@ func (c *Cache) Get(ctx context.Context) (hotstuff.Command, error) {
 	c.mut.Lock()
 awaitBatch:
 	// wait until we can send a new batch.
-	for c.len() <= c.batchSize {
+	for c.len() < c.batchSize {
 		c.mut.Unlock()
 		select {
 		case <-c.c:
