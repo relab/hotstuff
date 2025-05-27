@@ -114,7 +114,7 @@ func New(
 		depsSecure.Authority(),
 	)
 	var protocol modules.ConsensusProtocol
-	if depsCore.RuntimeCfg().KauriEnabled() {
+	if depsCore.RuntimeCfg().HasKauriTree() {
 		protocol = kauri.New(
 			depsCore.Logger(),
 			depsCore.EventLoop(),

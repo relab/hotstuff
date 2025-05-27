@@ -144,7 +144,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 	// setup core - used in replica and measurement framework
 	runtimeOpts := []core.RuntimeOption{}
-	if opts.TreeEnabled() {
+	// TODO(AlanRostem): maybe rename the tree option to kauriTree? should also use the tree check only for enable kauri
+	if opts.GetKauri() && opts.TreeEnabled() {
 		delayMode := tree.DelayTypeNone
 		if opts.GetAggregationTime() {
 			delayMode = tree.DelayTypeAggregation
@@ -157,10 +158,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			opts.TreePositionIDs(),
 			opts.GetTreeDelta().AsDuration(),
 		)
-		runtimeOpts = append(runtimeOpts, core.WithTree(t))
-	}
-	if opts.GetKauri() {
-		runtimeOpts = append(runtimeOpts, core.WithKauri())
+		runtimeOpts = append(runtimeOpts, core.WithKauriTree(t))
 	}
 	runtimeOpts = append(runtimeOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
 	if opts.GetUseAggQC() {

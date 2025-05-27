@@ -34,7 +34,7 @@ func (t *treeLeader) ViewDuration() modules.ViewDuration {
 
 // GetLeader returns the id of the leader in the given view
 func (t *treeLeader) GetLeader(_ hotstuff.View) hotstuff.ID {
-	if !t.config.HasTree() {
+	if !t.config.HasKauriTree() {
 		return 1
 	}
 	return t.config.Tree().Root()
