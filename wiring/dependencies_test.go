@@ -16,7 +16,7 @@ import (
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
-	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/security/crypto/eddsa"
@@ -90,7 +90,7 @@ func TestModules(t *testing.T) {
 			depsCore.RuntimeCfg(),
 			sender,
 			td.cryptoName,
-			certauth.WithCache(100),
+			cert.WithCache(100),
 		)
 		if err != nil {
 			t.Fatalf("%v", err)

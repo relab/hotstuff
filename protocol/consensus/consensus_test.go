@@ -12,7 +12,7 @@ import (
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/wiring"
 	"google.golang.org/grpc/credentials/insecure"
@@ -26,7 +26,7 @@ func TestVote(t *testing.T) {
 	type replica struct {
 		eventLoop    *eventloop.EventLoop
 		blockChain   *blockchain.BlockChain
-		certAuth     *certauth.CertAuthority
+		auth         *cert.Authority
 		proposer     *consensus.Proposer
 		synchronizer *synchronizer.Synchronizer
 	}
@@ -53,7 +53,7 @@ func TestVote(t *testing.T) {
 			depsCore.RuntimeCfg(),
 			sender,
 			cryptoName,
-			certauth.WithCache(cacheSize),
+			cert.WithCache(cacheSize),
 		)
 		if err != nil {
 			t.Fatalf("%v", err)
@@ -78,7 +78,7 @@ func TestVote(t *testing.T) {
 			eventLoop:    depsCore.EventLoop(),
 			blockChain:   depsSecure.BlockChain(),
 			consensus:    depsProtocol.Consensus(),
-			certAuth:     depsSecure.CertAuth(),
+			auth:     depsSecure.Authority(),
 			synchronizer: depsProtocol.Synchronizer(),
 		})*/
 	}
@@ -104,7 +104,7 @@ func TestVote(t *testing.T) {
 	r.proposer.Propose(1, qc, hotstuff.NewSyncInfo().WithQC(qc))
 
 	for i, signer := range replicas {
-		pc, err := signer.certAuth.CreatePartialCert(b.Block)
+		pc, err := signer.auth.CreatePartialCert(b.Block)
 		if err != nil {
 			t.Fatalf("Failed to create partial certificate: %v", err)
 		}

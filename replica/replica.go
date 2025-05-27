@@ -13,8 +13,7 @@ import (
 	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
-	"github.com/relab/hotstuff/protocol/viewstates"
-	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/service/clientsrv"
 	"github.com/relab/hotstuff/wiring"
 
@@ -59,7 +58,7 @@ func New(
 		depsCore.RuntimeCfg(),
 		sender,
 		names.crypto,
-		certauth.WithCache(100), // TODO: consider making this configurable
+		cert.WithCache(100), // TODO: consider making this configurable
 	)
 	if err != nil {
 		return nil, err
@@ -109,10 +108,10 @@ func New(
 		return nil, err
 	}
 	// TODO(AlanRostem): avoid creating viewstates here.
-	viewStates := viewstates.New(
+	viewStates := consensus.NewViewStates(
 		depsCore.Logger(),
 		depsSecure.BlockChain(),
-		depsSecure.CertAuth(),
+		depsSecure.Authority(),
 	)
 	var protocol modules.ConsensusProtocol
 	if depsCore.RuntimeCfg().KauriEnabled() {
@@ -121,7 +120,7 @@ func New(
 			depsCore.EventLoop(),
 			depsCore.RuntimeCfg(),
 			depsSecure.BlockChain(),
-			depsSecure.CertAuth(),
+			depsSecure.Authority(),
 			kauri.NewExtendedGorumsSender(
 				depsCore.EventLoop(),
 				depsCore.Logger(),
@@ -135,7 +134,7 @@ func New(
 			depsCore.EventLoop(),
 			depsCore.RuntimeCfg(),
 			depsSecure.BlockChain(),
-			depsSecure.CertAuth(),
+			depsSecure.Authority(),
 			viewStates,
 			leader,
 			sender,
@@ -145,7 +144,7 @@ func New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
-		depsSecure.CertAuth(),
+		depsSecure.Authority(),
 		depsSrv.CmdCache(),
 		depsSrv.Committer(),
 		rules,
@@ -157,7 +156,7 @@ func New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
-		depsSecure.CertAuth(),
+		depsSecure.Authority(),
 		leader,
 		depsConsensus.Proposer(),
 		depsConsensus.Voter(),

@@ -6,13 +6,13 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/security/cert"
 )
 
 type Security struct {
 	blockChain *blockchain.BlockChain
 	cryptoImpl modules.CryptoBase
-	certAuth   *certauth.CertAuthority
+	auth       *cert.Authority
 }
 
 // NewSecurity returns a set of dependencies necessary for application security and integrity.
@@ -22,7 +22,7 @@ func NewSecurity(
 	config *core.RuntimeConfig,
 	sender modules.Sender,
 	cryptoName string,
-	opts ...certauth.Option,
+	opts ...cert.Option,
 ) (*Security, error) {
 	blockChain := blockchain.New(
 		eventLoop,
@@ -40,7 +40,7 @@ func NewSecurity(
 	return &Security{
 		blockChain: blockChain,
 		cryptoImpl: cryptoImpl,
-		certAuth: certauth.New(
+		auth: cert.NewAuthority(
 			config,
 			logger,
 			blockChain,
@@ -60,7 +60,7 @@ func (s *Security) CryptoImpl() modules.CryptoBase {
 	return s.cryptoImpl
 }
 
-// CertAuth returns the certificate authority.
-func (s *Security) CertAuth() *certauth.CertAuthority {
-	return s.certAuth
+// auth returns the certificate authority.
+func (s *Security) Authority() *cert.Authority {
+	return s.auth
 }

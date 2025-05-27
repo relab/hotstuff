@@ -1,4 +1,4 @@
-package certauth
+package cert
 
 import (
 	"container/list"
