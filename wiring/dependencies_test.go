@@ -1,11 +1,10 @@
-package dependencies_test
+package wiring_test
 
 import (
 	"testing"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/leaderrotation/carousel"
@@ -17,10 +16,11 @@ import (
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
-	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/security/crypto/eddsa"
+	"github.com/relab/hotstuff/wiring"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -77,20 +77,20 @@ func TestModules(t *testing.T) {
 		if td.consensusName == fasthotstuff.ModuleName {
 			runtimeOpts = append(runtimeOpts, core.WithAggregateQC())
 		}
-		depsCore := dependencies.NewCore(hotstuff.ID(1), "test", pk, runtimeOpts...)
+		depsCore := wiring.NewCore(hotstuff.ID(1), "test", pk, runtimeOpts...)
 		sender := network.NewGorumsSender(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
 			insecure.NewCredentials(),
 		)
-		depsSecure, err := dependencies.NewSecurity(
+		depsSecure, err := wiring.NewSecurity(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
 			sender,
 			td.cryptoName,
-			certauth.WithCache(100),
+			cert.WithCache(100),
 		)
 		if err != nil {
 			t.Fatalf("%v", err)

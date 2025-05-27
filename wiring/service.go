@@ -1,4 +1,4 @@
-package dependencies
+package wiring
 
 import (
 	"github.com/relab/gorums"

@@ -10,7 +10,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/security/cert"
 
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/testutil"
@@ -22,7 +22,7 @@ func TestConvertPartialCert(t *testing.T) {
 	key := testutil.GenerateECDSAKey(t)
 	cfg := core.NewRuntimeConfig(1, key)
 	crypt := ecdsa.New(nil, cfg) // TODO: why is logger nil?
-	signer := certauth.New(cfg, nil, nil, crypt)
+	signer := cert.NewAuthority(cfg, nil, nil, crypt)
 
 	want, err := signer.CreatePartialCert(hotstuff.GetGenesis())
 	if err != nil {
@@ -39,12 +39,12 @@ func TestConvertPartialCert(t *testing.T) {
 
 func TestConvertQuorumCert(t *testing.T) {
 	n := 4
-	signers := make([]*certauth.CertAuthority, n)
+	signers := make([]*cert.Authority, n)
 	for i := range n {
 		key := testutil.GenerateECDSAKey(t)
 		cfg := core.NewRuntimeConfig(hotstuff.ID(i+1), key)
 		crypt := ecdsa.New(nil, cfg)
-		signer := certauth.New(cfg, nil, nil, crypt)
+		signer := cert.NewAuthority(cfg, nil, nil, crypt)
 		signers[i] = signer
 	}
 
@@ -100,7 +100,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 		id := hotstuff.ID(i + 1)
 		logger := logging.New("test")
 		crypt := bls12.New(logger, cfgs[id])
-		signer := certauth.New(cfgs[id], logger, nil, crypt)
+		signer := cert.NewAuthority(cfgs[id], logger, nil, crypt)
 		signers[i] = signer
 		meta := cfgs[id].ConnectionMetadata()
 		err := cfgs[id].SetReplicaMetadata(id, meta)
@@ -114,7 +114,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 	pb := hotstuffpb.TimeoutCertToProto(tc1)
 	tc2 := hotstuffpb.TimeoutCertFromProto(pb)
 
-	signer := signers[0].(*certauth.CertAuthority)
+	signer := signers[0].(*cert.Authority)
 
 	if !signer.VerifyTimeoutCert(cfgs[1].QuorumSize(), tc2) {
 		t.Fatal("Failed to verify timeout cert")

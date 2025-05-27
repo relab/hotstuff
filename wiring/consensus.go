@@ -1,4 +1,4 @@
-package dependencies
+package wiring
 
 import (
 	"github.com/relab/hotstuff/core"
@@ -7,7 +7,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/service/committer"
 )
 
@@ -20,7 +20,7 @@ func NewConsensus(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-	auth *certauth.CertAuthority,
+	auth *cert.Authority,
 	commandCache *clientpb.Cache,
 	committer *committer.Committer,
 	consensusRulesModule modules.HotstuffRuleset,

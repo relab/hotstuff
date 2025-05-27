@@ -1,4 +1,4 @@
-package viewstates
+package consensus
 
 import (
 	"fmt"
@@ -7,13 +7,13 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/security/cert"
 )
 
 type ViewStates struct {
 	logger     logging.Logger
 	blockChain *blockchain.BlockChain
-	auth       *certauth.CertAuthority
+	auth       *cert.Authority
 
 	mut sync.RWMutex // to protect the following
 
@@ -22,10 +22,10 @@ type ViewStates struct {
 	view   hotstuff.View
 }
 
-func New(
+func NewViewStates(
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
-	auth *certauth.CertAuthority,
+	auth *cert.Authority,
 ) *ViewStates {
 	s := &ViewStates{
 		logger:     logger,

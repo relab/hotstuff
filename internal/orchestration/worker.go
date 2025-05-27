@@ -16,7 +16,6 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
@@ -27,6 +26,7 @@ import (
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 	"github.com/relab/hotstuff/service/server"
+	"github.com/relab/hotstuff/wiring"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -166,7 +166,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if opts.GetUseAggQC() {
 		runtimeOpts = append(runtimeOpts, core.WithAggregateQC())
 	}
-	depsCore := dependencies.NewCore(opts.HotstuffID(), "hs", privKey, runtimeOpts...)
+	depsCore := wiring.NewCore(opts.HotstuffID(), "hs", privKey, runtimeOpts...)
 	// check if measurements should be enabled
 	if w.measurementInterval > 0 {
 		// Initializes the metrics modules internally.

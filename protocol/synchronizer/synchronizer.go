@@ -10,8 +10,7 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/viewstates"
-	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/security/cert"
 
 	"github.com/relab/hotstuff"
 )
@@ -22,13 +21,13 @@ type Synchronizer struct {
 	logger    logging.Logger
 	config    *core.RuntimeConfig
 
-	auth *certauth.CertAuthority
+	auth *cert.Authority
 
 	duration       modules.ViewDuration
 	leaderRotation modules.LeaderRotation
 	voter          *consensus.Voter
 	proposer       *consensus.Proposer
-	state          *viewstates.ViewStates
+	state          *consensus.ViewStates
 
 	sender modules.Sender
 
@@ -51,13 +50,13 @@ func New(
 	config *core.RuntimeConfig,
 
 	// security dependencies
-	auth *certauth.CertAuthority,
+	auth *cert.Authority,
 
 	// protocol dependencies
 	leaderRotation modules.LeaderRotation,
 	proposer *consensus.Proposer,
 	voter *consensus.Voter,
-	state *viewstates.ViewStates,
+	state *consensus.ViewStates,
 
 	// network dependencies
 	sender modules.Sender,
