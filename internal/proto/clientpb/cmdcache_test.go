@@ -26,17 +26,17 @@ func TestAddGetCommand(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for range 3 {
-			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 			cmd, err := cache.Get(ctx)
 			if err != nil {
 				t.Errorf("Get() error: %v", err)
 			}
-			batch, err := cache.unmarshal(cmd)
+			batch, err := cache.getCommands(cmd)
 			if err != nil {
 				t.Errorf("Batch() error: %v", err)
 			}
-			t.Logf("Received command: %v", batch.GetCommands())
+			t.Logf("Received command: %v", batch)
 		}
 	}()
 	wg.Wait()

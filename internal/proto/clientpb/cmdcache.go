@@ -111,7 +111,7 @@ awaitBatch:
 
 // Accept returns an error if the given command batch is too old to be accepted.
 func (c *Cache) Accept(cmd hotstuff.Command) error {
-	batch, err := c.unmarshal(cmd)
+	batch, err := c.getCommands(cmd)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (c *Cache) Accept(cmd hotstuff.Command) error {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 
-	for _, cmd := range batch.GetCommands() {
+	for _, cmd := range batch {
 		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
 			return fmt.Errorf("command too old")
 		}
@@ -129,7 +129,7 @@ func (c *Cache) Accept(cmd hotstuff.Command) error {
 
 // Proposed updates the serial numbers such that we will not accept the given batch again.
 func (c *Cache) Proposed(cmd hotstuff.Command) error {
-	batch, err := c.unmarshal(cmd)
+	batch, err := c.getCommands(cmd)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func (c *Cache) Proposed(cmd hotstuff.Command) error {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 
-	for _, cmd := range batch.GetCommands() {
+	for _, cmd := range batch {
 		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo < cmd.GetSequenceNumber() {
 			c.serialNumbers[cmd.GetClientID()] = cmd.GetSequenceNumber()
 		}
@@ -145,11 +145,11 @@ func (c *Cache) Proposed(cmd hotstuff.Command) error {
 	return nil
 }
 
-// unmarshal unmarshals the given command into a Batch.
-func (c *Cache) unmarshal(cmd hotstuff.Command) (batch *Batch, err error) {
-	batch = new(Batch)
-	if err = c.unmarshaler.Unmarshal([]byte(cmd), batch); err != nil {
+// getCommands unmarshals the given command returns its batch of commands.
+func (c *Cache) getCommands(cmd hotstuff.Command) ([]*Command, error) {
+	batch := new(Batch)
+	if err := c.unmarshaler.Unmarshal([]byte(cmd), batch); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal batch: %w", err)
 	}
-	return batch, nil
+	return batch.GetCommands(), nil
 }
