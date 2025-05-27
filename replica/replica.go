@@ -15,6 +15,7 @@ import (
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/service/clientsrv"
+	"github.com/relab/hotstuff/service/committer"
 	"github.com/relab/hotstuff/wiring"
 
 	"github.com/relab/hotstuff"
@@ -87,19 +88,24 @@ func New(
 		rules = byz
 		depsCore.Logger().Infof("assigned byzantine strategy: %s", byzStrat)
 	}
-	depsSrv := wiring.NewService(
-		depsCore.Logger(),
+	depsClient := wiring.NewClient(
 		depsCore.EventLoop(),
-		depsSecure.BlockChain(),
-		rules,
+		depsCore.Logger(),
 		rOpt.cmdCacheOpts,
 		rOpt.clientGorumsSrvOpts...,
+	)
+	committer := committer.New(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsSecure.BlockChain(),
+		rules,
+		depsClient.Server(),
 	)
 	leader, err := wiring.NewLeaderRotation(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
-		depsSrv.Committer(),
+		committer,
 		vdParams,
 		rOpt.moduleNames.leaderRotation,
 		rules.ChainLength(),
@@ -146,8 +152,8 @@ func New(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.Authority(),
-		depsSrv.CmdCache(),
-		depsSrv.Committer(),
+		depsClient.Cache(),
+		committer,
 		rules,
 		leader,
 		protocol,
@@ -174,7 +180,7 @@ func New(
 	)
 	srv := &Replica{
 		eventLoop:    depsCore.EventLoop(),
-		clientSrv:    depsSrv.ClientSrv(),
+		clientSrv:    depsClient.Server(),
 		sender:       sender,
 		synchronizer: synchronizer,
 		hsSrv:        server,
