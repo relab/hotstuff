@@ -5,13 +5,11 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
 )
 
 type ViewStates struct {
-	logger     logging.Logger
 	blockChain *blockchain.BlockChain
 	auth       *cert.Authority
 
@@ -23,12 +21,10 @@ type ViewStates struct {
 }
 
 func NewViewStates(
-	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
 	auth *cert.Authority,
-) *ViewStates {
+) (*ViewStates, error) {
 	s := &ViewStates{
-		logger:     logger,
 		blockChain: blockChain,
 		auth:       auth,
 
@@ -37,29 +33,28 @@ func NewViewStates(
 	var err error
 	s.highQC, err = s.auth.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
 	if err != nil {
-		panic(fmt.Errorf("unable to create empty quorum cert for genesis block: %v", err))
+		return nil, fmt.Errorf("unable to create empty quorum cert for genesis block: %v", err)
 	}
 	s.highTC, err = s.auth.CreateTimeoutCert(hotstuff.View(0), []hotstuff.TimeoutMsg{})
 	if err != nil {
-		panic(fmt.Errorf("unable to create empty timeout cert for view 0: %v", err))
+		return nil, fmt.Errorf("unable to create empty timeout cert for view 0: %v", err)
 	}
-	return s
+	return s, nil
 }
 
 // updateHighQC attempts to update the highQC, but does not verify the qc first.
 // This method is meant to be used instead of the exported UpdateHighQC internally
 // in this package when the qc has already been verified.
 // TODO(AlanRostem): this was in synchronizer, make tests.
-func (s *ViewStates) UpdateHighQC(qc hotstuff.QuorumCert) {
+func (s *ViewStates) UpdateHighQC(qc hotstuff.QuorumCert) error {
 	newBlock, ok := s.blockChain.Get(qc.BlockHash())
 	if !ok {
-		s.logger.Info("updateHighQC: Could not find block referenced by new QC!")
-		return
+		return fmt.Errorf("could not find block referenced by new qc")
 	}
 	if newBlock.View() > s.highQC.View() {
 		s.highQC = qc
-		s.logger.Debug("HighQC updated")
 	}
+	return nil
 }
 
 // updateHighTC attempts to update the highTC, but does not verify the tc first.
@@ -67,7 +62,6 @@ func (s *ViewStates) UpdateHighQC(qc hotstuff.QuorumCert) {
 func (s *ViewStates) UpdateHighTC(tc hotstuff.TimeoutCert) {
 	if tc.View() > s.highTC.View() {
 		s.highTC = tc
-		s.logger.Debug("HighTC updated")
 	}
 }
 

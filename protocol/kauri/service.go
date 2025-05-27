@@ -3,7 +3,6 @@ package kauri
 import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/kauripb"
 )
 
@@ -14,11 +13,9 @@ type serviceImpl struct {
 // RegisterService registers a service implementation for Gorums which allows sending ContributionRecvEvent.
 func RegisterService(
 	eventLoop *eventloop.EventLoop,
-	logger logging.Logger,
 	gorumsSrv *gorums.Server,
 ) {
 	i := &serviceImpl{eventLoop: eventLoop}
-	logger.Debug("Kauripb: Service registered.")
 	kauripb.RegisterKauriServer(gorumsSrv, i)
 }
 

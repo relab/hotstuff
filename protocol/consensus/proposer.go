@@ -52,13 +52,7 @@ func NewProposer(
 }
 
 // Propose creates a new outgoing proposal.
-func (cs *Proposer) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syncInfo hotstuff.SyncInfo) {
-	proposal, err := cs.CreateProposal(view, highQC, syncInfo)
-	if err != nil {
-		// do not send or vote interally for the proposal if it could not be created successfully
-		cs.logger.Debugf("could not create proposal: %v", err)
-		return
-	}
+func (cs *Proposer) Propose(proposal *hotstuff.ProposeMsg) {
 	block := proposal.Block
 	// store the valid block, it may commit the block or its ancestors
 	cs.committer.Update(block)
@@ -69,14 +63,14 @@ func (cs *Proposer) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, sync
 	}
 	pc, err := cs.voter.Vote(block)
 	if err != nil {
-		// if the block is invalid, reject it. This means the command is also discarded.
-		cs.logger.Errorf("critical error at proposer: %v", err)
+		// this should not happen which is why we log here just in case of a bug
+		cs.logger.Errorf("critical: %v", err)
 		return
 	}
 	// TODO(AlanRostem): moved this line to HotStuff since Kauri already sends a new view in its own logic. Check if this is valid.
 	// cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
 	// as proposer, I can vote for my own proposal without verifying.
-	cs.protocol.SendPropose(&proposal, pc)
+	cs.protocol.SendPropose(proposal, pc)
 }
 
 // CreateProposal attempts to create a new outgoing proposal if a command exists and the protocol's rule is satisfied.
@@ -88,7 +82,7 @@ func (cs *Proposer) CreateProposal(view hotstuff.View, highQC hotstuff.QuorumCer
 	// NOTE: this is blocking until a batch is present in the cache.
 	cmdBatch, err := cs.commandCache.Get(ctx)
 	if err != nil {
-		return proposal, fmt.Errorf("no command batch: %w", err)
+		return proposal, fmt.Errorf("no command batch: %v", err)
 	}
 	// ensure that a proposal can be sent based on the protocol's rule.
 	// NOTE: the ruler will create the proposal too.
