@@ -23,7 +23,7 @@ func TestCacheConcurrentAddGet(t *testing.T) {
 		for i := range 6 {
 			cmd := &Command{ClientID: 1, SequenceNumber: uint64(i + 1)}
 			want = append(want, cmd)
-			cache.Add(cmd)
+			cache.add(cmd)
 		}
 	}()
 
@@ -34,17 +34,14 @@ func TestCacheConcurrentAddGet(t *testing.T) {
 		for range 3 {
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 			defer cancel()
-			cmd, err := cache.Get(ctx)
+			batch, err := cache.Get(ctx)
 			if err != nil {
 				t.Errorf("Get() error: %v", err)
 			}
-			batch, err := cache.GetCommands(cmd)
-			if err != nil {
-				t.Errorf("Batch() error: %v", err)
-			}
-			got = append(got, batch...)
-			if len(batch) != 2 {
-				t.Errorf("Get() got %d commands, want 2", len(batch))
+			cmds := batch.GetCommands()
+			got = append(got, cmds...)
+			if len(cmds) != 2 {
+				t.Errorf("Get() got %d commands, want 2", len(cmds))
 			}
 		}
 		if diff := cmp.Diff(got, want, protocmp.Transform()); diff != "" {
@@ -130,7 +127,7 @@ func TestCacheAddGetDeadlineExceeded(t *testing.T) {
 			cache := New(WithBatching(2))
 
 			for _, cmd := range tt.cmds {
-				cache.Add(cmd)
+				cache.add(cmd)
 			}
 
 			for e := range tt.wantErr {
@@ -143,20 +140,13 @@ func TestCacheAddGetDeadlineExceeded(t *testing.T) {
 				got, err := cache.Get(ctx)
 				if (err != nil) != (wantErr != nil) || (wantErr != nil && !errors.Is(err, wantErr)) {
 					t.Errorf("Get() error = %v, wantErr %v", err, wantErr)
-					batch, err := cache.GetCommands(got)
-					if err != nil {
-						t.Fatalf("GetCommands() error: %v", err)
-					}
-					t.Logf("Got command batch: %v", batch)
+					t.Logf("Got command batch: %v", got.GetCommands())
 					return
 				}
 
 				if len(wantBatch) > 0 {
 					// we use GetCommands to unmarshal the commands and confirm they match the expected commands
-					gotBatch, err := cache.GetCommands(got)
-					if err != nil {
-						t.Fatalf("GetCommands() error: %v", err)
-					}
+					gotBatch := got.GetCommands()
 					if diff := cmp.Diff(gotBatch, wantBatch, protocmp.Transform()); diff != "" {
 						t.Errorf("Get() mismatch (-got +want):\n%s", diff)
 					}

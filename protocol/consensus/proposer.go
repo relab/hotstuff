@@ -58,9 +58,7 @@ func (cs *Proposer) Propose(proposal *hotstuff.ProposeMsg) {
 	cs.committer.Update(block)
 	// TODO(AlanRostem): solve issue #191
 	// update the command's age before voting.
-	if err := cs.commandCache.Proposed(block.Command()); err != nil {
-		cs.logger.Error(err) // only unmarshal error
-	}
+	cs.commandCache.Proposed(block.Command())
 	pc, err := cs.voter.Vote(block)
 	if err != nil {
 		// this should not happen which is why we log here just in case of a bug
@@ -75,11 +73,12 @@ func (cs *Proposer) Propose(proposal *hotstuff.ProposeMsg) {
 
 // CreateProposal attempts to create a new outgoing proposal if a command exists and the protocol's rule is satisfied.
 func (cs *Proposer) CreateProposal(view hotstuff.View, highQC hotstuff.QuorumCert, syncInfo hotstuff.SyncInfo) (proposal hotstuff.ProposeMsg, err error) {
-	err = nil
 	ctx, cancel := timeout.Context(cs.eventLoop.Context(), cs.eventLoop)
 	defer cancel()
 	// find a value to propose.
 	// NOTE: this is blocking until a batch is present in the cache.
+	// TODO(meling): Should this return a partially filled batch if there is a timeout? What is the timeout? Right now, it returns nil if ctx is canceled.
+	// TODO(meling): Note: the ctx is canceled on view change as well; should it return a batch on view change?
 	cmdBatch, err := cs.commandCache.Get(ctx)
 	if err != nil {
 		return proposal, fmt.Errorf("no command batch: %v", err)
@@ -94,7 +93,7 @@ func (cs *Proposer) CreateProposal(view hotstuff.View, highQC hotstuff.QuorumCer
 }
 
 // ProposeRule implements the default propose ruler.
-func (cs *Proposer) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
+func (cs *Proposer) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
 	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
 	proposal = hotstuff.ProposeMsg{
 		ID: cs.config.ID(),

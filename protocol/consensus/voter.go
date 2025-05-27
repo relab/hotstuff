@@ -76,9 +76,7 @@ func (cs *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) {
 	cs.committer.Update(block)
 	// TODO(AlanRostem): solve issue #191
 	// update the command's age before voting.
-	if err := cs.commandCache.Proposed(block.Command()); err != nil {
-		cs.logger.Error(err) // only unmarshal error
-	}
+	cs.commandCache.Proposed(block.Command())
 	pc, err := cs.Vote(block)
 	if err != nil {
 		// if the block is invalid, reject it. This means the command is also discarded.

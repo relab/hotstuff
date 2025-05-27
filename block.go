@@ -5,6 +5,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"time"
+
+	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"google.golang.org/protobuf/proto"
 )
 
 // Block contains a propsed "command", metadata for the protocol, and a link to the "parent" block.
@@ -13,14 +16,14 @@ type Block struct {
 	hash     Hash
 	parent   Hash
 	proposer ID
-	cmd      Command
+	cmd      *clientpb.Batch
 	cert     QuorumCert
 	view     View
 	ts       time.Time
 }
 
 // NewBlock creates a new Block
-func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID) *Block {
+func NewBlock(parent Hash, cert QuorumCert, cmd *clientpb.Batch, view View, proposer ID) *Block {
 	b := &Block{
 		parent:   parent,
 		cert:     cert,
@@ -61,7 +64,7 @@ func (b *Block) Parent() Hash {
 }
 
 // Command returns the command
-func (b *Block) Command() Command {
+func (b *Block) Command() *clientpb.Batch { // TODO(meling): rename field and method to Batch
 	return b.cmd
 }
 
@@ -89,7 +92,13 @@ func (b *Block) ToBytes() []byte {
 	var viewBuf [8]byte
 	binary.LittleEndian.PutUint64(viewBuf[:], uint64(b.view))
 	buf = append(buf, viewBuf[:]...)
-	buf = append(buf, []byte(b.cmd)...)
+	// HACK(meling): should be avoided when we remove the translation layer.
+	x, err := proto.MarshalOptions{Deterministic: true}.Marshal(b.cmd)
+	if err != nil {
+		panic(fmt.Sprintf("failed to marshal command: %v", err))
+	}
+	buf = append(buf, x...)
+	// buf = append(buf, []byte(b.cmd)...)//TODO: Convert clientpb.Batch to []byte
 	buf = append(buf, b.cert.ToBytes()...)
 	return buf
 }

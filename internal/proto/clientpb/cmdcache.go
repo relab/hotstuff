@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/relab/hotstuff"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -40,7 +39,7 @@ func (c *Cache) len() uint32 {
 	return uint32(c.cache.Len())
 }
 
-func (c *Cache) Add(cmd *Command) {
+func (c *Cache) add(cmd *Command) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
@@ -60,7 +59,7 @@ func (c *Cache) Add(cmd *Command) {
 // Get returns a batch of commands to propose.
 // It blocks until it can return a batch of commands, or the context is done.
 // If the context is done, it returns an error.
-func (c *Cache) Get(ctx context.Context) (hotstuff.Command, error) {
+func (c *Cache) Get(ctx context.Context) (*Batch, error) {
 	batch := new(Batch)
 
 	c.mut.Lock()
@@ -71,7 +70,7 @@ awaitBatch:
 		select {
 		case <-c.c:
 		case <-ctx.Done():
-			return "", ctx.Err()
+			return nil, ctx.Err()
 		}
 		c.mut.Lock()
 	}
@@ -97,28 +96,18 @@ awaitBatch:
 		goto awaitBatch
 	}
 
-	defer c.mut.Unlock()
+	c.mut.Unlock()
 
-	// otherwise, we should have at least one command
-	b, err := c.marshaler.Marshal(batch)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal batch: %w", err)
-	}
-
-	return hotstuff.Command(b), nil
+	return batch, nil
 }
 
 // Accept returns an error if the given command batch is too old to be accepted.
-func (c *Cache) Accept(cmd hotstuff.Command) error {
-	batch, err := c.GetCommands(cmd)
-	if err != nil {
-		return err
-	}
-
+func (c *Cache) Accept(batch *Batch) error {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 
-	for _, cmd := range batch {
+	for _, cmd := range batch.GetCommands() {
+		// TODO(meling): Should this error out on the first old command?
 		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
 			return fmt.Errorf("command too old")
 		}
@@ -127,28 +116,13 @@ func (c *Cache) Accept(cmd hotstuff.Command) error {
 }
 
 // Proposed updates the serial numbers such that we will not accept the given batch again.
-func (c *Cache) Proposed(cmd hotstuff.Command) error {
-	batch, err := c.GetCommands(cmd)
-	if err != nil {
-		return err
-	}
-
+func (c *Cache) Proposed(batch *Batch) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 
-	for _, cmd := range batch {
+	for _, cmd := range batch.GetCommands() {
 		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo < cmd.GetSequenceNumber() {
 			c.serialNumbers[cmd.GetClientID()] = cmd.GetSequenceNumber()
 		}
 	}
-	return nil
-}
-
-// GetCommands unmarshals the given command returns its batch of commands.
-func (c *Cache) GetCommands(cmd hotstuff.Command) ([]*Command, error) {
-	batch := new(Batch)
-	if err := c.unmarshaler.Unmarshal([]byte(cmd), batch); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal batch: %w", err)
-	}
-	return batch.GetCommands(), nil
 }

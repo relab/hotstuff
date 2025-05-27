@@ -89,7 +89,9 @@ func (cm *Committer) commitInner(block *hotstuff.Block) error {
 		return fmt.Errorf("failed to locate block: %s", block.Parent())
 	}
 	cm.logger.Debug("EXEC: ", block)
-	cm.clientSrv.Exec(block.Command())
+	batch := block.Command()
+	cm.eventLoop.AddEvent(hotstuff.CommitEvent{Commands: len(batch.Commands)})
+	cm.clientSrv.Exec(batch)
 	cm.eventLoop.AddEvent(hotstuff.ConsensusLatencyEvent{Latency: time.Since(block.TimeStamp())})
 	cm.bExec = block
 	return nil

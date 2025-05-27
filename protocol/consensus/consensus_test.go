@@ -7,6 +7,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/consensus"
@@ -95,7 +96,7 @@ func TestVote(t *testing.T) {
 	b := testutil.NewProposeMsg(
 		hotstuff.GetGenesis().Hash(),
 		hotstuff.NewQuorumCert(nil, 1, hotstuff.GetGenesis().Hash()),
-		"test", 1, 1,
+		&clientpb.Batch{}, 1, 1,
 	)
 
 	qc := b.Block.QuorumCert()

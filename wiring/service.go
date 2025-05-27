@@ -31,7 +31,6 @@ func NewService(
 		cacheOpt...,
 	)
 	clientSrv := clientpb.NewServer(
-		eventLoop,
 		logger,
 		cmdCache,
 		clientSrvOpts...,

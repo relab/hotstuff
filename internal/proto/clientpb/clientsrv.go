@@ -6,10 +6,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/relab/hotstuff"
-
 	"github.com/relab/gorums"
-	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -18,9 +15,8 @@ import (
 
 // Server serves a client.
 type Server struct {
-	eventLoop *eventloop.EventLoop
-	logger    logging.Logger
-	cmdCache  *Cache
+	logger   logging.Logger
+	cmdCache *Cache
 
 	mut          sync.Mutex
 	srv          *gorums.Server
@@ -31,16 +27,13 @@ type Server struct {
 
 // NewServer returns a new client server.
 func NewServer(
-	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	cmdCache *Cache,
-
 	srvOpts ...gorums.ServerOption,
 ) (srv *Server) {
 	srv = &Server{
-		eventLoop: eventLoop,
-		logger:    logger,
-		cmdCache:  cmdCache,
+		logger:   logger,
+		cmdCache: cmdCache,
 
 		awaitingCmds: make(map[MessageID]chan<- error),
 		srv:          gorums.NewServer(srvOpts...),
@@ -79,22 +72,14 @@ func (srv *Server) ExecCommand(ctx gorums.ServerCtx, cmd *Command) (*emptypb.Emp
 	srv.awaitingCmds[id] = c
 	srv.mut.Unlock()
 
-	srv.cmdCache.Add(cmd)
+	srv.cmdCache.add(cmd)
 	ctx.Release()
 	err := <-c
 	return &emptypb.Empty{}, err
 }
 
-func (srv *Server) Exec(cmd hotstuff.Command) {
-	batch, err := srv.cmdCache.GetCommands(cmd)
-	if err != nil {
-		srv.logger.Error(err)
-		return
-	}
-
-	srv.eventLoop.AddEvent(hotstuff.CommitEvent{Commands: len(batch)})
-
-	for _, cmd := range batch {
+func (srv *Server) Exec(batch *Batch) {
+	for _, cmd := range batch.GetCommands() {
 		id := cmd.ID()
 
 		srv.mut.Lock()
@@ -112,13 +97,8 @@ func (srv *Server) Exec(cmd hotstuff.Command) {
 	srv.logger.Debugf("Hash: %.8x", srv.hash.Sum(nil))
 }
 
-func (srv *Server) Fork(cmd hotstuff.Command) {
-	batch, err := srv.cmdCache.GetCommands(cmd)
-	if err != nil {
-		srv.logger.Error(err)
-		return
-	}
-	for _, cmd := range batch {
+func (srv *Server) Fork(batch *Batch) {
+	for _, cmd := range batch.GetCommands() {
 		id := cmd.ID()
 
 		srv.mut.Lock()
