@@ -1,4 +1,4 @@
-package proposer
+package consensus
 
 import (
 	"fmt"
@@ -6,35 +6,75 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 	"github.com/relab/hotstuff/service/cmdcache"
+	"github.com/relab/hotstuff/service/committer"
 )
 
 type Proposer struct {
 	eventLoop    *eventloop.EventLoop
+	logger       logging.Logger
 	config       *core.RuntimeConfig
 	ruler        modules.ProposeRuler
+	protocol     modules.ConsensusProtocol
+	voter        *Voter
 	commandCache *cmdcache.Cache
+	committer    *committer.Committer
 }
 
-func New(
+func NewProposer(
 	eventLoop *eventloop.EventLoop,
+	logger logging.Logger,
 	config *core.RuntimeConfig,
+	protocol modules.ConsensusProtocol,
+	voter *Voter,
 	commandCache *cmdcache.Cache,
-	opts ...Option,
+	committer *committer.Committer,
+	opts ...ProposerOption,
 ) *Proposer {
 	p := &Proposer{
 		eventLoop:    eventLoop,
+		logger:       logger,
 		config:       config,
 		ruler:        nil,
+		protocol:     protocol,
+		voter:        voter,
 		commandCache: commandCache,
+		committer:    committer,
 	}
 	p.ruler = p
 	for _, opt := range opts {
 		opt(p)
 	}
 	return p
+}
+
+// Propose creates a new outgoing proposal.
+func (cs *Proposer) Propose(view hotstuff.View, highQC hotstuff.QuorumCert, syncInfo hotstuff.SyncInfo) {
+	proposal, err := cs.CreateProposal(view, highQC, syncInfo)
+	if err != nil {
+		// do not send or vote interally for the proposal if it could not be created successfully
+		cs.logger.Debugf("could not create proposal: %v", err)
+		return
+	}
+	block := proposal.Block
+	// store the valid block, it may commit the block or its ancestors
+	cs.committer.Update(block)
+	// TODO(AlanRostem): solve issue #191
+	// update the command's age before voting.
+	cs.commandCache.Proposed(block.Command())
+	pc, err := cs.voter.Vote(block)
+	if err != nil {
+		// if the block is invalid, reject it. This means the command is also discarded.
+		cs.logger.Errorf("critical error at proposer: %v", err)
+		return
+	}
+	// TODO(AlanRostem): moved this line to HotStuff since Kauri already sends a new view in its own logic. Check if this is valid.
+	// cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
+	// as proposer, I can vote for my own proposal without verifying.
+	cs.protocol.SendPropose(&proposal, pc)
 }
 
 // CreateProposal attempts to create a new outgoing proposal if a command exists and the protocol's rule is satisfied.

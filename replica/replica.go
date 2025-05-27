@@ -147,19 +147,10 @@ func New(
 		depsCore.RuntimeCfg(),
 		depsSecure.CertAuth(),
 		depsSrv.CmdCache(),
+		depsSrv.Committer(),
 		rules,
 		leader,
-	)
-	// TODO(AlanRostem): explore ways to simplify consensus and synchronizer so that they take in less dependencies.
-	consensus := consensus.New(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
 		protocol,
-		depsConsensus.Proposer(),
-		depsConsensus.Voter(),
-		depsSrv.CmdCache(),
-		depsSrv.Committer(),
 	)
 	// TODO(AlanRostem): consder a way to move the consensus flow from Synchronzier to Consensus
 	synchronizer := synchronizer.New(
@@ -168,7 +159,7 @@ func New(
 		depsCore.RuntimeCfg(),
 		depsSecure.CertAuth(),
 		leader,
-		consensus,
+		depsConsensus.Proposer(),
 		depsConsensus.Voter(),
 		viewStates,
 		sender,

@@ -1,4 +1,4 @@
-package voter
+package consensus
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/certauth"
 	"github.com/relab/hotstuff/service/cmdcache"
+	"github.com/relab/hotstuff/service/committer"
 )
 
 type Voter struct {
@@ -19,36 +20,76 @@ type Voter struct {
 
 	leaderRotation modules.LeaderRotation
 	ruler          modules.VoteRuler
+	protocol       modules.ConsensusProtocol
 
 	auth         *certauth.CertAuthority
 	commandCache *cmdcache.Cache
+	committer    *committer.Committer
 
 	lastVote hotstuff.View
 }
 
-func New(
+func NewVoter(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	leaderRotation modules.LeaderRotation,
 	rules modules.VoteRuler,
+	protocol modules.ConsensusProtocol,
 	auth *certauth.CertAuthority,
 	commandCache *cmdcache.Cache,
+	committer *committer.Committer,
 ) *Voter {
-	return &Voter{
+	v := &Voter{
 		logger:    logger,
 		eventLoop: eventLoop,
 		config:    config,
 
 		leaderRotation: leaderRotation,
 		ruler:          rules,
+		protocol:       protocol,
 
-		auth: auth,
-
+		auth:         auth,
 		commandCache: commandCache,
+		committer:    committer,
 
 		lastVote: 0,
 	}
+	v.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
+		p := event.(hotstuff.ProposeMsg)
+		v.OnPropose(&p)
+	})
+	return v
+}
+
+// OnPropose is called when receiving a proposal from a leader and returns true if the proposal was voted for.
+func (cs *Voter) OnPropose(proposal *hotstuff.ProposeMsg) {
+	block := proposal.Block
+	// ensure that I can vote in this view based on the protocol's rule.
+	err := cs.Verify(proposal)
+	if err != nil {
+		cs.logger.Infof("failed to verify incoming vote: %v", err)
+		return
+	}
+	// store the valid block, it may commit the block or its ancestors
+	cs.committer.Update(block)
+	// TODO(AlanRostem): solve issue #191
+	// update the command's age before voting.
+	cs.commandCache.Proposed(block.Command())
+	pc, err := cs.Vote(block)
+	if err != nil {
+		// if the block is invalid, reject it. This means the command is also discarded.
+		cs.logger.Infof("%v", err)
+	} else {
+		// send the vote if it was successful
+		cs.protocol.SendVote(proposal, pc)
+	}
+	// advance the view regardless of vote success/failure
+	newInfo := hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
+	cs.eventLoop.AddEvent(hotstuff.NewViewMsg{
+		ID:       cs.config.ID(),
+		SyncInfo: newInfo,
+	})
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.

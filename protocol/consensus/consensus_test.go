@@ -26,8 +26,8 @@ func TestVote(t *testing.T) {
 	type replica struct {
 		eventLoop    *eventloop.EventLoop
 		blockChain   *blockchain.BlockChain
-		consensus    *consensus.Consensus
 		certAuth     *certauth.CertAuthority
+		proposer     *consensus.Proposer
 		synchronizer *synchronizer.Synchronizer
 	}
 
@@ -101,7 +101,7 @@ func TestVote(t *testing.T) {
 	qc := b.Block.QuorumCert()
 	r.blockChain.Store(b.Block)
 	// TODO: Test isn't succeeding since it hangs where consensus tries to get a command from cmdCache.
-	r.consensus.Propose(1, qc, hotstuff.NewSyncInfo().WithQC(qc))
+	r.proposer.Propose(1, qc, hotstuff.NewSyncInfo().WithQC(qc))
 
 	for i, signer := range replicas {
 		pc, err := signer.certAuth.CreatePartialCert(b.Block)

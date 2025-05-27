@@ -7,7 +7,6 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/viewstates"
-	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
 )
@@ -15,7 +14,7 @@ import (
 type HotStuff struct {
 	logger         logging.Logger
 	config         *core.RuntimeConfig
-	votingMachine  *votingmachine.VotingMachine
+	votingMachine  *VotingMachine
 	leaderRotation modules.LeaderRotation
 	sender         modules.Sender
 }
@@ -33,7 +32,7 @@ func NewHotStuff(
 	return &HotStuff{
 		logger: logger,
 		config: config,
-		votingMachine: votingmachine.New(
+		votingMachine: NewVotingMachine(
 			logger,
 			eventLoop,
 			config,

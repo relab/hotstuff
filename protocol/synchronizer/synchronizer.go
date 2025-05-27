@@ -11,7 +11,6 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/viewstates"
-	"github.com/relab/hotstuff/protocol/voter"
 	"github.com/relab/hotstuff/security/certauth"
 
 	"github.com/relab/hotstuff"
@@ -27,8 +26,8 @@ type Synchronizer struct {
 
 	duration       modules.ViewDuration
 	leaderRotation modules.LeaderRotation
-	voter          *voter.Voter
-	consensus      *consensus.Consensus
+	voter          *consensus.Voter
+	proposer       *consensus.Proposer
 	state          *viewstates.ViewStates
 
 	sender modules.Sender
@@ -56,8 +55,8 @@ func New(
 
 	// protocol dependencies
 	leaderRotation modules.LeaderRotation,
-	consensus *consensus.Consensus,
-	voter *voter.Voter,
+	proposer *consensus.Proposer,
+	voter *consensus.Voter,
 	state *viewstates.ViewStates,
 
 	// network dependencies
@@ -67,7 +66,7 @@ func New(
 		duration:       leaderRotation.ViewDuration(),
 		leaderRotation: leaderRotation,
 
-		consensus: consensus,
+		proposer:  proposer,
 		auth:      auth,
 		sender:    sender,
 		eventLoop: eventLoop,
@@ -133,7 +132,7 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	// start the initial proposal
 	if view := s.state.View(); view == 1 && s.leaderRotation.GetLeader(view) == s.config.ID() {
 		syncInfo := s.state.SyncInfo()
-		s.consensus.Propose(s.state.View(), s.state.HighQC(), syncInfo)
+		s.proposer.Propose(s.state.View(), s.state.HighQC(), syncInfo)
 	}
 }
 
@@ -307,7 +306,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.config.ID() {
-		s.consensus.Propose(s.state.View(), s.state.HighQC(), syncInfo)
+		s.proposer.Propose(s.state.View(), s.state.HighQC(), syncInfo)
 		return
 	}
 	err := s.sender.NewView(leader, syncInfo)

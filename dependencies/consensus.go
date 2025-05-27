@@ -5,15 +5,15 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/proposer"
-	"github.com/relab/hotstuff/protocol/voter"
+	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/security/certauth"
 	"github.com/relab/hotstuff/service/cmdcache"
+	"github.com/relab/hotstuff/service/committer"
 )
 
 type Consensus struct {
-	voter    *voter.Voter
-	proposer *proposer.Proposer
+	voter    *consensus.Voter
+	proposer *consensus.Proposer
 }
 
 func NewConsensus(
@@ -22,38 +22,47 @@ func NewConsensus(
 	config *core.RuntimeConfig,
 	auth *certauth.CertAuthority,
 	commandCache *cmdcache.Cache,
+	committer *committer.Committer,
 	consensusRulesModule modules.HotstuffRuleset,
 	leaderRotationModule modules.LeaderRotation,
+	protocol modules.ConsensusProtocol,
 ) *Consensus {
-	proposerOpts := []proposer.Option{}
+	proposerOpts := []consensus.ProposerOption{}
 	if ruler, ok := consensusRulesModule.(modules.ProposeRuler); ok {
-		proposerOpts = append(proposerOpts, proposer.OverrideProposeRule(ruler))
+		proposerOpts = append(proposerOpts, consensus.OverrideProposeRule(ruler))
 	}
+	voter := consensus.NewVoter(
+		eventLoop,
+		logger,
+		config,
+		leaderRotationModule,
+		consensusRulesModule,
+		protocol,
+		auth,
+		commandCache,
+		committer,
+	)
 	return &Consensus{
-		voter: voter.New(
+		voter: voter,
+		proposer: consensus.NewProposer(
 			eventLoop,
 			logger,
 			config,
-			leaderRotationModule,
-			consensusRulesModule,
-			auth,
+			protocol,
+			voter,
 			commandCache,
-		),
-		proposer: proposer.New(
-			eventLoop,
-			config,
-			commandCache,
+			committer,
 			proposerOpts...,
 		),
 	}
 }
 
 // Consensus returns the consensus protocol instance.
-func (p *Consensus) Proposer() *proposer.Proposer {
+func (p *Consensus) Proposer() *consensus.Proposer {
 	return p.proposer
 }
 
 // Synchronizer returns the synchronizer instance.
-func (p *Consensus) Voter() *voter.Voter {
+func (p *Consensus) Voter() *consensus.Voter {
 	return p.voter
 }
