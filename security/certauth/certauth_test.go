@@ -5,7 +5,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
@@ -13,6 +12,7 @@ import (
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/security/crypto/eddsa"
+	"github.com/relab/hotstuff/wiring"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -20,7 +20,7 @@ type dummyReplica struct {
 	config     *core.RuntimeConfig
 	connMd     map[string]string
 	sender     modules.Sender
-	depsSecure *dependencies.Security
+	depsSecure *wiring.Security
 }
 
 func genKey(t *testing.T, cryptoName string) hotstuff.PrivateKey {
@@ -37,7 +37,7 @@ func genKey(t *testing.T, cryptoName string) hotstuff.PrivateKey {
 
 func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuff.PrivateKey, cacheSize int) *dummyReplica {
 	t.Helper()
-	core := dependencies.NewCore(hotstuff.ID(id), "test", privKey)
+	core := wiring.NewCore(hotstuff.ID(id), "test", privKey)
 	sender := network.NewGorumsSender(
 		core.EventLoop(),
 		core.Logger(),
@@ -48,7 +48,7 @@ func createDependencies(t *testing.T, id int, cryptoName string, privKey hotstuf
 	if cacheSize > 0 {
 		opts = append(opts, certauth.WithCache(cacheSize))
 	}
-	sec, err := dependencies.NewSecurity(
+	sec, err := wiring.NewSecurity(
 		core.EventLoop(),
 		core.Logger(),
 		core.RuntimeCfg(),

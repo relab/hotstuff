@@ -7,7 +7,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/consensus"
@@ -15,6 +14,7 @@ import (
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/certauth"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/wiring"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -40,14 +40,14 @@ func TestVote(t *testing.T) {
 		// leaderRotationName := leaderrotation.RoundRobinModuleName
 		cacheSize := 100
 
-		depsCore := dependencies.NewCore(id, fmt.Sprintf("hs%d", id), testutil.GenerateECDSAKey(t))
+		depsCore := wiring.NewCore(id, fmt.Sprintf("hs%d", id), testutil.GenerateECDSAKey(t))
 		sender := network.NewGorumsSender(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
 			insecure.NewCredentials(),
 		)
-		depsSecure, err := dependencies.NewSecurity(
+		depsSecure, err := wiring.NewSecurity(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),

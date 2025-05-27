@@ -6,7 +6,6 @@ import (
 	"net"
 
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
@@ -17,6 +16,7 @@ import (
 	"github.com/relab/hotstuff/protocol/viewstates"
 	"github.com/relab/hotstuff/security/certauth"
 	"github.com/relab/hotstuff/service/clientsrv"
+	"github.com/relab/hotstuff/wiring"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/service/server"
@@ -38,7 +38,7 @@ type Replica struct {
 
 // New returns a new replica.
 func New(
-	depsCore *dependencies.Core,
+	depsCore *wiring.Core,
 	vdParams viewduration.Params,
 	opts ...Option,
 ) (replica *Replica, err error) {
@@ -53,7 +53,7 @@ func New(
 		depsCore.RuntimeCfg(),
 		rOpt.credentials,
 	)
-	depsSecure, err := dependencies.NewSecurity(
+	depsSecure, err := wiring.NewSecurity(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
@@ -64,7 +64,7 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	rules, err := dependencies.NewConsensusRules(
+	rules, err := wiring.NewConsensusRules(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
@@ -76,7 +76,7 @@ func New(
 
 	byzStrat := rOpt.moduleNames.byzantineStrategy
 	if byzStrat != "" {
-		byz, err := dependencies.WrapByzantineStrategy(
+		byz, err := wiring.WrapByzantineStrategy(
 			depsCore.RuntimeCfg(),
 			depsSecure.BlockChain(),
 			rules,
@@ -88,7 +88,7 @@ func New(
 		rules = byz
 		depsCore.Logger().Infof("assigned byzantine strategy: %s", byzStrat)
 	}
-	depsSrv := dependencies.NewService(
+	depsSrv := wiring.NewService(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsSecure.BlockChain(),
@@ -96,7 +96,7 @@ func New(
 		rOpt.cmdCacheOpts,
 		rOpt.clientGorumsSrvOpts...,
 	)
-	leader, err := dependencies.NewLeaderRotation(
+	leader, err := wiring.NewLeaderRotation(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
@@ -141,7 +141,7 @@ func New(
 			sender,
 		)
 	}
-	depsConsensus := dependencies.NewConsensus(
+	depsConsensus := wiring.NewConsensus(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),

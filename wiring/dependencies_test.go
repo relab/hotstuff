@@ -1,11 +1,10 @@
-package dependencies_test
+package wiring_test
 
 import (
 	"testing"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/leaderrotation/carousel"
@@ -21,6 +20,7 @@ import (
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/security/crypto/eddsa"
+	"github.com/relab/hotstuff/wiring"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -77,14 +77,14 @@ func TestModules(t *testing.T) {
 		if td.consensusName == fasthotstuff.ModuleName {
 			runtimeOpts = append(runtimeOpts, core.WithAggregateQC())
 		}
-		depsCore := dependencies.NewCore(hotstuff.ID(1), "test", pk, runtimeOpts...)
+		depsCore := wiring.NewCore(hotstuff.ID(1), "test", pk, runtimeOpts...)
 		sender := network.NewGorumsSender(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
 			insecure.NewCredentials(),
 		)
-		depsSecure, err := dependencies.NewSecurity(
+		depsSecure, err := wiring.NewSecurity(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),

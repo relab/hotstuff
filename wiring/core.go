@@ -1,4 +1,4 @@
-package dependencies
+package wiring
 
 import (
 	"fmt"
@@ -19,11 +19,11 @@ func NewCore(
 	id hotstuff.ID,
 	logTag string,
 	privKey hotstuff.PrivateKey,
-	gOpt ...core.RuntimeOption,
+	opts ...core.RuntimeOption,
 ) *Core {
 	logger := logging.New(fmt.Sprintf("%s%d", logTag, id))
 	return &Core{
-		config:    core.NewRuntimeConfig(id, privKey, gOpt...),
+		config:    core.NewRuntimeConfig(id, privKey, opts...),
 		eventLoop: eventloop.New(logger, 100),
 		logger:    logger,
 	}
