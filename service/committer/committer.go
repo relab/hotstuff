@@ -8,9 +8,9 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/service/clientsrv"
 )
 
 // Committer commits the correct block for a view.
@@ -19,7 +19,7 @@ type Committer struct {
 	logger     logging.Logger
 	blockChain *blockchain.BlockChain
 	rules      modules.CommitRuler
-	clientSrv  *clientsrv.Server
+	clientSrv  *clientpb.Server
 
 	mut   sync.Mutex
 	bExec *hotstuff.Block
@@ -30,7 +30,7 @@ func New(
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
 	rules modules.CommitRuler,
-	clientSrv *clientsrv.Server,
+	clientSrv *clientpb.Server,
 ) *Committer {
 	return &Committer{
 		eventLoop:  eventLoop,

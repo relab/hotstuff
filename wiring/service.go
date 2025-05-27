@@ -7,13 +7,12 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/service/clientsrv"
 	"github.com/relab/hotstuff/service/committer"
 )
 
 type Service struct {
 	cmdCache  *clientpb.Cache
-	clientSrv *clientsrv.Server
+	clientSrv *clientpb.Server
 	committer *committer.Committer
 }
 
@@ -31,7 +30,7 @@ func NewService(
 	cmdCache := clientpb.New(
 		cacheOpt...,
 	)
-	clientSrv := clientsrv.New(
+	clientSrv := clientpb.NewServer(
 		eventLoop,
 		logger,
 		cmdCache,
@@ -56,7 +55,7 @@ func (s *Service) CmdCache() *clientpb.Cache {
 }
 
 // ClientSrv returns the client server.
-func (s *Service) ClientSrv() *clientsrv.Server {
+func (s *Service) ClientSrv() *clientpb.Server {
 	return s.clientSrv
 }
 
