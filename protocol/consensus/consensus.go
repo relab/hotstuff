@@ -7,10 +7,10 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/proposer"
 	"github.com/relab/hotstuff/protocol/voter"
-	"github.com/relab/hotstuff/service/cmdcache"
 	"github.com/relab/hotstuff/service/committer"
 )
 
@@ -22,7 +22,7 @@ type Consensus struct {
 	config    *core.RuntimeConfig
 
 	committer    *committer.Committer
-	commandCache *cmdcache.Cache
+	commandCache *clientpb.Cache
 
 	protocol modules.ConsensusProtocol
 
@@ -43,7 +43,7 @@ func New(
 	voter *voter.Voter,
 
 	// service dependencies
-	commandCache *cmdcache.Cache,
+	commandCache *clientpb.Cache,
 	committer *committer.Committer,
 ) *Consensus {
 	cs := &Consensus{

@@ -12,7 +12,6 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/service/cmdcache"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -23,7 +22,7 @@ import (
 type Server struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
-	cmdCache  *cmdcache.Cache
+	cmdCache  *clientpb.Cache
 
 	mut          sync.Mutex
 	srv          *gorums.Server
@@ -36,7 +35,7 @@ type Server struct {
 func New(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	cmdCache *cmdcache.Cache,
+	cmdCache *clientpb.Cache,
 
 	srvOpts ...gorums.ServerOption,
 ) (srv *Server) {
@@ -75,7 +74,7 @@ func (srv *Server) Stop() {
 	srv.srv.Stop()
 }
 
-func (srv *Server) CmdCache() *cmdcache.Cache {
+func (srv *Server) CmdCache() *clientpb.Cache {
 	return srv.cmdCache
 }
 

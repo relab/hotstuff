@@ -4,11 +4,11 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/proposer"
 	"github.com/relab/hotstuff/protocol/voter"
 	"github.com/relab/hotstuff/security/certauth"
-	"github.com/relab/hotstuff/service/cmdcache"
 )
 
 type Consensus struct {
@@ -21,7 +21,7 @@ func NewConsensus(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	auth *certauth.CertAuthority,
-	commandCache *cmdcache.Cache,
+	commandCache *clientpb.Cache,
 	consensusRulesModule modules.HotstuffRuleset,
 	leaderRotationModule modules.LeaderRotation,
 ) *Consensus {

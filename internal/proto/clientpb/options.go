@@ -1,4 +1,4 @@
-package cmdcache
+package clientpb
 
 type Option func(*Cache)
 

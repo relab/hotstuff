@@ -1,4 +1,4 @@
-package cmdcache
+package clientpb
 
 import (
 	"container/list"
@@ -8,7 +8,7 @@ import (
 	"github.com/relab/hotstuff"
 
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/internal/proto/clientpb"
+
 	"google.golang.org/protobuf/proto"
 )
 
@@ -49,7 +49,7 @@ func (c *Cache) len() uint32 {
 	return uint32(c.cache.Len())
 }
 
-func (c *Cache) Add(cmd *clientpb.Command) {
+func (c *Cache) Add(cmd *Command) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
@@ -68,7 +68,7 @@ func (c *Cache) Add(cmd *clientpb.Command) {
 
 // Get returns a batch of commands to propose.
 func (c *Cache) Get(ctx context.Context) (cmd hotstuff.Command, ok bool) {
-	batch := new(clientpb.Batch)
+	batch := new(Batch)
 
 	c.mut.Lock()
 awaitBatch:
@@ -91,7 +91,7 @@ awaitBatch:
 			break
 		}
 		c.cache.Remove(elem)
-		cmd := elem.Value.(*clientpb.Command)
+		cmd := elem.Value.(*Command)
 		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
 			// command is too old
 			i--
@@ -120,7 +120,7 @@ awaitBatch:
 
 // Accept returns true if the batch is new.
 func (c *Cache) Accept(cmd hotstuff.Command) bool {
-	batch := new(clientpb.Batch)
+	batch := new(Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
 		c.logger.Errorf("Failed to unmarshal batch: %v", err)
@@ -142,7 +142,7 @@ func (c *Cache) Accept(cmd hotstuff.Command) bool {
 
 // Proposed updates the serial numbers such that we will not accept the given batch again.
 func (c *Cache) Proposed(cmd hotstuff.Command) {
-	batch := new(clientpb.Batch)
+	batch := new(Batch)
 	err := c.unmarshaler.Unmarshal([]byte(cmd), batch)
 	if err != nil {
 		c.logger.Errorf("Failed to unmarshal batch: %v", err)

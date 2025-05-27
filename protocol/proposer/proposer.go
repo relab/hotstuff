@@ -6,22 +6,22 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
-	"github.com/relab/hotstuff/service/cmdcache"
 )
 
 type Proposer struct {
 	eventLoop    *eventloop.EventLoop
 	config       *core.RuntimeConfig
 	ruler        modules.ProposeRuler
-	commandCache *cmdcache.Cache
+	commandCache *clientpb.Cache
 }
 
 func New(
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
-	commandCache *cmdcache.Cache,
+	commandCache *clientpb.Cache,
 	opts ...Option,
 ) *Proposer {
 	p := &Proposer{

@@ -18,6 +18,7 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/latency"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/internal/tree"
@@ -25,7 +26,6 @@ import (
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/security/crypto/keygen"
-	"github.com/relab/hotstuff/service/cmdcache"
 	"github.com/relab/hotstuff/service/server"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -197,7 +197,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 	if opts.GetBatchSize() > 1 {
 		replicaOpts = append(replicaOpts,
-			replica.WithCmdCacheOptions(cmdcache.WithBatching(opts.GetBatchSize())),
+			replica.WithCmdCacheOptions(clientpb.WithBatching(opts.GetBatchSize())),
 		)
 	}
 	replicaOpts = append(replicaOpts,

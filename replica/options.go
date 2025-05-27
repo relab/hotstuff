@@ -8,7 +8,7 @@ import (
 	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
-	"github.com/relab/hotstuff/service/cmdcache"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/service/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -26,7 +26,7 @@ type replicaOptions struct {
 	credentials          credentials.TransportCredentials
 	clientGorumsSrvOpts  []gorums.ServerOption
 	replicaGorumsSrvOpts []gorums.ServerOption
-	cmdCacheOpts         []cmdcache.Option
+	cmdCacheOpts         []clientpb.Option
 	serverOpts           []server.ServerOption
 	moduleNames          moduleNames
 }
@@ -76,7 +76,7 @@ func WithByzantineStrategy(strategyName string) Option {
 	}
 }
 
-func WithCmdCacheOptions(opts ...cmdcache.Option) Option {
+func WithCmdCacheOptions(opts ...clientpb.Option) Option {
 	return func(ro *replicaOptions) {
 		ro.cmdCacheOpts = append(ro.cmdCacheOpts, opts...)
 	}
