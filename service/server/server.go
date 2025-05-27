@@ -58,7 +58,8 @@ func NewServer(
 	}))
 	srv.gorumsSrv = gorums.NewServer(options.gorumsSrvOpts...)
 	if config.HasKauriTree() {
-		kauri.RegisterService(eventLoop, logger, srv.gorumsSrv)
+		logger.Debug("Kauripb: Service registered.")
+		kauri.RegisterService(eventLoop, srv.gorumsSrv)
 	}
 	hotstuffpb.RegisterConsensusServer(srv.gorumsSrv, &serviceImpl{srv})
 	return srv

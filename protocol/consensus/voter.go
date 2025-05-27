@@ -56,21 +56,22 @@ func NewVoter(
 		lastVote: 0,
 	}
 	v.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
-		p := event.(hotstuff.ProposeMsg)
-		v.OnPropose(&p)
+		proposal := event.(hotstuff.ProposeMsg)
+		// ensure that I can vote in this view based on the protocol's rule.
+		err := v.Verify(&proposal)
+		if err != nil {
+			v.logger.Infof("failed to verify incoming vote: %v", err)
+			return
+		}
+		v.OnValidPropose(&proposal)
 	})
 	return v
 }
 
-// OnPropose is called when receiving a proposal from a leader and returns true if the proposal was voted for.
-func (cs *Voter) OnPropose(proposal *hotstuff.ProposeMsg) {
+// OnValidPropose is called when receiving a valid proposal from a leader and emits an event to advance the view. The proposal should be verified before calling this.
+// The method tells the committer and command cache to update its state.
+func (cs *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) {
 	block := proposal.Block
-	// ensure that I can vote in this view based on the protocol's rule.
-	err := cs.Verify(proposal)
-	if err != nil {
-		cs.logger.Infof("failed to verify incoming vote: %v", err)
-		return
-	}
 	// store the valid block, it may commit the block or its ancestors
 	cs.committer.Update(block)
 	// TODO(AlanRostem): solve issue #191

@@ -131,7 +131,13 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	// start the initial proposal
 	if view := s.state.View(); view == 1 && s.leaderRotation.GetLeader(view) == s.config.ID() {
 		syncInfo := s.state.SyncInfo()
-		s.proposer.Propose(s.state.View(), s.state.HighQC(), syncInfo)
+		proposal, err := s.proposer.CreateProposal(s.state.View(), s.state.HighQC(), syncInfo)
+		if err != nil {
+			// debug log here since it may frequently fail due to lack of commands.
+			s.logger.Info("failed to create proposal: %v", err)
+			return
+		}
+		s.proposer.Propose(&proposal)
 	}
 }
 
@@ -273,7 +279,12 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	}
 
 	if haveQC {
-		s.state.UpdateHighQC(qc)
+		err := s.state.UpdateHighQC(qc)
+		if err != nil {
+			s.logger.Warnf("failed to update highQC: %v", err)
+		} else {
+			s.logger.Debug("highQC updated")
+		}
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
 		if qc.View() >= view {
 			view = qc.View()
@@ -305,7 +316,13 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.config.ID() {
-		s.proposer.Propose(s.state.View(), s.state.HighQC(), syncInfo)
+		proposal, err := s.proposer.CreateProposal(s.state.View(), s.state.HighQC(), syncInfo)
+		if err != nil {
+			// debug log here since it may frequently fail due to lack of commands.
+			s.logger.Debugf("failed to create proposal: %v", err)
+			return
+		}
+		s.proposer.Propose(&proposal)
 		return
 	}
 	err := s.sender.NewView(leader, syncInfo)

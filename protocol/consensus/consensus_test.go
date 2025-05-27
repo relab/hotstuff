@@ -101,7 +101,11 @@ func TestVote(t *testing.T) {
 	qc := b.Block.QuorumCert()
 	r.blockChain.Store(b.Block)
 	// TODO: Test isn't succeeding since it hangs where consensus tries to get a command from cmdCache.
-	r.proposer.Propose(1, qc, hotstuff.NewSyncInfo().WithQC(qc))
+	proposal, err := r.proposer.CreateProposal(1, qc, hotstuff.NewSyncInfo().WithQC(qc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.proposer.Propose(&proposal)
 
 	for i, signer := range replicas {
 		pc, err := signer.auth.CreatePartialCert(b.Block)

@@ -108,11 +108,13 @@ func New(
 		return nil, err
 	}
 	// TODO(AlanRostem): avoid creating viewstates here.
-	viewStates := consensus.NewViewStates(
-		depsCore.Logger(),
+	viewStates, err := consensus.NewViewStates(
 		depsSecure.BlockChain(),
 		depsSecure.Authority(),
 	)
+	if err != nil {
+		return nil, err
+	}
 	var protocol modules.ConsensusProtocol
 	if depsCore.RuntimeCfg().HasKauriTree() {
 		protocol = kauri.New(
@@ -123,7 +125,6 @@ func New(
 			depsSecure.Authority(),
 			kauri.NewExtendedGorumsSender(
 				depsCore.EventLoop(),
-				depsCore.Logger(),
 				depsCore.RuntimeCfg(),
 				sender,
 			),
