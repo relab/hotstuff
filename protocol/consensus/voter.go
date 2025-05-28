@@ -135,8 +135,8 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 	}
 	// verify the proposal's QC.
 	qc := proposal.Block.QuorumCert()
-	if !v.auth.VerifyAnyQC(&qc, proposal.AggregateQC) {
-		return fmt.Errorf("invalid qc")
+	if err := v.auth.VerifyAnyQC(&qc, proposal.AggregateQC); err != nil {
+		return err
 	}
 	// ensure the block came from the expected leader.
 	if proposal.ID != v.leaderRotation.GetLeader(block.View()) {

@@ -22,7 +22,7 @@ func TestConvertPartialCert(t *testing.T) {
 	key := testutil.GenerateECDSAKey(t)
 	cfg := core.NewRuntimeConfig(1, key)
 	crypt := ecdsa.New(cfg, nil) // TODO: why is logger nil?
-	signer := cert.NewAuthority(cfg, nil, nil, crypt)
+	signer := cert.NewAuthority(cfg, nil, crypt)
 
 	want, err := signer.CreatePartialCert(hotstuff.GetGenesis())
 	if err != nil {
@@ -44,7 +44,7 @@ func TestConvertQuorumCert(t *testing.T) {
 		key := testutil.GenerateECDSAKey(t)
 		cfg := core.NewRuntimeConfig(hotstuff.ID(i+1), key)
 		crypt := ecdsa.New(cfg, nil)
-		signer := cert.NewAuthority(cfg, nil, nil, crypt)
+		signer := cert.NewAuthority(cfg, nil, crypt)
 		signers[i] = signer
 	}
 
@@ -100,7 +100,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 		id := hotstuff.ID(i + 1)
 		logger := logging.New("test")
 		crypt := bls12.New(cfgs[id], logger)
-		signer := cert.NewAuthority(cfgs[id], logger, nil, crypt)
+		signer := cert.NewAuthority(cfgs[id], nil, crypt)
 		signers[i] = signer
 		meta := cfgs[id].ConnectionMetadata()
 		err := cfgs[id].SetReplicaMetadata(id, meta)
@@ -116,8 +116,8 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 
 	signer := signers[0].(*cert.Authority)
 
-	if !signer.VerifyTimeoutCert(cfgs[1].QuorumSize(), tc2) {
-		t.Fatal("Failed to verify timeout cert")
+	if err := signer.VerifyTimeoutCert(cfgs[1].QuorumSize(), tc2); err != nil {
+		t.Fatalf("Failed to verify timeout cert: %v", err)
 	}
 }
 

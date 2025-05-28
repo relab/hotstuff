@@ -242,8 +242,8 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	// check for a TC
 	if tc, ok := syncInfo.TC(); ok {
-		if !s.auth.VerifyTimeoutCert(s.config.QuorumSize(), tc) {
-			s.logger.Info("Timeout Certificate could not be verified!")
+		if err := s.auth.VerifyTimeoutCert(s.config.QuorumSize(), tc); err != nil {
+			s.logger.Info("Timeout Certificate could not be verified: %v", err)
 			return
 		}
 		s.state.UpdateHighTC(tc)
@@ -259,9 +259,9 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	// check for an AggQC or QC
 	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.config.HasAggregateQC() {
-		highQC, ok := s.auth.VerifyAggregateQC(s.config.QuorumSize(), aggQC)
-		if !ok {
-			s.logger.Info("Aggregated Quorum Certificate could not be verified")
+		highQC, err := s.auth.VerifyAggregateQC(s.config.QuorumSize(), aggQC)
+		if err != nil {
+			s.logger.Info("Aggregated Quorum Certificate could not be verified: %v", err)
 			return
 		}
 		if aggQC.View() >= view {
@@ -272,8 +272,8 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		syncInfo = syncInfo.WithQC(highQC)
 		qc = highQC
 	} else if qc, haveQC = syncInfo.QC(); haveQC {
-		if !s.auth.VerifyQuorumCert(s.config.QuorumSize(), qc) {
-			s.logger.Info("Quorum Certificate could not be verified!")
+		if err := s.auth.VerifyQuorumCert(s.config.QuorumSize(), qc); err != nil {
+			s.logger.Info("Quorum Certificate could not be verified: %v", err)
 			return
 		}
 	}

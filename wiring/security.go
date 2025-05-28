@@ -42,7 +42,6 @@ func NewSecurity(
 		cryptoImpl: cryptoImpl,
 		auth: cert.NewAuthority(
 			config,
-			logger,
 			blockChain,
 			cryptoImpl,
 			opts...,

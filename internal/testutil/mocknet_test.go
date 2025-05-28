@@ -1,6 +1,7 @@
 package testutil_test
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 )
 
-func TestUnicast(t *testing.T) {
+func TestSenderUnicast(t *testing.T) {
 	// setup
 	voteCount := uint(0)
 	replicaCount := uint(4)
@@ -49,7 +50,7 @@ func TestUnicast(t *testing.T) {
 	}
 }
 
-func TestBroadcast(t *testing.T) {
+func TestSenderBroadcast(t *testing.T) {
 	// setup
 	timeoutCount := uint(0)
 	replicaCount := uint(4)
@@ -70,7 +71,8 @@ func TestBroadcast(t *testing.T) {
 	emitter.Sender.Timeout(hotstuff.TimeoutMsg{})
 	// run all replica eventloops, including the one emitting the message
 	for _, id := range network.ReplicaIDs() {
-		ctx, _ := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		defer cancel()
 		r := network.Replica(id)
 		r.EventLoop.Run(ctx)
 	}
@@ -82,22 +84,32 @@ func TestBroadcast(t *testing.T) {
 	}
 }
 
-func TestRequestBlock(t *testing.T) {
+func TestSenderRequestBlock(t *testing.T) {
 	// setup
 	replicaCount := uint(4)
 	cfg := testutil.MockReplicaConfig{
 		EventLoopBufferSize: 1,
 	}
 	network := testutil.NewMockNetwork(t, replicaCount, cfg)
-	blockStorer := network.Replica(1)
-	config := core.NewRuntimeConfig(blockStorer.ID, testutil.GenerateECDSAKey(t))
+	storer := network.Replica(1)
+	config := core.NewRuntimeConfig(storer.ID, testutil.GenerateECDSAKey(t))
 	auth := cert.NewAuthority(
 		config,
-		blockStorer.Logger,
-		blockStorer.BlockChain,
-		ecdsa.New(config, blockStorer.Logger),
+		storer.BlockChain,
+		ecdsa.New(config, storer.Logger),
 	)
 	// TODO(AlanRostem): remove logger from Authority and all crypto impls.
-	blockStorer.BlockChain.Store(testutil.CreateBlock(t, auth))
-	// TODO(AlanRostem): finish this test
+	block := testutil.CreateBlock(t, auth)
+	storer.BlockChain.Store(block)
+
+	requester := network.Replica(2)
+	foundBlock, ok := requester.Sender.RequestBlock(nil, block.Hash())
+	if !ok {
+		t.Logf("expected block to be found")
+		t.Fail()
+	}
+	if !bytes.Equal(block.ToBytes(), foundBlock.ToBytes()) {
+		t.Logf("expected the blocks to be equal")
+		t.Fail()
+	}
 }

@@ -148,8 +148,8 @@ func TestVerifyPartialCert(t *testing.T) {
 
 		partialCert := testutil.CreatePC(t, block, dummy.depsSecure.Authority())
 
-		if !dummy.depsSecure.Authority().VerifyPartialCert(partialCert) {
-			t.Error("Partial Certificate was not verified.")
+		if err := dummy.depsSecure.Authority().VerifyPartialCert(partialCert); err != nil {
+			t.Error(err)
 		}
 	}
 }
@@ -249,8 +249,8 @@ func TestVerifyGenesisQC(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !signers[1].VerifyQuorumCert(dummies[0].config.QuorumSize(), genesisQC) {
-			t.Error("Genesis QC was not verified!")
+		if err := signers[1].VerifyQuorumCert(dummies[0].config.QuorumSize(), genesisQC); err != nil {
+			t.Error(err)
 		}
 	}
 }
@@ -270,7 +270,7 @@ func TestVerifyQuorumCert(t *testing.T) {
 
 		for i, verifier := range signers {
 			qSize := dummies[i].config.QuorumSize()
-			if !verifier.VerifyQuorumCert(qSize, qc) {
+			if err := verifier.VerifyQuorumCert(qSize, qc); err != nil {
 				t.Errorf("verifier %d failed to verify QC! (qsize=%d)", i+1, qSize)
 			}
 		}
@@ -293,8 +293,8 @@ func TestVerifyTimeoutCert(t *testing.T) {
 		tc := testutil.CreateTC(t, 1, signers0, signers1)
 
 		for i, verifier := range signers0 {
-			if !verifier.VerifyTimeoutCert(dummies[0].config.QuorumSize(), tc) {
-				t.Errorf("verifier %d failed to verify TC!", i+1)
+			if err := verifier.VerifyTimeoutCert(dummies[0].config.QuorumSize(), tc); err != nil {
+				t.Errorf("verifier %d failed to verify TC: %v", i+1, err)
 			}
 		}
 	}
@@ -319,9 +319,9 @@ func TestVerifyAggregateQC(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		highQC, ok := signers0[0].VerifyAggregateQC(dummies[0].config.QuorumSize(), aggQC)
-		if !ok {
-			t.Fatal("AggregateQC was not verified")
+		highQC, err := signers0[0].VerifyAggregateQC(dummies[0].config.QuorumSize(), aggQC)
+		if err != nil {
+			t.Fatalf("AggregateQC was not verified: %v", err)
 		}
 
 		if highQC.BlockHash() != hotstuff.GetGenesis().Hash() {
