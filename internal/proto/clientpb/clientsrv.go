@@ -1,4 +1,4 @@
-package clientsrv
+package clientpb
 
 import (
 	"crypto/sha256"
@@ -11,10 +11,8 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -22,20 +20,20 @@ import (
 type Server struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
-	cmdCache  *clientpb.Cache
+	cmdCache  *Cache
 
 	mut          sync.Mutex
 	srv          *gorums.Server
-	awaitingCmds map[clientpb.MessageID]chan<- error
+	awaitingCmds map[MessageID]chan<- error
 	hash         hash.Hash
 	cmdCount     uint32
 }
 
-// New returns a new client server.
-func New(
+// NewServer returns a new client server.
+func NewServer(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	cmdCache *clientpb.Cache,
+	cmdCache *Cache,
 
 	srvOpts ...gorums.ServerOption,
 ) (srv *Server) {
@@ -44,21 +42,12 @@ func New(
 		logger:    logger,
 		cmdCache:  cmdCache,
 
-		awaitingCmds: make(map[clientpb.MessageID]chan<- error),
+		awaitingCmds: make(map[MessageID]chan<- error),
 		srv:          gorums.NewServer(srvOpts...),
 		hash:         sha256.New(),
 	}
-	clientpb.RegisterClientServer(srv.srv, srv)
+	RegisterClientServer(srv.srv, srv)
 	return srv
-}
-
-func (srv *Server) Start(addr string) error {
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		return err
-	}
-	srv.StartOnListener(lis)
-	return nil
 }
 
 func (srv *Server) StartOnListener(lis net.Listener) {
@@ -74,10 +63,6 @@ func (srv *Server) Stop() {
 	srv.srv.Stop()
 }
 
-func (srv *Server) CmdCache() *clientpb.Cache {
-	return srv.cmdCache
-}
-
 func (srv *Server) Hash() hash.Hash {
 	return srv.hash
 }
@@ -86,7 +71,7 @@ func (srv *Server) CmdCount() uint32 {
 	return srv.cmdCount
 }
 
-func (srv *Server) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*emptypb.Empty, error) {
+func (srv *Server) ExecCommand(ctx gorums.ServerCtx, cmd *Command) (*emptypb.Empty, error) {
 	id := cmd.ID()
 	c := make(chan error)
 
@@ -101,20 +86,20 @@ func (srv *Server) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*em
 }
 
 func (srv *Server) Exec(cmd hotstuff.Command) {
-	batch := new(clientpb.Batch)
-	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
+	batch, err := srv.cmdCache.GetCommands(cmd)
 	if err != nil {
-		srv.logger.Errorf("Failed to unmarshal command: %v", err)
+		srv.logger.Error(err)
 		return
 	}
 
-	srv.eventLoop.AddEvent(hotstuff.CommitEvent{Commands: len(batch.GetCommands())})
+	srv.eventLoop.AddEvent(hotstuff.CommitEvent{Commands: len(batch)})
 
-	for _, cmd := range batch.GetCommands() {
+	for _, cmd := range batch {
 		id := cmd.ID()
 
 		srv.mut.Lock()
 		// TODO(meling): ASKING: previously the hash.Write and srv.cmdCount++ were outside the critical section, shouldn't they be inside?
+		// TODO(meling): We should add a concurrency test for this logic to check that the hash doesn't get corrupted.
 		_, _ = srv.hash.Write(cmd.Data)
 		srv.cmdCount++
 		if done, ok := srv.awaitingCmds[id]; ok {
@@ -128,13 +113,12 @@ func (srv *Server) Exec(cmd hotstuff.Command) {
 }
 
 func (srv *Server) Fork(cmd hotstuff.Command) {
-	batch := new(clientpb.Batch)
-	err := proto.UnmarshalOptions{AllowPartial: true}.Unmarshal([]byte(cmd), batch)
+	batch, err := srv.cmdCache.GetCommands(cmd)
 	if err != nil {
-		srv.logger.Errorf("Failed to unmarshal command: %v", err)
+		srv.logger.Error(err)
 		return
 	}
-	for _, cmd := range batch.GetCommands() {
+	for _, cmd := range batch {
 		id := cmd.ID()
 
 		srv.mut.Lock()

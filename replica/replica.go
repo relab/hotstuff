@@ -14,11 +14,10 @@ import (
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/cert"
-	"github.com/relab/hotstuff/service/clientsrv"
-	"github.com/relab/hotstuff/service/committer"
 	"github.com/relab/hotstuff/wiring"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/service/committer"
 	"github.com/relab/hotstuff/service/server"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -26,7 +25,7 @@ import (
 // Replica is a participant in the consensus protocol.
 type Replica struct {
 	eventLoop    *eventloop.EventLoop
-	clientSrv    *clientsrv.Server
+	clientSrv    *clientpb.Server
 	hsSrv        *server.Server
 	sender       *network.GorumsSender
 	synchronizer *synchronizer.Synchronizer
