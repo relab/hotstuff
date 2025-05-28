@@ -5,11 +5,11 @@ import (
 	"crypto/x509"
 
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
-	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/service/server"
+	"github.com/relab/hotstuff/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"

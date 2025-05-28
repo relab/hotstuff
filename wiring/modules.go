@@ -7,6 +7,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/protocol/leaderrotation/carousel"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/leaderrotation/reputation"
@@ -21,7 +22,6 @@ import (
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/security/crypto/eddsa"
-	"github.com/relab/hotstuff/service/committer"
 )
 
 func NewConsensusRules(

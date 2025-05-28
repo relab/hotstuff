@@ -9,8 +9,8 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/security/cert"
-	"github.com/relab/hotstuff/service/committer"
 )
 
 type Voter struct {

@@ -17,8 +17,8 @@ import (
 	"github.com/relab/hotstuff/wiring"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/service/committer"
-	"github.com/relab/hotstuff/service/server"
+	"github.com/relab/hotstuff/protocol/committer"
+	"github.com/relab/hotstuff/server"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -63,7 +63,7 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	rules, err := wiring.NewConsensusRules(
+	consensusRules, err := wiring.NewConsensusRules(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
@@ -78,13 +78,13 @@ func New(
 		byz, err := wiring.WrapByzantineStrategy(
 			depsCore.RuntimeCfg(),
 			depsSecure.BlockChain(),
-			rules,
+			consensusRules,
 			byzStrat,
 		)
 		if err != nil {
 			return nil, err
 		}
-		rules = byz
+		consensusRules = byz
 		depsCore.Logger().Infof("assigned byzantine strategy: %s", byzStrat)
 	}
 	depsClient := wiring.NewClient(
@@ -97,17 +97,17 @@ func New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsSecure.BlockChain(),
-		rules,
+		consensusRules,
 		depsClient.Server(),
 	)
-	leader, err := wiring.NewLeaderRotation(
+	leaderRotation, err := wiring.NewLeaderRotation(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
 		committer,
 		vdParams,
 		rOpt.moduleNames.leaderRotation,
-		rules.ChainLength(),
+		consensusRules.ChainLength(),
 	)
 	if err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func New(
 			depsSecure.BlockChain(),
 			depsSecure.Authority(),
 			viewStates,
-			leader,
+			leaderRotation,
 			sender,
 		)
 	}
@@ -153,17 +153,17 @@ func New(
 		depsSecure.Authority(),
 		depsClient.Cache(),
 		committer,
-		rules,
-		leader,
+		consensusRules,
+		leaderRotation,
 		protocol,
 	)
-	// TODO(AlanRostem): consder a way to move the consensus flow from Synchronzier to Consensus
+	// TODO(AlanRostem): consder moving the consensus flow from Synchronzier to a different class
 	synchronizer := synchronizer.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.Authority(),
-		leader,
+		leaderRotation,
 		depsConsensus.Proposer(),
 		depsConsensus.Voter(),
 		viewStates,
