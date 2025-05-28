@@ -34,6 +34,13 @@ func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID)
 	return b
 }
 
+func GenesisBlock() *Block {
+	ts := time.Unix(0, 0).UTC() // should we use a static string for parsing?
+	genesisBlock := NewBlock(Hash{}, QuorumCert{}, "", 0, 0)
+	genesisBlock.SetTimestamp(ts)
+	return genesisBlock
+}
+
 func (b *Block) SetTimestamp(ts time.Time) {
 	b.ts = ts
 	// recalculate the hash since the timestamp is part of the block
@@ -81,8 +88,8 @@ func (b *Block) View() View {
 	return b.view
 }
 
-// TimeStamp returns the timestamp of the block
-func (b *Block) TimeStamp() time.Time {
+// Timestamp returns the timestamp of the block
+func (b *Block) Timestamp() time.Time {
 	return b.ts
 }
 

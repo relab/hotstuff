@@ -3,9 +3,7 @@ syntax = "proto3";
 package hotstuffpb;
 
 import "gorums.proto";
-
 import "google/protobuf/empty.proto";
-
 import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/relab/hotstuff/internal/proto/hotstuffpb";

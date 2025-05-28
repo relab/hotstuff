@@ -140,7 +140,7 @@ func BlockToProto(block *hotstuff.Block) *Block {
 		QC:        QuorumCertToProto(block.QuorumCert()),
 		View:      uint64(block.View()),
 		Proposer:  uint32(block.Proposer()),
-		Timestamp: timestamppb.New(block.TimeStamp()),
+		Timestamp: timestamppb.New(block.Timestamp()),
 	}
 }
 
