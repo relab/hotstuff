@@ -6,7 +6,10 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/testutil"
+	"github.com/relab/hotstuff/security/cert"
+	"github.com/relab/hotstuff/security/crypto/ecdsa"
 )
 
 func TestUnicast(t *testing.T) {
@@ -33,7 +36,8 @@ func TestUnicast(t *testing.T) {
 	}
 	// run all replica's eventloops
 	for _, id := range network.ReplicaIDs() {
-		ctx, _ := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+		defer cancel()
 		r := network.Replica(id)
 		r.EventLoop.Run(ctx)
 	}
@@ -78,6 +82,22 @@ func TestBroadcast(t *testing.T) {
 	}
 }
 
-// func TestRequestBlock(t *testing.T) {
-//
-// }
+func TestRequestBlock(t *testing.T) {
+	// setup
+	replicaCount := uint(4)
+	cfg := testutil.MockReplicaConfig{
+		EventLoopBufferSize: 1,
+	}
+	network := testutil.NewMockNetwork(t, replicaCount, cfg)
+	blockStorer := network.Replica(1)
+	config := core.NewRuntimeConfig(blockStorer.ID, testutil.GenerateECDSAKey(t))
+	auth := cert.NewAuthority(
+		config,
+		blockStorer.Logger,
+		blockStorer.BlockChain,
+		ecdsa.New(config, blockStorer.Logger),
+	)
+	// TODO(AlanRostem): remove logger from Authority and all crypto impls.
+	blockStorer.BlockChain.Store(testutil.CreateBlock(t, auth))
+	// TODO(AlanRostem): finish this test
+}

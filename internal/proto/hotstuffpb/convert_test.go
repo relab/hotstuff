@@ -21,7 +21,7 @@ import (
 func TestConvertPartialCert(t *testing.T) {
 	key := testutil.GenerateECDSAKey(t)
 	cfg := core.NewRuntimeConfig(1, key)
-	crypt := ecdsa.New(nil, cfg) // TODO: why is logger nil?
+	crypt := ecdsa.New(cfg, nil) // TODO: why is logger nil?
 	signer := cert.NewAuthority(cfg, nil, nil, crypt)
 
 	want, err := signer.CreatePartialCert(hotstuff.GetGenesis())
@@ -43,7 +43,7 @@ func TestConvertQuorumCert(t *testing.T) {
 	for i := range n {
 		key := testutil.GenerateECDSAKey(t)
 		cfg := core.NewRuntimeConfig(hotstuff.ID(i+1), key)
-		crypt := ecdsa.New(nil, cfg)
+		crypt := ecdsa.New(cfg, nil)
 		signer := cert.NewAuthority(cfg, nil, nil, crypt)
 		signers[i] = signer
 	}
@@ -99,7 +99,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 	for i := range n {
 		id := hotstuff.ID(i + 1)
 		logger := logging.New("test")
-		crypt := bls12.New(logger, cfgs[id])
+		crypt := bls12.New(cfgs[id], logger)
 		signer := cert.NewAuthority(cfgs[id], logger, nil, crypt)
 		signers[i] = signer
 		meta := cfgs[id].ConnectionMetadata()

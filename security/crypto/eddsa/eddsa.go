@@ -58,8 +58,8 @@ type eddsaBase struct {
 
 // New returns a new instance of the EDDSA CryptoBase implementation.
 func New(
-	logger logging.Logger,
 	config *core.RuntimeConfig,
+	logger logging.Logger,
 ) modules.CryptoBase {
 	return &eddsaBase{
 		logger: logger,

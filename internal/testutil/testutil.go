@@ -133,6 +133,18 @@ func CreateTCPListener(t *testing.T) net.Listener {
 	return lis
 }
 
+func CreateBlock(t *testing.T, signer *cert.Authority) *hotstuff.Block {
+	t.Helper()
+
+	qc, err := signer.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+	if err != nil {
+		t.Errorf("Could not create empty QC for genesis: %v", err)
+	}
+
+	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "foo", 42, 1)
+	return b
+}
+
 // CreateSignatures creates partial certificates from multiple signers.
 func CreateSignatures(t *testing.T, message []byte, signers []modules.CryptoBase) []hotstuff.QuorumSignature {
 	t.Helper()

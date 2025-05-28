@@ -149,8 +149,8 @@ type bls12Base struct {
 
 // New returns a new instance of the BLS12 CryptoBase implementation.
 func New(
-	logger logging.Logger,
 	config *core.RuntimeConfig,
+	logger logging.Logger,
 ) modules.CryptoBase {
 	bls := &bls12Base{
 		logger: logger,

@@ -72,8 +72,8 @@ type ecdsaBase struct {
 
 // New returns a new instance of the ECDSA CryptoBase implementation.
 func New(
-	logger logging.Logger,
 	config *core.RuntimeConfig,
+	logger logging.Logger,
 ) modules.CryptoBase {
 	return &ecdsaBase{
 		logger: logger,
