@@ -357,7 +357,7 @@ func (bls *bls12Base) Combine(signatures ...hotstuff.QuorumSignature) (combined 
 }
 
 // Verify verifies the given quorum signature against the message.
-func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
+func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte) error {
 	s, ok := signature.(*AggregateSignature)
 	if !ok {
 		bls.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
@@ -369,38 +369,44 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 		id := firstParticipant(s.Participants())
 		pk, ok := bls.publicKey(id)
 		if !ok {
-			bls.logger.Warnf("Missing public key for ID %d", id)
-			return false
+			return fmt.Errorf("Missing public key for ID %d", id)
 		}
-		return bls.coreVerify(pk, message, &s.sig, domain)
+		if !bls.coreVerify(pk, message, &s.sig, domain) {
+			return fmt.Errorf("core-verify failed")
+		}
 	}
 
 	// else if l > 1:
 	pks := make([]*PublicKey, 0, n)
+	idsWithMissingKeys := []hotstuff.ID{}
 	s.Participants().RangeWhile(func(id hotstuff.ID) bool {
 		pk, ok := bls.publicKey(id)
 		if ok {
 			pks = append(pks, pk)
 			return true
 		}
-		bls.logger.Warnf("Missing public key for ID %d", id)
+		idsWithMissingKeys = append(idsWithMissingKeys, id)
+		// bls.logger.Warnf("Missing public key for ID %d", id)
 		return false
 	})
 	if len(pks) != n {
-		return false
+		return fmt.Errorf("not enough public keys - missing participants: %v", idsWithMissingKeys)
 	}
-	return bls.fastAggregateVerify(pks, message, &s.sig)
+	if !bls.fastAggregateVerify(pks, message, &s.sig) {
+		return fmt.Errorf("fast-agg-verify failed")
+	}
+	return nil
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
-func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
+func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) error {
 	s, ok := signature.(*AggregateSignature)
 	if !ok {
 		bls.logger.Panicf("cannot verify incompatible signature type %T (expected %T)", signature, s)
 	}
 
 	if s.Participants().Len() != len(batch) {
-		return false
+		return fmt.Errorf("expected %d participants", len(batch))
 	}
 
 	pks := make([]*PublicKey, 0, len(batch))
@@ -410,15 +416,20 @@ func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[
 		msgs = append(msgs, msg)
 		pk, ok := bls.publicKey(id)
 		if !ok {
-			bls.logger.Warnf("Missing public key for ID %d", id)
-			return false
+			return fmt.Errorf("missing public key for ID %d", id)
 		}
 		pks = append(pks, pk)
 	}
 
 	if len(batch) == 1 {
-		return bls.coreVerify(pks[0], msgs[0], &s.sig, domain)
+		if !bls.coreVerify(pks[0], msgs[0], &s.sig, domain) {
+			return fmt.Errorf("core-verify failed")
+		}
+		return nil
 	}
 
-	return bls.aggregateVerify(pks, msgs, &s.sig)
+	if !bls.aggregateVerify(pks, msgs, &s.sig) {
+		return fmt.Errorf("agg-verify failed")
+	}
+	return nil
 }

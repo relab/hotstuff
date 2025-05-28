@@ -189,7 +189,8 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 			}
 		}
 	}()
-	if !s.auth.Verify(timeout.ViewSignature, timeout.View.ToBytes()) {
+	if err := s.auth.Verify(timeout.ViewSignature, timeout.View.ToBytes()); err != nil {
+		s.logger.Infof("failed to verify signature: %v", err)
 		return
 	}
 	s.logger.Debug("OnRemoteTimeout: ", timeout)
@@ -261,6 +262,10 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.config.HasAggregateQC() {
 		highQC, err := s.auth.VerifyAggregateQC(s.config.QuorumSize(), aggQC)
 		if err != nil {
+			if _, ok := err.(*cert.FatalError); ok {
+				s.logger.Warnf("fatal error occurred: %v", err)
+				return
+			}
 			s.logger.Info("Aggregated Quorum Certificate could not be verified: %v", err)
 			return
 		}

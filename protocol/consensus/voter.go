@@ -60,6 +60,10 @@ func NewVoter(
 		// ensure that I can vote in this view based on the protocol's rule.
 		err := v.Verify(&proposal)
 		if err != nil {
+			if _, ok := err.(*cert.FatalError); ok {
+				v.logger.Warnf("fatal error occurred: %v", err)
+				return
+			}
 			v.logger.Infof("failed to verify incoming vote: %v", err)
 			return
 		}

@@ -67,26 +67,26 @@ func (cache *Cache) Sign(message []byte) (sig hotstuff.QuorumSignature, err erro
 }
 
 // Verify verifies the given quorum signature against the message.
-func (cache *Cache) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
+func (cache *Cache) Verify(signature hotstuff.QuorumSignature, message []byte) error {
 	var key strings.Builder
 	hash := sha256.Sum256(message)
 	_, _ = key.Write(hash[:])
 	_, _ = key.Write(signature.ToBytes())
 
 	if cache.check(key.String()) {
-		return true
+		return nil
 	}
 
-	if cache.impl.Verify(signature, message) {
-		cache.insert(key.String())
-		return true
+	if err := cache.impl.Verify(signature, message); err != nil {
+		return err
 	}
+	cache.insert(key.String())
 
-	return false
+	return nil
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
-func (cache *Cache) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
+func (cache *Cache) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) error {
 	// sort the list of ids from the batch map
 	ids := slices.Sorted(maps.Keys(batch))
 	var hash hotstuff.Hash
@@ -102,15 +102,14 @@ func (cache *Cache) BatchVerify(signature hotstuff.QuorumSignature, batch map[ho
 	_, _ = key.Write(signature.ToBytes())
 
 	if cache.check(key.String()) {
-		return true
+		return nil
 	}
 
-	if cache.impl.BatchVerify(signature, batch) {
-		cache.insert(key.String())
-		return true
+	if err := cache.impl.BatchVerify(signature, batch); err != nil {
+		return err
 	}
-
-	return false
+	cache.insert(key.String())
+	return nil
 }
 
 // Combine combines multiple signatures together into a single signature.
@@ -118,3 +117,5 @@ func (cache *Cache) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Qu
 	// we don't cache the result of this operation, because it is not guaranteed to be valid.
 	return cache.impl.Combine(signatures...)
 }
+
+var _ modules.CryptoBase = (*Cache)(nil)

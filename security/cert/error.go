@@ -1,22 +1,5 @@
 package cert
 
-import "reflect"
-
-type typeError struct {
-	want reflect.Type
-	got  reflect.Type
-}
-
-func newTypeError() error {
-	return &typeError{}
-}
-
-func (err *typeError) Error() string {
-	return ""
-}
-
-var _ error = (*typeError)(nil)
-
 type FatalError struct {
 	message string
 }

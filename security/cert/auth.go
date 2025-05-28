@@ -103,9 +103,9 @@ func (c *Authority) VerifyPartialCert(cert hotstuff.PartialCert) error {
 	if !ok {
 		return fmt.Errorf("block not found")
 	}
-	ok = c.Verify(cert.Signature(), block.ToBytes())
-	if !ok {
-		return fmt.Errorf("failed to verify block signature")
+	err := c.Verify(cert.Signature(), block.ToBytes())
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -132,9 +132,9 @@ func (c *Authority) VerifyQuorumCert(quorumSize int, qc hotstuff.QuorumCert) err
 	if !ok {
 		return fmt.Errorf("block not found")
 	}
-	ok = c.Verify(qc.Signature(), block.ToBytes())
-	if !ok {
-		return fmt.Errorf("failed to verify block signature")
+	err := c.Verify(qc.Signature(), block.ToBytes())
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -149,9 +149,9 @@ func (c *Authority) VerifyTimeoutCert(quorumSize int, tc hotstuff.TimeoutCert) e
 	if participants.Len() < quorumSize {
 		return fmt.Errorf("not enough participants to saisfy a quorum (want: %d, got %d)", participants.Len(), quorumSize)
 	}
-	ok := c.Verify(tc.Signature(), tc.View().ToBytes())
-	if !ok {
-		return fmt.Errorf("failed to verify block signature")
+	err := c.Verify(tc.Signature(), tc.View().ToBytes())
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -175,8 +175,8 @@ func (c *Authority) VerifyAggregateQC(quorumSize int, aggQC hotstuff.AggregateQC
 		return hotstuff.QuorumCert{}, fmt.Errorf("not enough participants to saisfy a quorum (want: %d, got %d)", participants.Len(), quorumSize)
 	}
 	// both the batched aggQC signatures and the highQC must be verified
-	if !c.BatchVerify(aggQC.Sig(), messages) {
-		return hotstuff.QuorumCert{}, fmt.Errorf("failed to verify the batch")
+	if err := c.BatchVerify(aggQC.Sig(), messages); err != nil {
+		return hotstuff.QuorumCert{}, err
 	}
 
 	if err := c.VerifyQuorumCert(quorumSize, highQC); err != nil {
