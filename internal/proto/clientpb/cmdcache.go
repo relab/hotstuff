@@ -5,8 +5,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-
-	"google.golang.org/protobuf/proto"
 )
 
 type Cache struct {
@@ -15,8 +13,6 @@ type Cache struct {
 	batchSize     uint32
 	serialNumbers map[uint32]uint64 // highest proposed serial number per client ID
 	cache         list.List
-	marshaler     proto.MarshalOptions
-	unmarshaler   proto.UnmarshalOptions
 }
 
 func New(
@@ -26,8 +22,6 @@ func New(
 		c:             make(chan struct{}),
 		batchSize:     1,
 		serialNumbers: make(map[uint32]uint64),
-		marshaler:     proto.MarshalOptions{Deterministic: true},
-		unmarshaler:   proto.UnmarshalOptions{DiscardUnknown: true, AllowPartial: true},
 	}
 	for _, opt := range opts {
 		opt(c)
