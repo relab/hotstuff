@@ -3,6 +3,7 @@ package bls12
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	bls12 "github.com/kilic/bls12-381"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/crypto"
 )
@@ -139,7 +139,6 @@ func firstParticipant(participants hotstuff.IDSet) hotstuff.ID {
 }
 
 type bls12Base struct {
-	logger logging.Logger
 	config *core.RuntimeConfig
 
 	mut sync.RWMutex
@@ -148,39 +147,39 @@ type bls12Base struct {
 }
 
 // New returns a new instance of the BLS12 CryptoBase implementation.
-func New(
-	config *core.RuntimeConfig,
-	logger logging.Logger,
-) modules.CryptoBase {
+func New(config *core.RuntimeConfig) (modules.CryptoBase, error) {
 	bls := &bls12Base{
-		logger: logger,
 		config: config,
 
 		popCache: make(map[string]bool),
 	}
 
-	pop := bls.popProve()
+	pop, err := bls.popProve()
+	if err != nil {
+		return nil, err
+	}
 	b := bls12.NewG2().ToCompressed(pop)
 	bls.config.AddConnectionMetadata(popMetadataKey, string(b))
-	return bls
+	return bls, nil
 }
 
 func (bls *bls12Base) privateKey() *PrivateKey {
 	return bls.config.PrivateKey().(*PrivateKey)
 }
 
-func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *PublicKey, ok bool) {
-	if replica, ok := bls.config.ReplicaInfo(id); ok {
-		if replica.ID != bls.config.ID() && !bls.checkPop(replica) {
-			bls.logger.Warnf("Invalid POP for replica %d", id)
-			return nil, false
-		}
-		if pubKey, ok = replica.PubKey.(*PublicKey); ok {
-			return pubKey, true
-		}
-		bls.logger.Errorf("Unsupported public key type: %T", replica.PubKey)
+func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *PublicKey, err error) {
+	replica, ok := bls.config.ReplicaInfo(id)
+	if !ok {
+		return nil, fmt.Errorf("replica not found")
 	}
-	return nil, false
+	if err := bls.checkPop(replica); err != nil {
+		return nil, err
+	}
+	pubKey, ok = replica.PubKey.(*PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("Unsupported public key type: %T", replica.PubKey)
+	}
+	return pubKey, nil
 }
 
 func (bls *bls12Base) subgroupCheck(point *bls12.PointG2) bool {
@@ -217,30 +216,24 @@ func (bls *bls12Base) coreVerify(pubKey *PublicKey, message []byte, signature *b
 	return engine.Result().IsOne()
 }
 
-func (bls *bls12Base) popProve() *bls12.PointG2 {
+func (bls *bls12Base) popProve() (*bls12.PointG2, error) {
 	pubKey := bls.privateKey().Public().(*PublicKey)
 	proof, err := bls.coreSign(pubKey.ToBytes(), domainPOP)
 	if err != nil {
-		bls.logger.Panicf("Failed to generate proof-of-possession: %v", err)
+		return nil, fmt.Errorf("Failed to generate proof-of-possession: %v", err)
 	}
-	return proof
+	return proof, nil
 }
 
 func (bls *bls12Base) popVerify(pubKey *PublicKey, proof *bls12.PointG2) bool {
 	return bls.coreVerify(pubKey, pubKey.ToBytes(), proof, domainPOP)
 }
 
-func (bls *bls12Base) checkPop(replica *hotstuff.ReplicaInfo) (valid bool) {
-	defer func() {
-		if !valid {
-			bls.logger.Warnf("Invalid proof-of-possession for replica %d", replica.ID)
-		}
-	}()
-
+func (bls *bls12Base) checkPop(replica *hotstuff.ReplicaInfo) (err error) {
 	popBytes, ok := replica.Metadata[popMetadataKey]
 	if !ok {
-		bls.logger.Warnf("Missing proof-of-possession for replica: %d", replica.ID)
-		return false
+		return fmt.Errorf("Missing proof-of-possession for replica: %d", replica.ID)
+
 	}
 
 	var key strings.Builder
@@ -248,15 +241,15 @@ func (bls *bls12Base) checkPop(replica *hotstuff.ReplicaInfo) (valid bool) {
 	_, _ = key.Write(replica.PubKey.(*PublicKey).ToBytes())
 
 	bls.mut.RLock()
-	valid, ok = bls.popCache[key.String()]
+	valid, ok := bls.popCache[key.String()]
 	bls.mut.RUnlock()
-	if ok {
-		return valid
+	if ok && valid {
+		return nil
 	}
 
 	proof, err := bls12.NewG2().FromCompressed([]byte(popBytes))
 	if err != nil {
-		return false
+		return err
 	}
 
 	valid = bls.popVerify(replica.PubKey.(*PublicKey), proof)
@@ -265,7 +258,7 @@ func (bls *bls12Base) checkPop(replica *hotstuff.ReplicaInfo) (valid bool) {
 	bls.popCache[key.String()] = valid
 	bls.mut.Unlock()
 
-	return valid
+	return nil
 }
 
 func (bls *bls12Base) coreAggregateVerify(publicKeys []*PublicKey, messages [][]byte, signature *bls12.PointG2) bool {
@@ -350,26 +343,26 @@ func (bls *bls12Base) Combine(signatures ...hotstuff.QuorumSignature) (combined 
 			}
 			g2.Add(&agg, &agg, &sig2.sig)
 		} else {
-			bls.logger.Panicf("cannot combine incompatible signature type %T (expected %T)", sig1, sig2)
+			return nil, fmt.Errorf("cannot combine incompatible signature type %T (expected %T)", sig1, sig2)
 		}
 	}
 	return &AggregateSignature{sig: agg, participants: participants}, nil
 }
 
 // Verify verifies the given quorum signature against the message.
-func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte) error {
+func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte) (err error) {
 	s, ok := signature.(*AggregateSignature)
 	if !ok {
-		bls.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 
 	n := s.Participants().Len()
 
 	if n == 1 {
 		id := firstParticipant(s.Participants())
-		pk, ok := bls.publicKey(id)
-		if !ok {
-			return fmt.Errorf("Missing public key for ID %d", id)
+		pk, err := bls.publicKey(id)
+		if err != nil {
+			return err
 		}
 		if !bls.coreVerify(pk, message, &s.sig, domain) {
 			return fmt.Errorf("core-verify failed")
@@ -378,19 +371,18 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 
 	// else if l > 1:
 	pks := make([]*PublicKey, 0, n)
-	idsWithMissingKeys := []hotstuff.ID{}
+	var errs error
 	s.Participants().RangeWhile(func(id hotstuff.ID) bool {
-		pk, ok := bls.publicKey(id)
-		if ok {
-			pks = append(pks, pk)
-			return true
+		pk, err := bls.publicKey(id)
+		if err != nil {
+			errs = errors.Join(err)
+			return false
 		}
-		idsWithMissingKeys = append(idsWithMissingKeys, id)
-		// bls.logger.Warnf("Missing public key for ID %d", id)
-		return false
+		pks = append(pks, pk)
+		return true
 	})
-	if len(pks) != n {
-		return fmt.Errorf("not enough public keys - missing participants: %v", idsWithMissingKeys)
+	if errs != nil {
+		return fmt.Errorf("one or more public keys had errors: %v", errs)
 	}
 	if !bls.fastAggregateVerify(pks, message, &s.sig) {
 		return fmt.Errorf("fast-agg-verify failed")
@@ -402,7 +394,7 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) error {
 	s, ok := signature.(*AggregateSignature)
 	if !ok {
-		bls.logger.Panicf("cannot verify incompatible signature type %T (expected %T)", signature, s)
+		return fmt.Errorf("cannot verify incompatible signature type %T (expected %T)", signature, s)
 	}
 
 	if s.Participants().Len() != len(batch) {
@@ -414,9 +406,9 @@ func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[
 
 	for id, msg := range batch {
 		msgs = append(msgs, msg)
-		pk, ok := bls.publicKey(id)
-		if !ok {
-			return fmt.Errorf("missing public key for ID %d", id)
+		pk, err := bls.publicKey(id)
+		if err != nil {
+			return err
 		}
 		pks = append(pks, pk)
 	}

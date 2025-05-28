@@ -70,11 +70,14 @@ func newCryptoModule(
 	logger.Debugf("Initializing module (crypto): %s", name)
 	switch name {
 	case bls12.ModuleName:
-		impl = bls12.New(config, logger)
+		impl, err = bls12.New(config)
+		if err != nil {
+			return nil, err
+		}
 	case ecdsa.ModuleName:
-		impl = ecdsa.New(config, logger)
+		impl = ecdsa.New(config)
 	case eddsa.ModuleName:
-		impl = eddsa.New(config, logger)
+		impl = eddsa.New(config)
 	default:
 		return nil, fmt.Errorf("invalid crypto name: '%s'", name)
 	}

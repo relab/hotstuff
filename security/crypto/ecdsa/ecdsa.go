@@ -5,12 +5,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/crypto"
 )
@@ -66,17 +66,12 @@ func (sig Signature) ToBytes() []byte {
 }
 
 type ecdsaBase struct {
-	logger logging.Logger
 	config *core.RuntimeConfig
 }
 
 // New returns a new instance of the ECDSA CryptoBase implementation.
-func New(
-	config *core.RuntimeConfig,
-	logger logging.Logger,
-) modules.CryptoBase {
+func New(config *core.RuntimeConfig) modules.CryptoBase {
 	return &ecdsaBase{
-		logger: logger,
 		config: config,
 	}
 }
@@ -115,54 +110,51 @@ func (ec *ecdsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Q
 				ts[id] = s
 			}
 		} else {
-			ec.logger.Panicf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
+			return nil, fmt.Errorf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
 		}
 	}
 	return ts, nil
 }
 
 // Verify verifies the given quorum signature against the message.
-func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) error {
+func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) (err error) {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
-		ec.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 	n := signature.Participants().Len()
 	if n == 0 {
 		return fmt.Errorf("expected more than zero participants")
 	}
 
-	results := make(chan bool, n)
+	results := make(chan error, n)
 	hash := sha256.Sum256(message)
 	for _, sig := range s {
 		go func(sig *Signature, hash hotstuff.Hash) {
 			results <- ec.verifySingle(sig, hash)
 		}(sig, hash)
 	}
-	valid := true
 	for range s {
-		if !<-results {
-			valid = false
-		}
+		err = errors.Join(<-results)
 	}
-	if !valid {
-		return fmt.Errorf("invalid signature")
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
-func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) error {
+func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) (err error) {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
-		ec.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 	n := signature.Participants().Len()
 	if n == 0 {
 		return fmt.Errorf("expected more than zero participants")
 	}
 
-	results := make(chan bool, n)
+	results := make(chan error, n)
 	set := make(map[hotstuff.Hash]struct{})
 	for id, sig := range s {
 		message, ok := batch[id]
@@ -175,26 +167,29 @@ func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 			results <- ec.verifySingle(sig, hash)
 		}(sig, hash)
 	}
-	valid := true
 	for range s {
-		if !<-results {
-			valid = false
-		}
+		err = errors.Join(<-results)
 	}
-
+	if err != nil {
+		return err
+	}
 	// valid if all partial signatures are valid and there are no duplicate messages
-	if !valid || len(set) != len(batch) {
+	if len(set) != len(batch) {
 		return fmt.Errorf("invalid signature")
 	}
 	return nil
 }
 
-func (ec *ecdsaBase) verifySingle(sig *Signature, hash hotstuff.Hash) bool {
+func (ec *ecdsaBase) verifySingle(sig *Signature, hash hotstuff.Hash) error {
 	replica, ok := ec.config.ReplicaInfo(sig.Signer())
 	if !ok {
-		ec.logger.Warnf("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
-		return false
+		return fmt.Errorf("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
 	}
 	pk := replica.PubKey.(*ecdsa.PublicKey)
-	return ecdsa.Verify(pk, hash[:], sig.R(), sig.S())
+	if !ecdsa.Verify(pk, hash[:], sig.R(), sig.S()) {
+		return fmt.Errorf("failed to verify public key")
+	}
+	return nil
 }
+
+var _ modules.CryptoBase = (*ecdsaBase)(nil)

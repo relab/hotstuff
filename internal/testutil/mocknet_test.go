@@ -96,12 +96,10 @@ func TestSenderRequestBlock(t *testing.T) {
 	auth := cert.NewAuthority(
 		config,
 		storer.BlockChain,
-		ecdsa.New(config, storer.Logger),
+		ecdsa.New(config),
 	)
-	// TODO(AlanRostem): remove logger from Authority and all crypto impls.
 	block := testutil.CreateBlock(t, auth)
 	storer.BlockChain.Store(block)
-
 	requester := network.Replica(2)
 	foundBlock, ok := requester.Sender.RequestBlock(nil, block.Hash())
 	if !ok {

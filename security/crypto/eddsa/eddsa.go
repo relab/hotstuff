@@ -4,11 +4,11 @@ package eddsa
 import (
 	"crypto/ed25519"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/crypto"
 )
@@ -53,17 +53,12 @@ func (sig Signature) ToBytes() []byte {
 }
 
 type eddsaBase struct {
-	logger logging.Logger
 	config *core.RuntimeConfig
 }
 
 // New returns a new instance of the EDDSA CryptoBase implementation.
-func New(
-	config *core.RuntimeConfig,
-	logger logging.Logger,
-) modules.CryptoBase {
+func New(config *core.RuntimeConfig) modules.CryptoBase {
 	return &eddsaBase{
-		logger: logger,
 		config: config,
 	}
 }
@@ -95,53 +90,50 @@ func (ed *eddsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Q
 				ts[id] = s
 			}
 		} else {
-			ed.logger.Panicf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
+			return nil, fmt.Errorf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
 		}
 	}
 	return ts, nil
 }
 
 // Verify verifies the given quorum signature against the message.
-func (ed *eddsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) error {
+func (ed *eddsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) (err error) {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
-		ed.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 	n := signature.Participants().Len()
 	if n == 0 {
 		return fmt.Errorf("expected more than zero participants")
 	}
 
-	results := make(chan bool, n)
+	results := make(chan error, n)
 	for _, sig := range s {
 		go func(sig *Signature, msg []byte) {
 			results <- ed.verifySingle(sig, msg)
 		}(sig, message)
 	}
-	valid := true
 	for range s {
-		if !<-results {
-			valid = false
-		}
+		err = errors.Join(<-results)
 	}
-	if !valid {
-		return fmt.Errorf("invalid signature")
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
-func (ed *eddsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) error {
+func (ed *eddsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) (err error) {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
-		ed.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 	n := signature.Participants().Len()
 	if n == 0 {
 		return fmt.Errorf("expected more than zero participants")
 	}
 
-	results := make(chan bool, n)
+	results := make(chan error, n)
 	set := make(map[hotstuff.Hash]struct{})
 	for id, sig := range s {
 		message, ok := batch[id]
@@ -154,27 +146,27 @@ func (ed *eddsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 			results <- ed.verifySingle(sig, msg)
 		}(sig, message)
 	}
-	valid := true
 	for range s {
-		if !<-results {
-			valid = false
-		}
+		err = errors.Join(<-results)
 	}
-
+	if err != nil {
+		return err
+	}
 	// valid if all partial signatures are valid and there are no duplicate messages
-
-	if !valid || len(set) != len(batch) {
+	if len(set) != len(batch) {
 		return fmt.Errorf("invalid signature")
 	}
 	return nil
 }
 
-func (ed *eddsaBase) verifySingle(sig *Signature, message []byte) bool {
+func (ed *eddsaBase) verifySingle(sig *Signature, message []byte) error {
 	replica, ok := ed.config.ReplicaInfo(sig.Signer())
 	if !ok {
-		ed.logger.Warnf("eddsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
-		return false
+		return fmt.Errorf("eddsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
 	}
 	pk := replica.PubKey.(ed25519.PublicKey)
-	return ed25519.Verify(pk, message, sig.sign)
+	if !ed25519.Verify(pk, message, sig.sign) {
+		return fmt.Errorf("failed to verify public key")
+	}
+	return nil
 }
