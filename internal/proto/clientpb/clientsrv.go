@@ -66,15 +66,15 @@ func (srv *Server) CmdCount() uint32 {
 
 func (srv *Server) ExecCommand(ctx gorums.ServerCtx, cmd *Command) (*emptypb.Empty, error) {
 	id := cmd.ID()
-	c := make(chan error)
+	errChan := make(chan error)
 
 	srv.mut.Lock()
-	srv.awaitingCmds[id] = c
+	srv.awaitingCmds[id] = errChan
 	srv.mut.Unlock()
 
 	srv.cmdCache.add(cmd)
 	ctx.Release()
-	err := <-c
+	err := <-errChan
 	return &emptypb.Empty{}, err
 }
 
@@ -87,8 +87,8 @@ func (srv *Server) Exec(batch *Batch) {
 		// TODO(meling): We should add a concurrency test for this logic to check that the hash doesn't get corrupted.
 		_, _ = srv.hash.Write(cmd.Data)
 		srv.cmdCount++
-		if done, ok := srv.awaitingCmds[id]; ok {
-			done <- nil
+		if errChan, ok := srv.awaitingCmds[id]; ok {
+			errChan <- nil
 			delete(srv.awaitingCmds, id)
 		}
 		srv.mut.Unlock()
@@ -102,8 +102,8 @@ func (srv *Server) Fork(batch *Batch) {
 		id := cmd.ID()
 
 		srv.mut.Lock()
-		if done, ok := srv.awaitingCmds[id]; ok {
-			done <- status.Error(codes.Aborted, "blockchain was forked")
+		if errChan, ok := srv.awaitingCmds[id]; ok {
+			errChan <- status.Error(codes.Aborted, "blockchain was forked")
 			delete(srv.awaitingCmds, id)
 		}
 		srv.mut.Unlock()
