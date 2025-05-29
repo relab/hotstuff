@@ -62,8 +62,8 @@ func (b *Block) Parent() Hash {
 	return b.parent
 }
 
-// Command returns a batch of commands.
-func (b *Block) Command() *clientpb.Batch { // TODO(meling): return a slice of commands
+// Commands returns a batch of commands.
+func (b *Block) Commands() *clientpb.Batch { // TODO(meling): return a slice of commands
 	return b.batch
 }
 

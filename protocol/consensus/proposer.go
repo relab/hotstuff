@@ -58,7 +58,7 @@ func (cs *Proposer) Propose(proposal *hotstuff.ProposeMsg) {
 	cs.committer.Update(block)
 	// TODO(AlanRostem): solve issue #191
 	// update the command's age before voting.
-	cs.commandCache.Proposed(block.Command())
+	cs.commandCache.Proposed(block.Commands())
 	pc, err := cs.voter.Vote(block)
 	if err != nil {
 		// this should not happen which is why we log here just in case of a bug

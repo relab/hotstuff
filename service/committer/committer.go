@@ -58,7 +58,7 @@ func (cm *Committer) commit(block *hotstuff.Block) error {
 		block.View(),
 	)
 	for _, block := range forkedBlocks {
-		cm.clientSrv.Fork(block.Command())
+		cm.clientSrv.Fork(block.Commands())
 	}
 	return nil
 }
@@ -89,7 +89,7 @@ func (cm *Committer) commitInner(block *hotstuff.Block) error {
 		return fmt.Errorf("failed to locate block: %s", block.Parent())
 	}
 	cm.logger.Debug("EXEC: ", block)
-	batch := block.Command()
+	batch := block.Commands()
 	cm.eventLoop.AddEvent(hotstuff.CommitEvent{Commands: len(batch.Commands)})
 	cm.clientSrv.Exec(batch)
 	cm.eventLoop.AddEvent(hotstuff.ConsensusLatencyEvent{Latency: time.Since(block.TimeStamp())})
