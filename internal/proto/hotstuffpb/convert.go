@@ -2,7 +2,6 @@
 package hotstuffpb
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/relab/hotstuff"
@@ -11,7 +10,6 @@ import (
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/security/crypto/eddsa"
-	"google.golang.org/protobuf/proto"
 )
 
 // QuorumSignatureToProto converts a threshold signature to a protocol buffers message.
@@ -136,15 +134,9 @@ func ProposalFromProto(p *Proposal) (proposal hotstuff.ProposeMsg) {
 // BlockToProto converts a hotstuff.Block to a Block.
 func BlockToProto(block *hotstuff.Block) *Block {
 	parentHash := block.Parent()
-	// HACK(meling): should be avoided when we remove the translation layer.
-	b, err := proto.MarshalOptions{Deterministic: true}.Marshal(block.Command())
-	if err != nil {
-		panic(fmt.Sprintf("failed to marshal command: %v", err))
-	}
 	return &Block{
-		Parent:  parentHash[:],
-		Command: b,
-		// Command:  []byte(block.Command()),//TODO: Convert clientpb.Batch to []byte
+		Parent:   parentHash[:],
+		Command:  block.Command().Marshal(), // may panic
 		QC:       QuorumCertToProto(block.QuorumCert()),
 		View:     uint64(block.View()),
 		Proposer: uint32(block.Proposer()),
@@ -155,17 +147,10 @@ func BlockToProto(block *hotstuff.Block) *Block {
 func BlockFromProto(block *Block) *hotstuff.Block {
 	var p hotstuff.Hash
 	copy(p[:], block.GetParent())
-	// HACK(meling): should be avoided when we remove the translation layer.
-	batch := new(clientpb.Batch)
-	err := proto.UnmarshalOptions{DiscardUnknown: true, AllowPartial: true}.Unmarshal(block.GetCommand(), batch)
-	if err != nil {
-		panic(fmt.Sprintf("failed to unmarshal command: %v", err))
-	}
 	return hotstuff.NewBlock(
 		p,
 		QuorumCertFromProto(block.GetQC()),
-		batch,
-		// hotstuff.Command(block.GetCommand()),//TODO: Convert hotstuffpb.Block.Command []byte to clientpb.Batch
+		clientpb.Unmarshal(block.GetCommand()), // may panic if command not a valid clientpb.Batch
 		hotstuff.View(block.GetView()),
 		hotstuff.ID(block.GetProposer()),
 	)
