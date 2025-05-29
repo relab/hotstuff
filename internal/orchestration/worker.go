@@ -25,7 +25,7 @@ import (
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/security/crypto/keygen"
-	"github.com/relab/hotstuff/service/server"
+	"github.com/relab/hotstuff/server"
 	"github.com/relab/hotstuff/wiring"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
