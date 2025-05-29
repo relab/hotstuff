@@ -3,25 +3,25 @@ package clientpb
 import (
 	"container/list"
 	"context"
-	"fmt"
+	"slices"
 	"sync"
 )
 
 type Cache struct {
-	mut           sync.Mutex
-	c             chan struct{}
-	batchSize     uint32
-	serialNumbers map[uint32]uint64 // highest proposed serial number per client ID
-	cache         list.List
+	mut              sync.Mutex
+	c                chan struct{}
+	batchSize        uint32
+	clientSeqNumbers map[uint32]uint64 // highest proposed sequence number per client ID
+	cache            list.List
 }
 
 func New(
 	opts ...Option,
 ) *Cache {
 	c := &Cache{
-		c:             make(chan struct{}),
-		batchSize:     1,
-		serialNumbers: make(map[uint32]uint64),
+		c:                make(chan struct{}),
+		batchSize:        1,
+		clientSeqNumbers: make(map[uint32]uint64),
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -33,10 +33,15 @@ func (c *Cache) len() uint32 {
 	return uint32(c.cache.Len())
 }
 
+func (c *Cache) isDuplicate(cmd *Command) bool {
+	seqNum := c.clientSeqNumbers[cmd.GetClientID()]
+	return seqNum >= cmd.GetSequenceNumber()
+}
+
 func (c *Cache) add(cmd *Command) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
-	if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
+	if c.isDuplicate(cmd) {
 		// command is too old
 		return
 	}
@@ -77,7 +82,7 @@ awaitBatch:
 			break
 		}
 		cmd := c.cache.Remove(elem).(*Command)
-		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
+		if c.isDuplicate(cmd) {
 			// command is too old
 			i--
 			continue
@@ -95,28 +100,24 @@ awaitBatch:
 	return batch, nil
 }
 
-// Accept returns an error if the given command batch is too old to be accepted.
-func (c *Cache) Accept(batch *Batch) error {
+// ContainsDuplicate returns true if the batch contains old commands already proposed.
+func (c *Cache) ContainsDuplicate(batch *Batch) bool {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 
-	for _, cmd := range batch.GetCommands() {
-		// TODO(meling): Should this error out on the first old command?
-		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
-			return fmt.Errorf("command too old")
-		}
-	}
-	return nil
+	return slices.ContainsFunc(batch.GetCommands(), c.isDuplicate)
 }
 
-// Proposed updates the serial numbers such that we will not accept the given batch again.
+// Proposed updates the sequence numbers such that we will not accept the given batch again.
 func (c *Cache) Proposed(batch *Batch) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 
 	for _, cmd := range batch.GetCommands() {
-		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo < cmd.GetSequenceNumber() {
-			c.serialNumbers[cmd.GetClientID()] = cmd.GetSequenceNumber()
+		if !c.isDuplicate(cmd) {
+			// the command is new (not a duplicate); we update the highest
+			// sequence number for the client that sent the command
+			c.clientSeqNumbers[cmd.GetClientID()] = cmd.GetSequenceNumber()
 		}
 	}
 }
