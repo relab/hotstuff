@@ -15,14 +15,3 @@ func (b *Batch) Marshal() []byte {
 	}
 	return data
 }
-
-// Unmarshal unmarshals the byte slice into a Batch using protobuf.
-// It panics if unmarshaling fails.
-func Unmarshal(data []byte) *Batch {
-	batch := new(Batch)
-	err := proto.UnmarshalOptions{DiscardUnknown: true, AllowPartial: true}.Unmarshal(data, batch)
-	if err != nil {
-		panic(fmt.Sprintf("failed to unmarshal command batch: %v", err))
-	}
-	return batch
-}
