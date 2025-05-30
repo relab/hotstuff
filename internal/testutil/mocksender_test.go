@@ -1,0 +1,124 @@
+package testutil_test
+
+import (
+	"bytes"
+	"testing"
+
+	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/testutil"
+	"github.com/relab/hotstuff/security/blockchain"
+	"github.com/relab/hotstuff/security/cert"
+	"github.com/relab/hotstuff/security/crypto/ecdsa"
+)
+
+type replica struct {
+	logger     logging.Logger
+	eventLoop  *eventloop.EventLoop
+	config     *core.RuntimeConfig
+	sender     *testutil.MockSender
+	blockChain *blockchain.BlockChain
+	auth       *cert.Authority
+}
+
+func wireUpReplica(t *testing.T) *replica {
+	logger := logging.New("test")
+	eventLoop := eventloop.New(logger, 1)
+	config := core.NewRuntimeConfig(1, testutil.GenerateECDSAKey(t))
+
+	sender := testutil.NewMockSender(1)
+	chain := blockchain.New(eventLoop, logger, sender)
+	auth := cert.NewAuthority(config, chain, ecdsa.New(config))
+	return &replica{
+		logger:     logger,
+		eventLoop:  eventLoop,
+		config:     config,
+		sender:     sender,
+		blockChain: chain,
+		auth:       auth,
+	}
+}
+
+func TestPropose(t *testing.T) {
+	r := wireUpReplica(t)
+	block := testutil.CreateBlock(t, r.auth)
+	r.sender.Propose(&hotstuff.ProposeMsg{
+		ID:    1,
+		Block: block,
+	})
+	// check if a message was sent at all
+	if len(r.sender.MessagesSent()) != 1 {
+		t.Fail()
+	}
+	// check if it was the correct type of message
+	msg, ok := r.sender.MessagesSent()[0].(hotstuff.ProposeMsg)
+	if !ok {
+		t.Log("incorrect message type")
+		t.Fail()
+	}
+	// below statements compare the data in the message
+	if msg.ID != 1 {
+		t.Log("incorrect sender")
+		t.Fail()
+	}
+	if !bytes.Equal(block.ToBytes(), msg.Block.ToBytes()) {
+		t.Log("incorrect data")
+		t.Fail()
+	}
+}
+
+func TestVote(t *testing.T) {
+	r := wireUpReplica(t)
+	block := testutil.CreateBlock(t, r.auth)
+	pc := testutil.CreatePC(t, block, r.auth)
+	r.sender.Vote(2, pc)
+	// check if a message was sent at all
+	if len(r.sender.MessagesSent()) != 1 {
+		t.Fail()
+	}
+	// check if it was the correct type of message
+	msg, ok := r.sender.MessagesSent()[0].(hotstuff.PartialCert)
+	if !ok {
+		t.Log("incorrect message type")
+		t.Fail()
+	}
+	// below statements compare the data in the message
+	if msg.Signer() != 1 {
+		t.Log("incorrect sender")
+		t.Fail()
+	}
+
+	if !bytes.Equal(msg.ToBytes(), pc.ToBytes()) {
+		t.Log("incorrect data")
+		t.Fail()
+	}
+}
+
+func TestTimeout(t *testing.T) {
+	r := wireUpReplica(t)
+	r.sender.Timeout(hotstuff.TimeoutMsg{
+		ID:   1,
+		View: 1,
+	})
+	// check if a message was sent at all
+	if len(r.sender.MessagesSent()) != 1 {
+		t.Fail()
+	}
+	// check if it was the correct type of message
+	msg, ok := r.sender.MessagesSent()[0].(hotstuff.TimeoutMsg)
+	if !ok {
+		t.Log("incorrect message type")
+		t.Fail()
+	}
+	// below statements compare the data in the message
+	if msg.ID != 1 {
+		t.Log("incorrect sender")
+		t.Fail()
+	}
+
+	if msg.View != 1 {
+		t.Logf("incorrect view")
+	}
+}
