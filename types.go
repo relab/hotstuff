@@ -98,11 +98,6 @@ func (h Hash) String() string {
 	return base64.StdEncoding.EncodeToString(h[:])
 }
 
-// Command is a client request to be executed by the consensus protocol.
-//
-// The string type is used because it is immutable and can hold arbitrary bytes of any length.
-type Command string
-
 // ToBytes is an object that can be converted into bytes for the purposes of hashing, etc.
 type ToBytes interface {
 	// ToBytes returns the object as bytes.

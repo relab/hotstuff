@@ -23,7 +23,7 @@ func TestCacheConcurrentAddGet(t *testing.T) {
 		for i := range 6 {
 			cmd := &Command{ClientID: 1, SequenceNumber: uint64(i + 1)}
 			want = append(want, cmd)
-			cache.Add(cmd)
+			cache.add(cmd)
 		}
 	}()
 
@@ -34,17 +34,14 @@ func TestCacheConcurrentAddGet(t *testing.T) {
 		for range 3 {
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 			defer cancel()
-			cmd, err := cache.Get(ctx)
+			batch, err := cache.Get(ctx)
 			if err != nil {
 				t.Errorf("Get() error: %v", err)
 			}
-			batch, err := cache.GetCommands(cmd)
-			if err != nil {
-				t.Errorf("Batch() error: %v", err)
-			}
-			got = append(got, batch...)
-			if len(batch) != 2 {
-				t.Errorf("Get() got %d commands, want 2", len(batch))
+			cmds := batch.GetCommands()
+			got = append(got, cmds...)
+			if len(cmds) != 2 {
+				t.Errorf("Get() got %d commands, want 2", len(cmds))
 			}
 		}
 		if diff := cmp.Diff(got, want, protocmp.Transform()); diff != "" {
@@ -130,7 +127,7 @@ func TestCacheAddGetDeadlineExceeded(t *testing.T) {
 			cache := New(WithBatching(2))
 
 			for _, cmd := range tt.cmds {
-				cache.Add(cmd)
+				cache.add(cmd)
 			}
 
 			for e := range tt.wantErr {
@@ -143,24 +140,179 @@ func TestCacheAddGetDeadlineExceeded(t *testing.T) {
 				got, err := cache.Get(ctx)
 				if (err != nil) != (wantErr != nil) || (wantErr != nil && !errors.Is(err, wantErr)) {
 					t.Errorf("Get() error = %v, wantErr %v", err, wantErr)
-					batch, err := cache.GetCommands(got)
-					if err != nil {
-						t.Fatalf("GetCommands() error: %v", err)
-					}
-					t.Logf("Got command batch: %v", batch)
+					t.Logf("Got command batch: %v", got.GetCommands())
 					return
 				}
 
 				if len(wantBatch) > 0 {
 					// we use GetCommands to unmarshal the commands and confirm they match the expected commands
-					gotBatch, err := cache.GetCommands(got)
-					if err != nil {
-						t.Fatalf("GetCommands() error: %v", err)
-					}
+					gotBatch := got.GetCommands()
 					if diff := cmp.Diff(gotBatch, wantBatch, protocmp.Transform()); diff != "" {
 						t.Errorf("Get() mismatch (-got +want):\n%s", diff)
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestPreventAddingDuplicates(t *testing.T) {
+	tests := []struct {
+		name    string
+		batchA  *Batch // Batch of commands that have been proposed
+		batchB  *Batch // Batch of commands to add to the cache
+		wantLen uint32
+	}{
+		{
+			name:    "NoCommands",
+			batchA:  &Batch{Commands: nil},
+			batchB:  &Batch{Commands: nil},
+			wantLen: 0,
+		},
+		{
+			name:    "OneNewCommand",
+			batchA:  &Batch{Commands: []*Command{{SequenceNumber: 1}}},
+			batchB:  &Batch{Commands: []*Command{{SequenceNumber: 2}}},
+			wantLen: 1,
+		},
+		{
+			name:    "OneOldCommand",
+			batchA:  &Batch{Commands: []*Command{{SequenceNumber: 1}}},
+			batchB:  &Batch{Commands: []*Command{{SequenceNumber: 1}}},
+			wantLen: 0,
+		},
+		{
+			name:    "TwoNewCommands",
+			batchA:  &Batch{Commands: []*Command{{SequenceNumber: 1}, {SequenceNumber: 2}}},
+			batchB:  &Batch{Commands: []*Command{{SequenceNumber: 3}, {SequenceNumber: 4}}},
+			wantLen: 2,
+		},
+		{
+			name:    "TwoCommandsOneOld",
+			batchA:  &Batch{Commands: []*Command{{SequenceNumber: 1}, {SequenceNumber: 2}}},
+			batchB:  &Batch{Commands: []*Command{{SequenceNumber: 2}, {SequenceNumber: 3}}},
+			wantLen: 1, // only the new command is added, the old command is ignored
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache := New(WithBatching(2))
+
+			// mark batchA as proposed; necessary to prevent the cache from adding previously proposed commands
+			cache.Proposed(tt.batchA)
+
+			for _, cmd := range tt.batchB.GetCommands() {
+				cache.add(cmd)
+			}
+			if got := cache.len(); got != tt.wantLen {
+				t.Errorf("len() = %d, want %d", got, tt.wantLen)
+			}
+		})
+	}
+}
+
+func TestCacheContainsDuplicate(t *testing.T) {
+	tests := []struct {
+		name   string
+		batchA *Batch // Batch to be proposed
+		batchB *Batch // Batch to check for duplicates/old commands
+		want   bool
+	}{
+		{
+			name:   "NoCommands",
+			batchA: &Batch{Commands: nil},
+			batchB: &Batch{Commands: nil},
+			want:   false, // no commands, no duplicates
+		},
+		{
+			name:   "OneCommandDifferent",
+			batchA: &Batch{Commands: []*Command{{SequenceNumber: 1}}},
+			batchB: &Batch{Commands: []*Command{{SequenceNumber: 2}}},
+			want:   false, // no duplicates; expected behavior
+		},
+		{
+			name:   "OneCommandDuplicate",
+			batchA: &Batch{Commands: []*Command{{SequenceNumber: 1}}},
+			batchB: &Batch{Commands: []*Command{{SequenceNumber: 1}}},
+			want:   true,
+		},
+		{
+			name:   "TwoCommandsDifferent",
+			batchA: &Batch{Commands: []*Command{{SequenceNumber: 1}, {SequenceNumber: 2}}},
+			batchB: &Batch{Commands: []*Command{{SequenceNumber: 3}, {SequenceNumber: 4}}},
+			want:   false, // no duplicates; expected behavior
+		},
+		{
+			name:   "TwoCommandsOneDuplicate",
+			batchA: &Batch{Commands: []*Command{{SequenceNumber: 1}, {SequenceNumber: 2}}},
+			batchB: &Batch{Commands: []*Command{{SequenceNumber: 2}, {SequenceNumber: 3}}},
+			want:   true,
+		},
+		{
+			name:   "TwoCommandsTwoDuplicates",
+			batchA: &Batch{Commands: []*Command{{SequenceNumber: 1}, {SequenceNumber: 2}}},
+			batchB: &Batch{Commands: []*Command{{SequenceNumber: 1}, {SequenceNumber: 2}}},
+			want:   true,
+		},
+		{
+			name:   "ThreeCommands",
+			batchA: &Batch{Commands: []*Command{{SequenceNumber: 1}, {SequenceNumber: 2}, {SequenceNumber: 3}}},
+			batchB: &Batch{Commands: []*Command{{SequenceNumber: 4}, {SequenceNumber: 5}, {SequenceNumber: 6}}},
+			want:   false, // no duplicates; expected behavior
+		},
+		{
+			name:   "ThreeCommandsOneDuplicate",
+			batchA: &Batch{Commands: []*Command{{SequenceNumber: 1}, {SequenceNumber: 2}, {SequenceNumber: 3}}},
+			batchB: &Batch{Commands: []*Command{{SequenceNumber: 4}, {SequenceNumber: 5}, {SequenceNumber: 1}}},
+			want:   true,
+		},
+		{
+			name:   "ThreeCommandsOneDuplicateRepeated",
+			batchA: &Batch{Commands: []*Command{{SequenceNumber: 1}, {SequenceNumber: 2}, {SequenceNumber: 3}}},
+			batchB: &Batch{Commands: []*Command{{SequenceNumber: 1}, {SequenceNumber: 1}, {SequenceNumber: 1}}},
+			want:   true,
+		},
+		{
+			name:   "ThreeCommandsTwoDuplicates",
+			batchA: &Batch{Commands: []*Command{{SequenceNumber: 1}, {SequenceNumber: 2}, {SequenceNumber: 3}}},
+			batchB: &Batch{Commands: []*Command{{SequenceNumber: 1}, {SequenceNumber: 2}, {SequenceNumber: 4}}},
+			want:   true,
+		},
+		{
+			name:   "ThreeCommandsAllDuplicates",
+			batchA: &Batch{Commands: []*Command{{SequenceNumber: 1}, {SequenceNumber: 2}, {SequenceNumber: 3}}},
+			batchB: &Batch{Commands: []*Command{{SequenceNumber: 1}, {SequenceNumber: 2}, {SequenceNumber: 3}}},
+			want:   true,
+		},
+		{
+			name:   "ThreeOldCommandsDifferentClients",
+			batchA: &Batch{Commands: []*Command{{ClientID: 1, SequenceNumber: 5}, {ClientID: 2, SequenceNumber: 10}, {ClientID: 3, SequenceNumber: 20}}},
+			batchB: &Batch{Commands: []*Command{{ClientID: 1, SequenceNumber: 1}, {ClientID: 2, SequenceNumber: 2}, {ClientID: 3, SequenceNumber: 3}}},
+			want:   true,
+		},
+		{
+			name:   "ThreeNewCommandsDifferentClients",
+			batchA: &Batch{Commands: []*Command{{ClientID: 1, SequenceNumber: 5}, {ClientID: 2, SequenceNumber: 10}, {ClientID: 3, SequenceNumber: 20}}},
+			batchB: &Batch{Commands: []*Command{{ClientID: 1, SequenceNumber: 6}, {ClientID: 2, SequenceNumber: 11}, {ClientID: 3, SequenceNumber: 21}}},
+			want:   false, // no duplicates; expected behavior
+		},
+		{
+			name:   "ThreeNewCommandsDifferentClientsJumpSequenceNumbers",
+			batchA: &Batch{Commands: []*Command{{ClientID: 1, SequenceNumber: 5}, {ClientID: 2, SequenceNumber: 10}, {ClientID: 3, SequenceNumber: 20}}},
+			batchB: &Batch{Commands: []*Command{{ClientID: 1, SequenceNumber: 7}, {ClientID: 2, SequenceNumber: 11}, {ClientID: 3, SequenceNumber: 21}}},
+			want:   false, // no duplicates, but client 1 skipped sequence number 6; TODO(meling): Is this expected/allowed behavior?
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache := New(WithBatching(2))
+
+			// mark batchA as proposed
+			cache.Proposed(tt.batchA)
+
+			// check if batchB contains duplicates with respect to batchA
+			if got := cache.ContainsDuplicate(tt.batchB); got != tt.want {
+				t.Errorf("ContainsDuplicate() = %v, want %v", got, tt.want)
 			}
 		})
 	}

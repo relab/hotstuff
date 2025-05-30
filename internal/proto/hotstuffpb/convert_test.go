@@ -11,6 +11,7 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/cert"
 
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/security/crypto/bls12"
@@ -47,7 +48,7 @@ func TestConvertQuorumCert(t *testing.T) {
 		signers[i] = signer
 	}
 
-	b1 := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), "", 1, 1)
+	b1 := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), &clientpb.Batch{}, 1, 1)
 
 	signatures := testutil.CreatePCs(t, b1, signers)
 
@@ -66,7 +67,7 @@ func TestConvertQuorumCert(t *testing.T) {
 
 func TestConvertBlock(t *testing.T) {
 	qc := hotstuff.NewQuorumCert(nil, 0, hotstuff.Hash{})
-	want := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "", 1, 1)
+	want := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, &clientpb.Batch{}, 1, 1)
 	pb := hotstuffpb.BlockToProto(want)
 	got := hotstuffpb.BlockFromProto(pb)
 

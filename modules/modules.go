@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 )
 
 // HotstuffRuleset is the minimum interface that a Hotstuff variant implements.
@@ -31,7 +32,7 @@ type CommitRuler interface {
 // This allows implementors to specify how new blocks are created.
 type ProposeRuler interface {
 	// ProposeRule creates a new proposal.
-	ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool)
+	ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool)
 }
 
 // LeaderRotation implements a leader rotation scheme.

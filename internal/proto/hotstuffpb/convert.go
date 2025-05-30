@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
@@ -135,7 +136,7 @@ func BlockToProto(block *hotstuff.Block) *Block {
 	parentHash := block.Parent()
 	return &Block{
 		Parent:   parentHash[:],
-		Command:  []byte(block.Command()),
+		Command:  block.Commands().Marshal(), // may panic
 		QC:       QuorumCertToProto(block.QuorumCert()),
 		View:     uint64(block.View()),
 		Proposer: uint32(block.Proposer()),
@@ -149,7 +150,7 @@ func BlockFromProto(block *Block) *hotstuff.Block {
 	return hotstuff.NewBlock(
 		p,
 		QuorumCertFromProto(block.GetQC()),
-		hotstuff.Command(block.GetCommand()),
+		clientpb.Unmarshal(block.GetCommand()), // may panic if command not a valid clientpb.Batch
 		hotstuff.View(block.GetView()),
 		hotstuff.ID(block.GetProposer()),
 	)
