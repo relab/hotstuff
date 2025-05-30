@@ -3,32 +3,25 @@ package clientpb
 import (
 	"container/list"
 	"context"
-	"fmt"
+	"slices"
 	"sync"
-
-	"github.com/relab/hotstuff"
-	"google.golang.org/protobuf/proto"
 )
 
 type Cache struct {
-	mut           sync.Mutex
-	c             chan struct{}
-	batchSize     uint32
-	serialNumbers map[uint32]uint64 // highest proposed serial number per client ID
-	cache         list.List
-	marshaler     proto.MarshalOptions
-	unmarshaler   proto.UnmarshalOptions
+	mut              sync.Mutex
+	c                chan struct{}
+	batchSize        uint32
+	clientSeqNumbers map[uint32]uint64 // highest proposed sequence number per client ID
+	cache            list.List
 }
 
 func New(
 	opts ...Option,
 ) *Cache {
 	c := &Cache{
-		c:             make(chan struct{}),
-		batchSize:     1,
-		serialNumbers: make(map[uint32]uint64),
-		marshaler:     proto.MarshalOptions{Deterministic: true},
-		unmarshaler:   proto.UnmarshalOptions{DiscardUnknown: true, AllowPartial: true},
+		c:                make(chan struct{}),
+		batchSize:        1,
+		clientSeqNumbers: make(map[uint32]uint64),
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -40,10 +33,15 @@ func (c *Cache) len() uint32 {
 	return uint32(c.cache.Len())
 }
 
-func (c *Cache) Add(cmd *Command) {
+func (c *Cache) isDuplicate(cmd *Command) bool {
+	seqNum := c.clientSeqNumbers[cmd.GetClientID()]
+	return seqNum >= cmd.GetSequenceNumber()
+}
+
+func (c *Cache) add(cmd *Command) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
-	if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
+	if c.isDuplicate(cmd) {
 		// command is too old
 		return
 	}
@@ -60,7 +58,7 @@ func (c *Cache) Add(cmd *Command) {
 // Get returns a batch of commands to propose.
 // It blocks until it can return a batch of commands, or the context is done.
 // If the context is done, it returns an error.
-func (c *Cache) Get(ctx context.Context) (hotstuff.Command, error) {
+func (c *Cache) Get(ctx context.Context) (*Batch, error) {
 	batch := new(Batch)
 
 	c.mut.Lock()
@@ -71,7 +69,7 @@ awaitBatch:
 		select {
 		case <-c.c:
 		case <-ctx.Done():
-			return "", ctx.Err()
+			return nil, ctx.Err()
 		}
 		c.mut.Lock()
 	}
@@ -84,7 +82,7 @@ awaitBatch:
 			break
 		}
 		cmd := c.cache.Remove(elem).(*Command)
-		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
+		if c.isDuplicate(cmd) {
 			// command is too old
 			i--
 			continue
@@ -97,58 +95,29 @@ awaitBatch:
 		goto awaitBatch
 	}
 
-	defer c.mut.Unlock()
+	c.mut.Unlock()
 
-	// otherwise, we should have at least one command
-	b, err := c.marshaler.Marshal(batch)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal batch: %w", err)
-	}
-
-	return hotstuff.Command(b), nil
+	return batch, nil
 }
 
-// Accept returns an error if the given command batch is too old to be accepted.
-func (c *Cache) Accept(cmd hotstuff.Command) error {
-	batch, err := c.GetCommands(cmd)
-	if err != nil {
-		return err
-	}
-
+// ContainsDuplicate returns true if the batch contains old commands already proposed.
+func (c *Cache) ContainsDuplicate(batch *Batch) bool {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 
-	for _, cmd := range batch {
-		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo >= cmd.GetSequenceNumber() {
-			return fmt.Errorf("command too old")
-		}
-	}
-	return nil
+	return slices.ContainsFunc(batch.GetCommands(), c.isDuplicate)
 }
 
-// Proposed updates the serial numbers such that we will not accept the given batch again.
-func (c *Cache) Proposed(cmd hotstuff.Command) error {
-	batch, err := c.GetCommands(cmd)
-	if err != nil {
-		return err
-	}
-
+// Proposed updates the sequence numbers such that we will not accept the given batch again.
+func (c *Cache) Proposed(batch *Batch) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 
-	for _, cmd := range batch {
-		if serialNo := c.serialNumbers[cmd.GetClientID()]; serialNo < cmd.GetSequenceNumber() {
-			c.serialNumbers[cmd.GetClientID()] = cmd.GetSequenceNumber()
+	for _, cmd := range batch.GetCommands() {
+		if !c.isDuplicate(cmd) {
+			// the command is new (not a duplicate); we update the highest
+			// sequence number for the client that sent the command
+			c.clientSeqNumbers[cmd.GetClientID()] = cmd.GetSequenceNumber()
 		}
 	}
-	return nil
-}
-
-// GetCommands unmarshals the given command returns its batch of commands.
-func (c *Cache) GetCommands(cmd hotstuff.Command) ([]*Command, error) {
-	batch := new(Batch)
-	if err := c.unmarshaler.Unmarshal([]byte(cmd), batch); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal batch: %w", err)
-	}
-	return batch.GetCommands(), nil
 }

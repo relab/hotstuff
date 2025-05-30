@@ -88,7 +88,6 @@ func New(
 		depsCore.Logger().Infof("assigned byzantine strategy: %s", byzStrat)
 	}
 	depsClient := wiring.NewClient(
-		depsCore.EventLoop(),
 		depsCore.Logger(),
 		rOpt.cmdCacheOpts,
 		rOpt.clientGorumsSrvOpts...,

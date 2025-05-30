@@ -135,7 +135,7 @@ func BlockToProto(block *hotstuff.Block) *Block {
 	parentHash := block.Parent()
 	return &Block{
 		Parent:   parentHash[:],
-		Command:  []byte(block.Command()),
+		Commands: block.Commands(),
 		QC:       QuorumCertToProto(block.QuorumCert()),
 		View:     uint64(block.View()),
 		Proposer: uint32(block.Proposer()),
@@ -149,7 +149,7 @@ func BlockFromProto(block *Block) *hotstuff.Block {
 	return hotstuff.NewBlock(
 		p,
 		QuorumCertFromProto(block.GetQC()),
-		hotstuff.Command(block.GetCommand()),
+		block.GetCommands(),
 		hotstuff.View(block.GetView()),
 		hotstuff.ID(block.GetProposer()),
 	)

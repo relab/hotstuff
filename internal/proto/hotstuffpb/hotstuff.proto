@@ -5,6 +5,7 @@ package hotstuffpb;
 import "gorums.proto";
 
 import "google/protobuf/empty.proto";
+import "internal/proto/clientpb/client.proto";
 
 option go_package = "github.com/relab/hotstuff/internal/proto/hotstuffpb";
 
@@ -39,7 +40,7 @@ message Block {
   bytes Parent = 1;
   QuorumCert QC = 2;
   uint64 View = 3;
-  bytes Command = 4;
+  clientpb.Batch Commands = 4;
   uint32 Proposer = 5;
 }
 
