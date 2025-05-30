@@ -142,7 +142,9 @@ func CreateBlock(t *testing.T, signer *cert.Authority) *hotstuff.Block {
 		t.Errorf("Could not create empty QC for genesis: %v", err)
 	}
 
-	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, "foo", 42, 1)
+	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, &clientpb.Batch{
+		Commands: []*clientpb.Command{},
+	}, 42, 1)
 	return b
 }
 
