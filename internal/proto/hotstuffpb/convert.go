@@ -9,6 +9,7 @@ import (
 	"github.com/relab/hotstuff/crypto/bls12"
 	"github.com/relab/hotstuff/crypto/ecdsa"
 	"github.com/relab/hotstuff/crypto/eddsa"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // QuorumSignatureToProto converts a threshold signature to a protocol buffers message.
@@ -134,11 +135,12 @@ func ProposalFromProto(p *Proposal) (proposal hotstuff.ProposeMsg) {
 func BlockToProto(block *hotstuff.Block) *Block {
 	parentHash := block.Parent()
 	return &Block{
-		Parent:   parentHash[:],
-		Command:  []byte(block.Command()),
-		QC:       QuorumCertToProto(block.QuorumCert()),
-		View:     uint64(block.View()),
-		Proposer: uint32(block.Proposer()),
+		Parent:    parentHash[:],
+		Command:   []byte(block.Command()),
+		QC:        QuorumCertToProto(block.QuorumCert()),
+		View:      uint64(block.View()),
+		Proposer:  uint32(block.Proposer()),
+		Timestamp: timestamppb.New(block.Timestamp()),
 	}
 }
 
@@ -146,13 +148,16 @@ func BlockToProto(block *hotstuff.Block) *Block {
 func BlockFromProto(block *Block) *hotstuff.Block {
 	var p hotstuff.Hash
 	copy(p[:], block.GetParent())
-	return hotstuff.NewBlock(
+
+	b := hotstuff.NewBlock(
 		p,
 		QuorumCertFromProto(block.GetQC()),
 		hotstuff.Command(block.GetCommand()),
 		hotstuff.View(block.GetView()),
 		hotstuff.ID(block.GetProposer()),
 	)
+	b.SetTimestamp(block.Timestamp.AsTime())
+	return b
 }
 
 // TimeoutMsgFromProto converts a TimeoutMsg proto to the hotstuff type.

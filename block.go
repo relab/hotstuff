@@ -34,6 +34,12 @@ func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID)
 	return b
 }
 
+func (b *Block) SetTimestamp(ts time.Time) {
+	b.ts = ts
+	// recalculate the hash since the timestamp is part of the block
+	b.hash = sha256.Sum256(b.ToBytes())
+}
+
 func (b *Block) String() string {
 	return fmt.Sprintf(
 		"Block{ hash: %.6s parent: %.6s, proposer: %d, view: %d , cert: %v }",
@@ -75,8 +81,8 @@ func (b *Block) View() View {
 	return b.view
 }
 
-// TimeStamp returns the timestamp of the block
-func (b *Block) TimeStamp() time.Time {
+// Timestamp returns the timestamp of the block
+func (b *Block) Timestamp() time.Time {
 	return b.ts
 }
 
@@ -91,5 +97,8 @@ func (b *Block) ToBytes() []byte {
 	buf = append(buf, viewBuf[:]...)
 	buf = append(buf, []byte(b.cmd)...)
 	buf = append(buf, b.cert.ToBytes()...)
+	var tsBuf [8]byte
+	binary.LittleEndian.PutUint64(tsBuf[:], uint64(b.ts.UnixNano()))
+	buf = append(buf, tsBuf[:]...)
 	return buf
 }
