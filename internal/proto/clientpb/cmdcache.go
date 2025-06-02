@@ -56,6 +56,7 @@ func (c *Cache) add(cmd *Command) {
 // Get returns a batch of commands to propose.
 // It blocks until it can return a batch of commands, or the context is done.
 // If the context is done, it returns an error.
+// NOTE: the commands should be marked as proposed to avoid duplicates.
 func (c *Cache) Get(ctx context.Context) (*Batch, error) {
 	batch := new(Batch)
 

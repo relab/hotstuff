@@ -74,9 +74,6 @@ func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) {
 	block := proposal.Block
 	// store the valid block, it may commit the block or its ancestors
 	v.committer.Update(block)
-	// TODO(AlanRostem): solve issue #191
-	// update the command's age before voting.
-	v.commandCache.Proposed(block.Commands())
 	pc, err := v.Vote(block)
 	if err != nil {
 		// if the block is invalid, reject it. This means the command is also discarded.
@@ -124,9 +121,9 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 		return fmt.Errorf("block view too old")
 	}
 	// cannot vote for old commands
-	if v.commandCache.ContainsDuplicate(block.Commands()) {
-		return fmt.Errorf("command too old")
-	}
+	// if v.commandCache.ContainsDuplicate(block.Commands()) {
+	// 	return fmt.Errorf("command too old")
+	// }
 	// vote rule must be valid
 	if !v.ruler.VoteRule(view, *proposal) {
 		return fmt.Errorf("vote rule not satisfied")

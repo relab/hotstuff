@@ -24,6 +24,8 @@ type Server struct {
 	awaitingCmds map[MessageID]chan<- error
 	hash         hash.Hash
 	cmdCount     uint32
+
+	lastExecutedSeqNum map[uint32]uint64 // highest executed sequence number per client ID
 }
 
 // NewServer returns a new client server.
@@ -37,9 +39,10 @@ func NewServer(
 		logger:   logger,
 		cmdCache: cmdCache,
 
-		awaitingCmds: make(map[MessageID]chan<- error),
-		srv:          gorums.NewServer(srvOpts...),
-		hash:         sha256.New(),
+		awaitingCmds:       make(map[MessageID]chan<- error),
+		srv:                gorums.NewServer(srvOpts...),
+		hash:               sha256.New(),
+		lastExecutedSeqNum: make(map[uint32]uint64),
 	}
 	RegisterClientServer(srv.srv, srv)
 	eventLoop.RegisterHandler(ExecuteEvent{}, func(event any) {
@@ -93,6 +96,21 @@ func (srv *Server) Exec(batch *Batch) {
 		id := cmd.ID()
 
 		srv.mut.Lock()
+
+		// update the seqNums
+		seqNum, ok := srv.lastExecutedSeqNum[cmd.ClientID]
+		if ok && seqNum >= cmd.SequenceNumber {
+			srv.logger.Errorf("duplicate command found")
+			if errChan, ok := srv.awaitingCmds[id]; ok {
+				// TODO(AlanRostem): unsure if we need this response to the client
+				errChan <- status.Error(codes.Aborted, "duplicate command")
+				delete(srv.awaitingCmds, id)
+			}
+			srv.mut.Unlock()
+			continue
+		}
+		srv.lastExecutedSeqNum[cmd.ClientID] = cmd.SequenceNumber
+
 		// TODO(meling): ASKING: previously the hash.Write and srv.cmdCount++ were outside the critical section, shouldn't they be inside?
 		// TODO(meling): We should add a concurrency test for this logic to check that the hash doesn't get corrupted.
 		_, _ = srv.hash.Write(cmd.Data)

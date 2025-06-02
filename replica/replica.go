@@ -149,6 +149,7 @@ func New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
+		depsSecure.BlockChain(),
 		depsSecure.Authority(),
 		depsClient.Cache(),
 		committer,
