@@ -1,6 +1,7 @@
 package consensus_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -9,7 +10,7 @@ import (
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
+	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
@@ -89,15 +90,19 @@ func wireUpVoter(
 	return voter, nil
 }
 
-// TestVote checks that a leader can collect votes on a proposal to form a QC
-func TestVote(t *testing.T) {
+// TestOnValidPropose checks that a voter will advance the view when receiving a valid proposal.
+func TestOnValidPropose(t *testing.T) {
 	id := hotstuff.ID(1)
 	depsCore := wiring.NewCore(id, "test", testutil.GenerateECDSAKey(t))
+	newViewTriggered := false
+	depsCore.EventLoop().RegisterHandler(hotstuff.NewViewMsg{}, func(_ any) {
+		newViewTriggered = true
+	})
 	sender := testutil.NewMockSender(depsCore.RuntimeCfg().ID())
 	// TODO(AlanRostem): put this in some test data
 	list := moduleList{
 		consensusRules: chainedhotstuff.ModuleName,
-		leaderRotation: roundrobin.ModuleName,
+		leaderRotation: fixedleader.ModuleName,
 		cryptoBase:     ecdsa.ModuleName,
 	}
 	depsSecurity, err := wiring.NewSecurity(
@@ -116,8 +121,16 @@ func TestVote(t *testing.T) {
 	}
 	// create a block signed by self and vote for it
 	block := testutil.CreateBlock(t, depsSecurity.Authority())
-	_, err = voter.Vote(block)
-	if err != nil {
-		t.Fatal(err)
+	proposal := hotstuff.ProposeMsg{
+		ID:    id,
+		Block: block,
+	}
+	voter.OnValidPropose(&proposal)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	depsCore.EventLoop().Run(ctx)
+	if !newViewTriggered {
+		t.Log("the voter did not advance the view")
+		t.Fail()
 	}
 }
