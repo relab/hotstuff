@@ -90,7 +90,7 @@ func (cm *Committer) commitInner(block *hotstuff.Block) error {
 	cm.logger.Debug("EXEC: ", block)
 	batch := block.Commands()
 	cm.eventLoop.AddEvent(clientpb.ExecuteEvent{Batch: batch})
-	cm.eventLoop.AddEvent(hotstuff.ConsensusLatencyEvent{Latency: time.Since(block.TimeStamp())})
+	cm.eventLoop.AddEvent(hotstuff.ConsensusLatencyEvent{Latency: time.Since(block.Timestamp())})
 	cm.bExec = block
 	return nil
 }
