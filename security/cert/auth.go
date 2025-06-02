@@ -121,7 +121,7 @@ func (c *Authority) VerifyQuorumCert(quorumSize int, qc hotstuff.QuorumCert) err
 	// TODO: FIX BUG - qcSignature can be nil when a leader is byzantine.
 	qcSignature := qc.Signature()
 	if qcSignature == nil {
-		return newFatalError(fmt.Sprintf("quorum certificate has nil signature (view=%d)", qc.View()))
+		panic(fmt.Sprintf("quorum certificate has nil signature (view=%d)", qc.View()))
 	}
 
 	participants := qcSignature.Participants()
