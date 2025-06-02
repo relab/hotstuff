@@ -124,7 +124,7 @@ func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) 
 	}
 	n := signature.Participants().Len()
 	if n == 0 {
-		return fmt.Errorf("expected more than zero participants")
+		return fmt.Errorf("verify failed: no participants")
 	}
 
 	results := make(chan error, n)
@@ -151,7 +151,7 @@ func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 	}
 	n := signature.Participants().Len()
 	if n == 0 {
-		return fmt.Errorf("expected more than zero participants")
+		return fmt.Errorf("batchverify failed: no participants")
 	}
 
 	results := make(chan error, n)
@@ -183,7 +183,7 @@ func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 func (ec *ecdsaBase) verifySingle(sig *Signature, hash hotstuff.Hash) error {
 	replica, ok := ec.config.ReplicaInfo(sig.Signer())
 	if !ok {
-		return fmt.Errorf("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
+		return fmt.Errorf("ecdsa: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
 	}
 	pk := replica.PubKey.(*ecdsa.PublicKey)
 	if !ecdsa.Verify(pk, hash[:], sig.R(), sig.S()) {

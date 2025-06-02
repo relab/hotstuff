@@ -190,7 +190,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		}
 	}()
 	if err := s.auth.Verify(timeout.ViewSignature, timeout.View.ToBytes()); err != nil {
-		s.logger.Infof("failed to verify signature: %v", err)
+		s.logger.Infof("View timeout signature could not be verified: %v", err)
 		return
 	}
 	s.logger.Debug("OnRemoteTimeout: ", timeout)

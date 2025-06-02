@@ -103,11 +103,7 @@ func (c *Authority) VerifyPartialCert(cert hotstuff.PartialCert) error {
 	if !ok {
 		return fmt.Errorf("block not found")
 	}
-	err := c.Verify(cert.Signature(), block.ToBytes())
-	if err != nil {
-		return err
-	}
-	return nil
+	return c.Verify(cert.Signature(), block.ToBytes())
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
