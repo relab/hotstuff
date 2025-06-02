@@ -1,125 +1,123 @@
 package consensus_test
 
 import (
-	"context"
-	"fmt"
 	"testing"
+	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
-	"github.com/relab/hotstuff/network"
+	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/synchronizer"
-	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/security/cert"
+	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
+	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
+	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/wiring"
-	"google.golang.org/grpc/credentials/insecure"
 )
+
+type moduleList struct {
+	consensusRules string
+	leaderRotation string
+	cryptoBase     string
+}
+
+func wireUpVoter(
+	t *testing.T,
+	depsCore *wiring.Core,
+	depsSecurity *wiring.Security,
+	sender *testutil.MockSender,
+	list moduleList,
+) (*consensus.Voter, error) {
+	t.Helper()
+	consensusRules, err := wiring.NewConsensusRules(
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		depsSecurity.BlockChain(),
+		list.consensusRules,
+	)
+	if err != nil {
+		return nil, err
+	}
+	committer := committer.New(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsSecurity.BlockChain(),
+		consensusRules,
+	)
+	leaderRotation, err := wiring.NewLeaderRotation(
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		depsSecurity.BlockChain(),
+		committer,
+		viewduration.NewParams(1, 100*time.Millisecond, 0, 1.2),
+		list.leaderRotation,
+		consensusRules.ChainLength(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	viewStates, err := consensus.NewViewStates(
+		depsSecurity.BlockChain(),
+		depsSecurity.Authority(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	hsProtocol := consensus.NewHotStuff(
+		depsCore.Logger(),
+		depsCore.EventLoop(),
+		depsCore.RuntimeCfg(),
+		depsSecurity.BlockChain(),
+		depsSecurity.Authority(),
+		viewStates,
+		leaderRotation,
+		sender,
+	)
+	commandCache := clientpb.New()
+	voter := consensus.NewVoter(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		leaderRotation,
+		consensusRules,
+		hsProtocol,
+		depsSecurity.Authority(),
+		commandCache,
+		committer,
+	)
+	return voter, nil
+}
 
 // TestVote checks that a leader can collect votes on a proposal to form a QC
 func TestVote(t *testing.T) {
-	t.Skip() // TODO: Finish setting up this test so it passes.
-	const n = 4
-
-	type replica struct {
-		eventLoop    *eventloop.EventLoop
-		blockChain   *blockchain.BlockChain
-		auth         *cert.Authority
-		proposer     *consensus.Proposer
-		synchronizer *synchronizer.Synchronizer
+	id := hotstuff.ID(1)
+	depsCore := wiring.NewCore(id, "test", testutil.GenerateECDSAKey(t))
+	sender := testutil.NewMockSender(depsCore.RuntimeCfg().ID())
+	// TODO(AlanRostem): put this in some test data
+	list := moduleList{
+		consensusRules: chainedhotstuff.ModuleName,
+		leaderRotation: roundrobin.ModuleName,
+		cryptoBase:     ecdsa.ModuleName,
 	}
-
-	replicas := []replica{}
-
-	for i := range n {
-		id := hotstuff.ID(i + 1)
-		cryptoName := ecdsa.ModuleName
-		// consensusName := chainedhotstuff.ModuleName
-		// leaderRotationName := leaderrotation.RoundRobinModuleName
-		cacheSize := 100
-
-		depsCore := wiring.NewCore(id, fmt.Sprintf("hs%d", id), testutil.GenerateECDSAKey(t))
-		sender := network.NewGorumsSender(
-			depsCore.EventLoop(),
-			depsCore.Logger(),
-			depsCore.RuntimeCfg(),
-			insecure.NewCredentials(),
-		)
-		depsSecure, err := wiring.NewSecurity(
-			depsCore.EventLoop(),
-			depsCore.Logger(),
-			depsCore.RuntimeCfg(),
-			sender,
-			cryptoName,
-			cert.WithCache(cacheSize),
-		)
-		if err != nil {
-			t.Fatalf("%v", err)
-		}
-		_ = depsSecure
-		// TODO(AlanRostem): fix
-		/*depsService := dependencies.NewService(
-			depsCore.Logger(),
-			depsCore.EventLoop(),
-			depsSecure.BlockChain(),
-			nil,
-		)
-		depsProtocol, err := dependencies.NewProtocol(
-			depsCore, depsNet, depsSecure, depsService,
-			consensusName, leaderRotationName, "",
-			viewduration.NewParams(0, 1*time.Millisecond, 0, 0), // TODO(AlanRostem): ensure test values are correct
-		)
-		if err != nil {
-			t.Fatalf("%v", err)
-		}
-		replicas = append(replicas, replica{
-			eventLoop:    depsCore.EventLoop(),
-			blockChain:   depsSecure.BlockChain(),
-			consensus:    depsProtocol.Consensus(),
-			auth:     depsSecure.Authority(),
-			synchronizer: depsProtocol.Synchronizer(),
-		})*/
-	}
-
-	r := replicas[0]
-
-	ok := false
-	ctx, cancel := context.WithCancel(context.Background())
-	r.eventLoop.RegisterHandler(hotstuff.NewViewMsg{}, func(_ any) {
-		ok = true
-		cancel()
-	}, eventloop.Prioritize())
-
-	b := testutil.NewProposeMsg(
-		hotstuff.GetGenesis().Hash(),
-		hotstuff.NewQuorumCert(nil, 1, hotstuff.GetGenesis().Hash()),
-		&clientpb.Batch{}, 1, 1,
+	depsSecurity, err := wiring.NewSecurity(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		sender,
+		list.cryptoBase,
 	)
-
-	qc := b.Block.QuorumCert()
-	r.blockChain.Store(b.Block)
-	// TODO: Test isn't succeeding since it hangs where consensus tries to get a command from cmdCache.
-	proposal, err := r.proposer.CreateProposal(1, qc, hotstuff.NewSyncInfo().WithQC(qc))
 	if err != nil {
 		t.Fatal(err)
 	}
-	r.proposer.Propose(&proposal)
-
-	for i, signer := range replicas {
-		pc, err := signer.auth.CreatePartialCert(b.Block)
-		if err != nil {
-			t.Fatalf("Failed to create partial certificate: %v", err)
-		}
-		r.eventLoop.AddEvent(hotstuff.VoteMsg{ID: hotstuff.ID(i + 1), PartialCert: pc})
+	voter, err := wireUpVoter(t, depsCore, depsSecurity, sender, list)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	r.synchronizer.Start(ctx)
-	r.eventLoop.Run(ctx)
-
-	if !ok {
-		t.Error("No new view event happened")
+	// create a block signed by self and vote for it
+	block := testutil.CreateBlock(t, depsSecurity.Authority())
+	_, err = voter.Vote(block)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
