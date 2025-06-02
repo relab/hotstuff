@@ -19,7 +19,6 @@ type Committer struct {
 	logger     logging.Logger
 	blockChain *blockchain.BlockChain
 	rules      modules.CommitRuler
-	clientSrv  *clientpb.Server
 
 	mut   sync.Mutex
 	bExec *hotstuff.Block
@@ -30,13 +29,11 @@ func New(
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
 	rules modules.CommitRuler,
-	clientSrv *clientpb.Server,
 ) *Committer {
 	return &Committer{
 		eventLoop:  eventLoop,
 		blockChain: blockChain,
 		rules:      rules,
-		clientSrv:  clientSrv,
 		logger:     logger,
 
 		bExec: hotstuff.GetGenesis(),
@@ -58,7 +55,9 @@ func (cm *Committer) commit(block *hotstuff.Block) error {
 		block.View(),
 	)
 	for _, block := range forkedBlocks {
-		cm.clientSrv.Fork(block.Commands())
+		cm.eventLoop.AddEvent(clientpb.AbortEvent{
+			Batch: block.Commands(),
+		})
 	}
 	return nil
 }
@@ -91,7 +90,7 @@ func (cm *Committer) commitInner(block *hotstuff.Block) error {
 	cm.logger.Debug("EXEC: ", block)
 	batch := block.Commands()
 	cm.eventLoop.AddEvent(hotstuff.CommitEvent{Commands: len(batch.Commands)})
-	cm.clientSrv.Exec(batch)
+	cm.eventLoop.AddEvent(clientpb.ExecuteEvent{Batch: batch})
 	cm.eventLoop.AddEvent(hotstuff.ConsensusLatencyEvent{Latency: time.Since(block.TimeStamp())})
 	cm.bExec = block
 	return nil

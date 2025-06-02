@@ -91,3 +91,8 @@ type ConsensusProtocol interface {
 	// SendPropose disseminates the proposal from the proposer.
 	SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
 }
+
+type Executor interface {
+	Exec(*clientpb.Batch)
+	Abort(*clientpb.Batch)
+}

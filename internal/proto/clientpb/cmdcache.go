@@ -15,9 +15,7 @@ type Cache struct {
 	cache            list.List
 }
 
-func New(
-	opts ...Option,
-) *Cache {
+func New(opts ...Option) *Cache {
 	c := &Cache{
 		c:                make(chan struct{}),
 		batchSize:        1,

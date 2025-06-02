@@ -88,6 +88,7 @@ func New(
 		depsCore.Logger().Infof("assigned byzantine strategy: %s", byzStrat)
 	}
 	depsClient := wiring.NewClient(
+		depsCore.EventLoop(),
 		depsCore.Logger(),
 		rOpt.cmdCacheOpts,
 		rOpt.clientGorumsSrvOpts...,
@@ -97,7 +98,6 @@ func New(
 		depsCore.Logger(),
 		depsSecure.BlockChain(),
 		consensusRules,
-		depsClient.Server(),
 	)
 	leaderRotation, err := wiring.NewLeaderRotation(
 		depsCore.Logger(),

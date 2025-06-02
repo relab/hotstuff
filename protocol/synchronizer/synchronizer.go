@@ -262,7 +262,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.config.HasAggregateQC() {
 		highQC, err := s.auth.VerifyAggregateQC(s.config.QuorumSize(), aggQC)
 		if err != nil {
-			s.logger.Info("Aggregated Quorum Certificate could not be verified: %v", err)
+			s.logger.Info("agg-qc could not be verified: %v", err)
 			return
 		}
 		if aggQC.View() >= view {
@@ -274,7 +274,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		qc = highQC
 	} else if qc, haveQC = syncInfo.QC(); haveQC {
 		if err := s.auth.VerifyQuorumCert(s.config.QuorumSize(), qc); err != nil {
-			s.logger.Info("Quorum Certificate could not be verified: %v", err)
+			s.logger.Info("qc could not be verified: %v", err)
 			return
 		}
 	}
@@ -282,7 +282,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	if haveQC {
 		err := s.state.UpdateHighQC(qc)
 		if err != nil {
-			s.logger.Warnf("failed to update highQC: %v", err)
+			s.logger.Warnf("failed to update high-qc: %v", err)
 		} else {
 			s.logger.Debug("highQC updated")
 		}

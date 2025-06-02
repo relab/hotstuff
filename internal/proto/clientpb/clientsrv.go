@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -27,6 +28,7 @@ type Server struct {
 
 // NewServer returns a new client server.
 func NewServer(
+	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	cmdCache *Cache,
 	srvOpts ...gorums.ServerOption,
@@ -40,6 +42,14 @@ func NewServer(
 		hash:         sha256.New(),
 	}
 	RegisterClientServer(srv.srv, srv)
+	eventLoop.RegisterHandler(ExecuteEvent{}, func(event any) {
+		e := event.(ExecuteEvent)
+		srv.Exec(e.Batch)
+	})
+	eventLoop.RegisterHandler(AbortEvent{}, func(event any) {
+		e := event.(AbortEvent)
+		srv.Fork(e.Batch)
+	})
 	return srv
 }
 
