@@ -89,7 +89,6 @@ func (cm *Committer) commitInner(block *hotstuff.Block) error {
 	}
 	cm.logger.Debug("EXEC: ", block)
 	batch := block.Commands()
-	cm.eventLoop.AddEvent(hotstuff.CommitEvent{Commands: len(batch.Commands)})
 	cm.eventLoop.AddEvent(clientpb.ExecuteEvent{Batch: batch})
 	cm.eventLoop.AddEvent(hotstuff.ConsensusLatencyEvent{Latency: time.Since(block.TimeStamp())})
 	cm.bExec = block
