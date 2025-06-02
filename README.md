@@ -111,7 +111,7 @@ These interfaces do not require any interaction with other modules, as that is t
 [default implementation](consensus/consensus.go) of the `Consensus` interface.
 
 The `Consensus` and `Rules` interfaces can also be used to override the behavior of other consensus implementations.
-The `consensus/byzantine` package contains some examples of byzantine behaviors that can be implemented by wrapping
+The `rules/byzantine` package contains some examples of byzantine behaviors that can be implemented by wrapping
 implementations of these interfaces.
 
 ## Crypto Interfaces

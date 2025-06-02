@@ -7,16 +7,12 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/consensus/fasthotstuff"
-	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
+	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/twins"
 )
-
-func init() {
-	modules.RegisterModule(vulnerableModule, func() consensus.Rules { return &vulnerableFHS{} })
-}
 
 const vulnerableModule = "vulnerableFHS"
 
@@ -137,22 +133,25 @@ func TestFHSBug(t *testing.T) {
 // A wrapper around the FHS rules that swaps the commit rule for a vulnerable version
 type vulnerableFHS struct {
 	logger     logging.Logger
-	blockChain modules.BlockChain
+	blockChain *blockchain.BlockChain
 	inner      fasthotstuff.FastHotStuff
 }
 
-func (fhs *vulnerableFHS) InitModule(mods *modules.Core) {
-	mods.Get(
-		&fhs.logger,
-		&fhs.blockChain,
-	)
-
-	fhs.inner.InitModule(mods)
+func NewVulnFHS(
+	logger logging.Logger,
+	blockChain *blockchain.BlockChain,
+	inner fasthotstuff.FastHotStuff,
+) modules.HotstuffRuleset {
+	return &vulnerableFHS{
+		logger:     logger,
+		blockChain: blockChain,
+		inner:      inner,
+	}
 }
 
 // VoteRule decides whether to vote for the block.
-func (fhs *vulnerableFHS) VoteRule(proposal hotstuff.ProposeMsg) bool {
-	return fhs.inner.VoteRule(proposal)
+func (fhs *vulnerableFHS) VoteRule(view hotstuff.View, proposal hotstuff.ProposeMsg) bool {
+	return fhs.inner.VoteRule(view, proposal)
 }
 
 func (fhs *vulnerableFHS) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {

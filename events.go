@@ -2,7 +2,9 @@ package hotstuff
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"time"
 )
 
 // ProposeMsg is broadcast when a leader makes a proposal.
@@ -62,4 +64,23 @@ type NewViewMsg struct {
 // and includes the number of client commands that were executed.
 type CommitEvent struct {
 	Commands int
+}
+
+// ViewChangeEvent is sent on the eventloop whenever a view change occurs.
+type ViewChangeEvent struct {
+	View    View
+	Timeout bool
+}
+
+// TimeoutEvent is sent on the eventloop when a local timeout occurs.
+type TimeoutEvent struct {
+	View View
+}
+
+type ReplicaConnectedEvent struct {
+	Ctx context.Context
+}
+
+type ConsensusLatencyEvent struct {
+	Latency time.Duration
 }

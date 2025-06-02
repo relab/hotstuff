@@ -12,37 +12,35 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/backend"
-	"github.com/relab/hotstuff/blockchain"
 	"github.com/relab/hotstuff/client"
-	"github.com/relab/hotstuff/consensus"
-	"github.com/relab/hotstuff/consensus/byzantine"
-	"github.com/relab/hotstuff/crypto"
-	"github.com/relab/hotstuff/crypto/keygen"
-	"github.com/relab/hotstuff/eventloop"
+	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/latency"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/internal/tree"
-	"github.com/relab/hotstuff/logging"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/replica"
-	"github.com/relab/hotstuff/synchronizer"
+	"github.com/relab/hotstuff/security/crypto/keygen"
+	"github.com/relab/hotstuff/server"
+	"github.com/relab/hotstuff/wiring"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
 	// imported modules
-	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
-	_ "github.com/relab/hotstuff/consensus/fasthotstuff"
-	_ "github.com/relab/hotstuff/consensus/simplehotstuff"
-	_ "github.com/relab/hotstuff/crypto/bls12"
-	_ "github.com/relab/hotstuff/crypto/ecdsa"
-	_ "github.com/relab/hotstuff/crypto/eddsa"
-	_ "github.com/relab/hotstuff/kauri"
-	_ "github.com/relab/hotstuff/leaderrotation"
+	_ "github.com/relab/hotstuff/protocol/kauri"
+	_ "github.com/relab/hotstuff/protocol/leaderrotation"
+	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
+	_ "github.com/relab/hotstuff/protocol/rules/fasthotstuff"
+	_ "github.com/relab/hotstuff/protocol/rules/simplehotstuff"
+	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
+	_ "github.com/relab/hotstuff/security/crypto/bls12"
+	_ "github.com/relab/hotstuff/security/crypto/ecdsa"
+	_ "github.com/relab/hotstuff/security/crypto/eddsa"
 )
 
 // Worker starts and runs clients and replicas based on commands from the controller.
@@ -120,27 +118,18 @@ func (w *Worker) createReplicas(req *orchestrationpb.CreateReplicaRequest) (*orc
 		if err != nil {
 			return nil, fmt.Errorf("failed to create listener: %w", err)
 		}
-		replicaPort, err := getPort(replicaListener)
-		if err != nil {
-			return nil, err
-		}
 		clientListener, err := net.Listen("tcp", ":0")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create listener: %w", err)
 		}
-		clientPort, err := getPort(clientListener)
-		if err != nil {
-			return nil, err
-		}
-
 		r.StartServers(replicaListener, clientListener)
 		w.replicas[hotstuff.ID(cfg.GetID())] = r
 
 		resp.Replicas[cfg.GetID()] = &orchestrationpb.ReplicaInfo{
 			ID:          cfg.GetID(),
 			PublicKey:   cfg.GetPublicKey(),
-			ReplicaPort: replicaPort,
-			ClientPort:  clientPort,
+			ReplicaPort: uint32(replicaListener.Addr().(*net.TCPAddr).Port),
+			ClientPort:  uint32(clientListener.Addr().(*net.TCPAddr).Port),
 		}
 	}
 	return resp, nil
@@ -148,13 +137,51 @@ func (w *Worker) createReplicas(req *orchestrationpb.CreateReplicaRequest) (*orc
 
 func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Replica, error) {
 	w.metricsLogger.Log(opts)
-	logger := logging.New("hs" + strconv.Itoa(int(opts.GetID())))
-
 	// get private key and certificates
 	privKey, err := keygen.ParsePrivateKey(opts.GetPrivateKey())
 	if err != nil {
 		return nil, err
 	}
+	// setup core - used in replica and measurement framework
+	runtimeOpts := []core.RuntimeOption{}
+	// TODO(AlanRostem): maybe rename the tree option to kauriTree? should also use the tree check only for enable kauri
+	if opts.GetKauri() && opts.TreeEnabled() {
+		delayMode := tree.DelayTypeNone
+		if opts.GetAggregationTime() {
+			delayMode = tree.DelayTypeAggregation
+		}
+		t := tree.NewDelayed(
+			opts.HotstuffID(),
+			delayMode,
+			int(opts.GetBranchFactor()),
+			latency.MatrixFrom(opts.GetLocations()),
+			opts.TreePositionIDs(),
+			opts.GetTreeDelta().AsDuration(),
+		)
+		runtimeOpts = append(runtimeOpts, core.WithKauriTree(t))
+	}
+	runtimeOpts = append(runtimeOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
+	if opts.GetUseAggQC() {
+		runtimeOpts = append(runtimeOpts, core.WithAggregateQC())
+	}
+	depsCore := wiring.NewCore(opts.HotstuffID(), "hs", privKey, runtimeOpts...)
+	// check if measurements should be enabled
+	if w.measurementInterval > 0 {
+		// Initializes the metrics modules internally.
+		err = metrics.Enable(
+			depsCore.EventLoop(),
+			depsCore.Logger(),
+			w.metricsLogger,
+			depsCore.RuntimeCfg().ID(),
+			w.measurementInterval,
+			w.metrics...,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+	// setup replica
+	replicaOpts := []replica.Option{}
 	var certificate tls.Certificate
 	var rootCAs *x509.CertPool
 	if opts.GetUseTLS() {
@@ -164,104 +191,30 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		}
 		rootCAs = x509.NewCertPool()
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
+		replicaOpts = append(replicaOpts, replica.WithTLS(certificate, rootCAs))
 	}
-	// prepare modules
-	builder := modules.NewBuilder(hotstuff.ID(opts.GetID()), privKey)
-
-	consensusRules, ok := modules.GetModule[consensus.Rules](opts.GetConsensus())
-	if !ok {
-		return nil, fmt.Errorf("invalid consensus name: '%s'", opts.GetConsensus())
-	}
-
-	strategy := opts.GetByzantineStrategy()
-	if strategy != "" {
-		if byz, ok := modules.GetModule[byzantine.Byzantine](strategy); ok {
-			consensusRules = byz.Wrap(consensusRules)
-			logger.Infof("assigned byzantine strategy: %s", strategy)
-
-		} else {
-			return nil, fmt.Errorf("invalid byzantine strategy: '%s'", opts.GetByzantineStrategy())
-		}
-	}
-
-	cryptoImpl, ok := modules.GetModule[modules.CryptoBase](opts.GetCrypto())
-	if !ok {
-		return nil, fmt.Errorf("invalid crypto name: '%s'", opts.GetCrypto())
-	}
-
-	leaderRotation, ok := modules.GetModule[modules.LeaderRotation](opts.GetLeaderRotation())
-	if !ok {
-		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", opts.GetLeaderRotation())
-	}
-	var viewDuration synchronizer.ViewDuration
-	if opts.GetLeaderRotation() == "tree-leader" {
-		// TODO(meling): Temporary default; should be configurable and moved to the appropriate place.
-		opts.SetTreeHeightWaitTime()
-		// create tree only if we are using tree leader (Kauri)
-		builder.Options().SetTree(createTree(opts))
-		viewDuration = synchronizer.NewFixedViewDuration(opts.GetInitialTimeout().AsDuration())
-	} else {
-		viewDuration = synchronizer.NewViewDuration(
-			uint64(opts.GetTimeoutSamples()),
-			float64(opts.GetInitialTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-			float64(opts.GetMaxTimeout().AsDuration().Nanoseconds())/float64(time.Millisecond),
-			float64(opts.GetTimeoutMultiplier()),
+	if opts.GetBatchSize() > 1 {
+		replicaOpts = append(replicaOpts,
+			replica.WithCmdCacheOptions(clientpb.WithBatching(opts.GetBatchSize())),
 		)
 	}
-	sync := synchronizer.New(viewDuration)
-	builder.Add(
-		eventloop.New(1000),
-		consensus.New(consensusRules),
-		consensus.NewVotingMachine(),
-		crypto.NewCache(cryptoImpl, 100), // TODO: consider making this configurable
-		leaderRotation,
-		sync,
-		w.metricsLogger,
-		blockchain.New(),
-		logger,
+	replicaOpts = append(replicaOpts,
+		replica.OverrideCrypto(opts.GetCrypto()),
+		replica.OverrideConsensusRules(opts.GetConsensus()),
+		replica.OverrideLeaderRotation(opts.GetLeaderRotation()),
+		replica.WithByzantineStrategy(opts.GetByzantineStrategy()),
+		replica.WithServerOptions(server.WithLatencies(opts.HotstuffID(), opts.GetLocations())),
 	)
-	builder.Options().SetSharedRandomSeed(opts.GetSharedSeed())
-
-	if w.measurementInterval > 0 {
-		replicaMetrics := metrics.GetReplicaMetrics(w.metrics...)
-		builder.Add(replicaMetrics...)
-		builder.Add(metrics.NewTicker(w.measurementInterval))
-	}
-
-	for _, n := range opts.GetModules() {
-		m, ok := modules.GetModuleUntyped(n)
-		if !ok {
-			return nil, fmt.Errorf("no module named '%s'", n)
-		}
-		builder.Add(m)
-	}
-	c := replica.Config{
-		ID:          hotstuff.ID(opts.GetID()),
-		PrivateKey:  privKey,
-		TLS:         opts.GetUseTLS(),
-		Certificate: &certificate,
-		RootCAs:     rootCAs,
-		Locations:   opts.GetLocations(),
-		BatchSize:   opts.GetBatchSize(),
-		ManagerOptions: []gorums.ManagerOption{
-			gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
-		},
-	}
-	return replica.New(c, builder), nil
-}
-
-// createTree creates a tree based on the given replica options.
-func createTree(replicaOpts *orchestrationpb.ReplicaOpts) tree.Tree {
-	tree := tree.CreateTree(replicaOpts.HotstuffID(), int(replicaOpts.GetBranchFactor()), replicaOpts.TreePositionIDs())
-	switch {
-	case replicaOpts.GetAggregationTime():
-		tree.SetAggregationWaitTime(latency.MatrixFrom(replicaOpts.GetLocations()), replicaOpts.TreeDeltaDuration())
-	case replicaOpts.GetTreeHeightTime():
-		fallthrough
-	default:
-		tree.SetTreeHeightWaitTime(replicaOpts.TreeDeltaDuration())
-	}
-	return tree
+	return replica.New(
+		depsCore,
+		viewduration.NewParams(
+			opts.GetTimeoutSamples(),
+			opts.GetInitialTimeout().AsDuration(),
+			opts.GetMaxTimeout().AsDuration(),
+			opts.GetTimeoutMultiplier(),
+		),
+		replicaOpts...,
+	)
 }
 
 func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {
@@ -326,18 +279,30 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		mods := modules.NewBuilder(hotstuff.ID(opts.GetID()), nil)
-		mods.Add(eventloop.New(1000))
+		runtimeCfg := core.NewRuntimeConfig(hotstuff.ID(opts.GetID()), nil)
+		logger := logging.New("cli" + strconv.Itoa(int(opts.GetID())))
+		eventLoop := eventloop.New(logger, 1000)
 
 		if w.measurementInterval > 0 {
-			clientMetrics := metrics.GetClientMetrics(w.metrics...)
-			mods.Add(clientMetrics...)
-			mods.Add(metrics.NewTicker(w.measurementInterval))
+			err := metrics.Enable(
+				eventLoop,
+				logger,
+				w.metricsLogger,
+				runtimeCfg.ID(),
+				w.measurementInterval,
+				w.metrics...,
+			)
+			if err != nil {
+				return nil, err
+			}
 		}
 
-		mods.Add(w.metricsLogger)
-		mods.Add(logging.New("cli" + strconv.Itoa(int(opts.GetID()))))
-		cli := client.New(c, mods)
+		cli := client.New(
+			eventLoop,
+			logger,
+			runtimeCfg,
+			c,
+		)
 		cfg, err := getConfiguration(req.GetConfiguration(), true)
 		if err != nil {
 			return nil, err
@@ -364,8 +329,8 @@ func (w *Worker) stopClients(req *orchestrationpb.StopClientRequest) (*orchestra
 	return &orchestrationpb.StopClientResponse{}, nil
 }
 
-func getConfiguration(conf map[uint32]*orchestrationpb.ReplicaInfo, client bool) ([]backend.ReplicaInfo, error) {
-	replicas := make([]backend.ReplicaInfo, 0, len(conf))
+func getConfiguration(conf map[uint32]*orchestrationpb.ReplicaInfo, client bool) ([]hotstuff.ReplicaInfo, error) {
+	replicas := make([]hotstuff.ReplicaInfo, 0, len(conf))
 	for _, replica := range conf {
 		pubKey, err := keygen.ParsePublicKey(replica.GetPublicKey())
 		if err != nil {
@@ -377,23 +342,11 @@ func getConfiguration(conf map[uint32]*orchestrationpb.ReplicaInfo, client bool)
 		} else {
 			addr = net.JoinHostPort(replica.GetAddress(), strconv.Itoa(int(replica.GetReplicaPort())))
 		}
-		replicas = append(replicas, backend.ReplicaInfo{
+		replicas = append(replicas, hotstuff.ReplicaInfo{
 			ID:      hotstuff.ID(replica.GetID()),
 			Address: addr,
 			PubKey:  pubKey,
 		})
 	}
 	return replicas, nil
-}
-
-func getPort(lis net.Listener) (uint32, error) {
-	_, portStr, err := net.SplitHostPort(lis.Addr().String())
-	if err != nil {
-		return 0, err
-	}
-	port, err := strconv.ParseUint(portStr, 10, 32)
-	if err != nil {
-		return 0, err
-	}
-	return uint32(port), nil
 }

@@ -4,17 +4,11 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/metrics/types"
-	"github.com/relab/hotstuff/modules"
 )
 
-func init() {
-	RegisterReplicaMetric("consensus-latency", func() any {
-		return &ConsensusLatency{}
-	})
-}
+const NameConsensusLatency = "consensus-latency"
 
 // ConsensusLatency processes consensus latency measurements and writes them to the metrics logger.
 type ConsensusLatency struct {
@@ -24,21 +18,16 @@ type ConsensusLatency struct {
 }
 
 // InitModule gives the module access to the other modules.
-func (lr *ConsensusLatency) InitModule(mods *modules.Core) {
-	var (
-		eventLoop *eventloop.EventLoop
-		logger    logging.Logger
-		opts      *modules.Options
-	)
+func enableConsensusLatency(
+	eventLoop *eventloop.EventLoop,
+	metricsLogger Logger,
+	id hotstuff.ID,
+) {
+	lr := ConsensusLatency{
+		metricsLogger: metricsLogger,
+		id:            id,
+	}
 
-	mods.Get(
-		&lr.metricsLogger,
-		opts,
-		&eventLoop,
-		&logger,
-	)
-
-	lr.id = opts.ID()
 	eventLoop.RegisterHandler(hotstuff.ConsensusLatencyEvent{}, func(event any) {
 		latencyEvent := event.(hotstuff.ConsensusLatencyEvent)
 		lr.addLatency(latencyEvent.Latency)
@@ -48,7 +37,6 @@ func (lr *ConsensusLatency) InitModule(mods *modules.Core) {
 		lr.tick(event.(types.TickEvent))
 	}, eventloop.Prioritize())
 
-	logger.Info("Consensus Latency metric enabled")
 }
 
 // AddLatency adds a latency data point to the current measurement.

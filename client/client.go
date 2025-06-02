@@ -14,11 +14,10 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/backend"
-	"github.com/relab/hotstuff/eventloop"
+	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/logging"
-	"github.com/relab/hotstuff/modules"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -62,7 +61,7 @@ type Config struct {
 type Client struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
-	opts      *modules.Options
+	config    *core.RuntimeConfig
 
 	mut              sync.Mutex
 	mgr              *clientpb.Manager
@@ -79,18 +78,18 @@ type Client struct {
 	timeout          time.Duration
 }
 
-// InitModule initializes the client.
-func (c *Client) InitModule(mods *modules.Core) {
-	mods.Get(
-		&c.eventLoop,
-		&c.logger,
-		&c.opts,
-	)
-}
-
 // New returns a new Client.
-func New(conf Config, builder modules.Builder) (client *Client) {
+func New(
+	eventLoop *eventloop.EventLoop,
+	logger logging.Logger,
+	config *core.RuntimeConfig,
+	conf Config,
+) (client *Client) {
 	client = &Client{
+		eventLoop: eventLoop,
+		logger:    logger,
+		config:    config,
+
 		pendingCmds:      make(chan pendingCmd, conf.MaxConcurrent),
 		highestCommitted: 1,
 		done:             make(chan struct{}),
@@ -102,10 +101,6 @@ func New(conf Config, builder modules.Builder) (client *Client) {
 		timeout:          conf.Timeout,
 	}
 
-	builder.Add(client)
-
-	builder.Build()
-
 	var creds credentials.TransportCredentials
 	if conf.TLS {
 		creds = credentials.NewClientTLSFromCert(conf.RootCAs, "")
@@ -113,15 +108,15 @@ func New(conf Config, builder modules.Builder) (client *Client) {
 		creds = insecure.NewCredentials()
 	}
 
-	opts := append(conf.ManagerOptions, gorums.WithGrpcDialOptions(grpc.WithTransportCredentials(creds)))
+	mgrOpts := append(conf.ManagerOptions, gorums.WithGrpcDialOptions(grpc.WithTransportCredentials(creds)))
 
-	client.mgr = clientpb.NewManager(opts...)
+	client.mgr = clientpb.NewManager(mgrOpts...)
 
 	return client
 }
 
 // Connect connects the client to the replicas.
-func (c *Client) Connect(replicas []backend.ReplicaInfo) (err error) {
+func (c *Client) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 	nodes := make(map[string]uint32, len(replicas))
 	for _, r := range replicas {
 		nodes[r.Address] = uint32(r.ID)
@@ -235,7 +230,7 @@ loop:
 		}
 
 		cmd := &clientpb.Command{
-			ClientID:       uint32(c.opts.ID()),
+			ClientID:       uint32(c.config.ID()),
 			SequenceNumber: num,
 			Data:           data[:n],
 		}

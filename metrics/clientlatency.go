@@ -3,40 +3,31 @@ package metrics
 import (
 	"time"
 
+	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/client"
-	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/metrics/types"
-	"github.com/relab/hotstuff/modules"
 )
 
-func init() {
-	RegisterClientMetric("client-latency", func() any {
-		return &ClientLatency{}
-	})
-}
+const NameClientLatency = "client-latency"
 
-// ClientLatency processes LatencyMeasurementEvents, and writes LatencyMeasurements to the metrics logger.
-type ClientLatency struct {
+// clientLatency processes LatencyMeasurementEvents, and writes LatencyMeasurements to the metrics logger.
+type clientLatency struct {
 	metricsLogger Logger
-	opts          *modules.Options
+	id            hotstuff.ID
 
 	wf Welford
 }
 
-// InitModule gives the module access to the other modules.
-func (lr *ClientLatency) InitModule(mods *modules.Core) {
-	var (
-		eventLoop *eventloop.EventLoop
-		logger    logging.Logger
-	)
-
-	mods.Get(
-		&lr.metricsLogger,
-		&lr.opts,
-		&eventLoop,
-		&logger,
-	)
+func enableClientLatency(
+	eventLoop *eventloop.EventLoop,
+	metricsLogger Logger,
+	id hotstuff.ID,
+) {
+	lr := &clientLatency{
+		id:            id,
+		metricsLogger: metricsLogger,
+	}
 
 	eventLoop.RegisterHandler(client.LatencyMeasurementEvent{}, func(event any) {
 		latencyEvent := event.(client.LatencyMeasurementEvent)
@@ -46,20 +37,18 @@ func (lr *ClientLatency) InitModule(mods *modules.Core) {
 	eventLoop.RegisterHandler(types.TickEvent{}, func(event any) {
 		lr.tick(event.(types.TickEvent))
 	}, eventloop.Prioritize())
-
-	logger.Info("Client Latency metric enabled")
 }
 
 // AddLatency adds a latency data point to the current measurement.
-func (lr *ClientLatency) addLatency(latency time.Duration) {
+func (lr *clientLatency) addLatency(latency time.Duration) {
 	millis := float64(latency) / float64(time.Millisecond)
 	lr.wf.Update(millis)
 }
 
-func (lr *ClientLatency) tick(_ types.TickEvent) {
+func (lr *clientLatency) tick(_ types.TickEvent) {
 	mean, variance, count := lr.wf.Get()
 	event := &types.LatencyMeasurement{
-		Event:    types.NewClientEvent(uint32(lr.opts.ID()), time.Now()),
+		Event:    types.NewClientEvent(uint32(lr.id), time.Now()),
 		Latency:  mean,
 		Variance: variance,
 		Count:    count,

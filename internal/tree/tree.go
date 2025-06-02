@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/latency"
 )
 
 // Tree contains the local replica's ID which must be part of the tree.
@@ -17,20 +18,49 @@ type Tree struct {
 	waitTime     time.Duration
 }
 
-// CreateTree creates the tree configuration.
-func CreateTree(myID hotstuff.ID, bf int, ids []hotstuff.ID) Tree {
-	if bf < 2 {
+type DelayType int
+
+const (
+	DelayTypeNone = DelayType(iota)
+	DelayTypeAggregation
+	DelayTypeTreeHeight
+)
+
+// NewDelayed creates a tree with wait times for the aggregation of votes.
+func NewDelayed(
+	id hotstuff.ID,
+	delayMode DelayType,
+	branchFactor int,
+	latencyMatrix latency.Matrix,
+	treePositionIDs []hotstuff.ID,
+	delta time.Duration,
+) *Tree {
+	t := NewSimple(id, branchFactor, treePositionIDs)
+	switch delayMode {
+	case DelayTypeAggregation:
+		t.SetAggregationWaitTime(latencyMatrix, delta)
+	case DelayTypeTreeHeight:
+		fallthrough
+	default:
+		t.SetTreeHeightWaitTime(delta)
+	}
+	return t
+}
+
+// NewSimple creates a simple tree configuration.
+func NewSimple(id hotstuff.ID, branchFactor int, treePositionIDs []hotstuff.ID) *Tree {
+	if branchFactor < 2 {
 		panic("Branch factor must be greater than 1")
 	}
-	if slices.Index(ids, myID) == -1 {
+	if slices.Index(treePositionIDs, id) == -1 {
 		panic("Replica ID not found in tree configuration")
 	}
 
-	return Tree{
-		id:           myID,
-		height:       treeHeight(len(ids), bf),
-		branchFactor: bf,
-		treePosToID:  ids,
+	return &Tree{
+		id:           id,
+		height:       treeHeight(len(treePositionIDs), branchFactor),
+		branchFactor: branchFactor,
+		treePosToID:  treePositionIDs,
 	}
 }
 

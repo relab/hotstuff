@@ -5,42 +5,31 @@ import (
 
 	"github.com/relab/hotstuff"
 
-	"github.com/relab/hotstuff/eventloop"
-	"github.com/relab/hotstuff/logging"
+	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/metrics/types"
-	"github.com/relab/hotstuff/modules"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
-func init() {
-	RegisterReplicaMetric("throughput", func() any {
-		return &Throughput{}
-	})
-}
+const NameThroughput = "throughput"
 
-// Throughput measures throughput in commits per second, and commands per second.
-type Throughput struct {
+// throughput measures throughput in commits per second, and commands per second.
+type throughput struct {
 	metricsLogger Logger
-	opts          *modules.Options
+	id            hotstuff.ID
 
 	commitCount  uint64
 	commandCount uint64
 }
 
-// InitModule gives the module access to the other modules.
-func (t *Throughput) InitModule(mods *modules.Core) {
-	var (
-		eventLoop *eventloop.EventLoop
-		logger    logging.Logger
-	)
-
-	mods.Get(
-		&t.metricsLogger,
-		&t.opts,
-		&eventLoop,
-		&logger,
-	)
-
+func enableThroughput(
+	eventLoop *eventloop.EventLoop,
+	metricsLogger Logger,
+	id hotstuff.ID,
+) {
+	t := &throughput{
+		metricsLogger: metricsLogger,
+		id:            id,
+	}
 	eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
 		commitEvent := event.(hotstuff.CommitEvent)
 		t.recordCommit(commitEvent.Commands)
@@ -50,18 +39,17 @@ func (t *Throughput) InitModule(mods *modules.Core) {
 		t.tick(event.(types.TickEvent))
 	}, eventloop.Prioritize())
 
-	logger.Info("Throughput metric enabled")
 }
 
-func (t *Throughput) recordCommit(commands int) {
+func (t *throughput) recordCommit(commands int) {
 	t.commitCount++
 	t.commandCount += uint64(commands)
 }
 
-func (t *Throughput) tick(tick types.TickEvent) {
+func (t *throughput) tick(tick types.TickEvent) {
 	now := time.Now()
 	event := &types.ThroughputMeasurement{
-		Event:    types.NewReplicaEvent(uint32(t.opts.ID()), now),
+		Event:    types.NewReplicaEvent(uint32(t.id), now),
 		Commits:  t.commitCount,
 		Commands: t.commandCount,
 		Duration: durationpb.New(now.Sub(tick.LastTick)),

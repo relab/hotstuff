@@ -9,7 +9,6 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // IDSet implements a set of replica IDs. It is used to show which replicas participated in some event.
@@ -98,11 +97,6 @@ type Hash [32]byte
 func (h Hash) String() string {
 	return base64.StdEncoding.EncodeToString(h[:])
 }
-
-// Command is a client request to be executed by the consensus protocol.
-//
-// The string type is used because it is immutable and can hold arbitrary bytes of any length.
-type Command string
 
 // ToBytes is an object that can be converted into bytes for the purposes of hashing, etc.
 type ToBytes interface {
@@ -385,6 +379,11 @@ func writeParticipants(wr io.Writer, participants IDSet) (err error) {
 	return err
 }
 
-type ConsensusLatencyEvent struct {
-	Latency time.Duration
+// ReplicaInfo holds information about a replica.
+type ReplicaInfo struct {
+	ID       ID
+	Address  string
+	PubKey   PublicKey
+	Location string
+	Metadata map[string]string
 }

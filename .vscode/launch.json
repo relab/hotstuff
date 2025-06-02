@@ -13,7 +13,7 @@
 			"cwd": "${workspaceRoot}",
 			"args": [
 				"run",
-				"--cue=scripts/local_config.cue"
+				"--kauri"
 			]
 		},
 		{

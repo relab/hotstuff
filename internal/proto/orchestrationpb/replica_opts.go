@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/crypto/keygen"
+	"github.com/relab/hotstuff/security/crypto/keygen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
@@ -50,6 +50,11 @@ func (x *ReplicaOpts) SetTreeOptions(branchFactor uint32, positions []uint32, tr
 	x.TreePositions = positions
 	x.BranchFactor = branchFactor
 	x.TreeDelta = durationpb.New(treeDelta)
+}
+
+func (x *ReplicaOpts) TreeEnabled() (enabled bool) {
+	enabled = len(x.TreePositions) > 0 && x.BranchFactor > 0 && x.TreeDelta.IsValid()
+	return
 }
 
 func (x *ReplicaOpts) SetByzantineStrategy(strategy string) {
