@@ -48,7 +48,7 @@ func NewServer(
 	})
 	eventLoop.RegisterHandler(AbortEvent{}, func(event any) {
 		e := event.(AbortEvent)
-		srv.Fork(e.Batch)
+		srv.Abort(e.Batch)
 	})
 	return srv
 }
@@ -107,7 +107,7 @@ func (srv *Server) Exec(batch *Batch) {
 	srv.logger.Debugf("Hash: %.8x", srv.hash.Sum(nil))
 }
 
-func (srv *Server) Fork(batch *Batch) {
+func (srv *Server) Abort(batch *Batch) {
 	for _, cmd := range batch.GetCommands() {
 		id := cmd.ID()
 
