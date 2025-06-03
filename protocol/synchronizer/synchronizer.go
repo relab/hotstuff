@@ -273,7 +273,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		syncInfo = syncInfo.WithQC(highQC)
 		qc = highQC
 	} else if qc, haveQC = syncInfo.QC(); haveQC {
-		if err := s.auth.VerifyQuorumCert(s.config.QuorumSize(), qc); err != nil {
+		if err := s.auth.VerifyQuorumCert(qc); err != nil {
 			s.logger.Info("QC could not be verified: %v", err)
 			return
 		}

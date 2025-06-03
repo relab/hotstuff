@@ -177,7 +177,7 @@ func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *PublicKey, err error) {
 	}
 	pubKey, ok = replica.PubKey.(*PublicKey)
 	if !ok {
-		return nil, fmt.Errorf("Unsupported public key type: %T", replica.PubKey)
+		return nil, fmt.Errorf("unsupported public key type: %T", replica.PubKey)
 	}
 	return pubKey, nil
 }
@@ -220,7 +220,7 @@ func (bls *bls12Base) popProve() (*bls12.PointG2, error) {
 	pubKey := bls.privateKey().Public().(*PublicKey)
 	proof, err := bls.coreSign(pubKey.ToBytes(), domainPOP)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to generate proof-of-possession: %v", err)
+		return nil, fmt.Errorf("failed to generate proof-of-possession: %w", err)
 	}
 	return proof, nil
 }
@@ -229,10 +229,10 @@ func (bls *bls12Base) popVerify(pubKey *PublicKey, proof *bls12.PointG2) bool {
 	return bls.coreVerify(pubKey, pubKey.ToBytes(), proof, domainPOP)
 }
 
-func (bls *bls12Base) checkPop(replica *hotstuff.ReplicaInfo) (err error) {
+func (bls *bls12Base) checkPop(replica *hotstuff.ReplicaInfo) error {
 	popBytes, ok := replica.Metadata[popMetadataKey]
 	if !ok {
-		return fmt.Errorf("Missing proof-of-possession for replica: %d", replica.ID)
+		return fmt.Errorf("missing proof-of-possession for replica: %d", replica.ID)
 
 	}
 

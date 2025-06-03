@@ -250,7 +250,7 @@ func TestVerifyGenesisQC(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := signers[1].VerifyQuorumCert(dummies[0].config.QuorumSize(), genesisQC); err != nil {
+		if err := signers[1].VerifyQuorumCert(genesisQC); err != nil {
 			t.Error(err)
 		}
 	}
@@ -270,9 +270,8 @@ func TestVerifyQuorumCert(t *testing.T) {
 		qc := testutil.CreateQC(t, signedBlock, signers)
 
 		for i, verifier := range signers {
-			qSize := dummies[i].config.QuorumSize()
-			if err := verifier.VerifyQuorumCert(qSize, qc); err != nil {
-				t.Errorf("verifier %d failed to verify QC! (qsize=%d)", i+1, qSize)
+			if err := verifier.VerifyQuorumCert(qc); err != nil {
+				t.Errorf("verifier %d failed to verify QC: %v", i+1, err)
 			}
 		}
 	}

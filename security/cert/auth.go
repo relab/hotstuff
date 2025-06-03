@@ -108,7 +108,7 @@ func (c *Authority) VerifyPartialCert(cert hotstuff.PartialCert) error {
 
 // VerifyQuorumCert verifies a quorum certificate.
 // WARNING: this can return a fatal error which should panic when returned. See FatalError.
-func (c *Authority) VerifyQuorumCert(quorumSize int, qc hotstuff.QuorumCert) error {
+func (c *Authority) VerifyQuorumCert(qc hotstuff.QuorumCert) error {
 	// genesis QC is always valid.
 	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
 		return nil
@@ -121,6 +121,7 @@ func (c *Authority) VerifyQuorumCert(quorumSize int, qc hotstuff.QuorumCert) err
 	}
 
 	participants := qcSignature.Participants()
+	quorumSize := c.config.QuorumSize()
 	if participants.Len() < quorumSize {
 		return fmt.Errorf("%d participations cannot satisfy the quorum requirement: %d", participants.Len(), quorumSize)
 	}
@@ -167,7 +168,7 @@ func (c *Authority) VerifyAggregateQC(quorumSize int, aggQC hotstuff.AggregateQC
 		return hotstuff.QuorumCert{}, err
 	}
 
-	if err := c.VerifyQuorumCert(quorumSize, highQC); err != nil {
+	if err := c.VerifyQuorumCert(highQC); err != nil {
 		return hotstuff.QuorumCert{}, err
 	}
 	return highQC, nil
@@ -186,5 +187,5 @@ func (c *Authority) VerifyAnyQC(qc *hotstuff.QuorumCert, aggQC *hotstuff.Aggrega
 			return fmt.Errorf("block QC does not equal highQC")
 		}
 	}
-	return c.VerifyQuorumCert(c.config.QuorumSize(), *qc)
+	return c.VerifyQuorumCert(*qc)
 }

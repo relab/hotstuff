@@ -50,22 +50,19 @@ func TestPropose(t *testing.T) {
 	})
 	// check if a message was sent at all
 	if len(r.sender.MessagesSent()) != 1 {
-		t.Fail()
+		t.Error("message not sent")
 	}
 	// check if it was the correct type of message
 	msg, ok := r.sender.MessagesSent()[0].(hotstuff.ProposeMsg)
 	if !ok {
-		t.Log("incorrect message type")
-		t.Fail()
+		t.Error("incorrect message type")
 	}
 	// below statements compare the data in the message
 	if msg.ID != 1 {
-		t.Log("incorrect sender")
-		t.Fail()
+		t.Error("incorrect sender")
 	}
 	if !bytes.Equal(block.ToBytes(), msg.Block.ToBytes()) {
-		t.Log("incorrect data")
-		t.Fail()
+		t.Error("incorrect data")
 	}
 }
 
@@ -76,23 +73,20 @@ func TestVote(t *testing.T) {
 	r.sender.Vote(2, pc)
 	// check if a message was sent at all
 	if len(r.sender.MessagesSent()) != 1 {
-		t.Fail()
+		t.Error("message not sent")
 	}
 	// check if it was the correct type of message
 	msg, ok := r.sender.MessagesSent()[0].(hotstuff.PartialCert)
 	if !ok {
-		t.Log("incorrect message type")
-		t.Fail()
+		t.Error("incorrect message type")
 	}
 	// below statements compare the data in the message
 	if msg.Signer() != 1 {
-		t.Log("incorrect sender")
-		t.Fail()
+		t.Error("incorrect sender")
 	}
 
 	if !bytes.Equal(msg.ToBytes(), pc.ToBytes()) {
-		t.Log("incorrect data")
-		t.Fail()
+		t.Error("incorrect data")
 	}
 }
 
@@ -104,21 +98,19 @@ func TestTimeout(t *testing.T) {
 	})
 	// check if a message was sent at all
 	if len(r.sender.MessagesSent()) != 1 {
-		t.Fail()
+		t.Error("message not sent")
 	}
 	// check if it was the correct type of message
 	msg, ok := r.sender.MessagesSent()[0].(hotstuff.TimeoutMsg)
 	if !ok {
-		t.Log("incorrect message type")
-		t.Fail()
+		t.Error("incorrect message type")
 	}
 	// below statements compare the data in the message
 	if msg.ID != 1 {
-		t.Log("incorrect sender")
-		t.Fail()
+		t.Error("incorrect sender")
 	}
 
 	if msg.View != 1 {
-		t.Logf("incorrect view")
+		t.Error("incorrect view")
 	}
 }
