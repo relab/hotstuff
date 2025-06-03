@@ -182,11 +182,14 @@ func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *PublicKey, err error) {
 	return pubKey, nil
 }
 
-func (bls *bls12Base) subgroupCheck(point *bls12.PointG2) bool {
+func (bls *bls12Base) subgroupCheck(point *bls12.PointG2) error {
 	var p bls12.PointG2
 	g2 := bls12.NewG2()
 	g2.MulScalarBig(&p, point, curveOrder)
-	return g2.IsZero(&p)
+	if !g2.IsZero(&p) {
+		return fmt.Errorf("point is not part of the subgroup")
+	}
+	return nil
 }
 
 func (bls *bls12Base) coreSign(message []byte, domainTag []byte) (*bls12.PointG2, error) {
@@ -201,19 +204,22 @@ func (bls *bls12Base) coreSign(message []byte, domainTag []byte) (*bls12.PointG2
 	return point, nil
 }
 
-func (bls *bls12Base) coreVerify(pubKey *PublicKey, message []byte, signature *bls12.PointG2, domainTag []byte) bool {
-	if !bls.subgroupCheck(signature) {
-		return false
+func (bls *bls12Base) coreVerify(pubKey *PublicKey, message []byte, signature *bls12.PointG2, domainTag []byte) error {
+	if err := bls.subgroupCheck(signature); err != nil {
+		return err
 	}
 	g2 := bls12.NewG2()
 	messagePoint, err := g2.HashToCurve(message, domainTag)
 	if err != nil {
-		return false
+		return err
 	}
 	engine := bls12.NewEngine()
 	engine.AddPairInv(&bls12.G1One, signature)
 	engine.AddPair(pubKey.p, messagePoint)
-	return engine.Result().IsOne()
+	if !engine.Result().IsOne() {
+		return fmt.Errorf("result is not one") // TODO(AlanRostem): write a better error message
+	}
+	return nil
 }
 
 func (bls *bls12Base) popProve() (*bls12.PointG2, error) {
@@ -225,7 +231,7 @@ func (bls *bls12Base) popProve() (*bls12.PointG2, error) {
 	return proof, nil
 }
 
-func (bls *bls12Base) popVerify(pubKey *PublicKey, proof *bls12.PointG2) bool {
+func (bls *bls12Base) popVerify(pubKey *PublicKey, proof *bls12.PointG2) error {
 	return bls.coreVerify(pubKey, pubKey.ToBytes(), proof, domainPOP)
 }
 
@@ -252,29 +258,30 @@ func (bls *bls12Base) checkPop(replica *hotstuff.ReplicaInfo) error {
 		return err
 	}
 
-	valid = bls.popVerify(replica.PubKey.(*PublicKey), proof)
+	err = bls.popVerify(replica.PubKey.(*PublicKey), proof)
+	valid = err == nil
 
 	bls.mut.Lock()
 	bls.popCache[key.String()] = valid
 	bls.mut.Unlock()
 
-	return nil
+	return err
 }
 
-func (bls *bls12Base) coreAggregateVerify(publicKeys []*PublicKey, messages [][]byte, signature *bls12.PointG2) bool {
+func (bls *bls12Base) coreAggregateVerify(publicKeys []*PublicKey, messages [][]byte, signature *bls12.PointG2) error {
 	n := len(publicKeys)
 	// validate input
 	if n != len(messages) {
-		return false
+		return fmt.Errorf("%d keys mismatch %d messages", n, len(messages))
 	}
 
 	// precondition n >= 1
 	if n < 1 {
-		return false
+		return fmt.Errorf("expected at least one message")
 	}
 
-	if !bls.subgroupCheck(signature) {
-		return false
+	if err := bls.subgroupCheck(signature); err != nil {
+		return err
 	}
 
 	engine := bls12.NewEngine()
@@ -282,24 +289,30 @@ func (bls *bls12Base) coreAggregateVerify(publicKeys []*PublicKey, messages [][]
 	for i := 0; i < n; i++ {
 		q, err := engine.G2.HashToCurve(messages[i], domain)
 		if err != nil {
-			return false
+			return err
 		}
 		engine.AddPair(publicKeys[i].p, q)
 	}
 
 	engine.AddPairInv(&bls12.G1One, signature)
-	return engine.Result().IsOne()
+	if !engine.Result().IsOne() {
+		return fmt.Errorf("result is not one") // TODO(AlanRostem): write a better message
+	}
+	return nil
 }
 
-func (bls *bls12Base) aggregateVerify(publicKeys []*PublicKey, messages [][]byte, signature *bls12.PointG2) bool {
+func (bls *bls12Base) aggregateVerify(publicKeys []*PublicKey, messages [][]byte, signature *bls12.PointG2) error {
 	set := make(map[string]struct{})
 	for _, m := range messages {
 		set[string(m)] = struct{}{}
 	}
-	return len(messages) == len(set) && bls.coreAggregateVerify(publicKeys, messages, signature)
+	if len(messages) != len(set) {
+		return fmt.Errorf("%d keys mismatch %d messages", len(set), len(messages)) // TODO(AlanRostem): what is in set?
+	}
+	return bls.coreAggregateVerify(publicKeys, messages, signature)
 }
 
-func (bls *bls12Base) fastAggregateVerify(publicKeys []*PublicKey, message []byte, signature *bls12.PointG2) bool {
+func (bls *bls12Base) fastAggregateVerify(publicKeys []*PublicKey, message []byte, signature *bls12.PointG2) error {
 	engine := bls12.NewEngine()
 	var aggregate bls12.PointG1
 	for _, pk := range publicKeys {
@@ -329,22 +342,22 @@ func (bls *bls12Base) Combine(signatures ...hotstuff.QuorumSignature) (combined 
 	agg := bls12.PointG2{}
 	var participants crypto.Bitfield
 	for _, sig1 := range signatures {
-		if sig2, ok := sig1.(*AggregateSignature); ok {
-			sig2.participants.RangeWhile(func(id hotstuff.ID) bool {
-				if participants.Contains(id) {
-					err = crypto.ErrCombineOverlap
-					return false
-				}
-				participants.Add(id)
-				return true
-			})
-			if err != nil {
-				return nil, err
-			}
-			g2.Add(&agg, &agg, &sig2.sig)
-		} else {
+		sig2, ok := sig1.(*AggregateSignature)
+		if !ok {
 			return nil, fmt.Errorf("cannot combine incompatible signature type %T (expected %T)", sig1, sig2)
 		}
+		sig2.participants.RangeWhile(func(id hotstuff.ID) bool {
+			if participants.Contains(id) {
+				err = crypto.ErrCombineOverlap
+				return false
+			}
+			participants.Add(id)
+			return true
+		})
+		if err != nil {
+			return nil, err
+		}
+		g2.Add(&agg, &agg, &sig2.sig)
 	}
 	return &AggregateSignature{sig: agg, participants: participants}, nil
 }
@@ -364,8 +377,8 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 		if err != nil {
 			return err
 		}
-		if !bls.coreVerify(pk, message, &s.sig, domain) {
-			return fmt.Errorf("core-verify failed")
+		if err := bls.coreVerify(pk, message, &s.sig, domain); err != nil {
+			return err
 		}
 	}
 
@@ -382,10 +395,10 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 		return true
 	})
 	if errs != nil {
-		return fmt.Errorf("one or more public keys had errors: %v", errs)
+		return fmt.Errorf("missing one or more public keys: %w", errs)
 	}
-	if !bls.fastAggregateVerify(pks, message, &s.sig) {
-		return fmt.Errorf("fast-agg-verify failed")
+	if err := bls.fastAggregateVerify(pks, message, &s.sig); err != nil {
+		return err
 	}
 	return nil
 }
@@ -398,7 +411,7 @@ func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[
 	}
 
 	if s.Participants().Len() != len(batch) {
-		return fmt.Errorf("expected %d participants", len(batch))
+		return fmt.Errorf("signature mismatch: %d participants, expected: %d", len(batch), s.Participants().Len())
 	}
 
 	pks := make([]*PublicKey, 0, len(batch))
@@ -414,14 +427,14 @@ func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[
 	}
 
 	if len(batch) == 1 {
-		if !bls.coreVerify(pks[0], msgs[0], &s.sig, domain) {
-			return fmt.Errorf("core-verify failed")
+		if err := bls.coreVerify(pks[0], msgs[0], &s.sig, domain); err != nil {
+			return err
 		}
 		return nil
 	}
 
-	if !bls.aggregateVerify(pks, msgs, &s.sig) {
-		return fmt.Errorf("agg-verify failed")
+	if err := bls.aggregateVerify(pks, msgs, &s.sig); err != nil {
+		return err
 	}
 	return nil
 }
