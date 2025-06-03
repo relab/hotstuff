@@ -122,17 +122,13 @@ func (c *Authority) VerifyQuorumCert(quorumSize int, qc hotstuff.QuorumCert) err
 
 	participants := qcSignature.Participants()
 	if participants.Len() < quorumSize {
-		return fmt.Errorf("not enough participants to saisfy a quorum (want: %d, got %d)", participants.Len(), quorumSize)
+		return fmt.Errorf("%d participations cannot satisfy the quorum requirement: %d", participants.Len(), quorumSize)
 	}
 	block, ok := c.blockChain.Get(qc.BlockHash())
 	if !ok {
 		return fmt.Errorf("block not found")
 	}
-	err := c.Verify(qc.Signature(), block.ToBytes())
-	if err != nil {
-		return err
-	}
-	return nil
+	return c.Verify(qc.Signature(), block.ToBytes())
 }
 
 // VerifyTimeoutCert verifies a timeout certificate.
@@ -143,13 +139,9 @@ func (c *Authority) VerifyTimeoutCert(quorumSize int, tc hotstuff.TimeoutCert) e
 	}
 	participants := tc.Signature().Participants()
 	if participants.Len() < quorumSize {
-		return fmt.Errorf("not enough participants to saisfy a quorum (want: %d, got %d)", participants.Len(), quorumSize)
+		return fmt.Errorf("%d participations cannot satisfy the quorum requirement: %d", participants.Len(), quorumSize)
 	}
-	err := c.Verify(tc.Signature(), tc.View().ToBytes())
-	if err != nil {
-		return err
-	}
-	return nil
+	return c.Verify(tc.Signature(), tc.View().ToBytes())
 }
 
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
@@ -168,7 +160,7 @@ func (c *Authority) VerifyAggregateQC(quorumSize int, aggQC hotstuff.AggregateQC
 	}
 	participants := aggQC.Sig().Participants()
 	if participants.Len() < quorumSize {
-		return hotstuff.QuorumCert{}, fmt.Errorf("not enough participants to saisfy a quorum (want: %d, got %d)", participants.Len(), quorumSize)
+		return hotstuff.QuorumCert{}, fmt.Errorf("%d participations cannot satisfy the quorum requirement: %d", participants.Len(), quorumSize)
 	}
 	// both the batched aggQC signatures and the highQC must be verified
 	if err := c.BatchVerify(aggQC.Sig(), messages); err != nil {
@@ -194,8 +186,5 @@ func (c *Authority) VerifyAnyQC(qc *hotstuff.QuorumCert, aggQC *hotstuff.Aggrega
 			return fmt.Errorf("block QC does not equal highQC")
 		}
 	}
-	if err := c.VerifyQuorumCert(c.config.QuorumSize(), *qc); err != nil {
-		return err
-	}
-	return nil
+	return c.VerifyQuorumCert(c.config.QuorumSize(), *qc)
 }

@@ -221,7 +221,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	if s.config.HasAggregateQC() {
 		aggQC, err := s.auth.CreateAggregateQC(currView, timeoutList)
 		if err != nil {
-			s.logger.Debugf("Failed to create aggregateQC: %v", err)
+			s.logger.Debugf("Failed to create agg-qc: %v", err)
 		} else {
 			si = si.WithAggQC(aggQC)
 		}
@@ -244,7 +244,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	// check for a TC
 	if tc, ok := syncInfo.TC(); ok {
 		if err := s.auth.VerifyTimeoutCert(s.config.QuorumSize(), tc); err != nil {
-			s.logger.Info("Timeout Certificate could not be verified: %v", err)
+			s.logger.Info("Timeout certificate could not be verified: %v", err)
 			return
 		}
 		s.state.UpdateHighTC(tc)
@@ -262,7 +262,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.config.HasAggregateQC() {
 		highQC, err := s.auth.VerifyAggregateQC(s.config.QuorumSize(), aggQC)
 		if err != nil {
-			s.logger.Info("agg-qc could not be verified: %v", err)
+			s.logger.Info("Agg-qc could not be verified: %v", err)
 			return
 		}
 		if aggQC.View() >= view {
@@ -274,7 +274,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		qc = highQC
 	} else if qc, haveQC = syncInfo.QC(); haveQC {
 		if err := s.auth.VerifyQuorumCert(s.config.QuorumSize(), qc); err != nil {
-			s.logger.Info("qc could not be verified: %v", err)
+			s.logger.Info("QC could not be verified: %v", err)
 			return
 		}
 	}
@@ -282,9 +282,9 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	if haveQC {
 		err := s.state.UpdateHighQC(qc)
 		if err != nil {
-			s.logger.Warnf("failed to update high-qc: %v", err)
+			s.logger.Warnf("Failed to update high-qc: %v", err)
 		} else {
-			s.logger.Debug("highQC updated")
+			s.logger.Debug("High-qc updated")
 		}
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
 		if qc.View() >= view {
@@ -312,7 +312,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	s.startTimeoutTimer()
 
-	s.logger.Debugf("advanced to view %d", newView)
+	s.logger.Debugf("Advanced to view %d", newView)
 	s.eventLoop.AddEvent(hotstuff.ViewChangeEvent{View: newView, Timeout: timeout})
 
 	leader := s.leaderRotation.GetLeader(newView)
@@ -320,7 +320,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		proposal, err := s.proposer.CreateProposal(s.state.View(), s.state.HighQC(), syncInfo)
 		if err != nil {
 			// debug log here since it may frequently fail due to lack of commands.
-			s.logger.Debugf("failed to create proposal: %v", err)
+			s.logger.Debugf("Failed to create proposal: %v", err)
 			return
 		}
 		s.proposer.Propose(&proposal)
