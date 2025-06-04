@@ -120,10 +120,6 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 	if block.View() <= v.lastVote {
 		return fmt.Errorf("block view too old")
 	}
-	// cannot vote for old commands
-	// if v.commandCache.ContainsDuplicate(block.Commands()) {
-	// 	return fmt.Errorf("command too old")
-	// }
 	// vote rule must be valid
 	if !v.ruler.VoteRule(view, *proposal) {
 		return fmt.Errorf("vote rule not satisfied")

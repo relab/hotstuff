@@ -125,12 +125,18 @@ func TestOnValidPropose(t *testing.T) {
 		ID:    id,
 		Block: block,
 	}
+	if err := voter.Verify(&proposal); err != nil {
+		t.Errorf("could not verify proposal: %v", err)
+	}
 	voter.OnValidPropose(&proposal)
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	depsCore.EventLoop().Run(ctx)
 	if !newViewTriggered {
-		t.Log("the voter did not advance the view")
-		t.Fail()
+		t.Error("the voter did not advance the view")
+	}
+
+	if voter.LastVote() != proposal.Block.View() {
+		t.Errorf("incorrect view voted for")
 	}
 }
