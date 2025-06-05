@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 )
 
 // HotstuffRuleset is the minimum interface that a Hotstuff variant implements.
@@ -31,7 +32,7 @@ type CommitRuler interface {
 // This allows implementors to specify how new blocks are created.
 type ProposeRuler interface {
 	// ProposeRule creates a new proposal.
-	ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool)
+	ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool)
 }
 
 // LeaderRotation implements a leader rotation scheme.
@@ -62,9 +63,9 @@ type CryptoBase interface {
 	// Combine combines multiple signatures into a single signature.
 	Combine(signatures ...hotstuff.QuorumSignature) (signature hotstuff.QuorumSignature, err error)
 	// Verify verifies the given quorum signature against the message.
-	Verify(signature hotstuff.QuorumSignature, message []byte) bool
+	Verify(signature hotstuff.QuorumSignature, message []byte) error
 	// BatchVerify verifies the given quorum signature against the batch of messages.
-	BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool
+	BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) error
 }
 
 // Sender handles the network layer of the consensus protocol by methods for sending specific messages.
@@ -91,13 +92,7 @@ type ConsensusProtocol interface {
 	SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
 }
 
-type CommandGenerator interface {
-	Accept(cmd hotstuff.Command) bool
-	Get(ctx context.Context) (cmd hotstuff.Command, ok bool)
-	MarkProposed(cmd hotstuff.Command)
-}
-
-type CommandExecutor interface {
-	Execute(cmd hotstuff.Command)
-	Fork(cmd hotstuff.Command)
+type Executor interface {
+	Exec(*clientpb.Batch)
+	Abort(*clientpb.Batch)
 }

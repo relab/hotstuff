@@ -10,9 +10,7 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/viewstates"
-	"github.com/relab/hotstuff/protocol/voter"
-	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/security/cert"
 
 	"github.com/relab/hotstuff"
 )
@@ -23,13 +21,13 @@ type Synchronizer struct {
 	logger    logging.Logger
 	config    *core.RuntimeConfig
 
-	auth *certauth.CertAuthority
+	auth *cert.Authority
 
 	duration       modules.ViewDuration
 	leaderRotation modules.LeaderRotation
-	voter          *voter.Voter
-	consensus      *consensus.Consensus
-	state          *viewstates.ViewStates
+	voter          *consensus.Voter
+	proposer       *consensus.Proposer
+	state          *consensus.ViewStates
 
 	sender modules.Sender
 
@@ -52,13 +50,13 @@ func New(
 	config *core.RuntimeConfig,
 
 	// security dependencies
-	auth *certauth.CertAuthority,
+	auth *cert.Authority,
 
 	// protocol dependencies
 	leaderRotation modules.LeaderRotation,
-	consensus *consensus.Consensus,
-	voter *voter.Voter,
-	state *viewstates.ViewStates,
+	proposer *consensus.Proposer,
+	voter *consensus.Voter,
+	state *consensus.ViewStates,
 
 	// network dependencies
 	sender modules.Sender,
@@ -67,7 +65,7 @@ func New(
 		duration:       leaderRotation.ViewDuration(),
 		leaderRotation: leaderRotation,
 
-		consensus: consensus,
+		proposer:  proposer,
 		auth:      auth,
 		sender:    sender,
 		eventLoop: eventLoop,
@@ -133,7 +131,13 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	// start the initial proposal
 	if view := s.state.View(); view == 1 && s.leaderRotation.GetLeader(view) == s.config.ID() {
 		syncInfo := s.state.SyncInfo()
-		s.consensus.Propose(s.state.View(), s.state.HighQC(), syncInfo)
+		proposal, err := s.proposer.CreateProposal(s.state.View(), s.state.HighQC(), syncInfo)
+		if err != nil {
+			// debug log here since it may frequently fail due to lack of commands.
+			s.logger.Info("failed to create proposal: %v", err)
+			return
+		}
+		s.proposer.Propose(&proposal)
 	}
 }
 
@@ -185,7 +189,8 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 			}
 		}
 	}()
-	if !s.auth.Verify(timeout.ViewSignature, timeout.View.ToBytes()) {
+	if err := s.auth.Verify(timeout.ViewSignature, timeout.View.ToBytes()); err != nil {
+		s.logger.Infof("View timeout signature could not be verified: %v", err)
 		return
 	}
 	s.logger.Debug("OnRemoteTimeout: ", timeout)
@@ -216,7 +221,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	if s.config.HasAggregateQC() {
 		aggQC, err := s.auth.CreateAggregateQC(currView, timeoutList)
 		if err != nil {
-			s.logger.Debugf("Failed to create aggregateQC: %v", err)
+			s.logger.Debugf("Failed to create agg-qc: %v", err)
 		} else {
 			si = si.WithAggQC(aggQC)
 		}
@@ -238,8 +243,8 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	// check for a TC
 	if tc, ok := syncInfo.TC(); ok {
-		if !s.auth.VerifyTimeoutCert(s.config.QuorumSize(), tc) {
-			s.logger.Info("Timeout Certificate could not be verified!")
+		if err := s.auth.VerifyTimeoutCert(s.config.QuorumSize(), tc); err != nil {
+			s.logger.Info("Timeout certificate could not be verified: %v", err)
 			return
 		}
 		s.state.UpdateHighTC(tc)
@@ -255,9 +260,9 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	// check for an AggQC or QC
 	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.config.HasAggregateQC() {
-		highQC, ok := s.auth.VerifyAggregateQC(s.config.QuorumSize(), aggQC)
-		if !ok {
-			s.logger.Info("Aggregated Quorum Certificate could not be verified")
+		highQC, err := s.auth.VerifyAggregateQC(s.config.QuorumSize(), aggQC)
+		if err != nil {
+			s.logger.Info("Agg-qc could not be verified: %v", err)
 			return
 		}
 		if aggQC.View() >= view {
@@ -268,14 +273,19 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		syncInfo = syncInfo.WithQC(highQC)
 		qc = highQC
 	} else if qc, haveQC = syncInfo.QC(); haveQC {
-		if !s.auth.VerifyQuorumCert(s.config.QuorumSize(), qc) {
-			s.logger.Info("Quorum Certificate could not be verified!")
+		if err := s.auth.VerifyQuorumCert(qc); err != nil {
+			s.logger.Info("QC could not be verified: %v", err)
 			return
 		}
 	}
 
 	if haveQC {
-		s.state.UpdateHighQC(qc)
+		err := s.state.UpdateHighQC(qc)
+		if err != nil {
+			s.logger.Warnf("Failed to update high-qc: %v", err)
+		} else {
+			s.logger.Debug("High-qc updated")
+		}
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
 		if qc.View() >= view {
 			view = qc.View()
@@ -302,12 +312,18 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	s.startTimeoutTimer()
 
-	s.logger.Debugf("advanced to view %d", newView)
+	s.logger.Debugf("Advanced to view %d", newView)
 	s.eventLoop.AddEvent(hotstuff.ViewChangeEvent{View: newView, Timeout: timeout})
 
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.config.ID() {
-		s.consensus.Propose(s.state.View(), s.state.HighQC(), syncInfo)
+		proposal, err := s.proposer.CreateProposal(s.state.View(), s.state.HighQC(), syncInfo)
+		if err != nil {
+			// debug log here since it may frequently fail due to lack of commands.
+			s.logger.Debugf("Failed to create proposal: %v", err)
+			return
+		}
+		s.proposer.Propose(&proposal)
 		return
 	}
 	err := s.sender.NewView(leader, syncInfo)

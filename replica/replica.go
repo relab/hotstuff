@@ -6,39 +6,38 @@ import (
 	"net"
 
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/dependencies"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
-	"github.com/relab/hotstuff/protocol/viewstates"
-	"github.com/relab/hotstuff/security/certauth"
-	"github.com/relab/hotstuff/service/clientsrv"
-	"github.com/relab/hotstuff/service/cmdcache"
+	"github.com/relab/hotstuff/security/cert"
+	"github.com/relab/hotstuff/wiring"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/service/server"
+	"github.com/relab/hotstuff/protocol/committer"
+	"github.com/relab/hotstuff/server"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Replica is a participant in the consensus protocol.
 type Replica struct {
 	eventLoop    *eventloop.EventLoop
-	clientSrv    *clientsrv.Server
+	clientSrv    *clientpb.Server
 	hsSrv        *server.Server
 	sender       *network.GorumsSender
 	synchronizer *synchronizer.Synchronizer
 
-	execHandlers map[cmdcache.CmdID]func(*emptypb.Empty, error)
+	execHandlers map[clientpb.MessageID]func(*emptypb.Empty, error)
 	cancel       context.CancelFunc
 	done         chan struct{}
 }
 
 // New returns a new replica.
 func New(
-	depsCore *dependencies.Core,
+	depsCore *wiring.Core,
 	vdParams viewduration.Params,
 	opts ...Option,
 ) (replica *Replica, err error) {
@@ -53,18 +52,18 @@ func New(
 		depsCore.RuntimeCfg(),
 		rOpt.credentials,
 	)
-	depsSecure, err := dependencies.NewSecurity(
+	depsSecure, err := wiring.NewSecurity(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		sender,
 		names.crypto,
-		certauth.WithCache(100), // TODO: consider making this configurable
+		cert.WithCache(100), // TODO: consider making this configurable
 	)
 	if err != nil {
 		return nil, err
 	}
-	rules, err := dependencies.NewConsensusRules(
+	consensusRules, err := wiring.NewConsensusRules(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
@@ -76,55 +75,60 @@ func New(
 
 	byzStrat := rOpt.moduleNames.byzantineStrategy
 	if byzStrat != "" {
-		byz, err := dependencies.WrapByzantineStrategy(
+		byz, err := wiring.WrapByzantineStrategy(
 			depsCore.RuntimeCfg(),
 			depsSecure.BlockChain(),
-			rules,
+			consensusRules,
 			byzStrat,
 		)
 		if err != nil {
 			return nil, err
 		}
-		rules = byz
+		consensusRules = byz
 		depsCore.Logger().Infof("assigned byzantine strategy: %s", byzStrat)
 	}
-	depsSrv := dependencies.NewService(
-		depsCore.Logger(),
+	depsClient := wiring.NewClient(
 		depsCore.EventLoop(),
-		depsSecure.BlockChain(),
-		rules,
+		depsCore.Logger(),
 		rOpt.cmdCacheOpts,
 		rOpt.clientGorumsSrvOpts...,
 	)
-	leader, err := dependencies.NewLeaderRotation(
+	committer := committer.New(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsSecure.BlockChain(),
+		consensusRules,
+	)
+	leaderRotation, err := wiring.NewLeaderRotation(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
-		depsSrv.Committer(),
+		committer,
 		vdParams,
 		rOpt.moduleNames.leaderRotation,
-		rules.ChainLength(),
+		consensusRules.ChainLength(),
 	)
 	if err != nil {
 		return nil, err
 	}
 	// TODO(AlanRostem): avoid creating viewstates here.
-	viewStates := viewstates.New(
-		depsCore.Logger(),
+	viewStates, err := consensus.NewViewStates(
 		depsSecure.BlockChain(),
-		depsSecure.CertAuth(),
+		depsSecure.Authority(),
 	)
+	if err != nil {
+		return nil, err
+	}
 	var protocol modules.ConsensusProtocol
-	if depsCore.RuntimeCfg().KauriEnabled() {
+	if depsCore.RuntimeCfg().HasKauriTree() {
 		protocol = kauri.New(
 			depsCore.Logger(),
 			depsCore.EventLoop(),
 			depsCore.RuntimeCfg(),
 			depsSecure.BlockChain(),
-			depsSecure.CertAuth(),
+			depsSecure.Authority(),
 			kauri.NewExtendedGorumsSender(
 				depsCore.EventLoop(),
-				depsCore.Logger(),
 				depsCore.RuntimeCfg(),
 				sender,
 			),
@@ -135,40 +139,32 @@ func New(
 			depsCore.EventLoop(),
 			depsCore.RuntimeCfg(),
 			depsSecure.BlockChain(),
-			depsSecure.CertAuth(),
+			depsSecure.Authority(),
 			viewStates,
-			leader,
+			leaderRotation,
 			sender,
 		)
 	}
-	depsConsensus := dependencies.NewConsensus(
+	depsConsensus := wiring.NewConsensus(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
-		depsSecure.CertAuth(),
-		depsSrv.CmdCache(),
-		rules,
-		leader,
-	)
-	// TODO(AlanRostem): explore ways to simplify consensus and synchronizer so that they take in less dependencies.
-	consensus := consensus.New(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
+		depsSecure.BlockChain(),
+		depsSecure.Authority(),
+		depsClient.Cache(),
+		committer,
+		consensusRules,
+		leaderRotation,
 		protocol,
-		depsConsensus.Proposer(),
-		depsConsensus.Voter(),
-		depsSrv.CmdCache(),
-		depsSrv.Committer(),
 	)
-	// TODO(AlanRostem): consder a way to move the consensus flow from Synchronzier to Consensus
+	// TODO(AlanRostem): consder moving the consensus flow from Synchronzier to a different class
 	synchronizer := synchronizer.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
-		depsSecure.CertAuth(),
-		leader,
-		consensus,
+		depsSecure.Authority(),
+		leaderRotation,
+		depsConsensus.Proposer(),
 		depsConsensus.Voter(),
 		viewStates,
 		sender,
@@ -183,12 +179,12 @@ func New(
 	)
 	srv := &Replica{
 		eventLoop:    depsCore.EventLoop(),
-		clientSrv:    depsSrv.ClientSrv(),
+		clientSrv:    depsClient.Server(),
 		sender:       sender,
 		synchronizer: synchronizer,
 		hsSrv:        server,
 
-		execHandlers: make(map[cmdcache.CmdID]func(*emptypb.Empty, error)),
+		execHandlers: make(map[clientpb.MessageID]func(*emptypb.Empty, error)),
 		cancel:       func() {},
 		done:         make(chan struct{}),
 	}

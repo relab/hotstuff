@@ -6,16 +6,14 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/viewstates"
-	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/security/cert"
 )
 
 type HotStuff struct {
 	logger         logging.Logger
 	config         *core.RuntimeConfig
-	votingMachine  *votingmachine.VotingMachine
+	votingMachine  *VotingMachine
 	leaderRotation modules.LeaderRotation
 	sender         modules.Sender
 }
@@ -25,15 +23,15 @@ func NewHotStuff(
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
-	auth *certauth.CertAuthority,
-	states *viewstates.ViewStates,
+	auth *cert.Authority,
+	states *ViewStates,
 	leaderRotation modules.LeaderRotation,
 	sender modules.Sender,
 ) modules.ConsensusProtocol {
 	return &HotStuff{
 		logger: logger,
 		config: config,
-		votingMachine: votingmachine.New(
+		votingMachine: NewVotingMachine(
 			logger,
 			eventLoop,
 			config,

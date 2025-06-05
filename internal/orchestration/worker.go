@@ -16,8 +16,8 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/dependencies"
 	"github.com/relab/hotstuff/internal/latency"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/internal/tree"
@@ -25,8 +25,8 @@ import (
 	"github.com/relab/hotstuff/metrics/types"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/security/crypto/keygen"
-	"github.com/relab/hotstuff/service/cmdcache"
-	"github.com/relab/hotstuff/service/server"
+	"github.com/relab/hotstuff/server"
+	"github.com/relab/hotstuff/wiring"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -144,7 +144,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 	// setup core - used in replica and measurement framework
 	runtimeOpts := []core.RuntimeOption{}
-	if opts.TreeEnabled() {
+	// TODO(AlanRostem): maybe rename the tree option to kauriTree? should also use the tree check only for enable kauri
+	if opts.GetKauri() && opts.TreeEnabled() {
 		delayMode := tree.DelayTypeNone
 		if opts.GetAggregationTime() {
 			delayMode = tree.DelayTypeAggregation
@@ -157,16 +158,13 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			opts.TreePositionIDs(),
 			opts.GetTreeDelta().AsDuration(),
 		)
-		runtimeOpts = append(runtimeOpts, core.WithTree(t))
-	}
-	if opts.GetKauri() {
-		runtimeOpts = append(runtimeOpts, core.WithKauri())
+		runtimeOpts = append(runtimeOpts, core.WithKauriTree(t))
 	}
 	runtimeOpts = append(runtimeOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
 	if opts.GetUseAggQC() {
 		runtimeOpts = append(runtimeOpts, core.WithAggregateQC())
 	}
-	depsCore := dependencies.NewCore(opts.HotstuffID(), "hs", privKey, runtimeOpts...)
+	depsCore := wiring.NewCore(opts.HotstuffID(), "hs", privKey, runtimeOpts...)
 	// check if measurements should be enabled
 	if w.measurementInterval > 0 {
 		// Initializes the metrics modules internally.
@@ -197,7 +195,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 	if opts.GetBatchSize() > 1 {
 		replicaOpts = append(replicaOpts,
-			replica.WithCmdCacheOptions(cmdcache.WithBatching(opts.GetBatchSize())),
+			replica.WithCmdCacheOptions(clientpb.WithBatching(opts.GetBatchSize())),
 		)
 	}
 	replicaOpts = append(replicaOpts,

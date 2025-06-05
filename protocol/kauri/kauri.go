@@ -15,7 +15,7 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/security/certauth"
+	"github.com/relab/hotstuff/security/cert"
 )
 
 const ModuleName = "kauri"
@@ -26,7 +26,7 @@ type Kauri struct {
 	eventLoop  *eventloop.EventLoop
 	config     *core.RuntimeConfig
 	blockChain *blockchain.BlockChain
-	auth       *certauth.CertAuthority
+	auth       *cert.Authority
 	sender     modules.KauriSender
 
 	aggContrib  hotstuff.QuorumSignature
@@ -44,7 +44,7 @@ func New(
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
-	auth *certauth.CertAuthority,
+	auth *cert.Authority,
 	sender modules.KauriSender,
 ) *Kauri {
 	k := &Kauri{
@@ -173,8 +173,8 @@ func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) err
 	if !ok {
 		return fmt.Errorf("failed to fetch block %v", k.blockHash)
 	}
-	if !k.auth.Verify(currentSignature, block.ToBytes()) {
-		return fmt.Errorf("cannot verify contribution for view %d from participants %v", k.currentView, currentSignature.Participants())
+	if err := k.auth.Verify(currentSignature, block.ToBytes()); err != nil {
+		return err
 	}
 	if k.aggContrib == nil {
 		// first contribution

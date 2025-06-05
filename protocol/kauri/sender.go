@@ -6,7 +6,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/proto/kauripb"
 	"github.com/relab/hotstuff/internal/tree"
@@ -16,7 +15,6 @@ import (
 
 type kauriGorumsSender struct {
 	eventLoop *eventloop.EventLoop
-	logger    logging.Logger
 	config    *core.RuntimeConfig
 	modules.Sender
 
@@ -26,13 +24,11 @@ type kauriGorumsSender struct {
 
 func NewExtendedGorumsSender(
 	eventLoop *eventloop.EventLoop,
-	logger logging.Logger,
 	config *core.RuntimeConfig,
 	base *network.GorumsSender,
 ) modules.KauriSender {
 	s := &kauriGorumsSender{
 		eventLoop: eventLoop,
-		logger:    logger,
 		config:    config,
 		Sender:    base, // important: extend the base
 

@@ -1,11 +1,8 @@
 package twins
 
 import (
-	"context"
 	"fmt"
-	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
@@ -144,48 +141,3 @@ func getBlocks(network *Network) map[NodeID][]*hotstuff.Block {
 	}
 	return m
 }
-
-type commandGenerator struct {
-	mut     sync.Mutex
-	nextCmd uint64
-}
-
-var _ modules.CommandGenerator = (*commandGenerator)(nil)
-
-func (cg *commandGenerator) next() hotstuff.Command {
-	cg.mut.Lock()
-	defer cg.mut.Unlock()
-	cmd := hotstuff.Command(strconv.FormatUint(cg.nextCmd, 10))
-	cg.nextCmd++
-	return cmd
-}
-
-// Accept returns true if the replica should accept the command, false otherwise.
-func (*commandGenerator) Accept(_ hotstuff.Command) bool {
-	return true
-}
-
-// MarkProposed tells the voter that the propose phase for the given command succeeded, and it should no longer be
-// accepted in the future.
-func (*commandGenerator) MarkProposed(_ hotstuff.Command) {}
-
-// Get returns the next command to be proposed.
-// It may run until the context is canceled.
-// If no command is available, the 'ok' return value should be false.
-func (cm *commandGenerator) Get(_ context.Context) (cmd hotstuff.Command, ok bool) {
-	return cm.next(), true
-}
-
-type commandModule struct {
-	commandGenerator *commandGenerator
-	node             *node
-}
-
-var _ modules.CommandExecutor = (*commandModule)(nil)
-
-// Exec executes the given command.
-func (cm *commandModule) Execute(cmd hotstuff.Command) {
-	cm.node.executeCommand(cmd)
-}
-
-func (*commandModule) Fork(cmd hotstuff.Command) {}

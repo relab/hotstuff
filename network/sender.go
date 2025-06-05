@@ -146,7 +146,7 @@ func (s *GorumsSender) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
 
 	replica := s.replicas[id]
 	replica.md = readMetadata(md)
-	if err := s.config.SetReplicaMetaData(replica.id, replica.md); err != nil {
+	if err := s.config.SetReplicaMetadata(replica.id, replica.md); err != nil {
 		s.logger.Errorf("failed to set replica metadata: %v", err)
 		return
 	}

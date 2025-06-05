@@ -83,7 +83,6 @@ func New(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-
 	conf Config,
 ) (client *Client) {
 	client = &Client{

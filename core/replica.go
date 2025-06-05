@@ -17,7 +17,7 @@ func (g *RuntimeConfig) ReplicaCount() int {
 	return len(g.replicas)
 }
 
-// QuorumSize returns the size of a quorum
+// QuorumSize returns the size of a quorum.
 func (g *RuntimeConfig) QuorumSize() int {
 	return hotstuff.QuorumSize(g.ReplicaCount())
 }
@@ -27,12 +27,12 @@ func (g *RuntimeConfig) AddReplica(replicaInfo *hotstuff.ReplicaInfo) {
 	g.replicas[replicaInfo.ID] = replicaInfo
 }
 
-// SetReplicaMetaData sets the metadata for a replica based on id.
-func (g *RuntimeConfig) SetReplicaMetaData(id hotstuff.ID, metaData map[string]string) error {
+// SetReplicaMetadata sets the metadata for a replica based on id.
+func (g *RuntimeConfig) SetReplicaMetadata(id hotstuff.ID, metadata map[string]string) error {
 	if _, ok := g.replicas[id]; !ok {
 		return fmt.Errorf("replica %d does not exist", id)
 	}
-	g.replicas[id].MetaData = metaData
+	g.replicas[id].Metadata = metadata
 	return nil
 }
 

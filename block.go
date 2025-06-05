@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"time"
+
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 )
 
 // Block contains a propsed "command", metadata for the protocol, and a link to the "parent" block.
@@ -13,18 +15,18 @@ type Block struct {
 	hash     Hash
 	parent   Hash
 	proposer ID
-	cmd      Command
+	batch    *clientpb.Batch
 	cert     QuorumCert
 	view     View
 	ts       time.Time
 }
 
 // NewBlock creates a new Block
-func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID) *Block {
+func NewBlock(parent Hash, cert QuorumCert, batch *clientpb.Batch, view View, proposer ID) *Block {
 	b := &Block{
 		parent:   parent,
 		cert:     cert,
-		cmd:      cmd,
+		batch:    batch,
 		view:     view,
 		proposer: proposer,
 		ts:       time.Now(),
@@ -32,6 +34,12 @@ func NewBlock(parent Hash, cert QuorumCert, cmd Command, view View, proposer ID)
 	// cache the hash immediately because it is too racy to do it in Hash()
 	b.hash = sha256.Sum256(b.ToBytes())
 	return b
+}
+
+func (b *Block) SetTimestamp(ts time.Time) {
+	b.ts = ts
+	// recalculate the hash since the timestamp is part of the block
+	b.hash = sha256.Sum256(b.ToBytes())
 }
 
 func (b *Block) String() string {
@@ -60,9 +68,9 @@ func (b *Block) Parent() Hash {
 	return b.parent
 }
 
-// Command returns the command
-func (b *Block) Command() Command {
-	return b.cmd
+// Commands returns a batch of commands.
+func (b *Block) Commands() *clientpb.Batch { // TODO(meling): return a slice of commands
+	return b.batch
 }
 
 // QuorumCert returns the quorum certificate in the block
@@ -75,8 +83,8 @@ func (b *Block) View() View {
 	return b.view
 }
 
-// TimeStamp returns the timestamp of the block
-func (b *Block) TimeStamp() time.Time {
+// Timestamp returns the timestamp of the block
+func (b *Block) Timestamp() time.Time {
 	return b.ts
 }
 
@@ -89,7 +97,10 @@ func (b *Block) ToBytes() []byte {
 	var viewBuf [8]byte
 	binary.LittleEndian.PutUint64(viewBuf[:], uint64(b.view))
 	buf = append(buf, viewBuf[:]...)
-	buf = append(buf, []byte(b.cmd)...)
+	buf = append(buf, b.batch.Marshal()...) // may panic
 	buf = append(buf, b.cert.ToBytes()...)
+	var tsBuf [8]byte
+	binary.LittleEndian.PutUint64(tsBuf[:], uint64(b.ts.UnixNano()))
+	buf = append(buf, tsBuf[:]...)
 	return buf
 }

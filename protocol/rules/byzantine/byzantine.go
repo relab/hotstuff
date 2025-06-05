@@ -4,6 +4,7 @@ package byzantine
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
 )
@@ -17,7 +18,7 @@ type silence struct {
 	modules.HotstuffRuleset
 }
 
-func (s *silence) ProposeRule(_ hotstuff.View, _ hotstuff.QuorumCert, _ hotstuff.SyncInfo, _ hotstuff.Command) (hotstuff.ProposeMsg, bool) {
+func (s *silence) ProposeRule(_ hotstuff.View, _ hotstuff.QuorumCert, _ hotstuff.SyncInfo, _ *clientpb.Batch) (hotstuff.ProposeMsg, bool) {
 	return hotstuff.ProposeMsg{}, false
 }
 
@@ -32,7 +33,7 @@ type fork struct {
 	modules.HotstuffRuleset
 }
 
-func (f *fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd hotstuff.Command) (proposal hotstuff.ProposeMsg, ok bool) {
+func (f *fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
 	block, ok := f.blockChain.Get(highQC.BlockHash())
 	if !ok {
 		return proposal, false
