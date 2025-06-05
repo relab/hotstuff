@@ -36,7 +36,7 @@ func (c *Cache) isDuplicate(cmd *Command) bool {
 	return seqNum >= cmd.GetSequenceNumber()
 }
 
-func (c *Cache) add(cmd *Command) {
+func (c *Cache) Add(cmd *Command) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	if c.isDuplicate(cmd) {

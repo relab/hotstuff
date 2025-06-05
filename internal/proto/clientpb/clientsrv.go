@@ -85,7 +85,7 @@ func (srv *Server) ExecCommand(ctx gorums.ServerCtx, cmd *Command) (*emptypb.Emp
 	srv.awaitingCmds[id] = errChan
 	srv.mut.Unlock()
 
-	srv.cmdCache.add(cmd)
+	srv.cmdCache.Add(cmd)
 	ctx.Release()
 	err := <-errChan
 	return &emptypb.Empty{}, err

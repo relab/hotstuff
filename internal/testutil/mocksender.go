@@ -6,6 +6,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/security/blockchain"
 )
 
 // type MockMessage struct {
@@ -18,6 +19,7 @@ type MockSender struct {
 	id                  hotstuff.ID
 	availableRecipients []hotstuff.ID
 	messagesSent        []any
+	blockChains         []*blockchain.BlockChain
 }
 
 func NewMockSender(id hotstuff.ID) *MockSender {
@@ -28,6 +30,10 @@ func NewMockSender(id hotstuff.ID) *MockSender {
 
 func (m *MockSender) MessagesSent() []any {
 	return m.messagesSent
+}
+
+func (m *MockSender) AddBlockChain(chain *blockchain.BlockChain) {
+	m.blockChains = append(m.blockChains, chain)
 }
 
 func (m *MockSender) saveUnicast(recipient hotstuff.ID, msg any) {
@@ -74,8 +80,17 @@ func (m *MockSender) Propose(proposal *hotstuff.ProposeMsg) {
 	m.saveBroadcast(*proposal)
 }
 
-func (m *MockSender) RequestBlock(_ context.Context, _ hotstuff.Hash) (*hotstuff.Block, bool) {
-	panic("not implemented")
+func (m *MockSender) RequestBlock(_ context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
+	if len(m.blockChains) == 0 {
+		panic("no blockchains available to mock sender")
+	}
+	for _, chain := range m.blockChains {
+		block, ok := chain.LocalGet(hash)
+		if ok {
+			return block, true
+		}
+	}
+	return nil, false
 }
 
 func (m *MockSender) Sub(ids []hotstuff.ID) (modules.Sender, error) {
