@@ -1,6 +1,7 @@
 package consensus_test
 
 import (
+	"bytes"
 	"testing"
 	"time"
 
@@ -20,7 +21,7 @@ import (
 
 func check(t *testing.T, err error) {
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 }
 
@@ -123,7 +124,7 @@ func TestPropose(t *testing.T) {
 			list.cryptoBase,
 		)
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 		signers = append(signers, depsSecurity.Authority())
 		replicas = append(replicas, replica{
@@ -137,12 +138,13 @@ func TestPropose(t *testing.T) {
 	for _, other := range replicas {
 		replica0.sender.AddBlockChain(other.depsSecurity.BlockChain())
 	}
-	commandCache := clientpb.New()
-	commandCache.Add(&clientpb.Command{
+	command := &clientpb.Command{
 		ClientID:       1,
 		SequenceNumber: 1,
 		Data:           []byte("testing data here"),
-	})
+	}
+	commandCache := clientpb.New()
+	commandCache.Add(command)
 	proposer := wireUpProposer(t, replica0.depsCore, replica0.depsSecurity, replica0.sender, commandCache, list)
 	block := testutil.CreateBlock(t, replica0.depsSecurity.Authority())
 	qc := testutil.CreateQC(t, block, signers)
@@ -151,4 +153,18 @@ func TestPropose(t *testing.T) {
 		t.Error(err)
 	}
 	proposer.Propose(&proposal)
+	messages := replica0.sender.MessagesSent()
+	if len(messages) != 1 {
+		t.Fatal("expected at least one messages to be sent by proposer")
+	}
+
+	msg := messages[0]
+	if _, ok := msg.(hotstuff.ProposeMsg); !ok {
+		t.Fatal("expected message to be hotstuff.ProposeMsg")
+	}
+
+	proposeMsg := msg.(hotstuff.ProposeMsg)
+	if proposeMsg.ID != 1 || !bytes.Equal(proposeMsg.Block.ToBytes(), proposal.Block.ToBytes()) {
+		t.Fatal("incorrect propose message data")
+	}
 }
