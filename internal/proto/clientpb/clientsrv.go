@@ -100,10 +100,10 @@ func (srv *Server) Exec(batch *Batch) {
 		// update the seqNums
 		seqNum, ok := srv.lastExecutedSeqNum[cmd.ClientID]
 		if ok && seqNum >= cmd.SequenceNumber {
-			srv.logger.Errorf("duplicate command found")
+			srv.logger.Info("duplicate command found")
 			if errChan, ok := srv.awaitingCmds[id]; ok {
 				// TODO(AlanRostem): unsure if we need this response to the client
-				errChan <- status.Error(codes.Aborted, "duplicate command")
+				errChan <- status.Error(codes.Aborted, "command already executed")
 				delete(srv.awaitingCmds, id)
 			}
 			srv.mut.Unlock()

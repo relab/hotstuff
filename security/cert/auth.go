@@ -107,7 +107,6 @@ func (c *Authority) VerifyPartialCert(cert hotstuff.PartialCert) error {
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
-// WARNING: this can return a fatal error which should panic when returned. See FatalError.
 func (c *Authority) VerifyQuorumCert(qc hotstuff.QuorumCert) error {
 	// genesis QC is always valid.
 	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
@@ -127,7 +126,7 @@ func (c *Authority) VerifyQuorumCert(qc hotstuff.QuorumCert) error {
 	}
 	block, ok := c.blockChain.Get(qc.BlockHash())
 	if !ok {
-		return fmt.Errorf("block not found")
+		return fmt.Errorf("block not found: %s", block.Hash().String())
 	}
 	return c.Verify(qc.Signature(), block.ToBytes())
 }
