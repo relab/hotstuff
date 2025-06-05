@@ -113,11 +113,11 @@ func TestOnValidPropose(t *testing.T) {
 		list.cryptoBase,
 	)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	voter, err := wireUpVoter(t, depsCore, depsSecurity, sender, list)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	// create a block signed by self and vote for it
 	block := testutil.CreateBlock(t, depsSecurity.Authority())
@@ -126,17 +126,16 @@ func TestOnValidPropose(t *testing.T) {
 		Block: block,
 	}
 	if err := voter.Verify(&proposal); err != nil {
-		t.Errorf("could not verify proposal: %v", err)
+		t.Fatalf("could not verify proposal: %v", err)
 	}
 	voter.OnValidPropose(&proposal)
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	depsCore.EventLoop().Run(ctx)
 	if !newViewTriggered {
-		t.Error("the voter did not advance the view")
+		t.Fatal("the voter did not advance the view")
 	}
-
 	if voter.LastVote() != proposal.Block.View() {
-		t.Error("incorrect view voted for")
+		t.Fatal("incorrect view voted for")
 	}
 }

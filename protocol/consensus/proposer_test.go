@@ -108,7 +108,6 @@ func TestPropose(t *testing.T) {
 		leaderRotation: fixedleader.ModuleName,
 		cryptoBase:     ecdsa.ModuleName,
 	}
-
 	const n = 4
 	replicas := make([]replica, 0)
 	signers := make([]*cert.Authority, 0)

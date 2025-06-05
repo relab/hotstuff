@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"fmt"
 	"slices"
 
 	"github.com/relab/hotstuff"
@@ -9,77 +10,78 @@ import (
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
-// type MockMessage struct {
-// 	Sender    hotstuff.ID
-// 	Recipient hotstuff.ID
-// 	Value     any
-// }
-
 type MockSender struct {
-	id                  hotstuff.ID
-	availableRecipients []hotstuff.ID
-	messagesSent        []any
-	blockChains         []*blockchain.BlockChain
+	id           hotstuff.ID
+	recipients   []hotstuff.ID
+	messagesSent []any
+	blockChains  []*blockchain.BlockChain
 }
 
-func NewMockSender(id hotstuff.ID) *MockSender {
+// NewMockSender returns a mock implementation of modules.Sender that
+// just stores messages in a slice to make testing easier.
+// Optionally, the mock sender can be restricted to send to a specific
+// set of recipients.
+func NewMockSender(id hotstuff.ID, recipients ...hotstuff.ID) *MockSender {
 	return &MockSender{
-		id: id,
+		id:         id,
+		recipients: recipients,
 	}
 }
 
+// MessagesSent returns a slice of messages that were sent by the mock sender.
 func (m *MockSender) MessagesSent() []any {
 	return m.messagesSent
 }
 
+// AddBlockChain saves a reference to a blockchain storage from a separate mock replica.
+// This is necessary for block lookup by RequestBlock.
 func (m *MockSender) AddBlockChain(chain *blockchain.BlockChain) {
+	if chain == nil {
+		panic("blockchain pointer cannot be nil")
+	}
 	m.blockChains = append(m.blockChains, chain)
 }
 
+// saveUnicast stores the message sent to one recipient by this mock sender.
+// If m.recipients is not empty, the message will be discarded if the recipient was not in m.recipients.
 func (m *MockSender) saveUnicast(recipient hotstuff.ID, msg any) {
-	if m.availableRecipients != nil && !slices.Contains(m.availableRecipients, recipient) {
+	if len(m.recipients) > 0 && !slices.Contains(m.recipients, recipient) {
 		return
 	}
 	m.messagesSent = append(m.messagesSent, msg)
 }
 
+// saveBroadcast stores the message broadcasted by this mock sender.
+// NOTE: it just wraps saveUnicast for now.
 func (m *MockSender) saveBroadcast(msg any) {
-	// if m.availableRecipients != nil {
-	// 	for _, recipient := range m.availableRecipients {
-	// 		if recipient == m.id {
-	// 			continue
-	// 		}
-	// 		m.messagesSent = append(m.messagesSent, MockMessage{
-	// 			Sender:    m.id,
-	// 			Recipient: recipient,
-	// 			Value:     msg,
-	// 		})
-	// 	}
-	// 	return
-	// }
-	// for now, it just sends to self since i'm not sure about how broadcast should be handled
 	m.saveUnicast(m.id, msg)
 }
 
+// NewView mock that stores msg.
 func (m *MockSender) NewView(id hotstuff.ID, msg hotstuff.SyncInfo) error {
 	m.saveUnicast(id, msg)
 	return nil
 }
 
+// Vote mock that stores cert.
 func (m *MockSender) Vote(id hotstuff.ID, cert hotstuff.PartialCert) error {
-	// Simulate sending a vote
 	m.saveUnicast(id, cert)
 	return nil
 }
 
+// Timeout mock that stores msg.
 func (m *MockSender) Timeout(msg hotstuff.TimeoutMsg) {
 	m.saveBroadcast(msg)
 }
 
+// Propose mock that stores the value of proposal.
 func (m *MockSender) Propose(proposal *hotstuff.ProposeMsg) {
 	m.saveBroadcast(*proposal)
 }
 
+// RequestBlock mock traverses the known blockchain references added by AddBlockChain and
+// attempts to retrieve the block by each chain's LocalGet method.
+// NOTE: this method panics if AddBlockChain was not called at least once.
 func (m *MockSender) RequestBlock(_ context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	if len(m.blockChains) == 0 {
 		panic("no blockchains available to mock sender")
@@ -93,12 +95,33 @@ func (m *MockSender) RequestBlock(_ context.Context, hash hotstuff.Hash) (*hotst
 	return nil, false
 }
 
+// Sub mock returns a copy MockSender that only allows to send to the provided sender ID's.
+// The method returns an error if the ids are not a subset of m.recipients.
 func (m *MockSender) Sub(ids []hotstuff.ID) (modules.Sender, error) {
-	// Simulate creating a sub-sender for specific IDs
+	if len(m.recipients) < len(ids) {
+		return nil, fmt.Errorf("cannot return a sub sender when ids slice is larger")
+	}
+	// checks if ids intersects m.recipients
+	if !isSubset(m.recipients, ids) {
+		return nil, fmt.Errorf("one or more ids are not a subset of the parent's recipients")
+	}
 	return &MockSender{
-		id:                  m.id,
-		availableRecipients: ids,
+		id:         m.id,
+		recipients: ids,
 	}, nil
 }
 
 var _ modules.Sender = (*MockSender)(nil)
+
+func isSubset(a, b []hotstuff.ID) bool {
+	set := make(map[hotstuff.ID]struct{}, len(a))
+	for _, id := range a {
+		set[id] = struct{}{}
+	}
+	for _, id := range b {
+		if _, found := set[id]; !found {
+			return false
+		}
+	}
+	return true
+}
