@@ -63,6 +63,7 @@ type node struct {
 
 type pendingMessage struct {
 	message  any
+	sender   uint32
 	receiver uint32
 }
 
@@ -222,7 +223,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 		node.proposer = proposer
 		node.synchronizer = synchronizer
 		node.commandGenerator = &commandGenerator{}
-		node.timeoutManager = newTimeoutManager(eventLoop, node.synchronizer)
+		node.timeoutManager = newTimeoutManager(n, node, eventLoop, node.synchronizer)
 		n.nodes[nodeID.NetworkID] = node
 		n.replicas[nodeID.ReplicaID] = append(n.replicas[nodeID.ReplicaID], node)
 		// necessary to count executed commands.
@@ -250,10 +251,10 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 func (n *Network) run(ticks int) {
 	// kick off the initial proposal(s)
 	for _, node := range n.nodes {
+		// artificially add a command to propose
+		cmd := node.commandGenerator.next()
+		node.commandCache.Add(cmd)
 		if node.leaderRotation.GetLeader(1) == node.id.ReplicaID {
-			// artificially add a command to propose
-			cmd := node.commandGenerator.next()
-			node.commandCache.Add(cmd)
 			s := node.viewStates
 			proposal, err := node.proposer.CreateProposal(s.View(), s.HighQC(), s.SyncInfo())
 			if err != nil {
@@ -367,6 +368,7 @@ func (c *emulatedSender) sendMessage(id hotstuff.ID, message any) {
 		c.network.pendingMessages = append(
 			c.network.pendingMessages,
 			pendingMessage{
+				sender:   uint32(c.node.id.NetworkID),
 				receiver: uint32(node.id.NetworkID),
 				message:  message,
 			},
@@ -417,7 +419,7 @@ func (c *emulatedSender) Sub(ids []hotstuff.ID) (sub modules.Sender, err error) 
 
 // Propose sends the block to all replicas in the configuration.
 func (c *emulatedSender) Propose(proposal *hotstuff.ProposeMsg) {
-	c.broadcastMessage(proposal)
+	c.broadcastMessage(*proposal) // very important to dereference it!
 }
 
 // Timeout sends the timeout message to all replicas.
@@ -566,10 +568,14 @@ func (tm *timeoutManager) viewChange(event hotstuff.ViewChangeEvent) {
 }
 
 func newTimeoutManager(
+	network *Network,
+	node *node,
 	eventLoop *eventloop.EventLoop,
 	synchronizer *synchronizer.Synchronizer,
 ) *timeoutManager {
 	tm := &timeoutManager{
+		node:         node,
+		network:      network,
 		eventLoop:    eventLoop,
 		synchronizer: synchronizer,
 	}
