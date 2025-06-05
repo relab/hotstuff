@@ -102,7 +102,6 @@ type replica struct {
 }
 
 func TestPropose(t *testing.T) {
-	// TODO(AlanRostem): put this in some test data
 	list := moduleList{
 		consensusRules: chainedhotstuff.ModuleName,
 		leaderRotation: fixedleader.ModuleName,
@@ -154,7 +153,7 @@ func TestPropose(t *testing.T) {
 	proposer.Propose(&proposal)
 	messages := replica0.sender.MessagesSent()
 	if len(messages) != 1 {
-		t.Fatal("expected at least one messages to be sent by proposer")
+		t.Fatal("expected at least one message to be sent by proposer")
 	}
 
 	msg := messages[0]

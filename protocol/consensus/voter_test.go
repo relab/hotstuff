@@ -99,7 +99,6 @@ func TestOnValidPropose(t *testing.T) {
 		newViewTriggered = true
 	})
 	sender := testutil.NewMockSender(depsCore.RuntimeCfg().ID())
-	// TODO(AlanRostem): put this in some test data
 	list := moduleList{
 		consensusRules: chainedhotstuff.ModuleName,
 		leaderRotation: fixedleader.ModuleName,

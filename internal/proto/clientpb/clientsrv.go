@@ -102,7 +102,7 @@ func (srv *Server) Exec(batch *Batch) {
 		if ok && seqNum >= cmd.SequenceNumber {
 			srv.logger.Info("duplicate command found")
 			if errChan, ok := srv.awaitingCmds[id]; ok {
-				// TODO(AlanRostem): unsure if we need this response to the client
+				// TODO(AlanRostem): should not happen anyway, but create a test case for this.
 				errChan <- status.Error(codes.Aborted, "command already executed")
 				delete(srv.awaitingCmds, id)
 			}

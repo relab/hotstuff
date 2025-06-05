@@ -217,7 +217,7 @@ func (bls *bls12Base) coreVerify(pubKey *PublicKey, message []byte, signature *b
 	engine.AddPairInv(&bls12.G1One, signature)
 	engine.AddPair(pubKey.p, messagePoint)
 	if !engine.Result().IsOne() {
-		return fmt.Errorf("result is not one") // TODO(AlanRostem): write a better error message
+		return fmt.Errorf("failed to verify message")
 	}
 	return nil
 }
@@ -296,7 +296,7 @@ func (bls *bls12Base) coreAggregateVerify(publicKeys []*PublicKey, messages [][]
 
 	engine.AddPairInv(&bls12.G1One, signature)
 	if !engine.Result().IsOne() {
-		return fmt.Errorf("result is not one") // TODO(AlanRostem): write a better message
+		return fmt.Errorf("failed to verify aggretated message")
 	}
 	return nil
 }
@@ -307,7 +307,7 @@ func (bls *bls12Base) aggregateVerify(publicKeys []*PublicKey, messages [][]byte
 		set[string(m)] = struct{}{}
 	}
 	if len(messages) != len(set) {
-		return fmt.Errorf("%d keys mismatch %d messages", len(set), len(messages)) // TODO(AlanRostem): what is in set?
+		return fmt.Errorf("aggregate verify failed: duplicate messages")
 	}
 	return bls.coreAggregateVerify(publicKeys, messages, signature)
 }
