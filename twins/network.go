@@ -42,6 +42,7 @@ func (id NodeID) String() string {
 type node struct {
 	config         *core.RuntimeConfig
 	logger         logging.Logger
+	sender         *emulatedSender
 	blockChain     *blockchain.BlockChain
 	commandCache   *clientpb.Cache
 	voter          *consensus.Voter
@@ -49,14 +50,15 @@ type node struct {
 	eventLoop      *eventloop.EventLoop
 	viewStates     *consensus.ViewStates
 	leaderRotation modules.LeaderRotation
-	synchronizer   synchronizer.Synchronizer
+	synchronizer   *synchronizer.Synchronizer
+	timeoutManager *timeoutManager
 	// opts           *core.Options
 
-	id             NodeID
-	executedBlocks []*hotstuff.Block
-	effectiveView  hotstuff.View
-	log            strings.Builder
-	cmdGen         *commandGenerator
+	id               NodeID
+	executedBlocks   []*hotstuff.Block
+	effectiveView    hotstuff.View
+	log              strings.Builder
+	commandGenerator *commandGenerator
 }
 
 type pendingMessage struct {
@@ -117,16 +119,21 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 			errs = errors.Join(err)
 			continue
 		}
-		node := &node{}
-		depsCore := wiring.NewCore(nodeID.ReplicaID, "twin", pk)
+		node := &node{
+			id: nodeID,
+		}
+		config := core.NewRuntimeConfig(nodeID.ReplicaID, pk)
+		logger := logging.NewWithDest(&n.log, "network")
+		eventLoop := eventloop.New(logger, 100)
 		sender := &emulatedSender{
-			node:    node,
-			network: n,
+			node:      node,
+			network:   n,
+			subConfig: hotstuff.NewIDSet(),
 		}
 		depsSecurity, err := wiring.NewSecurity(
-			depsCore.EventLoop(),
-			depsCore.Logger(),
-			depsCore.RuntimeCfg(),
+			eventLoop,
+			logger,
+			config,
 			sender,
 			cryptoName,
 		)
@@ -135,8 +142,8 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 			continue
 		}
 		consensusRules, err := wiring.NewConsensusRules(
-			depsCore.Logger(),
-			depsCore.RuntimeCfg(),
+			logger,
+			config,
 			depsSecurity.BlockChain(),
 			consensusName,
 		)
@@ -145,8 +152,8 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 			continue
 		}
 		committer := committer.New(
-			depsCore.EventLoop(),
-			depsCore.Logger(),
+			eventLoop,
+			logger,
 			depsSecurity.BlockChain(),
 			consensusRules,
 		)
@@ -158,11 +165,11 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 			errs = errors.Join(err)
 			continue
 		}
-		leaderRotation := &leaderRotation{}
+		leaderRotation := leaderRotation(n.views)
 		protocol := consensus.NewHotStuff(
-			depsCore.Logger(),
-			depsCore.EventLoop(),
-			depsCore.RuntimeCfg(),
+			logger,
+			eventLoop,
+			config,
 			depsSecurity.BlockChain(),
 			depsSecurity.Authority(),
 			viewStates,
@@ -171,9 +178,9 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 		)
 		commandCache := clientpb.New()
 		voter := consensus.NewVoter(
-			depsCore.EventLoop(),
-			depsCore.Logger(),
-			depsCore.RuntimeCfg(),
+			eventLoop,
+			logger,
+			config,
 			leaderRotation,
 			consensusRules,
 			protocol,
@@ -182,34 +189,55 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 			committer,
 		)
 		proposer := consensus.NewProposer(
-			depsCore.EventLoop(),
-			depsCore.Logger(),
-			depsCore.RuntimeCfg(),
+			eventLoop,
+			logger,
+			config,
 			depsSecurity.BlockChain(),
 			protocol,
 			voter,
 			commandCache,
 			committer,
 		)
+		synchronizer := synchronizer.New(
+			eventLoop,
+			logger,
+			config,
+			depsSecurity.Authority(),
+			leaderRotation,
+			proposer,
+			voter,
+			viewStates,
+			sender,
+		)
 		// TODO(AlanRostem): set this up in a nicer way
-		node.config = depsCore.RuntimeCfg()
-		node.eventLoop = depsCore.EventLoop()
-		node.logger = depsCore.Logger()
+		node.config = config
+		node.eventLoop = eventLoop
+		node.sender = sender
+		node.logger = logger
 		node.commandCache = commandCache
 		node.blockChain = depsSecurity.BlockChain()
 		node.leaderRotation = leaderRotation
 		node.viewStates = viewStates
 		node.voter = voter
 		node.proposer = proposer
-		node.cmdGen = &commandGenerator{}
+		node.synchronizer = synchronizer
+		node.commandGenerator = &commandGenerator{}
+		node.timeoutManager = newTimeoutManager(eventLoop, node.synchronizer)
 		n.nodes[nodeID.NetworkID] = node
+		n.replicas[nodeID.ReplicaID] = append(n.replicas[nodeID.ReplicaID], node)
+		// necessary to count executed commands.
+		node.eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
+			commit := event.(hotstuff.CommitEvent)
+			node.executedBlocks = append(node.executedBlocks, commit.Block)
+		})
 	}
+	// TODO(AlanRostem): set the connection metadata?
 	// need to configure the replica info after all of them were set up
 	// TODO(AlanRostem): is this the correct way?
-	// TODO(AlanRostem): set the connection metadata
 	for _, node := range n.nodes {
 		config := node.config
 		for _, otherNode := range n.nodes {
+			node.sender.subConfig.Add(otherNode.id.ReplicaID)
 			config.AddReplica(&hotstuff.ReplicaInfo{
 				ID:     otherNode.config.ID(),
 				PubKey: otherNode.config.PrivateKey().Public(),
@@ -222,10 +250,10 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 func (n *Network) run(ticks int) {
 	// kick off the initial proposal(s)
 	for _, node := range n.nodes {
-		// artificially add a command
-		cmd := node.cmdGen.next()
-		node.commandCache.Add(cmd)
 		if node.leaderRotation.GetLeader(1) == node.id.ReplicaID {
+			// artificially add a command to propose
+			cmd := node.commandGenerator.next()
+			node.commandCache.Add(cmd)
 			s := node.viewStates
 			proposal, err := node.proposer.CreateProposal(s.View(), s.HighQC(), s.SyncInfo())
 			if err != nil {
@@ -239,7 +267,7 @@ func (n *Network) run(ticks int) {
 	for tick := 0; tick < ticks; tick++ {
 		for _, node := range n.nodes {
 			// continue artificially adding commands for each tick
-			cmd := node.cmdGen.next()
+			cmd := node.commandGenerator.next()
 			node.commandCache.Add(cmd)
 		}
 		n.tick()
