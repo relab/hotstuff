@@ -114,3 +114,17 @@ func TestTimeout(t *testing.T) {
 		t.Error("incorrect view")
 	}
 }
+
+func TestSub(t *testing.T) {
+	sender := testutil.NewMockSender(1, 2, 3, 4)
+	var err error
+	_, err = sender.Sub([]hotstuff.ID{2, 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = sender.Sub([]hotstuff.ID{5, 6})
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+}
