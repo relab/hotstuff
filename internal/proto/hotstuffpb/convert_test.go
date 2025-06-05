@@ -8,7 +8,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/cert"
 
@@ -22,8 +21,8 @@ import (
 func TestConvertPartialCert(t *testing.T) {
 	key := testutil.GenerateECDSAKey(t)
 	cfg := core.NewRuntimeConfig(1, key)
-	crypt := ecdsa.New(nil, cfg) // TODO: why is logger nil?
-	signer := cert.NewAuthority(cfg, nil, nil, crypt)
+	crypt := ecdsa.New(cfg)
+	signer := cert.NewAuthority(cfg, nil, crypt)
 
 	want, err := signer.CreatePartialCert(hotstuff.GetGenesis())
 	if err != nil {
@@ -44,8 +43,8 @@ func TestConvertQuorumCert(t *testing.T) {
 	for i := range n {
 		key := testutil.GenerateECDSAKey(t)
 		cfg := core.NewRuntimeConfig(hotstuff.ID(i+1), key)
-		crypt := ecdsa.New(nil, cfg)
-		signer := cert.NewAuthority(cfg, nil, nil, crypt)
+		crypt := ecdsa.New(cfg)
+		signer := cert.NewAuthority(cfg, nil, crypt)
 		signers[i] = signer
 	}
 
@@ -99,12 +98,14 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 	signers := make([]modules.CryptoBase, n)
 	for i := range n {
 		id := hotstuff.ID(i + 1)
-		logger := logging.New("test")
-		crypt := bls12.New(logger, cfgs[id])
-		signer := cert.NewAuthority(cfgs[id], logger, nil, crypt)
+		crypt, err := bls12.New(cfgs[id])
+		if err != nil {
+			t.Fatal(err)
+		}
+		signer := cert.NewAuthority(cfgs[id], nil, crypt)
 		signers[i] = signer
 		meta := cfgs[id].ConnectionMetadata()
-		err := cfgs[id].SetReplicaMetadata(id, meta)
+		err = cfgs[id].SetReplicaMetadata(id, meta)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -117,8 +118,8 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 
 	signer := signers[0].(*cert.Authority)
 
-	if !signer.VerifyTimeoutCert(cfgs[1].QuorumSize(), tc2) {
-		t.Fatal("Failed to verify timeout cert")
+	if err := signer.VerifyTimeoutCert(cfgs[1].QuorumSize(), tc2); err != nil {
+		t.Fatalf("Failed to verify timeout cert: %v", err)
 	}
 }
 

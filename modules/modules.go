@@ -63,9 +63,9 @@ type CryptoBase interface {
 	// Combine combines multiple signatures into a single signature.
 	Combine(signatures ...hotstuff.QuorumSignature) (signature hotstuff.QuorumSignature, err error)
 	// Verify verifies the given quorum signature against the message.
-	Verify(signature hotstuff.QuorumSignature, message []byte) bool
+	Verify(signature hotstuff.QuorumSignature, message []byte) error
 	// BatchVerify verifies the given quorum signature against the batch of messages.
-	BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool
+	BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) error
 }
 
 // Sender handles the network layer of the consensus protocol by methods for sending specific messages.
@@ -90,4 +90,9 @@ type ConsensusProtocol interface {
 	SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
 	// SendPropose disseminates the proposal from the proposer.
 	SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
+}
+
+type Executor interface {
+	Exec(*clientpb.Batch)
+	Abort(*clientpb.Batch)
 }

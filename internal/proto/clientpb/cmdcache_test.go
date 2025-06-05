@@ -23,7 +23,7 @@ func TestCacheConcurrentAddGet(t *testing.T) {
 		for i := range 6 {
 			cmd := &Command{ClientID: 1, SequenceNumber: uint64(i + 1)}
 			want = append(want, cmd)
-			cache.add(cmd)
+			cache.Add(cmd)
 		}
 	}()
 
@@ -127,7 +127,7 @@ func TestCacheAddGetDeadlineExceeded(t *testing.T) {
 			cache := New(WithBatching(2))
 
 			for _, cmd := range tt.cmds {
-				cache.add(cmd)
+				cache.Add(cmd)
 			}
 
 			for e := range tt.wantErr {
@@ -202,7 +202,7 @@ func TestPreventAddingDuplicates(t *testing.T) {
 			cache.Proposed(tt.batchA)
 
 			for _, cmd := range tt.batchB.GetCommands() {
-				cache.add(cmd)
+				cache.Add(cmd)
 			}
 			if got := cache.len(); got != tt.wantLen {
 				t.Errorf("len() = %d, want %d", got, tt.wantLen)

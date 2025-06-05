@@ -86,8 +86,8 @@ func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 }
 
 func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
-	if !vm.auth.VerifyPartialCert(cert) {
-		vm.logger.Info("OnVote: Vote could not be verified!")
+	if err := vm.auth.VerifyPartialCert(cert); err != nil {
+		vm.logger.Info("vote could not be verified: %v", err)
 		return
 	}
 	vm.mut.Lock()

@@ -6,6 +6,7 @@ import (
 	"github.com/relab/hotstuff"
 
 	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/metrics/types"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
@@ -30,9 +31,9 @@ func enableThroughput(
 		metricsLogger: metricsLogger,
 		id:            id,
 	}
-	eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
-		commitEvent := event.(hotstuff.CommitEvent)
-		t.recordCommit(commitEvent.Commands)
+	eventLoop.RegisterHandler(clientpb.ExecuteEvent{}, func(event any) {
+		commitEvent := event.(clientpb.ExecuteEvent)
+		t.recordCommit(len(commitEvent.Batch.Commands))
 	})
 
 	eventLoop.RegisterHandler(types.TickEvent{}, func(event any) {

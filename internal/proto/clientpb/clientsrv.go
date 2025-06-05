@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -23,10 +24,13 @@ type Server struct {
 	awaitingCmds map[MessageID]chan<- error
 	hash         hash.Hash
 	cmdCount     uint32
+
+	lastExecutedSeqNum map[uint32]uint64 // highest executed sequence number per client ID
 }
 
 // NewServer returns a new client server.
 func NewServer(
+	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	cmdCache *Cache,
 	srvOpts ...gorums.ServerOption,
@@ -35,11 +39,20 @@ func NewServer(
 		logger:   logger,
 		cmdCache: cmdCache,
 
-		awaitingCmds: make(map[MessageID]chan<- error),
-		srv:          gorums.NewServer(srvOpts...),
-		hash:         sha256.New(),
+		awaitingCmds:       make(map[MessageID]chan<- error),
+		srv:                gorums.NewServer(srvOpts...),
+		hash:               sha256.New(),
+		lastExecutedSeqNum: make(map[uint32]uint64),
 	}
 	RegisterClientServer(srv.srv, srv)
+	eventLoop.RegisterHandler(ExecuteEvent{}, func(event any) {
+		e := event.(ExecuteEvent)
+		srv.Exec(e.Batch)
+	})
+	eventLoop.RegisterHandler(AbortEvent{}, func(event any) {
+		e := event.(AbortEvent)
+		srv.Abort(e.Batch)
+	})
 	return srv
 }
 
@@ -72,7 +85,7 @@ func (srv *Server) ExecCommand(ctx gorums.ServerCtx, cmd *Command) (*emptypb.Emp
 	srv.awaitingCmds[id] = errChan
 	srv.mut.Unlock()
 
-	srv.cmdCache.add(cmd)
+	srv.cmdCache.Add(cmd)
 	ctx.Release()
 	err := <-errChan
 	return &emptypb.Empty{}, err
@@ -83,6 +96,21 @@ func (srv *Server) Exec(batch *Batch) {
 		id := cmd.ID()
 
 		srv.mut.Lock()
+
+		// update the seqNums
+		seqNum, ok := srv.lastExecutedSeqNum[cmd.ClientID]
+		if ok && seqNum >= cmd.SequenceNumber {
+			srv.logger.Info("duplicate command found")
+			if errChan, ok := srv.awaitingCmds[id]; ok {
+				// TODO(AlanRostem): should not happen anyway, but create a test case for this.
+				errChan <- status.Error(codes.Aborted, "command already executed")
+				delete(srv.awaitingCmds, id)
+			}
+			srv.mut.Unlock()
+			continue
+		}
+		srv.lastExecutedSeqNum[cmd.ClientID] = cmd.SequenceNumber
+
 		// TODO(meling): ASKING: previously the hash.Write and srv.cmdCount++ were outside the critical section, shouldn't they be inside?
 		// TODO(meling): We should add a concurrency test for this logic to check that the hash doesn't get corrupted.
 		_, _ = srv.hash.Write(cmd.Data)
@@ -97,7 +125,7 @@ func (srv *Server) Exec(batch *Batch) {
 	srv.logger.Debugf("Hash: %.8x", srv.hash.Sum(nil))
 }
 
-func (srv *Server) Fork(batch *Batch) {
+func (srv *Server) Abort(batch *Batch) {
 	for _, cmd := range batch.GetCommands() {
 		id := cmd.ID()
 
