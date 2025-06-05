@@ -2,9 +2,12 @@ package twins
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 )
 
@@ -140,4 +143,21 @@ func getBlocks(network *Network) map[NodeID][]*hotstuff.Block {
 		m[node.id] = node.executedBlocks
 	}
 	return m
+}
+
+type commandGenerator struct {
+	mut     sync.Mutex
+	nextCmd uint64
+}
+
+func (cg *commandGenerator) next() *clientpb.Command {
+	cg.mut.Lock()
+	defer cg.mut.Unlock()
+	data := []byte(strconv.FormatUint(cg.nextCmd, 10))
+	cg.nextCmd++
+	return &clientpb.Command{
+		ClientID:       1,
+		SequenceNumber: cg.nextCmd,
+		Data:           data,
+	}
 }

@@ -3,6 +3,7 @@ package twins
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"reflect"
@@ -14,12 +15,15 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/synchronizer"
-	"github.com/relab/hotstuff/protocol/viewstates"
 	"github.com/relab/hotstuff/security/blockchain"
+	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/security/crypto/keygen"
+	"github.com/relab/hotstuff/wiring"
 )
 
 // NodeID is an ID that is unique to a node in the network.
@@ -37,10 +41,13 @@ func (id NodeID) String() string {
 // TODO(AlanRostem): initialize fields
 type node struct {
 	config         *core.RuntimeConfig
+	logger         logging.Logger
 	blockChain     *blockchain.BlockChain
-	consensus      consensus.Consensus
+	commandCache   *clientpb.Cache
+	voter          *consensus.Voter
+	proposer       *consensus.Proposer
 	eventLoop      *eventloop.EventLoop
-	viewStates     *viewstates.ViewStates
+	viewStates     *consensus.ViewStates
 	leaderRotation modules.LeaderRotation
 	synchronizer   synchronizer.Synchronizer
 	// opts           *core.Options
@@ -49,32 +56,7 @@ type node struct {
 	executedBlocks []*hotstuff.Block
 	effectiveView  hotstuff.View
 	log            strings.Builder
-}
-
-func newNode(
-	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
-	consensus consensus.Consensus,
-	eventLoop *eventloop.EventLoop,
-	viewStates *viewstates.ViewStates,
-	leaderRotation modules.LeaderRotation,
-	synchronizer synchronizer.Synchronizer,
-	id NodeID,
-) *node {
-	return &node{
-		config:         config,
-		blockChain:     blockChain,
-		consensus:      consensus,
-		eventLoop:      eventLoop,
-		viewStates:     viewStates,
-		leaderRotation: leaderRotation,
-		synchronizer:   synchronizer,
-		id:             id,
-	}
-}
-
-func (n *node) executeCommand(_ hotstuff.Command) {
-	panic("unimplemented") // TODO(AlanRostem)
+	cmdGen         *commandGenerator
 }
 
 type pendingMessage struct {
@@ -125,37 +107,141 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 	return n
 }
 
-func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName string) error {
-	cg := &commandGenerator{}
+// TODO(AlanRostem): hook something to the execute events
+func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName string) (errs error) {
+	cryptoName := ecdsa.ModuleName
 	for _, nodeID := range nodes {
-
 		var err error
 		pk, err := keygen.GenerateECDSAPrivateKey()
 		if err != nil {
-			return err
+			errs = errors.Join(err)
+			continue
 		}
-
-		logger := logging.NewWithDest()
-		el := eventloop.New()
-		node := n.nodes[nodeID.NetworkID]
-		*node = *newNode(
-			core.NewRuntimeConfig(nodeID.ReplicaID, pk),
-			blockchain.New()
+		node := &node{}
+		depsCore := wiring.NewCore(nodeID.ReplicaID, "twin", pk)
+		sender := &emulatedSender{
+			node:    node,
+			network: n,
+		}
+		depsSecurity, err := wiring.NewSecurity(
+			depsCore.EventLoop(),
+			depsCore.Logger(),
+			depsCore.RuntimeCfg(),
+			sender,
+			cryptoName,
 		)
+		if err != nil {
+			errs = errors.Join(err)
+			continue
+		}
+		consensusRules, err := wiring.NewConsensusRules(
+			depsCore.Logger(),
+			depsCore.RuntimeCfg(),
+			depsSecurity.BlockChain(),
+			consensusName,
+		)
+		if err != nil {
+			errs = errors.Join(err)
+			continue
+		}
+		committer := committer.New(
+			depsCore.EventLoop(),
+			depsCore.Logger(),
+			depsSecurity.BlockChain(),
+			consensusRules,
+		)
+		viewStates, err := consensus.NewViewStates(
+			depsSecurity.BlockChain(),
+			depsSecurity.Authority(),
+		)
+		if err != nil {
+			errs = errors.Join(err)
+			continue
+		}
+		leaderRotation := &leaderRotation{}
+		protocol := consensus.NewHotStuff(
+			depsCore.Logger(),
+			depsCore.EventLoop(),
+			depsCore.RuntimeCfg(),
+			depsSecurity.BlockChain(),
+			depsSecurity.Authority(),
+			viewStates,
+			leaderRotation,
+			sender,
+		)
+		commandCache := clientpb.New()
+		voter := consensus.NewVoter(
+			depsCore.EventLoop(),
+			depsCore.Logger(),
+			depsCore.RuntimeCfg(),
+			leaderRotation,
+			consensusRules,
+			protocol,
+			depsSecurity.Authority(),
+			commandCache,
+			committer,
+		)
+		proposer := consensus.NewProposer(
+			depsCore.EventLoop(),
+			depsCore.Logger(),
+			depsCore.RuntimeCfg(),
+			depsSecurity.BlockChain(),
+			protocol,
+			voter,
+			commandCache,
+			committer,
+		)
+		// TODO(AlanRostem): set this up in a nicer way
+		node.config = depsCore.RuntimeCfg()
+		node.eventLoop = depsCore.EventLoop()
+		node.logger = depsCore.Logger()
+		node.commandCache = commandCache
+		node.blockChain = depsSecurity.BlockChain()
+		node.leaderRotation = leaderRotation
+		node.viewStates = viewStates
+		node.voter = voter
+		node.proposer = proposer
+		node.cmdGen = &commandGenerator{}
+		n.nodes[nodeID.NetworkID] = node
 	}
-	return nil // TODO: Scrap twins or reimplement this function
+	// need to configure the replica info after all of them were set up
+	// TODO(AlanRostem): is this the correct way?
+	// TODO(AlanRostem): set the connection metadata
+	for _, node := range n.nodes {
+		config := node.config
+		for _, otherNode := range n.nodes {
+			config.AddReplica(&hotstuff.ReplicaInfo{
+				ID:     otherNode.config.ID(),
+				PubKey: otherNode.config.PrivateKey().Public(),
+			})
+		}
+	}
+	return
 }
 
 func (n *Network) run(ticks int) {
 	// kick off the initial proposal(s)
 	for _, node := range n.nodes {
+		// artificially add a command
+		cmd := node.cmdGen.next()
+		node.commandCache.Add(cmd)
 		if node.leaderRotation.GetLeader(1) == node.id.ReplicaID {
 			s := node.viewStates
-			node.consensus.Propose(s.View(), s.HighQC(), s.SyncInfo())
+			proposal, err := node.proposer.CreateProposal(s.View(), s.HighQC(), s.SyncInfo())
+			if err != nil {
+				node.logger.Infof("failed to create proposal: %w", err)
+				continue
+			}
+			node.proposer.Propose(&proposal)
 		}
 	}
 
 	for tick := 0; tick < ticks; tick++ {
+		for _, node := range n.nodes {
+			// continue artificially adding commands for each tick
+			cmd := node.cmdGen.next()
+			node.commandCache.Add(cmd)
+		}
 		n.tick()
 	}
 }
@@ -214,21 +300,21 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 
 // NewSender returns a new Configuration module for this network.
 func (n *Network) NewSender(node *node) modules.Sender {
-	return &sender{
+	return &emulatedSender{
 		network: n,
 		node:    node,
 	}
 }
 
-type sender struct {
+type emulatedSender struct {
 	node      *node
 	network   *Network
 	subConfig hotstuff.IDSet
 }
 
-var _ modules.Sender = (*sender)(nil)
+var _ modules.Sender = (*emulatedSender)(nil)
 
-func (c *sender) broadcastMessage(message any) {
+func (c *emulatedSender) broadcastMessage(message any) {
 	for id := range c.network.replicas {
 		if id == c.node.id.ReplicaID {
 			// do not send message to self or twin
@@ -239,7 +325,7 @@ func (c *sender) broadcastMessage(message any) {
 	}
 }
 
-func (c *sender) sendMessage(id hotstuff.ID, message any) {
+func (c *emulatedSender) sendMessage(id hotstuff.ID, message any) {
 	nodes, ok := c.network.replicas[id]
 	if !ok {
 		panic(fmt.Errorf("attempt to send message to replica %d, but this replica does not exist", id))
@@ -261,7 +347,7 @@ func (c *sender) sendMessage(id hotstuff.ID, message any) {
 }
 
 // shouldDrop checks if a message to the node identified by id should be dropped.
-func (c *sender) shouldDrop(id NodeID, message any) bool {
+func (c *emulatedSender) shouldDrop(id NodeID, message any) bool {
 	// retrieve the drop config for this node.
 	return c.network.shouldDrop(c.node.id.NetworkID, id.NetworkID, message)
 }
@@ -289,12 +375,12 @@ func (c *sender) Replica(id hotstuff.ID) (r *hotstuff.ReplicaInfo, ok bool) {
 }*/
 
 // GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
-func (c *sender) Sub(ids []hotstuff.ID) (sub modules.Sender, err error) {
+func (c *emulatedSender) Sub(ids []hotstuff.ID) (sub modules.Sender, err error) {
 	subConfig := hotstuff.NewIDSet()
 	for _, id := range ids {
 		subConfig.Add(id)
 	}
-	return &sender{
+	return &emulatedSender{
 		node:      c.node,
 		network:   c.network,
 		subConfig: subConfig,
@@ -302,16 +388,16 @@ func (c *sender) Sub(ids []hotstuff.ID) (sub modules.Sender, err error) {
 }
 
 // Propose sends the block to all replicas in the configuration.
-func (c *sender) Propose(proposal *hotstuff.ProposeMsg) {
+func (c *emulatedSender) Propose(proposal *hotstuff.ProposeMsg) {
 	c.broadcastMessage(proposal)
 }
 
 // Timeout sends the timeout message to all replicas.
-func (c *sender) Timeout(msg hotstuff.TimeoutMsg) {
+func (c *emulatedSender) Timeout(msg hotstuff.TimeoutMsg) {
 	c.broadcastMessage(msg)
 }
 
-func (c *sender) Vote(id hotstuff.ID, cert hotstuff.PartialCert) error {
+func (c *emulatedSender) Vote(id hotstuff.ID, cert hotstuff.PartialCert) error {
 	c.sendMessage(id, hotstuff.VoteMsg{
 		ID:          c.node.id.ReplicaID,
 		PartialCert: cert,
@@ -319,7 +405,7 @@ func (c *sender) Vote(id hotstuff.ID, cert hotstuff.PartialCert) error {
 	return nil
 }
 
-func (c *sender) NewView(id hotstuff.ID, si hotstuff.SyncInfo) error {
+func (c *emulatedSender) NewView(id hotstuff.ID, si hotstuff.SyncInfo) error {
 	c.sendMessage(id, hotstuff.NewViewMsg{
 		ID:       c.node.id.ReplicaID,
 		SyncInfo: si,
@@ -328,7 +414,7 @@ func (c *sender) NewView(id hotstuff.ID, si hotstuff.SyncInfo) error {
 }
 
 // Fetch requests a block from all the replicas in the configuration.
-func (c *sender) RequestBlock(_ context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
+func (c *emulatedSender) RequestBlock(_ context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
 	for _, replica := range c.network.replicas {
 		for _, node := range replica {
 			if c.shouldDrop(node.id, hash) {
@@ -419,7 +505,7 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 type tick struct{}
 
 type timeoutManager struct {
-	viewStates   *viewstates.ViewStates
+	viewStates   *consensus.ViewStates
 	synchronizer *synchronizer.Synchronizer
 	eventLoop    *eventloop.EventLoop
 
