@@ -16,7 +16,6 @@ func TestBasicScenario(t *testing.T) {
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
-	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 
 	result, err := ExecuteScenario(s, 4, 0, 100, "chainedhotstuff")
 	if err != nil {
@@ -29,5 +28,9 @@ func TestBasicScenario(t *testing.T) {
 
 	if result.Commits != 1 {
 		t.Error("Expected one commit")
+	}
+
+	for id, log := range result.NodeLogs {
+		t.Logf("Node %d's log: \n%s", id, log)
 	}
 }

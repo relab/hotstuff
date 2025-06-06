@@ -57,7 +57,7 @@ type node struct {
 	id               NodeID
 	executedBlocks   []*hotstuff.Block
 	effectiveView    hotstuff.View
-	log              strings.Builder
+	log              *strings.Builder
 	commandGenerator *commandGenerator
 }
 
@@ -66,45 +66,37 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 	if err != nil {
 		return nil, err
 	}
-
-	logger := logging.NewWithDest(&n.log, "network")
-
+	log := &strings.Builder{}
+	logger := logging.NewWithDest(log, "network")
 	node := &node{
 		id:               nodeID,
 		config:           core.NewRuntimeConfig(nodeID.ReplicaID, pk),
 		logger:           logger,
 		eventLoop:        eventloop.New(logger, 100),
 		commandCache:     clientpb.New(),
-		log:              strings.Builder{},
+		log:              log,
 		commandGenerator: &commandGenerator{},
 	}
-
 	node.sender = &emulatedSender{
 		node:      node,
 		network:   n,
 		subConfig: hotstuff.NewIDSet(),
 	}
-
-	depsSecurity, err := wiring.NewSecurity(node.eventLoop, logger, node.config, node.sender, cryptoName)
+	depsSecurity, err := wiring.NewSecurity(node.eventLoop, node.logger, node.config, node.sender, cryptoName)
 	if err != nil {
 		return nil, err
 	}
 	node.blockChain = depsSecurity.BlockChain()
-
-	consensusRules, err := wiring.NewConsensusRules(logger, node.config, node.blockChain, consensusName)
+	consensusRules, err := wiring.NewConsensusRules(node.logger, node.config, node.blockChain, consensusName)
 	if err != nil {
 		return nil, err
 	}
-
-	committer := committer.New(node.eventLoop, logger, node.blockChain, consensusRules)
-
+	committer := committer.New(node.eventLoop, node.logger, node.blockChain, consensusRules)
 	node.viewStates, err = consensus.NewViewStates(node.blockChain, depsSecurity.Authority())
 	if err != nil {
 		return nil, err
 	}
-
 	node.leaderRotation = leaderRotation(n.views)
-
 	protocol := consensus.NewHotStuff(
 		node.logger,
 		node.eventLoop,
@@ -115,7 +107,6 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 		node.leaderRotation,
 		node.sender,
 	)
-
 	node.voter = consensus.NewVoter(
 		node.eventLoop,
 		node.logger,
@@ -127,7 +118,6 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 		node.commandCache,
 		committer,
 	)
-
 	node.proposer = consensus.NewProposer(
 		node.eventLoop,
 		node.logger,
@@ -138,7 +128,6 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 		node.commandCache,
 		committer,
 	)
-
 	node.synchronizer = synchronizer.New(
 		node.eventLoop,
 		node.logger,
@@ -151,9 +140,7 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 		node.viewStates,
 		node.sender,
 	)
-
 	node.timeoutManager = newTimeoutManager(n, node, node.eventLoop, node.synchronizer)
-
 	// necessary to count executed commands.
 	node.eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
 		commit := event.(hotstuff.CommitEvent)
@@ -163,7 +150,6 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 		cmd := node.commandGenerator.next()
 		node.commandCache.Add(cmd)
 	}
-
 	return node, nil
 }
 
@@ -227,7 +213,6 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 	}
 	// TODO(AlanRostem): set the connection metadata?
 	// need to configure the replica info after all of them were set up
-	// TODO(AlanRostem): is this the correct way?
 	for _, node := range n.nodes {
 		config := node.config
 		for _, otherNode := range n.nodes {
@@ -367,28 +352,6 @@ func (c *emulatedSender) shouldDrop(id NodeID, message any) bool {
 	return c.network.shouldDrop(c.node.id.NetworkID, id.NetworkID, message)
 }
 
-// TODO(AlanRostem): these methods are in core.RunTimeConfig, ensure that they are correct when used here.
-/*// Replicas returns all of the replicas in the configuration.
-func (c *sender) Replicas() map[hotstuff.ID]*hotstuff.ReplicaInfo {
-	m := make(map[hotstuff.ID]*hotstuff.ReplicaInfo)
-	for id := range c.network.replicas {
-		m[id] = &hotstuff.ReplicaInfo{
-			ID: id, // TODO: More fields
-		}
-	}
-	return m
-}
-
-// Replica returns a replica if present in the configuration.
-func (c *sender) Replica(id hotstuff.ID) (r *hotstuff.ReplicaInfo, ok bool) {
-	if _, ok = c.network.replicas[id]; ok {
-		return &hotstuff.ReplicaInfo{
-			ID: id, // TODO: More fields
-		}, true
-	}
-	return nil, false
-}*/
-
 // GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
 func (c *emulatedSender) Sub(ids []hotstuff.ID) (sub modules.Sender, err error) {
 	subConfig := hotstuff.NewIDSet()
@@ -443,43 +406,6 @@ func (c *emulatedSender) RequestBlock(_ context.Context, hash hotstuff.Hash) (bl
 	}
 	return nil, false
 }
-
-/*type replica struct {
-	// pointer to the node that wants to contact this replica.
-	config *configuration
-	// id of the replica.
-	id hotstuff.ID
-}
-
-// ID returns the replica's id.
-func (r *replica) ID() hotstuff.ID {
-	return r.config.network.replicas[r.id][0].id.ReplicaID
-}
-
-// PublicKey returns the replica's public key.
-func (r *replica) PublicKey() hotstuff.PublicKey {
-	return r.config.network.replicas[r.id][0].opts.PrivateKey().Public()
-}
-
-// Vote sends the partial certificate to the other replica.
-func (r *replica) Vote(cert hotstuff.PartialCert) {
-	r.config.sendMessage(r.id, hotstuff.VoteMsg{
-		ID:          r.config.node.opts.ID(),
-		PartialCert: cert,
-	})
-}
-
-// NewView sends the quorum certificate to the other replica.
-func (r *replica) NewView(si hotstuff.SyncInfo) {
-	r.config.sendMessage(r.id, hotstuff.NewViewMsg{
-		ID:       r.config.node.opts.ID(),
-		SyncInfo: si,
-	})
-}
-
-func (r *replica) Metadata() map[string]string {
-	return r.config.network.replicas[r.id][0].opts.ConnectionMetadata()
-}*/
 
 // NodeSet is a set of network ids.
 type NodeSet map[uint32]struct{}
