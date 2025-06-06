@@ -132,10 +132,6 @@ func (lr leaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
 	return 0
 }
 
-func (lr leaderRotation) ViewDuration() modules.ViewDuration {
-	return FixedTimeout(0) // TODO(AlanRostem): add correct value
-}
-
 func getBlocks(network *Network) map[NodeID][]*hotstuff.Block {
 	m := make(map[NodeID][]*hotstuff.Block)
 	for _, node := range network.nodes {

@@ -61,6 +61,112 @@ type node struct {
 	commandGenerator *commandGenerator
 }
 
+func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node, error) {
+	pk, err := keygen.GenerateECDSAPrivateKey()
+	if err != nil {
+		return nil, err
+	}
+
+	logger := logging.NewWithDest(&n.log, "network")
+
+	node := &node{
+		id:               nodeID,
+		config:           core.NewRuntimeConfig(nodeID.ReplicaID, pk),
+		logger:           logger,
+		eventLoop:        eventloop.New(logger, 100),
+		commandCache:     clientpb.New(),
+		log:              strings.Builder{},
+		commandGenerator: &commandGenerator{},
+	}
+
+	node.sender = &emulatedSender{
+		node:      node,
+		network:   n,
+		subConfig: hotstuff.NewIDSet(),
+	}
+
+	depsSecurity, err := wiring.NewSecurity(node.eventLoop, logger, node.config, node.sender, cryptoName)
+	if err != nil {
+		return nil, err
+	}
+	node.blockChain = depsSecurity.BlockChain()
+
+	consensusRules, err := wiring.NewConsensusRules(logger, node.config, node.blockChain, consensusName)
+	if err != nil {
+		return nil, err
+	}
+
+	committer := committer.New(node.eventLoop, logger, node.blockChain, consensusRules)
+
+	node.viewStates, err = consensus.NewViewStates(node.blockChain, depsSecurity.Authority())
+	if err != nil {
+		return nil, err
+	}
+
+	node.leaderRotation = leaderRotation(n.views)
+
+	protocol := consensus.NewHotStuff(
+		node.logger,
+		node.eventLoop,
+		node.config,
+		node.blockChain,
+		depsSecurity.Authority(),
+		node.viewStates,
+		node.leaderRotation,
+		node.sender,
+	)
+
+	node.voter = consensus.NewVoter(
+		node.eventLoop,
+		node.logger,
+		node.config,
+		node.leaderRotation,
+		consensusRules,
+		protocol,
+		depsSecurity.Authority(),
+		node.commandCache,
+		committer,
+	)
+
+	node.proposer = consensus.NewProposer(
+		node.eventLoop,
+		node.logger,
+		node.config,
+		node.blockChain,
+		protocol,
+		node.voter,
+		node.commandCache,
+		committer,
+	)
+
+	node.synchronizer = synchronizer.New(
+		node.eventLoop,
+		node.logger,
+		node.config,
+		depsSecurity.Authority(),
+		node.leaderRotation,
+		FixedTimeout(1*time.Millisecond),
+		node.proposer,
+		node.voter,
+		node.viewStates,
+		node.sender,
+	)
+
+	node.timeoutManager = newTimeoutManager(n, node, node.eventLoop, node.synchronizer)
+
+	// necessary to count executed commands.
+	node.eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
+		commit := event.(hotstuff.CommitEvent)
+		node.executedBlocks = append(node.executedBlocks, commit.Block)
+	})
+	for range n.views {
+		cmd := node.commandGenerator.next()
+		node.commandCache.Add(cmd)
+	}
+
+	return node, nil
+}
+
 type pendingMessage struct {
 	message  any
 	sender   uint32
@@ -114,130 +220,10 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName string) (errs error) {
 	cryptoName := ecdsa.ModuleName
 	for _, nodeID := range nodes {
-		var err error
-		pk, err := keygen.GenerateECDSAPrivateKey()
-		if err != nil {
-			errs = errors.Join(err)
-			continue
-		}
-		node := &node{
-			id: nodeID,
-		}
-		config := core.NewRuntimeConfig(nodeID.ReplicaID, pk)
-		logger := logging.NewWithDest(&n.log, "network")
-		eventLoop := eventloop.New(logger, 100)
-		sender := &emulatedSender{
-			node:      node,
-			network:   n,
-			subConfig: hotstuff.NewIDSet(),
-		}
-		depsSecurity, err := wiring.NewSecurity(
-			eventLoop,
-			logger,
-			config,
-			sender,
-			cryptoName,
-		)
-		if err != nil {
-			errs = errors.Join(err)
-			continue
-		}
-		consensusRules, err := wiring.NewConsensusRules(
-			logger,
-			config,
-			depsSecurity.BlockChain(),
-			consensusName,
-		)
-		if err != nil {
-			errs = errors.Join(err)
-			continue
-		}
-		committer := committer.New(
-			eventLoop,
-			logger,
-			depsSecurity.BlockChain(),
-			consensusRules,
-		)
-		viewStates, err := consensus.NewViewStates(
-			depsSecurity.BlockChain(),
-			depsSecurity.Authority(),
-		)
-		if err != nil {
-			errs = errors.Join(err)
-			continue
-		}
-		leaderRotation := leaderRotation(n.views)
-		protocol := consensus.NewHotStuff(
-			logger,
-			eventLoop,
-			config,
-			depsSecurity.BlockChain(),
-			depsSecurity.Authority(),
-			viewStates,
-			leaderRotation,
-			sender,
-		)
-		commandCache := clientpb.New()
-		voter := consensus.NewVoter(
-			eventLoop,
-			logger,
-			config,
-			leaderRotation,
-			consensusRules,
-			protocol,
-			depsSecurity.Authority(),
-			commandCache,
-			committer,
-		)
-		proposer := consensus.NewProposer(
-			eventLoop,
-			logger,
-			config,
-			depsSecurity.BlockChain(),
-			protocol,
-			voter,
-			commandCache,
-			committer,
-		)
-		viewDuration := FixedTimeout(1 * time.Millisecond)
-		synchronizer := synchronizer.New(
-			eventLoop,
-			logger,
-			config,
-			depsSecurity.Authority(),
-			leaderRotation,
-			viewDuration,
-			proposer,
-			voter,
-			viewStates,
-			sender,
-		)
-		// TODO(AlanRostem): set this up in a nicer way
-		node.config = config
-		node.eventLoop = eventLoop
-		node.sender = sender
-		node.logger = logger
-		node.commandCache = commandCache
-		node.blockChain = depsSecurity.BlockChain()
-		node.leaderRotation = leaderRotation
-		node.viewStates = viewStates
-		node.voter = voter
-		node.proposer = proposer
-		node.synchronizer = synchronizer
-		node.commandGenerator = &commandGenerator{}
-		node.timeoutManager = newTimeoutManager(n, node, eventLoop, node.synchronizer)
+		node, err := newNode(n, nodeID, consensusName, cryptoName)
+		errs = errors.Join(err)
 		n.nodes[nodeID.NetworkID] = node
 		n.replicas[nodeID.ReplicaID] = append(n.replicas[nodeID.ReplicaID], node)
-		// necessary to count executed commands.
-		node.eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
-			commit := event.(hotstuff.CommitEvent)
-			node.executedBlocks = append(node.executedBlocks, commit.Block)
-		})
-
-		for range n.views {
-			cmd := node.commandGenerator.next()
-			node.commandCache.Add(cmd)
-		}
 	}
 	// TODO(AlanRostem): set the connection metadata?
 	// need to configure the replica info after all of them were set up
@@ -577,6 +563,7 @@ func newTimeoutManager(
 		network:      network,
 		eventLoop:    eventLoop,
 		synchronizer: synchronizer,
+		timeout:      10,
 	}
 	tm.eventLoop.RegisterHandler(tick{}, func(_ any) {
 		tm.advance()
