@@ -104,7 +104,6 @@ func New(
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
 		committer,
-		vdParams,
 		rOpt.moduleNames.leaderRotation,
 		consensusRules.ChainLength(),
 	)
@@ -157,6 +156,7 @@ func New(
 		leaderRotation,
 		protocol,
 	)
+	viewDuration := viewduration.NewDynamic(vdParams) // TODO(AlanRostem): should be fixed when selecting kauri
 	// TODO(AlanRostem): consder moving the consensus flow from Synchronzier to a different class
 	synchronizer := synchronizer.New(
 		depsCore.EventLoop(),
@@ -164,6 +164,7 @@ func New(
 		depsCore.RuntimeCfg(),
 		depsSecure.Authority(),
 		leaderRotation,
+		viewDuration,
 		depsConsensus.Proposer(),
 		depsConsensus.Voter(),
 		viewStates,

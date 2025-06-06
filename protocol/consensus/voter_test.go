@@ -12,7 +12,6 @@ import (
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/wiring"
 )
@@ -51,7 +50,6 @@ func wireUpVoter(
 		depsCore.RuntimeCfg(),
 		depsSecurity.BlockChain(),
 		committer,
-		viewduration.NewParams(1, 100*time.Millisecond, 0, 1.2),
 		list.leaderRotation,
 		consensusRules.ChainLength(),
 	)

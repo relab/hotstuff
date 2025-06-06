@@ -3,7 +3,6 @@ package consensus_test
 import (
 	"bytes"
 	"testing"
-	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
@@ -13,7 +12,6 @@ import (
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/wiring"
@@ -52,7 +50,6 @@ func wireUpProposer(
 		depsCore.RuntimeCfg(),
 		depsSecurity.BlockChain(),
 		committer,
-		viewduration.NewParams(1, 100*time.Millisecond, 0, 2),
 		list.leaderRotation,
 		consensusRules.ChainLength(),
 	)

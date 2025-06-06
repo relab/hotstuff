@@ -54,6 +54,7 @@ func New(
 
 	// protocol dependencies
 	leaderRotation modules.LeaderRotation,
+	viewDuration modules.ViewDuration,
 	proposer *consensus.Proposer,
 	voter *consensus.Voter,
 	state *consensus.ViewStates,
@@ -62,7 +63,7 @@ func New(
 	sender modules.Sender,
 ) *Synchronizer {
 	s := &Synchronizer{
-		duration:       leaderRotation.ViewDuration(),
+		duration:       viewDuration,
 		leaderRotation: leaderRotation,
 
 		proposer:  proposer,

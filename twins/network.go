@@ -199,12 +199,14 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 			commandCache,
 			committer,
 		)
+		viewDuration := FixedTimeout(1 * time.Millisecond)
 		synchronizer := synchronizer.New(
 			eventLoop,
 			logger,
 			config,
 			depsSecurity.Authority(),
 			leaderRotation,
+			viewDuration,
 			proposer,
 			voter,
 			viewStates,
@@ -231,6 +233,11 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 			commit := event.(hotstuff.CommitEvent)
 			node.executedBlocks = append(node.executedBlocks, commit.Block)
 		})
+
+		for range n.views {
+			cmd := node.commandGenerator.next()
+			node.commandCache.Add(cmd)
+		}
 	}
 	// TODO(AlanRostem): set the connection metadata?
 	// need to configure the replica info after all of them were set up
@@ -251,9 +258,6 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 func (n *Network) run(ticks int) {
 	// kick off the initial proposal(s)
 	for _, node := range n.nodes {
-		// artificially add a command to propose
-		cmd := node.commandGenerator.next()
-		node.commandCache.Add(cmd)
 		if node.leaderRotation.GetLeader(1) == node.id.ReplicaID {
 			s := node.viewStates
 			proposal, err := node.proposer.CreateProposal(s.View(), s.HighQC(), s.SyncInfo())
@@ -266,11 +270,6 @@ func (n *Network) run(ticks int) {
 	}
 
 	for tick := 0; tick < ticks; tick++ {
-		for _, node := range n.nodes {
-			// continue artificially adding commands for each tick
-			cmd := node.commandGenerator.next()
-			node.commandCache.Add(cmd)
-		}
 		n.tick()
 	}
 }

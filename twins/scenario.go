@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
@@ -146,13 +145,10 @@ func getBlocks(network *Network) map[NodeID][]*hotstuff.Block {
 }
 
 type commandGenerator struct {
-	mut     sync.Mutex
 	nextCmd uint64
 }
 
 func (cg *commandGenerator) next() *clientpb.Command {
-	cg.mut.Lock()
-	defer cg.mut.Unlock()
 	data := []byte(strconv.FormatUint(cg.nextCmd, 10))
 	cg.nextCmd++
 	return &clientpb.Command{
