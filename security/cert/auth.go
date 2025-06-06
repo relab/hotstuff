@@ -126,7 +126,7 @@ func (c *Authority) VerifyQuorumCert(qc hotstuff.QuorumCert) error {
 	}
 	block, ok := c.blockChain.Get(qc.BlockHash())
 	if !ok {
-		return fmt.Errorf("block not found: %s", block.Hash().String())
+		return fmt.Errorf("block not found: %s", qc.BlockHash().String())
 	}
 	return c.Verify(qc.Signature(), block.ToBytes())
 }

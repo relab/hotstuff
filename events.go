@@ -71,6 +71,10 @@ type TimeoutEvent struct {
 	View View
 }
 
+type CommitEvent struct {
+	Block *Block
+}
+
 type ReplicaConnectedEvent struct {
 	Ctx context.Context
 }

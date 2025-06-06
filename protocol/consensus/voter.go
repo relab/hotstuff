@@ -58,8 +58,7 @@ func NewVoter(
 	v.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		proposal := event.(hotstuff.ProposeMsg)
 		// ensure that I can vote in this view based on the protocol's rule.
-		err := v.Verify(&proposal)
-		if err != nil {
+		if err := v.Verify(&proposal); err != nil {
 			v.logger.Infof("failed to verify incoming vote: %v", err)
 			return
 		}
