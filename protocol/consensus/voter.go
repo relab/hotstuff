@@ -67,8 +67,9 @@ func NewVoter(
 	return v
 }
 
-// OnValidPropose is called when receiving a valid proposal from a leader and emits an event to advance the view. The proposal should be verified before calling this.
-// The method tells the committer and command cache to update its state.
+// OnValidPropose is called when receiving a valid proposal from a leader and emits an event to advance the
+// view. The proposal should be verified before calling this. The method tells the committer and command cache
+// to update its state.
 func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) {
 	block := proposal.Block
 	// store the valid block, it may commit the block or its ancestors

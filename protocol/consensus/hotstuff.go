@@ -58,8 +58,7 @@ func (cs *HotStuff) SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialC
 		return
 	}
 	// if I am the one voting, send the vote to next leader over the wire.
-	err := cs.sender.Vote(leaderID, pc)
-	if err != nil {
+	if err := cs.sender.Vote(leaderID, pc); err != nil {
 		cs.logger.Warnf("%v", err)
 		return
 	}

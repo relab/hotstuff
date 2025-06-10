@@ -140,7 +140,7 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 		node.viewStates,
 		node.sender,
 	)
-	node.timeoutManager = newTimeoutManager(n, node, node.eventLoop, node.synchronizer)
+	node.timeoutManager = newTimeoutManager(n, node, node.eventLoop, node.synchronizer, node.viewStates)
 	// necessary to count executed commands.
 	node.eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
 		commit := event.(hotstuff.CommitEvent)
@@ -483,12 +483,14 @@ func newTimeoutManager(
 	node *node,
 	eventLoop *eventloop.EventLoop,
 	synchronizer *synchronizer.Synchronizer,
+	viewStates *consensus.ViewStates,
 ) *timeoutManager {
 	tm := &timeoutManager{
 		node:         node,
 		network:      network,
 		eventLoop:    eventLoop,
 		synchronizer: synchronizer,
+		viewStates:   viewStates,
 		timeout:      10,
 	}
 	tm.eventLoop.RegisterHandler(tick{}, func(_ any) {
