@@ -148,7 +148,7 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 		node.viewStates,
 		node.sender,
 	)
-	node.timeoutManager = newTimeoutManager(n, node, node.eventLoop, node.synchronizer, node.viewStates)
+	node.timeoutManager = newTimeoutManager(n, node, node.eventLoop, node.viewStates)
 	// necessary to count executed commands.
 	node.eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
 		commit := event.(hotstuff.CommitEvent)
@@ -321,32 +321,32 @@ type emulatedSender struct {
 
 var _ modules.Sender = (*emulatedSender)(nil)
 
-func (c *emulatedSender) broadcastMessage(message any) {
-	for id := range c.network.replicas {
-		if id == c.node.id.ReplicaID {
+func (s *emulatedSender) broadcastMessage(message any) {
+	for id := range s.network.replicas {
+		if id == s.node.id.ReplicaID {
 			// do not send message to self or twin
 			continue
-		} else if c.subConfig == nil || c.subConfig.Contains(id) {
-			c.sendMessage(id, message)
+		} else if s.subConfig == nil || s.subConfig.Contains(id) {
+			s.sendMessage(id, message)
 		}
 	}
 }
 
-func (c *emulatedSender) sendMessage(id hotstuff.ID, message any) {
-	nodes, ok := c.network.replicas[id]
+func (s *emulatedSender) sendMessage(id hotstuff.ID, message any) {
+	nodes, ok := s.network.replicas[id]
 	if !ok {
 		panic(fmt.Errorf("attempt to send message to replica %d, but this replica does not exist", id))
 	}
 	for _, node := range nodes {
-		if c.shouldDrop(node.id, message) {
-			c.network.logger.Infof("node %v -> node %v: DROP %T(%v)", c.node.id, node.id, message, message)
+		if s.shouldDrop(node.id, message) {
+			s.network.logger.Infof("node %v -> node %v: DROP %T(%v)", s.node.id, node.id, message, message)
 			continue
 		}
-		c.network.logger.Infof("node %v -> node %v: SEND %T(%v)", c.node.id, node.id, message, message)
-		c.network.pendingMessages = append(
-			c.network.pendingMessages,
+		s.network.logger.Infof("node %v -> node %v: SEND %T(%v)", s.node.id, node.id, message, message)
+		s.network.pendingMessages = append(
+			s.network.pendingMessages,
 			pendingMessage{
-				sender:   uint32(c.node.id.NetworkID),
+				sender:   uint32(s.node.id.NetworkID),
 				receiver: uint32(node.id.NetworkID),
 				message:  message,
 			},
@@ -355,55 +355,55 @@ func (c *emulatedSender) sendMessage(id hotstuff.ID, message any) {
 }
 
 // shouldDrop checks if a message to the node identified by id should be dropped.
-func (c *emulatedSender) shouldDrop(id NodeID, message any) bool {
+func (s *emulatedSender) shouldDrop(id NodeID, message any) bool {
 	// retrieve the drop config for this node.
-	return c.network.shouldDrop(c.node.id.NetworkID, id.NetworkID, message)
+	return s.network.shouldDrop(s.node.id.NetworkID, id.NetworkID, message)
 }
 
 // GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
-func (c *emulatedSender) Sub(ids []hotstuff.ID) (sub modules.Sender, err error) {
+func (s *emulatedSender) Sub(ids []hotstuff.ID) (sub modules.Sender, err error) {
 	subConfig := hotstuff.NewIDSet()
 	for _, id := range ids {
 		subConfig.Add(id)
 	}
 	return &emulatedSender{
-		node:      c.node,
-		network:   c.network,
+		node:      s.node,
+		network:   s.network,
 		subConfig: subConfig,
 	}, nil
 }
 
 // Propose sends the block to all replicas in the configuration.
-func (c *emulatedSender) Propose(proposal *hotstuff.ProposeMsg) {
-	c.broadcastMessage(*proposal) // very important to dereference it!
+func (s *emulatedSender) Propose(proposal *hotstuff.ProposeMsg) {
+	s.broadcastMessage(*proposal) // very important to dereference it!
 }
 
 // Timeout sends the timeout message to all replicas.
-func (c *emulatedSender) Timeout(msg hotstuff.TimeoutMsg) {
-	c.broadcastMessage(msg)
+func (s *emulatedSender) Timeout(msg hotstuff.TimeoutMsg) {
+	s.broadcastMessage(msg)
 }
 
-func (c *emulatedSender) Vote(id hotstuff.ID, cert hotstuff.PartialCert) error {
-	c.sendMessage(id, hotstuff.VoteMsg{
-		ID:          c.node.id.ReplicaID,
+func (s *emulatedSender) Vote(id hotstuff.ID, cert hotstuff.PartialCert) error {
+	s.sendMessage(id, hotstuff.VoteMsg{
+		ID:          s.node.id.ReplicaID,
 		PartialCert: cert,
 	})
 	return nil
 }
 
-func (c *emulatedSender) NewView(id hotstuff.ID, si hotstuff.SyncInfo) error {
-	c.sendMessage(id, hotstuff.NewViewMsg{
-		ID:       c.node.id.ReplicaID,
+func (s *emulatedSender) NewView(id hotstuff.ID, si hotstuff.SyncInfo) error {
+	s.sendMessage(id, hotstuff.NewViewMsg{
+		ID:       s.node.id.ReplicaID,
 		SyncInfo: si,
 	})
 	return nil
 }
 
 // Fetch requests a block from all the replicas in the configuration.
-func (c *emulatedSender) RequestBlock(_ context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
-	for _, replica := range c.network.replicas {
+func (s *emulatedSender) RequestBlock(_ context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
+	for _, replica := range s.network.replicas {
 		for _, node := range replica {
-			if c.shouldDrop(node.id, hash) {
+			if s.shouldDrop(node.id, hash) {
 				continue
 			}
 			block, ok = node.blockChain.LocalGet(hash)
@@ -454,9 +454,8 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 type tick struct{}
 
 type timeoutManager struct {
-	viewStates   *consensus.ViewStates
-	synchronizer *synchronizer.Synchronizer
-	eventLoop    *eventloop.EventLoop
+	eventLoop  *eventloop.EventLoop
+	viewStates *consensus.ViewStates
 
 	node      *node
 	network   *Network
@@ -490,16 +489,14 @@ func newTimeoutManager(
 	network *Network,
 	node *node,
 	eventLoop *eventloop.EventLoop,
-	synchronizer *synchronizer.Synchronizer,
 	viewStates *consensus.ViewStates,
 ) *timeoutManager {
 	tm := &timeoutManager{
-		node:         node,
-		network:      network,
-		eventLoop:    eventLoop,
-		synchronizer: synchronizer,
-		viewStates:   viewStates,
-		timeout:      10,
+		node:       node,
+		network:    network,
+		eventLoop:  eventLoop,
+		viewStates: viewStates,
+		timeout:    5,
 	}
 	tm.eventLoop.RegisterHandler(tick{}, func(_ any) {
 		tm.advance()

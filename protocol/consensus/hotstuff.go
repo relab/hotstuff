@@ -15,6 +15,7 @@ type HotStuff struct {
 	config         *core.RuntimeConfig
 	votingMachine  *VotingMachine
 	leaderRotation modules.LeaderRotation
+	states         *ViewStates
 	sender         modules.Sender
 }
 
@@ -39,6 +40,7 @@ func NewHotStuff(
 			auth,
 			states,
 		),
+		states:         states,
 		leaderRotation: leaderRotation,
 		sender:         sender,
 	}
@@ -51,7 +53,7 @@ func (hs *HotStuff) SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.Parti
 
 // SendVote disseminates or stores a valid vote depending on replica being voter or leader in the next view.
 func (hs *HotStuff) SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
-	leaderID := hs.leaderRotation.GetLeader(proposal.Block.View() + 1)
+	leaderID := hs.leaderRotation.GetLeader(hs.states.View() + 1)
 	if leaderID == hs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.
 		hs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: hs.config.ID(), PartialCert: pc})
