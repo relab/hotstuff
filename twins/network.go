@@ -21,6 +21,7 @@ import (
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/security/blockchain"
+	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 	"github.com/relab/hotstuff/wiring"
@@ -70,7 +71,7 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 	logger := logging.NewWithDest(log, "network")
 	node := &node{
 		id:               nodeID,
-		config:           core.NewRuntimeConfig(nodeID.ReplicaID, pk),
+		config:           core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVoteVerification()),
 		logger:           logger,
 		eventLoop:        eventloop.New(logger, 100),
 		commandCache:     clientpb.New(),
@@ -82,7 +83,14 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 		network:   n,
 		subConfig: hotstuff.NewIDSet(),
 	}
-	depsSecurity, err := wiring.NewSecurity(node.eventLoop, node.logger, node.config, node.sender, cryptoName)
+	depsSecurity, err := wiring.NewSecurity(
+		node.eventLoop,
+		node.logger,
+		node.config,
+		node.sender,
+		cryptoName,
+		cert.WithCache(100),
+	)
 	if err != nil {
 		return nil, err
 	}

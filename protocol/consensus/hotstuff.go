@@ -44,25 +44,25 @@ func NewHotStuff(
 	}
 }
 
-func (cs *HotStuff) SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
-	cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
-	cs.sender.Propose(proposal)
+func (hs *HotStuff) SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+	hs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: hs.config.ID(), PartialCert: pc})
+	hs.sender.Propose(proposal)
 }
 
 // SendVote disseminates or stores a valid vote depending on replica being voter or leader in the next view.
-func (cs *HotStuff) SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
-	leaderID := cs.leaderRotation.GetLeader(proposal.Block.View() + 1)
-	if leaderID == cs.config.ID() {
+func (hs *HotStuff) SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+	leaderID := hs.leaderRotation.GetLeader(proposal.Block.View() + 1)
+	if leaderID == hs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.
-		cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
+		hs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: hs.config.ID(), PartialCert: pc})
 		return
 	}
 	// if I am the one voting, send the vote to next leader over the wire.
-	if err := cs.sender.Vote(leaderID, pc); err != nil {
-		cs.logger.Warnf("%v", err)
+	if err := hs.sender.Vote(leaderID, pc); err != nil {
+		hs.logger.Warnf("%v", err)
 		return
 	}
-	cs.logger.Debugf("voting for %v", proposal)
+	hs.logger.Debugf("voting for %v", proposal)
 }
 
 var _ modules.ConsensusProtocol = (*HotStuff)(nil)
