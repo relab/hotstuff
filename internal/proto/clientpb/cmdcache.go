@@ -15,9 +15,7 @@ type Cache struct {
 	cache            list.List
 }
 
-func New(
-	opts ...Option,
-) *Cache {
+func New(opts ...Option) *Cache {
 	c := &Cache{
 		c:                make(chan struct{}),
 		batchSize:        1,
@@ -38,7 +36,7 @@ func (c *Cache) isDuplicate(cmd *Command) bool {
 	return seqNum >= cmd.GetSequenceNumber()
 }
 
-func (c *Cache) add(cmd *Command) {
+func (c *Cache) Add(cmd *Command) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	if c.isDuplicate(cmd) {
@@ -58,6 +56,7 @@ func (c *Cache) add(cmd *Command) {
 // Get returns a batch of commands to propose.
 // It blocks until it can return a batch of commands, or the context is done.
 // If the context is done, it returns an error.
+// NOTE: the commands should be marked as proposed to avoid duplicates.
 func (c *Cache) Get(ctx context.Context) (*Batch, error) {
 	batch := new(Batch)
 

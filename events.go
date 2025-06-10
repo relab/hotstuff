@@ -60,12 +60,6 @@ type NewViewMsg struct {
 	SyncInfo SyncInfo // The highest QC / TC.
 }
 
-// CommitEvent is raised whenever a block is committed,
-// and includes the number of client commands that were executed.
-type CommitEvent struct {
-	Commands int
-}
-
 // ViewChangeEvent is sent on the eventloop whenever a view change occurs.
 type ViewChangeEvent struct {
 	View    View

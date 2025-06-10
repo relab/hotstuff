@@ -173,8 +173,8 @@ func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) err
 	if !ok {
 		return fmt.Errorf("failed to fetch block %v", k.blockHash)
 	}
-	if !k.auth.Verify(currentSignature, block.ToBytes()) {
-		return fmt.Errorf("cannot verify contribution for view %d from participants %v", k.currentView, currentSignature.Participants())
+	if err := k.auth.Verify(currentSignature, block.ToBytes()); err != nil {
+		return err
 	}
 	if k.aggContrib == nil {
 		// first contribution

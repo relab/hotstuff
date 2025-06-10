@@ -70,25 +70,22 @@ func NewVoter(
 
 // OnValidPropose is called when receiving a valid proposal from a leader and emits an event to advance the view. The proposal should be verified before calling this.
 // The method tells the committer and command cache to update its state.
-func (cs *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) {
+func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) {
 	block := proposal.Block
 	// store the valid block, it may commit the block or its ancestors
-	cs.committer.Update(block)
-	// TODO(AlanRostem): solve issue #191
-	// update the command's age before voting.
-	cs.commandCache.Proposed(block.Commands())
-	pc, err := cs.Vote(block)
+	v.committer.Update(block)
+	pc, err := v.Vote(block)
 	if err != nil {
 		// if the block is invalid, reject it. This means the command is also discarded.
-		cs.logger.Infof("%v", err)
+		v.logger.Infof("%v", err)
 	} else {
 		// send the vote if it was successful
-		cs.protocol.SendVote(proposal, pc)
+		v.protocol.SendVote(proposal, pc)
 	}
 	// advance the view regardless of vote success/failure
 	newInfo := hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
-	cs.eventLoop.AddEvent(hotstuff.NewViewMsg{
-		ID:       cs.config.ID(),
+	v.eventLoop.AddEvent(hotstuff.NewViewMsg{
+		ID:       v.config.ID(),
 		SyncInfo: newInfo,
 	})
 }
@@ -123,18 +120,14 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 	if block.View() <= v.lastVote {
 		return fmt.Errorf("block view too old")
 	}
-	// cannot vote for old commands
-	if v.commandCache.ContainsDuplicate(block.Commands()) {
-		return fmt.Errorf("command too old")
-	}
 	// vote rule must be valid
 	if !v.ruler.VoteRule(view, *proposal) {
 		return fmt.Errorf("vote rule not satisfied")
 	}
 	// verify the proposal's QC.
 	qc := proposal.Block.QuorumCert()
-	if !v.auth.VerifyAnyQC(&qc, proposal.AggregateQC) {
-		return fmt.Errorf("invalid qc")
+	if err := v.auth.VerifyAnyQC(&qc, proposal.AggregateQC); err != nil {
+		return err
 	}
 	// ensure the block came from the expected leader.
 	if proposal.ID != v.leaderRotation.GetLeader(block.View()) {

@@ -2,6 +2,7 @@ package wiring
 
 import (
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 )
@@ -13,6 +14,7 @@ type Client struct {
 
 // NewClient returns a set of dependencies for serving clients through
 func NewClient(
+	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	// TODO: Join these into single option type
 	cacheOpt []clientpb.Option,
@@ -22,6 +24,7 @@ func NewClient(
 		cacheOpt...,
 	)
 	clientSrv := clientpb.NewServer(
+		eventLoop,
 		logger,
 		cmdCache,
 		clientSrvOpts...,

@@ -8,6 +8,7 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
 )
 
@@ -20,6 +21,7 @@ func NewConsensus(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
+	blockChain *blockchain.BlockChain,
 	auth *cert.Authority,
 	commandCache *clientpb.Cache,
 	committer *committer.Committer,
@@ -48,6 +50,8 @@ func NewConsensus(
 			eventLoop,
 			logger,
 			config,
+
+			blockChain,
 			protocol,
 			voter,
 			commandCache,
