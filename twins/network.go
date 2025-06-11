@@ -53,13 +53,11 @@ type node struct {
 	leaderRotation modules.LeaderRotation
 	synchronizer   *synchronizer.Synchronizer
 	timeoutManager *timeoutManager
-	// opts           *core.Options
 
-	id               NodeID
-	executedBlocks   []*hotstuff.Block
-	effectiveView    hotstuff.View
-	log              *strings.Builder
-	commandGenerator *commandGenerator
+	id             NodeID
+	executedBlocks []*hotstuff.Block
+	effectiveView  hotstuff.View
+	log            *strings.Builder
 }
 
 func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node, error) {
@@ -70,13 +68,12 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 	log := &strings.Builder{}
 	logger := logging.NewWithDest(log, "network")
 	node := &node{
-		id:               nodeID,
-		config:           core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVoteVerification()),
-		logger:           logger,
-		eventLoop:        eventloop.New(logger, 100),
-		commandCache:     clientpb.New(),
-		log:              log,
-		commandGenerator: &commandGenerator{},
+		id:           nodeID,
+		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVoteVerification()),
+		logger:       logger,
+		eventLoop:    eventloop.New(logger, 100),
+		commandCache: clientpb.New(),
+		log:          log,
 	}
 	node.sender = &emulatedSender{
 		node:      node,
@@ -154,8 +151,9 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 		commit := event.(hotstuff.CommitEvent)
 		node.executedBlocks = append(node.executedBlocks, commit.Block)
 	})
+	commandGenerator := &commandGenerator{}
 	for range n.views {
-		cmd := node.commandGenerator.next()
+		cmd := commandGenerator.next()
 		node.commandCache.Add(cmd)
 	}
 	return node, nil
