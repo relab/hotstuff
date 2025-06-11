@@ -2,9 +2,12 @@ package twins
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/modules"
 )
 
 // View specifies the leader id and the partition scenario for a single view.
@@ -114,7 +117,9 @@ func checkCommits(network *Network) (safe bool, commits int) {
 	return true, i
 }
 
-/*type leaderRotation []View
+type leaderRotation []View
+
+var _ modules.LeaderRotation = (leaderRotation)(nil)
 
 // GetLeader returns the id of the leader in the given view.
 func (lr leaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
@@ -125,7 +130,7 @@ func (lr leaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
 	}
 	// default to 0 (which is an invalid id)
 	return 0
-}*/
+}
 
 func getBlocks(network *Network) map[NodeID][]*hotstuff.Block {
 	m := make(map[NodeID][]*hotstuff.Block)
@@ -135,43 +140,16 @@ func getBlocks(network *Network) map[NodeID][]*hotstuff.Block {
 	return m
 }
 
-/*type commandGenerator struct {
-	mut     sync.Mutex
+type commandGenerator struct {
 	nextCmd uint64
 }
 
-func (cg *commandGenerator) next() hotstuff.Command {
-	cg.mut.Lock()
-	defer cg.mut.Unlock()
-	cmd := hotstuff.Command(strconv.FormatUint(cg.nextCmd, 10))
+func (cg *commandGenerator) next() *clientpb.Command {
+	data := []byte(strconv.FormatUint(cg.nextCmd, 10))
 	cg.nextCmd++
-	return cmd
+	return &clientpb.Command{
+		ClientID:       1,
+		SequenceNumber: cg.nextCmd,
+		Data:           data,
+	}
 }
-
-type commandModule struct {
-	commandGenerator *commandGenerator
-	node             *node
-}
-
-// Accept returns true if the replica should accept the command, false otherwise.
-func (commandModule) Accept(_ hotstuff.Command) bool {
-	return true
-}
-
-// Proposed tells the voter that the propose phase for the given command succeeded, and it should no longer be
-// accepted in the future.
-func (commandModule) Proposed(_ hotstuff.Command) {}
-
-// Get returns the next command to be proposed.
-// It may run until the context is canceled.
-// If no command is available, the 'ok' return value should be false.
-func (cm commandModule) Get(_ context.Context) (cmd hotstuff.Command, ok bool) {
-	return cm.commandGenerator.next(), true
-}
-
-// Exec executes the given command.
-func (cm commandModule) Exec(block *hotstuff.Block) {
-	cm.node.executedBlocks = append(cm.node.executedBlocks, block)
-}
-
-func (commandModule) Fork(_ *hotstuff.Block) {}*/

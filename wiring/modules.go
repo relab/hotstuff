@@ -17,7 +17,6 @@ import (
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
@@ -89,22 +88,21 @@ func NewLeaderRotation(
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
 	committer *committer.Committer,
-	vdParams viewduration.Params,
 	name string,
 	chainLength int,
 ) (ld modules.LeaderRotation, err error) {
 	logger.Debugf("Initializing module (leader rotation): %s", name)
 	switch name {
 	case carousel.ModuleName:
-		ld = carousel.New(chainLength, vdParams, blockChain, committer, config, logger)
+		ld = carousel.New(chainLength, blockChain, committer, config, logger)
 	case reputation.ModuleName:
-		ld = reputation.New(chainLength, vdParams, committer, config, logger)
+		ld = reputation.New(chainLength, committer, config, logger)
 	case roundrobin.ModuleName:
-		ld = roundrobin.New(config, vdParams)
+		ld = roundrobin.New(config)
 	case fixedleader.ModuleName:
-		ld = fixedleader.New(hotstuff.ID(1), vdParams)
+		ld = fixedleader.New(hotstuff.ID(1))
 	case treeleader.ModuleName:
-		ld = treeleader.New(vdParams.StartTimeout(), config)
+		ld = treeleader.New(config)
 	default:
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", name)
 	}

@@ -81,14 +81,10 @@ func (p *Proposer) markProposed(view hotstuff.View, highQCBlockHash hotstuff.Has
 
 // Propose creates a new outgoing proposal.
 func (p *Proposer) Propose(proposal *hotstuff.ProposeMsg) {
-	block := proposal.Block
-	// store the valid block, it may commit the block or its ancestors
-	p.committer.Update(block)
-	// update the command's age before voting.
-	pc, err := p.voter.Vote(block)
+	pc, err := p.voter.OnValidPropose(proposal) // vote and advance the view for self
 	if err != nil {
-		// this should not happen which is why we log here just in case of a bug
-		p.logger.Errorf("critical: %v", err)
+		// this should not occur, but if it does then we log to detect the bug
+		p.logger.Error("could not vote for my own proposal")
 		return
 	}
 	// TODO(AlanRostem): moved this line to HotStuff since Kauri already sends a new view in its own logic. Check if this is valid.

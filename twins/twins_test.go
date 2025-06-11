@@ -23,10 +23,10 @@ func TestTwins(t *testing.T) {
 	})
 	g.Shuffle(time.Now().Unix())
 
-	scenarios := 10
+	scenarioCount := 10
 	totalCommits := 0
 
-	for i := 0; i < scenarios; i++ {
+	for range scenarioCount {
 		s, err := g.NextScenario()
 		if err != nil {
 			break
@@ -46,5 +46,5 @@ func TestTwins(t *testing.T) {
 		}
 	}
 
-	t.Logf("Average %f commits per scenario.", float64(totalCommits)/float64(scenarios))
+	t.Logf("Average %f commits per scenario.", float64(totalCommits)/float64(scenarioCount))
 }

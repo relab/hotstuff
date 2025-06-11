@@ -1,35 +1,25 @@
 package treeleader
 
 import (
-	"time"
-
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 )
 
 const ModuleName = "tree-leader"
 
 type treeLeader struct {
-	leader       hotstuff.ID
-	config       *core.RuntimeConfig
-	viewDuration modules.ViewDuration
+	leader hotstuff.ID
+	config *core.RuntimeConfig
 }
 
 func New(
-	viewDuration time.Duration,
 	config *core.RuntimeConfig,
 ) modules.LeaderRotation {
 	return &treeLeader{
-		config:       config,
-		leader:       1,
-		viewDuration: viewduration.NewFixed(viewDuration),
+		config: config,
+		leader: 1,
 	}
-}
-
-func (t *treeLeader) ViewDuration() modules.ViewDuration {
-	return t.viewDuration
 }
 
 // GetLeader returns the id of the leader in the given view

@@ -39,8 +39,6 @@ type ProposeRuler interface {
 type LeaderRotation interface {
 	// GetLeader returns the id of the leader in the given view.
 	GetLeader(hotstuff.View) hotstuff.ID
-	// ViewDuration returns an object that determines the duration of a view.
-	ViewDuration() ViewDuration
 }
 
 // ViewDuration determines the duration of a view.
@@ -90,9 +88,4 @@ type ConsensusProtocol interface {
 	SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
 	// SendPropose disseminates the proposal from the proposer.
 	SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
-}
-
-type Executor interface {
-	Exec(*clientpb.Batch)
-	Abort(*clientpb.Batch)
 }

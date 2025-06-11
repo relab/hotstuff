@@ -50,7 +50,7 @@ func NewVotingMachine(
 // CollectVote handles an incoming vote.
 func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 	cert := vote.PartialCert
-	vm.logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
+	vm.logger.Debugf("CollectVote(%d): %.8s", vote.ID, cert.BlockHash())
 	var (
 		block *hotstuff.Block
 		ok    bool

@@ -12,7 +12,6 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 )
 
 const ModuleName = "reputation"
@@ -20,10 +19,9 @@ const ModuleName = "reputation"
 type reputationsMap map[hotstuff.ID]float64
 
 type repBased struct {
-	committer    *committer.Committer
-	config       *core.RuntimeConfig
-	logger       logging.Logger
-	viewDuration modules.ViewDuration
+	committer *committer.Committer
+	config    *core.RuntimeConfig
+	logger    logging.Logger
 
 	chainLength    int
 	prevCommitHead *hotstuff.Block
@@ -31,10 +29,6 @@ type repBased struct {
 }
 
 // TODO: should GetLeader be thread-safe?
-
-func (r *repBased) ViewDuration() modules.ViewDuration {
-	return r.viewDuration
-}
 
 // GetLeader returns the id of the leader in the given view
 func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
@@ -98,17 +92,15 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 // NewRepBased returns a new random reputation-based leader rotation implementation
 func New(
 	chainLength int,
-	vdParams viewduration.Params,
 
 	committer *committer.Committer,
 	config *core.RuntimeConfig,
 	logger logging.Logger,
 ) modules.LeaderRotation {
 	return &repBased{
-		committer:    committer,
-		config:       config,
-		logger:       logger,
-		viewDuration: viewduration.NewDynamic(vdParams),
+		committer: committer,
+		config:    config,
+		logger:    logger,
 
 		chainLength:    chainLength,
 		reputations:    make(reputationsMap),

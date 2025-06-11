@@ -11,18 +11,16 @@ import (
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
 const ModuleName = "carousel"
 
 type carousel struct {
-	blockChain   *blockchain.BlockChain
-	committer    *committer.Committer
-	config       *core.RuntimeConfig
-	logger       logging.Logger
-	viewDuration modules.ViewDuration
+	blockChain *blockchain.BlockChain
+	committer  *committer.Committer
+	config     *core.RuntimeConfig
+	logger     logging.Logger
 
 	chainLength int
 }
@@ -30,7 +28,6 @@ type carousel struct {
 // New returns a new instance of the Carousel leader-election algorithm.
 func New(
 	chainLength int,
-	vdParams viewduration.Params,
 
 	blockChain *blockchain.BlockChain,
 	committer *committer.Committer,
@@ -38,12 +35,11 @@ func New(
 	logger logging.Logger,
 ) modules.LeaderRotation {
 	return &carousel{
-		blockChain:   blockChain,
-		chainLength:  chainLength,
-		committer:    committer,
-		config:       config,
-		logger:       logger,
-		viewDuration: viewduration.NewDynamic(vdParams),
+		blockChain:  blockChain,
+		chainLength: chainLength,
+		committer:   committer,
+		config:      config,
+		logger:      logger,
 	}
 }
 
@@ -92,8 +88,4 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 	c.logger.Debugf("chose id %d", leader)
 
 	return leader
-}
-
-func (c carousel) ViewDuration() modules.ViewDuration {
-	return c.viewDuration
 }
