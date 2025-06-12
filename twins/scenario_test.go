@@ -3,6 +3,7 @@ package twins
 import (
 	"testing"
 
+	"github.com/relab/hotstuff/core/logging"
 	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 )
 
@@ -16,10 +17,15 @@ func TestBasicScenario(t *testing.T) {
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
-
+	logging.SetLogLevel("debug")
 	result, err := ExecuteScenario(s, 4, 0, 100, "chainedhotstuff")
 	if err != nil {
-		t.Fatal(err)
+		t.Log(err)
+		for id, log := range result.NodeLogs {
+			t.Logf("Node %d's log: \n%s", id, log)
+		}
+		t.Fail()
+		return
 	}
 
 	if !result.Safe {

@@ -89,7 +89,7 @@ func (k *Kauri) reset() {
 	k.aggSent = false
 }
 
-func (k *Kauri) SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (k *Kauri) SendVote(_ hotstuff.View, proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	k.Begin(proposal, pc)
 }
 

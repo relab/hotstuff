@@ -46,14 +46,13 @@ func NewHotStuff(
 	}
 }
 
-func (hs *HotStuff) SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
-	hs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: hs.config.ID(), PartialCert: pc})
+func (hs *HotStuff) SendPropose(proposal *hotstuff.ProposeMsg, _ hotstuff.PartialCert) {
 	hs.sender.Propose(proposal)
 }
 
 // SendVote disseminates or stores a valid vote depending on replica being voter or leader in the next view.
-func (hs *HotStuff) SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
-	leaderID := hs.leaderRotation.GetLeader(hs.states.View() + 1)
+func (hs *HotStuff) SendVote(lastVote hotstuff.View, proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+	leaderID := hs.leaderRotation.GetLeader(lastVote + 1)
 	if leaderID == hs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.
 		hs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: hs.config.ID(), PartialCert: pc})

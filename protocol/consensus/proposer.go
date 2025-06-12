@@ -81,16 +81,20 @@ func (p *Proposer) markProposed(view hotstuff.View, highQCBlockHash hotstuff.Has
 
 // Propose creates a new outgoing proposal.
 func (p *Proposer) Propose(proposal *hotstuff.ProposeMsg) {
-	pc, err := p.voter.OnValidPropose(proposal) // vote and advance the view for self
-	if err != nil {
-		// this should not occur, but if it does then we log to detect the bug
-		p.logger.Error("could not vote for my own proposal")
+	p.logger.Debug("Propose")
+	if err := p.voter.Verify(proposal); err != nil {
+		p.logger.Error(err)
 		return
 	}
-	// TODO(AlanRostem): moved this line to HotStuff since Kauri already sends a new view in its own logic. Check if this is valid.
-	// cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
 	// as proposer, I can vote for my own proposal without verifying.
+	pc, err := p.voter.Vote(proposal.Block)
+	if err != nil {
+		p.logger.Error(err)
+		return
+	}
+	p.committer.Update(proposal.Block)
 	p.protocol.SendPropose(proposal, pc)
+	p.protocol.SendVote(p.voter.LastVote(), proposal, pc)
 }
 
 // CreateProposal attempts to create a new outgoing proposal if a command exists and the protocol's rule is satisfied.

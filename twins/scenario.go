@@ -72,6 +72,12 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, 
 		nodeLogs[node.id] = node.log.String()
 	}
 
+	if network.err != nil {
+		return ScenarioResult{
+			NodeLogs: nodeLogs,
+		}, network.err
+	}
+
 	// check if the majority of replicas have committed the same blocks
 	safe, commits := checkCommits(network)
 

@@ -49,7 +49,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 
 	// Note that we do not call UpdateHighQC here.
 	// This is done through AdvanceView, which the Consensus implementation will call.
-	hs.logger.Debug("PRE_COMMIT: ", block1)
+	hs.logger.Debug("CommitRule - PRE_COMMIT: ", block1)
 
 	block2, ok := hs.qcRef(block1.QuorumCert())
 	if !ok {
@@ -57,7 +57,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	}
 
 	if block2.View() > hs.bLock.View() {
-		hs.logger.Debug("COMMIT: ", block2)
+		hs.logger.Debug("CommitRule - COMMIT: ", block2)
 		hs.bLock = block2
 	}
 
@@ -67,7 +67,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	}
 
 	if block1.Parent() == block2.Hash() && block2.Parent() == block3.Hash() {
-		hs.logger.Debug("DECIDE: ", block3)
+		hs.logger.Debug("CommitRule - DECIDE: ", block3)
 		return block3
 	}
 
@@ -84,12 +84,12 @@ func (hs *ChainedHotStuff) VoteRule(_ hotstuff.View, proposal hotstuff.ProposeMs
 	if haveQCBlock && qcBlock.View() > hs.bLock.View() {
 		safe = true
 	} else {
-		hs.logger.Debug("OnPropose: liveness condition failed")
+		hs.logger.Debug("VoteRule: liveness condition failed")
 		// check if this block extends bLock
 		if hs.blockChain.Extends(block, hs.bLock) {
 			safe = true
 		} else {
-			hs.logger.Debug("OnPropose: safety condition failed")
+			hs.logger.Debug("VoteRule: safety condition failed")
 		}
 	}
 

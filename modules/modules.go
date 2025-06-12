@@ -85,7 +85,7 @@ type KauriSender interface {
 // ConsensusProtocol is an interface sending proposals and votes.
 type ConsensusProtocol interface {
 	// SendVote handles incoming proposals and replies with a vote.
-	SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
+	SendVote(lastVote hotstuff.View, proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
 	// SendPropose disseminates the proposal from the proposer.
 	SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
 }

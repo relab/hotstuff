@@ -181,6 +181,7 @@ type Network struct {
 	logger logging.Logger
 	// the destination of the logger
 	log strings.Builder
+	err error
 }
 
 // NewSimpleNetwork creates a simple network.
@@ -248,6 +249,9 @@ func (n *Network) run(ticks int) {
 
 	for tick := 0; tick < ticks; tick++ {
 		n.tick()
+		if n.err != nil {
+			break
+		}
 	}
 }
 
@@ -271,7 +275,8 @@ func (n *Network) tick() {
 func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 	node, ok := n.nodes[sender]
 	if !ok {
-		panic(fmt.Errorf("node matching sender id %d was not found", sender))
+		n.stopWithErr(fmt.Errorf("node matching sender id %d was not found", sender))
+		return true
 	}
 
 	// Index into viewPartitions.
@@ -301,6 +306,11 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 	_, ok = n.dropTypes[reflect.TypeOf(message)]
 
 	return ok
+}
+
+func (n *Network) stopWithErr(err error) {
+	n.logger.Errorf(err.Error())
+	n.err = err
 }
 
 // NewSender returns a new Configuration module for this network.
@@ -333,7 +343,8 @@ func (s *emulatedSender) broadcastMessage(message any) {
 func (s *emulatedSender) sendMessage(id hotstuff.ID, message any) {
 	nodes, ok := s.network.replicas[id]
 	if !ok {
-		panic(fmt.Errorf("attempt to send message to replica %d, but this replica does not exist", id))
+		s.network.stopWithErr(fmt.Errorf("attempt to send message to replica %d, but this replica does not exist", id))
+		return
 	}
 	for _, node := range nodes {
 		if s.shouldDrop(node.id, message) {

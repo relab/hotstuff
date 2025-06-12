@@ -63,7 +63,7 @@ func (cm *Committer) commit(block *hotstuff.Block) error {
 }
 
 func (cm *Committer) Update(block *hotstuff.Block) {
-	cm.logger.Debugf("block accepted: %v", block)
+	cm.logger.Debugf("Update: %v", block)
 	cm.blockChain.Store(block)
 	// NOTE: this overwrites the block variable. If it was nil, simply don't commit.
 	if block = cm.rules.CommitRule(block); block != nil {

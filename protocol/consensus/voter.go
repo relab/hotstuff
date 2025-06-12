@@ -71,6 +71,7 @@ func NewVoter(
 // view. The proposal should be verified before calling this. The method tells the committer and command cache
 // to update its state.
 func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (hotstuff.PartialCert, error) {
+	v.logger.Debug("Received proposal: %v", proposal.Block)
 	block := proposal.Block
 	// store the valid block, it may commit the block or its ancestors
 	v.committer.Update(block)
@@ -80,7 +81,7 @@ func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (hotstuff.PartialC
 		v.logger.Infof("%v", err)
 	} else {
 		// send the vote if it was successful
-		v.protocol.SendVote(proposal, pc)
+		v.protocol.SendVote(v.LastVote(), proposal, pc)
 	}
 	// advance the view regardless of vote success/failure
 	newInfo := hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
