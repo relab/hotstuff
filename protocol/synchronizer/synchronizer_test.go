@@ -15,7 +15,6 @@ import (
 	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/synchronizer"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/wiring"
@@ -52,7 +51,6 @@ func TestAdvanceViewQC(t *testing.T) {
 	ld := &leaderRotation{
 		LeaderRotation: roundrobin.New(
 			depsCore.RuntimeCfg(),
-			viewduration.NewParams(1, 100*time.Millisecond, 0, 1.2),
 		),
 	}
 	consensusRules := chainedhotstuff.New(
@@ -103,6 +101,7 @@ func TestAdvanceViewQC(t *testing.T) {
 		depsCore.RuntimeCfg(),
 		depsSecurity.Authority(),
 		ld,
+		testutil.FixedTimeout(1000*time.Nanosecond),
 		depsConsensus.Proposer(),
 		depsConsensus.Voter(),
 		viewStates,

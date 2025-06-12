@@ -113,7 +113,7 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	}
 	qc, err := vm.auth.CreateQuorumCert(block, votes)
 	if err != nil {
-		vm.logger.Info("OnVote: could not create QC for block: ", err)
+		vm.logger.Info("CollectVote: could not create QC for block: ", err)
 		return
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
