@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/protocol/consensus"
@@ -73,16 +72,13 @@ func wireUpVoter(
 		leaderRotation,
 		sender,
 	)
-	commandCache := clientpb.New()
 	voter := consensus.NewVoter(
-		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		leaderRotation,
 		consensusRules,
 		hsProtocol,
 		depsSecurity.Authority(),
-		commandCache,
 		committer,
 	)
 	return voter, nil

@@ -92,6 +92,20 @@ func New(
 		timeoutMsg := event.(hotstuff.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
 	})
+
+	// AlanRostem: instead of handling propose message in voter
+	// itself, do it here to access AdvanceView
+	s.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
+		proposal := event.(hotstuff.ProposeMsg)
+		// ensure that I can vote in this view based on the protocol's rule.
+		if err := s.voter.Verify(&proposal); err != nil {
+			s.logger.Infof("failed to verify incoming vote: %v", err)
+			return
+		}
+		s.voter.OnValidPropose(&proposal)
+		// advance the view regardless of vote status
+		s.advanceView(hotstuff.NewSyncInfo().WithQC(proposal.Block.QuorumCert()))
+	})
 	return s
 }
 
@@ -245,6 +259,7 @@ func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
 // advanceView attempts to advance to the next view using the given QC.
 // qc must be either a regular quorum certificate, or a timeout certificate.
 func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocyclo
+	s.logger.Debugf("advanceView: %v", syncInfo)
 	view := hotstuff.View(0)
 	timeout := false
 
@@ -336,7 +351,5 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	err := s.sender.NewView(leader, syncInfo)
 	if err != nil {
 		s.logger.Warnf("advanceView: error on sending new view: %v", err)
-	} else {
-		s.logger.Debug("advanceView: sending new view to leader")
 	}
 }

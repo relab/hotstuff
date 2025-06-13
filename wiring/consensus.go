@@ -34,14 +34,12 @@ func NewConsensus(
 		proposerOpts = append(proposerOpts, consensus.OverrideProposeRule(ruler))
 	}
 	voter := consensus.NewVoter(
-		eventLoop,
 		logger,
 		config,
 		leaderRotationModule,
 		consensusRulesModule,
 		protocol,
 		auth,
-		commandCache,
 		committer,
 	)
 	return &Consensus{

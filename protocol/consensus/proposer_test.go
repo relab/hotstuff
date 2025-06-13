@@ -70,14 +70,12 @@ func wireUpProposer(
 		sender,
 	)
 	voter := consensus.NewVoter(
-		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		leaderRotation,
 		consensusRules,
 		hsProtocol,
 		depsSecurity.Authority(),
-		commandCache,
 		committer,
 	)
 	return consensus.NewProposer(

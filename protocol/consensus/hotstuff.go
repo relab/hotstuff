@@ -46,7 +46,11 @@ func NewHotStuff(
 	}
 }
 
-func (hs *HotStuff) SendPropose(proposal *hotstuff.ProposeMsg, _ hotstuff.PartialCert) {
+func (hs *HotStuff) SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+	hs.votingMachine.CollectVote(hotstuff.VoteMsg{
+		ID:          hs.config.ID(),
+		PartialCert: pc,
+	})
 	hs.sender.Propose(proposal)
 }
 
@@ -66,7 +70,6 @@ func (hs *HotStuff) SendVote(lastVote hotstuff.View, proposal *hotstuff.ProposeM
 		hs.logger.Warnf("%v", err)
 		return
 	}
-	hs.logger.Debugf("voting for %v", proposal)
 }
 
 var _ modules.ConsensusProtocol = (*HotStuff)(nil)

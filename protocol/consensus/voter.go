@@ -5,7 +5,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
@@ -14,9 +13,8 @@ import (
 )
 
 type Voter struct {
-	logger    logging.Logger
-	eventLoop *eventloop.EventLoop
-	config    *core.RuntimeConfig
+	logger logging.Logger
+	config *core.RuntimeConfig
 
 	leaderRotation modules.LeaderRotation
 	ruler          modules.VoteRuler
@@ -30,40 +28,27 @@ type Voter struct {
 }
 
 func NewVoter(
-	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	leaderRotation modules.LeaderRotation,
 	rules modules.VoteRuler,
 	protocol modules.ConsensusProtocol,
 	auth *cert.Authority,
-	commandCache *clientpb.Cache,
 	committer *committer.Committer,
 ) *Voter {
 	v := &Voter{
-		logger:    logger,
-		eventLoop: eventLoop,
-		config:    config,
+		logger: logger,
+		config: config,
 
 		leaderRotation: leaderRotation,
 		ruler:          rules,
 		protocol:       protocol,
 
-		auth:         auth,
-		commandCache: commandCache,
-		committer:    committer,
+		auth:      auth,
+		committer: committer,
 
 		lastVote: 0,
 	}
-	v.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
-		proposal := event.(hotstuff.ProposeMsg)
-		// ensure that I can vote in this view based on the protocol's rule.
-		if err := v.Verify(&proposal); err != nil {
-			v.logger.Infof("failed to verify incoming vote: %v", err)
-			return
-		}
-		v.OnValidPropose(&proposal)
-	})
 	return v
 }
 
@@ -71,7 +56,7 @@ func NewVoter(
 // view. The proposal should be verified before calling this. The method tells the committer and command cache
 // to update its state.
 func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (hotstuff.PartialCert, error) {
-	v.logger.Debug("Received proposal: %v", proposal.Block)
+	v.logger.Debugf("Received proposal: %v", proposal.Block)
 	block := proposal.Block
 	// store the valid block, it may commit the block or its ancestors
 	v.committer.Update(block)
@@ -83,13 +68,6 @@ func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (hotstuff.PartialC
 		// send the vote if it was successful
 		v.protocol.SendVote(v.LastVote(), proposal, pc)
 	}
-	// advance the view regardless of vote success/failure
-	newInfo := hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
-	v.eventLoop.AddEvent(hotstuff.NewViewMsg{
-		ID:       v.config.ID(),
-		SyncInfo: newInfo,
-	})
-
 	return pc, err
 }
 

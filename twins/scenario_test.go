@@ -21,9 +21,11 @@ func TestBasicScenario(t *testing.T) {
 	result, err := ExecuteScenario(s, 4, 0, 100, "chainedhotstuff")
 	if err != nil {
 		t.Log(err)
-		for id, log := range result.NodeLogs {
-			t.Logf("Node %d's log: \n%s", id, log)
-		}
+		t.Log("Logging debug...")
+		t.Log(result.NetworkLog)
+		// for id, log := range result.NodeLogs {
+		// 	t.Logf("Node %d's log: \n%s", id, log)
+		// }
 		t.Fail()
 		return
 	}
@@ -36,7 +38,7 @@ func TestBasicScenario(t *testing.T) {
 		t.Error("Expected one commit")
 	}
 
-	for id, log := range result.NodeLogs {
-		t.Logf("Node %d's log: \n%s", id, log)
-	}
+	// for id, log := range result.NodeLogs {
+	// 	t.Logf("Node %d's log: \n%s", id, log)
+	// }
 }

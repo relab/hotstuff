@@ -57,7 +57,6 @@ type node struct {
 	id             NodeID
 	executedBlocks []*hotstuff.Block
 	effectiveView  hotstuff.View
-	log            *strings.Builder
 }
 
 func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node, error) {
@@ -65,15 +64,13 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 	if err != nil {
 		return nil, err
 	}
-	log := &strings.Builder{}
-	logger := logging.NewWithDest(log, "network")
+	logger := logging.NewWithDest(&n.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
 	node := &node{
 		id:           nodeID,
 		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVoteVerification()),
 		logger:       logger,
 		eventLoop:    eventloop.New(logger, 100),
 		commandCache: clientpb.New(),
-		log:          log,
 	}
 	node.sender = &emulatedSender{
 		node:      node,
@@ -113,14 +110,12 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 		node.sender,
 	)
 	node.voter = consensus.NewVoter(
-		node.eventLoop,
 		node.logger,
 		node.config,
 		node.leaderRotation,
 		consensusRules,
 		protocol,
 		depsSecurity.Authority(),
-		node.commandCache,
 		committer,
 	)
 	node.proposer = consensus.NewProposer(
@@ -248,6 +243,7 @@ func (n *Network) run(ticks int) {
 	}
 
 	for tick := 0; tick < ticks; tick++ {
+		n.logger.Debugf("new tick: %d", tick)
 		n.tick()
 		if n.err != nil {
 			break
