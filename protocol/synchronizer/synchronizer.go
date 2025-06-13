@@ -144,6 +144,7 @@ func (s *Synchronizer) Start(ctx context.Context) {
 
 // OnLocalTimeout is called when a local timeout happens.
 func (s *Synchronizer) OnLocalTimeout() {
+	s.logger.Debug("OnLocalTimeout")
 	s.startTimeoutTimer()
 	view := s.state.View()
 	if s.lastTimeout != nil && s.lastTimeout.View == view {
@@ -194,8 +195,8 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		s.logger.Infof("View timeout signature could not be verified: %v", err)
 		return
 	}
-	s.logger.Debug("OnRemoteTimeout: ", timeout)
-	s.AdvanceView(timeout.SyncInfo)
+	s.logger.Debug("OnRemoteTimeout (advancing view): ", timeout)
+	s.advanceView(timeout.SyncInfo)
 	timeouts, ok := s.timeouts[timeout.View]
 	if !ok {
 		timeouts = make(map[hotstuff.ID]hotstuff.TimeoutMsg)
@@ -228,17 +229,19 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		}
 	}
 	delete(s.timeouts, timeout.View)
-	s.AdvanceView(si)
+	s.logger.Debugf("OnRemoteTimeout (second advance)")
+	s.advanceView(si)
 }
 
 // OnNewView handles an incoming consensus.NewViewMsg
 func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
-	s.AdvanceView(newView.SyncInfo)
+	s.logger.Debugf("OnNewView (internal: %t)", newView.Internal)
+	s.advanceView(newView.SyncInfo)
 }
 
-// AdvanceView attempts to advance to the next view using the given QC.
+// advanceView attempts to advance to the next view using the given QC.
 // qc must be either a regular quorum certificate, or a timeout certificate.
-func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocyclo
+func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocyclo
 	view := hotstuff.View(0)
 	timeout := false
 
@@ -330,5 +333,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	err := s.sender.NewView(leader, syncInfo)
 	if err != nil {
 		s.logger.Warnf("%v", err)
+	} else {
+		s.logger.Debug("sending new view to leader")
 	}
 }

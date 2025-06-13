@@ -55,7 +55,10 @@ func (hs *HotStuff) SendVote(lastVote hotstuff.View, proposal *hotstuff.ProposeM
 	leaderID := hs.leaderRotation.GetLeader(lastVote + 1)
 	if leaderID == hs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.
-		hs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: hs.config.ID(), PartialCert: pc})
+		hs.votingMachine.CollectVote(hotstuff.VoteMsg{
+			ID:          hs.config.ID(),
+			PartialCert: pc,
+		})
 		return
 	}
 	// if I am the one voting, send the vote to next leader over the wire.

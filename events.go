@@ -58,6 +58,7 @@ func (timeout TimeoutMsg) String() string {
 type NewViewMsg struct {
 	ID       ID       // The ID of the replica who sent the message.
 	SyncInfo SyncInfo // The highest QC / TC.
+	Internal bool     // was this called internally or on the network?
 }
 
 // ViewChangeEvent is sent on the eventloop whenever a view change occurs.
