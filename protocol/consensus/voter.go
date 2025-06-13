@@ -88,7 +88,6 @@ func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (hotstuff.PartialC
 	v.eventLoop.AddEvent(hotstuff.NewViewMsg{
 		ID:       v.config.ID(),
 		SyncInfo: newInfo,
-		Internal: true,
 	})
 
 	return pc, err

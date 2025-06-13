@@ -235,7 +235,10 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 
 // OnNewView handles an incoming consensus.NewViewMsg
 func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
-	s.logger.Debugf("OnNewView (internal: %t)", newView.Internal)
+	s.logger.Debugf("OnNewView (from network: %t)", newView.FromNetwork)
+	if newView.FromNetwork {
+		s.logger.Debugf("new view msg from: %d", newView.ID)
+	}
 	s.advanceView(newView.SyncInfo)
 }
 
@@ -266,7 +269,7 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.config.HasAggregateQC() {
 		highQC, err := s.auth.VerifyAggregateQC(s.config.QuorumSize(), aggQC)
 		if err != nil {
-			s.logger.Info("Agg-qc could not be verified: %v", err)
+			s.logger.Info("advanceView: Agg-qc could not be verified: %v", err)
 			return
 		}
 		if aggQC.View() >= view {
@@ -278,7 +281,7 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		qc = highQC
 	} else if qc, haveQC = syncInfo.QC(); haveQC {
 		if err := s.auth.VerifyQuorumCert(qc); err != nil {
-			s.logger.Info("QC could not be verified: %v", err)
+			s.logger.Info("advanceView: QC could not be verified: %v", err)
 			return
 		}
 	}
@@ -286,9 +289,9 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	if haveQC {
 		err := s.state.UpdateHighQC(qc)
 		if err != nil {
-			s.logger.Warnf("Failed to update high-qc: %v", err)
+			s.logger.Warnf("advanceView: Failed to update high-qc: %v", err)
 		} else {
-			s.logger.Debug("High-qc updated")
+			s.logger.Debug("advanceView: High-qc updated")
 		}
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
 		if qc.View() >= view {
@@ -316,7 +319,7 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	s.startTimeoutTimer()
 
-	s.logger.Debugf("Advanced to view %d", newView)
+	s.logger.Debugf("advanceView: Advanced to view %d", newView)
 	s.eventLoop.AddEvent(hotstuff.ViewChangeEvent{View: newView, Timeout: timeout})
 
 	leader := s.leaderRotation.GetLeader(newView)
@@ -332,8 +335,8 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	}
 	err := s.sender.NewView(leader, syncInfo)
 	if err != nil {
-		s.logger.Warnf("%v", err)
+		s.logger.Warnf("advanceView: error on sending new view: %v", err)
 	} else {
-		s.logger.Debug("sending new view to leader")
+		s.logger.Debug("advanceView: sending new view to leader")
 	}
 }

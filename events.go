@@ -56,9 +56,9 @@ func (timeout TimeoutMsg) String() string {
 // NewViewMsg is sent to the leader whenever a replica decides to advance to the next view.
 // It contains the highest QC or TC known to the replica.
 type NewViewMsg struct {
-	ID       ID       // The ID of the replica who sent the message.
-	SyncInfo SyncInfo // The highest QC / TC.
-	Internal bool     // was this called internally or on the network?
+	ID          ID       // The ID of the replica who sent the message.
+	SyncInfo    SyncInfo // The highest QC / TC.
+	FromNetwork bool     // (debug) was this called internally or on the network?
 }
 
 // ViewChangeEvent is sent on the eventloop whenever a view change occurs.

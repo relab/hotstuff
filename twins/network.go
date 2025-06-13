@@ -402,8 +402,9 @@ func (s *emulatedSender) Vote(id hotstuff.ID, cert hotstuff.PartialCert) error {
 
 func (s *emulatedSender) NewView(id hotstuff.ID, si hotstuff.SyncInfo) error {
 	s.sendMessage(id, hotstuff.NewViewMsg{
-		ID:       s.node.id.ReplicaID,
-		SyncInfo: si,
+		ID:          s.node.id.ReplicaID,
+		SyncInfo:    si,
+		FromNetwork: true,
 	})
 	return nil
 }
