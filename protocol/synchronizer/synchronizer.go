@@ -16,7 +16,7 @@ import (
 	"github.com/relab/hotstuff"
 )
 
-// Synchronizer synchronizes replicas to the same view.
+// Synchronizer implements the DiemBFT pacemaker and is the main loop of the consensus protocol.
 type Synchronizer struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger

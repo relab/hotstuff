@@ -94,7 +94,6 @@ func (p *Proposer) Propose(proposal *hotstuff.ProposeMsg) {
 	}
 	p.committer.Update(proposal.Block)
 	p.protocol.SendPropose(proposal, pc)
-	// p.protocol.SendVote(p.voter.LastVote(), proposal, pc)
 }
 
 // CreateProposal attempts to create a new outgoing proposal if a command exists and the protocol's rule is satisfied.
