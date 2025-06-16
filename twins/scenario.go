@@ -38,10 +38,10 @@ func (s Scenario) String() string {
 
 // ScenarioResult contains the result and logs from executing a scenario.
 type ScenarioResult struct {
-	Safe       bool
-	Commits    int
-	NetworkLog string
-	// NodeLogs    map[NodeID]string
+	Safe        bool
+	Commits     int
+	NetworkLog  string
+	NodeLogs    map[NodeID]string
 	NodeCommits map[NodeID][]*hotstuff.Block
 }
 
@@ -67,10 +67,10 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, 
 
 	network.run(numTicks)
 
-	// nodeLogs := make(map[NodeID]string)
-	// for _, node := range network.nodes {
-	// 	nodeLogs[node.id] = node.log.String()
-	// }
+	nodeLogs := make(map[NodeID]string)
+	for _, node := range network.nodes {
+		nodeLogs[node.id] = node.log.String()
+	}
 
 	if network.err != nil {
 		return ScenarioResult{

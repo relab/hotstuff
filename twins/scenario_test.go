@@ -20,11 +20,7 @@ func TestBasicScenario(t *testing.T) {
 	logging.SetLogLevel("debug")
 	result, err := ExecuteScenario(s, 4, 0, 100, "chainedhotstuff")
 	if err != nil {
-		t.Log(err)
-		t.Log("Logging debug...")
-		t.Log(result.NetworkLog)
-		t.Fail()
-		return
+		t.Fatal(err)
 	}
 
 	if !result.Safe {
@@ -34,5 +30,4 @@ func TestBasicScenario(t *testing.T) {
 	if result.Commits != 1 {
 		t.Error("Expected one commit")
 	}
-	t.Log(result.NetworkLog)
 }

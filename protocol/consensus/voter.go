@@ -6,7 +6,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/security/cert"
@@ -20,9 +19,8 @@ type Voter struct {
 	ruler          modules.VoteRuler
 	protocol       modules.ConsensusProtocol
 
-	auth         *cert.Authority
-	commandCache *clientpb.Cache
-	committer    *committer.Committer
+	auth      *cert.Authority
+	committer *committer.Committer
 
 	lastVote hotstuff.View
 }
@@ -55,7 +53,7 @@ func NewVoter(
 // OnValidPropose is called when receiving a valid proposal from a leader and emits an event to advance the
 // view. The proposal should be verified before calling this. The method tells the committer and command cache
 // to update its state.
-func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (hotstuff.PartialCert, error) {
+func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) {
 	v.logger.Debugf("Received proposal: %v", proposal.Block)
 	block := proposal.Block
 	// store the valid block, it may commit the block or its ancestors
@@ -68,7 +66,6 @@ func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (hotstuff.PartialC
 		// send the vote if it was successful
 		v.protocol.SendVote(v.LastVote(), proposal, pc)
 	}
-	return pc, err
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.

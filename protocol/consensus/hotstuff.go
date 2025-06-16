@@ -55,7 +55,7 @@ func (hs *HotStuff) SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.Parti
 }
 
 // SendVote disseminates or stores a valid vote depending on replica being voter or leader in the next view.
-func (hs *HotStuff) SendVote(lastVote hotstuff.View, proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (hs *HotStuff) SendVote(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	leaderID := hs.leaderRotation.GetLeader(lastVote + 1)
 	if leaderID == hs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.

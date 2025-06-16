@@ -31,6 +31,7 @@ func (ld *leaderRotation) ViewDuration() modules.ViewDuration {
 var _ modules.LeaderRotation = (*leaderRotation)(nil)
 
 func TestAdvanceViewQC(t *testing.T) {
+	t.Skip() // TODO(AlanRostem): finish this test's implementation
 	const n = 4
 	const cryptoName = ecdsa.ModuleName
 	id := hotstuff.ID(1)

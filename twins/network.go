@@ -57,6 +57,7 @@ type node struct {
 	id             NodeID
 	executedBlocks []*hotstuff.Block
 	effectiveView  hotstuff.View
+	log            *strings.Builder
 }
 
 func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node, error) {
@@ -64,13 +65,15 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 	if err != nil {
 		return nil, err
 	}
-	logger := logging.NewWithDest(&n.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
+	log := &strings.Builder{}
+	logger := logging.NewWithDest(log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
 	node := &node{
 		id:           nodeID,
 		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVoteVerification()),
 		logger:       logger,
 		eventLoop:    eventloop.New(logger, 100),
 		commandCache: clientpb.New(),
+		log:          log,
 	}
 	node.sender = &emulatedSender{
 		node:      node,
