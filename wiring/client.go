@@ -8,7 +8,7 @@ import (
 )
 
 type Client struct {
-	cmdCache  *clientpb.Cache
+	cmdCache  *clientpb.CommandCache
 	clientSrv *clientpb.Server
 }
 
@@ -17,10 +17,10 @@ func NewClient(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	// TODO: Join these into single option type
-	cacheOpt []clientpb.Option,
+	cacheOpt []clientpb.CommandCacheOption,
 	clientSrvOpts ...gorums.ServerOption,
 ) *Client {
-	cmdCache := clientpb.New(
+	cmdCache := clientpb.NewCommandCache(
 		cacheOpt...,
 	)
 	clientSrv := clientpb.NewServer(
@@ -36,7 +36,7 @@ func NewClient(
 }
 
 // Cache returns the command cache.
-func (s *Client) Cache() *clientpb.Cache {
+func (s *Client) Cache() *clientpb.CommandCache {
 	return s.cmdCache
 }
 

@@ -26,7 +26,7 @@ type replicaOptions struct {
 	credentials          credentials.TransportCredentials
 	clientGorumsSrvOpts  []gorums.ServerOption
 	replicaGorumsSrvOpts []gorums.ServerOption
-	cmdCacheOpts         []clientpb.Option
+	cmdCacheOpts         []clientpb.CommandCacheOption
 	serverOpts           []server.ServerOption
 	moduleNames          moduleNames
 }
@@ -76,7 +76,7 @@ func WithByzantineStrategy(strategyName string) Option {
 	}
 }
 
-func WithCmdCacheOptions(opts ...clientpb.Option) Option {
+func WithCmdCacheOptions(opts ...clientpb.CommandCacheOption) Option {
 	return func(ro *replicaOptions) {
 		ro.cmdCacheOpts = append(ro.cmdCacheOpts, opts...)
 	}

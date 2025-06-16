@@ -45,7 +45,7 @@ type node struct {
 	logger         logging.Logger
 	sender         *emulatedSender
 	blockChain     *blockchain.BlockChain
-	commandCache   *clientpb.Cache
+	commandCache   *clientpb.CommandCache
 	voter          *consensus.Voter
 	proposer       *consensus.Proposer
 	eventLoop      *eventloop.EventLoop
@@ -72,7 +72,7 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVoteVerification()),
 		logger:       logger,
 		eventLoop:    eventloop.New(logger, 100),
-		commandCache: clientpb.New(),
+		commandCache: clientpb.NewCommandCache(),
 		log:          log,
 	}
 	node.sender = &emulatedSender{

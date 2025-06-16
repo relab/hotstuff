@@ -28,7 +28,7 @@ func wireUpProposer(
 	depsCore *wiring.Core,
 	depsSecurity *wiring.Security,
 	sender modules.Sender,
-	commandCache *clientpb.Cache,
+	commandCache *clientpb.CommandCache,
 	list moduleList,
 ) *consensus.Proposer {
 	t.Helper()
@@ -137,7 +137,7 @@ func TestPropose(t *testing.T) {
 		SequenceNumber: 1,
 		Data:           []byte("testing data here"),
 	}
-	commandCache := clientpb.New()
+	commandCache := clientpb.NewCommandCache()
 	commandCache.Add(command)
 	proposer := wireUpProposer(t, replica0.depsCore, replica0.depsSecurity, replica0.sender, commandCache, list)
 	// block := testutil.CreateBlock(t, replica0.depsSecurity.Authority())

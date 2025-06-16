@@ -23,7 +23,7 @@ func NewConsensus(
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
 	auth *cert.Authority,
-	commandCache *clientpb.Cache,
+	commandCache *clientpb.CommandCache,
 	committer *committer.Committer,
 	consensusRulesModule modules.HotstuffRuleset,
 	leaderRotationModule modules.LeaderRotation,

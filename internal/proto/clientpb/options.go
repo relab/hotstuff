@@ -1,12 +1,12 @@
 package clientpb
 
-type Option func(*Cache)
+type CommandCacheOption func(*CommandCache)
 
-func WithBatching(batchSize uint32) Option {
+func WithBatching(batchSize uint32) CommandCacheOption {
 	if batchSize < 2 {
 		panic("batch size must at least be two")
 	}
-	return func(cmdCache *Cache) {
+	return func(cmdCache *CommandCache) {
 		cmdCache.batchSize = batchSize
 	}
 }

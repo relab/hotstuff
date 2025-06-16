@@ -59,7 +59,7 @@ func TestAdvanceViewQC(t *testing.T) {
 		depsSecurity.BlockChain(),
 	)
 
-	commandCache := clientpb.New()
+	commandCache := clientpb.NewCommandCache()
 	committer := committer.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),

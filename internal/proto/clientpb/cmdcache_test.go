@@ -12,7 +12,7 @@ import (
 )
 
 func TestCacheConcurrentAddGet(t *testing.T) {
-	cache := New(WithBatching(2))
+	cache := NewCommandCache(WithBatching(2))
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -124,7 +124,7 @@ func TestCacheAddGetDeadlineExceeded(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cache := New(WithBatching(2))
+			cache := NewCommandCache(WithBatching(2))
 
 			for _, cmd := range tt.cmds {
 				cache.Add(cmd)
@@ -196,7 +196,7 @@ func TestPreventAddingDuplicates(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cache := New(WithBatching(2))
+			cache := NewCommandCache(WithBatching(2))
 
 			// mark batchA as proposed; necessary to prevent the cache from adding previously proposed commands
 			cache.Proposed(tt.batchA)
@@ -305,7 +305,7 @@ func TestCacheContainsDuplicate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cache := New(WithBatching(2))
+			cache := NewCommandCache(WithBatching(2))
 
 			// mark batchA as proposed
 			cache.Proposed(tt.batchA)

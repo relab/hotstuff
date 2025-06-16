@@ -17,7 +17,7 @@ import (
 // Server serves a client.
 type Server struct {
 	logger   logging.Logger
-	cmdCache *Cache
+	cmdCache *CommandCache
 
 	mut          sync.Mutex
 	srv          *gorums.Server
@@ -32,7 +32,7 @@ type Server struct {
 func NewServer(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	cmdCache *Cache,
+	cmdCache *CommandCache,
 	srvOpts ...gorums.ServerOption,
 ) (srv *Server) {
 	srv = &Server{

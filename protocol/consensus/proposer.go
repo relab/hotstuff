@@ -22,7 +22,7 @@ type Proposer struct {
 	ruler        modules.ProposeRuler
 	protocol     modules.ConsensusProtocol
 	voter        *Voter
-	commandCache *clientpb.Cache
+	commandCache *clientpb.CommandCache
 	committer    *committer.Committer
 
 	lastProposed hotstuff.View
@@ -35,7 +35,7 @@ func NewProposer(
 	blockChain *blockchain.BlockChain,
 	protocol modules.ConsensusProtocol,
 	voter *Voter,
-	commandCache *clientpb.Cache,
+	commandCache *clientpb.CommandCache,
 	committer *committer.Committer,
 	opts ...ProposerOption,
 ) *Proposer {
