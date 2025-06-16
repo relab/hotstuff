@@ -2,6 +2,7 @@
 package synchronizer
 
 import (
+	"bytes"
 	"context"
 	"time"
 
@@ -302,11 +303,15 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	}
 
 	if haveQC {
+		oldQC := s.state.HighQC()
 		err := s.state.UpdateHighQC(qc)
 		if err != nil {
 			s.logger.Warnf("advanceView: Failed to update high-qc: %v", err)
 		} else {
-			s.logger.Debug("advanceView: High-qc updated")
+			newQC := s.state.HighQC()
+			if !bytes.Equal(oldQC.ToBytes(), newQC.ToBytes()) {
+				s.logger.Debug("advanceView: High-qc updated")
+			}
 		}
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
 		if qc.View() >= view {
