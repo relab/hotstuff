@@ -86,6 +86,7 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, 
 		Commits:     commits,
 		NetworkLog:  network.log.String(),
 		NodeCommits: getBlocks(network),
+		NodeLogs:    nodeLogs,
 	}, nil
 }
 

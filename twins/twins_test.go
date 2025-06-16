@@ -21,7 +21,8 @@ func TestTwins(t *testing.T) {
 		Partitions: 2,
 		Views:      8,
 	})
-	g.Shuffle(time.Now().Unix())
+	seed := time.Now().Unix()
+	g.Shuffle(seed)
 
 	scenarioCount := 10
 	totalCommits := 0

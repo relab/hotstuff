@@ -137,7 +137,7 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 		node.config,
 		depsSecurity.Authority(),
 		node.leaderRotation,
-		FixedTimeout(1*time.Millisecond),
+		FixedTimeout(100*time.Millisecond),
 		node.proposer,
 		node.voter,
 		node.viewStates,
