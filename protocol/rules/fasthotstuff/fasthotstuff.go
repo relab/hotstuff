@@ -12,7 +12,7 @@ const ModuleName = "fasthotstuff"
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {
-	blockChain *blockchain.BlockChain
+	blockChain *blockchain.Blockchain
 	logger     logging.Logger
 }
 
@@ -20,7 +20,7 @@ type FastHotStuff struct {
 func New(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 ) *FastHotStuff {
 	if !config.HasAggregateQC() {
 		panic("aggregate qc must be enabled for fasthotstuff")

@@ -10,7 +10,7 @@ import (
 )
 
 type Security struct {
-	blockChain *blockchain.BlockChain
+	blockChain *blockchain.Blockchain
 	cryptoImpl modules.CryptoBase
 	auth       *cert.Authority
 }
@@ -50,7 +50,7 @@ func NewSecurity(
 }
 
 // BlockChain returns the blockchain instance.
-func (s *Security) BlockChain() *blockchain.BlockChain {
+func (s *Security) BlockChain() *blockchain.Blockchain {
 	return s.blockChain
 }
 

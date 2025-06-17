@@ -13,14 +13,14 @@ import (
 type Authority struct {
 	modules.CryptoBase // embedded to avoid having to implement forwarding methods
 	config             *core.RuntimeConfig
-	blockChain         *blockchain.BlockChain
+	blockChain         *blockchain.Blockchain
 }
 
 // NewAuthority returns an Authority. It will use the given CryptoBase to create and verify
 // signatures.
 func NewAuthority(
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 	impl modules.CryptoBase,
 	opts ...Option,
 ) *Authority {

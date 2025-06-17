@@ -17,7 +17,7 @@ import (
 const ModuleName = "carousel"
 
 type Carousel struct {
-	blockChain *blockchain.BlockChain
+	blockChain *blockchain.Blockchain
 	viewStates *protocol.ViewStates
 	config     *core.RuntimeConfig
 	logger     logging.Logger
@@ -29,7 +29,7 @@ type Carousel struct {
 func New(
 	chainLength int,
 
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 	viewStates *protocol.ViewStates,
 	config *core.RuntimeConfig,
 	logger logging.Logger,

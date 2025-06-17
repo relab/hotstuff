@@ -23,7 +23,7 @@ func NewHotStuff(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 	auth *cert.Authority,
 	states *protocol.ViewStates,
 	leaderRotation modules.LeaderRotation,

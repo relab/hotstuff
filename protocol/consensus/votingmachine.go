@@ -17,7 +17,7 @@ type VotingMachine struct {
 	logger     logging.Logger
 	eventLoop  *eventloop.EventLoop
 	config     *core.RuntimeConfig
-	blockChain *blockchain.BlockChain
+	blockChain *blockchain.Blockchain
 	auth       *cert.Authority
 	state      *protocol.ViewStates
 
@@ -29,7 +29,7 @@ func NewVotingMachine(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 	auth *cert.Authority,
 	state *protocol.ViewStates,
 ) *VotingMachine {

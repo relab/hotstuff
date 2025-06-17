@@ -25,7 +25,7 @@ type Kauri struct {
 	logger     logging.Logger
 	eventLoop  *eventloop.EventLoop
 	config     *core.RuntimeConfig
-	blockChain *blockchain.BlockChain
+	blockChain *blockchain.Blockchain
 	auth       *cert.Authority
 	sender     modules.KauriSender
 
@@ -43,7 +43,7 @@ func New(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 	auth *cert.Authority,
 	sender modules.KauriSender,
 ) *Kauri {

@@ -20,7 +20,7 @@ func NewConsensus(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 	auth *cert.Authority,
 	commandCache *clientpb.CommandCache,
 	committer *consensus.Committer,

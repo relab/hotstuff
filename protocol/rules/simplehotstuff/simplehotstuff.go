@@ -14,7 +14,7 @@ const ModuleName = "simplehotstuff"
 // Based on the simplified algorithm described in the paper
 // "Formal Verification of HotStuff" by Leander Jehl.
 type SimpleHotStuff struct {
-	blockChain *blockchain.BlockChain
+	blockChain *blockchain.Blockchain
 	logger     logging.Logger
 
 	locked *hotstuff.Block
@@ -23,7 +23,7 @@ type SimpleHotStuff struct {
 // New returns a new SimpleHotStuff instance.
 func New(
 	logger logging.Logger,
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 ) *SimpleHotStuff {
 	return &SimpleHotStuff{
 		blockChain: blockChain,

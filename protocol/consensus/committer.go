@@ -17,7 +17,7 @@ import (
 type Committer struct {
 	eventLoop  *eventloop.EventLoop
 	logger     logging.Logger
-	blockChain *blockchain.BlockChain
+	blockchain *blockchain.Blockchain
 	viewStates *protocol.ViewStates
 	ruler      modules.CommitRuler
 }
@@ -25,13 +25,13 @@ type Committer struct {
 func NewCommitter(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 	viewStates *protocol.ViewStates,
 	ruler modules.CommitRuler,
 ) *Committer {
 	return &Committer{
 		eventLoop:  eventLoop,
-		blockChain: blockChain,
+		blockchain: blockChain,
 		ruler:      ruler,
 		logger:     logger,
 		viewStates: viewStates,
@@ -45,7 +45,7 @@ func (cm *Committer) commit(block *hotstuff.Block) error {
 		return err
 	}
 
-	forkedBlocks := cm.blockChain.PruneToHeight(
+	forkedBlocks := cm.blockchain.PruneToHeight(
 		cm.viewStates.CommittedBlock().View(),
 		block.View(),
 	)
@@ -57,11 +57,11 @@ func (cm *Committer) commit(block *hotstuff.Block) error {
 	return nil
 }
 
-// Update stores the block on the chain and traverses it, ensuring that the block is valid and can be executed.
+// TryCommit stores the block on the chain and traverses it, ensuring that the block is valid and can be executed.
 // NOTE: The method checks the CommitRuler's rule before traversing.
-func (cm *Committer) Update(block *hotstuff.Block) error {
+func (cm *Committer) TryCommit(block *hotstuff.Block) error {
 	cm.logger.Debugf("Update: %v", block)
-	cm.blockChain.Store(block)
+	cm.blockchain.Store(block)
 	// NOTE: this overwrites the block variable. If it was nil, simply don't commit.
 	if block = cm.ruler.CommitRule(block); block != nil {
 		err := cm.commit(block) // committer will eventually execute the command.
@@ -77,7 +77,7 @@ func (cm *Committer) commitInner(block, committedBlock *hotstuff.Block) error {
 	if committedBlock.View() >= block.View() {
 		return nil
 	}
-	if parent, ok := cm.blockChain.Get(block.Parent()); ok {
+	if parent, ok := cm.blockchain.Get(block.Parent()); ok {
 		err := cm.commitInner(parent, committedBlock)
 		if err != nil {
 			return err

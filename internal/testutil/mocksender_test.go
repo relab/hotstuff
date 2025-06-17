@@ -21,7 +21,7 @@ type replica struct {
 	eventLoop  *eventloop.EventLoop
 	config     *core.RuntimeConfig
 	sender     *testutil.MockSender
-	blockChain *blockchain.BlockChain
+	blockChain *blockchain.Blockchain
 	auth       *cert.Authority
 }
 
@@ -136,7 +136,7 @@ func TestSub(t *testing.T) {
 
 func TestRequestBlock(t *testing.T) {
 	replicaIDs := []hotstuff.ID{1, 2, 3, 4}
-	chains := make([]*blockchain.BlockChain, 0)
+	chains := make([]*blockchain.Blockchain, 0)
 	senders := make([]*testutil.MockSender, 0)
 	var firstCore *wiring.Core
 	for _, id := range replicaIDs {

@@ -13,7 +13,7 @@ import (
 // by several consensus component objects.
 // TODO(AlanRostem): make tests for this.
 type ViewStates struct {
-	blockChain *blockchain.BlockChain
+	blockChain *blockchain.Blockchain
 	auth       *cert.Authority
 
 	mut sync.RWMutex // to protect the following
@@ -25,7 +25,7 @@ type ViewStates struct {
 }
 
 func NewViewStates(
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 	auth *cert.Authority,
 ) (*ViewStates, error) {
 	s := &ViewStates{

@@ -56,7 +56,7 @@ func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) {
 	v.logger.Debugf("Received proposal: %v", proposal.Block)
 	block := proposal.Block
 	// store the valid block, it may commit the block or its ancestors
-	if err := v.committer.Update(block); err != nil {
+	if err := v.committer.TryCommit(block); err != nil {
 		v.logger.Warn(err)
 	}
 	pc, err := v.Vote(block)

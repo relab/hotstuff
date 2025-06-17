@@ -133,13 +133,13 @@ func TestFHSBug(t *testing.T) {
 // A wrapper around the FHS rules that swaps the commit rule for a vulnerable version
 type vulnerableFHS struct {
 	logger     logging.Logger
-	blockChain *blockchain.BlockChain
+	blockChain *blockchain.Blockchain
 	inner      fasthotstuff.FastHotStuff
 }
 
 func NewVulnFHS(
 	logger logging.Logger,
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 	inner fasthotstuff.FastHotStuff,
 ) *vulnerableFHS {
 	return &vulnerableFHS{

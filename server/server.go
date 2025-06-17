@@ -22,7 +22,7 @@ import (
 // Server is the Server-side of the gorums backend.
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
-	blockChain *blockchain.BlockChain
+	blockChain *blockchain.Blockchain
 	eventLoop  *eventloop.EventLoop
 	logger     logging.Logger
 	config     *core.RuntimeConfig
@@ -37,7 +37,7 @@ func NewServer(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 	srvOpts ...ServerOption,
 ) *Server {
 	options := &serverOptions{}

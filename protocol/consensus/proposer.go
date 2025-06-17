@@ -17,7 +17,7 @@ type Proposer struct {
 	eventLoop    *eventloop.EventLoop
 	logger       logging.Logger
 	config       *core.RuntimeConfig
-	blockChain   *blockchain.BlockChain
+	blockChain   *blockchain.Blockchain
 	ruler        modules.ProposeRuler
 	dissAgg      modules.DisseminatorAggregator
 	voter        *Voter
@@ -31,7 +31,7 @@ func NewProposer(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 	dissAgg modules.DisseminatorAggregator,
 	voter *Voter,
 	commandCache *clientpb.CommandCache,
@@ -91,7 +91,7 @@ func (p *Proposer) Propose(proposal *hotstuff.ProposeMsg) {
 		p.logger.Error(err)
 		return
 	}
-	if err := p.committer.Update(proposal.Block); err != nil {
+	if err := p.committer.TryCommit(proposal.Block); err != nil {
 		p.logger.Error(err)
 	}
 	if err := p.dissAgg.Disseminate(proposal, pc); err != nil {

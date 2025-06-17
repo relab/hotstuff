@@ -28,7 +28,7 @@ func NewSilence(rules modules.HotstuffRuleset) *Silence {
 }
 
 type Fork struct {
-	blockChain *blockchain.BlockChain
+	blockChain *blockchain.Blockchain
 	config     *core.RuntimeConfig
 	modules.HotstuffRuleset
 }
@@ -66,7 +66,7 @@ func (f *Fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert 
 // NewFork returns a byzantine replica that will try to fork the chain.
 func NewFork(
 	rules modules.HotstuffRuleset,
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 	config *core.RuntimeConfig,
 ) *Fork {
 	return &Fork{

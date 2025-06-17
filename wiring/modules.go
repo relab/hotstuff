@@ -26,7 +26,7 @@ import (
 func NewConsensusRules(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 	name string,
 ) (rules modules.HotstuffRuleset, err error) {
 	logger.Debugf("Initializing module (consensus rules): %s", name)
@@ -45,7 +45,7 @@ func NewConsensusRules(
 
 func WrapByzantineStrategy(
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 	rules modules.HotstuffRuleset,
 	name string,
 ) (byzRules modules.HotstuffRuleset, err error) {
@@ -86,7 +86,7 @@ func newCryptoModule(
 func NewLeaderRotation(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
+	blockChain *blockchain.Blockchain,
 	viewStates *protocol.ViewStates,
 	name string,
 	chainLength int,

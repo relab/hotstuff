@@ -44,7 +44,7 @@ type node struct {
 	config         *core.RuntimeConfig
 	logger         logging.Logger
 	sender         *emulatedSender
-	blockChain     *blockchain.BlockChain
+	blockChain     *blockchain.Blockchain
 	commandCache   *clientpb.CommandCache
 	voter          *consensus.Voter
 	proposer       *consensus.Proposer
