@@ -28,7 +28,7 @@ func NewHotStuff(
 	states *ViewStates,
 	leaderRotation modules.LeaderRotation,
 	sender modules.Sender,
-) modules.ConsensusProtocol {
+) modules.DisseminatorAggregator {
 	return &HotStuff{
 		logger: logger,
 		config: config,
@@ -46,7 +46,7 @@ func NewHotStuff(
 	}
 }
 
-func (hs *HotStuff) SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (hs *HotStuff) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	hs.votingMachine.CollectVote(hotstuff.VoteMsg{
 		ID:          hs.config.ID(),
 		PartialCert: pc,
@@ -54,8 +54,8 @@ func (hs *HotStuff) SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.Parti
 	hs.sender.Propose(proposal)
 }
 
-// SendVote disseminates or stores a valid vote depending on replica being voter or leader in the next view.
-func (hs *HotStuff) SendVote(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+// Aggregate disseminates or stores a valid vote depending on replica being voter or leader in the next view.
+func (hs *HotStuff) Aggregate(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	leaderID := hs.leaderRotation.GetLeader(lastVote + 1)
 	if leaderID == hs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.
@@ -72,4 +72,4 @@ func (hs *HotStuff) SendVote(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc 
 	}
 }
 
-var _ modules.ConsensusProtocol = (*HotStuff)(nil)
+var _ modules.DisseminatorAggregator = (*HotStuff)(nil)

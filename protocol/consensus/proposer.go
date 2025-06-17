@@ -20,7 +20,7 @@ type Proposer struct {
 	config       *core.RuntimeConfig
 	blockChain   *blockchain.BlockChain
 	ruler        modules.ProposeRuler
-	protocol     modules.ConsensusProtocol
+	dissAgg      modules.DisseminatorAggregator
 	voter        *Voter
 	commandCache *clientpb.CommandCache
 	committer    *committer.Committer
@@ -33,7 +33,7 @@ func NewProposer(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
-	protocol modules.ConsensusProtocol,
+	dissAgg modules.DisseminatorAggregator,
 	voter *Voter,
 	commandCache *clientpb.CommandCache,
 	committer *committer.Committer,
@@ -45,7 +45,7 @@ func NewProposer(
 		config:       config,
 		blockChain:   blockChain,
 		ruler:        nil,
-		protocol:     protocol,
+		dissAgg:      dissAgg,
 		voter:        voter,
 		commandCache: commandCache,
 		committer:    committer,
@@ -93,7 +93,7 @@ func (p *Proposer) Propose(proposal *hotstuff.ProposeMsg) {
 		return
 	}
 	p.committer.Update(proposal.Block)
-	p.protocol.SendPropose(proposal, pc)
+	p.dissAgg.Disseminate(proposal, pc)
 }
 
 // CreateProposal attempts to create a new outgoing proposal if a command exists and the protocol's rule is satisfied.

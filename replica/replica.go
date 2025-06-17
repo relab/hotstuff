@@ -118,7 +118,7 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	var protocol modules.ConsensusProtocol
+	var protocol modules.DisseminatorAggregator
 	if depsCore.RuntimeCfg().HasKauriTree() {
 		protocol = kauri.New(
 			depsCore.Logger(),

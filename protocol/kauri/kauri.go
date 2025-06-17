@@ -89,11 +89,11 @@ func (k *Kauri) reset() {
 	k.aggSent = false
 }
 
-func (k *Kauri) SendVote(_ hotstuff.View, proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (k *Kauri) Aggregate(_ hotstuff.View, proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	k.Begin(proposal, pc)
 }
 
-func (k *Kauri) SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (k *Kauri) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
 	k.Begin(proposal, pc)
 }
 
@@ -220,4 +220,4 @@ type WaitTimerExpiredEvent struct {
 	currentView hotstuff.View
 }
 
-var _ modules.ConsensusProtocol = (*Kauri)(nil)
+var _ modules.DisseminatorAggregator = (*Kauri)(nil)

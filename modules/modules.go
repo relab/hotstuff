@@ -41,6 +41,14 @@ type LeaderRotation interface {
 	GetLeader(hotstuff.View) hotstuff.ID
 }
 
+// DisseminatorAggregator is an interface sending proposals and votes.
+type DisseminatorAggregator interface {
+	// Disseminate disseminates the proposal from the proposer.
+	Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
+	// Aggregate handles incoming proposals and replies with a vote.
+	Aggregate(lastVote hotstuff.View, proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
+}
+
 // ViewDuration determines the duration of a view.
 // The view synchronizer uses this interface to set its timeouts.
 type ViewDuration interface {
@@ -72,6 +80,7 @@ type Sender interface {
 	Vote(id hotstuff.ID, cert hotstuff.PartialCert) error
 	Timeout(msg hotstuff.TimeoutMsg)
 	Propose(proposal *hotstuff.ProposeMsg)
+	// RequestBlock sends a request to the replicas to send back a block missing locally.
 	RequestBlock(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool)
 	Sub(ids []hotstuff.ID) (Sender, error)
 }
@@ -80,12 +89,4 @@ type Sender interface {
 type KauriSender interface {
 	Sender
 	SendContributionToParent(view hotstuff.View, qc hotstuff.QuorumSignature)
-}
-
-// ConsensusProtocol is an interface sending proposals and votes.
-type ConsensusProtocol interface {
-	// SendVote handles incoming proposals and replies with a vote.
-	SendVote(lastVote hotstuff.View, proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
-	// SendPropose disseminates the proposal from the proposer.
-	SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
 }

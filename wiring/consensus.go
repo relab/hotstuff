@@ -27,7 +27,7 @@ func NewConsensus(
 	committer *committer.Committer,
 	consensusRulesModule modules.HotstuffRuleset,
 	leaderRotationModule modules.LeaderRotation,
-	protocol modules.ConsensusProtocol,
+	protocol modules.DisseminatorAggregator,
 ) *Consensus {
 	proposerOpts := []consensus.ProposerOption{}
 	if ruler, ok := consensusRulesModule.(modules.ProposeRuler); ok {
