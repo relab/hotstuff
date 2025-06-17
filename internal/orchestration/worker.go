@@ -211,9 +211,63 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if err != nil {
 		return nil, err
 	}
-	consensusRules, viewStates, leaderRotation, err := initConsensusModules(depsCore, depsSecure, opts)
+	consensusRules, viewStates, leaderRotation, disAgg, viewDuration, err := initConsensusModules(depsCore, depsSecure, sender, opts)
 	if err != nil {
 		return nil, err
+	}
+	return replica.New(
+		depsCore,
+		depsSecure,
+		sender,
+		viewStates,
+		disAgg,
+		leaderRotation,
+		consensusRules,
+		viewDuration,
+		replicaOpts...,
+	)
+}
+
+func initConsensusModules(depsCore *wiring.Core, depsSecure *wiring.Security, sender *network.GorumsSender, opts *orchestrationpb.ReplicaOpts) (modules.HotstuffRuleset, *protocol.ViewStates, modules.LeaderRotation, modules.DisseminatorAggregator, modules.ViewDuration, error) {
+	consensusRules, err := wiring.NewConsensusRules(
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		depsSecure.BlockChain(),
+		opts.GetConsensus(),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	if byzStrategy := opts.GetByzantineStrategy(); byzStrategy != "" {
+		byz, err := wiring.WrapByzantineStrategy(
+			depsCore.Logger(),
+			depsCore.RuntimeCfg(),
+			depsSecure.BlockChain(),
+			consensusRules,
+			byzStrategy,
+		)
+		if err != nil {
+			return nil, nil, nil, nil, nil, err
+		}
+		consensusRules = byz
+	}
+	viewStates, err := protocol.NewViewStates(
+		depsSecure.BlockChain(),
+		depsSecure.Authority(),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	leaderRotation, err := wiring.NewLeaderRotation(
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		depsSecure.BlockChain(),
+		viewStates,
+		opts.GetLeaderRotation(),
+		consensusRules.ChainLength(),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
 	}
 
 	var disAgg modules.DisseminatorAggregator
@@ -250,17 +304,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			sender,
 		)
 	}
-	return replica.New(
-		depsCore,
-		depsSecure,
-		sender,
-		viewStates,
-		disAgg,
-		leaderRotation,
-		consensusRules,
-		viewDuration,
-		replicaOpts...,
-	)
+	return consensusRules, viewStates, leaderRotation, disAgg, viewDuration, nil
 }
 
 // newTree creates a new tree based on the provided options. It uses the aggregation
@@ -279,52 +323,6 @@ func newTree(opts *orchestrationpb.ReplicaOpts) *tree.Tree {
 		opts.TreePositionIDs(),
 		opts.GetTreeDelta().AsDuration(),
 	)
-}
-
-// initConsensusModules initializes the consensus modules based on the provided options.
-// It returns the consensus ruleset, view states, and leader rotation modules.
-func initConsensusModules(depsCore *wiring.Core, depsSecure *wiring.Security, opts *orchestrationpb.ReplicaOpts) (modules.HotstuffRuleset, *protocol.ViewStates, modules.LeaderRotation, error) {
-	consensusRules, err := wiring.NewConsensusRules(
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		depsSecure.BlockChain(),
-		opts.GetConsensus(),
-	)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	if byzStrategy := opts.GetByzantineStrategy(); byzStrategy != "" {
-		byz, err := wiring.WrapByzantineStrategy(
-			depsCore.Logger(),
-			depsCore.RuntimeCfg(),
-			depsSecure.BlockChain(),
-			consensusRules,
-			byzStrategy,
-		)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		consensusRules = byz
-	}
-	viewStates, err := protocol.NewViewStates(
-		depsSecure.BlockChain(),
-		depsSecure.Authority(),
-	)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	leaderRotation, err := wiring.NewLeaderRotation(
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		depsSecure.BlockChain(),
-		viewStates,
-		opts.GetLeaderRotation(),
-		consensusRules.ChainLength(),
-	)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	return consensusRules, viewStates, leaderRotation, nil
 }
 
 func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {
