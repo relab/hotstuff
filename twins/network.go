@@ -17,7 +17,7 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/committer"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/security/blockchain"
@@ -49,7 +49,7 @@ type node struct {
 	voter          *consensus.Voter
 	proposer       *consensus.Proposer
 	eventLoop      *eventloop.EventLoop
-	viewStates     *consensus.ViewStates
+	viewStates     *protocol.ViewStates
 	leaderRotation modules.LeaderRotation
 	synchronizer   *synchronizer.Synchronizer
 	timeoutManager *timeoutManager
@@ -96,11 +96,11 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 	if err != nil {
 		return nil, err
 	}
-	committer := committer.New(node.eventLoop, node.logger, node.blockChain, consensusRules)
-	node.viewStates, err = consensus.NewViewStates(node.blockChain, depsSecurity.Authority())
+	node.viewStates, err = protocol.NewViewStates(node.blockChain, depsSecurity.Authority())
 	if err != nil {
 		return nil, err
 	}
+	committer := consensus.NewCommitter(node.eventLoop, node.logger, node.blockChain, node.viewStates, consensusRules)
 	node.leaderRotation = leaderRotation(n.views)
 	protocol := consensus.NewHotStuff(
 		node.logger,
@@ -471,7 +471,7 @@ type tick struct{}
 
 type timeoutManager struct {
 	eventLoop  *eventloop.EventLoop
-	viewStates *consensus.ViewStates
+	viewStates *protocol.ViewStates
 
 	node      *node
 	network   *Network
@@ -505,7 +505,7 @@ func newTimeoutManager(
 	network *Network,
 	node *node,
 	eventLoop *eventloop.EventLoop,
-	viewStates *consensus.ViewStates,
+	viewStates *protocol.ViewStates,
 ) *timeoutManager {
 	tm := &timeoutManager{
 		node:       node,

@@ -8,7 +8,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/committer"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
@@ -39,24 +39,18 @@ func wireUpProposer(
 		list.consensusRules,
 	)
 	check(t, err)
-	committer := committer.New(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
+	viewStates, err := protocol.NewViewStates(
 		depsSecurity.BlockChain(),
-		consensusRules,
+		depsSecurity.Authority(),
 	)
+	check(t, err)
 	leaderRotation, err := wiring.NewLeaderRotation(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecurity.BlockChain(),
-		committer,
+		viewStates,
 		list.leaderRotation,
 		consensusRules.ChainLength(),
-	)
-	check(t, err)
-	viewStates, err := consensus.NewViewStates(
-		depsSecurity.BlockChain(),
-		depsSecurity.Authority(),
 	)
 	check(t, err)
 	hsProtocol := consensus.NewHotStuff(
@@ -68,6 +62,13 @@ func wireUpProposer(
 		viewStates,
 		leaderRotation,
 		sender,
+	)
+	committer := consensus.NewCommitter(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsSecurity.BlockChain(),
+		viewStates,
+		consensusRules,
 	)
 	voter := consensus.NewVoter(
 		depsCore.Logger(),

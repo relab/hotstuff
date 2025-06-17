@@ -10,7 +10,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/committer"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 )
 
@@ -19,9 +19,9 @@ const ModuleName = "reputation"
 type reputationsMap map[hotstuff.ID]float64
 
 type repBased struct {
-	committer *committer.Committer
-	config    *core.RuntimeConfig
-	logger    logging.Logger
+	viewStates *protocol.ViewStates
+	config     *core.RuntimeConfig
+	logger     logging.Logger
 
 	chainLength    int
 	prevCommitHead *hotstuff.Block
@@ -32,7 +32,7 @@ type repBased struct {
 
 // GetLeader returns the id of the leader in the given view
 func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
-	block := r.committer.CommittedBlock()
+	block := r.viewStates.CommittedBlock()
 	if block.View() > view-hotstuff.View(r.chainLength) {
 		// TODO: it could be possible to lookup leaders for older views if we
 		// store a copy of the reputations in a metadata field of each block.
@@ -93,14 +93,14 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 func New(
 	chainLength int,
 
-	committer *committer.Committer,
+	viewStates *protocol.ViewStates,
 	config *core.RuntimeConfig,
 	logger logging.Logger,
 ) modules.LeaderRotation {
 	return &repBased{
-		committer: committer,
-		config:    config,
-		logger:    logger,
+		viewStates: viewStates,
+		config:     config,
+		logger:     logger,
 
 		chainLength:    chainLength,
 		reputations:    make(reputationsMap),

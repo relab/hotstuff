@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/committer"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/security/blockchain"
 )
@@ -18,7 +18,7 @@ const ModuleName = "carousel"
 
 type carousel struct {
 	blockChain *blockchain.BlockChain
-	committer  *committer.Committer
+	viewStates *protocol.ViewStates
 	config     *core.RuntimeConfig
 	logger     logging.Logger
 
@@ -30,21 +30,21 @@ func New(
 	chainLength int,
 
 	blockChain *blockchain.BlockChain,
-	committer *committer.Committer,
+	viewStates *protocol.ViewStates,
 	config *core.RuntimeConfig,
 	logger logging.Logger,
 ) modules.LeaderRotation {
 	return &carousel{
 		blockChain:  blockChain,
 		chainLength: chainLength,
-		committer:   committer,
+		viewStates:  viewStates,
 		config:      config,
 		logger:      logger,
 	}
 }
 
 func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
-	commitHead := c.committer.CommittedBlock()
+	commitHead := c.viewStates.CommittedBlock()
 
 	if commitHead.QuorumCert().Signature() == nil {
 		c.logger.Debug("in startup; using round-robin")

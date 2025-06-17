@@ -7,7 +7,6 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/security/cert"
 )
 
@@ -20,7 +19,7 @@ type Voter struct {
 	dissAgg        modules.DisseminatorAggregator
 
 	auth      *cert.Authority
-	committer *committer.Committer
+	committer *Committer
 
 	lastVote hotstuff.View
 }
@@ -32,7 +31,7 @@ func NewVoter(
 	rules modules.VoteRuler,
 	dissAgg modules.DisseminatorAggregator,
 	auth *cert.Authority,
-	committer *committer.Committer,
+	committer *Committer,
 ) *Voter {
 	v := &Voter{
 		logger: logger,

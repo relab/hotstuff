@@ -7,7 +7,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/testutil"
-	"github.com/relab/hotstuff/protocol/committer"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
@@ -38,26 +38,27 @@ func wireUpVoter(
 	if err != nil {
 		return nil, err
 	}
-	committer := committer.New(
+	viewStates, err := protocol.NewViewStates(
+		depsSecurity.BlockChain(),
+		depsSecurity.Authority(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	committer := consensus.NewCommitter(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsSecurity.BlockChain(),
+		viewStates,
 		consensusRules,
 	)
 	leaderRotation, err := wiring.NewLeaderRotation(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecurity.BlockChain(),
-		committer,
+		viewStates,
 		list.leaderRotation,
 		consensusRules.ChainLength(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	viewStates, err := consensus.NewViewStates(
-		depsSecurity.BlockChain(),
-		depsSecurity.Authority(),
 	)
 	if err != nil {
 		return nil, err

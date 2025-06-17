@@ -6,7 +6,6 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
@@ -24,7 +23,7 @@ func NewConsensus(
 	blockChain *blockchain.BlockChain,
 	auth *cert.Authority,
 	commandCache *clientpb.CommandCache,
-	committer *committer.Committer,
+	committer *consensus.Committer,
 	consensusRulesModule modules.HotstuffRuleset,
 	leaderRotationModule modules.LeaderRotation,
 	protocol modules.DisseminatorAggregator,

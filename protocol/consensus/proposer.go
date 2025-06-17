@@ -9,7 +9,6 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 	"github.com/relab/hotstuff/security/blockchain"
 )
@@ -23,7 +22,7 @@ type Proposer struct {
 	dissAgg      modules.DisseminatorAggregator
 	voter        *Voter
 	commandCache *clientpb.CommandCache
-	committer    *committer.Committer
+	committer    *Committer
 
 	lastProposed hotstuff.View
 }
@@ -36,7 +35,7 @@ func NewProposer(
 	dissAgg modules.DisseminatorAggregator,
 	voter *Voter,
 	commandCache *clientpb.CommandCache,
-	committer *committer.Committer,
+	committer *Committer,
 	opts ...ProposerOption,
 ) *Proposer {
 	p := &Proposer{

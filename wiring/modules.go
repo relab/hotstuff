@@ -7,7 +7,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/committer"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/leaderrotation/carousel"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/leaderrotation/reputation"
@@ -87,16 +87,16 @@ func NewLeaderRotation(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
-	committer *committer.Committer,
+	viewStates *protocol.ViewStates,
 	name string,
 	chainLength int,
 ) (ld modules.LeaderRotation, err error) {
 	logger.Debugf("Initializing module (leader rotation): %s", name)
 	switch name {
 	case carousel.ModuleName:
-		ld = carousel.New(chainLength, blockChain, committer, config, logger)
+		ld = carousel.New(chainLength, blockChain, viewStates, config, logger)
 	case reputation.ModuleName:
-		ld = reputation.New(chainLength, committer, config, logger)
+		ld = reputation.New(chainLength, viewStates, config, logger)
 	case roundrobin.ModuleName:
 		ld = roundrobin.New(config)
 	case fixedleader.ModuleName:

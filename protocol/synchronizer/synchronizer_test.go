@@ -10,7 +10,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/committer"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
@@ -59,21 +59,22 @@ func TestAdvanceViewQC(t *testing.T) {
 		depsSecurity.BlockChain(),
 	)
 
-	commandCache := clientpb.NewCommandCache()
-	committer := committer.New(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsSecurity.BlockChain(),
-		consensusRules,
-	)
-
-	viewStates, err := consensus.NewViewStates(
+	viewStates, err := protocol.NewViewStates(
 		depsSecurity.BlockChain(),
 		depsSecurity.Authority(),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	commandCache := clientpb.NewCommandCache()
+	committer := consensus.NewCommitter(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsSecurity.BlockChain(),
+		viewStates,
+		consensusRules,
+	)
+
 	depsConsensus := wiring.NewConsensus(
 		depsCore.EventLoop(),
 		depsCore.Logger(),

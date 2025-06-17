@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/security/cert"
 
@@ -28,7 +29,7 @@ type Synchronizer struct {
 	leaderRotation modules.LeaderRotation
 	voter          *consensus.Voter
 	proposer       *consensus.Proposer
-	state          *consensus.ViewStates
+	state          *protocol.ViewStates
 
 	sender modules.Sender
 
@@ -58,7 +59,7 @@ func New(
 	viewDuration modules.ViewDuration,
 	proposer *consensus.Proposer,
 	voter *consensus.Voter,
-	state *consensus.ViewStates,
+	state *protocol.ViewStates,
 
 	// network dependencies
 	sender modules.Sender,

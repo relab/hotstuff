@@ -6,6 +6,7 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
 )
@@ -15,7 +16,7 @@ type HotStuff struct {
 	config         *core.RuntimeConfig
 	votingMachine  *VotingMachine
 	leaderRotation modules.LeaderRotation
-	states         *ViewStates
+	states         *protocol.ViewStates
 	sender         modules.Sender
 }
 
@@ -25,7 +26,7 @@ func NewHotStuff(
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
 	auth *cert.Authority,
-	states *ViewStates,
+	states *protocol.ViewStates,
 	leaderRotation modules.LeaderRotation,
 	sender modules.Sender,
 ) modules.DisseminatorAggregator {

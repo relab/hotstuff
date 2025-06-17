@@ -9,6 +9,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/synchronizer"
@@ -17,7 +18,6 @@ import (
 	"github.com/relab/hotstuff/wiring"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/server"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -93,27 +93,27 @@ func New(
 		rOpt.cmdCacheOpts,
 		rOpt.clientGorumsSrvOpts...,
 	)
-	committer := committer.New(
+	viewStates, err := protocol.NewViewStates(
+		depsSecure.BlockChain(),
+		depsSecure.Authority(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	committer := consensus.NewCommitter(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsSecure.BlockChain(),
+		viewStates,
 		consensusRules,
 	)
 	leaderRotation, err := wiring.NewLeaderRotation(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
-		committer,
+		viewStates,
 		rOpt.moduleNames.leaderRotation,
 		consensusRules.ChainLength(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	// TODO(AlanRostem): avoid creating viewstates here.
-	viewStates, err := consensus.NewViewStates(
-		depsSecure.BlockChain(),
-		depsSecure.Authority(),
 	)
 	if err != nil {
 		return nil, err

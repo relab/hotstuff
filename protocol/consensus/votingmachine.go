@@ -7,6 +7,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
 )
@@ -18,7 +19,7 @@ type VotingMachine struct {
 	config     *core.RuntimeConfig
 	blockChain *blockchain.BlockChain
 	auth       *cert.Authority
-	state      *ViewStates
+	state      *protocol.ViewStates
 
 	mut           sync.Mutex
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert
@@ -30,7 +31,7 @@ func NewVotingMachine(
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
 	auth *cert.Authority,
-	state *ViewStates,
+	state *protocol.ViewStates,
 ) *VotingMachine {
 	vm := &VotingMachine{
 		blockChain:    blockChain,

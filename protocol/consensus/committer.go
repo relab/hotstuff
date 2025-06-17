@@ -1,8 +1,7 @@
-package committer
+package consensus
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/relab/hotstuff"
@@ -10,6 +9,7 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -18,40 +18,35 @@ type Committer struct {
 	eventLoop  *eventloop.EventLoop
 	logger     logging.Logger
 	blockChain *blockchain.BlockChain
-	rules      modules.CommitRuler
-
-	mut   sync.Mutex
-	bExec *hotstuff.Block
+	viewStates *protocol.ViewStates
+	ruler      modules.CommitRuler
 }
 
-func New(
+func NewCommitter(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
+	viewStates *protocol.ViewStates,
 	rules modules.CommitRuler,
 ) *Committer {
 	return &Committer{
 		eventLoop:  eventLoop,
 		blockChain: blockChain,
-		rules:      rules,
+		ruler:      rules,
 		logger:     logger,
-
-		bExec: hotstuff.GetGenesis(),
+		viewStates: viewStates,
 	}
 }
 
 // Stores the block before further execution.
 func (cm *Committer) commit(block *hotstuff.Block) error {
-	cm.mut.Lock()
-	// can't recurse due to requiring the mutex, so we use a helper instead.
-	err := cm.commitInner(block)
-	cm.mut.Unlock()
+	err := cm.commitInner(block, cm.viewStates.CommittedBlock())
 	if err != nil {
 		return err
 	}
 
 	forkedBlocks := cm.blockChain.PruneToHeight(
-		cm.CommittedBlock().View(),
+		cm.viewStates.CommittedBlock().View(),
 		block.View(),
 	)
 	for _, block := range forkedBlocks {
@@ -66,7 +61,7 @@ func (cm *Committer) Update(block *hotstuff.Block) {
 	cm.logger.Debugf("Update: %v", block)
 	cm.blockChain.Store(block)
 	// NOTE: this overwrites the block variable. If it was nil, simply don't commit.
-	if block = cm.rules.CommitRule(block); block != nil {
+	if block = cm.ruler.CommitRule(block); block != nil {
 		err := cm.commit(block) // committer will eventually execute the command.
 		if err != nil {
 			cm.logger.Warnf("failed to commit: %v", err)
@@ -75,12 +70,12 @@ func (cm *Committer) Update(block *hotstuff.Block) {
 }
 
 // recursive helper for commit
-func (cm *Committer) commitInner(block *hotstuff.Block) error {
-	if cm.bExec.View() >= block.View() {
+func (cm *Committer) commitInner(block, committedBlock *hotstuff.Block) error {
+	if committedBlock.View() >= block.View() {
 		return nil
 	}
 	if parent, ok := cm.blockChain.Get(block.Parent()); ok {
-		err := cm.commitInner(parent)
+		err := cm.commitInner(parent, committedBlock)
 		if err != nil {
 			return err
 		}
@@ -89,17 +84,9 @@ func (cm *Committer) commitInner(block *hotstuff.Block) error {
 	}
 	cm.logger.Debug("EXEC: ", block)
 	batch := block.Commands()
-	// TODO(AlanRostem): scrap ExecuteEvent
 	cm.eventLoop.AddEvent(hotstuff.CommitEvent{Block: block})
 	cm.eventLoop.AddEvent(clientpb.ExecuteEvent{Batch: batch})
 	cm.eventLoop.AddEvent(hotstuff.ConsensusLatencyEvent{Latency: time.Since(block.Timestamp())})
-	cm.bExec = block
+	cm.viewStates.UpdateCommittedBlock(block)
 	return nil
-}
-
-// Retrieve the last block which was committed on a pipe. Use zero if pipelining is not used.
-func (cm *Committer) CommittedBlock() *hotstuff.Block {
-	cm.mut.Lock()
-	defer cm.mut.Unlock()
-	return cm.bExec
 }
