@@ -152,20 +152,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	// setup core - used in replica and measurement framework
 	runtimeOpts := []core.RuntimeOption{}
 	// TODO(AlanRostem): maybe rename the tree option to kauriTree? should also use the tree check only for enable kauri
-	if opts.GetKauri() && opts.TreeEnabled() {
-		delayMode := tree.DelayTypeNone
-		if opts.GetAggregationTime() {
-			delayMode = tree.DelayTypeAggregation
-		}
-		t := tree.NewDelayed(
-			opts.HotstuffID(),
-			delayMode,
-			int(opts.GetBranchFactor()),
-			latency.MatrixFrom(opts.GetLocations()),
-			opts.TreePositionIDs(),
-			opts.GetTreeDelta().AsDuration(),
-		)
-		runtimeOpts = append(runtimeOpts, core.WithKauriTree(t))
+	if opts.TreeEnabled() {
+		runtimeOpts = append(runtimeOpts, core.WithKauriTree(newTree(opts)))
 	}
 	runtimeOpts = append(runtimeOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
 	if opts.GetUseAggQC() {
@@ -310,6 +298,25 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		replicaOpts...,
 	)
 }
+
+// newTree creates a new tree based on the provided options. It uses the aggregation
+// time option to determine the delay mode and initializes the tree with the specified
+// branch factor, locations, position IDs, and delta duration.
+func newTree(opts *orchestrationpb.ReplicaOpts) *tree.Tree {
+	delayMode := tree.DelayTypeNone
+	if opts.GetAggregationTime() {
+		delayMode = tree.DelayTypeAggregation
+	}
+	return tree.NewDelayed(
+		opts.HotstuffID(),
+		delayMode,
+		int(opts.GetBranchFactor()),
+		latency.MatrixFrom(opts.GetLocations()),
+		opts.TreePositionIDs(),
+		opts.GetTreeDelta().AsDuration(),
+	)
+}
+
 
 func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {
 	for _, id := range req.GetIDs() {
