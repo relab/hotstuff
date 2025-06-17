@@ -25,7 +25,7 @@ type Kauri struct {
 	logger     logging.Logger
 	eventLoop  *eventloop.EventLoop
 	config     *core.RuntimeConfig
-	blockChain *blockchain.Blockchain
+	blockchain *blockchain.Blockchain
 	auth       *cert.Authority
 	sender     modules.KauriSender
 
@@ -43,12 +43,12 @@ func New(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.Blockchain,
+	blockchain *blockchain.Blockchain,
 	auth *cert.Authority,
 	sender modules.KauriSender,
 ) *Kauri {
 	k := &Kauri{
-		blockChain: blockChain,
+		blockchain: blockchain,
 		auth:       auth,
 		config:     config,
 		eventLoop:  eventLoop,
@@ -73,7 +73,11 @@ func New(
 // Begin starts dissemination of proposal and aggregation of votes.
 func (k *Kauri) Begin(p *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	if !k.initDone {
-		k.eventLoop.DelayUntil(network.ConnectedEvent{}, func() { k.Begin(p, pc) })
+		k.eventLoop.DelayUntil(network.ConnectedEvent{}, func() {
+			if err := k.Begin(p, pc); err != nil {
+				k.logger.Error(err)
+			}
+		})
 		return nil
 	}
 	k.reset()
@@ -170,7 +174,7 @@ func canMergeContributions(a, b hotstuff.QuorumSignature) error {
 }
 
 func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) error {
-	block, ok := k.blockChain.Get(k.blockHash)
+	block, ok := k.blockchain.Get(k.blockHash)
 	if !ok {
 		return fmt.Errorf("failed to fetch block %v", k.blockHash)
 	}

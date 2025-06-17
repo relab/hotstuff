@@ -10,7 +10,7 @@ import (
 )
 
 type Security struct {
-	blockChain *blockchain.Blockchain
+	blockchain *blockchain.Blockchain
 	cryptoImpl modules.CryptoBase
 	auth       *cert.Authority
 }
@@ -24,7 +24,7 @@ func NewSecurity(
 	cryptoName string,
 	opts ...cert.Option,
 ) (*Security, error) {
-	blockChain := blockchain.New(
+	blockchain := blockchain.New(
 		eventLoop,
 		logger,
 		sender,
@@ -38,11 +38,11 @@ func NewSecurity(
 		return nil, err
 	}
 	return &Security{
-		blockChain: blockChain,
+		blockchain: blockchain,
 		cryptoImpl: cryptoImpl,
 		auth: cert.NewAuthority(
 			config,
-			blockChain,
+			blockchain,
 			cryptoImpl,
 			opts...,
 		),
@@ -51,7 +51,7 @@ func NewSecurity(
 
 // BlockChain returns the blockchain instance.
 func (s *Security) BlockChain() *blockchain.Blockchain {
-	return s.blockChain
+	return s.blockchain
 }
 
 // CryptoImpl returns the crypto implementation.

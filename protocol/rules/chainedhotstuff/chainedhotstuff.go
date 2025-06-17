@@ -12,7 +12,7 @@ const ModuleName = "chainedhotstuff"
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {
 	logger     logging.Logger
-	blockChain *blockchain.Blockchain
+	blockchain *blockchain.Blockchain
 
 	// protocol variables
 
@@ -22,10 +22,10 @@ type ChainedHotStuff struct {
 // New returns a new chainedhotstuff instance.
 func New(
 	logger logging.Logger,
-	blockChain *blockchain.Blockchain,
+	blockchain *blockchain.Blockchain,
 ) *ChainedHotStuff {
 	return &ChainedHotStuff{
-		blockChain: blockChain,
+		blockchain: blockchain,
 		logger:     logger,
 
 		bLock: hotstuff.GetGenesis(),
@@ -36,7 +36,7 @@ func (hs *ChainedHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool)
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return hs.blockChain.Get(qc.BlockHash())
+	return hs.blockchain.Get(qc.BlockHash())
 }
 
 // CommitRule decides whether an ancestor of the block should be committed.
@@ -77,7 +77,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 func (hs *ChainedHotStuff) VoteRule(_ hotstuff.View, proposal hotstuff.ProposeMsg) bool {
 	block := proposal.Block
 
-	qcBlock, haveQCBlock := hs.blockChain.Get(block.QuorumCert().BlockHash())
+	qcBlock, haveQCBlock := hs.blockchain.Get(block.QuorumCert().BlockHash())
 
 	safe := false
 	if haveQCBlock && qcBlock.View() > hs.bLock.View() {
@@ -85,7 +85,7 @@ func (hs *ChainedHotStuff) VoteRule(_ hotstuff.View, proposal hotstuff.ProposeMs
 	} else {
 		hs.logger.Debug("VoteRule: liveness condition failed")
 		// check if this block extends bLock
-		if hs.blockChain.Extends(block, hs.bLock) {
+		if hs.blockchain.Extends(block, hs.bLock) {
 			safe = true
 		} else {
 			hs.logger.Debug("VoteRule: safety condition failed")

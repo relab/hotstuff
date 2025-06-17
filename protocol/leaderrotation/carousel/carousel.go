@@ -17,7 +17,7 @@ import (
 const ModuleName = "carousel"
 
 type Carousel struct {
-	blockChain *blockchain.Blockchain
+	blockchain *blockchain.Blockchain
 	viewStates *protocol.ViewStates
 	config     *core.RuntimeConfig
 	logger     logging.Logger
@@ -29,13 +29,13 @@ type Carousel struct {
 func New(
 	chainLength int,
 
-	blockChain *blockchain.Blockchain,
+	blockchain *blockchain.Blockchain,
 	viewStates *protocol.ViewStates,
 	config *core.RuntimeConfig,
 	logger logging.Logger,
 ) *Carousel {
 	return &Carousel{
-		blockChain:  blockChain,
+		blockchain:  blockchain,
 		chainLength: chainLength,
 		viewStates:  viewStates,
 		config:      config,
@@ -68,7 +68,7 @@ func (c *Carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 
 	for ok && i < f && block != hotstuff.GetGenesis() {
 		lastAuthors.Add(block.Proposer())
-		block, ok = c.blockChain.Get(block.Parent())
+		block, ok = c.blockchain.Get(block.Parent())
 		i++
 	}
 

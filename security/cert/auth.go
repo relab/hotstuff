@@ -13,21 +13,21 @@ import (
 type Authority struct {
 	modules.CryptoBase // embedded to avoid having to implement forwarding methods
 	config             *core.RuntimeConfig
-	blockChain         *blockchain.Blockchain
+	blockchain         *blockchain.Blockchain
 }
 
 // NewAuthority returns an Authority. It will use the given CryptoBase to create and verify
 // signatures.
 func NewAuthority(
 	config *core.RuntimeConfig,
-	blockChain *blockchain.Blockchain,
+	blockchain *blockchain.Blockchain,
 	impl modules.CryptoBase,
 	opts ...Option,
 ) *Authority {
 	ca := &Authority{
 		CryptoBase: impl,
 		config:     config,
-		blockChain: blockChain,
+		blockchain: blockchain,
 	}
 	for _, opt := range opts {
 		opt(ca)
@@ -99,7 +99,7 @@ func (c *Authority) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.Ti
 
 // VerifyPartialCert verifies a single partial certificate.
 func (c *Authority) VerifyPartialCert(cert hotstuff.PartialCert) error {
-	block, ok := c.blockChain.Get(cert.BlockHash())
+	block, ok := c.blockchain.Get(cert.BlockHash())
 	if !ok {
 		return fmt.Errorf("block not found")
 	}
@@ -124,7 +124,7 @@ func (c *Authority) VerifyQuorumCert(qc hotstuff.QuorumCert) error {
 	if participants.Len() < quorumSize {
 		return fmt.Errorf("%d participations cannot satisfy the quorum requirement: %d", participants.Len(), quorumSize)
 	}
-	block, ok := c.blockChain.Get(qc.BlockHash())
+	block, ok := c.blockchain.Get(qc.BlockHash())
 	if !ok {
 		return fmt.Errorf("block not found: %s", qc.BlockHash().String())
 	}

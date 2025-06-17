@@ -28,21 +28,21 @@ func NewSilence(rules modules.HotstuffRuleset) *Silence {
 }
 
 type Fork struct {
-	blockChain *blockchain.Blockchain
+	blockchain *blockchain.Blockchain
 	config     *core.RuntimeConfig
 	modules.HotstuffRuleset
 }
 
 func (f *Fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
-	block, ok := f.blockChain.Get(highQC.BlockHash())
+	block, ok := f.blockchain.Get(highQC.BlockHash())
 	if !ok {
 		return proposal, false
 	}
-	parent, ok := f.blockChain.Get(block.Parent())
+	parent, ok := f.blockchain.Get(block.Parent())
 	if !ok {
 		return proposal, false
 	}
-	grandparent, ok := f.blockChain.Get(parent.Hash())
+	grandparent, ok := f.blockchain.Get(parent.Hash())
 	if !ok {
 		return proposal, false
 	}
@@ -66,12 +66,12 @@ func (f *Fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert 
 // NewFork returns a byzantine replica that will try to fork the chain.
 func NewFork(
 	rules modules.HotstuffRuleset,
-	blockChain *blockchain.Blockchain,
+	blockchain *blockchain.Blockchain,
 	config *core.RuntimeConfig,
 ) *Fork {
 	return &Fork{
 		HotstuffRuleset: rules,
-		blockChain:      blockChain,
+		blockchain:      blockchain,
 		config:          config,
 	}
 }

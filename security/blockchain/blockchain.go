@@ -28,7 +28,7 @@ type Blockchain struct {
 	pendingFetch  map[hotstuff.Hash]context.CancelFunc // allows a pending fetch operation to be canceled
 }
 
-// New creates a new blockChain with a maximum size.
+// New creates a new blockchain with a maximum size.
 // Blocks are dropped in least recently used order.
 func New(
 	eventLoop *eventloop.EventLoop,

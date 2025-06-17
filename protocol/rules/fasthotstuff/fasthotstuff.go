@@ -12,7 +12,7 @@ const ModuleName = "fasthotstuff"
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {
-	blockChain *blockchain.Blockchain
+	blockchain *blockchain.Blockchain
 	logger     logging.Logger
 }
 
@@ -20,13 +20,13 @@ type FastHotStuff struct {
 func New(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.Blockchain,
+	blockchain *blockchain.Blockchain,
 ) *FastHotStuff {
 	if !config.HasAggregateQC() {
 		panic("aggregate qc must be enabled for fasthotstuff")
 	}
 	fhs := &FastHotStuff{
-		blockChain: blockChain,
+		blockchain: blockchain,
 		logger:     logger,
 	}
 	return fhs
@@ -36,7 +36,7 @@ func (fhs *FastHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return fhs.blockChain.Get(qc.BlockHash())
+	return fhs.blockchain.Get(qc.BlockHash())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.
@@ -63,8 +63,8 @@ func (fhs *FastHotStuff) VoteRule(view hotstuff.View, proposal hotstuff.ProposeM
 	// The base implementation verifies both regular QCs and AggregateQCs, and asserts that the QC embedded in the
 	// block is the same as the highQC found in the aggregateQC.
 	if proposal.AggregateQC != nil {
-		hqcBlock, ok := fhs.blockChain.Get(proposal.Block.QuorumCert().BlockHash())
-		return ok && fhs.blockChain.Extends(proposal.Block, hqcBlock)
+		hqcBlock, ok := fhs.blockchain.Get(proposal.Block.QuorumCert().BlockHash())
+		return ok && fhs.blockchain.Extends(proposal.Block, hqcBlock)
 	}
 	return proposal.Block.View() >= view &&
 		proposal.Block.View() == proposal.Block.QuorumCert().View()+1

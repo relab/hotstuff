@@ -123,7 +123,7 @@ func TestAdvanceViewQC(t *testing.T) {
 		signers = append(signers, security.Authority())
 	}
 
-	blockChain := depsSecurity.BlockChain()
+	blockchain := depsSecurity.BlockChain()
 	block := hotstuff.NewBlock(
 		hotstuff.GetGenesis().Hash(),
 		hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
@@ -137,7 +137,7 @@ func TestAdvanceViewQC(t *testing.T) {
 		1,
 		2,
 	)
-	blockChain.Store(block)
+	blockchain.Store(block)
 	qc := testutil.CreateQC(t, block, signers)
 	// synchronizer should tell hotstuff to propose
 	proposer := depsConsensus.Proposer()

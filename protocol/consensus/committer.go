@@ -25,13 +25,13 @@ type Committer struct {
 func NewCommitter(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	blockChain *blockchain.Blockchain,
+	blockchain *blockchain.Blockchain,
 	viewStates *protocol.ViewStates,
 	ruler modules.CommitRuler,
 ) *Committer {
 	return &Committer{
 		eventLoop:  eventLoop,
-		blockchain: blockChain,
+		blockchain: blockchain,
 		ruler:      ruler,
 		logger:     logger,
 		viewStates: viewStates,

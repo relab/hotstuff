@@ -26,17 +26,17 @@ import (
 func NewConsensusRules(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.Blockchain,
+	blockchain *blockchain.Blockchain,
 	name string,
 ) (rules modules.HotstuffRuleset, err error) {
 	logger.Debugf("Initializing module (consensus rules): %s", name)
 	switch name {
 	case fasthotstuff.ModuleName:
-		rules = fasthotstuff.New(logger, config, blockChain)
+		rules = fasthotstuff.New(logger, config, blockchain)
 	case simplehotstuff.ModuleName:
-		rules = simplehotstuff.New(logger, blockChain)
+		rules = simplehotstuff.New(logger, blockchain)
 	case chainedhotstuff.ModuleName:
-		rules = chainedhotstuff.New(logger, blockChain)
+		rules = chainedhotstuff.New(logger, blockchain)
 	default:
 		return nil, fmt.Errorf("invalid consensus name: '%s'", name)
 	}
@@ -45,7 +45,7 @@ func NewConsensusRules(
 
 func WrapByzantineStrategy(
 	config *core.RuntimeConfig,
-	blockChain *blockchain.Blockchain,
+	blockchain *blockchain.Blockchain,
 	rules modules.HotstuffRuleset,
 	name string,
 ) (byzRules modules.HotstuffRuleset, err error) {
@@ -54,7 +54,7 @@ func WrapByzantineStrategy(
 	case byzantine.SilenceModuleName:
 		byzRules = byzantine.NewSilence(rules)
 	case byzantine.ForkModuleName:
-		byzRules = byzantine.NewFork(rules, blockChain, config)
+		byzRules = byzantine.NewFork(rules, blockchain, config)
 	default:
 		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", name)
 	}
@@ -86,7 +86,7 @@ func newCryptoModule(
 func NewLeaderRotation(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.Blockchain,
+	blockchain *blockchain.Blockchain,
 	viewStates *protocol.ViewStates,
 	name string,
 	chainLength int,
@@ -94,7 +94,7 @@ func NewLeaderRotation(
 	logger.Debugf("Initializing module (leader rotation): %s", name)
 	switch name {
 	case carousel.ModuleName:
-		ld = carousel.New(chainLength, blockChain, viewStates, config, logger)
+		ld = carousel.New(chainLength, blockchain, viewStates, config, logger)
 	case reputation.ModuleName:
 		ld = reputation.New(chainLength, viewStates, config, logger)
 	case roundrobin.ModuleName:

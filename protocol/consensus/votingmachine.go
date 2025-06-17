@@ -17,7 +17,7 @@ type VotingMachine struct {
 	logger     logging.Logger
 	eventLoop  *eventloop.EventLoop
 	config     *core.RuntimeConfig
-	blockChain *blockchain.Blockchain
+	blockchain *blockchain.Blockchain
 	auth       *cert.Authority
 	state      *protocol.ViewStates
 
@@ -29,12 +29,12 @@ func NewVotingMachine(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.Blockchain,
+	blockchain *blockchain.Blockchain,
 	auth *cert.Authority,
 	state *protocol.ViewStates,
 ) *VotingMachine {
 	vm := &VotingMachine{
-		blockChain:    blockChain,
+		blockchain:    blockchain,
 		auth:          auth,
 		eventLoop:     eventLoop,
 		logger:        logger,
@@ -58,7 +58,7 @@ func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 	)
 	if !vote.Deferred {
 		// first, try to get the block from the local cache
-		block, ok = vm.blockChain.LocalGet(cert.BlockHash())
+		block, ok = vm.blockchain.LocalGet(cert.BlockHash())
 		if !ok {
 			// if that does not work, we will try to handle this event later.
 			// hopefully, the block has arrived by then.
@@ -69,7 +69,7 @@ func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 		}
 	} else {
 		// if the block has not arrived at this point we will try to fetch it.
-		block, ok = vm.blockChain.Get(cert.BlockHash())
+		block, ok = vm.blockchain.Get(cert.BlockHash())
 		if !ok {
 			vm.logger.Debugf("Could not find block for vote: %.8s.", cert.BlockHash())
 			return
@@ -97,7 +97,7 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	defer func() {
 		// delete any pending QCs with lower height than bLeaf
 		for k := range vm.verifiedVotes {
-			if block, ok := vm.blockChain.LocalGet(k); ok {
+			if block, ok := vm.blockchain.LocalGet(k); ok {
 				if block.View() <= vm.state.HighQC().View() {
 					delete(vm.verifiedVotes, k)
 				}

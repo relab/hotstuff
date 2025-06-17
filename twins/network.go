@@ -44,7 +44,7 @@ type node struct {
 	config         *core.RuntimeConfig
 	logger         logging.Logger
 	sender         *emulatedSender
-	blockChain     *blockchain.Blockchain
+	blockchain     *blockchain.Blockchain
 	commandCache   *clientpb.CommandCache
 	voter          *consensus.Voter
 	proposer       *consensus.Proposer
@@ -91,22 +91,22 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 	if err != nil {
 		return nil, err
 	}
-	node.blockChain = depsSecurity.BlockChain()
-	consensusRules, err := wiring.NewConsensusRules(node.logger, node.config, node.blockChain, consensusName)
+	node.blockchain = depsSecurity.BlockChain()
+	consensusRules, err := wiring.NewConsensusRules(node.logger, node.config, node.blockchain, consensusName)
 	if err != nil {
 		return nil, err
 	}
-	node.viewStates, err = protocol.NewViewStates(node.blockChain, depsSecurity.Authority())
+	node.viewStates, err = protocol.NewViewStates(node.blockchain, depsSecurity.Authority())
 	if err != nil {
 		return nil, err
 	}
-	committer := consensus.NewCommitter(node.eventLoop, node.logger, node.blockChain, node.viewStates, consensusRules)
+	committer := consensus.NewCommitter(node.eventLoop, node.logger, node.blockchain, node.viewStates, consensusRules)
 	node.leaderRotation = leaderRotation(n.views)
 	protocol := consensus.NewHotStuff(
 		node.logger,
 		node.eventLoop,
 		node.config,
-		node.blockChain,
+		node.blockchain,
 		depsSecurity.Authority(),
 		node.viewStates,
 		node.leaderRotation,
@@ -125,7 +125,7 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 		node.eventLoop,
 		node.logger,
 		node.config,
-		node.blockChain,
+		node.blockchain,
 		protocol,
 		node.voter,
 		node.commandCache,
@@ -422,7 +422,7 @@ func (s *emulatedSender) RequestBlock(_ context.Context, hash hotstuff.Hash) (bl
 			if s.shouldDrop(node.id, hash) {
 				continue
 			}
-			block, ok = node.blockChain.LocalGet(hash)
+			block, ok = node.blockchain.LocalGet(hash)
 			if ok {
 				return block, true
 			}

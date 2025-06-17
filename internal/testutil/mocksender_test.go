@@ -21,7 +21,7 @@ type replica struct {
 	eventLoop  *eventloop.EventLoop
 	config     *core.RuntimeConfig
 	sender     *testutil.MockSender
-	blockChain *blockchain.Blockchain
+	blockchain *blockchain.Blockchain
 	auth       *cert.Authority
 }
 
@@ -38,7 +38,7 @@ func wireUpReplica(t *testing.T) *replica {
 		eventLoop:  eventLoop,
 		config:     config,
 		sender:     sender,
-		blockChain: chain,
+		blockchain: chain,
 		auth:       auth,
 	}
 }

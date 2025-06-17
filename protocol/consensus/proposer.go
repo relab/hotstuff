@@ -17,7 +17,7 @@ type Proposer struct {
 	eventLoop    *eventloop.EventLoop
 	logger       logging.Logger
 	config       *core.RuntimeConfig
-	blockChain   *blockchain.Blockchain
+	blockchain   *blockchain.Blockchain
 	ruler        modules.ProposeRuler
 	dissAgg      modules.DisseminatorAggregator
 	voter        *Voter
@@ -31,7 +31,7 @@ func NewProposer(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.Blockchain,
+	blockchain *blockchain.Blockchain,
 	dissAgg modules.DisseminatorAggregator,
 	voter *Voter,
 	commandCache *clientpb.CommandCache,
@@ -42,7 +42,7 @@ func NewProposer(
 		eventLoop:    eventLoop,
 		logger:       logger,
 		config:       config,
-		blockChain:   blockChain,
+		blockchain:   blockchain,
 		ruler:        nil,
 		dissAgg:      dissAgg,
 		voter:        voter,
@@ -60,7 +60,7 @@ func NewProposer(
 
 // markProposed traverses the block history and marks commands as proposed.
 func (p *Proposer) markProposed(view hotstuff.View, highQCBlockHash hotstuff.Hash) {
-	qcBlock, ok := p.blockChain.Get(highQCBlockHash)
+	qcBlock, ok := p.blockchain.Get(highQCBlockHash)
 	if !ok {
 		// NOTE: this should not occur, otherwise something went terribly wrong
 		p.logger.Errorf("qcBlock not found")
@@ -69,7 +69,7 @@ func (p *Proposer) markProposed(view hotstuff.View, highQCBlockHash hotstuff.Has
 	for qcBlock.View() > p.lastProposed {
 		p.commandCache.Proposed(qcBlock.Commands()) // mark as proposed
 		qc := qcBlock.QuorumCert()
-		qcBlock, ok = p.blockChain.Get(qc.BlockHash())
+		qcBlock, ok = p.blockchain.Get(qc.BlockHash())
 		if !ok {
 			p.logger.Errorf("qcBlock not found")
 			return

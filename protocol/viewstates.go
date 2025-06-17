@@ -13,7 +13,7 @@ import (
 // by several consensus component objects.
 // TODO(AlanRostem): make tests for this.
 type ViewStates struct {
-	blockChain *blockchain.Blockchain
+	blockchain *blockchain.Blockchain
 	auth       *cert.Authority
 
 	mut sync.RWMutex // to protect the following
@@ -25,11 +25,11 @@ type ViewStates struct {
 }
 
 func NewViewStates(
-	blockChain *blockchain.Blockchain,
+	blockchain *blockchain.Blockchain,
 	auth *cert.Authority,
 ) (*ViewStates, error) {
 	s := &ViewStates{
-		blockChain: blockChain,
+		blockchain: blockchain,
 		auth:       auth,
 
 		committedBlock: hotstuff.GetGenesis(),
@@ -51,7 +51,7 @@ func NewViewStates(
 // This method is meant to be used instead of the exported UpdateHighQC internally
 // in this package when the qc has already been verified.
 func (s *ViewStates) UpdateHighQC(qc hotstuff.QuorumCert) error {
-	newBlock, ok := s.blockChain.Get(qc.BlockHash())
+	newBlock, ok := s.blockchain.Get(qc.BlockHash())
 	if !ok {
 		return fmt.Errorf("could not find block referenced by new qc")
 	}
