@@ -23,15 +23,22 @@ import (
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
+	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/network"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/replica"
+	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 	"github.com/relab/hotstuff/server"
 	"github.com/relab/hotstuff/wiring"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
 	// imported modules
+	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/protocol/kauri"
 	_ "github.com/relab/hotstuff/protocol/kauri"
 	_ "github.com/relab/hotstuff/protocol/leaderrotation"
 	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
@@ -182,14 +189,12 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 	// setup replica
 	replicaOpts := []replica.Option{}
-	var certificate tls.Certificate
-	var rootCAs *x509.CertPool
 	if opts.GetUseTLS() {
-		certificate, err = tls.X509KeyPair(opts.GetCertificate(), opts.GetCertificateKey())
+		certificate, err := tls.X509KeyPair(opts.GetCertificate(), opts.GetCertificateKey())
 		if err != nil {
 			return nil, err
 		}
-		rootCAs = x509.NewCertPool()
+		rootCAs := x509.NewCertPool()
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
 		replicaOpts = append(replicaOpts, replica.WithTLS(certificate, rootCAs))
 	}
@@ -199,20 +204,109 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		)
 	}
 	replicaOpts = append(replicaOpts,
-		replica.OverrideCrypto(opts.GetCrypto()),
-		replica.OverrideConsensusRules(opts.GetConsensus()),
-		replica.OverrideLeaderRotation(opts.GetLeaderRotation()),
-		replica.WithByzantineStrategy(opts.GetByzantineStrategy()),
 		replica.WithServerOptions(server.WithLatencies(opts.HotstuffID(), opts.GetLocations())),
 	)
-	return replica.New(
-		depsCore,
-		viewduration.NewParams(
+	sender := network.NewGorumsSender(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		insecure.NewCredentials(), // TODO(meling): need to get the credentials from replicaOpts above (see WithTLS)
+	)
+	depsSecure, err := wiring.NewSecurity(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		sender,
+		opts.GetCrypto(),
+		cert.WithCache(100), // TODO: consider making this configurable
+	)
+	if err != nil {
+		return nil, err
+	}
+	consensusRules, err := wiring.NewConsensusRules(
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		depsSecure.BlockChain(),
+		opts.GetConsensus(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if byzStrategy := opts.GetByzantineStrategy(); byzStrategy != "" {
+		byz, err := wiring.WrapByzantineStrategy(
+			depsCore.Logger(),
+			depsCore.RuntimeCfg(),
+			depsSecure.BlockChain(),
+			consensusRules,
+			byzStrategy,
+		)
+		if err != nil {
+			return nil, err
+		}
+		consensusRules = byz
+	}
+	viewStates, err := protocol.NewViewStates(
+		depsSecure.BlockChain(),
+		depsSecure.Authority(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	leaderRotation, err := wiring.NewLeaderRotation(
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		depsSecure.BlockChain(),
+		viewStates,
+		opts.GetLeaderRotation(),
+		consensusRules.ChainLength(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var disAgg modules.DisseminatorAggregator
+	var viewDuration modules.ViewDuration
+	if depsCore.RuntimeCfg().HasKauriTree() {
+		viewDuration = viewduration.NewFixed(opts.GetInitialTimeout().AsDuration())
+		disAgg = kauri.New(
+			depsCore.Logger(),
+			depsCore.EventLoop(),
+			depsCore.RuntimeCfg(),
+			depsSecure.BlockChain(),
+			depsSecure.Authority(),
+			kauri.NewExtendedGorumsSender(
+				depsCore.EventLoop(),
+				depsCore.RuntimeCfg(),
+				sender,
+			),
+		)
+	} else {
+		viewDuration = viewduration.NewDynamic(viewduration.NewParams(
 			opts.GetTimeoutSamples(),
 			opts.GetInitialTimeout().AsDuration(),
 			opts.GetMaxTimeout().AsDuration(),
 			opts.GetTimeoutMultiplier(),
-		),
+		))
+		disAgg = consensus.NewHotStuff(
+			depsCore.Logger(),
+			depsCore.EventLoop(),
+			depsCore.RuntimeCfg(),
+			depsSecure.BlockChain(),
+			depsSecure.Authority(),
+			viewStates,
+			leaderRotation,
+			sender,
+		)
+	}
+	return replica.New(
+		depsCore,
+		depsSecure,
+		sender,
+		viewStates,
+		disAgg,
+		leaderRotation,
+		consensusRules,
+		viewDuration,
 		replicaOpts...,
 	)
 }

@@ -6,21 +6,11 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
-	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
-
-type moduleNames struct {
-	crypto,
-	consensus,
-	leaderRotation,
-	byzantineStrategy string
-}
 
 type replicaOptions struct {
 	credentials          credentials.TransportCredentials
@@ -28,53 +18,15 @@ type replicaOptions struct {
 	replicaGorumsSrvOpts []gorums.ServerOption
 	cmdCacheOpts         []clientpb.CommandCacheOption
 	serverOpts           []server.ServerOption
-	moduleNames          moduleNames
 }
 
 func newDefaultOpts() *replicaOptions {
 	return &replicaOptions{
 		credentials: insecure.NewCredentials(),
-		moduleNames: moduleNames{
-			crypto:            ecdsa.ModuleName,
-			consensus:         chainedhotstuff.ModuleName,
-			leaderRotation:    roundrobin.ModuleName,
-			byzantineStrategy: "",
-		},
 	}
 }
 
 type Option func(*replicaOptions)
-
-// OverrideCrypto changes the crypto implementation to the one specified by name.
-// Default: "ecdsa"
-func OverrideCrypto(moduleName string) Option {
-	return func(ro *replicaOptions) {
-		ro.moduleNames.crypto = moduleName
-	}
-}
-
-// OverrideConsensusRules changes the consensus rules to the one specified by name.
-// Default: "chainedhotstuff"
-func OverrideConsensusRules(moduleName string) Option {
-	return func(ro *replicaOptions) {
-		ro.moduleNames.consensus = moduleName
-	}
-}
-
-// OverrideLeaderRotation changes the leader rotation scheme to the one specified by name.
-// Default: "round-robin"
-func OverrideLeaderRotation(moduleName string) Option {
-	return func(ro *replicaOptions) {
-		ro.moduleNames.leaderRotation = moduleName
-	}
-}
-
-// WithByzantineStrategy wraps the existing consensus rules to a byzantine ruleset specified by name.
-func WithByzantineStrategy(strategyName string) Option {
-	return func(ro *replicaOptions) {
-		ro.moduleNames.byzantineStrategy = strategyName
-	}
-}
 
 func WithCmdCacheOptions(opts ...clientpb.CommandCacheOption) Option {
 	return func(ro *replicaOptions) {

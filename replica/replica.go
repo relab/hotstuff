@@ -11,10 +11,7 @@ import (
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/kauri"
 	"github.com/relab/hotstuff/protocol/synchronizer"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
-	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/wiring"
 
 	"github.com/relab/hotstuff"
@@ -38,54 +35,18 @@ type Replica struct {
 // New returns a new replica.
 func New(
 	depsCore *wiring.Core,
-	vdParams viewduration.Params,
+	depsSecure *wiring.Security,
+	sender *network.GorumsSender,
+	viewStates *protocol.ViewStates,
+	protocol modules.DisseminatorAggregator,
+	leaderRotation modules.LeaderRotation,
+	consensusRules modules.HotstuffRuleset,
+	viewDuration modules.ViewDuration,
 	opts ...Option,
 ) (replica *Replica, err error) {
 	rOpt := newDefaultOpts()
-	names := &rOpt.moduleNames
 	for _, opt := range opts {
 		opt(rOpt)
-	}
-	sender := network.NewGorumsSender(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		rOpt.credentials,
-	)
-	depsSecure, err := wiring.NewSecurity(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		sender,
-		names.crypto,
-		cert.WithCache(100), // TODO: consider making this configurable
-	)
-	if err != nil {
-		return nil, err
-	}
-	consensusRules, err := wiring.NewConsensusRules(
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		depsSecure.BlockChain(),
-		rOpt.moduleNames.consensus,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	byzStrat := rOpt.moduleNames.byzantineStrategy
-	if byzStrat != "" {
-		byz, err := wiring.WrapByzantineStrategy(
-			depsCore.RuntimeCfg(),
-			depsSecure.BlockChain(),
-			consensusRules,
-			byzStrat,
-		)
-		if err != nil {
-			return nil, err
-		}
-		consensusRules = byz
-		depsCore.Logger().Infof("assigned byzantine strategy: %s", byzStrat)
 	}
 	depsClient := wiring.NewClient(
 		depsCore.EventLoop(),
@@ -93,13 +54,6 @@ func New(
 		rOpt.cmdCacheOpts,
 		rOpt.clientGorumsSrvOpts...,
 	)
-	viewStates, err := protocol.NewViewStates(
-		depsSecure.BlockChain(),
-		depsSecure.Authority(),
-	)
-	if err != nil {
-		return nil, err
-	}
 	committer := consensus.NewCommitter(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
@@ -107,43 +61,6 @@ func New(
 		viewStates,
 		consensusRules,
 	)
-	leaderRotation, err := wiring.NewLeaderRotation(
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		depsSecure.BlockChain(),
-		viewStates,
-		rOpt.moduleNames.leaderRotation,
-		consensusRules.ChainLength(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	var protocol modules.DisseminatorAggregator
-	if depsCore.RuntimeCfg().HasKauriTree() {
-		protocol = kauri.New(
-			depsCore.Logger(),
-			depsCore.EventLoop(),
-			depsCore.RuntimeCfg(),
-			depsSecure.BlockChain(),
-			depsSecure.Authority(),
-			kauri.NewExtendedGorumsSender(
-				depsCore.EventLoop(),
-				depsCore.RuntimeCfg(),
-				sender,
-			),
-		)
-	} else {
-		protocol = consensus.NewHotStuff(
-			depsCore.Logger(),
-			depsCore.EventLoop(),
-			depsCore.RuntimeCfg(),
-			depsSecure.BlockChain(),
-			depsSecure.Authority(),
-			viewStates,
-			leaderRotation,
-			sender,
-		)
-	}
 	depsConsensus := wiring.NewConsensus(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
@@ -156,8 +73,7 @@ func New(
 		leaderRotation,
 		protocol,
 	)
-	viewDuration := viewduration.NewDynamic(vdParams) // TODO(AlanRostem): should be fixed when selecting kauri
-	// TODO(AlanRostem): consder moving the consensus flow from Synchronzier to a different class
+	// TODO(AlanRostem): consider moving the consensus flow from Synchronzier to a different class
 	synchronizer := synchronizer.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),

@@ -31,12 +31,14 @@ func NewConsensusRules(
 ) (rules modules.HotstuffRuleset, err error) {
 	logger.Debugf("Initializing module (consensus rules): %s", name)
 	switch name {
+	case "":
+		fallthrough // default to chainedhotstuff if no name is provided
+	case chainedhotstuff.ModuleName:
+		rules = chainedhotstuff.New(logger, blockchain)
 	case fasthotstuff.ModuleName:
 		rules = fasthotstuff.New(logger, config, blockchain)
 	case simplehotstuff.ModuleName:
 		rules = simplehotstuff.New(logger, blockchain)
-	case chainedhotstuff.ModuleName:
-		rules = chainedhotstuff.New(logger, blockchain)
 	default:
 		return nil, fmt.Errorf("invalid consensus name: '%s'", name)
 	}
@@ -44,13 +46,16 @@ func NewConsensusRules(
 }
 
 func WrapByzantineStrategy(
+	logger logging.Logger,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 	rules modules.HotstuffRuleset,
 	name string,
 ) (byzRules modules.HotstuffRuleset, err error) {
-	// logger.Debugf("Initializing module (byzantine strategy): %s", name)
+	logger.Debugf("Initializing module (byzantine strategy): %s", name)
 	switch name {
+	case "":
+		return rules, nil // default to no byzantine strategy if no name is provided
 	case byzantine.SilenceModuleName:
 		byzRules = byzantine.NewSilence(rules)
 	case byzantine.ForkModuleName:
@@ -68,13 +73,15 @@ func newCryptoModule(
 ) (impl modules.CryptoBase, err error) {
 	logger.Debugf("Initializing module (crypto): %s", name)
 	switch name {
+	case "":
+		fallthrough // default to ecdsa if no name is provided
+	case ecdsa.ModuleName:
+		impl = ecdsa.New(config)
 	case bls12.ModuleName:
 		impl, err = bls12.New(config)
 		if err != nil {
 			return nil, err
 		}
-	case ecdsa.ModuleName:
-		impl = ecdsa.New(config)
 	case eddsa.ModuleName:
 		impl = eddsa.New(config)
 	default:
@@ -93,16 +100,18 @@ func NewLeaderRotation(
 ) (ld modules.LeaderRotation, err error) {
 	logger.Debugf("Initializing module (leader rotation): %s", name)
 	switch name {
-	case carousel.ModuleName:
-		ld = carousel.New(chainLength, blockchain, viewStates, config, logger)
-	case reputation.ModuleName:
-		ld = reputation.New(chainLength, viewStates, config, logger)
+	case "":
+		fallthrough // default to round-robin if no name is provided
 	case roundrobin.ModuleName:
 		ld = roundrobin.New(config)
 	case fixedleader.ModuleName:
 		ld = fixedleader.New(hotstuff.ID(1))
 	case treeleader.ModuleName:
 		ld = treeleader.New(config)
+	case carousel.ModuleName:
+		ld = carousel.New(chainLength, blockchain, viewStates, config, logger)
+	case reputation.ModuleName:
+		ld = reputation.New(chainLength, viewStates, config, logger)
 	default:
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", name)
 	}
