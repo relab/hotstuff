@@ -9,7 +9,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 )
@@ -18,7 +17,7 @@ const ModuleName = "reputation"
 
 type reputationsMap map[hotstuff.ID]float64
 
-type repBased struct {
+type RepBasedLeaderRotation struct {
 	viewStates *protocol.ViewStates
 	config     *core.RuntimeConfig
 	logger     logging.Logger
@@ -31,7 +30,7 @@ type repBased struct {
 // TODO: should GetLeader be thread-safe?
 
 // GetLeader returns the id of the leader in the given view
-func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
+func (r *RepBasedLeaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
 	block := r.viewStates.CommittedBlock()
 	if block.View() > view-hotstuff.View(r.chainLength) {
 		// TODO: it could be possible to lookup leaders for older views if we
@@ -96,8 +95,8 @@ func New(
 	viewStates *protocol.ViewStates,
 	config *core.RuntimeConfig,
 	logger logging.Logger,
-) modules.LeaderRotation {
-	return &repBased{
+) *RepBasedLeaderRotation {
+	return &RepBasedLeaderRotation{
 		viewStates: viewStates,
 		config:     config,
 		logger:     logger,

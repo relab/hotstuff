@@ -52,30 +52,32 @@ func (sig Signature) ToBytes() []byte {
 	return b
 }
 
-type eddsaBase struct {
+type EDDSA struct {
 	config *core.RuntimeConfig
 }
 
 // New returns a new instance of the EDDSA CryptoBase implementation.
-func New(config *core.RuntimeConfig) modules.CryptoBase {
-	return &eddsaBase{
+func New(config *core.RuntimeConfig) *EDDSA {
+	return &EDDSA{
 		config: config,
 	}
 }
 
-func (ed *eddsaBase) privateKey() ed25519.PrivateKey {
+var _ modules.CryptoBase = (*EDDSA)(nil)
+
+func (ed *EDDSA) privateKey() ed25519.PrivateKey {
 	return ed.config.PrivateKey().(ed25519.PrivateKey)
 }
 
 // Sign creates a cryptographic signature of the given message.
-func (ed *eddsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
+func (ed *EDDSA) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
 	sign := ed25519.Sign(ed.privateKey(), message)
 	eddsaSign := &Signature{signer: ed.config.ID(), sign: sign}
 	return crypto.Multi[*Signature]{ed.config.ID(): eddsaSign}, nil
 }
 
 // Combine combines multiple signatures into a single signature.
-func (ed *eddsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
+func (ed *EDDSA) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
 	if len(signatures) < 2 {
 		return nil, crypto.ErrCombineMultiple
 	}
@@ -97,7 +99,7 @@ func (ed *eddsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Q
 }
 
 // Verify verifies the given quorum signature against the message.
-func (ed *eddsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) (err error) {
+func (ed *EDDSA) Verify(signature hotstuff.QuorumSignature, message []byte) (err error) {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
 		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
@@ -123,7 +125,7 @@ func (ed *eddsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) 
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
-func (ed *eddsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) (err error) {
+func (ed *EDDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) (err error) {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
 		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
@@ -159,7 +161,7 @@ func (ed *eddsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 	return nil
 }
 
-func (ed *eddsaBase) verifySingle(sig *Signature, message []byte) error {
+func (ed *EDDSA) verifySingle(sig *Signature, message []byte) error {
 	replica, ok := ed.config.ReplicaInfo(sig.Signer())
 	if !ok {
 		return fmt.Errorf("eddsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())

@@ -5,7 +5,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -22,7 +21,7 @@ func New(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	blockChain *blockchain.BlockChain,
-) modules.HotstuffRuleset {
+) *FastHotStuff {
 	if !config.HasAggregateQC() {
 		panic("aggregate qc must be enabled for fasthotstuff")
 	}

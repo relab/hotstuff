@@ -31,6 +31,8 @@ func (c *CommandCache) len() uint32 {
 	return uint32(c.cache.Len())
 }
 
+// isDuplicate returns true if the given command has already been processed.
+// Callers must hold the lock to access the underlying clientSeqNumbers map.
 func (c *CommandCache) isDuplicate(cmd *Command) bool {
 	seqNum := c.clientSeqNumbers[cmd.GetClientID()]
 	return seqNum >= cmd.GetSequenceNumber()
@@ -99,8 +101,9 @@ awaitBatch:
 	return batch, nil
 }
 
-// ContainsDuplicate returns true if the batch contains old commands already proposed.
-func (c *CommandCache) ContainsDuplicate(batch *Batch) bool {
+// containsDuplicate returns true if the batch contains old commands already proposed.
+// NOTE: This method is only used in the tests.
+func (c *CommandCache) containsDuplicate(batch *Batch) bool {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 

@@ -141,13 +141,15 @@ func NewVulnFHS(
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
 	inner fasthotstuff.FastHotStuff,
-) modules.HotstuffRuleset {
+) *vulnerableFHS {
 	return &vulnerableFHS{
 		logger:     logger,
 		blockChain: blockChain,
 		inner:      inner,
 	}
 }
+
+var _ modules.HotstuffRuleset = (*vulnerableFHS)(nil)
 
 // VoteRule decides whether to vote for the block.
 func (fhs *vulnerableFHS) VoteRule(view hotstuff.View, proposal hotstuff.ProposeMsg) bool {

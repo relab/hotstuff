@@ -4,7 +4,6 @@ package chainedhotstuff
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -24,7 +23,7 @@ type ChainedHotStuff struct {
 func New(
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
-) modules.HotstuffRuleset {
+) *ChainedHotStuff {
 	return &ChainedHotStuff{
 		blockChain: blockChain,
 		logger:     logger,

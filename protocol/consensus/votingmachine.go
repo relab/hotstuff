@@ -79,7 +79,7 @@ func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 		vm.logger.Info("block too old")
 		return
 	}
-	if vm.config.SyncVoteVerification() {
+	if vm.config.SyncVerification() {
 		vm.verifyCert(cert, block)
 	} else {
 		go vm.verifyCert(cert, block)

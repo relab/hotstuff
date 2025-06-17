@@ -65,23 +65,25 @@ func (sig Signature) ToBytes() []byte {
 	return b
 }
 
-type ecdsaBase struct {
+type ECDSA struct {
 	config *core.RuntimeConfig
 }
 
 // New returns a new instance of the ECDSA CryptoBase implementation.
-func New(config *core.RuntimeConfig) modules.CryptoBase {
-	return &ecdsaBase{
+func New(config *core.RuntimeConfig) *ECDSA {
+	return &ECDSA{
 		config: config,
 	}
 }
 
-func (ec *ecdsaBase) privateKey() *ecdsa.PrivateKey {
+var _ modules.CryptoBase = (*ECDSA)(nil)
+
+func (ec *ECDSA) privateKey() *ecdsa.PrivateKey {
 	return ec.config.PrivateKey().(*ecdsa.PrivateKey)
 }
 
 // Sign creates a cryptographic signature of the given message.
-func (ec *ecdsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
+func (ec *ECDSA) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
 	hash := sha256.Sum256(message)
 	r, s, err := ecdsa.Sign(rand.Reader, ec.privateKey(), hash[:])
 	if err != nil {
@@ -95,7 +97,7 @@ func (ec *ecdsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, e
 }
 
 // Combine combines multiple signatures into a single signature.
-func (ec *ecdsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
+func (ec *ECDSA) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
 	if len(signatures) < 2 {
 		return nil, crypto.ErrCombineMultiple
 	}
@@ -117,7 +119,7 @@ func (ec *ecdsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Q
 }
 
 // Verify verifies the given quorum signature against the message.
-func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) (err error) {
+func (ec *ECDSA) Verify(signature hotstuff.QuorumSignature, message []byte) (err error) {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
 		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
@@ -144,7 +146,7 @@ func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) 
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
-func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) (err error) {
+func (ec *ECDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) (err error) {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
 		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
@@ -180,7 +182,7 @@ func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 	return nil
 }
 
-func (ec *ecdsaBase) verifySingle(sig *Signature, hash hotstuff.Hash) error {
+func (ec *ECDSA) verifySingle(sig *Signature, hash hotstuff.Hash) error {
 	replica, ok := ec.config.ReplicaInfo(sig.Signer())
 	if !ok {
 		return fmt.Errorf("ecdsa: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
@@ -192,4 +194,4 @@ func (ec *ecdsaBase) verifySingle(sig *Signature, hash hotstuff.Hash) error {
 	return nil
 }
 
-var _ modules.CryptoBase = (*ecdsaBase)(nil)
+var _ modules.CryptoBase = (*ECDSA)(nil)

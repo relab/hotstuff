@@ -69,7 +69,7 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 	logger := logging.NewWithDest(log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
 	node := &node{
 		id:           nodeID,
-		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVoteVerification()),
+		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVerification()),
 		logger:       logger,
 		eventLoop:    eventloop.New(logger, 100),
 		commandCache: clientpb.NewCommandCache(),
@@ -313,7 +313,7 @@ func (n *Network) stopWithErr(err error) {
 }
 
 // NewSender returns a new Configuration module for this network.
-func (n *Network) NewSender(node *node) modules.Sender {
+func (n *Network) NewSender(node *node) *emulatedSender {
 	return &emulatedSender{
 		network: n,
 		node:    node,
@@ -524,15 +524,15 @@ func newTimeoutManager(
 }
 
 // FixedTimeout returns an ExponentialTimeout with a max exponent of 0.
-func FixedTimeout(timeout time.Duration) modules.ViewDuration {
-	return fixedDuration{timeout}
+func FixedTimeout(timeout time.Duration) *FixedDuration {
+	return &FixedDuration{timeout}
 }
 
-type fixedDuration struct {
+type FixedDuration struct {
 	timeout time.Duration
 }
 
-func (d fixedDuration) Duration() time.Duration { return d.timeout }
-func (d fixedDuration) ViewStarted()            {}
-func (d fixedDuration) ViewSucceeded()          {}
-func (d fixedDuration) ViewTimeout()            {}
+func (d FixedDuration) Duration() time.Duration { return d.timeout }
+func (d FixedDuration) ViewStarted()            {}
+func (d FixedDuration) ViewSucceeded()          {}
+func (d FixedDuration) ViewTimeout()            {}

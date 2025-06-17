@@ -6,27 +6,29 @@ import (
 	"github.com/relab/hotstuff/modules"
 )
 
-type fixedViewDuration struct {
+type Fixed struct {
 	duration time.Duration
 }
 
 // NewFixedViewDuration returns a ViewDuration with a fixed duration.
-func NewFixed(duration time.Duration) modules.ViewDuration {
-	return &fixedViewDuration{
+func NewFixed(duration time.Duration) *Fixed {
+	return &Fixed{
 		duration: duration,
 	}
 }
 
+var _ modules.ViewDuration = (*Fixed)(nil)
+
 // Duration returns the fixed duration.
-func (f *fixedViewDuration) Duration() time.Duration {
+func (f *Fixed) Duration() time.Duration {
 	return f.duration
 }
 
 // ViewStarted does nothing for FixedViewDuration.
-func (f *fixedViewDuration) ViewStarted() {}
+func (f *Fixed) ViewStarted() {}
 
 // ViewSucceeded does nothing for FixedViewDuration.
-func (f *fixedViewDuration) ViewSucceeded() {}
+func (f *Fixed) ViewSucceeded() {}
 
 // ViewTimeout does nothing for FixedViewDuration.
-func (f *fixedViewDuration) ViewTimeout() {}
+func (f *Fixed) ViewTimeout() {}

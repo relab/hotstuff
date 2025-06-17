@@ -299,17 +299,13 @@ func NewProposeMsg(parent hotstuff.Hash, qc hotstuff.QuorumCert, cmd *clientpb.B
 	return hotstuff.ProposeMsg{ID: id, Block: hotstuff.NewBlock(parent, qc, cmd, view, id)}
 }
 
-type leaderRotation struct {
+type LeaderRotation struct {
 	t     *testing.T
 	order []hotstuff.ID
 }
 
-func (l leaderRotation) ViewDuration() modules.ViewDuration {
-	return FixedTimeout(0) // TODO(AlanRostem): return proper value
-}
-
 // GetLeader returns the id of the leader in the given view.
-func (l leaderRotation) GetLeader(v hotstuff.View) hotstuff.ID {
+func (l LeaderRotation) GetLeader(v hotstuff.View) hotstuff.ID {
 	l.t.Helper()
 	if v == 0 {
 		l.t.Fatalf("attempt to get leader for view 0")
@@ -321,12 +317,12 @@ func (l leaderRotation) GetLeader(v hotstuff.View) hotstuff.ID {
 }
 
 // NewLeaderRotation returns a leader rotation implementation that will return leaders in the specified order.
-func NewLeaderRotation(t *testing.T, order ...hotstuff.ID) modules.LeaderRotation {
+func NewLeaderRotation(t *testing.T, order ...hotstuff.ID) *LeaderRotation {
 	t.Helper()
-	return leaderRotation{t, order}
+	return &LeaderRotation{t, order}
 }
 
 // FixedTimeout returns an ExponentialTimeout with a max exponent of 0.
-func FixedTimeout(timeout time.Duration) modules.ViewDuration {
+func FixedTimeout(timeout time.Duration) *twins.FixedDuration {
 	return twins.FixedTimeout(timeout)
 }

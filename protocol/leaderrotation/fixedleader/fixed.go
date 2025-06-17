@@ -7,20 +7,22 @@ import (
 
 const ModuleName = "fixed"
 
-type fixed struct {
+type FixedLeader struct {
 	leader hotstuff.ID
 }
 
 // GetLeader returns the id of the leader in the given view
-func (f fixed) GetLeader(_ hotstuff.View) hotstuff.ID {
+func (f *FixedLeader) GetLeader(_ hotstuff.View) hotstuff.ID {
 	return f.leader
 }
 
 // NewFixed returns a new fixed-leader leader rotation implementation.
 func New(
 	leader hotstuff.ID,
-) modules.LeaderRotation {
-	return fixed{
+) *FixedLeader {
+	return &FixedLeader{
 		leader: leader,
 	}
 }
+
+var _ modules.LeaderRotation = (*FixedLeader)(nil)

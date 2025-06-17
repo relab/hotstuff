@@ -24,10 +24,6 @@ type leaderRotation struct {
 	modules.LeaderRotation
 }
 
-func (ld *leaderRotation) ViewDuration() modules.ViewDuration {
-	return testutil.FixedTimeout(1000)
-}
-
 var _ modules.LeaderRotation = (*leaderRotation)(nil)
 
 func TestAdvanceViewQC(t *testing.T) {
@@ -49,11 +45,9 @@ func TestAdvanceViewQC(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ld := &leaderRotation{
-		LeaderRotation: roundrobin.New(
-			depsCore.RuntimeCfg(),
-		),
-	}
+	ld := roundrobin.New(
+		depsCore.RuntimeCfg(),
+	)
 	consensusRules := chainedhotstuff.New(
 		depsCore.Logger(),
 		depsSecurity.BlockChain(),

@@ -29,7 +29,7 @@ func NewHotStuff(
 	states *protocol.ViewStates,
 	leaderRotation modules.LeaderRotation,
 	sender modules.Sender,
-) modules.DisseminatorAggregator {
+) *HotStuff {
 	return &HotStuff{
 		logger: logger,
 		config: config,

@@ -311,7 +311,7 @@ func TestCacheContainsDuplicate(t *testing.T) {
 			cache.Proposed(tt.batchA)
 
 			// check if batchB contains duplicates with respect to batchA
-			if got := cache.ContainsDuplicate(tt.batchB); got != tt.want {
+			if got := cache.containsDuplicate(tt.batchB); got != tt.want {
 				t.Errorf("ContainsDuplicate() = %v, want %v", got, tt.want)
 			}
 		})

@@ -56,7 +56,9 @@ func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) {
 	v.logger.Debugf("Received proposal: %v", proposal.Block)
 	block := proposal.Block
 	// store the valid block, it may commit the block or its ancestors
-	v.committer.Update(block)
+	if err := v.committer.Update(block); err != nil {
+		v.logger.Warn(err)
+	}
 	pc, err := v.Vote(block)
 	if err != nil {
 		// if the block is invalid, reject it. This means the command is also discarded.

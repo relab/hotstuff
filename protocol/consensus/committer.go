@@ -27,12 +27,12 @@ func NewCommitter(
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
 	viewStates *protocol.ViewStates,
-	rules modules.CommitRuler,
+	ruler modules.CommitRuler,
 ) *Committer {
 	return &Committer{
 		eventLoop:  eventLoop,
 		blockChain: blockChain,
-		ruler:      rules,
+		ruler:      ruler,
 		logger:     logger,
 		viewStates: viewStates,
 	}
@@ -57,16 +57,19 @@ func (cm *Committer) commit(block *hotstuff.Block) error {
 	return nil
 }
 
-func (cm *Committer) Update(block *hotstuff.Block) {
+// Update stores the block on the chain and traverses it, ensuring that the block is valid and can be executed.
+// NOTE: The method checks the CommitRuler's rule before traversing.
+func (cm *Committer) Update(block *hotstuff.Block) error {
 	cm.logger.Debugf("Update: %v", block)
 	cm.blockChain.Store(block)
 	// NOTE: this overwrites the block variable. If it was nil, simply don't commit.
 	if block = cm.ruler.CommitRule(block); block != nil {
 		err := cm.commit(block) // committer will eventually execute the command.
 		if err != nil {
-			cm.logger.Warnf("failed to commit: %v", err)
+			return fmt.Errorf("failed to commit: %v", err)
 		}
 	}
+	return nil
 }
 
 // recursive helper for commit

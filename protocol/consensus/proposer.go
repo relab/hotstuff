@@ -91,7 +91,9 @@ func (p *Proposer) Propose(proposal *hotstuff.ProposeMsg) {
 		p.logger.Error(err)
 		return
 	}
-	p.committer.Update(proposal.Block)
+	if err := p.committer.Update(proposal.Block); err != nil {
+		p.logger.Warn(err)
+	}
 	p.dissAgg.Disseminate(proposal, pc)
 }
 

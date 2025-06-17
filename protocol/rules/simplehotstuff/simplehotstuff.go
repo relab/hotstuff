@@ -4,7 +4,6 @@ package simplehotstuff
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -25,7 +24,7 @@ type SimpleHotStuff struct {
 func New(
 	logger logging.Logger,
 	blockChain *blockchain.BlockChain,
-) modules.HotstuffRuleset {
+) *SimpleHotStuff {
 	return &SimpleHotStuff{
 		blockChain: blockChain,
 		logger:     logger,

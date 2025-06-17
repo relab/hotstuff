@@ -16,7 +16,7 @@ import (
 
 const ModuleName = "carousel"
 
-type carousel struct {
+type Carousel struct {
 	blockChain *blockchain.BlockChain
 	viewStates *protocol.ViewStates
 	config     *core.RuntimeConfig
@@ -33,8 +33,8 @@ func New(
 	viewStates *protocol.ViewStates,
 	config *core.RuntimeConfig,
 	logger logging.Logger,
-) modules.LeaderRotation {
-	return &carousel{
+) *Carousel {
+	return &Carousel{
 		blockChain:  blockChain,
 		chainLength: chainLength,
 		viewStates:  viewStates,
@@ -43,7 +43,7 @@ func New(
 	}
 }
 
-func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
+func (c *Carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 	commitHead := c.viewStates.CommittedBlock()
 
 	if commitHead.QuorumCert().Signature() == nil {
@@ -89,3 +89,5 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 
 	return leader
 }
+
+var _ modules.LeaderRotation = (*Carousel)(nil)
