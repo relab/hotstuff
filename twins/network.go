@@ -143,8 +143,8 @@ func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName str
 			consensus.New(consensusModule),
 			consensus.NewVotingMachine(),
 			crypto.NewCache(ecdsa.New(), 100),
-			synchronizer.New(FixedTimeout(1*time.Millisecond)),
-			logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
+			synchronizer.New(FixedTimeout(100*time.Millisecond)),
+			logging.NewWithDest(&n.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID)),
 			// twins-specific:
 			&configuration{network: n, node: node},
 			&timeoutManager{network: n, node: node, timeout: 5},
@@ -166,6 +166,7 @@ func (n *Network) run(ticks int) {
 	}
 
 	for tick := 0; tick < ticks; tick++ {
+		n.logger.Debugf("new tick: %d", tick)
 		n.tick()
 	}
 }

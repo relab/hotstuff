@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	_ "github.com/relab/hotstuff/consensus/chainedhotstuff"
+	"github.com/relab/hotstuff/logging"
 )
 
 func TestBasicScenario(t *testing.T) {
@@ -17,6 +18,8 @@ func TestBasicScenario(t *testing.T) {
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 
+	logging.SetLogLevel("debug")
+
 	result, err := ExecuteScenario(s, 4, 0, 100, "chainedhotstuff")
 	if err != nil {
 		t.Fatal(err)
@@ -29,4 +32,7 @@ func TestBasicScenario(t *testing.T) {
 	if result.Commits != 1 {
 		t.Error("Expected one commit")
 	}
+
+	t.Log("Logging debug...")
+	t.Log(result.NetworkLog)
 }
