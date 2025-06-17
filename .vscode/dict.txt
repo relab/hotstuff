@@ -109,6 +109,7 @@ unexported
 unittests
 unmarshals
 unregisters
+viewduration
 Warnf
 wcfg
 Welford
