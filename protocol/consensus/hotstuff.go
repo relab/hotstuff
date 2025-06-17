@@ -16,7 +16,6 @@ type HotStuff struct {
 	config         *core.RuntimeConfig
 	votingMachine  *VotingMachine
 	leaderRotation modules.LeaderRotation
-	states         *protocol.ViewStates
 	sender         modules.Sender
 }
 
@@ -41,22 +40,23 @@ func NewHotStuff(
 			auth,
 			states,
 		),
-		states:         states,
 		leaderRotation: leaderRotation,
 		sender:         sender,
 	}
 }
 
-func (hs *HotStuff) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+// Disseminate stores a vote for the proposal and broadcasts the proposal.
+func (hs *HotStuff) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	hs.votingMachine.CollectVote(hotstuff.VoteMsg{
 		ID:          hs.config.ID(),
 		PartialCert: pc,
 	})
 	hs.sender.Propose(proposal)
+	return nil
 }
 
-// Aggregate disseminates or stores a valid vote depending on replica being voter or leader in the next view.
-func (hs *HotStuff) Aggregate(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+// Aggregate aggregates the vote or stores it if the replica is leader in the next view.
+func (hs *HotStuff) Aggregate(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	leaderID := hs.leaderRotation.GetLeader(lastVote + 1)
 	if leaderID == hs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.
@@ -64,13 +64,10 @@ func (hs *HotStuff) Aggregate(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc
 			ID:          hs.config.ID(),
 			PartialCert: pc,
 		})
-		return
+		return nil
 	}
 	// if I am the one voting, send the vote to next leader over the wire.
-	if err := hs.sender.Vote(leaderID, pc); err != nil {
-		hs.logger.Warnf("%v", err)
-		return
-	}
+	return hs.sender.Vote(leaderID, pc)
 }
 
 var _ modules.DisseminatorAggregator = (*HotStuff)(nil)

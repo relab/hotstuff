@@ -44,9 +44,9 @@ type LeaderRotation interface {
 // DisseminatorAggregator is an interface sending proposals and votes.
 type DisseminatorAggregator interface {
 	// Disseminate disseminates the proposal from the proposer.
-	Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
+	Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error
 	// Aggregate handles incoming proposals and replies with a vote.
-	Aggregate(lastVote hotstuff.View, proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert)
+	Aggregate(lastVote hotstuff.View, proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error
 }
 
 // ViewDuration determines the duration of a view.

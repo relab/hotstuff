@@ -92,9 +92,11 @@ func (p *Proposer) Propose(proposal *hotstuff.ProposeMsg) {
 		return
 	}
 	if err := p.committer.Update(proposal.Block); err != nil {
-		p.logger.Warn(err)
+		p.logger.Error(err)
 	}
-	p.dissAgg.Disseminate(proposal, pc)
+	if err := p.dissAgg.Disseminate(proposal, pc); err != nil {
+		p.logger.Error(err)
+	}
 }
 
 // CreateProposal attempts to create a new outgoing proposal if a command exists and the protocol's rule is satisfied.

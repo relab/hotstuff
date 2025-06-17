@@ -65,7 +65,9 @@ func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) {
 		v.logger.Infof("%v", err)
 	} else {
 		// send the vote if it was successful
-		v.dissAgg.Aggregate(v.LastVote(), proposal, pc)
+		if err := v.dissAgg.Aggregate(v.LastVote(), proposal, pc); err != nil {
+			v.logger.Error(err)
+		}
 	}
 }
 
