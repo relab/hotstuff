@@ -71,7 +71,8 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVerification()),
 		commandCache: clientpb.NewCommandCache(),
 	}
-	node.logger = logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
+	// for debugging purposes, this will append to the network log
+	node.logger = logging.NewWithDest(&n.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
 	node.eventLoop = eventloop.New(node.logger, 100)
 	node.sender = &emulatedSender{
 		node:      node,

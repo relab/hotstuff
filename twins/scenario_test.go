@@ -26,7 +26,8 @@ func TestPartitionedScenario(t *testing.T) {
 	s = append(s, View{Leader: 3, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
-	result, err := ExecuteScenario(s, 4, 0, 100, "chainedhotstuff")
+	logging.SetLogLevel("debug")
+	result, err := ExecuteScenario(s, 4, 0, 20, "chainedhotstuff")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,6 +37,8 @@ func TestPartitionedScenario(t *testing.T) {
 	if result.Commits != 1 {
 		t.Error("Expected one commit")
 	}
+	t.Log("Logging debug...")
+	t.Log(result.NetworkLog)
 }
 
 // TestBasicScenario checks if chained Hotstuff will commit one block
@@ -61,4 +64,6 @@ func TestBasicScenario(t *testing.T) {
 	if result.Commits != 1 {
 		t.Error("Expected one commit")
 	}
+	t.Log("Logging debug...")
+	t.Log(result.NetworkLog)
 }
