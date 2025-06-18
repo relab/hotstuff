@@ -40,12 +40,8 @@ func WithServerOptions(opts ...server.ServerOption) Option {
 	}
 }
 
-func WithTLS(certificate tls.Certificate, rootCAs *x509.CertPool) Option {
+func WithTLS(certificate tls.Certificate, rootCAs *x509.CertPool, creds credentials.TransportCredentials) Option {
 	return func(ro *replicaOptions) {
-		creds := credentials.NewTLS(&tls.Config{
-			RootCAs:      rootCAs,
-			Certificates: []tls.Certificate{certificate},
-		})
 		ro.clientGorumsSrvOpts = append(ro.clientGorumsSrvOpts, gorums.WithGRPCServerOptions(
 			grpc.Creds(credentials.NewServerTLSFromCert(&certificate)),
 		))

@@ -32,6 +32,7 @@ import (
 	"github.com/relab/hotstuff/server"
 	"github.com/relab/hotstuff/wiring"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -175,6 +176,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			return nil, err
 		}
 	}
+	creds := insecure.NewCredentials()
 	// setup replica
 	replicaOpts := []replica.Option{}
 	if opts.GetUseTLS() {
@@ -184,7 +186,11 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		}
 		rootCAs := x509.NewCertPool()
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
-		replicaOpts = append(replicaOpts, replica.WithTLS(certificate, rootCAs))
+		creds = credentials.NewTLS(&tls.Config{ // overwrite creds to a secure TLS version
+			RootCAs:      rootCAs,
+			Certificates: []tls.Certificate{certificate},
+		})
+		replicaOpts = append(replicaOpts, replica.WithTLS(certificate, rootCAs, creds))
 	}
 	if opts.GetBatchSize() > 1 {
 		replicaOpts = append(replicaOpts,
@@ -198,7 +204,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
-		insecure.NewCredentials(), // TODO(meling): need to get the credentials from replicaOpts above (see WithTLS)
+		creds,
 	)
 	depsSecure, err := wiring.NewSecurity(
 		depsCore.EventLoop(),
