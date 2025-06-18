@@ -3,12 +3,7 @@ package consensus
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol"
-	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/security/cert"
 )
 
 type HotStuff struct {
@@ -19,25 +14,14 @@ type HotStuff struct {
 }
 
 func NewHotStuff(
-	logger logging.Logger,
-	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
-	blockchain *blockchain.Blockchain,
-	auth *cert.Authority,
-	states *protocol.ViewStates,
+	votingMachine *VotingMachine,
 	leaderRotation modules.LeaderRotation,
 	sender modules.Sender,
 ) *HotStuff {
 	return &HotStuff{
-		config: config,
-		votingMachine: NewVotingMachine(
-			logger,
-			eventLoop,
-			config,
-			blockchain,
-			auth,
-			states,
-		),
+		config:         config,
+		votingMachine:  votingMachine,
 		leaderRotation: leaderRotation,
 		sender:         sender,
 	}
@@ -68,4 +52,5 @@ func (hs *HotStuff) Aggregate(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc
 	return hs.sender.Vote(leaderID, pc)
 }
 
-var _ modules.DisseminatorAggregator = (*HotStuff)(nil)
+var _ modules.Aggregator = (*HotStuff)(nil)
+var _ modules.Disseminator = (*HotStuff)(nil)

@@ -53,13 +53,17 @@ func wireUpProposer(
 		consensusRules.ChainLength(),
 	)
 	check(t, err)
-	hsProtocol := consensus.NewHotStuff(
+	votingMachine := consensus.NewVotingMachine(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsCore.RuntimeCfg(),
 		depsSecurity.BlockChain(),
 		depsSecurity.Authority(),
 		viewStates,
+	)
+	hsProtocol := consensus.NewHotStuff(
+		depsCore.RuntimeCfg(),
+		votingMachine,
 		leaderRotation,
 		sender,
 	)

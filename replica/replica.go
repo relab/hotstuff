@@ -38,7 +38,7 @@ func New(
 	depsSecure *wiring.Security,
 	sender *network.GorumsSender,
 	viewStates *protocol.ViewStates,
-	protocol modules.DisseminatorAggregator,
+	dissAgg modules.DisseminatorAggregator,
 	leaderRotation modules.LeaderRotation,
 	consensusRules modules.HotstuffRuleset,
 	viewDuration modules.ViewDuration,
@@ -71,7 +71,7 @@ func New(
 		committer,
 		consensusRules,
 		leaderRotation,
-		protocol,
+		dissAgg,
 	)
 	// TODO(AlanRostem): consider moving the consensus flow from synchronizer to a different class
 	synchronizer := synchronizer.New(

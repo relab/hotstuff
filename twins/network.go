@@ -100,13 +100,17 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 	}
 	committer := consensus.NewCommitter(node.eventLoop, node.logger, node.blockchain, node.viewStates, consensusRules)
 	node.leaderRotation = leaderRotation(n.views)
-	protocol := consensus.NewHotStuff(
+	votingMachine := consensus.NewVotingMachine(
 		node.logger,
 		node.eventLoop,
 		node.config,
-		node.blockchain,
+		depsSecurity.BlockChain(),
 		depsSecurity.Authority(),
 		node.viewStates,
+	)
+	protocol := consensus.NewHotStuff(
+		node.config,
+		votingMachine,
 		node.leaderRotation,
 		node.sender,
 	)

@@ -299,13 +299,17 @@ func initConsensusModules(depsCore *wiring.Core, depsSecure *wiring.Security, se
 			opts.GetMaxTimeout().AsDuration(),
 			opts.GetTimeoutMultiplier(),
 		))
-		disAgg = consensus.NewHotStuff(
+		votingMachine := consensus.NewVotingMachine(
 			depsCore.Logger(),
 			depsCore.EventLoop(),
 			depsCore.RuntimeCfg(),
 			depsSecure.BlockChain(),
 			depsSecure.Authority(),
 			viewStates,
+		)
+		disAgg = consensus.NewHotStuff(
+			depsCore.RuntimeCfg(),
+			votingMachine,
 			leaderRotation,
 			sender,
 		)

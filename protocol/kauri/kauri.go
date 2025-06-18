@@ -225,4 +225,5 @@ type WaitTimerExpiredEvent struct {
 	currentView hotstuff.View
 }
 
-var _ modules.DisseminatorAggregator = (*Kauri)(nil)
+var _ modules.Disseminator = (*Kauri)(nil)
+var _ modules.Aggregator = (*Kauri)(nil)

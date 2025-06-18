@@ -16,7 +16,7 @@ type Voter struct {
 
 	leaderRotation modules.LeaderRotation
 	ruler          modules.VoteRuler
-	dissAgg        modules.DisseminatorAggregator
+	aggregator     modules.Aggregator
 
 	auth      *cert.Authority
 	committer *Committer
@@ -29,7 +29,7 @@ func NewVoter(
 	config *core.RuntimeConfig,
 	leaderRotation modules.LeaderRotation,
 	rules modules.VoteRuler,
-	dissAgg modules.DisseminatorAggregator,
+	aggregator modules.Aggregator,
 	auth *cert.Authority,
 	committer *Committer,
 ) *Voter {
@@ -39,7 +39,7 @@ func NewVoter(
 
 		leaderRotation: leaderRotation,
 		ruler:          rules,
-		dissAgg:        dissAgg,
+		aggregator:     aggregator,
 
 		auth:      auth,
 		committer: committer,
@@ -65,7 +65,7 @@ func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) {
 		v.logger.Infof("%v", err)
 	} else {
 		// send the vote if it was successful
-		if err := v.dissAgg.Aggregate(v.LastVote(), proposal, pc); err != nil {
+		if err := v.aggregator.Aggregate(v.LastVote(), proposal, pc); err != nil {
 			v.logger.Error(err)
 		}
 	}

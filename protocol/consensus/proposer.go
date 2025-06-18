@@ -19,7 +19,7 @@ type Proposer struct {
 	config       *core.RuntimeConfig
 	blockchain   *blockchain.Blockchain
 	ruler        modules.ProposeRuler
-	dissAgg      modules.DisseminatorAggregator
+	disseminator modules.Disseminator
 	voter        *Voter
 	commandCache *clientpb.CommandCache
 	committer    *Committer
@@ -32,7 +32,7 @@ func NewProposer(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
-	dissAgg modules.DisseminatorAggregator,
+	disseminator modules.Disseminator,
 	voter *Voter,
 	commandCache *clientpb.CommandCache,
 	committer *Committer,
@@ -44,7 +44,7 @@ func NewProposer(
 		config:       config,
 		blockchain:   blockchain,
 		ruler:        nil,
-		dissAgg:      dissAgg,
+		disseminator: disseminator,
 		voter:        voter,
 		commandCache: commandCache,
 		committer:    committer,
@@ -94,7 +94,7 @@ func (p *Proposer) Propose(proposal *hotstuff.ProposeMsg) {
 	if err := p.committer.TryCommit(proposal.Block); err != nil {
 		p.logger.Error(err)
 	}
-	if err := p.dissAgg.Disseminate(proposal, pc); err != nil {
+	if err := p.disseminator.Disseminate(proposal, pc); err != nil {
 		p.logger.Error(err)
 	}
 }

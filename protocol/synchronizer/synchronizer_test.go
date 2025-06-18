@@ -69,7 +69,14 @@ func TestAdvanceViewQC(t *testing.T) {
 		viewStates,
 		consensusRules,
 	)
-
+	votingMachine := consensus.NewVotingMachine(
+		depsCore.Logger(),
+		depsCore.EventLoop(),
+		depsCore.RuntimeCfg(),
+		depsSecurity.BlockChain(),
+		depsSecurity.Authority(),
+		viewStates,
+	)
 	depsConsensus := wiring.NewConsensus(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
@@ -81,12 +88,8 @@ func TestAdvanceViewQC(t *testing.T) {
 		consensusRules,
 		ld,
 		consensus.NewHotStuff(
-			depsCore.Logger(),
-			depsCore.EventLoop(),
 			depsCore.RuntimeCfg(),
-			depsSecurity.BlockChain(),
-			depsSecurity.Authority(),
-			viewStates,
+			votingMachine,
 			ld,
 			sender,
 		),
