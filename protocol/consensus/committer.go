@@ -38,6 +38,23 @@ func NewCommitter(
 	}
 }
 
+// TryCommit stores the given block in the local blockchain and applies the
+// CommitRule to identify the youngest ancestor block eligible to be committed.
+// This eligible block is then used as the starting point for recursively
+// committing its uncommitted ancestor blocks.
+func (cm *Committer) TryCommit(block *hotstuff.Block) error {
+	cm.logger.Debugf("TryCommit: %v", block)
+	cm.blockchain.Store(block)
+	// NOTE: this overwrites the block variable. If it was nil, simply don't commit.
+	if block = cm.ruler.CommitRule(block); block != nil {
+		// recursively commit the block's ancestors before committing the block itself
+		if err := cm.commit(block); err != nil {
+			return fmt.Errorf("failed to commit: %w", err)
+		}
+	}
+	return nil
+}
+
 // Stores the block before further execution.
 func (cm *Committer) commit(block *hotstuff.Block) error {
 	err := cm.commitInner(block, cm.viewStates.CommittedBlock())
@@ -53,23 +70,6 @@ func (cm *Committer) commit(block *hotstuff.Block) error {
 		cm.eventLoop.AddEvent(clientpb.AbortEvent{
 			Batch: block.Commands(),
 		})
-	}
-	return nil
-}
-
-// TryCommit stores the given block in the local blockchain and applies the
-// CommitRule to identify the youngest ancestor block eligible to be committed.
-// This eligible block is then used as the starting point for recursively
-// committing its uncommitted ancestor blocks.
-func (cm *Committer) TryCommit(block *hotstuff.Block) error {
-	cm.logger.Debugf("TryCommit: %v", block)
-	cm.blockchain.Store(block)
-	// NOTE: this overwrites the block variable. If it was nil, simply don't commit.
-	if block = cm.ruler.CommitRule(block); block != nil {
-		// recursively commit the block's ancestors before committing the block itself
-		if err := cm.commit(block); err != nil {
-			return fmt.Errorf("failed to commit: %w", err)
-		}
 	}
 	return nil
 }
