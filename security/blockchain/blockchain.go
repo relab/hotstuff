@@ -120,7 +120,7 @@ func (chain *Blockchain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 
 	delete(chain.pendingFetch, hash)
 	if !ok {
-		// check again in case the block arrived while we we fetching
+		// check again in case the block arrived while we were fetching
 		block, ok = chain.blocks[hash]
 		goto done
 	}
