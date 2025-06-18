@@ -96,44 +96,41 @@ func (srv *Server) Exec(batch *Batch) {
 		id := cmd.ID()
 
 		srv.mut.Lock()
-
-		// update the seqNums
-		seqNum, ok := srv.lastExecutedSeqNum[cmd.ClientID]
-		if ok && seqNum >= cmd.SequenceNumber {
+		if srv.isDuplicate(cmd) {
 			srv.logger.Info("duplicate command found")
-			if errChan, ok := srv.awaitingCmds[id]; ok {
-				// TODO(AlanRostem): should not happen anyway, but create a test case for this.
-				errChan <- status.Error(codes.Aborted, "command already executed")
-				delete(srv.awaitingCmds, id)
-			}
+			srv.completeCommand(id, status.Error(codes.Aborted, "command already executed"))
 			srv.mut.Unlock()
 			continue
 		}
 		srv.lastExecutedSeqNum[cmd.ClientID] = cmd.SequenceNumber
-
-		// TODO(meling): ASKING: previously the hash.Write and srv.cmdCount++ were outside the critical section, shouldn't they be inside?
-		// TODO(meling): We should add a concurrency test for this logic to check that the hash doesn't get corrupted.
 		_, _ = srv.hash.Write(cmd.Data)
 		srv.cmdCount++
-		if errChan, ok := srv.awaitingCmds[id]; ok {
-			errChan <- nil
-			delete(srv.awaitingCmds, id)
-		}
+		srv.completeCommand(id, nil)
 		srv.mut.Unlock()
 	}
-
 	srv.logger.Debugf("Hash: %.8x", srv.hash.Sum(nil))
 }
 
 func (srv *Server) Abort(batch *Batch) {
 	for _, cmd := range batch.GetCommands() {
-		id := cmd.ID()
-
 		srv.mut.Lock()
-		if errChan, ok := srv.awaitingCmds[id]; ok {
-			errChan <- status.Error(codes.Aborted, "blockchain was forked")
-			delete(srv.awaitingCmds, id)
-		}
+		srv.completeCommand(cmd.ID(), status.Error(codes.Aborted, "blockchain was forked"))
 		srv.mut.Unlock()
+	}
+}
+
+// isDuplicate return true if the command has already been executed.
+// The caller must hold srv.mut.Lock().
+func (srv *Server) isDuplicate(cmd *Command) bool {
+	seqNum, ok := srv.lastExecutedSeqNum[cmd.ClientID]
+	return ok && seqNum >= cmd.SequenceNumber
+}
+
+// completeCommand sends an error or nil to the awaiting client's error channel.
+// The caller must hold srv.mut.Lock().
+func (srv *Server) completeCommand(id MessageID, err error) {
+	if errChan, ok := srv.awaitingCmds[id]; ok {
+		errChan <- err
+		delete(srv.awaitingCmds, id)
 	}
 }
