@@ -5,8 +5,8 @@ import "github.com/relab/hotstuff/internal/tree"
 type RuntimeOption func(*RuntimeConfig)
 
 // WithSyncVerification forces synchronous verification of incoming votes at the leader.
-// The default is to verify votes concurrently. Forcing synchronous vote verification can make it
-// easier to debug.
+// The default is to verify votes concurrently. Forcing synchronous vote verification
+// can make it easier to debug.
 func WithSyncVerification() RuntimeOption {
 	return func(rc *RuntimeConfig) {
 		rc.syncVoteVerification = true

@@ -337,7 +337,7 @@ func (s *emulatedSender) broadcastMessage(message any) error {
 func (s *emulatedSender) sendMessage(id hotstuff.ID, message any) error {
 	nodes, ok := s.network.replicas[id]
 	if !ok {
-		return fmt.Errorf("attempt to send message to replica %d, but this replica does not exist", id)
+		return fmt.Errorf("attempt to send message to unknown replica %d", id)
 	}
 	for _, node := range nodes {
 		if s.shouldDrop(node.id, message) {
