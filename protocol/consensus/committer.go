@@ -57,16 +57,17 @@ func (cm *Committer) commit(block *hotstuff.Block) error {
 	return nil
 }
 
-// TryCommit stores the block on the chain and traverses it,
-// ensuring that the block is valid and can be executed.
-// NOTE: The method checks the CommitRuler's rule before traversing.
+// TryCommit stores the given block in the local blockchain and applies the
+// CommitRule to identify the youngest ancestor block eligible to be committed.
+// This eligible block is then used as the starting point for recursively
+// committing its uncommitted ancestor blocks.
 func (cm *Committer) TryCommit(block *hotstuff.Block) error {
 	cm.logger.Debugf("TryCommit: %v", block)
 	cm.blockchain.Store(block)
 	// NOTE: this overwrites the block variable. If it was nil, simply don't commit.
 	if block = cm.ruler.CommitRule(block); block != nil {
-		err := cm.commit(block) // committer will eventually execute the command.
-		if err != nil {
+		// recursively commit the block's ancestors before committing the block itself
+		if err := cm.commit(block); err != nil {
 			return fmt.Errorf("failed to commit: %w", err)
 		}
 	}
