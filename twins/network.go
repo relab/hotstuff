@@ -125,7 +125,6 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 	)
 	node.proposer = consensus.NewProposer(
 		node.eventLoop,
-		node.logger,
 		node.config,
 		node.blockchain,
 		protocol,

@@ -154,7 +154,11 @@ func (s *Synchronizer) Start(ctx context.Context) {
 			s.logger.Info("failed to create proposal: %v", err)
 			return
 		}
-		s.proposer.Propose(&proposal)
+		s.logger.Debug("Propose")
+		if err := s.proposer.Propose(&proposal); err != nil {
+			s.logger.Info(err)
+			return
+		}
 	}
 }
 

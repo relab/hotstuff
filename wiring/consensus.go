@@ -45,7 +45,6 @@ func NewConsensus(
 		voter: voter,
 		proposer: consensus.NewProposer(
 			eventLoop,
-			logger,
 			config,
 
 			blockchain,

@@ -85,7 +85,6 @@ func wireUpProposer(
 	)
 	return consensus.NewProposer(
 		depsCore.EventLoop(),
-		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecurity.BlockChain(),
 		hsProtocol,
