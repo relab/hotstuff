@@ -12,7 +12,6 @@ import (
 )
 
 type HotStuff struct {
-	logger         logging.Logger
 	config         *core.RuntimeConfig
 	votingMachine  *VotingMachine
 	leaderRotation modules.LeaderRotation
@@ -30,7 +29,6 @@ func NewHotStuff(
 	sender modules.Sender,
 ) *HotStuff {
 	return &HotStuff{
-		logger: logger,
 		config: config,
 		votingMachine: NewVotingMachine(
 			logger,
