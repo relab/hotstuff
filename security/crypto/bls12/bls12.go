@@ -239,7 +239,6 @@ func (bls *bls12Base) checkPop(replica *hotstuff.ReplicaInfo) error {
 	popBytes, ok := replica.Metadata[popMetadataKey]
 	if !ok {
 		return fmt.Errorf("missing proof-of-possession for replica: %d", replica.ID)
-
 	}
 
 	var key strings.Builder
@@ -438,3 +437,5 @@ func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[
 	}
 	return nil
 }
+
+var _ modules.CryptoBase = (*bls12Base)(nil)

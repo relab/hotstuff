@@ -24,12 +24,6 @@ const (
 	PublicKeyFileType = "ECDSA PUBLIC KEY"
 )
 
-var (
-	_ hotstuff.QuorumSignature = (*crypto.Multi[*Signature])(nil)
-	_ hotstuff.IDSet           = (*crypto.Multi[*Signature])(nil)
-	_ crypto.Signature         = (*Signature)(nil)
-)
-
 // Signature is an ECDSA signature.
 type Signature struct {
 	r, s   *big.Int
@@ -75,8 +69,6 @@ func New(config *core.RuntimeConfig) *ECDSA {
 		config: config,
 	}
 }
-
-var _ modules.CryptoBase = (*ECDSA)(nil)
 
 func (ec *ECDSA) privateKey() *ecdsa.PrivateKey {
 	return ec.config.PrivateKey().(*ecdsa.PrivateKey)
@@ -153,7 +145,7 @@ func (ec *ECDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotst
 	}
 	n := signature.Participants().Len()
 	if n == 0 {
-		return fmt.Errorf("batchverify failed: no participants")
+		return fmt.Errorf("failed to verify batch: no participants")
 	}
 
 	results := make(chan error, n)
@@ -194,4 +186,9 @@ func (ec *ECDSA) verifySingle(sig *Signature, hash hotstuff.Hash) error {
 	return nil
 }
 
-var _ modules.CryptoBase = (*ECDSA)(nil)
+var (
+	_ hotstuff.QuorumSignature = (*crypto.Multi[*Signature])(nil)
+	_ hotstuff.IDSet           = (*crypto.Multi[*Signature])(nil)
+	_ crypto.Signature         = (*Signature)(nil)
+	_ modules.CryptoBase       = (*ECDSA)(nil)
+)

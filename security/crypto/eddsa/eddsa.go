@@ -22,12 +22,6 @@ const (
 	PublicKeyFileType = "EDDSA PUBLIC KEY"
 )
 
-var (
-	_ hotstuff.QuorumSignature = (*crypto.Multi[*Signature])(nil)
-	_ hotstuff.IDSet           = (*crypto.Multi[*Signature])(nil)
-	_ crypto.Signature         = (*Signature)(nil)
-)
-
 // Signature is an EDDSA signature.
 type Signature struct {
 	signer hotstuff.ID
@@ -62,8 +56,6 @@ func New(config *core.RuntimeConfig) *EDDSA {
 		config: config,
 	}
 }
-
-var _ modules.CryptoBase = (*EDDSA)(nil)
 
 func (ed *EDDSA) privateKey() ed25519.PrivateKey {
 	return ed.config.PrivateKey().(ed25519.PrivateKey)
@@ -172,3 +164,10 @@ func (ed *EDDSA) verifySingle(sig *Signature, message []byte) error {
 	}
 	return nil
 }
+
+var (
+	_ hotstuff.QuorumSignature = (*crypto.Multi[*Signature])(nil)
+	_ hotstuff.IDSet           = (*crypto.Multi[*Signature])(nil)
+	_ crypto.Signature         = (*Signature)(nil)
+	_ modules.CryptoBase       = (*EDDSA)(nil)
+)
