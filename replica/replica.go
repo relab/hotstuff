@@ -73,7 +73,7 @@ func New(
 		leaderRotation,
 		protocol,
 	)
-	// TODO(AlanRostem): consider moving the consensus flow from Synchronzier to a different class
+	// TODO(AlanRostem): consider moving the consensus flow from synchronizer to a different class
 	synchronizer := synchronizer.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),

@@ -4,7 +4,6 @@ package testutil
 import (
 	"net"
 	"testing"
-	"time"
 
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
@@ -13,7 +12,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/keygen"
-	"github.com/relab/hotstuff/twins"
 )
 
 // TestModules registers default modules for testing to the given builder.
@@ -320,9 +318,4 @@ func (l LeaderRotation) GetLeader(v hotstuff.View) hotstuff.ID {
 func NewLeaderRotation(t *testing.T, order ...hotstuff.ID) *LeaderRotation {
 	t.Helper()
 	return &LeaderRotation{t, order}
-}
-
-// FixedTimeout returns an ExponentialTimeout with a max exponent of 0.
-func FixedTimeout(timeout time.Duration) *twins.FixedDuration {
-	return twins.FixedTimeout(timeout)
 }

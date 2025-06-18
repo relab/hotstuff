@@ -3,10 +3,13 @@ package twins
 import (
 	"testing"
 
+	"github.com/relab/hotstuff/core/logging"
 	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 )
 
-func TestPartionedScenario(t *testing.T) {
+// TestBasicScenario checks if chained Hotstuff will commit one block
+// when all nodes are honest and the leader is in a separate partition.
+func TestPartitionedScenario(t *testing.T) {
 	s := Scenario{}
 	allNodesSet := make(NodeSet)
 	for i := 1; i <= 4; i++ {
@@ -35,6 +38,8 @@ func TestPartionedScenario(t *testing.T) {
 	}
 }
 
+// TestBasicScenario checks if chained Hotstuff will commit one block
+// when all nodes are honest and the network is not partitioned.
 func TestBasicScenario(t *testing.T) {
 	s := Scenario{}
 	allNodesSet := make(NodeSet)
@@ -45,7 +50,8 @@ func TestBasicScenario(t *testing.T) {
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
-	result, err := ExecuteScenario(s, 4, 0, 100, "chainedhotstuff")
+	logging.SetLogLevel("debug")
+	result, err := ExecuteScenario(s, 4, 0, 8, "chainedhotstuff")
 	if err != nil {
 		t.Fatal(err)
 	}

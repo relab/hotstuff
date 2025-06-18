@@ -60,7 +60,7 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, 
 	nodes, twins := assignNodeIDs(numNodes, numTwins)
 	nodes = append(nodes, twins...)
 
-	err = network.createTwinsNodes(nodes, scenario, consensusName)
+	err = network.createTwinsNodes(nodes, consensusName)
 	if err != nil {
 		return ScenarioResult{}, err
 	}

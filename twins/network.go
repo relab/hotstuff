@@ -20,6 +20,7 @@ import (
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/synchronizer"
+	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
@@ -39,7 +40,6 @@ func (id NodeID) String() string {
 	return fmt.Sprintf("r%dn%d", id.ReplicaID, id.NetworkID)
 }
 
-// TODO(AlanRostem): initialize fields
 type node struct {
 	config         *core.RuntimeConfig
 	logger         logging.Logger
@@ -57,24 +57,22 @@ type node struct {
 	id             NodeID
 	executedBlocks []*hotstuff.Block
 	effectiveView  hotstuff.View
-	log            *strings.Builder
+	log            strings.Builder
 }
 
-func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node, error) {
+func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
+	cryptoName := ecdsa.ModuleName
 	pk, err := keygen.GenerateECDSAPrivateKey()
 	if err != nil {
 		return nil, err
 	}
-	log := &strings.Builder{}
-	logger := logging.NewWithDest(log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
 	node := &node{
 		id:           nodeID,
 		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVerification()),
-		logger:       logger,
-		eventLoop:    eventloop.New(logger, 100),
 		commandCache: clientpb.NewCommandCache(),
-		log:          log,
 	}
+	node.logger = logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
+	node.eventLoop = eventloop.New(node.logger, 100)
 	node.sender = &emulatedSender{
 		node:      node,
 		network:   n,
@@ -137,7 +135,7 @@ func newNode(n *Network, nodeID NodeID, consensusName, cryptoName string) (*node
 		node.config,
 		depsSecurity.Authority(),
 		node.leaderRotation,
-		FixedTimeout(100*time.Millisecond),
+		viewduration.NewFixed(100*time.Millisecond),
 		node.proposer,
 		node.voter,
 		node.viewStates,
@@ -207,20 +205,20 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 	return n
 }
 
-// TODO(AlanRostem): hook something to the execute events
-func (n *Network) createTwinsNodes(nodes []NodeID, _ Scenario, consensusName string) (errs error) {
-	cryptoName := ecdsa.ModuleName
+func (n *Network) createTwinsNodes(nodes []NodeID, consensusName string) (errs error) {
 	for _, nodeID := range nodes {
-		node, err := newNode(n, nodeID, consensusName, cryptoName)
+		node, err := newNode(n, nodeID, consensusName)
 		errs = errors.Join(err)
 		n.nodes[nodeID.NetworkID] = node
 		n.replicas[nodeID.ReplicaID] = append(n.replicas[nodeID.ReplicaID], node)
 	}
-	// TODO(AlanRostem): set the connection metadata?
 	// need to configure the replica info after all of them were set up
 	for _, node := range n.nodes {
 		config := node.config
 		for _, otherNode := range n.nodes {
+			if node.id.ReplicaID == otherNode.id.ReplicaID {
+				continue
+			}
 			node.sender.subConfig.Add(otherNode.id.ReplicaID)
 			config.AddReplica(&hotstuff.ReplicaInfo{
 				ID:     otherNode.config.ID(),
@@ -238,8 +236,7 @@ func (n *Network) run(ticks int) {
 			s := node.viewStates
 			proposal, err := node.proposer.CreateProposal(s.View(), s.HighQC(), s.SyncInfo())
 			if err != nil {
-				node.logger.Infof("failed to create proposal: %w", err)
-				continue
+				panic(err) // should not fail to create propose, unless command cache has a bug.
 			}
 			node.proposer.Propose(&proposal)
 		}
@@ -274,8 +271,7 @@ func (n *Network) tick() {
 func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 	node, ok := n.nodes[sender]
 	if !ok {
-		n.stopWithErr(fmt.Errorf("node matching sender id %d was not found", sender))
-		return true
+		panic(fmt.Errorf("node matching sender id %d was not found", sender))
 	}
 
 	// Index into viewPartitions.
@@ -305,11 +301,6 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 	_, ok = n.dropTypes[reflect.TypeOf(message)]
 
 	return ok
-}
-
-func (n *Network) stopWithErr(err error) {
-	n.logger.Errorf(err.Error())
-	n.err = err
 }
 
 // NewSender returns a new Configuration module for this network.
@@ -522,17 +513,3 @@ func newTimeoutManager(
 	}, eventloop.Prioritize())
 	return tm
 }
-
-// FixedTimeout returns an ExponentialTimeout with a max exponent of 0.
-func FixedTimeout(timeout time.Duration) *FixedDuration {
-	return &FixedDuration{timeout}
-}
-
-type FixedDuration struct {
-	timeout time.Duration
-}
-
-func (d FixedDuration) Duration() time.Duration { return d.timeout }
-func (d FixedDuration) ViewStarted()            {}
-func (d FixedDuration) ViewSucceeded()          {}
-func (d FixedDuration) ViewTimeout()            {}
