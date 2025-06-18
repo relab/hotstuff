@@ -47,5 +47,5 @@ func TestTwins(t *testing.T) {
 		}
 	}
 
-	t.Logf("Average %f commits per scenario.", float64(totalCommits)/float64(scenarioCount))
+	t.Logf("Average %.1f commits per scenario.", float64(totalCommits)/float64(scenarioCount))
 }
