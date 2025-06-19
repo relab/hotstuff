@@ -8,24 +8,28 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 )
 
-// HotstuffRuleset is the minimum interface that a Hotstuff variant implements.
-// It must implement the vote and commit rules, but the propose rule is optional.
-type HotstuffRuleset interface {
-	VoteRuler
-	CommitRuler
-	// ChainLength returns the number of blocks that need to be chained together in order to commit.
-	ChainLength() int
-}
-
+// VoteRuler is an interface that specifies when to vote for a block for a given view.
 type VoteRuler interface {
 	// VoteRule decides whether to vote for the block.
 	VoteRule(view hotstuff.View, proposal hotstuff.ProposeMsg) bool
 }
 
+// CommitRuler is an interface that specifies when to commit a block and its ancestors
+// on the local chain.
 type CommitRuler interface {
 	// CommitRule decides whether any ancestor of the block can be committed.
 	// Returns the youngest ancestor of the block that can be committed.
 	CommitRule(*hotstuff.Block) *hotstuff.Block
+}
+
+// HotstuffRuleset is the minimum interface that a Hotstuff variant implements.
+// It combines VoteRuler and CommitRuler since they are mandatory. Some variants
+// may implement ProposeRuler.
+type HotstuffRuleset interface {
+	VoteRuler
+	CommitRuler
+	// ChainLength returns the number of blocks that need to be chained together in order to commit.
+	ChainLength() int
 }
 
 // ProposeRuler is an interface that adds a ProposeRule method.
@@ -53,7 +57,7 @@ type Aggregator interface {
 	Aggregate(lastVote hotstuff.View, proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error
 }
 
-// DisseminatorAggregator is an interface that combines Disseminator and Aggregator
+// DisseminatorAggregator is an interface that combines Disseminator and Aggregator for convenience.
 type DisseminatorAggregator interface {
 	Disseminator
 	Aggregator
@@ -86,17 +90,24 @@ type CryptoBase interface {
 
 // Sender handles the network layer of the consensus protocol by methods for sending specific messages.
 type Sender interface {
+	// NewView sends a new view message to a replica. Returns an error if the replica was not found.
 	NewView(id hotstuff.ID, msg hotstuff.SyncInfo) error
+	// Vote sends a vote message to a replica. Returns an error if the replica was not found.
 	Vote(id hotstuff.ID, cert hotstuff.PartialCert) error
+	// Timeout broadcasts a timeout message to the replicas.
 	Timeout(msg hotstuff.TimeoutMsg)
+	// Propose broadcasts a propose message to the replicas.
 	Propose(proposal *hotstuff.ProposeMsg)
-	// RequestBlock sends a request to the replicas to send back a block missing locally.
+	// RequestBlock sends a request to the replicas to send back a locally missing block.
 	RequestBlock(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool)
+	// Sub returns a new sender copy that is only allowed to send to the provided ids.
+	// Returns an error if the ids are not a subset of the parent's ids.
 	Sub(ids []hotstuff.ID) (Sender, error)
 }
 
 // KauriSender is an extension of Sender allowing to send contribution messages to parent nodes.
 type KauriSender interface {
 	Sender
+	// SendContributionToParent aggregates the contribution to the parent.
 	SendContributionToParent(view hotstuff.View, qc hotstuff.QuorumSignature)
 }
