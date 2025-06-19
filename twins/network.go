@@ -321,25 +321,21 @@ type emulatedSender struct {
 
 var _ modules.Sender = (*emulatedSender)(nil)
 
-func (s *emulatedSender) broadcastMessage(message any) error {
+func (s *emulatedSender) broadcastMessage(message any) {
 	for id := range s.network.replicas {
 		if id == s.node.id.ReplicaID {
 			// do not send message to self or twin
 			continue
 		} else if s.subConfig == nil || s.subConfig.Contains(id) {
-			err := s.sendMessage(id, message)
-			if err != nil {
-				return err
-			}
+			s.sendMessage(id, message)
 		}
 	}
-	return nil
 }
 
-func (s *emulatedSender) sendMessage(id hotstuff.ID, message any) error {
+func (s *emulatedSender) sendMessage(id hotstuff.ID, message any) {
 	nodes, ok := s.network.replicas[id]
 	if !ok {
-		return fmt.Errorf("attempt to send message to unknown replica %d", id)
+		panic(fmt.Errorf("attempt to send message to unknown replica %d", id))
 	}
 	for _, node := range nodes {
 		if s.shouldDrop(node.id, message) {
@@ -356,7 +352,6 @@ func (s *emulatedSender) sendMessage(id hotstuff.ID, message any) error {
 			},
 		)
 	}
-	return nil
 }
 
 // shouldDrop checks if a message to the node identified by id should be dropped.
@@ -381,34 +376,38 @@ func (s *emulatedSender) Sub(ids []hotstuff.ID) (sub modules.Sender, err error) 
 // Propose sends the block to all replicas in the configuration.
 func (s *emulatedSender) Propose(proposal *hotstuff.ProposeMsg) {
 	// very important to dereference it!
-	if err := s.broadcastMessage(*proposal); err != nil {
-		s.node.logger.Warn(err)
-	}
+	s.broadcastMessage(*proposal)
 }
 
 // Timeout sends the timeout message to all replicas.
 func (s *emulatedSender) Timeout(msg hotstuff.TimeoutMsg) {
-	if err := s.broadcastMessage(msg); err != nil {
-		s.node.logger.Warn(err)
-	}
+	s.broadcastMessage(msg)
 }
 
 func (s *emulatedSender) Vote(id hotstuff.ID, cert hotstuff.PartialCert) error {
-	return s.sendMessage(id, hotstuff.VoteMsg{
+	if _, ok := s.network.replicas[id]; !ok {
+		return fmt.Errorf("replica with id %d not found", id)
+	}
+	s.sendMessage(id, hotstuff.VoteMsg{
 		ID:          s.node.id.ReplicaID,
 		PartialCert: cert,
 	})
+	return nil
 }
 
 func (s *emulatedSender) NewView(id hotstuff.ID, si hotstuff.SyncInfo) error {
-	return s.sendMessage(id, hotstuff.NewViewMsg{
+	if _, ok := s.network.replicas[id]; !ok {
+		return fmt.Errorf("replica with id %d not found", id)
+	}
+	s.sendMessage(id, hotstuff.NewViewMsg{
 		ID:          s.node.id.ReplicaID,
 		SyncInfo:    si,
 		FromNetwork: true,
 	})
+	return nil
 }
 
-// Fetch requests a block from all the replicas in the configuration.
+// RequestBlock requests a block from all the replicas in the network.
 func (s *emulatedSender) RequestBlock(_ context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
 	for _, replica := range s.network.replicas {
 		for _, node := range replica {
