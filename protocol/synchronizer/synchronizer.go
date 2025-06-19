@@ -96,7 +96,7 @@ func New(
 	})
 	s.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		proposal := event.(hotstuff.ProposeMsg)
-		// ensure that I can vote in this view based on the protocol's rule.
+		// verify the incoming proposal before attempting to vote and try to commit.
 		if err := s.voter.Verify(&proposal); err != nil {
 			s.logger.Infof("failed to verify incoming vote: %v", err)
 			return

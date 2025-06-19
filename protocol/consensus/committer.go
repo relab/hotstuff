@@ -45,10 +45,10 @@ func NewCommitter(
 func (cm *Committer) TryCommit(block *hotstuff.Block) error {
 	cm.logger.Debugf("TryCommit: %v", block)
 	cm.blockchain.Store(block)
-	// NOTE: this overwrites the block variable. If it was nil, simply don't commit.
-	if block = cm.ruler.CommitRule(block); block != nil {
+	// check commit rule and get the next block to commit. If it was nil, do nothing.
+	if blockToCommit := cm.ruler.CommitRule(block); blockToCommit != nil {
 		// recursively commit the block's ancestors before committing the block itself
-		if err := cm.commit(block); err != nil {
+		if err := cm.commit(blockToCommit); err != nil {
 			return fmt.Errorf("failed to commit: %w", err)
 		}
 	}
