@@ -96,11 +96,12 @@ func TestOnValidPropose(t *testing.T) {
 	}
 	sender.AddBlockChain(depsSecurity.BlockChain())
 	voter := wireUpVoter(t, depsCore, depsSecurity, sender, list)
-	// create a block signed by self and vote for it
+	// create a signed block (doesn't matter who did it)
 	qc, err := depsSecurity.Authority().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	// create a propose message with a valid block from a replica who is not 1
 	proposerID := hotstuff.ID(2)
 	block := hotstuff.NewBlock(
 		hotstuff.GetGenesis().Hash(),
@@ -113,15 +114,19 @@ func TestOnValidPropose(t *testing.T) {
 		ID:    proposerID,
 		Block: block,
 	}
+	// verify proposal
 	if err := voter.Verify(&proposal); err != nil {
 		t.Fatalf("could not verify proposal: %v", err)
 	}
+	// process proposal (vote happens here)
 	if err := voter.OnValidPropose(&proposal); err != nil {
 		t.Fatalf("failure to process proposal: %v", err)
 	}
+	// check vote aggregation
 	if len(sender.MessagesSent()) != 1 {
 		t.Fatal("no vote was aggregated")
 	}
+	// validate message data
 	pc, ok := sender.MessagesSent()[0].(hotstuff.PartialCert)
 	if !ok {
 		t.Fatal("incorrect message type was sent")
