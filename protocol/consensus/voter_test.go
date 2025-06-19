@@ -1,11 +1,10 @@
 package consensus_test
 
 import (
-	"context"
 	"testing"
-	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
@@ -48,15 +47,7 @@ func wireUpVoter(
 		viewStates,
 		consensusRules,
 	)
-	leaderRotation, err := wiring.NewLeaderRotation(
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		depsSecurity.BlockChain(),
-		viewStates,
-		list.leaderRotation,
-		consensusRules.ChainLength(),
-	)
-	check(t, err)
+	leaderRotation := fixedleader.New(2) // want a leader that is not 1
 	votingMachine := consensus.NewVotingMachine(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
@@ -65,7 +56,7 @@ func wireUpVoter(
 		depsSecurity.Authority(),
 		viewStates,
 	)
-	hsProtocol := consensus.NewHotStuff(
+	hsDissAgg := consensus.NewHotStuff(
 		depsCore.RuntimeCfg(),
 		votingMachine,
 		leaderRotation,
@@ -75,22 +66,18 @@ func wireUpVoter(
 		depsCore.RuntimeCfg(),
 		leaderRotation,
 		consensusRules,
-		hsProtocol,
+		hsDissAgg,
 		depsSecurity.Authority(),
 		committer,
 	)
 	return voter
 }
 
-// TestOnValidPropose checks that a voter will advance the view when receiving a valid proposal.
+// TestOnValidPropose checks that a voter will aggregate a partial cert when receiving a valid proposal from
+// an honest leader.
 func TestOnValidPropose(t *testing.T) {
-	t.Skip() // TODO(AlanRostem): fix test
 	id := hotstuff.ID(1)
 	depsCore := wiring.NewCore(id, "test", testutil.GenerateECDSAKey(t))
-	newViewTriggered := false
-	depsCore.EventLoop().RegisterHandler(hotstuff.NewViewMsg{}, func(_ any) {
-		newViewTriggered = true
-	})
 	sender := testutil.NewMockSender(depsCore.RuntimeCfg().ID())
 	list := moduleList{
 		consensusRules: chainedhotstuff.ModuleName,
@@ -107,22 +94,40 @@ func TestOnValidPropose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	sender.AddBlockChain(depsSecurity.BlockChain())
 	voter := wireUpVoter(t, depsCore, depsSecurity, sender, list)
 	// create a block signed by self and vote for it
-	block := testutil.CreateBlock(t, depsSecurity.Authority())
+	qc, err := depsSecurity.Authority().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposerID := hotstuff.ID(2)
+	block := hotstuff.NewBlock(
+		hotstuff.GetGenesis().Hash(),
+		qc,
+		&clientpb.Batch{},
+		1,
+		proposerID,
+	)
 	proposal := hotstuff.ProposeMsg{
-		ID:    id,
+		ID:    proposerID,
 		Block: block,
 	}
 	if err := voter.Verify(&proposal); err != nil {
 		t.Fatalf("could not verify proposal: %v", err)
 	}
-	voter.OnValidPropose(&proposal)
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	depsCore.EventLoop().Run(ctx)
-	if !newViewTriggered {
-		t.Fatal("the voter did not advance the view")
+	if err := voter.OnValidPropose(&proposal); err != nil {
+		t.Fatalf("failure to process proposal: %v", err)
+	}
+	if len(sender.MessagesSent()) != 1 {
+		t.Fatal("no vote was aggregated")
+	}
+	pc, ok := sender.MessagesSent()[0].(hotstuff.PartialCert)
+	if !ok {
+		t.Fatal("incorrect message type was sent")
+	}
+	if pc.BlockHash().String() != block.Hash().String() {
+		t.Fatal("incorrect partial cert was aggregated")
 	}
 	if voter.LastVote() != proposal.Block.View() {
 		t.Fatal("incorrect view voted for")

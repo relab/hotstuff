@@ -157,12 +157,10 @@ func TestPropose(t *testing.T) {
 	if len(messages) != 1 {
 		t.Fatal("expected at least one message to be sent by proposer")
 	}
-
 	msg := messages[0]
 	if _, ok := msg.(hotstuff.ProposeMsg); !ok {
 		t.Fatal("expected message to be hotstuff.ProposeMsg")
 	}
-
 	proposeMsg := msg.(hotstuff.ProposeMsg)
 	if proposeMsg.ID != 1 || !bytes.Equal(proposeMsg.Block.ToBytes(), proposal.Block.ToBytes()) {
 		t.Fatal("incorrect propose message data")
