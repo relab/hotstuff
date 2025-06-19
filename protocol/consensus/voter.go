@@ -46,26 +46,24 @@ func NewVoter(
 	return v
 }
 
-// OnValidPropose is called when receiving a valid proposal from a leader and emits an event to advance the
-// view. The proposal should be verified before calling this.
+// OnValidPropose is called when receiving a valid proposal from a leader and emits
+// an event to advance the view. The proposal must be verified before calling this.
 func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (errs error) {
 	block := proposal.Block
-	// store the valid block, it may commit the block or its ancestors
+	// try to commit the block; accumulate any error but still proceed to vote
 	if err := v.committer.TryCommit(block); err != nil {
-		errs = errors.Join(fmt.Errorf("Failed to commit: %w", err))
-		// want to vote for the block which is why we dont return here and join errs instead
+		errs = errors.Join(errs, err)
 	}
+	// always vote, even if commit failed
 	pc, err := v.Vote(block)
 	if err != nil {
-		errs = errors.Join(fmt.Errorf("Rejected invalid block: %w", err))
-		return
+		return errors.Join(errs, fmt.Errorf("vote failed: %w", err))
 	}
 	// send the vote if it was successful
 	if err := v.aggregator.Aggregate(v.LastVote(), proposal, pc); err != nil {
-		errs = errors.Join(err)
-		return
+		return errors.Join(errs, fmt.Errorf("aggregate failed: %w", err))
 	}
-	return
+	return errs
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
