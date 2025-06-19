@@ -21,12 +21,13 @@ func TestTwins(t *testing.T) {
 		Partitions: 2,
 		Views:      8,
 	})
-	g.Shuffle(time.Now().Unix())
+	seed := time.Now().Unix()
+	g.Shuffle(seed)
 
-	scenarios := 10
+	scenarioCount := 10
 	totalCommits := 0
 
-	for i := 0; i < scenarios; i++ {
+	for range scenarioCount {
 		s, err := g.NextScenario()
 		if err != nil {
 			break
@@ -46,5 +47,5 @@ func TestTwins(t *testing.T) {
 		}
 	}
 
-	t.Logf("Average %f commits per scenario.", float64(totalCommits)/float64(scenarios))
+	t.Logf("Average %.1f commits per scenario.", float64(totalCommits)/float64(scenarioCount))
 }

@@ -14,35 +14,35 @@ const (
 	ForkModuleName    = "fork"
 )
 
-type silence struct {
+type Silence struct {
 	modules.HotstuffRuleset
 }
 
-func (s *silence) ProposeRule(_ hotstuff.View, _ hotstuff.QuorumCert, _ hotstuff.SyncInfo, _ *clientpb.Batch) (hotstuff.ProposeMsg, bool) {
+func (s *Silence) ProposeRule(_ hotstuff.View, _ hotstuff.QuorumCert, _ hotstuff.SyncInfo, _ *clientpb.Batch) (hotstuff.ProposeMsg, bool) {
 	return hotstuff.ProposeMsg{}, false
 }
 
 // NewSilence returns a byzantine replica that will never propose.
-func NewSilence(rules modules.HotstuffRuleset) modules.HotstuffRuleset {
-	return &silence{HotstuffRuleset: rules}
+func NewSilence(rules modules.HotstuffRuleset) *Silence {
+	return &Silence{HotstuffRuleset: rules}
 }
 
-type fork struct {
-	blockChain *blockchain.BlockChain
+type Fork struct {
+	blockchain *blockchain.Blockchain
 	config     *core.RuntimeConfig
 	modules.HotstuffRuleset
 }
 
-func (f *fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
-	block, ok := f.blockChain.Get(highQC.BlockHash())
+func (f *Fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
+	block, ok := f.blockchain.Get(highQC.BlockHash())
 	if !ok {
 		return proposal, false
 	}
-	parent, ok := f.blockChain.Get(block.Parent())
+	parent, ok := f.blockchain.Get(block.Parent())
 	if !ok {
 		return proposal, false
 	}
-	grandparent, ok := f.blockChain.Get(parent.Hash())
+	grandparent, ok := f.blockchain.Get(parent.Hash())
 	if !ok {
 		return proposal, false
 	}
@@ -66,19 +66,19 @@ func (f *fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert 
 // NewFork returns a byzantine replica that will try to fork the chain.
 func NewFork(
 	rules modules.HotstuffRuleset,
-	blockChain *blockchain.BlockChain,
+	blockchain *blockchain.Blockchain,
 	config *core.RuntimeConfig,
-) modules.HotstuffRuleset {
-	return &fork{
+) *Fork {
+	return &Fork{
 		HotstuffRuleset: rules,
-		blockChain:      blockChain,
+		blockchain:      blockchain,
 		config:          config,
 	}
 }
 
 var (
-	_ modules.HotstuffRuleset = (*silence)(nil)
-	_ modules.ProposeRuler    = (*silence)(nil)
-	_ modules.HotstuffRuleset = (*fork)(nil)
-	_ modules.ProposeRuler    = (*fork)(nil)
+	_ modules.HotstuffRuleset = (*Silence)(nil)
+	_ modules.ProposeRuler    = (*Silence)(nil)
+	_ modules.HotstuffRuleset = (*Fork)(nil)
+	_ modules.ProposeRuler    = (*Fork)(nil)
 )

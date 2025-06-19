@@ -123,7 +123,6 @@ func TestFHSBug(t *testing.T) {
 
 	if res.Safe || *logAll {
 		t.Logf("Network log:\n%s", res.NetworkLog)
-
 		for id, log := range res.NodeLogs {
 			t.Logf("Node %v log:\n%s", id, log)
 		}
@@ -133,18 +132,18 @@ func TestFHSBug(t *testing.T) {
 // A wrapper around the FHS rules that swaps the commit rule for a vulnerable version
 type vulnerableFHS struct {
 	logger     logging.Logger
-	blockChain *blockchain.BlockChain
+	blockchain *blockchain.Blockchain
 	inner      fasthotstuff.FastHotStuff
 }
 
 func NewVulnFHS(
 	logger logging.Logger,
-	blockChain *blockchain.BlockChain,
+	blockchain *blockchain.Blockchain,
 	inner fasthotstuff.FastHotStuff,
-) modules.HotstuffRuleset {
+) *vulnerableFHS {
 	return &vulnerableFHS{
 		logger:     logger,
-		blockChain: blockChain,
+		blockchain: blockchain,
 		inner:      inner,
 	}
 }
@@ -158,7 +157,7 @@ func (fhs *vulnerableFHS) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) 
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return fhs.blockChain.Get(qc.BlockHash())
+	return fhs.blockchain.Get(qc.BlockHash())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.
@@ -185,3 +184,5 @@ func (fhs *vulnerableFHS) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 func (fhs *vulnerableFHS) ChainLength() int {
 	return fhs.inner.ChainLength()
 }
+
+var _ modules.HotstuffRuleset = (*vulnerableFHS)(nil)

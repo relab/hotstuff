@@ -2,6 +2,7 @@ package testutil_test
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/relab/hotstuff"
@@ -20,7 +21,7 @@ type replica struct {
 	eventLoop  *eventloop.EventLoop
 	config     *core.RuntimeConfig
 	sender     *testutil.MockSender
-	blockChain *blockchain.BlockChain
+	blockchain *blockchain.Blockchain
 	auth       *cert.Authority
 }
 
@@ -37,7 +38,7 @@ func wireUpReplica(t *testing.T) *replica {
 		eventLoop:  eventLoop,
 		config:     config,
 		sender:     sender,
-		blockChain: chain,
+		blockchain: chain,
 		auth:       auth,
 	}
 }
@@ -71,7 +72,10 @@ func TestVote(t *testing.T) {
 	r := wireUpReplica(t)
 	block := testutil.CreateBlock(t, r.auth)
 	pc := testutil.CreatePC(t, block, r.auth)
-	r.sender.Vote(2, pc)
+	err := r.sender.Vote(2, pc)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// check if a message was sent at all
 	if len(r.sender.MessagesSent()) != 1 {
 		t.Error("message not sent")
@@ -132,7 +136,7 @@ func TestSub(t *testing.T) {
 
 func TestRequestBlock(t *testing.T) {
 	replicaIDs := []hotstuff.ID{1, 2, 3, 4}
-	chains := make([]*blockchain.BlockChain, 0)
+	chains := make([]*blockchain.Blockchain, 0)
 	senders := make([]*testutil.MockSender, 0)
 	var firstCore *wiring.Core
 	for _, id := range replicaIDs {
@@ -164,7 +168,7 @@ func TestRequestBlock(t *testing.T) {
 	block := testutil.CreateBlock(t, signer)
 	chain1.Store(block)
 
-	_, ok := sender0.RequestBlock(nil, block.Hash())
+	_, ok := sender0.RequestBlock(context.TODO(), block.Hash())
 	if !ok {
 		t.Fatal("expected a block to be returned")
 	}

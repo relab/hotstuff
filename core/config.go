@@ -53,9 +53,9 @@ func (g *RuntimeConfig) HasAggregateQC() bool {
 	return g.aggQC
 }
 
-// SyncVoteVerification returns true if votes should be verified synchronously.
+// SyncVerification returns true if votes should be verified synchronously.
 // Enabling this should make the voting machine process votes synchronously.
-func (g *RuntimeConfig) SyncVoteVerification() bool {
+func (g *RuntimeConfig) SyncVerification() bool {
 	return g.syncVoteVerification
 }
 

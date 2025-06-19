@@ -79,3 +79,8 @@ func (sig Multi[T]) Len() int {
 func (sig Multi[T]) String() string {
 	return hotstuff.IDSetToString(sig)
 }
+
+var (
+	_ hotstuff.QuorumSignature = (*Multi[Signature])(nil)
+	_ hotstuff.IDSet           = (*Multi[Signature])(nil)
+)

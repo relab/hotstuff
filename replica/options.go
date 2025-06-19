@@ -5,82 +5,26 @@ import (
 	"crypto/x509"
 
 	"github.com/relab/gorums"
-	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
-	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-type moduleNames struct {
-	crypto,
-	consensus,
-	leaderRotation,
-	byzantineStrategy string
-}
-
 type replicaOptions struct {
 	credentials          credentials.TransportCredentials
 	clientGorumsSrvOpts  []gorums.ServerOption
 	replicaGorumsSrvOpts []gorums.ServerOption
-	cmdCacheOpts         []clientpb.Option
 	serverOpts           []server.ServerOption
-	moduleNames          moduleNames
 }
 
 func newDefaultOpts() *replicaOptions {
 	return &replicaOptions{
 		credentials: insecure.NewCredentials(),
-		moduleNames: moduleNames{
-			crypto:            ecdsa.ModuleName,
-			consensus:         chainedhotstuff.ModuleName,
-			leaderRotation:    roundrobin.ModuleName,
-			byzantineStrategy: "",
-		},
 	}
 }
 
 type Option func(*replicaOptions)
-
-// OverrideCrypto changes the crypto implementation to the one specified by name.
-// Default: "ecdsa"
-func OverrideCrypto(moduleName string) Option {
-	return func(ro *replicaOptions) {
-		ro.moduleNames.crypto = moduleName
-	}
-}
-
-// OverrideConsensusRules changes the consensus rules to the one specified by name.
-// Default: "chainedhotstuff"
-func OverrideConsensusRules(moduleName string) Option {
-	return func(ro *replicaOptions) {
-		ro.moduleNames.consensus = moduleName
-	}
-}
-
-// OverrideLeaderRotation changes the leader rotation scheme to the one specified by name.
-// Default: "round-robin"
-func OverrideLeaderRotation(moduleName string) Option {
-	return func(ro *replicaOptions) {
-		ro.moduleNames.leaderRotation = moduleName
-	}
-}
-
-// WithByzantineStrategy wraps the existing consensus rules to a byzantine ruleset specified by name.
-func WithByzantineStrategy(strategyName string) Option {
-	return func(ro *replicaOptions) {
-		ro.moduleNames.byzantineStrategy = strategyName
-	}
-}
-
-func WithCmdCacheOptions(opts ...clientpb.Option) Option {
-	return func(ro *replicaOptions) {
-		ro.cmdCacheOpts = append(ro.cmdCacheOpts, opts...)
-	}
-}
 
 func WithServerOptions(opts ...server.ServerOption) Option {
 	return func(ro *replicaOptions) {
@@ -88,12 +32,8 @@ func WithServerOptions(opts ...server.ServerOption) Option {
 	}
 }
 
-func WithTLS(certificate tls.Certificate, rootCAs *x509.CertPool) Option {
+func WithTLS(certificate tls.Certificate, rootCAs *x509.CertPool, creds credentials.TransportCredentials) Option {
 	return func(ro *replicaOptions) {
-		creds := credentials.NewTLS(&tls.Config{
-			RootCAs:      rootCAs,
-			Certificates: []tls.Certificate{certificate},
-		})
 		ro.clientGorumsSrvOpts = append(ro.clientGorumsSrvOpts, gorums.WithGRPCServerOptions(
 			grpc.Creds(credentials.NewServerTLSFromCert(&certificate)),
 		))

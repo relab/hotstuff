@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-type Cache struct {
+type CommandCache struct {
 	mut              sync.Mutex
 	c                chan struct{}
 	batchSize        uint32
@@ -15,28 +15,27 @@ type Cache struct {
 	cache            list.List
 }
 
-func New(opts ...Option) *Cache {
-	c := &Cache{
+func NewCommandCache(batchSize uint32) *CommandCache {
+	c := &CommandCache{
 		c:                make(chan struct{}),
-		batchSize:        1,
+		batchSize:        batchSize,
 		clientSeqNumbers: make(map[uint32]uint64),
-	}
-	for _, opt := range opts {
-		opt(c)
 	}
 	return c
 }
 
-func (c *Cache) len() uint32 {
+func (c *CommandCache) len() uint32 {
 	return uint32(c.cache.Len())
 }
 
-func (c *Cache) isDuplicate(cmd *Command) bool {
+// isDuplicate returns true if the given command has already been processed.
+// Callers must hold the lock to access the underlying clientSeqNumbers map.
+func (c *CommandCache) isDuplicate(cmd *Command) bool {
 	seqNum := c.clientSeqNumbers[cmd.GetClientID()]
 	return seqNum >= cmd.GetSequenceNumber()
 }
 
-func (c *Cache) Add(cmd *Command) {
+func (c *CommandCache) Add(cmd *Command) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	if c.isDuplicate(cmd) {
@@ -57,7 +56,7 @@ func (c *Cache) Add(cmd *Command) {
 // It blocks until it can return a batch of commands, or the context is done.
 // If the context is done, it returns an error.
 // NOTE: the commands should be marked as proposed to avoid duplicates.
-func (c *Cache) Get(ctx context.Context) (*Batch, error) {
+func (c *CommandCache) Get(ctx context.Context) (*Batch, error) {
 	batch := new(Batch)
 
 	c.mut.Lock()
@@ -99,8 +98,9 @@ awaitBatch:
 	return batch, nil
 }
 
-// ContainsDuplicate returns true if the batch contains old commands already proposed.
-func (c *Cache) ContainsDuplicate(batch *Batch) bool {
+// containsDuplicate returns true if the batch contains old commands already proposed.
+// NOTE: This method is only used in the tests.
+func (c *CommandCache) containsDuplicate(batch *Batch) bool {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 
@@ -108,7 +108,7 @@ func (c *Cache) ContainsDuplicate(batch *Batch) bool {
 }
 
 // Proposed updates the sequence numbers such that we will not accept the given batch again.
-func (c *Cache) Proposed(batch *Batch) {
+func (c *CommandCache) Proposed(batch *Batch) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 

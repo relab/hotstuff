@@ -3,15 +3,10 @@ package consensus
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/security/cert"
 )
 
 type HotStuff struct {
-	logger         logging.Logger
 	config         *core.RuntimeConfig
 	votingMachine  *VotingMachine
 	leaderRotation modules.LeaderRotation
@@ -19,51 +14,43 @@ type HotStuff struct {
 }
 
 func NewHotStuff(
-	logger logging.Logger,
-	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
-	auth *cert.Authority,
-	states *ViewStates,
+	votingMachine *VotingMachine,
 	leaderRotation modules.LeaderRotation,
 	sender modules.Sender,
-) modules.ConsensusProtocol {
+) *HotStuff {
 	return &HotStuff{
-		logger: logger,
-		config: config,
-		votingMachine: NewVotingMachine(
-			logger,
-			eventLoop,
-			config,
-			blockChain,
-			auth,
-			states,
-		),
+		config:         config,
+		votingMachine:  votingMachine,
 		leaderRotation: leaderRotation,
 		sender:         sender,
 	}
 }
 
-func (cs *HotStuff) SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
-	cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
-	cs.sender.Propose(proposal)
+// Disseminate stores a vote for the proposal and broadcasts the proposal.
+func (hs *HotStuff) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
+	hs.votingMachine.CollectVote(hotstuff.VoteMsg{
+		ID:          hs.config.ID(),
+		PartialCert: pc,
+	})
+	hs.sender.Propose(proposal)
+	return nil
 }
 
-// SendVote disseminates or stores a valid vote depending on replica being voter or leader in the next view.
-func (cs *HotStuff) SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
-	leaderID := cs.leaderRotation.GetLeader(proposal.Block.View() + 1)
-	if leaderID == cs.config.ID() {
+// Aggregate aggregates the vote or stores it if the replica is leader in the next view.
+func (hs *HotStuff) Aggregate(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
+	leaderID := hs.leaderRotation.GetLeader(lastVote + 1)
+	if leaderID == hs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.
-		cs.votingMachine.CollectVote(hotstuff.VoteMsg{ID: cs.config.ID(), PartialCert: pc})
-		return
+		hs.votingMachine.CollectVote(hotstuff.VoteMsg{
+			ID:          hs.config.ID(),
+			PartialCert: pc,
+		})
+		return nil
 	}
 	// if I am the one voting, send the vote to next leader over the wire.
-	err := cs.sender.Vote(leaderID, pc)
-	if err != nil {
-		cs.logger.Warnf("%v", err)
-		return
-	}
-	cs.logger.Debugf("voting for %v", proposal)
+	return hs.sender.Vote(leaderID, pc)
 }
 
-var _ modules.ConsensusProtocol = (*HotStuff)(nil)
+var _ modules.Aggregator = (*HotStuff)(nil)
+var _ modules.Disseminator = (*HotStuff)(nil)

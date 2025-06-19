@@ -25,7 +25,7 @@ type Kauri struct {
 	logger     logging.Logger
 	eventLoop  *eventloop.EventLoop
 	config     *core.RuntimeConfig
-	blockChain *blockchain.BlockChain
+	blockchain *blockchain.Blockchain
 	auth       *cert.Authority
 	sender     modules.KauriSender
 
@@ -43,12 +43,12 @@ func New(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
+	blockchain *blockchain.Blockchain,
 	auth *cert.Authority,
 	sender modules.KauriSender,
 ) *Kauri {
 	k := &Kauri{
-		blockChain: blockChain,
+		blockchain: blockchain,
 		auth:       auth,
 		config:     config,
 		eventLoop:  eventLoop,
@@ -71,16 +71,20 @@ func New(
 }
 
 // Begin starts dissemination of proposal and aggregation of votes.
-func (k *Kauri) Begin(p *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (k *Kauri) Begin(p *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	if !k.initDone {
-		k.eventLoop.DelayUntil(network.ConnectedEvent{}, func() { k.Begin(p, pc) })
-		return
+		k.eventLoop.DelayUntil(network.ConnectedEvent{}, func() {
+			if err := k.Begin(p, pc); err != nil {
+				k.logger.Error(err)
+			}
+		})
+		return nil
 	}
 	k.reset()
 	k.blockHash = pc.BlockHash()
 	k.currentView = p.Block.View()
 	k.aggContrib = pc.Signature()
-	k.SendProposalToChildren(p)
+	return k.SendProposalToChildren(p)
 }
 
 func (k *Kauri) reset() {
@@ -89,12 +93,12 @@ func (k *Kauri) reset() {
 	k.aggSent = false
 }
 
-func (k *Kauri) SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
-	k.Begin(proposal, pc)
+func (k *Kauri) Aggregate(_ hotstuff.View, proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
+	return k.Begin(proposal, pc)
 }
 
-func (k *Kauri) SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
-	k.Begin(proposal, pc)
+func (k *Kauri) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
+	return k.Begin(proposal, pc)
 }
 
 func (k *Kauri) WaitToAggregate() {
@@ -104,13 +108,12 @@ func (k *Kauri) WaitToAggregate() {
 }
 
 // SendProposalToChildren sends the proposal to the children.
-func (k *Kauri) SendProposalToChildren(p *hotstuff.ProposeMsg) {
+func (k *Kauri) SendProposalToChildren(p *hotstuff.ProposeMsg) error {
 	children := k.tree.ReplicaChildren()
 	if len(children) != 0 {
 		childSender, err := k.sender.Sub(children)
 		if err != nil {
-			k.logger.Errorf("Unable to send the proposal to children: %v", err)
-			return
+			return fmt.Errorf("unable to send the proposal to children: %w", err)
 		}
 		k.logger.Debug("Sending proposal to children ", children)
 		childSender.Propose(p)
@@ -119,6 +122,7 @@ func (k *Kauri) SendProposalToChildren(p *hotstuff.ProposeMsg) {
 		k.sender.SendContributionToParent(k.currentView, k.aggContrib)
 		k.aggSent = true
 	}
+	return nil
 }
 
 // OnContributionRecv is invoked upon receiving the vote for aggregation.
@@ -169,9 +173,9 @@ func canMergeContributions(a, b hotstuff.QuorumSignature) error {
 }
 
 func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) error {
-	block, ok := k.blockChain.Get(k.blockHash)
+	block, ok := k.blockchain.Get(k.blockHash)
 	if !ok {
-		return fmt.Errorf("failed to fetch block %v", k.blockHash)
+		return fmt.Errorf("failed to fetch block %s", k.blockHash.SmallString())
 	}
 	if err := k.auth.Verify(currentSignature, block.ToBytes()); err != nil {
 		return err
@@ -220,4 +224,5 @@ type WaitTimerExpiredEvent struct {
 	currentView hotstuff.View
 }
 
-var _ modules.ConsensusProtocol = (*Kauri)(nil)
+var _ modules.Disseminator = (*Kauri)(nil)
+var _ modules.Aggregator = (*Kauri)(nil)

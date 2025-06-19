@@ -22,7 +22,7 @@ import (
 // Server is the Server-side of the gorums backend.
 // It is responsible for calling handler methods on the consensus instance.
 type Server struct {
-	blockChain *blockchain.BlockChain
+	blockchain *blockchain.Blockchain
 	eventLoop  *eventloop.EventLoop
 	logger     logging.Logger
 	config     *core.RuntimeConfig
@@ -37,7 +37,7 @@ func NewServer(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
+	blockchain *blockchain.Blockchain,
 	srvOpts ...ServerOption,
 ) *Server {
 	options := &serverOptions{}
@@ -45,7 +45,7 @@ func NewServer(
 		opt(options)
 	}
 	srv := &Server{
-		blockChain: blockChain,
+		blockchain: blockchain,
 		eventLoop:  eventLoop,
 		logger:     logger,
 		config:     config,
@@ -161,12 +161,12 @@ func (impl *serviceImpl) Fetch(_ gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*h
 	var hash hotstuff.Hash
 	copy(hash[:], pb.GetHash())
 
-	block, ok := impl.srv.blockChain.LocalGet(hash)
+	block, ok := impl.srv.blockchain.LocalGet(hash)
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "requested block was not found")
 	}
 
-	impl.srv.logger.Debugf("OnFetch: %.8s", hash)
+	impl.srv.logger.Debugf("OnFetch: %s", hash.SmallString())
 
 	return hotstuffpb.BlockToProto(block), nil
 }

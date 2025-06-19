@@ -1,4 +1,4 @@
-package consensus
+package protocol
 
 import (
 	"fmt"
@@ -9,26 +9,31 @@ import (
 	"github.com/relab/hotstuff/security/cert"
 )
 
+// ViewStates is a shared object which stores the protocol's state and may be modified
+// by several consensus component objects.
+// TODO(AlanRostem): make tests for this.
 type ViewStates struct {
-	blockChain *blockchain.BlockChain
+	blockchain *blockchain.Blockchain
 	auth       *cert.Authority
 
 	mut sync.RWMutex // to protect the following
 
-	highTC hotstuff.TimeoutCert
-	highQC hotstuff.QuorumCert
-	view   hotstuff.View
+	highTC         hotstuff.TimeoutCert
+	highQC         hotstuff.QuorumCert
+	view           hotstuff.View
+	committedBlock *hotstuff.Block
 }
 
 func NewViewStates(
-	blockChain *blockchain.BlockChain,
+	blockchain *blockchain.Blockchain,
 	auth *cert.Authority,
 ) (*ViewStates, error) {
 	s := &ViewStates{
-		blockChain: blockChain,
+		blockchain: blockchain,
 		auth:       auth,
 
-		view: 1,
+		committedBlock: hotstuff.GetGenesis(),
+		view:           1,
 	}
 	var err error
 	s.highQC, err = s.auth.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
@@ -45,9 +50,8 @@ func NewViewStates(
 // updateHighQC attempts to update the highQC, but does not verify the qc first.
 // This method is meant to be used instead of the exported UpdateHighQC internally
 // in this package when the qc has already been verified.
-// TODO(AlanRostem): this was in synchronizer, make tests.
 func (s *ViewStates) UpdateHighQC(qc hotstuff.QuorumCert) error {
-	newBlock, ok := s.blockChain.Get(qc.BlockHash())
+	newBlock, ok := s.blockchain.Get(qc.BlockHash())
 	if !ok {
 		return fmt.Errorf("could not find block referenced by new qc")
 	}
@@ -58,7 +62,6 @@ func (s *ViewStates) UpdateHighQC(qc hotstuff.QuorumCert) error {
 }
 
 // updateHighTC attempts to update the highTC, but does not verify the tc first.
-// TODO(AlanRostem): this was in synchronizer, make tests.
 func (s *ViewStates) UpdateHighTC(tc hotstuff.TimeoutCert) {
 	if tc.View() > s.highTC.View() {
 		s.highTC = tc
@@ -92,4 +95,17 @@ func (s *ViewStates) SyncInfo() hotstuff.SyncInfo {
 	s.mut.RLock()
 	defer s.mut.RUnlock()
 	return hotstuff.NewSyncInfo().WithQC(s.HighQC()).WithTC(s.HighTC())
+}
+
+func (s *ViewStates) UpdateCommittedBlock(block *hotstuff.Block) {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+	s.committedBlock = block
+}
+
+// CommittedBlock retrieves the last block which was committed.
+func (s *ViewStates) CommittedBlock() *hotstuff.Block {
+	s.mut.RLock()
+	defer s.mut.RUnlock()
+	return s.committedBlock
 }

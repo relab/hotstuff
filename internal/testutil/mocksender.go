@@ -14,7 +14,7 @@ type MockSender struct {
 	id           hotstuff.ID
 	recipients   []hotstuff.ID
 	messagesSent []any
-	blockChains  []*blockchain.BlockChain
+	blockChains  []*blockchain.Blockchain
 }
 
 // NewMockSender returns a mock implementation of modules.Sender that
@@ -35,7 +35,7 @@ func (m *MockSender) MessagesSent() []any {
 
 // AddBlockChain saves a reference to a blockchain storage from a separate mock replica.
 // This is necessary for block lookup by RequestBlock.
-func (m *MockSender) AddBlockChain(chain *blockchain.BlockChain) {
+func (m *MockSender) AddBlockChain(chain *blockchain.Blockchain) {
 	if chain == nil {
 		panic("blockchain pointer cannot be nil")
 	}

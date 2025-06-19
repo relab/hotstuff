@@ -2,6 +2,7 @@
 package synchronizer
 
 import (
+	"bytes"
 	"context"
 	"time"
 
@@ -9,13 +10,14 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/security/cert"
 
 	"github.com/relab/hotstuff"
 )
 
-// Synchronizer synchronizes replicas to the same view.
+// Synchronizer implements the DiemBFT pacemaker and is the main loop of the consensus protocol.
 type Synchronizer struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
@@ -27,7 +29,7 @@ type Synchronizer struct {
 	leaderRotation modules.LeaderRotation
 	voter          *consensus.Voter
 	proposer       *consensus.Proposer
-	state          *consensus.ViewStates
+	state          *protocol.ViewStates
 
 	sender modules.Sender
 
@@ -54,15 +56,16 @@ func New(
 
 	// protocol dependencies
 	leaderRotation modules.LeaderRotation,
+	viewDuration modules.ViewDuration,
 	proposer *consensus.Proposer,
 	voter *consensus.Voter,
-	state *consensus.ViewStates,
+	state *protocol.ViewStates,
 
 	// network dependencies
 	sender modules.Sender,
 ) *Synchronizer {
 	s := &Synchronizer{
-		duration:       leaderRotation.ViewDuration(),
+		duration:       viewDuration,
 		leaderRotation: leaderRotation,
 
 		proposer:  proposer,
@@ -90,6 +93,21 @@ func New(
 	s.eventLoop.RegisterHandler(hotstuff.TimeoutMsg{}, func(event any) {
 		timeoutMsg := event.(hotstuff.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
+	})
+	s.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
+		proposal := event.(hotstuff.ProposeMsg)
+		// verify the incoming proposal before attempting to vote and try to commit.
+		if err := s.voter.Verify(&proposal); err != nil {
+			s.logger.Infof("failed to verify incoming vote: %v", err)
+			return
+		}
+		s.logger.Debugf("Received proposal: %v", proposal.Block)
+		err := s.voter.OnValidPropose(&proposal)
+		if err != nil {
+			s.logger.Info(err)
+		}
+		// advance the view regardless of vote status
+		s.advanceView(hotstuff.NewSyncInfo().WithQC(proposal.Block.QuorumCert()))
 	})
 	return s
 }
@@ -137,12 +155,17 @@ func (s *Synchronizer) Start(ctx context.Context) {
 			s.logger.Info("failed to create proposal: %v", err)
 			return
 		}
-		s.proposer.Propose(&proposal)
+		s.logger.Debug("Propose")
+		if err := s.proposer.Propose(&proposal); err != nil {
+			s.logger.Info(err)
+			return
+		}
 	}
 }
 
 // OnLocalTimeout is called when a local timeout happens.
 func (s *Synchronizer) OnLocalTimeout() {
+	s.logger.Debug("OnLocalTimeout")
 	s.startTimeoutTimer()
 	view := s.state.View()
 	if s.lastTimeout != nil && s.lastTimeout.View == view {
@@ -173,7 +196,13 @@ func (s *Synchronizer) OnLocalTimeout() {
 	}
 	s.lastTimeout = &timeoutMsg
 	// stop voting for current view
+	prev := s.voter.LastVote()
 	s.voter.StopVoting(view)
+	// check if view is the same to log vote stop
+	if prev != view {
+		s.logger.Debugf("stopped voting on view %d and changed view to %d", prev, view)
+	}
+
 	s.sender.Timeout(timeoutMsg)
 	s.OnRemoteTimeout(timeoutMsg)
 }
@@ -193,8 +222,8 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		s.logger.Infof("View timeout signature could not be verified: %v", err)
 		return
 	}
-	s.logger.Debug("OnRemoteTimeout: ", timeout)
-	s.AdvanceView(timeout.SyncInfo)
+	s.logger.Debug("OnRemoteTimeout (advancing view): ", timeout)
+	s.advanceView(timeout.SyncInfo)
 	timeouts, ok := s.timeouts[timeout.View]
 	if !ok {
 		timeouts = make(map[hotstuff.ID]hotstuff.TimeoutMsg)
@@ -227,17 +256,23 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		}
 	}
 	delete(s.timeouts, timeout.View)
-	s.AdvanceView(si)
+	s.logger.Debugf("OnRemoteTimeout (second advance)")
+	s.advanceView(si)
 }
 
 // OnNewView handles an incoming consensus.NewViewMsg
 func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
-	s.AdvanceView(newView.SyncInfo)
+	s.logger.Debugf("OnNewView (from network: %t)", newView.FromNetwork)
+	if newView.FromNetwork {
+		s.logger.Debugf("new view msg from: %d", newView.ID)
+	}
+	s.advanceView(newView.SyncInfo)
 }
 
-// AdvanceView attempts to advance to the next view using the given QC.
+// advanceView attempts to advance to the next view using the given QC.
 // qc must be either a regular quorum certificate, or a timeout certificate.
-func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocyclo
+func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocyclo
+	s.logger.Debugf("advanceView: %v", syncInfo)
 	view := hotstuff.View(0)
 	timeout := false
 
@@ -262,7 +297,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.config.HasAggregateQC() {
 		highQC, err := s.auth.VerifyAggregateQC(s.config.QuorumSize(), aggQC)
 		if err != nil {
-			s.logger.Info("Agg-qc could not be verified: %v", err)
+			s.logger.Info("advanceView: Agg-qc could not be verified: %v", err)
 			return
 		}
 		if aggQC.View() >= view {
@@ -274,17 +309,21 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		qc = highQC
 	} else if qc, haveQC = syncInfo.QC(); haveQC {
 		if err := s.auth.VerifyQuorumCert(qc); err != nil {
-			s.logger.Info("QC could not be verified: %v", err)
+			s.logger.Info("advanceView: QC could not be verified: %v", err)
 			return
 		}
 	}
 
 	if haveQC {
+		oldQC := s.state.HighQC()
 		err := s.state.UpdateHighQC(qc)
 		if err != nil {
-			s.logger.Warnf("Failed to update high-qc: %v", err)
+			s.logger.Warnf("advanceView: Failed to update high-qc: %v", err)
 		} else {
-			s.logger.Debug("High-qc updated")
+			newQC := s.state.HighQC()
+			if !bytes.Equal(oldQC.ToBytes(), newQC.ToBytes()) {
+				s.logger.Debug("advanceView: High-qc updated")
+			}
 		}
 		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
 		if qc.View() >= view {
@@ -312,7 +351,7 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	s.startTimeoutTimer()
 
-	s.logger.Debugf("Advanced to view %d", newView)
+	s.logger.Debugf("advanceView: Advanced to view %d", newView)
 	s.eventLoop.AddEvent(hotstuff.ViewChangeEvent{View: newView, Timeout: timeout})
 
 	leader := s.leaderRotation.GetLeader(newView)
@@ -328,6 +367,6 @@ func (s *Synchronizer) AdvanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	}
 	err := s.sender.NewView(leader, syncInfo)
 	if err != nil {
-		s.logger.Warnf("%v", err)
+		s.logger.Warnf("advanceView: error on sending new view: %v", err)
 	}
 }
