@@ -149,8 +149,6 @@ func NewVulnFHS(
 	}
 }
 
-var _ modules.HotstuffRuleset = (*vulnerableFHS)(nil)
-
 // VoteRule decides whether to vote for the block.
 func (fhs *vulnerableFHS) VoteRule(view hotstuff.View, proposal hotstuff.ProposeMsg) bool {
 	return fhs.inner.VoteRule(view, proposal)
@@ -187,3 +185,5 @@ func (fhs *vulnerableFHS) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 func (fhs *vulnerableFHS) ChainLength() int {
 	return fhs.inner.ChainLength()
 }
+
+var _ modules.HotstuffRuleset = (*vulnerableFHS)(nil)
