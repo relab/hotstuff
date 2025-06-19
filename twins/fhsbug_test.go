@@ -123,10 +123,9 @@ func TestFHSBug(t *testing.T) {
 
 	if res.Safe || *logAll {
 		t.Logf("Network log:\n%s", res.NetworkLog)
-
-		// for id, log := range res.NodeLogs {
-		// 	t.Logf("Node %v log:\n%s", id, log)
-		// }
+		for id, log := range res.NodeLogs {
+			t.Logf("Node %v log:\n%s", id, log)
+		}
 	}
 }
 
