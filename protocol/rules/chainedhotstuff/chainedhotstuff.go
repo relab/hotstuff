@@ -77,7 +77,8 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 func (hs *ChainedHotStuff) VoteRule(_ hotstuff.View, proposal hotstuff.ProposeMsg) bool {
 	block := proposal.Block
 
-	qcBlock, haveQCBlock := hs.blockchain.Get(block.QuorumCert().BlockHash())
+	hash := block.QuorumCert().BlockHash()
+	qcBlock, haveQCBlock := hs.blockchain.Get(hash)
 
 	safe := false
 	if haveQCBlock && qcBlock.View() > hs.bLock.View() {

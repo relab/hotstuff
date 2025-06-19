@@ -100,7 +100,6 @@ type replica struct {
 }
 
 func TestPropose(t *testing.T) {
-	t.Skip() // TODO(AlanRostem): fix test
 	list := moduleList{
 		consensusRules: chainedhotstuff.ModuleName,
 		leaderRotation: fixedleader.ModuleName,
@@ -143,13 +142,17 @@ func TestPropose(t *testing.T) {
 	commandCache := clientpb.NewCommandCache(1)
 	commandCache.Add(command)
 	proposer := wireUpProposer(t, replica0.depsCore, replica0.depsSecurity, replica0.sender, commandCache, list)
-	// block := testutil.CreateBlock(t, replica0.depsSecurity.Authority())
-	// qc := testutil.CreateQC(t, block, signers)
-	proposal, err := proposer.CreateProposal(1, hotstuff.GetGenesis().QuorumCert(), hotstuff.NewSyncInfo())
+	highQC, err := replica0.depsSecurity.Authority().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
-	proposer.Propose(&proposal)
+	proposal, err := proposer.CreateProposal(1, highQC, hotstuff.NewSyncInfo().WithQC(highQC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := proposer.Propose(&proposal); err != nil {
+		t.Fatal(err)
+	}
 	messages := replica0.sender.MessagesSent()
 	if len(messages) != 1 {
 		t.Fatal("expected at least one message to be sent by proposer")
