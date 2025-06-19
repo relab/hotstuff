@@ -94,9 +94,6 @@ func New(
 		timeoutMsg := event.(hotstuff.TimeoutMsg)
 		s.OnRemoteTimeout(timeoutMsg)
 	})
-
-	// AlanRostem: instead of handling propose message in voter
-	// itself, do it here to access AdvanceView
 	s.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		proposal := event.(hotstuff.ProposeMsg)
 		// ensure that I can vote in this view based on the protocol's rule.

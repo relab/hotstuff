@@ -17,8 +17,6 @@ func NewFixed(duration time.Duration) *Fixed {
 	}
 }
 
-var _ modules.ViewDuration = (*Fixed)(nil)
-
 // Duration returns the fixed duration.
 func (f *Fixed) Duration() time.Duration {
 	return f.duration
@@ -32,3 +30,5 @@ func (f *Fixed) ViewSucceeded() {}
 
 // ViewTimeout does nothing for FixedViewDuration.
 func (f *Fixed) ViewTimeout() {}
+
+var _ modules.ViewDuration = (*Fixed)(nil)

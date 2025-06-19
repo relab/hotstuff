@@ -27,7 +27,7 @@ func wireUpVoter(
 	depsSecurity *wiring.Security,
 	sender *testutil.MockSender,
 	list moduleList,
-) (*consensus.Voter, error) {
+) *consensus.Voter {
 	t.Helper()
 	consensusRules, err := wiring.NewConsensusRules(
 		depsCore.Logger(),
@@ -35,16 +35,12 @@ func wireUpVoter(
 		depsSecurity.BlockChain(),
 		list.consensusRules,
 	)
-	if err != nil {
-		return nil, err
-	}
+	check(t, err)
 	viewStates, err := protocol.NewViewStates(
 		depsSecurity.BlockChain(),
 		depsSecurity.Authority(),
 	)
-	if err != nil {
-		return nil, err
-	}
+	check(t, err)
 	committer := consensus.NewCommitter(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
@@ -60,9 +56,7 @@ func wireUpVoter(
 		list.leaderRotation,
 		consensusRules.ChainLength(),
 	)
-	if err != nil {
-		return nil, err
-	}
+	check(t, err)
 	votingMachine := consensus.NewVotingMachine(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
@@ -85,7 +79,7 @@ func wireUpVoter(
 		depsSecurity.Authority(),
 		committer,
 	)
-	return voter, nil
+	return voter
 }
 
 // TestOnValidPropose checks that a voter will advance the view when receiving a valid proposal.
@@ -113,10 +107,7 @@ func TestOnValidPropose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	voter, err := wireUpVoter(t, depsCore, depsSecurity, sender, list)
-	if err != nil {
-		t.Fatal(err)
-	}
+	voter := wireUpVoter(t, depsCore, depsSecurity, sender, list)
 	// create a block signed by self and vote for it
 	block := testutil.CreateBlock(t, depsSecurity.Authority())
 	proposal := hotstuff.ProposeMsg{

@@ -52,12 +52,12 @@ func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (errs error) {
 	block := proposal.Block
 	// store the valid block, it may commit the block or its ancestors
 	if err := v.committer.TryCommit(block); err != nil {
-		errs = errors.Join(fmt.Errorf("Failed to commit: %v", err))
+		errs = errors.Join(fmt.Errorf("Failed to commit: %w", err))
 		// want to vote for the block which is why we dont return here and join errs instead
 	}
 	pc, err := v.Vote(block)
 	if err != nil {
-		errs = errors.Join(fmt.Errorf("Rejected invalid block: %v", err))
+		errs = errors.Join(fmt.Errorf("Rejected invalid block: %w", err))
 		return
 	}
 	// send the vote if it was successful

@@ -113,8 +113,7 @@ func (k *Kauri) SendProposalToChildren(p *hotstuff.ProposeMsg) error {
 	if len(children) != 0 {
 		childSender, err := k.sender.Sub(children)
 		if err != nil {
-			return fmt.Errorf("Unable to send the proposal to children: %v", err)
-
+			return fmt.Errorf("unable to send the proposal to children: %w", err)
 		}
 		k.logger.Debug("Sending proposal to children ", children)
 		childSender.Propose(p)
