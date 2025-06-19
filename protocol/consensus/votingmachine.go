@@ -51,7 +51,7 @@ func NewVotingMachine(
 // CollectVote handles an incoming vote.
 func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 	cert := vote.PartialCert
-	vm.logger.Debugf("CollectVote(from %d): %.8s", vote.ID, cert.BlockHash())
+	vm.logger.Debugf("CollectVote(from %d): %s", vote.ID, cert.BlockHash().SmallString())
 	var (
 		block *hotstuff.Block
 		ok    bool
@@ -62,7 +62,7 @@ func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 		if !ok {
 			// if that does not work, we will try to handle this event later.
 			// hopefully, the block has arrived by then.
-			vm.logger.Debugf("Local cache miss for block: %.8s", cert.BlockHash())
+			vm.logger.Debugf("Local cache miss for block: %s", cert.BlockHash().SmallString())
 			vote.Deferred = true
 			vm.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, vote)
 			return
@@ -71,7 +71,7 @@ func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 		// if the block has not arrived at this point we will try to fetch it.
 		block, ok = vm.blockchain.Get(cert.BlockHash())
 		if !ok {
-			vm.logger.Debugf("Could not find block for vote: %.8s.", cert.BlockHash())
+			vm.logger.Debugf("Could not find block for vote: %s.", cert.BlockHash().SmallString())
 			return
 		}
 	}
@@ -114,7 +114,7 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	}
 	qc, err := vm.auth.CreateQuorumCert(block, votes)
 	if err != nil {
-		vm.logger.Info("CollectVote: could not create QC for block: ", err)
+		vm.logger.Infof("CollectVote: could not create QC for block: %v", err)
 		return
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())

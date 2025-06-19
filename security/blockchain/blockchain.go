@@ -114,7 +114,7 @@ func (chain *Blockchain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 	chain.pendingFetch[hash] = cancel
 
 	chain.mut.Unlock()
-	chain.logger.Debugf("Attempting to fetch block: %.8s", hash)
+	chain.logger.Debugf("Attempting to fetch block: %s", hash.SmallString())
 	block, ok = chain.sender.RequestBlock(ctx, hash)
 	chain.mut.Lock()
 
@@ -125,7 +125,7 @@ func (chain *Blockchain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 		goto done
 	}
 
-	chain.logger.Debugf("Successfully fetched block: %.8s", hash)
+	chain.logger.Debugf("Successfully fetched block: %s", hash.SmallString())
 
 	chain.blocks[hash] = block
 	chain.blockAtHeight[block.View()] = block

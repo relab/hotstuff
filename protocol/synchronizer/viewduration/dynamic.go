@@ -20,8 +20,6 @@ func NewDynamic(opt Params) *Dynamic {
 	}
 }
 
-var _ modules.ViewDuration = (*Dynamic)(nil)
-
 // Dynamic uses statistics from previous views to guess a good value for the view duration.
 // It only takes a limited amount of measurements into account.
 type Dynamic struct {
@@ -101,3 +99,5 @@ func (v *Dynamic) Duration() time.Duration {
 
 	return time.Duration(duration * float64(time.Millisecond))
 }
+
+var _ modules.ViewDuration = (*Dynamic)(nil)

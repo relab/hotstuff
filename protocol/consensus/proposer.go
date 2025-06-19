@@ -61,14 +61,18 @@ func (p *Proposer) markProposed(view hotstuff.View, highQCBlockHash hotstuff.Has
 	qcBlock, ok := p.blockchain.Get(highQCBlockHash)
 	if !ok {
 		// NOTE: this should not occur, otherwise something went terribly wrong
-		return fmt.Errorf("failed to mark proposed: block not found for high QC block hash: %s", highQCBlockHash.String())
+		return fmt.Errorf(
+			"failed to mark proposed: block not found for high QC block hash: %s",
+			highQCBlockHash.SmallString())
 	}
 	for qcBlock.View() > p.lastProposed {
 		p.commandCache.Proposed(qcBlock.Commands()) // mark as proposed
 		qc := qcBlock.QuorumCert()
 		qcBlock, ok = p.blockchain.Get(qc.BlockHash())
 		if !ok {
-			return fmt.Errorf("failed to mark proposed: qcBlock not found: %s", qcBlock.Hash().String())
+			return fmt.Errorf(
+				"failed to mark proposed: qcBlock not found: %s",
+				qcBlock.Hash().SmallString())
 		}
 	}
 	p.lastProposed = view
@@ -107,7 +111,7 @@ func (p *Proposer) CreateProposal(view hotstuff.View, highQC hotstuff.QuorumCert
 	// NOTE: this is blocking until a batch is present in the cache.
 	cmdBatch, err := p.commandCache.Get(ctx)
 	if err != nil {
-		return proposal, fmt.Errorf("no command batch: %v", err)
+		return proposal, fmt.Errorf("no command batch: %w", err)
 	}
 	// ensure that a proposal can be sent based on the protocol's rule.
 	// NOTE: the ruler will create the proposal too.

@@ -44,9 +44,9 @@ func (b *Block) SetTimestamp(ts time.Time) {
 
 func (b *Block) String() string {
 	return fmt.Sprintf(
-		"Block{ hash: %.6s parent: %.6s, proposer: %d, view: %d , cert: %v }",
-		b.Hash().String(),
-		b.parent.String(),
+		"Block{ hash: %s parent: %s, proposer: %d, view: %d , cert: %v }",
+		b.Hash().SmallString(),
+		b.parent.SmallString(),
 		b.proposer,
 		b.view,
 		b.cert,

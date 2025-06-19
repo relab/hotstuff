@@ -85,7 +85,7 @@ func (cm *Committer) commitInner(block, committedBlock *hotstuff.Block) error {
 			return err
 		}
 	} else {
-		return fmt.Errorf("failed to locate block: %s", block.Parent())
+		return fmt.Errorf("failed to locate block: %s", block.Parent().SmallString())
 	}
 	cm.logger.Debug("EXEC: ", block)
 	batch := block.Commands()

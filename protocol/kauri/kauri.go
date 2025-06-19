@@ -175,7 +175,7 @@ func canMergeContributions(a, b hotstuff.QuorumSignature) error {
 func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) error {
 	block, ok := k.blockchain.Get(k.blockHash)
 	if !ok {
-		return fmt.Errorf("failed to fetch block %v", k.blockHash)
+		return fmt.Errorf("failed to fetch block %s", k.blockHash.SmallString())
 	}
 	if err := k.auth.Verify(currentSignature, block.ToBytes()); err != nil {
 		return err

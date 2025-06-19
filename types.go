@@ -98,6 +98,13 @@ func (h Hash) String() string {
 	return base64.StdEncoding.EncodeToString(h[:])
 }
 
+// SmallString returns a 6-character string version of the hash
+func (h Hash) SmallString() string {
+	return base64.StdEncoding.EncodeToString(h[:6])
+}
+
+var _ fmt.Stringer = (*Hash)(nil)
+
 // ToBytes is an object that can be converted into bytes for the purposes of hashing, etc.
 type ToBytes interface {
 	// ToBytes returns the object as bytes.
@@ -239,6 +246,8 @@ func (si SyncInfo) String() string {
 	return sb.String()
 }
 
+var _ fmt.Stringer = (*SyncInfo)(nil)
+
 // QuorumCert (QC) is a certificate for a Block created by a quorum of partial certificates.
 type QuorumCert struct {
 	signature QuorumSignature
@@ -298,6 +307,8 @@ func (qc QuorumCert) String() string {
 	return fmt.Sprintf("QC{ hash: %.6s, IDs: [ %s] }", qc.hash, &sb)
 }
 
+var _ fmt.Stringer = (*QuorumCert)(nil)
+
 // TimeoutCert (TC) is a certificate created by a quorum of timeout messages.
 type TimeoutCert struct {
 	signature QuorumSignature
@@ -333,6 +344,8 @@ func (tc TimeoutCert) String() string {
 	}
 	return fmt.Sprintf("TC{ view: %d, IDs: [ %s] }", tc.view, &sb)
 }
+
+var _ fmt.Stringer = (*TimeoutCert)(nil)
 
 // AggregateQC is a set of QCs extracted from timeout messages and an aggregate signature of the timeout signatures.
 //
@@ -370,6 +383,8 @@ func (aggQC AggregateQC) String() string {
 	}
 	return fmt.Sprintf("AggQC{ view: %d, IDs: [ %s] }", aggQC.view, &sb)
 }
+
+var _ fmt.Stringer = (*AggregateQC)(nil)
 
 func writeParticipants(wr io.Writer, participants IDSet) (err error) {
 	participants.RangeWhile(func(id ID) bool {

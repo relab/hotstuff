@@ -57,3 +57,5 @@ func (k *KauriGorumsSender) SendContributionToParent(view hotstuff.View, qc hots
 		}
 	}
 }
+
+var _ modules.KauriSender = (*KauriGorumsSender)(nil)
