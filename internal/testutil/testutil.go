@@ -119,12 +119,12 @@ func CreateQC(t *testing.T, block *hotstuff.Block, signers []*cert.Authority) ho
 }
 
 // CreateTC generates a TC using the given signers.
-func CreateTC(t *testing.T, view hotstuff.View, signers0 []*cert.Authority, signers1 []modules.CryptoBase) hotstuff.TimeoutCert {
+func CreateTC(t *testing.T, view hotstuff.View, timeoutCreator *cert.Authority, otherSigners []modules.CryptoBase) hotstuff.TimeoutCert {
 	t.Helper()
-	if len(signers0) == 0 || len(signers1) == 0 {
+	if timeoutCreator == nil || len(otherSigners) == 0 {
 		return hotstuff.TimeoutCert{}
 	}
-	tc, err := signers0[0].CreateTimeoutCert(view, CreateTimeouts(t, view, signers1))
+	tc, err := timeoutCreator.CreateTimeoutCert(view, CreateTimeouts(t, view, otherSigners))
 	if err != nil {
 		t.Fatalf("Failed to create TC: %v", err)
 	}
