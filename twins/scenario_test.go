@@ -7,7 +7,7 @@ import (
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 )
 
-// TestBasicScenario checks if chained Hotstuff will commit one block
+// TestPartitionedScenario checks if chained Hotstuff will commit one block
 // when all nodes are honest and the leader is in a separate partition.
 func TestPartitionedScenario(t *testing.T) {
 	s := Scenario{}
