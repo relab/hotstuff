@@ -63,7 +63,6 @@ func New(
 	)
 	depsConsensus := wiring.NewConsensus(
 		depsCore.EventLoop(),
-		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
 		depsSecure.Authority(),

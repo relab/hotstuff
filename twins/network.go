@@ -115,7 +115,6 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		node.sender,
 	)
 	node.voter = consensus.NewVoter(
-		node.logger,
 		node.config,
 		node.leaderRotation,
 		consensusRules,

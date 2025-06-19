@@ -79,7 +79,6 @@ func TestAdvanceViewQC(t *testing.T) {
 	)
 	depsConsensus := wiring.NewConsensus(
 		depsCore.EventLoop(),
-		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecurity.BlockChain(),
 		depsSecurity.Authority(),

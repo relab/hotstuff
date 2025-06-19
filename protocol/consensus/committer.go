@@ -89,7 +89,9 @@ func (cm *Committer) commitInner(block, committedBlock *hotstuff.Block) error {
 	}
 	cm.logger.Debug("EXEC: ", block)
 	batch := block.Commands()
+	// CommitEvent holds the entire block and is used in twins since it needs the hash.
 	cm.eventLoop.AddEvent(hotstuff.CommitEvent{Block: block})
+	// ExecuteEvent is a solution to cyclic dependencies between hotstuff package and clientpb.
 	cm.eventLoop.AddEvent(clientpb.ExecuteEvent{Batch: batch})
 	cm.eventLoop.AddEvent(hotstuff.ConsensusLatencyEvent{Latency: time.Since(block.Timestamp())})
 	cm.viewStates.UpdateCommittedBlock(block)

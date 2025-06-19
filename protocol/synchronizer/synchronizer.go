@@ -104,7 +104,11 @@ func New(
 			s.logger.Infof("failed to verify incoming vote: %v", err)
 			return
 		}
-		s.voter.OnValidPropose(&proposal)
+		s.logger.Debugf("Received proposal: %v", proposal.Block)
+		err := s.voter.OnValidPropose(&proposal)
+		if err != nil {
+			s.logger.Info(err)
+		}
 		// advance the view regardless of vote status
 		s.advanceView(hotstuff.NewSyncInfo().WithQC(proposal.Block.QuorumCert()))
 	})
@@ -195,7 +199,13 @@ func (s *Synchronizer) OnLocalTimeout() {
 	}
 	s.lastTimeout = &timeoutMsg
 	// stop voting for current view
+	prev := s.voter.LastVote()
 	s.voter.StopVoting(view)
+	// check if view is the same to log vote stop
+	if prev != view {
+		s.logger.Debugf("stopped voting on view %d and changed view to %d", prev, view)
+	}
+
 	s.sender.Timeout(timeoutMsg)
 	s.OnRemoteTimeout(timeoutMsg)
 }

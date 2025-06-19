@@ -1,17 +1,16 @@
 package consensus
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/cert"
 )
 
 type Voter struct {
-	logger logging.Logger
 	config *core.RuntimeConfig
 
 	leaderRotation modules.LeaderRotation
@@ -25,7 +24,6 @@ type Voter struct {
 }
 
 func NewVoter(
-	logger logging.Logger,
 	config *core.RuntimeConfig,
 	leaderRotation modules.LeaderRotation,
 	rules modules.VoteRuler,
@@ -34,7 +32,6 @@ func NewVoter(
 	committer *Committer,
 ) *Voter {
 	v := &Voter{
-		logger: logger,
 		config: config,
 
 		leaderRotation: leaderRotation,
@@ -50,31 +47,30 @@ func NewVoter(
 }
 
 // OnValidPropose is called when receiving a valid proposal from a leader and emits an event to advance the
-// view. The proposal should be verified before calling this. The method tells the committer and command cache
-// to update its state.
-func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) {
-	v.logger.Debugf("Received proposal: %v", proposal.Block)
+// view. The proposal should be verified before calling this.
+func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (errs error) {
 	block := proposal.Block
 	// store the valid block, it may commit the block or its ancestors
 	if err := v.committer.TryCommit(block); err != nil {
-		v.logger.Warn(err)
+		errs = errors.Join(fmt.Errorf("Failed to commit: %v", err))
+		// want to vote for the block which is why we dont return here and join errs instead
 	}
 	pc, err := v.Vote(block)
 	if err != nil {
-		// if the block is invalid, reject it. This means the command is also discarded.
-		v.logger.Infof("%v", err)
-	} else {
-		// send the vote if it was successful
-		if err := v.aggregator.Aggregate(v.LastVote(), proposal, pc); err != nil {
-			v.logger.Error(err)
-		}
+		errs = errors.Join(fmt.Errorf("Rejected invalid block: %v", err))
+		return
 	}
+	// send the vote if it was successful
+	if err := v.aggregator.Aggregate(v.LastVote(), proposal, pc); err != nil {
+		errs = errors.Join(err)
+		return
+	}
+	return
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
 func (v *Voter) StopVoting(view hotstuff.View) {
 	if v.lastVote < view {
-		v.logger.Debugf("stopped voting on view %d and changed view to %d", v.lastVote, view)
 		v.lastVote = view
 	}
 }
@@ -93,7 +89,7 @@ func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, err error)
 	return pc, nil
 }
 
-// verify verifies the proposal and returns true if it can be voted for.
+// Verify verifies the proposal and returns true if it can be voted for.
 func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 	block := proposal.Block
 	view := block.View()

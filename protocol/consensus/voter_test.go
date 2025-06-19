@@ -78,7 +78,6 @@ func wireUpVoter(
 		sender,
 	)
 	voter := consensus.NewVoter(
-		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		leaderRotation,
 		consensusRules,

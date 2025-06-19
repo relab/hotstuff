@@ -3,7 +3,6 @@ package wiring
 import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/consensus"
@@ -18,7 +17,6 @@ type Consensus struct {
 
 func NewConsensus(
 	eventLoop *eventloop.EventLoop,
-	logger logging.Logger,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 	auth *cert.Authority,
@@ -33,7 +31,6 @@ func NewConsensus(
 		proposerOpts = append(proposerOpts, consensus.OverrideProposeRule(ruler))
 	}
 	voter := consensus.NewVoter(
-		logger,
 		config,
 		leaderRotationModule,
 		consensusRulesModule,

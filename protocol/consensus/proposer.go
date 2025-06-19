@@ -68,7 +68,7 @@ func (p *Proposer) markProposed(view hotstuff.View, highQCBlockHash hotstuff.Has
 		qc := qcBlock.QuorumCert()
 		qcBlock, ok = p.blockchain.Get(qc.BlockHash())
 		if !ok {
-			return fmt.Errorf("failed to mark proposed: block not found for QC block hash: %s", qcBlock.Hash().String())
+			return fmt.Errorf("failed to mark proposed: qcBlock not found: %s", qcBlock.Hash().String())
 		}
 	}
 	p.lastProposed = view
