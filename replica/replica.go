@@ -42,6 +42,7 @@ func New(
 	leaderRotation modules.LeaderRotation,
 	consensusRules modules.HotstuffRuleset,
 	viewDuration modules.ViewDuration,
+	commandBatchSize uint32,
 	opts ...Option,
 ) (replica *Replica, err error) {
 	rOpt := newDefaultOpts()
@@ -51,7 +52,7 @@ func New(
 	depsClient := wiring.NewClient(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
-		rOpt.cmdCacheOpts,
+		commandBatchSize,
 		rOpt.clientGorumsSrvOpts...,
 	)
 	committer := consensus.NewCommitter(

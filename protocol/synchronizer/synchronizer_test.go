@@ -61,7 +61,7 @@ func TestAdvanceViewQC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commandCache := clientpb.NewCommandCache()
+	commandCache := clientpb.NewCommandCache(1)
 	committer := consensus.NewCommitter(
 		depsCore.EventLoop(),
 		depsCore.Logger(),

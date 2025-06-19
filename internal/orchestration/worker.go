@@ -17,7 +17,6 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/latency"
-	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/internal/tree"
@@ -192,11 +191,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		})
 		replicaOpts = append(replicaOpts, replica.WithTLS(certificate, rootCAs, creds))
 	}
-	if opts.GetBatchSize() > 1 {
-		replicaOpts = append(replicaOpts,
-			replica.WithCmdCacheOptions(clientpb.WithBatching(opts.GetBatchSize())),
-		)
-	}
 	replicaOpts = append(replicaOpts,
 		replica.WithServerOptions(server.WithLatencies(opts.HotstuffID(), opts.GetLocations())),
 	)
@@ -230,6 +224,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		leaderRotation,
 		consensusRules,
 		viewDuration,
+		opts.GetBatchSize(),
 		replicaOpts...,
 	)
 }

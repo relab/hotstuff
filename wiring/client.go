@@ -16,12 +16,11 @@ type Client struct {
 func NewClient(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	// TODO: Join these into single option type
-	cacheOpt []clientpb.CommandCacheOption,
+	commandBatchSize uint32,
 	clientSrvOpts ...gorums.ServerOption,
 ) *Client {
 	cmdCache := clientpb.NewCommandCache(
-		cacheOpt...,
+		commandBatchSize,
 	)
 	clientSrv := clientpb.NewServer(
 		eventLoop,

@@ -290,7 +290,7 @@ func TestVerifyTimeoutCert(t *testing.T) {
 			dummy.depsSecure.BlockChain().Store(signedBlock)
 		}
 
-		tc := testutil.CreateTC(t, 1, signers0, signers1)
+		tc := testutil.CreateTC(t, 1, signers0[0], signers1)
 
 		for i, verifier := range signers0 {
 			if err := verifier.VerifyTimeoutCert(dummies[0].config.QuorumSize(), tc); err != nil {

@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 
 	"github.com/relab/gorums"
-	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -16,7 +15,6 @@ type replicaOptions struct {
 	credentials          credentials.TransportCredentials
 	clientGorumsSrvOpts  []gorums.ServerOption
 	replicaGorumsSrvOpts []gorums.ServerOption
-	cmdCacheOpts         []clientpb.CommandCacheOption
 	serverOpts           []server.ServerOption
 }
 
@@ -27,12 +25,6 @@ func newDefaultOpts() *replicaOptions {
 }
 
 type Option func(*replicaOptions)
-
-func WithCmdCacheOptions(opts ...clientpb.CommandCacheOption) Option {
-	return func(ro *replicaOptions) {
-		ro.cmdCacheOpts = append(ro.cmdCacheOpts, opts...)
-	}
-}
 
 func WithServerOptions(opts ...server.ServerOption) Option {
 	return func(ro *replicaOptions) {

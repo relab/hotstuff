@@ -69,7 +69,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 	node := &node{
 		id:           nodeID,
 		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVerification()),
-		commandCache: clientpb.NewCommandCache(),
+		commandCache: clientpb.NewCommandCache(1),
 	}
 	node.logger = logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
 	node.eventLoop = eventloop.New(node.logger, 100)

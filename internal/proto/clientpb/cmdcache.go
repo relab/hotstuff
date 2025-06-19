@@ -15,14 +15,11 @@ type CommandCache struct {
 	cache            list.List
 }
 
-func NewCommandCache(opts ...CommandCacheOption) *CommandCache {
+func NewCommandCache(batchSize uint32) *CommandCache {
 	c := &CommandCache{
 		c:                make(chan struct{}),
-		batchSize:        1,
+		batchSize:        batchSize,
 		clientSeqNumbers: make(map[uint32]uint64),
-	}
-	for _, opt := range opts {
-		opt(c)
 	}
 	return c
 }

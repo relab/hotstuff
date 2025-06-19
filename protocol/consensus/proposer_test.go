@@ -140,7 +140,7 @@ func TestPropose(t *testing.T) {
 		SequenceNumber: 1,
 		Data:           []byte("testing data here"),
 	}
-	commandCache := clientpb.NewCommandCache()
+	commandCache := clientpb.NewCommandCache(1)
 	commandCache.Add(command)
 	proposer := wireUpProposer(t, replica0.depsCore, replica0.depsSecurity, replica0.sender, commandCache, list)
 	// block := testutil.CreateBlock(t, replica0.depsSecurity.Authority())
