@@ -19,8 +19,6 @@ import (
 	"github.com/relab/hotstuff/wiring"
 )
 
-const cryptoName = ecdsa.ModuleName
-
 func wireUpSynchronizer(
 	t *testing.T,
 	essentials *testutil.Essentials,

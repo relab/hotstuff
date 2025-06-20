@@ -14,7 +14,6 @@ import (
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
-	"github.com/relab/hotstuff/wiring"
 )
 
 func check(t *testing.T, err error) {
@@ -77,12 +76,6 @@ func wireUpProposer(
 		commandCache,
 		committer,
 	)
-}
-
-type replica struct {
-	depsCore     *wiring.Core
-	depsSecurity *wiring.Security
-	sender       *testutil.MockSender
 }
 
 func TestPropose(t *testing.T) {

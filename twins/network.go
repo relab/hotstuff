@@ -242,7 +242,9 @@ func (n *Network) run(ticks int) {
 			if err != nil {
 				panic(err) // should not fail to create propose, unless command cache has a bug.
 			}
-			node.proposer.Propose(&proposal)
+			if err := node.proposer.Propose(&proposal); err != nil {
+				n.logger.Info(err)
+			}
 		}
 	}
 

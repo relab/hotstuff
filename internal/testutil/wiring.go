@@ -5,11 +5,8 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/security/cert"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/wiring"
 )
-
-const cryptoName = ecdsa.ModuleName
 
 // Essentials is a bundle of components essential for constructing simple data for a replica
 // in basic consensus protocol unit tests.
