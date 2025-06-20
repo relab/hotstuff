@@ -89,7 +89,7 @@ func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 
 func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
 	if err := vm.auth.VerifyPartialCert(cert); err != nil {
-		vm.logger.Info("vote could not be verified: %v", err)
+		vm.logger.Infof("vote could not be verified: %v", err)
 		return
 	}
 	vm.mut.Lock()
@@ -119,6 +119,6 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 		return
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
-	vm.logger.Debug("CollectVote: dispatching event for new view (current : %d)", vm.state.View())
+	vm.logger.Debugf("CollectVote: dispatching event for new view (current : %d)", vm.state.View())
 	vm.eventLoop.AddEvent(hotstuff.NewViewMsg{ID: vm.config.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
 }

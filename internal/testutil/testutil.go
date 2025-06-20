@@ -38,6 +38,19 @@ func CreateBlock(t *testing.T, signer *cert.Authority) *hotstuff.Block {
 	return b
 }
 
+func CreateValidBlock(t *testing.T, proposer hotstuff.ID, validParent *hotstuff.Block) *hotstuff.Block {
+	t.Helper()
+	// TODO(AlanRostem): consider creating a qc with a valid signature too
+	qc := hotstuff.NewQuorumCert(nil, validParent.View(), validParent.Hash())
+	return hotstuff.NewBlock(
+		validParent.Hash(),
+		qc,
+		&clientpb.Batch{},
+		validParent.View()+1,
+		proposer,
+	)
+}
+
 // CreateSignatures creates partial certificates from multiple signers.
 func CreateSignatures(t *testing.T, message []byte, signers []*cert.Authority) []hotstuff.QuorumSignature {
 	t.Helper()

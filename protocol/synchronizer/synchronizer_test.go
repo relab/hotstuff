@@ -161,6 +161,7 @@ func TestAdvanceViewQC(t *testing.T) {
 
 func TestAdvanceViewTC(t *testing.T) {
 	essentials := testutil.WireUpEssentials(t, 1)
+	essentials.MockSender().AddBlockChain(essentials.BlockChain())
 	viewStates, err := protocol.NewViewStates(
 		essentials.BlockChain(),
 		essentials.Authority(),
@@ -175,11 +176,15 @@ func TestAdvanceViewTC(t *testing.T) {
 	tc := testutil.CreateTC(t, 1, essentials.Authority(), signers)
 
 	proposer := synchronizer.proposer // TODO(AlanRostem): not very clean, refactor
-	commandCache.Add(&clientpb.Command{
-		ClientID:       1,
-		SequenceNumber: 1,
-		Data:           []byte("bar"),
-	})
+	for i := range 2 {
+		// adding multiple commands so the next call CreateProposal
+		// in advanceView doesn't block
+		commandCache.Add(&clientpb.Command{
+			ClientID:       1,
+			SequenceNumber: uint64(i + 1),
+			Data:           []byte("bar"),
+		})
+	}
 	proposal, err := proposer.CreateProposal(1, viewStates.HighQC(), viewStates.SyncInfo())
 	if err != nil {
 		t.Fatal(err)
