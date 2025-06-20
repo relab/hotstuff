@@ -105,8 +105,9 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 		return err
 	}
 	// ensure the block came from the expected leader.
-	if proposal.ID != v.leaderRotation.GetLeader(block.View()) {
-		return fmt.Errorf("unexpected leader")
+	leaderID := v.leaderRotation.GetLeader(block.View())
+	if proposal.ID != leaderID {
+		return fmt.Errorf("expected leader %d but got %d in view %d", leaderID, proposal.ID, block.View())
 	}
 	return nil
 }

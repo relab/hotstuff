@@ -8,7 +8,6 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
@@ -91,11 +90,7 @@ func TestUpdateCerts(t *testing.T) {
 		t.Fatal("quorum cert was not updated")
 	}
 
-	cryptoSigners := make([]modules.CryptoBase, 0)
-	for _, signer := range signers {
-		cryptoSigners = append(cryptoSigners, signer.CryptoBase)
-	}
-	tc := testutil.CreateTC(t, 1, security.Authority(), cryptoSigners)
+	tc := testutil.CreateTC(t, 1, security.Authority(), signers)
 	states.UpdateHighTC(tc)
 	if !bytes.Equal(tc.ToBytes(), states.HighTC().ToBytes()) {
 		t.Fatal("timeout cert was not updated")

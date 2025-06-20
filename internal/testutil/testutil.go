@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/cert"
 
 	"github.com/relab/hotstuff"
@@ -40,7 +39,7 @@ func CreateBlock(t *testing.T, signer *cert.Authority) *hotstuff.Block {
 }
 
 // CreateSignatures creates partial certificates from multiple signers.
-func CreateSignatures(t *testing.T, message []byte, signers []modules.CryptoBase) []hotstuff.QuorumSignature {
+func CreateSignatures(t *testing.T, message []byte, signers []*cert.Authority) []hotstuff.QuorumSignature {
 	t.Helper()
 	sigs := make([]hotstuff.QuorumSignature, 0, len(signers))
 	for _, signer := range signers {
@@ -63,7 +62,7 @@ func signer(s hotstuff.QuorumSignature) hotstuff.ID {
 }
 
 // CreateTimeouts creates a set of TimeoutMsg messages from the given signers.
-func CreateTimeouts(t *testing.T, view hotstuff.View, signers []modules.CryptoBase) (timeouts []hotstuff.TimeoutMsg) {
+func CreateTimeouts(t *testing.T, view hotstuff.View, signers []*cert.Authority) (timeouts []hotstuff.TimeoutMsg) {
 	t.Helper()
 	timeouts = make([]hotstuff.TimeoutMsg, 0, len(signers))
 	viewSigs := CreateSignatures(t, view.ToBytes(), signers)
@@ -119,7 +118,7 @@ func CreateQC(t *testing.T, block *hotstuff.Block, signers []*cert.Authority) ho
 }
 
 // CreateTC generates a TC using the given signers.
-func CreateTC(t *testing.T, view hotstuff.View, timeoutCreator *cert.Authority, otherSigners []modules.CryptoBase) hotstuff.TimeoutCert {
+func CreateTC(t *testing.T, view hotstuff.View, timeoutCreator *cert.Authority, otherSigners []*cert.Authority) hotstuff.TimeoutCert {
 	t.Helper()
 	if timeoutCreator == nil || len(otherSigners) == 0 {
 		return hotstuff.TimeoutCert{}
@@ -133,12 +132,12 @@ func CreateTC(t *testing.T, view hotstuff.View, timeoutCreator *cert.Authority, 
 
 // TODO(meling): Currently only used from disabledTestConvertTimeoutCertBLS12.
 // Ideally, we should replace CreateTC above with this function since it avoids two arguments with the same signers.
-func CreateTCOld(t *testing.T, view hotstuff.View, signers []modules.CryptoBase) hotstuff.TimeoutCert {
+func CreateTCOld(t *testing.T, view hotstuff.View, signers []*cert.Authority) hotstuff.TimeoutCert {
 	t.Helper()
 	if len(signers) == 0 {
 		return hotstuff.TimeoutCert{}
 	}
-	x := signers[0].(*cert.Authority)
+	x := signers[0]
 	tc, err := x.CreateTimeoutCert(view, CreateTimeouts(t, view, signers))
 	if err != nil {
 		t.Fatalf("Failed to create TC: %v", err)

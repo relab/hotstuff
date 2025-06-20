@@ -182,9 +182,9 @@ func TestCreateTimeoutCert(t *testing.T) {
 	for _, td := range testData {
 		const n = 4
 		dummies := createDummyReplicas(t, n, td.cryptoName, td.cacheSize)
-		signers := make([]modules.CryptoBase, 0)
+		signers := make([]*cert.Authority, 0)
 		for _, dummy := range dummies {
-			signers = append(signers, dummy.depsSecure.CryptoImpl())
+			signers = append(signers, dummy.depsSecure.Authority())
 		}
 
 		timeouts := testutil.CreateTimeouts(t, 1, signers)
@@ -282,11 +282,11 @@ func TestVerifyTimeoutCert(t *testing.T) {
 		const n = 4
 		dummies := createDummyReplicas(t, n, td.cryptoName, td.cacheSize)
 		signers0 := make([]*cert.Authority, 0)
-		signers1 := make([]modules.CryptoBase, 0)
+		signers1 := make([]*cert.Authority, 0)
 		signedBlock := createBlock(t, dummies[0].depsSecure.Authority())
 		for _, dummy := range dummies {
 			signers0 = append(signers0, dummy.depsSecure.Authority())
-			signers1 = append(signers1, dummy.depsSecure.CryptoImpl())
+			signers1 = append(signers1, dummy.depsSecure.Authority())
 			dummy.depsSecure.BlockChain().Store(signedBlock)
 		}
 
@@ -305,11 +305,11 @@ func TestVerifyAggregateQC(t *testing.T) {
 		const n = 4
 		dummies := createDummyReplicas(t, n, td.cryptoName, td.cacheSize)
 		signers0 := make([]*cert.Authority, 0)
-		signers1 := make([]modules.CryptoBase, 0)
+		signers1 := make([]*cert.Authority, 0)
 		signedBlock := createBlock(t, dummies[0].depsSecure.Authority())
 		for _, dummy := range dummies {
 			signers0 = append(signers0, dummy.depsSecure.Authority())
-			signers1 = append(signers1, dummy.depsSecure.CryptoImpl())
+			signers1 = append(signers1, dummy.depsSecure.Authority())
 			dummy.depsSecure.BlockChain().Store(signedBlock)
 		}
 

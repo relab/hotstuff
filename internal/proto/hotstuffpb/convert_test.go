@@ -8,7 +8,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/cert"
 
 	"github.com/relab/hotstuff/internal/proto/clientpb"
@@ -95,7 +94,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 		}
 	}
 
-	signers := make([]modules.CryptoBase, n)
+	signers := make([]*cert.Authority, n)
 	for i := range n {
 		id := hotstuff.ID(i + 1)
 		crypt, err := bls12.New(cfgs[id])
@@ -116,7 +115,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 	pb := hotstuffpb.TimeoutCertToProto(tc1)
 	tc2 := hotstuffpb.TimeoutCertFromProto(pb)
 
-	signer := signers[0].(*cert.Authority)
+	signer := signers[0]
 
 	if err := signer.VerifyTimeoutCert(cfgs[1].QuorumSize(), tc2); err != nil {
 		t.Fatalf("Failed to verify timeout cert: %v", err)
