@@ -1,4 +1,4 @@
-// Package crypto provides implementations of the Crypto interface.
+// Package cert provides a certificate authority for creating and verifying quorum certificates.
 package cert
 
 import (
@@ -122,7 +122,7 @@ func (c *Authority) VerifyQuorumCert(qc hotstuff.QuorumCert) error {
 	participants := qcSignature.Participants()
 	quorumSize := c.config.QuorumSize()
 	if participants.Len() < quorumSize {
-		return fmt.Errorf("%d participations cannot satisfy the quorum requirement: %d", participants.Len(), quorumSize)
+		return fmt.Errorf("not enough participants to satisfy the quorum requirement: %d/%d", participants.Len(), quorumSize)
 	}
 	block, ok := c.blockchain.Get(qc.BlockHash())
 	if !ok {
@@ -139,7 +139,7 @@ func (c *Authority) VerifyTimeoutCert(quorumSize int, tc hotstuff.TimeoutCert) e
 	}
 	participants := tc.Signature().Participants()
 	if participants.Len() < quorumSize {
-		return fmt.Errorf("%d participations cannot satisfy the quorum requirement: %d", participants.Len(), quorumSize)
+		return fmt.Errorf("not enough participants to satisfy the quorum requirement: %d/%d", participants.Len(), quorumSize)
 	}
 	return c.Verify(tc.Signature(), tc.View().ToBytes())
 }
@@ -160,7 +160,7 @@ func (c *Authority) VerifyAggregateQC(quorumSize int, aggQC hotstuff.AggregateQC
 	}
 	participants := aggQC.Sig().Participants()
 	if participants.Len() < quorumSize {
-		return hotstuff.QuorumCert{}, fmt.Errorf("%d participations cannot satisfy the quorum requirement: %d", participants.Len(), quorumSize)
+		return hotstuff.QuorumCert{}, fmt.Errorf("not enough participants to satisfy the quorum requirement: %d/%d", participants.Len(), quorumSize)
 	}
 	// both the batched aggQC signatures and the highQC must be verified
 	if err := c.BatchVerify(aggQC.Sig(), messages); err != nil {
@@ -175,16 +175,18 @@ func (c *Authority) VerifyAggregateQC(quorumSize int, aggQC hotstuff.AggregateQC
 
 // VerifyAnyQC is a helper that verifies either a QC or the aggregateQC.
 // TODO(AlanRostem): add a test case for this method.
-func (c *Authority) VerifyAnyQC(qc *hotstuff.QuorumCert, aggQC *hotstuff.AggregateQC) error {
+func (c *Authority) VerifyAnyQC(proposal *hotstuff.ProposeMsg) error {
+	qc := proposal.Block.QuorumCert()
+	aggQC := proposal.AggregateQC
 	if c.config.HasAggregateQC() && aggQC != nil {
 		highQC, err := c.VerifyAggregateQC(c.config.QuorumSize(), *aggQC)
 		if err != nil {
 			return err
 		}
-		// NOTE: for simplicity, we require that the highQC found in the AggregateQC equals the QC embedded in the block.
+		// for simplicity, we require that the highQC found in the AggregateQC equals the block's QC.
 		if !qc.Equals(highQC) {
-			return fmt.Errorf("block QC does not equal highQC")
+			return fmt.Errorf("block QC does not match the highQC of the block's aggregate QC")
 		}
 	}
-	return c.VerifyQuorumCert(*qc)
+	return c.VerifyQuorumCert(qc)
 }

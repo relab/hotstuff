@@ -99,9 +99,8 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 	if !v.ruler.VoteRule(view, *proposal) {
 		return fmt.Errorf("vote rule not satisfied")
 	}
-	// verify the proposal's QC.
-	qc := proposal.Block.QuorumCert()
-	if err := v.auth.VerifyAnyQC(&qc, proposal.AggregateQC); err != nil {
+	// verify the proposal's quorum certificate(s).
+	if err := v.auth.VerifyAnyQC(proposal); err != nil {
 		return err
 	}
 	// ensure the block came from the expected leader.
