@@ -37,8 +37,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	// imported modules
-	"github.com/relab/hotstuff/protocol/dissagg/clique"
-	"github.com/relab/hotstuff/protocol/dissagg/kauri"
+	"github.com/relab/hotstuff/protocol/disagg/clique"
+	"github.com/relab/hotstuff/protocol/disagg/kauri"
 	_ "github.com/relab/hotstuff/protocol/leaderrotation"
 	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	_ "github.com/relab/hotstuff/protocol/rules/fasthotstuff"
