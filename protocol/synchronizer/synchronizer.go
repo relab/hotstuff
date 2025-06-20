@@ -152,7 +152,7 @@ func (s *Synchronizer) Start(ctx context.Context) {
 		proposal, err := s.proposer.CreateProposal(s.state.View(), s.state.HighQC(), syncInfo)
 		if err != nil {
 			// debug log here since it may frequently fail due to lack of commands.
-			s.logger.Info("failed to create proposal: %v", err)
+			s.logger.Debugf("Failed to create proposal: %v", err)
 			return
 		}
 		s.logger.Debug("Propose")
@@ -362,7 +362,9 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 			s.logger.Debugf("Failed to create proposal: %v", err)
 			return
 		}
-		s.proposer.Propose(&proposal)
+		if err := s.proposer.Propose(&proposal); err != nil {
+			s.logger.Info(err)
+		}
 		return
 	}
 	err := s.sender.NewView(leader, syncInfo)
