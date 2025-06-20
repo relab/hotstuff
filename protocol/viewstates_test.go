@@ -8,7 +8,6 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol"
-	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 )
 
@@ -26,8 +25,9 @@ func TestUpdateView(t *testing.T) {
 }
 
 func TestUpdateCerts(t *testing.T) {
-	essentials := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
-	states, err := protocol.NewViewStates(essentials.BlockChain(), essentials.Authority())
+	set := testutil.NewEssentialsSet(t, 4, ecdsa.ModuleName)
+	subject := set[0]
+	states, err := protocol.NewViewStates(subject.BlockChain(), subject.Authority())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,18 +38,8 @@ func TestUpdateCerts(t *testing.T) {
 		1,
 		1,
 	)
-	essentials.BlockChain().Store(block)
-	signers := make([]*cert.Authority, 0)
-	signers = append(signers, essentials.Authority())
-	for i := range 3 {
-		id := hotstuff.ID(i + 2)
-		replica := testutil.WireUpEssentials(t, id, ecdsa.ModuleName)
-		essentials.RuntimeCfg().AddReplica(&hotstuff.ReplicaInfo{
-			ID:     id,
-			PubKey: replica.RuntimeCfg().PrivateKey().Public(),
-		})
-		signers = append(signers, replica.Authority())
-	}
+	subject.BlockChain().Store(block)
+	signers := set.Signers()
 
 	// need only 3 for a quorum
 	qc := testutil.CreateQC(t, block, signers)

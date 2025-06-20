@@ -15,7 +15,6 @@ import (
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/protocol/votingmachine"
-	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/wiring"
 )
@@ -81,18 +80,19 @@ func wireUpSynchronizer(
 }
 
 func TestAdvanceViewQC(t *testing.T) {
-	essentials := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
+	set := testutil.NewEssentialsSet(t, 4, ecdsa.ModuleName)
+	subject := set[0]
 	viewStates, err := protocol.NewViewStates(
-		essentials.BlockChain(),
-		essentials.Authority(),
+		subject.BlockChain(),
+		subject.Authority(),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	commandCache := clientpb.NewCommandCache(1)
-	synchronizer := wireUpSynchronizer(t, essentials, commandCache, viewStates)
+	synchronizer := wireUpSynchronizer(t, subject, commandCache, viewStates)
 
-	blockchain := essentials.BlockChain()
+	blockchain := subject.BlockChain()
 	block := hotstuff.NewBlock(
 		hotstuff.GetGenesis().Hash(),
 		hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
@@ -107,25 +107,18 @@ func TestAdvanceViewQC(t *testing.T) {
 		1,
 	)
 	blockchain.Store(block)
-	signers := make([]*cert.Authority, 0)
-	signers = append(signers, essentials.Authority())
-	for i := range 3 {
-		id := hotstuff.ID(i + 2)
-		replica := testutil.WireUpEssentials(t, id, ecdsa.ModuleName)
-		essentials.RuntimeCfg().AddReplica(&hotstuff.ReplicaInfo{
-			ID:     id,
-			PubKey: replica.RuntimeCfg().PrivateKey().Public(),
-		})
-		signers = append(signers, replica.Authority())
-	}
-
+	signers := set.Signers()
 	qc := testutil.CreateQC(t, block, signers)
 	proposer := synchronizer.proposer // TODO(AlanRostem): not very clean, refactor
-	commandCache.Add(&clientpb.Command{
-		ClientID:       1,
-		SequenceNumber: 1,
-		Data:           []byte("bar"),
-	})
+	for i := range 2 {
+		// adding multiple commands so the next call CreateProposal
+		// in advanceView doesn't block
+		commandCache.Add(&clientpb.Command{
+			ClientID:       1,
+			SequenceNumber: uint64(i + 1),
+			Data:           []byte("bar"),
+		})
+	}
 	proposal, err := proposer.CreateProposal(1, viewStates.HighQC(), viewStates.SyncInfo())
 	if err != nil {
 		t.Fatal(err)
@@ -142,29 +135,19 @@ func TestAdvanceViewQC(t *testing.T) {
 }
 
 func TestAdvanceViewTC(t *testing.T) {
-	essentials := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
-	essentials.MockSender().AddBlockChain(essentials.BlockChain())
+	set := testutil.NewEssentialsSet(t, 4, ecdsa.ModuleName)
+	subject := set[0]
 	viewStates, err := protocol.NewViewStates(
-		essentials.BlockChain(),
-		essentials.Authority(),
+		subject.BlockChain(),
+		subject.Authority(),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	commandCache := clientpb.NewCommandCache(1)
-	synchronizer := wireUpSynchronizer(t, essentials, commandCache, viewStates)
+	synchronizer := wireUpSynchronizer(t, subject, commandCache, viewStates)
 
-	signers := make([]*cert.Authority, 0)
-	signers = append(signers, essentials.Authority())
-	for i := range 3 {
-		id := hotstuff.ID(i + 2)
-		replica := testutil.WireUpEssentials(t, id, ecdsa.ModuleName)
-		essentials.RuntimeCfg().AddReplica(&hotstuff.ReplicaInfo{
-			ID:     id,
-			PubKey: replica.RuntimeCfg().PrivateKey().Public(),
-		})
-		signers = append(signers, replica.Authority())
-	}
+	signers := set.Signers()
 
 	tc := testutil.CreateTC(t, 1, signers)
 

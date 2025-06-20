@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/wiring"
@@ -24,10 +23,12 @@ func WireUpEssentials(
 	t *testing.T,
 	id hotstuff.ID,
 	cryptoName string,
-	opts ...core.RuntimeOption,
+	opts ...cert.Option,
 ) *Essentials {
 	t.Helper()
-	depsCore := wiring.NewCore(id, "test", GenerateKey(t, cryptoName), opts...)
+	// TODO(AlanRostem): runtime options omitted. It's not used by tests, but
+	// I am commenting to make other maintainers aware
+	depsCore := wiring.NewCore(id, "test", GenerateKey(t, cryptoName))
 	sender := NewMockSender(id)
 	depsSecurity, err := wiring.NewSecurity(
 		depsCore.EventLoop(),
@@ -35,6 +36,7 @@ func WireUpEssentials(
 		depsCore.RuntimeCfg(),
 		sender,
 		cryptoName,
+		opts...,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -50,29 +52,48 @@ func (e *Essentials) MockSender() *MockSender {
 	return e.sender
 }
 
-func WireUpSigners(t *testing.T, parent *Essentials, count uint, cryptoName string) []*cert.Authority {
+type EssentialsSet []*Essentials
+
+func NewEssentialsSet(
+	t *testing.T,
+	count uint,
+	cryptoName string,
+	opts ...cert.Option,
+) EssentialsSet {
 	t.Helper()
 	if count == 0 {
 		t.Fatal("signer count cannot be zero")
 	}
 	dummies := make([]*Essentials, 0)
 	replicas := make([]hotstuff.ReplicaInfo, 0)
-	signers := make([]*cert.Authority, 0)
-	signers = append(signers, parent.Authority())
 	for i := range count {
-		id := hotstuff.ID(i + 2)
-		dummy := WireUpEssentials(t, id, cryptoName)
+		id := hotstuff.ID(i + 1)
+		dummy := WireUpEssentials(t, id, cryptoName, opts...)
 		replicas = append(replicas, hotstuff.ReplicaInfo{
-			ID:       hotstuff.ID(id + 1),
+			ID:       hotstuff.ID(id),
 			PubKey:   dummy.RuntimeCfg().PrivateKey().Public(),
 			Metadata: dummy.RuntimeCfg().ConnectionMetadata(),
 		})
-		signers = append(signers, dummy.Authority())
+		dummies = append(dummies, dummy)
 	}
 	for _, dummy := range dummies {
 		for _, replica := range replicas {
 			dummy.RuntimeCfg().AddReplica(&replica)
 		}
+		for _, other := range dummies {
+			if other == dummy {
+				continue
+			}
+			dummy.MockSender().AddBlockChain(other.BlockChain())
+		}
+	}
+	return dummies
+}
+
+func (s EssentialsSet) Signers() []*cert.Authority {
+	signers := make([]*cert.Authority, 0)
+	for _, dummy := range s {
+		signers = append(signers, dummy.Authority())
 	}
 	return signers
 }
