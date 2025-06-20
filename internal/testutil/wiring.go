@@ -54,6 +54,8 @@ func (e *Essentials) MockSender() *MockSender {
 
 type EssentialsSet []*Essentials
 
+// NewEssentialsSet wires up multiple essential component bundles and adds each replica configuration
+// to each other.
 func NewEssentialsSet(
 	t *testing.T,
 	count uint,
