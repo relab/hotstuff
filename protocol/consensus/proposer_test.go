@@ -46,7 +46,7 @@ func wireUpProposer(
 		essentials.Authority(),
 		viewStates,
 	)
-	dissAgg := clique.New(
+	disAgg := clique.New(
 		essentials.RuntimeCfg(),
 		votingMachine,
 		leaderRotation,
@@ -63,7 +63,7 @@ func wireUpProposer(
 		essentials.RuntimeCfg(),
 		leaderRotation,
 		consensusRules,
-		dissAgg,
+		disAgg,
 		essentials.Authority(),
 		committer,
 	)
@@ -71,7 +71,7 @@ func wireUpProposer(
 		essentials.EventLoop(),
 		essentials.RuntimeCfg(),
 		essentials.BlockChain(),
-		dissAgg,
+		disAgg,
 		voter,
 		commandCache,
 		committer,

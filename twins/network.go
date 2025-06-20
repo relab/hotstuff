@@ -110,7 +110,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		depsSecurity.Authority(),
 		node.viewStates,
 	)
-	dissAgg := clique.New(
+	disAgg := clique.New(
 		node.config,
 		votingMachine,
 		node.leaderRotation,
@@ -120,7 +120,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		node.config,
 		node.leaderRotation,
 		consensusRules,
-		dissAgg,
+		disAgg,
 		depsSecurity.Authority(),
 		committer,
 	)
@@ -128,7 +128,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		node.eventLoop,
 		node.config,
 		node.blockchain,
-		dissAgg,
+		disAgg,
 		node.voter,
 		node.commandCache,
 		committer,

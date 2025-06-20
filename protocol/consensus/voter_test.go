@@ -44,7 +44,7 @@ func wireUpVoter(
 		essentials.Authority(),
 		viewStates,
 	)
-	dissAgg := clique.New(
+	disAgg := clique.New(
 		essentials.RuntimeCfg(),
 		votingMachine,
 		leaderRotation,
@@ -54,7 +54,7 @@ func wireUpVoter(
 		essentials.RuntimeCfg(),
 		leaderRotation,
 		consensusRules,
-		dissAgg,
+		disAgg,
 		essentials.Authority(),
 		committer,
 	)
