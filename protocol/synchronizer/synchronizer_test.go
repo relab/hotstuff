@@ -10,10 +10,12 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol"
+	"github.com/relab/hotstuff/protocol/clique"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
+	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/wiring"
@@ -63,7 +65,7 @@ func wireUpSynchronizer(t *testing.T) (
 		viewStates,
 		consensusRules,
 	)
-	votingMachine := consensus.NewVotingMachine(
+	votingMachine := votingmachine.New(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsCore.RuntimeCfg(),
@@ -80,7 +82,7 @@ func wireUpSynchronizer(t *testing.T) (
 		committer,
 		consensusRules,
 		leaderRotation,
-		consensus.NewClique(
+		clique.New(
 			depsCore.RuntimeCfg(),
 			votingMachine,
 			leaderRotation,

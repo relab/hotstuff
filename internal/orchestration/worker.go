@@ -37,7 +37,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	// imported modules
-	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/protocol/clique"
 	"github.com/relab/hotstuff/protocol/kauri"
 	_ "github.com/relab/hotstuff/protocol/kauri"
 	_ "github.com/relab/hotstuff/protocol/leaderrotation"
@@ -45,6 +45,7 @@ import (
 	_ "github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	_ "github.com/relab/hotstuff/protocol/rules/simplehotstuff"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
+	"github.com/relab/hotstuff/protocol/votingmachine"
 	_ "github.com/relab/hotstuff/security/crypto/bls12"
 	_ "github.com/relab/hotstuff/security/crypto/ecdsa"
 	_ "github.com/relab/hotstuff/security/crypto/eddsa"
@@ -294,7 +295,7 @@ func initConsensusModules(depsCore *wiring.Core, depsSecure *wiring.Security, se
 			opts.GetMaxTimeout().AsDuration(),
 			opts.GetTimeoutMultiplier(),
 		))
-		votingMachine := consensus.NewVotingMachine(
+		votingMachine := votingmachine.New(
 			depsCore.Logger(),
 			depsCore.EventLoop(),
 			depsCore.RuntimeCfg(),
@@ -302,7 +303,7 @@ func initConsensusModules(depsCore *wiring.Core, depsSecure *wiring.Security, se
 			depsSecure.Authority(),
 			viewStates,
 		)
-		disAgg = consensus.NewClique(
+		disAgg = clique.New(
 			depsCore.RuntimeCfg(),
 			votingMachine,
 			leaderRotation,

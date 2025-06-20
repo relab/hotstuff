@@ -1,21 +1,23 @@
-package consensus
+package clique
 
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/votingmachine"
 )
 
+// Clique implements one-to-all dissemination and all-to-one aggregation.
 type Clique struct {
 	config         *core.RuntimeConfig
-	votingMachine  *VotingMachine
+	votingMachine  *votingmachine.VotingMachine
 	leaderRotation modules.LeaderRotation
 	sender         modules.Sender
 }
 
-func NewClique(
+func New(
 	config *core.RuntimeConfig,
-	votingMachine *VotingMachine,
+	votingMachine *votingmachine.VotingMachine,
 	leaderRotation modules.LeaderRotation,
 	sender modules.Sender,
 ) *Clique {

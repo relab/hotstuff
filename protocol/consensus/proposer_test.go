@@ -9,9 +9,11 @@ import (
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol"
+	"github.com/relab/hotstuff/protocol/clique"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
+	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/wiring"
 )
@@ -52,7 +54,7 @@ func wireUpProposer(
 		consensusRules.ChainLength(),
 	)
 	check(t, err)
-	votingMachine := consensus.NewVotingMachine(
+	votingMachine := votingmachine.New(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsCore.RuntimeCfg(),
@@ -60,7 +62,7 @@ func wireUpProposer(
 		depsSecurity.Authority(),
 		viewStates,
 	)
-	dissAgg := consensus.NewClique(
+	dissAgg := clique.New(
 		depsCore.RuntimeCfg(),
 		votingMachine,
 		leaderRotation,

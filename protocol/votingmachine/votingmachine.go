@@ -1,4 +1,4 @@
-package consensus
+package votingmachine
 
 import (
 	"sync"
@@ -25,7 +25,7 @@ type VotingMachine struct {
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert
 }
 
-func NewVotingMachine(
+func New(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
