@@ -57,7 +57,7 @@ func (hs *SimpleHotStuff) VoteRule(view hotstuff.View, proposal hotstuff.Propose
 
 	// Rule 2: can only vote if parent's view is greater than or equal to locked block's view.
 	if parent.View() < hs.locked.View() {
-		hs.logger.Info("OnPropose: parent too old")
+		hs.logger.Info("VoteRule: parent too old")
 		return false
 	}
 
@@ -75,7 +75,7 @@ func (hs *SimpleHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	gp, ok := hs.blockchain.Get(p.QuorumCert().BlockHash())
 	if ok && gp.View() > hs.locked.View() {
 		hs.locked = gp
-		hs.logger.Debug("Locked: ", gp)
+		hs.logger.Debug("CommitRule: updated locked block: ", gp)
 	} else if !ok {
 		return nil
 	}
@@ -95,22 +95,10 @@ func (hs *SimpleHotStuff) ChainLength() int {
 	return 3
 }
 
-// ProposeRule implements the default propose ruler.
+// ProposeRule returns a new hotstuff proposal based on the current view, quorum certificate, and command batch.
 func (hs *SimpleHotStuff) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
 	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
-	proposal = hotstuff.ProposeMsg{
-		ID: hs.config.ID(),
-		Block: hotstuff.NewBlock(
-			qc.BlockHash(),
-			qc,
-			cmd,
-			view,
-			hs.config.ID(),
-		),
-	}
-	if aggQC, ok := cert.AggQC(); ok && hs.config.HasAggregateQC() {
-		proposal.AggregateQC = &aggQC
-	}
+	proposal = hotstuff.NewProposeMsg(hs.config.ID(), view, qc, cmd)
 	return proposal, true
 }
 

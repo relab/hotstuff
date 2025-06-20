@@ -18,19 +18,32 @@ type Silence struct {
 	consensus.Ruleset
 }
 
-func (s *Silence) ProposeRule(_ hotstuff.View, _ hotstuff.QuorumCert, _ hotstuff.SyncInfo, _ *clientpb.Batch) (hotstuff.ProposeMsg, bool) {
-	return hotstuff.ProposeMsg{}, false
-}
-
-// NewSilence returns a byzantine replica that will never propose.
+// NewSilence returns a Byzantine replica that will never propose.
 func NewSilence(rules consensus.Ruleset) *Silence {
 	return &Silence{Ruleset: rules}
 }
 
+func (s *Silence) ProposeRule(_ hotstuff.View, _ hotstuff.QuorumCert, _ hotstuff.SyncInfo, _ *clientpb.Batch) (hotstuff.ProposeMsg, bool) {
+	return hotstuff.ProposeMsg{}, false
+}
+
 type Fork struct {
-	blockchain *blockchain.Blockchain
 	config     *core.RuntimeConfig
+	blockchain *blockchain.Blockchain
 	consensus.Ruleset
+}
+
+// NewFork returns a Byzantine replica that will try to fork the chain.
+func NewFork(
+	config *core.RuntimeConfig,
+	blockchain *blockchain.Blockchain,
+	rules consensus.Ruleset,
+) *Fork {
+	return &Fork{
+		config:     config,
+		blockchain: blockchain,
+		Ruleset:    rules,
+	}
 }
 
 func (f *Fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
@@ -46,34 +59,11 @@ func (f *Fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert 
 	if !ok {
 		return proposal, false
 	}
-
-	proposal = hotstuff.ProposeMsg{
-		ID: f.config.ID(),
-		Block: hotstuff.NewBlock(
-			grandparent.Hash(),
-			grandparent.QuorumCert(),
-			cmd,
-			view,
-			f.config.ID(),
-		),
-	}
+	proposal = hotstuff.NewProposeMsg(f.config.ID(), view, grandparent.QuorumCert(), cmd)
 	if aggQC, ok := cert.AggQC(); f.config.HasAggregateQC() && ok {
 		proposal.AggregateQC = &aggQC
 	}
 	return proposal, true
-}
-
-// NewFork returns a byzantine replica that will try to fork the chain.
-func NewFork(
-	rules consensus.Ruleset,
-	blockchain *blockchain.Blockchain,
-	config *core.RuntimeConfig,
-) *Fork {
-	return &Fork{
-		Ruleset:    rules,
-		blockchain: blockchain,
-		config:     config,
-	}
 }
 
 var (

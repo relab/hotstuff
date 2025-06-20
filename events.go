@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 )
 
 // ProposeMsg is broadcast when a leader makes a proposal.
@@ -12,6 +14,13 @@ type ProposeMsg struct {
 	ID          ID           // The ID of the replica who sent the message.
 	Block       *Block       // The block that is proposed.
 	AggregateQC *AggregateQC // Optional AggregateQC
+}
+
+func NewProposeMsg(id ID, view View, qc QuorumCert, cmd *clientpb.Batch) ProposeMsg {
+	return ProposeMsg{
+		ID:    id,
+		Block: NewBlock(qc.BlockHash(), qc, cmd, view, id),
+	}
 }
 
 func (p ProposeMsg) String() string {

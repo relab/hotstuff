@@ -107,22 +107,10 @@ func (hs *ChainedHotStuff) ChainLength() int {
 	return 3
 }
 
-// ProposeRule implements the default propose ruler.
+// ProposeRule returns a new hotstuff proposal based on the current view, quorum certificate, and command batch.
 func (hs *ChainedHotStuff) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
 	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
-	proposal = hotstuff.ProposeMsg{
-		ID: hs.config.ID(),
-		Block: hotstuff.NewBlock(
-			qc.BlockHash(),
-			qc,
-			cmd,
-			view,
-			hs.config.ID(),
-		),
-	}
-	if aggQC, ok := cert.AggQC(); ok && hs.config.HasAggregateQC() {
-		proposal.AggregateQC = &aggQC
-	}
+	proposal = hotstuff.NewProposeMsg(hs.config.ID(), view, qc, cmd)
 	return proposal, true
 }
 

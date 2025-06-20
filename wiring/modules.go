@@ -60,7 +60,7 @@ func WrapByzantineStrategy(
 	case byzantine.SilenceModuleName:
 		byzRules = byzantine.NewSilence(rules)
 	case byzantine.ForkModuleName:
-		byzRules = byzantine.NewFork(rules, blockchain, config)
+		byzRules = byzantine.NewFork(config, blockchain, rules)
 	default:
 		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", name)
 	}
