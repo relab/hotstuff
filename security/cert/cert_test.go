@@ -91,13 +91,7 @@ func TestCreateTimeoutCert(t *testing.T) {
 		dummies := createDummies(t, n, td.cryptoName, td.cacheSize)
 		signers := dummies.Signers()
 
-		timeouts := testutil.CreateTimeouts(t, 1, signers)
-
-		tc, err := dummies[0].Authority().CreateTimeoutCert(1, timeouts)
-		if err != nil {
-			t.Fatalf("Failed to create QC: %v", err)
-		}
-
+		tc := testutil.CreateTC(t, 1, signers)
 		if tc.View() != hotstuff.View(1) {
 			t.Error("Timeout certificate view does not match original view.")
 		}
