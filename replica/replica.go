@@ -40,7 +40,7 @@ func New(
 	viewStates *protocol.ViewStates,
 	disAgg modules.DisseminatorAggregator,
 	leaderRotation modules.LeaderRotation,
-	consensusRules modules.HotstuffRuleset,
+	consensusRules consensus.Ruleset,
 	viewDuration modules.ViewDuration,
 	commandBatchSize uint32,
 	opts ...Option,

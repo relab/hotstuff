@@ -8,7 +8,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/twins"
@@ -177,4 +177,4 @@ func (fhs *vulnerableFHS) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	return nil
 }
 
-var _ modules.HotstuffRuleset = (*vulnerableFHS)(nil)
+var _ consensus.Ruleset = (*vulnerableFHS)(nil)

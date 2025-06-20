@@ -37,6 +37,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	// imported modules
+	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/disagg/clique"
 	"github.com/relab/hotstuff/protocol/disagg/kauri"
 	_ "github.com/relab/hotstuff/protocol/leaderrotation"
@@ -229,7 +230,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	)
 }
 
-func initConsensusModules(depsCore *wiring.Core, depsSecure *wiring.Security, sender *network.GorumsSender, opts *orchestrationpb.ReplicaOpts) (modules.HotstuffRuleset, *protocol.ViewStates, modules.LeaderRotation, modules.DisseminatorAggregator, modules.ViewDuration, error) {
+func initConsensusModules(depsCore *wiring.Core, depsSecure *wiring.Security, sender *network.GorumsSender, opts *orchestrationpb.ReplicaOpts) (consensus.Ruleset, *protocol.ViewStates, modules.LeaderRotation, modules.DisseminatorAggregator, modules.ViewDuration, error) {
 	consensusRules, err := wiring.NewConsensusRules(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),

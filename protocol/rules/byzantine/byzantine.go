@@ -5,7 +5,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -15,7 +15,7 @@ const (
 )
 
 type Silence struct {
-	modules.HotstuffRuleset
+	consensus.Ruleset
 }
 
 func (s *Silence) ProposeRule(_ hotstuff.View, _ hotstuff.QuorumCert, _ hotstuff.SyncInfo, _ *clientpb.Batch) (hotstuff.ProposeMsg, bool) {
@@ -23,14 +23,14 @@ func (s *Silence) ProposeRule(_ hotstuff.View, _ hotstuff.QuorumCert, _ hotstuff
 }
 
 // NewSilence returns a byzantine replica that will never propose.
-func NewSilence(rules modules.HotstuffRuleset) *Silence {
-	return &Silence{HotstuffRuleset: rules}
+func NewSilence(rules consensus.Ruleset) *Silence {
+	return &Silence{Ruleset: rules}
 }
 
 type Fork struct {
 	blockchain *blockchain.Blockchain
 	config     *core.RuntimeConfig
-	modules.HotstuffRuleset
+	consensus.Ruleset
 }
 
 func (f *Fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
@@ -65,18 +65,18 @@ func (f *Fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert 
 
 // NewFork returns a byzantine replica that will try to fork the chain.
 func NewFork(
-	rules modules.HotstuffRuleset,
+	rules consensus.Ruleset,
 	blockchain *blockchain.Blockchain,
 	config *core.RuntimeConfig,
 ) *Fork {
 	return &Fork{
-		HotstuffRuleset: rules,
-		blockchain:      blockchain,
-		config:          config,
+		Ruleset:    rules,
+		blockchain: blockchain,
+		config:     config,
 	}
 }
 
 var (
-	_ modules.HotstuffRuleset = (*Silence)(nil)
-	_ modules.HotstuffRuleset = (*Fork)(nil)
+	_ consensus.Ruleset = (*Silence)(nil)
+	_ consensus.Ruleset = (*Fork)(nil)
 )

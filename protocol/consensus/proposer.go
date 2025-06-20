@@ -16,7 +16,7 @@ type Proposer struct {
 	eventLoop    *eventloop.EventLoop
 	config       *core.RuntimeConfig
 	blockchain   *blockchain.Blockchain
-	ruler        modules.ProposeRuler
+	ruler        ProposeRuler
 	disseminator modules.Disseminator
 	voter        *Voter
 	commandCache *clientpb.CommandCache
@@ -29,7 +29,7 @@ func NewProposer(
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
-	ruler modules.ProposeRuler,
+	ruler ProposeRuler,
 	disseminator modules.Disseminator,
 	voter *Voter,
 	commandCache *clientpb.CommandCache,

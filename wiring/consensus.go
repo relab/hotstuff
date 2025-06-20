@@ -22,7 +22,7 @@ func NewConsensus(
 	auth *cert.Authority,
 	commandCache *clientpb.CommandCache,
 	committer *consensus.Committer,
-	consensusRules modules.HotstuffRuleset,
+	consensusRules consensus.Ruleset,
 	leaderRotation modules.LeaderRotation,
 	disAgg modules.DisseminatorAggregator,
 ) *Consensus {

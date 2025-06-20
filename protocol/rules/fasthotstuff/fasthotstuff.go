@@ -6,7 +6,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -97,4 +97,4 @@ func (p *FastHotStuff) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, ce
 	return proposal, true
 }
 
-var _ modules.HotstuffRuleset = (*FastHotStuff)(nil)
+var _ consensus.Ruleset = (*FastHotStuff)(nil)
