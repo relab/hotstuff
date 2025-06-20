@@ -4,35 +4,12 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/security/crypto/eddsa"
-	"github.com/relab/hotstuff/wiring"
 )
-
-type dummyReplica struct {
-	config     *core.RuntimeConfig
-	connMd     map[string]string
-	sender     modules.Sender
-	depsSecure *wiring.Security
-}
-
-func createBlock(t *testing.T, signer *cert.Authority) *hotstuff.Block {
-	t.Helper()
-
-	qc, err := signer.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
-	if err != nil {
-		t.Errorf("Could not create empty QC for genesis: %v", err)
-	}
-
-	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, &clientpb.Batch{}, 42, 1)
-	return b
-}
 
 func createDummies(t *testing.T, count uint, cryptoName string, cacheSize int) testutil.EssentialsSet {
 	opts := make([]cert.Option, 0)
@@ -83,7 +60,7 @@ func TestVerifyPartialCert(t *testing.T) {
 	for _, td := range testData {
 		dummies := createDummies(t, 2, td.cryptoName, td.cacheSize)
 		dummy := dummies[0]
-		block := createBlock(t, dummy.Authority())
+		block := testutil.CreateBlock(t, dummy.Authority())
 		dummy.BlockChain().Store(block)
 
 		partialCert := testutil.CreatePC(t, block, dummy.Authority())
@@ -100,7 +77,7 @@ func TestCreateQuorumCert(t *testing.T) {
 		dummies := createDummies(t, n, td.cryptoName, td.cacheSize)
 		signers := dummies.Signers()
 		dummy := dummies[0]
-		block := createBlock(t, dummy.Authority())
+		block := testutil.CreateBlock(t, dummy.Authority())
 		pcs := testutil.CreatePCs(t, block, signers)
 
 		qc, err := signers[0].CreateQuorumCert(block, pcs)
@@ -139,7 +116,7 @@ func TestCreateQCWithOneSig(t *testing.T) {
 		dummies := createDummies(t, n, td.cryptoName, td.cacheSize)
 		signers := dummies.Signers()
 		dummy := dummies[0]
-		block := createBlock(t, dummy.Authority())
+		block := testutil.CreateBlock(t, dummy.Authority())
 		pcs := testutil.CreatePCs(t, block, signers)
 		_, err := signers[0].CreateQuorumCert(block, pcs[:1])
 		if err == nil {
@@ -154,7 +131,7 @@ func TestCreateQCWithOverlappingSigs(t *testing.T) {
 		dummies := createDummies(t, n, td.cryptoName, td.cacheSize)
 		signers := dummies.Signers()
 		dummy := dummies[0]
-		block := createBlock(t, dummy.Authority())
+		block := testutil.CreateBlock(t, dummy.Authority())
 		pcs := testutil.CreatePCs(t, block, signers)
 		pcs = append(pcs, pcs[0])
 		_, err := signers[0].CreateQuorumCert(block, pcs)
@@ -184,7 +161,7 @@ func TestVerifyQuorumCert(t *testing.T) {
 		const n = 4
 		dummies := createDummies(t, n, td.cryptoName, td.cacheSize)
 		signers := dummies.Signers()
-		signedBlock := createBlock(t, dummies[0].Authority())
+		signedBlock := testutil.CreateBlock(t, dummies[0].Authority())
 		for _, dummy := range dummies {
 			dummy.BlockChain().Store(signedBlock)
 		}
@@ -204,7 +181,7 @@ func TestVerifyTimeoutCert(t *testing.T) {
 		const n = 4
 		dummies := createDummies(t, n, td.cryptoName, td.cacheSize)
 		signers := dummies.Signers()
-		signedBlock := createBlock(t, dummies[0].Authority())
+		signedBlock := testutil.CreateBlock(t, dummies[0].Authority())
 		for _, dummy := range dummies {
 			dummy.BlockChain().Store(signedBlock)
 		}
@@ -224,7 +201,7 @@ func TestVerifyAggregateQC(t *testing.T) {
 		const n = 4
 		dummies := createDummies(t, n, td.cryptoName, td.cacheSize)
 		signers := dummies.Signers()
-		signedBlock := createBlock(t, dummies[0].Authority())
+		signedBlock := testutil.CreateBlock(t, dummies[0].Authority())
 		for _, dummy := range dummies {
 			dummy.BlockChain().Store(signedBlock)
 		}
