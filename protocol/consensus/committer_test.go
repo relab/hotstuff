@@ -5,6 +5,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/testutil"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
@@ -14,6 +15,7 @@ func wireUpCommitter(
 	t *testing.T,
 	essentials *testutil.Essentials,
 	viewStates *protocol.ViewStates,
+	commitRuler modules.CommitRuler,
 ) *consensus.Committer {
 	t.Helper()
 	return consensus.NewCommitter(
@@ -21,10 +23,7 @@ func wireUpCommitter(
 		essentials.Logger(),
 		essentials.BlockChain(),
 		viewStates,
-		chainedhotstuff.New(
-			essentials.Logger(),
-			essentials.BlockChain(),
-		),
+		commitRuler,
 	)
 }
 
@@ -41,8 +40,11 @@ func TestValidCommit(t *testing.T) {
 	chain := essentials.BlockChain()
 	parent := hotstuff.GetGenesis()
 	var firstBlock *hotstuff.Block = nil
-	const n = 3
-	for range n {
+	chs := chainedhotstuff.New(
+		essentials.Logger(),
+		essentials.BlockChain(),
+	)
+	for range chs.ChainLength() {
 		block := testutil.CreateValidBlock(t, 1, parent)
 		if firstBlock == nil {
 			firstBlock = block
@@ -51,7 +53,7 @@ func TestValidCommit(t *testing.T) {
 		parent = block
 	}
 	blockToCommit := testutil.CreateValidBlock(t, 1, parent)
-	committer := wireUpCommitter(t, essentials, viewStates)
+	committer := wireUpCommitter(t, essentials, viewStates, chs)
 	if err := committer.TryCommit(blockToCommit); err != nil {
 		t.Fatal(err)
 	}
