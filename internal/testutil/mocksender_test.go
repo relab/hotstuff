@@ -6,9 +6,6 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
@@ -16,46 +13,19 @@ import (
 	"github.com/relab/hotstuff/wiring"
 )
 
-type replica struct {
-	logger     logging.Logger
-	eventLoop  *eventloop.EventLoop
-	config     *core.RuntimeConfig
-	sender     *testutil.MockSender
-	blockchain *blockchain.Blockchain
-	auth       *cert.Authority
-}
-
-func wireUpReplica(t *testing.T) *replica {
-	logger := logging.New("test")
-	eventLoop := eventloop.New(logger, 1)
-	config := core.NewRuntimeConfig(1, testutil.GenerateECDSAKey(t))
-
-	sender := testutil.NewMockSender(1)
-	chain := blockchain.New(eventLoop, logger, sender)
-	auth := cert.NewAuthority(config, chain, ecdsa.New(config))
-	return &replica{
-		logger:     logger,
-		eventLoop:  eventLoop,
-		config:     config,
-		sender:     sender,
-		blockchain: chain,
-		auth:       auth,
-	}
-}
-
 func TestPropose(t *testing.T) {
-	r := wireUpReplica(t)
-	block := testutil.CreateBlock(t, r.auth)
-	r.sender.Propose(&hotstuff.ProposeMsg{
+	r := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
+	block := testutil.CreateBlock(t, r.Authority())
+	r.MockSender().Propose(&hotstuff.ProposeMsg{
 		ID:    1,
 		Block: block,
 	})
 	// check if a message was sent at all
-	if len(r.sender.MessagesSent()) != 1 {
+	if len(r.MockSender().MessagesSent()) != 1 {
 		t.Error("message not sent")
 	}
 	// check if it was the correct type of message
-	msg, ok := r.sender.MessagesSent()[0].(hotstuff.ProposeMsg)
+	msg, ok := r.MockSender().MessagesSent()[0].(hotstuff.ProposeMsg)
 	if !ok {
 		t.Error("incorrect message type")
 	}
@@ -69,25 +39,25 @@ func TestPropose(t *testing.T) {
 }
 
 func TestVote(t *testing.T) {
-	r := wireUpReplica(t)
-	block := testutil.CreateBlock(t, r.auth)
-	pc := testutil.CreatePC(t, block, r.auth)
-	err := r.sender.Vote(2, pc)
+	r := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
+	block := testutil.CreateBlock(t, r.Authority())
+	pc := testutil.CreatePC(t, block, r.Authority())
+	err := r.MockSender().Vote(2, pc)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// check if a message was sent at all
-	if len(r.sender.MessagesSent()) != 1 {
+	if len(r.MockSender().MessagesSent()) != 1 {
 		t.Error("message not sent")
 	}
 	// check if it was the correct type of message
-	msg, ok := r.sender.MessagesSent()[0].(hotstuff.PartialCert)
+	msg, ok := r.MockSender().MessagesSent()[0].(hotstuff.PartialCert)
 	if !ok {
 		t.Error("incorrect message type")
 	}
 	// below statements compare the data in the message
 	if msg.Signer() != 1 {
-		t.Error("incorrect sender")
+		t.Error("incorrect MockSender()")
 	}
 
 	if !bytes.Equal(msg.ToBytes(), pc.ToBytes()) {
@@ -96,23 +66,23 @@ func TestVote(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	r := wireUpReplica(t)
-	r.sender.Timeout(hotstuff.TimeoutMsg{
+	r := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
+	r.MockSender().Timeout(hotstuff.TimeoutMsg{
 		ID:   1,
 		View: 1,
 	})
 	// check if a message was sent at all
-	if len(r.sender.MessagesSent()) != 1 {
+	if len(r.MockSender().MessagesSent()) != 1 {
 		t.Error("message not sent")
 	}
 	// check if it was the correct type of message
-	msg, ok := r.sender.MessagesSent()[0].(hotstuff.TimeoutMsg)
+	msg, ok := r.MockSender().MessagesSent()[0].(hotstuff.TimeoutMsg)
 	if !ok {
 		t.Error("incorrect message type")
 	}
 	// below statements compare the data in the message
 	if msg.ID != 1 {
-		t.Error("incorrect sender")
+		t.Error("incorrect MockSender()")
 	}
 
 	if msg.View != 1 {
@@ -135,6 +105,7 @@ func TestSub(t *testing.T) {
 }
 
 func TestRequestBlock(t *testing.T) {
+	// TODO(AlanRostem): use testutil version to init
 	replicaIDs := []hotstuff.ID{1, 2, 3, 4}
 	chains := make([]*blockchain.Blockchain, 0)
 	senders := make([]*testutil.MockSender, 0)
