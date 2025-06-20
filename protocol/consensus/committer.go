@@ -14,6 +14,7 @@ import (
 )
 
 // Committer commits the correct block for a view.
+// TODO(AlanRostem): make tests
 type Committer struct {
 	eventLoop  *eventloop.EventLoop
 	logger     logging.Logger

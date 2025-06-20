@@ -11,7 +11,6 @@ import (
 
 // ViewStates is a shared object which stores the protocol's state and may be modified
 // by several consensus component objects.
-// TODO(AlanRostem): make tests for this.
 type ViewStates struct {
 	blockchain *blockchain.Blockchain
 	auth       *cert.Authority
