@@ -49,12 +49,7 @@ func TestConvertQuorumCert(t *testing.T) {
 
 	b1 := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), &clientpb.Batch{}, 1, 1)
 
-	signatures := testutil.CreatePCs(t, b1, signers)
-
-	want, err := signers[0].CreateQuorumCert(b1, signatures)
-	if err != nil {
-		t.Fatal(err)
-	}
+	want := testutil.CreateQC(t, b1, signers...)
 
 	pb := hotstuffpb.QuorumCertToProto(want)
 	got := hotstuffpb.QuorumCertFromProto(pb)

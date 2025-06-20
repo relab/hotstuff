@@ -42,7 +42,7 @@ func TestUpdateCerts(t *testing.T) {
 	signers := set.Signers()
 
 	// need only 3 for a quorum
-	qc := testutil.CreateQC(t, block, signers)
+	qc := testutil.CreateQC(t, block, signers...)
 
 	if err := states.UpdateHighQC(qc); err != nil {
 		t.Fatal(err)

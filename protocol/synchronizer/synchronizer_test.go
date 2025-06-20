@@ -108,7 +108,7 @@ func TestAdvanceViewQC(t *testing.T) {
 	)
 	blockchain.Store(block)
 	signers := set.Signers()
-	qc := testutil.CreateQC(t, block, signers)
+	qc := testutil.CreateQC(t, block, signers...)
 	proposer := synchronizer.proposer // TODO(AlanRostem): not very clean, refactor
 	for i := range 2 {
 		// adding multiple commands so the next call CreateProposal

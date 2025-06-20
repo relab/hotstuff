@@ -78,13 +78,7 @@ func TestCreateQuorumCert(t *testing.T) {
 		signers := dummies.Signers()
 		dummy := dummies[0]
 		block := testutil.CreateBlock(t, dummy.Authority())
-		pcs := testutil.CreatePCs(t, block, signers)
-
-		qc, err := signers[0].CreateQuorumCert(block, pcs)
-		if err != nil {
-			t.Fatalf("Failed to create QC: %v", err)
-		}
-
+		qc := testutil.CreateQC(t, block, signers...)
 		if qc.BlockHash() != block.Hash() {
 			t.Error("Quorum certificate hash does not match block hash!")
 		}
@@ -146,10 +140,7 @@ func TestVerifyGenesisQC(t *testing.T) {
 		const n = 4
 		dummies := createDummies(t, n, td.cryptoName, td.cacheSize)
 		signers := dummies.Signers()
-		genesisQC, err := signers[0].CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
-		if err != nil {
-			t.Fatal(err)
-		}
+		genesisQC := testutil.CreateQC(t, hotstuff.GetGenesis(), signers[0])
 		if err := signers[1].VerifyQuorumCert(genesisQC); err != nil {
 			t.Error(err)
 		}
@@ -166,7 +157,7 @@ func TestVerifyQuorumCert(t *testing.T) {
 			dummy.BlockChain().Store(signedBlock)
 		}
 
-		qc := testutil.CreateQC(t, signedBlock, signers)
+		qc := testutil.CreateQC(t, signedBlock, signers...)
 
 		for i, verifier := range signers {
 			if err := verifier.VerifyQuorumCert(qc); err != nil {

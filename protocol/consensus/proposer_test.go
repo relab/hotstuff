@@ -98,10 +98,7 @@ func TestPropose(t *testing.T) {
 	commandCache := clientpb.NewCommandCache(1)
 	commandCache.Add(command)
 	proposer := wireUpProposer(t, essentials, commandCache)
-	highQC, err := essentials.Authority().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	highQC := testutil.CreateQC(t, hotstuff.GetGenesis(), essentials.Authority())
 	proposal, err := proposer.CreateProposal(1, highQC, hotstuff.NewSyncInfo().WithQC(highQC))
 	if err != nil {
 		t.Fatal(err)

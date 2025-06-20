@@ -28,12 +28,7 @@ func CreateTCPListener(t *testing.T) net.Listener {
 
 func CreateBlock(t *testing.T, signer *cert.Authority) *hotstuff.Block {
 	t.Helper()
-
-	qc, err := signer.CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
-	if err != nil {
-		t.Errorf("Could not create empty QC for genesis: %v", err)
-	}
-
+	qc := CreateQC(t, hotstuff.GetGenesis(), signer)
 	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, &clientpb.Batch{
 		Commands: []*clientpb.Command{},
 	}, 42, 1)
@@ -120,12 +115,13 @@ func CreatePCs(t *testing.T, block *hotstuff.Block, signers []*cert.Authority) [
 }
 
 // CreateQC creates a QC using the given signers.
-func CreateQC(t *testing.T, block *hotstuff.Block, signers []*cert.Authority) hotstuff.QuorumCert {
+func CreateQC(t *testing.T, block *hotstuff.Block, signers ...*cert.Authority) hotstuff.QuorumCert {
 	t.Helper()
 	if len(signers) == 0 {
 		return hotstuff.QuorumCert{}
 	}
-	qc, err := signers[0].CreateQuorumCert(block, CreatePCs(t, block, signers))
+	qcCreator := signers[0]
+	qc, err := qcCreator.CreateQuorumCert(block, CreatePCs(t, block, signers))
 	if err != nil {
 		t.Fatalf("Failed to create QC: %v", err)
 	}

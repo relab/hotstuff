@@ -70,10 +70,7 @@ func TestOnValidPropose(t *testing.T) {
 
 	voter := wireUpVoter(t, essentials)
 	// create a signed block (doesn't matter who did it)
-	qc, err := essentials.Authority().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	qc := testutil.CreateQC(t, hotstuff.GetGenesis(), essentials.Authority())
 	// create a propose message with a valid block from a replica who is not 1
 	proposerID := hotstuff.ID(2)
 	block := hotstuff.NewBlock(
