@@ -90,7 +90,7 @@ func TestUpdateCerts(t *testing.T) {
 		t.Fatal("quorum cert was not updated")
 	}
 
-	tc := testutil.CreateTC(t, 1, security.Authority(), signers)
+	tc := testutil.CreateTC(t, 1, signers)
 	states.UpdateHighTC(tc)
 	if !bytes.Equal(tc.ToBytes(), states.HighTC().ToBytes()) {
 		t.Fatal("timeout cert was not updated")

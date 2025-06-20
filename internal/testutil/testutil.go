@@ -130,28 +130,15 @@ func CreateQC(t *testing.T, block *hotstuff.Block, signers []*cert.Authority) ho
 	return qc
 }
 
-// CreateTC generates a TC using the given signers.
-func CreateTC(t *testing.T, view hotstuff.View, timeoutCreator *cert.Authority, otherSigners []*cert.Authority) hotstuff.TimeoutCert {
-	t.Helper()
-	if timeoutCreator == nil || len(otherSigners) == 0 {
-		return hotstuff.TimeoutCert{}
-	}
-	tc, err := timeoutCreator.CreateTimeoutCert(view, CreateTimeouts(t, view, otherSigners))
-	if err != nil {
-		t.Fatalf("Failed to create TC: %v", err)
-	}
-	return tc
-}
-
-// TODO(meling): Currently only used from disabledTestConvertTimeoutCertBLS12.
-// Ideally, we should replace CreateTC above with this function since it avoids two arguments with the same signers.
-func CreateTCOld(t *testing.T, view hotstuff.View, signers []*cert.Authority) hotstuff.TimeoutCert {
+// CreateTC generates a timeout certificate signed by the given signers.
+// The first signer is the timeout creator.
+func CreateTC(t *testing.T, view hotstuff.View, signers []*cert.Authority) hotstuff.TimeoutCert {
 	t.Helper()
 	if len(signers) == 0 {
 		return hotstuff.TimeoutCert{}
 	}
-	x := signers[0]
-	tc, err := x.CreateTimeoutCert(view, CreateTimeouts(t, view, signers))
+	timeoutCreator := signers[0]
+	tc, err := timeoutCreator.CreateTimeoutCert(view, CreateTimeouts(t, view, signers))
 	if err != nil {
 		t.Fatalf("Failed to create TC: %v", err)
 	}

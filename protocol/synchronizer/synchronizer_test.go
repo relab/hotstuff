@@ -173,7 +173,7 @@ func TestAdvanceViewTC(t *testing.T) {
 	synchronizer := wireUpSynchronizer(t, essentials, commandCache, viewStates)
 
 	signers := makeSigners(t, essentials.RuntimeCfg(), essentials.Authority())
-	tc := testutil.CreateTC(t, 1, essentials.Authority(), signers)
+	tc := testutil.CreateTC(t, 1, signers)
 
 	proposer := synchronizer.proposer // TODO(AlanRostem): not very clean, refactor
 	for i := range 2 {

@@ -110,7 +110,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 		}
 	}
 
-	tc1 := testutil.CreateTCOld(t, 1, signers)
+	tc1 := testutil.CreateTC(t, 1, signers)
 
 	pb := hotstuffpb.TimeoutCertToProto(tc1)
 	tc2 := hotstuffpb.TimeoutCertFromProto(pb)

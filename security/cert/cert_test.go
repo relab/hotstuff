@@ -281,18 +281,16 @@ func TestVerifyTimeoutCert(t *testing.T) {
 	for _, td := range testData {
 		const n = 4
 		dummies := createDummyReplicas(t, n, td.cryptoName, td.cacheSize)
-		signers0 := make([]*cert.Authority, 0)
-		signers1 := make([]*cert.Authority, 0)
+		signers := make([]*cert.Authority, 0)
 		signedBlock := createBlock(t, dummies[0].depsSecure.Authority())
 		for _, dummy := range dummies {
-			signers0 = append(signers0, dummy.depsSecure.Authority())
-			signers1 = append(signers1, dummy.depsSecure.Authority())
+			signers = append(signers, dummy.depsSecure.Authority())
 			dummy.depsSecure.BlockChain().Store(signedBlock)
 		}
 
-		tc := testutil.CreateTC(t, 1, signers0[0], signers1)
+		tc := testutil.CreateTC(t, 1, signers)
 
-		for i, verifier := range signers0 {
+		for i, verifier := range signers {
 			if err := verifier.VerifyTimeoutCert(dummies[0].config.QuorumSize(), tc); err != nil {
 				t.Errorf("verifier %d failed to verify TC: %v", i+1, err)
 			}
