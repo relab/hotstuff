@@ -23,86 +23,63 @@ import (
 
 const cryptoName = ecdsa.ModuleName
 
-func wireUpSynchronizer(t *testing.T) (
-	*wiring.Core,
-	*wiring.Security,
-	*clientpb.CommandCache,
-	*protocol.ViewStates,
-	*wiring.Consensus,
-	*Synchronizer,
-) {
-	id := hotstuff.ID(1)
-	pk := testutil.GenerateECDSAKey(t)
-	depsCore := wiring.NewCore(id, "test", pk)
-	sender := testutil.NewMockSender(id)
-	depsSecurity, err := wiring.NewSecurity(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		sender,
-		cryptoName,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	leaderRotation := fixedleader.New(id)
+func wireUpSynchronizer(
+	t *testing.T,
+	essentials *testutil.Essentials,
+	commandCache *clientpb.CommandCache,
+	viewStates *protocol.ViewStates,
+) *Synchronizer {
+	t.Helper()
+	leaderRotation := fixedleader.New(1)
 	consensusRules := chainedhotstuff.New(
-		depsCore.Logger(),
-		depsSecurity.BlockChain(),
+		essentials.Logger(),
+		essentials.BlockChain(),
 	)
-	viewStates, err := protocol.NewViewStates(
-		depsSecurity.BlockChain(),
-		depsSecurity.Authority(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	commandCache := clientpb.NewCommandCache(1)
 	committer := consensus.NewCommitter(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsSecurity.BlockChain(),
+		essentials.EventLoop(),
+		essentials.Logger(),
+		essentials.BlockChain(),
 		viewStates,
 		consensusRules,
 	)
 	votingMachine := votingmachine.New(
-		depsCore.Logger(),
-		depsCore.EventLoop(),
-		depsCore.RuntimeCfg(),
-		depsSecurity.BlockChain(),
-		depsSecurity.Authority(),
+		essentials.Logger(),
+		essentials.EventLoop(),
+		essentials.RuntimeCfg(),
+		essentials.BlockChain(),
+		essentials.Authority(),
 		viewStates,
 	)
 	depsConsensus := wiring.NewConsensus(
-		depsCore.EventLoop(),
-		depsCore.RuntimeCfg(),
-		depsSecurity.BlockChain(),
-		depsSecurity.Authority(),
+		essentials.EventLoop(),
+		essentials.RuntimeCfg(),
+		essentials.BlockChain(),
+		essentials.Authority(),
 		commandCache,
 		committer,
 		consensusRules,
 		leaderRotation,
 		clique.New(
-			depsCore.RuntimeCfg(),
+			essentials.RuntimeCfg(),
 			votingMachine,
 			leaderRotation,
-			sender,
+			essentials.MockSender(),
 		),
 	)
 	synchronizer := New(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		depsSecurity.Authority(),
+		essentials.EventLoop(),
+		essentials.Logger(),
+		essentials.RuntimeCfg(),
+		essentials.Authority(),
 		leaderRotation,
 		viewduration.NewFixed(1000*time.Nanosecond),
 		depsConsensus.Proposer(),
 		depsConsensus.Voter(),
 		viewStates,
-		sender,
+		essentials.MockSender(),
 	)
 
-	return depsCore, depsSecurity, commandCache, viewStates, depsConsensus, synchronizer
+	return synchronizer
 }
 
 func makeSigners(t *testing.T, leaderCfg *core.RuntimeConfig, leaderAuth *cert.Authority) []*cert.Authority {
@@ -133,15 +110,18 @@ func makeSigners(t *testing.T, leaderCfg *core.RuntimeConfig, leaderAuth *cert.A
 }
 
 func TestAdvanceViewQC(t *testing.T) {
-	const n = 4
-	depsCore,
-		depsSecurity,
-		commandCache,
-		viewStates,
-		depsConsensus,
-		synchronizer := wireUpSynchronizer(t)
+	essentials := testutil.WireUpEssentials(t, 1)
+	viewStates, err := protocol.NewViewStates(
+		essentials.BlockChain(),
+		essentials.Authority(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commandCache := clientpb.NewCommandCache(1)
+	synchronizer := wireUpSynchronizer(t, essentials, commandCache, viewStates)
 
-	blockchain := depsSecurity.BlockChain()
+	blockchain := essentials.BlockChain()
 	block := hotstuff.NewBlock(
 		hotstuff.GetGenesis().Hash(),
 		hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
@@ -156,9 +136,9 @@ func TestAdvanceViewQC(t *testing.T) {
 		1,
 	)
 	blockchain.Store(block)
-	signers := makeSigners(t, depsCore.RuntimeCfg(), depsSecurity.Authority())
+	signers := makeSigners(t, essentials.RuntimeCfg(), essentials.Authority())
 	qc := testutil.CreateQC(t, block, signers)
-	proposer := depsConsensus.Proposer()
+	proposer := synchronizer.proposer // TODO(AlanRostem): not very clean, refactor
 	commandCache.Add(&clientpb.Command{
 		ClientID:       1,
 		SequenceNumber: 1,
@@ -180,17 +160,21 @@ func TestAdvanceViewQC(t *testing.T) {
 }
 
 func TestAdvanceViewTC(t *testing.T) {
-	const n = 4
-	depsCore,
-		depsSecurity,
-		commandCache,
-		viewStates,
-		depsConsensus,
-		synchronizer := wireUpSynchronizer(t)
-	signers := makeSigners(t, depsCore.RuntimeCfg(), depsSecurity.Authority())
-	tc := testutil.CreateTC(t, 1, depsSecurity.Authority(), signers)
+	essentials := testutil.WireUpEssentials(t, 1)
+	viewStates, err := protocol.NewViewStates(
+		essentials.BlockChain(),
+		essentials.Authority(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commandCache := clientpb.NewCommandCache(1)
+	synchronizer := wireUpSynchronizer(t, essentials, commandCache, viewStates)
 
-	proposer := depsConsensus.Proposer()
+	signers := makeSigners(t, essentials.RuntimeCfg(), essentials.Authority())
+	tc := testutil.CreateTC(t, 1, essentials.Authority(), signers)
+
+	proposer := synchronizer.proposer // TODO(AlanRostem): not very clean, refactor
 	commandCache.Add(&clientpb.Command{
 		ClientID:       1,
 		SequenceNumber: 1,

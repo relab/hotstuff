@@ -12,64 +12,50 @@ import (
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/votingmachine"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
-	"github.com/relab/hotstuff/wiring"
 )
-
-type moduleList struct {
-	consensusRules string
-	leaderRotation string
-	cryptoBase     string
-}
 
 func wireUpVoter(
 	t *testing.T,
-	depsCore *wiring.Core,
-	depsSecurity *wiring.Security,
-	sender *testutil.MockSender,
-	list moduleList,
+	essentials *testutil.Essentials,
 ) *consensus.Voter {
 	t.Helper()
-	consensusRules, err := wiring.NewConsensusRules(
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		depsSecurity.BlockChain(),
-		list.consensusRules,
+	consensusRules := chainedhotstuff.New(
+		essentials.Logger(),
+		essentials.BlockChain(),
 	)
-	check(t, err)
 	viewStates, err := protocol.NewViewStates(
-		depsSecurity.BlockChain(),
-		depsSecurity.Authority(),
+		essentials.BlockChain(),
+		essentials.Authority(),
 	)
 	check(t, err)
 	committer := consensus.NewCommitter(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsSecurity.BlockChain(),
+		essentials.EventLoop(),
+		essentials.Logger(),
+		essentials.BlockChain(),
 		viewStates,
 		consensusRules,
 	)
-	leaderRotation := fixedleader.New(2) // want a leader that is not 1
+	leaderRotation := fixedleader.New(2) // want a leader that is not 1 in this test case
 	votingMachine := votingmachine.New(
-		depsCore.Logger(),
-		depsCore.EventLoop(),
-		depsCore.RuntimeCfg(),
-		depsSecurity.BlockChain(),
-		depsSecurity.Authority(),
+		essentials.Logger(),
+		essentials.EventLoop(),
+		essentials.RuntimeCfg(),
+		essentials.BlockChain(),
+		essentials.Authority(),
 		viewStates,
 	)
 	dissAgg := clique.New(
-		depsCore.RuntimeCfg(),
+		essentials.RuntimeCfg(),
 		votingMachine,
 		leaderRotation,
-		sender,
+		essentials.MockSender(),
 	)
 	voter := consensus.NewVoter(
-		depsCore.RuntimeCfg(),
+		essentials.RuntimeCfg(),
 		leaderRotation,
 		consensusRules,
 		dissAgg,
-		depsSecurity.Authority(),
+		essentials.Authority(),
 		committer,
 	)
 	return voter
@@ -79,27 +65,11 @@ func wireUpVoter(
 // an honest leader.
 func TestOnValidPropose(t *testing.T) {
 	id := hotstuff.ID(1)
-	depsCore := wiring.NewCore(id, "test", testutil.GenerateECDSAKey(t))
-	sender := testutil.NewMockSender(depsCore.RuntimeCfg().ID())
-	list := moduleList{
-		consensusRules: chainedhotstuff.ModuleName,
-		leaderRotation: fixedleader.ModuleName,
-		cryptoBase:     ecdsa.ModuleName,
-	}
-	depsSecurity, err := wiring.NewSecurity(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		sender,
-		list.cryptoBase,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sender.AddBlockChain(depsSecurity.BlockChain())
-	voter := wireUpVoter(t, depsCore, depsSecurity, sender, list)
+	essentials := testutil.WireUpEssentials(t, id)
+
+	voter := wireUpVoter(t, essentials)
 	// create a signed block (doesn't matter who did it)
-	qc, err := depsSecurity.Authority().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+	qc, err := essentials.Authority().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,6 +94,7 @@ func TestOnValidPropose(t *testing.T) {
 	if err := voter.OnValidPropose(&proposal); err != nil {
 		t.Fatalf("failure to process proposal: %v", err)
 	}
+	sender := essentials.MockSender()
 	// check vote aggregation
 	if len(sender.MessagesSent()) != 1 {
 		t.Fatal("no vote was aggregated")

@@ -20,7 +20,7 @@ import (
 
 const ModuleName = "kauri"
 
-// Kauri structure contains the modules for kauri protocol implementation.
+// Kauri implements tree-based dissemination and aggregation.
 type Kauri struct {
 	logger     logging.Logger
 	eventLoop  *eventloop.EventLoop

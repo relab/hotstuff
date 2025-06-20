@@ -7,14 +7,12 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/dissagg/clique"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/votingmachine"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/wiring"
 )
 
@@ -26,67 +24,53 @@ func check(t *testing.T, err error) {
 
 func wireUpProposer(
 	t *testing.T,
-	depsCore *wiring.Core,
-	depsSecurity *wiring.Security,
-	sender modules.Sender,
+	essentials *testutil.Essentials,
 	commandCache *clientpb.CommandCache,
-	list moduleList,
 ) *consensus.Proposer {
 	t.Helper()
-	consensusRules, err := wiring.NewConsensusRules(
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		depsSecurity.BlockChain(),
-		list.consensusRules,
+	consensusRules := chainedhotstuff.New(
+		essentials.Logger(),
+		essentials.BlockChain(),
 	)
-	check(t, err)
 	viewStates, err := protocol.NewViewStates(
-		depsSecurity.BlockChain(),
-		depsSecurity.Authority(),
+		essentials.BlockChain(),
+		essentials.Authority(),
 	)
 	check(t, err)
-	leaderRotation, err := wiring.NewLeaderRotation(
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		depsSecurity.BlockChain(),
-		viewStates,
-		list.leaderRotation,
-		consensusRules.ChainLength(),
-	)
-	check(t, err)
+	leaderRotation := fixedleader.New(1)
 	votingMachine := votingmachine.New(
-		depsCore.Logger(),
-		depsCore.EventLoop(),
-		depsCore.RuntimeCfg(),
-		depsSecurity.BlockChain(),
-		depsSecurity.Authority(),
+		essentials.Logger(),
+		essentials.EventLoop(),
+		essentials.RuntimeCfg(),
+		essentials.BlockChain(),
+		essentials.Authority(),
 		viewStates,
 	)
 	dissAgg := clique.New(
-		depsCore.RuntimeCfg(),
+		essentials.RuntimeCfg(),
 		votingMachine,
 		leaderRotation,
-		sender,
+		essentials.MockSender(),
 	)
 	committer := consensus.NewCommitter(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsSecurity.BlockChain(),
+		essentials.EventLoop(),
+		essentials.Logger(),
+		essentials.BlockChain(),
 		viewStates,
 		consensusRules,
 	)
 	voter := consensus.NewVoter(
-		depsCore.RuntimeCfg(),
+		essentials.RuntimeCfg(),
 		leaderRotation,
 		consensusRules,
 		dissAgg,
-		depsSecurity.Authority(),
+		essentials.Authority(),
 		committer,
 	)
 	return consensus.NewProposer(
-		depsCore.EventLoop(),
-		depsCore.RuntimeCfg(),
-		depsSecurity.BlockChain(),
+		essentials.EventLoop(),
+		essentials.RuntimeCfg(),
+		essentials.BlockChain(),
 		dissAgg,
 		voter,
 		commandCache,
@@ -101,31 +85,10 @@ type replica struct {
 }
 
 func TestPropose(t *testing.T) {
-	list := moduleList{
-		consensusRules: chainedhotstuff.ModuleName,
-		leaderRotation: fixedleader.ModuleName,
-		cryptoBase:     ecdsa.ModuleName,
-	}
 	id := hotstuff.ID(1)
-	depsCore := wiring.NewCore(id, "test", testutil.GenerateECDSAKey(t))
-	sender := testutil.NewMockSender(depsCore.RuntimeCfg().ID())
-	depsSecurity, err := wiring.NewSecurity(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		sender,
-		list.cryptoBase,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	leaderReplica := replica{
-		depsCore:     depsCore,
-		depsSecurity: depsSecurity,
-		sender:       sender,
-	}
+	essentials := testutil.WireUpEssentials(t, id)
 	// add the blockchains to the proposer's mock sender
-	leaderReplica.sender.AddBlockChain(depsSecurity.BlockChain())
+	essentials.MockSender().AddBlockChain(essentials.BlockChain())
 	command := &clientpb.Command{
 		ClientID:       1,
 		SequenceNumber: 1,
@@ -133,8 +96,8 @@ func TestPropose(t *testing.T) {
 	}
 	commandCache := clientpb.NewCommandCache(1)
 	commandCache.Add(command)
-	proposer := wireUpProposer(t, leaderReplica.depsCore, leaderReplica.depsSecurity, leaderReplica.sender, commandCache, list)
-	highQC, err := leaderReplica.depsSecurity.Authority().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+	proposer := wireUpProposer(t, essentials, commandCache)
+	highQC, err := essentials.Authority().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +108,7 @@ func TestPropose(t *testing.T) {
 	if err := proposer.Propose(&proposal); err != nil {
 		t.Fatal(err)
 	}
-	messages := leaderReplica.sender.MessagesSent()
+	messages := essentials.MockSender().MessagesSent()
 	if len(messages) != 1 {
 		t.Fatal("expected at least one message to be sent by proposer")
 	}
