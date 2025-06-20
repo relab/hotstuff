@@ -34,9 +34,8 @@ func NewProposer(
 	voter *Voter,
 	commandCache *clientpb.CommandCache,
 	committer *Committer,
-	opts ...ProposerOption,
 ) *Proposer {
-	p := &Proposer{
+	return &Proposer{
 		eventLoop:    eventLoop,
 		config:       config,
 		blockchain:   blockchain,
@@ -48,10 +47,6 @@ func NewProposer(
 
 		lastProposed: 0, // genesis block has zero view
 	}
-	for _, opt := range opts {
-		opt(p)
-	}
-	return p
 }
 
 // markProposed traverses the block history and marks commands as proposed.
