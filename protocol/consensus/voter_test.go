@@ -56,7 +56,7 @@ func wireUpVoter(
 		depsSecurity.Authority(),
 		viewStates,
 	)
-	hsDissAgg := consensus.NewHotStuff(
+	dissAgg := consensus.NewClique(
 		depsCore.RuntimeCfg(),
 		votingMachine,
 		leaderRotation,
@@ -66,7 +66,7 @@ func wireUpVoter(
 		depsCore.RuntimeCfg(),
 		leaderRotation,
 		consensusRules,
-		hsDissAgg,
+		dissAgg,
 		depsSecurity.Authority(),
 		committer,
 	)

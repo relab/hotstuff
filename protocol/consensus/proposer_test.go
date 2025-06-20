@@ -12,7 +12,6 @@ import (
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
-	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/wiring"
 )
@@ -61,7 +60,7 @@ func wireUpProposer(
 		depsSecurity.Authority(),
 		viewStates,
 	)
-	hsProtocol := consensus.NewHotStuff(
+	dissAgg := consensus.NewClique(
 		depsCore.RuntimeCfg(),
 		votingMachine,
 		leaderRotation,
@@ -78,7 +77,7 @@ func wireUpProposer(
 		depsCore.RuntimeCfg(),
 		leaderRotation,
 		consensusRules,
-		hsProtocol,
+		dissAgg,
 		depsSecurity.Authority(),
 		committer,
 	)
@@ -86,7 +85,7 @@ func wireUpProposer(
 		depsCore.EventLoop(),
 		depsCore.RuntimeCfg(),
 		depsSecurity.BlockChain(),
-		hsProtocol,
+		dissAgg,
 		voter,
 		commandCache,
 		committer,
@@ -105,35 +104,26 @@ func TestPropose(t *testing.T) {
 		leaderRotation: fixedleader.ModuleName,
 		cryptoBase:     ecdsa.ModuleName,
 	}
-	const n = 4
-	replicas := make([]replica, 0)
-	signers := make([]*cert.Authority, 0)
-	for i := range n {
-		id := hotstuff.ID(i + 1)
-		depsCore := wiring.NewCore(id, "test", testutil.GenerateECDSAKey(t))
-		sender := testutil.NewMockSender(depsCore.RuntimeCfg().ID())
-		depsSecurity, err := wiring.NewSecurity(
-			depsCore.EventLoop(),
-			depsCore.Logger(),
-			depsCore.RuntimeCfg(),
-			sender,
-			list.cryptoBase,
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		signers = append(signers, depsSecurity.Authority())
-		replicas = append(replicas, replica{
-			depsCore:     depsCore,
-			depsSecurity: depsSecurity,
-			sender:       sender,
-		})
+	id := hotstuff.ID(1)
+	depsCore := wiring.NewCore(id, "test", testutil.GenerateECDSAKey(t))
+	sender := testutil.NewMockSender(depsCore.RuntimeCfg().ID())
+	depsSecurity, err := wiring.NewSecurity(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		sender,
+		list.cryptoBase,
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
-	replica0 := replicas[0]
+	leaderReplica := replica{
+		depsCore:     depsCore,
+		depsSecurity: depsSecurity,
+		sender:       sender,
+	}
 	// add the blockchains to the proposer's mock sender
-	for _, other := range replicas {
-		replica0.sender.AddBlockChain(other.depsSecurity.BlockChain())
-	}
+	leaderReplica.sender.AddBlockChain(depsSecurity.BlockChain())
 	command := &clientpb.Command{
 		ClientID:       1,
 		SequenceNumber: 1,
@@ -141,8 +131,8 @@ func TestPropose(t *testing.T) {
 	}
 	commandCache := clientpb.NewCommandCache(1)
 	commandCache.Add(command)
-	proposer := wireUpProposer(t, replica0.depsCore, replica0.depsSecurity, replica0.sender, commandCache, list)
-	highQC, err := replica0.depsSecurity.Authority().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
+	proposer := wireUpProposer(t, leaderReplica.depsCore, leaderReplica.depsSecurity, leaderReplica.sender, commandCache, list)
+	highQC, err := leaderReplica.depsSecurity.Authority().CreateQuorumCert(hotstuff.GetGenesis(), []hotstuff.PartialCert{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +143,7 @@ func TestPropose(t *testing.T) {
 	if err := proposer.Propose(&proposal); err != nil {
 		t.Fatal(err)
 	}
-	messages := replica0.sender.MessagesSent()
+	messages := leaderReplica.sender.MessagesSent()
 	if len(messages) != 1 {
 		t.Fatal("expected at least one message to be sent by proposer")
 	}

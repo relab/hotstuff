@@ -24,7 +24,7 @@ func NewConsensus(
 	committer *consensus.Committer,
 	consensusRulesModule modules.HotstuffRuleset,
 	leaderRotationModule modules.LeaderRotation,
-	protocol modules.DisseminatorAggregator,
+	dissAgg modules.DisseminatorAggregator,
 ) *Consensus {
 	proposerOpts := []consensus.ProposerOption{}
 	if ruler, ok := consensusRulesModule.(modules.ProposeRuler); ok {
@@ -34,7 +34,7 @@ func NewConsensus(
 		config,
 		leaderRotationModule,
 		consensusRulesModule,
-		protocol,
+		dissAgg,
 		auth,
 		committer,
 	)
@@ -45,7 +45,7 @@ func NewConsensus(
 			config,
 
 			blockchain,
-			protocol,
+			dissAgg,
 			voter,
 			commandCache,
 			committer,

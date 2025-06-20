@@ -86,7 +86,7 @@ func TestAdvanceViewQC(t *testing.T) {
 		committer,
 		consensusRules,
 		ld,
-		consensus.NewHotStuff(
+		consensus.NewClique(
 			depsCore.RuntimeCfg(),
 			votingMachine,
 			ld,

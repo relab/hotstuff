@@ -302,7 +302,7 @@ func initConsensusModules(depsCore *wiring.Core, depsSecure *wiring.Security, se
 			depsSecure.Authority(),
 			viewStates,
 		)
-		disAgg = consensus.NewHotStuff(
+		disAgg = consensus.NewClique(
 			depsCore.RuntimeCfg(),
 			votingMachine,
 			leaderRotation,

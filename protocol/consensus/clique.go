@@ -6,20 +6,20 @@ import (
 	"github.com/relab/hotstuff/modules"
 )
 
-type HotStuff struct {
+type Clique struct {
 	config         *core.RuntimeConfig
 	votingMachine  *VotingMachine
 	leaderRotation modules.LeaderRotation
 	sender         modules.Sender
 }
 
-func NewHotStuff(
+func NewClique(
 	config *core.RuntimeConfig,
 	votingMachine *VotingMachine,
 	leaderRotation modules.LeaderRotation,
 	sender modules.Sender,
-) *HotStuff {
-	return &HotStuff{
+) *Clique {
+	return &Clique{
 		config:         config,
 		votingMachine:  votingMachine,
 		leaderRotation: leaderRotation,
@@ -28,7 +28,7 @@ func NewHotStuff(
 }
 
 // Disseminate stores a vote for the proposal and broadcasts the proposal.
-func (hs *HotStuff) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
+func (hs *Clique) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	hs.votingMachine.CollectVote(hotstuff.VoteMsg{
 		ID:          hs.config.ID(),
 		PartialCert: pc,
@@ -38,7 +38,7 @@ func (hs *HotStuff) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.Parti
 }
 
 // Aggregate aggregates the vote or stores it if the replica is leader in the next view.
-func (hs *HotStuff) Aggregate(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
+func (hs *Clique) Aggregate(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	leaderID := hs.leaderRotation.GetLeader(lastVote + 1)
 	if leaderID == hs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.
@@ -52,5 +52,5 @@ func (hs *HotStuff) Aggregate(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc
 	return hs.sender.Vote(leaderID, pc)
 }
 
-var _ modules.Aggregator = (*HotStuff)(nil)
-var _ modules.Disseminator = (*HotStuff)(nil)
+var _ modules.Aggregator = (*Clique)(nil)
+var _ modules.Disseminator = (*Clique)(nil)

@@ -108,7 +108,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		depsSecurity.Authority(),
 		node.viewStates,
 	)
-	protocol := consensus.NewHotStuff(
+	dissAgg := consensus.NewClique(
 		node.config,
 		votingMachine,
 		node.leaderRotation,
@@ -118,7 +118,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		node.config,
 		node.leaderRotation,
 		consensusRules,
-		protocol,
+		dissAgg,
 		depsSecurity.Authority(),
 		committer,
 	)
@@ -126,7 +126,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		node.eventLoop,
 		node.config,
 		node.blockchain,
-		protocol,
+		dissAgg,
 		node.voter,
 		node.commandCache,
 		committer,
