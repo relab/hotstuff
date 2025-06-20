@@ -31,6 +31,7 @@ func wireUpProposer(
 	t.Helper()
 	consensusRules := chainedhotstuff.New(
 		essentials.Logger(),
+		essentials.RuntimeCfg(),
 		essentials.BlockChain(),
 	)
 	viewStates, err := protocol.NewViewStates(
@@ -72,6 +73,7 @@ func wireUpProposer(
 		essentials.EventLoop(),
 		essentials.RuntimeCfg(),
 		essentials.BlockChain(),
+		consensusRules,
 		disAgg,
 		voter,
 		commandCache,

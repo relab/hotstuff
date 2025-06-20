@@ -78,7 +78,5 @@ func NewFork(
 
 var (
 	_ modules.HotstuffRuleset = (*Silence)(nil)
-	_ modules.ProposeRuler    = (*Silence)(nil)
 	_ modules.HotstuffRuleset = (*Fork)(nil)
-	_ modules.ProposeRuler    = (*Fork)(nil)
 )

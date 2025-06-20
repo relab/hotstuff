@@ -84,8 +84,10 @@ const fhsBugScenario = `
 }
 `
 
-var logLevel = flag.String("log-level", "info", "set the log level")
-var logAll = flag.Bool("log-all", false, "print all logs on success")
+var (
+	logLevel = flag.String("log-level", "info", "set the log level")
+	logAll   = flag.Bool("log-all", false, "print all logs on success")
+)
 
 func TestFHSBug(t *testing.T) {
 	t.Skip("This test is not working as expected; skipping until we have fixed the issue.")
@@ -133,7 +135,7 @@ func TestFHSBug(t *testing.T) {
 type vulnerableFHS struct {
 	logger     logging.Logger
 	blockchain *blockchain.Blockchain
-	inner      fasthotstuff.FastHotStuff
+	fasthotstuff.FastHotStuff
 }
 
 func NewVulnFHS(
@@ -142,15 +144,10 @@ func NewVulnFHS(
 	inner fasthotstuff.FastHotStuff,
 ) *vulnerableFHS {
 	return &vulnerableFHS{
-		logger:     logger,
-		blockchain: blockchain,
-		inner:      inner,
+		logger:       logger,
+		blockchain:   blockchain,
+		FastHotStuff: inner,
 	}
-}
-
-// VoteRule decides whether to vote for the block.
-func (fhs *vulnerableFHS) VoteRule(view hotstuff.View, proposal hotstuff.ProposeMsg) bool {
-	return fhs.inner.VoteRule(view, proposal)
 }
 
 func (fhs *vulnerableFHS) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
@@ -178,11 +175,6 @@ func (fhs *vulnerableFHS) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 		return grandparent
 	}
 	return nil
-}
-
-// ChainLength returns the number of blocks that need to be chained together in order to commit.
-func (fhs *vulnerableFHS) ChainLength() int {
-	return fhs.inner.ChainLength()
 }
 
 var _ modules.HotstuffRuleset = (*vulnerableFHS)(nil)

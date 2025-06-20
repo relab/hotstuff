@@ -34,11 +34,11 @@ func NewConsensusRules(
 	case "":
 		fallthrough // default to chainedhotstuff if no name is provided
 	case chainedhotstuff.ModuleName:
-		rules = chainedhotstuff.New(logger, blockchain)
+		rules = chainedhotstuff.New(logger, config, blockchain)
 	case fasthotstuff.ModuleName:
 		rules = fasthotstuff.New(logger, config, blockchain)
 	case simplehotstuff.ModuleName:
-		rules = simplehotstuff.New(logger, blockchain)
+		rules = simplehotstuff.New(logger, config, blockchain)
 	default:
 		return nil, fmt.Errorf("invalid consensus name: '%s'", name)
 	}

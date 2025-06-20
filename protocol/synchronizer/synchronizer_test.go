@@ -31,6 +31,7 @@ func wireUpSynchronizer(
 	leaderRotation := fixedleader.New(1)
 	consensusRules := chainedhotstuff.New(
 		essentials.Logger(),
+		essentials.RuntimeCfg(),
 		essentials.BlockChain(),
 	)
 	committer := consensus.NewCommitter(

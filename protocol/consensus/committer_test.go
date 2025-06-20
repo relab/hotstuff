@@ -43,6 +43,7 @@ func TestValidCommit(t *testing.T) {
 	var firstBlock *hotstuff.Block = nil
 	chs := chainedhotstuff.New(
 		essentials.Logger(),
+		essentials.RuntimeCfg(),
 		essentials.BlockChain(),
 	)
 	for range chs.ChainLength() {

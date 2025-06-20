@@ -43,8 +43,8 @@ func NewConsensus(
 		proposer: consensus.NewProposer(
 			eventLoop,
 			config,
-
 			blockchain,
+			consensusRulesModule,
 			disAgg,
 			voter,
 			commandCache,

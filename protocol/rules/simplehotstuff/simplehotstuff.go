@@ -3,7 +3,10 @@ package simplehotstuff
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -14,8 +17,9 @@ const ModuleName = "simplehotstuff"
 // Based on the simplified algorithm described in the paper
 // "Formal Verification of HotStuff" by Leander Jehl.
 type SimpleHotStuff struct {
-	blockchain *blockchain.Blockchain
 	logger     logging.Logger
+	config     *core.RuntimeConfig
+	blockchain *blockchain.Blockchain
 
 	locked *hotstuff.Block
 }
@@ -23,11 +27,13 @@ type SimpleHotStuff struct {
 // New returns a new SimpleHotStuff instance.
 func New(
 	logger logging.Logger,
+	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 ) *SimpleHotStuff {
 	return &SimpleHotStuff{
-		blockchain: blockchain,
 		logger:     logger,
+		config:     config,
+		blockchain: blockchain,
 
 		locked: hotstuff.GetGenesis(),
 	}
@@ -88,3 +94,24 @@ func (hs *SimpleHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 func (hs *SimpleHotStuff) ChainLength() int {
 	return 3
 }
+
+// ProposeRule implements the default propose ruler.
+func (hs *SimpleHotStuff) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
+	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
+	proposal = hotstuff.ProposeMsg{
+		ID: hs.config.ID(),
+		Block: hotstuff.NewBlock(
+			qc.BlockHash(),
+			qc,
+			cmd,
+			view,
+			hs.config.ID(),
+		),
+	}
+	if aggQC, ok := cert.AggQC(); ok && hs.config.HasAggregateQC() {
+		proposal.AggregateQC = &aggQC
+	}
+	return proposal, true
+}
+
+var _ modules.HotstuffRuleset = (*SimpleHotStuff)(nil)

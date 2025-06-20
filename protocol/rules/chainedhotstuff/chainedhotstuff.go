@@ -3,7 +3,10 @@ package chainedhotstuff
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -12,6 +15,7 @@ const ModuleName = "chainedhotstuff"
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {
 	logger     logging.Logger
+	config     *core.RuntimeConfig
 	blockchain *blockchain.Blockchain
 
 	// protocol variables
@@ -22,11 +26,13 @@ type ChainedHotStuff struct {
 // New returns a new chainedhotstuff instance.
 func New(
 	logger logging.Logger,
+	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 ) *ChainedHotStuff {
 	return &ChainedHotStuff{
-		blockchain: blockchain,
 		logger:     logger,
+		config:     config,
+		blockchain: blockchain,
 
 		bLock: hotstuff.GetGenesis(),
 	}
@@ -100,3 +106,24 @@ func (hs *ChainedHotStuff) VoteRule(_ hotstuff.View, proposal hotstuff.ProposeMs
 func (hs *ChainedHotStuff) ChainLength() int {
 	return 3
 }
+
+// ProposeRule implements the default propose ruler.
+func (hs *ChainedHotStuff) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
+	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
+	proposal = hotstuff.ProposeMsg{
+		ID: hs.config.ID(),
+		Block: hotstuff.NewBlock(
+			qc.BlockHash(),
+			qc,
+			cmd,
+			view,
+			hs.config.ID(),
+		),
+	}
+	if aggQC, ok := cert.AggQC(); ok && hs.config.HasAggregateQC() {
+		proposal.AggregateQC = &aggQC
+	}
+	return proposal, true
+}
+
+var _ modules.HotstuffRuleset = (*ChainedHotStuff)(nil)

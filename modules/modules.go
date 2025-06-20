@@ -22,21 +22,22 @@ type CommitRuler interface {
 	CommitRule(*hotstuff.Block) *hotstuff.Block
 }
 
+// ProposeRuler is an interface that adds a ProposeRule method.
+// This allows implementors to specify how new blocks are created.
+type ProposeRuler interface {
+	// ProposeRule creates a new proposal.
+	ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool)
+}
+
 // HotstuffRuleset is the minimum interface that a Hotstuff variant implements.
 // It combines VoteRuler and CommitRuler since they are mandatory. Some variants
 // may implement ProposeRuler.
 type HotstuffRuleset interface {
 	VoteRuler
 	CommitRuler
+	ProposeRuler
 	// ChainLength returns the number of blocks that need to be chained together in order to commit.
 	ChainLength() int
-}
-
-// ProposeRuler is an interface that adds a ProposeRule method.
-// This allows implementors to specify how new blocks are created.
-type ProposeRuler interface {
-	// ProposeRule creates a new proposal.
-	ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool)
 }
 
 // LeaderRotation implements a leader rotation scheme.
