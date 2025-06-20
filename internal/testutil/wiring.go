@@ -22,17 +22,18 @@ type Essentials struct {
 func WireUpEssentials(
 	t *testing.T,
 	id hotstuff.ID,
+	cryptoName string,
 	opts ...core.RuntimeOption,
 ) *Essentials {
 	t.Helper()
-	depsCore := wiring.NewCore(id, "test", GenerateECDSAKey(t), opts...)
+	depsCore := wiring.NewCore(id, "test", GenerateKey(t, cryptoName), opts...)
 	sender := NewMockSender(id)
 	depsSecurity, err := wiring.NewSecurity(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		sender,
-		cryptoName, // will always usde ecdsa for simplicity
+		cryptoName,
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -6,7 +6,6 @@ import (
 	"cuelang.org/go/pkg/time"
 	"github.com/relab/hotstuff"
 
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol"
@@ -78,39 +77,11 @@ func wireUpSynchronizer(
 		viewStates,
 		essentials.MockSender(),
 	)
-
 	return synchronizer
 }
 
-func makeSigners(t *testing.T, leaderCfg *core.RuntimeConfig, leaderAuth *cert.Authority) []*cert.Authority {
-	signers := make([]*cert.Authority, 0)
-	signers = append(signers, leaderAuth)
-	const n = 4
-	for i := range n - 1 {
-		id := hotstuff.ID(i + 2)
-		pk := testutil.GenerateECDSAKey(t)
-		core := wiring.NewCore(id, "test", pk)
-		leaderCfg.AddReplica(&hotstuff.ReplicaInfo{
-			ID:     id,
-			PubKey: pk.Public(),
-		})
-		security, err := wiring.NewSecurity(
-			core.EventLoop(),
-			core.Logger(),
-			core.RuntimeCfg(),
-			testutil.NewMockSender(id),
-			cryptoName,
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		signers = append(signers, security.Authority())
-	}
-	return signers
-}
-
 func TestAdvanceViewQC(t *testing.T) {
-	essentials := testutil.WireUpEssentials(t, 1)
+	essentials := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
 	viewStates, err := protocol.NewViewStates(
 		essentials.BlockChain(),
 		essentials.Authority(),
@@ -136,7 +107,18 @@ func TestAdvanceViewQC(t *testing.T) {
 		1,
 	)
 	blockchain.Store(block)
-	signers := makeSigners(t, essentials.RuntimeCfg(), essentials.Authority())
+	signers := make([]*cert.Authority, 0)
+	signers = append(signers, essentials.Authority())
+	for i := range 3 {
+		id := hotstuff.ID(i + 2)
+		replica := testutil.WireUpEssentials(t, id, ecdsa.ModuleName)
+		essentials.RuntimeCfg().AddReplica(&hotstuff.ReplicaInfo{
+			ID:     id,
+			PubKey: replica.RuntimeCfg().PrivateKey().Public(),
+		})
+		signers = append(signers, replica.Authority())
+	}
+
 	qc := testutil.CreateQC(t, block, signers)
 	proposer := synchronizer.proposer // TODO(AlanRostem): not very clean, refactor
 	commandCache.Add(&clientpb.Command{
@@ -160,7 +142,7 @@ func TestAdvanceViewQC(t *testing.T) {
 }
 
 func TestAdvanceViewTC(t *testing.T) {
-	essentials := testutil.WireUpEssentials(t, 1)
+	essentials := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
 	essentials.MockSender().AddBlockChain(essentials.BlockChain())
 	viewStates, err := protocol.NewViewStates(
 		essentials.BlockChain(),
@@ -172,7 +154,18 @@ func TestAdvanceViewTC(t *testing.T) {
 	commandCache := clientpb.NewCommandCache(1)
 	synchronizer := wireUpSynchronizer(t, essentials, commandCache, viewStates)
 
-	signers := makeSigners(t, essentials.RuntimeCfg(), essentials.Authority())
+	signers := make([]*cert.Authority, 0)
+	signers = append(signers, essentials.Authority())
+	for i := range 3 {
+		id := hotstuff.ID(i + 2)
+		replica := testutil.WireUpEssentials(t, id, ecdsa.ModuleName)
+		essentials.RuntimeCfg().AddReplica(&hotstuff.ReplicaInfo{
+			ID:     id,
+			PubKey: replica.RuntimeCfg().PrivateKey().Public(),
+		})
+		signers = append(signers, replica.Authority())
+	}
+
 	tc := testutil.CreateTC(t, 1, signers)
 
 	proposer := synchronizer.proposer // TODO(AlanRostem): not very clean, refactor

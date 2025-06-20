@@ -10,6 +10,8 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/security/crypto/bls12"
+	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto/eddsa"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 )
 
@@ -173,4 +175,17 @@ func GenerateBLS12Key(t *testing.T) hotstuff.PrivateKey {
 		t.Fatalf("Failed to generate private key: %v", err)
 	}
 	return key
+}
+
+func GenerateKey(t *testing.T, cryptoName string) hotstuff.PrivateKey {
+	switch cryptoName {
+	case ecdsa.ModuleName:
+		return GenerateECDSAKey(t)
+	case eddsa.ModuleName:
+		return GenerateEDDSAKey(t)
+	case bls12.ModuleName:
+		return GenerateBLS12Key(t)
+	default:
+		panic("incorrect crypto module name")
+	}
 }

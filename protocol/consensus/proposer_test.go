@@ -13,6 +13,7 @@ import (
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/votingmachine"
+	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/wiring"
 )
 
@@ -86,7 +87,7 @@ type replica struct {
 
 func TestPropose(t *testing.T) {
 	id := hotstuff.ID(1)
-	essentials := testutil.WireUpEssentials(t, id)
+	essentials := testutil.WireUpEssentials(t, id, ecdsa.ModuleName)
 	// add the blockchains to the proposer's mock sender
 	essentials.MockSender().AddBlockChain(essentials.BlockChain())
 	command := &clientpb.Command{
