@@ -60,16 +60,14 @@ func (c *Carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 
 	var (
 		block       = commitHead
+		genesis     = hotstuff.GetGenesis()
 		f           = hotstuff.NumFaulty(c.config.ReplicaCount())
-		i           = 0
 		lastAuthors = make([]hotstuff.ID, 0, f)
 		ok          = true
 	)
-
-	for ok && i < f && block != hotstuff.GetGenesis() {
+	for i := 0; ok && i < f && block != genesis; i++ {
 		lastAuthors = append(lastAuthors, block.Proposer())
 		block, ok = c.blockchain.Get(block.Parent())
-		i++
 	}
 
 	candidates := make([]hotstuff.ID, 0, c.config.ReplicaCount()-f)
