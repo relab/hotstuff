@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/core/logging"
-	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
+	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/twins"
 )
 
@@ -32,7 +32,7 @@ func TestTwins(t *testing.T) {
 		if err != nil {
 			break
 		}
-		result, err := twins.ExecuteScenario(s, numNodes, numTwins, 100, "chainedhotstuff")
+		result, err := twins.ExecuteScenario(s, numNodes, numTwins, 100, chainedhotstuff.ModuleName)
 		if err != nil {
 			t.Fatal(err)
 		}

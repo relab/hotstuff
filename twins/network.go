@@ -3,7 +3,6 @@ package twins
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"maps"
 	"reflect"
@@ -219,10 +218,12 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 	return n
 }
 
-func (n *Network) createTwinsNodes(nodes []NodeID, consensusName string) (errs error) {
+func (n *Network) createTwinsNodes(nodes []NodeID, consensusName string) error {
 	for _, nodeID := range nodes {
 		node, err := newNode(n, nodeID, consensusName)
-		errs = errors.Join(errs, err)
+		if err != nil {
+			return fmt.Errorf("failed to create node %v: %w", nodeID, err)
+		}
 		n.nodes[nodeID.NetworkID] = node
 		n.replicas[nodeID.ReplicaID] = append(n.replicas[nodeID.ReplicaID], node)
 	}
@@ -240,7 +241,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, consensusName string) (errs e
 			})
 		}
 	}
-	return
+	return nil
 }
 
 func (n *Network) run(ticks int) {
