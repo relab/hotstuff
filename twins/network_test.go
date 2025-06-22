@@ -119,6 +119,7 @@ func TestNetworkSubConfigBroadcastMessage(t *testing.T) {
 }
 
 func createNetwork(t *testing.T, numNodes int) (*Network, []*emulatedSender) {
+	t.Helper()
 	network := NewSimpleNetwork(numNodes)
 	// create 4 nodes without twins
 	nodes, _ := assignNodeIDs(uint8(numNodes), 0)
@@ -136,7 +137,8 @@ func createNetwork(t *testing.T, numNodes int) (*Network, []*emulatedSender) {
 func checkAppendedMessages(t *testing.T, name string, netMessages, want []pendingMessage) {
 	t.Helper()
 	if len(netMessages) < len(want) {
-		t.Fatalf("%s: got %d network messages, want at least %d", name, len(netMessages), len(want))
+		t.Errorf("%s: got %d network messages, want at least %d", name, len(netMessages), len(want))
+		return
 	}
 	// only last len(want) network messages are relevant for this test
 	got := slices.Clone(netMessages[len(netMessages)-len(want):])
@@ -157,6 +159,7 @@ func checkAppendedMessages(t *testing.T, name string, netMessages, want []pendin
 }
 
 func checkAllMessages(t *testing.T, got []pendingMessage, want []pendingMessage) {
+	t.Helper()
 	// Sort the got pending messages for comparison with the want pending messages.
 	// This is necessary because broadcasting message iterates over the receivers
 	// in a random order, since they are stored in a map (receivers=network.replicas).
