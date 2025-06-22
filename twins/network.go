@@ -75,11 +75,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 	}
 	node.logger = logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
 	node.eventLoop = eventloop.New(node.logger, 100)
-	node.sender = &emulatedSender{
-		node:      node,
-		network:   n,
-		subConfig: hotstuff.NewIDSet(),
-	}
+	node.sender = n.NewSender(node)
 	depsSecurity, err := wiring.NewSecurity(
 		node.eventLoop,
 		node.logger,
@@ -237,7 +233,7 @@ func (n *Network) createTwinsNodes(nodes []NodeID, consensusName string) (errs e
 			if node.id.ReplicaID == otherNode.id.ReplicaID {
 				continue
 			}
-			node.sender.subConfig.Add(otherNode.id.ReplicaID)
+			node.sender.subConfig = append(node.sender.subConfig, otherNode.id.ReplicaID)
 			config.AddReplica(&hotstuff.ReplicaInfo{
 				ID:     otherNode.config.ID(),
 				PubKey: otherNode.config.PrivateKey().Public(),
@@ -334,7 +330,7 @@ func (n *Network) NewSender(node *node) *emulatedSender {
 type emulatedSender struct {
 	node      *node
 	network   *Network
-	subConfig hotstuff.IDSet
+	subConfig []hotstuff.ID
 }
 
 var _ modules.Sender = (*emulatedSender)(nil)
@@ -344,7 +340,7 @@ func (s *emulatedSender) broadcastMessage(message any) {
 		if id == s.node.id.ReplicaID {
 			// do not send message to self or twin
 			continue
-		} else if s.subConfig == nil || s.subConfig.Contains(id) {
+		} else if len(s.subConfig) == 0 || slices.Contains(s.subConfig, id) {
 			s.sendMessage(id, message)
 		}
 	}
@@ -380,14 +376,10 @@ func (s *emulatedSender) shouldDrop(id NodeID, message any) bool {
 
 // GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
 func (s *emulatedSender) Sub(ids []hotstuff.ID) (sub modules.Sender, err error) {
-	subConfig := hotstuff.NewIDSet()
-	for _, id := range ids {
-		subConfig.Add(id)
-	}
 	return &emulatedSender{
 		node:      s.node,
 		network:   s.network,
-		subConfig: subConfig,
+		subConfig: ids,
 	}, nil
 }
 
