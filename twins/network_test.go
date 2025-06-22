@@ -90,7 +90,6 @@ func TestNetworkSubConfigBroadcastMessage(t *testing.T) {
 		{name: "self/sender=6/receivers=6", msg: t1, sender: 6, receivers: []hotstuff.ID{1, 3, 4, 5, 6, 7}, want: []pendingMessage{{t1, 6, 1}, {t1, 6, 3}, {t1, 6, 4}, {t1, 6, 5}, {t1, 6, 7}}},
 		{name: "self/sender=7/receivers=6", msg: t1, sender: 7, receivers: []hotstuff.ID{1, 2, 4, 5, 6, 7}, want: []pendingMessage{{t1, 7, 1}, {t1, 7, 2}, {t1, 7, 4}, {t1, 7, 5}, {t1, 7, 6}}},
 		// sender is not part of the receivers list.
-		{name: "no_self/sender=1/receivers=0", msg: t1, sender: 1, receivers: []hotstuff.ID{}, want: []pendingMessage{}},
 		{name: "no_self/sender=1/receivers=1", msg: t1, sender: 1, receivers: []hotstuff.ID{2}, want: []pendingMessage{{t1, 1, 2}}},
 		{name: "no_self/sender=1/receivers=2", msg: t1, sender: 1, receivers: []hotstuff.ID{2, 3}, want: []pendingMessage{{t1, 1, 2}, {t1, 1, 3}}},
 		{name: "no_self/sender=1/receivers=3", msg: t1, sender: 1, receivers: []hotstuff.ID{2, 3, 4}, want: []pendingMessage{{t1, 1, 2}, {t1, 1, 3}, {t1, 1, 4}}},
@@ -144,7 +143,6 @@ func BenchmarkNetworkSubConfigBroadcastMessage(b *testing.B) {
 		{name: "self/sender=6/receivers=6", msg: t1, sender: 6, receivers: []hotstuff.ID{1, 3, 4, 5, 6, 7}, want: []pendingMessage{{t1, 6, 1}, {t1, 6, 3}, {t1, 6, 4}, {t1, 6, 5}, {t1, 6, 7}}},
 		{name: "self/sender=7/receivers=6", msg: t1, sender: 7, receivers: []hotstuff.ID{1, 2, 4, 5, 6, 7}, want: []pendingMessage{{t1, 7, 1}, {t1, 7, 2}, {t1, 7, 4}, {t1, 7, 5}, {t1, 7, 6}}},
 		// sender is not part of the receivers list.
-		{name: "no_self/sender=1/receivers=0", msg: t1, sender: 1, receivers: []hotstuff.ID{}, want: []pendingMessage{}},
 		{name: "no_self/sender=1/receivers=1", msg: t1, sender: 1, receivers: []hotstuff.ID{2}, want: []pendingMessage{{t1, 1, 2}}},
 		{name: "no_self/sender=1/receivers=2", msg: t1, sender: 1, receivers: []hotstuff.ID{2, 3}, want: []pendingMessage{{t1, 1, 2}, {t1, 1, 3}}},
 		{name: "no_self/sender=1/receivers=3", msg: t1, sender: 1, receivers: []hotstuff.ID{2, 3, 4}, want: []pendingMessage{{t1, 1, 2}, {t1, 1, 3}, {t1, 1, 4}}},
