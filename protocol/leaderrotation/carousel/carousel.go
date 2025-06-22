@@ -62,12 +62,12 @@ func (c *Carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 		block       = commitHead
 		f           = hotstuff.NumFaulty(c.config.ReplicaCount())
 		i           = 0
-		lastAuthors = hotstuff.NewIDSet()
+		lastAuthors = make([]hotstuff.ID, 0, f)
 		ok          = true
 	)
 
 	for ok && i < f && block != hotstuff.GetGenesis() {
-		lastAuthors.Add(block.Proposer())
+		lastAuthors = append(lastAuthors, block.Proposer())
 		block, ok = c.blockchain.Get(block.Parent())
 		i++
 	}
@@ -75,7 +75,7 @@ func (c *Carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 	candidates := make([]hotstuff.ID, 0, c.config.ReplicaCount()-f)
 
 	commitHead.QuorumCert().Signature().Participants().ForEach(func(id hotstuff.ID) {
-		if !lastAuthors.Contains(id) {
+		if !slices.Contains(lastAuthors, id) {
 			candidates = append(candidates, id)
 		}
 	})
