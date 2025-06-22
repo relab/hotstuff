@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/test"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 )
 
@@ -68,7 +69,7 @@ func TestNetworkBroadcastMessage(t *testing.T) {
 }
 
 func TestNetworkSubConfigBroadcastMessage(t *testing.T) {
-	network, senders := createNetwork(t, 7)
+	_, senders := createNetwork(t, 7)
 
 	t1 := hotstuff.TimeoutMsg{ID: 1, View: 1}
 	tests := []struct {
@@ -110,7 +111,7 @@ func TestNetworkSubConfigBroadcastMessage(t *testing.T) {
 		// using the Timeout call to broadcast to the subconfiguration.
 		sub.Timeout(tt.msg)
 		// needed to access network.pendingMessages
-		network = sub.(*emulatedSender).network
+		network := sub.(*emulatedSender).network
 		checkAppendedMessages(t, tt.name, network.pendingMessages, tt.want)
 		gotPendingMessages = append(gotPendingMessages, network.pendingMessages...)
 		wantPendingMessages = append(wantPendingMessages, tt.want...)
@@ -121,51 +122,38 @@ func TestNetworkSubConfigBroadcastMessage(t *testing.T) {
 }
 
 func BenchmarkNetworkSubConfigBroadcastMessage(b *testing.B) {
-	network, senders := createNetwork(b, 7)
+	_, senders := createNetwork(b, 7)
 
 	t1 := hotstuff.TimeoutMsg{ID: 1, View: 1}
 	tests := []struct {
-		name      string
 		msg       hotstuff.TimeoutMsg
 		sender    hotstuff.ID
 		receivers []hotstuff.ID
-		want      []pendingMessage
 	}{
 		// sender is also part of the receivers list, but it will not send to itself.
-		{name: "self/sender=1/receivers=1", msg: t1, sender: 1, receivers: []hotstuff.ID{1}, want: []pendingMessage{}},
-		{name: "self/sender=1/receivers=2", msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2}, want: []pendingMessage{{t1, 1, 2}}},
-		{name: "self/sender=1/receivers=3", msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2, 3}, want: []pendingMessage{{t1, 1, 2}, {t1, 1, 3}}},
-		{name: "self/sender=1/receivers=4", msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2, 3, 4}, want: []pendingMessage{{t1, 1, 2}, {t1, 1, 3}, {t1, 1, 4}}},
-		{name: "self/sender=2/receivers=5", msg: t1, sender: 2, receivers: []hotstuff.ID{1, 2, 3, 4, 5}, want: []pendingMessage{{t1, 2, 1}, {t1, 2, 3}, {t1, 2, 4}, {t1, 2, 5}}},
-		{name: "self/sender=3/receivers=6", msg: t1, sender: 3, receivers: []hotstuff.ID{1, 2, 3, 4, 5, 6}, want: []pendingMessage{{t1, 3, 1}, {t1, 3, 2}, {t1, 3, 4}, {t1, 3, 5}, {t1, 3, 6}}},
-		{name: "self/sender=4/receivers=7", msg: t1, sender: 4, receivers: []hotstuff.ID{1, 2, 3, 4, 5, 6, 7}, want: []pendingMessage{{t1, 4, 1}, {t1, 4, 2}, {t1, 4, 3}, {t1, 4, 5}, {t1, 4, 6}, {t1, 4, 7}}},
-		{name: "self/sender=5/receivers=6", msg: t1, sender: 5, receivers: []hotstuff.ID{2, 3, 4, 5, 6, 7}, want: []pendingMessage{{t1, 5, 2}, {t1, 5, 3}, {t1, 5, 4}, {t1, 5, 6}, {t1, 5, 7}}},
-		{name: "self/sender=6/receivers=6", msg: t1, sender: 6, receivers: []hotstuff.ID{1, 3, 4, 5, 6, 7}, want: []pendingMessage{{t1, 6, 1}, {t1, 6, 3}, {t1, 6, 4}, {t1, 6, 5}, {t1, 6, 7}}},
-		{name: "self/sender=7/receivers=6", msg: t1, sender: 7, receivers: []hotstuff.ID{1, 2, 4, 5, 6, 7}, want: []pendingMessage{{t1, 7, 1}, {t1, 7, 2}, {t1, 7, 4}, {t1, 7, 5}, {t1, 7, 6}}},
-		// sender is not part of the receivers list.
-		{name: "no_self/sender=1/receivers=1", msg: t1, sender: 1, receivers: []hotstuff.ID{2}, want: []pendingMessage{{t1, 1, 2}}},
-		{name: "no_self/sender=1/receivers=2", msg: t1, sender: 1, receivers: []hotstuff.ID{2, 3}, want: []pendingMessage{{t1, 1, 2}, {t1, 1, 3}}},
-		{name: "no_self/sender=1/receivers=3", msg: t1, sender: 1, receivers: []hotstuff.ID{2, 3, 4}, want: []pendingMessage{{t1, 1, 2}, {t1, 1, 3}, {t1, 1, 4}}},
-		{name: "no_self/sender=2/receivers=4", msg: t1, sender: 2, receivers: []hotstuff.ID{1, 3, 4, 5}, want: []pendingMessage{{t1, 2, 1}, {t1, 2, 3}, {t1, 2, 4}, {t1, 2, 5}}},
-		{name: "no_self/sender=3/receivers=5", msg: t1, sender: 3, receivers: []hotstuff.ID{1, 2, 4, 5, 6}, want: []pendingMessage{{t1, 3, 1}, {t1, 3, 2}, {t1, 3, 4}, {t1, 3, 5}, {t1, 3, 6}}},
-		{name: "no_self/sender=4/receivers=6", msg: t1, sender: 4, receivers: []hotstuff.ID{1, 2, 3, 5, 6, 7}, want: []pendingMessage{{t1, 4, 1}, {t1, 4, 2}, {t1, 4, 3}, {t1, 4, 5}, {t1, 4, 6}, {t1, 4, 7}}},
-		{name: "no_self/sender=5/receivers=5", msg: t1, sender: 5, receivers: []hotstuff.ID{2, 3, 4, 6, 7}, want: []pendingMessage{{t1, 5, 2}, {t1, 5, 3}, {t1, 5, 4}, {t1, 5, 6}, {t1, 5, 7}}},
-		{name: "no_self/sender=6/receivers=5", msg: t1, sender: 6, receivers: []hotstuff.ID{1, 3, 4, 5, 7}, want: []pendingMessage{{t1, 6, 1}, {t1, 6, 3}, {t1, 6, 4}, {t1, 6, 5}, {t1, 6, 7}}},
-		{name: "no_self/sender=7/receivers=5", msg: t1, sender: 7, receivers: []hotstuff.ID{1, 2, 4, 5, 6}, want: []pendingMessage{{t1, 7, 1}, {t1, 7, 2}, {t1, 7, 4}, {t1, 7, 5}, {t1, 7, 6}}},
+		{msg: t1, sender: 1, receivers: []hotstuff.ID{1}},
+		{msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2}},
+		{msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2, 3}},
+		{msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2, 3, 4}},
+		{msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2, 3, 4, 5}},
+		{msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2, 3, 4, 5, 6}},
+		{msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2, 3, 4, 5, 6, 7}},
 	}
-	for b.Loop() {
-		for _, tt := range tests {
-			sender := senders[tt.sender-1]
-			sub, err := sender.Sub(tt.receivers)
-			if err != nil {
-				b.Fatalf("Failed to create subconfiguration: %v", err)
+	for _, tt := range tests {
+		b.Run(test.Name([]string{"receivers"}, len(tt.receivers)), func(b *testing.B) {
+			for b.Loop() {
+				sender := senders[tt.sender-1]
+				sub, err := sender.Sub(tt.receivers)
+				if err != nil {
+					b.Fatalf("Failed to create subconfiguration: %v", err)
+				}
+				// using the Timeout call to broadcast to the subconfiguration.
+				sub.Timeout(tt.msg)
+				// needed to access network.pendingMessages
+				network := sub.(*emulatedSender).network
+				network.pendingMessages = nil // reset pending messages for the next test
 			}
-			// using the Timeout call to broadcast to the subconfiguration.
-			sub.Timeout(tt.msg)
-			// needed to access network.pendingMessages
-			network = sub.(*emulatedSender).network
-			network.pendingMessages = nil // reset pending messages for the next test
-		}
+		})
 	}
 }
 
