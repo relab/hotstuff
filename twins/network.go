@@ -226,7 +226,7 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 func (n *Network) createTwinsNodes(nodes []NodeID, consensusName string) (errs error) {
 	for _, nodeID := range nodes {
 		node, err := newNode(n, nodeID, consensusName)
-		errs = errors.Join(err)
+		errs = errors.Join(errs, err)
 		n.nodes[nodeID.NetworkID] = node
 		n.replicas[nodeID.ReplicaID] = append(n.replicas[nodeID.ReplicaID], node)
 	}
