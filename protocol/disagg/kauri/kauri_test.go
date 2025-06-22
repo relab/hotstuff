@@ -59,26 +59,7 @@ func BenchmarkSubTree(b *testing.B) {
 				isSubSetMap(subSet, set)
 			}
 		})
-		b.Run("IDSet___/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
-			for b.Loop() {
-				isSubSetIDSet(subSet, set)
-			}
-		})
 	}
-}
-
-// isSubSet returns true if a is a subset of b.
-func isSubSetIDSet(a, b []hotstuff.ID) bool {
-	c := hotstuff.NewIDSet()
-	for _, id := range b {
-		c.Add(id)
-	}
-	for _, id := range a {
-		if !c.Contains(id) {
-			return false
-		}
-	}
-	return true
 }
 
 func isSubSetMap(a, b []hotstuff.ID) bool {
