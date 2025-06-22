@@ -101,7 +101,7 @@ func TestNetworkSubConfigBroadcastMessage(t *testing.T) {
 		{name: "no_self/sender=6/receivers=5", msg: t1, sender: 6, receivers: []hotstuff.ID{1, 3, 4, 5, 7}, want: []pendingMessage{{t1, 6, 1}, {t1, 6, 3}, {t1, 6, 4}, {t1, 6, 5}, {t1, 6, 7}}},
 		{name: "no_self/sender=7/receivers=5", msg: t1, sender: 7, receivers: []hotstuff.ID{1, 2, 4, 5, 6}, want: []pendingMessage{{t1, 7, 1}, {t1, 7, 2}, {t1, 7, 4}, {t1, 7, 5}, {t1, 7, 6}}},
 	}
-	var wantPendingMessages []pendingMessage
+	var gotPendingMessages, wantPendingMessages []pendingMessage
 	for _, tt := range tests {
 		sender := senders[tt.sender-1]
 		sub, err := sender.Sub(tt.receivers)
@@ -110,11 +110,14 @@ func TestNetworkSubConfigBroadcastMessage(t *testing.T) {
 		}
 		// using the Timeout call to broadcast to the subconfiguration.
 		sub.Timeout(tt.msg)
+		// needed to access network.pendingMessages
+		network = sub.(*emulatedSender).network
 		checkAppendedMessages(t, tt.name, network.pendingMessages, tt.want)
+		gotPendingMessages = append(gotPendingMessages, network.pendingMessages...)
 		wantPendingMessages = append(wantPendingMessages, tt.want...)
+		network.pendingMessages = nil // reset pending messages for the next test
 	}
 
-	gotPendingMessages := slices.Clone(network.pendingMessages)
 	checkAllMessages(t, gotPendingMessages, wantPendingMessages)
 }
 
