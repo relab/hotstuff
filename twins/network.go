@@ -165,6 +165,13 @@ type pendingMessage struct {
 	receiver uint32
 }
 
+func (pm pendingMessage) String() string {
+	if pm.message == nil {
+		return fmt.Sprintf("%d→%d", pm.sender, pm.receiver)
+	}
+	return fmt.Sprintf("%d→%d: %v", pm.sender, pm.receiver, pm.message)
+}
+
 // Network is a simulated network that supports twins.
 type Network struct {
 	nodes map[uint32]*node
@@ -185,12 +192,19 @@ type Network struct {
 }
 
 // NewSimpleNetwork creates a simple network.
-func NewSimpleNetwork() *Network {
-	return &Network{
+func NewSimpleNetwork(numNodes int) *Network {
+	allNodesSet := make(NodeSet)
+	for i := 1; i <= numNodes; i++ {
+		allNodesSet.Add(uint32(i))
+	}
+	network := &Network{
 		nodes:     make(map[uint32]*node),
 		replicas:  make(map[hotstuff.ID][]*node),
+		views:     []View{{Leader: 1, Partitions: []NodeSet{allNodesSet}}},
 		dropTypes: make(map[reflect.Type]struct{}),
 	}
+	network.logger = logging.NewWithDest(&network.log, "network")
+	return network
 }
 
 // NewPartitionedNetwork creates a new Network with the specified partitions.
