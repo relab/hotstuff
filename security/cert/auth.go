@@ -101,7 +101,7 @@ func (c *Authority) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.Ti
 func (c *Authority) VerifyPartialCert(cert hotstuff.PartialCert) error {
 	block, ok := c.blockchain.Get(cert.BlockHash())
 	if !ok {
-		return fmt.Errorf("block not found")
+		return fmt.Errorf("block not found: %v", cert.BlockHash())
 	}
 	return c.Verify(cert.Signature(), block.ToBytes())
 }
@@ -126,7 +126,7 @@ func (c *Authority) VerifyQuorumCert(qc hotstuff.QuorumCert) error {
 	}
 	block, ok := c.blockchain.Get(qc.BlockHash())
 	if !ok {
-		return fmt.Errorf("block not found: %s", qc.BlockHash().String())
+		return fmt.Errorf("block not found: %v", qc.BlockHash())
 	}
 	return c.Verify(qc.Signature(), block.ToBytes())
 }
