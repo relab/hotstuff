@@ -22,18 +22,14 @@ func NewConsensus(
 	auth *cert.Authority,
 	commandCache *clientpb.CommandCache,
 	committer *consensus.Committer,
-	consensusRulesModule modules.HotstuffRuleset,
-	leaderRotationModule modules.LeaderRotation,
+	consensusRules consensus.Ruleset,
+	leaderRotation modules.LeaderRotation,
 	disAgg modules.DisseminatorAggregator,
 ) *Consensus {
-	proposerOpts := []consensus.ProposerOption{}
-	if ruler, ok := consensusRulesModule.(modules.ProposeRuler); ok {
-		proposerOpts = append(proposerOpts, consensus.OverrideProposeRule(ruler))
-	}
 	voter := consensus.NewVoter(
 		config,
-		leaderRotationModule,
-		consensusRulesModule,
+		leaderRotation,
+		consensusRules,
 		disAgg,
 		auth,
 		committer,
@@ -43,13 +39,12 @@ func NewConsensus(
 		proposer: consensus.NewProposer(
 			eventLoop,
 			config,
-
 			blockchain,
+			consensusRules,
 			disAgg,
 			voter,
 			commandCache,
 			committer,
-			proposerOpts...,
 		),
 	}
 }

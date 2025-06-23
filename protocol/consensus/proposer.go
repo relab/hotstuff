@@ -6,7 +6,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
@@ -15,10 +14,9 @@ import (
 
 type Proposer struct {
 	eventLoop    *eventloop.EventLoop
-	logger       logging.Logger
 	config       *core.RuntimeConfig
 	blockchain   *blockchain.Blockchain
-	ruler        modules.ProposeRuler
+	ruler        ProposeRuler
 	disseminator modules.Disseminator
 	voter        *Voter
 	commandCache *clientpb.CommandCache
@@ -31,17 +29,17 @@ func NewProposer(
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
+	ruler ProposeRuler,
 	disseminator modules.Disseminator,
 	voter *Voter,
 	commandCache *clientpb.CommandCache,
 	committer *Committer,
-	opts ...ProposerOption,
 ) *Proposer {
-	p := &Proposer{
+	return &Proposer{
 		eventLoop:    eventLoop,
 		config:       config,
 		blockchain:   blockchain,
-		ruler:        nil,
+		ruler:        ruler,
 		disseminator: disseminator,
 		voter:        voter,
 		commandCache: commandCache,
@@ -49,11 +47,6 @@ func NewProposer(
 
 		lastProposed: 0, // genesis block has zero view
 	}
-	p.ruler = p
-	for _, opt := range opts {
-		opt(p)
-	}
-	return p
 }
 
 // markProposed traverses the block history and marks commands as proposed.
@@ -121,24 +114,3 @@ func (p *Proposer) CreateProposal(view hotstuff.View, highQC hotstuff.QuorumCert
 	}
 	return
 }
-
-// ProposeRule implements the default propose ruler.
-func (p *Proposer) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
-	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
-	proposal = hotstuff.ProposeMsg{
-		ID: p.config.ID(),
-		Block: hotstuff.NewBlock(
-			qc.BlockHash(),
-			qc,
-			cmd,
-			view,
-			p.config.ID(),
-		),
-	}
-	if aggQC, ok := cert.AggQC(); ok && p.config.HasAggregateQC() {
-		proposal.AggregateQC = &aggQC
-	}
-	return proposal, true
-}
-
-var _ modules.ProposeRuler = (*Proposer)(nil)
