@@ -278,7 +278,7 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	// check for a TC
 	if tc, ok := syncInfo.TC(); ok {
-		if err := s.auth.VerifyTimeoutCert(s.config.QuorumSize(), tc); err != nil {
+		if err := s.auth.VerifyTimeoutCert(tc); err != nil {
 			s.logger.Infof("Timeout certificate could not be verified: %v", err)
 			return
 		}
@@ -295,7 +295,7 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	// check for an AggQC or QC
 	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.config.HasAggregateQC() {
-		highQC, err := s.auth.VerifyAggregateQC(s.config.QuorumSize(), aggQC)
+		highQC, err := s.auth.VerifyAggregateQC(aggQC)
 		if err != nil {
 			s.logger.Infof("advanceView: Agg-qc could not be verified: %v", err)
 			return

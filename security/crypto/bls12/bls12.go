@@ -47,7 +47,8 @@ func (pub PublicKey) ToBytes() []byte {
 }
 
 // FromBytes unmarshals the public key from a byte slice.
-func (pub *PublicKey) FromBytes(b []byte) (err error) {
+func (pub *PublicKey) FromBytes(b []byte) error {
+	var err error
 	pub.p, err = bls12.NewG1().FromCompressed(b)
 	if err != nil {
 		return fmt.Errorf("bls12: failed to decompress public key: %w", err)
@@ -362,7 +363,7 @@ func (bls *bls12Base) Combine(signatures ...hotstuff.QuorumSignature) (combined 
 }
 
 // Verify verifies the given quorum signature against the message.
-func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte) (err error) {
+func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte) error {
 	s, ok := signature.(*AggregateSignature)
 	if !ok {
 		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
@@ -396,10 +397,7 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 	if errs != nil {
 		return fmt.Errorf("missing one or more public keys: %w", errs)
 	}
-	if err := bls.fastAggregateVerify(pks, message, &s.sig); err != nil {
-		return err
-	}
-	return nil
+	return bls.fastAggregateVerify(pks, message, &s.sig)
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
@@ -431,11 +429,7 @@ func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[
 		}
 		return nil
 	}
-
-	if err := bls.aggregateVerify(pks, msgs, &s.sig); err != nil {
-		return err
-	}
-	return nil
+	return bls.aggregateVerify(pks, msgs, &s.sig)
 }
 
 var _ modules.CryptoBase = (*bls12Base)(nil)

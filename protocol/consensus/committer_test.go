@@ -5,7 +5,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/testutil"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
@@ -16,7 +15,7 @@ func wireUpCommitter(
 	t *testing.T,
 	essentials *testutil.Essentials,
 	viewStates *protocol.ViewStates,
-	commitRuler modules.CommitRuler,
+	commitRuler consensus.CommitRuler,
 ) *consensus.Committer {
 	t.Helper()
 	return consensus.NewCommitter(
@@ -43,6 +42,7 @@ func TestValidCommit(t *testing.T) {
 	var firstBlock *hotstuff.Block = nil
 	chs := chainedhotstuff.New(
 		essentials.Logger(),
+		essentials.RuntimeCfg(),
 		essentials.BlockChain(),
 	)
 	for range chs.ChainLength() {

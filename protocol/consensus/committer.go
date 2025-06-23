@@ -8,7 +8,6 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/security/blockchain"
 )
@@ -19,7 +18,7 @@ type Committer struct {
 	logger     logging.Logger
 	blockchain *blockchain.Blockchain
 	viewStates *protocol.ViewStates
-	ruler      modules.CommitRuler
+	ruler      CommitRuler
 }
 
 func NewCommitter(
@@ -27,7 +26,7 @@ func NewCommitter(
 	logger logging.Logger,
 	blockchain *blockchain.Blockchain,
 	viewStates *protocol.ViewStates,
-	ruler modules.CommitRuler,
+	ruler CommitRuler,
 ) *Committer {
 	return &Committer{
 		eventLoop:  eventLoop,

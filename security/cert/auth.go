@@ -101,7 +101,7 @@ func (c *Authority) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.Ti
 func (c *Authority) VerifyPartialCert(cert hotstuff.PartialCert) error {
 	block, ok := c.blockchain.Get(cert.BlockHash())
 	if !ok {
-		return fmt.Errorf("block not found")
+		return fmt.Errorf("block not found: %v", cert.BlockHash())
 	}
 	return c.Verify(cert.Signature(), block.ToBytes())
 }
@@ -122,30 +122,31 @@ func (c *Authority) VerifyQuorumCert(qc hotstuff.QuorumCert) error {
 	participants := qcSignature.Participants()
 	quorumSize := c.config.QuorumSize()
 	if participants.Len() < quorumSize {
-		return fmt.Errorf("not enough participants to satisfy the quorum requirement: %d/%d", participants.Len(), quorumSize)
+		return fmt.Errorf("%d participants cannot satisfy the quorum requirement: %d", participants.Len(), quorumSize)
 	}
 	block, ok := c.blockchain.Get(qc.BlockHash())
 	if !ok {
-		return fmt.Errorf("block not found: %s", qc.BlockHash().String())
+		return fmt.Errorf("block not found: %v", qc.BlockHash())
 	}
 	return c.Verify(qc.Signature(), block.ToBytes())
 }
 
 // VerifyTimeoutCert verifies a timeout certificate.
-func (c *Authority) VerifyTimeoutCert(quorumSize int, tc hotstuff.TimeoutCert) error {
+func (c *Authority) VerifyTimeoutCert(tc hotstuff.TimeoutCert) error {
 	// view 0 TC is always valid.
 	if tc.View() == 0 {
 		return nil
 	}
+	quorumSize := c.config.QuorumSize()
 	participants := tc.Signature().Participants()
 	if participants.Len() < quorumSize {
-		return fmt.Errorf("not enough participants to satisfy the quorum requirement: %d/%d", participants.Len(), quorumSize)
+		return fmt.Errorf("%d participants cannot satisfy the quorum requirement: %d", participants.Len(), quorumSize)
 	}
 	return c.Verify(tc.Signature(), tc.View().ToBytes())
 }
 
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
-func (c *Authority) VerifyAggregateQC(quorumSize int, aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, err error) {
+func (c *Authority) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, err error) {
 	messages := make(map[hotstuff.ID][]byte)
 	for id, qc := range aggQC.QCs() {
 		if highQC.View() < qc.View() || highQC == (hotstuff.QuorumCert{}) {
@@ -158,9 +159,10 @@ func (c *Authority) VerifyAggregateQC(quorumSize int, aggQC hotstuff.AggregateQC
 			SyncInfo: hotstuff.NewSyncInfo().WithQC(qc),
 		}.ToBytes()
 	}
+	quorumSize := c.config.QuorumSize()
 	participants := aggQC.Sig().Participants()
 	if participants.Len() < quorumSize {
-		return hotstuff.QuorumCert{}, fmt.Errorf("not enough participants to satisfy the quorum requirement: %d/%d", participants.Len(), quorumSize)
+		return hotstuff.QuorumCert{}, fmt.Errorf("%d participants cannot satisfy the quorum requirement: %d", participants.Len(), quorumSize)
 	}
 	// both the batched aggQC signatures and the highQC must be verified
 	if err := c.BatchVerify(aggQC.Sig(), messages); err != nil {
@@ -179,7 +181,7 @@ func (c *Authority) VerifyAnyQC(proposal *hotstuff.ProposeMsg) error {
 	qc := proposal.Block.QuorumCert()
 	aggQC := proposal.AggregateQC
 	if c.config.HasAggregateQC() && aggQC != nil {
-		highQC, err := c.VerifyAggregateQC(c.config.QuorumSize(), *aggQC)
+		highQC, err := c.VerifyAggregateQC(*aggQC)
 		if err != nil {
 			return err
 		}

@@ -174,7 +174,7 @@ func TestVerifyTimeoutCert(t *testing.T) {
 		tc := testutil.CreateTC(t, 1, signers)
 
 		for i, verifier := range signers {
-			if err := verifier.VerifyTimeoutCert(dummies[0].RuntimeCfg().QuorumSize(), tc); err != nil {
+			if err := verifier.VerifyTimeoutCert(tc); err != nil {
 				t.Errorf("verifier %d failed to verify TC: %v", i+1, err)
 			}
 		}
@@ -197,7 +197,7 @@ func TestVerifyAggregateQC(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		highQC, err := signers[0].VerifyAggregateQC(dummies[0].RuntimeCfg().QuorumSize(), aggQC)
+		highQC, err := signers[0].VerifyAggregateQC(aggQC)
 		if err != nil {
 			t.Fatalf("AggregateQC was not verified: %v", err)
 		}
