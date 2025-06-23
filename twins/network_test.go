@@ -168,7 +168,7 @@ func createNetwork(t testing.TB, numNodes int) (*Network, []*emulatedSender) {
 	}
 	senders := make([]*emulatedSender, len(network.nodes))
 	for i, node := range network.nodes {
-		senders[i-1] = network.NewSender(node)
+		senders[i-1] = newSender(network, node)
 	}
 	return network, senders
 }

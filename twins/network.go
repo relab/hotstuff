@@ -8,25 +8,9 @@ import (
 	"reflect"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol"
-	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/disagg/clique"
-	"github.com/relab/hotstuff/protocol/synchronizer"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
-	"github.com/relab/hotstuff/protocol/votingmachine"
-	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/security/cert"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
-	"github.com/relab/hotstuff/security/crypto/keygen"
-	"github.com/relab/hotstuff/wiring"
 )
 
 // NodeID is an ID that is unique to a node in the network.
@@ -39,119 +23,6 @@ type NodeID struct {
 
 func (id NodeID) String() string {
 	return fmt.Sprintf("r%dn%d", id.ReplicaID, id.NetworkID)
-}
-
-type node struct {
-	config         *core.RuntimeConfig
-	logger         logging.Logger
-	sender         *emulatedSender
-	blockchain     *blockchain.Blockchain
-	commandCache   *clientpb.CommandCache
-	voter          *consensus.Voter
-	proposer       *consensus.Proposer
-	eventLoop      *eventloop.EventLoop
-	viewStates     *protocol.ViewStates
-	leaderRotation modules.LeaderRotation
-	synchronizer   *synchronizer.Synchronizer
-	timeoutManager *timeoutManager
-
-	id             NodeID
-	executedBlocks []*hotstuff.Block
-	effectiveView  hotstuff.View
-	log            strings.Builder
-}
-
-func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
-	cryptoName := ecdsa.ModuleName
-	pk, err := keygen.GenerateECDSAPrivateKey()
-	if err != nil {
-		return nil, err
-	}
-	node := &node{
-		id:           nodeID,
-		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVerification()),
-		commandCache: clientpb.NewCommandCache(1),
-	}
-	node.logger = logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
-	node.eventLoop = eventloop.New(node.logger, 100)
-	node.sender = n.NewSender(node)
-	depsSecurity, err := wiring.NewSecurity(
-		node.eventLoop,
-		node.logger,
-		node.config,
-		node.sender,
-		cryptoName,
-		cert.WithCache(100),
-	)
-	if err != nil {
-		return nil, err
-	}
-	node.blockchain = depsSecurity.BlockChain()
-	consensusRules, err := wiring.NewConsensusRules(node.logger, node.config, node.blockchain, consensusName)
-	if err != nil {
-		return nil, err
-	}
-	node.viewStates, err = protocol.NewViewStates(node.blockchain, depsSecurity.Authority())
-	if err != nil {
-		return nil, err
-	}
-	committer := consensus.NewCommitter(node.eventLoop, node.logger, node.blockchain, node.viewStates, consensusRules)
-	node.leaderRotation = leaderRotation(n.views)
-	votingMachine := votingmachine.New(
-		node.logger,
-		node.eventLoop,
-		node.config,
-		depsSecurity.BlockChain(),
-		depsSecurity.Authority(),
-		node.viewStates,
-	)
-	disAgg := clique.New(
-		node.config,
-		votingMachine,
-		node.leaderRotation,
-		node.sender,
-	)
-	node.voter = consensus.NewVoter(
-		node.config,
-		node.leaderRotation,
-		consensusRules,
-		disAgg,
-		depsSecurity.Authority(),
-		committer,
-	)
-	node.proposer = consensus.NewProposer(
-		node.eventLoop,
-		node.config,
-		node.blockchain,
-		disAgg,
-		node.voter,
-		node.commandCache,
-		committer,
-	)
-	node.synchronizer = synchronizer.New(
-		node.eventLoop,
-		node.logger,
-		node.config,
-		depsSecurity.Authority(),
-		node.leaderRotation,
-		viewduration.NewFixed(100*time.Millisecond),
-		node.proposer,
-		node.voter,
-		node.viewStates,
-		node.sender,
-	)
-	node.timeoutManager = newTimeoutManager(n, node, node.eventLoop, node.viewStates)
-	// necessary to count executed commands.
-	node.eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
-		commit := event.(hotstuff.CommitEvent)
-		node.executedBlocks = append(node.executedBlocks, commit.Block)
-	})
-	commandGenerator := &commandGenerator{}
-	for range n.views {
-		cmd := commandGenerator.next()
-		node.commandCache.Add(cmd)
-	}
-	return node, nil
 }
 
 type pendingMessage struct {
@@ -268,7 +139,8 @@ func (n *Network) run(ticks int) {
 	}
 }
 
-// tick performs one tick for each node
+// tick adds pending messages to each node's event loop and subsequently performs one tick for each node,
+// processing each pending message.
 func (n *Network) tick() {
 	for _, msg := range n.pendingMessages {
 		n.nodes[msg.receiver].eventLoop.AddEvent(msg.message)
@@ -320,122 +192,6 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 	return ok
 }
 
-// NewSender returns a new Configuration module for this network.
-func (n *Network) NewSender(node *node) *emulatedSender {
-	return &emulatedSender{
-		network: n,
-		node:    node,
-	}
-}
-
-type emulatedSender struct {
-	node      *node
-	network   *Network
-	subConfig []hotstuff.ID
-}
-
-var _ modules.Sender = (*emulatedSender)(nil)
-
-func (s *emulatedSender) broadcastMessage(message any) {
-	for id := range s.network.replicas {
-		if id == s.node.id.ReplicaID {
-			// do not send message to self or twin
-			continue
-		} else if len(s.subConfig) == 0 || slices.Contains(s.subConfig, id) {
-			s.sendMessage(id, message)
-		}
-	}
-}
-
-func (s *emulatedSender) sendMessage(id hotstuff.ID, message any) {
-	nodes, ok := s.network.replicas[id]
-	if !ok {
-		panic(fmt.Errorf("attempt to send message to unknown replica %d", id))
-	}
-	for _, node := range nodes {
-		if s.shouldDrop(node.id, message) {
-			s.network.logger.Infof("node %v -> node %v: DROP %T(%v)", s.node.id, node.id, message, message)
-			continue
-		}
-		s.network.logger.Infof("node %v -> node %v: SEND %T(%v)", s.node.id, node.id, message, message)
-		s.network.pendingMessages = append(
-			s.network.pendingMessages,
-			pendingMessage{
-				sender:   uint32(s.node.id.NetworkID),
-				receiver: uint32(node.id.NetworkID),
-				message:  message,
-			},
-		)
-	}
-}
-
-// shouldDrop checks if a message to the node identified by id should be dropped.
-func (s *emulatedSender) shouldDrop(id NodeID, message any) bool {
-	// retrieve the drop config for this node.
-	return s.network.shouldDrop(s.node.id.NetworkID, id.NetworkID, message)
-}
-
-// Sub returns a subconfiguration containing the replicas specified in the ids slice.
-func (s *emulatedSender) Sub(ids []hotstuff.ID) (sub modules.Sender, err error) {
-	return &emulatedSender{
-		node:      s.node,
-		network:   s.network,
-		subConfig: ids,
-	}, nil
-}
-
-// Propose sends the block to all replicas in the configuration.
-func (s *emulatedSender) Propose(proposal *hotstuff.ProposeMsg) {
-	// very important to dereference it!
-	s.broadcastMessage(*proposal)
-}
-
-// Timeout sends the timeout message to all replicas.
-func (s *emulatedSender) Timeout(msg hotstuff.TimeoutMsg) {
-	s.broadcastMessage(msg)
-}
-
-// Vote sends the partial cert to the replica.
-func (s *emulatedSender) Vote(id hotstuff.ID, cert hotstuff.PartialCert) error {
-	if _, ok := s.network.replicas[id]; !ok {
-		return fmt.Errorf("replica with id %d not found", id)
-	}
-	s.sendMessage(id, hotstuff.VoteMsg{
-		ID:          s.node.id.ReplicaID,
-		PartialCert: cert,
-	})
-	return nil
-}
-
-// NewView sends the new view message to the replica.
-func (s *emulatedSender) NewView(id hotstuff.ID, si hotstuff.SyncInfo) error {
-	if _, ok := s.network.replicas[id]; !ok {
-		return fmt.Errorf("replica with id %d not found", id)
-	}
-	s.sendMessage(id, hotstuff.NewViewMsg{
-		ID:          s.node.id.ReplicaID,
-		SyncInfo:    si,
-		FromNetwork: true,
-	})
-	return nil
-}
-
-// RequestBlock requests a block from all the replicas in the network.
-func (s *emulatedSender) RequestBlock(_ context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
-	for _, replica := range s.network.replicas {
-		for _, node := range replica {
-			if s.shouldDrop(node.id, hash) {
-				continue
-			}
-			block, ok = node.blockchain.LocalGet(hash)
-			if ok {
-				return block, true
-			}
-		}
-	}
-	return nil, false
-}
-
 // NodeSet is a set of network ids.
 type NodeSet map[uint32]struct{}
 
@@ -473,57 +229,3 @@ func (s *NodeSet) UnmarshalJSON(data []byte) error {
 }
 
 type tick struct{}
-
-type timeoutManager struct {
-	eventLoop  *eventloop.EventLoop
-	viewStates *protocol.ViewStates
-
-	node      *node
-	network   *Network
-	countdown int
-	timeout   int
-}
-
-func (tm *timeoutManager) advance() {
-	tm.countdown--
-	if tm.countdown == 0 {
-		view := tm.viewStates.View()
-		tm.eventLoop.AddEvent(hotstuff.TimeoutEvent{View: view})
-		tm.countdown = tm.timeout
-		if tm.node.effectiveView <= view {
-			tm.node.effectiveView = view + 1
-			tm.network.logger.Infof("node %v effective view is %d due to timeout", tm.node.id, tm.node.effectiveView)
-		}
-	}
-}
-
-func (tm *timeoutManager) viewChange(event hotstuff.ViewChangeEvent) {
-	tm.countdown = tm.timeout
-	if event.Timeout {
-		tm.network.logger.Infof("node %v entered view %d after timeout", tm.node.id, event.View)
-	} else {
-		tm.network.logger.Infof("node %v entered view %d after voting", tm.node.id, event.View)
-	}
-}
-
-func newTimeoutManager(
-	network *Network,
-	node *node,
-	eventLoop *eventloop.EventLoop,
-	viewStates *protocol.ViewStates,
-) *timeoutManager {
-	tm := &timeoutManager{
-		node:       node,
-		network:    network,
-		eventLoop:  eventLoop,
-		viewStates: viewStates,
-		timeout:    5,
-	}
-	tm.eventLoop.RegisterHandler(tick{}, func(_ any) {
-		tm.advance()
-	}, eventloop.Prioritize())
-	tm.eventLoop.RegisterHandler(hotstuff.ViewChangeEvent{}, func(event any) {
-		tm.viewChange(event.(hotstuff.ViewChangeEvent))
-	}, eventloop.Prioritize())
-	return tm
-}
