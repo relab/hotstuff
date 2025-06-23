@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/wiring"
 )
@@ -25,7 +26,7 @@ func WireUpEssentials(
 	t.Helper()
 	// TODO(AlanRostem): runtime options omitted. It's not used by tests, but
 	// I am commenting to make other maintainers aware
-	depsCore := wiring.NewCore(id, "test", GenerateKey(t, cryptoName))
+	depsCore := wiring.NewCore(id, "test", GenerateKey(t, cryptoName), core.WithSyncVerification())
 	sender := NewMockSender(id)
 	depsSecurity, err := wiring.NewSecurity(
 		depsCore.EventLoop(),
