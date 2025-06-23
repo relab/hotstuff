@@ -375,7 +375,7 @@ func (s *emulatedSender) shouldDrop(id NodeID, message any) bool {
 	return s.network.shouldDrop(s.node.id.NetworkID, id.NetworkID, message)
 }
 
-// GetSubConfig returns a subconfiguration containing the replicas specified in the ids slice.
+// Sub returns a subconfiguration containing the replicas specified in the ids slice.
 func (s *emulatedSender) Sub(ids []hotstuff.ID) (sub modules.Sender, err error) {
 	return &emulatedSender{
 		node:      s.node,
@@ -395,6 +395,7 @@ func (s *emulatedSender) Timeout(msg hotstuff.TimeoutMsg) {
 	s.broadcastMessage(msg)
 }
 
+// Vote sends the partial cert to the replica.
 func (s *emulatedSender) Vote(id hotstuff.ID, cert hotstuff.PartialCert) error {
 	if _, ok := s.network.replicas[id]; !ok {
 		return fmt.Errorf("replica with id %d not found", id)
@@ -406,6 +407,7 @@ func (s *emulatedSender) Vote(id hotstuff.ID, cert hotstuff.PartialCert) error {
 	return nil
 }
 
+// NewView sends the new view message to the replica.
 func (s *emulatedSender) NewView(id hotstuff.ID, si hotstuff.SyncInfo) error {
 	if _, ok := s.network.replicas[id]; !ok {
 		return fmt.Errorf("replica with id %d not found", id)
