@@ -8,7 +8,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/security/blockchain"
@@ -90,4 +89,4 @@ func (c *Carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 	return leader
 }
 
-var _ modules.LeaderRotation = (*Carousel)(nil)
+var _ leaderrotation.LeaderRotation = (*Carousel)(nil)

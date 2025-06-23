@@ -7,11 +7,13 @@ import (
 
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/protocol/disagg"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/synchronizer"
+	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/wiring"
 
 	"github.com/relab/hotstuff"
@@ -38,10 +40,10 @@ func New(
 	depsSecure *wiring.Security,
 	sender *network.GorumsSender,
 	viewStates *protocol.ViewStates,
-	disAgg modules.DisseminatorAggregator,
-	leaderRotation modules.LeaderRotation,
+	disAgg disagg.DisseminatorAggregator,
+	leaderRotation leaderrotation.LeaderRotation,
 	consensusRules consensus.Ruleset,
-	viewDuration modules.ViewDuration,
+	viewDuration viewduration.ViewDuration,
 	commandBatchSize uint32,
 	opts ...Option,
 ) (replica *Replica, err error) {

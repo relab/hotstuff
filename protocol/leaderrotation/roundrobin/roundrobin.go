@@ -3,7 +3,6 @@ package roundrobin
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 )
 
@@ -27,4 +26,4 @@ func New(config *core.RuntimeConfig) *RoundRobin {
 	}
 }
 
-var _ modules.LeaderRotation = (*RoundRobin)(nil)
+var _ leaderrotation.LeaderRotation = (*RoundRobin)(nil)

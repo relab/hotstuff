@@ -106,3 +106,5 @@ func New(
 		prevCommitHead: hotstuff.GetGenesis(),
 	}
 }
+
+var _ leaderrotation.LeaderRotation = (*RepBasedLeaderRotation)(nil)

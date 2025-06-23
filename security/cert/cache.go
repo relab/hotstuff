@@ -9,11 +9,11 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 type Cache struct {
-	impl        modules.CryptoBase
+	impl        crypto.Base
 	mut         sync.Mutex
 	capacity    int
 	entries     map[string]*list.Element
@@ -118,4 +118,4 @@ func (cache *Cache) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Qu
 	return cache.impl.Combine(signatures...)
 }
 
-var _ modules.CryptoBase = (*Cache)(nil)
+var _ crypto.Base = (*Cache)(nil)

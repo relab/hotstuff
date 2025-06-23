@@ -3,7 +3,8 @@ package clique
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/disagg"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 )
 
@@ -12,15 +13,15 @@ import (
 type Clique struct {
 	config         *core.RuntimeConfig
 	votingMachine  *votingmachine.VotingMachine
-	leaderRotation modules.LeaderRotation
-	sender         modules.Sender
+	leaderRotation leaderrotation.LeaderRotation
+	sender         core.Sender
 }
 
 func New(
 	config *core.RuntimeConfig,
 	votingMachine *votingmachine.VotingMachine,
-	leaderRotation modules.LeaderRotation,
-	sender modules.Sender,
+	leaderRotation leaderrotation.LeaderRotation,
+	sender core.Sender,
 ) *Clique {
 	return &Clique{
 		config:         config,
@@ -55,5 +56,5 @@ func (hs *Clique) Aggregate(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc h
 	return hs.sender.Vote(leaderID, pc)
 }
 
-var _ modules.Aggregator = (*Clique)(nil)
-var _ modules.Disseminator = (*Clique)(nil)
+var _ disagg.Aggregator = (*Clique)(nil)
+var _ disagg.Disseminator = (*Clique)(nil)

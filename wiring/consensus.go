@@ -4,8 +4,9 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/protocol/disagg"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
 )
@@ -23,8 +24,8 @@ func NewConsensus(
 	commandCache *clientpb.CommandCache,
 	committer *consensus.Committer,
 	consensusRules consensus.Ruleset,
-	leaderRotation modules.LeaderRotation,
-	disAgg modules.DisseminatorAggregator,
+	leaderRotation leaderrotation.LeaderRotation,
+	disAgg disagg.DisseminatorAggregator,
 ) *Consensus {
 	voter := consensus.NewVoter(
 		config,

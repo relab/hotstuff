@@ -4,14 +4,14 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 type Security struct {
 	blockchain *blockchain.Blockchain
-	cryptoImpl modules.CryptoBase
+	cryptoImpl crypto.Base
 	auth       *cert.Authority
 }
 
@@ -20,7 +20,7 @@ func NewSecurity(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-	sender modules.Sender,
+	sender core.Sender,
 	cryptoName string,
 	opts ...cert.Option,
 ) (*Security, error) {
@@ -55,7 +55,7 @@ func (s *Security) BlockChain() *blockchain.Blockchain {
 }
 
 // CryptoImpl returns the crypto implementation.
-func (s *Security) CryptoImpl() modules.CryptoBase {
+func (s *Security) CryptoImpl() crypto.Base {
 	return s.cryptoImpl
 }
 

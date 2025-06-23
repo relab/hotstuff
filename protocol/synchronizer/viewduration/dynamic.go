@@ -3,8 +3,6 @@ package viewduration
 import (
 	"math"
 	"time"
-
-	"github.com/relab/hotstuff/modules"
 )
 
 // NewDynamic returns a ViewDuration that approximates the view duration based on durations of previous views.
@@ -100,4 +98,4 @@ func (v *Dynamic) Duration() time.Duration {
 	return time.Duration(duration * float64(time.Millisecond))
 }
 
-var _ modules.ViewDuration = (*Dynamic)(nil)
+var _ ViewDuration = (*Dynamic)(nil)

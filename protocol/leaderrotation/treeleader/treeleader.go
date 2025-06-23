@@ -3,7 +3,7 @@ package treeleader
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 )
 
 const ModuleName = "tree-leader"
@@ -30,4 +30,4 @@ func (t *TreeLeader) GetLeader(_ hotstuff.View) hotstuff.ID {
 	return t.config.Tree().Root()
 }
 
-var _ modules.LeaderRotation = (*TreeLeader)(nil)
+var _ leaderrotation.LeaderRotation = (*TreeLeader)(nil)

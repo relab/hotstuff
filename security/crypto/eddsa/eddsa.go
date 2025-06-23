@@ -9,7 +9,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/crypto"
 )
 
@@ -171,5 +170,5 @@ var (
 	_ hotstuff.QuorumSignature = (*crypto.Multi[*Signature])(nil)
 	_ hotstuff.IDSet           = (*crypto.Multi[*Signature])(nil)
 	_ crypto.Signature         = (*Signature)(nil)
-	_ modules.CryptoBase       = (*EDDSA)(nil)
+	_ crypto.Base              = (*EDDSA)(nil)
 )
