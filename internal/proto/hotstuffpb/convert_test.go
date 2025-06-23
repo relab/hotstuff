@@ -112,7 +112,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 
 	signer := signers[0]
 
-	if err := signer.VerifyTimeoutCert(cfgs[1].QuorumSize(), tc2); err != nil {
+	if err := signer.VerifyTimeoutCert(tc2); err != nil {
 		t.Fatalf("Failed to verify timeout cert: %v", err)
 	}
 }

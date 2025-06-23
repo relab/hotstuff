@@ -111,7 +111,7 @@ func (ec *ECDSA) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Quoru
 }
 
 // Verify verifies the given quorum signature against the message.
-func (ec *ECDSA) Verify(signature hotstuff.QuorumSignature, message []byte) (err error) {
+func (ec *ECDSA) Verify(signature hotstuff.QuorumSignature, message []byte) error {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
 		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
@@ -128,6 +128,7 @@ func (ec *ECDSA) Verify(signature hotstuff.QuorumSignature, message []byte) (err
 			results <- ec.verifySingle(sig, hash)
 		}(sig, hash)
 	}
+	var err error
 	for range s {
 		err = errors.Join(<-results)
 	}
@@ -177,7 +178,7 @@ func (ec *ECDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotst
 func (ec *ECDSA) verifySingle(sig *Signature, hash hotstuff.Hash) error {
 	replica, ok := ec.config.ReplicaInfo(sig.Signer())
 	if !ok {
-		return fmt.Errorf("ecdsa: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
+		return fmt.Errorf("ecdsa: got signature from replica whose ID (%d) was not in the config", sig.Signer())
 	}
 	pk := replica.PubKey.(*ecdsa.PublicKey)
 	if !ecdsa.Verify(pk, hash[:], sig.R(), sig.S()) {

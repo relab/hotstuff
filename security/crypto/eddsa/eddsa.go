@@ -91,14 +91,14 @@ func (ed *EDDSA) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Quoru
 }
 
 // Verify verifies the given quorum signature against the message.
-func (ed *EDDSA) Verify(signature hotstuff.QuorumSignature, message []byte) (err error) {
+func (ed *EDDSA) Verify(signature hotstuff.QuorumSignature, message []byte) error {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
 		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 	n := signature.Participants().Len()
 	if n == 0 {
-		return fmt.Errorf("expected more than zero participants")
+		return fmt.Errorf("signature mismatch: no participants")
 	}
 
 	results := make(chan error, n)
@@ -107,6 +107,7 @@ func (ed *EDDSA) Verify(signature hotstuff.QuorumSignature, message []byte) (err
 			results <- ed.verifySingle(sig, msg)
 		}(sig, message)
 	}
+	var err error
 	for range s {
 		err = errors.Join(<-results)
 	}
@@ -117,7 +118,7 @@ func (ed *EDDSA) Verify(signature hotstuff.QuorumSignature, message []byte) (err
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
-func (ed *EDDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) (err error) {
+func (ed *EDDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) error {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
 		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
@@ -140,6 +141,7 @@ func (ed *EDDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotst
 			results <- ed.verifySingle(sig, msg)
 		}(sig, message)
 	}
+	var err error
 	for range s {
 		err = errors.Join(<-results)
 	}
