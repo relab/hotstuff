@@ -2,7 +2,7 @@ package fixedleader
 
 import (
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 )
 
 const ModuleName = "fixed"
@@ -25,4 +25,4 @@ func New(
 	}
 }
 
-var _ modules.LeaderRotation = (*FixedLeader)(nil)
+var _ leaderrotation.LeaderRotation = (*FixedLeader)(nil)

@@ -6,8 +6,8 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/testutil"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 )
@@ -18,7 +18,7 @@ func (ld *leaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
 	return hotstuff.ID(view) // simple leader that casts view to leader ID
 }
 
-var _ modules.LeaderRotation = (*leaderRotation)(nil)
+var _ leaderrotation.LeaderRotation = (*leaderRotation)(nil)
 
 func TestDisseminateAggregate(t *testing.T) {
 	essentials := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)

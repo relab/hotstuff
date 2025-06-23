@@ -22,7 +22,6 @@ import (
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/replica"
@@ -38,8 +37,10 @@ import (
 
 	// imported modules
 	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/protocol/disagg"
 	"github.com/relab/hotstuff/protocol/disagg/clique"
 	"github.com/relab/hotstuff/protocol/disagg/kauri"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	_ "github.com/relab/hotstuff/protocol/leaderrotation"
 	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	_ "github.com/relab/hotstuff/protocol/rules/fasthotstuff"
@@ -230,7 +231,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	)
 }
 
-func initConsensusModules(depsCore *wiring.Core, depsSecure *wiring.Security, sender *network.GorumsSender, opts *orchestrationpb.ReplicaOpts) (consensus.Ruleset, *protocol.ViewStates, modules.LeaderRotation, modules.DisseminatorAggregator, modules.ViewDuration, error) {
+func initConsensusModules(depsCore *wiring.Core, depsSecure *wiring.Security, sender *network.GorumsSender, opts *orchestrationpb.ReplicaOpts) (consensus.Ruleset, *protocol.ViewStates, leaderrotation.LeaderRotation, disagg.DisseminatorAggregator, viewduration.ViewDuration, error) {
 	consensusRules, err := wiring.NewConsensusRules(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
@@ -272,8 +273,8 @@ func initConsensusModules(depsCore *wiring.Core, depsSecure *wiring.Security, se
 		return nil, nil, nil, nil, nil, err
 	}
 
-	var disAgg modules.DisseminatorAggregator
-	var viewDuration modules.ViewDuration
+	var disAgg disagg.DisseminatorAggregator
+	var viewDuration viewduration.ViewDuration
 	if depsCore.RuntimeCfg().HasKauriTree() {
 		viewDuration = viewduration.NewFixed(opts.GetInitialTimeout().AsDuration())
 		disAgg = kauri.New(

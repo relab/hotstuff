@@ -9,9 +9,10 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
+	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/cert"
 
 	"github.com/relab/hotstuff"
@@ -25,13 +26,13 @@ type Synchronizer struct {
 
 	auth *cert.Authority
 
-	duration       modules.ViewDuration
-	leaderRotation modules.LeaderRotation
+	duration       viewduration.ViewDuration
+	leaderRotation leaderrotation.LeaderRotation
 	voter          *consensus.Voter
 	proposer       *consensus.Proposer
 	state          *protocol.ViewStates
 
-	sender modules.Sender
+	sender core.Sender
 
 	// A pointer to the last timeout message that we sent.
 	// If a timeout happens again before we advance to the next view,
@@ -55,14 +56,14 @@ func New(
 	auth *cert.Authority,
 
 	// protocol dependencies
-	leaderRotation modules.LeaderRotation,
-	viewDuration modules.ViewDuration,
+	leaderRotation leaderrotation.LeaderRotation,
+	viewDuration viewduration.ViewDuration,
 	proposer *consensus.Proposer,
 	voter *consensus.Voter,
 	state *protocol.ViewStates,
 
 	// network dependencies
-	sender modules.Sender,
+	sender core.Sender,
 ) *Synchronizer {
 	s := &Synchronizer{
 		duration:       viewDuration,

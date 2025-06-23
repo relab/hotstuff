@@ -12,7 +12,6 @@ import (
 	bls12 "github.com/kilic/bls12-381"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/crypto"
 )
 
@@ -148,7 +147,7 @@ type bls12Base struct {
 }
 
 // New returns a new instance of the BLS12 CryptoBase implementation.
-func New(config *core.RuntimeConfig) (modules.CryptoBase, error) {
+func New(config *core.RuntimeConfig) (crypto.Base, error) {
 	bls := &bls12Base{
 		config: config,
 
@@ -432,4 +431,4 @@ func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[
 	return bls.aggregateVerify(pks, msgs, &s.sig)
 }
 
-var _ modules.CryptoBase = (*bls12Base)(nil)
+var _ crypto.Base = (*bls12Base)(nil)

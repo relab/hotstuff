@@ -6,9 +6,9 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/leaderrotation/carousel"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/leaderrotation/reputation"
@@ -19,6 +19,7 @@ import (
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
 	"github.com/relab/hotstuff/security/blockchain"
+	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/security/crypto/eddsa"
@@ -71,7 +72,7 @@ func newCryptoModule(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	name string,
-) (impl modules.CryptoBase, err error) {
+) (impl crypto.Base, err error) {
 	logger.Debugf("Initializing module (crypto): %s", name)
 	switch name {
 	case "":
@@ -98,7 +99,7 @@ func NewLeaderRotation(
 	viewStates *protocol.ViewStates,
 	name string,
 	chainLength int,
-) (ld modules.LeaderRotation, err error) {
+) (ld leaderrotation.LeaderRotation, err error) {
 	logger.Debugf("Initializing module (leader rotation): %s", name)
 	switch name {
 	case "":

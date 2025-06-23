@@ -6,14 +6,14 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 type Authority struct {
-	modules.CryptoBase // embedded to avoid having to implement forwarding methods
-	config             *core.RuntimeConfig
-	blockchain         *blockchain.Blockchain
+	crypto.Base // embedded to avoid having to implement forwarding methods
+	config      *core.RuntimeConfig
+	blockchain  *blockchain.Blockchain
 }
 
 // NewAuthority returns an Authority. It will use the given CryptoBase to create and verify
@@ -21,11 +21,11 @@ type Authority struct {
 func NewAuthority(
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
-	impl modules.CryptoBase,
+	impl crypto.Base,
 	opts ...Option,
 ) *Authority {
 	ca := &Authority{
-		CryptoBase: impl,
+		Base:       impl,
 		config:     config,
 		blockchain: blockchain,
 	}

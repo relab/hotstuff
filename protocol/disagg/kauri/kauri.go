@@ -13,8 +13,8 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/tree"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
+	"github.com/relab/hotstuff/protocol/disagg"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
 )
@@ -28,7 +28,7 @@ type Kauri struct {
 	config     *core.RuntimeConfig
 	blockchain *blockchain.Blockchain
 	auth       *cert.Authority
-	sender     modules.KauriSender
+	sender     core.KauriSender
 
 	aggContrib  hotstuff.QuorumSignature
 	aggSent     bool
@@ -46,7 +46,7 @@ func New(
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 	auth *cert.Authority,
-	sender modules.KauriSender,
+	sender core.KauriSender,
 ) *Kauri {
 	k := &Kauri{
 		blockchain: blockchain,
@@ -221,4 +221,4 @@ type WaitTimerExpiredEvent struct {
 	currentView hotstuff.View
 }
 
-var _ modules.DisseminatorAggregator = (*Kauri)(nil)
+var _ disagg.DisseminatorAggregator = (*Kauri)(nil)

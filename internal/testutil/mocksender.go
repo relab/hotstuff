@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -17,7 +17,7 @@ type MockSender struct {
 	blockChains  []*blockchain.Blockchain
 }
 
-// NewMockSender returns a mock implementation of modules.Sender that
+// NewMockSender returns a mock implementation of core.Sender that
 // just stores messages in a slice to make testing easier.
 // Optionally, the mock sender can be restricted to send to a specific
 // set of recipients.
@@ -97,7 +97,7 @@ func (m *MockSender) RequestBlock(_ context.Context, hash hotstuff.Hash) (*hotst
 
 // Sub mock returns a copy MockSender that only allows to send to the provided sender ID's.
 // The method returns an error if the ids are not a subset of m.recipients.
-func (m *MockSender) Sub(ids []hotstuff.ID) (modules.Sender, error) {
+func (m *MockSender) Sub(ids []hotstuff.ID) (core.Sender, error) {
 	if len(m.recipients) < len(ids) {
 		return nil, fmt.Errorf("cannot return a sub sender when ids slice is larger")
 	}
@@ -111,7 +111,7 @@ func (m *MockSender) Sub(ids []hotstuff.ID) (modules.Sender, error) {
 	}, nil
 }
 
-var _ modules.Sender = (*MockSender)(nil)
+var _ core.Sender = (*MockSender)(nil)
 
 func isSubset(a, b []hotstuff.ID) bool {
 	set := make(map[hotstuff.ID]struct{}, len(a))

@@ -9,14 +9,13 @@ import (
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/proto/kauripb"
 	"github.com/relab/hotstuff/internal/tree"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
 )
 
 type KauriGorumsSender struct {
 	eventLoop *eventloop.EventLoop
 	config    *core.RuntimeConfig
-	modules.Sender
+	core.Sender
 
 	nodes map[hotstuff.ID]*kauripb.Node
 	tree  *tree.Tree
@@ -58,4 +57,4 @@ func (k *KauriGorumsSender) SendContributionToParent(view hotstuff.View, qc hots
 	}
 }
 
-var _ modules.KauriSender = (*KauriGorumsSender)(nil)
+var _ core.KauriSender = (*KauriGorumsSender)(nil)

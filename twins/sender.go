@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/core"
 )
 
 type emulatedSender struct {
@@ -67,7 +67,7 @@ func (s *emulatedSender) shouldDrop(id NodeID, message any) bool {
 }
 
 // Sub returns a subconfiguration containing the replicas specified in the ids slice.
-func (s *emulatedSender) Sub(ids []hotstuff.ID) (sub modules.Sender, err error) {
+func (s *emulatedSender) Sub(ids []hotstuff.ID) (sub core.Sender, err error) {
 	return &emulatedSender{
 		node:      s.node,
 		network:   s.network,
@@ -127,4 +127,4 @@ func (s *emulatedSender) RequestBlock(_ context.Context, hash hotstuff.Hash) (bl
 	return nil, false
 }
 
-var _ modules.Sender = (*emulatedSender)(nil)
+var _ core.Sender = (*emulatedSender)(nil)

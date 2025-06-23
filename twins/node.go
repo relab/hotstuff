@@ -10,10 +10,10 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/disagg/clique"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/protocol/votingmachine"
@@ -34,7 +34,7 @@ type node struct {
 	proposer       *consensus.Proposer
 	eventLoop      *eventloop.EventLoop
 	viewStates     *protocol.ViewStates
-	leaderRotation modules.LeaderRotation
+	leaderRotation leaderrotation.LeaderRotation
 	synchronizer   *synchronizer.Synchronizer
 	timeoutManager *timeoutManager
 

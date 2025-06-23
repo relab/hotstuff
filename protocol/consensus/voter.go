@@ -6,16 +6,17 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/disagg"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/security/cert"
 )
 
 type Voter struct {
 	config *core.RuntimeConfig
 
-	leaderRotation modules.LeaderRotation
+	leaderRotation leaderrotation.LeaderRotation
 	ruler          VoteRuler
-	aggregator     modules.Aggregator
+	aggregator     disagg.Aggregator
 
 	auth      *cert.Authority
 	committer *Committer
@@ -25,9 +26,9 @@ type Voter struct {
 
 func NewVoter(
 	config *core.RuntimeConfig,
-	leaderRotation modules.LeaderRotation,
+	leaderRotation leaderrotation.LeaderRotation,
 	rules VoteRuler,
-	aggregator modules.Aggregator,
+	aggregator disagg.Aggregator,
 	auth *cert.Authority,
 	committer *Committer,
 ) *Voter {

@@ -2,8 +2,6 @@ package viewduration
 
 import (
 	"time"
-
-	"github.com/relab/hotstuff/modules"
 )
 
 type Fixed struct {
@@ -31,4 +29,4 @@ func (f *Fixed) ViewSucceeded() {}
 // ViewTimeout does nothing for FixedViewDuration.
 func (f *Fixed) ViewTimeout() {}
 
-var _ modules.ViewDuration = (*Fixed)(nil)
+var _ ViewDuration = (*Fixed)(nil)

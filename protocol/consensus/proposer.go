@@ -7,7 +7,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/disagg"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 	"github.com/relab/hotstuff/security/blockchain"
 )
@@ -17,7 +17,7 @@ type Proposer struct {
 	config       *core.RuntimeConfig
 	blockchain   *blockchain.Blockchain
 	ruler        ProposeRuler
-	disseminator modules.Disseminator
+	disseminator disagg.Disseminator
 	voter        *Voter
 	commandCache *clientpb.CommandCache
 	committer    *Committer
@@ -30,7 +30,7 @@ func NewProposer(
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 	ruler ProposeRuler,
-	disseminator modules.Disseminator,
+	disseminator disagg.Disseminator,
 	voter *Voter,
 	commandCache *clientpb.CommandCache,
 	committer *Committer,

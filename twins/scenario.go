@@ -7,7 +7,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 )
 
 // View specifies the leader id and the partition scenario for a single view.
@@ -125,7 +125,7 @@ func checkCommits(network *Network) (safe bool, commits int) {
 
 type leaderRotation []View
 
-var _ modules.LeaderRotation = (leaderRotation)(nil)
+var _ leaderrotation.LeaderRotation = (leaderRotation)(nil)
 
 // GetLeader returns the id of the leader in the given view.
 func (lr leaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {

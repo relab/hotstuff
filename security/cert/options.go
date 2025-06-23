@@ -10,8 +10,8 @@ func WithCache(cacheSize int) Option {
 		panic("cache size cannot be zero")
 	}
 	return func(ca *Authority) {
-		prevImpl := ca.CryptoBase
-		ca.CryptoBase = &Cache{
+		prevImpl := ca.Base
+		ca.Base = &Cache{
 			impl:     prevImpl,
 			capacity: cacheSize,
 			entries:  make(map[string]*list.Element, cacheSize),
