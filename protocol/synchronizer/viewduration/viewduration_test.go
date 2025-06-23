@@ -5,22 +5,22 @@ import (
 	"time"
 )
 
-func checkDuration(t *testing.T, want, got time.Duration) {
+func checkDuration(t *testing.T, funcName string, want, got time.Duration) {
 	if want != got {
-		t.Fatalf("incorrect fixed view duration (want: %d, got: %d)", want, got)
+		t.Fatalf("incorrect view duration after calling %s (want: %d, got: %d)", funcName, want, got)
 	}
 }
 
 func TestFixed(t *testing.T) {
 	want := 100 * time.Microsecond
 	vd := NewFixed(want)
-	checkDuration(t, want, vd.Duration())
+	checkDuration(t, "nothing", want, vd.Duration())
 	vd.ViewStarted()
-	checkDuration(t, want, vd.Duration())
+	checkDuration(t, "ViewStarted", want, vd.Duration())
 	vd.ViewSucceeded()
-	checkDuration(t, want, vd.Duration())
+	checkDuration(t, "ViewSucceeded", want, vd.Duration())
 	vd.ViewTimeout()
-	checkDuration(t, want, vd.Duration())
+	checkDuration(t, "ViewTimeout", want, vd.Duration())
 }
 
 func TestDynamic(t *testing.T) {
@@ -35,16 +35,16 @@ func TestDynamic(t *testing.T) {
 		multiplier,
 	)
 	vd := NewDynamic(params)
-	checkDuration(t, startTimeout, vd.Duration())
+	checkDuration(t, "nothing", startTimeout, vd.Duration())
 	vd.ViewStarted()
-	checkDuration(t, startTimeout, vd.Duration())
+	checkDuration(t, "ViewStarted", startTimeout, vd.Duration())
 	vd.ViewTimeout()
-	checkDuration(t, time.Duration(multiplier)*startTimeout, vd.Duration())
+	checkDuration(t, "ViewTimeout", time.Duration(multiplier)*startTimeout, vd.Duration())
 	// timeout many times to reach max timeout
 	for range 10 {
 		vd.ViewTimeout()
 	}
-	checkDuration(t, maxTimeout, vd.Duration())
+	checkDuration(t, "ViewTimeout 10 times", maxTimeout, vd.Duration())
 	vd.ViewSucceeded()
-	checkDuration(t, 0, vd.Duration())
+	checkDuration(t, "ViewSucceeded", 0, vd.Duration())
 }

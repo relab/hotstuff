@@ -31,7 +31,7 @@ func TestCollectVote(t *testing.T) {
 	)
 
 	newViewTriggered := false
-	leader.EventLoop().RegisterHandler(hotstuff.NewViewMsg{}, func(event any) {
+	leader.EventLoop().RegisterHandler(hotstuff.NewViewMsg{}, func(_ any) {
 		newViewTriggered = true
 	})
 
