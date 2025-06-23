@@ -4,6 +4,7 @@ package kauri
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/relab/hotstuff"
@@ -206,14 +207,10 @@ func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) err
 	return nil
 }
 
-// isSubSet returns true if a is a subset of b.
+// isSubSet returns true if all elements in a are contained in b.
 func isSubSet(a, b []hotstuff.ID) bool {
-	c := hotstuff.NewIDSet()
-	for _, id := range b {
-		c.Add(id)
-	}
 	for _, id := range a {
-		if !c.Contains(id) {
+		if !slices.Contains(b, id) {
 			return false
 		}
 	}
@@ -224,5 +221,4 @@ type WaitTimerExpiredEvent struct {
 	currentView hotstuff.View
 }
 
-var _ disagg.Disseminator = (*Kauri)(nil)
-var _ disagg.Aggregator = (*Kauri)(nil)
+var _ disagg.DisseminatorAggregator = (*Kauri)(nil)

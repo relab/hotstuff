@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/test"
 	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 )
@@ -25,6 +26,53 @@ func TestSubTree(t *testing.T) {
 			t.Errorf("SubTree(%v, %v) = %t; want %t", test.a, test.b, !test.want, test.want)
 		}
 	}
+}
+
+func BenchmarkSubTree(b *testing.B) {
+	benchData := []struct {
+		size  int
+		start int // start index for the subset
+	}{
+		{10, 8},  // subset size 2
+		{10, 5},  // subset size 5
+		{40, 30}, // subset size 10
+		{40, 20}, // subset size 20
+		{80, 50}, // subset size 30
+		{80, 40}, // subset size 40
+		{80, 30}, // subset size 50
+		{80, 20}, // subset size 60
+		{80, 10}, // subset size 70
+	}
+	for _, data := range benchData {
+		set := make([]hotstuff.ID, data.size)
+		for i := range set {
+			set[i] = hotstuff.ID(i + 1)
+		}
+		subSet := set[data.start:]
+		b.Run("SliceSet/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
+			for b.Loop() {
+				isSubSet(subSet, set)
+			}
+		})
+		b.Run("MapSet__/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
+			for b.Loop() {
+				isSubSetMap(subSet, set)
+			}
+		})
+	}
+}
+
+func isSubSetMap(a, b []hotstuff.ID) bool {
+	set := make(map[hotstuff.ID]struct{}, len(b))
+	for _, id := range b {
+		set[id] = struct{}{}
+	}
+	for _, id := range a {
+		if _, ok := set[id]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func TestCanMerge(t *testing.T) {

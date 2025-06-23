@@ -25,50 +25,6 @@ type IDSet interface {
 	Len() int
 }
 
-// idSetMap implements IDSet using a map.
-type idSetMap map[ID]struct{}
-
-// NewIDSet returns a new IDSet using the default implementation.
-func NewIDSet() IDSet {
-	return make(idSetMap)
-}
-
-// Add adds an ID to the set.
-func (s idSetMap) Add(id ID) {
-	s[id] = struct{}{}
-}
-
-// Contains returns true if the set contains the given ID.
-func (s idSetMap) Contains(id ID) bool {
-	_, ok := s[id]
-	return ok
-}
-
-// ForEach calls f for each ID in the set.
-func (s idSetMap) ForEach(f func(ID)) {
-	for id := range s {
-		f(id)
-	}
-}
-
-// RangeWhile calls f for each ID in the set until f returns false.
-func (s idSetMap) RangeWhile(f func(ID) bool) {
-	for id := range s {
-		if !f(id) {
-			break
-		}
-	}
-}
-
-// Len returns the number of entries in the set.
-func (s idSetMap) Len() int {
-	return len(s)
-}
-
-func (s idSetMap) String() string {
-	return IDSetToString(s)
-}
-
 // IDSetToString formats an IDSet as a string.
 func IDSetToString(set IDSet) string {
 	var sb strings.Builder
