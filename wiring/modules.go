@@ -8,6 +8,7 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol"
+	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation/carousel"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/leaderrotation/reputation"
@@ -28,17 +29,17 @@ func NewConsensusRules(
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 	name string,
-) (rules modules.HotstuffRuleset, err error) {
+) (rules consensus.Ruleset, err error) {
 	logger.Debugf("Initializing module (consensus rules): %s", name)
 	switch name {
 	case "":
 		fallthrough // default to chainedhotstuff if no name is provided
 	case chainedhotstuff.ModuleName:
-		rules = chainedhotstuff.New(logger, blockchain)
+		rules = chainedhotstuff.New(logger, config, blockchain)
 	case fasthotstuff.ModuleName:
 		rules = fasthotstuff.New(logger, config, blockchain)
 	case simplehotstuff.ModuleName:
-		rules = simplehotstuff.New(logger, blockchain)
+		rules = simplehotstuff.New(logger, config, blockchain)
 	default:
 		return nil, fmt.Errorf("invalid consensus name: '%s'", name)
 	}
@@ -49,9 +50,9 @@ func WrapByzantineStrategy(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
-	rules modules.HotstuffRuleset,
+	rules consensus.Ruleset,
 	name string,
-) (byzRules modules.HotstuffRuleset, err error) {
+) (byzRules consensus.Ruleset, err error) {
 	logger.Debugf("Initializing module (byzantine strategy): %s", name)
 	switch name {
 	case "":
@@ -59,7 +60,7 @@ func WrapByzantineStrategy(
 	case byzantine.SilenceModuleName:
 		byzRules = byzantine.NewSilence(rules)
 	case byzantine.ForkModuleName:
-		byzRules = byzantine.NewFork(rules, blockchain, config)
+		byzRules = byzantine.NewFork(config, blockchain, rules)
 	default:
 		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", name)
 	}

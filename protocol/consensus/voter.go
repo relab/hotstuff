@@ -14,7 +14,7 @@ type Voter struct {
 	config *core.RuntimeConfig
 
 	leaderRotation modules.LeaderRotation
-	ruler          modules.VoteRuler
+	ruler          VoteRuler
 	aggregator     modules.Aggregator
 
 	auth      *cert.Authority
@@ -26,7 +26,7 @@ type Voter struct {
 func NewVoter(
 	config *core.RuntimeConfig,
 	leaderRotation modules.LeaderRotation,
-	rules modules.VoteRuler,
+	rules VoteRuler,
 	aggregator modules.Aggregator,
 	auth *cert.Authority,
 	committer *Committer,

@@ -3,7 +3,10 @@ package simplehotstuff
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -14,8 +17,9 @@ const ModuleName = "simplehotstuff"
 // Based on the simplified algorithm described in the paper
 // "Formal Verification of HotStuff" by Leander Jehl.
 type SimpleHotStuff struct {
-	blockchain *blockchain.Blockchain
 	logger     logging.Logger
+	config     *core.RuntimeConfig
+	blockchain *blockchain.Blockchain
 
 	locked *hotstuff.Block
 }
@@ -23,11 +27,13 @@ type SimpleHotStuff struct {
 // New returns a new SimpleHotStuff instance.
 func New(
 	logger logging.Logger,
+	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 ) *SimpleHotStuff {
 	return &SimpleHotStuff{
-		blockchain: blockchain,
 		logger:     logger,
+		config:     config,
+		blockchain: blockchain,
 
 		locked: hotstuff.GetGenesis(),
 	}
@@ -51,7 +57,7 @@ func (hs *SimpleHotStuff) VoteRule(view hotstuff.View, proposal hotstuff.Propose
 
 	// Rule 2: can only vote if parent's view is greater than or equal to locked block's view.
 	if parent.View() < hs.locked.View() {
-		hs.logger.Info("OnPropose: parent too old")
+		hs.logger.Info("VoteRule: parent too old")
 		return false
 	}
 
@@ -69,7 +75,7 @@ func (hs *SimpleHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	gp, ok := hs.blockchain.Get(p.QuorumCert().BlockHash())
 	if ok && gp.View() > hs.locked.View() {
 		hs.locked = gp
-		hs.logger.Debug("Locked: ", gp)
+		hs.logger.Debug("CommitRule: updated locked block: ", gp)
 	} else if !ok {
 		return nil
 	}
@@ -88,3 +94,12 @@ func (hs *SimpleHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 func (hs *SimpleHotStuff) ChainLength() int {
 	return 3
 }
+
+// ProposeRule returns a new hotstuff proposal based on the current view, quorum certificate, and command batch.
+func (hs *SimpleHotStuff) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
+	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
+	proposal = hotstuff.NewProposeMsg(hs.config.ID(), view, qc, cmd)
+	return proposal, true
+}
+
+var _ consensus.Ruleset = (*SimpleHotStuff)(nil)

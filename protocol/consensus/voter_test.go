@@ -22,6 +22,7 @@ func wireUpVoter(
 	t.Helper()
 	consensusRules := chainedhotstuff.New(
 		essentials.Logger(),
+		essentials.RuntimeCfg(),
 		essentials.BlockChain(),
 	)
 	viewStates, err := protocol.NewViewStates(

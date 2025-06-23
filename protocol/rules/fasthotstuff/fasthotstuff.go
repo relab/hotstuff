@@ -5,6 +5,8 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -12,8 +14,9 @@ const ModuleName = "fasthotstuff"
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {
-	blockchain *blockchain.Blockchain
 	logger     logging.Logger
+	config     *core.RuntimeConfig
+	blockchain *blockchain.Blockchain
 }
 
 // New returns a new FastHotStuff instance.
@@ -25,11 +28,11 @@ func New(
 	if !config.HasAggregateQC() {
 		panic("aggregate qc must be enabled for fasthotstuff")
 	}
-	fhs := &FastHotStuff{
-		blockchain: blockchain,
+	return &FastHotStuff{
 		logger:     logger,
+		config:     config,
+		blockchain: blockchain,
 	}
-	return fhs
 }
 
 func (fhs *FastHotStuff) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
@@ -74,3 +77,15 @@ func (fhs *FastHotStuff) VoteRule(view hotstuff.View, proposal hotstuff.ProposeM
 func (fhs *FastHotStuff) ChainLength() int {
 	return 2
 }
+
+// ProposeRule returns a new fast hotstuff proposal based on the current view, (aggregate) quorum certificate, and command batch.
+func (fhs *FastHotStuff) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
+	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
+	proposal = hotstuff.NewProposeMsg(fhs.config.ID(), view, qc, cmd)
+	if aggQC, ok := cert.AggQC(); ok {
+		proposal.AggregateQC = &aggQC
+	}
+	return proposal, true
+}
+
+var _ consensus.Ruleset = (*FastHotStuff)(nil)
