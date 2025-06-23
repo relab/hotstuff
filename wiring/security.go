@@ -4,14 +4,14 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 type Security struct {
-	blockChain *blockchain.BlockChain
-	cryptoImpl modules.CryptoBase
+	blockchain *blockchain.Blockchain
+	cryptoImpl crypto.Base
 	auth       *cert.Authority
 }
 
@@ -20,11 +20,11 @@ func NewSecurity(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
-	sender modules.Sender,
+	sender core.Sender,
 	cryptoName string,
 	opts ...cert.Option,
 ) (*Security, error) {
-	blockChain := blockchain.New(
+	blockchain := blockchain.New(
 		eventLoop,
 		logger,
 		sender,
@@ -38,12 +38,11 @@ func NewSecurity(
 		return nil, err
 	}
 	return &Security{
-		blockChain: blockChain,
+		blockchain: blockchain,
 		cryptoImpl: cryptoImpl,
 		auth: cert.NewAuthority(
 			config,
-			logger,
-			blockChain,
+			blockchain,
 			cryptoImpl,
 			opts...,
 		),
@@ -51,12 +50,12 @@ func NewSecurity(
 }
 
 // BlockChain returns the blockchain instance.
-func (s *Security) BlockChain() *blockchain.BlockChain {
-	return s.blockChain
+func (s *Security) BlockChain() *blockchain.Blockchain {
+	return s.blockchain
 }
 
 // CryptoImpl returns the crypto implementation.
-func (s *Security) CryptoImpl() modules.CryptoBase {
+func (s *Security) CryptoImpl() crypto.Base {
 	return s.cryptoImpl
 }
 

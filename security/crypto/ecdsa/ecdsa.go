@@ -5,13 +5,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/crypto"
 )
 
@@ -22,12 +21,6 @@ const (
 	PrivateKeyFileType = "ECDSA PRIVATE KEY"
 	// PublicKeyFileType is the PEM type for a public key.
 	PublicKeyFileType = "ECDSA PUBLIC KEY"
-)
-
-var (
-	_ hotstuff.QuorumSignature = (*crypto.Multi[*Signature])(nil)
-	_ hotstuff.IDSet           = (*crypto.Multi[*Signature])(nil)
-	_ crypto.Signature         = (*Signature)(nil)
 )
 
 // Signature is an ECDSA signature.
@@ -65,28 +58,23 @@ func (sig Signature) ToBytes() []byte {
 	return b
 }
 
-type ecdsaBase struct {
-	logger logging.Logger
+type ECDSA struct {
 	config *core.RuntimeConfig
 }
 
 // New returns a new instance of the ECDSA CryptoBase implementation.
-func New(
-	logger logging.Logger,
-	config *core.RuntimeConfig,
-) modules.CryptoBase {
-	return &ecdsaBase{
-		logger: logger,
+func New(config *core.RuntimeConfig) *ECDSA {
+	return &ECDSA{
 		config: config,
 	}
 }
 
-func (ec *ecdsaBase) privateKey() *ecdsa.PrivateKey {
+func (ec *ECDSA) privateKey() *ecdsa.PrivateKey {
 	return ec.config.PrivateKey().(*ecdsa.PrivateKey)
 }
 
 // Sign creates a cryptographic signature of the given message.
-func (ec *ecdsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
+func (ec *ECDSA) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
 	hash := sha256.Sum256(message)
 	r, s, err := ecdsa.Sign(rand.Reader, ec.privateKey(), hash[:])
 	if err != nil {
@@ -100,7 +88,7 @@ func (ec *ecdsaBase) Sign(message []byte) (signature hotstuff.QuorumSignature, e
 }
 
 // Combine combines multiple signatures into a single signature.
-func (ec *ecdsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
+func (ec *ECDSA) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
 	if len(signatures) < 2 {
 		return nil, crypto.ErrCombineMultiple
 	}
@@ -115,56 +103,57 @@ func (ec *ecdsaBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Q
 				ts[id] = s
 			}
 		} else {
-			ec.logger.Panicf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
+			return nil, fmt.Errorf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
 		}
 	}
 	return ts, nil
 }
 
 // Verify verifies the given quorum signature against the message.
-func (ec *ecdsaBase) Verify(signature hotstuff.QuorumSignature, message []byte) bool {
+func (ec *ECDSA) Verify(signature hotstuff.QuorumSignature, message []byte) error {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
-		ec.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 	n := signature.Participants().Len()
 	if n == 0 {
-		return false
+		return fmt.Errorf("verify failed: no participants")
 	}
 
-	results := make(chan bool, n)
+	results := make(chan error, n)
 	hash := sha256.Sum256(message)
 	for _, sig := range s {
 		go func(sig *Signature, hash hotstuff.Hash) {
 			results <- ec.verifySingle(sig, hash)
 		}(sig, hash)
 	}
-	valid := true
+	var err error
 	for range s {
-		if !<-results {
-			valid = false
-		}
+		err = errors.Join(<-results)
 	}
-	return valid
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
-func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) bool {
+func (ec *ECDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) (err error) {
 	s, ok := signature.(crypto.Multi[*Signature])
 	if !ok {
-		ec.logger.Panicf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 	n := signature.Participants().Len()
 	if n == 0 {
-		return false
+		return fmt.Errorf("failed to verify batch: no participants")
 	}
 
-	results := make(chan bool, n)
+	results := make(chan error, n)
 	set := make(map[hotstuff.Hash]struct{})
 	for id, sig := range s {
 		message, ok := batch[id]
 		if !ok {
-			return false
+			return fmt.Errorf("message not found")
 		}
 		hash := sha256.Sum256(message)
 		set[hash] = struct{}{}
@@ -172,23 +161,34 @@ func (ec *ecdsaBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[h
 			results <- ec.verifySingle(sig, hash)
 		}(sig, hash)
 	}
-	valid := true
 	for range s {
-		if !<-results {
-			valid = false
-		}
+		err = errors.Join(<-results)
 	}
-
+	if err != nil {
+		return err
+	}
 	// valid if all partial signatures are valid and there are no duplicate messages
-	return valid && len(set) == len(batch)
+	if len(set) != len(batch) {
+		return fmt.Errorf("invalid signature")
+	}
+	return nil
 }
 
-func (ec *ecdsaBase) verifySingle(sig *Signature, hash hotstuff.Hash) bool {
+func (ec *ECDSA) verifySingle(sig *Signature, hash hotstuff.Hash) error {
 	replica, ok := ec.config.ReplicaInfo(sig.Signer())
 	if !ok {
-		ec.logger.Warnf("ecdsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
-		return false
+		return fmt.Errorf("ecdsa: got signature from replica whose ID (%d) was not in the config", sig.Signer())
 	}
 	pk := replica.PubKey.(*ecdsa.PublicKey)
-	return ecdsa.Verify(pk, hash[:], sig.R(), sig.S())
+	if !ecdsa.Verify(pk, hash[:], sig.R(), sig.S()) {
+		return fmt.Errorf("failed to verify public key")
+	}
+	return nil
 }
+
+var (
+	_ hotstuff.QuorumSignature = (*crypto.Multi[*Signature])(nil)
+	_ hotstuff.IDSet           = (*crypto.Multi[*Signature])(nil)
+	_ crypto.Signature         = (*Signature)(nil)
+	_ crypto.Base              = (*ECDSA)(nil)
+)

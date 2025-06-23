@@ -3,16 +3,14 @@ package viewduration
 import (
 	"math"
 	"time"
-
-	"github.com/relab/hotstuff/modules"
 )
 
 // NewDynamic returns a ViewDuration that approximates the view duration based on durations of previous views.
 // sampleSize determines the number of previous views that should be considered.
 // startTimeout determines the view duration of the first views.
 // When a timeout occurs, the next view duration will be multiplied by the multiplier.
-func NewDynamic(opt Params) modules.ViewDuration {
-	return &viewDuration{
+func NewDynamic(opt Params) *Dynamic {
+	return &Dynamic{
 		limit: opt.sampleSize,
 		mean:  opt.startTimeout,
 		max:   opt.maxTimeout,
@@ -20,9 +18,9 @@ func NewDynamic(opt Params) modules.ViewDuration {
 	}
 }
 
-// viewDuration uses statistics from previous views to guess a good value for the view duration.
+// Dynamic uses statistics from previous views to guess a good value for the view duration.
 // It only takes a limited amount of measurements into account.
-type viewDuration struct {
+type Dynamic struct {
 	mul       float64   // on failed views, multiply the current mean by this number (should be > 1)
 	limit     uint64    // how many measurements should be included in mean
 	count     uint64    // total number of measurements
@@ -35,7 +33,7 @@ type viewDuration struct {
 
 // ViewSucceeded calculates the duration of the view
 // and updates the internal values used for mean and variance calculations.
-func (v *viewDuration) ViewSucceeded() {
+func (v *Dynamic) ViewSucceeded() {
 	if v.startTime.IsZero() {
 		return
 	}
@@ -68,17 +66,17 @@ func (v *viewDuration) ViewSucceeded() {
 }
 
 // ViewTimeout should be called when a view timeout occurred. It will multiply the current mean by 'mul'.
-func (v *viewDuration) ViewTimeout() {
+func (v *Dynamic) ViewTimeout() {
 	v.mean *= v.mul
 }
 
 // ViewStarted records the start time of a view.
-func (v *viewDuration) ViewStarted() {
+func (v *Dynamic) ViewStarted() {
 	v.startTime = time.Now()
 }
 
 // Duration returns the upper bound of the 95% confidence interval for the mean view duration.
-func (v *viewDuration) Duration() time.Duration {
+func (v *Dynamic) Duration() time.Duration {
 	conf := 1.96 // 95% confidence
 	dev := float64(0)
 	if v.count > 1 {
@@ -99,3 +97,5 @@ func (v *viewDuration) Duration() time.Duration {
 
 	return time.Duration(duration * float64(time.Millisecond))
 }
+
+var _ ViewDuration = (*Dynamic)(nil)

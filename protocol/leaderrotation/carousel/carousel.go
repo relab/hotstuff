@@ -8,21 +8,18 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/committer"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
 const ModuleName = "carousel"
 
-type carousel struct {
-	blockChain   *blockchain.BlockChain
-	committer    *committer.Committer
-	config       *core.RuntimeConfig
-	logger       logging.Logger
-	viewDuration modules.ViewDuration
+type Carousel struct {
+	blockchain *blockchain.Blockchain
+	viewStates *protocol.ViewStates
+	config     *core.RuntimeConfig
+	logger     logging.Logger
 
 	chainLength int
 }
@@ -30,25 +27,23 @@ type carousel struct {
 // New returns a new instance of the Carousel leader-election algorithm.
 func New(
 	chainLength int,
-	vdParams viewduration.Params,
 
-	blockChain *blockchain.BlockChain,
-	committer *committer.Committer,
+	blockchain *blockchain.Blockchain,
+	viewStates *protocol.ViewStates,
 	config *core.RuntimeConfig,
 	logger logging.Logger,
-) modules.LeaderRotation {
-	return &carousel{
-		blockChain:   blockChain,
-		chainLength:  chainLength,
-		committer:    committer,
-		config:       config,
-		logger:       logger,
-		viewDuration: viewduration.NewDynamic(vdParams),
+) *Carousel {
+	return &Carousel{
+		blockchain:  blockchain,
+		chainLength: chainLength,
+		viewStates:  viewStates,
+		config:      config,
+		logger:      logger,
 	}
 }
 
-func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
-	commitHead := c.committer.CommittedBlock()
+func (c *Carousel) GetLeader(round hotstuff.View) hotstuff.ID {
+	commitHead := c.viewStates.CommittedBlock()
 
 	if commitHead.QuorumCert().Signature() == nil {
 		c.logger.Debug("in startup; using round-robin")
@@ -64,22 +59,20 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 
 	var (
 		block       = commitHead
+		genesis     = hotstuff.GetGenesis()
 		f           = hotstuff.NumFaulty(c.config.ReplicaCount())
-		i           = 0
-		lastAuthors = hotstuff.NewIDSet()
+		lastAuthors = make([]hotstuff.ID, 0, f)
 		ok          = true
 	)
-
-	for ok && i < f && block != hotstuff.GetGenesis() {
-		lastAuthors.Add(block.Proposer())
-		block, ok = c.blockChain.Get(block.Parent())
-		i++
+	for i := 0; ok && i < f && block != genesis; i++ {
+		lastAuthors = append(lastAuthors, block.Proposer())
+		block, ok = c.blockchain.Get(block.Parent())
 	}
 
 	candidates := make([]hotstuff.ID, 0, c.config.ReplicaCount()-f)
 
 	commitHead.QuorumCert().Signature().Participants().ForEach(func(id hotstuff.ID) {
-		if !lastAuthors.Contains(id) {
+		if !slices.Contains(lastAuthors, id) {
 			candidates = append(candidates, id)
 		}
 	})
@@ -94,6 +87,4 @@ func (c carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 	return leader
 }
 
-func (c carousel) ViewDuration() modules.ViewDuration {
-	return c.viewDuration
-}
+var _ leaderrotation.LeaderRotation = (*Carousel)(nil)

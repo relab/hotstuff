@@ -4,126 +4,18 @@ package testutil
 import (
 	"net"
 	"testing"
-	"time"
 
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/cert"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/security/crypto/bls12"
+	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto/eddsa"
 	"github.com/relab/hotstuff/security/crypto/keygen"
-	"github.com/relab/hotstuff/twins"
 )
 
-// TestModules registers default modules for testing to the given builder.
-/*func TestModules(t *testing.T, ctrl *gomock.Controller, id hotstuff.ID, _ hotstuff.PrivateKey, builder *core.Builder) {
-	t.Helper()
-
-	voter := mocks.NewMockAcceptor(ctrl)
-	voter.EXPECT().Accept(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes().Return(true)
-	voter.EXPECT().Proposed(gomock.Any()).AnyTimes()
-
-	executor := mocks.NewMockExecutor(ctrl)
-	executor.EXPECT().Exec(gomock.AssignableToTypeOf(hotstuff.Command(""))).AnyTimes()
-
-	forkHandler := mocks.NewMockForkHandler(ctrl)
-
-	commandQ := mocks.NewMockCommandQueue(ctrl)
-	commandQ.EXPECT().Get(gomock.Any()).AnyTimes().Return(hotstuff.Command("foo"), true)
-
-	signer := auth.NewCached(ecdsa.New(), 10)
-
-	config := mocks.NewMockConfiguration(ctrl)
-	config.EXPECT().Len().AnyTimes().Return(1)
-	config.EXPECT().QuorumSize().AnyTimes().Return(3)
-
-	synchronizer := mocks.NewMockSynchronizer(ctrl)
-	synchronizer.EXPECT().Start(gomock.Any()).AnyTimes()
-	builder.Add(
-		core.NewEventLoop(100),
-		logging.New(fmt.Sprintf("hs%d", id)),
-		blockchain.New(),
-		mocks.NewMockConsensus(ctrl),
-		consensus.NewVotingMachine(),
-		leaderrotation.NewFixed(1),
-		synchronizer,
-		config,
-		signer,
-		voter,
-		core.ExtendedExecutor(executor),
-		commandQ,
-		core.ExtendedForkHandler(forkHandler),
-	)
-}
-
-// BuilderList is a helper type to perform actions on a set of builders.
-type BuilderList []*core.Builder
-
-// HotStuffList is a helper type to perform actions on a set of HotStuff instances.
-type HotStuffList []*core.Core
-
-// Build calls Build() for all of the builders.
-func (bl BuilderList) Build() HotStuffList {
-	hl := HotStuffList{}
-	for _, hs := range bl {
-		hl = append(hl, hs.Build())
-	}
-	return hl
-}
-
-// Signers returns the set of signers from all of the HotStuff instances.
-func (hl HotStuffList) Signers() (signers []core.auth) {
-	signers = make([]core.auth, len(hl))
-	for i, hs := range hl {
-		hs.Get(&signers[i])
-	}
-	return signers
-}
-
-// Verifiers returns the set of verifiers from all of the HotStuff instances.
-func (hl HotStuffList) Verifiers() (verifiers []core.auth) {
-	verifiers = make([]core.auth, len(hl))
-	for i, hs := range hl {
-		hs.Get(&verifiers[i])
-	}
-	return verifiers
-}
-
-// Keys returns the set of private keys from all of the HotStuff instances.
-func (hl HotStuffList) Keys() (keys []hotstuff.PrivateKey) {
-	keys = make([]hotstuff.PrivateKey, len(hl))
-	for i, hs := range hl {
-		var opts *core.Options
-		hs.Get(&opts)
-		keys[i] = opts.PrivateKey()
-	}
-	return keys
-}
-
-// CreateBuilders creates n builders with default consensus. Configurations are initialized with replicas.
-func CreateBuilders(t *testing.T, ctrl *gomock.Controller, n int, keys ...hotstuff.PrivateKey) (builders BuilderList) {
-	t.Helper()
-	network := twins.NewSimpleNetwork()
-	builders = make([]*core.Builder, n)
-	for i := 0; i < n; i++ {
-		id := hotstuff.ID(i + 1)
-		var key hotstuff.PrivateKey
-		if i < len(keys) {
-			key = keys[i]
-		} else {
-			key = GenerateECDSAKey(t)
-		}
-
-		builder := network.GetNodeBuilder(twins.NodeID{ReplicaID: id, NetworkID: uint32(id)}, key)
-		builder.Add(network.NewConfiguration())
-		TestModules(t, ctrl, id, key, &builder)
-		builder.Add(network.NewConfiguration())
-		builders[i] = &builder
-	}
-	return builders
-}*/
-
+// TODO(AlanRostem): create a test for server.go using this in another PR.
 // CreateTCPListener creates a net.Listener on a random port.
 func CreateTCPListener(t *testing.T) net.Listener {
 	t.Helper()
@@ -134,8 +26,30 @@ func CreateTCPListener(t *testing.T) net.Listener {
 	return lis
 }
 
+func CreateBlock(t *testing.T, signer *cert.Authority) *hotstuff.Block {
+	t.Helper()
+	qc := CreateQC(t, hotstuff.GetGenesis(), signer)
+	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, &clientpb.Batch{
+		Commands: []*clientpb.Command{},
+	}, 42, 1)
+	return b
+}
+
+func CreateValidBlock(t *testing.T, proposer hotstuff.ID, validParent *hotstuff.Block) *hotstuff.Block {
+	t.Helper()
+	// TODO(AlanRostem): consider creating a qc with a valid signature too
+	qc := hotstuff.NewQuorumCert(nil, validParent.View(), validParent.Hash())
+	return hotstuff.NewBlock(
+		validParent.Hash(),
+		qc,
+		&clientpb.Batch{},
+		validParent.View()+1,
+		proposer,
+	)
+}
+
 // CreateSignatures creates partial certificates from multiple signers.
-func CreateSignatures(t *testing.T, message []byte, signers []modules.CryptoBase) []hotstuff.QuorumSignature {
+func CreateSignatures(t *testing.T, message []byte, signers []*cert.Authority) []hotstuff.QuorumSignature {
 	t.Helper()
 	sigs := make([]hotstuff.QuorumSignature, 0, len(signers))
 	for _, signer := range signers {
@@ -158,7 +72,7 @@ func signer(s hotstuff.QuorumSignature) hotstuff.ID {
 }
 
 // CreateTimeouts creates a set of TimeoutMsg messages from the given signers.
-func CreateTimeouts(t *testing.T, view hotstuff.View, signers []modules.CryptoBase) (timeouts []hotstuff.TimeoutMsg) {
+func CreateTimeouts(t *testing.T, view hotstuff.View, signers []*cert.Authority) (timeouts []hotstuff.TimeoutMsg) {
 	t.Helper()
 	timeouts = make([]hotstuff.TimeoutMsg, 0, len(signers))
 	viewSigs := CreateSignatures(t, view.ToBytes(), signers)
@@ -201,40 +115,28 @@ func CreatePCs(t *testing.T, block *hotstuff.Block, signers []*cert.Authority) [
 }
 
 // CreateQC creates a QC using the given signers.
-func CreateQC(t *testing.T, block *hotstuff.Block, signers []*cert.Authority) hotstuff.QuorumCert {
+func CreateQC(t *testing.T, block *hotstuff.Block, signers ...*cert.Authority) hotstuff.QuorumCert {
 	t.Helper()
 	if len(signers) == 0 {
 		return hotstuff.QuorumCert{}
 	}
-	qc, err := signers[0].CreateQuorumCert(block, CreatePCs(t, block, signers))
+	qcCreator := signers[0]
+	qc, err := qcCreator.CreateQuorumCert(block, CreatePCs(t, block, signers))
 	if err != nil {
 		t.Fatalf("Failed to create QC: %v", err)
 	}
 	return qc
 }
 
-// CreateTC generates a TC using the given signers.
-func CreateTC(t *testing.T, view hotstuff.View, signers0 []*cert.Authority, signers1 []modules.CryptoBase) hotstuff.TimeoutCert {
-	t.Helper()
-	if len(signers0) == 0 || len(signers1) == 0 {
-		return hotstuff.TimeoutCert{}
-	}
-	tc, err := signers0[0].CreateTimeoutCert(view, CreateTimeouts(t, view, signers1))
-	if err != nil {
-		t.Fatalf("Failed to create TC: %v", err)
-	}
-	return tc
-}
-
-// TODO(meling): Currently only used from disabledTestConvertTimeoutCertBLS12.
-// Ideally, we should replace CreateTC above with this function since it avoids two arguments with the same signers.
-func CreateTCOld(t *testing.T, view hotstuff.View, signers []modules.CryptoBase) hotstuff.TimeoutCert {
+// CreateTC generates a timeout certificate signed by the given signers.
+// The first signer is the timeout creator.
+func CreateTC(t *testing.T, view hotstuff.View, signers []*cert.Authority) hotstuff.TimeoutCert {
 	t.Helper()
 	if len(signers) == 0 {
 		return hotstuff.TimeoutCert{}
 	}
-	x := signers[0].(*cert.Authority)
-	tc, err := x.CreateTimeoutCert(view, CreateTimeouts(t, view, signers))
+	timeoutCreator := signers[0]
+	tc, err := timeoutCreator.CreateTimeoutCert(view, CreateTimeouts(t, view, signers))
 	if err != nil {
 		t.Fatalf("Failed to create TC: %v", err)
 	}
@@ -271,48 +173,15 @@ func GenerateBLS12Key(t *testing.T) hotstuff.PrivateKey {
 	return key
 }
 
-// GenerateKeys generates n keys.
-func GenerateKeys(t *testing.T, n int, keyFunc func(t *testing.T) hotstuff.PrivateKey) (keys []hotstuff.PrivateKey) {
-	keys = make([]hotstuff.PrivateKey, n)
-	for i := 0; i < n; i++ {
-		keys[i] = keyFunc(t)
+func GenerateKey(t *testing.T, cryptoName string) hotstuff.PrivateKey {
+	switch cryptoName {
+	case ecdsa.ModuleName:
+		return GenerateECDSAKey(t)
+	case eddsa.ModuleName:
+		return GenerateEDDSAKey(t)
+	case bls12.ModuleName:
+		return GenerateBLS12Key(t)
+	default:
+		panic("incorrect crypto module name")
 	}
-	return keys
-}
-
-// NewProposeMsg wraps a new block in a ProposeMsg.
-func NewProposeMsg(parent hotstuff.Hash, qc hotstuff.QuorumCert, cmd *clientpb.Batch, view hotstuff.View, id hotstuff.ID) hotstuff.ProposeMsg {
-	return hotstuff.ProposeMsg{ID: id, Block: hotstuff.NewBlock(parent, qc, cmd, view, id)}
-}
-
-type leaderRotation struct {
-	t     *testing.T
-	order []hotstuff.ID
-}
-
-func (l leaderRotation) ViewDuration() modules.ViewDuration {
-	return FixedTimeout(0) // TODO(AlanRostem): return proper value
-}
-
-// GetLeader returns the id of the leader in the given view.
-func (l leaderRotation) GetLeader(v hotstuff.View) hotstuff.ID {
-	l.t.Helper()
-	if v == 0 {
-		l.t.Fatalf("attempt to get leader for view 0")
-	}
-	if v > hotstuff.View(len(l.order)) {
-		l.t.Fatalf("leader rotation only defined up to view: %v", len(l.order))
-	}
-	return l.order[v-1]
-}
-
-// NewLeaderRotation returns a leader rotation implementation that will return leaders in the specified order.
-func NewLeaderRotation(t *testing.T, order ...hotstuff.ID) modules.LeaderRotation {
-	t.Helper()
-	return leaderRotation{t, order}
-}
-
-// FixedTimeout returns an ExponentialTimeout with a max exponent of 0.
-func FixedTimeout(timeout time.Duration) modules.ViewDuration {
-	return twins.FixedTimeout(timeout)
 }

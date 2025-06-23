@@ -22,6 +22,7 @@ cpuprofile
 cuecontext
 cuelang
 Debugf
+disagg
 durationpb
 dylib
 eddsa
@@ -35,6 +36,7 @@ Feng
 ferr
 fgprof
 fgprofprofile
+fixedleader
 gcflags
 gcov
 gocyclo
@@ -93,6 +95,8 @@ qerr
 qspec
 Reiter
 relab
+Rostem
+roundrobin
 sigs
 simplehotstuff
 Sonnino
@@ -105,10 +109,13 @@ timestamppb
 TMPDIR
 tmpl
 Tormod
+treeleader
 unexported
 unittests
 unmarshals
 unregisters
+viewduration
+votingmachine
 Warnf
 wcfg
 Welford

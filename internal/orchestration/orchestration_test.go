@@ -104,6 +104,9 @@ func run(t *testing.T, cfg *config.ExperimentConfig) {
 }
 
 func TestOrchestration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
 	fork := map[string][]uint32{"fork": {1}}
 	silence := map[string][]uint32{"silence": {1}}
 

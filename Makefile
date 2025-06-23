@@ -13,7 +13,7 @@ binaries := hotstuff plot
 
 CSV ?= wonderproxy.csv
 
-.PHONY: all aws wonderproxy latencies debug clean protos download tools $(binaries)
+.PHONY: all test short aws wonderproxy latencies debug clean protos download tools $(binaries)
 
 all: $(binaries)
 
@@ -33,6 +33,9 @@ tools: download
 
 test:
 	@go test -v ./...
+
+short:
+	@go test -v -short ./...
 
 lint:
 	@golangci-lint run ./...

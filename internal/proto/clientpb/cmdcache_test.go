@@ -12,7 +12,7 @@ import (
 )
 
 func TestCacheConcurrentAddGet(t *testing.T) {
-	cache := New(WithBatching(2))
+	cache := NewCommandCache(2)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -23,7 +23,7 @@ func TestCacheConcurrentAddGet(t *testing.T) {
 		for i := range 6 {
 			cmd := &Command{ClientID: 1, SequenceNumber: uint64(i + 1)}
 			want = append(want, cmd)
-			cache.add(cmd)
+			cache.Add(cmd)
 		}
 	}()
 
@@ -124,10 +124,10 @@ func TestCacheAddGetDeadlineExceeded(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cache := New(WithBatching(2))
+			cache := NewCommandCache(2)
 
 			for _, cmd := range tt.cmds {
-				cache.add(cmd)
+				cache.Add(cmd)
 			}
 
 			for e := range tt.wantErr {
@@ -196,13 +196,13 @@ func TestPreventAddingDuplicates(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cache := New(WithBatching(2))
+			cache := NewCommandCache(2)
 
 			// mark batchA as proposed; necessary to prevent the cache from adding previously proposed commands
 			cache.Proposed(tt.batchA)
 
 			for _, cmd := range tt.batchB.GetCommands() {
-				cache.add(cmd)
+				cache.Add(cmd)
 			}
 			if got := cache.len(); got != tt.wantLen {
 				t.Errorf("len() = %d, want %d", got, tt.wantLen)
@@ -305,13 +305,13 @@ func TestCacheContainsDuplicate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cache := New(WithBatching(2))
+			cache := NewCommandCache(2)
 
 			// mark batchA as proposed
 			cache.Proposed(tt.batchA)
 
 			// check if batchB contains duplicates with respect to batchA
-			if got := cache.ContainsDuplicate(tt.batchB); got != tt.want {
+			if got := cache.containsDuplicate(tt.batchB); got != tt.want {
 				t.Errorf("ContainsDuplicate() = %v, want %v", got, tt.want)
 			}
 		})

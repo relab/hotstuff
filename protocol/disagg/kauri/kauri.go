@@ -4,6 +4,7 @@ package kauri
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/relab/hotstuff"
@@ -12,22 +13,22 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/tree"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
+	"github.com/relab/hotstuff/protocol/disagg"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
 )
 
 const ModuleName = "kauri"
 
-// Kauri structure contains the modules for kauri protocol implementation.
+// Kauri implements tree-based dissemination and aggregation.
 type Kauri struct {
 	logger     logging.Logger
 	eventLoop  *eventloop.EventLoop
 	config     *core.RuntimeConfig
-	blockChain *blockchain.BlockChain
+	blockchain *blockchain.Blockchain
 	auth       *cert.Authority
-	sender     modules.KauriSender
+	sender     core.KauriSender
 
 	aggContrib  hotstuff.QuorumSignature
 	aggSent     bool
@@ -43,12 +44,12 @@ func New(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
+	blockchain *blockchain.Blockchain,
 	auth *cert.Authority,
-	sender modules.KauriSender,
+	sender core.KauriSender,
 ) *Kauri {
 	k := &Kauri{
-		blockChain: blockChain,
+		blockchain: blockchain,
 		auth:       auth,
 		config:     config,
 		eventLoop:  eventLoop,
@@ -71,16 +72,20 @@ func New(
 }
 
 // Begin starts dissemination of proposal and aggregation of votes.
-func (k *Kauri) Begin(p *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
+func (k *Kauri) Begin(p *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	if !k.initDone {
-		k.eventLoop.DelayUntil(network.ConnectedEvent{}, func() { k.Begin(p, pc) })
-		return
+		k.eventLoop.DelayUntil(network.ConnectedEvent{}, func() {
+			if err := k.Begin(p, pc); err != nil {
+				k.logger.Error(err)
+			}
+		})
+		return nil
 	}
 	k.reset()
 	k.blockHash = pc.BlockHash()
 	k.currentView = p.Block.View()
 	k.aggContrib = pc.Signature()
-	k.SendProposalToChildren(p)
+	return k.SendProposalToChildren(p)
 }
 
 func (k *Kauri) reset() {
@@ -89,12 +94,12 @@ func (k *Kauri) reset() {
 	k.aggSent = false
 }
 
-func (k *Kauri) SendVote(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
-	k.Begin(proposal, pc)
+func (k *Kauri) Aggregate(_ hotstuff.View, proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
+	return k.Begin(proposal, pc)
 }
 
-func (k *Kauri) SendPropose(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) {
-	k.Begin(proposal, pc)
+func (k *Kauri) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
+	return k.Begin(proposal, pc)
 }
 
 func (k *Kauri) WaitToAggregate() {
@@ -104,13 +109,12 @@ func (k *Kauri) WaitToAggregate() {
 }
 
 // SendProposalToChildren sends the proposal to the children.
-func (k *Kauri) SendProposalToChildren(p *hotstuff.ProposeMsg) {
+func (k *Kauri) SendProposalToChildren(p *hotstuff.ProposeMsg) error {
 	children := k.tree.ReplicaChildren()
 	if len(children) != 0 {
 		childSender, err := k.sender.Sub(children)
 		if err != nil {
-			k.logger.Errorf("Unable to send the proposal to children: %v", err)
-			return
+			return fmt.Errorf("unable to send the proposal to children: %w", err)
 		}
 		k.logger.Debug("Sending proposal to children ", children)
 		childSender.Propose(p)
@@ -119,6 +123,7 @@ func (k *Kauri) SendProposalToChildren(p *hotstuff.ProposeMsg) {
 		k.sender.SendContributionToParent(k.currentView, k.aggContrib)
 		k.aggSent = true
 	}
+	return nil
 }
 
 // OnContributionRecv is invoked upon receiving the vote for aggregation.
@@ -169,12 +174,12 @@ func canMergeContributions(a, b hotstuff.QuorumSignature) error {
 }
 
 func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) error {
-	block, ok := k.blockChain.Get(k.blockHash)
+	block, ok := k.blockchain.Get(k.blockHash)
 	if !ok {
-		return fmt.Errorf("failed to fetch block %v", k.blockHash)
+		return fmt.Errorf("failed to fetch block %s", k.blockHash.SmallString())
 	}
-	if !k.auth.Verify(currentSignature, block.ToBytes()) {
-		return fmt.Errorf("cannot verify contribution for view %d from participants %v", k.currentView, currentSignature.Participants())
+	if err := k.auth.Verify(currentSignature, block.ToBytes()); err != nil {
+		return err
 	}
 	if k.aggContrib == nil {
 		// first contribution
@@ -202,14 +207,10 @@ func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) err
 	return nil
 }
 
-// isSubSet returns true if a is a subset of b.
+// isSubSet returns true if all elements in a are contained in b.
 func isSubSet(a, b []hotstuff.ID) bool {
-	c := hotstuff.NewIDSet()
-	for _, id := range b {
-		c.Add(id)
-	}
 	for _, id := range a {
-		if !c.Contains(id) {
+		if !slices.Contains(b, id) {
 			return false
 		}
 	}
@@ -220,4 +221,4 @@ type WaitTimerExpiredEvent struct {
 	currentView hotstuff.View
 }
 
-var _ modules.ConsensusProtocol = (*Kauri)(nil)
+var _ disagg.DisseminatorAggregator = (*Kauri)(nil)

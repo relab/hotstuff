@@ -3,11 +3,11 @@ package wiring
 import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/protocol/disagg"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
+	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
 )
 
@@ -18,41 +18,34 @@ type Consensus struct {
 
 func NewConsensus(
 	eventLoop *eventloop.EventLoop,
-	logger logging.Logger,
 	config *core.RuntimeConfig,
+	blockchain *blockchain.Blockchain,
 	auth *cert.Authority,
-	commandCache *clientpb.Cache,
-	committer *committer.Committer,
-	consensusRulesModule modules.HotstuffRuleset,
-	leaderRotationModule modules.LeaderRotation,
-	protocol modules.ConsensusProtocol,
+	commandCache *clientpb.CommandCache,
+	committer *consensus.Committer,
+	consensusRules consensus.Ruleset,
+	leaderRotation leaderrotation.LeaderRotation,
+	disAgg disagg.DisseminatorAggregator,
 ) *Consensus {
-	proposerOpts := []consensus.ProposerOption{}
-	if ruler, ok := consensusRulesModule.(modules.ProposeRuler); ok {
-		proposerOpts = append(proposerOpts, consensus.OverrideProposeRule(ruler))
-	}
 	voter := consensus.NewVoter(
-		eventLoop,
-		logger,
 		config,
-		leaderRotationModule,
-		consensusRulesModule,
-		protocol,
+		leaderRotation,
+		consensusRules,
+		disAgg,
 		auth,
-		commandCache,
 		committer,
 	)
 	return &Consensus{
 		voter: voter,
 		proposer: consensus.NewProposer(
 			eventLoop,
-			logger,
 			config,
-			protocol,
+			blockchain,
+			consensusRules,
+			disAgg,
 			voter,
 			commandCache,
 			committer,
-			proposerOpts...,
 		),
 	}
 }

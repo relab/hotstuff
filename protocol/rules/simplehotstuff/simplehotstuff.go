@@ -3,8 +3,10 @@ package simplehotstuff
 
 import (
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -15,8 +17,9 @@ const ModuleName = "simplehotstuff"
 // Based on the simplified algorithm described in the paper
 // "Formal Verification of HotStuff" by Leander Jehl.
 type SimpleHotStuff struct {
-	blockChain *blockchain.BlockChain
 	logger     logging.Logger
+	config     *core.RuntimeConfig
+	blockchain *blockchain.Blockchain
 
 	locked *hotstuff.Block
 }
@@ -24,11 +27,13 @@ type SimpleHotStuff struct {
 // New returns a new SimpleHotStuff instance.
 func New(
 	logger logging.Logger,
-	blockChain *blockchain.BlockChain,
-) modules.HotstuffRuleset {
+	config *core.RuntimeConfig,
+	blockchain *blockchain.Blockchain,
+) *SimpleHotStuff {
 	return &SimpleHotStuff{
-		blockChain: blockChain,
 		logger:     logger,
+		config:     config,
+		blockchain: blockchain,
 
 		locked: hotstuff.GetGenesis(),
 	}
@@ -44,7 +49,7 @@ func (hs *SimpleHotStuff) VoteRule(view hotstuff.View, proposal hotstuff.Propose
 		return false
 	}
 
-	parent, ok := hs.blockChain.Get(block.QuorumCert().BlockHash())
+	parent, ok := hs.blockchain.Get(block.QuorumCert().BlockHash())
 	if !ok {
 		hs.logger.Info("VoteRule: missing parent block: ", block.QuorumCert().BlockHash())
 		return false
@@ -52,7 +57,7 @@ func (hs *SimpleHotStuff) VoteRule(view hotstuff.View, proposal hotstuff.Propose
 
 	// Rule 2: can only vote if parent's view is greater than or equal to locked block's view.
 	if parent.View() < hs.locked.View() {
-		hs.logger.Info("OnPropose: parent too old")
+		hs.logger.Info("VoteRule: parent too old")
 		return false
 	}
 
@@ -62,20 +67,20 @@ func (hs *SimpleHotStuff) VoteRule(view hotstuff.View, proposal hotstuff.Propose
 // CommitRule decides if an ancestor of the block can be committed, and returns the ancestor, otherwise returns nil.
 func (hs *SimpleHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	// will consider if the great-grandparent of the new block can be committed.
-	p, ok := hs.blockChain.Get(block.QuorumCert().BlockHash())
+	p, ok := hs.blockchain.Get(block.QuorumCert().BlockHash())
 	if !ok {
 		return nil
 	}
 
-	gp, ok := hs.blockChain.Get(p.QuorumCert().BlockHash())
+	gp, ok := hs.blockchain.Get(p.QuorumCert().BlockHash())
 	if ok && gp.View() > hs.locked.View() {
 		hs.locked = gp
-		hs.logger.Debug("Locked: ", gp)
+		hs.logger.Debug("CommitRule: updated locked block: ", gp)
 	} else if !ok {
 		return nil
 	}
 
-	ggp, ok := hs.blockChain.Get(gp.QuorumCert().BlockHash())
+	ggp, ok := hs.blockchain.Get(gp.QuorumCert().BlockHash())
 	// we commit the great-grandparent of the block if its grandchild is certified,
 	// which we already know is true because the new block contains the grandchild's certificate,
 	// and if the great-grandparent's view + 2 equals the grandchild's view.
@@ -89,3 +94,12 @@ func (hs *SimpleHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 func (hs *SimpleHotStuff) ChainLength() int {
 	return 3
 }
+
+// ProposeRule returns a new hotstuff proposal based on the current view, quorum certificate, and command batch.
+func (hs *SimpleHotStuff) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
+	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
+	proposal = hotstuff.NewProposeMsg(hs.config.ID(), view, qc, cmd)
+	return proposal, true
+}
+
+var _ consensus.Ruleset = (*SimpleHotStuff)(nil)

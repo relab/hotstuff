@@ -8,7 +8,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
+	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/twins"
@@ -84,8 +84,10 @@ const fhsBugScenario = `
 }
 `
 
-var logLevel = flag.String("log-level", "info", "set the log level")
-var logAll = flag.Bool("log-all", false, "print all logs on success")
+var (
+	logLevel = flag.String("log-level", "info", "set the log level")
+	logAll   = flag.Bool("log-all", false, "print all logs on success")
+)
 
 func TestFHSBug(t *testing.T) {
 	t.Skip("This test is not working as expected; skipping until we have fixed the issue.")
@@ -123,7 +125,6 @@ func TestFHSBug(t *testing.T) {
 
 	if res.Safe || *logAll {
 		t.Logf("Network log:\n%s", res.NetworkLog)
-
 		for id, log := range res.NodeLogs {
 			t.Logf("Node %v log:\n%s", id, log)
 		}
@@ -133,32 +134,27 @@ func TestFHSBug(t *testing.T) {
 // A wrapper around the FHS rules that swaps the commit rule for a vulnerable version
 type vulnerableFHS struct {
 	logger     logging.Logger
-	blockChain *blockchain.BlockChain
-	inner      fasthotstuff.FastHotStuff
+	blockchain *blockchain.Blockchain
+	fasthotstuff.FastHotStuff
 }
 
 func NewVulnFHS(
 	logger logging.Logger,
-	blockChain *blockchain.BlockChain,
+	blockchain *blockchain.Blockchain,
 	inner fasthotstuff.FastHotStuff,
-) modules.HotstuffRuleset {
+) *vulnerableFHS {
 	return &vulnerableFHS{
-		logger:     logger,
-		blockChain: blockChain,
-		inner:      inner,
+		logger:       logger,
+		blockchain:   blockchain,
+		FastHotStuff: inner,
 	}
-}
-
-// VoteRule decides whether to vote for the block.
-func (fhs *vulnerableFHS) VoteRule(view hotstuff.View, proposal hotstuff.ProposeMsg) bool {
-	return fhs.inner.VoteRule(view, proposal)
 }
 
 func (fhs *vulnerableFHS) qcRef(qc hotstuff.QuorumCert) (*hotstuff.Block, bool) {
 	if (hotstuff.Hash{}) == qc.BlockHash() {
 		return nil, false
 	}
-	return fhs.blockChain.Get(qc.BlockHash())
+	return fhs.blockchain.Get(qc.BlockHash())
 }
 
 // CommitRule decides whether an ancestor of the block can be committed.
@@ -181,7 +177,4 @@ func (fhs *vulnerableFHS) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	return nil
 }
 
-// ChainLength returns the number of blocks that need to be chained together in order to commit.
-func (fhs *vulnerableFHS) ChainLength() int {
-	return fhs.inner.ChainLength()
-}
+var _ consensus.Ruleset = (*vulnerableFHS)(nil)

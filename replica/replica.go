@@ -7,17 +7,16 @@ import (
 
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/kauri"
+	"github.com/relab/hotstuff/protocol/disagg"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
-	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/wiring"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/protocol/committer"
 	"github.com/relab/hotstuff/server"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -38,131 +37,52 @@ type Replica struct {
 // New returns a new replica.
 func New(
 	depsCore *wiring.Core,
-	vdParams viewduration.Params,
+	depsSecure *wiring.Security,
+	sender *network.GorumsSender,
+	viewStates *protocol.ViewStates,
+	disAgg disagg.DisseminatorAggregator,
+	leaderRotation leaderrotation.LeaderRotation,
+	consensusRules consensus.Ruleset,
+	viewDuration viewduration.ViewDuration,
+	commandBatchSize uint32,
 	opts ...Option,
 ) (replica *Replica, err error) {
 	rOpt := newDefaultOpts()
-	names := &rOpt.moduleNames
 	for _, opt := range opts {
 		opt(rOpt)
 	}
-	sender := network.NewGorumsSender(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		rOpt.credentials,
-	)
-	depsSecure, err := wiring.NewSecurity(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		sender,
-		names.crypto,
-		cert.WithCache(100), // TODO: consider making this configurable
-	)
-	if err != nil {
-		return nil, err
-	}
-	consensusRules, err := wiring.NewConsensusRules(
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		depsSecure.BlockChain(),
-		rOpt.moduleNames.consensus,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	byzStrat := rOpt.moduleNames.byzantineStrategy
-	if byzStrat != "" {
-		byz, err := wiring.WrapByzantineStrategy(
-			depsCore.RuntimeCfg(),
-			depsSecure.BlockChain(),
-			consensusRules,
-			byzStrat,
-		)
-		if err != nil {
-			return nil, err
-		}
-		consensusRules = byz
-		depsCore.Logger().Infof("assigned byzantine strategy: %s", byzStrat)
-	}
 	depsClient := wiring.NewClient(
+		depsCore.EventLoop(),
 		depsCore.Logger(),
-		rOpt.cmdCacheOpts,
+		commandBatchSize,
 		rOpt.clientGorumsSrvOpts...,
 	)
-	committer := committer.New(
+	committer := consensus.NewCommitter(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsSecure.BlockChain(),
+		viewStates,
 		consensusRules,
-		depsClient.Server(),
 	)
-	leaderRotation, err := wiring.NewLeaderRotation(
-		depsCore.Logger(),
-		depsCore.RuntimeCfg(),
-		depsSecure.BlockChain(),
-		committer,
-		vdParams,
-		rOpt.moduleNames.leaderRotation,
-		consensusRules.ChainLength(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	// TODO(AlanRostem): avoid creating viewstates here.
-	viewStates, err := consensus.NewViewStates(
-		depsSecure.BlockChain(),
-		depsSecure.Authority(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	var protocol modules.ConsensusProtocol
-	if depsCore.RuntimeCfg().HasKauriTree() {
-		protocol = kauri.New(
-			depsCore.Logger(),
-			depsCore.EventLoop(),
-			depsCore.RuntimeCfg(),
-			depsSecure.BlockChain(),
-			depsSecure.Authority(),
-			kauri.NewExtendedGorumsSender(
-				depsCore.EventLoop(),
-				depsCore.RuntimeCfg(),
-				sender,
-			),
-		)
-	} else {
-		protocol = consensus.NewHotStuff(
-			depsCore.Logger(),
-			depsCore.EventLoop(),
-			depsCore.RuntimeCfg(),
-			depsSecure.BlockChain(),
-			depsSecure.Authority(),
-			viewStates,
-			leaderRotation,
-			sender,
-		)
-	}
 	depsConsensus := wiring.NewConsensus(
 		depsCore.EventLoop(),
-		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
+		depsSecure.BlockChain(),
 		depsSecure.Authority(),
 		depsClient.Cache(),
 		committer,
 		consensusRules,
 		leaderRotation,
-		protocol,
+		disAgg,
 	)
-	// TODO(AlanRostem): consder moving the consensus flow from Synchronzier to a different class
+	// TODO(AlanRostem): consider moving the consensus flow from synchronizer to a different class
 	synchronizer := synchronizer.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.Authority(),
 		leaderRotation,
+		viewDuration,
 		depsConsensus.Proposer(),
 		depsConsensus.Voter(),
 		viewStates,

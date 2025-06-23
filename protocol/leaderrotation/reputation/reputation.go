@@ -9,21 +9,18 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/committer"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 )
 
 const ModuleName = "reputation"
 
 type reputationsMap map[hotstuff.ID]float64
 
-type repBased struct {
-	committer    *committer.Committer
-	config       *core.RuntimeConfig
-	logger       logging.Logger
-	viewDuration modules.ViewDuration
+type RepBasedLeaderRotation struct {
+	viewStates *protocol.ViewStates
+	config     *core.RuntimeConfig
+	logger     logging.Logger
 
 	chainLength    int
 	prevCommitHead *hotstuff.Block
@@ -32,13 +29,9 @@ type repBased struct {
 
 // TODO: should GetLeader be thread-safe?
 
-func (r *repBased) ViewDuration() modules.ViewDuration {
-	return r.viewDuration
-}
-
 // GetLeader returns the id of the leader in the given view
-func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
-	block := r.committer.CommittedBlock()
+func (r *RepBasedLeaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
+	block := r.viewStates.CommittedBlock()
 	if block.View() > view-hotstuff.View(r.chainLength) {
 		// TODO: it could be possible to lookup leaders for older views if we
 		// store a copy of the reputations in a metadata field of each block.
@@ -98,20 +91,20 @@ func (r *repBased) GetLeader(view hotstuff.View) hotstuff.ID {
 // NewRepBased returns a new random reputation-based leader rotation implementation
 func New(
 	chainLength int,
-	vdParams viewduration.Params,
 
-	committer *committer.Committer,
+	viewStates *protocol.ViewStates,
 	config *core.RuntimeConfig,
 	logger logging.Logger,
-) modules.LeaderRotation {
-	return &repBased{
-		committer:    committer,
-		config:       config,
-		logger:       logger,
-		viewDuration: viewduration.NewDynamic(vdParams),
+) *RepBasedLeaderRotation {
+	return &RepBasedLeaderRotation{
+		viewStates: viewStates,
+		config:     config,
+		logger:     logger,
 
 		chainLength:    chainLength,
 		reputations:    make(reputationsMap),
 		prevCommitHead: hotstuff.GetGenesis(),
 	}
 }
+
+var _ leaderrotation.LeaderRotation = (*RepBasedLeaderRotation)(nil)

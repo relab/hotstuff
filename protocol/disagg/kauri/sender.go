@@ -9,14 +9,13 @@ import (
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/proto/kauripb"
 	"github.com/relab/hotstuff/internal/tree"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/network"
 )
 
-type kauriGorumsSender struct {
+type KauriGorumsSender struct {
 	eventLoop *eventloop.EventLoop
 	config    *core.RuntimeConfig
-	modules.Sender
+	core.Sender
 
 	nodes map[hotstuff.ID]*kauripb.Node
 	tree  *tree.Tree
@@ -26,8 +25,8 @@ func NewExtendedGorumsSender(
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
 	base *network.GorumsSender,
-) modules.KauriSender {
-	s := &kauriGorumsSender{
+) *KauriGorumsSender {
+	s := &KauriGorumsSender{
 		eventLoop: eventLoop,
 		config:    config,
 		Sender:    base, // important: extend the base
@@ -44,7 +43,7 @@ func NewExtendedGorumsSender(
 	return s
 }
 
-func (k *kauriGorumsSender) SendContributionToParent(view hotstuff.View, qc hotstuff.QuorumSignature) {
+func (k *KauriGorumsSender) SendContributionToParent(view hotstuff.View, qc hotstuff.QuorumSignature) {
 	parent, ok := k.tree.Parent()
 	if ok {
 		node, isPresent := k.nodes[parent]
@@ -57,3 +56,5 @@ func (k *kauriGorumsSender) SendContributionToParent(view hotstuff.View, qc hots
 		}
 	}
 }
+
+var _ core.KauriSender = (*KauriGorumsSender)(nil)

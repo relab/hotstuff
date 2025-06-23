@@ -11,7 +11,6 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -219,7 +218,7 @@ func (s *GorumsSender) GorumsConfig() gorums.RawConfiguration {
 }
 
 // Sub returns a copy of self dedicated to the replica IDs provided.
-func (s *GorumsSender) Sub(ids []hotstuff.ID) (modules.Sender, error) {
+func (s *GorumsSender) Sub(ids []hotstuff.ID) (core.Sender, error) {
 	replicas := make(map[hotstuff.ID]*replicaNode)
 	nids := make([]uint32, len(ids))
 	for i, id := range ids {
@@ -278,4 +277,4 @@ func (q qspec) FetchQF(in *hotstuffpb.BlockHash, replies map[uint32]*hotstuffpb.
 // ConnectedEvent is sent when the configuration has connected to the other replicas.
 type ConnectedEvent struct{}
 
-var _ modules.Sender = (*GorumsSender)(nil)
+var _ core.Sender = (*GorumsSender)(nil)

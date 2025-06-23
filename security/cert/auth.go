@@ -1,35 +1,33 @@
-// Package crypto provides implementations of the Crypto interface.
+// Package cert provides a certificate authority for creating and verifying quorum certificates.
 package cert
 
 import (
+	"fmt"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
 	"github.com/relab/hotstuff/security/blockchain"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 type Authority struct {
-	modules.CryptoBase // embedded to avoid having to implement forwarding methods
-	config             *core.RuntimeConfig
-	logger             logging.Logger
-	blockChain         *blockchain.BlockChain
+	crypto.Base // embedded to avoid having to implement forwarding methods
+	config      *core.RuntimeConfig
+	blockchain  *blockchain.Blockchain
 }
 
 // NewAuthority returns an Authority. It will use the given CryptoBase to create and verify
 // signatures.
 func NewAuthority(
 	config *core.RuntimeConfig,
-	logger logging.Logger,
-	blockChain *blockchain.BlockChain,
-	impl modules.CryptoBase,
+	blockchain *blockchain.Blockchain,
+	impl crypto.Base,
 	opts ...Option,
 ) *Authority {
 	ca := &Authority{
-		CryptoBase: impl,
+		Base:       impl,
 		config:     config,
-		logger:     logger,
-		blockChain: blockChain,
+		blockchain: blockchain,
 	}
 	for _, opt := range opts {
 		opt(ca)
@@ -100,52 +98,55 @@ func (c *Authority) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.Ti
 }
 
 // VerifyPartialCert verifies a single partial certificate.
-func (c *Authority) VerifyPartialCert(cert hotstuff.PartialCert) bool {
-	block, ok := c.blockChain.Get(cert.BlockHash())
+func (c *Authority) VerifyPartialCert(cert hotstuff.PartialCert) error {
+	block, ok := c.blockchain.Get(cert.BlockHash())
 	if !ok {
-		return false
+		return fmt.Errorf("block not found: %v", cert.BlockHash())
 	}
 	return c.Verify(cert.Signature(), block.ToBytes())
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
-func (c *Authority) VerifyQuorumCert(quorumSize int, qc hotstuff.QuorumCert) bool {
+func (c *Authority) VerifyQuorumCert(qc hotstuff.QuorumCert) error {
 	// genesis QC is always valid.
 	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
-		return true
+		return nil
 	}
 
 	// TODO: FIX BUG - qcSignature can be nil when a leader is byzantine.
 	qcSignature := qc.Signature()
 	if qcSignature == nil {
-		c.logger.DPanicf("quorum certificate has nil signature (view=%d)", qc.View())
+		return fmt.Errorf("quorum certificate has nil signature (view=%d)", qc.View())
 	}
 
 	participants := qcSignature.Participants()
+	quorumSize := c.config.QuorumSize()
 	if participants.Len() < quorumSize {
-		return false
+		return fmt.Errorf("%d participants cannot satisfy the quorum requirement: %d", participants.Len(), quorumSize)
 	}
-	block, ok := c.blockChain.Get(qc.BlockHash())
+	block, ok := c.blockchain.Get(qc.BlockHash())
 	if !ok {
-		return false
+		return fmt.Errorf("block not found: %v", qc.BlockHash())
 	}
 	return c.Verify(qc.Signature(), block.ToBytes())
 }
 
 // VerifyTimeoutCert verifies a timeout certificate.
-func (c *Authority) VerifyTimeoutCert(quorumSize int, tc hotstuff.TimeoutCert) bool {
+func (c *Authority) VerifyTimeoutCert(tc hotstuff.TimeoutCert) error {
 	// view 0 TC is always valid.
 	if tc.View() == 0 {
-		return true
+		return nil
 	}
-	if tc.Signature().Participants().Len() < quorumSize {
-		return false
+	quorumSize := c.config.QuorumSize()
+	participants := tc.Signature().Participants()
+	if participants.Len() < quorumSize {
+		return fmt.Errorf("%d participants cannot satisfy the quorum requirement: %d", participants.Len(), quorumSize)
 	}
 	return c.Verify(tc.Signature(), tc.View().ToBytes())
 }
 
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
-func (c *Authority) VerifyAggregateQC(quorumSize int, aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, ok bool) {
+func (c *Authority) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, err error) {
 	messages := make(map[hotstuff.ID][]byte)
 	for id, qc := range aggQC.QCs() {
 		if highQC.View() < qc.View() || highQC == (hotstuff.QuorumCert{}) {
@@ -158,34 +159,36 @@ func (c *Authority) VerifyAggregateQC(quorumSize int, aggQC hotstuff.AggregateQC
 			SyncInfo: hotstuff.NewSyncInfo().WithQC(qc),
 		}.ToBytes()
 	}
-	if aggQC.Sig().Participants().Len() < quorumSize {
-		return hotstuff.QuorumCert{}, false
+	quorumSize := c.config.QuorumSize()
+	participants := aggQC.Sig().Participants()
+	if participants.Len() < quorumSize {
+		return hotstuff.QuorumCert{}, fmt.Errorf("%d participants cannot satisfy the quorum requirement: %d", participants.Len(), quorumSize)
 	}
 	// both the batched aggQC signatures and the highQC must be verified
-	if c.BatchVerify(aggQC.Sig(), messages) && c.VerifyQuorumCert(quorumSize, highQC) {
-		return highQC, true
+	if err := c.BatchVerify(aggQC.Sig(), messages); err != nil {
+		return hotstuff.QuorumCert{}, err
 	}
-	return hotstuff.QuorumCert{}, false
+
+	if err := c.VerifyQuorumCert(highQC); err != nil {
+		return hotstuff.QuorumCert{}, err
+	}
+	return highQC, nil
 }
 
 // VerifyAnyQC is a helper that verifies either a QC or the aggregateQC.
 // TODO(AlanRostem): add a test case for this method.
-func (c *Authority) VerifyAnyQC(qc *hotstuff.QuorumCert, aggQC *hotstuff.AggregateQC) bool {
+func (c *Authority) VerifyAnyQC(proposal *hotstuff.ProposeMsg) error {
+	qc := proposal.Block.QuorumCert()
+	aggQC := proposal.AggregateQC
 	if c.config.HasAggregateQC() && aggQC != nil {
-		highQC, ok := c.VerifyAggregateQC(c.config.QuorumSize(), *aggQC)
-		if !ok {
-			c.logger.Warnf("VerifyAnyQC: failed to verify aggregate QC")
-			return false
+		highQC, err := c.VerifyAggregateQC(*aggQC)
+		if err != nil {
+			return err
 		}
-		// NOTE: for simplicity, we require that the highQC found in the AggregateQC equals the QC embedded in the block.
+		// for simplicity, we require that the highQC found in the AggregateQC equals the block's QC.
 		if !qc.Equals(highQC) {
-			c.logger.Warnf("VerifyAnyQC: block QC does not equal highQC")
-			return false
+			return fmt.Errorf("block QC does not match the highQC of the block's aggregate QC")
 		}
 	}
-	if !c.VerifyQuorumCert(c.config.QuorumSize(), *qc) {
-		c.logger.Infof("VerifyAnyQC: invalid QC")
-		return false
-	}
-	return true
+	return c.VerifyQuorumCert(qc)
 }

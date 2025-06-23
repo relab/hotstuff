@@ -28,7 +28,7 @@ func assignNodeIDs(numNodes, numTwins uint8) (nodes, twins []NodeID) {
 	remainingTwins := numTwins
 
 	// assign IDs to nodes
-	for i := uint8(0); i < numNodes; i++ {
+	for range numNodes {
 		if remainingTwins > 0 {
 			twins = append(twins, NodeID{
 				ReplicaID: replicaID,

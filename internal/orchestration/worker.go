@@ -17,27 +17,36 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/latency"
-	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/metrics/types"
+	"github.com/relab/hotstuff/network"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/replica"
+	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 	"github.com/relab/hotstuff/server"
 	"github.com/relab/hotstuff/wiring"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
 	// imported modules
-	_ "github.com/relab/hotstuff/protocol/kauri"
+	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/protocol/disagg"
+	"github.com/relab/hotstuff/protocol/disagg/clique"
+	"github.com/relab/hotstuff/protocol/disagg/kauri"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	_ "github.com/relab/hotstuff/protocol/leaderrotation"
 	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	_ "github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	_ "github.com/relab/hotstuff/protocol/rules/simplehotstuff"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
+	"github.com/relab/hotstuff/protocol/votingmachine"
 	_ "github.com/relab/hotstuff/security/crypto/bls12"
 	_ "github.com/relab/hotstuff/security/crypto/ecdsa"
 	_ "github.com/relab/hotstuff/security/crypto/eddsa"
@@ -145,20 +154,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	// setup core - used in replica and measurement framework
 	runtimeOpts := []core.RuntimeOption{}
 	// TODO(AlanRostem): maybe rename the tree option to kauriTree? should also use the tree check only for enable kauri
-	if opts.GetKauri() && opts.TreeEnabled() {
-		delayMode := tree.DelayTypeNone
-		if opts.GetAggregationTime() {
-			delayMode = tree.DelayTypeAggregation
-		}
-		t := tree.NewDelayed(
-			opts.HotstuffID(),
-			delayMode,
-			int(opts.GetBranchFactor()),
-			latency.MatrixFrom(opts.GetLocations()),
-			opts.TreePositionIDs(),
-			opts.GetTreeDelta().AsDuration(),
-		)
-		runtimeOpts = append(runtimeOpts, core.WithKauriTree(t))
+	if opts.TreeEnabled() {
+		runtimeOpts = append(runtimeOpts, core.WithKauriTree(newTree(opts)))
 	}
 	runtimeOpts = append(runtimeOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
 	if opts.GetUseAggQC() {
@@ -180,40 +177,158 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 			return nil, err
 		}
 	}
+	creds := insecure.NewCredentials()
 	// setup replica
 	replicaOpts := []replica.Option{}
-	var certificate tls.Certificate
-	var rootCAs *x509.CertPool
 	if opts.GetUseTLS() {
-		certificate, err = tls.X509KeyPair(opts.GetCertificate(), opts.GetCertificateKey())
+		certificate, err := tls.X509KeyPair(opts.GetCertificate(), opts.GetCertificateKey())
 		if err != nil {
 			return nil, err
 		}
-		rootCAs = x509.NewCertPool()
+		rootCAs := x509.NewCertPool()
 		rootCAs.AppendCertsFromPEM(opts.GetCertificateAuthority())
-		replicaOpts = append(replicaOpts, replica.WithTLS(certificate, rootCAs))
-	}
-	if opts.GetBatchSize() > 1 {
-		replicaOpts = append(replicaOpts,
-			replica.WithCmdCacheOptions(clientpb.WithBatching(opts.GetBatchSize())),
-		)
+		creds = credentials.NewTLS(&tls.Config{ // overwrite creds to a secure TLS version
+			RootCAs:      rootCAs,
+			Certificates: []tls.Certificate{certificate},
+		})
+		replicaOpts = append(replicaOpts, replica.WithTLS(certificate, rootCAs, creds))
 	}
 	replicaOpts = append(replicaOpts,
-		replica.OverrideCrypto(opts.GetCrypto()),
-		replica.OverrideConsensusRules(opts.GetConsensus()),
-		replica.OverrideLeaderRotation(opts.GetLeaderRotation()),
-		replica.WithByzantineStrategy(opts.GetByzantineStrategy()),
 		replica.WithServerOptions(server.WithLatencies(opts.HotstuffID(), opts.GetLocations())),
 	)
+	sender := network.NewGorumsSender(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		creds,
+	)
+	depsSecure, err := wiring.NewSecurity(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		sender,
+		opts.GetCrypto(),
+		cert.WithCache(100), // TODO: consider making this configurable
+	)
+	if err != nil {
+		return nil, err
+	}
+	consensusRules, viewStates, leaderRotation, disAgg, viewDuration, err := initConsensusModules(depsCore, depsSecure, sender, opts)
+	if err != nil {
+		return nil, err
+	}
 	return replica.New(
 		depsCore,
-		viewduration.NewParams(
+		depsSecure,
+		sender,
+		viewStates,
+		disAgg,
+		leaderRotation,
+		consensusRules,
+		viewDuration,
+		opts.GetBatchSize(),
+		replicaOpts...,
+	)
+}
+
+func initConsensusModules(depsCore *wiring.Core, depsSecure *wiring.Security, sender *network.GorumsSender, opts *orchestrationpb.ReplicaOpts) (consensus.Ruleset, *protocol.ViewStates, leaderrotation.LeaderRotation, disagg.DisseminatorAggregator, viewduration.ViewDuration, error) {
+	consensusRules, err := wiring.NewConsensusRules(
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		depsSecure.BlockChain(),
+		opts.GetConsensus(),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	if byzStrategy := opts.GetByzantineStrategy(); byzStrategy != "" {
+		byz, err := wiring.WrapByzantineStrategy(
+			depsCore.Logger(),
+			depsCore.RuntimeCfg(),
+			depsSecure.BlockChain(),
+			consensusRules,
+			byzStrategy,
+		)
+		if err != nil {
+			return nil, nil, nil, nil, nil, err
+		}
+		consensusRules = byz
+	}
+	viewStates, err := protocol.NewViewStates(
+		depsSecure.BlockChain(),
+		depsSecure.Authority(),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	leaderRotation, err := wiring.NewLeaderRotation(
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		depsSecure.BlockChain(),
+		viewStates,
+		opts.GetLeaderRotation(),
+		consensusRules.ChainLength(),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
+	var disAgg disagg.DisseminatorAggregator
+	var viewDuration viewduration.ViewDuration
+	if depsCore.RuntimeCfg().HasKauriTree() {
+		viewDuration = viewduration.NewFixed(opts.GetInitialTimeout().AsDuration())
+		disAgg = kauri.New(
+			depsCore.Logger(),
+			depsCore.EventLoop(),
+			depsCore.RuntimeCfg(),
+			depsSecure.BlockChain(),
+			depsSecure.Authority(),
+			kauri.NewExtendedGorumsSender(
+				depsCore.EventLoop(),
+				depsCore.RuntimeCfg(),
+				sender,
+			),
+		)
+	} else {
+		viewDuration = viewduration.NewDynamic(viewduration.NewParams(
 			opts.GetTimeoutSamples(),
 			opts.GetInitialTimeout().AsDuration(),
 			opts.GetMaxTimeout().AsDuration(),
 			opts.GetTimeoutMultiplier(),
-		),
-		replicaOpts...,
+		))
+		votingMachine := votingmachine.New(
+			depsCore.Logger(),
+			depsCore.EventLoop(),
+			depsCore.RuntimeCfg(),
+			depsSecure.BlockChain(),
+			depsSecure.Authority(),
+			viewStates,
+		)
+		disAgg = clique.New(
+			depsCore.RuntimeCfg(),
+			votingMachine,
+			leaderRotation,
+			sender,
+		)
+	}
+	return consensusRules, viewStates, leaderRotation, disAgg, viewDuration, nil
+}
+
+// newTree creates a new tree based on the provided options. It uses the aggregation
+// time option to determine the delay mode and initializes the tree with the specified
+// branch factor, locations, position IDs, and delta duration.
+func newTree(opts *orchestrationpb.ReplicaOpts) *tree.Tree {
+	delayMode := tree.DelayTypeNone
+	if opts.GetAggregationTime() {
+		delayMode = tree.DelayTypeAggregation
+	}
+	return tree.NewDelayed(
+		opts.HotstuffID(),
+		delayMode,
+		int(opts.GetBranchFactor()),
+		latency.MatrixFrom(opts.GetLocations()),
+		opts.TreePositionIDs(),
+		opts.GetTreeDelta().AsDuration(),
 	)
 }
 

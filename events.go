@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 )
 
 // ProposeMsg is broadcast when a leader makes a proposal.
@@ -12,6 +14,13 @@ type ProposeMsg struct {
 	ID          ID           // The ID of the replica who sent the message.
 	Block       *Block       // The block that is proposed.
 	AggregateQC *AggregateQC // Optional AggregateQC
+}
+
+func NewProposeMsg(id ID, view View, qc QuorumCert, cmd *clientpb.Batch) ProposeMsg {
+	return ProposeMsg{
+		ID:    id,
+		Block: NewBlock(qc.BlockHash(), qc, cmd, view, id),
+	}
 }
 
 func (p ProposeMsg) String() string {
@@ -56,14 +65,9 @@ func (timeout TimeoutMsg) String() string {
 // NewViewMsg is sent to the leader whenever a replica decides to advance to the next view.
 // It contains the highest QC or TC known to the replica.
 type NewViewMsg struct {
-	ID       ID       // The ID of the replica who sent the message.
-	SyncInfo SyncInfo // The highest QC / TC.
-}
-
-// CommitEvent is raised whenever a block is committed,
-// and includes the number of client commands that were executed.
-type CommitEvent struct {
-	Commands int
+	ID          ID       // The ID of the replica who sent the message.
+	SyncInfo    SyncInfo // The highest QC / TC.
+	FromNetwork bool     // (debug) was this called internally or on the network?
 }
 
 // ViewChangeEvent is sent on the eventloop whenever a view change occurs.
@@ -75,6 +79,10 @@ type ViewChangeEvent struct {
 // TimeoutEvent is sent on the eventloop when a local timeout occurs.
 type TimeoutEvent struct {
 	View View
+}
+
+type CommitEvent struct {
+	Block *Block
 }
 
 type ReplicaConnectedEvent struct {

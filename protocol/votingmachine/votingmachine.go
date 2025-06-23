@@ -1,4 +1,4 @@
-package consensus
+package votingmachine
 
 import (
 	"sync"
@@ -7,33 +7,35 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
 )
 
 // VotingMachine collects and verifies votes.
+// TODO(AlanRostem): make tests
 type VotingMachine struct {
 	logger     logging.Logger
 	eventLoop  *eventloop.EventLoop
 	config     *core.RuntimeConfig
-	blockChain *blockchain.BlockChain
+	blockchain *blockchain.Blockchain
 	auth       *cert.Authority
-	state      *ViewStates
+	state      *protocol.ViewStates
 
 	mut           sync.Mutex
 	verifiedVotes map[hotstuff.Hash][]hotstuff.PartialCert
 }
 
-func NewVotingMachine(
+func New(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
-	blockChain *blockchain.BlockChain,
+	blockchain *blockchain.Blockchain,
 	auth *cert.Authority,
-	state *ViewStates,
+	state *protocol.ViewStates,
 ) *VotingMachine {
 	vm := &VotingMachine{
-		blockChain:    blockChain,
+		blockchain:    blockchain,
 		auth:          auth,
 		eventLoop:     eventLoop,
 		logger:        logger,
@@ -50,27 +52,27 @@ func NewVotingMachine(
 // CollectVote handles an incoming vote.
 func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 	cert := vote.PartialCert
-	vm.logger.Debugf("OnVote(%d): %.8s", vote.ID, cert.BlockHash())
+	vm.logger.Debugf("CollectVote(from %d): %s", vote.ID, cert.BlockHash().SmallString())
 	var (
 		block *hotstuff.Block
 		ok    bool
 	)
 	if !vote.Deferred {
 		// first, try to get the block from the local cache
-		block, ok = vm.blockChain.LocalGet(cert.BlockHash())
+		block, ok = vm.blockchain.LocalGet(cert.BlockHash())
 		if !ok {
 			// if that does not work, we will try to handle this event later.
 			// hopefully, the block has arrived by then.
-			vm.logger.Debugf("Local cache miss for block: %.8s", cert.BlockHash())
+			vm.logger.Debugf("Local cache miss for block: %s", cert.BlockHash().SmallString())
 			vote.Deferred = true
 			vm.eventLoop.DelayUntil(hotstuff.ProposeMsg{}, vote)
 			return
 		}
 	} else {
 		// if the block has not arrived at this point we will try to fetch it.
-		block, ok = vm.blockChain.Get(cert.BlockHash())
+		block, ok = vm.blockchain.Get(cert.BlockHash())
 		if !ok {
-			vm.logger.Debugf("Could not find block for vote: %.8s.", cert.BlockHash())
+			vm.logger.Debugf("Could not find block for vote: %s.", cert.BlockHash().SmallString())
 			return
 		}
 	}
@@ -78,7 +80,7 @@ func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 		vm.logger.Info("block too old")
 		return
 	}
-	if vm.config.SyncVoteVerification() {
+	if vm.config.SyncVerification() {
 		vm.verifyCert(cert, block)
 	} else {
 		go vm.verifyCert(cert, block)
@@ -86,8 +88,8 @@ func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 }
 
 func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
-	if !vm.auth.VerifyPartialCert(cert) {
-		vm.logger.Info("OnVote: Vote could not be verified!")
+	if err := vm.auth.VerifyPartialCert(cert); err != nil {
+		vm.logger.Infof("vote could not be verified: %v", err)
 		return
 	}
 	vm.mut.Lock()
@@ -96,7 +98,7 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	defer func() {
 		// delete any pending QCs with lower height than bLeaf
 		for k := range vm.verifiedVotes {
-			if block, ok := vm.blockChain.LocalGet(k); ok {
+			if block, ok := vm.blockchain.LocalGet(k); ok {
 				if block.View() <= vm.state.HighQC().View() {
 					delete(vm.verifiedVotes, k)
 				}
@@ -113,9 +115,10 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	}
 	qc, err := vm.auth.CreateQuorumCert(block, votes)
 	if err != nil {
-		vm.logger.Info("OnVote: could not create QC for block: ", err)
+		vm.logger.Infof("CollectVote: could not create QC for block: %v", err)
 		return
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
+	vm.logger.Debugf("CollectVote: dispatching event for new view (current : %d)", vm.state.View())
 	vm.eventLoop.AddEvent(hotstuff.NewViewMsg{ID: vm.config.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
 }

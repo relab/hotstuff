@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/modules"
 	"github.com/spf13/cobra"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -34,14 +33,15 @@ use 'hotstuff help run' to view all possible parameters for this command.`,
 			if !listModules {
 				return cmd.Usage()
 			}
-			mods := modules.ListModules()
-			for k, v := range mods {
-				fmt.Println(k, ":")
-				for _, n := range v {
-					fmt.Println("\t", n)
-				}
-			}
-			return nil
+			// mods := modules.ListModules()
+			// for k, v := range mods {
+			// 	fmt.Println(k, ":")
+			// 	for _, n := range v {
+			// 		fmt.Println("\t", n)
+			// 	}
+			// }
+			// TODO(AlanRostem): reimplement this
+			return fmt.Errorf("not implemented")
 		},
 	}
 )

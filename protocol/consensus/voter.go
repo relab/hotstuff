@@ -1,102 +1,75 @@
 package consensus
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/internal/proto/clientpb"
-	"github.com/relab/hotstuff/modules"
-	"github.com/relab/hotstuff/protocol/committer"
+	"github.com/relab/hotstuff/protocol/disagg"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/security/cert"
 )
 
 type Voter struct {
-	logger    logging.Logger
-	eventLoop *eventloop.EventLoop
-	config    *core.RuntimeConfig
+	config *core.RuntimeConfig
 
-	leaderRotation modules.LeaderRotation
-	ruler          modules.VoteRuler
-	protocol       modules.ConsensusProtocol
+	leaderRotation leaderrotation.LeaderRotation
+	ruler          VoteRuler
+	aggregator     disagg.Aggregator
 
-	auth         *cert.Authority
-	commandCache *clientpb.Cache
-	committer    *committer.Committer
+	auth      *cert.Authority
+	committer *Committer
 
 	lastVote hotstuff.View
 }
 
 func NewVoter(
-	eventLoop *eventloop.EventLoop,
-	logger logging.Logger,
 	config *core.RuntimeConfig,
-	leaderRotation modules.LeaderRotation,
-	rules modules.VoteRuler,
-	protocol modules.ConsensusProtocol,
+	leaderRotation leaderrotation.LeaderRotation,
+	rules VoteRuler,
+	aggregator disagg.Aggregator,
 	auth *cert.Authority,
-	commandCache *clientpb.Cache,
-	committer *committer.Committer,
+	committer *Committer,
 ) *Voter {
 	v := &Voter{
-		logger:    logger,
-		eventLoop: eventLoop,
-		config:    config,
+		config: config,
 
 		leaderRotation: leaderRotation,
 		ruler:          rules,
-		protocol:       protocol,
+		aggregator:     aggregator,
 
-		auth:         auth,
-		commandCache: commandCache,
-		committer:    committer,
+		auth:      auth,
+		committer: committer,
 
 		lastVote: 0,
 	}
-	v.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
-		proposal := event.(hotstuff.ProposeMsg)
-		// ensure that I can vote in this view based on the protocol's rule.
-		err := v.Verify(&proposal)
-		if err != nil {
-			v.logger.Infof("failed to verify incoming vote: %v", err)
-			return
-		}
-		v.OnValidPropose(&proposal)
-	})
 	return v
 }
 
-// OnValidPropose is called when receiving a valid proposal from a leader and emits an event to advance the view. The proposal should be verified before calling this.
-// The method tells the committer and command cache to update its state.
-func (cs *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) {
+// OnValidPropose is called when receiving a valid proposal from a leader and emits
+// an event to advance the view. The proposal must be verified before calling this.
+func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (errs error) {
 	block := proposal.Block
-	// store the valid block, it may commit the block or its ancestors
-	cs.committer.Update(block)
-	// TODO(AlanRostem): solve issue #191
-	// update the command's age before voting.
-	cs.commandCache.Proposed(block.Commands())
-	pc, err := cs.Vote(block)
-	if err != nil {
-		// if the block is invalid, reject it. This means the command is also discarded.
-		cs.logger.Infof("%v", err)
-	} else {
-		// send the vote if it was successful
-		cs.protocol.SendVote(proposal, pc)
+	// try to commit the block; accumulate any error but still proceed to vote
+	if err := v.committer.TryCommit(block); err != nil {
+		errs = errors.Join(errs, err)
 	}
-	// advance the view regardless of vote success/failure
-	newInfo := hotstuff.NewSyncInfo().WithQC(block.QuorumCert())
-	cs.eventLoop.AddEvent(hotstuff.NewViewMsg{
-		ID:       cs.config.ID(),
-		SyncInfo: newInfo,
-	})
+	// always vote, even if commit failed
+	pc, err := v.Vote(block)
+	if err != nil {
+		return errors.Join(errs, fmt.Errorf("vote failed: %w", err))
+	}
+	// send the vote if it was successful
+	if err := v.aggregator.Aggregate(v.LastVote(), proposal, pc); err != nil {
+		return errors.Join(errs, fmt.Errorf("aggregate failed: %w", err))
+	}
+	return errs
 }
 
 // StopVoting ensures that no voting happens in a view earlier than `view`.
 func (v *Voter) StopVoting(view hotstuff.View) {
 	if v.lastVote < view {
-		v.logger.Debugf("stopped voting on view %d and changed view to %d", v.lastVote, view)
 		v.lastVote = view
 	}
 }
@@ -115,7 +88,7 @@ func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, err error)
 	return pc, nil
 }
 
-// verify verifies the proposal and returns true if it can be voted for.
+// Verify verifies the proposal and returns true if it can be voted for.
 func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 	block := proposal.Block
 	view := block.View()
@@ -123,22 +96,18 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 	if block.View() <= v.lastVote {
 		return fmt.Errorf("block view too old")
 	}
-	// cannot vote for old commands
-	if v.commandCache.ContainsDuplicate(block.Commands()) {
-		return fmt.Errorf("command too old")
-	}
 	// vote rule must be valid
 	if !v.ruler.VoteRule(view, *proposal) {
 		return fmt.Errorf("vote rule not satisfied")
 	}
-	// verify the proposal's QC.
-	qc := proposal.Block.QuorumCert()
-	if !v.auth.VerifyAnyQC(&qc, proposal.AggregateQC) {
-		return fmt.Errorf("invalid qc")
+	// verify the proposal's quorum certificate(s).
+	if err := v.auth.VerifyAnyQC(proposal); err != nil {
+		return err
 	}
 	// ensure the block came from the expected leader.
-	if proposal.ID != v.leaderRotation.GetLeader(block.View()) {
-		return fmt.Errorf("unexpected leader")
+	leaderID := v.leaderRotation.GetLeader(block.View())
+	if proposal.ID != leaderID {
+		return fmt.Errorf("expected leader %d but got %d in view %d", leaderID, proposal.ID, block.View())
 	}
 	return nil
 }

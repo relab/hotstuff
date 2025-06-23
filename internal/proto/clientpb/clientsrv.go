@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/relab/gorums"
+	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -16,30 +17,42 @@ import (
 // Server serves a client.
 type Server struct {
 	logger   logging.Logger
-	cmdCache *Cache
+	cmdCache *CommandCache
 
 	mut          sync.Mutex
 	srv          *gorums.Server
 	awaitingCmds map[MessageID]chan<- error
 	hash         hash.Hash
 	cmdCount     uint32
+
+	lastExecutedSeqNum map[uint32]uint64 // highest executed sequence number per client ID
 }
 
 // NewServer returns a new client server.
 func NewServer(
+	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	cmdCache *Cache,
+	cmdCache *CommandCache,
 	srvOpts ...gorums.ServerOption,
 ) (srv *Server) {
 	srv = &Server{
 		logger:   logger,
 		cmdCache: cmdCache,
 
-		awaitingCmds: make(map[MessageID]chan<- error),
-		srv:          gorums.NewServer(srvOpts...),
-		hash:         sha256.New(),
+		awaitingCmds:       make(map[MessageID]chan<- error),
+		srv:                gorums.NewServer(srvOpts...),
+		hash:               sha256.New(),
+		lastExecutedSeqNum: make(map[uint32]uint64),
 	}
 	RegisterClientServer(srv.srv, srv)
+	eventLoop.RegisterHandler(ExecuteEvent{}, func(event any) {
+		e := event.(ExecuteEvent)
+		srv.Exec(e.Batch)
+	})
+	eventLoop.RegisterHandler(AbortEvent{}, func(event any) {
+		e := event.(AbortEvent)
+		srv.Abort(e.Batch)
+	})
 	return srv
 }
 
@@ -72,7 +85,7 @@ func (srv *Server) ExecCommand(ctx gorums.ServerCtx, cmd *Command) (*emptypb.Emp
 	srv.awaitingCmds[id] = errChan
 	srv.mut.Unlock()
 
-	srv.cmdCache.add(cmd)
+	srv.cmdCache.Add(cmd)
 	ctx.Release()
 	err := <-errChan
 	return &emptypb.Empty{}, err
@@ -83,29 +96,41 @@ func (srv *Server) Exec(batch *Batch) {
 		id := cmd.ID()
 
 		srv.mut.Lock()
-		// TODO(meling): ASKING: previously the hash.Write and srv.cmdCount++ were outside the critical section, shouldn't they be inside?
-		// TODO(meling): We should add a concurrency test for this logic to check that the hash doesn't get corrupted.
+		if srv.isDuplicate(cmd) {
+			srv.logger.Info("duplicate command found")
+			srv.completeCommand(id, status.Error(codes.Aborted, "command already executed"))
+			srv.mut.Unlock()
+			continue
+		}
+		srv.lastExecutedSeqNum[cmd.ClientID] = cmd.SequenceNumber
 		_, _ = srv.hash.Write(cmd.Data)
 		srv.cmdCount++
-		if errChan, ok := srv.awaitingCmds[id]; ok {
-			errChan <- nil
-			delete(srv.awaitingCmds, id)
-		}
+		srv.completeCommand(id, nil)
 		srv.mut.Unlock()
 	}
-
 	srv.logger.Debugf("Hash: %.8x", srv.hash.Sum(nil))
 }
 
-func (srv *Server) Fork(batch *Batch) {
+func (srv *Server) Abort(batch *Batch) {
 	for _, cmd := range batch.GetCommands() {
-		id := cmd.ID()
-
 		srv.mut.Lock()
-		if errChan, ok := srv.awaitingCmds[id]; ok {
-			errChan <- status.Error(codes.Aborted, "blockchain was forked")
-			delete(srv.awaitingCmds, id)
-		}
+		srv.completeCommand(cmd.ID(), status.Error(codes.Aborted, "blockchain was forked"))
 		srv.mut.Unlock()
+	}
+}
+
+// isDuplicate return true if the command has already been executed.
+// The caller must hold srv.mut.Lock().
+func (srv *Server) isDuplicate(cmd *Command) bool {
+	seqNum, ok := srv.lastExecutedSeqNum[cmd.ClientID]
+	return ok && seqNum >= cmd.SequenceNumber
+}
+
+// completeCommand sends an error or nil to the awaiting client's error channel.
+// The caller must hold srv.mut.Lock().
+func (srv *Server) completeCommand(id MessageID, err error) {
+	if errChan, ok := srv.awaitingCmds[id]; ok {
+		errChan <- err
+		delete(srv.awaitingCmds, id)
 	}
 }
