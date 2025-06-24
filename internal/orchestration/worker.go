@@ -40,6 +40,8 @@ import (
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	_ "github.com/relab/hotstuff/protocol/leaderrotation"
+	"github.com/relab/hotstuff/protocol/rules"
+	"github.com/relab/hotstuff/protocol/rules/byzantine"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	_ "github.com/relab/hotstuff/security/crypto/bls12"
 	_ "github.com/relab/hotstuff/security/crypto/ecdsa"
@@ -196,6 +198,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		depsCore.RuntimeCfg(),
 		creds,
 	)
+	depsCore.Logger().Debugf("Initializing module (crypto): %s", opts.GetCrypto())
 	depsSecure, err := wiring.NewSecurity(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
@@ -238,7 +241,7 @@ func initConsensusModules(
 	viewduration.ViewDuration,
 	error,
 ) {
-	consensusRules, err := wiring.NewConsensusRules(
+	consensusRules, err := rules.New(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
@@ -248,7 +251,7 @@ func initConsensusModules(
 		return nil, nil, nil, nil, nil, err
 	}
 	if byzStrategy := opts.GetByzantineStrategy(); byzStrategy != "" {
-		byz, err := wiring.WrapByzantineStrategy(
+		byz, err := byzantine.Wrap(
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
 			depsSecure.BlockChain(),
@@ -267,7 +270,7 @@ func initConsensusModules(
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
-	leaderRotation, err := wiring.NewLeaderRotation(
+	leaderRotation, err := leaderrotation.New(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),

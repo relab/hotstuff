@@ -14,6 +14,7 @@ import (
 	"github.com/relab/hotstuff/protocol/comm/clique"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
+	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/protocol/votingmachine"
@@ -70,7 +71,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		return nil, err
 	}
 	node.blockchain = depsSecurity.BlockChain()
-	consensusRules, err := wiring.NewConsensusRules(node.logger, node.config, node.blockchain, consensusName)
+	consensusRules, err := rules.New(node.logger, node.config, node.blockchain, consensusName)
 	if err != nil {
 		return nil, err
 	}

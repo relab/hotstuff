@@ -29,34 +29,24 @@ func NewSecurity(
 		logger,
 		sender,
 	)
-	cryptoImpl, err := newCryptoModule(
-		logger,
+	auth, err := cert.NewAuthority(
 		config,
+		blockchain,
 		cryptoName,
+		opts...,
 	)
 	if err != nil {
 		return nil, err
 	}
 	return &Security{
 		blockchain: blockchain,
-		cryptoImpl: cryptoImpl,
-		auth: cert.NewAuthority(
-			config,
-			blockchain,
-			cryptoImpl,
-			opts...,
-		),
+		auth:       auth,
 	}, nil
 }
 
 // BlockChain returns the blockchain instance.
 func (s *Security) BlockChain() *blockchain.Blockchain {
 	return s.blockchain
-}
-
-// CryptoImpl returns the crypto implementation.
-func (s *Security) CryptoImpl() crypto.Base {
-	return s.cryptoImpl
 }
 
 // auth returns the certificate authority.

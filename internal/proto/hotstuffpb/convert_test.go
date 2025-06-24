@@ -20,8 +20,10 @@ import (
 func TestConvertPartialCert(t *testing.T) {
 	key := testutil.GenerateECDSAKey(t)
 	cfg := core.NewRuntimeConfig(1, key)
-	crypt := ecdsa.New(cfg)
-	signer := cert.NewAuthority(cfg, nil, crypt)
+	signer, err := cert.NewAuthority(cfg, nil, ecdsa.ModuleName)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	want, err := signer.CreatePartialCert(hotstuff.GetGenesis())
 	if err != nil {
@@ -42,8 +44,11 @@ func TestConvertQuorumCert(t *testing.T) {
 	for i := range n {
 		key := testutil.GenerateECDSAKey(t)
 		cfg := core.NewRuntimeConfig(hotstuff.ID(i+1), key)
-		crypt := ecdsa.New(cfg)
-		signer := cert.NewAuthority(cfg, nil, crypt)
+		signer, err := cert.NewAuthority(cfg, nil, ecdsa.ModuleName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		signers[i] = signer
 	}
 
@@ -92,11 +97,10 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 	signers := make([]*cert.Authority, n)
 	for i := range n {
 		id := hotstuff.ID(i + 1)
-		crypt, err := bls12.New(cfgs[id])
+		signer, err := cert.NewAuthority(cfgs[id], nil, bls12.ModuleName)
 		if err != nil {
 			t.Fatal(err)
 		}
-		signer := cert.NewAuthority(cfgs[id], nil, crypt)
 		signers[i] = signer
 		meta := cfgs[id].ConnectionMetadata()
 		err = cfgs[id].SetReplicaMetadata(id, meta)

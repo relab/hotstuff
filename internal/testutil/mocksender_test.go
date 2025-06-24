@@ -129,11 +129,14 @@ func TestRequestBlock(t *testing.T) {
 			sender.AddBlockChain(chain)
 		}
 	}
-	signer := cert.NewAuthority(
+	signer, err := cert.NewAuthority(
 		firstCore.RuntimeCfg(),
 		chains[0],
-		ecdsa.New(firstCore.RuntimeCfg()),
+		ecdsa.ModuleName,
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	sender0 := senders[0]
 	chain1 := chains[1]
 	block := testutil.CreateBlock(t, signer)

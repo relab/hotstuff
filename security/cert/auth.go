@@ -21,18 +21,25 @@ type Authority struct {
 func NewAuthority(
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
-	impl crypto.Base,
+	cryptoName string,
 	opts ...Option,
-) *Authority {
+) (*Authority, error) {
+	base, err := newCryptoModule(
+		config,
+		cryptoName,
+	)
+	if err != nil {
+		return nil, err
+	}
 	ca := &Authority{
-		Base:       impl,
+		Base:       base,
 		config:     config,
 		blockchain: blockchain,
 	}
 	for _, opt := range opts {
 		opt(ca)
 	}
-	return ca
+	return ca, nil
 }
 
 // CreatePartialCert signs a single block and returns the partial certificate.
