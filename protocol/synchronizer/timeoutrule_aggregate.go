@@ -49,3 +49,15 @@ func (s *Aggregate) LocalTimeoutRule(view hotstuff.View, syncInfo hotstuff.SyncI
 
 	return timeoutMsg, nil
 }
+
+func (s *Aggregate) RemoteTimeoutRule(currentView, timeoutView hotstuff.View, timeouts []hotstuff.TimeoutMsg) (hotstuff.SyncInfo, error) {
+	tc, err := s.auth.CreateTimeoutCert(timeoutView, timeouts)
+	if err != nil {
+		return hotstuff.SyncInfo{}, fmt.Errorf("failed to create timeout certificate: %w", err)
+	}
+	aggQC, err := s.auth.CreateAggregateQC(currentView, timeouts)
+	if err != nil {
+		return hotstuff.SyncInfo{}, fmt.Errorf("failed to create aggregate quorum certificate: %w", err)
+	}
+	return hotstuff.NewSyncInfo().WithTC(tc).WithAggQC(aggQC), nil
+}

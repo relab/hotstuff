@@ -39,3 +39,11 @@ func (s *Simple) LocalTimeoutRule(view hotstuff.View, syncInfo hotstuff.SyncInfo
 		ViewSignature: sig,
 	}, nil
 }
+
+func (s *Simple) RemoteTimeoutRule(_, timeoutView hotstuff.View, timeouts []hotstuff.TimeoutMsg) (hotstuff.SyncInfo, error) {
+	tc, err := s.auth.CreateTimeoutCert(timeoutView, timeouts)
+	if err != nil {
+		return hotstuff.SyncInfo{}, fmt.Errorf("failed to create timeout certificate: %w", err)
+	}
+	return hotstuff.NewSyncInfo().WithTC(tc), nil
+}

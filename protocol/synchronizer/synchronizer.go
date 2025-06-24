@@ -231,21 +231,17 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	for _, t := range timeouts {
 		timeoutList = append(timeoutList, t)
 	}
-	tc, err := s.auth.CreateTimeoutCert(timeout.View, timeoutList)
+	delete(s.timeouts, timeout.View)
+
+	si, err := s.timeoutRules.RemoteTimeoutRule(currView, timeout.View, timeoutList)
 	if err != nil {
-		s.logger.Debugf("Failed to create timeout certificate: %v", err)
+		// this can only happen if the timeout rule fails to create a quorum certificate
+		// or aggregate certificate, e.g., due insufficient number of timeouts.
+		s.logger.Debugf("Failed to create sync info: %v", err)
 		return
 	}
-	si := s.state.SyncInfo().WithTC(tc)
-	if s.config.HasAggregateQC() {
-		aggQC, err := s.auth.CreateAggregateQC(currView, timeoutList)
-		if err != nil {
-			s.logger.Debugf("Failed to create agg-qc: %v", err)
-		} else {
-			si = si.WithAggQC(aggQC)
-		}
-	}
-	delete(s.timeouts, timeout.View)
+	si = si.WithQC(s.state.HighQC()) // ensure sync info also has the high QC
+
 	s.logger.Debugf("OnRemoteTimeout (second advance)")
 	s.advanceView(si)
 }
