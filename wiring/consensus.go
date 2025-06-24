@@ -4,6 +4,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
@@ -25,6 +26,7 @@ func NewConsensus(
 	committer *consensus.Committer,
 	consensusRules consensus.Ruleset,
 	leaderRotation leaderrotation.LeaderRotation,
+	viewStates *protocol.ViewStates,
 	comm comm.Communication,
 ) *Consensus {
 	voter := consensus.NewVoter(
@@ -41,6 +43,7 @@ func NewConsensus(
 			eventLoop,
 			config,
 			blockchain,
+			viewStates,
 			consensusRules,
 			comm,
 			voter,

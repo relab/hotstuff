@@ -73,6 +73,7 @@ func New(
 		committer,
 		consensusRules,
 		leaderRotation,
+		viewStates,
 		comm,
 	)
 	// TODO(AlanRostem): consider moving the consensus flow from synchronizer to a different class

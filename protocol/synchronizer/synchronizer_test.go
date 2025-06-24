@@ -56,6 +56,7 @@ func wireUpSynchronizer(
 		committer,
 		consensusRules,
 		leaderRotation,
+		viewStates,
 		clique.New(
 			essentials.RuntimeCfg(),
 			votingMachine,
@@ -118,7 +119,7 @@ func TestAdvanceViewQC(t *testing.T) {
 			Data:           []byte("bar"),
 		})
 	}
-	proposal, err := proposer.CreateProposal(1, viewStates.HighQC(), viewStates.SyncInfo())
+	proposal, err := proposer.CreateProposal(viewStates.SyncInfo())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +161,7 @@ func TestAdvanceViewTC(t *testing.T) {
 			Data:           []byte("bar"),
 		})
 	}
-	proposal, err := proposer.CreateProposal(1, viewStates.HighQC(), viewStates.SyncInfo())
+	proposal, err := proposer.CreateProposal(viewStates.SyncInfo())
 	if err != nil {
 		t.Fatal(err)
 	}

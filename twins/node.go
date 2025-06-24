@@ -106,6 +106,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		node.eventLoop,
 		node.config,
 		node.blockchain,
+		node.viewStates,
 		consensusRules,
 		comm,
 		node.voter,

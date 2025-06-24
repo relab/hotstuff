@@ -150,7 +150,7 @@ func (s *Synchronizer) Start(ctx context.Context) {
 	// start the initial proposal
 	if view := s.state.View(); view == 1 && s.leaderRotation.GetLeader(view) == s.config.ID() {
 		syncInfo := s.state.SyncInfo()
-		proposal, err := s.proposer.CreateProposal(s.state.View(), s.state.HighQC(), syncInfo)
+		proposal, err := s.proposer.CreateProposal(syncInfo)
 		if err != nil {
 			// debug log here since it may frequently fail due to lack of commands.
 			s.logger.Debugf("Failed to create proposal: %v", err)
@@ -357,7 +357,7 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 
 	leader := s.leaderRotation.GetLeader(newView)
 	if leader == s.config.ID() {
-		proposal, err := s.proposer.CreateProposal(s.state.View(), s.state.HighQC(), syncInfo)
+		proposal, err := s.proposer.CreateProposal(syncInfo)
 		if err != nil {
 			// debug log here since it may frequently fail due to lack of commands.
 			s.logger.Debugf("Failed to create proposal: %v", err)

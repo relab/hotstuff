@@ -120,7 +120,7 @@ func (n *Network) run(ticks int) {
 	for _, node := range n.nodes {
 		if node.leaderRotation.GetLeader(1) == node.id.ReplicaID {
 			s := node.viewStates
-			proposal, err := node.proposer.CreateProposal(s.View(), s.HighQC(), s.SyncInfo())
+			proposal, err := node.proposer.CreateProposal(s.SyncInfo())
 			if err != nil {
 				panic(err) // should not fail to create propose, unless command cache has a bug.
 			}

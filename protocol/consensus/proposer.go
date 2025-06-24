@@ -7,6 +7,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 	"github.com/relab/hotstuff/security/blockchain"
@@ -16,6 +17,7 @@ type Proposer struct {
 	eventLoop    *eventloop.EventLoop
 	config       *core.RuntimeConfig
 	blockchain   *blockchain.Blockchain
+	states       *protocol.ViewStates
 	ruler        ProposeRuler
 	disseminator comm.Disseminator
 	voter        *Voter
@@ -29,6 +31,7 @@ func NewProposer(
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
+	states *protocol.ViewStates,
 	ruler ProposeRuler,
 	disseminator comm.Disseminator,
 	voter *Voter,
@@ -39,6 +42,7 @@ func NewProposer(
 		eventLoop:    eventLoop,
 		config:       config,
 		blockchain:   blockchain,
+		states:       states,
 		ruler:        ruler,
 		disseminator: disseminator,
 		voter:        voter,
@@ -92,9 +96,11 @@ func (p *Proposer) Propose(proposal *hotstuff.ProposeMsg) error {
 }
 
 // CreateProposal attempts to create a new outgoing proposal if a command exists and the protocol's rule is satisfied.
-func (p *Proposer) CreateProposal(view hotstuff.View, highQC hotstuff.QuorumCert, syncInfo hotstuff.SyncInfo) (proposal hotstuff.ProposeMsg, err error) {
+func (p *Proposer) CreateProposal(syncInfo hotstuff.SyncInfo) (proposal hotstuff.ProposeMsg, err error) {
 	ctx, cancel := timeout.Context(p.eventLoop.Context(), p.eventLoop)
 	defer cancel()
+	view := p.states.View()
+	highQC := p.states.HighQC()
 	if err := p.markProposed(view, highQC.BlockHash()); err != nil {
 		return proposal, err
 	}
