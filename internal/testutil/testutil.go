@@ -17,7 +17,7 @@ import (
 
 // TODO(AlanRostem): create a test for server.go using this in another PR.
 // CreateTCPListener creates a net.Listener on a random port.
-func CreateTCPListener(t *testing.T) net.Listener {
+func CreateTCPListener(t testing.TB) net.Listener {
 	t.Helper()
 	lis, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
@@ -26,7 +26,7 @@ func CreateTCPListener(t *testing.T) net.Listener {
 	return lis
 }
 
-func CreateBlock(t *testing.T, signer *cert.Authority) *hotstuff.Block {
+func CreateBlock(t testing.TB, signer *cert.Authority) *hotstuff.Block {
 	t.Helper()
 	qc := CreateQC(t, hotstuff.GetGenesis(), signer)
 	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, &clientpb.Batch{
@@ -35,7 +35,7 @@ func CreateBlock(t *testing.T, signer *cert.Authority) *hotstuff.Block {
 	return b
 }
 
-func CreateValidBlock(t *testing.T, proposer hotstuff.ID, validParent *hotstuff.Block) *hotstuff.Block {
+func CreateValidBlock(t testing.TB, proposer hotstuff.ID, validParent *hotstuff.Block) *hotstuff.Block {
 	t.Helper()
 	// TODO(AlanRostem): consider creating a qc with a valid signature too
 	qc := hotstuff.NewQuorumCert(nil, validParent.View(), validParent.Hash())
@@ -49,7 +49,7 @@ func CreateValidBlock(t *testing.T, proposer hotstuff.ID, validParent *hotstuff.
 }
 
 // CreateSignatures creates partial certificates from multiple signers.
-func CreateSignatures(t *testing.T, message []byte, signers []*cert.Authority) []hotstuff.QuorumSignature {
+func CreateSignatures(t testing.TB, message []byte, signers []*cert.Authority) []hotstuff.QuorumSignature {
 	t.Helper()
 	sigs := make([]hotstuff.QuorumSignature, 0, len(signers))
 	for _, signer := range signers {
@@ -72,7 +72,7 @@ func signer(s hotstuff.QuorumSignature) hotstuff.ID {
 }
 
 // CreateTimeouts creates a set of TimeoutMsg messages from the given signers.
-func CreateTimeouts(t *testing.T, view hotstuff.View, signers []*cert.Authority) (timeouts []hotstuff.TimeoutMsg) {
+func CreateTimeouts(t testing.TB, view hotstuff.View, signers []*cert.Authority) (timeouts []hotstuff.TimeoutMsg) {
 	t.Helper()
 	timeouts = make([]hotstuff.TimeoutMsg, 0, len(signers))
 	viewSigs := CreateSignatures(t, view.ToBytes(), signers)
@@ -95,7 +95,7 @@ func CreateTimeouts(t *testing.T, view hotstuff.View, signers []*cert.Authority)
 }
 
 // CreatePC creates a partial certificate using the given signer.
-func CreatePC(t *testing.T, block *hotstuff.Block, signer *cert.Authority) hotstuff.PartialCert {
+func CreatePC(t testing.TB, block *hotstuff.Block, signer *cert.Authority) hotstuff.PartialCert {
 	t.Helper()
 	pc, err := signer.CreatePartialCert(block)
 	if err != nil {
@@ -105,7 +105,7 @@ func CreatePC(t *testing.T, block *hotstuff.Block, signer *cert.Authority) hotst
 }
 
 // CreatePCs creates one partial certificate using each of the given signers.
-func CreatePCs(t *testing.T, block *hotstuff.Block, signers []*cert.Authority) []hotstuff.PartialCert {
+func CreatePCs(t testing.TB, block *hotstuff.Block, signers []*cert.Authority) []hotstuff.PartialCert {
 	t.Helper()
 	pcs := make([]hotstuff.PartialCert, 0, len(signers))
 	for _, signer := range signers {
@@ -115,7 +115,7 @@ func CreatePCs(t *testing.T, block *hotstuff.Block, signers []*cert.Authority) [
 }
 
 // CreateQC creates a QC using the given signers.
-func CreateQC(t *testing.T, block *hotstuff.Block, signers ...*cert.Authority) hotstuff.QuorumCert {
+func CreateQC(t testing.TB, block *hotstuff.Block, signers ...*cert.Authority) hotstuff.QuorumCert {
 	t.Helper()
 	if len(signers) == 0 {
 		return hotstuff.QuorumCert{}
@@ -130,7 +130,7 @@ func CreateQC(t *testing.T, block *hotstuff.Block, signers ...*cert.Authority) h
 
 // CreateTC generates a timeout certificate signed by the given signers.
 // The first signer is the timeout creator.
-func CreateTC(t *testing.T, view hotstuff.View, signers []*cert.Authority) hotstuff.TimeoutCert {
+func CreateTC(t testing.TB, view hotstuff.View, signers []*cert.Authority) hotstuff.TimeoutCert {
 	t.Helper()
 	if len(signers) == 0 {
 		return hotstuff.TimeoutCert{}
@@ -144,7 +144,7 @@ func CreateTC(t *testing.T, view hotstuff.View, signers []*cert.Authority) hotst
 }
 
 // GenerateECDSAKey generates an ECDSA private key for use in tests.
-func GenerateECDSAKey(t *testing.T) hotstuff.PrivateKey {
+func GenerateECDSAKey(t testing.TB) hotstuff.PrivateKey {
 	t.Helper()
 	key, err := keygen.GenerateECDSAPrivateKey()
 	if err != nil {
@@ -154,7 +154,7 @@ func GenerateECDSAKey(t *testing.T) hotstuff.PrivateKey {
 }
 
 // GenerateEDDSAKey generates an ECDSA private key for use in tests.
-func GenerateEDDSAKey(t *testing.T) hotstuff.PrivateKey {
+func GenerateEDDSAKey(t testing.TB) hotstuff.PrivateKey {
 	t.Helper()
 	_, key, err := keygen.GenerateED25519Key()
 	if err != nil {
@@ -164,7 +164,7 @@ func GenerateEDDSAKey(t *testing.T) hotstuff.PrivateKey {
 }
 
 // GenerateBLS12Key generates a BLS12-381 private key for use in tests.
-func GenerateBLS12Key(t *testing.T) hotstuff.PrivateKey {
+func GenerateBLS12Key(t testing.TB) hotstuff.PrivateKey {
 	t.Helper()
 	key, err := bls12.GeneratePrivateKey()
 	if err != nil {
@@ -173,7 +173,7 @@ func GenerateBLS12Key(t *testing.T) hotstuff.PrivateKey {
 	return key
 }
 
-func GenerateKey(t *testing.T, cryptoName string) hotstuff.PrivateKey {
+func GenerateKey(t testing.TB, cryptoName string) hotstuff.PrivateKey {
 	switch cryptoName {
 	case ecdsa.ModuleName:
 		return GenerateECDSAKey(t)
