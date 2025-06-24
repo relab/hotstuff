@@ -1,4 +1,4 @@
-package votingmachine
+package votingmachine_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol"
+	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 )
 
@@ -21,7 +22,7 @@ func TestCollectVote(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	votingMachine := New(
+	votingMachine := votingmachine.New(
 		leader.Logger(),
 		leader.EventLoop(),
 		leader.RuntimeCfg(),
