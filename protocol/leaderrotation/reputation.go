@@ -1,4 +1,4 @@
-package reputation
+package leaderrotation
 
 import (
 	"math/rand"
@@ -10,14 +10,13 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/protocol"
-	"github.com/relab/hotstuff/protocol/leaderrotation"
 )
 
-const ModuleName = "reputation"
+const ModuleNameReputation = "reputation"
 
 type reputationsMap map[hotstuff.ID]float64
 
-type RepBasedLeaderRotation struct {
+type RepBased struct {
 	viewStates *protocol.ViewStates
 	config     *core.RuntimeConfig
 	logger     logging.Logger
@@ -30,7 +29,7 @@ type RepBasedLeaderRotation struct {
 // TODO: should GetLeader be thread-safe?
 
 // GetLeader returns the id of the leader in the given view
-func (r *RepBasedLeaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
+func (r *RepBased) GetLeader(view hotstuff.View) hotstuff.ID {
 	block := r.viewStates.CommittedBlock()
 	if block.View() > view-hotstuff.View(r.chainLength) {
 		// TODO: it could be possible to lookup leaders for older views if we
@@ -42,7 +41,7 @@ func (r *RepBasedLeaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
 	numReplicas := r.config.ReplicaCount()
 	// use round-robin for the first few views until we get a signature
 	if block.QuorumCert().Signature() == nil {
-		return leaderrotation.ChooseRoundRobin(view, numReplicas)
+		return ChooseRoundRobin(view, numReplicas)
 	}
 
 	voters := block.QuorumCert().Signature().Participants()
@@ -89,14 +88,14 @@ func (r *RepBasedLeaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
 }
 
 // NewRepBased returns a new random reputation-based leader rotation implementation
-func New(
+func NewRepBased(
 	chainLength int,
 
 	viewStates *protocol.ViewStates,
 	config *core.RuntimeConfig,
 	logger logging.Logger,
-) *RepBasedLeaderRotation {
-	return &RepBasedLeaderRotation{
+) *RepBased {
+	return &RepBased{
 		viewStates: viewStates,
 		config:     config,
 		logger:     logger,
@@ -107,4 +106,4 @@ func New(
 	}
 }
 
-var _ leaderrotation.LeaderRotation = (*RepBasedLeaderRotation)(nil)
+var _ LeaderRotation = (*RepBased)(nil)

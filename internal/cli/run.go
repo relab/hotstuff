@@ -16,7 +16,7 @@ import (
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/metrics"
-	"github.com/relab/hotstuff/protocol/leaderrotation/treeleader"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	"github.com/relab/iago"
 	"github.com/spf13/viper"
@@ -42,7 +42,7 @@ func runController() {
 	}
 
 	if cfg.Kauri {
-		cfg.LeaderRotation = treeleader.ModuleName
+		cfg.LeaderRotation = leaderrotation.ModuleNameTree
 	}
 
 	// If the config is set to run locally, `hosts` will be nil (empty)

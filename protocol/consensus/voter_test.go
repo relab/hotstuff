@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/comm/clique"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
@@ -37,7 +37,7 @@ func wireUpVoter(
 		viewStates,
 		consensusRules,
 	)
-	leaderRotation := fixedleader.New(2) // want a leader that is not 1 in this test case
+	leaderRotation := leaderrotation.NewFixed(2) // want a leader that is not 1 in this test case
 	votingMachine := votingmachine.New(
 		essentials.Logger(),
 		essentials.EventLoop(),

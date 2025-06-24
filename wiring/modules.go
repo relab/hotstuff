@@ -14,11 +14,6 @@ import (
 	"github.com/relab/hotstuff/protocol/comm/kauri"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
-	"github.com/relab/hotstuff/protocol/leaderrotation/carousel"
-	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
-	"github.com/relab/hotstuff/protocol/leaderrotation/reputation"
-	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
-	"github.com/relab/hotstuff/protocol/leaderrotation/treeleader"
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
@@ -111,23 +106,22 @@ func NewLeaderRotation(
 	switch name {
 	case "":
 		fallthrough // default to round-robin if no name is provided
-	case roundrobin.ModuleName:
-		ld = roundrobin.New(config)
-	case fixedleader.ModuleName:
-		ld = fixedleader.New(hotstuff.ID(1))
-	case treeleader.ModuleName:
-		ld = treeleader.New(config)
-	case carousel.ModuleName:
-		ld = carousel.New(chainLength, blockchain, viewStates, config, logger)
-	case reputation.ModuleName:
-		ld = reputation.New(chainLength, viewStates, config, logger)
+	case leaderrotation.ModuleNameRoundRobin:
+		ld = leaderrotation.NewRoundRobin(config)
+	case leaderrotation.ModuleNameFixed:
+		ld = leaderrotation.NewFixed(hotstuff.ID(1))
+	case leaderrotation.ModuleNameTree:
+		ld = leaderrotation.NewTreeBased(config)
+	case leaderrotation.ModuleNameCarousel:
+		ld = leaderrotation.NewCarousel(chainLength, blockchain, viewStates, config, logger)
+	case leaderrotation.ModuleNameReputation:
+		ld = leaderrotation.NewRepBased(chainLength, viewStates, config, logger)
 	default:
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", name)
 	}
 	return
 }
 
-// TODO(AlanRostem): use this
 func NewCommunicationModule(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,

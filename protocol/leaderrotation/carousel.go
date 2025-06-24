@@ -1,5 +1,5 @@
 // Package leaderrotation provide various leader rotation algorithms.
-package carousel
+package leaderrotation
 
 import (
 	"math/rand"
@@ -9,11 +9,10 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/protocol"
-	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
-const ModuleName = "carousel"
+const ModuleNameCarousel = "carousel"
 
 type Carousel struct {
 	blockchain *blockchain.Blockchain
@@ -24,8 +23,8 @@ type Carousel struct {
 	chainLength int
 }
 
-// New returns a new instance of the Carousel leader-election algorithm.
-func New(
+// NewCarousel returns a new instance of the Carousel leader-election algorithm.
+func NewCarousel(
 	chainLength int,
 
 	blockchain *blockchain.Blockchain,
@@ -47,12 +46,12 @@ func (c *Carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 
 	if commitHead.QuorumCert().Signature() == nil {
 		c.logger.Debug("in startup; using round-robin")
-		return leaderrotation.ChooseRoundRobin(round, c.config.ReplicaCount())
+		return ChooseRoundRobin(round, c.config.ReplicaCount())
 	}
 
 	if commitHead.View() != round-hotstuff.View(c.chainLength) {
 		c.logger.Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.View())
-		return leaderrotation.ChooseRoundRobin(round, c.config.ReplicaCount())
+		return ChooseRoundRobin(round, c.config.ReplicaCount())
 	}
 
 	c.logger.Debug("proceeding with carousel")
@@ -87,4 +86,4 @@ func (c *Carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 	return leader
 }
 
-var _ leaderrotation.LeaderRotation = (*Carousel)(nil)
+var _ LeaderRotation = (*Carousel)(nil)

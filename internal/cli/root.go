@@ -7,11 +7,9 @@ import (
 	"strings"
 
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/protocol/leaderrotation/carousel"
-	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
-	"github.com/relab/hotstuff/protocol/leaderrotation/reputation"
-	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
-	"github.com/relab/hotstuff/protocol/leaderrotation/treeleader"
+	"github.com/relab/hotstuff/protocol/comm/clique"
+	"github.com/relab/hotstuff/protocol/comm/kauri"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
@@ -61,13 +59,16 @@ use 'hotstuff help run' to view all possible parameters for this command.`,
 					bls12.ModuleName,
 				},
 				"--leader-rotation": {
-					roundrobin.ModuleName,
-					fixedleader.ModuleName,
-					carousel.ModuleName,
-					reputation.ModuleName,
-					treeleader.ModuleName,
+					leaderrotation.ModuleNameRoundRobin,
+					leaderrotation.ModuleNameCarousel,
+					leaderrotation.ModuleNameFixed,
+					leaderrotation.ModuleNameTree,
+					leaderrotation.ModuleNameReputation,
 				},
-				"--propagation": {}, // TODO(AlanRostem)
+				"--communication": {
+					clique.ModuleName,
+					kauri.ModuleName,
+				},
 			}
 			mods := modules
 			for k, v := range mods {

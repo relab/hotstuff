@@ -1,33 +1,32 @@
-package treeleader
+package leaderrotation
 
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/protocol/leaderrotation"
 )
 
-const ModuleName = "tree-leader"
+const ModuleNameTree = "tree-leader"
 
-type TreeLeader struct {
+type TreeBased struct {
 	leader hotstuff.ID
 	config *core.RuntimeConfig
 }
 
-func New(
+func NewTreeBased(
 	config *core.RuntimeConfig,
-) *TreeLeader {
-	return &TreeLeader{
+) *TreeBased {
+	return &TreeBased{
 		config: config,
 		leader: 1,
 	}
 }
 
 // GetLeader returns the id of the leader in the given view
-func (t *TreeLeader) GetLeader(_ hotstuff.View) hotstuff.ID {
+func (t *TreeBased) GetLeader(_ hotstuff.View) hotstuff.ID {
 	if !t.config.HasKauriTree() {
 		return 1
 	}
 	return t.config.Tree().Root()
 }
 
-var _ leaderrotation.LeaderRotation = (*TreeLeader)(nil)
+var _ LeaderRotation = (*TreeBased)(nil)

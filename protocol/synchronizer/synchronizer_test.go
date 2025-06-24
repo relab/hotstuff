@@ -11,7 +11,7 @@ import (
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/comm/clique"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/protocol/votingmachine"
@@ -26,7 +26,7 @@ func wireUpSynchronizer(
 	viewStates *protocol.ViewStates,
 ) *Synchronizer {
 	t.Helper()
-	leaderRotation := fixedleader.New(1)
+	leaderRotation := leaderrotation.NewFixed(1)
 	consensusRules := chainedhotstuff.New(
 		essentials.Logger(),
 		essentials.RuntimeCfg(),

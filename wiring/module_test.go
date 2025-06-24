@@ -7,11 +7,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/network"
-	"github.com/relab/hotstuff/protocol/leaderrotation/carousel"
-	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
-	"github.com/relab/hotstuff/protocol/leaderrotation/reputation"
-	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
-	"github.com/relab/hotstuff/protocol/leaderrotation/treeleader"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
@@ -34,31 +30,31 @@ func TestModules(t *testing.T) {
 		{
 			cryptoName:         ecdsa.ModuleName,
 			consensusName:      chainedhotstuff.ModuleName,
-			leaderRotationName: roundrobin.ModuleName,
+			leaderRotationName: leaderrotation.ModuleNameRoundRobin,
 			byzantineStrategy:  byzantine.ForkModuleName,
 		},
 		{
 			cryptoName:         eddsa.ModuleName,
 			consensusName:      simplehotstuff.ModuleName,
-			leaderRotationName: fixedleader.ModuleName,
+			leaderRotationName: leaderrotation.ModuleNameFixed,
 			byzantineStrategy:  byzantine.SilenceModuleName,
 		},
 		{
 			cryptoName:         bls12.ModuleName,
 			consensusName:      fasthotstuff.ModuleName,
-			leaderRotationName: carousel.ModuleName,
+			leaderRotationName: leaderrotation.ModuleNameCarousel,
 			byzantineStrategy:  "",
 		},
 		{
 			cryptoName:         bls12.ModuleName,
 			consensusName:      fasthotstuff.ModuleName,
-			leaderRotationName: reputation.ModuleName,
+			leaderRotationName: leaderrotation.ModuleNameReputation,
 			byzantineStrategy:  "",
 		},
 		{
 			cryptoName:         bls12.ModuleName,
 			consensusName:      fasthotstuff.ModuleName,
-			leaderRotationName: treeleader.ModuleName,
+			leaderRotationName: leaderrotation.ModuleNameTree,
 			byzantineStrategy:  "",
 		},
 	}

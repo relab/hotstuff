@@ -10,7 +10,7 @@ import (
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/comm/clique"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
@@ -38,7 +38,7 @@ func wireUpProposer(
 		essentials.Authority(),
 	)
 	check(t, err)
-	leaderRotation := fixedleader.New(1)
+	leaderRotation := leaderrotation.NewFixed(1)
 	votingMachine := votingmachine.New(
 		essentials.Logger(),
 		essentials.EventLoop(),
