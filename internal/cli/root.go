@@ -7,6 +7,17 @@ import (
 	"strings"
 
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/protocol/leaderrotation/carousel"
+	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
+	"github.com/relab/hotstuff/protocol/leaderrotation/reputation"
+	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
+	"github.com/relab/hotstuff/protocol/leaderrotation/treeleader"
+	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
+	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
+	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
+	"github.com/relab/hotstuff/security/crypto/bls12"
+	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto/eddsa"
 	"github.com/spf13/cobra"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -33,15 +44,33 @@ use 'hotstuff help run' to view all possible parameters for this command.`,
 			if !listModules {
 				return cmd.Usage()
 			}
-			// mods := modules.ListModules()
-			// for k, v := range mods {
-			// 	fmt.Println(k, ":")
-			// 	for _, n := range v {
-			// 		fmt.Println("\t", n)
-			// 	}
-			// }
-			// TODO(AlanRostem): reimplement this
-			return fmt.Errorf("not implemented")
+			modules := map[string][]string{
+				"--consensus": {
+					simplehotstuff.ModuleName,
+					fasthotstuff.ModuleName,
+					chainedhotstuff.ModuleName,
+				},
+				"--crypto": {
+					ecdsa.ModuleName,
+					eddsa.ModuleName,
+					bls12.ModuleName,
+				},
+				"--leader-rotation": {
+					roundrobin.ModuleName,
+					fixedleader.ModuleName,
+					carousel.ModuleName,
+					reputation.ModuleName,
+					treeleader.ModuleName,
+				},
+			}
+			mods := modules
+			for k, v := range mods {
+				fmt.Println(k, ":")
+				for _, n := range v {
+					fmt.Println("\t", n)
+				}
+			}
+			return nil
 		},
 	}
 )
