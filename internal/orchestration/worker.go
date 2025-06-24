@@ -231,7 +231,19 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	)
 }
 
-func initConsensusModules(depsCore *wiring.Core, depsSecure *wiring.Security, sender *network.GorumsSender, opts *orchestrationpb.ReplicaOpts) (consensus.Ruleset, *protocol.ViewStates, leaderrotation.LeaderRotation, disagg.DisseminatorAggregator, viewduration.ViewDuration, error) {
+func initConsensusModules(
+	depsCore *wiring.Core,
+	depsSecure *wiring.Security,
+	sender *network.GorumsSender,
+	opts *orchestrationpb.ReplicaOpts,
+) (
+	consensus.Ruleset,
+	*protocol.ViewStates,
+	leaderrotation.LeaderRotation,
+	disagg.DisseminatorAggregator,
+	viewduration.ViewDuration,
+	error,
+) {
 	consensusRules, err := wiring.NewConsensusRules(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),

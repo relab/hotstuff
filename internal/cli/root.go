@@ -12,6 +12,7 @@ import (
 	"github.com/relab/hotstuff/protocol/leaderrotation/reputation"
 	"github.com/relab/hotstuff/protocol/leaderrotation/roundrobin"
 	"github.com/relab/hotstuff/protocol/leaderrotation/treeleader"
+	"github.com/relab/hotstuff/protocol/rules/byzantine"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
@@ -50,6 +51,10 @@ use 'hotstuff help run' to view all possible parameters for this command.`,
 					fasthotstuff.ModuleName,
 					chainedhotstuff.ModuleName,
 				},
+				"--byzantine-stragegy": {
+					byzantine.SilenceModuleName,
+					byzantine.ForkModuleName,
+				},
 				"--crypto": {
 					ecdsa.ModuleName,
 					eddsa.ModuleName,
@@ -62,6 +67,7 @@ use 'hotstuff help run' to view all possible parameters for this command.`,
 					reputation.ModuleName,
 					treeleader.ModuleName,
 				},
+				"--propagation": {}, // TODO(AlanRostem)
 			}
 			mods := modules
 			for k, v := range mods {

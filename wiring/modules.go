@@ -5,9 +5,13 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
+	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
+	"github.com/relab/hotstuff/protocol/disagg"
+	"github.com/relab/hotstuff/protocol/disagg/clique"
+	"github.com/relab/hotstuff/protocol/disagg/kauri"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/leaderrotation/carousel"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
@@ -18,7 +22,9 @@ import (
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
+	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/blockchain"
+	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
@@ -30,7 +36,7 @@ func NewConsensusRules(
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 	name string,
-) (rules consensus.Ruleset, err error) {
+) (rules consensus.Ruleset, _ error) {
 	logger.Debugf("Initializing module (consensus rules): %s", name)
 	switch name {
 	case "":
@@ -53,7 +59,7 @@ func WrapByzantineStrategy(
 	blockchain *blockchain.Blockchain,
 	rules consensus.Ruleset,
 	name string,
-) (byzRules consensus.Ruleset, err error) {
+) (byzRules consensus.Ruleset, _ error) {
 	logger.Debugf("Initializing module (byzantine strategy): %s", name)
 	switch name {
 	case "":
@@ -99,7 +105,7 @@ func NewLeaderRotation(
 	viewStates *protocol.ViewStates,
 	name string,
 	chainLength int,
-) (ld leaderrotation.LeaderRotation, err error) {
+) (ld leaderrotation.LeaderRotation, _ error) {
 	logger.Debugf("Initializing module (leader rotation): %s", name)
 	switch name {
 	case "":
@@ -116,6 +122,54 @@ func NewLeaderRotation(
 		ld = reputation.New(chainLength, viewStates, config, logger)
 	default:
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", name)
+	}
+	return
+}
+
+// TODO(AlanRostem): use this
+func NewPropagationModule(
+	logger logging.Logger,
+	eventLoop *eventloop.EventLoop,
+	config *core.RuntimeConfig,
+	blockchain *blockchain.Blockchain,
+	auth *cert.Authority,
+	sender core.Sender,
+	leaderRotation leaderrotation.LeaderRotation,
+	viewStates *protocol.ViewStates,
+	name string,
+) (disAgg disagg.DisseminatorAggregator, _ error) {
+	logger.Debugf("initializing module (propagation): %s", name)
+	switch name {
+	case kauri.ModuleName:
+		// TODO(AlanRostem): find a less hacky way to do this
+		kauriSender, ok := sender.(core.KauriSender)
+		if !ok {
+			return nil, fmt.Errorf("input parameter sender does not implement KauriSender")
+		}
+		disAgg = kauri.New(
+			logger,
+			eventLoop,
+			config,
+			blockchain,
+			auth,
+			kauriSender,
+		)
+	case clique.ModuleName:
+		disAgg = clique.New(
+			config,
+			votingmachine.New(
+				logger,
+				eventLoop,
+				config,
+				blockchain,
+				auth,
+				viewStates,
+			),
+			leaderRotation,
+			sender,
+		)
+	default:
+		return nil, fmt.Errorf("invalid propagation scheme: '%s'", name)
 	}
 	return
 }

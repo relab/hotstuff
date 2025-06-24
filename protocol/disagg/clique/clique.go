@@ -8,8 +8,9 @@ import (
 	"github.com/relab/hotstuff/protocol/votingmachine"
 )
 
+const ModuleName = "clique"
+
 // Clique implements one-to-all dissemination and all-to-one aggregation.
-// TODO(AlanRostem): make tests
 type Clique struct {
 	config         *core.RuntimeConfig
 	votingMachine  *votingmachine.VotingMachine
