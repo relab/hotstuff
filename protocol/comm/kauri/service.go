@@ -1,4 +1,4 @@
-package comm
+package kauri
 
 import (
 	"github.com/relab/gorums"
