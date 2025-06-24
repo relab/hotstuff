@@ -1,6 +1,7 @@
 package kauri
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/relab/hotstuff"
@@ -89,6 +90,13 @@ func TestCanMerge(t *testing.T) {
 		{nil, nil, false},
 	}
 	for _, test := range testData {
+		overlaps := hasOverlap(test.a, test.b)
+		if overlaps && !test.wantErr {
+			t.Errorf("hasOverlap(%v, %v) = true, want false", test.a, test.b)
+		}
+		if !overlaps && test.wantErr {
+			t.Errorf("hasOverlap(%v, %v) = false, want true", test.a, test.b)
+		}
 		a := make(crypto.Multi[*ecdsa.Signature])
 		for _, id := range test.a {
 			a[id] = &ecdsa.Signature{}
@@ -109,4 +117,56 @@ func TestCanMerge(t *testing.T) {
 	if err == nil {
 		t.Errorf("canMergeContributions(nil, nil) succeeded and error is expected")
 	}
+}
+
+func BenchmarkHasOverlap(b *testing.B) {
+	benchData := []struct {
+		size  int
+		start int // start index for the subset
+	}{
+		{200, 200}, // subset size 0
+		{200, 150}, // subset size 50
+		{200, 100}, // subset size 100
+		{200, 50},  // subset size 150
+		{200, 0},   // subset size 200
+		{500, 400}, // subset size 100
+		{500, 300}, // subset size 200
+	}
+	for _, data := range benchData {
+		set := make([]hotstuff.ID, data.size)
+		for i := range set {
+			set[i] = hotstuff.ID(i + 1)
+		}
+		subSet := set[data.start:]
+
+		p := make(crypto.Multi[*ecdsa.Signature])
+		for _, id := range set {
+			p[id] = &ecdsa.Signature{}
+		}
+		q := make(crypto.Multi[*ecdsa.Signature])
+		for _, id := range subSet {
+			q[id] = &ecdsa.Signature{}
+		}
+
+		b.Run("HasOverlap/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
+			for b.Loop() {
+				hasOverlap(subSet, set)
+			}
+		})
+		b.Run("CanMerge/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
+			for b.Loop() {
+				canMergeContributions(p, q)
+			}
+		})
+	}
+}
+
+// hasOverlap returns true if there is any overlap between a and b.
+func hasOverlap(a, b []hotstuff.ID) bool {
+	for _, id := range a {
+		if slices.Contains(b, id) {
+			return true
+		}
+	}
+	return false
 }
