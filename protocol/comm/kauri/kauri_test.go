@@ -147,7 +147,6 @@ func BenchmarkHasOverlap(b *testing.B) {
 		for _, id := range subSet {
 			q[id] = &ecdsa.Signature{}
 		}
-
 		b.Run("HasOverlap/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
 			for b.Loop() {
 				hasOverlap(subSet, set)
@@ -155,7 +154,8 @@ func BenchmarkHasOverlap(b *testing.B) {
 		})
 		b.Run("CanMerge/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
 			for b.Loop() {
-				canMergeContributions(p, q)
+				// intentionally discarding error since it's not relevan in the benchmark
+				_ = canMergeContributions(p, q)
 			}
 		})
 	}
