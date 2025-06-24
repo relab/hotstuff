@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol"
-	"github.com/relab/hotstuff/protocol/comm/clique"
+	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
@@ -57,7 +57,7 @@ func wireUpSynchronizer(
 		consensusRules,
 		leaderRotation,
 		viewStates,
-		clique.New(
+		comm.NewClique(
 			essentials.RuntimeCfg(),
 			votingMachine,
 			leaderRotation,

@@ -1,14 +1,13 @@
-package clique
+package comm
 
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 )
 
-const ModuleName = "clique"
+const ModuleNameClique = "clique"
 
 // Clique implements one-to-all dissemination and all-to-one aggregation.
 type Clique struct {
@@ -18,7 +17,7 @@ type Clique struct {
 	sender         core.Sender
 }
 
-func New(
+func NewClique(
 	config *core.RuntimeConfig,
 	votingMachine *votingmachine.VotingMachine,
 	leaderRotation leaderrotation.LeaderRotation,
@@ -57,5 +56,5 @@ func (hs *Clique) Aggregate(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc h
 	return hs.sender.Vote(leaderID, pc)
 }
 
-var _ comm.Aggregator = (*Clique)(nil)
-var _ comm.Disseminator = (*Clique)(nil)
+var _ Aggregator = (*Clique)(nil)
+var _ Disseminator = (*Clique)(nil)

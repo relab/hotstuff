@@ -11,7 +11,7 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/protocol"
-	"github.com/relab/hotstuff/protocol/comm/clique"
+	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
@@ -89,7 +89,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		depsSecurity.Authority(),
 		node.viewStates,
 	)
-	comm := clique.New(
+	comm := comm.NewClique(
 		node.config,
 		votingMachine,
 		node.leaderRotation,

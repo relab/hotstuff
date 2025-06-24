@@ -1,4 +1,4 @@
-package clique_test
+package comm_test
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol"
-	"github.com/relab/hotstuff/protocol/comm/clique"
+	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
@@ -38,7 +38,7 @@ func TestDisseminateAggregate(t *testing.T) {
 		essentials.Authority(),
 		viewStates,
 	)
-	clique := clique.New(
+	clique := comm.NewClique(
 		essentials.RuntimeCfg(),
 		votingMachine,
 		&leaderRotation{},

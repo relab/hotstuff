@@ -1,4 +1,4 @@
-package kauri
+package comm
 
 import (
 	"github.com/relab/gorums"
@@ -6,7 +6,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/kauripb"
 )
 
-type serviceImpl struct {
+type kauriServiceImpl struct {
 	eventLoop *eventloop.EventLoop
 }
 
@@ -15,11 +15,11 @@ func RegisterService(
 	eventLoop *eventloop.EventLoop,
 	gorumsSrv *gorums.Server,
 ) {
-	i := &serviceImpl{eventLoop: eventLoop}
+	i := &kauriServiceImpl{eventLoop: eventLoop}
 	kauripb.RegisterKauriServer(gorumsSrv, i)
 }
 
-func (i serviceImpl) SendContribution(_ gorums.ServerCtx, request *kauripb.Contribution) {
+func (i kauriServiceImpl) SendContribution(_ gorums.ServerCtx, request *kauripb.Contribution) {
 	i.eventLoop.AddEvent(ContributionRecvEvent{Contribution: request})
 }
 

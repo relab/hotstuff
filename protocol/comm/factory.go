@@ -1,4 +1,4 @@
-package wiring
+package comm
 
 import (
 	"fmt"
@@ -8,8 +8,6 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol"
-	"github.com/relab/hotstuff/protocol/comm"
-	"github.com/relab/hotstuff/protocol/comm/clique"
 	"github.com/relab/hotstuff/protocol/comm/kauri"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/votingmachine"
@@ -17,8 +15,7 @@ import (
 	"github.com/relab/hotstuff/security/cert"
 )
 
-// TODO(AlanRostem): make a "comm" package and move this method into it
-func NewCommunicationModule(
+func New(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
@@ -28,11 +25,11 @@ func NewCommunicationModule(
 	leaderRotation leaderrotation.LeaderRotation,
 	viewStates *protocol.ViewStates,
 	name string,
-) (comm comm.Communication, _ error) {
+) (communication Communication, _ error) {
 	logger.Debugf("initializing module (propagation): %s", name)
 	switch name {
-	case kauri.ModuleName:
-		comm = kauri.New(
+	case ModuleNameKauri:
+		communication = NewKauri(
 			logger,
 			eventLoop,
 			config,
@@ -44,8 +41,8 @@ func NewCommunicationModule(
 				sender.(*network.GorumsSender), // TODO(AlanRostem): avoid cast
 			),
 		)
-	case clique.ModuleName:
-		comm = clique.New(
+	case ModuleNameClique:
+		communication = NewClique(
 			config,
 			votingmachine.New(
 				logger,

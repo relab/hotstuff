@@ -282,7 +282,7 @@ func initConsensusModules(
 		return nil, nil, nil, nil, nil, err
 	}
 
-	comm, err := wiring.NewCommunicationModule(
+	comm, err := comm.New(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsCore.RuntimeCfg(),

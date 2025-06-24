@@ -20,7 +20,7 @@ import (
 	"github.com/relab/hotstuff/internal/test"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/metrics"
-	"github.com/relab/hotstuff/protocol/comm/clique"
+	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/security/crypto/bls12"
@@ -45,7 +45,7 @@ func makeCfg(
 		RandomTree:        randomTree,
 		BranchFactor:      branchFactor,
 		Consensus:         consensusImpl,
-		Communication:     clique.ModuleName,
+		Communication:     comm.ModuleNameClique,
 		Crypto:            crypto,
 		LeaderRotation:    leaderRotation,
 		ByzantineStrategy: byzantine,

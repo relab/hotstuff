@@ -7,8 +7,7 @@ import (
 	"strings"
 
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/protocol/comm/clique"
-	"github.com/relab/hotstuff/protocol/comm/kauri"
+	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
@@ -47,7 +46,7 @@ use 'hotstuff help run' to view all possible parameters for this command.`,
 					rules.ModuleNameFastHotstuff,
 					rules.ModuleNameChainedHotstuff,
 				},
-				"--byzantine-stragegy": {
+				"--byzantine-strategy": {
 					byzantine.ModuleNameSilence,
 					byzantine.ModuleNameFork,
 				},
@@ -64,8 +63,8 @@ use 'hotstuff help run' to view all possible parameters for this command.`,
 					leaderrotation.ModuleNameReputation,
 				},
 				"--communication": {
-					clique.ModuleName,
-					kauri.ModuleName,
+					comm.ModuleNameClique,
+					comm.ModuleNameKauri,
 				},
 			}
 			mods := modules

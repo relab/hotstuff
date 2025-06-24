@@ -1,4 +1,4 @@
-package kauri
+package kauri_test
 
 import (
 	"slices"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/test"
+	"github.com/relab/hotstuff/protocol/comm/kauri"
 	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 )
@@ -23,7 +24,7 @@ func TestSubTree(t *testing.T) {
 		{nil, nil, true},
 	}
 	for _, test := range testData {
-		if isSubSet(test.a, test.b) != test.want {
+		if kauri.IsSubSet(test.a, test.b) != test.want {
 			t.Errorf("SubTree(%v, %v) = %t; want %t", test.a, test.b, !test.want, test.want)
 		}
 	}
@@ -52,7 +53,7 @@ func BenchmarkSubTree(b *testing.B) {
 		subSet := set[data.start:]
 		b.Run("SliceSet/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
 			for b.Loop() {
-				isSubSet(subSet, set)
+				kauri.IsSubSet(subSet, set)
 			}
 		})
 		b.Run("MapSet__/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
@@ -105,7 +106,7 @@ func TestCanMerge(t *testing.T) {
 		for _, id := range test.b {
 			b[id] = &ecdsa.Signature{}
 		}
-		err := canMergeContributions(a, b)
+		err := kauri.CanMergeContributions(a, b)
 		if err != nil && !test.wantErr {
 			t.Errorf("canMergeContributions(%v, %v) got error and no error is expected", a, b)
 		}
@@ -113,7 +114,7 @@ func TestCanMerge(t *testing.T) {
 			t.Errorf("canMergeContributions(%v, %v) succeeded and error is expected", a, b)
 		}
 	}
-	err := canMergeContributions(nil, nil)
+	err := kauri.CanMergeContributions(nil, nil)
 	if err == nil {
 		t.Errorf("canMergeContributions(nil, nil) succeeded and error is expected")
 	}
@@ -154,8 +155,8 @@ func BenchmarkHasOverlap(b *testing.B) {
 		})
 		b.Run("CanMerge/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
 			for b.Loop() {
-				// intentionally discarding error since it's not relevan in the benchmark
-				_ = canMergeContributions(p, q)
+				// intentionally discarding error since it's not relevant in the benchmark
+				_ = kauri.CanMergeContributions(p, q)
 			}
 		})
 	}
