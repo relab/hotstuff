@@ -114,6 +114,14 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		node.commandCache,
 		committer,
 	)
+	var timeoutRules synchronizer.TimeoutRuler
+	if consensusName == rules.ModuleNameFastHotstuff {
+		// Use aggregated quorum certificates.
+		// This must be true for Fast-Hotstuff: https://arxiv.org/abs/2010.11454
+		timeoutRules = synchronizer.NewAggregate(node.config, depsSecurity.Authority())
+	} else {
+		timeoutRules = synchronizer.NewSimple(node.config, depsSecurity.Authority())
+	}
 	node.synchronizer = synchronizer.New(
 		node.eventLoop,
 		node.logger,
@@ -121,6 +129,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		depsSecurity.Authority(),
 		node.leaderRotation,
 		viewduration.NewFixed(100*time.Millisecond),
+		timeoutRules,
 		node.proposer,
 		node.voter,
 		node.viewStates,

@@ -28,11 +28,3 @@ func WithSharedRandomSeed(seed int64) RuntimeOption {
 		g.sharedRandomSeed = seed
 	}
 }
-
-// WithAggregateQC returns true if aggregated quorum certificates should be used.
-// This is true for Fast-Hotstuff: https://arxiv.org/abs/2010.11454
-func WithAggregateQC() RuntimeOption {
-	return func(g *RuntimeConfig) {
-		g.aggQC = true
-	}
-}

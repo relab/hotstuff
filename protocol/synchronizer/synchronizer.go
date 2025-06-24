@@ -26,8 +26,9 @@ type Synchronizer struct {
 
 	auth *cert.Authority
 
-	duration       viewduration.ViewDuration
 	leaderRotation leaderrotation.LeaderRotation
+	duration       viewduration.ViewDuration
+	timeoutRules   TimeoutRuler
 	voter          *consensus.Voter
 	proposer       *consensus.Proposer
 	state          *protocol.ViewStates
@@ -58,6 +59,7 @@ func New(
 	// protocol dependencies
 	leaderRotation leaderrotation.LeaderRotation,
 	viewDuration viewduration.ViewDuration,
+	timeoutRules TimeoutRuler,
 	proposer *consensus.Proposer,
 	voter *consensus.Voter,
 	state *protocol.ViewStates,
@@ -66,8 +68,9 @@ func New(
 	sender core.Sender,
 ) *Synchronizer {
 	s := &Synchronizer{
-		duration:       viewDuration,
 		leaderRotation: leaderRotation,
+		duration:       viewDuration,
+		timeoutRules:   timeoutRules,
 
 		proposer:  proposer,
 		auth:      auth,
@@ -175,37 +178,23 @@ func (s *Synchronizer) OnLocalTimeout() {
 	}
 	s.duration.ViewTimeout() // increase the duration of the next view
 	s.logger.Debugf("OnLocalTimeout: %v", view)
-	sig, err := s.auth.Sign(view.ToBytes())
+
+	timeoutMsg, err := s.timeoutRules.LocalTimeoutRule(view, s.state.SyncInfo())
 	if err != nil {
-		s.logger.Warnf("Failed to sign view: %v", err)
+		s.logger.Warnf("Failed to create timeout message: %v", err)
 		return
 	}
-	timeoutMsg := hotstuff.TimeoutMsg{
-		ID:            s.config.ID(),
-		View:          view,
-		SyncInfo:      s.state.SyncInfo(),
-		ViewSignature: sig,
-	}
-	if s.config.HasAggregateQC() {
-		// generate a second signature that will become part of the aggregateQC
-		sig, err := s.auth.Sign(timeoutMsg.ToBytes())
-		if err != nil {
-			s.logger.Warnf("Failed to sign timeout message: %v", err)
-			return
-		}
-		timeoutMsg.MsgSignature = sig
-	}
-	s.lastTimeout = &timeoutMsg
+	s.lastTimeout = timeoutMsg
 	// stop voting for current view
 	prev := s.voter.LastVote()
 	s.voter.StopVoting(view)
 	// check if view is the same to log vote stop
 	if prev != view {
-		s.logger.Debugf("stopped voting on view %d and changed view to %d", prev, view)
+		s.logger.Debugf("Stopped voting in view %d and changed to view %d", prev, view)
 	}
 
-	s.sender.Timeout(timeoutMsg)
-	s.OnRemoteTimeout(timeoutMsg)
+	s.sender.Timeout(*timeoutMsg)
+	s.OnRemoteTimeout(*timeoutMsg)
 }
 
 // OnRemoteTimeout handles an incoming timeout from a remote replica.

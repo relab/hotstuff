@@ -42,6 +42,7 @@ import (
 	_ "github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
+	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	_ "github.com/relab/hotstuff/security/crypto/bls12"
 	_ "github.com/relab/hotstuff/security/crypto/ecdsa"
@@ -154,9 +155,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		runtimeOpts = append(runtimeOpts, core.WithKauriTree(newTree(opts)))
 	}
 	runtimeOpts = append(runtimeOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
-	if opts.GetUseAggQC() {
-		runtimeOpts = append(runtimeOpts, core.WithAggregateQC())
-	}
 	depsCore := wiring.NewCore(opts.HotstuffID(), "hs", privKey, runtimeOpts...)
 	// check if measurements should be enabled
 	if w.measurementInterval > 0 {
@@ -210,6 +208,16 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if err != nil {
 		return nil, err
 	}
+
+	var timeoutRules synchronizer.TimeoutRuler
+	if opts.GetUseAggQC() {
+		// Use aggregated quorum certificates.
+		// This must be true for Fast-Hotstuff: https://arxiv.org/abs/2010.11454
+		timeoutRules = synchronizer.NewAggregate(depsCore.RuntimeCfg(), depsSecure.Authority())
+	} else {
+		timeoutRules = synchronizer.NewSimple(depsCore.RuntimeCfg(), depsSecure.Authority())
+	}
+
 	consensusRules, viewStates, leaderRotation, comm, viewDuration, err := initConsensusModules(depsCore, depsSecure, sender, opts)
 	if err != nil {
 		return nil, err
@@ -223,6 +231,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		leaderRotation,
 		consensusRules,
 		viewDuration,
+		timeoutRules,
 		opts.GetBatchSize(),
 		replicaOpts...,
 	)

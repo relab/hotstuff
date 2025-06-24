@@ -71,6 +71,7 @@ func wireUpSynchronizer(
 		essentials.Authority(),
 		leaderRotation,
 		viewduration.NewFixed(1000*time.Nanosecond),
+		NewSimple(essentials.RuntimeCfg(), essentials.Authority()),
 		depsConsensus.Proposer(),
 		depsConsensus.Voter(),
 		viewStates,
