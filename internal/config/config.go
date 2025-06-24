@@ -11,7 +11,7 @@ import (
 
 // ExperimentConfig holds the configuration for an experiment.
 type ExperimentConfig struct {
-	// # Host-based configuration values below
+	// # Host-basCommunicationed configuration values below
 
 	// ReplicaHosts is a list of hosts that will run replicas.
 	ReplicaHosts []string
@@ -52,6 +52,8 @@ type ExperimentConfig struct {
 	Crypto string
 	// LeaderRotation is the name of the leader rotation algorithm to use.
 	LeaderRotation string
+	// Communication is the name of the dissemination and aggregation technique to use.
+	Communication string
 	// Metrics is a list of metrics to log.
 	Metrics []string
 
@@ -240,6 +242,7 @@ func (c *ExperimentConfig) CreateReplicaOpts() *orchestrationpb.ReplicaOpts {
 		Consensus:         c.Consensus,
 		Crypto:            c.Crypto,
 		LeaderRotation:    c.LeaderRotation,
+		Communication:     c.Communication,
 		ConnectTimeout:    durationpb.New(c.ConnectTimeout),
 		InitialTimeout:    durationpb.New(c.ViewTimeout),
 		TimeoutSamples:    c.DurationSamples,

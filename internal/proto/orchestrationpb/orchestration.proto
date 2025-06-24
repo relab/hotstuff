@@ -9,68 +9,99 @@ import "google/protobuf/duration.proto";
 /* -------------------------------------------------------------------------- */
 /*                              General messages                              */
 /* -------------------------------------------------------------------------- */
-
 // ReplicaOpts contains the configuration options for a replica.
 message ReplicaOpts {
   // The replica's ID.
   uint32 ID = 1;
+  
   // The replica's private key.
-  bytes PrivateKey = 3;
+  bytes PrivateKey = 2;
+
   // The replica's public key.
-  bytes PublicKey = 16;
+  bytes PublicKey = 3;
+
   // Determines whether TLS should be used.
   bool UseTLS = 4;
+
   // The replica's TLS certificate.
   bytes Certificate = 5;
+
   // The private key of the TLS certificate.
   bytes CertificateKey = 6;
+
   // The certificate authority that created the TLS certificates.
   bytes CertificateAuthority = 7;
+
   // The name of the crypto implementation to use.
   string Crypto = 8;
+
   // The name of the consensus implementation to use.
   string Consensus = 9;
+
   // The name of the leader rotation algorithm to use.
   string LeaderRotation = 10;
+
   // The number of client commands that should be batched together.
   uint32 BatchSize = 11;
-  // The timeout of the initial connection setup.
-  google.protobuf.Duration ConnectTimeout = 17;
+
+  // The name of the dissemination and aggregation method to use.
+  string Communication = 12;
+
   // The initial view duration.
-  google.protobuf.Duration InitialTimeout = 12;
-  // The maximum view timeout.
-  google.protobuf.Duration MaxTimeout = 19;
+  google.protobuf.Duration InitialTimeout = 13;
+
   // The number of samples used to calculate view duration.
-  uint32 TimeoutSamples = 13;
+  uint32 TimeoutSamples = 14;
+
   // The number that the old view duration should be multiplied by when a new
   // timeout happens.
-  float TimeoutMultiplier = 14;
+  float TimeoutMultiplier = 15;
+
+  // The replica's public key.
+  // (Already reassigned above as 3 — removed duplicate 16)
+
+  // The timeout of the initial connection setup.
+  google.protobuf.Duration ConnectTimeout = 16;
+
   // The byzantine strategy to use. If empty, the replica will act normally.
-  string ByzantineStrategy = 18;
+  string ByzantineStrategy = 17;
+
+  // The maximum view timeout.
+  google.protobuf.Duration MaxTimeout = 18;
+
   // A shared random number for seeding random number generators.
-  int64 SharedSeed = 20;
+  int64 SharedSeed = 19;
+
   // A list of modules to load.
-  repeated string Modules = 21;
+  repeated string Modules = 20;
+
   // Replica locations indexed by replica ID.
-  repeated string Locations = 22;
+  repeated string Locations = 21;
+
   // Tree positions of the replica.
-  repeated uint32 TreePositions = 23;
-  // Branch Factor in tree communication
-  uint32 BranchFactor = 24;
-  // Tree Duration in tree communication
-  google.protobuf.Duration TreeDelta = 25;
-  // Enable Kauri
-  bool Kauri = 26;
+  repeated uint32 TreePositions = 22;
+
+  // Branch Factor in tree communication.
+  uint32 BranchFactor = 23;
+
+  // Tree Duration in tree communication.
+  google.protobuf.Duration TreeDelta = 24;
+
+  // Enable Kauri.
+  bool Kauri = 25;
+
   // DelayType is the type of delay to use for the wait time.
   oneof DelayType {
     // AggregationTime computes the wait time based on the latency of links in the tree.
-    bool AggregationTime = 27;
+    bool AggregationTime = 26;
     // TreeHeightTime computes the wait time only based on the height of the tree.
-    bool TreeHeightTime = 28;
+    bool TreeHeightTime = 27;
   }
+
   // UseAggQC is true if aggregate quorum certs should be used by the protocol.
-  bool UseAggQC = 29;
+  bool UseAggQC = 28;
 }
+
 
 // ReplicaInfo is the information that the replicas need about each other.
 message ReplicaInfo {

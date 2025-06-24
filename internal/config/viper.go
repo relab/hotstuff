@@ -54,6 +54,7 @@ func NewViper() (*ExperimentConfig, error) {
 		Consensus:           viper.GetString("consensus"),
 		Crypto:              viper.GetString("crypto"),
 		LeaderRotation:      viper.GetString("leader-rotation"),
+		Communication:       viper.GetString("communication"),
 		ConnectTimeout:      viper.GetDuration("connect-timeout"),
 		ViewTimeout:         viper.GetDuration("view-timeout"),
 		DurationSamples:     viper.GetUint32("duration-samples"),

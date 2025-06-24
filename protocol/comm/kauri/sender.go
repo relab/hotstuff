@@ -21,7 +21,7 @@ type KauriGorumsSender struct {
 	tree  *tree.Tree
 }
 
-func NewExtendedGorumsSender(
+func WrapGorumsSender(
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
 	base *network.GorumsSender,

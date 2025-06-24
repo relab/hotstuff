@@ -11,8 +11,8 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/protocol"
+	"github.com/relab/hotstuff/protocol/comm/clique"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/disagg/clique"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
@@ -88,7 +88,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		depsSecurity.Authority(),
 		node.viewStates,
 	)
-	disAgg := clique.New(
+	comm := clique.New(
 		node.config,
 		votingMachine,
 		node.leaderRotation,
@@ -98,7 +98,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		node.config,
 		node.leaderRotation,
 		consensusRules,
-		disAgg,
+		comm,
 		depsSecurity.Authority(),
 		committer,
 	)
@@ -107,7 +107,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		node.config,
 		node.blockchain,
 		consensusRules,
-		disAgg,
+		comm,
 		node.voter,
 		node.commandCache,
 		committer,

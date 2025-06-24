@@ -3,7 +3,7 @@ package clique
 import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/protocol/disagg"
+	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 )
@@ -57,5 +57,5 @@ func (hs *Clique) Aggregate(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc h
 	return hs.sender.Vote(leaderID, pc)
 }
 
-var _ disagg.Aggregator = (*Clique)(nil)
-var _ disagg.Disseminator = (*Clique)(nil)
+var _ comm.Aggregator = (*Clique)(nil)
+var _ comm.Disseminator = (*Clique)(nil)

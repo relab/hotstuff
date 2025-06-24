@@ -1,4 +1,4 @@
-package disagg
+package comm
 
 import "github.com/relab/hotstuff"
 
@@ -14,8 +14,8 @@ type Aggregator interface {
 	Aggregate(lastVote hotstuff.View, proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error
 }
 
-// DisseminatorAggregator is an interface that combines Disseminator and Aggregator for convenience.
-type DisseminatorAggregator interface {
+// Communication is an interface that combines Disseminator and Aggregator for convenience.
+type Communication interface {
 	Disseminator
 	Aggregator
 }

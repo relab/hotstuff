@@ -14,7 +14,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/network"
-	"github.com/relab/hotstuff/protocol/disagg"
+	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
 )
@@ -221,4 +221,4 @@ type WaitTimerExpiredEvent struct {
 	currentView hotstuff.View
 }
 
-var _ disagg.DisseminatorAggregator = (*Kauri)(nil)
+var _ comm.Communication = (*Kauri)(nil)

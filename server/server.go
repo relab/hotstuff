@@ -8,7 +8,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/protocol/disagg/kauri"
+	"github.com/relab/hotstuff/protocol/comm/kauri"
 	"github.com/relab/hotstuff/security/blockchain"
 
 	"github.com/relab/gorums"

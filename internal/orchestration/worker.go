@@ -36,17 +36,14 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	// imported modules
+	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/disagg"
-	"github.com/relab/hotstuff/protocol/disagg/clique"
-	"github.com/relab/hotstuff/protocol/disagg/kauri"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	_ "github.com/relab/hotstuff/protocol/leaderrotation"
 	_ "github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	_ "github.com/relab/hotstuff/protocol/rules/fasthotstuff"
 	_ "github.com/relab/hotstuff/protocol/rules/simplehotstuff"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
-	"github.com/relab/hotstuff/protocol/votingmachine"
 	_ "github.com/relab/hotstuff/security/crypto/bls12"
 	_ "github.com/relab/hotstuff/security/crypto/ecdsa"
 	_ "github.com/relab/hotstuff/security/crypto/eddsa"
@@ -213,7 +210,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if err != nil {
 		return nil, err
 	}
-	consensusRules, viewStates, leaderRotation, disAgg, viewDuration, err := initConsensusModules(depsCore, depsSecure, sender, opts)
+	consensusRules, viewStates, leaderRotation, comm, viewDuration, err := initConsensusModules(depsCore, depsSecure, sender, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +219,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		depsSecure,
 		sender,
 		viewStates,
-		disAgg,
+		comm,
 		leaderRotation,
 		consensusRules,
 		viewDuration,
@@ -240,7 +237,7 @@ func initConsensusModules(
 	consensus.Ruleset,
 	*protocol.ViewStates,
 	leaderrotation.LeaderRotation,
-	disagg.DisseminatorAggregator,
+	comm.Communication,
 	viewduration.ViewDuration,
 	error,
 ) {
@@ -285,45 +282,28 @@ func initConsensusModules(
 		return nil, nil, nil, nil, nil, err
 	}
 
-	var disAgg disagg.DisseminatorAggregator
-	var viewDuration viewduration.ViewDuration
-	if depsCore.RuntimeCfg().HasKauriTree() {
-		viewDuration = viewduration.NewFixed(opts.GetInitialTimeout().AsDuration())
-		disAgg = kauri.New(
-			depsCore.Logger(),
-			depsCore.EventLoop(),
-			depsCore.RuntimeCfg(),
-			depsSecure.BlockChain(),
-			depsSecure.Authority(),
-			kauri.NewExtendedGorumsSender(
-				depsCore.EventLoop(),
-				depsCore.RuntimeCfg(),
-				sender,
-			),
-		)
-	} else {
-		viewDuration = viewduration.NewDynamic(viewduration.NewParams(
-			opts.GetTimeoutSamples(),
-			opts.GetInitialTimeout().AsDuration(),
-			opts.GetMaxTimeout().AsDuration(),
-			opts.GetTimeoutMultiplier(),
-		))
-		votingMachine := votingmachine.New(
-			depsCore.Logger(),
-			depsCore.EventLoop(),
-			depsCore.RuntimeCfg(),
-			depsSecure.BlockChain(),
-			depsSecure.Authority(),
-			viewStates,
-		)
-		disAgg = clique.New(
-			depsCore.RuntimeCfg(),
-			votingMachine,
-			leaderRotation,
-			sender,
-		)
+	comm, err := wiring.NewCommunicationModule(
+		depsCore.Logger(),
+		depsCore.EventLoop(),
+		depsCore.RuntimeCfg(),
+		depsSecure.BlockChain(),
+		depsSecure.Authority(),
+		sender,
+		leaderRotation,
+		viewStates,
+		opts.GetCommunication(),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
 	}
-	return consensusRules, viewStates, leaderRotation, disAgg, viewDuration, nil
+	// TODO(AlanRostem): use fixed duration based on config
+	viewDuration := viewduration.NewDynamic(viewduration.NewParams(
+		opts.GetTimeoutSamples(),
+		opts.GetInitialTimeout().AsDuration(),
+		opts.GetMaxTimeout().AsDuration(),
+		opts.GetTimeoutMultiplier(),
+	))
+	return consensusRules, viewStates, leaderRotation, comm, viewDuration, nil
 }
 
 // newTree creates a new tree based on the provided options. It uses the aggregation

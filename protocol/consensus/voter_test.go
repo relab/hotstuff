@@ -7,8 +7,8 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol"
+	"github.com/relab/hotstuff/protocol/comm/clique"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/disagg/clique"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
 	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
 	"github.com/relab/hotstuff/protocol/votingmachine"
@@ -46,7 +46,7 @@ func wireUpVoter(
 		essentials.Authority(),
 		viewStates,
 	)
-	disAgg := clique.New(
+	comm := clique.New(
 		essentials.RuntimeCfg(),
 		votingMachine,
 		leaderRotation,
@@ -56,7 +56,7 @@ func wireUpVoter(
 		essentials.RuntimeCfg(),
 		leaderRotation,
 		consensusRules,
-		disAgg,
+		comm,
 		essentials.Authority(),
 		committer,
 	)

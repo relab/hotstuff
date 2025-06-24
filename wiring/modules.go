@@ -7,11 +7,12 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol"
+	"github.com/relab/hotstuff/protocol/comm"
+	"github.com/relab/hotstuff/protocol/comm/clique"
+	"github.com/relab/hotstuff/protocol/comm/kauri"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/disagg"
-	"github.com/relab/hotstuff/protocol/disagg/clique"
-	"github.com/relab/hotstuff/protocol/disagg/kauri"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/leaderrotation/carousel"
 	"github.com/relab/hotstuff/protocol/leaderrotation/fixedleader"
@@ -127,7 +128,7 @@ func NewLeaderRotation(
 }
 
 // TODO(AlanRostem): use this
-func NewPropagationModule(
+func NewCommunicationModule(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,
 	config *core.RuntimeConfig,
@@ -137,25 +138,24 @@ func NewPropagationModule(
 	leaderRotation leaderrotation.LeaderRotation,
 	viewStates *protocol.ViewStates,
 	name string,
-) (disAgg disagg.DisseminatorAggregator, _ error) {
+) (comm comm.Communication, _ error) {
 	logger.Debugf("initializing module (propagation): %s", name)
 	switch name {
 	case kauri.ModuleName:
-		// TODO(AlanRostem): find a less hacky way to do this
-		kauriSender, ok := sender.(core.KauriSender)
-		if !ok {
-			return nil, fmt.Errorf("input parameter sender does not implement KauriSender")
-		}
-		disAgg = kauri.New(
+		comm = kauri.New(
 			logger,
 			eventLoop,
 			config,
 			blockchain,
 			auth,
-			kauriSender,
+			kauri.WrapGorumsSender(
+				eventLoop,
+				config,
+				sender.(*network.GorumsSender), // TODO(AlanRostem): avoid cast
+			),
 		)
 	case clique.ModuleName:
-		disAgg = clique.New(
+		comm = clique.New(
 			config,
 			votingmachine.New(
 				logger,
