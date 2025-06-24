@@ -6,7 +6,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/test"
-	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
+	"github.com/relab/hotstuff/protocol/rules"
 )
 
 func TestNetworkSendMessage(t *testing.T) {
@@ -163,7 +163,7 @@ func createNetwork(t testing.TB, numNodes int) (*Network, []*emulatedSender) {
 	// create 4 nodes without twins
 	nodes, _ := assignNodeIDs(uint8(numNodes), 0)
 
-	if err := network.createTwinsNodes(nodes, chainedhotstuff.ModuleName); err != nil {
+	if err := network.createTwinsNodes(nodes, rules.ModuleNameChainedHotstuff); err != nil {
 		t.Fatalf("Failed to create nodes: %v", err)
 	}
 	senders := make([]*emulatedSender, len(network.nodes))

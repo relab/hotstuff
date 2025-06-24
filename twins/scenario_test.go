@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
+	"github.com/relab/hotstuff/protocol/rules"
 )
 
 // TestPartitionedScenario checks if chained Hotstuff will commit one block
@@ -26,7 +26,7 @@ func TestPartitionedScenario(t *testing.T) {
 	s = append(s, View{Leader: 3, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
-	result, err := ExecuteScenario(s, 4, 0, 100, chainedhotstuff.ModuleName)
+	result, err := ExecuteScenario(s, 4, 0, 100, rules.ModuleNameChainedHotstuff)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func TestBasicScenario(t *testing.T) {
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	logging.SetLogLevel("debug")
-	result, err := ExecuteScenario(s, 4, 0, 8, chainedhotstuff.ModuleName)
+	result, err := ExecuteScenario(s, 4, 0, 8, rules.ModuleNameChainedHotstuff)
 	if err != nil {
 		t.Fatal(err)
 	}

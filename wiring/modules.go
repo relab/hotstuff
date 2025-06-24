@@ -14,10 +14,8 @@ import (
 	"github.com/relab/hotstuff/protocol/comm/kauri"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
+	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
-	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
-	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
-	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
@@ -32,17 +30,17 @@ func NewConsensusRules(
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 	name string,
-) (rules consensus.Ruleset, _ error) {
+) (ruleset consensus.Ruleset, _ error) {
 	logger.Debugf("Initializing module (consensus rules): %s", name)
 	switch name {
 	case "":
 		fallthrough // default to chainedhotstuff if no name is provided
-	case chainedhotstuff.ModuleName:
-		rules = chainedhotstuff.New(logger, config, blockchain)
-	case fasthotstuff.ModuleName:
-		rules = fasthotstuff.New(logger, config, blockchain)
-	case simplehotstuff.ModuleName:
-		rules = simplehotstuff.New(logger, config, blockchain)
+	case rules.ModuleNameChainedHotstuff:
+		ruleset = rules.NewChainedHotStuff(logger, config, blockchain)
+	case rules.ModuleNameFastHotstuff:
+		ruleset = rules.NewFastHotstuff(logger, config, blockchain)
+	case rules.ModuleNameSimpleHotStuff:
+		ruleset = rules.NewSimpleHotStuff(logger, config, blockchain)
 	default:
 		return nil, fmt.Errorf("invalid consensus name: '%s'", name)
 	}
@@ -60,9 +58,9 @@ func WrapByzantineStrategy(
 	switch name {
 	case "":
 		return rules, nil // default to no byzantine strategy if no name is provided
-	case byzantine.SilenceModuleName:
+	case byzantine.ModuleNameSilence:
 		byzRules = byzantine.NewSilence(rules)
-	case byzantine.ForkModuleName:
+	case byzantine.ModuleNameFork:
 		byzRules = byzantine.NewFork(config, blockchain, rules)
 	default:
 		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", name)

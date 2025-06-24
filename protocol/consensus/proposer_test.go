@@ -11,7 +11,7 @@ import (
 	"github.com/relab/hotstuff/protocol/comm/clique"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
-	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
+	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 )
@@ -28,7 +28,7 @@ func wireUpProposer(
 	commandCache *clientpb.CommandCache,
 ) (*consensus.Proposer, *protocol.ViewStates) {
 	t.Helper()
-	consensusRules := chainedhotstuff.New(
+	consensusRules := rules.NewChainedHotStuff(
 		essentials.Logger(),
 		essentials.RuntimeCfg(),
 		essentials.BlockChain(),

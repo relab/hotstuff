@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
+	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/twins"
 )
@@ -135,13 +135,13 @@ func TestFHSBug(t *testing.T) {
 type vulnerableFHS struct {
 	logger     logging.Logger
 	blockchain *blockchain.Blockchain
-	fasthotstuff.FastHotStuff
+	rules.FastHotStuff
 }
 
 func NewVulnFHS(
 	logger logging.Logger,
 	blockchain *blockchain.Blockchain,
-	inner fasthotstuff.FastHotStuff,
+	inner rules.FastHotStuff,
 ) *vulnerableFHS {
 	return &vulnerableFHS{
 		logger:       logger,

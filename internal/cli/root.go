@@ -10,10 +10,8 @@ import (
 	"github.com/relab/hotstuff/protocol/comm/clique"
 	"github.com/relab/hotstuff/protocol/comm/kauri"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
+	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
-	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
-	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
-	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/security/crypto/eddsa"
@@ -45,13 +43,13 @@ use 'hotstuff help run' to view all possible parameters for this command.`,
 			}
 			modules := map[string][]string{
 				"--consensus": {
-					simplehotstuff.ModuleName,
-					fasthotstuff.ModuleName,
-					chainedhotstuff.ModuleName,
+					rules.ModuleNameSimpleHotStuff,
+					rules.ModuleNameFastHotstuff,
+					rules.ModuleNameChainedHotstuff,
 				},
 				"--byzantine-stragegy": {
-					byzantine.SilenceModuleName,
-					byzantine.ForkModuleName,
+					byzantine.ModuleNameSilence,
+					byzantine.ModuleNameFork,
 				},
 				"--crypto": {
 					ecdsa.ModuleName,

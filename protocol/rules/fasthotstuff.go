@@ -1,5 +1,4 @@
-// Package fasthotstuff implements the two-chain Fast-HotStuff protocol.
-package fasthotstuff
+package rules
 
 import (
 	"github.com/relab/hotstuff"
@@ -10,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
-const ModuleName = "fasthotstuff"
+const ModuleNameFastHotstuff = "fasthotstuff"
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {
@@ -20,7 +19,7 @@ type FastHotStuff struct {
 }
 
 // New returns a new FastHotStuff instance.
-func New(
+func NewFastHotstuff(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,

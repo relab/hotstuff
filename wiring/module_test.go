@@ -8,10 +8,8 @@ import (
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
+	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
-	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
-	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
-	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
 	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
@@ -29,31 +27,31 @@ func TestModules(t *testing.T) {
 	}{
 		{
 			cryptoName:         ecdsa.ModuleName,
-			consensusName:      chainedhotstuff.ModuleName,
+			consensusName:      rules.ModuleNameChainedHotstuff,
 			leaderRotationName: leaderrotation.ModuleNameRoundRobin,
-			byzantineStrategy:  byzantine.ForkModuleName,
+			byzantineStrategy:  byzantine.ModuleNameFork,
 		},
 		{
 			cryptoName:         eddsa.ModuleName,
-			consensusName:      simplehotstuff.ModuleName,
+			consensusName:      rules.ModuleNameSimpleHotStuff,
 			leaderRotationName: leaderrotation.ModuleNameFixed,
-			byzantineStrategy:  byzantine.SilenceModuleName,
+			byzantineStrategy:  byzantine.ModuleNameSilence,
 		},
 		{
 			cryptoName:         bls12.ModuleName,
-			consensusName:      fasthotstuff.ModuleName,
+			consensusName:      rules.ModuleNameFastHotstuff,
 			leaderRotationName: leaderrotation.ModuleNameCarousel,
 			byzantineStrategy:  "",
 		},
 		{
 			cryptoName:         bls12.ModuleName,
-			consensusName:      fasthotstuff.ModuleName,
+			consensusName:      rules.ModuleNameFastHotstuff,
 			leaderRotationName: leaderrotation.ModuleNameReputation,
 			byzantineStrategy:  "",
 		},
 		{
 			cryptoName:         bls12.ModuleName,
-			consensusName:      fasthotstuff.ModuleName,
+			consensusName:      rules.ModuleNameFastHotstuff,
 			leaderRotationName: leaderrotation.ModuleNameTree,
 			byzantineStrategy:  "",
 		},
@@ -70,7 +68,7 @@ func TestModules(t *testing.T) {
 			pk = testutil.GenerateEDDSAKey(t)
 		}
 		runtimeOpts := []core.RuntimeOption{}
-		if td.consensusName == fasthotstuff.ModuleName {
+		if td.consensusName == rules.ModuleNameFastHotstuff {
 			runtimeOpts = append(runtimeOpts, core.WithAggregateQC())
 		}
 		depsCore := wiring.NewCore(hotstuff.ID(1), "test", pk, runtimeOpts...)

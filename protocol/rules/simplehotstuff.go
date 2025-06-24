@@ -1,5 +1,4 @@
-// Package simplehotstuff implements a simplified version of the three-chain HotStuff protocol.
-package simplehotstuff
+package rules
 
 import (
 	"github.com/relab/hotstuff"
@@ -10,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
-const ModuleName = "simplehotstuff"
+const ModuleNameSimpleHotStuff = "simplehotstuff"
 
 // SimpleHotStuff implements a simplified version of the HotStuff algorithm.
 //
@@ -25,7 +24,7 @@ type SimpleHotStuff struct {
 }
 
 // New returns a new SimpleHotStuff instance.
-func New(
+func NewSimpleHotStuff(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,

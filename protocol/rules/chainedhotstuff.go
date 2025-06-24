@@ -1,5 +1,4 @@
-// Package chainedhotstuff implements the pipelined three-chain version of the HotStuff protocol.
-package chainedhotstuff
+package rules
 
 import (
 	"github.com/relab/hotstuff"
@@ -10,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
-const ModuleName = "chainedhotstuff"
+const ModuleNameChainedHotstuff = "chainedhotstuff"
 
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {
@@ -24,7 +23,7 @@ type ChainedHotStuff struct {
 }
 
 // New returns a new chainedhotstuff instance.
-func New(
+func NewChainedHotStuff(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,

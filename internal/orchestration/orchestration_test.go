@@ -22,9 +22,7 @@ import (
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/protocol/comm/clique"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
-	"github.com/relab/hotstuff/protocol/rules/chainedhotstuff"
-	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
-	"github.com/relab/hotstuff/protocol/rules/simplehotstuff"
+	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/security/crypto/bls12"
 	"github.com/relab/hotstuff/security/crypto/ecdsa"
 	"github.com/relab/hotstuff/security/crypto/eddsa"
@@ -39,7 +37,7 @@ func makeCfg(
 	randomTree bool,
 	kauri bool,
 ) *config.ExperimentConfig {
-	useAggQC := consensusImpl == fasthotstuff.ModuleName
+	useAggQC := consensusImpl == rules.ModuleNameFastHotstuff
 	cfg := &config.ExperimentConfig{
 		Replicas:          replicas,
 		Clients:           clients,
@@ -120,21 +118,21 @@ func TestOrchestration(t *testing.T) {
 		branchFactor uint32
 		randomTree   bool
 	}{
-		{consensus: chainedhotstuff.ModuleName, crypto: ecdsa.ModuleName, replicas: 4},
-		{consensus: chainedhotstuff.ModuleName, crypto: eddsa.ModuleName, replicas: 4},
-		{consensus: chainedhotstuff.ModuleName, crypto: bls12.ModuleName, replicas: 4},
-		{consensus: fasthotstuff.ModuleName, crypto: ecdsa.ModuleName, replicas: 4},
-		{consensus: fasthotstuff.ModuleName, crypto: eddsa.ModuleName, replicas: 4},
-		{consensus: fasthotstuff.ModuleName, crypto: bls12.ModuleName, replicas: 4},
-		{consensus: simplehotstuff.ModuleName, crypto: ecdsa.ModuleName, replicas: 4},
-		{consensus: simplehotstuff.ModuleName, crypto: eddsa.ModuleName, replicas: 4},
-		{consensus: simplehotstuff.ModuleName, crypto: bls12.ModuleName, replicas: 4},
-		{consensus: chainedhotstuff.ModuleName, crypto: ecdsa.ModuleName, byzantine: fork, replicas: 4},
-		{consensus: chainedhotstuff.ModuleName, crypto: ecdsa.ModuleName, byzantine: silence, replicas: 4},
-		{consensus: chainedhotstuff.ModuleName, crypto: ecdsa.ModuleName, kauri: true, replicas: 7, branchFactor: 2},
-		{consensus: chainedhotstuff.ModuleName, crypto: bls12.ModuleName, kauri: true, replicas: 7, branchFactor: 2},
-		{consensus: chainedhotstuff.ModuleName, crypto: ecdsa.ModuleName, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
-		{consensus: chainedhotstuff.ModuleName, crypto: bls12.ModuleName, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: ecdsa.ModuleName, replicas: 4},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: eddsa.ModuleName, replicas: 4},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: bls12.ModuleName, replicas: 4},
+		{consensus: rules.ModuleNameFastHotstuff, crypto: ecdsa.ModuleName, replicas: 4},
+		{consensus: rules.ModuleNameFastHotstuff, crypto: eddsa.ModuleName, replicas: 4},
+		{consensus: rules.ModuleNameFastHotstuff, crypto: bls12.ModuleName, replicas: 4},
+		{consensus: rules.ModuleNameSimpleHotStuff, crypto: ecdsa.ModuleName, replicas: 4},
+		{consensus: rules.ModuleNameSimpleHotStuff, crypto: eddsa.ModuleName, replicas: 4},
+		{consensus: rules.ModuleNameSimpleHotStuff, crypto: bls12.ModuleName, replicas: 4},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: ecdsa.ModuleName, byzantine: fork, replicas: 4},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: ecdsa.ModuleName, byzantine: silence, replicas: 4},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: ecdsa.ModuleName, kauri: true, replicas: 7, branchFactor: 2},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: bls12.ModuleName, kauri: true, replicas: 7, branchFactor: 2},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: ecdsa.ModuleName, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: bls12.ModuleName, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
 	}
 
 	for _, tt := range tests {
@@ -233,7 +231,7 @@ func TestDeployment(t *testing.T) {
 		ViewTimeout:       100 * time.Millisecond,
 		DurationSamples:   1000,
 		TimeoutMultiplier: 1.2,
-		Consensus:         chainedhotstuff.ModuleName,
+		Consensus:         rules.ModuleNameChainedHotstuff,
 		Crypto:            ecdsa.ModuleName,
 		LeaderRotation:    "round-robin",
 	}

@@ -9,23 +9,7 @@ import (
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
-const (
-	SilenceModuleName = "silence"
-	ForkModuleName    = "fork"
-)
-
-type Silence struct {
-	consensus.Ruleset
-}
-
-// NewSilence returns a Byzantine replica that will never propose.
-func NewSilence(rules consensus.Ruleset) *Silence {
-	return &Silence{Ruleset: rules}
-}
-
-func (s *Silence) ProposeRule(_ hotstuff.View, _ hotstuff.QuorumCert, _ hotstuff.SyncInfo, _ *clientpb.Batch) (hotstuff.ProposeMsg, bool) {
-	return hotstuff.ProposeMsg{}, false
-}
+const ModuleNameFork = "fork"
 
 type Fork struct {
 	config     *core.RuntimeConfig
@@ -66,7 +50,4 @@ func (f *Fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert 
 	return proposal, true
 }
 
-var (
-	_ consensus.Ruleset = (*Silence)(nil)
-	_ consensus.Ruleset = (*Fork)(nil)
-)
+var _ consensus.Ruleset = (*Fork)(nil)

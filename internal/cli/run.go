@@ -17,7 +17,7 @@ import (
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/metrics"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
-	"github.com/relab/hotstuff/protocol/rules/fasthotstuff"
+	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/iago"
 	"github.com/spf13/viper"
 )
@@ -37,7 +37,7 @@ func runController() {
 	}
 
 	// fasthotstuff strictly requires QC aggregation.
-	if cfg.Consensus == fasthotstuff.ModuleName {
+	if cfg.Consensus == rules.ModuleNameFastHotstuff {
 		cfg.UseAggQC = true
 	}
 
