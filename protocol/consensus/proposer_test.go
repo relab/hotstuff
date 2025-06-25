@@ -95,7 +95,10 @@ func TestPropose(t *testing.T) {
 	commandCache.Add(command)
 	proposer, viewStates := wireUpProposer(t, essentials, commandCache)
 	highQC := testutil.CreateQC(t, hotstuff.GetGenesis(), essentials.Authority())
-	viewStates.UpdateHighQC(highQC)
+	err := viewStates.UpdateHighQC(highQC)
+	if err != nil {
+		t.Fatal(err)
+	}
 	proposal, err := proposer.CreateProposal(hotstuff.NewSyncInfo().WithQC(highQC))
 	if err != nil {
 		t.Fatal(err)

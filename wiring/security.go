@@ -6,12 +6,10 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
-	"github.com/relab/hotstuff/security/crypto"
 )
 
 type Security struct {
 	blockchain *blockchain.Blockchain
-	cryptoImpl crypto.Base
 	auth       *cert.Authority
 }
 
