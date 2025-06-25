@@ -66,7 +66,6 @@ func NewViper() (*ExperimentConfig, error) {
 		RateStep:            viper.GetFloat64("rate-step"),
 		RateStepInterval:    viper.GetDuration("rate-step-interval"),
 		ClientTimeout:       viper.GetDuration("client-timeout"),
-		Kauri:               viper.GetBool("kauri"),
 		UseAggQC:            viper.GetBool("agg-qc"),
 		UseTLS:              true,
 	}

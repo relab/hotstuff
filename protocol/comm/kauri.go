@@ -45,6 +45,9 @@ func NewKauri(
 	auth *cert.Authority,
 	sender core.KauriSender,
 ) *Kauri {
+	if !config.HasKauriTree() {
+		panic("the tree must be configured for kauri")
+	}
 	k := &Kauri{
 		blockchain: blockchain,
 		auth:       auth,

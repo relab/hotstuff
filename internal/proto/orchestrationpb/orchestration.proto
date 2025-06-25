@@ -87,19 +87,16 @@ message ReplicaOpts {
   // Tree Duration in tree communication.
   google.protobuf.Duration TreeDelta = 24;
 
-  // Enable Kauri.
-  bool Kauri = 25;
-
   // DelayType is the type of delay to use for the wait time.
   oneof DelayType {
     // AggregationTime computes the wait time based on the latency of links in the tree.
-    bool AggregationTime = 26;
+    bool AggregationTime = 25;
     // TreeHeightTime computes the wait time only based on the height of the tree.
-    bool TreeHeightTime = 27;
+    bool TreeHeightTime = 26;
   }
 
   // UseAggQC is true if aggregate quorum certs should be used by the protocol.
-  bool UseAggQC = 28;
+  bool UseAggQC = 27;
 }
 
 

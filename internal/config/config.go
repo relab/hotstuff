@@ -59,10 +59,8 @@ type ExperimentConfig struct {
 
 	// # Protocol-specific values:
 
-	// UseAggQC indicates whether or not to use aggregated QCs.
+	// UseAggQC indicates whether or not to use aggregated QCs (Fast Hotstuff).
 	UseAggQC bool
-	// Kauri enables Kauri protocol.
-	Kauri bool
 
 	// # File path strings below:
 
@@ -251,7 +249,6 @@ func (c *ExperimentConfig) CreateReplicaOpts() *orchestrationpb.ReplicaOpts {
 		BranchFactor:      c.BranchFactor,
 		TreePositions:     c.TreePositions,
 		TreeDelta:         durationpb.New(c.TreeDelta),
-		Kauri:             c.Kauri,
 		UseAggQC:          c.UseAggQC,
 	}
 }

@@ -33,7 +33,7 @@ func makeCfg(
 	byzantine map[string][]uint32,
 	branchFactor uint32,
 	randomTree bool,
-	kauri bool,
+	commName string,
 ) *config.ExperimentConfig {
 	useAggQC := consensusImpl == rules.NameFastHotstuff
 	cfg := &config.ExperimentConfig{
@@ -43,11 +43,10 @@ func makeCfg(
 		RandomTree:        randomTree,
 		BranchFactor:      branchFactor,
 		Consensus:         consensusImpl,
-		Communication:     comm.NameClique,
+		Communication:     commName,
 		Crypto:            crypto,
 		LeaderRotation:    leaderRotation,
 		ByzantineStrategy: byzantine,
-		Kauri:             kauri,
 		UseAggQC:          useAggQC,
 
 		// Common default values:
@@ -111,7 +110,7 @@ func TestOrchestration(t *testing.T) {
 		consensus    string
 		crypto       string
 		byzantine    map[string][]uint32
-		kauri        bool
+		commName     string
 		replicas     int
 		branchFactor uint32
 		randomTree   bool
@@ -127,18 +126,19 @@ func TestOrchestration(t *testing.T) {
 		{consensus: rules.NameSimpleHotStuff, crypto: crypto.NameBLS12, replicas: 4},
 		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, byzantine: fork, replicas: 4},
 		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, byzantine: silence, replicas: 4},
-		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, kauri: true, replicas: 7, branchFactor: 2},
-		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameBLS12, kauri: true, replicas: 7, branchFactor: 2},
-		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
-		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameBLS12, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, commName: comm.NameKauri, replicas: 7, branchFactor: 2},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameBLS12, commName: comm.NameKauri, replicas: 7, branchFactor: 2},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, commName: comm.NameKauri, replicas: 7, branchFactor: 2, randomTree: true},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameBLS12, commName: comm.NameKauri, replicas: 7, branchFactor: 2, randomTree: true},
 	}
 
 	for _, tt := range tests {
-		t.Run(test.Name([]string{"consensus", "crypto", "byzantine", "kauri"}, tt.consensus, tt.crypto, tt.byzantine, tt.kauri), func(t *testing.T) {
+		t.Run(test.Name([]string{"consensus", "crypto", "byzantine", "kauri"}, tt.consensus, tt.crypto, tt.byzantine, tt.commName), func(t *testing.T) {
 			var leaderRotation string
-			if tt.kauri {
+			if tt.commName != "" {
 				leaderRotation = leaderrotation.NameTree
 			} else {
+				tt.commName = comm.NameClique
 				leaderRotation = leaderrotation.NameRoundRobin
 			}
 			cfg := makeCfg(
@@ -149,7 +149,7 @@ func TestOrchestration(t *testing.T) {
 				tt.byzantine,
 				tt.branchFactor,
 				tt.randomTree,
-				tt.kauri,
+				tt.commName,
 			)
 			run(t, cfg)
 		})

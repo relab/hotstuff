@@ -147,7 +147,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 	// setup core - used in replica and measurement framework
 	runtimeOpts := []core.RuntimeOption{}
-	// TODO(AlanRostem): maybe rename the tree option to kauriTree? should also use the tree check only for enable kauri
 	if opts.TreeEnabled() {
 		runtimeOpts = append(runtimeOpts, core.WithKauriTree(newTree(opts)))
 	}
