@@ -23,9 +23,7 @@ import (
 	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
-	"github.com/relab/hotstuff/security/crypto/bls12"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
-	"github.com/relab/hotstuff/security/crypto/eddsa"
+	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/iago/iagotest"
 )
 
@@ -118,21 +116,21 @@ func TestOrchestration(t *testing.T) {
 		branchFactor uint32
 		randomTree   bool
 	}{
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: ecdsa.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: eddsa.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: bls12.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameFastHotstuff, crypto: ecdsa.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameFastHotstuff, crypto: eddsa.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameFastHotstuff, crypto: bls12.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameSimpleHotStuff, crypto: ecdsa.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameSimpleHotStuff, crypto: eddsa.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameSimpleHotStuff, crypto: bls12.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: ecdsa.ModuleName, byzantine: fork, replicas: 4},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: ecdsa.ModuleName, byzantine: silence, replicas: 4},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: ecdsa.ModuleName, kauri: true, replicas: 7, branchFactor: 2},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: bls12.ModuleName, kauri: true, replicas: 7, branchFactor: 2},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: ecdsa.ModuleName, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: bls12.ModuleName, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameECDSA, replicas: 4},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameEDDSA, replicas: 4},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameBLS12, replicas: 4},
+		{consensus: rules.ModuleNameFastHotstuff, crypto: crypto.ModuleNameECDSA, replicas: 4},
+		{consensus: rules.ModuleNameFastHotstuff, crypto: crypto.ModuleNameEDDSA, replicas: 4},
+		{consensus: rules.ModuleNameFastHotstuff, crypto: crypto.ModuleNameBLS12, replicas: 4},
+		{consensus: rules.ModuleNameSimpleHotStuff, crypto: crypto.ModuleNameECDSA, replicas: 4},
+		{consensus: rules.ModuleNameSimpleHotStuff, crypto: crypto.ModuleNameEDDSA, replicas: 4},
+		{consensus: rules.ModuleNameSimpleHotStuff, crypto: crypto.ModuleNameBLS12, replicas: 4},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameECDSA, byzantine: fork, replicas: 4},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameECDSA, byzantine: silence, replicas: 4},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameECDSA, kauri: true, replicas: 7, branchFactor: 2},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameBLS12, kauri: true, replicas: 7, branchFactor: 2},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameECDSA, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
+		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameBLS12, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
 	}
 
 	for _, tt := range tests {
@@ -232,7 +230,7 @@ func TestDeployment(t *testing.T) {
 		DurationSamples:   1000,
 		TimeoutMultiplier: 1.2,
 		Consensus:         rules.ModuleNameChainedHotstuff,
-		Crypto:            ecdsa.ModuleName,
+		Crypto:            crypto.ModuleNameECDSA,
 		LeaderRotation:    "round-robin",
 	}
 

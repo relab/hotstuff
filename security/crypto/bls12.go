@@ -1,5 +1,4 @@
-// Package bls12 implements the crypto primitives used by HotStuff using curve BLS12-381.
-package bls12
+package crypto
 
 import (
 	"crypto/rand"
@@ -12,17 +11,16 @@ import (
 	bls12 "github.com/kilic/bls12-381"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
-	"github.com/relab/hotstuff/security/crypto"
 )
 
-const ModuleName = "bls12"
+const ModuleNameBLS12 = "bls12"
 
 const (
 	// PrivateKeyFileType is the PEM type for a private key.
-	PrivateKeyFileType = "BLS12-381 PRIVATE KEY"
+	BLS12PrivateKeyFileType = "BLS12-381 PRIVATE KEY"
 
 	// PublicKeyFileType is the PEM type for a public key.
-	PublicKeyFileType = "BLS12-381 PUBLIC KEY"
+	BLS12PublicKeyFileType = "BLS12-381 PUBLIC KEY"
 
 	popMetadataKey = "bls12-pop-bin"
 )
@@ -35,18 +33,18 @@ var (
 	curveOrder, _ = new(big.Int).SetString("73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001", 16)
 )
 
-// PublicKey is a bls12-381 public key.
-type PublicKey struct {
+// BLS12PublicKey is a bls12-381 public key.
+type BLS12PublicKey struct {
 	p *bls12.PointG1
 }
 
 // ToBytes marshals the public key to a byte slice.
-func (pub PublicKey) ToBytes() []byte {
+func (pub BLS12PublicKey) ToBytes() []byte {
 	return bls12.NewG1().ToCompressed(pub.p)
 }
 
 // FromBytes unmarshals the public key from a byte slice.
-func (pub *PublicKey) FromBytes(b []byte) error {
+func (pub *BLS12PublicKey) FromBytes(b []byte) error {
 	var err error
 	pub.p, err = bls12.NewG1().FromCompressed(b)
 	if err != nil {
@@ -55,63 +53,63 @@ func (pub *PublicKey) FromBytes(b []byte) error {
 	return nil
 }
 
-// PrivateKey is a bls12-381 private key.
-type PrivateKey struct {
+// BLS12PrivateKey is a bls12-381 private key.
+type BLS12PrivateKey struct {
 	p *big.Int
 }
 
 // ToBytes marshals the private key to a byte slice.
-func (priv PrivateKey) ToBytes() []byte {
+func (priv BLS12PrivateKey) ToBytes() []byte {
 	return priv.p.Bytes()
 }
 
 // FromBytes unmarshals the private key from a byte slice.
-func (priv *PrivateKey) FromBytes(b []byte) {
+func (priv *BLS12PrivateKey) FromBytes(b []byte) {
 	priv.p = new(big.Int)
 	priv.p.SetBytes(b)
 }
 
-// GeneratePrivateKey generates a new private key.
-func GeneratePrivateKey() (*PrivateKey, error) {
+// GenerateBLS12PrivateKey generates a new private key.
+func GenerateBLS12PrivateKey() (*BLS12PrivateKey, error) {
 	// the private key is uniformly random integer such that 0 <= pk < r
 	pk, err := rand.Int(rand.Reader, curveOrder)
 	if err != nil {
 		return nil, fmt.Errorf("bls12: failed to generate private key: %w", err)
 	}
-	return &PrivateKey{
+	return &BLS12PrivateKey{
 		p: pk,
 	}, nil
 }
 
 // Public returns the public key associated with this private key.
-func (priv *PrivateKey) Public() hotstuff.PublicKey {
+func (priv *BLS12PrivateKey) Public() hotstuff.PublicKey {
 	p := &bls12.PointG1{}
 	// The public key is the secret key multiplied by the generator G1
-	return &PublicKey{p: bls12.NewG1().MulScalarBig(p, &bls12.G1One, priv.p)}
+	return &BLS12PublicKey{p: bls12.NewG1().MulScalarBig(p, &bls12.G1One, priv.p)}
 }
 
-// AggregateSignature is a bls12-381 aggregate signature. The participants field contains the IDs of the replicas that
+// BLS12AggregateSignature is a bls12-381 aggregate signature. The participants field contains the IDs of the replicas that
 // participated in signature creation. This allows us to build an aggregated public key to verify the signature.
-type AggregateSignature struct {
+type BLS12AggregateSignature struct {
 	sig          bls12.PointG2
-	participants crypto.Bitfield // The ids of the replicas who submitted signatures.
+	participants Bitfield // The ids of the replicas who submitted signatures.
 }
 
-// RestoreAggregateSignature restores an existing aggregate signature. It should not be used to create new aggregate
+// RestoreBLS12AggregateSignature restores an existing aggregate signature. It should not be used to create new aggregate
 // signatures. Use CreateThresholdSignature instead.
-func RestoreAggregateSignature(sig []byte, participants crypto.Bitfield) (s *AggregateSignature, err error) {
+func RestoreBLS12AggregateSignature(sig []byte, participants Bitfield) (s *BLS12AggregateSignature, err error) {
 	p, err := bls12.NewG2().FromCompressed(sig)
 	if err != nil {
 		return nil, fmt.Errorf("bls12: failed to restore aggregate signature: %w", err)
 	}
-	return &AggregateSignature{
+	return &BLS12AggregateSignature{
 		sig:          *p,
 		participants: participants,
 	}, nil
 }
 
 // ToBytes returns a byte representation of the aggregate signature.
-func (agg *AggregateSignature) ToBytes() []byte {
+func (agg *BLS12AggregateSignature) ToBytes() []byte {
 	if agg == nil {
 		return nil
 	}
@@ -120,12 +118,12 @@ func (agg *AggregateSignature) ToBytes() []byte {
 }
 
 // Participants returns the IDs of replicas who participated in the threshold signature.
-func (agg AggregateSignature) Participants() hotstuff.IDSet {
+func (agg BLS12AggregateSignature) Participants() hotstuff.IDSet {
 	return &agg.participants
 }
 
 // Bitfield returns the bitmask.
-func (agg AggregateSignature) Bitfield() crypto.Bitfield {
+func (agg BLS12AggregateSignature) Bitfield() Bitfield {
 	return agg.participants
 }
 
@@ -138,6 +136,7 @@ func firstParticipant(participants hotstuff.IDSet) hotstuff.ID {
 	return id
 }
 
+// bls12Base implements the crypto primitives used by HotStuff using curve BLS12-381.
 type bls12Base struct {
 	config *core.RuntimeConfig
 
@@ -147,7 +146,7 @@ type bls12Base struct {
 }
 
 // New returns a new instance of the BLS12 CryptoBase implementation.
-func New(config *core.RuntimeConfig) (crypto.Base, error) {
+func NewBLS12(config *core.RuntimeConfig) (Base, error) {
 	bls := &bls12Base{
 		config: config,
 
@@ -163,11 +162,11 @@ func New(config *core.RuntimeConfig) (crypto.Base, error) {
 	return bls, nil
 }
 
-func (bls *bls12Base) privateKey() *PrivateKey {
-	return bls.config.PrivateKey().(*PrivateKey)
+func (bls *bls12Base) privateKey() *BLS12PrivateKey {
+	return bls.config.PrivateKey().(*BLS12PrivateKey)
 }
 
-func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *PublicKey, err error) {
+func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *BLS12PublicKey, err error) {
 	replica, ok := bls.config.ReplicaInfo(id)
 	if !ok {
 		return nil, fmt.Errorf("replica not found")
@@ -175,7 +174,7 @@ func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *PublicKey, err error) {
 	if err := bls.checkPop(replica); err != nil {
 		return nil, err
 	}
-	pubKey, ok = replica.PubKey.(*PublicKey)
+	pubKey, ok = replica.PubKey.(*BLS12PublicKey)
 	if !ok {
 		return nil, fmt.Errorf("unsupported public key type: %T", replica.PubKey)
 	}
@@ -204,7 +203,7 @@ func (bls *bls12Base) coreSign(message []byte, domainTag []byte) (*bls12.PointG2
 	return point, nil
 }
 
-func (bls *bls12Base) coreVerify(pubKey *PublicKey, message []byte, signature *bls12.PointG2, domainTag []byte) error {
+func (bls *bls12Base) coreVerify(pubKey *BLS12PublicKey, message []byte, signature *bls12.PointG2, domainTag []byte) error {
 	if err := bls.subgroupCheck(signature); err != nil {
 		return err
 	}
@@ -223,7 +222,7 @@ func (bls *bls12Base) coreVerify(pubKey *PublicKey, message []byte, signature *b
 }
 
 func (bls *bls12Base) popProve() (*bls12.PointG2, error) {
-	pubKey := bls.privateKey().Public().(*PublicKey)
+	pubKey := bls.privateKey().Public().(*BLS12PublicKey)
 	proof, err := bls.coreSign(pubKey.ToBytes(), domainPOP)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate proof-of-possession: %w", err)
@@ -231,7 +230,7 @@ func (bls *bls12Base) popProve() (*bls12.PointG2, error) {
 	return proof, nil
 }
 
-func (bls *bls12Base) popVerify(pubKey *PublicKey, proof *bls12.PointG2) error {
+func (bls *bls12Base) popVerify(pubKey *BLS12PublicKey, proof *bls12.PointG2) error {
 	return bls.coreVerify(pubKey, pubKey.ToBytes(), proof, domainPOP)
 }
 
@@ -243,7 +242,7 @@ func (bls *bls12Base) checkPop(replica *hotstuff.ReplicaInfo) error {
 
 	var key strings.Builder
 	key.WriteString(popBytes)
-	_, _ = key.Write(replica.PubKey.(*PublicKey).ToBytes())
+	_, _ = key.Write(replica.PubKey.(*BLS12PublicKey).ToBytes())
 
 	bls.mut.RLock()
 	valid, ok := bls.popCache[key.String()]
@@ -257,7 +256,7 @@ func (bls *bls12Base) checkPop(replica *hotstuff.ReplicaInfo) error {
 		return err
 	}
 
-	err = bls.popVerify(replica.PubKey.(*PublicKey), proof)
+	err = bls.popVerify(replica.PubKey.(*BLS12PublicKey), proof)
 	valid = err == nil
 
 	bls.mut.Lock()
@@ -267,7 +266,7 @@ func (bls *bls12Base) checkPop(replica *hotstuff.ReplicaInfo) error {
 	return err
 }
 
-func (bls *bls12Base) coreAggregateVerify(publicKeys []*PublicKey, messages [][]byte, signature *bls12.PointG2) error {
+func (bls *bls12Base) coreAggregateVerify(publicKeys []*BLS12PublicKey, messages [][]byte, signature *bls12.PointG2) error {
 	n := len(publicKeys)
 	// validate input
 	if n != len(messages) {
@@ -300,7 +299,7 @@ func (bls *bls12Base) coreAggregateVerify(publicKeys []*PublicKey, messages [][]
 	return nil
 }
 
-func (bls *bls12Base) aggregateVerify(publicKeys []*PublicKey, messages [][]byte, signature *bls12.PointG2) error {
+func (bls *bls12Base) aggregateVerify(publicKeys []*BLS12PublicKey, messages [][]byte, signature *bls12.PointG2) error {
 	set := make(map[string]struct{})
 	for _, m := range messages {
 		set[string(m)] = struct{}{}
@@ -311,13 +310,13 @@ func (bls *bls12Base) aggregateVerify(publicKeys []*PublicKey, messages [][]byte
 	return bls.coreAggregateVerify(publicKeys, messages, signature)
 }
 
-func (bls *bls12Base) fastAggregateVerify(publicKeys []*PublicKey, message []byte, signature *bls12.PointG2) error {
+func (bls *bls12Base) fastAggregateVerify(publicKeys []*BLS12PublicKey, message []byte, signature *bls12.PointG2) error {
 	engine := bls12.NewEngine()
 	var aggregate bls12.PointG1
 	for _, pk := range publicKeys {
 		engine.G1.Add(&aggregate, &aggregate, pk.p)
 	}
-	return bls.coreVerify(&PublicKey{p: &aggregate}, message, signature, domain)
+	return bls.coreVerify(&BLS12PublicKey{p: &aggregate}, message, signature, domain)
 }
 
 // Sign creates a cryptographic signature of the given message.
@@ -326,28 +325,28 @@ func (bls *bls12Base) Sign(message []byte) (signature hotstuff.QuorumSignature, 
 	if err != nil {
 		return nil, fmt.Errorf("bls12: coreSign failed: %w", err)
 	}
-	bf := crypto.Bitfield{}
+	bf := Bitfield{}
 	bf.Add(bls.config.ID())
-	return &AggregateSignature{sig: *p, participants: bf}, nil
+	return &BLS12AggregateSignature{sig: *p, participants: bf}, nil
 }
 
 // Combine combines multiple signatures into a single signature.
 func (bls *bls12Base) Combine(signatures ...hotstuff.QuorumSignature) (combined hotstuff.QuorumSignature, err error) {
 	if len(signatures) < 2 {
-		return nil, crypto.ErrCombineMultiple
+		return nil, ErrCombineMultiple
 	}
 
 	g2 := bls12.NewG2()
 	agg := bls12.PointG2{}
-	var participants crypto.Bitfield
+	var participants Bitfield
 	for _, sig1 := range signatures {
-		sig2, ok := sig1.(*AggregateSignature)
+		sig2, ok := sig1.(*BLS12AggregateSignature)
 		if !ok {
 			return nil, fmt.Errorf("cannot combine incompatible signature type %T (expected %T)", sig1, sig2)
 		}
 		sig2.participants.RangeWhile(func(id hotstuff.ID) bool {
 			if participants.Contains(id) {
-				err = crypto.ErrCombineOverlap
+				err = ErrCombineOverlap
 				return false
 			}
 			participants.Add(id)
@@ -358,12 +357,12 @@ func (bls *bls12Base) Combine(signatures ...hotstuff.QuorumSignature) (combined 
 		}
 		g2.Add(&agg, &agg, &sig2.sig)
 	}
-	return &AggregateSignature{sig: agg, participants: participants}, nil
+	return &BLS12AggregateSignature{sig: agg, participants: participants}, nil
 }
 
 // Verify verifies the given quorum signature against the message.
 func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte) error {
-	s, ok := signature.(*AggregateSignature)
+	s, ok := signature.(*BLS12AggregateSignature)
 	if !ok {
 		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
@@ -382,7 +381,7 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 	}
 
 	// else if l > 1:
-	pks := make([]*PublicKey, 0, n)
+	pks := make([]*BLS12PublicKey, 0, n)
 	var errs error
 	s.Participants().RangeWhile(func(id hotstuff.ID) bool {
 		pk, err := bls.publicKey(id)
@@ -401,7 +400,7 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 
 // BatchVerify verifies the given quorum signature against the batch of messages.
 func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) error {
-	s, ok := signature.(*AggregateSignature)
+	s, ok := signature.(*BLS12AggregateSignature)
 	if !ok {
 		return fmt.Errorf("cannot verify incompatible signature type %T (expected %T)", signature, s)
 	}
@@ -410,7 +409,7 @@ func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[
 		return fmt.Errorf("signature mismatch: %d participants, expected: %d", len(batch), s.Participants().Len())
 	}
 
-	pks := make([]*PublicKey, 0, len(batch))
+	pks := make([]*BLS12PublicKey, 0, len(batch))
 	msgs := make([][]byte, 0, len(batch))
 
 	for id, msg := range batch {
@@ -431,4 +430,4 @@ func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[
 	return bls.aggregateVerify(pks, msgs, &s.sig)
 }
 
-var _ crypto.Base = (*bls12Base)(nil)
+var _ Base = (*bls12Base)(nil)

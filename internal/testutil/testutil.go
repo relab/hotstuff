@@ -7,11 +7,9 @@ import (
 
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/security/cert"
+	"github.com/relab/hotstuff/security/crypto"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/security/crypto/bls12"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
-	"github.com/relab/hotstuff/security/crypto/eddsa"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 )
 
@@ -166,7 +164,7 @@ func GenerateEDDSAKey(t testing.TB) hotstuff.PrivateKey {
 // GenerateBLS12Key generates a BLS12-381 private key for use in tests.
 func GenerateBLS12Key(t testing.TB) hotstuff.PrivateKey {
 	t.Helper()
-	key, err := bls12.GeneratePrivateKey()
+	key, err := crypto.GenerateBLS12PrivateKey()
 	if err != nil {
 		t.Fatalf("Failed to generate private key: %v", err)
 	}
@@ -175,11 +173,11 @@ func GenerateBLS12Key(t testing.TB) hotstuff.PrivateKey {
 
 func GenerateKey(t testing.TB, cryptoName string) hotstuff.PrivateKey {
 	switch cryptoName {
-	case ecdsa.ModuleName:
+	case crypto.ModuleNameECDSA:
 		return GenerateECDSAKey(t)
-	case eddsa.ModuleName:
+	case crypto.ModuleNameEDDSA:
 		return GenerateEDDSAKey(t)
-	case bls12.ModuleName:
+	case crypto.ModuleNameBLS12:
 		return GenerateBLS12Key(t)
 	default:
 		panic("incorrect crypto module name")

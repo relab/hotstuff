@@ -11,9 +11,7 @@ import (
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
-	"github.com/relab/hotstuff/security/crypto/bls12"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
-	"github.com/relab/hotstuff/security/crypto/eddsa"
+	"github.com/relab/hotstuff/security/crypto"
 	"github.com/spf13/cobra"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -51,9 +49,9 @@ use 'hotstuff help run' to view all possible parameters for this command.`,
 					byzantine.ModuleNameFork,
 				},
 				"--crypto": {
-					ecdsa.ModuleName,
-					eddsa.ModuleName,
-					bls12.ModuleName,
+					crypto.ModuleNameECDSA,
+					crypto.ModuleNameEDDSA,
+					crypto.ModuleNameBLS12,
 				},
 				"--leader-rotation": {
 					leaderrotation.ModuleNameRoundRobin,

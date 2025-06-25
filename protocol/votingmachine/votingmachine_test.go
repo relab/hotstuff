@@ -9,11 +9,11 @@ import (
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/votingmachine"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 func TestCollectVote(t *testing.T) {
-	signers := testutil.NewEssentialsSet(t, 4, ecdsa.ModuleName)
+	signers := testutil.NewEssentialsSet(t, 4, crypto.ModuleNameECDSA)
 	leader := signers[0]
 	viewStates, err := protocol.NewViewStates(
 		leader.BlockChain(),

@@ -8,7 +8,7 @@ import (
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/rules"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 func wireUpCommitter(
@@ -28,7 +28,7 @@ func wireUpCommitter(
 }
 
 func TestValidCommit(t *testing.T) {
-	essentials := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
+	essentials := testutil.WireUpEssentials(t, 1, crypto.ModuleNameECDSA)
 	viewStates, err := protocol.NewViewStates(
 		essentials.BlockChain(),
 		essentials.Authority(),

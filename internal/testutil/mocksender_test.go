@@ -9,12 +9,12 @@ import (
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/wiring"
 )
 
 func TestPropose(t *testing.T) {
-	r := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
+	r := testutil.WireUpEssentials(t, 1, crypto.ModuleNameECDSA)
 	block := testutil.CreateBlock(t, r.Authority())
 	r.MockSender().Propose(&hotstuff.ProposeMsg{
 		ID:    1,
@@ -39,7 +39,7 @@ func TestPropose(t *testing.T) {
 }
 
 func TestVote(t *testing.T) {
-	r := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
+	r := testutil.WireUpEssentials(t, 1, crypto.ModuleNameECDSA)
 	block := testutil.CreateBlock(t, r.Authority())
 	pc := testutil.CreatePC(t, block, r.Authority())
 	err := r.MockSender().Vote(2, pc)
@@ -66,7 +66,7 @@ func TestVote(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	r := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
+	r := testutil.WireUpEssentials(t, 1, crypto.ModuleNameECDSA)
 	r.MockSender().Timeout(hotstuff.TimeoutMsg{
 		ID:   1,
 		View: 1,
@@ -129,14 +129,18 @@ func TestRequestBlock(t *testing.T) {
 			sender.AddBlockChain(chain)
 		}
 	}
-	signer, err := cert.NewAuthority(
+	base, err := crypto.New(
 		firstCore.RuntimeCfg(),
-		chains[0],
-		ecdsa.ModuleName,
+		crypto.ModuleNameECDSA,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	signer := cert.NewAuthority(
+		firstCore.RuntimeCfg(),
+		chains[0],
+		base,
+	)
 	sender0 := senders[0]
 	chain1 := chains[1]
 	block := testutil.CreateBlock(t, signer)

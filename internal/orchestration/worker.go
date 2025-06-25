@@ -26,6 +26,7 @@ import (
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/security/cert"
+	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 	"github.com/relab/hotstuff/server"
 	"github.com/relab/hotstuff/wiring"
@@ -43,9 +44,6 @@ import (
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
-	_ "github.com/relab/hotstuff/security/crypto/bls12"
-	_ "github.com/relab/hotstuff/security/crypto/ecdsa"
-	_ "github.com/relab/hotstuff/security/crypto/eddsa"
 )
 
 // Worker starts and runs clients and replicas based on commands from the controller.
@@ -199,17 +197,21 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		creds,
 	)
 	depsCore.Logger().Debugf("Initializing module (crypto): %s", opts.GetCrypto())
-	depsSecure, err := wiring.NewSecurity(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
+	base, err := crypto.New(
 		depsCore.RuntimeCfg(),
-		sender,
 		opts.GetCrypto(),
-		cert.WithCache(100), // TODO: consider making this configurable
 	)
 	if err != nil {
 		return nil, err
 	}
+	depsSecure := wiring.NewSecurity(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		sender,
+		base,
+		cert.WithCache(100), // TODO: consider making this configurable
+	)
 	consensusRules, viewStates, leaderRotation, comm, viewDuration, err := initConsensusModules(depsCore, depsSecure, sender, opts)
 	if err != nil {
 		return nil, err

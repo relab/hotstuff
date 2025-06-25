@@ -1,10 +1,11 @@
-package crypto
+package crypto_test
 
 import (
 	"math/rand"
 	"testing"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 // TestBitfieldAdd checks that the bitfield can extend itself to fit larger IDs.
@@ -14,17 +15,17 @@ func TestBitfieldAdd(t *testing.T) {
 		len int
 	}{{1, 1}, {9, 2}, {17, 3}}
 
-	var bm Bitfield
+	var bm crypto.Bitfield
 
 	// initial length should be 0
-	if len(bm.data) != 0 {
-		t.Errorf("Unexpected length: got: %v, want: %v", len(bm.data), 0)
+	if len(bm.Bytes()) != 0 {
+		t.Errorf("Unexpected length: got: %v, want: %v", len(bm.Bytes()), 0)
 	}
 
 	for _, testCase := range testCases {
 		bm.Add(testCase.id)
-		if len(bm.data) != testCase.len {
-			t.Errorf("Unexpected length: got: %v, want: %v", len(bm.data), testCase.len)
+		if len(bm.Bytes()) != testCase.len {
+			t.Errorf("Unexpected length: got: %v, want: %v", len(bm.Bytes()), testCase.len)
 		}
 	}
 }
@@ -33,7 +34,7 @@ func TestBitfieldContains(t *testing.T) {
 	random := hotstuff.ID(rand.Intn(254)) + 2 // should not be 0 or 1
 	testCases := []hotstuff.ID{1, random, random + 1}
 
-	var bm Bitfield
+	var bm crypto.Bitfield
 
 	// first check that the bitfield returns false for all testCases
 	for _, testCase := range testCases {
@@ -59,7 +60,7 @@ func TestBitfieldForEach(t *testing.T) {
 	random := hotstuff.ID(rand.Intn(254)) + 2 // should not be 0 or 1
 	testCases := []hotstuff.ID{1, random, random + 1}
 
-	var bm Bitfield
+	var bm crypto.Bitfield
 
 	// first check that the bitfield is empty
 	count := 0

@@ -6,9 +6,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/security/cert"
-	"github.com/relab/hotstuff/security/crypto/bls12"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
-	"github.com/relab/hotstuff/security/crypto/eddsa"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 func createDummies(t *testing.T, count uint, cryptoName string, cacheSize int) testutil.EssentialsSet {
@@ -23,12 +21,12 @@ var testData = []struct {
 	cryptoName string
 	cacheSize  int
 }{
-	{cryptoName: ecdsa.ModuleName},
-	{cryptoName: eddsa.ModuleName},
-	{cryptoName: bls12.ModuleName},
-	{cryptoName: ecdsa.ModuleName, cacheSize: 10},
-	{cryptoName: eddsa.ModuleName, cacheSize: 10},
-	{cryptoName: bls12.ModuleName, cacheSize: 10},
+	{cryptoName: crypto.ModuleNameECDSA},
+	{cryptoName: crypto.ModuleNameEDDSA},
+	{cryptoName: crypto.ModuleNameBLS12},
+	{cryptoName: crypto.ModuleNameECDSA, cacheSize: 10},
+	{cryptoName: crypto.ModuleNameEDDSA, cacheSize: 10},
+	{cryptoName: crypto.ModuleNameBLS12, cacheSize: 10},
 }
 
 func TestCreatePartialCert(t *testing.T) {

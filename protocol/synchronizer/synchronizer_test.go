@@ -15,7 +15,7 @@ import (
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/protocol/votingmachine"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/wiring"
 )
 
@@ -80,7 +80,7 @@ func wireUpSynchronizer(
 }
 
 func TestAdvanceViewQC(t *testing.T) {
-	set := testutil.NewEssentialsSet(t, 4, ecdsa.ModuleName)
+	set := testutil.NewEssentialsSet(t, 4, crypto.ModuleNameECDSA)
 	subject := set[0]
 	viewStates, err := protocol.NewViewStates(
 		subject.BlockChain(),
@@ -135,7 +135,7 @@ func TestAdvanceViewQC(t *testing.T) {
 }
 
 func TestAdvanceViewTC(t *testing.T) {
-	set := testutil.NewEssentialsSet(t, 4, ecdsa.ModuleName)
+	set := testutil.NewEssentialsSet(t, 4, crypto.ModuleNameECDSA)
 	subject := set[0]
 	viewStates, err := protocol.NewViewStates(
 		subject.BlockChain(),

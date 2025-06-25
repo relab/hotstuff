@@ -8,11 +8,11 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 func TestUpdateView(t *testing.T) {
-	essentials := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
+	essentials := testutil.WireUpEssentials(t, 1, crypto.ModuleNameECDSA)
 	states, err := protocol.NewViewStates(essentials.BlockChain(), essentials.Authority())
 	if err != nil {
 		t.Fatal(err)
@@ -25,7 +25,7 @@ func TestUpdateView(t *testing.T) {
 }
 
 func TestUpdateCerts(t *testing.T) {
-	set := testutil.NewEssentialsSet(t, 4, ecdsa.ModuleName)
+	set := testutil.NewEssentialsSet(t, 4, crypto.ModuleNameECDSA)
 	subject := set[0]
 	states, err := protocol.NewViewStates(subject.BlockChain(), subject.Authority())
 	if err != nil {
@@ -66,7 +66,7 @@ func TestUpdateCommit(t *testing.T) {
 		1,
 		1,
 	)
-	essentials := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
+	essentials := testutil.WireUpEssentials(t, 1, crypto.ModuleNameECDSA)
 	states, err := protocol.NewViewStates(essentials.BlockChain(), essentials.Authority())
 	if err != nil {
 		t.Fatal(err)

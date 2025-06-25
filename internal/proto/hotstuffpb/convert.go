@@ -6,9 +6,6 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/security/crypto"
-	"github.com/relab/hotstuff/security/crypto/bls12"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
-	"github.com/relab/hotstuff/security/crypto/eddsa"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -16,7 +13,7 @@ import (
 func QuorumSignatureToProto(sig hotstuff.QuorumSignature) *QuorumSignature {
 	signature := &QuorumSignature{}
 	switch ms := sig.(type) {
-	case crypto.Multi[*ecdsa.Signature]:
+	case crypto.Multi[*crypto.ECDSASignature]:
 		sigs := make([]*ECDSASignature, 0, sig.Participants().Len())
 		for _, s := range ms {
 			sigs = append(sigs, &ECDSASignature{
@@ -29,7 +26,7 @@ func QuorumSignatureToProto(sig hotstuff.QuorumSignature) *QuorumSignature {
 			Sigs: sigs,
 		}}
 
-	case crypto.Multi[*eddsa.Signature]:
+	case crypto.Multi[*crypto.EDDSASignature]:
 		sigs := make([]*EDDSASignature, 0, sig.Participants().Len())
 		for _, s := range ms {
 			sigs = append(sigs, &EDDSASignature{Signer: uint32(s.Signer()), Sig: s.ToBytes()})
@@ -38,7 +35,7 @@ func QuorumSignatureToProto(sig hotstuff.QuorumSignature) *QuorumSignature {
 			Sigs: sigs,
 		}}
 
-	case *bls12.AggregateSignature:
+	case *crypto.BLS12AggregateSignature:
 		signature.Sig = &QuorumSignature_BLS12Sig{BLS12Sig: &BLS12AggregateSignature{
 			Sig:          ms.ToBytes(),
 			Participants: ms.Bitfield().Bytes(),
@@ -50,25 +47,25 @@ func QuorumSignatureToProto(sig hotstuff.QuorumSignature) *QuorumSignature {
 // QuorumSignatureFromProto converts a protocol buffers message to a threshold signature.
 func QuorumSignatureFromProto(sig *QuorumSignature) hotstuff.QuorumSignature {
 	if signature := sig.GetECDSASigs(); signature != nil {
-		sigs := make([]*ecdsa.Signature, len(signature.GetSigs()))
+		sigs := make([]*crypto.ECDSASignature, len(signature.GetSigs()))
 		for i, sig := range signature.GetSigs() {
 			r := new(big.Int)
 			r.SetBytes(sig.GetR())
 			s := new(big.Int)
 			s.SetBytes(sig.GetS())
-			sigs[i] = ecdsa.RestoreSignature(r, s, hotstuff.ID(sig.GetSigner()))
+			sigs[i] = crypto.RestoreECDSASignature(r, s, hotstuff.ID(sig.GetSigner()))
 		}
 		return crypto.Restore(sigs)
 	}
 	if signature := sig.GetEDDSASigs(); signature != nil {
-		sigs := make([]*eddsa.Signature, len(signature.GetSigs()))
+		sigs := make([]*crypto.EDDSASignature, len(signature.GetSigs()))
 		for i, sig := range signature.GetSigs() {
-			sigs[i] = eddsa.RestoreSignature(sig.Sig, hotstuff.ID(sig.GetSigner()))
+			sigs[i] = crypto.RestoreEDDSASignature(sig.Sig, hotstuff.ID(sig.GetSigner()))
 		}
 		return crypto.Restore(sigs)
 	}
 	if signature := sig.GetBLS12Sig(); signature != nil {
-		aggSig, err := bls12.RestoreAggregateSignature(signature.GetSig(), crypto.BitfieldFromBytes(signature.GetParticipants()))
+		aggSig, err := crypto.RestoreBLS12AggregateSignature(signature.GetSig(), crypto.BitfieldFromBytes(signature.GetParticipants()))
 		if err != nil {
 			return nil
 		}

@@ -6,6 +6,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/security/cert"
+	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/wiring"
 )
 
@@ -28,17 +29,21 @@ func WireUpEssentials(
 	// I am commenting to make other maintainers aware
 	depsCore := wiring.NewCore(id, "test", GenerateKey(t, cryptoName), core.WithSyncVerification())
 	sender := NewMockSender(id)
-	depsSecurity, err := wiring.NewSecurity(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
+	base, err := crypto.New(
 		depsCore.RuntimeCfg(),
-		sender,
 		cryptoName,
-		opts...,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	depsSecurity := wiring.NewSecurity(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		sender,
+		base,
+		opts...,
+	)
 	return &Essentials{
 		Core:     *depsCore, // no problem dereferencing, since the deps just hold pointers
 		Security: *depsSecurity,
