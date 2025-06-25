@@ -19,11 +19,11 @@ func New(
 	switch name {
 	case "":
 		fallthrough // default to chainedhotstuff if no name is provided
-	case ModuleNameChainedHotstuff:
+	case NameChainedHotstuff:
 		ruleset = NewChainedHotStuff(logger, config, blockchain)
-	case ModuleNameFastHotstuff:
+	case NameFastHotstuff:
 		ruleset = NewFastHotstuff(logger, config, blockchain)
-	case ModuleNameSimpleHotStuff:
+	case NameSimpleHotStuff:
 		ruleset = NewSimpleHotStuff(logger, config, blockchain)
 	default:
 		return nil, fmt.Errorf("invalid consensus name: '%s'", name)

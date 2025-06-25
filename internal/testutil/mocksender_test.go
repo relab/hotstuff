@@ -14,7 +14,7 @@ import (
 )
 
 func TestPropose(t *testing.T) {
-	r := testutil.WireUpEssentials(t, 1, crypto.ModuleNameECDSA)
+	r := testutil.WireUpEssentials(t, 1, crypto.NameECDSA)
 	block := testutil.CreateBlock(t, r.Authority())
 	r.MockSender().Propose(&hotstuff.ProposeMsg{
 		ID:    1,
@@ -39,7 +39,7 @@ func TestPropose(t *testing.T) {
 }
 
 func TestVote(t *testing.T) {
-	r := testutil.WireUpEssentials(t, 1, crypto.ModuleNameECDSA)
+	r := testutil.WireUpEssentials(t, 1, crypto.NameECDSA)
 	block := testutil.CreateBlock(t, r.Authority())
 	pc := testutil.CreatePC(t, block, r.Authority())
 	err := r.MockSender().Vote(2, pc)
@@ -66,7 +66,7 @@ func TestVote(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	r := testutil.WireUpEssentials(t, 1, crypto.ModuleNameECDSA)
+	r := testutil.WireUpEssentials(t, 1, crypto.NameECDSA)
 	r.MockSender().Timeout(hotstuff.TimeoutMsg{
 		ID:   1,
 		View: 1,
@@ -131,7 +131,7 @@ func TestRequestBlock(t *testing.T) {
 	}
 	base, err := crypto.New(
 		firstCore.RuntimeCfg(),
-		crypto.ModuleNameECDSA,
+		crypto.NameECDSA,
 	)
 	if err != nil {
 		t.Fatal(err)

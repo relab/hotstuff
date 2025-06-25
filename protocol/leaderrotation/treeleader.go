@@ -5,7 +5,7 @@ import (
 	"github.com/relab/hotstuff/core"
 )
 
-const ModuleNameTree = "tree-leader"
+const NameTree = "tree-leader"
 
 type TreeBased struct {
 	leader hotstuff.ID

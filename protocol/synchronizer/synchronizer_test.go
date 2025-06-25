@@ -72,7 +72,7 @@ func wireUpSynchronizer(
 }
 
 func TestAdvanceViewQC(t *testing.T) {
-	set := testutil.NewEssentialsSet(t, 4, crypto.ModuleNameECDSA)
+	set := testutil.NewEssentialsSet(t, 4, crypto.NameECDSA)
 	subject := set[0]
 	viewStates, err := protocol.NewViewStates(
 		subject.BlockChain(),
@@ -127,7 +127,7 @@ func TestAdvanceViewQC(t *testing.T) {
 }
 
 func TestAdvanceViewTC(t *testing.T) {
-	set := testutil.NewEssentialsSet(t, 4, crypto.ModuleNameECDSA)
+	set := testutil.NewEssentialsSet(t, 4, crypto.NameECDSA)
 	subject := set[0]
 	viewStates, err := protocol.NewViewStates(
 		subject.BlockChain(),

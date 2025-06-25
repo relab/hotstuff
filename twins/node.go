@@ -46,7 +46,7 @@ type node struct {
 }
 
 func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
-	cryptoName := crypto.ModuleNameECDSA
+	cryptoName := crypto.NameECDSA
 	pk, err := keygen.GenerateECDSAPrivateKey()
 	if err != nil {
 		return nil, err

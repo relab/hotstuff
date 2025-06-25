@@ -19,7 +19,7 @@ import (
 func TestConvertPartialCert(t *testing.T) {
 	key := testutil.GenerateECDSAKey(t)
 	cfg := core.NewRuntimeConfig(1, key)
-	base, err := crypto.New(cfg, crypto.ModuleNameECDSA)
+	base, err := crypto.New(cfg, crypto.NameECDSA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestConvertQuorumCert(t *testing.T) {
 	for i := range n {
 		key := testutil.GenerateECDSAKey(t)
 		cfg := core.NewRuntimeConfig(hotstuff.ID(i+1), key)
-		base, err := crypto.New(cfg, crypto.ModuleNameECDSA)
+		base, err := crypto.New(cfg, crypto.NameECDSA)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -97,7 +97,7 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 	signers := make([]*cert.Authority, n)
 	for i := range n {
 		id := hotstuff.ID(i + 1)
-		base, err := crypto.New(cfgs[id], crypto.ModuleNameBLS12)
+		base, err := crypto.New(cfgs[id], crypto.NameBLS12)
 		if err != nil {
 			t.Fatal(err)
 		}

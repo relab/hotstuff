@@ -173,11 +173,11 @@ func GenerateBLS12Key(t testing.TB) hotstuff.PrivateKey {
 
 func GenerateKey(t testing.TB, cryptoName string) hotstuff.PrivateKey {
 	switch cryptoName {
-	case crypto.ModuleNameECDSA:
+	case crypto.NameECDSA:
 		return GenerateECDSAKey(t)
-	case crypto.ModuleNameEDDSA:
+	case crypto.NameEDDSA:
 		return GenerateEDDSAKey(t)
-	case crypto.ModuleNameBLS12:
+	case crypto.NameBLS12:
 		return GenerateBLS12Key(t)
 	default:
 		panic("incorrect crypto module name")

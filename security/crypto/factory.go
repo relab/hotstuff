@@ -13,11 +13,11 @@ func New(
 	switch name {
 	case "":
 		fallthrough // default to ecdsa if no name is provided
-	case ModuleNameECDSA:
+	case NameECDSA:
 		impl = NewECDSA(config)
-	case ModuleNameEDDSA:
+	case NameEDDSA:
 		impl = NewEDDSA(config)
-	case ModuleNameBLS12:
+	case NameBLS12:
 		impl, err = NewBLS12(config)
 		if err != nil {
 			return nil, err

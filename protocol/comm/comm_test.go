@@ -22,7 +22,7 @@ func (ld *leaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
 var _ leaderrotation.LeaderRotation = (*leaderRotation)(nil)
 
 func TestDisseminateAggregate(t *testing.T) {
-	essentials := testutil.WireUpEssentials(t, 1, crypto.ModuleNameECDSA)
+	essentials := testutil.WireUpEssentials(t, 1, crypto.NameECDSA)
 	viewStates, err := protocol.NewViewStates(
 		essentials.BlockChain(),
 		essentials.Authority(),

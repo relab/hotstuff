@@ -6,7 +6,7 @@ import (
 	"github.com/relab/hotstuff/protocol/consensus"
 )
 
-const ModuleNameSilence = "silence"
+const NameSilence = "silence"
 
 type Silence struct {
 	consensus.Ruleset

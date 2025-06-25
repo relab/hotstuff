@@ -13,7 +13,7 @@ import (
 )
 
 func TestCollectVote(t *testing.T) {
-	signers := testutil.NewEssentialsSet(t, 4, crypto.ModuleNameECDSA)
+	signers := testutil.NewEssentialsSet(t, 4, crypto.NameECDSA)
 	leader := signers[0]
 	viewStates, err := protocol.NewViewStates(
 		leader.BlockChain(),

@@ -28,7 +28,7 @@ func New(
 ) (communication Communication, _ error) {
 	logger.Debugf("initializing module (propagation): %s", name)
 	switch name {
-	case ModuleNameKauri:
+	case NameKauri:
 		communication = NewKauri(
 			logger,
 			eventLoop,
@@ -41,7 +41,7 @@ func New(
 				sender.(*network.GorumsSender), // TODO(AlanRostem): avoid cast
 			),
 		)
-	case ModuleNameClique:
+	case NameClique:
 		communication = NewClique(
 			config,
 			votingmachine.New(

@@ -37,12 +37,12 @@ func runController() {
 	}
 
 	// fasthotstuff strictly requires QC aggregation.
-	if cfg.Consensus == rules.ModuleNameFastHotstuff {
+	if cfg.Consensus == rules.NameFastHotstuff {
 		cfg.UseAggQC = true
 	}
 
 	if cfg.Kauri {
-		cfg.LeaderRotation = leaderrotation.ModuleNameTree
+		cfg.LeaderRotation = leaderrotation.NameTree
 	}
 
 	// If the config is set to run locally, `hosts` will be nil (empty)

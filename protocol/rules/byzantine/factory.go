@@ -20,9 +20,9 @@ func Wrap(
 	switch name {
 	case "":
 		return rules, nil // default to no byzantine strategy if no name is provided
-	case ModuleNameSilence:
+	case NameSilence:
 		byzRules = NewSilence(rules)
-	case ModuleNameFork:
+	case NameFork:
 		byzRules = NewFork(config, blockchain, rules)
 	default:
 		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", name)

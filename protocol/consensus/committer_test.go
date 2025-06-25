@@ -28,7 +28,7 @@ func wireUpCommitter(
 }
 
 func TestValidCommit(t *testing.T) {
-	essentials := testutil.WireUpEssentials(t, 1, crypto.ModuleNameECDSA)
+	essentials := testutil.WireUpEssentials(t, 1, crypto.NameECDSA)
 	viewStates, err := protocol.NewViewStates(
 		essentials.BlockChain(),
 		essentials.Authority(),

@@ -21,12 +21,12 @@ var testData = []struct {
 	cryptoName string
 	cacheSize  int
 }{
-	{cryptoName: crypto.ModuleNameECDSA},
-	{cryptoName: crypto.ModuleNameEDDSA},
-	{cryptoName: crypto.ModuleNameBLS12},
-	{cryptoName: crypto.ModuleNameECDSA, cacheSize: 10},
-	{cryptoName: crypto.ModuleNameEDDSA, cacheSize: 10},
-	{cryptoName: crypto.ModuleNameBLS12, cacheSize: 10},
+	{cryptoName: crypto.NameECDSA},
+	{cryptoName: crypto.NameEDDSA},
+	{cryptoName: crypto.NameBLS12},
+	{cryptoName: crypto.NameECDSA, cacheSize: 10},
+	{cryptoName: crypto.NameEDDSA, cacheSize: 10},
+	{cryptoName: crypto.NameBLS12, cacheSize: 10},
 }
 
 func TestCreatePartialCert(t *testing.T) {

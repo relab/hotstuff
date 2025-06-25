@@ -13,7 +13,7 @@ import (
 	"github.com/relab/hotstuff/core"
 )
 
-const ModuleNameBLS12 = "bls12"
+const NameBLS12 = "bls12"
 
 const (
 	// PrivateKeyFileType is the PEM type for a private key.

@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
-const ModuleNameSimpleHotStuff = "simplehotstuff"
+const NameSimpleHotStuff = "simplehotstuff"
 
 // SimpleHotStuff implements a simplified version of the HotStuff algorithm.
 //

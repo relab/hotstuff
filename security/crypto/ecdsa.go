@@ -12,7 +12,7 @@ import (
 	"github.com/relab/hotstuff/core"
 )
 
-const ModuleNameECDSA = "ecdsa"
+const NameECDSA = "ecdsa"
 
 const (
 	// PrivateKeyFileType is the PEM type for a private key.

@@ -67,7 +67,7 @@ func wireUpVoter(
 // an honest leader.
 func TestOnValidPropose(t *testing.T) {
 	id := hotstuff.ID(1)
-	essentials := testutil.WireUpEssentials(t, id, crypto.ModuleNameECDSA)
+	essentials := testutil.WireUpEssentials(t, id, crypto.NameECDSA)
 
 	voter := wireUpVoter(t, essentials)
 	// create a signed block (doesn't matter who did it)

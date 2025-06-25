@@ -83,7 +83,7 @@ func wireUpProposer(
 
 func TestPropose(t *testing.T) {
 	id := hotstuff.ID(1)
-	essentials := testutil.WireUpEssentials(t, id, crypto.ModuleNameECDSA)
+	essentials := testutil.WireUpEssentials(t, id, crypto.NameECDSA)
 	// add the blockchains to the proposer's mock sender
 	essentials.MockSender().AddBlockChain(essentials.BlockChain())
 	command := &clientpb.Command{

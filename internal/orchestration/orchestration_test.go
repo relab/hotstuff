@@ -35,7 +35,7 @@ func makeCfg(
 	randomTree bool,
 	kauri bool,
 ) *config.ExperimentConfig {
-	useAggQC := consensusImpl == rules.ModuleNameFastHotstuff
+	useAggQC := consensusImpl == rules.NameFastHotstuff
 	cfg := &config.ExperimentConfig{
 		Replicas:          replicas,
 		Clients:           clients,
@@ -43,7 +43,7 @@ func makeCfg(
 		RandomTree:        randomTree,
 		BranchFactor:      branchFactor,
 		Consensus:         consensusImpl,
-		Communication:     comm.ModuleNameClique,
+		Communication:     comm.NameClique,
 		Crypto:            crypto,
 		LeaderRotation:    leaderRotation,
 		ByzantineStrategy: byzantine,
@@ -116,30 +116,30 @@ func TestOrchestration(t *testing.T) {
 		branchFactor uint32
 		randomTree   bool
 	}{
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameECDSA, replicas: 4},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameEDDSA, replicas: 4},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameBLS12, replicas: 4},
-		{consensus: rules.ModuleNameFastHotstuff, crypto: crypto.ModuleNameECDSA, replicas: 4},
-		{consensus: rules.ModuleNameFastHotstuff, crypto: crypto.ModuleNameEDDSA, replicas: 4},
-		{consensus: rules.ModuleNameFastHotstuff, crypto: crypto.ModuleNameBLS12, replicas: 4},
-		{consensus: rules.ModuleNameSimpleHotStuff, crypto: crypto.ModuleNameECDSA, replicas: 4},
-		{consensus: rules.ModuleNameSimpleHotStuff, crypto: crypto.ModuleNameEDDSA, replicas: 4},
-		{consensus: rules.ModuleNameSimpleHotStuff, crypto: crypto.ModuleNameBLS12, replicas: 4},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameECDSA, byzantine: fork, replicas: 4},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameECDSA, byzantine: silence, replicas: 4},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameECDSA, kauri: true, replicas: 7, branchFactor: 2},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameBLS12, kauri: true, replicas: 7, branchFactor: 2},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameECDSA, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: crypto.ModuleNameBLS12, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, replicas: 4},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameEDDSA, replicas: 4},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameBLS12, replicas: 4},
+		{consensus: rules.NameFastHotstuff, crypto: crypto.NameECDSA, replicas: 4},
+		{consensus: rules.NameFastHotstuff, crypto: crypto.NameEDDSA, replicas: 4},
+		{consensus: rules.NameFastHotstuff, crypto: crypto.NameBLS12, replicas: 4},
+		{consensus: rules.NameSimpleHotStuff, crypto: crypto.NameECDSA, replicas: 4},
+		{consensus: rules.NameSimpleHotStuff, crypto: crypto.NameEDDSA, replicas: 4},
+		{consensus: rules.NameSimpleHotStuff, crypto: crypto.NameBLS12, replicas: 4},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, byzantine: fork, replicas: 4},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, byzantine: silence, replicas: 4},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, kauri: true, replicas: 7, branchFactor: 2},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameBLS12, kauri: true, replicas: 7, branchFactor: 2},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameBLS12, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(test.Name([]string{"consensus", "crypto", "byzantine", "kauri"}, tt.consensus, tt.crypto, tt.byzantine, tt.kauri), func(t *testing.T) {
 			var leaderRotation string
 			if tt.kauri {
-				leaderRotation = leaderrotation.ModuleNameTree
+				leaderRotation = leaderrotation.NameTree
 			} else {
-				leaderRotation = leaderrotation.ModuleNameRoundRobin
+				leaderRotation = leaderrotation.NameRoundRobin
 			}
 			cfg := makeCfg(
 				tt.replicas, 2,
@@ -229,8 +229,8 @@ func TestDeployment(t *testing.T) {
 		ViewTimeout:       100 * time.Millisecond,
 		DurationSamples:   1000,
 		TimeoutMultiplier: 1.2,
-		Consensus:         rules.ModuleNameChainedHotstuff,
-		Crypto:            crypto.ModuleNameECDSA,
+		Consensus:         rules.NameChainedHotstuff,
+		Crypto:            crypto.NameECDSA,
 		LeaderRotation:    "round-robin",
 	}
 

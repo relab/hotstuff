@@ -12,7 +12,7 @@ import (
 )
 
 func TestUpdateView(t *testing.T) {
-	essentials := testutil.WireUpEssentials(t, 1, crypto.ModuleNameECDSA)
+	essentials := testutil.WireUpEssentials(t, 1, crypto.NameECDSA)
 	states, err := protocol.NewViewStates(essentials.BlockChain(), essentials.Authority())
 	if err != nil {
 		t.Fatal(err)
@@ -25,7 +25,7 @@ func TestUpdateView(t *testing.T) {
 }
 
 func TestUpdateCerts(t *testing.T) {
-	set := testutil.NewEssentialsSet(t, 4, crypto.ModuleNameECDSA)
+	set := testutil.NewEssentialsSet(t, 4, crypto.NameECDSA)
 	subject := set[0]
 	states, err := protocol.NewViewStates(subject.BlockChain(), subject.Authority())
 	if err != nil {
@@ -66,7 +66,7 @@ func TestUpdateCommit(t *testing.T) {
 		1,
 		1,
 	)
-	essentials := testutil.WireUpEssentials(t, 1, crypto.ModuleNameECDSA)
+	essentials := testutil.WireUpEssentials(t, 1, crypto.NameECDSA)
 	states, err := protocol.NewViewStates(essentials.BlockChain(), essentials.Authority())
 	if err != nil {
 		t.Fatal(err)

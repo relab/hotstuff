@@ -40,29 +40,29 @@ use 'hotstuff help run' to view all possible parameters for this command.`,
 			}
 			modules := map[string][]string{
 				"--consensus": {
-					rules.ModuleNameSimpleHotStuff,
-					rules.ModuleNameFastHotstuff,
-					rules.ModuleNameChainedHotstuff,
+					rules.NameSimpleHotStuff,
+					rules.NameFastHotstuff,
+					rules.NameChainedHotstuff,
 				},
 				"--byzantine-strategy": {
-					byzantine.ModuleNameSilence,
-					byzantine.ModuleNameFork,
+					byzantine.NameSilence,
+					byzantine.NameFork,
 				},
 				"--crypto": {
-					crypto.ModuleNameECDSA,
-					crypto.ModuleNameEDDSA,
-					crypto.ModuleNameBLS12,
+					crypto.NameECDSA,
+					crypto.NameEDDSA,
+					crypto.NameBLS12,
 				},
 				"--leader-rotation": {
-					leaderrotation.ModuleNameRoundRobin,
-					leaderrotation.ModuleNameCarousel,
-					leaderrotation.ModuleNameFixed,
-					leaderrotation.ModuleNameTree,
-					leaderrotation.ModuleNameReputation,
+					leaderrotation.NameRoundRobin,
+					leaderrotation.NameCarousel,
+					leaderrotation.NameFixed,
+					leaderrotation.NameTree,
+					leaderrotation.NameReputation,
 				},
 				"--communication": {
-					comm.ModuleNameClique,
-					comm.ModuleNameKauri,
+					comm.NameClique,
+					comm.NameKauri,
 				},
 			}
 			mods := modules

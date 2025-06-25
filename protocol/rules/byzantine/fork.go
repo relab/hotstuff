@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
-const ModuleNameFork = "fork"
+const NameFork = "fork"
 
 type Fork struct {
 	config     *core.RuntimeConfig

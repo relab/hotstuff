@@ -12,7 +12,7 @@ import (
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
-const ModuleNameCarousel = "carousel"
+const NameCarousel = "carousel"
 
 type Carousel struct {
 	blockchain *blockchain.Blockchain

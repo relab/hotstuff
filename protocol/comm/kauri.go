@@ -16,7 +16,7 @@ import (
 	"github.com/relab/hotstuff/security/cert"
 )
 
-const ModuleNameKauri = "kauri"
+const NameKauri = "kauri"
 
 // Kauri implements tree-based dissemination and aggregation.
 type Kauri struct {
