@@ -15,7 +15,6 @@ func New(
 	blockchain *blockchain.Blockchain,
 	name string,
 ) (ruleset consensus.Ruleset, _ error) {
-	logger.Debugf("Initializing module (consensus rules): %s", name)
 	switch name {
 	case "":
 		fallthrough // default to chainedhotstuff if no name is provided

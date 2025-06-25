@@ -26,7 +26,6 @@ func New(
 	viewStates *protocol.ViewStates,
 	name string,
 ) (communication Communication, _ error) {
-	logger.Debugf("initializing module (propagation): %s", name)
 	switch name {
 	case NameKauri:
 		communication = NewKauri(

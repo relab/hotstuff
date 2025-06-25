@@ -18,7 +18,6 @@ func New(
 	name string,
 	chainLength int,
 ) (ld LeaderRotation, _ error) {
-	logger.Debugf("Initializing module (leader rotation): %s", name)
 	switch name {
 	case "":
 		fallthrough // default to round-robin if no name is provided

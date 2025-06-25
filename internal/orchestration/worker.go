@@ -243,6 +243,7 @@ func initConsensusModules(
 	viewduration.ViewDuration,
 	error,
 ) {
+	depsCore.Logger().Debugf("Initializing module (consensus rules): %s", opts.GetConsensus())
 	consensusRules, err := rules.New(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
@@ -253,8 +254,8 @@ func initConsensusModules(
 		return nil, nil, nil, nil, nil, err
 	}
 	if byzStrategy := opts.GetByzantineStrategy(); byzStrategy != "" {
+		depsCore.Logger().Debugf("Initializing module (byzantine strategy): %s", byzStrategy)
 		byz, err := byzantine.Wrap(
-			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
 			depsSecure.BlockChain(),
 			consensusRules,
@@ -272,6 +273,7 @@ func initConsensusModules(
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
+	depsCore.Logger().Debugf("Initializing module (leader rotation): %s", opts.GetLeaderRotation())
 	leaderRotation, err := leaderrotation.New(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
@@ -283,7 +285,7 @@ func initConsensusModules(
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
-
+	depsCore.Logger().Debugf("Initializing module (communication): %s", opts.GetCommunication())
 	comm, err := comm.New(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
