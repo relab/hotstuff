@@ -10,7 +10,6 @@ import (
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/comm"
-	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
@@ -32,13 +31,6 @@ func wireUpSynchronizer(
 		essentials.RuntimeCfg(),
 		essentials.BlockChain(),
 	)
-	committer := consensus.NewCommitter(
-		essentials.EventLoop(),
-		essentials.Logger(),
-		essentials.BlockChain(),
-		viewStates,
-		consensusRules,
-	)
 	votingMachine := votingmachine.New(
 		essentials.Logger(),
 		essentials.EventLoop(),
@@ -49,11 +41,11 @@ func wireUpSynchronizer(
 	)
 	depsConsensus := wiring.NewConsensus(
 		essentials.EventLoop(),
+		essentials.Logger(),
 		essentials.RuntimeCfg(),
 		essentials.BlockChain(),
 		essentials.Authority(),
 		commandCache,
-		committer,
 		consensusRules,
 		leaderRotation,
 		viewStates,

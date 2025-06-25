@@ -57,20 +57,13 @@ func New(
 		commandBatchSize,
 		rOpt.clientGorumsSrvOpts...,
 	)
-	committer := consensus.NewCommitter(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsSecure.BlockChain(),
-		viewStates,
-		consensusRules,
-	)
 	depsConsensus := wiring.NewConsensus(
 		depsCore.EventLoop(),
+		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
 		depsSecure.Authority(),
 		depsClient.Cache(),
-		committer,
 		consensusRules,
 		leaderRotation,
 		viewStates,
