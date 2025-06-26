@@ -259,9 +259,9 @@ func readMetadata(md metadata.MD) map[string]string {
 
 type qspec struct{}
 
-// FetchQF is the quorum function for the Fetch quorum call method.
+// RequestBlockQF is the quorum function for the Fetch quorum call method.
 // It simply returns true if one of the replies matches the requested block.
-func (q qspec) FetchQF(in *hotstuffpb.BlockHash, replies map[uint32]*hotstuffpb.Block) (*hotstuffpb.Block, bool) {
+func (q qspec) RequestBlockQF(in *hotstuffpb.BlockHash, replies map[uint32]*hotstuffpb.Block) (*hotstuffpb.Block, bool) {
 	var h hotstuff.Hash
 	copy(h[:], in.GetHash())
 	for _, b := range replies {

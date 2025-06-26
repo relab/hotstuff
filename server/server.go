@@ -156,7 +156,7 @@ func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo)
 	})
 }
 
-// Fetch handles an incoming fetch request.
+// RequestBlock handles an incoming block request.
 func (impl *serviceImpl) RequestBlock(_ gorums.ServerCtx, pb *hotstuffpb.BlockHash) (*hotstuffpb.Block, error) {
 	var hash hotstuff.Hash
 	copy(hash[:], pb.GetHash())
@@ -166,7 +166,7 @@ func (impl *serviceImpl) RequestBlock(_ gorums.ServerCtx, pb *hotstuffpb.BlockHa
 		return nil, status.Errorf(codes.NotFound, "requested block was not found")
 	}
 
-	impl.srv.logger.Debugf("OnFetch: %s", hash.SmallString())
+	impl.srv.logger.Debugf("On RequestBlock: %s", hash.SmallString())
 
 	return hotstuffpb.BlockToProto(block), nil
 }
@@ -182,3 +182,5 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	impl.srv.addNetworkDelay(id)
 	impl.srv.eventLoop.AddEvent(timeoutMsg)
 }
+
+var _ hotstuffpb.Consensus = (*serviceImpl)(nil)
