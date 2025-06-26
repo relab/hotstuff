@@ -171,7 +171,7 @@ func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *BLS12PublicKey, err err
 	if !ok {
 		return nil, fmt.Errorf("replica not found")
 	}
-	if err := bls.checkPop(replica); err != nil {
+	if err := bls.checkPop(replica); id != bls.config.ID() && err != nil {
 		return nil, err
 	}
 	pubKey, ok = replica.PubKey.(*BLS12PublicKey)
@@ -235,7 +235,6 @@ func (bls *bls12Base) popVerify(pubKey *BLS12PublicKey, proof *bls12.PointG2) er
 }
 
 func (bls *bls12Base) checkPop(replica *hotstuff.ReplicaInfo) error {
-	// BUG(AlanRostem): sometimes this map is nil, but don't know why
 	popBytes, ok := replica.Metadata[popMetadataKey]
 	if !ok {
 		return fmt.Errorf("missing proof-of-possession for replica: %d", replica.ID)
