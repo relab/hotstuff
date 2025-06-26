@@ -10,43 +10,43 @@ import (
 	"testing"
 	"time"
 
-	"github.com/relab/hotstuff/builder"
-	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/network/netconfig"
-	"github.com/relab/hotstuff/network/sender"
-	"github.com/relab/hotstuff/service/server"
-
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core/eventloop"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
+	"github.com/relab/hotstuff/network"
+	"github.com/relab/hotstuff/protocol"
+	"github.com/relab/hotstuff/protocol/comm"
+	"github.com/relab/hotstuff/protocol/leaderrotation"
+	"github.com/relab/hotstuff/protocol/rules"
+	"github.com/relab/hotstuff/protocol/synchronizer"
+	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
+	"github.com/relab/hotstuff/protocol/votingmachine"
+	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/security/crypto/keygen"
-	"go.uber.org/mock/gomock"
+	"github.com/relab/hotstuff/server"
+	"github.com/relab/hotstuff/wiring"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
 
+type replicaDeps struct {
+	wiring.Core
+	wiring.Security
+	Sender       *network.GorumsSender
+	Server       *server.Server
+	Synchronizer *synchronizer.Synchronizer
+}
+
 func TestConnect(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
-		ctrl := gomock.NewController(t)
-		td := setup(t, ctrl, n)
-		builder := builder.NewBuilder(1, td.keys[0])
-		testutil.TestModules(t, ctrl, 1, td.keys[0], &builder)
-		teardown := createServers(t, td, ctrl)
+		td := setup(t, n)
+		deps, teardown := createServers(t, td)
 		defer teardown()
-		td.builders.Build()
-
-		cfg := netconfig.NewConfig()
-		inv := sender.New(
-			td.creds,
-			gorums.WithDialTimeout(time.Second),
-		)
-		td.builders[0].Add(cfg, inv)
-
-		builder.Add(cfg, inv)
-		builder.Build()
-
-		err := inv.Connect(td.replicas)
+		first := deps[0]
+		err := first.Sender.Connect(td.replicas)
 		if err != nil {
 			t.Error(err)
 		}
@@ -55,38 +55,31 @@ func TestConnect(t *testing.T) {
 }
 
 // testBase is a generic test for a unicast/multicast call
-func testBase(t *testing.T, typ any, send func(*sender.Sender), handle eventloop.EventHandler) {
+func testBase(t *testing.T, typ any, send func(*network.GorumsSender), handle eventloop.EventHandler) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
-		ctrl := gomock.NewController(t)
-		td := setup(t, ctrl, n)
+		td := setup(t, n)
 
-		serverTeardown := createServers(t, td, ctrl)
+		deps, serverTeardown := createServers(t, td)
 		defer serverTeardown()
 
-		cfg := netconfig.NewConfig()
-		inv := sender.New(td.creds, gorums.WithDialTimeout(time.Second))
-		td.builders[0].Add(cfg, inv)
-		hl := td.builders.Build()
+		first := deps[0]
 
-		err := inv.Connect(td.replicas)
+		err := first.Sender.Connect(td.replicas)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer inv.Close()
+		defer first.Sender.Close()
 
 		ctx, cancel := context.WithCancel(context.Background())
-		for _, hs := range hl[1:] {
-			var (
-				eventLoop    *eventloop.EventLoop
-				synchronizer builder.Synchronizer
-			)
-			hs.Get(&eventLoop, &synchronizer)
+		for _, d := range deps {
+			eventLoop := d.EventLoop()
+			synchronizer := d.Synchronizer
 			eventLoop.RegisterHandler(typ, handle)
 			synchronizer.Start(ctx)
 			go eventLoop.Run(ctx)
 		}
-		send(inv)
+		send(first.Sender)
 		cancel()
 	}
 	runBoth(t, run)
@@ -99,12 +92,12 @@ func TestPropose(t *testing.T) {
 		Block: hotstuff.NewBlock(
 			hotstuff.GetGenesis().Hash(),
 			hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
-			"foo", 1, 1,
+			&clientpb.Batch{}, 1, 1,
 		),
 	}
-	testBase(t, want, func(inv *sender.Sender) {
+	testBase(t, want, func(inv *network.GorumsSender) {
 		wg.Add(3)
-		inv.Propose(want)
+		inv.Propose(&want)
 		wg.Wait()
 	}, func(event any) {
 		got := event.(hotstuff.ProposeMsg)
@@ -126,7 +119,7 @@ func TestTimeout(t *testing.T) {
 		ViewSignature: nil,
 		SyncInfo:      hotstuff.NewSyncInfo(),
 	}
-	testBase(t, want, func(inv builder.Sender) {
+	testBase(t, want, func(inv *network.GorumsSender) {
 		wg.Add(3)
 		inv.Timeout(want)
 		wg.Wait()
@@ -148,12 +141,11 @@ type testData struct {
 	replicas  []hotstuff.ReplicaInfo
 	listeners []net.Listener
 	keys      []hotstuff.PrivateKey
-	builders  testutil.BuilderList
 }
 
-type setupFunc func(t *testing.T, ctrl *gomock.Controller, n int) testData
+type setupFunc func(t *testing.T, n int) testData
 
-func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
+func setupReplicas(t *testing.T, n int) testData {
 	t.Helper()
 
 	listeners := make([]net.Listener, n)
@@ -177,13 +169,12 @@ func setupReplicas(t *testing.T, ctrl *gomock.Controller, n int) testData {
 		replicas:  replicas,
 		listeners: listeners,
 		keys:      keys,
-		builders:  testutil.CreateBuilders(t, ctrl, n, keys...),
 	}
 }
 
-func setupTLS(t *testing.T, ctrl *gomock.Controller, n int) testData {
+func setupTLS(t *testing.T, n int) testData {
 	t.Helper()
-	td := setupReplicas(t, ctrl, n)
+	td := setupReplicas(t, n)
 
 	certificates := make([]*x509.Certificate, 0, n)
 
@@ -226,17 +217,93 @@ func runBoth(t *testing.T, run func(*testing.T, setupFunc)) {
 	t.Run("WithTLS", func(t *testing.T) { run(t, setupTLS) })
 }
 
-func createServers(t *testing.T, td testData, _ *gomock.Controller) (teardown func()) {
+func createServers(t *testing.T, td testData) ([]replicaDeps, func()) {
 	t.Helper()
-	servers := make([]*server.Server, td.n)
-	for i := range servers {
-		servers[i] = server.NewServer(server.WithGorumsServerOptions(gorums.WithGRPCServerOptions(grpc.Creds(td.creds))))
-		servers[i].StartOnListener(td.listeners[i])
-		td.builders[i].Add(servers[i])
+	deps := make([]replicaDeps, 0)
+	for i := range td.n {
+		depsCore := wiring.NewCore(hotstuff.ID(i+1), "test", testutil.GenerateKey(t, crypto.NameECDSA))
+		sender := network.NewGorumsSender(
+			depsCore.EventLoop(),
+			depsCore.Logger(),
+			depsCore.RuntimeCfg(),
+			td.creds,
+			gorums.WithDialTimeout(time.Second),
+		)
+		depsSecurity := wiring.NewSecurity(
+			depsCore.EventLoop(),
+			depsCore.Logger(),
+			depsCore.RuntimeCfg(),
+			sender,
+			crypto.NewECDSA(depsCore.RuntimeCfg()),
+		)
+		server := server.NewServer(
+			depsCore.EventLoop(),
+			depsCore.Logger(),
+			depsCore.RuntimeCfg(),
+			depsSecurity.BlockChain(),
+			server.WithGorumsServerOptions(gorums.WithGRPCServerOptions(grpc.Creds(td.creds))),
+		)
+		server.StartOnListener(td.listeners[i])
+		commandCache := clientpb.NewCommandCache(1)
+		states, err := protocol.NewViewStates(
+			depsSecurity.BlockChain(),
+			depsSecurity.Authority(),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		leaderRotation := leaderrotation.NewFixed(hotstuff.ID(1))
+		depsConsensus := wiring.NewConsensus(
+			depsCore.EventLoop(),
+			depsCore.Logger(),
+			depsCore.RuntimeCfg(),
+			depsSecurity.BlockChain(),
+			depsSecurity.Authority(),
+			commandCache,
+			rules.NewChainedHotStuff(
+				depsCore.Logger(),
+				depsCore.RuntimeCfg(),
+				depsSecurity.BlockChain(),
+			),
+			leaderRotation,
+			states,
+			comm.NewClique(
+				depsCore.RuntimeCfg(),
+				votingmachine.New(
+					depsCore.Logger(),
+					depsCore.EventLoop(),
+					depsCore.RuntimeCfg(),
+					depsSecurity.BlockChain(),
+					depsSecurity.Authority(),
+					states,
+				),
+				leaderRotation,
+				sender,
+			),
+		)
+		synchronizer := synchronizer.New(
+			depsCore.EventLoop(),
+			depsCore.Logger(),
+			depsCore.RuntimeCfg(),
+			depsSecurity.Authority(),
+			leaderRotation,
+			viewduration.NewFixed(100*time.Millisecond),
+			depsConsensus.Proposer(),
+			depsConsensus.Voter(),
+			states,
+			sender,
+		)
+		deps = append(deps, replicaDeps{
+			Core:         *depsCore,
+			Security:     *depsSecurity,
+			Sender:       sender,
+			Server:       server,
+			Synchronizer: synchronizer,
+		})
 	}
-	return func() {
-		for _, srv := range servers {
-			srv.Stop()
+	return deps, func() {
+		for _, d := range deps {
+			d.Server.Stop()
 		}
 	}
 }
