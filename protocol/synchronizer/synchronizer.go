@@ -42,8 +42,8 @@ type Synchronizer struct {
 
 	timer oneShotTimer
 
-	// map of collected timeout messages per view
-	timeouts map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg
+	// bag of collected timeout messages for different views
+	timeouts *timeoutCollector
 }
 
 // New creates a new Synchronizer.
@@ -82,7 +82,7 @@ func New(
 		state:     state,
 
 		timer:    oneShotTimer{time.AfterFunc(0, func() {})}, // dummy timer that will be replaced after start() is called
-		timeouts: make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
+		timeouts: newTimeoutCollector(config.QuorumSize()),
 	}
 	s.eventLoop.RegisterHandler(hotstuff.TimeoutEvent{}, func(event any) {
 		timeoutView := event.(hotstuff.TimeoutEvent).View
@@ -200,38 +200,20 @@ func (s *Synchronizer) OnLocalTimeout() {
 // OnRemoteTimeout handles an incoming timeout from a remote replica.
 func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 	currView := s.state.View()
-	defer func() {
-		// cleanup old timeouts
-		for view := range s.timeouts {
-			if view < currView {
-				delete(s.timeouts, view)
-			}
-		}
-	}()
+	defer s.timeouts.deleteOldViews(currView)
+
 	if err := s.auth.Verify(timeout.ViewSignature, timeout.View.ToBytes()); err != nil {
 		s.logger.Infof("View timeout signature could not be verified: %v", err)
 		return
 	}
 	s.logger.Debug("OnRemoteTimeout (advancing view): ", timeout)
 	s.advanceView(timeout.SyncInfo)
-	timeouts, ok := s.timeouts[timeout.View]
-	if !ok {
-		timeouts = make(map[hotstuff.ID]hotstuff.TimeoutMsg)
-		s.timeouts[timeout.View] = timeouts
-	}
-	if _, ok := timeouts[timeout.ID]; !ok {
-		timeouts[timeout.ID] = timeout
-	}
-	if len(timeouts) < s.config.QuorumSize() {
+
+	timeoutList, quorum := s.timeouts.add(timeout)
+	if !quorum {
+		s.logger.Debugf("OnRemoteTimeout: not enough timeouts for view %d, waiting for more", timeout.View)
 		return
 	}
-	// TODO: should probably change CreateTimeoutCert and maybe also CreateQuorumCert
-	// to use maps instead of slices
-	timeoutList := make([]hotstuff.TimeoutMsg, 0, len(timeouts))
-	for _, t := range timeouts {
-		timeoutList = append(timeoutList, t)
-	}
-	delete(s.timeouts, timeout.View)
 
 	si, err := s.timeoutRules.RemoteTimeoutRule(currView, timeout.View, timeoutList)
 	if err != nil {
