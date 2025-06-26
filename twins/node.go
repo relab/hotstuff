@@ -51,9 +51,14 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 	if err != nil {
 		return nil, err
 	}
+	opts := make([]core.RuntimeOption, 0)
+	if consensusName == nameVulnerableFHS {
+		opts = append(opts, core.WithAggregateQC())
+	}
+	opts = append(opts, core.WithSyncVerification())
 	node := &node{
 		id:           nodeID,
-		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVerification()),
+		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, opts...),
 		commandCache: clientpb.NewCommandCache(1),
 	}
 	node.logger = logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
@@ -75,9 +80,22 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		cert.WithCache(100),
 	)
 	node.blockchain = depsSecurity.BlockChain()
-	consensusRules, err := rules.New(node.logger, node.config, node.blockchain, consensusName)
-	if err != nil {
-		return nil, err
+	var consensusRules consensus.Ruleset
+	if consensusName == nameVulnerableFHS {
+		consensusRules = NewVulnFHS(
+			node.logger,
+			node.blockchain,
+			rules.NewFastHotstuff(
+				node.logger,
+				node.config,
+				node.blockchain,
+			),
+		)
+	} else {
+		consensusRules, err = rules.New(node.logger, node.config, node.blockchain, consensusName)
+		if err != nil {
+			return nil, err
+		}
 	}
 	node.viewStates, err = protocol.NewViewStates(node.blockchain, depsSecurity.Authority())
 	if err != nil {
