@@ -26,7 +26,7 @@ service Consensus {
     option (gorums.unicast) = true;
   }
 
-  rpc Fetch(BlockHash) returns (Block) { option (gorums.quorumcall) = true; }
+  rpc RequestBlock(BlockHash) returns (Block) { option (gorums.quorumcall) = true; }
 }
 
 message Proposal {

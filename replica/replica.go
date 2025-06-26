@@ -69,7 +69,6 @@ func New(
 		viewStates,
 		comm,
 	)
-	// TODO(AlanRostem): consider moving the consensus flow from synchronizer to a different class
 	synchronizer := synchronizer.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),

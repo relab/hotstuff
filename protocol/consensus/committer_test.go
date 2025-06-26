@@ -46,14 +46,14 @@ func TestValidCommit(t *testing.T) {
 		essentials.BlockChain(),
 	)
 	for range chs.ChainLength() {
-		block := testutil.CreateValidBlock(t, 1, parent)
+		block := testutil.CreateParentedBlock(t, 1, parent)
 		if firstBlock == nil {
 			firstBlock = block
 		}
 		chain.Store(block)
 		parent = block
 	}
-	blockToCommit := testutil.CreateValidBlock(t, 1, parent)
+	blockToCommit := testutil.CreateParentedBlock(t, 1, parent)
 	committer := wireUpCommitter(t, essentials, viewStates, chs)
 	if err := committer.TryCommit(blockToCommit); err != nil {
 		t.Fatal(err)

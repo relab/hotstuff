@@ -205,3 +205,28 @@ func TestVerifyAggregateQC(t *testing.T) {
 		}
 	}
 }
+
+func TestVerifyAnyQC(t *testing.T) {
+	for _, td := range testData {
+		const n = 4
+		dummies := createDummies(t, n, td.cryptoName, td.cacheSize)
+		signers := dummies.Signers()
+		signedBlock := testutil.CreateBlock(t, dummies[0].Authority())
+		for _, dummy := range dummies {
+			dummy.BlockChain().Store(signedBlock)
+		}
+		timeouts := testutil.CreateTimeouts(t, 1, signers)
+		aggQC, err := signers[0].CreateAggregateQC(1, timeouts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		proposal := &hotstuff.ProposeMsg{
+			Block:       signedBlock,
+			AggregateQC: &aggQC,
+		}
+		err = signers[0].VerifyAnyQC(proposal)
+		if err != nil {
+			t.Fatalf("AnyQC was not verified: %v", err)
+		}
+	}
+}

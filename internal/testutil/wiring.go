@@ -25,8 +25,7 @@ func WireUpEssentials(
 	opts ...cert.Option,
 ) *Essentials {
 	t.Helper()
-	// TODO(AlanRostem): runtime options omitted. It's not used by tests, but
-	// I am commenting to make other maintainers aware
+	// NOTE: using synchronous vote verification to keep tests simple.
 	depsCore := wiring.NewCore(id, "test", GenerateKey(t, cryptoName), core.WithSyncVerification())
 	sender := NewMockSender(id)
 	base, err := crypto.New(

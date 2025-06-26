@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/comm"
+	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
@@ -23,7 +24,7 @@ func wireUpSynchronizer(
 	essentials *testutil.Essentials,
 	commandCache *clientpb.CommandCache,
 	viewStates *protocol.ViewStates,
-) *Synchronizer {
+) (*Synchronizer, *consensus.Proposer) {
 	t.Helper()
 	leaderRotation := leaderrotation.NewFixed(1)
 	consensusRules := rules.NewChainedHotStuff(
@@ -68,7 +69,7 @@ func wireUpSynchronizer(
 		viewStates,
 		essentials.MockSender(),
 	)
-	return synchronizer
+	return synchronizer, depsConsensus.Proposer()
 }
 
 func TestAdvanceViewQC(t *testing.T) {
@@ -82,7 +83,7 @@ func TestAdvanceViewQC(t *testing.T) {
 		t.Fatal(err)
 	}
 	commandCache := clientpb.NewCommandCache(1)
-	synchronizer := wireUpSynchronizer(t, subject, commandCache, viewStates)
+	synchronizer, proposer := wireUpSynchronizer(t, subject, commandCache, viewStates)
 
 	blockchain := subject.BlockChain()
 	block := hotstuff.NewBlock(
@@ -101,7 +102,6 @@ func TestAdvanceViewQC(t *testing.T) {
 	blockchain.Store(block)
 	signers := set.Signers()
 	qc := testutil.CreateQC(t, block, signers...)
-	proposer := synchronizer.proposer // TODO(AlanRostem): not very clean, refactor
 	for i := range 2 {
 		// adding multiple commands so the next call CreateProposal
 		// in advanceView doesn't block
@@ -137,13 +137,12 @@ func TestAdvanceViewTC(t *testing.T) {
 		t.Fatal(err)
 	}
 	commandCache := clientpb.NewCommandCache(1)
-	synchronizer := wireUpSynchronizer(t, subject, commandCache, viewStates)
+	synchronizer, proposer := wireUpSynchronizer(t, subject, commandCache, viewStates)
 
 	signers := set.Signers()
 
 	tc := testutil.CreateTC(t, 1, signers)
 
-	proposer := synchronizer.proposer // TODO(AlanRostem): not very clean, refactor
 	for i := range 2 {
 		// adding multiple commands so the next call CreateProposal
 		// in advanceView doesn't block

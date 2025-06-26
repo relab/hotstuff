@@ -175,8 +175,7 @@ func (c *Authority) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstu
 	return highQC, nil
 }
 
-// VerifyAnyQC is a helper that verifies either a QC or the aggregateQC.
-// TODO(AlanRostem): add a test case for this method.
+// VerifyAnyQC is a helper that verifies either a QC or the aggregateQC in a proposal message.
 func (c *Authority) VerifyAnyQC(proposal *hotstuff.ProposeMsg) error {
 	qc := proposal.Block.QuorumCert()
 	aggQC := proposal.AggregateQC

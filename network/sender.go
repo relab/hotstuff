@@ -170,8 +170,7 @@ func (s *GorumsSender) Timeout(msg hotstuff.TimeoutMsg) {
 // RequestBlock requests a block from all the replicas in the configuration
 func (s *GorumsSender) RequestBlock(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	cfg := s.pbCfg
-	// TODO(AlanRostem): consider changing the proto service name as well
-	protoBlock, err := cfg.Fetch(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
+	protoBlock, err := cfg.RequestBlock(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
 	if err != nil {
 		qcErr, ok := err.(gorums.QuorumCallError)
 		// filter out context errors

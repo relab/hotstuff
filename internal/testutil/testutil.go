@@ -33,9 +33,8 @@ func CreateBlock(t testing.TB, signer *cert.Authority) *hotstuff.Block {
 	return b
 }
 
-func CreateValidBlock(t testing.TB, proposer hotstuff.ID, validParent *hotstuff.Block) *hotstuff.Block {
+func CreateParentedBlock(t testing.TB, proposer hotstuff.ID, validParent *hotstuff.Block) *hotstuff.Block {
 	t.Helper()
-	// TODO(AlanRostem): consider creating a qc with a valid signature too
 	qc := hotstuff.NewQuorumCert(nil, validParent.View(), validParent.Hash())
 	return hotstuff.NewBlock(
 		validParent.Hash(),
