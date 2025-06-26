@@ -6,9 +6,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/security/cert"
-	"github.com/relab/hotstuff/security/crypto/bls12"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
-	"github.com/relab/hotstuff/security/crypto/eddsa"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 func createDummies(t *testing.T, count uint, cryptoName string, cacheSize int) testutil.EssentialsSet {
@@ -23,12 +21,12 @@ var testData = []struct {
 	cryptoName string
 	cacheSize  int
 }{
-	{cryptoName: ecdsa.ModuleName},
-	{cryptoName: eddsa.ModuleName},
-	{cryptoName: bls12.ModuleName},
-	{cryptoName: ecdsa.ModuleName, cacheSize: 10},
-	{cryptoName: eddsa.ModuleName, cacheSize: 10},
-	{cryptoName: bls12.ModuleName, cacheSize: 10},
+	{cryptoName: crypto.NameECDSA},
+	{cryptoName: crypto.NameEDDSA},
+	{cryptoName: crypto.NameBLS12},
+	{cryptoName: crypto.NameECDSA, cacheSize: 10},
+	{cryptoName: crypto.NameEDDSA, cacheSize: 10},
+	{cryptoName: crypto.NameBLS12, cacheSize: 10},
 }
 
 func TestCreatePartialCert(t *testing.T) {
@@ -204,6 +202,31 @@ func TestVerifyAggregateQC(t *testing.T) {
 
 		if highQC.BlockHash() != hotstuff.GetGenesis().Hash() {
 			t.Fatal("Wrong hash for highQC")
+		}
+	}
+}
+
+func TestVerifyAnyQC(t *testing.T) {
+	for _, td := range testData {
+		const n = 4
+		dummies := createDummies(t, n, td.cryptoName, td.cacheSize)
+		signers := dummies.Signers()
+		signedBlock := testutil.CreateBlock(t, dummies[0].Authority())
+		for _, dummy := range dummies {
+			dummy.BlockChain().Store(signedBlock)
+		}
+		timeouts := testutil.CreateTimeouts(t, 1, signers)
+		aggQC, err := signers[0].CreateAggregateQC(1, timeouts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		proposal := &hotstuff.ProposeMsg{
+			Block:       signedBlock,
+			AggregateQC: &aggQC,
+		}
+		err = signers[0].VerifyAnyQC(proposal)
+		if err != nil {
+			t.Fatalf("AnyQC was not verified: %v", err)
 		}
 	}
 }

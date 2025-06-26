@@ -17,9 +17,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/security/crypto/bls12"
-	ecdsacrypto "github.com/relab/hotstuff/security/crypto/ecdsa"
-	"github.com/relab/hotstuff/security/crypto/eddsa"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 // GenerateECDSAPrivateKey returns a new ECDSA private key.
@@ -111,16 +109,16 @@ func PrivateKeyToPEM(key hotstuff.PrivateKey) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		keyType = ecdsacrypto.PrivateKeyFileType
+		keyType = crypto.ECDSAPrivateKeyFileType
 	case ed25519.PrivateKey:
 		marshaled, err = x509.MarshalPKCS8PrivateKey(k)
 		if err != nil {
 			return nil, err
 		}
-		keyType = eddsa.PrivateKeyFileType
-	case *bls12.PrivateKey:
+		keyType = crypto.EDDSAPrivateKeyFileType
+	case *crypto.BLS12PrivateKey:
 		marshaled = k.ToBytes()
-		keyType = bls12.PrivateKeyFileType
+		keyType = crypto.BLS12PrivateKeyFileType
 	}
 
 	b := &pem.Block{
@@ -164,16 +162,16 @@ func PublicKeyToPEM(key hotstuff.PublicKey) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		keyType = ecdsacrypto.PublicKeyFileType
+		keyType = crypto.ECDSAPublicKeyFileType
 	case ed25519.PublicKey:
 		marshaled, err = x509.MarshalPKIXPublicKey(k)
 		if err != nil {
 			return nil, err
 		}
-		keyType = eddsa.PublicKeyFileType
-	case *bls12.PublicKey:
+		keyType = crypto.EDDSAPublicKeyFileType
+	case *crypto.BLS12PublicKey:
 		marshaled = k.ToBytes()
-		keyType = bls12.PublicKeyFileType
+		keyType = crypto.BLS12PublicKeyFileType
 	}
 
 	b := &pem.Block{
@@ -230,9 +228,9 @@ func WriteCertFile(cert *x509.Certificate, file string) (err error) {
 func ParsePrivateKey(buf []byte) (key hotstuff.PrivateKey, err error) {
 	b, _ := pem.Decode(buf)
 	switch b.Type {
-	case ecdsacrypto.PrivateKeyFileType:
+	case crypto.ECDSAPrivateKeyFileType:
 		key, err = x509.ParseECPrivateKey(b.Bytes)
-	case eddsa.PrivateKeyFileType:
+	case crypto.EDDSAPrivateKeyFileType:
 		genericKey, err := x509.ParsePKCS8PrivateKey(b.Bytes)
 		if err != nil {
 			return nil, err
@@ -242,8 +240,8 @@ func ParsePrivateKey(buf []byte) (key hotstuff.PrivateKey, err error) {
 		if !ok {
 			return nil, fmt.Errorf("failed to parse key")
 		}
-	case bls12.PrivateKeyFileType:
-		k := &bls12.PrivateKey{}
+	case crypto.BLS12PrivateKeyFileType:
+		k := &crypto.BLS12PrivateKey{}
 		k.FromBytes(b.Bytes)
 		key = k
 	default:
@@ -271,12 +269,12 @@ func ParsePublicKey(buf []byte) (key hotstuff.PublicKey, err error) {
 		return nil, fmt.Errorf("failed to decode PEM block")
 	}
 	switch b.Type {
-	case ecdsacrypto.PublicKeyFileType:
+	case crypto.ECDSAPublicKeyFileType:
 		key, err = x509.ParsePKIXPublicKey(b.Bytes)
-	case eddsa.PublicKeyFileType:
+	case crypto.EDDSAPublicKeyFileType:
 		key, err = x509.ParsePKIXPublicKey(b.Bytes)
-	case bls12.PublicKeyFileType:
-		k := &bls12.PublicKey{}
+	case crypto.BLS12PublicKeyFileType:
+		k := &crypto.BLS12PublicKey{}
 		err = k.FromBytes(b.Bytes)
 		if err != nil {
 			return nil, err
@@ -333,7 +331,7 @@ type KeyChain struct {
 }
 
 // GenerateKeyChain generates keys and certificates for a replica.
-func GenerateKeyChain(id hotstuff.ID, validFor []string, crypto string, ca *x509.Certificate, caKey *ecdsa.PrivateKey) (KeyChain, error) {
+func GenerateKeyChain(id hotstuff.ID, validFor []string, cryptoModule string, ca *x509.Certificate, caKey *ecdsa.PrivateKey) (KeyChain, error) {
 	ecdsaKey, err := GenerateECDSAPrivateKey()
 	if err != nil {
 		return KeyChain{}, err
@@ -352,12 +350,12 @@ func GenerateKeyChain(id hotstuff.ID, validFor []string, crypto string, ca *x509
 
 	var privateKey hotstuff.PrivateKey
 	var publicKey hotstuff.PublicKey
-	switch crypto {
+	switch cryptoModule {
 	case "ecdsa":
 		privateKey = ecdsaKey
 		publicKey = privateKey.Public()
 	case "bls12":
-		privateKey, err = bls12.GeneratePrivateKey()
+		privateKey, err = crypto.GenerateBLS12PrivateKey()
 		if err != nil {
 			return KeyChain{}, fmt.Errorf("failed to generate bls12-381 private key: %w", err)
 		}
@@ -368,7 +366,7 @@ func GenerateKeyChain(id hotstuff.ID, validFor []string, crypto string, ca *x509
 			return KeyChain{}, fmt.Errorf("failed to generate ed25519 key: %w", err)
 		}
 	default:
-		return KeyChain{}, fmt.Errorf("unknown crypto implementation: %s", crypto)
+		return KeyChain{}, fmt.Errorf("unknown crypto implementation: %s", cryptoModule)
 	}
 
 	privateKeyPEM, err := PrivateKeyToPEM(privateKey)

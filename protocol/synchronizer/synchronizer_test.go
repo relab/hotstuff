@@ -15,7 +15,7 @@ import (
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/protocol/votingmachine"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/wiring"
 )
 
@@ -24,20 +24,13 @@ func wireUpSynchronizer(
 	essentials *testutil.Essentials,
 	commandCache *clientpb.CommandCache,
 	viewStates *protocol.ViewStates,
-) *Synchronizer {
+) (*Synchronizer, *consensus.Proposer) {
 	t.Helper()
 	leaderRotation := leaderrotation.NewFixed(1)
 	consensusRules := rules.NewChainedHotStuff(
 		essentials.Logger(),
 		essentials.RuntimeCfg(),
 		essentials.BlockChain(),
-	)
-	committer := consensus.NewCommitter(
-		essentials.EventLoop(),
-		essentials.Logger(),
-		essentials.BlockChain(),
-		viewStates,
-		consensusRules,
 	)
 	votingMachine := votingmachine.New(
 		essentials.Logger(),
@@ -49,11 +42,11 @@ func wireUpSynchronizer(
 	)
 	depsConsensus := wiring.NewConsensus(
 		essentials.EventLoop(),
+		essentials.Logger(),
 		essentials.RuntimeCfg(),
 		essentials.BlockChain(),
 		essentials.Authority(),
 		commandCache,
-		committer,
 		consensusRules,
 		leaderRotation,
 		viewStates,
@@ -77,11 +70,11 @@ func wireUpSynchronizer(
 		viewStates,
 		essentials.MockSender(),
 	)
-	return synchronizer
+	return synchronizer, depsConsensus.Proposer()
 }
 
 func TestAdvanceViewQC(t *testing.T) {
-	set := testutil.NewEssentialsSet(t, 4, ecdsa.ModuleName)
+	set := testutil.NewEssentialsSet(t, 4, crypto.NameECDSA)
 	subject := set[0]
 	viewStates, err := protocol.NewViewStates(
 		subject.BlockChain(),
@@ -91,7 +84,7 @@ func TestAdvanceViewQC(t *testing.T) {
 		t.Fatal(err)
 	}
 	commandCache := clientpb.NewCommandCache(1)
-	synchronizer := wireUpSynchronizer(t, subject, commandCache, viewStates)
+	synchronizer, proposer := wireUpSynchronizer(t, subject, commandCache, viewStates)
 
 	blockchain := subject.BlockChain()
 	block := hotstuff.NewBlock(
@@ -110,7 +103,6 @@ func TestAdvanceViewQC(t *testing.T) {
 	blockchain.Store(block)
 	signers := set.Signers()
 	qc := testutil.CreateQC(t, block, signers...)
-	proposer := synchronizer.proposer // TODO(AlanRostem): not very clean, refactor
 	for i := range 2 {
 		// adding multiple commands so the next call CreateProposal
 		// in advanceView doesn't block
@@ -136,7 +128,7 @@ func TestAdvanceViewQC(t *testing.T) {
 }
 
 func TestAdvanceViewTC(t *testing.T) {
-	set := testutil.NewEssentialsSet(t, 4, ecdsa.ModuleName)
+	set := testutil.NewEssentialsSet(t, 4, crypto.NameECDSA)
 	subject := set[0]
 	viewStates, err := protocol.NewViewStates(
 		subject.BlockChain(),
@@ -146,13 +138,12 @@ func TestAdvanceViewTC(t *testing.T) {
 		t.Fatal(err)
 	}
 	commandCache := clientpb.NewCommandCache(1)
-	synchronizer := wireUpSynchronizer(t, subject, commandCache, viewStates)
+	synchronizer, proposer := wireUpSynchronizer(t, subject, commandCache, viewStates)
 
 	signers := set.Signers()
 
 	tc := testutil.CreateTC(t, 1, signers)
 
-	proposer := synchronizer.proposer // TODO(AlanRostem): not very clean, refactor
 	for i := range 2 {
 		// adding multiple commands so the next call CreateProposal
 		// in advanceView doesn't block

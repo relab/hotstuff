@@ -170,8 +170,7 @@ func (s *GorumsSender) Timeout(msg hotstuff.TimeoutMsg) {
 // RequestBlock requests a block from all the replicas in the configuration
 func (s *GorumsSender) RequestBlock(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	cfg := s.pbCfg
-	// TODO(AlanRostem): consider changing the proto service name as well
-	protoBlock, err := cfg.Fetch(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
+	protoBlock, err := cfg.RequestBlock(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
 	if err != nil {
 		qcErr, ok := err.(gorums.QuorumCallError)
 		// filter out context errors
@@ -260,9 +259,9 @@ func readMetadata(md metadata.MD) map[string]string {
 
 type qspec struct{}
 
-// FetchQF is the quorum function for the Fetch quorum call method.
+// RequestBlockQF is the quorum function for the Fetch quorum call method.
 // It simply returns true if one of the replies matches the requested block.
-func (q qspec) FetchQF(in *hotstuffpb.BlockHash, replies map[uint32]*hotstuffpb.Block) (*hotstuffpb.Block, bool) {
+func (q qspec) RequestBlockQF(in *hotstuffpb.BlockHash, replies map[uint32]*hotstuffpb.Block) (*hotstuffpb.Block, bool) {
 	var h hotstuff.Hash
 	copy(h[:], in.GetHash())
 	for _, b := range replies {

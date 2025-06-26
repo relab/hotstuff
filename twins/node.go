@@ -20,7 +20,7 @@ import (
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 	"github.com/relab/hotstuff/wiring"
 )
@@ -46,34 +46,56 @@ type node struct {
 }
 
 func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
-	cryptoName := ecdsa.ModuleName
+	cryptoName := crypto.NameECDSA
 	pk, err := keygen.GenerateECDSAPrivateKey()
 	if err != nil {
 		return nil, err
 	}
+	opts := make([]core.RuntimeOption, 0)
+	if consensusName == nameVulnerableFHS {
+		opts = append(opts, core.WithAggregateQC())
+	}
+	opts = append(opts, core.WithSyncVerification())
 	node := &node{
 		id:           nodeID,
-		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVerification()),
+		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, opts...),
 		commandCache: clientpb.NewCommandCache(1),
 	}
 	node.logger = logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
 	node.eventLoop = eventloop.New(node.logger, 100)
 	node.sender = newSender(n, node)
-	depsSecurity, err := wiring.NewSecurity(
-		node.eventLoop,
-		node.logger,
+	base, err := crypto.New(
 		node.config,
-		node.sender,
 		cryptoName,
-		cert.WithCache(100),
 	)
 	if err != nil {
 		return nil, err
 	}
+	depsSecurity := wiring.NewSecurity(
+		node.eventLoop,
+		node.logger,
+		node.config,
+		node.sender,
+		base,
+		cert.WithCache(100),
+	)
 	node.blockchain = depsSecurity.BlockChain()
-	consensusRules, err := rules.New(node.logger, node.config, node.blockchain, consensusName)
-	if err != nil {
-		return nil, err
+	var consensusRules consensus.Ruleset
+	if consensusName == nameVulnerableFHS {
+		consensusRules = NewVulnFHS(
+			node.logger,
+			node.blockchain,
+			rules.NewFastHotstuff(
+				node.logger,
+				node.config,
+				node.blockchain,
+			),
+		)
+	} else {
+		consensusRules, err = rules.New(node.logger, node.config, node.blockchain, consensusName)
+		if err != nil {
+			return nil, err
+		}
 	}
 	node.viewStates, err = protocol.NewViewStates(node.blockchain, depsSecurity.Authority())
 	if err != nil {

@@ -7,7 +7,7 @@ import (
 	"github.com/relab/hotstuff/protocol/votingmachine"
 )
 
-const ModuleNameClique = "clique"
+const NameClique = "clique"
 
 // Clique implements one-to-all dissemination and all-to-one aggregation.
 type Clique struct {

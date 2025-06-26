@@ -15,15 +15,14 @@ func New(
 	blockchain *blockchain.Blockchain,
 	name string,
 ) (ruleset consensus.Ruleset, _ error) {
-	logger.Debugf("Initializing module (consensus rules): %s", name)
 	switch name {
 	case "":
 		fallthrough // default to chainedhotstuff if no name is provided
-	case ModuleNameChainedHotstuff:
+	case NameChainedHotstuff:
 		ruleset = NewChainedHotStuff(logger, config, blockchain)
-	case ModuleNameFastHotstuff:
+	case NameFastHotstuff:
 		ruleset = NewFastHotstuff(logger, config, blockchain)
-	case ModuleNameSimpleHotStuff:
+	case NameSimpleHotStuff:
 		ruleset = NewSimpleHotStuff(logger, config, blockchain)
 	default:
 		return nil, fmt.Errorf("invalid consensus name: '%s'", name)

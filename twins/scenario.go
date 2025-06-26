@@ -46,7 +46,6 @@ type ScenarioResult struct {
 }
 
 // ExecuteScenario executes a twins scenario.
-// TODO(AlanRostem): pass in the ruleset interface instead of the name to allow flexibility.
 func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, consensusName string) (result ScenarioResult, err error) {
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.

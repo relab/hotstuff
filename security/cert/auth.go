@@ -21,16 +21,9 @@ type Authority struct {
 func NewAuthority(
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
-	cryptoName string,
+	base crypto.Base,
 	opts ...Option,
-) (*Authority, error) {
-	base, err := newCryptoModule(
-		config,
-		cryptoName,
-	)
-	if err != nil {
-		return nil, err
-	}
+) *Authority {
 	ca := &Authority{
 		Base:       base,
 		config:     config,
@@ -39,7 +32,7 @@ func NewAuthority(
 	for _, opt := range opts {
 		opt(ca)
 	}
-	return ca, nil
+	return ca
 }
 
 // CreatePartialCert signs a single block and returns the partial certificate.
@@ -182,8 +175,7 @@ func (c *Authority) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstu
 	return highQC, nil
 }
 
-// VerifyAnyQC is a helper that verifies either a QC or the aggregateQC.
-// TODO(AlanRostem): add a test case for this method.
+// VerifyAnyQC is a helper that verifies either a QC or the aggregateQC in a proposal message.
 func (c *Authority) VerifyAnyQC(proposal *hotstuff.ProposeMsg) error {
 	qc := proposal.Block.QuorumCert()
 	aggQC := proposal.AggregateQC

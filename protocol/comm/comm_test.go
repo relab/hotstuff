@@ -10,7 +10,7 @@ import (
 	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/votingmachine"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 type leaderRotation struct{}
@@ -22,7 +22,7 @@ func (ld *leaderRotation) GetLeader(view hotstuff.View) hotstuff.ID {
 var _ leaderrotation.LeaderRotation = (*leaderRotation)(nil)
 
 func TestDisseminateAggregate(t *testing.T) {
-	essentials := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
+	essentials := testutil.WireUpEssentials(t, 1, crypto.NameECDSA)
 	viewStates, err := protocol.NewViewStates(
 		essentials.BlockChain(),
 		essentials.Authority(),

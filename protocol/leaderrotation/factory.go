@@ -18,19 +18,18 @@ func New(
 	name string,
 	chainLength int,
 ) (ld LeaderRotation, _ error) {
-	logger.Debugf("Initializing module (leader rotation): %s", name)
 	switch name {
 	case "":
 		fallthrough // default to round-robin if no name is provided
-	case ModuleNameRoundRobin:
+	case NameRoundRobin:
 		ld = NewRoundRobin(config)
-	case ModuleNameFixed:
+	case NameFixed:
 		ld = NewFixed(hotstuff.ID(1))
-	case ModuleNameTree:
+	case NameTree:
 		ld = NewTreeBased(config)
-	case ModuleNameCarousel:
+	case NameCarousel:
 		ld = NewCarousel(chainLength, blockchain, viewStates, config, logger)
-	case ModuleNameReputation:
+	case NameReputation:
 		ld = NewRepBased(chainLength, viewStates, config, logger)
 	default:
 		return nil, fmt.Errorf("invalid leader-rotation algorithm: '%s'", name)

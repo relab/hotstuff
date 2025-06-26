@@ -11,7 +11,6 @@ import (
 
 type Security struct {
 	blockchain *blockchain.Blockchain
-	cryptoImpl crypto.Base
 	auth       *cert.Authority
 }
 
@@ -21,27 +20,24 @@ func NewSecurity(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	sender core.Sender,
-	cryptoName string,
+	base crypto.Base,
 	opts ...cert.Option,
-) (*Security, error) {
+) *Security {
 	blockchain := blockchain.New(
 		eventLoop,
 		logger,
 		sender,
 	)
-	auth, err := cert.NewAuthority(
+	auth := cert.NewAuthority(
 		config,
 		blockchain,
-		cryptoName,
+		base,
 		opts...,
 	)
-	if err != nil {
-		return nil, err
-	}
 	return &Security{
 		blockchain: blockchain,
 		auth:       auth,
-	}, nil
+	}
 }
 
 // BlockChain returns the blockchain instance.

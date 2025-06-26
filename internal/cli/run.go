@@ -16,6 +16,7 @@ import (
 	"github.com/relab/hotstuff/internal/protostream"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/metrics"
+	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/iago"
@@ -37,12 +38,12 @@ func runController() {
 	}
 
 	// fasthotstuff strictly requires QC aggregation.
-	if cfg.Consensus == rules.ModuleNameFastHotstuff {
+	if cfg.Consensus == rules.NameFastHotstuff {
 		cfg.UseAggQC = true
 	}
 
-	if cfg.Kauri {
-		cfg.LeaderRotation = leaderrotation.ModuleNameTree
+	if cfg.Communication == comm.NameKauri {
+		cfg.LeaderRotation = leaderrotation.NameTree
 	}
 
 	// If the config is set to run locally, `hosts` will be nil (empty)

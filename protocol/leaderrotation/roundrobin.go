@@ -5,7 +5,7 @@ import (
 	"github.com/relab/hotstuff/core"
 )
 
-const ModuleNameRoundRobin = "round-robin"
+const NameRoundRobin = "round-robin"
 
 type RoundRobin struct {
 	config *core.RuntimeConfig

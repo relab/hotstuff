@@ -8,7 +8,6 @@ import (
 	"github.com/relab/hotstuff/internal/test"
 	"github.com/relab/hotstuff/protocol/comm/kauri"
 	"github.com/relab/hotstuff/security/crypto"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
 )
 
 func TestSubTree(t *testing.T) {
@@ -98,13 +97,13 @@ func TestCanMerge(t *testing.T) {
 		if !overlaps && test.wantErr {
 			t.Errorf("hasOverlap(%v, %v) = false, want true", test.a, test.b)
 		}
-		a := make(crypto.Multi[*ecdsa.Signature])
+		a := make(crypto.Multi[*crypto.ECDSASignature])
 		for _, id := range test.a {
-			a[id] = &ecdsa.Signature{}
+			a[id] = &crypto.ECDSASignature{}
 		}
-		b := make(crypto.Multi[*ecdsa.Signature])
+		b := make(crypto.Multi[*crypto.ECDSASignature])
 		for _, id := range test.b {
-			b[id] = &ecdsa.Signature{}
+			b[id] = &crypto.ECDSASignature{}
 		}
 		err := kauri.CanMergeContributions(a, b)
 		if err != nil && !test.wantErr {
@@ -140,13 +139,13 @@ func BenchmarkHasOverlap(b *testing.B) {
 		}
 		subSet := set[data.start:]
 
-		p := make(crypto.Multi[*ecdsa.Signature])
+		p := make(crypto.Multi[*crypto.ECDSASignature])
 		for _, id := range set {
-			p[id] = &ecdsa.Signature{}
+			p[id] = &crypto.ECDSASignature{}
 		}
-		q := make(crypto.Multi[*ecdsa.Signature])
+		q := make(crypto.Multi[*crypto.ECDSASignature])
 		for _, id := range subSet {
-			q[id] = &ecdsa.Signature{}
+			q[id] = &crypto.ECDSASignature{}
 		}
 		b.Run("HasOverlap/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
 			for b.Loop() {

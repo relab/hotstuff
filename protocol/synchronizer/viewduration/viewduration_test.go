@@ -45,7 +45,9 @@ func TestDynamic(t *testing.T) {
 		vd.ViewTimeout()
 	}
 	checkDuration(t, "ViewTimeout 10 times", maxTimeout, vd.Duration())
-	// TODO(AlanRostem): this outputs different values on Windows vs. Linux. Find out why.
-	// vd.ViewSucceeded()
-	// checkDuration(t, "ViewSucceeded", 0, vd.Duration())
+	time.Sleep(2 * time.Second)
+	vd.ViewSucceeded()
+	if vd.Duration() == 0 {
+		t.Fatal("expected view duration to be greater than zero")
+	}
 }

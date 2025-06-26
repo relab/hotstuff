@@ -9,22 +9,21 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/security/cert"
+	"github.com/relab/hotstuff/security/crypto"
 
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
 	"github.com/relab/hotstuff/internal/testutil"
-	"github.com/relab/hotstuff/security/crypto/bls12"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
 )
 
 func TestConvertPartialCert(t *testing.T) {
 	key := testutil.GenerateECDSAKey(t)
 	cfg := core.NewRuntimeConfig(1, key)
-	signer, err := cert.NewAuthority(cfg, nil, ecdsa.ModuleName)
+	base, err := crypto.New(cfg, crypto.NameECDSA)
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	signer := cert.NewAuthority(cfg, nil, base)
 	want, err := signer.CreatePartialCert(hotstuff.GetGenesis())
 	if err != nil {
 		t.Fatal(err)
@@ -44,10 +43,11 @@ func TestConvertQuorumCert(t *testing.T) {
 	for i := range n {
 		key := testutil.GenerateECDSAKey(t)
 		cfg := core.NewRuntimeConfig(hotstuff.ID(i+1), key)
-		signer, err := cert.NewAuthority(cfg, nil, ecdsa.ModuleName)
+		base, err := crypto.New(cfg, crypto.NameECDSA)
 		if err != nil {
 			t.Fatal(err)
 		}
+		signer := cert.NewAuthority(cfg, nil, base)
 
 		signers[i] = signer
 	}
@@ -97,10 +97,11 @@ func TestConvertTimeoutCertBLS12(t *testing.T) {
 	signers := make([]*cert.Authority, n)
 	for i := range n {
 		id := hotstuff.ID(i + 1)
-		signer, err := cert.NewAuthority(cfgs[id], nil, bls12.ModuleName)
+		base, err := crypto.New(cfgs[id], crypto.NameBLS12)
 		if err != nil {
 			t.Fatal(err)
 		}
+		signer := cert.NewAuthority(cfgs[id], nil, base)
 		signers[i] = signer
 		meta := cfgs[id].ConnectionMetadata()
 		err = cfgs[id].SetReplicaMetadata(id, meta)

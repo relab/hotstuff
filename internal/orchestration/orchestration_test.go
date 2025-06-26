@@ -23,9 +23,7 @@ import (
 	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
-	"github.com/relab/hotstuff/security/crypto/bls12"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
-	"github.com/relab/hotstuff/security/crypto/eddsa"
+	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/iago/iagotest"
 )
 
@@ -35,9 +33,9 @@ func makeCfg(
 	byzantine map[string][]uint32,
 	branchFactor uint32,
 	randomTree bool,
-	kauri bool,
+	commName string,
 ) *config.ExperimentConfig {
-	useAggQC := consensusImpl == rules.ModuleNameFastHotstuff
+	useAggQC := consensusImpl == rules.NameFastHotstuff
 	cfg := &config.ExperimentConfig{
 		Replicas:          replicas,
 		Clients:           clients,
@@ -45,11 +43,10 @@ func makeCfg(
 		RandomTree:        randomTree,
 		BranchFactor:      branchFactor,
 		Consensus:         consensusImpl,
-		Communication:     comm.ModuleNameClique,
+		Communication:     commName,
 		Crypto:            crypto,
 		LeaderRotation:    leaderRotation,
 		ByzantineStrategy: byzantine,
-		Kauri:             kauri,
 		UseAggQC:          useAggQC,
 
 		// Common default values:
@@ -113,35 +110,36 @@ func TestOrchestration(t *testing.T) {
 		consensus    string
 		crypto       string
 		byzantine    map[string][]uint32
-		kauri        bool
+		commName     string
 		replicas     int
 		branchFactor uint32
 		randomTree   bool
 	}{
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: ecdsa.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: eddsa.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: bls12.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameFastHotstuff, crypto: ecdsa.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameFastHotstuff, crypto: eddsa.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameFastHotstuff, crypto: bls12.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameSimpleHotStuff, crypto: ecdsa.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameSimpleHotStuff, crypto: eddsa.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameSimpleHotStuff, crypto: bls12.ModuleName, replicas: 4},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: ecdsa.ModuleName, byzantine: fork, replicas: 4},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: ecdsa.ModuleName, byzantine: silence, replicas: 4},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: ecdsa.ModuleName, kauri: true, replicas: 7, branchFactor: 2},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: bls12.ModuleName, kauri: true, replicas: 7, branchFactor: 2},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: ecdsa.ModuleName, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
-		{consensus: rules.ModuleNameChainedHotstuff, crypto: bls12.ModuleName, kauri: true, replicas: 7, branchFactor: 2, randomTree: true},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, replicas: 4},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameEDDSA, replicas: 4},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameBLS12, replicas: 4},
+		{consensus: rules.NameFastHotstuff, crypto: crypto.NameECDSA, replicas: 4},
+		{consensus: rules.NameFastHotstuff, crypto: crypto.NameEDDSA, replicas: 4},
+		{consensus: rules.NameFastHotstuff, crypto: crypto.NameBLS12, replicas: 4},
+		{consensus: rules.NameSimpleHotStuff, crypto: crypto.NameECDSA, replicas: 4},
+		{consensus: rules.NameSimpleHotStuff, crypto: crypto.NameEDDSA, replicas: 4},
+		{consensus: rules.NameSimpleHotStuff, crypto: crypto.NameBLS12, replicas: 4},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, byzantine: fork, replicas: 4},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, byzantine: silence, replicas: 4},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, commName: comm.NameKauri, replicas: 7, branchFactor: 2},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameBLS12, commName: comm.NameKauri, replicas: 7, branchFactor: 2},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, commName: comm.NameKauri, replicas: 7, branchFactor: 2, randomTree: true},
+		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameBLS12, commName: comm.NameKauri, replicas: 7, branchFactor: 2, randomTree: true},
 	}
 
 	for _, tt := range tests {
-		t.Run(test.Name([]string{"consensus", "crypto", "byzantine", "kauri"}, tt.consensus, tt.crypto, tt.byzantine, tt.kauri), func(t *testing.T) {
+		t.Run(test.Name([]string{"consensus", "crypto", "byzantine", "kauri"}, tt.consensus, tt.crypto, tt.byzantine, tt.commName), func(t *testing.T) {
 			var leaderRotation string
-			if tt.kauri {
-				leaderRotation = leaderrotation.ModuleNameTree
+			if tt.commName != "" {
+				leaderRotation = leaderrotation.NameTree
 			} else {
-				leaderRotation = leaderrotation.ModuleNameRoundRobin
+				tt.commName = comm.NameClique
+				leaderRotation = leaderrotation.NameRoundRobin
 			}
 			cfg := makeCfg(
 				tt.replicas, 2,
@@ -151,7 +149,7 @@ func TestOrchestration(t *testing.T) {
 				tt.byzantine,
 				tt.branchFactor,
 				tt.randomTree,
-				tt.kauri,
+				tt.commName,
 			)
 			run(t, cfg)
 		})
@@ -231,8 +229,8 @@ func TestDeployment(t *testing.T) {
 		ViewTimeout:       100 * time.Millisecond,
 		DurationSamples:   1000,
 		TimeoutMultiplier: 1.2,
-		Consensus:         rules.ModuleNameChainedHotstuff,
-		Crypto:            ecdsa.ModuleName,
+		Consensus:         rules.NameChainedHotstuff,
+		Crypto:            crypto.NameECDSA,
 		LeaderRotation:    "round-robin",
 	}
 

@@ -13,7 +13,6 @@ import (
 )
 
 // VotingMachine collects and verifies votes.
-// TODO(AlanRostem): make tests
 type VotingMachine struct {
 	logger     logging.Logger
 	eventLoop  *eventloop.EventLoop

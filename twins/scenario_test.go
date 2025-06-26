@@ -3,7 +3,6 @@ package twins
 import (
 	"testing"
 
-	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/protocol/rules"
 )
 
@@ -26,7 +25,7 @@ func TestPartitionedScenario(t *testing.T) {
 	s = append(s, View{Leader: 3, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
-	result, err := ExecuteScenario(s, 4, 0, 100, rules.ModuleNameChainedHotstuff)
+	result, err := ExecuteScenario(s, 4, 0, 100, rules.NameChainedHotstuff)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,8 +49,7 @@ func TestBasicScenario(t *testing.T) {
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
-	logging.SetLogLevel("debug")
-	result, err := ExecuteScenario(s, 4, 0, 8, rules.ModuleNameChainedHotstuff)
+	result, err := ExecuteScenario(s, 4, 0, 100, rules.NameChainedHotstuff)
 	if err != nil {
 		t.Fatal(err)
 	}

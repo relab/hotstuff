@@ -12,7 +12,7 @@ import (
 	"github.com/relab/hotstuff/protocol"
 )
 
-const ModuleNameReputation = "reputation"
+const NameReputation = "reputation"
 
 type reputationsMap map[hotstuff.ID]float64
 

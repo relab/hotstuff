@@ -8,7 +8,7 @@ import (
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/rules"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 func wireUpCommitter(
@@ -28,7 +28,7 @@ func wireUpCommitter(
 }
 
 func TestValidCommit(t *testing.T) {
-	essentials := testutil.WireUpEssentials(t, 1, ecdsa.ModuleName)
+	essentials := testutil.WireUpEssentials(t, 1, crypto.NameECDSA)
 	viewStates, err := protocol.NewViewStates(
 		essentials.BlockChain(),
 		essentials.Authority(),
@@ -46,14 +46,14 @@ func TestValidCommit(t *testing.T) {
 		essentials.BlockChain(),
 	)
 	for range chs.ChainLength() {
-		block := testutil.CreateValidBlock(t, 1, parent)
+		block := testutil.CreateParentedBlock(t, 1, parent)
 		if firstBlock == nil {
 			firstBlock = block
 		}
 		chain.Store(block)
 		parent = block
 	}
-	blockToCommit := testutil.CreateValidBlock(t, 1, parent)
+	blockToCommit := testutil.CreateParentedBlock(t, 1, parent)
 	committer := wireUpCommitter(t, essentials, viewStates, chs)
 	if err := committer.TryCommit(blockToCommit); err != nil {
 		t.Fatal(err)

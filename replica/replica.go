@@ -58,26 +58,18 @@ func New(
 		commandBatchSize,
 		rOpt.clientGorumsSrvOpts...,
 	)
-	committer := consensus.NewCommitter(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
-		depsSecure.BlockChain(),
-		viewStates,
-		consensusRules,
-	)
 	depsConsensus := wiring.NewConsensus(
 		depsCore.EventLoop(),
+		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
 		depsSecure.BlockChain(),
 		depsSecure.Authority(),
 		depsClient.Cache(),
-		committer,
 		consensusRules,
 		leaderRotation,
 		viewStates,
 		comm,
 	)
-	// TODO(AlanRostem): consider moving the consensus flow from synchronizer to a different class
 	synchronizer := synchronizer.New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),

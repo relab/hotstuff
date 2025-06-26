@@ -163,7 +163,7 @@ func createNetwork(t testing.TB, numNodes int) (*Network, []*emulatedSender) {
 	// create 4 nodes without twins
 	nodes, _ := assignNodeIDs(uint8(numNodes), 0)
 
-	if err := network.createTwinsNodes(nodes, rules.ModuleNameChainedHotstuff); err != nil {
+	if err := network.createTwinsNodes(nodes, rules.NameChainedHotstuff); err != nil {
 		t.Fatalf("Failed to create nodes: %v", err)
 	}
 	senders := make([]*emulatedSender, len(network.nodes))

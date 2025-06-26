@@ -32,7 +32,7 @@ func TestTwins(t *testing.T) {
 		if err != nil {
 			break
 		}
-		result, err := twins.ExecuteScenario(s, numNodes, numTwins, 100, rules.ModuleNameChainedHotstuff)
+		result, err := twins.ExecuteScenario(s, numNodes, numTwins, 100, rules.NameChainedHotstuff)
 		if err != nil {
 			t.Fatal(err)
 		}

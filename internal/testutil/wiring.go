@@ -6,6 +6,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/security/cert"
+	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/wiring"
 )
 
@@ -24,21 +25,24 @@ func WireUpEssentials(
 	opts ...cert.Option,
 ) *Essentials {
 	t.Helper()
-	// TODO(AlanRostem): runtime options omitted. It's not used by tests, but
-	// I am commenting to make other maintainers aware
+	// NOTE: using synchronous vote verification to keep tests simple.
 	depsCore := wiring.NewCore(id, "test", GenerateKey(t, cryptoName), core.WithSyncVerification())
 	sender := NewMockSender(id)
-	depsSecurity, err := wiring.NewSecurity(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
+	base, err := crypto.New(
 		depsCore.RuntimeCfg(),
-		sender,
 		cryptoName,
-		opts...,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	depsSecurity := wiring.NewSecurity(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		sender,
+		base,
+		opts...,
+	)
 	return &Essentials{
 		Core:     *depsCore, // no problem dereferencing, since the deps just hold pointers
 		Security: *depsSecurity,

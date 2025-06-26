@@ -4,7 +4,7 @@ import (
 	"github.com/relab/hotstuff"
 )
 
-const ModuleNameFixed = "fixed"
+const NameFixed = "fixed"
 
 type Fixed struct {
 	leader hotstuff.ID

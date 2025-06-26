@@ -12,7 +12,7 @@ import (
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/votingmachine"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 func wireUpVoter(
@@ -67,7 +67,7 @@ func wireUpVoter(
 // an honest leader.
 func TestOnValidPropose(t *testing.T) {
 	id := hotstuff.ID(1)
-	essentials := testutil.WireUpEssentials(t, id, ecdsa.ModuleName)
+	essentials := testutil.WireUpEssentials(t, id, crypto.NameECDSA)
 
 	voter := wireUpVoter(t, essentials)
 	// create a signed block (doesn't matter who did it)

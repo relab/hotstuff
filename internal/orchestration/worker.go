@@ -26,6 +26,7 @@ import (
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/replica"
 	"github.com/relab/hotstuff/security/cert"
+	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 	"github.com/relab/hotstuff/server"
 	"github.com/relab/hotstuff/wiring"
@@ -44,9 +45,6 @@ import (
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
-	_ "github.com/relab/hotstuff/security/crypto/bls12"
-	_ "github.com/relab/hotstuff/security/crypto/ecdsa"
-	_ "github.com/relab/hotstuff/security/crypto/eddsa"
 )
 
 // Worker starts and runs clients and replicas based on commands from the controller.
@@ -150,7 +148,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 	// setup core - used in replica and measurement framework
 	runtimeOpts := []core.RuntimeOption{}
-	// TODO(AlanRostem): maybe rename the tree option to kauriTree? should also use the tree check only for enable kauri
 	if opts.TreeEnabled() {
 		runtimeOpts = append(runtimeOpts, core.WithKauriTree(newTree(opts)))
 	}
@@ -197,17 +194,21 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		creds,
 	)
 	depsCore.Logger().Debugf("Initializing module (crypto): %s", opts.GetCrypto())
-	depsSecure, err := wiring.NewSecurity(
-		depsCore.EventLoop(),
-		depsCore.Logger(),
+	base, err := crypto.New(
 		depsCore.RuntimeCfg(),
-		sender,
 		opts.GetCrypto(),
-		cert.WithCache(100), // TODO: consider making this configurable
 	)
 	if err != nil {
 		return nil, err
 	}
+	depsSecure := wiring.NewSecurity(
+		depsCore.EventLoop(),
+		depsCore.Logger(),
+		depsCore.RuntimeCfg(),
+		sender,
+		base,
+		cert.WithCache(100), // TODO: consider making this configurable
+	)
 
 	var timeoutRules synchronizer.TimeoutRuler
 	if opts.GetUseAggQC() {
@@ -217,7 +218,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	} else {
 		timeoutRules = synchronizer.NewSimple(depsCore.RuntimeCfg(), depsSecure.Authority())
 	}
-
 	consensusRules, viewStates, leaderRotation, comm, viewDuration, err := initConsensusModules(depsCore, depsSecure, sender, opts)
 	if err != nil {
 		return nil, err
@@ -250,6 +250,7 @@ func initConsensusModules(
 	viewduration.ViewDuration,
 	error,
 ) {
+	depsCore.Logger().Debugf("Initializing module (consensus rules): %s", opts.GetConsensus())
 	consensusRules, err := rules.New(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
@@ -260,8 +261,8 @@ func initConsensusModules(
 		return nil, nil, nil, nil, nil, err
 	}
 	if byzStrategy := opts.GetByzantineStrategy(); byzStrategy != "" {
+		depsCore.Logger().Debugf("Initializing module (byzantine strategy): %s", byzStrategy)
 		byz, err := byzantine.Wrap(
-			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
 			depsSecure.BlockChain(),
 			consensusRules,
@@ -279,6 +280,7 @@ func initConsensusModules(
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
+	depsCore.Logger().Debugf("Initializing module (leader rotation): %s", opts.GetLeaderRotation())
 	leaderRotation, err := leaderrotation.New(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
@@ -290,7 +292,7 @@ func initConsensusModules(
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
-
+	depsCore.Logger().Debugf("Initializing module (communication): %s", opts.GetCommunication())
 	comm, err := comm.New(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
@@ -305,13 +307,17 @@ func initConsensusModules(
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
-	// TODO(AlanRostem): use fixed duration based on config
-	viewDuration := viewduration.NewDynamic(viewduration.NewParams(
-		opts.GetTimeoutSamples(),
-		opts.GetInitialTimeout().AsDuration(),
-		opts.GetMaxTimeout().AsDuration(),
-		opts.GetTimeoutMultiplier(),
-	))
+	var viewDuration viewduration.ViewDuration
+	if opts.GetFixedTimeout().AsDuration() > 0 {
+		viewDuration = viewduration.NewFixed(opts.GetFixedTimeout().AsDuration())
+	} else {
+		viewDuration = viewduration.NewDynamic(viewduration.NewParams(
+			opts.GetTimeoutSamples(),
+			opts.GetInitialTimeout().AsDuration(),
+			opts.GetMaxTimeout().AsDuration(),
+			opts.GetTimeoutMultiplier(),
+		))
+	}
 	return consensusRules, viewStates, leaderRotation, comm, viewDuration, nil
 }
 

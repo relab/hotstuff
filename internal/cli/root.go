@@ -11,9 +11,7 @@ import (
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
-	"github.com/relab/hotstuff/security/crypto/bls12"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
-	"github.com/relab/hotstuff/security/crypto/eddsa"
+	"github.com/relab/hotstuff/security/crypto"
 	"github.com/spf13/cobra"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -42,29 +40,29 @@ use 'hotstuff help run' to view all possible parameters for this command.`,
 			}
 			modules := map[string][]string{
 				"--consensus": {
-					rules.ModuleNameSimpleHotStuff,
-					rules.ModuleNameFastHotstuff,
-					rules.ModuleNameChainedHotstuff,
+					rules.NameSimpleHotStuff,
+					rules.NameFastHotstuff,
+					rules.NameChainedHotstuff,
 				},
 				"--byzantine-strategy": {
-					byzantine.ModuleNameSilence,
-					byzantine.ModuleNameFork,
+					byzantine.NameSilence,
+					byzantine.NameFork,
 				},
 				"--crypto": {
-					ecdsa.ModuleName,
-					eddsa.ModuleName,
-					bls12.ModuleName,
+					crypto.NameECDSA,
+					crypto.NameEDDSA,
+					crypto.NameBLS12,
 				},
 				"--leader-rotation": {
-					leaderrotation.ModuleNameRoundRobin,
-					leaderrotation.ModuleNameCarousel,
-					leaderrotation.ModuleNameFixed,
-					leaderrotation.ModuleNameTree,
-					leaderrotation.ModuleNameReputation,
+					leaderrotation.NameRoundRobin,
+					leaderrotation.NameCarousel,
+					leaderrotation.NameFixed,
+					leaderrotation.NameTree,
+					leaderrotation.NameReputation,
 				},
 				"--communication": {
-					comm.ModuleNameClique,
-					comm.ModuleNameKauri,
+					comm.NameClique,
+					comm.NameKauri,
 				},
 			}
 			mods := modules

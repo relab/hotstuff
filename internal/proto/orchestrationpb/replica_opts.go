@@ -52,11 +52,11 @@ func (x *ReplicaOpts) SetTreeOptions(branchFactor uint32, positions []uint32, tr
 	x.TreeDelta = durationpb.New(treeDelta)
 }
 
-// TreeEnabled returns true if the Kauri flag is set, there are tree positions defined,
+// TreeEnabled returns true if there are tree positions defined,
 // the branch factor is greater than 0, and the tree delta is valid (not zero).
 // This indicates that the replica is configured to use a tree structure for the Kauri protocol.
 func (x *ReplicaOpts) TreeEnabled() bool {
-	return x.Kauri && len(x.TreePositions) > 0 && x.BranchFactor > 0 && x.TreeDelta.IsValid()
+	return len(x.TreePositions) > 0 && x.BranchFactor > 0 && x.TreeDelta.IsValid()
 }
 
 func (x *ReplicaOpts) SetByzantineStrategy(strategy string) {

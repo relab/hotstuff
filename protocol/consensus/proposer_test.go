@@ -13,7 +13,7 @@ import (
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/votingmachine"
-	"github.com/relab/hotstuff/security/crypto/ecdsa"
+	"github.com/relab/hotstuff/security/crypto"
 )
 
 func check(t *testing.T, err error) {
@@ -83,7 +83,7 @@ func wireUpProposer(
 
 func TestPropose(t *testing.T) {
 	id := hotstuff.ID(1)
-	essentials := testutil.WireUpEssentials(t, id, ecdsa.ModuleName)
+	essentials := testutil.WireUpEssentials(t, id, crypto.NameECDSA)
 	// add the blockchains to the proposer's mock sender
 	essentials.MockSender().AddBlockChain(essentials.BlockChain())
 	command := &clientpb.Command{
@@ -95,7 +95,10 @@ func TestPropose(t *testing.T) {
 	commandCache.Add(command)
 	proposer, viewStates := wireUpProposer(t, essentials, commandCache)
 	highQC := testutil.CreateQC(t, hotstuff.GetGenesis(), essentials.Authority())
-	viewStates.UpdateHighQC(highQC)
+	err := viewStates.UpdateHighQC(highQC)
+	if err != nil {
+		t.Fatal(err)
+	}
 	proposal, err := proposer.CreateProposal(hotstuff.NewSyncInfo().WithQC(highQC))
 	if err != nil {
 		t.Fatal(err)
