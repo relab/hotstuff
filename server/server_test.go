@@ -72,13 +72,13 @@ func testBase(t *testing.T, typ any, send func(*network.GorumsSender), handle ev
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		for _, d := range deps {
 			d.EventLoop().RegisterHandler(typ, handle)
 			d.Synchronizer.Start(ctx)
 			go d.EventLoop().Run(ctx)
 		}
 		send(deps[0].Sender)
-		cancel()
 	}
 	runBoth(t, run)
 }
@@ -151,7 +151,7 @@ func setupReplicas(t *testing.T, n int) testData {
 	replicas := make([]hotstuff.ReplicaInfo, 0, n)
 
 	// generate keys and replicaInfo
-	for i := 0; i < n; i++ {
+	for i := range n {
 		listeners[i] = testutil.CreateTCPListener(t)
 		keys = append(keys, testutil.GenerateECDSAKey(t))
 		replicas = append(replicas, hotstuff.ReplicaInfo{
