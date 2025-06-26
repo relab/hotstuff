@@ -39,6 +39,7 @@ func init() {
 	// need longer default timeout for the kauri
 	runCmd.Flags().Duration("view-timeout", 500*time.Millisecond, "duration of the first view")
 	runCmd.Flags().Duration("max-timeout", 0, "upper limit on view timeouts")
+	runCmd.Flags().Duration("fixed-timeout", 0, "view duration for fixed timeout duration. Overrides all dynamic duration values if set.")
 	runCmd.Flags().Int("duration-samples", 1000, "number of previous views to consider when predicting view duration")
 	runCmd.Flags().Float32("timeout-multiplier", 1.2, "number to multiply the view duration by in case of a timeout")
 	runCmd.Flags().String("consensus", "chainedhotstuff", "name of the consensus implementation")

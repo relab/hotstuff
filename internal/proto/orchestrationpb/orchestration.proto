@@ -97,6 +97,9 @@ message ReplicaOpts {
 
   // UseAggQC is true if aggregate quorum certs should be used by the protocol.
   bool UseAggQC = 27;
+
+  // FixedTimeout specifies the fixed view duration. Default is zero. Overrides dynamic duration if set.
+  google.protobuf.Duration FixedTimeout = 28;
 }
 
 

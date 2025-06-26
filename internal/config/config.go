@@ -82,9 +82,6 @@ type ExperimentConfig struct {
 	// MemProfile enables memory profiling if true.
 	MemProfile bool
 
-	// DurationSamples is the number of previous views to consider when predicting view duration.
-	DurationSamples uint32
-
 	// # Client-based configuration value below:
 
 	// MaxConcurrent is the maximum number of commands sent concurrently by each client.
@@ -98,10 +95,22 @@ type ExperimentConfig struct {
 	// The number of client commands that should be batched together.
 	BatchSize uint32
 
-	// # Other values:
+	// View-timeout values:
 
 	// TimeoutMultiplies is the number to multiply the view duration by in case of a timeout.
 	TimeoutMultiplier float64
+	// DurationSamples is the number of previous views to consider when predicting view duration.
+	DurationSamples uint32
+	// Duration specifies the entire duration of the experiment.
+	Duration time.Duration
+	// ViewTimeout is the duration of the first view.
+	ViewTimeout time.Duration
+	// MaxTimeout is the upper limit on view timeouts.
+	MaxTimeout time.Duration
+	// FixedTimeout specifies a fixed view duration instead of dynamic if set (default=0).
+	FixedTimeout time.Duration
+
+	// # Other values:
 
 	// Worker spawns a local worker on the controller.
 	Worker bool
@@ -126,13 +135,6 @@ type ExperimentConfig struct {
 	RateStepInterval time.Duration
 	// MeasurementInterval is the time interval between measurements
 	MeasurementInterval time.Duration
-
-	// Duration specifies the entire duration of the experiment.
-	Duration time.Duration
-	// ViewTimeout is the duration of the first view.
-	ViewTimeout time.Duration
-	// MaxTimeout is the upper limit on view timeouts.
-	MaxTimeout time.Duration
 }
 
 // TreePosIDs returns a slice of hotstuff.IDs ordered by the tree positions.
@@ -244,6 +246,7 @@ func (c *ExperimentConfig) CreateReplicaOpts() *orchestrationpb.ReplicaOpts {
 		ConnectTimeout:    durationpb.New(c.ConnectTimeout),
 		InitialTimeout:    durationpb.New(c.ViewTimeout),
 		TimeoutSamples:    c.DurationSamples,
+		FixedTimeout:      durationpb.New(c.FixedTimeout),
 		MaxTimeout:        durationpb.New(c.MaxTimeout),
 		SharedSeed:        c.SharedSeed,
 		BranchFactor:      c.BranchFactor,

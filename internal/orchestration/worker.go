@@ -299,13 +299,17 @@ func initConsensusModules(
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
-	// TODO(AlanRostem): use fixed duration based on config
-	viewDuration := viewduration.NewDynamic(viewduration.NewParams(
-		opts.GetTimeoutSamples(),
-		opts.GetInitialTimeout().AsDuration(),
-		opts.GetMaxTimeout().AsDuration(),
-		opts.GetTimeoutMultiplier(),
-	))
+	var viewDuration viewduration.ViewDuration
+	if opts.GetFixedTimeout().AsDuration() > 0 {
+		viewDuration = viewduration.NewFixed(opts.GetFixedTimeout().AsDuration())
+	} else {
+		viewDuration = viewduration.NewDynamic(viewduration.NewParams(
+			opts.GetTimeoutSamples(),
+			opts.GetInitialTimeout().AsDuration(),
+			opts.GetMaxTimeout().AsDuration(),
+			opts.GetTimeoutMultiplier(),
+		))
+	}
 	return consensusRules, viewStates, leaderRotation, comm, viewDuration, nil
 }
 
