@@ -7,10 +7,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/testutil"
-	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto"
-	"github.com/relab/hotstuff/wiring"
 )
 
 func TestPropose(t *testing.T) {
@@ -105,48 +102,13 @@ func TestSub(t *testing.T) {
 }
 
 func TestRequestBlock(t *testing.T) {
-	// TODO(AlanRostem): use testutil version to init
-	replicaIDs := []hotstuff.ID{1, 2, 3, 4}
-	chains := make([]*blockchain.Blockchain, 0)
-	senders := make([]*testutil.MockSender, 0)
-	var firstCore *wiring.Core
-	for _, id := range replicaIDs {
-		depsCore := wiring.NewCore(id, "test", testutil.GenerateECDSAKey(t))
-		if firstCore == nil {
-			firstCore = depsCore
-		}
-		sender := testutil.NewMockSender(id, replicaIDs...)
-		chain := blockchain.New(
-			depsCore.EventLoop(),
-			depsCore.Logger(),
-			sender,
-		)
-		senders = append(senders, sender)
-		chains = append(chains, chain)
-	}
-	for _, chain := range chains {
-		for _, sender := range senders {
-			sender.AddBlockChain(chain)
-		}
-	}
-	base, err := crypto.New(
-		firstCore.RuntimeCfg(),
-		crypto.NameECDSA,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	signer := cert.NewAuthority(
-		firstCore.RuntimeCfg(),
-		chains[0],
-		base,
-	)
-	sender0 := senders[0]
-	chain1 := chains[1]
-	block := testutil.CreateBlock(t, signer)
-	chain1.Store(block)
+	set := testutil.NewEssentialsSet(t, 4, crypto.NameECDSA)
+	first := set[0]
+	second := set[1]
+	block := testutil.CreateBlock(t, second.Authority())
+	second.BlockChain().Store(block)
 
-	_, ok := sender0.RequestBlock(context.TODO(), block.Hash())
+	_, ok := first.MockSender().RequestBlock(context.TODO(), block.Hash())
 	if !ok {
 		t.Fatal("expected a block to be returned")
 	}
