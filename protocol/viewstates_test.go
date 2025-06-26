@@ -11,15 +11,14 @@ import (
 	"github.com/relab/hotstuff/security/crypto"
 )
 
-func TestUpdateView(t *testing.T) {
+func TestNextView(t *testing.T) {
 	essentials := testutil.WireUpEssentials(t, 1, crypto.NameECDSA)
 	states, err := protocol.NewViewStates(essentials.BlockChain(), essentials.Authority())
 	if err != nil {
 		t.Fatal(err)
 	}
-	view := hotstuff.View(5)
-	states.UpdateView(view)
-	if view != states.View() {
+	newView := states.NextView()
+	if newView != hotstuff.View(2) {
 		t.Fail()
 	}
 }

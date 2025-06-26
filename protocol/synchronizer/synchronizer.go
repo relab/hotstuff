@@ -310,9 +310,7 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		s.duration.ViewSucceeded()
 	}
 
-	newView := s.state.View() + 1
-
-	s.state.UpdateView(newView)
+	newView := s.state.NextView()
 
 	s.lastTimeout = nil
 	s.duration.ViewStarted()

@@ -79,8 +79,11 @@ func (s *ViewStates) HighTC() hotstuff.TimeoutCert {
 	return s.highTC
 }
 
-func (s *ViewStates) UpdateView(v hotstuff.View) {
-	s.view = v
+func (s *ViewStates) NextView() hotstuff.View {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+	s.view++
+	return s.view
 }
 
 func (s *ViewStates) View() hotstuff.View {
