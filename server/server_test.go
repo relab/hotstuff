@@ -63,23 +63,21 @@ func testBase(t *testing.T, typ any, send func(*network.GorumsSender), handle ev
 		deps, serverTeardown := createServers(t, td)
 		defer serverTeardown()
 
-		first := deps[0]
-
-		err := first.Sender.Connect(td.replicas)
-		if err != nil {
-			t.Fatal(err)
+		for _, dep := range deps {
+			err := dep.Sender.Connect(td.replicas)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer dep.Sender.Close()
 		}
-		defer first.Sender.Close()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		for _, d := range deps {
-			eventLoop := d.EventLoop()
-			synchronizer := d.Synchronizer
-			eventLoop.RegisterHandler(typ, handle)
-			synchronizer.Start(ctx)
-			go eventLoop.Run(ctx)
+			d.EventLoop().RegisterHandler(typ, handle)
+			d.Synchronizer.Start(ctx)
+			go d.EventLoop().Run(ctx)
 		}
-		send(first.Sender)
+		send(deps[0].Sender)
 		cancel()
 	}
 	runBoth(t, run)
@@ -95,9 +93,9 @@ func TestPropose(t *testing.T) {
 			&clientpb.Batch{}, 1, 1,
 		),
 	}
-	testBase(t, want, func(inv *network.GorumsSender) {
+	testBase(t, want, func(sender *network.GorumsSender) {
 		wg.Add(3)
-		inv.Propose(&want)
+		sender.Propose(&want)
 		wg.Wait()
 	}, func(event any) {
 		got := event.(hotstuff.ProposeMsg)
@@ -119,9 +117,9 @@ func TestTimeout(t *testing.T) {
 		ViewSignature: nil,
 		SyncInfo:      hotstuff.NewSyncInfo(),
 	}
-	testBase(t, want, func(inv *network.GorumsSender) {
+	testBase(t, want, func(sender *network.GorumsSender) {
 		wg.Add(3)
-		inv.Timeout(want)
+		sender.Timeout(want)
 		wg.Wait()
 	}, func(event any) {
 		got := event.(hotstuff.TimeoutMsg)
@@ -221,7 +219,7 @@ func createServers(t *testing.T, td testData) ([]replicaDeps, func()) {
 	t.Helper()
 	deps := make([]replicaDeps, 0)
 	for i := range td.n {
-		depsCore := wiring.NewCore(hotstuff.ID(i+1), "test", testutil.GenerateKey(t, crypto.NameECDSA))
+		depsCore := wiring.NewCore(hotstuff.ID(i+1), "test", td.keys[i])
 		sender := network.NewGorumsSender(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
