@@ -171,12 +171,16 @@ func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *BLS12PublicKey, err err
 	if !ok {
 		return nil, fmt.Errorf("replica not found")
 	}
-	if err := bls.checkPop(replica); id != bls.config.ID() && err != nil {
-		return nil, err
-	}
 	pubKey, ok = replica.PubKey.(*BLS12PublicKey)
 	if !ok {
 		return nil, fmt.Errorf("unsupported public key type: %T", replica.PubKey)
+	}
+	// not checking proof-of-possession for self.
+	if id == bls.config.ID() {
+		return pubKey, nil
+	}
+	if err := bls.checkPop(replica); err != nil {
+		return nil, err
 	}
 	return pubKey, nil
 }
