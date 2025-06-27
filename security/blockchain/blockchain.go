@@ -10,7 +10,6 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
-	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 )
 
 // Blockchain stores a limited amount of blocks in a map.
@@ -110,7 +109,7 @@ func (chain *Blockchain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 		goto done
 	}
 
-	ctx, cancel = timeout.Context(chain.eventLoop.Context(), chain.eventLoop)
+	ctx, cancel = chain.eventLoop.TimeoutContext()
 	chain.pendingFetch[hash] = cancel
 
 	chain.mut.Unlock()

@@ -23,7 +23,7 @@ import (
 // Replica is a participant in the consensus protocol.
 type Replica struct {
 	eventLoop    *eventloop.EventLoop
-	clientSrv    *clientpb.Server
+	clientSrv    *server.ClientIO
 	hsSrv        *server.Server
 	sender       *network.GorumsSender
 	synchronizer *synchronizer.Synchronizer
