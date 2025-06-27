@@ -5,11 +5,12 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/server"
 )
 
 type Client struct {
-	cmdCache  *clientpb.CommandCache
-	clientSrv *clientpb.Server
+	cmdCache *clientpb.CommandCache
+	clientIO *server.ClientIO
 }
 
 // NewClient returns a set of dependencies for serving clients through
@@ -22,15 +23,15 @@ func NewClient(
 	cmdCache := clientpb.NewCommandCache(
 		commandBatchSize,
 	)
-	clientSrv := clientpb.NewServer(
+	clientSrv := server.NewClientIO(
 		eventLoop,
 		logger,
 		cmdCache,
 		clientSrvOpts...,
 	)
 	return &Client{
-		cmdCache:  cmdCache,
-		clientSrv: clientSrv,
+		cmdCache: cmdCache,
+		clientIO: clientSrv,
 	}
 }
 
@@ -40,6 +41,6 @@ func (s *Client) Cache() *clientpb.CommandCache {
 }
 
 // Server returns the client server.
-func (s *Client) Server() *clientpb.Server {
-	return s.clientSrv
+func (s *Client) Server() *server.ClientIO {
+	return s.clientIO
 }

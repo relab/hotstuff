@@ -9,7 +9,6 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/comm"
-	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
@@ -69,7 +68,7 @@ func (p *Proposer) markProposed(view hotstuff.View, highQCBlockHash hotstuff.Has
 		if !ok {
 			return fmt.Errorf(
 				"failed to mark proposed: qcBlock not found: %s",
-				qcBlock.Hash().SmallString())
+				qc.BlockHash().SmallString())
 		}
 	}
 	p.lastProposed = view
@@ -97,7 +96,7 @@ func (p *Proposer) Propose(proposal *hotstuff.ProposeMsg) error {
 
 // CreateProposal attempts to create a new outgoing proposal if a command exists and the protocol's rule is satisfied.
 func (p *Proposer) CreateProposal(syncInfo hotstuff.SyncInfo) (proposal hotstuff.ProposeMsg, err error) {
-	ctx, cancel := timeout.Context(p.eventLoop.Context(), p.eventLoop)
+	ctx, cancel := p.eventLoop.TimeoutContext()
 	defer cancel()
 	view := p.states.View()
 	highQC := p.states.HighQC()

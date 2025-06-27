@@ -11,7 +11,6 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
-	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -116,7 +115,7 @@ func (s *GorumsSender) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 // Propose sends the block to all replicas in the configuration
 func (s *GorumsSender) Propose(proposal *hotstuff.ProposeMsg) {
 	cfg := s.pbCfg
-	ctx, cancel := timeout.Context(s.eventLoop.Context(), s.eventLoop)
+	ctx, cancel := s.eventLoop.TimeoutContext()
 	defer cancel()
 	cfg.Propose(
 		ctx,
@@ -158,7 +157,7 @@ func (s *GorumsSender) Timeout(msg hotstuff.TimeoutMsg) {
 	cfg := s.pbCfg
 
 	// will wait until the second timeout before canceling
-	ctx, cancel := timeout.Context(s.eventLoop.Context(), s.eventLoop)
+	ctx, cancel := s.eventLoop.TimeoutContext()
 	defer cancel()
 
 	cfg.Timeout(

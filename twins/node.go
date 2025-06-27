@@ -16,7 +16,6 @@ import (
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/synchronizer"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
@@ -56,7 +55,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVerification()),
 		commandCache: clientpb.NewCommandCache(1),
 	}
-	node.logger = logging.NewWithDest(&node.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
+	node.logger = logging.NewWithDest(&n.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
 	node.eventLoop = eventloop.New(node.logger, 100)
 	node.sender = newSender(n, node)
 	base, err := crypto.New(
@@ -145,7 +144,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		node.config,
 		depsSecurity.Authority(),
 		node.leaderRotation,
-		viewduration.NewFixed(100*time.Millisecond),
+		synchronizer.NewFixedDuration(500*time.Millisecond),
 		timeoutRules,
 		node.proposer,
 		node.voter,

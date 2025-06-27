@@ -4,7 +4,6 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
-	"github.com/relab/hotstuff/protocol/synchronizer/timeout"
 )
 
 // replicaNode provides methods used by hotstuff to send messages to replicas.
@@ -21,7 +20,7 @@ func (r *replicaNode) vote(cert hotstuff.PartialCert) {
 	if r.node == nil {
 		return
 	}
-	ctx, cancel := timeout.Context(r.eventLoop.Context(), r.eventLoop)
+	ctx, cancel := r.eventLoop.TimeoutContext()
 	defer cancel()
 	pCert := hotstuffpb.PartialCertToProto(cert)
 	r.node.Vote(ctx, pCert)
@@ -32,7 +31,7 @@ func (r *replicaNode) newView(msg hotstuff.SyncInfo) {
 	if r.node == nil {
 		return
 	}
-	ctx, cancel := timeout.Context(r.eventLoop.Context(), r.eventLoop)
+	ctx, cancel := r.eventLoop.TimeoutContext()
 	defer cancel()
 	r.node.NewView(ctx, hotstuffpb.SyncInfoToProto(msg))
 }

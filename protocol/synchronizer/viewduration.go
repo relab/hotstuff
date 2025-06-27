@@ -1,4 +1,4 @@
-package viewduration
+package synchronizer
 
 import "time"
 

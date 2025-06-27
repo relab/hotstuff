@@ -13,7 +13,6 @@ import (
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/synchronizer"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/wiring"
 
 	"github.com/relab/hotstuff"
@@ -24,7 +23,7 @@ import (
 // Replica is a participant in the consensus protocol.
 type Replica struct {
 	eventLoop    *eventloop.EventLoop
-	clientSrv    *clientpb.Server
+	clientSrv    *server.ClientIO
 	hsSrv        *server.Server
 	sender       *network.GorumsSender
 	synchronizer *synchronizer.Synchronizer
@@ -43,7 +42,7 @@ func New(
 	comm comm.Communication,
 	leaderRotation leaderrotation.LeaderRotation,
 	consensusRules consensus.Ruleset,
-	viewDuration viewduration.ViewDuration,
+	viewDuration synchronizer.ViewDuration,
 	timeoutRules synchronizer.TimeoutRuler,
 	commandBatchSize uint32,
 	opts ...Option,

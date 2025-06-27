@@ -3,6 +3,7 @@ package twins
 import (
 	"testing"
 
+	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/protocol/rules"
 )
 
@@ -25,6 +26,7 @@ func TestPartitionedScenario(t *testing.T) {
 	s = append(s, View{Leader: 3, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
+	logging.SetLogLevel("debug")
 	result, err := ExecuteScenario(s, 4, 0, 100, rules.NameChainedHotstuff)
 	if err != nil {
 		t.Fatal(err)
@@ -34,6 +36,9 @@ func TestPartitionedScenario(t *testing.T) {
 	}
 	if result.Commits != 1 {
 		t.Error("Expected one commit")
+	}
+	for id, log := range result.NodeLogs {
+		t.Logf("Replica %d:\n%s", id.ReplicaID, log)
 	}
 }
 
@@ -49,6 +54,7 @@ func TestBasicScenario(t *testing.T) {
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
+	logging.SetLogLevel("debug")
 	result, err := ExecuteScenario(s, 4, 0, 100, rules.NameChainedHotstuff)
 	if err != nil {
 		t.Fatal(err)
@@ -58,5 +64,6 @@ func TestBasicScenario(t *testing.T) {
 	}
 	if result.Commits != 1 {
 		t.Error("Expected one commit")
+		t.Logf("Network log:\n%s", result.NetworkLog)
 	}
 }

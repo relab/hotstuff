@@ -1,4 +1,4 @@
-package clientpb
+package server
 
 import (
 	"crypto/sha256"
@@ -9,54 +9,55 @@ import (
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// Server serves a client.
-type Server struct {
+// ClientIO serves a client.
+type ClientIO struct {
 	logger   logging.Logger
-	cmdCache *CommandCache
+	cmdCache *clientpb.CommandCache
 
 	mut          sync.Mutex
 	srv          *gorums.Server
-	awaitingCmds map[MessageID]chan<- error
+	awaitingCmds map[clientpb.MessageID]chan<- error
 	hash         hash.Hash
 	cmdCount     uint32
 
 	lastExecutedSeqNum map[uint32]uint64 // highest executed sequence number per client ID
 }
 
-// NewServer returns a new client server.
-func NewServer(
+// NewClientIO returns a new client IO server.
+func NewClientIO(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	cmdCache *CommandCache,
+	cmdCache *clientpb.CommandCache,
 	srvOpts ...gorums.ServerOption,
-) (srv *Server) {
-	srv = &Server{
+) (srv *ClientIO) {
+	srv = &ClientIO{
 		logger:   logger,
 		cmdCache: cmdCache,
 
-		awaitingCmds:       make(map[MessageID]chan<- error),
+		awaitingCmds:       make(map[clientpb.MessageID]chan<- error),
 		srv:                gorums.NewServer(srvOpts...),
 		hash:               sha256.New(),
 		lastExecutedSeqNum: make(map[uint32]uint64),
 	}
-	RegisterClientServer(srv.srv, srv)
-	eventLoop.RegisterHandler(ExecuteEvent{}, func(event any) {
-		e := event.(ExecuteEvent)
+	clientpb.RegisterClientServer(srv.srv, srv)
+	eventLoop.RegisterHandler(clientpb.ExecuteEvent{}, func(event any) {
+		e := event.(clientpb.ExecuteEvent)
 		srv.Exec(e.Batch)
 	})
-	eventLoop.RegisterHandler(AbortEvent{}, func(event any) {
-		e := event.(AbortEvent)
+	eventLoop.RegisterHandler(clientpb.AbortEvent{}, func(event any) {
+		e := event.(clientpb.AbortEvent)
 		srv.Abort(e.Batch)
 	})
 	return srv
 }
 
-func (srv *Server) StartOnListener(lis net.Listener) {
+func (srv *ClientIO) StartOnListener(lis net.Listener) {
 	go func() {
 		err := srv.srv.Serve(lis)
 		if err != nil {
@@ -65,19 +66,19 @@ func (srv *Server) StartOnListener(lis net.Listener) {
 	}()
 }
 
-func (srv *Server) Stop() {
+func (srv *ClientIO) Stop() {
 	srv.srv.Stop()
 }
 
-func (srv *Server) Hash() hash.Hash {
+func (srv *ClientIO) Hash() hash.Hash {
 	return srv.hash
 }
 
-func (srv *Server) CmdCount() uint32 {
+func (srv *ClientIO) CmdCount() uint32 {
 	return srv.cmdCount
 }
 
-func (srv *Server) ExecCommand(ctx gorums.ServerCtx, cmd *Command) (*emptypb.Empty, error) {
+func (srv *ClientIO) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) (*emptypb.Empty, error) {
 	id := cmd.ID()
 	errChan := make(chan error)
 
@@ -91,7 +92,7 @@ func (srv *Server) ExecCommand(ctx gorums.ServerCtx, cmd *Command) (*emptypb.Emp
 	return &emptypb.Empty{}, err
 }
 
-func (srv *Server) Exec(batch *Batch) {
+func (srv *ClientIO) Exec(batch *clientpb.Batch) {
 	for _, cmd := range batch.GetCommands() {
 		id := cmd.ID()
 
@@ -111,7 +112,7 @@ func (srv *Server) Exec(batch *Batch) {
 	srv.logger.Debugf("Hash: %.8x", srv.hash.Sum(nil))
 }
 
-func (srv *Server) Abort(batch *Batch) {
+func (srv *ClientIO) Abort(batch *clientpb.Batch) {
 	for _, cmd := range batch.GetCommands() {
 		srv.mut.Lock()
 		srv.completeCommand(cmd.ID(), status.Error(codes.Aborted, "blockchain was forked"))
@@ -121,14 +122,14 @@ func (srv *Server) Abort(batch *Batch) {
 
 // isDuplicate return true if the command has already been executed.
 // The caller must hold srv.mut.Lock().
-func (srv *Server) isDuplicate(cmd *Command) bool {
+func (srv *ClientIO) isDuplicate(cmd *clientpb.Command) bool {
 	seqNum, ok := srv.lastExecutedSeqNum[cmd.ClientID]
 	return ok && seqNum >= cmd.SequenceNumber
 }
 
 // completeCommand sends an error or nil to the awaiting client's error channel.
 // The caller must hold srv.mut.Lock().
-func (srv *Server) completeCommand(id MessageID, err error) {
+func (srv *ClientIO) completeCommand(id clientpb.MessageID, err error) {
 	if errChan, ok := srv.awaitingCmds[id]; ok {
 		errChan <- err
 		delete(srv.awaitingCmds, id)

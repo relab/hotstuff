@@ -40,11 +40,9 @@ import (
 	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
-	_ "github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/rules/byzantine"
 	"github.com/relab/hotstuff/protocol/synchronizer"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 )
 
 // Worker starts and runs clients and replicas based on commands from the controller.
@@ -247,7 +245,7 @@ func initConsensusModules(
 	*protocol.ViewStates,
 	leaderrotation.LeaderRotation,
 	comm.Communication,
-	viewduration.ViewDuration,
+	synchronizer.ViewDuration,
 	error,
 ) {
 	depsCore.Logger().Debugf("Initializing module (consensus rules): %s", opts.GetConsensus())
@@ -307,16 +305,16 @@ func initConsensusModules(
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
-	var viewDuration viewduration.ViewDuration
+	var viewDuration synchronizer.ViewDuration
 	if opts.GetFixedTimeout().AsDuration() > 0 {
-		viewDuration = viewduration.NewFixed(opts.GetFixedTimeout().AsDuration())
+		viewDuration = synchronizer.NewFixedDuration(opts.GetFixedTimeout().AsDuration())
 	} else {
-		viewDuration = viewduration.NewDynamic(viewduration.NewParams(
+		viewDuration = synchronizer.NewDynamicDuration(
 			opts.GetTimeoutSamples(),
 			opts.GetInitialTimeout().AsDuration(),
 			opts.GetMaxTimeout().AsDuration(),
 			opts.GetTimeoutMultiplier(),
-		))
+		)
 	}
 	return consensusRules, viewStates, leaderRotation, comm, viewDuration, nil
 }
