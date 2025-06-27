@@ -90,17 +90,12 @@ func TestAdvanceViewQC(t *testing.T) {
 	block := hotstuff.NewBlock(
 		hotstuff.GetGenesis().Hash(),
 		hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
-		&clientpb.Batch{
-			Commands: []*clientpb.Command{
-				{
-					Data: []byte("foo"),
-				},
-			},
-		},
+		&clientpb.Batch{Commands: []*clientpb.Command{{Data: []byte("foo")}}},
 		1,
 		1,
 	)
 	blockchain.Store(block)
+
 	signers := set.Signers()
 	qc := testutil.CreateQC(t, block, signers...)
 	for i := range 2 {
@@ -141,9 +136,7 @@ func TestAdvanceViewTC(t *testing.T) {
 	synchronizer, proposer := wireUpSynchronizer(t, subject, commandCache, viewStates)
 
 	signers := set.Signers()
-
 	tc := testutil.CreateTC(t, 1, signers)
-
 	for i := range 2 {
 		// adding multiple commands so the next call CreateProposal
 		// in advanceView doesn't block
@@ -160,6 +153,7 @@ func TestAdvanceViewTC(t *testing.T) {
 	if err := proposer.Propose(&proposal); err != nil {
 		t.Fatal(err)
 	}
+
 	synchronizer.advanceView(hotstuff.NewSyncInfo().WithTC(tc))
 
 	if viewStates.View() != 2 {
