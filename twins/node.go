@@ -16,7 +16,6 @@ import (
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/synchronizer"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
@@ -142,7 +141,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		node.config,
 		depsSecurity.Authority(),
 		node.leaderRotation,
-		viewduration.NewFixed(500*time.Millisecond),
+		synchronizer.NewFixedDuration(500*time.Millisecond),
 		node.proposer,
 		node.voter,
 		node.viewStates,

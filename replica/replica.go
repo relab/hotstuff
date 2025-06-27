@@ -13,7 +13,6 @@ import (
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/synchronizer"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/wiring"
 
 	"github.com/relab/hotstuff"
@@ -43,7 +42,7 @@ func New(
 	comm comm.Communication,
 	leaderRotation leaderrotation.LeaderRotation,
 	consensusRules consensus.Ruleset,
-	viewDuration viewduration.ViewDuration,
+	viewDuration synchronizer.ViewDuration,
 	commandBatchSize uint32,
 	opts ...Option,
 ) (replica *Replica, err error) {

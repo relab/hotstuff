@@ -12,7 +12,6 @@ import (
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/security/cert"
 
 	"github.com/relab/hotstuff"
@@ -26,7 +25,7 @@ type Synchronizer struct {
 
 	auth *cert.Authority
 
-	duration       viewduration.ViewDuration
+	duration       ViewDuration
 	leaderRotation leaderrotation.LeaderRotation
 	voter          *consensus.Voter
 	proposer       *consensus.Proposer
@@ -57,7 +56,7 @@ func New(
 
 	// protocol dependencies
 	leaderRotation leaderrotation.LeaderRotation,
-	viewDuration viewduration.ViewDuration,
+	viewDuration ViewDuration,
 	proposer *consensus.Proposer,
 	voter *consensus.Voter,
 	state *protocol.ViewStates,

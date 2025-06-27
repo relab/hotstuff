@@ -13,7 +13,6 @@ import (
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/wiring"
@@ -63,7 +62,7 @@ func wireUpSynchronizer(
 		essentials.RuntimeCfg(),
 		essentials.Authority(),
 		leaderRotation,
-		viewduration.NewFixed(1000*time.Nanosecond),
+		NewFixedDuration(1000*time.Nanosecond),
 		depsConsensus.Proposer(),
 		depsConsensus.Voter(),
 		viewStates,

@@ -1,32 +1,32 @@
-package viewduration
+package synchronizer
 
 import (
 	"time"
 )
 
-type Fixed struct {
+type FixedDuration struct {
 	duration time.Duration
 }
 
 // NewFixedViewDuration returns a ViewDuration with a fixed duration.
-func NewFixed(duration time.Duration) *Fixed {
-	return &Fixed{
+func NewFixedDuration(duration time.Duration) *FixedDuration {
+	return &FixedDuration{
 		duration: duration,
 	}
 }
 
 // Duration returns the fixed duration.
-func (f *Fixed) Duration() time.Duration {
+func (f *FixedDuration) Duration() time.Duration {
 	return f.duration
 }
 
 // ViewStarted does nothing for FixedViewDuration.
-func (f *Fixed) ViewStarted() {}
+func (f *FixedDuration) ViewStarted() {}
 
 // ViewSucceeded does nothing for FixedViewDuration.
-func (f *Fixed) ViewSucceeded() {}
+func (f *FixedDuration) ViewSucceeded() {}
 
 // ViewTimeout does nothing for FixedViewDuration.
-func (f *Fixed) ViewTimeout() {}
+func (f *FixedDuration) ViewTimeout() {}
 
-var _ ViewDuration = (*Fixed)(nil)
+var _ ViewDuration = (*FixedDuration)(nil)
