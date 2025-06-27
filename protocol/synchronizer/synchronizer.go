@@ -81,7 +81,7 @@ func New(
 		state:     state,
 
 		timer:    oneShotTimer{time.AfterFunc(0, func() {})}, // dummy timer that will be replaced after start() is called
-		timeouts: newTimeoutCollector(config.QuorumSize()),
+		timeouts: newTimeoutCollector(config),
 	}
 	s.eventLoop.RegisterHandler(hotstuff.TimeoutEvent{}, func(event any) {
 		timeoutView := event.(hotstuff.TimeoutEvent).View

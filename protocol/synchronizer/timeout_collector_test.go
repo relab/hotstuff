@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/test"
 )
 
@@ -29,6 +30,12 @@ func TestTimeoutQuorum(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		config := core.NewRuntimeConfig(1, nil)
+		for i := range tt.n { // to set the quorum size
+			config.AddReplica(&hotstuff.ReplicaInfo{
+				ID: hotstuff.ID(i + 1),
+			})
+		}
 		for _, ds := range []string{"MapMap", "MapSlice", "Slice"} {
 			name := ds + "/" + tt.name
 			var s interface {
@@ -47,7 +54,7 @@ func TestTimeoutQuorum(t *testing.T) {
 					quorumSize:     hotstuff.QuorumSize(tt.n),
 				}
 			case "Slice":
-				s = newTimeoutCollector(hotstuff.QuorumSize(tt.n))
+				s = newTimeoutCollector(config)
 			default:
 				t.Fatalf("unknown data structure: %s", ds)
 			}
@@ -139,7 +146,13 @@ func BenchmarkTimeoutQuorum(b *testing.B) {
 		})
 
 		b.Run("Slice/"+params, func(b *testing.B) {
-			s := newTimeoutCollector(hotstuff.QuorumSize(bc.n))
+			config := core.NewRuntimeConfig(1, nil)
+			for i := range bc.n { // to set the quorum size
+				config.AddReplica(&hotstuff.ReplicaInfo{
+					ID: hotstuff.ID(i + 1),
+				})
+			}
+			s := newTimeoutCollector(config)
 			for b.Loop() {
 				for _, timeout := range timeouts {
 					s.add(timeout)

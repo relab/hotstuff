@@ -37,9 +37,7 @@ func TestPartitionedScenario(t *testing.T) {
 	if result.Commits != 1 {
 		t.Error("Expected one commit")
 	}
-	for id, log := range result.NodeLogs {
-		t.Logf("Replica %d:\n%s", id.ReplicaID, log)
-	}
+	t.Logf("Network log:\n%s", result.NetworkLog)
 }
 
 // TestBasicScenario checks if chained Hotstuff will commit one block
@@ -64,6 +62,5 @@ func TestBasicScenario(t *testing.T) {
 	}
 	if result.Commits != 1 {
 		t.Error("Expected one commit")
-		t.Logf("Network log:\n%s", result.NetworkLog)
 	}
 }
