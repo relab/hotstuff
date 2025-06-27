@@ -69,7 +69,7 @@ func (p *Proposer) markProposed(view hotstuff.View, highQCBlockHash hotstuff.Has
 		if !ok {
 			return fmt.Errorf(
 				"failed to mark proposed: qcBlock not found: %s",
-				qcBlock.Hash().SmallString())
+				qc.BlockHash().SmallString())
 		}
 	}
 	p.lastProposed = view
