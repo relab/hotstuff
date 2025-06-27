@@ -43,8 +43,12 @@ func TestUpdateCerts(t *testing.T) {
 	// need only 3 for a quorum
 	qc := testutil.CreateQC(t, block, signers...)
 
-	if err := states.UpdateHighQC(qc); err != nil {
+	updated, err := states.UpdateHighQC(qc)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if !updated {
+		t.Fatal("UpdateHighQC should have returned true")
 	}
 	if !bytes.Equal(qc.ToBytes(), states.HighQC().ToBytes()) {
 		t.Fatal("quorum cert was not updated")

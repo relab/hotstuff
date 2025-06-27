@@ -46,18 +46,21 @@ func NewViewStates(
 	return s, nil
 }
 
-// updateHighQC attempts to update the highQC, but does not verify the qc first.
-// This method is meant to be used instead of the exported UpdateHighQC internally
-// in this package when the qc has already been verified.
-func (s *ViewStates) UpdateHighQC(qc hotstuff.QuorumCert) error {
+// UpdateHighQC updates HighQC if quorum certificate's block is for a higher view.
+// It returns true if HighQC was updated. It returns an error if the
+// quorum certificate's block is not found in the local blockchain.
+func (s *ViewStates) UpdateHighQC(qc hotstuff.QuorumCert) (bool, error) {
 	newBlock, ok := s.blockchain.Get(qc.BlockHash())
 	if !ok {
-		return fmt.Errorf("could not find block referenced by new qc")
+		return false, fmt.Errorf("block %x not found for QC@view %d", qc.BlockHash(), qc.View())
 	}
-	if newBlock.View() > s.highQC.View() {
-		s.highQC = qc
+	s.mut.Lock()
+	defer s.mut.Unlock()
+	if newBlock.View() <= s.highQC.View() {
+		return false, nil
 	}
-	return nil
+	s.highQC = qc
+	return true, nil
 }
 
 // updateHighTC attempts to update the highTC, but does not verify the tc first.
