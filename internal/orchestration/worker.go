@@ -149,6 +149,10 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if opts.TreeEnabled() {
 		runtimeOpts = append(runtimeOpts, core.WithKauriTree(newTree(opts)))
 	}
+	if opts.GetConsensus() == rules.NameFastHotstuff {
+		// Use aggregated quorum certificates for Fast-Hotstuff: https://arxiv.org/abs/2010.11454
+		runtimeOpts = append(runtimeOpts, core.WithAggregateQC())
+	}
 	runtimeOpts = append(runtimeOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))
 	depsCore := wiring.NewCore(opts.HotstuffID(), "hs", privKey, runtimeOpts...)
 	// check if measurements should be enabled
@@ -209,9 +213,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	)
 
 	var timeoutRules synchronizer.TimeoutRuler
-	if opts.GetUseAggQC() {
-		// Use aggregated quorum certificates.
-		// This must be true for Fast-Hotstuff: https://arxiv.org/abs/2010.11454
+	if depsCore.RuntimeCfg().HasAggregateQC() {
 		timeoutRules = synchronizer.NewAggregate(depsCore.RuntimeCfg(), depsSecure.Authority())
 	} else {
 		timeoutRules = synchronizer.NewSimple(depsCore.RuntimeCfg(), depsSecure.Authority())
