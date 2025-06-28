@@ -207,7 +207,6 @@ func TestAdvanceView(t *testing.T) {
 				syncInfo = syncInfo.WithQC(validQC)
 			}
 			if tt.tc {
-				// validTC := testutil.CreateTC(t, 1, signers[2:])
 				validTC := testutil.CreateTC(t, 1, signers[tt.firstSignerIdx:])
 				syncInfo = syncInfo.WithTC(validTC)
 			}
