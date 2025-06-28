@@ -237,62 +237,24 @@ func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
 
 // advanceView attempts to advance to the next view using the given QC.
 // qc must be either a regular quorum certificate, or a timeout certificate.
-func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocyclo
+func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) {
 	s.logger.Debugf("advanceView: %v", syncInfo)
-	view := hotstuff.View(0)
-	timeout := false
 
-	// check for a TC
-	if tc, ok := syncInfo.TC(); ok {
-		if err := s.auth.VerifyTimeoutCert(tc); err != nil {
-			s.logger.Infof("Timeout certificate could not be verified: %v", err)
-			return
-		}
-		s.state.UpdateHighTC(tc)
-		view = tc.View()
-		timeout = true
+	qc, _, view, timeout, err := s.timeoutRules.VerifySyncInfo(syncInfo)
+	if err != nil {
+		s.logger.Infof("advanceView: Failed to verify sync info: %v", err)
+		return
 	}
-
-	var (
-		haveQC bool
-		qc     hotstuff.QuorumCert
-		aggQC  hotstuff.AggregateQC
-	)
-
-	// check for an AggQC or QC
-	if aggQC, haveQC = syncInfo.AggQC(); haveQC {
-		highQC, err := s.auth.VerifyAggregateQC(aggQC)
-		if err != nil {
-			s.logger.Infof("advanceView: Agg-qc could not be verified: %v", err)
-			return
-		}
-		if aggQC.View() >= view {
-			view = aggQC.View()
-			timeout = true
-		}
+	if qc != nil {
 		// ensure that the true highQC is the one stored in the syncInfo
-		syncInfo = syncInfo.WithQC(highQC)
-		qc = highQC
-	} else if qc, haveQC = syncInfo.QC(); haveQC {
-		if err := s.auth.VerifyQuorumCert(qc); err != nil {
-			s.logger.Infof("advanceView: QC could not be verified: %v", err)
-			return
-		}
-	}
-
-	if haveQC {
-		updated, err := s.state.UpdateHighQC(qc)
+		syncInfo = syncInfo.WithQC(*qc)
+		updated, err := s.state.UpdateHighQC(*qc)
 		if err != nil {
 			s.logger.Warnf("advanceView: Failed to update HighQC: %v", err)
 		} else if updated {
 			s.logger.Debug("advanceView: Successfully updated HighQC")
 		} else {
 			s.logger.Debugf("advanceView: HighQC not updated, current view: %d, new view: %d", s.state.View(), qc.View())
-		}
-		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
-		if qc.View() >= view {
-			view = qc.View()
-			timeout = false
 		}
 	} else {
 		s.logger.Debug("advanceView: No QC found in sync info, using TC if available")
