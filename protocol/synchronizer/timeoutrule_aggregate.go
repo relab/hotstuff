@@ -8,9 +8,6 @@ import (
 	"github.com/relab/hotstuff/security/cert"
 )
 
-// TODO(meling): Decide on an appropriate module name for the aggregate rule; it could also be named "fasthotstuff" or something else.
-const ModuleNameAggregate = "aggregate"
-
 // Aggregate implements an aggregate timeout rule.
 type Aggregate struct {
 	config *core.RuntimeConfig

@@ -8,8 +8,6 @@ import (
 	"github.com/relab/hotstuff/security/cert"
 )
 
-const ModuleNameSimple = "simple"
-
 // Simple implements a simple timeout rule.
 type Simple struct {
 	config *core.RuntimeConfig
