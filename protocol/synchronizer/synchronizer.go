@@ -260,7 +260,7 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 	)
 
 	// check for an AggQC or QC
-	if aggQC, haveQC = syncInfo.AggQC(); haveQC && s.config.HasAggregateQC() {
+	if aggQC, haveQC = syncInfo.AggQC(); haveQC {
 		highQC, err := s.auth.VerifyAggregateQC(aggQC)
 		if err != nil {
 			s.logger.Infof("advanceView: Agg-qc could not be verified: %v", err)

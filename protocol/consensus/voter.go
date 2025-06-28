@@ -94,7 +94,7 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 	view := block.View()
 	// cannot vote for an old block.
 	if block.View() <= v.lastVote {
-		return fmt.Errorf("block view too old")
+		return fmt.Errorf("block view %d too old, last vote was %d", block.View(), v.lastVote)
 	}
 	// vote rule must be valid
 	if !v.ruler.VoteRule(view, *proposal) {
