@@ -59,26 +59,25 @@ func (s *Aggregate) RemoteTimeoutRule(currentView, timeoutView hotstuff.View, ti
 	return hotstuff.NewSyncInfo().WithTC(tc).WithAggQC(aggQC), nil
 }
 
-func (s *Aggregate) VerifySyncInfo(syncInfo hotstuff.SyncInfo) (qc *hotstuff.QuorumCert, tc *hotstuff.TimeoutCert, view hotstuff.View, timeout bool, err error) {
+func (s *Aggregate) VerifySyncInfo(syncInfo hotstuff.SyncInfo) (qc *hotstuff.QuorumCert, view hotstuff.View, timeout bool, err error) {
 	if timeoutCert, haveTC := syncInfo.TC(); haveTC {
 		if err := s.auth.VerifyTimeoutCert(timeoutCert); err != nil {
-			return nil, nil, 0, timeout, fmt.Errorf("failed to verify timeout certificate: %w", err)
+			return nil, 0, timeout, fmt.Errorf("failed to verify timeout certificate: %w", err)
 		}
 		view = timeoutCert.View()
 		timeout = true
-		tc = &timeoutCert
 	}
 
 	if aggQC, haveQC := syncInfo.AggQC(); haveQC {
 		highQC, err := s.auth.VerifyAggregateQC(aggQC)
 		if err != nil {
-			return nil, nil, 0, timeout, fmt.Errorf("failed to verify aggregate quorum certificate: %w", err)
+			return nil, 0, timeout, fmt.Errorf("failed to verify aggregate quorum certificate: %w", err)
 		}
 		if aggQC.View() >= view {
 			view = aggQC.View()
 			timeout = true
 		}
-		return &highQC, tc, view, timeout, nil
+		return &highQC, view, timeout, nil
 	}
-	return nil, tc, view, timeout, nil // aggregate quorum certificate not present, so no high QC available
+	return nil, view, timeout, nil // aggregate quorum certificate not present, so no high QC available
 }
