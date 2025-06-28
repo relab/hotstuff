@@ -157,9 +157,7 @@ func TestOrchestration(t *testing.T) {
 }
 
 func TestDeployment(t *testing.T) {
-	t.Skip("skipping... TODO: remove later")
 	if os.Getenv("GITHUB_ACTIONS") != "" && runtime.GOOS != "linux" {
-		t.Log("WARNING: This test was skipped.")
 		t.Skip("GitHub Actions only supports linux containers on linux runners.")
 	}
 
@@ -231,7 +229,8 @@ func TestDeployment(t *testing.T) {
 		TimeoutMultiplier: 1.2,
 		Consensus:         rules.NameChainedHotstuff,
 		Crypto:            crypto.NameECDSA,
-		LeaderRotation:    "round-robin",
+		LeaderRotation:    leaderrotation.NameRoundRobin,
+		Communication:     comm.NameClique,
 	}
 
 	experiment, err := orchestration.NewExperiment(
