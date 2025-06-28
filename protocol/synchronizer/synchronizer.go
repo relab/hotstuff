@@ -294,6 +294,8 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 			view = qc.View()
 			timeout = false
 		}
+	} else {
+		s.logger.Debug("advanceView: No QC found in sync info, using TC if available")
 	}
 
 	if view < s.state.View() {
@@ -329,8 +331,7 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) { // nolint: gocy
 		}
 		return
 	}
-	err := s.sender.NewView(leader, syncInfo)
-	if err != nil {
+	if err := s.sender.NewView(leader, syncInfo); err != nil {
 		s.logger.Warnf("advanceView: error on sending new view: %v", err)
 	}
 }
