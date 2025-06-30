@@ -73,13 +73,13 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		base,
 		cert.WithCache(100),
 	)
-	node.blockchain = depsSecurity.BlockChain()
+	node.blockchain = depsSecurity.Blockchain()
 	var consensusRules consensus.Ruleset
 	if consensusName == nameVulnerableFHS {
 		consensusRules = NewVulnFHS(
 			node.logger,
 			node.blockchain,
-			rules.NewFastHotstuff(
+			rules.NewFastHotStuff(
 				node.logger,
 				node.config,
 				node.blockchain,
@@ -101,7 +101,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		node.logger,
 		node.eventLoop,
 		node.config,
-		depsSecurity.BlockChain(),
+		depsSecurity.Blockchain(),
 		depsSecurity.Authority(),
 		node.viewStates,
 	)

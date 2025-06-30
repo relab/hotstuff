@@ -1,3 +1,6 @@
+// Package protocol maintains the protocol's view states, which include
+// the high quorum certificate (HighQC), high timeout certificate (HighTC),
+// the current view, and the last committed block.
 package protocol
 
 import (
@@ -63,25 +66,28 @@ func (s *ViewStates) UpdateHighQC(qc hotstuff.QuorumCert) (bool, error) {
 	return true, nil
 }
 
-// updateHighTC attempts to update the highTC, but does not verify the tc first.
+// UpdateHighTC updates HighTC if timeout certificate's view is higher than the current HighTC.
 func (s *ViewStates) UpdateHighTC(tc hotstuff.TimeoutCert) {
 	if tc.View() > s.highTC.View() {
 		s.highTC = tc
 	}
 }
 
+// HighQC returns the highest known quorum certificate.
 func (s *ViewStates) HighQC() hotstuff.QuorumCert {
 	s.mut.RLock()
 	defer s.mut.RUnlock()
 	return s.highQC
 }
 
+// HighTC returns the highest known timeout certificate.
 func (s *ViewStates) HighTC() hotstuff.TimeoutCert {
 	s.mut.RLock()
 	defer s.mut.RUnlock()
 	return s.highTC
 }
 
+// NextView increments the current view and returns the new view.
 func (s *ViewStates) NextView() hotstuff.View {
 	s.mut.Lock()
 	defer s.mut.Unlock()
@@ -89,6 +95,7 @@ func (s *ViewStates) NextView() hotstuff.View {
 	return s.view
 }
 
+// View returns the current view.
 func (s *ViewStates) View() hotstuff.View {
 	s.mut.RLock()
 	defer s.mut.RUnlock()
@@ -102,6 +109,7 @@ func (s *ViewStates) SyncInfo() hotstuff.SyncInfo {
 	return hotstuff.NewSyncInfo().WithQC(s.HighQC()).WithTC(s.HighTC())
 }
 
+// UpdateCommittedBlock updates the last committed block.
 func (s *ViewStates) UpdateCommittedBlock(block *hotstuff.Block) {
 	s.mut.Lock()
 	defer s.mut.Unlock()

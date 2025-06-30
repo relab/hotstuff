@@ -106,7 +106,7 @@ func TestRequestBlock(t *testing.T) {
 	first := set[0]
 	second := set[1]
 	block := testutil.CreateBlock(t, second.Authority())
-	second.BlockChain().Store(block)
+	second.Blockchain().Store(block)
 
 	_, ok := first.MockSender().RequestBlock(context.TODO(), block.Hash())
 	if !ok {

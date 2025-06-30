@@ -8,7 +8,7 @@ type FixedDuration struct {
 	duration time.Duration
 }
 
-// NewFixedViewDuration returns a ViewDuration with a fixed duration.
+// NewFixedDuration returns a ViewDuration with a fixed duration.
 func NewFixedDuration(duration time.Duration) *FixedDuration {
 	return &FixedDuration{
 		duration: duration,

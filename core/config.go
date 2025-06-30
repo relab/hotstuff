@@ -1,3 +1,4 @@
+// Package core provides the runtime configuration for the consensus protocols.
 package core
 
 import (

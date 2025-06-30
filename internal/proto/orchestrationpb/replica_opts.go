@@ -1,3 +1,4 @@
+// Package orchestrationpb provides the ReplicaOpts message type for configuring replicas.
 package orchestrationpb
 
 import (

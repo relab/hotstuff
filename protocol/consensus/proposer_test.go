@@ -31,10 +31,10 @@ func wireUpProposer(
 	consensusRules := rules.NewChainedHotStuff(
 		essentials.Logger(),
 		essentials.RuntimeCfg(),
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 	)
 	viewStates, err := protocol.NewViewStates(
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 		essentials.Authority(),
 	)
 	check(t, err)
@@ -43,7 +43,7 @@ func wireUpProposer(
 		essentials.Logger(),
 		essentials.EventLoop(),
 		essentials.RuntimeCfg(),
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 		essentials.Authority(),
 		viewStates,
 	)
@@ -56,7 +56,7 @@ func wireUpProposer(
 	committer := consensus.NewCommitter(
 		essentials.EventLoop(),
 		essentials.Logger(),
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 		viewStates,
 		consensusRules,
 	)
@@ -71,7 +71,7 @@ func wireUpProposer(
 	return consensus.NewProposer(
 		essentials.EventLoop(),
 		essentials.RuntimeCfg(),
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 		viewStates,
 		consensusRules,
 		comm,
@@ -85,7 +85,7 @@ func TestPropose(t *testing.T) {
 	id := hotstuff.ID(1)
 	essentials := testutil.WireUpEssentials(t, id, crypto.NameECDSA)
 	// add the blockchains to the proposer's mock sender
-	essentials.MockSender().AddBlockChain(essentials.BlockChain())
+	essentials.MockSender().AddBlockChain(essentials.Blockchain())
 	command := &clientpb.Command{
 		ClientID:       1,
 		SequenceNumber: 1,

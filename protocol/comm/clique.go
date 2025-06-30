@@ -17,6 +17,7 @@ type Clique struct {
 	sender         core.Sender
 }
 
+// NewClique creates a new Clique instance for communicating proposals and votes.
 func NewClique(
 	config *core.RuntimeConfig,
 	votingMachine *votingmachine.VotingMachine,

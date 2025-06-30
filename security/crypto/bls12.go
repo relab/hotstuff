@@ -145,7 +145,7 @@ type bls12Base struct {
 	popCache map[string]bool
 }
 
-// New returns a new instance of the BLS12 CryptoBase implementation.
+// NewBLS12 returns a new instance of the BLS12 crypto implementation.
 func NewBLS12(config *core.RuntimeConfig) (Base, error) {
 	bls := &bls12Base{
 		config: config,

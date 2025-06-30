@@ -254,7 +254,7 @@ func initConsensusModules(
 	consensusRules, err := rules.New(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
-		depsSecure.BlockChain(),
+		depsSecure.Blockchain(),
 		opts.GetConsensus(),
 	)
 	if err != nil {
@@ -264,7 +264,7 @@ func initConsensusModules(
 		depsCore.Logger().Debugf("Initializing module (byzantine strategy): %s", byzStrategy)
 		byz, err := byzantine.Wrap(
 			depsCore.RuntimeCfg(),
-			depsSecure.BlockChain(),
+			depsSecure.Blockchain(),
 			consensusRules,
 			byzStrategy,
 		)
@@ -274,7 +274,7 @@ func initConsensusModules(
 		consensusRules = byz
 	}
 	viewStates, err := protocol.NewViewStates(
-		depsSecure.BlockChain(),
+		depsSecure.Blockchain(),
 		depsSecure.Authority(),
 	)
 	if err != nil {
@@ -284,7 +284,7 @@ func initConsensusModules(
 	leaderRotation, err := leaderrotation.New(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
-		depsSecure.BlockChain(),
+		depsSecure.Blockchain(),
 		viewStates,
 		opts.GetLeaderRotation(),
 		consensusRules.ChainLength(),
@@ -297,7 +297,7 @@ func initConsensusModules(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
 		depsCore.RuntimeCfg(),
-		depsSecure.BlockChain(),
+		depsSecure.Blockchain(),
 		depsSecure.Authority(),
 		sender,
 		leaderRotation,

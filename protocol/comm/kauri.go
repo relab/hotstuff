@@ -36,7 +36,7 @@ type Kauri struct {
 	tree        *tree.Tree
 }
 
-// New initializes the kauri structure
+// NewKauri creates a new Kauri instance for communicating proposals and votes.
 func NewKauri(
 	logger logging.Logger,
 	eventLoop *eventloop.EventLoop,

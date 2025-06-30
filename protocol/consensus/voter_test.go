@@ -23,17 +23,17 @@ func wireUpVoter(
 	consensusRules := rules.NewChainedHotStuff(
 		essentials.Logger(),
 		essentials.RuntimeCfg(),
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 	)
 	viewStates, err := protocol.NewViewStates(
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 		essentials.Authority(),
 	)
 	check(t, err)
 	committer := consensus.NewCommitter(
 		essentials.EventLoop(),
 		essentials.Logger(),
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 		viewStates,
 		consensusRules,
 	)
@@ -42,7 +42,7 @@ func wireUpVoter(
 		essentials.Logger(),
 		essentials.EventLoop(),
 		essentials.RuntimeCfg(),
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 		essentials.Authority(),
 		viewStates,
 	)

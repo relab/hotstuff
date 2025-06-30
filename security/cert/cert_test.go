@@ -34,7 +34,7 @@ func TestCreatePartialCert(t *testing.T) {
 		id := 1
 		dummies := createDummies(t, 4, td.cryptoName, td.cacheSize)
 		subject := dummies[0]
-		block, ok := subject.BlockChain().Get(hotstuff.GetGenesis().Hash())
+		block, ok := subject.Blockchain().Get(hotstuff.GetGenesis().Hash())
 		if !ok {
 			t.Errorf("no block")
 		}
@@ -59,7 +59,7 @@ func TestVerifyPartialCert(t *testing.T) {
 		dummies := createDummies(t, 2, td.cryptoName, td.cacheSize)
 		dummy := dummies[0]
 		block := testutil.CreateBlock(t, dummy.Authority())
-		dummy.BlockChain().Store(block)
+		dummy.Blockchain().Store(block)
 
 		partialCert := testutil.CreatePC(t, block, dummy.Authority())
 
@@ -146,7 +146,7 @@ func TestVerifyQuorumCert(t *testing.T) {
 		signers := dummies.Signers()
 		signedBlock := testutil.CreateBlock(t, dummies[0].Authority())
 		for _, dummy := range dummies {
-			dummy.BlockChain().Store(signedBlock)
+			dummy.Blockchain().Store(signedBlock)
 		}
 
 		qc := testutil.CreateQC(t, signedBlock, signers...)
@@ -166,7 +166,7 @@ func TestVerifyTimeoutCert(t *testing.T) {
 		signers := dummies.Signers()
 		signedBlock := testutil.CreateBlock(t, dummies[0].Authority())
 		for _, dummy := range dummies {
-			dummy.BlockChain().Store(signedBlock)
+			dummy.Blockchain().Store(signedBlock)
 		}
 
 		tc := testutil.CreateTC(t, 1, signers)
@@ -186,7 +186,7 @@ func TestVerifyAggregateQC(t *testing.T) {
 		signers := dummies.Signers()
 		signedBlock := testutil.CreateBlock(t, dummies[0].Authority())
 		for _, dummy := range dummies {
-			dummy.BlockChain().Store(signedBlock)
+			dummy.Blockchain().Store(signedBlock)
 		}
 
 		timeouts := testutil.CreateTimeouts(t, 1, signers)
@@ -213,7 +213,7 @@ func TestVerifyAnyQC(t *testing.T) {
 		signers := dummies.Signers()
 		signedBlock := testutil.CreateBlock(t, dummies[0].Authority())
 		for _, dummy := range dummies {
-			dummy.BlockChain().Store(signedBlock)
+			dummy.Blockchain().Store(signedBlock)
 		}
 		timeouts := testutil.CreateTimeouts(t, 1, signers)
 		aggQC, err := signers[0].CreateAggregateQC(1, timeouts)

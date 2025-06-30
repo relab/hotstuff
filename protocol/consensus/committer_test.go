@@ -21,7 +21,7 @@ func wireUpCommitter(
 	return consensus.NewCommitter(
 		essentials.EventLoop(),
 		essentials.Logger(),
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 		viewStates,
 		commitRuler,
 	)
@@ -30,20 +30,20 @@ func wireUpCommitter(
 func TestValidCommit(t *testing.T) {
 	essentials := testutil.WireUpEssentials(t, 1, crypto.NameECDSA)
 	viewStates, err := protocol.NewViewStates(
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 		essentials.Authority(),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// create a valid chain of blocks
-	chain := essentials.BlockChain()
+	chain := essentials.Blockchain()
 	parent := hotstuff.GetGenesis()
 	var firstBlock *hotstuff.Block = nil
 	chs := rules.NewChainedHotStuff(
 		essentials.Logger(),
 		essentials.RuntimeCfg(),
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 	)
 	for range chs.ChainLength() {
 		block := testutil.CreateParentedBlock(t, 1, parent)

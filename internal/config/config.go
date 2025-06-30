@@ -1,3 +1,4 @@
+// Package config provides the configuration infrastructure for running experiments.
 package config
 
 import (
@@ -11,7 +12,7 @@ import (
 
 // ExperimentConfig holds the configuration for an experiment.
 type ExperimentConfig struct {
-	// # Host-basCommunicationed configuration values below
+	// # Host-based configuration values below
 
 	// ReplicaHosts is a list of hosts that will run replicas.
 	ReplicaHosts []string
@@ -41,7 +42,7 @@ type ExperimentConfig struct {
 	BranchFactor uint32
 	// TreeDelta is the waiting time for intermediate nodes in the tree.
 	TreeDelta time.Duration
-	// Shuffles the tree exisiting positions if true.
+	// Shuffles the tree existing positions if true.
 	RandomTree bool
 
 	// # Module strings below:
@@ -59,7 +60,7 @@ type ExperimentConfig struct {
 
 	// # Protocol-specific values:
 
-	// UseAggQC indicates whether or not to use aggregated QCs (Fast Hotstuff).
+	// UseAggQC indicates whether or not to use aggregated QCs (Fast-HotStuff).
 	UseAggQC bool
 
 	// # File path strings below:
@@ -70,13 +71,13 @@ type ExperimentConfig struct {
 	Exe string
 	// Output is the path to the experiment data output directory.
 	Output string
-	// SshConfig is the path to the SSH config file.
-	SshConfig string
+	// SSHConfig is the path to the SSH config file.
+	SSHConfig string
 
 	// # Profiling flags below:
 
-	// CpuProfile enables CPU profiling if true.
-	CpuProfile bool
+	// CPUProfile enables CPU profiling if true.
+	CPUProfile bool
 	// FgProfProfile enables fgprof library if true.
 	FgProfProfile bool
 	// MemProfile enables memory profiling if true.

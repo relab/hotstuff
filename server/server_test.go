@@ -244,13 +244,13 @@ func createServers(t *testing.T, td testData) ([]replicaDeps, func()) {
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
-			depsSecurity.BlockChain(),
+			depsSecurity.Blockchain(),
 			server.WithGorumsServerOptions(gorums.WithGRPCServerOptions(grpc.Creds(td.creds))),
 		)
 		server.StartOnListener(td.listeners[i])
 		commandCache := clientpb.NewCommandCache(1)
 		states, err := protocol.NewViewStates(
-			depsSecurity.BlockChain(),
+			depsSecurity.Blockchain(),
 			depsSecurity.Authority(),
 		)
 		if err != nil {
@@ -261,13 +261,13 @@ func createServers(t *testing.T, td testData) ([]replicaDeps, func()) {
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
-			depsSecurity.BlockChain(),
+			depsSecurity.Blockchain(),
 			depsSecurity.Authority(),
 			commandCache,
 			rules.NewChainedHotStuff(
 				depsCore.Logger(),
 				depsCore.RuntimeCfg(),
-				depsSecurity.BlockChain(),
+				depsSecurity.Blockchain(),
 			),
 			leaderRotation,
 			states,
@@ -277,7 +277,7 @@ func createServers(t *testing.T, td testData) ([]replicaDeps, func()) {
 					depsCore.Logger(),
 					depsCore.EventLoop(),
 					depsCore.RuntimeCfg(),
-					depsSecurity.BlockChain(),
+					depsSecurity.Blockchain(),
 					depsSecurity.Authority(),
 					states,
 				),

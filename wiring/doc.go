@@ -1,3 +1,3 @@
-// The package "wiring" provides helpers that initialize multiple components together based on category.
-// The package is useful for creating tests and allows seamless initialization of runtime components.
+// Package wiring provides helpers for initializing and wiring together components.
+// The package is useful for creating tests and seamlessly initializing runtime components.
 package wiring

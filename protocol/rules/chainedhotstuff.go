@@ -22,7 +22,7 @@ type ChainedHotStuff struct {
 	bLock *hotstuff.Block // the currently locked block
 }
 
-// New returns a new chainedhotstuff instance.
+// NewChainedHotStuff returns a new instance of the chained HotStuff consensus ruleset.
 func NewChainedHotStuff(
 	logger logging.Logger,
 	config *core.RuntimeConfig,

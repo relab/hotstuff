@@ -29,13 +29,13 @@ func wireUpSynchronizer(
 	consensusRules := rules.NewChainedHotStuff(
 		essentials.Logger(),
 		essentials.RuntimeCfg(),
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 	)
 	votingMachine := votingmachine.New(
 		essentials.Logger(),
 		essentials.EventLoop(),
 		essentials.RuntimeCfg(),
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 		essentials.Authority(),
 		viewStates,
 	)
@@ -43,7 +43,7 @@ func wireUpSynchronizer(
 		essentials.EventLoop(),
 		essentials.Logger(),
 		essentials.RuntimeCfg(),
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 		essentials.Authority(),
 		commandCache,
 		consensusRules,
@@ -76,7 +76,7 @@ func TestAdvanceViewQC(t *testing.T) {
 	set := testutil.NewEssentialsSet(t, 4, crypto.NameECDSA)
 	subject := set[0]
 	viewStates, err := protocol.NewViewStates(
-		subject.BlockChain(),
+		subject.Blockchain(),
 		subject.Authority(),
 	)
 	if err != nil {
@@ -85,7 +85,7 @@ func TestAdvanceViewQC(t *testing.T) {
 	commandCache := clientpb.NewCommandCache(1)
 	synchronizer, proposer := wireUpSynchronizer(t, subject, commandCache, viewStates)
 
-	blockchain := subject.BlockChain()
+	blockchain := subject.Blockchain()
 	block := hotstuff.NewBlock(
 		hotstuff.GetGenesis().Hash(),
 		hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
@@ -125,7 +125,7 @@ func TestAdvanceViewTC(t *testing.T) {
 	set := testutil.NewEssentialsSet(t, 4, crypto.NameECDSA)
 	subject := set[0]
 	viewStates, err := protocol.NewViewStates(
-		subject.BlockChain(),
+		subject.Blockchain(),
 		subject.Authority(),
 	)
 	if err != nil {
@@ -260,7 +260,7 @@ func prepareSynchronizer(t *testing.T) (testutil.EssentialsSet, *protocol.ViewSt
 	set := testutil.NewEssentialsSet(t, 4, crypto.NameECDSA)
 	subject := set[0]
 	viewStates, err := protocol.NewViewStates(
-		subject.BlockChain(),
+		subject.Blockchain(),
 		subject.Authority(),
 	)
 	if err != nil {
@@ -269,7 +269,7 @@ func prepareSynchronizer(t *testing.T) (testutil.EssentialsSet, *protocol.ViewSt
 	commandCache := clientpb.NewCommandCache(1)
 	synchronizer, proposer := wireUpSynchronizer(t, subject, commandCache, viewStates)
 
-	blockchain := subject.BlockChain()
+	blockchain := subject.Blockchain()
 	block := testutil.CreateBlock(t, subject.Authority())
 	blockchain.Store(block)
 

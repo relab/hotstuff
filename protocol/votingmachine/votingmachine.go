@@ -1,3 +1,4 @@
+// Package votingmachine provides a voting machine that collects and verifies votes.
 package votingmachine
 
 import (

@@ -1,3 +1,4 @@
+// Package comm provides interfaces for disseminating proposals and aggregating votes.
 package comm
 
 import "github.com/relab/hotstuff"

@@ -61,7 +61,7 @@ func New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
-		depsSecure.BlockChain(),
+		depsSecure.Blockchain(),
 		depsSecure.Authority(),
 		depsClient.Cache(),
 		consensusRules,
@@ -87,7 +87,7 @@ func New(
 		depsCore.EventLoop(),
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
-		depsSecure.BlockChain(),
+		depsSecure.Blockchain(),
 		rOpt.serverOpts...,
 	)
 	srv := &Replica{
