@@ -23,6 +23,7 @@ import (
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/protocol/votingmachine"
+	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 	"github.com/relab/hotstuff/server"
@@ -54,8 +55,10 @@ func TestConnect(t *testing.T) {
 	runBoth(t, run)
 }
 
+type sendFunc func(*cert.Authority, *network.GorumsSender)
+
 // testBase is a generic test for a unicast/multicast call
-func testBase(t *testing.T, typ any, send func(*network.GorumsSender), handle eventloop.EventHandler) {
+func testBase(t *testing.T, typ any, send sendFunc, handle eventloop.EventHandler) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		td := setup(t, n)
@@ -78,7 +81,7 @@ func testBase(t *testing.T, typ any, send func(*network.GorumsSender), handle ev
 			d.Synchronizer.Start(ctx)
 			go d.EventLoop().Run(ctx)
 		}
-		send(deps[0].Sender)
+		send(deps[0].Authority(), deps[0].Sender)
 	}
 	runBoth(t, run)
 }
@@ -93,7 +96,7 @@ func TestPropose(t *testing.T) {
 			&clientpb.Batch{}, 1, 1,
 		),
 	}
-	testBase(t, want, func(sender *network.GorumsSender) {
+	testBase(t, want, func(_ *cert.Authority, sender *network.GorumsSender) {
 		wg.Add(3)
 		sender.Propose(&want)
 		wg.Wait()
@@ -111,14 +114,20 @@ func TestPropose(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	var wg sync.WaitGroup
-	want := hotstuff.TimeoutMsg{
-		ID:            1,
-		View:          1,
-		ViewSignature: nil,
-		SyncInfo:      hotstuff.NewSyncInfo(),
-	}
-	testBase(t, want, func(sender *network.GorumsSender) {
-		wg.Add(3)
+	var want hotstuff.TimeoutMsg
+	testBase(t, want, func(auth *cert.Authority, sender *network.GorumsSender) {
+		view := hotstuff.View(1)
+		sig, err := auth.Sign(view.ToBytes())
+		if err != nil {
+			t.Fatal(err)
+		}
+		want = hotstuff.TimeoutMsg{
+			ID:            1,
+			View:          view,
+			ViewSignature: sig,
+			SyncInfo:      hotstuff.NewSyncInfo(),
+		}
+		wg.Add(6) // TODO(AlanRostem): this was 3 when we used mocking. Not sure why 6 is needed for the "real" synchronizer.
 		sender.Timeout(want)
 		wg.Wait()
 	}, func(event any) {
