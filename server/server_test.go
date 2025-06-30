@@ -87,15 +87,13 @@ func testBase(t *testing.T, typ any, send sendFunc, handle eventloop.EventHandle
 
 func TestPropose(t *testing.T) {
 	var wg sync.WaitGroup
-	want := hotstuff.ProposeMsg{
-		ID: 1,
-		Block: hotstuff.NewBlock(
-			hotstuff.GetGenesis().Hash(),
-			hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()),
-			&clientpb.Batch{}, 1, 1,
-		),
-	}
-	testBase(t, want, func(_ *cert.Authority, sender *network.GorumsSender) {
+	var want hotstuff.ProposeMsg
+	testBase(t, want, func(auth *cert.Authority, sender *network.GorumsSender) {
+		// write the wanted test data to the variable in outer scope
+		want = hotstuff.ProposeMsg{
+			ID:    1,
+			Block: testutil.CreateBlock(t, auth),
+		}
 		wg.Add(3)
 		sender.Propose(&want)
 		wg.Wait()
@@ -120,6 +118,7 @@ func TestTimeout(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// write the wanted test data to the variable in outer scope
 		want = hotstuff.TimeoutMsg{
 			ID:            1,
 			View:          view,
