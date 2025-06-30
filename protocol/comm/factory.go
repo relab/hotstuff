@@ -55,7 +55,7 @@ func New(
 			sender,
 		)
 	default:
-		return nil, fmt.Errorf("invalid propagation scheme: '%s'", name)
+		return nil, fmt.Errorf("invalid communication type: '%s'", name)
 	}
 	return
 }

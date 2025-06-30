@@ -43,6 +43,7 @@ func New(
 	leaderRotation leaderrotation.LeaderRotation,
 	consensusRules consensus.Ruleset,
 	viewDuration synchronizer.ViewDuration,
+	timeoutRules synchronizer.TimeoutRuler,
 	commandBatchSize uint32,
 	opts ...Option,
 ) (replica *Replica, err error) {
@@ -75,6 +76,7 @@ func New(
 		depsSecure.Authority(),
 		leaderRotation,
 		viewDuration,
+		timeoutRules,
 		depsConsensus.Proposer(),
 		depsConsensus.Voter(),
 		viewStates,

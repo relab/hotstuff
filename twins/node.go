@@ -50,14 +50,9 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 	if err != nil {
 		return nil, err
 	}
-	opts := make([]core.RuntimeOption, 0)
-	if consensusName == nameVulnerableFHS {
-		opts = append(opts, core.WithAggregateQC())
-	}
-	opts = append(opts, core.WithSyncVerification())
 	node := &node{
 		id:           nodeID,
-		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, opts...),
+		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVerification()),
 		commandCache: clientpb.NewCommandCache(1),
 	}
 	node.logger = logging.NewWithDest(&n.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
@@ -135,6 +130,14 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		node.commandCache,
 		committer,
 	)
+	var timeoutRules synchronizer.TimeoutRuler
+	if consensusName == rules.NameFastHotstuff || consensusName == nameVulnerableFHS {
+		// Use aggregated quorum certificates.
+		// This must be true for Fast-Hotstuff: https://arxiv.org/abs/2010.11454
+		timeoutRules = synchronizer.NewAggregate(node.config, depsSecurity.Authority())
+	} else {
+		timeoutRules = synchronizer.NewSimple(node.config, depsSecurity.Authority())
+	}
 	node.synchronizer = synchronizer.New(
 		node.eventLoop,
 		node.logger,
@@ -142,6 +145,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		depsSecurity.Authority(),
 		node.leaderRotation,
 		synchronizer.NewFixedDuration(500*time.Millisecond),
+		timeoutRules,
 		node.proposer,
 		node.voter,
 		node.viewStates,

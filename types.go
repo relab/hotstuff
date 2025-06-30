@@ -260,7 +260,7 @@ func (qc QuorumCert) String() string {
 	if qc.signature != nil {
 		_ = writeParticipants(&sb, qc.Signature().Participants())
 	}
-	return fmt.Sprintf("QC{ hash: %.6s, IDs: [ %s] }", qc.hash, &sb)
+	return fmt.Sprintf("QC{ hash: %s, view: %d, IDs: [ %s] }", qc.hash.SmallString(), qc.view, &sb)
 }
 
 var _ fmt.Stringer = (*QuorumCert)(nil)

@@ -95,7 +95,7 @@ func TestPropose(t *testing.T) {
 	commandCache.Add(command)
 	proposer, viewStates := wireUpProposer(t, essentials, commandCache)
 	highQC := testutil.CreateQC(t, hotstuff.GetGenesis(), essentials.Authority())
-	err := viewStates.UpdateHighQC(highQC)
+	_, err := viewStates.UpdateHighQC(highQC)
 	if err != nil {
 		t.Fatal(err)
 	}
