@@ -27,10 +27,9 @@ func CreateTCPListener(t testing.TB) net.Listener {
 func CreateBlock(t testing.TB, signer *cert.Authority) *hotstuff.Block {
 	t.Helper()
 	qc := CreateQC(t, hotstuff.GetGenesis(), signer)
-	b := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, &clientpb.Batch{
+	return hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), qc, &clientpb.Batch{
 		Commands: []*clientpb.Command{},
-	}, 42, 1)
-	return b
+	}, 1, 1)
 }
 
 func CreateParentedBlock(t testing.TB, proposer hotstuff.ID, validParent *hotstuff.Block) *hotstuff.Block {
@@ -138,6 +137,19 @@ func CreateTC(t testing.TB, view hotstuff.View, signers []*cert.Authority) hotst
 		t.Fatalf("Failed to create TC: %v", err)
 	}
 	return tc
+}
+
+// CreateAC creates an aggregate timeout certificate signed by the given signers.
+func CreateAC(t testing.TB, view hotstuff.View, signers []*cert.Authority) hotstuff.AggregateQC {
+	t.Helper()
+	if len(signers) == 0 {
+		return hotstuff.AggregateQC{}
+	}
+	aggQC, err := signers[0].CreateAggregateQC(view, CreateTimeouts(t, view, signers))
+	if err != nil {
+		t.Fatalf("Failed to create AggregateQC: %v", err)
+	}
+	return aggQC
 }
 
 // GenerateECDSAKey generates an ECDSA private key for use in tests.

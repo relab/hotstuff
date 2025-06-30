@@ -102,9 +102,6 @@ func (n *Network) createTwinsNodes(nodes []NodeID, consensusName string) error {
 	for _, node := range n.nodes {
 		config := node.config
 		for _, otherNode := range n.nodes {
-			if node.id.ReplicaID == otherNode.id.ReplicaID {
-				continue
-			}
 			node.sender.subConfig = append(node.sender.subConfig, otherNode.id.ReplicaID)
 			config.AddReplica(&hotstuff.ReplicaInfo{
 				ID:     otherNode.config.ID(),

@@ -1,26 +1,31 @@
-package viewduration
+package synchronizer
 
 import (
 	"math"
 	"time"
 )
 
-// NewDynamic returns a ViewDuration that approximates the view duration based on durations of previous views.
+// NewDynamicDuration returns a ViewDuration that approximates the view duration based on durations of previous views.
 // sampleSize determines the number of previous views that should be considered.
 // startTimeout determines the view duration of the first views.
 // When a timeout occurs, the next view duration will be multiplied by the multiplier.
-func NewDynamic(opt Params) *Dynamic {
-	return &Dynamic{
-		limit: opt.sampleSize,
-		mean:  opt.startTimeout,
-		max:   opt.maxTimeout,
-		mul:   opt.multiplier,
+func NewDynamicDuration(
+	sampleSize uint32,
+	startTimeout time.Duration,
+	maxTimeout time.Duration,
+	multiplier float32,
+) *DynamicDuration {
+	return &DynamicDuration{
+		limit: uint64(sampleSize),
+		mean:  float64(startTimeout.Nanoseconds()) / float64(time.Millisecond),
+		max:   float64(maxTimeout.Nanoseconds()) / float64(time.Millisecond),
+		mul:   float64(multiplier),
 	}
 }
 
-// Dynamic uses statistics from previous views to guess a good value for the view duration.
+// DynamicDuration uses statistics from previous views to guess a good value for the view duration.
 // It only takes a limited amount of measurements into account.
-type Dynamic struct {
+type DynamicDuration struct {
 	mul       float64   // on failed views, multiply the current mean by this number (should be > 1)
 	limit     uint64    // how many measurements should be included in mean
 	count     uint64    // total number of measurements
@@ -33,7 +38,7 @@ type Dynamic struct {
 
 // ViewSucceeded calculates the duration of the view
 // and updates the internal values used for mean and variance calculations.
-func (v *Dynamic) ViewSucceeded() {
+func (v *DynamicDuration) ViewSucceeded() {
 	if v.startTime.IsZero() {
 		return
 	}
@@ -66,17 +71,17 @@ func (v *Dynamic) ViewSucceeded() {
 }
 
 // ViewTimeout should be called when a view timeout occurred. It will multiply the current mean by 'mul'.
-func (v *Dynamic) ViewTimeout() {
+func (v *DynamicDuration) ViewTimeout() {
 	v.mean *= v.mul
 }
 
 // ViewStarted records the start time of a view.
-func (v *Dynamic) ViewStarted() {
+func (v *DynamicDuration) ViewStarted() {
 	v.startTime = time.Now()
 }
 
 // Duration returns the upper bound of the 95% confidence interval for the mean view duration.
-func (v *Dynamic) Duration() time.Duration {
+func (v *DynamicDuration) Duration() time.Duration {
 	conf := 1.96 // 95% confidence
 	dev := float64(0)
 	if v.count > 1 {
@@ -98,4 +103,4 @@ func (v *Dynamic) Duration() time.Duration {
 	return time.Duration(duration * float64(time.Millisecond))
 }
 
-var _ ViewDuration = (*Dynamic)(nil)
+var _ ViewDuration = (*DynamicDuration)(nil)

@@ -1,8 +1,10 @@
-package viewduration
+package synchronizer_test
 
 import (
 	"testing"
 	"time"
+
+	"github.com/relab/hotstuff/protocol/synchronizer"
 )
 
 func checkDuration(t *testing.T, funcName string, want, got time.Duration) {
@@ -13,7 +15,7 @@ func checkDuration(t *testing.T, funcName string, want, got time.Duration) {
 
 func TestFixed(t *testing.T) {
 	want := 100 * time.Microsecond
-	vd := NewFixed(want)
+	vd := synchronizer.NewFixedDuration(want)
 	checkDuration(t, "nothing", want, vd.Duration())
 	vd.ViewStarted()
 	checkDuration(t, "ViewStarted", want, vd.Duration())
@@ -28,13 +30,12 @@ func TestDynamic(t *testing.T) {
 	startTimeout := 100 * time.Millisecond
 	maxTimeout := 500 * time.Millisecond
 	multiplier := float32(2)
-	params := NewParams(
+	vd := synchronizer.NewDynamicDuration(
 		sampleSize,
 		startTimeout,
 		maxTimeout,
 		multiplier,
 	)
-	vd := NewDynamic(params)
 	checkDuration(t, "nothing", startTimeout, vd.Duration())
 	vd.ViewStarted()
 	checkDuration(t, "ViewStarted", startTimeout, vd.Duration())
