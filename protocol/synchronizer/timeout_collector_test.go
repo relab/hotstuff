@@ -38,26 +38,7 @@ func TestTimeoutQuorum(t *testing.T) {
 		}
 		for _, ds := range []string{"MapMap", "MapSlice", "Slice"} {
 			name := ds + "/" + tt.name
-			var s interface {
-				add(hotstuff.TimeoutMsg) ([]hotstuff.TimeoutMsg, bool)
-			}
-			switch ds {
-			case "MapMap":
-				s = &timeoutMapMap{
-					timeoutsByView: make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
-					quorumSize:     hotstuff.QuorumSize(tt.n),
-				}
-			case "MapSlice":
-				s = &timeoutMapSlice{
-					timeoutsByView: make(map[hotstuff.View][]hotstuff.TimeoutMsg),
-					replicaCount:   tt.n,
-					quorumSize:     hotstuff.QuorumSize(tt.n),
-				}
-			case "Slice":
-				s = newTimeoutCollector(config)
-			default:
-				t.Fatalf("unknown data structure: %s", ds)
-			}
+			s := newTimeoutStore(t, ds, tt.n, config)
 			t.Run(name, func(t *testing.T) {
 				for i, timeout := range tt.timeouts {
 					got, quorum := s.add(timeout)
@@ -85,6 +66,29 @@ func TestTimeoutQuorum(t *testing.T) {
 			})
 		}
 	}
+}
+
+func newTimeoutStore(t *testing.T, ds string, n int, config *core.RuntimeConfig) (s interface {
+	add(hotstuff.TimeoutMsg) ([]hotstuff.TimeoutMsg, bool)
+}) {
+	switch ds {
+	case "MapMap":
+		s = &timeoutMapMap{
+			timeoutsByView: make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
+			quorumSize:     hotstuff.QuorumSize(n),
+		}
+	case "MapSlice":
+		s = &timeoutMapSlice{
+			timeoutsByView: make(map[hotstuff.View][]hotstuff.TimeoutMsg),
+			replicaCount:   n,
+			quorumSize:     hotstuff.QuorumSize(n),
+		}
+	case "Slice":
+		s = newTimeoutCollector(config)
+	default:
+		t.Fatalf("unknown data structure: %s", ds)
+	}
+	return s
 }
 
 func BenchmarkTimeoutQuorum(b *testing.B) {
