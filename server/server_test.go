@@ -21,7 +21,6 @@ import (
 	"github.com/relab/hotstuff/protocol/leaderrotation"
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/synchronizer"
-	"github.com/relab/hotstuff/protocol/synchronizer/viewduration"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto"
@@ -288,13 +287,18 @@ func createServers(t *testing.T, td testData) ([]replicaDeps, func()) {
 				sender,
 			),
 		)
+		timeoutRuler := synchronizer.NewSimple(
+			depsCore.RuntimeCfg(),
+			depsSecurity.Authority(),
+		)
 		synchronizer := synchronizer.New(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
 			depsSecurity.Authority(),
 			leaderRotation,
-			viewduration.NewFixed(100*time.Millisecond),
+			synchronizer.NewFixedDuration(100*time.Millisecond),
+			timeoutRuler,
 			depsConsensus.Proposer(),
 			depsConsensus.Voter(),
 			states,
