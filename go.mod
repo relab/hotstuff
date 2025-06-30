@@ -16,7 +16,6 @@ require (
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 	go-hep.org/x/hep v0.37.1
-	go.uber.org/mock v0.5.2
 	go.uber.org/zap v1.27.0
 	golang.org/x/time v0.12.0
 	gonum.org/v1/plot v0.16.0
