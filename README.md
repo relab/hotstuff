@@ -103,7 +103,7 @@ It is also possible to add custom modules that can interact with the modules we 
 There are two ways to implement a new consensus protocol, depending on the requirements of the new protocol.
 The `Consensus` module interface is the most general, but also the most difficult to implement.
 That is because it is oriented towards the other modules, and the other modules rely on it to perform certain operations,
-such as verifying proposals, interacting with the `BlockChain`, `Acceptor`, `Executor`, and `Synchronizer` modules,
+such as verifying proposals, interacting with the `Blockchain`, `Acceptor`, `Executor`, and `Synchronizer` modules,
 and so on. That is why we provide a simplified `Rules` interface and the optional `ProposeRuler` interface.
 These interfaces are only required to implement the core rules of the consensus protocol, namely deciding whether or not
 to vote for a proposal, whether or not it is safe to commit a block, and optionally how to create new blocks.

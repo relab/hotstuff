@@ -1,4 +1,4 @@
-// Package blockchain provides an implementation of the consensus.BlockChain interface.
+// Package blockchain provides a blockchain implementation.
 package blockchain
 
 import (

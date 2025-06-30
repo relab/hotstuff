@@ -88,7 +88,7 @@ func NewEssentialsSet(
 			if other == dummy {
 				continue
 			}
-			dummy.MockSender().AddBlockChain(other.Blockchain())
+			dummy.MockSender().AddBlockchain(other.Blockchain())
 		}
 	}
 	return dummies
