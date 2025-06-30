@@ -38,7 +38,7 @@ func runController() {
 	}
 
 	// fasthotstuff strictly requires QC aggregation.
-	if cfg.Consensus == rules.NameFastHotstuff {
+	if cfg.Consensus == rules.NameFastHotStuff {
 		cfg.UseAggQC = true
 	}
 

@@ -49,7 +49,7 @@ func (g *RuntimeConfig) PrivateKey() hotstuff.PrivateKey {
 }
 
 // HasAggregateQC returns true if aggregated quorum certificates should be used.
-// This is true for Fast-Hotstuff: https://arxiv.org/abs/2010.11454
+// This is true for Fast-HotStuff: https://arxiv.org/abs/2010.11454
 func (g *RuntimeConfig) HasAggregateQC() bool {
 	return g.aggQC
 }

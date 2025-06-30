@@ -131,9 +131,9 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 		committer,
 	)
 	var timeoutRules synchronizer.TimeoutRuler
-	if consensusName == rules.NameFastHotstuff || consensusName == nameVulnerableFHS {
+	if consensusName == rules.NameFastHotStuff || consensusName == nameVulnerableFHS {
 		// Use aggregated quorum certificates.
-		// This must be true for Fast-Hotstuff: https://arxiv.org/abs/2010.11454
+		// This must be true for Fast-HotStuff: https://arxiv.org/abs/2010.11454
 		timeoutRules = synchronizer.NewAggregate(node.config, depsSecurity.Authority())
 	} else {
 		timeoutRules = synchronizer.NewSimple(node.config, depsSecurity.Authority())

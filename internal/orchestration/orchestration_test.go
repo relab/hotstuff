@@ -35,7 +35,7 @@ func makeCfg(
 	randomTree bool,
 	commName string,
 ) *config.ExperimentConfig {
-	useAggQC := consensusImpl == rules.NameFastHotstuff
+	useAggQC := consensusImpl == rules.NameFastHotStuff
 	cfg := &config.ExperimentConfig{
 		Replicas:          replicas,
 		Clients:           clients,
@@ -115,21 +115,21 @@ func TestOrchestration(t *testing.T) {
 		branchFactor uint32
 		randomTree   bool
 	}{
-		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, replicas: 4},
-		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameEDDSA, replicas: 4},
-		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameBLS12, replicas: 4},
-		{consensus: rules.NameFastHotstuff, crypto: crypto.NameECDSA, replicas: 4},
-		{consensus: rules.NameFastHotstuff, crypto: crypto.NameEDDSA, replicas: 4},
-		{consensus: rules.NameFastHotstuff, crypto: crypto.NameBLS12, replicas: 4},
+		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameECDSA, replicas: 4},
+		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameEDDSA, replicas: 4},
+		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameBLS12, replicas: 4},
+		{consensus: rules.NameFastHotStuff, crypto: crypto.NameECDSA, replicas: 4},
+		{consensus: rules.NameFastHotStuff, crypto: crypto.NameEDDSA, replicas: 4},
+		{consensus: rules.NameFastHotStuff, crypto: crypto.NameBLS12, replicas: 4},
 		{consensus: rules.NameSimpleHotStuff, crypto: crypto.NameECDSA, replicas: 4},
 		{consensus: rules.NameSimpleHotStuff, crypto: crypto.NameEDDSA, replicas: 4},
 		{consensus: rules.NameSimpleHotStuff, crypto: crypto.NameBLS12, replicas: 4},
-		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, byzantine: fork, replicas: 4},
-		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, byzantine: silence, replicas: 4},
-		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, commName: comm.NameKauri, replicas: 7, branchFactor: 2},
-		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameBLS12, commName: comm.NameKauri, replicas: 7, branchFactor: 2},
-		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameECDSA, commName: comm.NameKauri, replicas: 7, branchFactor: 2, randomTree: true},
-		{consensus: rules.NameChainedHotstuff, crypto: crypto.NameBLS12, commName: comm.NameKauri, replicas: 7, branchFactor: 2, randomTree: true},
+		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameECDSA, byzantine: fork, replicas: 4},
+		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameECDSA, byzantine: silence, replicas: 4},
+		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameECDSA, commName: comm.NameKauri, replicas: 7, branchFactor: 2},
+		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameBLS12, commName: comm.NameKauri, replicas: 7, branchFactor: 2},
+		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameECDSA, commName: comm.NameKauri, replicas: 7, branchFactor: 2, randomTree: true},
+		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameBLS12, commName: comm.NameKauri, replicas: 7, branchFactor: 2, randomTree: true},
 	}
 
 	for _, tt := range tests {
@@ -230,7 +230,7 @@ func TestDeployment(t *testing.T) {
 		ViewTimeout:       100 * time.Millisecond,
 		DurationSamples:   1000,
 		TimeoutMultiplier: 1.2,
-		Consensus:         rules.NameChainedHotstuff,
+		Consensus:         rules.NameChainedHotStuff,
 		Crypto:            crypto.NameECDSA,
 		LeaderRotation:    leaderrotation.NameRoundRobin,
 		Communication:     comm.NameClique,

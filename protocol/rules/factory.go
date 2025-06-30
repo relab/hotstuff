@@ -19,9 +19,9 @@ func New(
 	switch name {
 	case "":
 		fallthrough // default to chainedhotstuff if no name is provided
-	case NameChainedHotstuff:
+	case NameChainedHotStuff:
 		ruleset = NewChainedHotStuff(logger, config, blockchain)
-	case NameFastHotstuff:
+	case NameFastHotStuff:
 		ruleset = NewFastHotStuff(logger, config, blockchain)
 	case NameSimpleHotStuff:
 		ruleset = NewSimpleHotStuff(logger, config, blockchain)

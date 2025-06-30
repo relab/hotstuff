@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
-const NameFastHotstuff = "fasthotstuff"
+const NameFastHotStuff = "fasthotstuff"
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {

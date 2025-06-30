@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
-const NameChainedHotstuff = "chainedhotstuff"
+const NameChainedHotStuff = "chainedhotstuff"
 
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {
