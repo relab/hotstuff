@@ -232,7 +232,6 @@ func createServers(t *testing.T, td testData) ([]replicaDeps, func()) {
 			depsCore.Logger(),
 			depsCore.RuntimeCfg(),
 			td.creds,
-			gorums.WithDialTimeout(time.Second),
 		)
 		depsSecurity := wiring.NewSecurity(
 			depsCore.EventLoop(),

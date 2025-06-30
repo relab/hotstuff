@@ -388,14 +388,12 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		w.metricsLogger.Log(opts)
 
 		c := client.Config{
-			TLS:           opts.GetUseTLS(),
-			RootCAs:       cp,
-			MaxConcurrent: opts.GetMaxConcurrent(),
-			PayloadSize:   opts.GetPayloadSize(),
-			Input:         io.NopCloser(rand.Reader),
-			ManagerOptions: []gorums.ManagerOption{
-				gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
-			},
+			TLS:              opts.GetUseTLS(),
+			RootCAs:          cp,
+			MaxConcurrent:    opts.GetMaxConcurrent(),
+			PayloadSize:      opts.GetPayloadSize(),
+			Input:            io.NopCloser(rand.Reader),
+			ManagerOptions:   []gorums.ManagerOption{},
 			RateLimit:        opts.GetRateLimit(),
 			RateStep:         opts.GetRateStep(),
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),

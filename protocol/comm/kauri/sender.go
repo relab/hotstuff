@@ -35,9 +35,9 @@ func WrapGorumsSender(
 		tree:  config.Tree(),
 	}
 	s.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(_ any) {
-		kauriCfg := kauripb.ConfigurationFromRaw(base.GorumsConfig(), nil)
-		for _, n := range kauriCfg.Nodes() {
-			s.nodes[hotstuff.ID(n.ID())] = n
+		cfg := base.GorumsConfig()
+		for _, n := range cfg.Nodes() {
+			s.nodes[hotstuff.ID(n.ID())] = &kauripb.Node{RawNode: n.RawNode}
 		}
 	}, eventloop.Prioritize())
 	return s

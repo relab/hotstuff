@@ -171,11 +171,7 @@ func (s *GorumsSender) RequestBlock(ctx context.Context, hash hotstuff.Hash) (*h
 	cfg := s.pbCfg
 	protoBlock, err := cfg.RequestBlock(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
 	if err != nil {
-		qcErr, ok := err.(gorums.QuorumCallError)
-		// filter out context errors
-		if !ok || (qcErr.Reason != context.Canceled.Error() && qcErr.Reason != context.DeadlineExceeded.Error()) {
-			s.logger.Infof("Failed to fetch block: %v", err)
-		}
+		s.logger.Infof("Failed to download requested block: %v", err)
 		return nil, false
 	}
 	return hotstuffpb.BlockFromProto(protoBlock), true
@@ -211,8 +207,8 @@ func (s *GorumsSender) Close() {
 	s.mgr.Close()
 }
 
-func (s *GorumsSender) GorumsConfig() gorums.RawConfiguration {
-	return s.pbCfg.RawConfiguration
+func (s *GorumsSender) GorumsConfig() *hotstuffpb.Configuration {
+	return s.pbCfg
 }
 
 // Sub returns a copy of self dedicated to the replica IDs provided.

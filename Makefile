@@ -29,13 +29,13 @@ download:
 	@go mod download
 
 tools: download
-	@cat tools.go | grep _ | awk -F'"' '{print $$2}' | xargs -I % go install %
+	go install tool
 
 test:
-	@go test -v ./...
+	@go test ./...
 
 short:
-	@go test -v -short ./...
+	@go test -short ./...
 
 lint:
 	@golangci-lint run ./...

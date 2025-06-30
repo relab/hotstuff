@@ -274,12 +274,14 @@ func (c *Client) handleCommands(ctx context.Context) (executed, failed, timeout 
 		}
 		_, err := cmd.promise.Get()
 		if err != nil {
-			qcError, ok := err.(gorums.QuorumCallError)
-			if ok && qcError.Reason == context.DeadlineExceeded.Error() {
-				c.logger.Debug("Command timed out.")
+			if errors.Is(err, context.DeadlineExceeded) {
+				c.logger.Debugf("Command timed out: %v", err)
 				timeout++
-			} else if !ok || qcError.Reason != context.Canceled.Error() {
-				c.logger.Debugf("Did not get enough replies for command: %v\n", err)
+			} else if errors.Is(err, context.Canceled) {
+				c.logger.Debugf("Command was canceled: %v", err)
+				failed++
+			} else {
+				c.logger.Debugf("Command failed: %v", err)
 				failed++
 			}
 		} else {

@@ -157,6 +157,9 @@ func TestOrchestration(t *testing.T) {
 }
 
 func TestDeployment(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow test in short mode")
+	}
 	if os.Getenv("GITHUB_ACTIONS") != "" && runtime.GOOS != "linux" {
 		t.Skip("GitHub Actions only supports linux containers on linux runners.")
 	}
