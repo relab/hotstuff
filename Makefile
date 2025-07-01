@@ -32,7 +32,7 @@ tools: download
 	go install tool
 
 test:
-	@go test ./...
+	@go test -v ./... > test.log
 
 short:
 	@go test -short ./...

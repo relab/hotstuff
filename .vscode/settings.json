@@ -25,6 +25,9 @@
 	"go.testFlags": [
 		"-count=1"
 	],
+	"gopls": {
+		"ui.semanticTokens": true
+	},
 	"cSpell.enabled": true,
 	"cSpell.ignorePaths": [
 		"package-lock.json",
