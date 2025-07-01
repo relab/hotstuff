@@ -8,7 +8,7 @@ import (
 	"github.com/relab/hotstuff/internal/config"
 )
 
-func TestLoad(t *testing.T) {
+func TestNewCue(t *testing.T) {
 	replicaHosts := []string{"bbchain1", "bbchain2", "bbchain3", "bbchain4", "bbchain5", "bbchain6"}
 	clientHosts := []string{"bbchain7", "bbchain8"}
 	locations := []string{"Melbourne", "Toronto", "Prague", "Paris", "Tokyo", "Amsterdam", "Auckland", "Moscow", "Stockholm", "London"}
@@ -73,6 +73,20 @@ func TestLoad(t *testing.T) {
 		Replicas:     3,
 		Clients:      2,
 	}
+	exp := &config.ExperimentConfig{
+		ReplicaHosts:      []string{"localhost"},
+		ClientHosts:       []string{"localhost"},
+		Replicas:          4,
+		Clients:           1,
+		Locations:         []string{"Rome", "Oslo", "London", "Munich"},
+		TreePositions:     []uint32{3, 2, 1, 4},
+		BranchFactor:      2,
+		Consensus:         "chainedhotstuff",
+		Communication:     "clique",
+		Crypto:            "ecdsa",
+		LeaderRotation:    "round-robin",
+		ByzantineStrategy: map[string][]uint32{"": {}},
+	}
 	tests := []struct {
 		name     string
 		filename string
@@ -89,16 +103,98 @@ func TestLoad(t *testing.T) {
 		{name: "InvalidLocationsSize", filename: "invalid-loc-size.cue", wantCfg: nil, wantErr: true},
 		{name: "InvalidTree", filename: "invalid-tree.cue", wantCfg: nil, wantErr: true},
 		{name: "Invalid2TreeOnly", filename: "invalid-tree-only.cue", wantCfg: nil, wantErr: true},
+		{name: "Experiments", filename: "exp.cue", wantCfg: exp, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotCfg, err := config.NewCue(filepath.Join("testdata", tt.filename), nil)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Load(%s) error = %v, wantErr %v", tt.filename, err, tt.wantErr)
+				t.Errorf("NewCue(%s) error = %v, wantErr %v", tt.filename, err, tt.wantErr)
 				return
 			}
-			if diff := cmp.Diff(gotCfg, tt.wantCfg); diff != "" {
-				t.Errorf("Load(%s) mismatch (-want +got):\n%s", tt.filename, diff)
+			if diff := cmp.Diff(tt.wantCfg, gotCfg); diff != "" {
+				t.Errorf("NewCue(%s) mismatch (-want +got):\n%s", tt.filename, diff)
+			}
+		})
+	}
+}
+
+func TestNewCueExperiment(t *testing.T) {
+	fourExp := []*config.ExperimentConfig{
+		{
+			ReplicaHosts:      []string{"localhost"},
+			ClientHosts:       []string{"localhost"},
+			Replicas:          4,
+			Clients:           1,
+			Locations:         []string{"Rome", "Oslo", "London", "Munich"},
+			TreePositions:     []uint32{3, 2, 1, 4},
+			BranchFactor:      2,
+			Consensus:         "chainedhotstuff",
+			Communication:     "clique",
+			Crypto:            "ecdsa",
+			LeaderRotation:    "round-robin",
+			ByzantineStrategy: map[string][]uint32{"": {}},
+		},
+		{
+			ReplicaHosts:      []string{"localhost"},
+			ClientHosts:       []string{"localhost"},
+			Replicas:          4,
+			Clients:           1,
+			Locations:         []string{"Rome", "Oslo", "London", "Munich"},
+			TreePositions:     []uint32{3, 2, 1, 4},
+			BranchFactor:      2,
+			Consensus:         "simplehotstuff",
+			Communication:     "clique",
+			Crypto:            "ecdsa",
+			LeaderRotation:    "round-robin",
+			ByzantineStrategy: map[string][]uint32{"fork": {2}},
+		},
+		{
+			ReplicaHosts:      []string{"localhost"},
+			ClientHosts:       []string{"localhost"},
+			Replicas:          4,
+			Clients:           1,
+			Locations:         []string{"Rome", "Oslo", "London", "Munich"},
+			TreePositions:     []uint32{3, 2, 1, 4},
+			BranchFactor:      2,
+			Consensus:         "fasthotstuff",
+			Communication:     "kauri",
+			Crypto:            "ecdsa",
+			LeaderRotation:    "round-robin",
+			ByzantineStrategy: map[string][]uint32{"silence": {2}},
+		},
+		{
+			ReplicaHosts:      []string{"localhost"},
+			ClientHosts:       []string{"localhost"},
+			Replicas:          4,
+			Clients:           1,
+			Locations:         []string{"Rome", "Oslo", "London", "Munich"},
+			TreePositions:     []uint32{3, 2, 1, 4},
+			BranchFactor:      2,
+			Consensus:         "chainedhotstuff",
+			Communication:     "kauri",
+			Crypto:            "ecdsa",
+			LeaderRotation:    "round-robin",
+			ByzantineStrategy: map[string][]uint32{"": {}},
+		},
+	}
+	tests := []struct {
+		name     string
+		filename string
+		wantCfg  []*config.ExperimentConfig
+		wantErr  bool
+	}{
+		{name: "FourExperiments", filename: "four-experiments.cue", wantCfg: fourExp, wantErr: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotCfg, err := config.NewCueExperiments(filepath.Join("testdata", tt.filename))
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewCueExperiments(%s) error = %v, wantErr %v", tt.filename, err, tt.wantErr)
+				return
+			}
+			if diff := cmp.Diff(tt.wantCfg, gotCfg); diff != "" {
+				t.Errorf("NewCueExperiments(%s) mismatch (-want +got):\n%s", tt.filename, diff)
 			}
 		})
 	}
