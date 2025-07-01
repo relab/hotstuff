@@ -2,6 +2,7 @@ package config
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
 	"os"
 
@@ -56,16 +57,25 @@ func NewCueExperiments(filename string) ([]*ExperimentConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	expList := ctx.CompileString(string(b), cue.Filename(filename))
-	if expList.Err() != nil {
-		return nil, expList.Err()
+	experimentList := ctx.CompileString(string(b), cue.Filename(filename))
+	if experimentList.Err() != nil {
+		return nil, experimentList.Err()
 	}
-	head := expList.Value() // this is the list of experiments
+	var head cue.Value
+	var errMissing error
+	// lookup the experiments in the compiled file
+	expandList := experimentList.LookupPath(cue.ParsePath("config.experiments"))
+	if expandList.Err() != nil {
+		errMissing = expandList.Err() // missing config.experiments
+		head = experimentList.Value() // file may contain a list of experiments
+	} else {
+		head = expandList.Value() // file may expanded into a list of experiments
+	}
 
 	// walk the list
 	iter, err := head.List()
 	if err != nil {
-		return nil, fmt.Errorf("experiments file must be an array: %w", err)
+		return nil, fmt.Errorf("experiments file must be or expand into an array: %w", errors.Join(errMissing, err))
 	}
 	var out []*ExperimentConfig
 	for iter.Next() {

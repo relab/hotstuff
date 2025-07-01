@@ -182,16 +182,24 @@ func TestNewCueExperiment(t *testing.T) {
 		name     string
 		filename string
 		wantCfg  []*config.ExperimentConfig
+		wantLen  int
 		wantErr  bool
 	}{
-		{name: "FourExperiments", filename: "four-experiments.cue", wantCfg: fourExp, wantErr: false},
+		{name: "FourExperiments", filename: "four-experiments.cue", wantCfg: fourExp, wantLen: 4, wantErr: false},
+		{name: "SweepExperiments", filename: "sweep-experiments.cue", wantLen: 16, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotCfg, err := config.NewCueExperiments(filepath.Join("testdata", tt.filename))
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewCueExperiments(%s) error = %v, wantErr %v", tt.filename, err, tt.wantErr)
+				t.Errorf("NewCueExperiments(%s) error = %v, want %v", tt.filename, err, tt.wantErr)
 				return
+			}
+			if len(gotCfg) != tt.wantLen {
+				t.Errorf("NewCueExperiments(%s) length = %d, want %d", tt.filename, len(gotCfg), tt.wantLen)
+			}
+			if tt.wantCfg == nil {
+				return // skip diff check for large parameter sweeps
 			}
 			if diff := cmp.Diff(tt.wantCfg, gotCfg); diff != "" {
 				t.Errorf("NewCueExperiments(%s) mismatch (-want +got):\n%s", tt.filename, diff)
