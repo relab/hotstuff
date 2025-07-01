@@ -73,6 +73,20 @@ func TestNewCue(t *testing.T) {
 		Replicas:     3,
 		Clients:      2,
 	}
+	exp := &config.ExperimentConfig{
+		ReplicaHosts:      []string{"localhost"},
+		ClientHosts:       []string{"localhost"},
+		Replicas:          4,
+		Clients:           1,
+		Locations:         []string{"Rome", "Oslo", "London", "Munich"},
+		TreePositions:     []uint32{3, 2, 1, 4},
+		BranchFactor:      2,
+		Consensus:         "chainedhotstuff",
+		Communication:     "clique",
+		Crypto:            "ecdsa",
+		LeaderRotation:    "round-robin",
+		ByzantineStrategy: map[string][]uint32{"": {}},
+	}
 	tests := []struct {
 		name     string
 		filename string
@@ -89,6 +103,7 @@ func TestNewCue(t *testing.T) {
 		{name: "InvalidLocationsSize", filename: "invalid-loc-size.cue", wantCfg: nil, wantErr: true},
 		{name: "InvalidTree", filename: "invalid-tree.cue", wantCfg: nil, wantErr: true},
 		{name: "Invalid2TreeOnly", filename: "invalid-tree-only.cue", wantCfg: nil, wantErr: true},
+		{name: "Experiments", filename: "exp.cue", wantCfg: exp, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
