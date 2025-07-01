@@ -8,9 +8,7 @@ import (
 	"os"
 	"time"
 
-	_ "github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/metrics/plotting"
-	_ "github.com/relab/hotstuff/metrics/types"
 )
 
 var (
