@@ -1,6 +1,6 @@
 module github.com/relab/hotstuff
 
-go 1.24.3
+go 1.24.4
 
 require (
 	cuelang.org/go v0.11.1
@@ -16,7 +16,6 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	go-hep.org/x/hep v0.36.0
-	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/time v0.9.0
 	gonum.org/v1/plot v0.15.0
@@ -98,4 +97,10 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+)
+
+tool (
+	cuelang.org/go/cmd/cue
+	github.com/relab/gorums/cmd/protoc-gen-gorums
+	google.golang.org/protobuf/cmd/protoc-gen-go
 )
