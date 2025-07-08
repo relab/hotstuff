@@ -8,7 +8,6 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/kilic/bls12-381 v0.1.1-0.20210208205449-6045b0235e36
 	github.com/mattn/go-isatty v0.0.20
-	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mroth/weightedrand v1.0.0
 	github.com/relab/gorums v0.7.1-0.20220818130557-8533cb369cd6
 	github.com/relab/iago v0.0.0-20250112171319-2c4979b99287
@@ -56,6 +55,7 @@ require (
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/magiconair/properties v1.8.9 // indirect
+	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
