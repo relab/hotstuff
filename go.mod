@@ -7,7 +7,6 @@ require (
 	github.com/felixge/fgprof v0.9.5
 	github.com/google/go-cmp v0.6.0
 	github.com/kilic/bls12-381 v0.1.1-0.20210208205449-6045b0235e36
-	github.com/mattn/go-isatty v0.0.20
 	github.com/mroth/weightedrand v1.0.0
 	github.com/relab/gorums v0.7.1-0.20220818130557-8533cb369cd6
 	github.com/relab/iago v0.0.0-20250707114349-736f0685d57f
@@ -16,6 +15,7 @@ require (
 	github.com/spf13/viper v1.19.0
 	go-hep.org/x/hep v0.36.0
 	go.uber.org/zap v1.27.0
+	golang.org/x/term v0.32.0
 	golang.org/x/time v0.9.0
 	gonum.org/v1/plot v0.15.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250106144421-5f5ef82da422
