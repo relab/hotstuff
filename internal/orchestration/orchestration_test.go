@@ -177,8 +177,10 @@ func TestDeployment(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(len(sessions))
 	workers := make(map[string]orchestration.RemoteWorker)
+	allHosts := make([]string, 0, numHosts)
 	for host, session := range sessions {
 		t.Logf("Added worker host: %s", host)
+		allHosts = append(allHosts, host)
 		workers[host] = orchestration.NewRemoteWorker(protostream.NewWriter(session.Stdin()), protostream.NewReader(session.Stdout()))
 		go func(session orchestration.WorkerSession) {
 			_, err := io.Copy(os.Stderr, session.Stderr())
@@ -189,34 +191,13 @@ func TestDeployment(t *testing.T) {
 		}(session)
 	}
 
-	// Put all hostnames into a string list.
-	allHosts := make([]string, 0, numHosts)
-	for host := range workers {
-		allHosts = append(allHosts, host)
-	}
-
-	// Pop any hostname and add them to a separate list for replicas.
-	replicaHosts := make([]string, 0, numReplicas)
-	for range numReplicas {
-		popped := allHosts[0]
-		replicaHosts = append(replicaHosts, popped)
-		allHosts = allHosts[1:]
-	}
-
-	// Pop any hostname and add them to a separate list for clients.
-	clientHosts := make([]string, 0, numClients)
-	for range numClients {
-		popped := allHosts[0]
-		clientHosts = append(clientHosts, popped)
-		allHosts = allHosts[1:]
-	}
 	// Add all replica and client hostnames (that came from workers) separately
 	// to the config.
 	cfg := &config.ExperimentConfig{
 		Replicas:          numReplicas,
 		Clients:           numClients,
-		ReplicaHosts:      replicaHosts,
-		ClientHosts:       clientHosts,
+		ReplicaHosts:      allHosts[:numReplicas],
+		ClientHosts:       allHosts[numReplicas : numReplicas+numClients],
 		Duration:          10 * time.Second,
 		ClientTimeout:     500 * time.Millisecond,
 		ConnectTimeout:    time.Second,
