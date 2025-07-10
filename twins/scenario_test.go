@@ -7,7 +7,7 @@ import (
 	"github.com/relab/hotstuff/protocol/rules"
 )
 
-// TestPartitionedScenario checks if chained Hotstuff will commit one block
+// TestPartitionedScenario checks if chained HotStuff will commit one block
 // when all nodes are honest and the leader is in a separate partition.
 func TestPartitionedScenario(t *testing.T) {
 	s := Scenario{}
@@ -27,7 +27,7 @@ func TestPartitionedScenario(t *testing.T) {
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	logging.SetLogLevel("debug")
-	result, err := ExecuteScenario(s, 4, 0, 100, rules.NameChainedHotstuff)
+	result, err := ExecuteScenario(s, 4, 0, 100, rules.NameChainedHotStuff)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestPartitionedScenario(t *testing.T) {
 	t.Logf("Network log:\n%s", result.NetworkLog)
 }
 
-// TestBasicScenario checks if chained Hotstuff will commit one block
+// TestBasicScenario checks if chained HotStuff will commit one block
 // when all nodes are honest and the network is not partitioned.
 func TestBasicScenario(t *testing.T) {
 	s := Scenario{}
@@ -53,7 +53,7 @@ func TestBasicScenario(t *testing.T) {
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	logging.SetLogLevel("debug")
-	result, err := ExecuteScenario(s, 4, 0, 100, rules.NameChainedHotstuff)
+	result, err := ExecuteScenario(s, 4, 0, 100, rules.NameChainedHotStuff)
 	if err != nil {
 		t.Fatal(err)
 	}

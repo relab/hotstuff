@@ -129,7 +129,7 @@ func (pc PartialCert) ToBytes() []byte {
 // SyncInfo holds the highest known QC or TC.
 // Generally, if highQC.View > highTC.View, there is no need to include highTC in the SyncInfo.
 // However, if highQC.View < highTC.View, we should still include highQC.
-// This can also hold an AggregateQC for Fast-Hotstuff.
+// This can also hold an AggregateQC for Fast-HotStuff.
 type SyncInfo struct {
 	qc    *QuorumCert
 	tc    *TimeoutCert

@@ -59,7 +59,7 @@ type ExperimentConfig struct {
 
 	// # Protocol-specific values:
 
-	// UseAggQC indicates whether or not to use aggregated QCs (Fast Hotstuff).
+	// UseAggQC indicates whether or not to use aggregated QCs (Fast-HotStuff).
 	UseAggQC bool
 
 	// # File path strings below:

@@ -1,3 +1,4 @@
+// Package rules contains consensus rulesets for various HotStuff-based protocols.
 package rules
 
 import (
@@ -18,10 +19,10 @@ func New(
 	switch name {
 	case "":
 		fallthrough // default to chainedhotstuff if no name is provided
-	case NameChainedHotstuff:
+	case NameChainedHotStuff:
 		ruleset = NewChainedHotStuff(logger, config, blockchain)
-	case NameFastHotstuff:
-		ruleset = NewFastHotstuff(logger, config, blockchain)
+	case NameFastHotStuff:
+		ruleset = NewFastHotStuff(logger, config, blockchain)
 	case NameSimpleHotStuff:
 		ruleset = NewSimpleHotStuff(logger, config, blockchain)
 	default:

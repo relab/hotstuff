@@ -23,7 +23,7 @@ type SimpleHotStuff struct {
 	locked *hotstuff.Block
 }
 
-// New returns a new SimpleHotStuff instance.
+// NewSimpleHotStuff creates a new instance of the simple HotStuff consensus ruleset.
 func NewSimpleHotStuff(
 	logger logging.Logger,
 	config *core.RuntimeConfig,

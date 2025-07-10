@@ -149,8 +149,8 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	if opts.TreeEnabled() {
 		runtimeOpts = append(runtimeOpts, core.WithKauriTree(newTree(opts)))
 	}
-	if opts.GetConsensus() == rules.NameFastHotstuff {
-		// Use aggregated quorum certificates for Fast-Hotstuff: https://arxiv.org/abs/2010.11454
+	if opts.GetConsensus() == rules.NameFastHotStuff {
+		// Use aggregated quorum certificates for Fast-HotStuff: https://arxiv.org/abs/2010.11454
 		runtimeOpts = append(runtimeOpts, core.WithAggregateQC())
 	}
 	runtimeOpts = append(runtimeOpts, core.WithSharedRandomSeed(opts.GetSharedSeed()))

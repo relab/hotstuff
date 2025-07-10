@@ -39,8 +39,8 @@ use 'hotstuff help run' to view all possible parameters for this command.`,
 			modules := map[string][]string{
 				"--consensus": {
 					rules.NameSimpleHotStuff,
-					rules.NameFastHotstuff,
-					rules.NameChainedHotstuff,
+					rules.NameFastHotStuff,
+					rules.NameChainedHotStuff,
 				},
 				"--byzantine-strategy": {
 					byzantine.NameSilence,

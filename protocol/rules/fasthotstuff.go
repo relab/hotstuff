@@ -9,7 +9,7 @@ import (
 	"github.com/relab/hotstuff/security/blockchain"
 )
 
-const NameFastHotstuff = "fasthotstuff"
+const NameFastHotStuff = "fasthotstuff"
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 type FastHotStuff struct {
@@ -18,8 +18,8 @@ type FastHotStuff struct {
 	blockchain *blockchain.Blockchain
 }
 
-// New returns a new FastHotStuff instance.
-func NewFastHotstuff(
+// NewFastHotStuff returns a new instance of the Fast-HotStuff consensus ruleset.
+func NewFastHotStuff(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
