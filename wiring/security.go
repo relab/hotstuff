@@ -40,8 +40,8 @@ func NewSecurity(
 	}
 }
 
-// BlockChain returns the blockchain instance.
-func (s *Security) BlockChain() *blockchain.Blockchain {
+// Blockchain returns the blockchain instance.
+func (s *Security) Blockchain() *blockchain.Blockchain {
 	return s.blockchain
 }
 

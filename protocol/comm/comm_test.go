@@ -24,7 +24,7 @@ var _ leaderrotation.LeaderRotation = (*leaderRotation)(nil)
 func TestDisseminateAggregate(t *testing.T) {
 	essentials := testutil.WireUpEssentials(t, 1, crypto.NameECDSA)
 	viewStates, err := protocol.NewViewStates(
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 		essentials.Authority(),
 	)
 	if err != nil {
@@ -34,7 +34,7 @@ func TestDisseminateAggregate(t *testing.T) {
 		essentials.Logger(),
 		essentials.EventLoop(),
 		essentials.RuntimeCfg(),
-		essentials.BlockChain(),
+		essentials.Blockchain(),
 		essentials.Authority(),
 		viewStates,
 	)

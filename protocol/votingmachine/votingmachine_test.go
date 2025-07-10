@@ -16,7 +16,7 @@ func TestCollectVote(t *testing.T) {
 	signers := testutil.NewEssentialsSet(t, 4, crypto.NameECDSA)
 	leader := signers[0]
 	viewStates, err := protocol.NewViewStates(
-		leader.BlockChain(),
+		leader.Blockchain(),
 		leader.Authority(),
 	)
 	if err != nil {
@@ -26,7 +26,7 @@ func TestCollectVote(t *testing.T) {
 		leader.Logger(),
 		leader.EventLoop(),
 		leader.RuntimeCfg(),
-		leader.BlockChain(),
+		leader.Blockchain(),
 		leader.Authority(),
 		viewStates,
 	)
@@ -37,7 +37,7 @@ func TestCollectVote(t *testing.T) {
 	})
 
 	block := testutil.CreateBlock(t, leader.Authority())
-	leader.BlockChain().Store(block)
+	leader.Blockchain().Store(block)
 
 	for _, signer := range signers {
 		pc := testutil.CreatePC(t, block, signer.Authority())

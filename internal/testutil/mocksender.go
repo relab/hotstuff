@@ -33,9 +33,9 @@ func (m *MockSender) MessagesSent() []any {
 	return m.messagesSent
 }
 
-// AddBlockChain saves a reference to a blockchain storage from a separate mock replica.
+// AddBlockchain saves a reference to a blockchain storage from a separate mock replica.
 // This is necessary for block lookup by RequestBlock.
-func (m *MockSender) AddBlockChain(chain *blockchain.Blockchain) {
+func (m *MockSender) AddBlockchain(chain *blockchain.Blockchain) {
 	if chain == nil {
 		panic("blockchain pointer cannot be nil")
 	}
@@ -79,9 +79,9 @@ func (m *MockSender) Propose(proposal *hotstuff.ProposeMsg) {
 	m.saveBroadcast(*proposal)
 }
 
-// RequestBlock mock traverses the known blockchain references added by AddBlockChain and
+// RequestBlock mock traverses the known blockchain references added by AddBlockchain and
 // attempts to retrieve the block by each chain's LocalGet method.
-// NOTE: this method panics if AddBlockChain was not called at least once.
+// NOTE: this method panics if AddBlockchain was not called at least once.
 func (m *MockSender) RequestBlock(_ context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	if len(m.blockChains) == 0 {
 		panic("no blockchains available to mock sender")
