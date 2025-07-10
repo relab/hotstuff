@@ -9,9 +9,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mattn/go-isatty"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/term"
 )
 
 var (
@@ -212,7 +212,7 @@ func New(name string) Logger {
 		config = zap.NewProductionConfig()
 	} else {
 		config = zap.NewDevelopmentConfig()
-		if isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd()) {
+		if term.IsTerminal(int(os.Stderr.Fd())) {
 			config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 		}
 	}

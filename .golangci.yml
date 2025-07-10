@@ -1,28 +1,32 @@
----
+version: "2"
 linters:
   enable:
-  - revive
   - gocyclo
   - misspell
-
-linters-settings:
-  gocyclo:
-    min-complexity: 15
-
-  misspell:
-    locale: US
-
-  revive:
-    rules:
-    - name: unexported-return
-      disabled: true
-    - name: unused-parameter
-
-  staticcheck:
-    checks:
-    - all
-    - '-SA1019' # temporarily disable the "is deprecated" rule
-
-issues:
-  exclude-use-default: false
-  exclude-case-sensitive: false
+  - revive
+  settings:
+    gocyclo:
+      min-complexity: 15
+    misspell:
+      locale: US
+    revive:
+      rules:
+      - name: unexported-return
+        disabled: true
+      - name: unused-parameter
+    staticcheck:
+      checks:
+      - all
+  exclusions:
+    generated: lax
+    paths:
+    - third_party$
+    - builtin$
+    - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+    - third_party$
+    - builtin$
+    - examples$
