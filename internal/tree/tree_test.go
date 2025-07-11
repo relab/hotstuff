@@ -291,9 +291,7 @@ func BenchmarkReplicaChildren(b *testing.B) {
 	for _, bm := range benchmarks {
 		b.Run(fmt.Sprintf("size=%d/bf=%d", bm.size, bm.bf), func(b *testing.B) {
 			tree := NewSimple(1, bm.bf, DefaultTreePos(bm.size))
-			// replace `for range b.N` with `for b.Loop()` when go 1.24 released (in release candidate as of writing)
-			// for b.Loop() {
-			for range b.N {
+			for b.Loop() {
 				tree.ReplicaChildren()
 			}
 		})
