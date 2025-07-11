@@ -1,3 +1,4 @@
+// Package network provides an implementation of a Gorums-based sender for HotStuff messages.
 package network
 
 import (

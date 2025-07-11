@@ -1,3 +1,4 @@
+// Package tree implements a tree structure for organizing the replicas.
 package tree
 
 import (

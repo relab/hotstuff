@@ -1,3 +1,4 @@
+// Package clientpb provides the service interface and command batcher for clients.
 package clientpb
 
 import (

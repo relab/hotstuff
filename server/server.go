@@ -1,3 +1,4 @@
+// Package server implements the gorums server for accepting client requests to the consensus protocol.
 package server
 
 import (

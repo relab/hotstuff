@@ -54,7 +54,7 @@ func runController() {
 		hosts = cfg.AllHosts()
 	}
 
-	g, err := iago.NewSSHGroup(hosts, cfg.SshConfig)
+	g, err := iago.NewSSHGroup(hosts, cfg.SSHConfig)
 	checkf("failed to connect to remote hosts: %v", err)
 
 	if cfg.Exe == "" {
@@ -66,7 +66,7 @@ func runController() {
 	sessions, err := orchestration.Deploy(g, orchestration.DeployConfig{
 		ExePath:             cfg.Exe,
 		LogLevel:            cfg.LogLevel,
-		CPUProfiling:        cfg.CpuProfile,
+		CPUProfiling:        cfg.CPUProfile,
 		MemProfiling:        cfg.MemProfile,
 		Tracing:             cfg.Trace,
 		Fgprof:              cfg.FgProfProfile,

@@ -13,7 +13,6 @@ import (
 	"github.com/relab/hotstuff/security/crypto/keygen"
 )
 
-// TODO(AlanRostem): create a test for server.go using this in another PR.
 // CreateTCPListener creates a net.Listener on a random port.
 func CreateTCPListener(t testing.TB) net.Listener {
 	t.Helper()

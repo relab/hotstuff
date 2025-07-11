@@ -1,3 +1,4 @@
+// Package root provides the root directory of the project.
 package root
 
 import (

@@ -1,3 +1,4 @@
+// Package test provides utilities for generating test names based on fields and values.
 package test
 
 import (

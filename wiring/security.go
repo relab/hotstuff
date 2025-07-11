@@ -45,7 +45,7 @@ func (s *Security) Blockchain() *blockchain.Blockchain {
 	return s.blockchain
 }
 
-// auth returns the certificate authority.
+// Authority returns the certificate authority.
 func (s *Security) Authority() *cert.Authority {
 	return s.auth
 }
