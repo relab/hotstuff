@@ -67,7 +67,7 @@ func (chain *Blockchain) Store(block *hotstuff.Block) {
 	}
 }
 
-// Get retrieves a block given its hash. It will only try the local cache.
+// LocalGet returns the block for the given hash from the local cache.
 func (chain *Blockchain) LocalGet(hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
@@ -76,10 +76,10 @@ func (chain *Blockchain) LocalGet(hash hotstuff.Hash) (*hotstuff.Block, bool) {
 	if !ok {
 		return nil, false
 	}
-
 	return block, true
 }
 
+// DeleteAtHeight deletes the block with the provided block hash at the given height.
 func (chain *Blockchain) DeleteAtHeight(height hotstuff.View, blockHash hotstuff.Hash) error {
 	block, ok := chain.blockAtHeight[height]
 	if !ok {
@@ -149,6 +149,7 @@ func (chain *Blockchain) Extends(block, target *hotstuff.Block) bool {
 	return ok && current.Hash() == target.Hash()
 }
 
+// PruneToHeight prunes the blockchain to the given height.
 func (chain *Blockchain) PruneToHeight(committedHeight, height hotstuff.View) (forkedBlocks []*hotstuff.Block) {
 	chain.mut.Lock()
 	defer chain.mut.Unlock()
@@ -182,6 +183,7 @@ func (chain *Blockchain) PruneToHeight(committedHeight, height hotstuff.View) (f
 	return forkedBlocks
 }
 
+// PruneHeight returns the current prune height of the blockchain.
 func (chain *Blockchain) PruneHeight() hotstuff.View {
 	return chain.pruneHeight
 }

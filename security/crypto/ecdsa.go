@@ -21,13 +21,13 @@ const (
 	ECDSAPublicKeyFileType = "ECDSA PUBLIC KEY"
 )
 
-// Signature is an ECDSA signature.
+// ECDSASignature is an ECDSA signature.
 type ECDSASignature struct {
 	r, s   *big.Int
 	signer hotstuff.ID
 }
 
-// RestoreSignature restores an existing signature.
+// RestoreECDSASignature restores an existing signature.
 // It should not be used to create new signatures, use Sign instead.
 func RestoreECDSASignature(r, s *big.Int, signer hotstuff.ID) *ECDSASignature {
 	return &ECDSASignature{r, s, signer}
@@ -61,7 +61,7 @@ type ECDSA struct {
 	config *core.RuntimeConfig
 }
 
-// New returns a new instance of the ECDSA CryptoBase implementation.
+// NewECDSA returns a new instance of the ECDSA crypto implementation.
 func NewECDSA(config *core.RuntimeConfig) *ECDSA {
 	return &ECDSA{
 		config: config,

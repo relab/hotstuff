@@ -1,4 +1,9 @@
-// Package eddsa implements the ed25519 curve signature.
+// Package crypto implements several signature schemes.
+// It provides a common interface for creating, verifying, and combining signatures.
+// The supported schemes are:
+// - EDDSA (Ed25519)
+// - ECDSA (secp256k1)
+// - BLS12 (BLS signatures)
 package crypto
 
 import (
@@ -20,7 +25,7 @@ const (
 	EDDSAPublicKeyFileType = "EDDSA PUBLIC KEY"
 )
 
-// Signature is an EDDSA signature.
+// EDDSASignature is an EDDSA signature.
 type EDDSASignature struct {
 	signer hotstuff.ID
 	sign   []byte
@@ -44,11 +49,12 @@ func (sig EDDSASignature) ToBytes() []byte {
 	return b
 }
 
+// EDDSA implements the ed25519 curve signature.
 type EDDSA struct {
 	config *core.RuntimeConfig
 }
 
-// NewEDDSA returns a new instance of the EDDSA CryptoBase implementation.
+// NewEDDSA returns a new instance of the EDDSA crypto implementation.
 func NewEDDSA(config *core.RuntimeConfig) *EDDSA {
 	return &EDDSA{
 		config: config,
@@ -156,7 +162,7 @@ func (ed *EDDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotst
 func (ed *EDDSA) verifySingle(sig *EDDSASignature, message []byte) error {
 	replica, ok := ed.config.ReplicaInfo(sig.Signer())
 	if !ok {
-		return fmt.Errorf("eddsaBase: got signature from replica whose ID (%d) was not in the config.", sig.Signer())
+		return fmt.Errorf("signature from unknown signer: replica %d not in config", sig.Signer())
 	}
 	pk := replica.PubKey.(ed25519.PublicKey)
 	if !ed25519.Verify(pk, message, sig.sign) {
