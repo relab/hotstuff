@@ -9,13 +9,25 @@
 			"--proto_path=${env.GOPATH}/pkg/mod/github.com/relab/gorums@v0.7.1-0.20220307181651-94a8af8e467c",
 		]
 	},
-	"go.lintTool": "golangci-lint",
+	"go.lintTool": "golangci-lint-v2",
 	"go.lintFlags": [
-		"--fast",
+		"--path-mode=abs",
+		"--fast-only"
+	],
+	"go.formatTool": "custom",
+	"go.alternateTools": {
+		"customFormatter": "golangci-lint-v2"
+	},
+	"go.formatFlags": [
+		"fmt",
+		"--stdin"
 	],
 	"go.testFlags": [
 		"-count=1"
 	],
+	"gopls": {
+		"ui.semanticTokens": true
+	},
 	"cSpell.enabled": true,
 	"cSpell.ignorePaths": [
 		"package-lock.json",
