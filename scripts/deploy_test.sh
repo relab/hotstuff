@@ -28,4 +28,7 @@ exit_code="$?"
 
 docker compose $compose_args down
 
+# Clean up dangling images
+docker image prune -f --filter "dangling=true"
+
 exit $exit_code
