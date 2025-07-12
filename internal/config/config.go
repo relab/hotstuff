@@ -138,6 +138,42 @@ type ExperimentConfig struct {
 	MeasurementInterval time.Duration
 }
 
+// Clone returns a clone of the ExperimentConfig. It makes a shallow copy
+// of primitive types and a deep copy of the ByzantineStrategy and
+// TreePositions. We assume ReplicaHosts, ClientHosts, Locations, and
+// Metrics are fixed across experiments and so we do not clone them.
+// If this assumption no longer holds, we should clone them as well.
+func (c *ExperimentConfig) Clone() *ExperimentConfig {
+	if c == nil {
+		return &ExperimentConfig{}
+	}
+	// shallow copy: copies all fields by value (primitive types) and by reference (slices/maps)
+	clone := *c
+
+	// deep copy reference types to ensure independent copies
+	if clone.ByzantineStrategy != nil {
+		clone.ByzantineStrategy = make(map[string][]uint32, len(c.ByzantineStrategy))
+		for k, v := range c.ByzantineStrategy {
+			clone.ByzantineStrategy[k] = slices.Clone(v)
+		}
+	}
+	clone.TreePositions = slices.Clone(c.TreePositions)
+
+	return &clone
+}
+
+// Merge merges (overwrites) the values from the given ExperimentConfig into the current one.
+// Currently, it only overwrites the module strings for Consensus, Communication, Crypto, and LeaderRotation.
+func (c *ExperimentConfig) Merge(ec *ExperimentConfig) {
+	if ec == nil {
+		return
+	}
+	c.Communication = ec.Communication
+	c.Consensus = ec.Consensus
+	c.Crypto = ec.Crypto
+	c.LeaderRotation = ec.LeaderRotation
+}
+
 // TreePosIDs returns a slice of hotstuff.IDs ordered by the tree positions.
 func (c *ExperimentConfig) TreePosIDs() []hotstuff.ID {
 	ids := make([]hotstuff.ID, 0, len(c.TreePositions))

@@ -29,8 +29,10 @@ func runController() {
 
 	cuePath := viper.GetString("cue")
 	if cuePath != "" {
-		cfg, err = config.NewCue(cuePath, cfg)
+		// cfg, err = config.NewCue(cuePath, cfg)
+		expConfig, err := config.NewCueExperiments(cuePath, cfg)
 		checkf("config error when loading %s: %v", cuePath, err)
+		cfg = expConfig[0] // Use the first experiment config for now
 	}
 
 	if cfg.RandomTree {
