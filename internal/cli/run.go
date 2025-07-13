@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -29,12 +30,17 @@ func runController() {
 
 	cuePath := viper.GetString("cue")
 	if cuePath != "" {
-		// cfg, err = config.NewCue(cuePath, cfg)
-		expConfig, err := config.NewCueExperiments(cuePath, cfg)
-		checkf("config error when loading %s: %v", cuePath, err)
-		cfg = expConfig[0] // Use the first experiment config for now
+		for expConfig, err := range config.Experiments(cuePath, cfg) {
+			checkf("config error when loading %s: %v", cuePath, err)
+			fmt.Printf("%s\n", expConfig.PrettyPrint(120))
+			runSingleExperiment(expConfig)
+		}
+	} else {
+		runSingleExperiment(cfg)
 	}
+}
 
+func runSingleExperiment(cfg *config.ExperimentConfig) {
 	if cfg.RandomTree {
 		tree.Shuffle(cfg.TreePositions)
 	}
