@@ -14,26 +14,10 @@ import (
 //go:embed schema.cue
 var schemaFile string
 
-// NewCueExperiments loads a cue configuration from filename and returns a list
-// of ExperimentConfig structs.
-// The configuration is validated against the embedded schema.
-// One can specify the `base` config to overwrite its values from the Cue config.
-// Leave `base` nil to construct a Cue config from scratch.
-func NewCueExperiments(filename string, base *ExperimentConfig) ([]*ExperimentConfig, error) {
-	var out []*ExperimentConfig
-	for ec, err := range Experiments(filename, base) {
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, ec)
-	}
-	return out, nil
-}
-
 // Experiments returns an iterator over experiment configurations that yields
-// an ExperimentConfig and error for each experiment. It processes the cue file and
-// validates each configuration against the schema. If [base] is non-nil, it is used
-// to overwrite values in the Cue config, e.g., specified on the command line.
+// an ExperimentConfig for each experiment, unless there was an error. It processes the
+// cue file and validates each configuration against the schema. If [base] is non-nil,
+// it is used to overwrite values in the Cue config, e.g., specified on the command line.
 func Experiments(filename string, base *ExperimentConfig) iter.Seq2[*ExperimentConfig, error] {
 	if base == nil {
 		base = &ExperimentConfig{}
