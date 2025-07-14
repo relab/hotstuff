@@ -8,10 +8,10 @@ package orchestration
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"path"
 	"path/filepath"
 	"strings"
@@ -58,7 +58,7 @@ func Deploy(g iago.Group, cfg DeployConfig) (workers map[string]WorkerSession, e
 
 	g.Run("Create temporary directory",
 		func(_ context.Context, host iago.Host) error {
-			tmpDir := "hotstuff." + randString(8)
+			tmpDir := "hotstuff." + rand.Text()[:8]
 			testDir := strings.TrimPrefix(tempDirPath(host, tmpDir), "/")
 			dataDir := testDir + "/data"
 			host.SetVar("test-dir", testDir)
@@ -259,15 +259,4 @@ func tempDirPath(host iago.Host, dirName string) string {
 		tmp = "/tmp"
 	}
 	return path.Join(tmp, dirName)
-}
-
-var rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
-
-func randString(n int) string {
-	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-	s := make([]rune, n)
-	for i := range s {
-		s[i] = letters[rnd.Intn(len(letters))]
-	}
-	return string(s)
 }
