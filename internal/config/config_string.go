@@ -2,10 +2,13 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"slices"
 	"strconv"
 	"strings"
+
+	"golang.org/x/term"
 )
 
 // join concatenates the elements of a to create a single string with elements separated by sep.
@@ -136,11 +139,22 @@ func (td *configurationTemplate) formatScalarLines() []string {
 	return lines
 }
 
-// PrettyPrint formats ExperimentConfig into a star-bordered box:
-// - slice fields and map fields: one column, printed first
-// - scalar fields: three columns, ordered top-to-bottom, printed after separator
-// - maxWidth: cap with ellipsis
-func (c ExperimentConfig) PrettyPrint(maxWidth int) string {
+func terminalWidth() int {
+	// check that it's actually a terminal
+	fd := int(os.Stdout.Fd())
+	if term.IsTerminal(fd) {
+		width, _, err := term.GetSize(fd)
+		if err == nil {
+			return width
+		}
+	}
+	return 80
+}
+
+// PrettyPrint formats the ExperimentConfig into a human-readable string.
+func (c ExperimentConfig) PrettyPrint(defaultWidth int) string {
+	const padding = 4
+	maxWidth := max(terminalWidth(), defaultWidth) - padding
 	v := reflect.ValueOf(c)
 	t := v.Type()
 	var sd configurationTemplate
