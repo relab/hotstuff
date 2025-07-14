@@ -197,6 +197,9 @@ func (w *workerSetup) Apply(_ context.Context, host iago.Host) (err error) {
 	dir := "/" + iago.GetStringVar(host, "data-dir")
 
 	var sb strings.Builder
+	sb.WriteString("GOCOVERDIR=")
+	sb.WriteString(dir)
+	sb.WriteString(" ")
 	sb.WriteString(iago.GetStringVar(host, "exe"))
 	sb.WriteString(" ")
 

@@ -10,18 +10,37 @@ gorums_go := internal/proto/clientpb/client_gorums.pb.go \
 		internal/proto/kauripb/kauri_gorums.pb.go
 
 binaries := hotstuff plot
+coverage_bin := hscov
+GOCOVERDIR := .log/coverage-data
 
 CSV ?= wonderproxy.csv
 
-.PHONY: all test short aws wonderproxy latencies debug clean protos download tools $(binaries)
+.PHONY: all coverage test short aws wonderproxy latencies debug clean protos download tools $(binaries)
 
 all: $(binaries)
+
+coverage: $(coverage_bin)
 
 debug: GCFLAGS += -gcflags='all=-N -l'
 debug: $(binaries)
 
 $(binaries): protos
 	@go build -o ./$@ $(GCFLAGS) ./cmd/$@
+
+$(coverage_bin): protos
+	@go build -cover -coverpkg=./... -o ./$@ $(GCFLAGS) ./cmd/hotstuff
+
+coverage: $(coverage_bin)
+	@rm -rf $(GOCOVERDIR)
+	@mkdir -p $(GOCOVERDIR)
+	@echo "Running tests with coverage..."
+	@GOCOVERDIR=$(GOCOVERDIR) ./$(coverage_bin) run --batch-size=100 --cue scripts/local_config.cue &> $(GOCOVERDIR)/log.out
+	@go tool covdata percent -i=$(GOCOVERDIR)
+	@go tool covdata textfmt -i=$(GOCOVERDIR) -o=$(GOCOVERDIR)/cov.txt
+	@echo "Execution output saved to $(GOCOVERDIR)/log.out"
+	@echo "To view the coverage report, run:"
+	@echo "- Browser view:   go tool cover -html=$(GOCOVERDIR)/cov.txt"
+	@echo "- Terminal view:  go tool cover -func=$(GOCOVERDIR)/cov.txt"
 
 protos: $(proto_go) $(gorums_go)
 
