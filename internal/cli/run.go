@@ -32,7 +32,7 @@ func runController() {
 	if cuePath != "" {
 		for expConfig, err := range config.Experiments(cuePath, cfg) {
 			checkf("config error when loading %s: %v", cuePath, err)
-			fmt.Printf("%s\n", expConfig.PrettyPrint(120))
+			fmt.Println(expConfig.PrettyPrint(120))
 			runSingleExperiment(expConfig)
 		}
 	} else {
