@@ -31,6 +31,15 @@ config: {
 		branchFactor!: int & >1 & <=div(replicas, 2)
 	}
 
+	// Consensus algorithm to use. (Default: "chainedhotstuff")
+	consensus: *"chainedhotstuff" | "simplehotstuff" | "fasthotstuff"
+	// Leader rotation strategy to use. (Default: "round-robin")
+	leaderRotation: *"round-robin" | "fixed" | "carousel" | "reputation"
+	// Cryptographic algorithm to use. (Default: "ecdsa")
+	crypto: *"ecdsa" | "eddsa" | "bls12"
+	// Communication protocol to use. (Default: "clique")
+	communication: *"clique" | "kauri"
+
 	// Byzantine strategy for different replicas (optional).
 	byzantineStrategy?: {
 		silent?: [...int & >=1 & <=replicas]

@@ -16,6 +16,7 @@ cmdqueue
 Cmds
 cmpopts
 CODECOV
+covdata
 covermode
 coverpkg
 coverprofile
@@ -40,6 +41,7 @@ fgprofprofile
 fixedleader
 gcflags
 gcov
+GOCOVERDIR
 gocyclo
 golangci
 golint
@@ -53,6 +55,7 @@ hostnames
 HOTSTUFF
 hotstuffgorums
 hotstuffpb
+hscov
 iagotest
 ICDCS
 iface
@@ -105,6 +108,7 @@ SSWU
 structs
 subconfiguration
 testutil
+textfmt
 throughputvslatency
 timestamppb
 TMPDIR

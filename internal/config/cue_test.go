@@ -8,7 +8,7 @@ import (
 	"github.com/relab/hotstuff/internal/config"
 )
 
-func TestLoad(t *testing.T) {
+func TestExperimentsIteratorSingle(t *testing.T) {
 	replicaHosts := []string{"bbchain1", "bbchain2", "bbchain3", "bbchain4", "bbchain5", "bbchain6"}
 	clientHosts := []string{"bbchain7", "bbchain8"}
 	locations := []string{"Melbourne", "Toronto", "Prague", "Paris", "Tokyo", "Amsterdam", "Auckland", "Moscow", "Stockholm", "London"}
@@ -17,6 +17,12 @@ func TestLoad(t *testing.T) {
 	byzantineStrategy := map[string][]uint32{
 		"silent": {2, 5},
 		"slow":   {4},
+	}
+	defaultModules := &config.ExperimentConfig{
+		Consensus:      "chainedhotstuff",
+		Communication:  "clique",
+		Crypto:         "ecdsa",
+		LeaderRotation: "round-robin",
 	}
 	validLocOnlyCfg := &config.ExperimentConfig{
 		ReplicaHosts: replicaHosts,
@@ -73,6 +79,16 @@ func TestLoad(t *testing.T) {
 		Replicas:     3,
 		Clients:      2,
 	}
+	exp := &config.ExperimentConfig{
+		ReplicaHosts:      []string{"localhost"},
+		ClientHosts:       []string{"localhost"},
+		Replicas:          4,
+		Clients:           1,
+		Locations:         []string{"Rome", "Oslo", "London", "Munich"},
+		TreePositions:     []uint32{3, 2, 1, 4},
+		BranchFactor:      2,
+		ByzantineStrategy: map[string][]uint32{"": {}},
+	}
 	tests := []struct {
 		name     string
 		filename string
@@ -89,16 +105,122 @@ func TestLoad(t *testing.T) {
 		{name: "InvalidLocationsSize", filename: "invalid-loc-size.cue", wantCfg: nil, wantErr: true},
 		{name: "InvalidTree", filename: "invalid-tree.cue", wantCfg: nil, wantErr: true},
 		{name: "Invalid2TreeOnly", filename: "invalid-tree-only.cue", wantCfg: nil, wantErr: true},
+		{name: "Experiments", filename: "exp.cue", wantCfg: exp, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotCfg, err := config.NewCue(filepath.Join("testdata", tt.filename), nil)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Load(%s) error = %v, wantErr %v", tt.filename, err, tt.wantErr)
-				return
+			for expConfig, err := range config.Experiments(filepath.Join("testdata", tt.filename), nil) {
+				if (err != nil) != tt.wantErr {
+					t.Errorf("Experiments(%s) error = %v, wantErr %v", tt.filename, err, tt.wantErr)
+				}
+				if (tt.wantCfg == nil && expConfig != nil) || (tt.wantCfg != nil && expConfig == nil) {
+					t.Errorf("Experiments(%s) mismatch: got %v, want %v", tt.filename, expConfig, tt.wantCfg)
+				}
+				if expConfig == nil && tt.wantCfg == nil {
+					return // both nil, no diff to check
+				}
+				if tt.wantCfg != nil {
+					// merge default modules into the wanted config
+					tt.wantCfg.Merge(defaultModules)
+				}
+				if diff := cmp.Diff(tt.wantCfg, expConfig); diff != "" {
+					t.Errorf("Experiments(%s) mismatch (-want +got):\n%s", tt.filename, diff)
+				}
 			}
-			if diff := cmp.Diff(gotCfg, tt.wantCfg); diff != "" {
-				t.Errorf("Load(%s) mismatch (-want +got):\n%s", tt.filename, diff)
+		})
+	}
+}
+
+func TestExperimentsIteratorMultiple(t *testing.T) {
+	fourExp := []*config.ExperimentConfig{
+		{
+			ReplicaHosts:      []string{"localhost"},
+			ClientHosts:       []string{"localhost"},
+			Replicas:          4,
+			Clients:           1,
+			Locations:         []string{"Rome", "Oslo", "London", "Munich"},
+			TreePositions:     []uint32{3, 2, 1, 4},
+			BranchFactor:      2,
+			Consensus:         "chainedhotstuff",
+			Communication:     "clique",
+			Crypto:            "ecdsa",
+			LeaderRotation:    "round-robin",
+			ByzantineStrategy: map[string][]uint32{"": {}},
+		},
+		{
+			ReplicaHosts:      []string{"localhost"},
+			ClientHosts:       []string{"localhost"},
+			Replicas:          4,
+			Clients:           1,
+			Locations:         []string{"Rome", "Oslo", "London", "Munich"},
+			TreePositions:     []uint32{3, 2, 1, 4},
+			BranchFactor:      2,
+			Consensus:         "simplehotstuff",
+			Communication:     "clique",
+			Crypto:            "ecdsa",
+			LeaderRotation:    "round-robin",
+			ByzantineStrategy: map[string][]uint32{"fork": {2}},
+		},
+		{
+			ReplicaHosts:      []string{"localhost"},
+			ClientHosts:       []string{"localhost"},
+			Replicas:          4,
+			Clients:           1,
+			Locations:         []string{"Rome", "Oslo", "London", "Munich"},
+			TreePositions:     []uint32{3, 2, 1, 4},
+			BranchFactor:      2,
+			Consensus:         "fasthotstuff",
+			Communication:     "kauri",
+			Crypto:            "ecdsa",
+			LeaderRotation:    "round-robin",
+			ByzantineStrategy: map[string][]uint32{"silence": {2}},
+		},
+		{
+			ReplicaHosts:      []string{"localhost"},
+			ClientHosts:       []string{"localhost"},
+			Replicas:          4,
+			Clients:           1,
+			Locations:         []string{"Rome", "Oslo", "London", "Munich"},
+			TreePositions:     []uint32{3, 2, 1, 4},
+			BranchFactor:      2,
+			Consensus:         "chainedhotstuff",
+			Communication:     "kauri",
+			Crypto:            "ecdsa",
+			LeaderRotation:    "round-robin",
+			ByzantineStrategy: map[string][]uint32{"": {}},
+		},
+	}
+	tests := []struct {
+		name     string
+		filename string
+		wantCfg  []*config.ExperimentConfig
+		wantLen  int
+		wantErr  bool
+	}{
+		{name: "FourExperiments", filename: "four-experiments.cue", wantCfg: fourExp, wantLen: 4, wantErr: false},
+		{name: "SweepExperiments", filename: "sweep-experiments.cue", wantLen: 16, wantErr: false},
+		{name: "NoSuchExperiment", filename: "no-such-experiment.cue", wantLen: 0, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expCnt := 0
+			for gotCfg, err := range config.Experiments(filepath.Join("testdata", tt.filename), nil) {
+				if (err != nil) != tt.wantErr {
+					t.Errorf("Experiments(%s) error = %v, wantErr %v", tt.filename, err, tt.wantErr)
+				}
+				if gotCfg != nil {
+					expCnt++ // only count non-nil configs towards the wanted length
+				}
+				if tt.wantCfg == nil {
+					continue // skip diff check for large parameter sweeps
+				}
+				wantCfg := tt.wantCfg[expCnt-1]
+				if diff := cmp.Diff(wantCfg, gotCfg); diff != "" {
+					t.Errorf("Experiments(%s) mismatch (-want +got):\n%s", tt.filename, diff)
+				}
+			}
+			if expCnt != tt.wantLen {
+				t.Errorf("Experiments(%s) length = %d, want %d", tt.filename, expCnt, tt.wantLen)
 			}
 		})
 	}
