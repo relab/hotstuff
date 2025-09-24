@@ -146,7 +146,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 	}
 	// setup core - used in replica and measurement framework
 	runtimeOpts := []core.RuntimeOption{}
-	if opts.TreeEnabled() && opts.GetCommunication() == comm.NameKauri {
+	if opts.KauriEnabled() {
 		runtimeOpts = append(runtimeOpts, core.WithKauriTree(newTree(opts)))
 	}
 	if opts.GetConsensus() == rules.NameFastHotStuff {

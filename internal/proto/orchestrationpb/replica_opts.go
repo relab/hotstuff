@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -53,11 +54,11 @@ func (x *ReplicaOpts) SetTreeOptions(branchFactor uint32, positions []uint32, tr
 	x.TreeDelta = durationpb.New(treeDelta)
 }
 
-// TreeEnabled returns true if there are tree positions defined,
+// KauriEnabled returns true if there are tree positions defined,
 // the branch factor is greater than 0, and the tree delta is valid (not zero).
 // This indicates that the replica is configured to use a tree structure for the Kauri protocol.
-func (x *ReplicaOpts) TreeEnabled() bool {
-	return len(x.TreePositions) > 0 && x.BranchFactor > 0 && x.TreeDelta.IsValid()
+func (x *ReplicaOpts) KauriEnabled() bool {
+	return len(x.TreePositions) > 0 && x.BranchFactor > 0 && x.TreeDelta.IsValid() && x.Communication == comm.NameKauri
 }
 
 func (x *ReplicaOpts) SetByzantineStrategy(strategy string) {
