@@ -32,19 +32,13 @@ func NewClique(
 	}
 }
 
-// Disseminate broadcasts the proposal and sends my vote for this proposal to the next leader
+// Disseminate broadcasts the proposal and aggregate my vote for this proposal
 func (hs *Clique) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	hs.sender.Propose(proposal)
 
-	leaderID := hs.leaderRotation.GetLeader(proposal.Block.View() + 1)
-	if leaderID == hs.config.ID() {
-		// I am the next leader, store, not send
-		hs.votingMachine.CollectVote(hotstuff.VoteMsg{
-			ID:          hs.config.ID(),
-			PartialCert: pc,
-		})
-	} else {
-		hs.sender.Vote(leaderID, pc)
+	err := hs.Aggregate(proposal.Block.View(), proposal, pc)
+	if err != nil {
+		return err
 	}
 	return nil
 }
