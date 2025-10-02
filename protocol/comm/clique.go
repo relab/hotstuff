@@ -38,7 +38,7 @@ func (hs *Clique) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.Partial
 
 	leaderID := hs.leaderRotation.GetLeader(proposal.Block.View() + 1)
 	if leaderID == hs.config.ID() {
-		// I am the next leader, store not send
+		// I am the next leader, store, not send
 		hs.votingMachine.CollectVote(hotstuff.VoteMsg{
 			ID:          hs.config.ID(),
 			PartialCert: pc,
