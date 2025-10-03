@@ -67,9 +67,9 @@ func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (errs error) {
 	return errs
 }
 
-// StopVoting prevents voting in the given view and all earlier views.
-// Returns true if the last vote was advanced, and false if voting had
-// already stopped for this view.
+// StopVoting marks this and earlier views as unavailable for voting.
+// Returns true if voting was stopped for this view, and false if voting
+// had already been stopped for this view.
 func (v *Voter) StopVoting(view hotstuff.View) bool {
 	if v.lastVote < view {
 		v.lastVote = view
