@@ -43,7 +43,8 @@ func (hs *Clique) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.Partial
 }
 
 // Aggregate aggregates the vote or stores it if the replica is leader in the next view.
-func (hs *Clique) Aggregate(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
+func (hs *Clique) Aggregate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
+	lastVote := proposal.Block.View()
 	leaderID := hs.leaderRotation.GetLeader(lastVote + 1)
 	if leaderID == hs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.

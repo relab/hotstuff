@@ -61,7 +61,7 @@ func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (errs error) {
 		return errors.Join(errs, fmt.Errorf("vote failed: %w", err))
 	}
 	// send the vote if it was successful
-	if err := v.aggregator.Aggregate(v.LastVote(), proposal, pc); err != nil {
+	if err := v.aggregator.Aggregate(proposal, pc); err != nil {
 		return errors.Join(errs, fmt.Errorf("aggregate failed (view %d): %w", block.View(), err))
 	}
 	return errs

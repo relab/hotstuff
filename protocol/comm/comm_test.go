@@ -68,7 +68,7 @@ func TestDisseminateAggregate(t *testing.T) {
 	// reusing the previous partial cert
 	// aggregating for view 2 to change the leader to 2 so clique will aggregate instead
 	// of storing the vote internally
-	err = clique.Aggregate(1, nil, pc)
+	err = clique.Aggregate(proposal, pc)
 	if err != nil {
 		t.Fatal(err)
 	}
