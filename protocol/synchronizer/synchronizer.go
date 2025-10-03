@@ -183,12 +183,9 @@ func (s *Synchronizer) OnLocalTimeout() {
 		return
 	}
 	s.lastTimeout = timeoutMsg
-	// stop voting for current view
-	prev := s.voter.LastVote()
-	s.voter.StopVoting(view)
-	// check if view is the same to log vote stop
-	if prev != view {
-		s.logger.Debugf("Stopped voting in view %d and changed to view %d", prev, view)
+
+	if s.voter.StopVoting(view) {
+		s.logger.Debugf("Stopped voting for view %d", view)
 	}
 
 	s.sender.Timeout(*timeoutMsg)

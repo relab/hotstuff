@@ -67,11 +67,15 @@ func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (errs error) {
 	return errs
 }
 
-// StopVoting ensures that no voting happens in a view earlier than `view`.
-func (v *Voter) StopVoting(view hotstuff.View) {
+// StopVoting prevents voting in the given view and all earlier views.
+// Returns true if the last vote was advanced, and false if voting had
+// already stopped for this view.
+func (v *Voter) StopVoting(view hotstuff.View) bool {
 	if v.lastVote < view {
 		v.lastVote = view
+		return true
 	}
+	return false
 }
 
 // Vote votes for and signs the block, returning a partial certificate
@@ -110,8 +114,4 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 		return fmt.Errorf("expected leader %d but got %d in view %d", leaderID, proposal.ID, block.View())
 	}
 	return nil
-}
-
-func (v *Voter) LastVote() hotstuff.View {
-	return v.lastVote
 }
