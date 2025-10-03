@@ -21,7 +21,7 @@ type Voter struct {
 	auth      *cert.Authority
 	committer *Committer
 
-	lastVote hotstuff.View
+	lastVotedView hotstuff.View
 }
 
 func NewVoter(
@@ -42,7 +42,7 @@ func NewVoter(
 		auth:      auth,
 		committer: committer,
 
-		lastVote: 0,
+		lastVotedView: 0,
 	}
 	return v
 }
@@ -71,8 +71,8 @@ func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (errs error) {
 // Returns true if voting was stopped for this view, and false if voting
 // had already been stopped for this view.
 func (v *Voter) StopVoting(view hotstuff.View) bool {
-	if v.lastVote < view {
-		v.lastVote = view
+	if v.lastVotedView < view {
+		v.lastVotedView = view
 		return true
 	}
 	return false
@@ -88,7 +88,7 @@ func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, err error)
 	}
 	// block is safe, so we update the view we voted for
 	// i.e., we voted for this block!
-	v.lastVote = block.View()
+	v.lastVotedView = block.View()
 	return pc, nil
 }
 
@@ -97,8 +97,8 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 	block := proposal.Block
 	view := block.View()
 	// cannot vote for an old block.
-	if block.View() <= v.lastVote {
-		return fmt.Errorf("block view %d too old, last vote was %d", block.View(), v.lastVote)
+	if block.View() <= v.lastVotedView {
+		return fmt.Errorf("block view %d too old, last voted view was %d", block.View(), v.lastVotedView)
 	}
 	// vote rule must be valid
 	if !v.ruler.VoteRule(view, *proposal) {
