@@ -49,33 +49,42 @@ func NewKauri(
 		panic("the tree must be configured for kauri")
 	}
 	k := &Kauri{
+		logger:     logger,
+		eventLoop:  eventLoop,
+		config:     config,
 		blockchain: blockchain,
 		auth:       auth,
-		config:     config,
-		eventLoop:  eventLoop,
 		sender:     sender,
-		logger:     logger,
-
-		senders: make([]hotstuff.ID, 0),
-		tree:    config.Tree(),
+		senders:    make([]hotstuff.ID, 0),
+		tree:       config.Tree(),
 	}
 	k.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(_ any) {
-		k.initDone = true // this signals that
+		k.initDone = true // signal that we are connected
 	})
 	k.eventLoop.RegisterHandler(kauri.ContributionRecvEvent{}, func(event any) {
-		k.OnContributionRecv(event.(kauri.ContributionRecvEvent))
+		k.onContributionRecv(event.(kauri.ContributionRecvEvent))
 	})
 	k.eventLoop.RegisterHandler(WaitTimerExpiredEvent{}, func(event any) {
-		k.OnWaitTimerExpired(event.(WaitTimerExpiredEvent))
+		k.onWaitTimerExpired(event.(WaitTimerExpiredEvent))
 	})
 	return k
 }
 
-// Begin starts dissemination of proposal and aggregation of votes.
-func (k *Kauri) Begin(p *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
+// Disseminate disseminates the proposal from the proposer to replicas below in the tree.
+func (k *Kauri) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
+	return k.begin(proposal, pc)
+}
+
+// Aggregate sends the vote to the aggregating replica above in the tree.
+func (k *Kauri) Aggregate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
+	return k.begin(proposal, pc)
+}
+
+// begin starts dissemination of proposal and aggregation of votes.
+func (k *Kauri) begin(p *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	if !k.initDone {
 		k.eventLoop.DelayUntil(network.ConnectedEvent{}, func() {
-			if err := k.Begin(p, pc); err != nil {
+			if err := k.begin(p, pc); err != nil {
 				k.logger.Error(err)
 			}
 		})
@@ -85,7 +94,7 @@ func (k *Kauri) Begin(p *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	k.blockHash = pc.BlockHash()
 	k.currentView = p.Block.View()
 	k.aggContrib = pc.Signature()
-	return k.SendProposalToChildren(p)
+	return k.sendProposalToChildren(p)
 }
 
 func (k *Kauri) reset() {
@@ -94,22 +103,8 @@ func (k *Kauri) reset() {
 	k.aggSent = false
 }
 
-func (k *Kauri) Aggregate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
-	return k.Begin(proposal, pc)
-}
-
-func (k *Kauri) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
-	return k.Begin(proposal, pc)
-}
-
-func (k *Kauri) WaitToAggregate() {
-	view := k.currentView
-	time.Sleep(k.tree.WaitTime())
-	k.eventLoop.AddEvent(WaitTimerExpiredEvent{currentView: view})
-}
-
-// SendProposalToChildren sends the proposal to the children.
-func (k *Kauri) SendProposalToChildren(p *hotstuff.ProposeMsg) error {
+// sendProposalToChildren sends the proposal to the children.
+func (k *Kauri) sendProposalToChildren(p *hotstuff.ProposeMsg) error {
 	children := k.tree.ReplicaChildren()
 	if len(children) != 0 {
 		childSender, err := k.sender.Sub(children)
@@ -118,7 +113,7 @@ func (k *Kauri) SendProposalToChildren(p *hotstuff.ProposeMsg) error {
 		}
 		k.logger.Debug("Sending proposal to children ", children)
 		childSender.Propose(p)
-		go k.WaitToAggregate()
+		go k.waitToAggregate()
 	} else {
 		k.sender.SendContributionToParent(k.currentView, k.aggContrib)
 		k.aggSent = true
@@ -126,8 +121,14 @@ func (k *Kauri) SendProposalToChildren(p *hotstuff.ProposeMsg) error {
 	return nil
 }
 
-// OnContributionRecv is invoked upon receiving the vote for aggregation.
-func (k *Kauri) OnContributionRecv(event kauri.ContributionRecvEvent) {
+func (k *Kauri) waitToAggregate() {
+	view := k.currentView
+	time.Sleep(k.tree.WaitTime())
+	k.eventLoop.AddEvent(WaitTimerExpiredEvent{currentView: view})
+}
+
+// onContributionRecv is invoked upon receiving the vote for aggregation.
+func (k *Kauri) onContributionRecv(event kauri.ContributionRecvEvent) {
 	if k.currentView != hotstuff.View(event.Contribution.View) {
 		return
 	}
@@ -146,7 +147,7 @@ func (k *Kauri) OnContributionRecv(event kauri.ContributionRecvEvent) {
 	}
 }
 
-func (k *Kauri) OnWaitTimerExpired(event WaitTimerExpiredEvent) {
+func (k *Kauri) onWaitTimerExpired(event WaitTimerExpiredEvent) {
 	if k.currentView != event.currentView {
 		return
 	}
