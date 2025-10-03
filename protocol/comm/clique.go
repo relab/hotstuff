@@ -32,15 +32,11 @@ func NewClique(
 	}
 }
 
-// Disseminate broadcasts the proposal and aggregate my vote for this proposal
+// Disseminate broadcasts the proposal and aggregates vote for this proposal
 func (hs *Clique) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	hs.sender.Propose(proposal)
 
-	err := hs.Aggregate(proposal.Block.View(), proposal, pc)
-	if err != nil {
-		return err
-	}
-	return nil
+	return hs.Aggregate(proposal.Block.View(), proposal, pc)
 }
 
 // Aggregate aggregates the vote or stores it if the replica is leader in the next view.
