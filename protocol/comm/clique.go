@@ -32,16 +32,16 @@ func NewClique(
 	}
 }
 
-// Disseminate broadcasts the proposal and aggregates vote for this proposal
+// Disseminate broadcasts the proposal and aggregates my vote for this proposals.
 func (hs *Clique) Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	hs.sender.Propose(proposal)
-
-	return hs.Aggregate(proposal.Block.View(), proposal, pc)
+	return hs.Aggregate(proposal, pc)
 }
 
-// Aggregate aggregates the vote or stores it if the replica is leader in the next view.
-func (hs *Clique) Aggregate(lastVote hotstuff.View, _ *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
-	leaderID := hs.leaderRotation.GetLeader(lastVote + 1)
+// Aggregate sends the vote or stores it if the replica is leader in the next view.
+func (hs *Clique) Aggregate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
+	nextView := proposal.Block.View() + 1
+	leaderID := hs.leaderRotation.GetLeader(nextView)
 	if leaderID == hs.config.ID() {
 		// if I am the leader in the next view, collect the vote for myself beforehand.
 		hs.votingMachine.CollectVote(hotstuff.VoteMsg{

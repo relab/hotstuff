@@ -94,7 +94,7 @@ func (k *Kauri) reset() {
 	k.aggSent = false
 }
 
-func (k *Kauri) Aggregate(_ hotstuff.View, proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
+func (k *Kauri) Aggregate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	return k.Begin(proposal, pc)
 }
 

@@ -106,9 +106,8 @@ func TestAggregateSend(t *testing.T) {
 		Block: block,
 	}
 
-	// Replica 1 is not leader of next view (2)
-	lastVote := hotstuff.View(1)
-	err = clique.Aggregate(lastVote, proposal, pc)
+	// Replica 1 is not leader of next view 2
+	err = clique.Aggregate(proposal, pc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +126,7 @@ func TestAggregateSend(t *testing.T) {
 }
 
 func TestAggregateStore(t *testing.T) {
-	essentials := testutil.WireUpEssentials(t, 1, crypto.NameECDSA)
+	essentials := testutil.WireUpEssentials(t, 2, crypto.NameECDSA)
 	viewStates, err := protocol.NewViewStates(
 		essentials.Blockchain(),
 		essentials.Authority(),
@@ -156,9 +155,8 @@ func TestAggregateStore(t *testing.T) {
 		Block: block,
 	}
 
-	// Replica 1 is leader of view (1)
-	lastVote := hotstuff.View(0)
-	err = clique.Aggregate(lastVote, proposal, pc)
+	// Replica 2 is leader of view 2
+	err = clique.Aggregate(proposal, pc)
 	if err != nil {
 		t.Fatal(err)
 	}
