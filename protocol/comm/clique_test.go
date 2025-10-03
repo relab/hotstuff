@@ -168,6 +168,4 @@ func TestAggregateStore(t *testing.T) {
 	if len(messages) != 0 {
 		t.Fatal("expected no message to be sent")
 	}
-
-	// TODO: How can we test that the vote was indeed recorded
 }
