@@ -14,8 +14,7 @@ type IncreaseView struct {
 	consensus.Ruleset
 }
 
-// NewIncreaseView returns a Byzantine replica that will try to increase the view
-// out of protocol in its Propose.
+// NewIncreaseView returns a repliaca that proposes with an inflated view number.
 func NewIncreaseView(
 	config *core.RuntimeConfig,
 	rules consensus.Ruleset,
@@ -29,7 +28,7 @@ func NewIncreaseView(
 func (iv *IncreaseView) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
 	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
 	const ByzViewExtraIncrease hotstuff.View = 1000
-	proposal = hotstuff.NewProposeMsg(iv.config.ID(), view+ByzViewExtraIncrease, qc, cmd) // Bump up view
+	proposal = hotstuff.NewProposeMsg(iv.config.ID(), view+ByzViewExtraIncrease, qc, cmd)
 	return proposal, true
 }
 
