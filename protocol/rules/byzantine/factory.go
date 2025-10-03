@@ -22,7 +22,7 @@ func Wrap(
 	case NameFork:
 		byzRules = NewFork(config, blockchain, rules)
 	case NameIncreaseView:
-		byzRules = NewIncreaseView(config, blockchain, rules)
+		byzRules = NewIncreaseView(config, rules)
 	default:
 		return nil, fmt.Errorf("invalid byzantine strategy: '%s'", name)
 	}

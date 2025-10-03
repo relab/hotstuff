@@ -1,4 +1,3 @@
-// Package byzantine contains Byzantine consensus rules.
 package byzantine
 
 import (
@@ -6,14 +5,12 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/protocol/consensus"
-	"github.com/relab/hotstuff/security/blockchain"
 )
 
-const NameIncreaseView = "increaseView"
+const NameIncreaseView = "increaseview"
 
 type IncreaseView struct {
-	config     *core.RuntimeConfig
-	blockchain *blockchain.Blockchain
+	config *core.RuntimeConfig
 	consensus.Ruleset
 }
 
@@ -21,13 +18,11 @@ type IncreaseView struct {
 // out of protocol in its Propose.
 func NewIncreaseView(
 	config *core.RuntimeConfig,
-	blockchain *blockchain.Blockchain,
 	rules consensus.Ruleset,
 ) *IncreaseView {
 	return &IncreaseView{
-		config:     config,
-		blockchain: blockchain,
-		Ruleset:    rules,
+		config:  config,
+		Ruleset: rules,
 	}
 }
 
