@@ -9,9 +9,9 @@ type Disseminator interface {
 	Disseminate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error
 }
 
-// Aggregator is an interface for handling incoming proposals and replying with a vote.
+// Aggregator is an interface for collecting votes for a given proposal.
 type Aggregator interface {
-	// Aggregate handles incoming proposals and replies with a vote.
+	// Aggregate sends the vote to the aggregating replica.
 	Aggregate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error
 }
 
