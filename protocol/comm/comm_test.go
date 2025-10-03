@@ -55,8 +55,8 @@ func TestDisseminateAggregate(t *testing.T) {
 		t.Fatal(err)
 	}
 	messages := essentials.MockSender().MessagesSent()
-	if len(messages) != 1 {
-		t.Fatal("expected a message to be sent")
+	if len(messages) != 2 {
+		t.Fatal("expected two messages to be sent")
 	}
 	msgProposal, ok := messages[0].(hotstuff.ProposeMsg)
 	if !ok {
@@ -65,17 +65,7 @@ func TestDisseminateAggregate(t *testing.T) {
 	if msgProposal.ID != proposal.ID || msgProposal.Block != proposal.Block {
 		t.Fatal("incorrect message data")
 	}
-	// reusing the previous partial cert
-	// aggregating for view 2 to change the leader to 2 so clique will aggregate instead
-	// of storing the vote internally
-	err = clique.Aggregate(1, nil, pc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	messages = essentials.MockSender().MessagesSent()
-	if len(messages) != 2 {
-		t.Fatal("expected another message to be sent")
-	}
+
 	// checking the second message
 	msgPC, ok := messages[1].(hotstuff.PartialCert)
 	if !ok {
