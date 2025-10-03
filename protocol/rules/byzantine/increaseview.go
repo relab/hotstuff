@@ -14,7 +14,7 @@ type IncreaseView struct {
 	consensus.Ruleset
 }
 
-// NewIncreaseView returns a repliaca that proposes with an inflated view number.
+// NewIncreaseView returns a replica that proposes with an inflated view number.
 func NewIncreaseView(
 	config *core.RuntimeConfig,
 	rules consensus.Ruleset,
