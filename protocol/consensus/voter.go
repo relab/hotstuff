@@ -94,14 +94,13 @@ func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, err error)
 
 // Verify verifies the proposal and returns true if it can be voted for.
 func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
-	block := proposal.Block
-	view := block.View()
+	blockView := proposal.Block.View()
 	// cannot vote for an old block.
-	if block.View() <= v.lastVotedView {
-		return fmt.Errorf("block view %d too old, last voted view was %d", block.View(), v.lastVotedView)
+	if blockView <= v.lastVotedView {
+		return fmt.Errorf("block view %d too old, last voted view was %d", blockView, v.lastVotedView)
 	}
 	// vote rule must be valid
-	if !v.ruler.VoteRule(view, *proposal) {
+	if !v.ruler.VoteRule(blockView, *proposal) {
 		return fmt.Errorf("vote rule not satisfied")
 	}
 	// verify the proposal's quorum certificate(s).
@@ -109,9 +108,9 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 		return err
 	}
 	// ensure the block came from the expected leader.
-	leaderID := v.leaderRotation.GetLeader(block.View())
+	leaderID := v.leaderRotation.GetLeader(blockView)
 	if proposal.ID != leaderID {
-		return fmt.Errorf("expected leader %d but got %d in view %d", leaderID, proposal.ID, block.View())
+		return fmt.Errorf("expected leader %d but got %d in view %d", leaderID, proposal.ID, blockView)
 	}
 	return nil
 }
