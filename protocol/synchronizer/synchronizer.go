@@ -169,26 +169,23 @@ func (s *Synchronizer) Start(ctx context.Context) {
 func (s *Synchronizer) OnLocalTimeout() {
 	s.logger.Debug("OnLocalTimeout")
 	s.startTimeoutTimer()
-	view := s.state.View()
-	if s.lastTimeout != nil && s.lastTimeout.View == view {
+	currentView := s.state.View()
+	if s.lastTimeout != nil && s.lastTimeout.View == currentView {
 		s.sender.Timeout(*s.lastTimeout)
 		return
 	}
 	s.duration.ViewTimeout() // increase the duration of the next view
-	s.logger.Debugf("OnLocalTimeout: %v", view)
+	s.logger.Debugf("OnLocalTimeout: %v", currentView)
 
-	timeoutMsg, err := s.timeoutRules.LocalTimeoutRule(view, s.state.SyncInfo())
+	timeoutMsg, err := s.timeoutRules.LocalTimeoutRule(currentView, s.state.SyncInfo())
 	if err != nil {
 		s.logger.Warnf("Failed to create timeout message: %v", err)
 		return
 	}
 	s.lastTimeout = timeoutMsg
-	// stop voting for current view
-	prev := s.voter.LastVote()
-	s.voter.StopVoting(view)
-	// check if view is the same to log vote stop
-	if prev != view {
-		s.logger.Debugf("Stopped voting in view %d and changed to view %d", prev, view)
+
+	if s.voter.StopVoting(currentView) {
+		s.logger.Debugf("Stopped voting for timed out view %d", currentView)
 	}
 
 	s.sender.Timeout(*timeoutMsg)

@@ -106,7 +106,38 @@ func TestOnValidPropose(t *testing.T) {
 	if pc.BlockHash().String() != block.Hash().String() {
 		t.Fatal("incorrect partial cert was aggregated")
 	}
-	if voter.LastVote() != proposal.Block.View() {
-		t.Fatal("incorrect view voted for")
+	// verify that voting was stopped for the view after voting
+	if voter.StopVoting(proposal.Block.View()) {
+		t.Fatal("should not be able to advance to the same view we just voted for")
+	}
+}
+
+func TestStopVoting(t *testing.T) {
+	tests := []struct {
+		name string
+		view hotstuff.View
+		want bool
+	}{
+		{name: "advance from view 0 to view 1", view: 1, want: true},
+		{name: "stop voting for same view", view: 1, want: false},
+		{name: "stop voting for earlier view", view: 0, want: false},
+		{name: "advance to view 2", view: 2, want: true},
+		{name: "advance to higher view", view: 5, want: true},
+		{name: "stop voting for view less than current", view: 3, want: false},
+		{name: "stop voting for current view", view: 5, want: false},
+		{name: "advance to much higher view", view: 10, want: true},
+	}
+
+	id := hotstuff.ID(1)
+	essentials := testutil.WireUpEssentials(t, id, crypto.NameECDSA)
+	voter := wireUpVoter(t, essentials)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := voter.StopVoting(tt.view)
+			if got != tt.want {
+				t.Errorf("StopVoting(%d) = %v, want %v", tt.view, got, tt.want)
+			}
+		})
 	}
 }

@@ -21,7 +21,7 @@ type Voter struct {
 	auth      *cert.Authority
 	committer *Committer
 
-	lastVote hotstuff.View
+	lastVotedView hotstuff.View
 }
 
 func NewVoter(
@@ -42,7 +42,7 @@ func NewVoter(
 		auth:      auth,
 		committer: committer,
 
-		lastVote: 0,
+		lastVotedView: 0,
 	}
 	return v
 }
@@ -67,11 +67,15 @@ func (v *Voter) OnValidPropose(proposal *hotstuff.ProposeMsg) (errs error) {
 	return errs
 }
 
-// StopVoting ensures that no voting happens in a view earlier than `view`.
-func (v *Voter) StopVoting(view hotstuff.View) {
-	if v.lastVote < view {
-		v.lastVote = view
+// StopVoting marks this and earlier views as unavailable for voting.
+// Returns true if voting was stopped for this view, and false if voting
+// had already been stopped for this view.
+func (v *Voter) StopVoting(view hotstuff.View) bool {
+	if v.lastVotedView < view {
+		v.lastVotedView = view
+		return true
 	}
+	return false
 }
 
 // Vote votes for and signs the block, returning a partial certificate
@@ -84,20 +88,19 @@ func (v *Voter) Vote(block *hotstuff.Block) (pc hotstuff.PartialCert, err error)
 	}
 	// block is safe, so we update the view we voted for
 	// i.e., we voted for this block!
-	v.lastVote = block.View()
+	v.lastVotedView = block.View()
 	return pc, nil
 }
 
 // Verify verifies the proposal and returns true if it can be voted for.
 func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
-	block := proposal.Block
-	view := block.View()
+	blockView := proposal.Block.View()
 	// cannot vote for an old block.
-	if block.View() <= v.lastVote {
-		return fmt.Errorf("block view %d too old, last vote was %d", block.View(), v.lastVote)
+	if blockView <= v.lastVotedView {
+		return fmt.Errorf("block view %d too old, last voted view was %d", blockView, v.lastVotedView)
 	}
 	// vote rule must be valid
-	if !v.ruler.VoteRule(view, *proposal) {
+	if !v.ruler.VoteRule(blockView, *proposal) {
 		return fmt.Errorf("vote rule not satisfied")
 	}
 	// verify the proposal's quorum certificate(s).
@@ -105,13 +108,9 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 		return err
 	}
 	// ensure the block came from the expected leader.
-	leaderID := v.leaderRotation.GetLeader(block.View())
+	leaderID := v.leaderRotation.GetLeader(blockView)
 	if proposal.ID != leaderID {
-		return fmt.Errorf("expected leader %d but got %d in view %d", leaderID, proposal.ID, block.View())
+		return fmt.Errorf("expected leader %d but got %d in view %d", leaderID, proposal.ID, blockView)
 	}
 	return nil
-}
-
-func (v *Voter) LastVote() hotstuff.View {
-	return v.lastVote
 }
