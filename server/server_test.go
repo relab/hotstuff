@@ -92,6 +92,7 @@ func TestPropose(t *testing.T) {
 		sender.Propose(&want)
 		wg.Wait()
 	}, func(event any) {
+		// We should receive the proposal at all replicas except the sender (3 replicas)
 		got := event.(hotstuff.ProposeMsg)
 		if got.ID != want.ID {
 			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
@@ -105,24 +106,29 @@ func TestPropose(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	var wg sync.WaitGroup
-	var want hotstuff.TimeoutMsg
+	view := hotstuff.View(1)
+	want := hotstuff.TimeoutMsg{
+		ID:       1,
+		View:     view,
+		SyncInfo: hotstuff.NewSyncInfo(),
+	}
+
 	testBase(t, want, func(auth *cert.Authority, sender *network.GorumsSender) {
-		view := hotstuff.View(1)
 		sig, err := auth.Sign(view.ToBytes())
 		if err != nil {
 			t.Fatal(err)
 		}
-		// write the wanted test data to the variable in outer scope
-		want = hotstuff.TimeoutMsg{
-			ID:            1,
-			View:          view,
-			ViewSignature: sig,
-			SyncInfo:      hotstuff.NewSyncInfo(),
-		}
-		wg.Add(6) // TODO(AlanRostem): this was 3 when we used mocking. Not sure why 6 is needed for the "real" synchronizer.
+		want.ViewSignature = sig
+		wg.Add(6)
+		// We send only a single timeout message, but the synchronizer triggers
+		// an additional timeout, resulting from the following call chain:
+		// Start() -> startTimeoutTimer() -> TimeoutEvent -> OnLocalTimeout() -> sender.Timeout()
 		sender.Timeout(want)
 		wg.Wait()
 	}, func(event any) {
+		// We should receive 2 TimeoutMsg events at all replicas except the sender
+		// for a total of 6 events (3 replicas * 2 events). This is because the
+		// synchronizer triggers an additional timeout.
 		got := event.(hotstuff.TimeoutMsg)
 		if got.ID != want.ID {
 			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
