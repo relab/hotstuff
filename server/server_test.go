@@ -1,7 +1,6 @@
 package server_test
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"crypto/tls"
 	"crypto/x509"
@@ -43,8 +42,7 @@ func TestConnect(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		td := setup(t, n)
-		deps, teardown := createServers(t, td)
-		defer teardown()
+		deps := createServers(t, td)
 		first := deps[0]
 		err := first.Sender.Connect(td.replicas)
 		if err != nil {
@@ -61,20 +59,16 @@ func testBase(t *testing.T, typ any, send sendFunc, handle eventloop.EventHandle
 	run := func(t *testing.T, setup setupFunc) {
 		const n = 4
 		td := setup(t, n)
-
-		deps, serverTeardown := createServers(t, td)
-		defer serverTeardown()
-
+		deps := createServers(t, td)
 		for _, dep := range deps {
 			err := dep.Sender.Connect(td.replicas)
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer dep.Sender.Close()
+			t.Cleanup(dep.Sender.Close)
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		for _, d := range deps {
 			d.EventLoop().RegisterHandler(typ, handle)
 			d.Synchronizer.Start(ctx)
@@ -222,7 +216,7 @@ func runBoth(t *testing.T, run func(*testing.T, setupFunc)) {
 	t.Run("WithTLS", func(t *testing.T) { run(t, setupTLS) })
 }
 
-func createServers(t *testing.T, td testData) ([]replicaDeps, func()) {
+func createServers(t *testing.T, td testData) []replicaDeps {
 	t.Helper()
 	deps := make([]replicaDeps, 0)
 	for i := range td.n {
@@ -311,9 +305,10 @@ func createServers(t *testing.T, td testData) ([]replicaDeps, func()) {
 			Synchronizer: synchronizer,
 		})
 	}
-	return deps, func() {
+	t.Cleanup(func() {
 		for _, d := range deps {
 			d.Server.Stop()
 		}
-	}
+	})
+	return deps
 }
