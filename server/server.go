@@ -120,7 +120,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 		return
 	}
 	if impl.srv.config.HasKauriTree() {
-		id = hotstuff.ID(proposal.Block.Proposer)
+		id = proposal.ProposerID()
 	}
 	proposal.Block.Proposer = uint32(id)
 	proposeMsg := hotstuffpb.ProposalFromProto(proposal)
