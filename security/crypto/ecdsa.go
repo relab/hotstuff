@@ -102,7 +102,7 @@ func (ec *ECDSA) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Quoru
 				ts[id] = s
 			}
 		} else {
-			return nil, fmt.Errorf("cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
+			return nil, fmt.Errorf("ecdsa: cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
 		}
 	}
 	return ts, nil
@@ -112,11 +112,11 @@ func (ec *ECDSA) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Quoru
 func (ec *ECDSA) Verify(signature hotstuff.QuorumSignature, message []byte) error {
 	s, ok := signature.(Multi[*ECDSASignature])
 	if !ok {
-		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		return fmt.Errorf("ecdsa: cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 	n := signature.Participants().Len()
 	if n == 0 {
-		return fmt.Errorf("verify failed: no participants")
+		return fmt.Errorf("ecdsa: failed to verify: no participants")
 	}
 
 	results := make(chan error, n)
@@ -140,11 +140,11 @@ func (ec *ECDSA) Verify(signature hotstuff.QuorumSignature, message []byte) erro
 func (ec *ECDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) (err error) {
 	s, ok := signature.(Multi[*ECDSASignature])
 	if !ok {
-		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		return fmt.Errorf("ecdsa: cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 	n := signature.Participants().Len()
 	if n == 0 {
-		return fmt.Errorf("failed to verify batch: no participants")
+		return fmt.Errorf("ecdsa: failed to verify batch: no participants")
 	}
 
 	results := make(chan error, n)
@@ -152,7 +152,7 @@ func (ec *ECDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotst
 	for id, sig := range s {
 		message, ok := batch[id]
 		if !ok {
-			return fmt.Errorf("message not found")
+			return fmt.Errorf("ecdsa: message not found")
 		}
 		hash := sha256.Sum256(message)
 		set[hash] = struct{}{}
@@ -168,7 +168,7 @@ func (ec *ECDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotst
 	}
 	// valid if all partial signatures are valid and there are no duplicate messages
 	if len(set) != len(batch) {
-		return fmt.Errorf("invalid signature")
+		return fmt.Errorf("ecdsa: invalid signature")
 	}
 	return nil
 }
@@ -176,11 +176,11 @@ func (ec *ECDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotst
 func (ec *ECDSA) verifySingle(sig *ECDSASignature, hash hotstuff.Hash) error {
 	replica, ok := ec.config.ReplicaInfo(sig.Signer())
 	if !ok {
-		return fmt.Errorf("ecdsa: got signature from replica whose ID (%d) was not in the config", sig.Signer())
+		return fmt.Errorf("ecdsa: failed to verify signature from replica %d: unknown replica", sig.Signer())
 	}
 	pk := replica.PubKey.(*ecdsa.PublicKey)
 	if !ecdsa.Verify(pk, hash[:], sig.R(), sig.S()) {
-		return fmt.Errorf("failed to verify public key")
+		return fmt.Errorf("ecdsa: failed to verify signature from replica %d", sig.Signer())
 	}
 	return nil
 }
