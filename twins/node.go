@@ -1,6 +1,7 @@
 package twins
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"strings"
 	"time"
@@ -20,7 +21,6 @@ import (
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto"
-	"github.com/relab/hotstuff/security/crypto/keygen"
 	"github.com/relab/hotstuff/wiring"
 )
 
@@ -44,12 +44,8 @@ type node struct {
 	log            strings.Builder
 }
 
-func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
+func newNode(n *Network, nodeID NodeID, consensusName string, pk *ecdsa.PrivateKey) (*node, error) {
 	cryptoName := crypto.NameECDSA
-	pk, err := keygen.GenerateECDSAPrivateKey()
-	if err != nil {
-		return nil, err
-	}
 	node := &node{
 		id:           nodeID,
 		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVerification()),

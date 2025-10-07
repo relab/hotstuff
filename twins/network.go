@@ -11,6 +11,7 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/logging"
+	"github.com/relab/hotstuff/security/crypto/keygen"
 )
 
 // NodeID is an ID that is unique to a node in the network.
@@ -90,8 +91,21 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 }
 
 func (n *Network) createTwinsNodes(nodes []NodeID, consensusName string) error {
+	lastReplicaID := hotstuff.ID(1)
+	lastPrivKey, err := keygen.GenerateECDSAPrivateKey()
+	if err != nil {
+		return fmt.Errorf("failed to generate private key %w", err)
+	}
 	for _, nodeID := range nodes {
-		node, err := newNode(n, nodeID, consensusName)
+		if nodeID.ReplicaID != lastReplicaID {
+			// not a twin, generate new key
+			lastPrivKey, err = keygen.GenerateECDSAPrivateKey()
+			if err != nil {
+				return fmt.Errorf("failed to generate private key %w", err)
+			}
+		}
+
+		node, err := newNode(n, nodeID, consensusName, lastPrivKey)
 		if err != nil {
 			return fmt.Errorf("failed to create node %v: %w", nodeID, err)
 		}
