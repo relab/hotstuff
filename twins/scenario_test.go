@@ -166,7 +166,7 @@ func TestTwinsScenarioNeeded(t *testing.T) {
 	if !result.Safe {
 		t.Errorf("Expected no safety violations")
 	}
-	if result.Commits != 0 {
+	if result.Commits != 1 {
 		t.Error("Expected one commit")
 		for id, commits := range result.NodeCommits {
 			t.Logf("Node %v commits:", id)
@@ -216,6 +216,9 @@ func TestTwinsScenarioRepNeeded(t *testing.T) {
 		}
 	}
 
-	// t.Logf("Node logs:\n%s", result.NodeLogs[NodeID{1, 1}])
-	t.Logf("Network log:\n%s", result.NetworkLog)
+	if false {
+		t.Fail()
+		t.Logf("Network log:\n%s", result.NetworkLog)
+	}
+
 }
