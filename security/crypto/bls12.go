@@ -169,11 +169,11 @@ func (bls *bls12Base) privateKey() *BLS12PrivateKey {
 func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *BLS12PublicKey, err error) {
 	replica, ok := bls.config.ReplicaInfo(id)
 	if !ok {
-		return nil, fmt.Errorf("replica not found")
+		return nil, fmt.Errorf("bls12: replica %d not found", id)
 	}
 	pubKey, ok = replica.PubKey.(*BLS12PublicKey)
 	if !ok {
-		return nil, fmt.Errorf("unsupported public key type: %T", replica.PubKey)
+		return nil, fmt.Errorf("bls12: unsupported public key type: %T", replica.PubKey)
 	}
 	// not checking proof-of-possession for self.
 	if id == bls.config.ID() {
@@ -190,7 +190,7 @@ func (bls *bls12Base) subgroupCheck(point *bls12.PointG2) error {
 	g2 := bls12.NewG2()
 	g2.MulScalarBig(&p, point, curveOrder)
 	if !g2.IsZero(&p) {
-		return fmt.Errorf("point is not part of the subgroup")
+		return fmt.Errorf("bls12: point is not part of the subgroup")
 	}
 	return nil
 }
@@ -220,7 +220,7 @@ func (bls *bls12Base) coreVerify(pubKey *BLS12PublicKey, message []byte, signatu
 	engine.AddPairInv(&bls12.G1One, signature)
 	engine.AddPair(pubKey.p, messagePoint)
 	if !engine.Result().IsOne() {
-		return fmt.Errorf("failed to verify message")
+		return fmt.Errorf("bls12: failed to verify message")
 	}
 	return nil
 }
@@ -229,7 +229,7 @@ func (bls *bls12Base) popProve() (*bls12.PointG2, error) {
 	pubKey := bls.privateKey().Public().(*BLS12PublicKey)
 	proof, err := bls.coreSign(pubKey.ToBytes(), domainPOP)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate proof-of-possession: %w", err)
+		return nil, fmt.Errorf("bls12: failed to generate proof-of-possession: %w", err)
 	}
 	return proof, nil
 }
@@ -241,7 +241,7 @@ func (bls *bls12Base) popVerify(pubKey *BLS12PublicKey, proof *bls12.PointG2) er
 func (bls *bls12Base) checkPop(replica *hotstuff.ReplicaInfo) error {
 	popBytes, ok := replica.Metadata[popMetadataKey]
 	if !ok {
-		return fmt.Errorf("missing proof-of-possession for replica: %d", replica.ID)
+		return fmt.Errorf("bls12: missing proof-of-possession for replica: %d", replica.ID)
 	}
 
 	var key strings.Builder
@@ -274,12 +274,12 @@ func (bls *bls12Base) coreAggregateVerify(publicKeys []*BLS12PublicKey, messages
 	n := len(publicKeys)
 	// validate input
 	if n != len(messages) {
-		return fmt.Errorf("%d keys mismatch %d messages", n, len(messages))
+		return fmt.Errorf("bls12: %d keys mismatch %d messages", n, len(messages))
 	}
 
 	// precondition n >= 1
 	if n < 1 {
-		return fmt.Errorf("expected at least one message")
+		return fmt.Errorf("bls12: expected at least one message")
 	}
 
 	if err := bls.subgroupCheck(signature); err != nil {
@@ -298,7 +298,7 @@ func (bls *bls12Base) coreAggregateVerify(publicKeys []*BLS12PublicKey, messages
 
 	engine.AddPairInv(&bls12.G1One, signature)
 	if !engine.Result().IsOne() {
-		return fmt.Errorf("failed to verify aggretated message")
+		return fmt.Errorf("bls12: failed to verify aggregated message")
 	}
 	return nil
 }
@@ -309,7 +309,7 @@ func (bls *bls12Base) aggregateVerify(publicKeys []*BLS12PublicKey, messages [][
 		set[string(m)] = struct{}{}
 	}
 	if len(messages) != len(set) {
-		return fmt.Errorf("aggregate verify failed: duplicate messages")
+		return fmt.Errorf("bls12: failed to verify aggregate: duplicate messages")
 	}
 	return bls.coreAggregateVerify(publicKeys, messages, signature)
 }
@@ -346,7 +346,7 @@ func (bls *bls12Base) Combine(signatures ...hotstuff.QuorumSignature) (combined 
 	for _, sig1 := range signatures {
 		sig2, ok := sig1.(*BLS12AggregateSignature)
 		if !ok {
-			return nil, fmt.Errorf("cannot combine incompatible signature type %T (expected %T)", sig1, sig2)
+			return nil, fmt.Errorf("bls12: cannot combine incompatible signature type %T (expected %T)", sig1, sig2)
 		}
 		sig2.participants.RangeWhile(func(id hotstuff.ID) bool {
 			if participants.Contains(id) {
@@ -368,7 +368,7 @@ func (bls *bls12Base) Combine(signatures ...hotstuff.QuorumSignature) (combined 
 func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte) error {
 	s, ok := signature.(*BLS12AggregateSignature)
 	if !ok {
-		return fmt.Errorf("cannot verify signature of incompatible type %T (expected %T)", signature, s)
+		return fmt.Errorf("bls12: cannot verify signature of incompatible type %T (expected %T)", signature, s)
 	}
 
 	n := s.Participants().Len()
@@ -397,7 +397,7 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 		return true
 	})
 	if errs != nil {
-		return fmt.Errorf("missing one or more public keys: %w", errs)
+		return fmt.Errorf("bls12: missing one or more public keys: %w", errs)
 	}
 	return bls.fastAggregateVerify(pks, message, &s.sig)
 }
@@ -406,11 +406,11 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) error {
 	s, ok := signature.(*BLS12AggregateSignature)
 	if !ok {
-		return fmt.Errorf("cannot verify incompatible signature type %T (expected %T)", signature, s)
+		return fmt.Errorf("bls12: cannot verify incompatible signature type %T (expected %T)", signature, s)
 	}
 
 	if s.Participants().Len() != len(batch) {
-		return fmt.Errorf("signature mismatch: %d participants, expected: %d", len(batch), s.Participants().Len())
+		return fmt.Errorf("bls12: signature mismatch: %d participants, expected: %d", len(batch), s.Participants().Len())
 	}
 
 	pks := make([]*BLS12PublicKey, 0, len(batch))
