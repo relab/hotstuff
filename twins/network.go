@@ -206,6 +206,15 @@ func (n *Network) shouldDrop(sender, receiver uint32, message any) bool {
 // NodeSet is a set of network ids.
 type NodeSet map[uint32]struct{}
 
+// NewNodeSet creates a new NodeSet containing the specified ids.
+func NewNodeSet(ids ...uint32) NodeSet {
+	s := make(NodeSet)
+	for _, id := range ids {
+		s.Add(id)
+	}
+	return s
+}
+
 // Add adds a NodeID to the set.
 func (s NodeSet) Add(v uint32) {
 	s[v] = struct{}{}
