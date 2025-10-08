@@ -104,7 +104,7 @@ func TestOrchestration(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 	fork := map[string][]uint32{"fork": {1}}
-	silence := map[string][]uint32{"silence": {1}}
+	silentProposer := map[string][]uint32{"silentproposer": {1}}
 
 	tests := []struct {
 		consensus    string
@@ -125,7 +125,7 @@ func TestOrchestration(t *testing.T) {
 		{consensus: rules.NameSimpleHotStuff, crypto: crypto.NameEDDSA, replicas: 4},
 		{consensus: rules.NameSimpleHotStuff, crypto: crypto.NameBLS12, replicas: 4},
 		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameECDSA, byzantine: fork, replicas: 4},
-		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameECDSA, byzantine: silence, replicas: 4},
+		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameECDSA, byzantine: silentProposer, replicas: 4},
 		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameECDSA, commName: comm.NameKauri, replicas: 7, branchFactor: 2},
 		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameBLS12, commName: comm.NameKauri, replicas: 7, branchFactor: 2},
 		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameECDSA, commName: comm.NameKauri, replicas: 7, branchFactor: 2, randomTree: true},

@@ -104,6 +104,7 @@ Rostem
 roundrobin
 secp
 sigs
+silentproposer
 simplehotstuff
 Sonnino
 SSWU
