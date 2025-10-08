@@ -98,16 +98,32 @@ func New(
 	})
 	s.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		proposal := event.(hotstuff.ProposeMsg)
+		s.logger.Debugf("Received proposal: %v", proposal.Block)
+
+		pView := proposal.Block.View()
+		sView := s.state.View()
+		const alpha hotstuff.View = 10
+		if pView > sView+alpha {
+			s.logger.Infof("Dropping proposal, too high view (%v) >> state view (%v)", pView, sView)
+			return
+		}
+		if pView > s.state.View() {
+			s.logger.Infof("Dropping proposal, too high view (%v) >> state view (%v)", pView, sView)
+			s.logger.Infof("Delayed until next view increase: %v", proposal)
+			s.eventLoop.DelayUntil(hotstuff.ViewChangeEvent{}, proposal)
+			return
+		}
+
 		// verify the incoming proposal before attempting to vote and try to commit.
 		if err := s.voter.Verify(&proposal); err != nil {
 			s.logger.Infof("failed to verify incoming vote: %v", err)
 			return
 		}
-		s.logger.Debugf("Received proposal: %v", proposal.Block)
 		err := s.voter.OnValidPropose(&proposal)
 		if err != nil {
 			s.logger.Info(err)
 		}
+
 		// advance the view regardless of vote status
 		s.advanceView(hotstuff.NewSyncInfo().WithQC(proposal.Block.QuorumCert()))
 	})
