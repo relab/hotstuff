@@ -42,7 +42,7 @@ config: {
 
 	// Byzantine strategy for different replicas (optional).
 	byzantineStrategy?: {
-		silent?: [...int & >=1 & <=replicas]
+		silentproposer?: [...int & >=1 & <=replicas]
 		slow?: [...int & >=1 & <=replicas]
 	}
 }

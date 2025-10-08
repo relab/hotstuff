@@ -43,7 +43,7 @@ use 'hotstuff help run' to view all possible parameters for this command.`,
 					rules.NameChainedHotStuff,
 				},
 				"--byzantine-strategy": {
-					byzantine.NameSilence,
+					byzantine.NameSilentProposer,
 					byzantine.NameFork,
 				},
 				"--crypto": {
