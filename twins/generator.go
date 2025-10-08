@@ -152,13 +152,6 @@ func (g *Generator) NextScenario() (s Scenario, err error) {
 	return p, nil
 }
 
-func min(a, b uint8) uint8 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // genPartitionSizes generates all possible combinations of partition sizes
 // for a system consisting of n nodes and up to k partitions, where at least
 // one partition must have a size greater than 'minSize'.
