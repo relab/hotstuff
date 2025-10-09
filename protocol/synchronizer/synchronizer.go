@@ -100,6 +100,9 @@ func New(
 		proposal := event.(hotstuff.ProposeMsg)
 		s.logger.Debugf("Received proposal: %v", proposal.Block)
 
+		// advance the view regardless of vote status
+		s.advanceView(hotstuff.NewSyncInfo().WithQC(proposal.Block.QuorumCert()))
+
 		pView := proposal.Block.View()
 		sView := s.state.View()
 		const alpha hotstuff.View = 10
@@ -123,9 +126,6 @@ func New(
 		if err != nil {
 			s.logger.Info(err)
 		}
-
-		// advance the view regardless of vote status
-		s.advanceView(hotstuff.NewSyncInfo().WithQC(proposal.Block.QuorumCert()))
 	})
 	return s
 }
