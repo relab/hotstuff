@@ -3,6 +3,7 @@ package cert
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
@@ -148,10 +149,9 @@ func (c *Authority) VerifyTimeoutCert(tc hotstuff.TimeoutCert) error {
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
 func (c *Authority) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, err error) {
 	messages := make(map[hotstuff.ID][]byte)
+	qcs := make(map[hotstuff.View][]hotstuff.QuorumCert, len(aggQC.QCs()))
 	for id, qc := range aggQC.QCs() {
-		if highQC.View() < qc.View() || highQC == (hotstuff.QuorumCert{}) {
-			highQC = qc
-		}
+		qcs[qc.View()] = append(qcs[qc.View()], qc)
 		// reconstruct the TimeoutMsg to get the hash
 		messages[id] = hotstuff.TimeoutMsg{
 			ID:       id,
@@ -168,11 +168,33 @@ func (c *Authority) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstu
 	if err := c.BatchVerify(aggQC.Sig(), messages); err != nil {
 		return hotstuff.QuorumCert{}, err
 	}
-
-	if err := c.VerifyQuorumCert(highQC); err != nil {
+	// After verifying the aggregate signature, find the highest-view valid QC from the set.
+	// This individual QC will serve as the highQC for the protocol.
+	highQC, err = c.findHighestValidQC(qcs)
+	if err != nil {
 		return hotstuff.QuorumCert{}, err
 	}
 	return highQC, nil
+}
+
+func (c *Authority) findHighestValidQC(qcs map[hotstuff.View][]hotstuff.QuorumCert) (highQC hotstuff.QuorumCert, err error) {
+	views := make([]hotstuff.View, 0, len(qcs))
+	for v := range qcs {
+		views = append(views, v)
+	}
+	// Sort views in descending order to check the highest view first.
+	sort.Slice(views, func(i, j int) bool {
+		return views[i] > views[j]
+	})
+	for _, view := range views {
+		for _, qc := range qcs[view] {
+			if err := c.VerifyQuorumCert(qc); err == nil {
+				return qc, nil
+			}
+		}
+	}
+	// If the loop completes without finding any valid QC, return an error.
+	return hotstuff.QuorumCert{}, fmt.Errorf("no valid high quorum certificate found in aggregate QC")
 }
 
 // VerifyAnyQC is a helper that verifies either a QC or the aggregateQC in a proposal message.
