@@ -51,6 +51,7 @@ func (sig ECDSASignature) Signer() hotstuff.ID {
 }
 
 // R returns the r value of the signature.
+// This method is primarily used for protobuf serialization and decodes the ASN.1 signature on each call.
 func (sig ECDSASignature) R() *big.Int {
 	var asn1Sig ecdsaASN1Sig
 	if _, err := asn1.Unmarshal(sig.sig, &asn1Sig); err != nil {
@@ -61,6 +62,7 @@ func (sig ECDSASignature) R() *big.Int {
 }
 
 // S returns the s value of the signature.
+// This method is primarily used for protobuf serialization and decodes the ASN.1 signature on each call.
 func (sig ECDSASignature) S() *big.Int {
 	var asn1Sig ecdsaASN1Sig
 	if _, err := asn1.Unmarshal(sig.sig, &asn1Sig); err != nil {

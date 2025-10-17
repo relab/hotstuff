@@ -478,8 +478,13 @@ func TestECDSASignatureASN1Encoding(t *testing.T) {
 	sigBytes := ecdsaSig.ToBytes()
 	
 	// ASN.1 encoded ECDSA signatures should start with 0x30 (SEQUENCE tag)
-	if len(sigBytes) < 8 {
-		t.Fatalf("signature too short: %d bytes", len(sigBytes))
+	// Minimum length is 8 bytes: 1 byte SEQUENCE tag + 1 byte length + 
+	// 2 bytes for R (1 byte INTEGER tag + 1 byte length) + 
+	// 2 bytes for S (1 byte INTEGER tag + 1 byte length) + 
+	// 2 bytes minimum for actual R and S values
+	const minASN1SignatureLength = 8
+	if len(sigBytes) < minASN1SignatureLength {
+		t.Fatalf("signature too short: %d bytes (minimum %d)", len(sigBytes), minASN1SignatureLength)
 	}
 	if sigBytes[0] != 0x30 {
 		t.Fatalf("signature does not start with ASN.1 SEQUENCE tag (0x30), got 0x%02x", sigBytes[0])
