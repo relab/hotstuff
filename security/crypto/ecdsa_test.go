@@ -360,7 +360,7 @@ func TestECDSABatchVerify(t *testing.T) {
 	}
 }
 
-func TestECDSASignatureRSMethods(t *testing.T) {
+func TestECDSASignatureToBytes(t *testing.T) {
 	ec, _ := setupECDSATest(t, 1)
 	message := []byte("test message")
 	
@@ -376,25 +376,6 @@ func TestECDSASignatureRSMethods(t *testing.T) {
 	for _, s := range multiSig {
 		ecdsaSig = s
 		break
-	}
-	
-	// Test R() and S() methods
-	r := ecdsaSig.R()
-	s := ecdsaSig.S()
-	
-	if r == nil {
-		t.Fatal("R() returned nil")
-	}
-	if s == nil {
-		t.Fatal("S() returned nil")
-	}
-	
-	// R and S should be positive
-	if r.Sign() <= 0 {
-		t.Fatalf("R should be positive, got %v", r)
-	}
-	if s.Sign() <= 0 {
-		t.Fatalf("S should be positive, got %v", s)
 	}
 	
 	// Test ToBytes()
@@ -419,7 +400,7 @@ func TestECDSARestoreSignature(t *testing.T) {
 		t.Fatalf("Sign failed: %v", err)
 	}
 	
-	// Extract R and S from the signature
+	// Extract the signature bytes
 	multiSig := sig.(crypto.Multi[*crypto.ECDSASignature])
 	var originalSig *crypto.ECDSASignature
 	for _, s := range multiSig {
@@ -427,19 +408,21 @@ func TestECDSARestoreSignature(t *testing.T) {
 		break
 	}
 	
-	r := originalSig.R()
-	s := originalSig.S()
+	sigBytes := originalSig.ToBytes()
 	signer := originalSig.Signer()
 	
-	// Restore the signature using R and S
-	restoredSig := crypto.RestoreECDSASignature(r, s, signer)
+	// Restore the signature using the bytes
+	restoredSig := crypto.RestoreECDSASignature(sigBytes, signer)
 	
-	// Verify that the restored signature has the same R, S values
-	if restoredR := restoredSig.R(); restoredR.Cmp(r) != 0 {
-		t.Fatalf("restored R does not match: got %v, want %v", restoredR, r)
+	// Verify that the restored signature has the same bytes
+	restoredBytes := restoredSig.ToBytes()
+	if len(restoredBytes) != len(sigBytes) {
+		t.Fatalf("restored signature length does not match: got %d, want %d", len(restoredBytes), len(sigBytes))
 	}
-	if restoredS := restoredSig.S(); restoredS.Cmp(s) != 0 {
-		t.Fatalf("restored S does not match: got %v, want %v", restoredS, s)
+	for i := range restoredBytes {
+		if restoredBytes[i] != sigBytes[i] {
+			t.Fatalf("restored signature bytes do not match at index %d", i)
+		}
 	}
 	if restoredSig.Signer() != signer {
 		t.Fatalf("restored signer does not match: got %v, want %v", restoredSig.Signer(), signer)

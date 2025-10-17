@@ -4,10 +4,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/asn1"
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
@@ -22,54 +20,21 @@ const (
 	ECDSAPublicKeyFileType = "ECDSA PUBLIC KEY"
 )
 
-// ecdsaASN1Sig represents the ASN.1 structure of an ECDSA signature
-type ecdsaASN1Sig struct {
-	R, S *big.Int
-}
-
 // ECDSASignature is an ECDSA signature.
 type ECDSASignature struct {
-	sig    []byte // ASN.1 encoded signature
+	sig    []byte
 	signer hotstuff.ID
 }
 
 // RestoreECDSASignature restores an existing signature.
 // It should not be used to create new signatures, use Sign instead.
-func RestoreECDSASignature(r, s *big.Int, signer hotstuff.ID) *ECDSASignature {
-	// Encode r and s as ASN.1 for internal storage
-	sig, err := asn1.Marshal(ecdsaASN1Sig{R: r, S: s})
-	if err != nil {
-		// This should never happen with valid r, s values
-		panic(fmt.Sprintf("failed to encode ECDSA signature: %v", err))
-	}
+func RestoreECDSASignature(sig []byte, signer hotstuff.ID) *ECDSASignature {
 	return &ECDSASignature{sig, signer}
 }
 
 // Signer returns the ID of the replica that generated the signature.
 func (sig ECDSASignature) Signer() hotstuff.ID {
 	return sig.signer
-}
-
-// R returns the r value of the signature.
-// This method is primarily used for protobuf serialization and decodes the ASN.1 signature on each call.
-func (sig ECDSASignature) R() *big.Int {
-	var asn1Sig ecdsaASN1Sig
-	if _, err := asn1.Unmarshal(sig.sig, &asn1Sig); err != nil {
-		// This should never happen with a valid signature
-		panic(fmt.Sprintf("failed to decode ECDSA signature: %v", err))
-	}
-	return asn1Sig.R
-}
-
-// S returns the s value of the signature.
-// This method is primarily used for protobuf serialization and decodes the ASN.1 signature on each call.
-func (sig ECDSASignature) S() *big.Int {
-	var asn1Sig ecdsaASN1Sig
-	if _, err := asn1.Unmarshal(sig.sig, &asn1Sig); err != nil {
-		// This should never happen with a valid signature
-		panic(fmt.Sprintf("failed to decode ECDSA signature: %v", err))
-	}
-	return asn1Sig.S
 }
 
 // ToBytes returns a raw byte string representation of the signature.
