@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/asn1"
 	"errors"
 	"fmt"
 	"math/big"
@@ -21,16 +22,27 @@ const (
 	ECDSAPublicKeyFileType = "ECDSA PUBLIC KEY"
 )
 
+// ecdsaASN1Sig represents the ASN.1 structure of an ECDSA signature
+type ecdsaASN1Sig struct {
+	R, S *big.Int
+}
+
 // ECDSASignature is an ECDSA signature.
 type ECDSASignature struct {
-	r, s   *big.Int
+	sig    []byte // ASN.1 encoded signature
 	signer hotstuff.ID
 }
 
 // RestoreECDSASignature restores an existing signature.
 // It should not be used to create new signatures, use Sign instead.
 func RestoreECDSASignature(r, s *big.Int, signer hotstuff.ID) *ECDSASignature {
-	return &ECDSASignature{r, s, signer}
+	// Encode r and s as ASN.1 for internal storage
+	sig, err := asn1.Marshal(ecdsaASN1Sig{R: r, S: s})
+	if err != nil {
+		// This should never happen with valid r, s values
+		panic(fmt.Sprintf("failed to encode ECDSA signature: %v", err))
+	}
+	return &ECDSASignature{sig, signer}
 }
 
 // Signer returns the ID of the replica that generated the signature.
@@ -40,20 +52,27 @@ func (sig ECDSASignature) Signer() hotstuff.ID {
 
 // R returns the r value of the signature.
 func (sig ECDSASignature) R() *big.Int {
-	return sig.r
+	var asn1Sig ecdsaASN1Sig
+	if _, err := asn1.Unmarshal(sig.sig, &asn1Sig); err != nil {
+		// This should never happen with a valid signature
+		panic(fmt.Sprintf("failed to decode ECDSA signature: %v", err))
+	}
+	return asn1Sig.R
 }
 
 // S returns the s value of the signature.
 func (sig ECDSASignature) S() *big.Int {
-	return sig.s
+	var asn1Sig ecdsaASN1Sig
+	if _, err := asn1.Unmarshal(sig.sig, &asn1Sig); err != nil {
+		// This should never happen with a valid signature
+		panic(fmt.Sprintf("failed to decode ECDSA signature: %v", err))
+	}
+	return asn1Sig.S
 }
 
 // ToBytes returns a raw byte string representation of the signature.
 func (sig ECDSASignature) ToBytes() []byte {
-	var b []byte
-	b = append(b, sig.r.Bytes()...)
-	b = append(b, sig.s.Bytes()...)
-	return b
+	return sig.sig
 }
 
 // ECDSA implements the spec-k256 curve signature.
@@ -75,13 +94,12 @@ func (ec *ECDSA) privateKey() *ecdsa.PrivateKey {
 // Sign creates a cryptographic signature of the given message.
 func (ec *ECDSA) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
 	hash := sha256.Sum256(message)
-	r, s, err := ecdsa.Sign(rand.Reader, ec.privateKey(), hash[:])
+	sig, err := ecdsa.SignASN1(rand.Reader, ec.privateKey(), hash[:])
 	if err != nil {
 		return nil, fmt.Errorf("ecdsa: sign failed: %w", err)
 	}
 	return Multi[*ECDSASignature]{ec.config.ID(): &ECDSASignature{
-		r:      r,
-		s:      s,
+		sig:    sig,
 		signer: ec.config.ID(),
 	}}, nil
 }
@@ -179,7 +197,7 @@ func (ec *ECDSA) verifySingle(sig *ECDSASignature, hash hotstuff.Hash) error {
 		return fmt.Errorf("ecdsa: failed to verify signature from replica %d: unknown replica", sig.Signer())
 	}
 	pk := replica.PubKey.(*ecdsa.PublicKey)
-	if !ecdsa.Verify(pk, hash[:], sig.R(), sig.S()) {
+	if !ecdsa.VerifyASN1(pk, hash[:], sig.sig) {
 		return fmt.Errorf("ecdsa: failed to verify signature from replica %d", sig.Signer())
 	}
 	return nil
