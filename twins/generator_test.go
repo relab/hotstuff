@@ -47,3 +47,33 @@ func TestPartitionSizes(t *testing.T) {
 		t.Error("did not get the expected result")
 	}
 }
+
+func TestAssignNodeIDs(t *testing.T) {
+	tests := []struct {
+		name      string
+		numNodes  uint8
+		numTwins  uint8
+		wantNodes []NodeID
+		wantTwins []NodeID
+	}{
+		{"no twins", 3, 0, []NodeID{{1, 0}, {2, 0}, {3, 0}}, nil},
+		{"one twin pair", 2, 1, []NodeID{{2, 0}}, []NodeID{{1, 1}, {1, 2}}},
+		{"multiple twin pairs", 4, 2, []NodeID{{3, 0}, {4, 0}}, []NodeID{{1, 1}, {1, 2}, {2, 1}, {2, 2}}},
+		{"all twins", 2, 2, nil, []NodeID{{1, 1}, {1, 2}, {2, 1}, {2, 2}}},
+		{"edge case: zero nodes", 0, 0, nil, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotNodes, gotTwins := assignNodeIDs(tt.numNodes, tt.numTwins)
+			
+			if !reflect.DeepEqual(gotNodes, tt.wantNodes) {
+				t.Errorf("assignNodeIDs() gotNodes = %v, want %v", gotNodes, tt.wantNodes)
+			}
+			
+			if !reflect.DeepEqual(gotTwins, tt.wantTwins) {
+				t.Errorf("assignNodeIDs() gotTwins = %v, want %v", gotTwins, tt.wantTwins)
+			}
+		})
+	}
+}
