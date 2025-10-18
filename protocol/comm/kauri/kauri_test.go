@@ -50,12 +50,12 @@ func BenchmarkSubTree(b *testing.B) {
 			set[i] = hotstuff.ID(i + 1)
 		}
 		subSet := set[data.start:]
-		b.Run("SliceSet/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
+		b.Run(test.Name("SliceSet", "size", len(set), "q", len(subSet)), func(b *testing.B) {
 			for b.Loop() {
 				kauri.IsSubSet(subSet, set)
 			}
 		})
-		b.Run("MapSet__/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
+		b.Run(test.Name("MapSet__", "size", len(set), "q", len(subSet)), func(b *testing.B) {
 			for b.Loop() {
 				isSubSetMap(subSet, set)
 			}
@@ -147,12 +147,12 @@ func BenchmarkHasOverlap(b *testing.B) {
 		for _, id := range subSet {
 			q[id] = &crypto.ECDSASignature{}
 		}
-		b.Run("HasOverlap/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
+		b.Run(test.Name("HasOverlap", "size", len(set), "q", len(subSet)), func(b *testing.B) {
 			for b.Loop() {
 				hasOverlap(subSet, set)
 			}
 		})
-		b.Run("CanMerge/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
+		b.Run(test.Name("CanMerge", "size", len(set), "q", len(subSet)), func(b *testing.B) {
 			for b.Loop() {
 				// intentionally discarding error since it's not relevant in the benchmark
 				_ = kauri.CanMergeContributions(p, q)
