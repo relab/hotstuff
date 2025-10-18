@@ -43,27 +43,29 @@ func (s *emulatedSender) sendMessage(id hotstuff.ID, message any) {
 	if !ok {
 		panic(fmt.Errorf("attempt to send message to unknown replica %d", id))
 	}
+	effectiveView := s.node.EffectiveView()
 	for _, node := range nodes {
-		if s.shouldDrop(node.id, message) {
-			s.network.logger.Infof("node %v -> node %v: DROP %T(%v)", s.node.id, node.id, message, message)
+		if s.shouldDrop(node.id, message, effectiveView) {
+			s.network.logger.Infof("view %d node %v -> node %v: DROP %T(%v)", effectiveView, s.node.id, node.id, message, message)
 			continue
 		}
-		s.network.logger.Infof("node %v -> node %v: SEND %T(%v)", s.node.id, node.id, message, message)
+		s.network.logger.Infof("view %d node %v -> node %v: SEND %T(%v)", effectiveView, s.node.id, node.id, message, message)
 		s.network.pendingMessages = append(
 			s.network.pendingMessages,
 			pendingMessage{
 				sender:   s.node.id,
 				receiver: node.id,
 				message:  message,
+				view:     effectiveView,
 			},
 		)
 	}
 }
 
 // shouldDrop checks if a message to the node identified by id should be dropped.
-func (s *emulatedSender) shouldDrop(id NodeID, message any) bool {
+func (s *emulatedSender) shouldDrop(id NodeID, message any, view hotstuff.View) bool {
 	// retrieve the drop config for this node.
-	return s.network.shouldDrop(s.node.id, id, message)
+	return s.network.shouldDrop(s.node.id, id, message, view)
 }
 
 // Sub returns a subconfiguration containing the replicas specified in the ids slice.
@@ -115,7 +117,7 @@ func (s *emulatedSender) NewView(id hotstuff.ID, si hotstuff.SyncInfo) error {
 func (s *emulatedSender) RequestBlock(_ context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
 	for _, replica := range s.network.replicas {
 		for _, node := range replica {
-			if s.shouldDrop(node.id, hash) {
+			if s.shouldDrop(node.id, hash, s.node.EffectiveView()) {
 				continue
 			}
 			block, ok = node.blockchain.LocalGet(hash)

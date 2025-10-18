@@ -160,3 +160,10 @@ func newNode(n *Network, nodeID NodeID, consensusName string, pk *ecdsa.PrivateK
 	}
 	return node, nil
 }
+
+func (n *node) EffectiveView() hotstuff.View {
+	if n.effectiveView > n.viewStates.View() {
+		return n.effectiveView
+	}
+	return n.viewStates.View()
+}
