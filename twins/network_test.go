@@ -18,18 +18,18 @@ func TestNetworkSendMessage(t *testing.T) {
 		receiver hotstuff.ID
 		want     pendingMessage
 	}{
-		{msg: "s1r2", sender: 1, receiver: 2, want: pendingMessage{"s1r2", NodeID{1, 1}, NodeID{2, 2}}},
-		{msg: "s1r3", sender: 1, receiver: 3, want: pendingMessage{"s1r3", NodeID{1, 1}, NodeID{3, 3}}},
-		{msg: "s1r4", sender: 1, receiver: 4, want: pendingMessage{"s1r4", NodeID{1, 1}, NodeID{4, 4}}},
-		{msg: "s2r1", sender: 2, receiver: 1, want: pendingMessage{"s2r1", NodeID{2, 2}, NodeID{1, 1}}},
-		{msg: "s2r3", sender: 2, receiver: 3, want: pendingMessage{"s2r3", NodeID{2, 2}, NodeID{3, 3}}},
-		{msg: "s2r4", sender: 2, receiver: 4, want: pendingMessage{"s2r4", NodeID{2, 2}, NodeID{4, 4}}},
-		{msg: "s3r1", sender: 3, receiver: 1, want: pendingMessage{"s3r1", NodeID{3, 3}, NodeID{1, 1}}},
-		{msg: "s3r2", sender: 3, receiver: 2, want: pendingMessage{"s3r2", NodeID{3, 3}, NodeID{2, 2}}},
-		{msg: "s3r4", sender: 3, receiver: 4, want: pendingMessage{"s3r4", NodeID{3, 3}, NodeID{4, 4}}},
-		{msg: "s4r1", sender: 4, receiver: 1, want: pendingMessage{"s4r1", NodeID{4, 4}, NodeID{1, 1}}},
-		{msg: "s4r2", sender: 4, receiver: 2, want: pendingMessage{"s4r2", NodeID{4, 4}, NodeID{2, 2}}},
-		{msg: "s4r3", sender: 4, receiver: 3, want: pendingMessage{"s4r3", NodeID{4, 4}, NodeID{3, 3}}},
+		{msg: "s1r2", sender: 1, receiver: 2, want: pendingMessage{"s1r2", NodeID{1, 0}, NodeID{2, 0}}},
+		{msg: "s1r3", sender: 1, receiver: 3, want: pendingMessage{"s1r3", NodeID{1, 0}, NodeID{3, 0}}},
+		{msg: "s1r4", sender: 1, receiver: 4, want: pendingMessage{"s1r4", NodeID{1, 0}, NodeID{4, 0}}},
+		{msg: "s2r1", sender: 2, receiver: 1, want: pendingMessage{"s2r1", NodeID{2, 0}, NodeID{1, 0}}},
+		{msg: "s2r3", sender: 2, receiver: 3, want: pendingMessage{"s2r3", NodeID{2, 0}, NodeID{3, 0}}},
+		{msg: "s2r4", sender: 2, receiver: 4, want: pendingMessage{"s2r4", NodeID{2, 0}, NodeID{4, 0}}},
+		{msg: "s3r1", sender: 3, receiver: 1, want: pendingMessage{"s3r1", NodeID{3, 0}, NodeID{1, 0}}},
+		{msg: "s3r2", sender: 3, receiver: 2, want: pendingMessage{"s3r2", NodeID{3, 0}, NodeID{2, 0}}},
+		{msg: "s3r4", sender: 3, receiver: 4, want: pendingMessage{"s3r4", NodeID{3, 0}, NodeID{4, 0}}},
+		{msg: "s4r1", sender: 4, receiver: 1, want: pendingMessage{"s4r1", NodeID{4, 0}, NodeID{1, 0}}},
+		{msg: "s4r2", sender: 4, receiver: 2, want: pendingMessage{"s4r2", NodeID{4, 0}, NodeID{2, 0}}},
+		{msg: "s4r3", sender: 4, receiver: 3, want: pendingMessage{"s4r3", NodeID{4, 0}, NodeID{3, 0}}},
 	}
 	var wantPendingMessages []pendingMessage
 	for _, tt := range tests {
@@ -51,10 +51,10 @@ func TestNetworkBroadcastMessage(t *testing.T) {
 		sender hotstuff.ID
 		want   []pendingMessage
 	}{
-		{msg: "s1", sender: 1, want: []pendingMessage{{"s1", NodeID{1, 1}, NodeID{2, 2}}, {"s1", NodeID{1, 1}, NodeID{3, 3}}, {"s1", NodeID{1, 1}, NodeID{4, 4}}}}, // receivers: {2, 3, 4}
-		{msg: "s2", sender: 2, want: []pendingMessage{{"s2", NodeID{2, 2}, NodeID{1, 1}}, {"s2", NodeID{2, 2}, NodeID{3, 3}}, {"s2", NodeID{2, 2}, NodeID{4, 4}}}}, // receivers: {1, 3, 4}
-		{msg: "s3", sender: 3, want: []pendingMessage{{"s3", NodeID{3, 3}, NodeID{1, 1}}, {"s3", NodeID{3, 3}, NodeID{2, 2}}, {"s3", NodeID{3, 3}, NodeID{4, 4}}}}, // receivers: {1, 2, 4}
-		{msg: "s4", sender: 4, want: []pendingMessage{{"s4", NodeID{4, 4}, NodeID{1, 1}}, {"s4", NodeID{4, 4}, NodeID{2, 2}}, {"s4", NodeID{4, 4}, NodeID{3, 3}}}}, // receivers: {1, 2, 3}
+		{msg: "s1", sender: 1, want: []pendingMessage{{"s1", NodeID{1, 0}, NodeID{2, 0}}, {"s1", NodeID{1, 0}, NodeID{3, 0}}, {"s1", NodeID{1, 0}, NodeID{4, 0}}}}, // receivers: {2, 3, 4}
+		{msg: "s2", sender: 2, want: []pendingMessage{{"s2", NodeID{2, 0}, NodeID{1, 0}}, {"s2", NodeID{2, 0}, NodeID{3, 0}}, {"s2", NodeID{2, 0}, NodeID{4, 0}}}}, // receivers: {1, 3, 4}
+		{msg: "s3", sender: 3, want: []pendingMessage{{"s3", NodeID{3, 0}, NodeID{1, 0}}, {"s3", NodeID{3, 0}, NodeID{2, 0}}, {"s3", NodeID{3, 0}, NodeID{4, 0}}}}, // receivers: {1, 2, 4}
+		{msg: "s4", sender: 4, want: []pendingMessage{{"s4", NodeID{4, 0}, NodeID{1, 0}}, {"s4", NodeID{4, 0}, NodeID{2, 0}}, {"s4", NodeID{4, 0}, NodeID{3, 0}}}}, // receivers: {1, 2, 3}
 	}
 	var wantPendingMessages []pendingMessage
 	for _, tt := range tests {
@@ -81,25 +81,25 @@ func TestNetworkSubConfigBroadcastMessage(t *testing.T) {
 	}{
 		// sender is also part of the receivers list, but it will not send to itself.
 		{name: "self/sender=1/receivers=1", msg: t1, sender: 1, receivers: []hotstuff.ID{1}, want: []pendingMessage{}},
-		{name: "self/sender=1/receivers=2", msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2}, want: []pendingMessage{{t1, NodeID{1, 1}, NodeID{2, 2}}}},
-		{name: "self/sender=1/receivers=3", msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2, 3}, want: []pendingMessage{{t1, NodeID{1, 1}, NodeID{2, 2}}, {t1, NodeID{1, 1}, NodeID{3, 3}}}},
-		{name: "self/sender=1/receivers=4", msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2, 3, 4}, want: []pendingMessage{{t1, NodeID{1, 1}, NodeID{2, 2}}, {t1, NodeID{1, 1}, NodeID{3, 3}}, {t1, NodeID{1, 1}, NodeID{4, 4}}}},
-		{name: "self/sender=2/receivers=5", msg: t1, sender: 2, receivers: []hotstuff.ID{1, 2, 3, 4, 5}, want: []pendingMessage{{t1, NodeID{2, 2}, NodeID{1, 1}}, {t1, NodeID{2, 2}, NodeID{3, 3}}, {t1, NodeID{2, 2}, NodeID{4, 4}}, {t1, NodeID{2, 2}, NodeID{5, 5}}}},
-		{name: "self/sender=3/receivers=6", msg: t1, sender: 3, receivers: []hotstuff.ID{1, 2, 3, 4, 5, 6}, want: []pendingMessage{{t1, NodeID{3, 3}, NodeID{1, 1}}, {t1, NodeID{3, 3}, NodeID{2, 2}}, {t1, NodeID{3, 3}, NodeID{4, 4}}, {t1, NodeID{3, 3}, NodeID{5, 5}}, {t1, NodeID{3, 3}, NodeID{6, 6}}}},
-		{name: "self/sender=4/receivers=7", msg: t1, sender: 4, receivers: []hotstuff.ID{1, 2, 3, 4, 5, 6, 7}, want: []pendingMessage{{t1, NodeID{4, 4}, NodeID{1, 1}}, {t1, NodeID{4, 4}, NodeID{2, 2}}, {t1, NodeID{4, 4}, NodeID{3, 3}}, {t1, NodeID{4, 4}, NodeID{5, 5}}, {t1, NodeID{4, 4}, NodeID{6, 6}}, {t1, NodeID{4, 4}, NodeID{7, 7}}}},
-		{name: "self/sender=5/receivers=6", msg: t1, sender: 5, receivers: []hotstuff.ID{2, 3, 4, 5, 6, 7}, want: []pendingMessage{{t1, NodeID{5, 5}, NodeID{2, 2}}, {t1, NodeID{5, 5}, NodeID{3, 3}}, {t1, NodeID{5, 5}, NodeID{4, 4}}, {t1, NodeID{5, 5}, NodeID{6, 6}}, {t1, NodeID{5, 5}, NodeID{7, 7}}}},
-		{name: "self/sender=6/receivers=6", msg: t1, sender: 6, receivers: []hotstuff.ID{1, 3, 4, 5, 6, 7}, want: []pendingMessage{{t1, NodeID{6, 6}, NodeID{1, 1}}, {t1, NodeID{6, 6}, NodeID{3, 3}}, {t1, NodeID{6, 6}, NodeID{4, 4}}, {t1, NodeID{6, 6}, NodeID{5, 5}}, {t1, NodeID{6, 6}, NodeID{7, 7}}}},
-		{name: "self/sender=7/receivers=6", msg: t1, sender: 7, receivers: []hotstuff.ID{1, 2, 4, 5, 6, 7}, want: []pendingMessage{{t1, NodeID{7, 7}, NodeID{1, 1}}, {t1, NodeID{7, 7}, NodeID{2, 2}}, {t1, NodeID{7, 7}, NodeID{4, 4}}, {t1, NodeID{7, 7}, NodeID{5, 5}}, {t1, NodeID{7, 7}, NodeID{6, 6}}}},
+		{name: "self/sender=1/receivers=2", msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2}, want: []pendingMessage{{t1, NodeID{1, 0}, NodeID{2, 0}}}},
+		{name: "self/sender=1/receivers=3", msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2, 3}, want: []pendingMessage{{t1, NodeID{1, 0}, NodeID{2, 0}}, {t1, NodeID{1, 0}, NodeID{3, 0}}}},
+		{name: "self/sender=1/receivers=4", msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2, 3, 4}, want: []pendingMessage{{t1, NodeID{1, 0}, NodeID{2, 0}}, {t1, NodeID{1, 0}, NodeID{3, 0}}, {t1, NodeID{1, 0}, NodeID{4, 0}}}},
+		{name: "self/sender=2/receivers=5", msg: t1, sender: 2, receivers: []hotstuff.ID{1, 2, 3, 4, 5}, want: []pendingMessage{{t1, NodeID{2, 0}, NodeID{1, 0}}, {t1, NodeID{2, 0}, NodeID{3, 0}}, {t1, NodeID{2, 0}, NodeID{4, 0}}, {t1, NodeID{2, 0}, NodeID{5, 0}}}},
+		{name: "self/sender=3/receivers=6", msg: t1, sender: 3, receivers: []hotstuff.ID{1, 2, 3, 4, 5, 6}, want: []pendingMessage{{t1, NodeID{3, 0}, NodeID{1, 0}}, {t1, NodeID{3, 0}, NodeID{2, 0}}, {t1, NodeID{3, 0}, NodeID{4, 0}}, {t1, NodeID{3, 0}, NodeID{5, 0}}, {t1, NodeID{3, 0}, NodeID{6, 0}}}},
+		{name: "self/sender=4/receivers=7", msg: t1, sender: 4, receivers: []hotstuff.ID{1, 2, 3, 4, 5, 6, 7}, want: []pendingMessage{{t1, NodeID{4, 0}, NodeID{1, 0}}, {t1, NodeID{4, 0}, NodeID{2, 0}}, {t1, NodeID{4, 0}, NodeID{3, 0}}, {t1, NodeID{4, 0}, NodeID{5, 0}}, {t1, NodeID{4, 0}, NodeID{6, 0}}, {t1, NodeID{4, 0}, NodeID{7, 0}}}},
+		{name: "self/sender=5/receivers=6", msg: t1, sender: 5, receivers: []hotstuff.ID{2, 3, 4, 5, 6, 7}, want: []pendingMessage{{t1, NodeID{5, 0}, NodeID{2, 0}}, {t1, NodeID{5, 0}, NodeID{3, 0}}, {t1, NodeID{5, 0}, NodeID{4, 0}}, {t1, NodeID{5, 0}, NodeID{6, 0}}, {t1, NodeID{5, 0}, NodeID{7, 0}}}},
+		{name: "self/sender=6/receivers=6", msg: t1, sender: 6, receivers: []hotstuff.ID{1, 3, 4, 5, 6, 7}, want: []pendingMessage{{t1, NodeID{6, 0}, NodeID{1, 0}}, {t1, NodeID{6, 0}, NodeID{3, 0}}, {t1, NodeID{6, 0}, NodeID{4, 0}}, {t1, NodeID{6, 0}, NodeID{5, 0}}, {t1, NodeID{6, 0}, NodeID{7, 0}}}},
+		{name: "self/sender=7/receivers=6", msg: t1, sender: 7, receivers: []hotstuff.ID{1, 2, 4, 5, 6, 7}, want: []pendingMessage{{t1, NodeID{7, 0}, NodeID{1, 0}}, {t1, NodeID{7, 0}, NodeID{2, 0}}, {t1, NodeID{7, 0}, NodeID{4, 0}}, {t1, NodeID{7, 0}, NodeID{5, 0}}, {t1, NodeID{7, 0}, NodeID{6, 0}}}},
 		// sender is not part of the receivers list.
-		{name: "no_self/sender=1/receivers=1", msg: t1, sender: 1, receivers: []hotstuff.ID{2}, want: []pendingMessage{{t1, NodeID{1, 1}, NodeID{2, 2}}}},
-		{name: "no_self/sender=1/receivers=2", msg: t1, sender: 1, receivers: []hotstuff.ID{2, 3}, want: []pendingMessage{{t1, NodeID{1, 1}, NodeID{2, 2}}, {t1, NodeID{1, 1}, NodeID{3, 3}}}},
-		{name: "no_self/sender=1/receivers=3", msg: t1, sender: 1, receivers: []hotstuff.ID{2, 3, 4}, want: []pendingMessage{{t1, NodeID{1, 1}, NodeID{2, 2}}, {t1, NodeID{1, 1}, NodeID{3, 3}}, {t1, NodeID{1, 1}, NodeID{4, 4}}}},
-		{name: "no_self/sender=2/receivers=4", msg: t1, sender: 2, receivers: []hotstuff.ID{1, 3, 4, 5}, want: []pendingMessage{{t1, NodeID{2, 2}, NodeID{1, 1}}, {t1, NodeID{2, 2}, NodeID{3, 3}}, {t1, NodeID{2, 2}, NodeID{4, 4}}, {t1, NodeID{2, 2}, NodeID{5, 5}}}},
-		{name: "no_self/sender=3/receivers=5", msg: t1, sender: 3, receivers: []hotstuff.ID{1, 2, 4, 5, 6}, want: []pendingMessage{{t1, NodeID{3, 3}, NodeID{1, 1}}, {t1, NodeID{3, 3}, NodeID{2, 2}}, {t1, NodeID{3, 3}, NodeID{4, 4}}, {t1, NodeID{3, 3}, NodeID{5, 5}}, {t1, NodeID{3, 3}, NodeID{6, 6}}}},
-		{name: "no_self/sender=4/receivers=6", msg: t1, sender: 4, receivers: []hotstuff.ID{1, 2, 3, 5, 6, 7}, want: []pendingMessage{{t1, NodeID{4, 4}, NodeID{1, 1}}, {t1, NodeID{4, 4}, NodeID{2, 2}}, {t1, NodeID{4, 4}, NodeID{3, 3}}, {t1, NodeID{4, 4}, NodeID{5, 5}}, {t1, NodeID{4, 4}, NodeID{6, 6}}, {t1, NodeID{4, 4}, NodeID{7, 7}}}},
-		{name: "no_self/sender=5/receivers=5", msg: t1, sender: 5, receivers: []hotstuff.ID{2, 3, 4, 6, 7}, want: []pendingMessage{{t1, NodeID{5, 5}, NodeID{2, 2}}, {t1, NodeID{5, 5}, NodeID{3, 3}}, {t1, NodeID{5, 5}, NodeID{4, 4}}, {t1, NodeID{5, 5}, NodeID{6, 6}}, {t1, NodeID{5, 5}, NodeID{7, 7}}}},
-		{name: "no_self/sender=6/receivers=5", msg: t1, sender: 6, receivers: []hotstuff.ID{1, 3, 4, 5, 7}, want: []pendingMessage{{t1, NodeID{6, 6}, NodeID{1, 1}}, {t1, NodeID{6, 6}, NodeID{3, 3}}, {t1, NodeID{6, 6}, NodeID{4, 4}}, {t1, NodeID{6, 6}, NodeID{5, 5}}, {t1, NodeID{6, 6}, NodeID{7, 7}}}},
-		{name: "no_self/sender=7/receivers=5", msg: t1, sender: 7, receivers: []hotstuff.ID{1, 2, 4, 5, 6}, want: []pendingMessage{{t1, NodeID{7, 7}, NodeID{1, 1}}, {t1, NodeID{7, 7}, NodeID{2, 2}}, {t1, NodeID{7, 7}, NodeID{4, 4}}, {t1, NodeID{7, 7}, NodeID{5, 5}}, {t1, NodeID{7, 7}, NodeID{6, 6}}}},
+		{name: "no_self/sender=1/receivers=1", msg: t1, sender: 1, receivers: []hotstuff.ID{2}, want: []pendingMessage{{t1, NodeID{1, 0}, NodeID{2, 0}}}},
+		{name: "no_self/sender=1/receivers=2", msg: t1, sender: 1, receivers: []hotstuff.ID{2, 3}, want: []pendingMessage{{t1, NodeID{1, 0}, NodeID{2, 0}}, {t1, NodeID{1, 0}, NodeID{3, 0}}}},
+		{name: "no_self/sender=1/receivers=3", msg: t1, sender: 1, receivers: []hotstuff.ID{2, 3, 4}, want: []pendingMessage{{t1, NodeID{1, 0}, NodeID{2, 0}}, {t1, NodeID{1, 0}, NodeID{3, 0}}, {t1, NodeID{1, 0}, NodeID{4, 0}}}},
+		{name: "no_self/sender=2/receivers=4", msg: t1, sender: 2, receivers: []hotstuff.ID{1, 3, 4, 5}, want: []pendingMessage{{t1, NodeID{2, 0}, NodeID{1, 0}}, {t1, NodeID{2, 0}, NodeID{3, 0}}, {t1, NodeID{2, 0}, NodeID{4, 0}}, {t1, NodeID{2, 0}, NodeID{5, 0}}}},
+		{name: "no_self/sender=3/receivers=5", msg: t1, sender: 3, receivers: []hotstuff.ID{1, 2, 4, 5, 6}, want: []pendingMessage{{t1, NodeID{3, 0}, NodeID{1, 0}}, {t1, NodeID{3, 0}, NodeID{2, 0}}, {t1, NodeID{3, 0}, NodeID{4, 0}}, {t1, NodeID{3, 0}, NodeID{5, 0}}, {t1, NodeID{3, 0}, NodeID{6, 0}}}},
+		{name: "no_self/sender=4/receivers=6", msg: t1, sender: 4, receivers: []hotstuff.ID{1, 2, 3, 5, 6, 7}, want: []pendingMessage{{t1, NodeID{4, 0}, NodeID{1, 0}}, {t1, NodeID{4, 0}, NodeID{2, 0}}, {t1, NodeID{4, 0}, NodeID{3, 0}}, {t1, NodeID{4, 0}, NodeID{5, 0}}, {t1, NodeID{4, 0}, NodeID{6, 0}}, {t1, NodeID{4, 0}, NodeID{7, 0}}}},
+		{name: "no_self/sender=5/receivers=5", msg: t1, sender: 5, receivers: []hotstuff.ID{2, 3, 4, 6, 7}, want: []pendingMessage{{t1, NodeID{5, 0}, NodeID{2, 0}}, {t1, NodeID{5, 0}, NodeID{3, 0}}, {t1, NodeID{5, 0}, NodeID{4, 0}}, {t1, NodeID{5, 0}, NodeID{6, 0}}, {t1, NodeID{5, 0}, NodeID{7, 0}}}},
+		{name: "no_self/sender=6/receivers=5", msg: t1, sender: 6, receivers: []hotstuff.ID{1, 3, 4, 5, 7}, want: []pendingMessage{{t1, NodeID{6, 0}, NodeID{1, 0}}, {t1, NodeID{6, 0}, NodeID{3, 0}}, {t1, NodeID{6, 0}, NodeID{4, 0}}, {t1, NodeID{6, 0}, NodeID{5, 0}}, {t1, NodeID{6, 0}, NodeID{7, 0}}}},
+		{name: "no_self/sender=7/receivers=5", msg: t1, sender: 7, receivers: []hotstuff.ID{1, 2, 4, 5, 6}, want: []pendingMessage{{t1, NodeID{7, 0}, NodeID{1, 0}}, {t1, NodeID{7, 0}, NodeID{2, 0}}, {t1, NodeID{7, 0}, NodeID{4, 0}}, {t1, NodeID{7, 0}, NodeID{5, 0}}, {t1, NodeID{7, 0}, NodeID{6, 0}}}},
 	}
 	var gotPendingMessages, wantPendingMessages []pendingMessage
 	for _, tt := range tests {
@@ -206,11 +206,11 @@ func checkAppendedMessages(t *testing.T, name string, netMessages, want []pendin
 	// only last len(want) network messages are relevant for this test
 	got := slices.Clone(netMessages[len(netMessages)-len(want):])
 	slices.SortFunc(got, func(a, b pendingMessage) int {
-		if a.sender.NetworkID != b.sender.NetworkID {
-			return int(a.sender.NetworkID) - int(b.sender.NetworkID)
+		if a.sender.ReplicaID != b.sender.ReplicaID {
+			return int(a.sender.ReplicaID) - int(b.sender.ReplicaID)
 		}
-		if a.receiver.NetworkID != b.receiver.NetworkID {
-			return int(a.receiver.NetworkID) - int(b.receiver.NetworkID)
+		if a.receiver.ReplicaID != b.receiver.ReplicaID {
+			return int(a.receiver.ReplicaID) - int(b.receiver.ReplicaID)
 		}
 		return 0
 	})
@@ -227,11 +227,11 @@ func checkAllMessages(t *testing.T, got []pendingMessage, want []pendingMessage)
 	// This is necessary because broadcasting message iterates over the receivers
 	// in a random order, since they are stored in a map (receivers=network.replicas).
 	slices.SortFunc(got, func(a, b pendingMessage) int {
-		if a.sender.NetworkID != b.sender.NetworkID {
-			return int(a.sender.NetworkID) - int(b.sender.NetworkID)
+		if a.sender.ReplicaID != b.sender.ReplicaID {
+			return int(a.sender.ReplicaID) - int(b.sender.ReplicaID)
 		}
-		if a.receiver.NetworkID != b.receiver.NetworkID {
-			return int(a.receiver.NetworkID) - int(b.receiver.NetworkID)
+		if a.receiver.ReplicaID != b.receiver.ReplicaID {
+			return int(a.receiver.ReplicaID) - int(b.receiver.ReplicaID)
 		}
 		return 0
 	})
@@ -240,11 +240,11 @@ func checkAllMessages(t *testing.T, got []pendingMessage, want []pendingMessage)
 	// which is not guaranteed to be the same as the order as the sorted got pending messages
 	// when there are repeated sender-receiver pairs.
 	slices.SortFunc(want, func(a, b pendingMessage) int {
-		if a.sender.NetworkID != b.sender.NetworkID {
-			return int(a.sender.NetworkID) - int(b.sender.NetworkID)
+		if a.sender.ReplicaID != b.sender.ReplicaID {
+			return int(a.sender.ReplicaID) - int(b.sender.ReplicaID)
 		}
-		if a.receiver.NetworkID != b.receiver.NetworkID {
-			return int(a.receiver.NetworkID) - int(b.receiver.NetworkID)
+		if a.receiver.ReplicaID != b.receiver.ReplicaID {
+			return int(a.receiver.ReplicaID) - int(b.receiver.ReplicaID)
 		}
 		return 0
 	})
@@ -279,7 +279,7 @@ func TestNetworkWithTwins(t *testing.T) {
 	// Create a network with 1 twin and 3 hotstuff ids
 	network, senders, _, _ := createNetworkWithTwins(t, 3, 1)
 
-	nonTwinSender := senders[0] // index 0 corresponds to r2n3 (first regular node)
+	nonTwinSender := senders[0] // index 0 corresponds to r2n0 (first regular node)
 
 	// Clear any existing pending messages
 	network.pendingMessages = nil
@@ -290,8 +290,8 @@ func TestNetworkWithTwins(t *testing.T) {
 
 	// Define expected messages: one to each twin (r1n1 and r1n2)
 	expectedMessages := []pendingMessage{
-		{testMessage, NodeID{2, 3}, NodeID{1, 1}},
-		{testMessage, NodeID{2, 3}, NodeID{1, 2}},
+		{testMessage, NodeID{2, 0}, NodeID{1, 1}},
+		{testMessage, NodeID{2, 0}, NodeID{1, 2}},
 	}
 
 	// Use the helper function to check messages
