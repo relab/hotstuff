@@ -52,8 +52,8 @@ func (s *emulatedSender) sendMessage(id hotstuff.ID, message any) {
 		s.network.pendingMessages = append(
 			s.network.pendingMessages,
 			pendingMessage{
-				sender:   uint32(s.node.id.NetworkID),
-				receiver: uint32(node.id.NetworkID),
+				sender:   s.node.id,
+				receiver: node.id,
 				message:  message,
 			},
 		)
@@ -63,7 +63,7 @@ func (s *emulatedSender) sendMessage(id hotstuff.ID, message any) {
 // shouldDrop checks if a message to the node identified by id should be dropped.
 func (s *emulatedSender) shouldDrop(id NodeID, message any) bool {
 	// retrieve the drop config for this node.
-	return s.network.shouldDrop(s.node.id.NetworkID, id.NetworkID, message)
+	return s.network.shouldDrop(s.node.id, id, message)
 }
 
 // Sub returns a subconfiguration containing the replicas specified in the ids slice.
