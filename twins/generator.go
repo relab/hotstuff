@@ -24,29 +24,28 @@ type Generator struct {
 
 func assignNodeIDs(numNodes, numTwins uint8) (nodes, twins []NodeID) {
 	replicaID := hotstuff.ID(1)
-	networkID := uint32(1)
 	remainingTwins := numTwins
 
 	// assign IDs to nodes
 	for range numNodes {
 		if remainingTwins > 0 {
+			// twins get networkID 1 and 2
 			twins = append(twins, NodeID{
 				ReplicaID: replicaID,
-				NetworkID: networkID,
+				NetworkID: 1,
 			})
-			networkID++
 			twins = append(twins, NodeID{
 				ReplicaID: replicaID,
-				NetworkID: networkID,
+				NetworkID: 2,
 			})
 			remainingTwins--
 		} else {
+			// non-twins get networkID 0
 			nodes = append(nodes, NodeID{
 				ReplicaID: replicaID,
-				NetworkID: networkID,
+				NetworkID: 0,
 			})
 		}
-		networkID++
 		replicaID++
 	}
 
