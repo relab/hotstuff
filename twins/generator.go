@@ -275,7 +275,7 @@ func genPartitionScenarios(twins, nodes []NodeID, k uint8, min uint8) (partition
 				twin := 0
 				for k := range twinAssignments[j] {
 					for _, t := range twinAssignments[j][k] {
-						partitions[t].Add(twins[twin].NetworkID)
+						partitions[t].Add(twins[twin])
 						twin++
 					}
 				}
@@ -284,7 +284,7 @@ func genPartitionScenarios(twins, nodes []NodeID, k uint8, min uint8) (partition
 			node := 0
 			for k := range partitions {
 				for sizes[i][k]-uint8(len(partitions[k])) > 0 {
-					partitions[k].Add(nodes[node].NetworkID)
+					partitions[k].Add(nodes[node])
 					node++
 				}
 			}
