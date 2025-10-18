@@ -30,6 +30,7 @@ type pendingMessage struct {
 	message  any
 	sender   NodeID
 	receiver NodeID
+	view     hotstuff.View
 }
 
 func (pm pendingMessage) String() string {
@@ -46,6 +47,9 @@ type Network struct {
 	replicas map[hotstuff.ID][]*node
 	// For each view (starting at 1), contains the list of partitions for that view.
 	views []View
+
+	// Global view, to enforce no out of view messages.
+	globalView hotstuff.View
 
 	// the message types to drop
 	dropTypes map[reflect.Type]struct{}
@@ -65,10 +69,11 @@ func NewSimpleNetwork(numNodes int) *Network {
 		allNodesSet.Add(NodeID{ReplicaID: hotstuff.ID(i), NetworkID: uint32(i)})
 	}
 	network := &Network{
-		nodes:     make(map[NodeID]*node),
-		replicas:  make(map[hotstuff.ID][]*node),
-		views:     []View{{Leader: 1, Partitions: []NodeSet{allNodesSet}}},
-		dropTypes: make(map[reflect.Type]struct{}),
+		nodes:      make(map[NodeID]*node),
+		replicas:   make(map[hotstuff.ID][]*node),
+		views:      []View{{Leader: 1, Partitions: []NodeSet{allNodesSet}}},
+		globalView: 1,
+		dropTypes:  make(map[reflect.Type]struct{}),
 	}
 	network.logger = logging.NewWithDest(&network.log, "network")
 	return network
@@ -78,10 +83,11 @@ func NewSimpleNetwork(numNodes int) *Network {
 // partitions specifies the network partitions for each view.
 func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 	n := &Network{
-		nodes:     make(map[NodeID]*node),
-		replicas:  make(map[hotstuff.ID][]*node),
-		views:     views,
-		dropTypes: make(map[reflect.Type]struct{}),
+		nodes:      make(map[NodeID]*node),
+		replicas:   make(map[hotstuff.ID][]*node),
+		views:      views,
+		globalView: 1,
+		dropTypes:  make(map[reflect.Type]struct{}),
 	}
 	n.logger = logging.NewWithDest(&n.log, "network")
 	for _, t := range dropTypes {
@@ -153,10 +159,21 @@ func (n *Network) run(ticks int) {
 // tick adds pending messages to each node's event loop and subsequently performs one tick for each node,
 // processing each pending message.
 func (n *Network) tick() {
+	nextMsgs := make([]pendingMessage, 0, len(n.pendingMessages))
 	for _, msg := range n.pendingMessages {
+		if msg.view > n.globalView {
+			nextMsgs = append(nextMsgs, msg)
+			continue
+		}
 		n.nodes[msg.receiver].eventLoop.AddEvent(msg.message)
 	}
-	n.pendingMessages = nil
+
+	if len(n.pendingMessages) == len(nextMsgs) {
+		// no new messages were delivered, advance global view
+		n.globalView++
+	}
+
+	n.pendingMessages = nextMsgs
 
 	for _, node := range n.nodes {
 		node.eventLoop.AddEvent(tick{})
@@ -164,23 +181,15 @@ func (n *Network) tick() {
 		for node.eventLoop.Tick(context.Background()) { //revive:disable-line:empty-block
 		}
 	}
+
 }
 
 // shouldDrop decides if the sender should drop the message, based on the current view of the sender and the
 // partitions configured for that view.
-func (n *Network) shouldDrop(sender, receiver NodeID, message any) bool {
-	node, ok := n.nodes[sender]
-	if !ok {
-		panic(fmt.Errorf("node matching sender id %v was not found", sender))
-	}
+func (n *Network) shouldDrop(sender, receiver NodeID, message any, view hotstuff.View) bool {
 
 	// Index into viewPartitions.
-	i := -1
-	if node.effectiveView > node.viewStates.View() {
-		i += int(node.effectiveView)
-	} else {
-		i += int(node.viewStates.View())
-	}
+	i := int(view) - 1
 
 	if i < 0 {
 		return false
@@ -198,7 +207,7 @@ func (n *Network) shouldDrop(sender, receiver NodeID, message any) bool {
 		}
 	}
 
-	_, ok = n.dropTypes[reflect.TypeOf(message)]
+	_, ok := n.dropTypes[reflect.TypeOf(message)]
 
 	return ok
 }
