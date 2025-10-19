@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/security/crypto"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 )
 
@@ -192,4 +193,43 @@ func GenerateKey(t testing.TB, cryptoName string) hotstuff.PrivateKey {
 	default:
 		panic("incorrect crypto module name")
 	}
+}
+
+func CreateSigners[T crypto.Base](t testing.TB, numReplicas int) (signers []T) {
+	t.Helper()
+
+	var cryptoName string
+	keys := make(map[hotstuff.ID]hotstuff.PrivateKey)
+	for i := 1; i <= numReplicas; i++ {
+		var priv hotstuff.PrivateKey
+		switch any(signers).(type) {
+		case []*crypto.ECDSA:
+			priv = GenerateECDSAKey(t)
+			cryptoName = crypto.NameECDSA
+		case []*crypto.EDDSA:
+			priv = GenerateEDDSAKey(t)
+			cryptoName = crypto.NameEDDSA
+		default:
+			t.Fatalf("unsupported crypto type: %T", signers)
+		}
+		keys[hotstuff.ID(i)] = priv
+	}
+
+	signers = make([]T, numReplicas)
+	for i := range numReplicas {
+		id := hotstuff.ID(i + 1)
+		cfg := core.NewRuntimeConfig(id, keys[id])
+		for j := 1; j <= numReplicas; j++ {
+			rid := hotstuff.ID(j)
+			// Add public keys for all replicas
+			cfg.AddReplica(&hotstuff.ReplicaInfo{ID: rid, PubKey: keys[rid].Public()})
+		}
+		base, err := crypto.New(cfg, cryptoName)
+		if err != nil {
+			t.Fatalf("failed to create crypto impl: %v", err)
+		}
+		signers[i] = base.(T)
+	}
+
+	return signers
 }

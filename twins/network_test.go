@@ -140,7 +140,7 @@ func BenchmarkNetworkSubConfigBroadcastMessage(b *testing.B) {
 		{msg: t1, sender: 1, receivers: []hotstuff.ID{1, 2, 3, 4, 5, 6, 7}},
 	}
 	for _, tt := range tests {
-		b.Run(test.Name([]string{"receivers"}, len(tt.receivers)), func(b *testing.B) {
+		b.Run(test.Name("receivers", len(tt.receivers)), func(b *testing.B) {
 			for b.Loop() {
 				sender := senders[tt.sender-1]
 				sub, err := sender.Sub(tt.receivers)

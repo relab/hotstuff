@@ -288,7 +288,7 @@ func (bls *bls12Base) coreAggregateVerify(publicKeys []*BLS12PublicKey, messages
 
 	engine := bls12.NewEngine()
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		q, err := engine.G2.HashToCurve(messages[i], domain)
 		if err != nil {
 			return err
@@ -390,7 +390,7 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 	s.Participants().RangeWhile(func(id hotstuff.ID) bool {
 		pk, err := bls.publicKey(id)
 		if err != nil {
-			errs = errors.Join(err)
+			errs = errors.Join(errs, err)
 			return false
 		}
 		pks = append(pks, pk)

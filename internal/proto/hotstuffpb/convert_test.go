@@ -145,3 +145,39 @@ func TestTimeoutMsgFromProto_Issue129(t *testing.T) {
 		})
 	}
 }
+
+func TestQuorumSignatureFromProto_UnorderedECDSA(t *testing.T) {
+	signers := testutil.CreateSigners[*crypto.ECDSA](t, 5)
+
+	message := []byte("combine message")
+	// Create signatures in an unordered fashion: [3,2,1,0,4]
+	indices := []int{3, 2, 1, 0, 4}
+	sigs := make([]hotstuff.QuorumSignature, len(indices))
+	for i, idx := range indices {
+		sig, err := signers[idx].Sign(message)
+		if err != nil {
+			t.Fatalf("Sign failed for replica %d: %v", idx+1, err)
+		}
+		sigs[i] = sig
+	}
+
+	// Combine signatures into a Multi signature
+	combined, err := signers[0].Combine(sigs...)
+	if err != nil {
+		t.Fatalf("Combine failed: %v", err)
+	}
+
+	// Convert to protobuf and back (simulate network transfer)
+	protoSig := hotstuffpb.QuorumSignatureToProto(combined)
+	restored := hotstuffpb.QuorumSignatureFromProto(protoSig)
+
+	// Should be able to verify the restored signature
+	if err := signers[0].Verify(restored, message); err != nil {
+		t.Fatalf("Verify restored signature failed: %v", err)
+	}
+
+	// Check that the restored signature has the correct number of participants
+	if restored.Participants().Len() != len(indices) {
+		t.Fatalf("expected %d participants, got %d", len(indices), restored.Participants().Len())
+	}
+}
