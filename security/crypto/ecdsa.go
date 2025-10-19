@@ -59,16 +59,16 @@ func (ec *ECDSA) privateKey() *ecdsa.PrivateKey {
 }
 
 // Sign creates a cryptographic signature of the given message.
-func (ec *ECDSA) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
+func (ec *ECDSA) Sign(message []byte) (hotstuff.QuorumSignature, error) {
 	hash := sha256.Sum256(message)
 	sig, err := ecdsa.SignASN1(rand.Reader, ec.privateKey(), hash[:])
 	if err != nil {
 		return nil, fmt.Errorf("ecdsa: sign failed: %w", err)
 	}
-	return Multi[*ECDSASignature]{&ECDSASignature{
+	return NewMulti(&ECDSASignature{
 		sig:    sig,
 		signer: ec.config.ID(),
-	}}, nil
+	}), nil
 }
 
 // Combine combines multiple signatures into a single signature.
