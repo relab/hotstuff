@@ -2,55 +2,22 @@ package crypto_test
 
 import (
 	"bytes"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"maps"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/relab/hotstuff/internal/testutil"
+
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
+
 	"github.com/relab/hotstuff/security/crypto"
 )
 
-// setupECDSATest creates a test configuration with ECDSA keys for testing
-func setupECDSATest(t testing.TB, numReplicas int) *crypto.ECDSA {
+// createSigner creates a single ECDSA-based signer for testing.
+func createSigner(t testing.TB, numReplicas int) *crypto.ECDSA {
 	t.Helper()
-	return setupECDSATestMulti(t, numReplicas)[0]
-}
-
-// setupECDSATestMulti creates ECDSA instances for multiple replicas.
-// Returns a slice of ECDSA signers (index 0 corresponds to replica 1, etc.)
-func setupECDSATestMulti(t testing.TB, numReplicas int) []*crypto.ECDSA {
-	t.Helper()
-
-	keys := make(map[hotstuff.ID]*ecdsa.PrivateKey)
-	for i := 1; i <= numReplicas; i++ {
-		privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-		if err != nil {
-			t.Fatalf("failed to generate key for replica %d: %v", i, err)
-		}
-		keys[hotstuff.ID(i)] = privKey
-	}
-
-	signers := make([]*crypto.ECDSA, numReplicas)
-	for i := range signers {
-		id := hotstuff.ID(i + 1)
-		// Create config for this replica (with their key) and add all replicas
-		config := core.NewRuntimeConfig(id, keys[id])
-		for j := 1; j <= numReplicas; j++ {
-			rid := hotstuff.ID(j)
-			config.AddReplica(&hotstuff.ReplicaInfo{
-				ID:     rid,
-				PubKey: &keys[rid].PublicKey,
-			})
-		}
-		signers[i] = crypto.NewECDSA(config)
-	}
-
-	return signers
+	return testutil.CreateSigners[*crypto.ECDSA](t, numReplicas)[0]
 }
 
 func TestECDSASignAndVerify(t *testing.T) {
@@ -65,7 +32,7 @@ func TestECDSASignAndVerify(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ec := setupECDSATest(t, 1)
+			ec := createSigner(t, 1)
 			sig, err := ec.Sign([]byte(tc.message))
 			if err != nil {
 				t.Fatalf("Sign failed: %v", err)
@@ -95,7 +62,7 @@ func TestECDSAVerifyFailure(t *testing.T) {
 	wantErr := "ecdsa: failed to verify signature from replica 1"
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ec := setupECDSATest(t, 1)
+			ec := createSigner(t, 1)
 			sig, err := ec.Sign([]byte(tc.message))
 			if err != nil {
 				t.Fatalf("Sign failed: %v", err)
@@ -129,7 +96,7 @@ func TestECDSACombine(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			signers := setupECDSATestMulti(t, tc.numReplicas)
+			signers := testutil.CreateSigners[*crypto.ECDSA](t, tc.numReplicas)
 
 			message := []byte("combine message")
 			// Create signatures from specified replicas (repeat index for overlap)
@@ -276,7 +243,7 @@ func TestECDSABatchVerify(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			signers := setupECDSATestMulti(t, tc.numReplicas)
+			signers := testutil.CreateSigners[*crypto.ECDSA](t, tc.numReplicas)
 
 			// Create signatures for the message batch in deterministic order
 			sigs := make([]hotstuff.QuorumSignature, len(tc.messages))
@@ -320,7 +287,7 @@ func TestECDSABatchVerify(t *testing.T) {
 }
 
 func TestECDSASignatureToBytes(t *testing.T) {
-	ec := setupECDSATest(t, 1)
+	ec := createSigner(t, 1)
 	message := []byte("test message")
 	sig, err := ec.Sign(message)
 	if err != nil {
@@ -340,7 +307,7 @@ func TestECDSASignatureToBytes(t *testing.T) {
 }
 
 func TestECDSARestoreSignature(t *testing.T) {
-	ec := setupECDSATest(t, 1)
+	ec := createSigner(t, 1)
 	message := []byte("test message")
 	sig, err := ec.Sign(message)
 	if err != nil {
@@ -374,7 +341,7 @@ func TestECDSARestoreSignature(t *testing.T) {
 }
 
 func BenchmarkECDSASign(b *testing.B) {
-	ec := setupECDSATest(b, 1)
+	ec := createSigner(b, 1)
 	message := []byte("benchmark message")
 
 	for b.Loop() {
@@ -386,7 +353,7 @@ func BenchmarkECDSASign(b *testing.B) {
 }
 
 func BenchmarkECDSAVerify(b *testing.B) {
-	ec := setupECDSATest(b, 1)
+	ec := createSigner(b, 1)
 	message := []byte("benchmark message")
 	sig, err := ec.Sign(message)
 	if err != nil {
@@ -403,7 +370,7 @@ func BenchmarkECDSAVerify(b *testing.B) {
 
 func BenchmarkECDSACombine(b *testing.B) {
 	numReplicas := 4
-	signers := setupECDSATestMulti(b, numReplicas)
+	signers := testutil.CreateSigners[*crypto.ECDSA](b, numReplicas)
 
 	message := []byte("benchmark message")
 	sigs := make([]hotstuff.QuorumSignature, numReplicas)
