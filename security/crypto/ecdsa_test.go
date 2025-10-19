@@ -1,6 +1,7 @@
 package crypto_test
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -270,75 +271,51 @@ func TestECDSABatchVerify(t *testing.T) {
 func TestECDSASignatureToBytes(t *testing.T) {
 	ec := setupECDSATest(t, 1)
 	message := []byte("test message")
-
-	// Sign the message
 	sig, err := ec.Sign(message)
 	if err != nil {
 		t.Fatalf("Sign failed: %v", err)
 	}
 
-	// Extract the signature from Multi
-	multiSig := sig.(crypto.Multi[*crypto.ECDSASignature])
-	var ecdsaSig *crypto.ECDSASignature
-	for _, s := range multiSig {
-		ecdsaSig = s
-		break
-	}
+	// Extract the ECDSA signature from Multi signature
+	ecdsaSig := sig.(crypto.Multi[*crypto.ECDSASignature])[0]
 
-	// Test ToBytes()
 	sigBytes := ecdsaSig.ToBytes()
 	if len(sigBytes) == 0 {
-		t.Fatal("ToBytes() returned empty slice")
+		t.Error("ToBytes() returned empty slice")
 	}
-
-	// Test Signer()
 	if ecdsaSig.Signer() != 1 {
-		t.Fatalf("expected signer ID 1, got %d", ecdsaSig.Signer())
+		t.Errorf("Expected signer ID 1, got %d", ecdsaSig.Signer())
 	}
 }
 
 func TestECDSARestoreSignature(t *testing.T) {
 	ec := setupECDSATest(t, 1)
 	message := []byte("test message")
-
-	// Sign the message
 	sig, err := ec.Sign(message)
 	if err != nil {
 		t.Fatalf("Sign failed: %v", err)
 	}
 
-	// Extract the signature bytes
-	multiSig := sig.(crypto.Multi[*crypto.ECDSASignature])
-	var originalSig *crypto.ECDSASignature
-	for _, s := range multiSig {
-		originalSig = s
-		break
-	}
-
-	sigBytes := originalSig.ToBytes()
+	// Extract the ECDSA signature from Multi signature
+	originalSig := sig.(crypto.Multi[*crypto.ECDSASignature])[0]
+	originalSigBytes := originalSig.ToBytes()
 	signer := originalSig.Signer()
 
-	// Restore the signature using the bytes
-	restoredSig := crypto.RestoreECDSASignature(sigBytes, signer)
+	// Restore ECDSA signature using the original bytes and signer
+	restoredSig := crypto.RestoreECDSASignature(originalSigBytes, signer)
 
-	// Verify that the restored signature has the same bytes
-	restoredBytes := restoredSig.ToBytes()
-	if len(restoredBytes) != len(sigBytes) {
-		t.Fatalf("restored signature length does not match: got %d, want %d", len(restoredBytes), len(sigBytes))
-	}
-	for i := range restoredBytes {
-		if restoredBytes[i] != sigBytes[i] {
-			t.Fatalf("restored signature bytes do not match at index %d", i)
-		}
+	// Verify that the restored signature has the same bytes as the original
+	if !bytes.Equal(originalSigBytes, restoredSig.ToBytes()) {
+		t.Fatal("Restored signature bytes do not match original")
 	}
 	if restoredSig.Signer() != signer {
-		t.Fatalf("restored signer does not match: got %v, want %v", restoredSig.Signer(), signer)
+		t.Fatalf("Restored signer does not match: got %v, want %v", restoredSig.Signer(), signer)
 	}
 
-	// Create a Multi signature with the restored signature
+	// Create a Multi signature from the restored ECDSA signature
 	restoredMulti := crypto.NewMulti(restoredSig)
 
-	// Verify that the restored signature can be verified
+	// Check that the restored signature can be verified
 	err = ec.Verify(restoredMulti, message)
 	if err != nil {
 		t.Fatalf("Verify restored signature failed: %v", err)
