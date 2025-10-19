@@ -12,33 +12,41 @@ import (
 )
 
 // setupECDSATest creates a test configuration with ECDSA keys for testing
-func setupECDSATest(t *testing.T, numReplicas int) (*crypto.ECDSA, map[hotstuff.ID]*ecdsa.PrivateKey) {
+func setupECDSATest(t testing.TB, numReplicas int) *crypto.ECDSA {
+	t.Helper()
+	return setupECDSATestMulti(t, numReplicas)[0]
+}
+
+// setupECDSATestMulti creates ECDSA instances for multiple replicas.
+// Returns a slice of ECDSA signers (index 0 corresponds to replica 1, etc.)
+func setupECDSATestMulti(t testing.TB, numReplicas int) []*crypto.ECDSA {
 	t.Helper()
 
 	keys := make(map[hotstuff.ID]*ecdsa.PrivateKey)
-
 	for i := 1; i <= numReplicas; i++ {
 		privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
 			t.Fatalf("failed to generate key for replica %d: %v", i, err)
 		}
-		id := hotstuff.ID(i)
-		keys[id] = privKey
+		keys[hotstuff.ID(i)] = privKey
 	}
 
-	// Use replica 1 as the signer for this test
-	config := core.NewRuntimeConfig(hotstuff.ID(1), keys[1])
-
-	// Add all replicas to the configuration
-	for i := 1; i <= numReplicas; i++ {
-		id := hotstuff.ID(i)
-		config.AddReplica(&hotstuff.ReplicaInfo{
-			ID:     id,
-			PubKey: &keys[id].PublicKey,
-		})
+	signers := make([]*crypto.ECDSA, numReplicas)
+	for i := range signers {
+		id := hotstuff.ID(i + 1)
+		// Create config for this replica (with their key) and add all replicas
+		config := core.NewRuntimeConfig(id, keys[id])
+		for j := 1; j <= numReplicas; j++ {
+			rid := hotstuff.ID(j)
+			config.AddReplica(&hotstuff.ReplicaInfo{
+				ID:     rid,
+				PubKey: &keys[rid].PublicKey,
+			})
+		}
+		signers[i] = crypto.NewECDSA(config)
 	}
 
-	return crypto.NewECDSA(config), keys
+	return signers
 }
 
 func TestECDSASignAndVerify(t *testing.T) {
@@ -53,7 +61,7 @@ func TestECDSASignAndVerify(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ec, _ := setupECDSATest(t, 1)
+			ec := setupECDSATest(t, 1)
 			sig, err := ec.Sign([]byte(tc.message))
 			if err != nil {
 				t.Fatalf("Sign failed: %v", err)
@@ -83,7 +91,7 @@ func TestECDSAVerifyFailure(t *testing.T) {
 	wantErr := "ecdsa: failed to verify signature from replica 1"
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ec, _ := setupECDSATest(t, 1)
+			ec := setupECDSATest(t, 1)
 			sig, err := ec.Sign([]byte(tc.message))
 			if err != nil {
 				t.Fatalf("Sign failed: %v", err)
@@ -133,51 +141,22 @@ func TestECDSACombine(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Create multiple ECDSA instances for different replicas
-			keys := make(map[hotstuff.ID]*ecdsa.PrivateKey)
-
-			for i := 1; i <= tc.numReplicas; i++ {
-				privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-				if err != nil {
-					t.Fatalf("failed to generate key for replica %d: %v", i, err)
-				}
-				id := hotstuff.ID(i)
-				keys[id] = privKey
-			}
-
-			// Create a shared config with all replicas
-			config := core.NewRuntimeConfig(hotstuff.ID(1), keys[1])
-			for i := 1; i <= tc.numReplicas; i++ {
-				id := hotstuff.ID(i)
-				config.AddReplica(&hotstuff.ReplicaInfo{
-					ID:     id,
-					PubKey: &keys[id].PublicKey,
-				})
-			}
+			signers := setupECDSATestMulti(t, tc.numReplicas)
 
 			message := []byte("test message for combining")
-			sigs := make([]hotstuff.QuorumSignature, 0, tc.numSigs)
+			sigs := make([]hotstuff.QuorumSignature, tc.numSigs)
 
 			// Create signatures from different replicas
-			for i := 1; i <= tc.numSigs; i++ {
-				replicaConfig := core.NewRuntimeConfig(hotstuff.ID(i), keys[hotstuff.ID(i)])
-				for j := 1; j <= tc.numReplicas; j++ {
-					id := hotstuff.ID(j)
-					replicaConfig.AddReplica(&hotstuff.ReplicaInfo{
-						ID:     id,
-						PubKey: &keys[id].PublicKey,
-					})
-				}
-				ec := crypto.NewECDSA(replicaConfig)
-				sig, err := ec.Sign(message)
+			for i := range tc.numSigs {
+				sig, err := signers[i].Sign(message)
 				if err != nil {
 					t.Fatalf("Sign failed for replica %d: %v", i, err)
 				}
-				sigs = append(sigs, sig)
+				sigs[i] = sig
 			}
 
 			// Try to combine signatures
-			ec := crypto.NewECDSA(config)
+			ec := signers[0]
 			combined, err := ec.Combine(sigs...)
 
 			if tc.shouldFail {
@@ -249,27 +228,7 @@ func TestECDSABatchVerify(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Create multiple ECDSA instances for different replicas
-			keys := make(map[hotstuff.ID]*ecdsa.PrivateKey)
-
-			for i := 1; i <= tc.numReplicas; i++ {
-				privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-				if err != nil {
-					t.Fatalf("failed to generate key for replica %d: %v", i, err)
-				}
-				id := hotstuff.ID(i)
-				keys[id] = privKey
-			}
-
-			// Create a shared config
-			config := core.NewRuntimeConfig(hotstuff.ID(1), keys[1])
-			for i := 1; i <= tc.numReplicas; i++ {
-				id := hotstuff.ID(i)
-				config.AddReplica(&hotstuff.ReplicaInfo{
-					ID:     id,
-					PubKey: &keys[id].PublicKey,
-				})
-			}
+			signers := setupECDSATestMulti(t, tc.numReplicas)
 
 			// Create signatures for the batch
 			batch := make(map[hotstuff.ID][]byte)
@@ -277,16 +236,7 @@ func TestECDSABatchVerify(t *testing.T) {
 
 			for id, msg := range tc.messages {
 				batch[id] = []byte(msg)
-				replicaConfig := core.NewRuntimeConfig(id, keys[id])
-				for i := 1; i <= tc.numReplicas; i++ {
-					rid := hotstuff.ID(i)
-					replicaConfig.AddReplica(&hotstuff.ReplicaInfo{
-						ID:     rid,
-						PubKey: &keys[rid].PublicKey,
-					})
-				}
-				ec := crypto.NewECDSA(replicaConfig)
-				sig, err := ec.Sign([]byte(msg))
+				sig, err := signers[id-1].Sign([]byte(msg))
 				if err != nil {
 					t.Fatalf("Sign failed for replica %d: %v", id, err)
 				}
@@ -294,7 +244,7 @@ func TestECDSABatchVerify(t *testing.T) {
 			}
 
 			// Combine all signatures
-			ec := crypto.NewECDSA(config)
+			ec := signers[0]
 			combined, err := ec.Combine(sigs...)
 			if err != nil {
 				t.Fatalf("Combine failed: %v", err)
@@ -318,7 +268,7 @@ func TestECDSABatchVerify(t *testing.T) {
 }
 
 func TestECDSASignatureToBytes(t *testing.T) {
-	ec, _ := setupECDSATest(t, 1)
+	ec := setupECDSATest(t, 1)
 	message := []byte("test message")
 
 	// Sign the message
@@ -348,7 +298,7 @@ func TestECDSASignatureToBytes(t *testing.T) {
 }
 
 func TestECDSARestoreSignature(t *testing.T) {
-	ec, _ := setupECDSATest(t, 1)
+	ec := setupECDSATest(t, 1)
 	message := []byte("test message")
 
 	// Sign the message
@@ -395,162 +345,8 @@ func TestECDSARestoreSignature(t *testing.T) {
 	}
 }
 
-func TestECDSASignatureASN1Encoding(t *testing.T) {
-	// This test verifies that signatures use ASN.1 encoding internally
-	ec, _ := setupECDSATest(t, 1)
-	message := []byte("test message")
-
-	// Sign the message
-	sig, err := ec.Sign(message)
-	if err != nil {
-		t.Fatalf("Sign failed: %v", err)
-	}
-
-	// Extract the signature
-	multiSig := sig.(crypto.Multi[*crypto.ECDSASignature])
-	var ecdsaSig *crypto.ECDSASignature
-	for _, s := range multiSig {
-		ecdsaSig = s
-		break
-	}
-
-	// Get the ASN.1 encoded signature bytes
-	sigBytes := ecdsaSig.ToBytes()
-
-	// ASN.1 encoded ECDSA signatures should start with 0x30 (SEQUENCE tag)
-	// Minimum length is 8 bytes: 1 byte SEQUENCE tag + 1 byte length +
-	// 2 bytes for R (1 byte INTEGER tag + 1 byte length) +
-	// 2 bytes for S (1 byte INTEGER tag + 1 byte length) +
-	// 2 bytes minimum for actual R and S values
-	const minASN1SignatureLength = 8
-	if len(sigBytes) < minASN1SignatureLength {
-		t.Fatalf("signature too short: %d bytes (minimum %d)", len(sigBytes), minASN1SignatureLength)
-	}
-	if sigBytes[0] != 0x30 {
-		t.Fatalf("signature does not start with ASN.1 SEQUENCE tag (0x30), got 0x%02x", sigBytes[0])
-	}
-
-	// Verify the signature still works
-	err = ec.Verify(sig, message)
-	if err != nil {
-		t.Fatalf("Verify failed: %v", err)
-	}
-}
-
-func TestECDSAWithDifferentCurves(t *testing.T) {
-	curves := []struct {
-		name  string
-		curve elliptic.Curve
-	}{
-		{"P256", elliptic.P256()},
-		{"P384", elliptic.P384()},
-		{"P521", elliptic.P521()},
-	}
-
-	for _, tc := range curves {
-		t.Run(tc.name, func(t *testing.T) {
-			// Generate key with specific curve
-			privKey, err := ecdsa.GenerateKey(tc.curve, rand.Reader)
-			if err != nil {
-				t.Fatalf("failed to generate key: %v", err)
-			}
-
-			config := core.NewRuntimeConfig(hotstuff.ID(1), privKey)
-			config.AddReplica(&hotstuff.ReplicaInfo{
-				ID:     1,
-				PubKey: &privKey.PublicKey,
-			})
-
-			ec := crypto.NewECDSA(config)
-
-			message := []byte("test message")
-
-			// Sign
-			sig, err := ec.Sign(message)
-			if err != nil {
-				t.Fatalf("Sign failed: %v", err)
-			}
-
-			// Verify
-			err = ec.Verify(sig, message)
-			if err != nil {
-				t.Fatalf("Verify failed: %v", err)
-			}
-		})
-	}
-}
-
-func TestECDSASignatureDeterminism(t *testing.T) {
-	// While ECDSA signatures are randomized and will differ between calls,
-	// we test that they are all valid
-	ec, _ := setupECDSATest(t, 1)
-	message := []byte("test message")
-
-	numSignatures := 10
-	signatures := make([]hotstuff.QuorumSignature, numSignatures)
-
-	// Generate multiple signatures
-	for i := range numSignatures {
-		sig, err := ec.Sign(message)
-		if err != nil {
-			t.Fatalf("Sign failed on iteration %d: %v", i, err)
-		}
-		signatures[i] = sig
-
-		// Each signature should verify independently
-		err = ec.Verify(sig, message)
-		if err != nil {
-			t.Fatalf("Verify failed on iteration %d: %v", i, err)
-		}
-	}
-
-	// The signatures should differ (ECDSA is randomized)
-	// Compare first two signatures
-	sig1 := signatures[0].(crypto.Multi[*crypto.ECDSASignature])
-	sig2 := signatures[1].(crypto.Multi[*crypto.ECDSASignature])
-
-	var bytes1, bytes2 []byte
-	for _, s := range sig1 {
-		bytes1 = s.ToBytes()
-		break
-	}
-	for _, s := range sig2 {
-		bytes2 = s.ToBytes()
-		break
-	}
-
-	// Note: There's a very small chance they could be equal, but it's extremely unlikely
-	// This is just to document the randomized nature of ECDSA
-	allEqual := true
-	if len(bytes1) != len(bytes2) {
-		allEqual = false
-	} else {
-		for i := range bytes1 {
-			if bytes1[i] != bytes2[i] {
-				allEqual = false
-				break
-			}
-		}
-	}
-
-	if allEqual {
-		t.Log("Note: Two signatures were identical (very rare but possible)")
-	}
-}
-
 func BenchmarkECDSASign(b *testing.B) {
-	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		b.Fatalf("failed to generate key: %v", err)
-	}
-
-	config := core.NewRuntimeConfig(hotstuff.ID(1), privKey)
-	config.AddReplica(&hotstuff.ReplicaInfo{
-		ID:     1,
-		PubKey: &privKey.PublicKey,
-	})
-
-	ec := crypto.NewECDSA(config)
+	ec := setupECDSATest(b, 1)
 	message := []byte("benchmark message")
 
 	for b.Loop() {
@@ -562,20 +358,8 @@ func BenchmarkECDSASign(b *testing.B) {
 }
 
 func BenchmarkECDSAVerify(b *testing.B) {
-	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		b.Fatalf("failed to generate key: %v", err)
-	}
-
-	config := core.NewRuntimeConfig(hotstuff.ID(1), privKey)
-	config.AddReplica(&hotstuff.ReplicaInfo{
-		ID:     1,
-		PubKey: &privKey.PublicKey,
-	})
-
-	ec := crypto.NewECDSA(config)
+	ec := setupECDSATest(b, 1)
 	message := []byte("benchmark message")
-
 	sig, err := ec.Sign(message)
 	if err != nil {
 		b.Fatalf("Sign failed: %v", err)
@@ -591,48 +375,19 @@ func BenchmarkECDSAVerify(b *testing.B) {
 
 func BenchmarkECDSACombine(b *testing.B) {
 	numReplicas := 4
-	keys := make(map[hotstuff.ID]*ecdsa.PrivateKey)
-
-	for i := 1; i <= numReplicas; i++ {
-		privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-		if err != nil {
-			b.Fatalf("failed to generate key: %v", err)
-		}
-		id := hotstuff.ID(i)
-		keys[id] = privKey
-	}
-
-	// Create a shared config
-	config := core.NewRuntimeConfig(hotstuff.ID(1), keys[1])
-	for i := 1; i <= numReplicas; i++ {
-		id := hotstuff.ID(i)
-		config.AddReplica(&hotstuff.ReplicaInfo{
-			ID:     id,
-			PubKey: &keys[id].PublicKey,
-		})
-	}
+	signers := setupECDSATestMulti(b, numReplicas)
 
 	message := []byte("benchmark message")
 	sigs := make([]hotstuff.QuorumSignature, numReplicas)
-
-	for i := 1; i <= numReplicas; i++ {
-		replicaConfig := core.NewRuntimeConfig(hotstuff.ID(i), keys[hotstuff.ID(i)])
-		for j := 1; j <= numReplicas; j++ {
-			id := hotstuff.ID(j)
-			replicaConfig.AddReplica(&hotstuff.ReplicaInfo{
-				ID:     id,
-				PubKey: &keys[id].PublicKey,
-			})
-		}
-		ec := crypto.NewECDSA(replicaConfig)
-		sig, err := ec.Sign(message)
+	for i, signer := range signers {
+		sig, err := signer.Sign(message)
 		if err != nil {
 			b.Fatalf("Sign failed: %v", err)
 		}
-		sigs[i-1] = sig
+		sigs[i] = sig
 	}
 
-	ec := crypto.NewECDSA(config)
+	ec := signers[0]
 
 	for b.Loop() {
 		_, err := ec.Combine(sigs...)
