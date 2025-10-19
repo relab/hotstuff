@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"maps"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/relab/hotstuff"
@@ -115,77 +116,70 @@ func TestECDSACombine(t *testing.T) {
 	testCases := []struct {
 		name        string
 		numReplicas int
-		numSigs     int
-		shouldFail  bool
-		description string
+		sigIndices  []int  // indices of signers to sign (repeat for overlap)
+		badType     bool   // include an incompatible type to trigger type error
+		wantErr     string // expected error substring
 	}{
-		{
-			name:        "TwoSignatures",
-			numReplicas: 4,
-			numSigs:     2,
-			shouldFail:  false,
-			description: "combine two valid signatures",
-		},
-		{
-			name:        "FourSignatures",
-			numReplicas: 4,
-			numSigs:     4,
-			shouldFail:  false,
-			description: "combine four valid signatures",
-		},
-		{
-			name:        "SingleSignature",
-			numReplicas: 2,
-			numSigs:     1,
-			shouldFail:  true,
-			description: "should fail with only one signature",
-		},
+		{name: "TwoSignatures", numReplicas: 4, sigIndices: []int{0, 1}, wantErr: ""},
+		{name: "FourSignatures", numReplicas: 4, sigIndices: []int{0, 1, 2, 3}, wantErr: ""},
+		{name: "SingleSignature", numReplicas: 2, sigIndices: []int{0}, wantErr: "must have at least two signatures"},
+		{name: "DuplicateSignatures", numReplicas: 3, sigIndices: []int{0, 0, 1}, wantErr: "overlapping signatures"},
+		{name: "IncompatibleType", numReplicas: 2, sigIndices: []int{0, 1}, badType: true, wantErr: "incompatible type"},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			signers := setupECDSATestMulti(t, tc.numReplicas)
 
-			message := []byte("test message for combining")
-			sigs := make([]hotstuff.QuorumSignature, tc.numSigs)
-
-			// Create signatures from different replicas
-			for i := range tc.numSigs {
-				sig, err := signers[i].Sign(message)
+			message := []byte("combine message")
+			// Create signatures from specified replicas (repeat index for overlap)
+			var sigs []hotstuff.QuorumSignature
+			for _, idx := range tc.sigIndices {
+				sig, err := signers[idx].Sign(message)
 				if err != nil {
-					t.Fatalf("Sign failed for replica %d: %v", i, err)
+					t.Fatalf("Sign failed for replica %d: %v", idx+1, err)
 				}
-				sigs[i] = sig
+				sigs = append(sigs, sig)
 			}
 
-			// Try to combine signatures
+			if tc.badType {
+				// Append an incompatible hotstuff.QuorumSignature type that
+				// isn't Multi[*ECDSASignature] to trigger type error in Combine
+				sigs = append(sigs, dummyQuorumSignature{})
+			}
+
 			ec := signers[0]
 			combined, err := ec.Combine(sigs...)
-
-			if tc.shouldFail {
+			if tc.wantErr != "" {
 				if err == nil {
-					t.Fatalf("Combine should have failed: %s", tc.description)
+					t.Fatalf("expected error containing %q, got nil", tc.wantErr)
+				}
+				if !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("Combine() error: %q, want %q", err.Error(), tc.wantErr)
 				}
 				return
 			}
-
 			if err != nil {
 				t.Fatalf("Combine failed: %v", err)
 			}
 
-			// Verify the combined signature
-			err = ec.Verify(combined, message)
-			if err != nil {
+			if err = ec.Verify(combined, message); err != nil {
 				t.Fatalf("Verify combined signature failed: %v", err)
 			}
 
 			// Check that the combined signature has the correct number of participants
-			if combined.Participants().Len() != tc.numSigs {
-				t.Fatalf("expected %d participants, got %d", tc.numSigs, combined.Participants().Len())
+			if combined.Participants().Len() != len(tc.sigIndices) {
+				t.Fatalf("expected %d participants, got %d", len(tc.sigIndices), combined.Participants().Len())
 			}
 		})
 	}
 }
+
+// dummyQuorumSignature is a minimal implementation of hotstuff.QuorumSignature that is
+// intentionally not a Multi[*ECDSASignature], used to test type errors in Combine.
+type dummyQuorumSignature struct{}
+
+func (dummyQuorumSignature) Participants() hotstuff.IDSet { return nil }
+func (dummyQuorumSignature) ToBytes() []byte              { return nil }
 
 func TestECDSABatchVerify(t *testing.T) {
 	testCases := []struct {
