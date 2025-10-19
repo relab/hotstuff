@@ -2,6 +2,7 @@ package crypto_test
 
 import (
 	"bytes"
+	"slices"
 	"testing"
 
 	"github.com/relab/hotstuff"
@@ -50,6 +51,42 @@ func createMultiSignature(t testing.TB, numSigners int) crypto.Multi[*crypto.ECD
 		t.Fatalf("Expected signature to be of type Multi[*ECDSASignature], got %T", sig)
 	}
 	return multi
+}
+func TestNewMultiSorted(t *testing.T) {
+	ms1 := createMultiSignature(t, 2)
+	ms2 := slices.Clone(ms1)
+	slices.Reverse(ms2)
+
+	cmp := func(a, b *crypto.ECDSASignature) int { return int(a.Signer()) - int(b.Signer()) }
+
+	// Verify that ms1 is sorted and ms2 is not
+	if !slices.IsSortedFunc(ms1, cmp) {
+		t.Error("ms1 is not sorted: should be sorted")
+	}
+	if slices.IsSortedFunc(ms2, cmp) {
+		t.Error("ms2 is sorted: should be not be sorted")
+	}
+
+	// NewMulti should produce sorted output when given sorted input
+	sorted := crypto.NewMulti(ms1...)
+	if !slices.IsSortedFunc(sorted, cmp) {
+		t.Error("NewMulti output is not sorted for sorted input")
+	}
+	// Confirm that NewMulti does not sort the input
+	unsorted := crypto.NewMulti(ms2...)
+	if slices.IsSortedFunc(unsorted, cmp) {
+		t.Error("NewMulti output is sorted for unsorted input")
+	}
+	// NewMultiSorted should always return sorted output even for unsorted input
+	sorted2 := crypto.NewMultiSorted(ms2...)
+	if !slices.IsSortedFunc(sorted2, cmp) {
+		t.Error("NewMultiSorted output is not sorted for unsorted input")
+	}
+	// NewMultiSorted should return sorted output when given sorted input
+	sorted3 := crypto.NewMultiSorted(ms1...)
+	if !slices.IsSortedFunc(sorted3, cmp) {
+		t.Error("NewMultiSorted output is not sorted for sorted input")
+	}
 }
 
 func TestMultiSignatureLen(t *testing.T) {

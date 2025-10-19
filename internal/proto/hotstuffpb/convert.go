@@ -55,14 +55,14 @@ func QuorumSignatureFromProto(sig *QuorumSignature) hotstuff.QuorumSignature {
 			s.SetBytes(sig.GetS())
 			sigs[i] = crypto.RestoreECDSASignature(r, s, hotstuff.ID(sig.GetSigner()))
 		}
-		return crypto.Restore(sigs)
+		return crypto.NewMulti(sigs...)
 	}
 	if signature := sig.GetEDDSASigs(); signature != nil {
 		sigs := make([]*crypto.EDDSASignature, len(signature.GetSigs()))
 		for i, sig := range signature.GetSigs() {
 			sigs[i] = crypto.RestoreEDDSASignature(sig.Sig, hotstuff.ID(sig.GetSigner()))
 		}
-		return crypto.Restore(sigs)
+		return crypto.NewMulti(sigs...)
 	}
 	if signature := sig.GetBLS12Sig(); signature != nil {
 		aggSig, err := crypto.RestoreBLS12AggregateSignature(signature.GetSig(), crypto.BitfieldFromBytes(signature.GetParticipants()))

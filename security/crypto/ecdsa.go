@@ -79,7 +79,7 @@ func (ec *ECDSA) Sign(message []byte) (signature hotstuff.QuorumSignature, err e
 	if err != nil {
 		return nil, fmt.Errorf("ecdsa: sign failed: %w", err)
 	}
-	return Multi[*ECDSASignature]{ec.config.ID(): &ECDSASignature{
+	return Multi[*ECDSASignature]{&ECDSASignature{
 		r:      r,
 		s:      s,
 		signer: ec.config.ID(),
@@ -91,15 +91,14 @@ func (ec *ECDSA) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Quoru
 	if len(signatures) < 2 {
 		return nil, ErrCombineMultiple
 	}
-
-	ts := make(Multi[*ECDSASignature])
+	ts := make(Multi[*ECDSASignature], 0, len(signatures)*2) // preallocate some space
 	for _, sig1 := range signatures {
 		if sig2, ok := sig1.(Multi[*ECDSASignature]); ok {
-			for id, s := range sig2 {
-				if _, duplicate := ts[id]; duplicate {
+			for _, s := range sig2 {
+				if ts.Contains(s.Signer()) { // has duplicate
 					return nil, ErrCombineOverlap
 				}
-				ts[id] = s
+				ts = append(ts, s)
 			}
 		} else {
 			return nil, fmt.Errorf("ecdsa: cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
@@ -149,8 +148,8 @@ func (ec *ECDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotst
 
 	results := make(chan error, n)
 	set := make(map[hotstuff.Hash]struct{})
-	for id, sig := range s {
-		message, ok := batch[id]
+	for _, sig := range s {
+		message, ok := batch[sig.Signer()]
 		if !ok {
 			return fmt.Errorf("ecdsa: message not found")
 		}

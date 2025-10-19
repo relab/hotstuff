@@ -69,7 +69,7 @@ func (ed *EDDSA) privateKey() ed25519.PrivateKey {
 func (ed *EDDSA) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
 	sign := ed25519.Sign(ed.privateKey(), message)
 	eddsaSign := &EDDSASignature{signer: ed.config.ID(), sign: sign}
-	return Multi[*EDDSASignature]{ed.config.ID(): eddsaSign}, nil
+	return Multi[*EDDSASignature]{eddsaSign}, nil
 }
 
 // Combine combines multiple signatures into a single signature.
@@ -77,15 +77,14 @@ func (ed *EDDSA) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Quoru
 	if len(signatures) < 2 {
 		return nil, ErrCombineMultiple
 	}
-
-	ts := make(Multi[*EDDSASignature])
+	ts := make(Multi[*EDDSASignature], 0, len(signatures)*2) // preallocate some space
 	for _, sig1 := range signatures {
 		if sig2, ok := sig1.(Multi[*EDDSASignature]); ok {
-			for id, s := range sig2 {
-				if _, duplicate := ts[id]; duplicate {
+			for _, s := range sig2 {
+				if ts.Contains(s.Signer()) { // has duplicate
 					return nil, ErrCombineOverlap
 				}
-				ts[id] = s
+				ts = append(ts, s)
 			}
 		} else {
 			return nil, fmt.Errorf("eddsa: cannot combine signature of incompatible type %T (expected %T)", sig1, sig2)
@@ -134,8 +133,8 @@ func (ed *EDDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotst
 
 	results := make(chan error, n)
 	set := make(map[hotstuff.Hash]struct{})
-	for id, sig := range s {
-		message, ok := batch[id]
+	for _, sig := range s {
+		message, ok := batch[sig.Signer()]
 		if !ok {
 			return fmt.Errorf("eddsa: message not found")
 		}
