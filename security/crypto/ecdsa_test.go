@@ -122,6 +122,7 @@ func TestECDSACombine(t *testing.T) {
 	}{
 		{name: "TwoSignatures", numReplicas: 4, sigIndices: []int{0, 1}, wantErr: ""},
 		{name: "FourSignatures", numReplicas: 4, sigIndices: []int{0, 1, 2, 3}, wantErr: ""},
+		{name: "UnorderedFiveSignatures", numReplicas: 5, sigIndices: []int{3, 2, 1, 0, 4}, wantErr: ""},
 		{name: "SingleSignature", numReplicas: 2, sigIndices: []int{0}, wantErr: "must have at least two signatures"},
 		{name: "DuplicateSignatures", numReplicas: 3, sigIndices: []int{0, 0, 1}, wantErr: "overlapping signatures"},
 		{name: "IncompatibleType", numReplicas: 2, sigIndices: []int{0, 1}, badType: true, wantErr: "incompatible type"},
