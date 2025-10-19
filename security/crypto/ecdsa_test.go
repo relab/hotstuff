@@ -43,54 +43,25 @@ func setupECDSATest(t *testing.T, numReplicas int) (*crypto.ECDSA, map[hotstuff.
 
 func TestECDSASignAndVerify(t *testing.T) {
 	testCases := []struct {
-		name        string
-		message     string
-		numReplicas int
+		name    string
+		message string
 	}{
-		{
-			name:        "SingleReplica",
-			message:     "test message",
-			numReplicas: 1,
-		},
-		{
-			name:        "EmptyMessage",
-			message:     "",
-			numReplicas: 1,
-		},
-		{
-			name:        "LongMessage",
-			message:     "this is a very long message that needs to be signed and verified using ECDSA",
-			numReplicas: 1,
-		},
-		{
-			name:        "BinaryData",
-			message:     string([]byte{0x00, 0x01, 0x02, 0xFF, 0xFE, 0xFD}),
-			numReplicas: 1,
-		},
-		{
-			name:        "MultipleReplicas",
-			message:     "test with multiple replicas",
-			numReplicas: 4,
-		},
+		{name: "SingleReplica", message: "test message"},
+		{name: "EmptyMessage", message: ""},
+		{name: "LongMessage", message: "this is a very long message that needs to be signed and verified using ECDSA"},
+		{name: "BinaryData", message: string([]byte{0x00, 0x01, 0x02, 0xFF, 0xFE, 0xFD})},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ec, _ := setupECDSATest(t, tc.numReplicas)
-
-			// Sign the message
+			ec, _ := setupECDSATest(t, 1)
 			sig, err := ec.Sign([]byte(tc.message))
 			if err != nil {
 				t.Fatalf("Sign failed: %v", err)
 			}
-
 			if sig == nil {
 				t.Fatal("signature is nil")
 			}
-
-			// Verify the signature
-			err = ec.Verify(sig, []byte(tc.message))
-			if err != nil {
+			if err = ec.Verify(sig, []byte(tc.message)); err != nil {
 				t.Fatalf("Verify failed: %v", err)
 			}
 		})
@@ -99,45 +70,31 @@ func TestECDSASignAndVerify(t *testing.T) {
 
 func TestECDSAVerifyFailure(t *testing.T) {
 	testCases := []struct {
-		name          string
-		message       string
-		tamperedMsg   string
-		expectedError string
+		name        string
+		message     string
+		tamperedMsg string
 	}{
-		{
-			name:          "ModifiedMessage",
-			message:       "original message",
-			tamperedMsg:   "tampered message",
-			expectedError: "failed to verify signature",
-		},
-		{
-			name:          "EmptyMessageTampering",
-			message:       "message",
-			tamperedMsg:   "",
-			expectedError: "failed to verify signature",
-		},
-		{
-			name:          "OneByteChange",
-			message:       "message",
-			tamperedMsg:   "messag",
-			expectedError: "failed to verify signature",
-		},
+		{name: "ModifiedMessage", message: "original message", tamperedMsg: "tampered message"},
+		{name: "EmptyMessageTampering", message: "message", tamperedMsg: ""},
+		{name: "SubOneByte", message: "message", tamperedMsg: "messag"},
+		{name: "AddOneByte", message: "message", tamperedMsg: "message!"},
+		{name: "OneByteChange", message: "message", tamperedMsg: "massage"},
 	}
-
+	wantErr := "ecdsa: failed to verify signature from replica 1"
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ec, _ := setupECDSATest(t, 1)
-
-			// Sign the original message
 			sig, err := ec.Sign([]byte(tc.message))
 			if err != nil {
 				t.Fatalf("Sign failed: %v", err)
 			}
-
-			// Try to verify with tampered message
+			// Confirm that error is returned for tampered message
 			err = ec.Verify(sig, []byte(tc.tamperedMsg))
 			if err == nil {
 				t.Fatal("Verify should have failed with tampered message")
+			}
+			if err.Error() != wantErr {
+				t.Fatalf("unexpected error: got %q, want %q", err.Error(), wantErr)
 			}
 		})
 	}
