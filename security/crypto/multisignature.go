@@ -16,7 +16,7 @@ type Signature interface {
 type Multi[T Signature] []T
 
 // NewMulti creates a new Multi from the given signatures.
-// The signatures must be sorted by signer ID in ascending order.
+// The provided signatures are assumed to be sorted by signer ID.
 func NewMulti[T Signature](sigs ...T) Multi[T] {
 	return Multi[T](sigs)
 }
@@ -42,7 +42,7 @@ func (sig Multi[T]) Participants() hotstuff.IDSet {
 	return sig
 }
 
-// Add adds an ID to the set (not supported for Multi).
+// Add is not supported for Multi.
 func (sig Multi[T]) Add(_ hotstuff.ID) {
 	panic("not implemented")
 }
