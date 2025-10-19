@@ -5,6 +5,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"maps"
+	"slices"
 	"testing"
 
 	"github.com/relab/hotstuff"
@@ -189,41 +191,91 @@ func TestECDSABatchVerify(t *testing.T) {
 	testCases := []struct {
 		name        string
 		numReplicas int
-		messages    map[hotstuff.ID]string
-		shouldFail  bool
-		description string
+		messages    map[hotstuff.ID][]byte
+		rcvMessages map[hotstuff.ID][]byte
+		wantErr     string
 	}{
 		{
 			name:        "TwoReplicasDifferentMessages",
 			numReplicas: 2,
-			messages: map[hotstuff.ID]string{
-				1: "message for replica 1",
-				2: "message for replica 2",
+			messages: map[hotstuff.ID][]byte{
+				1: []byte("message for replica 1"),
+				2: []byte("message for replica 2"),
 			},
-			shouldFail:  false,
-			description: "two replicas with different messages",
+			wantErr: "",
 		},
 		{
 			name:        "FourReplicasDifferentMessages",
 			numReplicas: 4,
-			messages: map[hotstuff.ID]string{
-				1: "message 1",
-				2: "message 2",
-				3: "message 3",
-				4: "message 4",
+			messages: map[hotstuff.ID][]byte{
+				1: []byte("message 1"),
+				2: []byte("message 2"),
+				3: []byte("message 3"),
+				4: []byte("message 4"),
 			},
-			shouldFail:  false,
-			description: "four replicas with different messages",
+			wantErr: "",
 		},
 		{
 			name:        "DuplicateMessages",
 			numReplicas: 2,
-			messages: map[hotstuff.ID]string{
-				1: "same message",
-				2: "same message",
+			messages: map[hotstuff.ID][]byte{
+				1: []byte("same message"),
+				2: []byte("same message"),
 			},
-			shouldFail:  true,
-			description: "should fail with duplicate messages",
+			wantErr: "ecdsa: invalid signature",
+		},
+		{
+			name:        "MissingMessage",
+			numReplicas: 2,
+			messages: map[hotstuff.ID][]byte{
+				1: []byte("message 1"),
+				2: []byte("message 2"),
+			},
+			rcvMessages: map[hotstuff.ID][]byte{
+				1: []byte("message 1"),
+				// missing message for replica 2, but got its signature
+			},
+			wantErr: "ecdsa: message not found",
+		},
+		{
+			name:        "ExtraMessage",
+			numReplicas: 2,
+			messages: map[hotstuff.ID][]byte{
+				1: []byte("message 1"),
+				2: []byte("message 2"),
+			},
+			rcvMessages: map[hotstuff.ID][]byte{
+				1: []byte("message 1"),
+				2: []byte("message 2"),
+				3: []byte("message 3"),
+			},
+			wantErr: "ecdsa: invalid signature",
+		},
+		{
+			name:        "MessageFromUnknownReplica",
+			numReplicas: 2,
+			messages: map[hotstuff.ID][]byte{
+				1: []byte("message 1"),
+				2: []byte("message 2"),
+			},
+			rcvMessages: map[hotstuff.ID][]byte{
+				1: []byte("message 1"),
+				3: []byte("message 3"),
+			},
+			wantErr: "ecdsa: message not found",
+		},
+		{
+			name:        "TamperedMessage",
+			numReplicas: 2,
+			messages: map[hotstuff.ID][]byte{
+				1: []byte("message 1"),
+				2: []byte("message 2"),
+			},
+			rcvMessages: map[hotstuff.ID][]byte{
+				1: []byte("message X"),
+				2: []byte("message 2"),
+			},
+			wantErr: "ecdsa: failed to verify signature from replica 1",
 		},
 	}
 
@@ -231,38 +283,42 @@ func TestECDSABatchVerify(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			signers := setupECDSATestMulti(t, tc.numReplicas)
 
-			// Create signatures for the batch
-			batch := make(map[hotstuff.ID][]byte)
-			sigs := make([]hotstuff.QuorumSignature, 0, len(tc.messages))
-
-			for id, msg := range tc.messages {
-				batch[id] = []byte(msg)
-				sig, err := signers[id-1].Sign([]byte(msg))
+			// Create signatures for the message batch in deterministic order
+			sigs := make([]hotstuff.QuorumSignature, len(tc.messages))
+			for _, id := range slices.Sorted(maps.Keys(tc.messages)) {
+				msg := tc.messages[id]
+				sig, err := signers[id-1].Sign(msg)
 				if err != nil {
-					t.Fatalf("Sign failed for replica %d: %v", id, err)
+					t.Errorf("Sign failed for replica %d: %v", id, err)
 				}
-				sigs = append(sigs, sig)
+				sigs[id-1] = sig
 			}
 
 			// Combine all signatures
 			ec := signers[0]
 			combined, err := ec.Combine(sigs...)
 			if err != nil {
-				t.Fatalf("Combine failed: %v", err)
+				t.Errorf("Combine failed: %v", err)
 			}
 
-			// Verify the batch
-			err = ec.BatchVerify(combined, batch)
-
-			if tc.shouldFail {
-				if err == nil {
-					t.Fatalf("BatchVerify should have failed: %s", tc.description)
-				}
-				return
+			// Use tampered messages if provided
+			msgs := tc.messages
+			if tc.rcvMessages != nil {
+				msgs = tc.rcvMessages
 			}
 
+			// Verify the batch of messages against the combined quorum signature
+			err = ec.BatchVerify(combined, msgs)
 			if err != nil {
-				t.Fatalf("BatchVerify failed: %v", err)
+				if err.Error() != tc.wantErr {
+					t.Errorf("BatchVerify() error: %q, want %q", err.Error(), tc.wantErr)
+				}
+				if tc.wantErr == "" {
+					t.Errorf("BatchVerify() error: %v, want <nil>", err)
+				}
+			}
+			if err == nil && tc.wantErr != "" {
+				t.Errorf("BatchVerify() error: <nil>, want %q", tc.wantErr)
 			}
 		})
 	}
