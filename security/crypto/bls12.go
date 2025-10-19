@@ -390,7 +390,7 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 	s.Participants().RangeWhile(func(id hotstuff.ID) bool {
 		pk, err := bls.publicKey(id)
 		if err != nil {
-			errs = errors.Join(err)
+			errs = errors.Join(errs, err)
 			return false
 		}
 		pks = append(pks, pk)

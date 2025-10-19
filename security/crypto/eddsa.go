@@ -114,7 +114,7 @@ func (ed *EDDSA) Verify(signature hotstuff.QuorumSignature, message []byte) erro
 	}
 	var err error
 	for range s {
-		err = errors.Join(<-results)
+		err = errors.Join(err, <-results)
 	}
 	if err != nil {
 		return err
@@ -148,7 +148,7 @@ func (ed *EDDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotst
 	}
 	var err error
 	for range s {
-		err = errors.Join(<-results)
+		err = errors.Join(err, <-results)
 	}
 	if err != nil {
 		return err
