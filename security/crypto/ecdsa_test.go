@@ -533,7 +533,7 @@ func TestECDSASignatureDeterminism(t *testing.T) {
 	signatures := make([]hotstuff.QuorumSignature, numSignatures)
 
 	// Generate multiple signatures
-	for i := 0; i < numSignatures; i++ {
+	for i := range numSignatures {
 		sig, err := ec.Sign(message)
 		if err != nil {
 			t.Fatalf("Sign failed on iteration %d: %v", i, err)
@@ -596,8 +596,7 @@ func BenchmarkECDSASign(b *testing.B) {
 	ec := crypto.NewECDSA(config)
 	message := []byte("benchmark message")
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := ec.Sign(message)
 		if err != nil {
 			b.Fatalf("Sign failed: %v", err)
@@ -625,8 +624,7 @@ func BenchmarkECDSAVerify(b *testing.B) {
 		b.Fatalf("Sign failed: %v", err)
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		err := ec.Verify(sig, message)
 		if err != nil {
 			b.Fatalf("Verify failed: %v", err)
@@ -679,8 +677,7 @@ func BenchmarkECDSACombine(b *testing.B) {
 
 	ec := crypto.NewECDSA(config)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := ec.Combine(sigs...)
 		if err != nil {
 			b.Fatalf("Combine failed: %v", err)
