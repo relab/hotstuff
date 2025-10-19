@@ -133,7 +133,7 @@ func TestOrchestration(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(test.Name([]string{"consensus", "crypto", "byzantine", "kauri"}, tt.consensus, tt.crypto, tt.byzantine, tt.commName), func(t *testing.T) {
+		t.Run(test.Name("consensus", tt.consensus, "crypto", tt.crypto, "byzantine", tt.byzantine, "kauri", tt.commName), func(t *testing.T) {
 			var leaderRotation string
 			if tt.commName != "" {
 				leaderRotation = leaderrotation.NameTree
