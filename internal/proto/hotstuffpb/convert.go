@@ -2,8 +2,6 @@
 package hotstuffpb
 
 import (
-	"math/big"
-
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/security/crypto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -18,8 +16,7 @@ func QuorumSignatureToProto(sig hotstuff.QuorumSignature) *QuorumSignature {
 		for _, s := range ms {
 			sigs = append(sigs, &ECDSASignature{
 				Signer: uint32(s.Signer()),
-				R:      s.R().Bytes(),
-				S:      s.S().Bytes(),
+				Sig:    s.ToBytes(),
 			})
 		}
 		signature.Sig = &QuorumSignature_ECDSASigs{ECDSASigs: &ECDSAMultiSignature{
@@ -49,11 +46,7 @@ func QuorumSignatureFromProto(sig *QuorumSignature) hotstuff.QuorumSignature {
 	if signature := sig.GetECDSASigs(); signature != nil {
 		sigs := make([]*crypto.ECDSASignature, len(signature.GetSigs()))
 		for i, sig := range signature.GetSigs() {
-			r := new(big.Int)
-			r.SetBytes(sig.GetR())
-			s := new(big.Int)
-			s.SetBytes(sig.GetS())
-			sigs[i] = crypto.RestoreECDSASignature(r, s, hotstuff.ID(sig.GetSigner()))
+			sigs[i] = crypto.RestoreECDSASignature(sig.GetSig(), hotstuff.ID(sig.GetSigner()))
 		}
 		return crypto.NewMulti(sigs...)
 	}

@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
@@ -23,14 +22,14 @@ const (
 
 // ECDSASignature is an ECDSA signature.
 type ECDSASignature struct {
-	r, s   *big.Int
+	sig    []byte
 	signer hotstuff.ID
 }
 
 // RestoreECDSASignature restores an existing signature.
 // It should not be used to create new signatures, use Sign instead.
-func RestoreECDSASignature(r, s *big.Int, signer hotstuff.ID) *ECDSASignature {
-	return &ECDSASignature{r, s, signer}
+func RestoreECDSASignature(sig []byte, signer hotstuff.ID) *ECDSASignature {
+	return &ECDSASignature{sig, signer}
 }
 
 // Signer returns the ID of the replica that generated the signature.
@@ -38,22 +37,9 @@ func (sig ECDSASignature) Signer() hotstuff.ID {
 	return sig.signer
 }
 
-// R returns the r value of the signature.
-func (sig ECDSASignature) R() *big.Int {
-	return sig.r
-}
-
-// S returns the s value of the signature.
-func (sig ECDSASignature) S() *big.Int {
-	return sig.s
-}
-
 // ToBytes returns a raw byte string representation of the signature.
 func (sig ECDSASignature) ToBytes() []byte {
-	var b []byte
-	b = append(b, sig.r.Bytes()...)
-	b = append(b, sig.s.Bytes()...)
-	return b
+	return sig.sig
 }
 
 // ECDSA implements the spec-k256 curve signature.
@@ -73,17 +59,16 @@ func (ec *ECDSA) privateKey() *ecdsa.PrivateKey {
 }
 
 // Sign creates a cryptographic signature of the given message.
-func (ec *ECDSA) Sign(message []byte) (signature hotstuff.QuorumSignature, err error) {
+func (ec *ECDSA) Sign(message []byte) (hotstuff.QuorumSignature, error) {
 	hash := sha256.Sum256(message)
-	r, s, err := ecdsa.Sign(rand.Reader, ec.privateKey(), hash[:])
+	sig, err := ecdsa.SignASN1(rand.Reader, ec.privateKey(), hash[:])
 	if err != nil {
 		return nil, fmt.Errorf("ecdsa: sign failed: %w", err)
 	}
-	return Multi[*ECDSASignature]{&ECDSASignature{
-		r:      r,
-		s:      s,
+	return NewMulti(&ECDSASignature{
+		sig:    sig,
 		signer: ec.config.ID(),
-	}}, nil
+	}), nil
 }
 
 // Combine combines multiple signatures into a single signature.
@@ -127,7 +112,7 @@ func (ec *ECDSA) Verify(signature hotstuff.QuorumSignature, message []byte) erro
 	}
 	var err error
 	for range s {
-		err = errors.Join(<-results)
+		err = errors.Join(err, <-results)
 	}
 	if err != nil {
 		return err
@@ -160,7 +145,7 @@ func (ec *ECDSA) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotst
 		}(sig, hash)
 	}
 	for range s {
-		err = errors.Join(<-results)
+		err = errors.Join(err, <-results)
 	}
 	if err != nil {
 		return err
@@ -178,7 +163,7 @@ func (ec *ECDSA) verifySingle(sig *ECDSASignature, hash hotstuff.Hash) error {
 		return fmt.Errorf("ecdsa: failed to verify signature from replica %d: unknown replica", sig.Signer())
 	}
 	pk := replica.PubKey.(*ecdsa.PublicKey)
-	if !ecdsa.Verify(pk, hash[:], sig.R(), sig.S()) {
+	if !ecdsa.VerifyASN1(pk, hash[:], sig.sig) {
 		return fmt.Errorf("ecdsa: failed to verify signature from replica %d", sig.Signer())
 	}
 	return nil
