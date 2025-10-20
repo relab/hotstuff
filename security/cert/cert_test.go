@@ -4,13 +4,14 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/test"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto"
 )
 
-func createDummies(t *testing.T, count uint, cryptoName string, cacheSize int) testutil.EssentialsSet {
+func createDummies(t testing.TB, count uint, cryptoName string, cacheSize int) testutil.EssentialsSet {
 	opts := make([]cert.Option, 0)
 	if cacheSize > 0 {
 		opts = append(opts, cert.WithCache(cacheSize))
@@ -18,7 +19,7 @@ func createDummies(t *testing.T, count uint, cryptoName string, cacheSize int) t
 	return testutil.NewEssentialsSet(t, count, cryptoName, opts...)
 }
 
-func createSignersWithBlock(t *testing.T, cryptoName string, cacheSize int) ([]*cert.Authority, *hotstuff.Block) {
+func createSignersWithBlock(t testing.TB, cryptoName string, cacheSize int) ([]*cert.Authority, *hotstuff.Block) {
 	const n = 4
 	dummies := createDummies(t, n, cryptoName, cacheSize)
 	signers := dummies.Signers()
@@ -417,4 +418,98 @@ func TestVerifyAnyQC(t *testing.T) {
 			t.Fatalf("AnyQC was not verified: %v", err)
 		}
 	}
+}
+
+// BenchmarkVerifyAggregateQC benchmarks Authority.VerifyAggregateQC with varying parameters.
+func BenchmarkVerifyAggregateQC(b *testing.B) {
+	// generate test cases
+	type benchCase struct {
+		td struct {
+			cryptoName string
+			cacheSize  int
+		}
+		n         int
+		qcsPer    int
+		view      uint64
+		blockSize int
+	}
+	participantSizes := []int{10, 50, 100, 200, 400, 800}
+	numQCsPerParticipant := []int{1, 2, 4, 8}
+	views := []uint64{1, 10, 100, 1000}
+	blockSizes := []int{128, 1024, 4096}
+
+	cases := make([]benchCase, 0)
+	for _, td := range testData {
+		for _, n := range participantSizes {
+			for _, qcsPer := range numQCsPerParticipant {
+				for _, view := range views {
+					for _, blockSize := range blockSizes {
+						cases = append(cases, benchCase{td: struct {
+							cryptoName string
+							cacheSize  int
+						}{cryptoName: td.cryptoName, cacheSize: td.cacheSize}, n: n, qcsPer: qcsPer, view: view, blockSize: blockSize})
+					}
+				}
+			}
+		}
+	}
+
+	for _, c := range cases {
+		name := test.Name(
+			"crypto", c.td.cryptoName,
+			"cache", c.td.cacheSize,
+			"participants", c.n,
+			"qcsPerParticipant", c.qcsPer,
+			"view", c.view,
+			"blockSize", c.blockSize,
+		)
+		b.Run(name, func(b *testing.B) {
+			auths, aggQC := buildAuthsAndAggregateQC(b, c.n, c.td.cryptoName, c.td.cacheSize, c.qcsPer, c.view, c.blockSize)
+			b.ResetTimer()
+			for b.Loop() {
+				_, err := auths[0].VerifyAggregateQC(aggQC)
+				if err != nil {
+					b.Fatalf("VerifyAggregateQC failed: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// buildAuthsAndAggregateQC creates a set of authorities and an AggregateQC according to the parameters.
+func buildAuthsAndAggregateQC(tb testing.TB, n int, cryptoName string, cacheSize int, qcsPoolSize int, view uint64, blockSize int) ([]*cert.Authority, hotstuff.AggregateQC) {
+	tb.Helper()
+	if n <= 0 {
+		tb.Fatalf("participant count must be > 0")
+	}
+	dummies := createDummies(tb, uint(n), cryptoName, cacheSize)
+	auths := dummies.Signers()
+
+	poolSize := min(qcsPoolSize, n)
+	qcPool := make([]hotstuff.QuorumCert, 0, poolSize)
+	for k := range poolSize {
+		blockData := make([]byte, blockSize)
+		if blockSize > 0 {
+			blockData[0] = byte(k)
+		}
+		parentQC := hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
+		block := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), parentQC, &clientpb.Batch{Commands: []*clientpb.Command{{Data: blockData}}}, hotstuff.View(k+1), hotstuff.ID(1))
+		for _, dummy := range dummies {
+			dummy.Blockchain().Store(block)
+		}
+		qc := testutil.CreateQC(tb, block, auths...)
+		qcPool = append(qcPool, qc)
+	}
+
+	perParticipantQCs := make([]hotstuff.QuorumCert, n)
+	for i := range n {
+		perParticipantQCs[i] = qcPool[i%len(qcPool)]
+	}
+
+	timeouts := testutil.CreateTimeouts(tb, hotstuff.View(view), auths, perParticipantQCs...)
+	agg, err := auths[0].CreateAggregateQC(hotstuff.View(view), timeouts)
+	if err != nil {
+		tb.Fatalf("failed to create AggregateQC: %v", err)
+	}
+	return auths, agg
 }

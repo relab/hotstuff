@@ -19,7 +19,7 @@ type Essentials struct {
 }
 
 func WireUpEssentials(
-	t *testing.T,
+	t testing.TB,
 	id hotstuff.ID,
 	cryptoName string,
 	opts ...cert.Option,
@@ -59,7 +59,7 @@ type EssentialsSet []*Essentials
 // NewEssentialsSet wires up multiple essential component bundles and adds each replica configuration
 // to each other.
 func NewEssentialsSet(
-	t *testing.T,
+	t testing.TB,
 	count uint,
 	cryptoName string,
 	opts ...cert.Option,
