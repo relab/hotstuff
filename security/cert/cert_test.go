@@ -155,22 +155,6 @@ func TestVerifyTimeoutCert(t *testing.T) {
 	}
 }
 
-// Notes about decisions and edge-cases
-
-// Malformed aggregate signature (nil signature): VerifyAggregateQC currently calls aggQC.Sig().Participants() without
-// checking for nil, so a nil aggregate signature causes a nil pointer dereference (panic). The test captures this
-// panic to exercise the current code path. If desired, we can change VerifyAggregateQC to return a clear error
-// instead of panicking.
-// QC block missing: to ensure aggregate signature verification succeeded but a QC was invalid later, I constructed timeouts that reference a missing QC in their SyncInfo, signed them properly, and used them to build aggQC. That exercises the case where BatchVerify passes but findHighestValidQC skips missing/invalid QCs.
-// qc with nil signature in QC map: replaced one QC with a nil signature in the aggQC.QCs() map. Because other QCs (e.g., genesis QC) may still exist, this typically doesn't cause overall failure — test checks for a valid highQC (e.g., genesis) in that case.
-
-// Next steps I can take (optional)
-
-// Convert the panic case in VerifyAggregateQC to return an error (production change) and update tests accordingly.
-// Add more negative tests: e.g., partial invalid timeouts, signatures with insufficient participants, or malformed aggregated signatures that do not panic but produce BatchVerify errors.
-// Run the entire repo test suite (can be slow) to ensure no other tests are affected.
-// All todos in the plan are completed. If you want me to make the VerifyAggregateQC function robust to nil aggregate signatures, I can implement that change and re-run tests.
-
 // TestVerifyAggregateQCModifiedTimeouts tests AggregateQC verification for cases where timeouts are modified.
 func TestVerifyAggregateQCModifiedTimeouts(t *testing.T) {
 	tests := []struct {
