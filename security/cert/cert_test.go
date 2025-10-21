@@ -424,14 +424,12 @@ func TestVerifyAnyQC(t *testing.T) {
 func BenchmarkVerifyAggregateQC(b *testing.B) {
 	// generate test cases
 	type benchCase struct {
-		td struct {
-			cryptoName string
-			cacheSize  int
-		}
-		n         int
-		qcsPer    int
-		view      uint64
-		blockSize int
+		cryptoName string
+		cacheSize  int
+		n          int
+		qcsPer     int
+		view       uint64
+		blockSize  int
 	}
 	participantSizes := []int{10, 50, 100, 200, 400, 800}
 	numQCsPerParticipant := []int{1, 2, 4, 8}
@@ -444,27 +442,30 @@ func BenchmarkVerifyAggregateQC(b *testing.B) {
 			for _, qcsPer := range numQCsPerParticipant {
 				for _, view := range views {
 					for _, blockSize := range blockSizes {
-						cases = append(cases, benchCase{td: struct {
-							cryptoName string
-							cacheSize  int
-						}{cryptoName: td.cryptoName, cacheSize: td.cacheSize}, n: n, qcsPer: qcsPer, view: view, blockSize: blockSize})
+						cases = append(cases, benchCase{
+							cryptoName: td.cryptoName,
+							cacheSize:  td.cacheSize,
+							n:          n,
+							qcsPer:     qcsPer,
+							view:       view,
+							blockSize:  blockSize,
+						})
 					}
 				}
 			}
 		}
 	}
-
 	for _, c := range cases {
 		name := test.Name(
-			"crypto", c.td.cryptoName,
-			"cache", c.td.cacheSize,
+			"crypto", c.cryptoName,
+			"cache", c.cacheSize,
 			"participants", c.n,
 			"qcsPerParticipant", c.qcsPer,
 			"view", c.view,
 			"blockSize", c.blockSize,
 		)
 		b.Run(name, func(b *testing.B) {
-			auths, aggQC := buildAuthsAndAggregateQC(b, c.n, c.td.cryptoName, c.td.cacheSize, c.qcsPer, c.view, c.blockSize)
+			auths, aggQC := buildAuthsAndAggregateQC(b, c.n, c.cryptoName, c.cacheSize, c.qcsPer, c.view, c.blockSize)
 			b.ResetTimer()
 			for b.Loop() {
 				_, err := auths[0].VerifyAggregateQC(aggQC)
