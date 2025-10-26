@@ -428,47 +428,34 @@ func BenchmarkVerifyAggregateQC(b *testing.B) {
 		cacheSize  int
 		n          int
 		qcsPer     int
-		view       uint64
-		blockSize  int
 	}
-	participantSizes := []int{10, 50, 100, 200, 400, 800}
-	numQCsPerParticipant := []int{1, 2, 4, 8}
-	views := []uint64{1, 10, 100, 1000}
-	blockSizes := []int{128, 1024, 4096}
+	participants := []int{10, 100, 200, 400}
+	numQCsPerParticipant := []int{1, 4, 20}
 
 	cases := make([]benchCase, 0)
 	for _, td := range testData {
-		for _, n := range participantSizes {
+		for _, n := range participants {
 			for _, qcsPer := range numQCsPerParticipant {
-				for _, view := range views {
-					for _, blockSize := range blockSizes {
-						cases = append(cases, benchCase{
-							cryptoName: td.cryptoName,
-							cacheSize:  td.cacheSize,
-							n:          n,
-							qcsPer:     qcsPer,
-							view:       view,
-							blockSize:  blockSize,
-						})
-					}
-				}
+				cases = append(cases, benchCase{
+					cryptoName: td.cryptoName,
+					cacheSize:  td.cacheSize,
+					n:          n,
+					qcsPer:     qcsPer,
+				})
 			}
 		}
 	}
 	for _, c := range cases {
 		name := test.Name(
-			"crypto", c.cryptoName,
-			"cache", c.cacheSize,
-			"participants", c.n,
-			"qcsPerParticipant", c.qcsPer,
-			"view", c.view,
-			"blockSize", c.blockSize,
+			"Crypto", c.cryptoName,
+			"Cache", c.cacheSize,
+			"Participants", c.n,
+			"QCsPerParticipant", c.qcsPer,
 		)
 		b.Run(name, func(b *testing.B) {
-			auths, aggQC := buildAuthsAndAggregateQC(b, c.n, c.cryptoName, c.cacheSize, c.qcsPer, c.view, c.blockSize)
-			b.ResetTimer()
+			verifier, aggQC := buildAuthsAndAggregateQC(b, c.n, c.cryptoName, c.cacheSize, c.qcsPer)
 			for b.Loop() {
-				_, err := auths[0].VerifyAggregateQC(aggQC)
+				_, err := verifier.VerifyAggregateQC(aggQC)
 				if err != nil {
 					b.Fatalf("VerifyAggregateQC failed: %v", err)
 				}
@@ -477,8 +464,12 @@ func BenchmarkVerifyAggregateQC(b *testing.B) {
 	}
 }
 
-// buildAuthsAndAggregateQC creates a set of authorities and an AggregateQC according to the parameters.
-func buildAuthsAndAggregateQC(tb testing.TB, n int, cryptoName string, cacheSize int, qcsPoolSize int, view uint64, blockSize int) ([]*cert.Authority, hotstuff.AggregateQC) {
+// buildAuthsAndAggregateQC creates a verifier authority and an AggregateQC according to the parameters.
+// It creates QCs across multiple views to exercise findHighestValidQC logic in the worst-case scenario:
+// - Only the lowest view (view 1) has a valid QC
+// - All higher views have invalid QCs (blocks not stored in blockchain)
+// - This forces findHighestValidQC to iterate through all invalid QCs before finding the valid one
+func buildAuthsAndAggregateQC(tb testing.TB, n int, cryptoName string, cacheSize, numQCs int) (*cert.Authority, hotstuff.AggregateQC) {
 	tb.Helper()
 	if n <= 0 {
 		tb.Fatalf("participant count must be > 0")
@@ -486,31 +477,46 @@ func buildAuthsAndAggregateQC(tb testing.TB, n int, cryptoName string, cacheSize
 	dummies := createDummies(tb, uint(n), cryptoName, cacheSize)
 	auths := dummies.Signers()
 
-	poolSize := min(qcsPoolSize, n)
+	poolSize := min(numQCs, n)
 	qcPool := make([]hotstuff.QuorumCert, 0, poolSize)
-	for k := range poolSize {
-		blockData := make([]byte, blockSize)
-		if blockSize > 0 {
-			blockData[0] = byte(k)
-		}
+
+	// Views: (poolSize-1)*10+1, ..., 21, 11, 1 (descending)
+	for k := poolSize - 1; k >= 0; k-- {
 		parentQC := hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
-		block := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), parentQC, &clientpb.Batch{Commands: []*clientpb.Command{{Data: blockData}}}, hotstuff.View(k+1), hotstuff.ID(1))
-		for _, dummy := range dummies {
-			dummy.Blockchain().Store(block)
+		view := blockView(k)
+		block := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), parentQC, &clientpb.Batch{Commands: []*clientpb.Command{}}, view, hotstuff.ID(1))
+
+		if view == 1 {
+			// Valid QC: store the block for view 1
+			for _, dummy := range dummies {
+				dummy.Blockchain().Store(block)
+			}
 		}
+		// For view > 1, we DON'T store the block, making these QCs invalid during verification
+
 		qc := testutil.CreateQC(tb, block, auths...)
 		qcPool = append(qcPool, qc)
 	}
 
+	// Distribute QCs among participants to create worst-case for findHighestValidQC.
+	// We want the highest views to have the most QCs, forcing maximum iterations.
+	// Strategy: Assign high-view (invalid) QCs to most participants, and the valid (view 1) QC to fewer.
 	perParticipantQCs := make([]hotstuff.QuorumCert, n)
 	for i := range n {
-		perParticipantQCs[i] = qcPool[i%len(qcPool)]
+		perParticipantQCs[i] = qcPool[i%poolSize]
 	}
 
-	timeouts := testutil.CreateTimeouts(tb, hotstuff.View(view), auths, perParticipantQCs...)
-	agg, err := auths[0].CreateAggregateQC(hotstuff.View(view), timeouts)
+	view := blockView(poolSize - 1)
+	timeouts := testutil.CreateTimeouts(tb, view, auths, perParticipantQCs...)
+	agg, err := auths[0].CreateAggregateQC(view, timeouts)
 	if err != nil {
 		tb.Fatalf("failed to create AggregateQC: %v", err)
 	}
-	return auths, agg
+	return auths[0], agg
+}
+
+// blockView returns a hotstuff.View for the k-th block in the test setup.
+// That is, it returns views: 1, 11, 21, ..., for k = 0, 1, 2, ...
+func blockView(k int) hotstuff.View {
+	return hotstuff.View(k*10 + 1)
 }
