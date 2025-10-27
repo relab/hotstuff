@@ -3,12 +3,11 @@ package cert
 
 import (
 	"fmt"
-	"sort"
-
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/crypto"
+	"slices"
 )
 
 type Authority struct {
@@ -149,9 +148,9 @@ func (c *Authority) VerifyTimeoutCert(tc hotstuff.TimeoutCert) error {
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
 func (c *Authority) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, err error) {
 	messages := make(map[hotstuff.ID][]byte)
-	qcs := make(map[hotstuff.View][]hotstuff.QuorumCert, len(aggQC.QCs()))
+	qcs := make([]hotstuff.QuorumCert, len(aggQC.QCs()))
 	for id, qc := range aggQC.QCs() {
-		qcs[qc.View()] = append(qcs[qc.View()], qc)
+		qcs = append(qcs, qc)
 		// reconstruct the TimeoutMsg to get the hash
 		messages[id] = hotstuff.TimeoutMsg{
 			ID:       id,
@@ -170,27 +169,17 @@ func (c *Authority) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstu
 	}
 	// After verifying the aggregate signature, find the highest-view valid QC from the set.
 	// This individual QC will serve as the highQC for the protocol.
-	highQC, err = c.findHighestValidQC(qcs)
-	if err != nil {
-		return hotstuff.QuorumCert{}, err
-	}
-	return highQC, nil
+	return c.findHighestValidQC(qcs)
 }
 
-func (c *Authority) findHighestValidQC(qcs map[hotstuff.View][]hotstuff.QuorumCert) (highQC hotstuff.QuorumCert, err error) {
-	views := make([]hotstuff.View, 0, len(qcs))
-	for v := range qcs {
-		views = append(views, v)
-	}
-	// Sort views in descending order to check the highest view first.
-	sort.Slice(views, func(i, j int) bool {
-		return views[i] > views[j]
+func (c *Authority) findHighestValidQC(qcs []hotstuff.QuorumCert) (highQC hotstuff.QuorumCert, err error) {
+	// Sort QCs by view in descending order to check the highest view first.
+	slices.SortFunc(qcs, func(a, b hotstuff.QuorumCert) int {
+		return int(b.View()) - int(a.View())
 	})
-	for _, view := range views {
-		for _, qc := range qcs[view] {
-			if err := c.VerifyQuorumCert(qc); err == nil {
-				return qc, nil
-			}
+	for _, qc := range qcs {
+		if err := c.VerifyQuorumCert(qc); err == nil {
+			return qc, nil
 		}
 	}
 	// If the loop completes without finding any valid QC, return an error.
