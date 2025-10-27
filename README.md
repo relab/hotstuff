@@ -5,6 +5,10 @@
 ![golangci-lint](https://github.com/relab/hotstuff/workflows/golangci-lint/badge.svg)
 [![codecov](https://codecov.io/gh/relab/hotstuff/branch/master/graph/badge.svg?token=IYZ7WD6ZAH)](https://codecov.io/gh/relab/hotstuff)
 
+**Deprecation Warning: This branch is no longer maintained.**
+Please see the [main branch](https://github.com/relab/hotstuff/tree/main) as the starting point for new development.
+This branch is kept for archival purposes.
+
 `relab/hotstuff` is a framework for experimenting with HotStuff and similar consensus protocols.
 It provides a set of modules and interfaces that make it easy to test different algorithms.
 It also provides a tool for deploying and running experiments on multiple servers via SSH.
