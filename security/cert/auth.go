@@ -3,11 +3,12 @@ package cert
 
 import (
 	"fmt"
+	"slices"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/crypto"
-	"slices"
 )
 
 type Authority struct {
@@ -172,6 +173,7 @@ func (c *Authority) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstu
 	return c.findHighestValidQC(qcs)
 }
 
+// findHighestValidQC returns the highest-view valid QC from a list of QCs.
 func (c *Authority) findHighestValidQC(qcs []hotstuff.QuorumCert) (highQC hotstuff.QuorumCert, err error) {
 	// Sort QCs by view in descending order to check the highest view first.
 	slices.SortFunc(qcs, func(a, b hotstuff.QuorumCert) int {
