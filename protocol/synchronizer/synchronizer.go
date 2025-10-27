@@ -111,8 +111,7 @@ func New(
 			return
 		}
 		if pView > s.state.View() {
-			s.logger.Infof("Dropping proposal, too high view (%v) >> state view (%v)", pView, sView)
-			s.logger.Infof("Delayed until next view increase: %v", proposal)
+			s.logger.Debugf("Delayed until next view increase, too high view (%v) >> state view (%v): %v", pView, sView, proposal)
 			s.eventLoop.DelayUntil(hotstuff.ViewChangeEvent{}, proposal)
 			return
 		}
