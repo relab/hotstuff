@@ -106,6 +106,7 @@ func TestPropose(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
+	const expectedEvents = 6 // 3 replicas (excluding sender) * 2 events each
 	var wg sync.WaitGroup
 	var eventCount atomic.Int32
 	view := hotstuff.View(1)
@@ -121,7 +122,7 @@ func TestTimeout(t *testing.T) {
 			t.Fatal(err)
 		}
 		want.ViewSignature = sig
-		wg.Add(6)
+		wg.Add(expectedEvents)
 		// We send only a single timeout message, but the synchronizer triggers
 		// an additional timeout, resulting from the following call chain:
 		// Start() -> startTimeoutTimer() -> TimeoutEvent -> OnLocalTimeout() -> sender.Timeout()
@@ -140,7 +141,9 @@ func TestTimeout(t *testing.T) {
 		}
 		// Only call Done() for the expected number of events to prevent negative WaitGroup counter.
 		// Additional events may arrive after wg.Wait() returns due to timing conditions.
-		if eventCount.Add(1) <= 6 {
+		// The atomic Add operation returns the new value after incrementing, ensuring that
+		// at most expectedEvents goroutines will see a value <= expectedEvents.
+		if eventCount.Add(1) <= expectedEvents {
 			wg.Done()
 		}
 	})
