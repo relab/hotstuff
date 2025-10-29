@@ -105,6 +105,8 @@ func New(
 
 		proposalView := proposal.Block.View()
 		localView := s.state.View()
+
+		// alpha limits acceptable view drift, 10 is a temporary heuristic.
 		const alpha hotstuff.View = 10
 		if proposalView > localView+alpha {
 			s.logger.Warnf("Dropping proposal: proposal view too high (%v) >> replica's local view (%v)", proposalView, localView)
