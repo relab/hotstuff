@@ -255,13 +255,15 @@ func findProjectRoot(t *testing.T) string {
 	return root
 }
 
+// compileBinary compiles the hotstuff binary for deployment testing on Linux containers.
 func compileBinary(t *testing.T) string {
 	dir := t.TempDir()
 	exe := filepath.Join(dir, "hotstuff")
 	cmd := exec.Command("go", "build", "-o", exe, "./cmd/hotstuff")
 	cmd.Dir = findProjectRoot(t)
 	// assume docker host is using the same architecture
-	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH="+runtime.GOARCH)
+	// CGO_ENABLED=0 ensures a static binary that works on Alpine Linux (musl)
+	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH="+runtime.GOARCH, "CGO_ENABLED=0")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Logf("%s", out)
