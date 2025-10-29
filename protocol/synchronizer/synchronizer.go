@@ -103,15 +103,15 @@ func New(
 		// advance the view regardless of vote status
 		s.advanceView(hotstuff.NewSyncInfo().WithQC(proposal.Block.QuorumCert()))
 
-		pView := proposal.Block.View()
-		sView := s.state.View()
+		proposalView := proposal.Block.View()
+		localView := s.state.View()
 		const alpha hotstuff.View = 10
-		if pView > sView+alpha {
-			s.logger.Infof("Dropping proposal, too high view (%v) >> state view (%v)", pView, sView)
+		if proposalView > localView+alpha {
+			s.logger.Infof("Dropping proposal, too high view (%v) >> state view (%v)", proposalView, localView)
 			return
 		}
-		if pView > s.state.View() {
-			s.logger.Debugf("Delayed until next view increase, too high view (%v) >> state view (%v): %v", pView, sView, proposal)
+		if proposalView > localView {
+			s.logger.Debugf("Delayed until next view increase, too high view (%v) >> state view (%v): %v", proposalView, localView, proposal)
 			s.eventLoop.DelayUntil(hotstuff.ViewChangeEvent{}, proposal)
 			return
 		}
