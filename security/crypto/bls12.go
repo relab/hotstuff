@@ -382,6 +382,7 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 		if err := bls.coreVerify(pk, message, &s.sig, domain); err != nil {
 			return err
 		}
+		return nil
 	}
 
 	// else if l > 1:
