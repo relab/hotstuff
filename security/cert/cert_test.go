@@ -166,14 +166,14 @@ func TestVerifyAggregateQCModifiedTimeouts(t *testing.T) {
 	}{
 		{
 			name: "InsufficientParticipants",
-			modify: func(timeouts []hotstuff.TimeoutMsg, signers []*cert.Authority) []hotstuff.TimeoutMsg {
+			modify: func(timeouts []hotstuff.TimeoutMsg, _ []*cert.Authority) []hotstuff.TimeoutMsg {
 				return timeouts[:1]
 			},
 			wantErr: true,
 		},
 		{
 			name: "InvalidQCSignature",
-			modify: func(timeouts []hotstuff.TimeoutMsg, signers []*cert.Authority) []hotstuff.TimeoutMsg {
+			modify: func(timeouts []hotstuff.TimeoutMsg, _ []*cert.Authority) []hotstuff.TimeoutMsg {
 				if len(timeouts) > 0 {
 					timeouts[0].MsgSignature = nil
 				}
@@ -183,7 +183,7 @@ func TestVerifyAggregateQCModifiedTimeouts(t *testing.T) {
 		},
 		{
 			name: "NoValidHighQC",
-			modify: func(timeouts []hotstuff.TimeoutMsg, signers []*cert.Authority) []hotstuff.TimeoutMsg {
+			modify: func(timeouts []hotstuff.TimeoutMsg, _ []*cert.Authority) []hotstuff.TimeoutMsg {
 				for i := range timeouts {
 					timeouts[i].SyncInfo = hotstuff.NewSyncInfo()
 				}
@@ -193,7 +193,7 @@ func TestVerifyAggregateQCModifiedTimeouts(t *testing.T) {
 		},
 		{
 			name: "EmptyQCs",
-			modify: func(timeouts []hotstuff.TimeoutMsg, signers []*cert.Authority) []hotstuff.TimeoutMsg {
+			modify: func(_ []hotstuff.TimeoutMsg, _ []*cert.Authority) []hotstuff.TimeoutMsg {
 				return []hotstuff.TimeoutMsg{}
 			},
 			wantErr: true,
@@ -264,7 +264,7 @@ func TestVerifyAggregateQCModifiedAggregateQC(t *testing.T) {
 	}{
 		{
 			name: "QCWithNilSignature",
-			modify: func(agg hotstuff.AggregateQC, signers []*cert.Authority) hotstuff.AggregateQC {
+			modify: func(agg hotstuff.AggregateQC, _ []*cert.Authority) hotstuff.AggregateQC {
 				qcs := agg.QCs()
 				for id, qc := range qcs {
 					qcs[id] = hotstuff.NewQuorumCert(nil, qc.View(), qc.BlockHash())
@@ -318,7 +318,7 @@ func TestVerifyAggregateQCPanic(t *testing.T) {
 	}{
 		{
 			name: "MalformedAggregateSignature",
-			modify: func(agg hotstuff.AggregateQC, signers []*cert.Authority) hotstuff.AggregateQC {
+			modify: func(agg hotstuff.AggregateQC, _ []*cert.Authority) hotstuff.AggregateQC {
 				return hotstuff.NewAggregateQC(agg.QCs(), nil, agg.View())
 			},
 		},
