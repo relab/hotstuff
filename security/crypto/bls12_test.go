@@ -75,11 +75,10 @@ func TestBLS12MultiSignerVerify(t *testing.T) {
 	
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Generate keys and configs for all replicas
+			// Generate keys and create initial configs to get PoP metadata
 			keys := make(map[hotstuff.ID]hotstuff.PrivateKey)
-			configs := make(map[hotstuff.ID]*core.RuntimeConfig)
+			popMetadata := make(map[hotstuff.ID]map[string]string)
 			
-			// First pass: generate keys and create initial configs
 			for i := 1; i <= tc.numReplicas; i++ {
 				id := hotstuff.ID(i)
 				priv, err := crypto.GenerateBLS12PrivateKey()
@@ -87,21 +86,19 @@ func TestBLS12MultiSignerVerify(t *testing.T) {
 					t.Fatalf("Failed to generate private key: %v", err)
 				}
 				keys[id] = priv
-				configs[id] = core.NewRuntimeConfig(id, priv)
-			}
-			
-			// Second pass: create BLS12 instances to get PoP metadata
-			tempBLS := make(map[hotstuff.ID]crypto.Base)
-			for i := 1; i <= tc.numReplicas; i++ {
-				id := hotstuff.ID(i)
-				bls, err := crypto.NewBLS12(configs[id])
+				
+				// Create initial config to generate PoP
+				cfg := core.NewRuntimeConfig(id, priv)
+				bls, err := crypto.NewBLS12(cfg)
 				if err != nil {
 					t.Fatalf("Failed to create BLS12: %v", err)
 				}
-				tempBLS[id] = bls
+				popMetadata[id] = cfg.ConnectionMetadata()
+				// Discard the BLS instance; we only needed the metadata
+				_ = bls
 			}
 			
-			// Third pass: recreate configs with PoP metadata and create final instances
+			// Create final BLS12 instances with all replica info including PoP
 			blsInstances := make([]crypto.Base, 0, tc.numReplicas)
 			for i := 1; i <= tc.numReplicas; i++ {
 				id := hotstuff.ID(i)
@@ -110,17 +107,16 @@ func TestBLS12MultiSignerVerify(t *testing.T) {
 				// Add all replicas with their PoP metadata
 				for j := 1; j <= tc.numReplicas; j++ {
 					jid := hotstuff.ID(j)
-					replica := &hotstuff.ReplicaInfo{
+					cfg.AddReplica(&hotstuff.ReplicaInfo{
 						ID:       jid,
 						PubKey:   keys[jid].Public(),
-						Metadata: configs[jid].ConnectionMetadata(),
-					}
-					cfg.AddReplica(replica)
+						Metadata: popMetadata[jid],
+					})
 				}
 				
 				bls, err := crypto.NewBLS12(cfg)
 				if err != nil {
-					t.Fatalf("Failed to recreate BLS12 with PoP: %v", err)
+					t.Fatalf("Failed to create BLS12 with PoP: %v", err)
 				}
 				blsInstances = append(blsInstances, bls)
 			}
