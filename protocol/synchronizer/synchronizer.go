@@ -107,7 +107,7 @@ func New(
 		localView := s.state.View()
 		const alpha hotstuff.View = 10
 		if proposalView > localView+alpha {
-			s.logger.Infof("Dropping proposal, too high view (%v) >> state view (%v)", proposalView, localView)
+			s.logger.Warnf("Dropping proposal, too high view (%v) >> state view (%v)", proposalView, localView)
 			return
 		}
 		if proposalView > localView {
