@@ -98,18 +98,35 @@ func New(
 	})
 	s.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
 		proposal := event.(hotstuff.ProposeMsg)
+		s.logger.Debugf("Received proposal: %v", proposal.Block)
+
+		// advance the view regardless of vote status
+		s.advanceView(hotstuff.NewSyncInfo().WithQC(proposal.Block.QuorumCert()))
+
+		proposalView := proposal.Block.View()
+		localView := s.state.View()
+
+		// alpha limits acceptable view drift, 10 is a temporary heuristic.
+		const alpha hotstuff.View = 10
+		if proposalView > localView+alpha {
+			s.logger.Warnf("Dropping proposal: proposal view too high (%v) >> replica's local view (%v)", proposalView, localView)
+			return
+		}
+		if proposalView > localView {
+			s.logger.Debugf("Delaying proposal until after next view change (proposal view %v > local view %v)", proposalView, localView)
+			s.eventLoop.DelayUntil(hotstuff.ViewChangeEvent{}, proposal)
+			return
+		}
+
 		// verify the incoming proposal before attempting to vote and try to commit.
 		if err := s.voter.Verify(&proposal); err != nil {
 			s.logger.Infof("failed to verify incoming vote: %v", err)
 			return
 		}
-		s.logger.Debugf("Received proposal: %v", proposal.Block)
 		err := s.voter.OnValidPropose(&proposal)
 		if err != nil {
 			s.logger.Info(err)
 		}
-		// advance the view regardless of vote status
-		s.advanceView(hotstuff.NewSyncInfo().WithQC(proposal.Block.QuorumCert()))
 	})
 	return s
 }
