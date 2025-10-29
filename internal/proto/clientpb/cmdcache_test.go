@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -12,43 +13,53 @@ import (
 )
 
 func TestCacheConcurrentAddGet(t *testing.T) {
-	cache := NewCommandCache(2)
+	synctest.Test(t, func(t *testing.T) {
+		cache := NewCommandCache(2)
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+		var wg sync.WaitGroup
+		wg.Add(2)
 
-	var want []*Command
-	go func() {
-		defer wg.Done()
-		for i := range 6 {
-			cmd := &Command{ClientID: 1, SequenceNumber: uint64(i + 1)}
-			want = append(want, cmd)
-			cache.Add(cmd)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-
-		var got []*Command
-		for range 3 {
-			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-			defer cancel()
-			batch, err := cache.Get(ctx)
-			if err != nil {
-				t.Errorf("Get() error: %v", err)
+		var want []*Command
+		batchReady := make(chan struct{}, 3)
+		go func() {
+			defer wg.Done()
+			for i := range 6 {
+				cmd := &Command{ClientID: 1, SequenceNumber: uint64(i + 1)}
+				want = append(want, cmd)
+				cache.Add(cmd)
+				if (i+1)%2 == 0 {
+					// Signal that a batch is ready
+					batchReady <- struct{}{}
+				}
 			}
-			cmds := batch.GetCommands()
-			got = append(got, cmds...)
-			if len(cmds) != 2 {
-				t.Errorf("Get() got %d commands, want 2", len(cmds))
+			close(batchReady)
+		}()
+
+		go func() {
+			defer wg.Done()
+
+			var got []*Command
+			for range 3 {
+				// Wait for the batch to be ready before calling Get with timeout
+				<-batchReady
+				ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+				defer cancel()
+				batch, err := cache.Get(ctx)
+				if err != nil {
+					t.Errorf("Get() error: %v", err)
+				}
+				cmds := batch.GetCommands()
+				got = append(got, cmds...)
+				if len(cmds) != 2 {
+					t.Errorf("Get() got %d commands, want 2", len(cmds))
+				}
 			}
-		}
-		if diff := cmp.Diff(got, want, protocmp.Transform()); diff != "" {
-			t.Errorf("Get() mismatch (-got +want):\n%s", diff)
-		}
-	}()
-	wg.Wait()
+			if diff := cmp.Diff(got, want, protocmp.Transform()); diff != "" {
+				t.Errorf("Get() mismatch (-got +want):\n%s", diff)
+			}
+		}()
+		wg.Wait()
+	})
 }
 
 func TestCacheAddGetDeadlineExceeded(t *testing.T) {
