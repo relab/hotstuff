@@ -107,11 +107,11 @@ func New(
 		localView := s.state.View()
 		const alpha hotstuff.View = 10
 		if proposalView > localView+alpha {
-			s.logger.Warnf("Dropping proposal, too high view (%v) >> state view (%v)", proposalView, localView)
+			s.logger.Warnf("Dropping proposal: proposal view too high (%v) >> replica's local view (%v)", proposalView, localView)
 			return
 		}
 		if proposalView > localView {
-			s.logger.Debugf("Delayed until next view increase, too high view (%v) >> state view (%v): %v", proposalView, localView, proposal)
+			s.logger.Debugf("Delaying proposal until after next view change (proposal view %v > local view %v)", proposalView, localView)
 			s.eventLoop.DelayUntil(hotstuff.ViewChangeEvent{}, proposal)
 			return
 		}
