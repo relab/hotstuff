@@ -23,6 +23,6 @@ config: {
 
 	byzantineStrategy: {
 		silentproposer: [2, 5]
-		slow: [4]
+		fork: [4]
 	}
 }
