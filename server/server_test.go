@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -106,6 +107,7 @@ func TestPropose(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	var wg sync.WaitGroup
+	var eventCount atomic.Int32
 	view := hotstuff.View(1)
 	want := hotstuff.TimeoutMsg{
 		ID:       1,
@@ -136,7 +138,11 @@ func TestTimeout(t *testing.T) {
 		if got.View != want.View {
 			t.Errorf("wrong view in proposal: got: %d, want: %d", got.View, want.View)
 		}
-		wg.Done()
+		// Only call Done() for the expected number of events to prevent negative WaitGroup counter.
+		// Additional events may arrive after wg.Wait() returns due to timing conditions.
+		if eventCount.Add(1) <= 6 {
+			wg.Done()
+		}
 	})
 }
 
