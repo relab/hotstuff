@@ -163,6 +163,9 @@ func TestDeployment(t *testing.T) {
 	if os.Getenv("GITHUB_ACTIONS") != "" && runtime.GOOS != "linux" {
 		t.Skip("GitHub Actions only supports linux containers on linux runners.")
 	}
+	if os.Getenv("ACT") != "" {
+		t.Skip("Skipping docker-in-docker test when running with act")
+	}
 
 	numReplicas := 4
 	numClients := 2
