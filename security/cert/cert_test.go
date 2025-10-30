@@ -1,6 +1,7 @@
 package cert_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/relab/hotstuff"
@@ -435,6 +436,48 @@ func TestVerifyAggregateQC(t *testing.T) {
 			verifier, aggQC := buildAuthsAndAggregateQC(t, c.n, c.cryptoName, c.cacheSize, c.qcsPer)
 			_, err := verifier.VerifyAggregateQC(aggQC)
 			if err != nil {
+				t.Fatalf("VerifyAggregateQC failed: %v", err)
+			}
+		})
+	}
+}
+
+// TestVerifyAggregateQCReproduceBLS12FailVerify attempts to reproduce a failure
+// in BLS12 AggregateQC verification that was observed during benchmarking.
+// See issue #232. This test is skipped by default and can be run by setting
+// the DEBUG environment variable as follows:
+//
+//	DEBUG=1 go test -v -run TestVerifyAggregateQCReproduceBLS12FailVerify -timeout=0 -count=1 > debug-bls12-verify.log
+//
+// Adjust the count parameter as needed to increase the likelihood of reproducing the issue.
+func TestVerifyAggregateQCReproduceBLS12FailVerify(t *testing.T) {
+	if os.Getenv("DEBUG") == "" {
+		t.Skip("Skipping slow debug-only test")
+	}
+
+	tests := []struct {
+		cryptoName string
+		cacheSize  int
+		n          int
+		qcsPer     int
+	}{
+		{crypto.NameBLS12, 0, 800, 4},
+		{crypto.NameBLS12, 10, 800, 1},
+		{crypto.NameBLS12, 10, 400, 4},
+		{crypto.NameBLS12, 10, 800, 40},
+	}
+	for _, c := range tests {
+		name := test.Name(
+			"Crypto", c.cryptoName,
+			"Cache", c.cacheSize,
+			"Participants", c.n,
+			"QCsPerParticipant", c.qcsPer,
+		)
+		t.Run(name, func(t *testing.T) {
+			verifier, aggQC := buildAuthsAndAggregateQC(t, c.n, c.cryptoName, c.cacheSize, c.qcsPer)
+			_, err := verifier.VerifyAggregateQC(aggQC)
+			if err != nil {
+				t.Logf("aggQC: %v", aggQC)
 				t.Fatalf("VerifyAggregateQC failed: %v", err)
 			}
 		})
