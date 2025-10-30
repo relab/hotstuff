@@ -401,6 +401,46 @@ func TestVerifyAggregateQCHighQCMismatch(t *testing.T) {
 	}
 }
 
+func TestVerifyAggregateQC(t *testing.T) {
+	type testCase struct {
+		cryptoName string
+		cacheSize  int
+		n          int
+		qcsPer     int
+	}
+	participants := []int{10, 50}
+	numQCsPerParticipant := []int{1, 4}
+
+	cases := make([]testCase, 0)
+	for _, td := range testData {
+		for _, n := range participants {
+			for _, qcsPer := range numQCsPerParticipant {
+				cases = append(cases, testCase{
+					cryptoName: td.cryptoName,
+					cacheSize:  td.cacheSize,
+					n:          n,
+					qcsPer:     qcsPer,
+				})
+			}
+		}
+	}
+	for _, c := range cases {
+		name := test.Name(
+			"Crypto", c.cryptoName,
+			"Cache", c.cacheSize,
+			"Participants", c.n,
+			"QCsPerParticipant", c.qcsPer,
+		)
+		t.Run(name, func(t *testing.T) {
+			verifier, aggQC := buildAuthsAndAggregateQC(t, c.n, c.cryptoName, c.cacheSize, c.qcsPer)
+			_, err := verifier.VerifyAggregateQC(aggQC)
+			if err != nil {
+				t.Fatalf("VerifyAggregateQC failed: %v", err)
+			}
+		})
+	}
+}
+
 func TestVerifyAnyQC(t *testing.T) {
 	for _, td := range testData {
 		signers, signedBlock := createSignersWithBlock(t, td.cryptoName, td.cacheSize)
@@ -422,7 +462,6 @@ func TestVerifyAnyQC(t *testing.T) {
 
 // BenchmarkVerifyAggregateQC benchmarks Authority.VerifyAggregateQC with varying parameters.
 func BenchmarkVerifyAggregateQC(b *testing.B) {
-	// generate test cases
 	type benchCase struct {
 		cryptoName string
 		cacheSize  int
