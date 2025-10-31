@@ -84,20 +84,18 @@ func TestCollectVoteWithDuplicates(t *testing.T) {
 	block := testutil.CreateBlock(t, leader.Authority())
 	leader.Blockchain().Store(block)
 
+	// Send duplicate votes from the first signer
+	// This will cause an error unless the duplicate is filtered
+	signer := signers[0]
+	pc := testutil.CreatePC(t, block, signer.Authority())
+	vote := hotstuff.VoteMsg{
+		ID:          signer.RuntimeCfg().ID(),
+		PartialCert: pc,
+	}
+	votingMachine.CollectVote(vote)
+
 	// Collect votes from all signers
 	for _, signer := range signers {
-		pc := testutil.CreatePC(t, block, signer.Authority())
-		vote := hotstuff.VoteMsg{
-			ID:          signer.RuntimeCfg().ID(),
-			PartialCert: pc,
-		}
-		votingMachine.CollectVote(vote)
-	}
-
-	// Send duplicate votes from the first two signers
-	// These should be ignored and not cause an error
-	for i := 0; i < 2; i++ {
-		signer := signers[i]
 		pc := testutil.CreatePC(t, block, signer.Authority())
 		vote := hotstuff.VoteMsg{
 			ID:          signer.RuntimeCfg().ID(),
