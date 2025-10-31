@@ -36,6 +36,7 @@ func (c *CommandCache) isDuplicate(cmd *Command) bool {
 	return seqNum >= cmd.GetSequenceNumber()
 }
 
+// Add adds a command to the cache and notifies waiting Get calls if a batch can be formed.
 func (c *CommandCache) Add(cmd *Command) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
