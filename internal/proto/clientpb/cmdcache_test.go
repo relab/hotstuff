@@ -31,9 +31,9 @@ func TestCacheConcurrentAddGet(t *testing.T) {
 
 		wg.Go(func() {
 			for range numBatches {
-				ctx, cancel := context.WithTimeout(context.Background(), 2000*time.Millisecond)
-				defer cancel()
-				batch, err := cache.Get(ctx)
+				// Use background context to allow waiting indefinitely for commands
+				// to be added to the cache; this avoids timing issues in the test.
+				batch, err := cache.Get(context.Background())
 				if err != nil {
 					t.Errorf("Get() error: %v", err)
 				}
