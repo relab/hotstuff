@@ -86,10 +86,10 @@ func TestCollectVoteWithDuplicates(t *testing.T) {
 
 	// Send duplicate votes from the first signer
 	// This will cause an error unless the duplicate is filtered
-	signer := signers[0]
-	pc := testutil.CreatePC(t, block, signer.Authority())
+	firstSigner := signers[0]
+	pc := testutil.CreatePC(t, block, firstSigner.Authority())
 	vote := hotstuff.VoteMsg{
-		ID:          signer.RuntimeCfg().ID(),
+		ID:          firstSigner.RuntimeCfg().ID(),
 		PartialCert: pc,
 	}
 	votingMachine.CollectVote(vote)
