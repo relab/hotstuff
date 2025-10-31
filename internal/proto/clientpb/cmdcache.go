@@ -61,12 +61,14 @@ func (c *CommandCache) Get(ctx context.Context) (*Batch, error) {
 	defer c.mut.Unlock()
 
 	// Start a goroutine to wake us up when context is done.
-	// This goroutine is cleaned up when this function returns via defer.
+	// The goroutine can safely lock the mutex because c.cond.Wait() atomically
+	// unlocks the mutex while waiting, allowing the goroutine to acquire it.
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
 		select {
 		case <-ctx.Done():
+			// Wait() has unlocked c.mut, so we can lock it here.
 			c.mut.Lock()
 			c.cond.Broadcast()
 			c.mut.Unlock()
@@ -75,24 +77,40 @@ func (c *CommandCache) Get(ctx context.Context) (*Batch, error) {
 	}()
 
 	for {
-		// Check if we should return a batch.
-		// Return a full batch if we have enough commands, or a partial batch if context is done.
-		if c.len() >= c.batchSize || ctx.Err() != nil {
+		// Try to extract a batch if we have enough commands.
+		if c.len() >= c.batchSize {
 			batch := c.extractBatch()
 			if len(batch.Commands) > 0 {
-				// We have commands, return them.
 				return batch, nil
 			}
-			// No non-duplicate commands available.
-			if ctx.Err() != nil {
-				// Context is done and no commands, return error.
-				return nil, ctx.Err()
+			// All commands were duplicates, continue waiting.
+		}
+
+		// Check if context is done before waiting.
+		// This handles the case where context was canceled before we start waiting.
+		if ctx.Err() != nil {
+			// Return whatever commands we have, or error if none.
+			batch := c.extractBatch()
+			if len(batch.Commands) > 0 {
+				return batch, nil
 			}
-			// All commands were duplicates, wait for more.
+			return nil, ctx.Err()
 		}
 
 		// Wait for more commands or context cancellation.
+		// This atomically unlocks c.mut, waits for a signal, then re-locks c.mut.
 		c.cond.Wait()
+
+		// After waking up, check if context was canceled.
+		// This is necessary because the wake-up might be due to context cancellation.
+		if ctx.Err() != nil {
+			// Return whatever commands we have, or error if none.
+			batch := c.extractBatch()
+			if len(batch.Commands) > 0 {
+				return batch, nil
+			}
+			return nil, ctx.Err()
+		}
 	}
 }
 
