@@ -10,7 +10,7 @@ import (
 
 type CommandCache struct {
 	mut              sync.Mutex
-	c                chan struct{}
+	cond             *sync.Cond
 	batchSize        uint32
 	clientSeqNumbers map[uint32]uint64 // highest proposed sequence number per client ID
 	cache            list.List
@@ -18,10 +18,10 @@ type CommandCache struct {
 
 func NewCommandCache(batchSize uint32) *CommandCache {
 	c := &CommandCache{
-		c:                make(chan struct{}),
 		batchSize:        batchSize,
 		clientSeqNumbers: make(map[uint32]uint64),
 	}
+	c.cond = sync.NewCond(&c.mut)
 	return c
 }
 
@@ -46,10 +46,7 @@ func (c *CommandCache) Add(cmd *Command) {
 	c.cache.PushBack(cmd)
 	if c.len() >= c.batchSize {
 		// notify Get that we are ready to send a new batch.
-		select {
-		case c.c <- struct{}{}:
-		default:
-		}
+		c.cond.Signal()
 	}
 }
 
@@ -62,15 +59,41 @@ func (c *CommandCache) Get(ctx context.Context) (*Batch, error) {
 
 	c.mut.Lock()
 awaitBatch:
-	// wait until we can send a new batch.
+	// wait until we have enough commands for a batch.
 	for c.len() < c.batchSize {
-		c.mut.Unlock()
+		// Check if context is already done before waiting
 		select {
-		case <-c.c:
 		case <-ctx.Done():
+			c.mut.Unlock()
 			return nil, ctx.Err()
+		default:
 		}
-		c.mut.Lock()
+
+		// Wait for signal that commands are available.
+		// We use a goroutine to handle context cancellation while waiting.
+		done := make(chan struct{})
+		go func() {
+			select {
+			case <-ctx.Done():
+				c.mut.Lock()
+				c.cond.Broadcast() // Wake up waiting Get() to check context
+				c.mut.Unlock()
+			case <-done:
+			}
+		}()
+
+		c.cond.Wait() // Atomically unlock c.mut, wait, and re-lock c.mut
+		close(done)
+
+		// c.mut is locked again after Wait() returns
+		// Check context again after waking up
+		select {
+		case <-ctx.Done():
+			c.mut.Unlock()
+			return nil, ctx.Err()
+		default:
+		}
+		// Loop continues to check c.len() < c.batchSize again
 	}
 
 	// Get the batch. Note that we may not be able to fill the batch,
