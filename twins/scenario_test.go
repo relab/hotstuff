@@ -205,6 +205,10 @@ func TestSafety(t *testing.T) {
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{noB}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{noA}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{noB}})
+	s = append(s, View{Leader: 1, Partitions: []NodeSet{noA}})
+	s = append(s, View{Leader: 1, Partitions: []NodeSet{noB}})
+	s = append(s, View{Leader: 1, Partitions: []NodeSet{noA}})
+	s = append(s, View{Leader: 1, Partitions: []NodeSet{noB}})
 	logging.SetLogLevel("debug")
 	result, err := ExecuteScenario(s, 4, 1, 100, rules.NameChainedHotStuff)
 	if err != nil {
