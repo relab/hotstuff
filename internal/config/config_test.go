@@ -76,10 +76,10 @@ func TestAssignReplicas(t *testing.T) {
 func TestAssignReplicasByzantine(t *testing.T) {
 	locations := []string{"Melbourne", "Toronto", "Prague", "Paris", "Tokyo", "Amsterdam", "Auckland", "Moscow", "Stockholm", "London"}
 	byzStrategy := map[string][]uint32{
-		"silent": {1, 3},
-		"slow":   {2},
+		"silentproposer": {1, 3},
+		"slow":           {2},
 	}
-	byzMap := map[uint32]string{1: "silent", 2: "slow", 3: "silent"}
+	byzMap := map[uint32]string{1: "silentproposer", 2: "slow", 3: "silentproposer"}
 	type hostMap map[string][]uint32
 	tests := []struct {
 		name string

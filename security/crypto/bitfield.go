@@ -88,7 +88,7 @@ func (bf Bitfield) ForEach(f func(hotstuff.ID)) {
 // RangeWhile calls f for each ID in the set until f returns false.
 func (bf Bitfield) RangeWhile(f func(hotstuff.ID) bool) {
 	for byteIdx := range bf.data {
-		for bitIdx := 0; bitIdx < 8; bitIdx++ {
+		for bitIdx := range 8 {
 			if bf.isSet(byteIdx, bitIdx) {
 				if !f(id(byteIdx, bitIdx)) {
 					return

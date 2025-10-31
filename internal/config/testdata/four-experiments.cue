@@ -39,7 +39,7 @@
 		crypto:         "ecdsa"
 		communication:  "kauri"
 		byzantineStrategy: {
-			silence: [2]
+			silentproposer: [2]
 		}
 		replicaHosts: ["localhost"]
 		clientHosts: ["localhost"]

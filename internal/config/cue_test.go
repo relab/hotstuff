@@ -15,8 +15,8 @@ func TestExperimentsIteratorSingle(t *testing.T) {
 	locationsWithDuplicates := []string{"Melbourne", "Toronto", "Prague", "Paris", "Tokyo", "Melbourne", "Toronto", "Prague", "Paris", "Tokyo"}
 	treePositions := []uint32{10, 2, 3, 4, 5, 6, 7, 8, 9, 1}
 	byzantineStrategy := map[string][]uint32{
-		"silent": {2, 5},
-		"slow":   {4},
+		"silentproposer": {2, 5},
+		"slow":           {4},
 	}
 	defaultModules := &config.ExperimentConfig{
 		Consensus:      "chainedhotstuff",
@@ -173,7 +173,7 @@ func TestExperimentsIteratorMultiple(t *testing.T) {
 			Communication:     "kauri",
 			Crypto:            "ecdsa",
 			LeaderRotation:    "round-robin",
-			ByzantineStrategy: map[string][]uint32{"silence": {2}},
+			ByzantineStrategy: map[string][]uint32{"silentproposer": {2}},
 		},
 		{
 			ReplicaHosts:      []string{"localhost"},

@@ -5,8 +5,11 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/test"
+	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol/comm/kauri"
+	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto"
 )
 
@@ -50,12 +53,12 @@ func BenchmarkSubTree(b *testing.B) {
 			set[i] = hotstuff.ID(i + 1)
 		}
 		subSet := set[data.start:]
-		b.Run("SliceSet/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
+		b.Run(test.Name("SliceSet", "size", len(set), "q", len(subSet)), func(b *testing.B) {
 			for b.Loop() {
 				kauri.IsSubSet(subSet, set)
 			}
 		})
-		b.Run("MapSet__/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
+		b.Run(test.Name("MapSet__", "size", len(set), "q", len(subSet)), func(b *testing.B) {
 			for b.Loop() {
 				isSubSetMap(subSet, set)
 			}
@@ -78,33 +81,30 @@ func isSubSetMap(a, b []hotstuff.ID) bool {
 
 func TestCanMerge(t *testing.T) {
 	testData := []struct {
-		a       []hotstuff.ID
-		b       []hotstuff.ID
-		wantErr bool
+		a           []hotstuff.ID
+		b           []hotstuff.ID
+		wantOverlap bool
+		wantErr     bool
 	}{
-		{[]hotstuff.ID{1, 2, 3, 4, 5}, []hotstuff.ID{1, 2, 3, 4, 5}, true},
-		{[]hotstuff.ID{1, 2, 3, 4, 5}, []hotstuff.ID{1, 2, 3, 4, 5, 6}, true},
-		{[]hotstuff.ID{1, 2}, []hotstuff.ID{3, 4}, false},
-		{[]hotstuff.ID{1, 2, 3, 4, 5}, []hotstuff.ID{1, 2}, true},
-		{[]hotstuff.ID{3, 4, 5}, []hotstuff.ID{1, 2}, false},
-		{nil, nil, false},
+		{[]hotstuff.ID{1, 2, 3, 4, 5}, []hotstuff.ID{1, 2, 3, 4, 5}, true, true},
+		{[]hotstuff.ID{1, 2, 3, 4, 5}, []hotstuff.ID{1, 2, 3, 4, 5, 6}, true, true},
+		{[]hotstuff.ID{1, 2}, []hotstuff.ID{3, 4}, false, false},
+		{[]hotstuff.ID{1, 2, 3, 4, 5}, []hotstuff.ID{1, 2}, true, true},
+		{[]hotstuff.ID{3, 4, 5}, []hotstuff.ID{1, 2}, false, false},
+		{nil, []hotstuff.ID{1, 2}, false, true},
+		{[]hotstuff.ID{1, 2}, nil, false, true},
+		{nil, nil, false, true},
 	}
 	for _, test := range testData {
 		overlaps := hasOverlap(test.a, test.b)
-		if overlaps && !test.wantErr {
+		if overlaps && !test.wantOverlap {
 			t.Errorf("hasOverlap(%v, %v) = true, want false", test.a, test.b)
 		}
-		if !overlaps && test.wantErr {
+		if !overlaps && test.wantOverlap {
 			t.Errorf("hasOverlap(%v, %v) = false, want true", test.a, test.b)
 		}
-		a := make(crypto.Multi[*crypto.ECDSASignature])
-		for _, id := range test.a {
-			a[id] = &crypto.ECDSASignature{}
-		}
-		b := make(crypto.Multi[*crypto.ECDSASignature])
-		for _, id := range test.b {
-			b[id] = &crypto.ECDSASignature{}
-		}
+		a := createQC(t, test.a)
+		b := createQC(t, test.b)
 		err := kauri.CanMergeContributions(a, b)
 		if err != nil && !test.wantErr {
 			t.Errorf("canMergeContributions(%v, %v) got error and no error is expected", a, b)
@@ -139,20 +139,14 @@ func BenchmarkHasOverlap(b *testing.B) {
 		}
 		subSet := set[data.start:]
 
-		p := make(crypto.Multi[*crypto.ECDSASignature])
-		for _, id := range set {
-			p[id] = &crypto.ECDSASignature{}
-		}
-		q := make(crypto.Multi[*crypto.ECDSASignature])
-		for _, id := range subSet {
-			q[id] = &crypto.ECDSASignature{}
-		}
-		b.Run("HasOverlap/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
+		p := createQC(b, set)
+		q := createQC(b, subSet)
+		b.Run(test.Name("HasOverlap", "size", len(set), "q", len(subSet)), func(b *testing.B) {
 			for b.Loop() {
 				hasOverlap(subSet, set)
 			}
 		})
-		b.Run("CanMerge/"+test.Name([]string{"size", "q"}, len(set), len(subSet)), func(b *testing.B) {
+		b.Run(test.Name("CanMerge", "size", len(set), "q", len(subSet)), func(b *testing.B) {
 			for b.Loop() {
 				// intentionally discarding error since it's not relevant in the benchmark
 				_ = kauri.CanMergeContributions(p, q)
@@ -169,4 +163,23 @@ func hasOverlap(a, b []hotstuff.ID) bool {
 		}
 	}
 	return false
+}
+
+// createQC create a quorum certificate signed by the given IDs.
+func createQC(t testing.TB, ids []hotstuff.ID) hotstuff.QuorumSignature {
+	t.Helper()
+	if len(ids) == 0 {
+		return nil
+	}
+	signers := make([]*cert.Authority, len(ids))
+	for i, id := range ids {
+		key := testutil.GenerateECDSAKey(t)
+		cfg := core.NewRuntimeConfig(id, key)
+		base, err := crypto.New(cfg, crypto.NameECDSA)
+		if err != nil {
+			t.Fatal(err)
+		}
+		signers[i] = cert.NewAuthority(cfg, nil, base)
+	}
+	return testutil.CreateQC(t, testutil.CreateBlock(t, signers[0]), signers...).Signature()
 }

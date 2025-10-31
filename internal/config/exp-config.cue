@@ -24,7 +24,7 @@ config: {
 		byz: [
 			{strategy: "", targets: []},
 			{strategy: "fork", targets: [2]},
-			{strategy: "silence", targets: [2]},
+			{strategy: "silentproposer", targets: [2]},
 		]
 	}
 

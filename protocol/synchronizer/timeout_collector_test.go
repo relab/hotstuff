@@ -124,9 +124,8 @@ func BenchmarkTimeoutQuorum(b *testing.B) {
 				dup--
 			}
 		}
-		params := test.Name([]string{"n", "timeouts"}, bc.n, len(timeouts))
 
-		b.Run("MapMap/"+params, func(b *testing.B) {
+		b.Run(test.Name("MapMap__", "n", bc.n, "timeouts", len(timeouts)), func(b *testing.B) {
 			s := &timeoutMapMap{
 				timeoutsByView: make(map[hotstuff.View]map[hotstuff.ID]hotstuff.TimeoutMsg),
 				quorumSize:     hotstuff.QuorumSize(bc.n),
@@ -138,7 +137,7 @@ func BenchmarkTimeoutQuorum(b *testing.B) {
 			}
 		})
 
-		b.Run("MapSlice/"+params, func(b *testing.B) {
+		b.Run(test.Name("MapSlice", "n", bc.n, "timeouts", len(timeouts)), func(b *testing.B) {
 			s := &timeoutMapSlice{
 				timeoutsByView: make(map[hotstuff.View][]hotstuff.TimeoutMsg),
 				replicaCount:   bc.n,
@@ -151,7 +150,7 @@ func BenchmarkTimeoutQuorum(b *testing.B) {
 			}
 		})
 
-		b.Run("Slice/"+params, func(b *testing.B) {
+		b.Run(test.Name("Slice___", "n", bc.n, "timeouts", len(timeouts)), func(b *testing.B) {
 			config := core.NewRuntimeConfig(1, nil)
 			for i := range bc.n { // to set the quorum size
 				config.AddReplica(&hotstuff.ReplicaInfo{

@@ -22,7 +22,7 @@ config: {
 	branchFactor: 5
 
 	byzantineStrategy: {
-		silent: [2, 5]
+		silentproposer: [2, 5]
 		slow: [4]
 	}
 }

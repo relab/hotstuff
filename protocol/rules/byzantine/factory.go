@@ -17,8 +17,8 @@ func Wrap(
 	switch name {
 	case "":
 		return rules, nil // default to no byzantine strategy if no name is provided
-	case NameSilence:
-		byzRules = NewSilence(rules)
+	case NameSilentProposer:
+		byzRules = NewSilentProposer(rules)
 	case NameFork:
 		byzRules = NewFork(config, blockchain, rules)
 	case NameIncreaseView:

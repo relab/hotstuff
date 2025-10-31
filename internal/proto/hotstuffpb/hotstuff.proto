@@ -47,8 +47,7 @@ message Block {
 
 message ECDSASignature {
   uint32 Signer = 1;
-  bytes R = 2;
-  bytes S = 3;
+  bytes Sig = 2;
 }
 
 message BLS12Signature { bytes Sig = 1; }

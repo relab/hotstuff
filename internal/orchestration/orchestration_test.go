@@ -104,7 +104,7 @@ func TestOrchestration(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 	fork := map[string][]uint32{"fork": {1}}
-	silence := map[string][]uint32{"silence": {1}}
+	silentProposer := map[string][]uint32{"silentproposer": {1}}
 
 	tests := []struct {
 		consensus    string
@@ -125,7 +125,7 @@ func TestOrchestration(t *testing.T) {
 		{consensus: rules.NameSimpleHotStuff, crypto: crypto.NameEDDSA, replicas: 4},
 		{consensus: rules.NameSimpleHotStuff, crypto: crypto.NameBLS12, replicas: 4},
 		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameECDSA, byzantine: fork, replicas: 4},
-		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameECDSA, byzantine: silence, replicas: 4},
+		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameECDSA, byzantine: silentProposer, replicas: 4},
 		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameECDSA, commName: comm.NameKauri, replicas: 7, branchFactor: 2},
 		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameBLS12, commName: comm.NameKauri, replicas: 7, branchFactor: 2},
 		{consensus: rules.NameChainedHotStuff, crypto: crypto.NameECDSA, commName: comm.NameKauri, replicas: 7, branchFactor: 2, randomTree: true},
@@ -133,7 +133,7 @@ func TestOrchestration(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(test.Name([]string{"consensus", "crypto", "byzantine", "kauri"}, tt.consensus, tt.crypto, tt.byzantine, tt.commName), func(t *testing.T) {
+		t.Run(test.Name("consensus", tt.consensus, "crypto", tt.crypto, "byzantine", tt.byzantine, "kauri", tt.commName), func(t *testing.T) {
 			var leaderRotation string
 			if tt.commName != "" {
 				leaderRotation = leaderrotation.NameTree
@@ -162,6 +162,9 @@ func TestDeployment(t *testing.T) {
 	}
 	if os.Getenv("GITHUB_ACTIONS") != "" && runtime.GOOS != "linux" {
 		t.Skip("GitHub Actions only supports linux containers on linux runners.")
+	}
+	if os.Getenv("ACT") != "" {
+		t.Skip("Skipping docker-in-docker test when running with act")
 	}
 
 	numReplicas := 4
@@ -255,13 +258,15 @@ func findProjectRoot(t *testing.T) string {
 	return root
 }
 
+// compileBinary compiles the hotstuff binary for deployment testing on Linux containers.
 func compileBinary(t *testing.T) string {
 	dir := t.TempDir()
 	exe := filepath.Join(dir, "hotstuff")
 	cmd := exec.Command("go", "build", "-o", exe, "./cmd/hotstuff")
 	cmd.Dir = findProjectRoot(t)
 	// assume docker host is using the same architecture
-	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH="+runtime.GOARCH)
+	// CGO_ENABLED=0 ensures a static binary that works on Alpine Linux (musl)
+	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH="+runtime.GOARCH, "CGO_ENABLED=0")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Logf("%s", out)

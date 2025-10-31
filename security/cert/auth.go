@@ -3,6 +3,7 @@ package cert
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
@@ -148,10 +149,9 @@ func (c *Authority) VerifyTimeoutCert(tc hotstuff.TimeoutCert) error {
 // VerifyAggregateQC verifies the AggregateQC and returns the highQC, if valid.
 func (c *Authority) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstuff.QuorumCert, err error) {
 	messages := make(map[hotstuff.ID][]byte)
+	qcs := make([]hotstuff.QuorumCert, len(aggQC.QCs()))
 	for id, qc := range aggQC.QCs() {
-		if highQC.View() < qc.View() || highQC == (hotstuff.QuorumCert{}) {
-			highQC = qc
-		}
+		qcs = append(qcs, qc)
 		// reconstruct the TimeoutMsg to get the hash
 		messages[id] = hotstuff.TimeoutMsg{
 			ID:       id,
@@ -168,11 +168,24 @@ func (c *Authority) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstu
 	if err := c.BatchVerify(aggQC.Sig(), messages); err != nil {
 		return hotstuff.QuorumCert{}, err
 	}
+	// After verifying the aggregate signature, find the highest-view valid QC from the set.
+	// This individual QC will serve as the highQC for the protocol.
+	return c.findHighestValidQC(qcs)
+}
 
-	if err := c.VerifyQuorumCert(highQC); err != nil {
-		return hotstuff.QuorumCert{}, err
+// findHighestValidQC returns the highest-view valid QC from a list of QCs.
+func (c *Authority) findHighestValidQC(qcs []hotstuff.QuorumCert) (highQC hotstuff.QuorumCert, err error) {
+	// Sort QCs by view in descending order to check the highest view first.
+	slices.SortFunc(qcs, func(a, b hotstuff.QuorumCert) int {
+		return int(b.View()) - int(a.View())
+	})
+	for _, qc := range qcs {
+		if err := c.VerifyQuorumCert(qc); err == nil {
+			return qc, nil
+		}
 	}
-	return highQC, nil
+	// If the loop completes without finding any valid QC, return an error.
+	return hotstuff.QuorumCert{}, fmt.Errorf("no valid high quorum certificate found in aggregate QC")
 }
 
 // VerifyAnyQC is a helper that verifies either a QC or the aggregateQC in a proposal message.

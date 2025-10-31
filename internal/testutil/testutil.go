@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/security/crypto"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 )
 
@@ -44,15 +45,15 @@ func CreateParentedBlock(t testing.TB, proposer hotstuff.ID, validParent *hotstu
 }
 
 // CreateSignatures creates partial certificates from multiple signers.
-func CreateSignatures(t testing.TB, message []byte, signers []*cert.Authority) []hotstuff.QuorumSignature {
+func CreateSignatures[T crypto.Base](t testing.TB, message []byte, signers []T) []hotstuff.QuorumSignature {
 	t.Helper()
-	sigs := make([]hotstuff.QuorumSignature, 0, len(signers))
-	for _, signer := range signers {
+	sigs := make([]hotstuff.QuorumSignature, len(signers))
+	for i, signer := range signers {
 		sig, err := signer.Sign(message)
 		if err != nil {
 			t.Fatalf("Failed to sign block: %v", err)
 		}
-		sigs = append(sigs, sig)
+		sigs[i] = sig
 	}
 	return sigs
 }
@@ -67,16 +68,30 @@ func signer(s hotstuff.QuorumSignature) hotstuff.ID {
 }
 
 // CreateTimeouts creates a set of TimeoutMsg messages from the given signers.
-func CreateTimeouts(t testing.TB, view hotstuff.View, signers []*cert.Authority) (timeouts []hotstuff.TimeoutMsg) {
+// Optionally, a slice of QCs can be provided to set the SyncInfo for each timeout.
+// If no QCs are provided, the default is a QC for the genesis block.
+func CreateTimeouts[T crypto.Base](t testing.TB, view hotstuff.View, signers []T, qcs ...hotstuff.QuorumCert) (timeouts []hotstuff.TimeoutMsg) {
 	t.Helper()
-	timeouts = make([]hotstuff.TimeoutMsg, 0, len(signers))
+	n := len(signers)
+	if len(qcs) != 0 && len(qcs) != n {
+		t.Fatalf("CreateTimeouts: len(qcs)=%d, want 0 or %d (len(signers))", len(qcs), n)
+	}
+	var qc hotstuff.QuorumCert
+	if len(qcs) == 0 {
+		qc = hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())
+	}
+
+	timeouts = make([]hotstuff.TimeoutMsg, 0, n)
 	viewSigs := CreateSignatures(t, view.ToBytes(), signers)
-	for _, sig := range viewSigs {
+	for i, sig := range viewSigs {
+		if len(qcs) != 0 {
+			qc = qcs[i]
+		}
 		timeouts = append(timeouts, hotstuff.TimeoutMsg{
 			ID:            signer(sig),
 			View:          view,
 			ViewSignature: sig,
-			SyncInfo:      hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash())),
+			SyncInfo:      hotstuff.NewSyncInfo().WithQC(qc),
 		})
 	}
 	for i := range timeouts {
@@ -192,4 +207,43 @@ func GenerateKey(t testing.TB, cryptoName string) hotstuff.PrivateKey {
 	default:
 		panic("incorrect crypto module name")
 	}
+}
+
+func CreateSigners[T crypto.Base](t testing.TB, numReplicas int) (signers []T) {
+	t.Helper()
+
+	var cryptoName string
+	keys := make(map[hotstuff.ID]hotstuff.PrivateKey)
+	for i := 1; i <= numReplicas; i++ {
+		var priv hotstuff.PrivateKey
+		switch any(signers).(type) {
+		case []*crypto.ECDSA:
+			priv = GenerateECDSAKey(t)
+			cryptoName = crypto.NameECDSA
+		case []*crypto.EDDSA:
+			priv = GenerateEDDSAKey(t)
+			cryptoName = crypto.NameEDDSA
+		default:
+			t.Fatalf("unsupported crypto type: %T", signers)
+		}
+		keys[hotstuff.ID(i)] = priv
+	}
+
+	signers = make([]T, numReplicas)
+	for i := range numReplicas {
+		id := hotstuff.ID(i + 1)
+		cfg := core.NewRuntimeConfig(id, keys[id])
+		for j := 1; j <= numReplicas; j++ {
+			rid := hotstuff.ID(j)
+			// Add public keys for all replicas
+			cfg.AddReplica(&hotstuff.ReplicaInfo{ID: rid, PubKey: keys[rid].Public()})
+		}
+		base, err := crypto.New(cfg, cryptoName)
+		if err != nil {
+			t.Fatalf("failed to create crypto impl: %v", err)
+		}
+		signers[i] = base.(T)
+	}
+
+	return signers
 }

@@ -23,7 +23,7 @@ config: {
 		communication: ["clique", "kauri"]
 		byz: [
 			{strategy: "", targets: []},
-			{strategy: "silence", targets: [2]},
+			{strategy: "silentproposer", targets: [2]},
 		]
 	}
 
