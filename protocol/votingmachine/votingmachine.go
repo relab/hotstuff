@@ -108,7 +108,11 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 		}
 	}()
 	votes := vm.verifiedVotes[cert.BlockHash()]
-	// Check for duplicate votes from the same signer
+	// Check for duplicate votes from the same signer.
+	// Linear search is acceptable here because:
+	// 1. The number of votes is bounded by quorum size (typically 3-5)
+	// 2. Votes are deleted once quorum is reached (line 121)
+	// 3. This prevents ErrCombineOverlap from CreateQuorumCert
 	for _, v := range votes {
 		if v.Signer() == cert.Signer() {
 			vm.logger.Debugf("Ignoring duplicate vote from signer %d", cert.Signer())
