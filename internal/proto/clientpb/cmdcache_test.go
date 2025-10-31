@@ -66,10 +66,10 @@ func TestCacheAddGetDeadlineExceeded(t *testing.T) {
 			wantErr:   []error{context.DeadlineExceeded},
 		},
 		{
-			name:      "OneCommand/DeadlineExceeded",
+			name:      "OneCommand/PartialBatch",
 			cmds:      []*Command{{ClientID: 1, SequenceNumber: 1}},
-			wantBatch: [][]*Command{nil},
-			wantErr:   []error{context.DeadlineExceeded},
+			wantBatch: [][]*Command{{{ClientID: 1, SequenceNumber: 1}}},
+			wantErr:   []error{nil},
 		},
 		{
 			name: "TwoCommands",
@@ -80,7 +80,7 @@ func TestCacheAddGetDeadlineExceeded(t *testing.T) {
 			wantErr: []error{nil},
 		},
 		{
-			name: "ThreeCommands/DeadlineExceeded",
+			name: "ThreeCommands/PartialBatch",
 			cmds: []*Command{
 				{ClientID: 1, SequenceNumber: 1},
 				{ClientID: 1, SequenceNumber: 2},
@@ -88,9 +88,9 @@ func TestCacheAddGetDeadlineExceeded(t *testing.T) {
 			},
 			wantBatch: [][]*Command{
 				{{ClientID: 1, SequenceNumber: 1}, {ClientID: 1, SequenceNumber: 2}},
-				{},
+				{{ClientID: 1, SequenceNumber: 3}},
 			},
-			wantErr: []error{nil, context.DeadlineExceeded},
+			wantErr: []error{nil, nil},
 		},
 		{
 			name: "FourCommands",
@@ -107,7 +107,7 @@ func TestCacheAddGetDeadlineExceeded(t *testing.T) {
 			wantErr: []error{nil, nil},
 		},
 		{
-			name: "FiveCommands/DeadlineExceeded",
+			name: "FiveCommands/PartialBatch",
 			cmds: []*Command{
 				{ClientID: 1, SequenceNumber: 1},
 				{ClientID: 1, SequenceNumber: 2},
@@ -118,9 +118,9 @@ func TestCacheAddGetDeadlineExceeded(t *testing.T) {
 			wantBatch: [][]*Command{
 				{{ClientID: 1, SequenceNumber: 1}, {ClientID: 1, SequenceNumber: 2}},
 				{{ClientID: 1, SequenceNumber: 3}, {ClientID: 1, SequenceNumber: 4}},
-				{},
+				{{ClientID: 1, SequenceNumber: 5}},
 			},
-			wantErr: []error{nil, nil, context.DeadlineExceeded},
+			wantErr: []error{nil, nil, nil},
 		},
 	}
 	for _, tt := range tests {

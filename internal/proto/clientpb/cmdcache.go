@@ -52,53 +52,56 @@ func (c *CommandCache) Add(cmd *Command) {
 }
 
 // Get returns a batch of commands to propose.
-// It blocks until it can return a batch of commands, or the context is done.
-// If the context is done, it returns an error.
+// It blocks until it can return a full batch, or until the context is done.
+// If the context is done and there are commands available, it returns a partial batch.
+// If the context is done and no commands are available, it returns an error.
 // NOTE: the commands should be marked as proposed to avoid duplicates.
 func (c *CommandCache) Get(ctx context.Context) (*Batch, error) {
+	c.mut.Lock()
+	defer c.mut.Unlock()
+
+	// Start a goroutine to wake us up when context is done.
+	// This goroutine is cleaned up when this function returns via defer.
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case <-ctx.Done():
+			c.mut.Lock()
+			c.cond.Broadcast()
+			c.mut.Unlock()
+		case <-done:
+		}
+	}()
+
+	for {
+		// Check if we should return a batch.
+		// Return a full batch if we have enough commands, or a partial batch if context is done.
+		if c.len() >= c.batchSize || ctx.Err() != nil {
+			batch := c.extractBatch()
+			if len(batch.Commands) > 0 {
+				// We have commands, return them.
+				return batch, nil
+			}
+			// No non-duplicate commands available.
+			if ctx.Err() != nil {
+				// Context is done and no commands, return error.
+				return nil, ctx.Err()
+			}
+			// All commands were duplicates, wait for more.
+		}
+
+		// Wait for more commands or context cancellation.
+		c.cond.Wait()
+	}
+}
+
+// extractBatch extracts up to batchSize commands from the cache, skipping duplicates.
+// Returns an empty batch if no non-duplicate commands are found.
+// Callers must hold the lock.
+func (c *CommandCache) extractBatch() *Batch {
 	batch := new(Batch)
 
-	c.mut.Lock()
-awaitBatch:
-	// wait until we have enough commands for a batch.
-	for c.len() < c.batchSize {
-		// Check if context is already done before waiting
-		select {
-		case <-ctx.Done():
-			c.mut.Unlock()
-			return nil, ctx.Err()
-		default:
-		}
-
-		// Wait for signal that commands are available.
-		// We use a goroutine to handle context cancellation while waiting.
-		done := make(chan struct{})
-		go func() {
-			select {
-			case <-ctx.Done():
-				c.mut.Lock()
-				c.cond.Broadcast() // Wake up waiting Get() to check context
-				c.mut.Unlock()
-			case <-done:
-			}
-		}()
-
-		c.cond.Wait() // Atomically unlock c.mut, wait, and re-lock c.mut
-		close(done)
-
-		// c.mut is locked again after Wait() returns
-		// Check context again after waking up
-		select {
-		case <-ctx.Done():
-			c.mut.Unlock()
-			return nil, ctx.Err()
-		default:
-		}
-		// Loop continues to check c.len() < c.batchSize again
-	}
-
-	// Get the batch. Note that we may not be able to fill the batch,
-	// but that's okay as long as we can send at least one command.
 	for i := uint32(0); i < c.batchSize; i++ {
 		elem := c.cache.Front()
 		if elem == nil {
@@ -106,21 +109,14 @@ awaitBatch:
 		}
 		cmd := c.cache.Remove(elem).(*Command)
 		if c.isDuplicate(cmd) {
-			// command is too old
+			// command is too old, skip it
 			i--
 			continue
 		}
 		batch.Commands = append(batch.Commands, cmd)
 	}
 
-	// if we still got no (new) commands, try to wait again
-	if len(batch.Commands) == 0 {
-		goto awaitBatch
-	}
-
-	c.mut.Unlock()
-
-	return batch, nil
+	return batch
 }
 
 // containsDuplicate returns true if the batch contains old commands already proposed.
