@@ -12,26 +12,23 @@ import (
 )
 
 func TestCacheConcurrentAddGet(t *testing.T) {
-	cache := NewCommandCache(2)
+	const batchSize = 2
+	const numCmds = 6
+	const numBatches = numCmds / batchSize
+	cache := NewCommandCache(batchSize)
 
+	var want, got []*Command
 	var wg sync.WaitGroup
-	wg.Add(2)
-
-	var want []*Command
-	go func() {
-		defer wg.Done()
-		for i := range 6 {
+	wg.Go(func() {
+		for i := range numCmds {
 			cmd := &Command{ClientID: 1, SequenceNumber: uint64(i + 1)}
 			want = append(want, cmd)
 			cache.Add(cmd)
 		}
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
-
-		var got []*Command
-		for range 3 {
+	wg.Go(func() {
+		for range numBatches {
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 			defer cancel()
 			batch, err := cache.Get(ctx)
@@ -40,15 +37,16 @@ func TestCacheConcurrentAddGet(t *testing.T) {
 			}
 			cmds := batch.GetCommands()
 			got = append(got, cmds...)
-			if len(cmds) != 2 {
-				t.Errorf("Get() got %d commands, want 2", len(cmds))
+			if len(cmds) != batchSize {
+				t.Errorf("Get() got %d commands, want %d", len(cmds), batchSize)
 			}
 		}
-		if diff := cmp.Diff(got, want, protocmp.Transform()); diff != "" {
-			t.Errorf("Get() mismatch (-got +want):\n%s", diff)
-		}
-	}()
+	})
+
 	wg.Wait()
+	if diff := cmp.Diff(got, want, protocmp.Transform()); diff != "" {
+		t.Errorf("Get() mismatch (-got +want):\n%s", diff)
+	}
 }
 
 func TestCacheAddGetDeadlineExceeded(t *testing.T) {
