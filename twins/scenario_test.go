@@ -191,13 +191,13 @@ func TestTwinsScenarioRepNeeded(t *testing.T) {
 
 }
 
-func TestSafety(t *testing.T) {
+func TestSafetyWithTwins(t *testing.T) {
 	s := Scenario{}
 	// With 1 twin: nodes with NetworkID 1 and 2 will be twins of replica 1.
 	// twinA := NewNodeSet(NodeID{1, 1})
 	// twinB := NewNodeSet(NodeID{1, 2})
 	allNodesSet := NewNodeSet(NodeID{1, 1}, NodeID{1, 2}, NodeID{2, 0}, NodeID{3, 0}, NodeID{4, 0})
-	noA := NewNodeSet(NodeID{1, 2}, NodeID{2, 0}, NodeID{3, 0}, NodeID{4, 0})
+	noA := NewNodeSet(NodeID{1, 2}, NodeID{2, 0}, NodeID{3, 0})
 	noB := NewNodeSet(NodeID{1, 1}, NodeID{2, 0}, NodeID{3, 0}, NodeID{4, 0})
 
 	s = append(s, View{Leader: 2, Partitions: []NodeSet{allNodesSet}})
@@ -209,11 +209,13 @@ func TestSafety(t *testing.T) {
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{noB}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{noA}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{noB}})
+	s = append(s, View{Leader: 1, Partitions: []NodeSet{noB}})
 	logging.SetLogLevel("debug")
 	result, err := ExecuteScenario(s, 4, 1, 100, rules.NameChainedHotStuff)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if !result.Safe {
 		t.Errorf("Expected no safety violations")
 	}
@@ -227,7 +229,7 @@ func TestSafety(t *testing.T) {
 		}
 	}
 
-	if true {
+	if false {
 		t.Fail()
 		t.Logf("Network log:\n%s", result.NetworkLog)
 	}
