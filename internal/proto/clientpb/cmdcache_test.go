@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -12,41 +13,43 @@ import (
 )
 
 func TestCacheConcurrentAddGet(t *testing.T) {
-	const batchSize = 2
-	const numCmds = 6
-	const numBatches = numCmds / batchSize
-	cache := NewCommandCache(batchSize)
+	synctest.Test(t, func(t *testing.T) {
+		const batchSize = 2
+		const numCmds = 6
+		const numBatches = numCmds / batchSize
+		cache := NewCommandCache(batchSize)
 
-	var want, got []*Command
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		for i := range numCmds {
-			cmd := &Command{ClientID: 1, SequenceNumber: uint64(i + 1)}
-			want = append(want, cmd)
-			cache.Add(cmd)
+		var want, got []*Command
+		var wg sync.WaitGroup
+		wg.Go(func() {
+			for i := range numCmds {
+				cmd := &Command{ClientID: 1, SequenceNumber: uint64(i + 1)}
+				want = append(want, cmd)
+				cache.Add(cmd)
+			}
+		})
+
+		wg.Go(func() {
+			for range numBatches {
+				ctx, cancel := context.WithTimeout(context.Background(), 2000*time.Millisecond)
+				defer cancel()
+				batch, err := cache.Get(ctx)
+				if err != nil {
+					t.Errorf("Get() error: %v", err)
+				}
+				cmds := batch.GetCommands()
+				got = append(got, cmds...)
+				if len(cmds) != batchSize {
+					t.Errorf("Get() got %d commands, want %d", len(cmds), batchSize)
+				}
+			}
+		})
+
+		wg.Wait()
+		if diff := cmp.Diff(got, want, protocmp.Transform()); diff != "" {
+			t.Errorf("Get() mismatch (-got +want):\n%s", diff)
 		}
 	})
-
-	wg.Go(func() {
-		for range numBatches {
-			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-			defer cancel()
-			batch, err := cache.Get(ctx)
-			if err != nil {
-				t.Errorf("Get() error: %v", err)
-			}
-			cmds := batch.GetCommands()
-			got = append(got, cmds...)
-			if len(cmds) != batchSize {
-				t.Errorf("Get() got %d commands, want %d", len(cmds), batchSize)
-			}
-		}
-	})
-
-	wg.Wait()
-	if diff := cmp.Diff(got, want, protocmp.Transform()); diff != "" {
-		t.Errorf("Get() mismatch (-got +want):\n%s", diff)
-	}
 }
 
 func TestCacheAddGetDeadlineExceeded(t *testing.T) {
