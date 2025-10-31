@@ -110,6 +110,7 @@ Sonnino
 SSWU
 structs
 subconfiguration
+synctest
 testutil
 textfmt
 throughputvslatency
