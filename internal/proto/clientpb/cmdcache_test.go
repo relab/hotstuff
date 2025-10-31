@@ -318,3 +318,53 @@ func TestCacheContainsDuplicate(t *testing.T) {
 		})
 	}
 }
+
+func TestGetReturnsPartialBatchOnContextCancellation(t *testing.T) {
+	cache := NewCommandCache(5)
+
+	// Add 3 commands (less than batch size of 5)
+	cache.Add(&Command{ClientID: 1, SequenceNumber: 1})
+	cache.Add(&Command{ClientID: 1, SequenceNumber: 2})
+	cache.Add(&Command{ClientID: 1, SequenceNumber: 3})
+
+	// Create a context that we can cancel
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Start Get in a goroutine
+	done := make(chan struct{})
+	var batch *Batch
+	var err error
+	go func() {
+		batch, err = cache.Get(ctx)
+		close(done)
+	}()
+
+	// Give Get time to start waiting
+	time.Sleep(10 * time.Millisecond)
+
+	// Cancel the context - should cause Get to return with partial batch
+	cancel()
+
+	// Wait for Get to return
+	<-done
+
+	// Should get partial batch with no error
+	if err != nil {
+		t.Errorf("Get() error = %v, want nil", err)
+	}
+
+	cmds := batch.GetCommands()
+	if len(cmds) != 3 {
+		t.Errorf("Get() returned %d commands, want 3", len(cmds))
+	}
+
+	// Verify the commands are correct
+	want := []*Command{
+		{ClientID: 1, SequenceNumber: 1},
+		{ClientID: 1, SequenceNumber: 2},
+		{ClientID: 1, SequenceNumber: 3},
+	}
+	if diff := cmp.Diff(cmds, want, protocmp.Transform()); diff != "" {
+		t.Errorf("Get() mismatch (-got +want):\n%s", diff)
+	}
+}
