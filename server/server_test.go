@@ -1,3 +1,6 @@
+// Package server_test contains integration tests for the HotStuff server implementation.
+// Tests verify network communication, proposal handling, and timeout mechanisms across
+// multiple replicas with both TLS and non-TLS configurations.
 package server_test
 
 import (
@@ -5,13 +8,11 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/network"
@@ -30,6 +31,13 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
+const (
+	// defaultReplicaCount is the standard number of replicas used in tests.
+	defaultReplicaCount = 4
+	// testTimeout is the maximum time to wait for expected events before failing a test.
+	testTimeout = 5 * time.Second
+)
+
 type replicaDeps struct {
 	wiring.Core
 	wiring.Security
@@ -40,8 +48,7 @@ type replicaDeps struct {
 
 func TestConnect(t *testing.T) {
 	run := func(t *testing.T, setup setupFunc) {
-		const n = 4
-		td := setup(t, n)
+		td := setup(t, defaultReplicaCount)
 		deps := createServers(t, td)
 		first := deps[0]
 		err := first.Sender.Connect(td.replicas)
@@ -54,10 +61,11 @@ func TestConnect(t *testing.T) {
 
 type sendFunc func(*cert.Authority, *network.GorumsSender)
 
-// testBase is a generic test for a unicast/multicast call
-func testBase(t *testing.T, typ any, send sendFunc, handle eventloop.EventHandler) {
+// testBase is a test helper that collects events for verification. The handle function is called
+// for each received event and signals receipt on the events channel which is used to ensure that
+// the expected number of events are received.
+func testBase(t *testing.T, typ any, n int, expectedEventsPerReplica int, send sendFunc, handle func(any)) {
 	run := func(t *testing.T, setup setupFunc) {
-		const n = 4
 		td := setup(t, n)
 		deps := createServers(t, td)
 		for _, dep := range deps {
@@ -68,44 +76,65 @@ func testBase(t *testing.T, typ any, send sendFunc, handle eventloop.EventHandle
 			t.Cleanup(dep.Sender.Close)
 		}
 
+		// Calculate total expected events across all receiving replicas (sender is excluded)
+		expectedEvents := expectedEventsPerReplica * (n - 1)
+		// Create event channel for this test run
+		eventsCh := make(chan struct{}, expectedEvents)
+
+		// Start all replicas with event handling and event handled notification
 		ctx := t.Context()
 		for _, d := range deps {
-			d.EventLoop().RegisterHandler(typ, handle)
+			d.EventLoop().RegisterHandler(typ, func(event any) {
+				handle(event)
+				eventsCh <- struct{}{} // event handled
+			})
 			d.Synchronizer.Start(ctx)
 			go d.EventLoop().Run(ctx)
 		}
 		send(deps[0].Authority(), deps[0].Sender)
+
+		for i := range expectedEvents {
+			select {
+			case <-eventsCh:
+			case <-time.After(testTimeout):
+				t.Fatalf("timeout waiting for events: received %d/%d", i, expectedEvents)
+			}
+		}
 	}
 	runBoth(t, run)
 }
 
 func TestPropose(t *testing.T) {
-	var wg sync.WaitGroup
+	// We expect to receive 1 ProposeMsg event per replica (4 replicas - 1 sender = 3 receivers)
+	const expectedEventsPerReplica = 1
+
 	var want hotstuff.ProposeMsg
-	testBase(t, want, func(auth *cert.Authority, sender *network.GorumsSender) {
-		// write the wanted test data to the variable in outer scope
-		want = hotstuff.ProposeMsg{
-			ID:    1,
-			Block: testutil.CreateBlock(t, auth),
-		}
-		wg.Add(3)
-		sender.Propose(&want)
-		wg.Wait()
-	}, func(event any) {
-		// We should receive the proposal at all replicas except the sender (3 replicas)
-		got := event.(hotstuff.ProposeMsg)
-		if got.ID != want.ID {
-			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
-		}
-		if got.Block.Hash() != want.Block.Hash() {
-			t.Error("block hashes do not match")
-		}
-		wg.Done()
-	})
+	testBase(t, want, defaultReplicaCount, expectedEventsPerReplica,
+		func(auth *cert.Authority, sender *network.GorumsSender) {
+			// write the wanted test data to the variable in outer scope
+			want = hotstuff.ProposeMsg{
+				ID:    1,
+				Block: testutil.CreateBlock(t, auth),
+			}
+			sender.Propose(&want)
+		}, func(event any) {
+			// This should be invoked 3 times (1 per replica, 3 receiving replicas)
+			got := event.(hotstuff.ProposeMsg)
+			if got.ID != want.ID {
+				t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
+			}
+			if got.Block.Hash() != want.Block.Hash() {
+				t.Error("block hashes do not match")
+			}
+		})
 }
 
 func TestTimeout(t *testing.T) {
-	var wg sync.WaitGroup
+	// We expect to receive 2 TimeoutMsg events per replica (4 replicas - 1 sender = 3 receivers):
+	// 1. The timeout sent explicitly by the sender
+	// 2. An additional timeout triggered by the synchronizer's timer
+	const expectedEventsPerReplica = 2
+
 	view := hotstuff.View(1)
 	want := hotstuff.TimeoutMsg{
 		ID:       1,
@@ -113,31 +142,29 @@ func TestTimeout(t *testing.T) {
 		SyncInfo: hotstuff.NewSyncInfo(),
 	}
 
-	testBase(t, want, func(auth *cert.Authority, sender *network.GorumsSender) {
-		sig, err := auth.Sign(view.ToBytes())
-		if err != nil {
-			t.Fatal(err)
-		}
-		want.ViewSignature = sig
-		wg.Add(6)
-		// We send only a single timeout message, but the synchronizer triggers
-		// an additional timeout, resulting from the following call chain:
-		// Start() -> startTimeoutTimer() -> TimeoutEvent -> OnLocalTimeout() -> sender.Timeout()
-		sender.Timeout(want)
-		wg.Wait()
-	}, func(event any) {
-		// We should receive 2 TimeoutMsg events at all replicas except the sender
-		// for a total of 6 events (3 replicas * 2 events). This is because the
-		// synchronizer triggers an additional timeout.
-		got := event.(hotstuff.TimeoutMsg)
-		if got.ID != want.ID {
-			t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
-		}
-		if got.View != want.View {
-			t.Errorf("wrong view in proposal: got: %d, want: %d", got.View, want.View)
-		}
-		wg.Done()
-	})
+	testBase(t, want, defaultReplicaCount, expectedEventsPerReplica,
+		func(auth *cert.Authority, sender *network.GorumsSender) {
+			sig, err := auth.Sign(view.ToBytes())
+			if err != nil {
+				t.Fatal(err)
+			}
+			want.ViewSignature = sig
+			// We send only a single timeout message, but the synchronizer triggers
+			// an additional timeout, resulting from the following call chain:
+			// Start() -> startTimeoutTimer() -> TimeoutEvent -> OnLocalTimeout() -> sender.Timeout()
+			sender.Timeout(want)
+		},
+		func(event any) {
+			// This should be invoked 6 times (2 per replica, 3 receiving replicas)
+			got := event.(hotstuff.TimeoutMsg)
+			if got.ID != want.ID {
+				t.Errorf("wrong id: got: %d, want: %d", got.ID, want.ID)
+			}
+			if got.View != want.View {
+				t.Errorf("wrong view: got: %d, want: %d", got.View, want.View)
+			}
+		},
+	)
 }
 
 type testData struct {
@@ -189,7 +216,7 @@ func setupTLS(t *testing.T, n int) testData {
 		t.Fatalf("Failed to generate CA: %v", err)
 	}
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		cert, err := keygen.GenerateTLSCert(
 			hotstuff.ID(i)+1,
 			[]string{"localhost", "127.0.0.1"},
@@ -224,7 +251,7 @@ func runBoth(t *testing.T, run func(*testing.T, setupFunc)) {
 
 func createServers(t *testing.T, td testData) []replicaDeps {
 	t.Helper()
-	deps := make([]replicaDeps, 0)
+	deps := make([]replicaDeps, 0, td.n)
 	for i := range td.n {
 		depsCore := wiring.NewCore(hotstuff.ID(i+1), "test", td.keys[i])
 		sender := network.NewGorumsSender(
