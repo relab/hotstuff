@@ -162,7 +162,7 @@ func TestPreventAddingDuplicates(t *testing.T) {
 		name    string
 		batchA  *Batch // Batch of commands that have been proposed
 		batchB  *Batch // Batch of commands to add to the cache
-		wantLen uint32
+		wantLen int
 	}{
 		{
 			name:    "NoCommands",
@@ -205,7 +205,7 @@ func TestPreventAddingDuplicates(t *testing.T) {
 			for _, cmd := range tt.batchB.GetCommands() {
 				cache.Add(cmd)
 			}
-			if got := cache.len(); got != tt.wantLen {
+			if got := len(cache.cache); got != tt.wantLen {
 				t.Errorf("len() = %d, want %d", got, tt.wantLen)
 			}
 		})
@@ -316,5 +316,205 @@ func TestCacheContainsDuplicate(t *testing.T) {
 				t.Errorf("ContainsDuplicate() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestGetReturnsOnlyFullBatches(t *testing.T) {
+	tests := []struct {
+		name          string
+		batchSize     uint32
+		cmdsToAdd     []*Command
+		duplicateCmds []*Command // commands to mark as already proposed
+		wantBatchLen  int
+		wantErr       bool
+	}{
+		{
+			name:      "ExactlyFullBatch",
+			batchSize: 2,
+			cmdsToAdd: []*Command{
+				{ClientID: 1, SequenceNumber: 1},
+				{ClientID: 1, SequenceNumber: 2},
+			},
+			wantBatchLen: 2,
+			wantErr:      false,
+		},
+		{
+			name:      "MoreThanFullBatch",
+			batchSize: 2,
+			cmdsToAdd: []*Command{
+				{ClientID: 1, SequenceNumber: 1},
+				{ClientID: 1, SequenceNumber: 2},
+				{ClientID: 1, SequenceNumber: 3},
+			},
+			wantBatchLen: 2,
+			wantErr:      false,
+		},
+		{
+			name:      "ThreeCommandsOneDuplicate_ShouldReturnFullBatch",
+			batchSize: 2,
+			cmdsToAdd: []*Command{
+				{ClientID: 1, SequenceNumber: 1}, // duplicate
+				{ClientID: 1, SequenceNumber: 2},
+				{ClientID: 1, SequenceNumber: 3},
+			},
+			duplicateCmds: []*Command{
+				{ClientID: 1, SequenceNumber: 1},
+			},
+			wantBatchLen: 2, // should get commands 2 and 3
+			wantErr:      false,
+		},
+		{
+			name:      "ThreeCommandsTwoDuplicates_ShouldTimeout",
+			batchSize: 2,
+			cmdsToAdd: []*Command{
+				{ClientID: 1, SequenceNumber: 1}, // duplicate
+				{ClientID: 1, SequenceNumber: 2}, // duplicate
+				{ClientID: 1, SequenceNumber: 3},
+			},
+			duplicateCmds: []*Command{
+				{ClientID: 1, SequenceNumber: 1},
+				{ClientID: 1, SequenceNumber: 2},
+			},
+			wantBatchLen: 0, // only 1 non-duplicate, not enough for full batch
+			wantErr:      true,
+		},
+		{
+			name:      "FourCommandsTwoDuplicates_ShouldReturnFullBatch",
+			batchSize: 2,
+			cmdsToAdd: []*Command{
+				{ClientID: 1, SequenceNumber: 1}, // duplicate
+				{ClientID: 1, SequenceNumber: 2}, // duplicate
+				{ClientID: 1, SequenceNumber: 3},
+				{ClientID: 1, SequenceNumber: 4},
+			},
+			duplicateCmds: []*Command{
+				{ClientID: 1, SequenceNumber: 1},
+				{ClientID: 1, SequenceNumber: 2},
+			},
+			wantBatchLen: 2, // should get commands 3 and 4
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache := NewCommandCache(tt.batchSize)
+
+			// Mark duplicate commands as proposed
+			if len(tt.duplicateCmds) > 0 {
+				cache.Proposed(&Batch{Commands: tt.duplicateCmds})
+			}
+
+			// Add commands to cache
+			for _, cmd := range tt.cmdsToAdd {
+				cache.Add(cmd)
+			}
+
+			// Try to get a batch with timeout
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			defer cancel()
+
+			batch, err := cache.Get(ctx)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("Get() expected error, got batch with %d commands", len(batch.GetCommands()))
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Get() unexpected error: %v", err)
+					return
+				}
+				gotLen := len(batch.GetCommands())
+				if gotLen != tt.wantBatchLen {
+					t.Errorf("Get() returned batch with %d commands, want %d", gotLen, tt.wantBatchLen)
+				}
+			}
+		})
+	}
+}
+
+func TestGetMustReturnFullBatchNotPartial(t *testing.T) {
+	// This test specifically checks that Get() returns ONLY full batches
+	// even when duplicates are filtered out during batch extraction
+	cache := NewCommandCache(3) // batch size = 3
+
+	// Scenario: We need to trigger the case where Get() extracts commands,
+	// filters some as duplicates, and ends up with fewer than batchSize
+	// To do this, we need commands in the cache that become duplicates
+	// AFTER they were added but BEFORE Get() extracts them
+
+	// Step 1: Add 3 commands to cache (to trigger ready signal)
+	cache.Add(&Command{ClientID: 1, SequenceNumber: 1})
+	cache.Add(&Command{ClientID: 1, SequenceNumber: 2})
+	cache.Add(&Command{ClientID: 1, SequenceNumber: 3})
+
+	// Step 2: Mark command 1 as proposed BEFORE calling Get()
+	// This simulates a race where a command becomes duplicate after being cached
+	cache.Proposed(&Batch{Commands: []*Command{
+		{ClientID: 1, SequenceNumber: 1},
+	}})
+
+	// Step 3: Call Get() - it will see 3 commands, start extracting,
+	// skip command 1 as duplicate, and be left with only 2 commands
+	// The bug would cause it to return a partial batch of 2 instead of full batch of 3
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	batch, err := cache.Get(ctx)
+
+	if err != nil {
+		// This is acceptable - Get() correctly waited for a full batch
+		t.Logf("Get() correctly timed out waiting for full batch")
+		return
+	}
+
+	// If no error, verify we got a FULL batch, not partial
+	gotLen := len(batch.GetCommands())
+	if gotLen != 3 {
+		t.Errorf("Get() returned partial batch with %d commands (want 3): %v",
+			gotLen, batch.GetCommands())
+	}
+}
+
+func TestGetFullBatchAfterDuplicatesFiltered(t *testing.T) {
+	// Test that after filtering duplicates, Get() waits for more commands
+	// to complete a full batch rather than returning a partial batch
+	cache := NewCommandCache(3)
+
+	// Add 5 commands
+	for i := 1; i <= 5; i++ {
+		cache.Add(&Command{ClientID: 1, SequenceNumber: uint64(i)})
+	}
+
+	// Mark first 2 as proposed (simulating they were processed elsewhere)
+	cache.Proposed(&Batch{Commands: []*Command{
+		{ClientID: 1, SequenceNumber: 1},
+		{ClientID: 1, SequenceNumber: 2},
+	}})
+
+	// Now we have [1(dup), 2(dup), 3, 4, 5] in cache
+	// Get() should filter out 1 and 2, and return [3, 4, 5] - a full batch of 3
+	ctx := context.Background()
+	batch, err := cache.Get(ctx)
+
+	if err != nil {
+		t.Fatalf("Get() unexpected error: %v", err)
+	}
+
+	gotLen := len(batch.GetCommands())
+	if gotLen != 3 {
+		t.Errorf("Get() returned batch with %d commands, want 3: %v",
+			gotLen, batch.GetCommands())
+	}
+
+	// Verify we got commands 3, 4, 5
+	want := []*Command{
+		{ClientID: 1, SequenceNumber: 3},
+		{ClientID: 1, SequenceNumber: 4},
+		{ClientID: 1, SequenceNumber: 5},
+	}
+	if diff := cmp.Diff(batch.GetCommands(), want, protocmp.Transform()); diff != "" {
+		t.Errorf("Get() commands mismatch (-got +want):\n%s", diff)
 	}
 }
