@@ -67,6 +67,8 @@ func (s *ViewStates) UpdateHighQC(qc hotstuff.QuorumCert) (bool, error) {
 
 // UpdateHighTC updates HighTC if timeout certificate's view is higher than the current HighTC.
 func (s *ViewStates) UpdateHighTC(tc hotstuff.TimeoutCert) {
+	s.mut.Lock()
+	defer s.mut.Unlock()
 	if tc.View() > s.highTC.View() {
 		s.highTC = tc
 	}
