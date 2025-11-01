@@ -108,6 +108,13 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 		}
 	}()
 	votes := vm.verifiedVotes[cert.BlockHash()]
+	// Check for duplicate votes from the same signer
+	for _, v := range votes {
+		if v.Signer() == cert.Signer() {
+			vm.logger.Debugf("Ignoring duplicate vote from signer %d", cert.Signer())
+			return
+		}
+	}
 	votes = append(votes, cert)
 	vm.verifiedVotes[cert.BlockHash()] = votes
 	if len(votes) < vm.config.QuorumSize() {

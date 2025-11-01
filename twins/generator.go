@@ -24,29 +24,28 @@ type Generator struct {
 
 func assignNodeIDs(numNodes, numTwins uint8) (nodes, twins []NodeID) {
 	replicaID := hotstuff.ID(1)
-	networkID := uint32(1)
 	remainingTwins := numTwins
 
 	// assign IDs to nodes
 	for range numNodes {
 		if remainingTwins > 0 {
+			// twins get networkID 1 and 2
 			twins = append(twins, NodeID{
 				ReplicaID: replicaID,
-				NetworkID: networkID,
+				NetworkID: 1,
 			})
-			networkID++
 			twins = append(twins, NodeID{
 				ReplicaID: replicaID,
-				NetworkID: networkID,
+				NetworkID: 2,
 			})
 			remainingTwins--
 		} else {
+			// non-twins get networkID 0
 			nodes = append(nodes, NodeID{
 				ReplicaID: replicaID,
-				NetworkID: networkID,
+				NetworkID: 0,
 			})
 		}
-		networkID++
 		replicaID++
 	}
 
@@ -150,13 +149,6 @@ func (g *Generator) NextScenario() (s Scenario, err error) {
 	g.remaining--
 
 	return p, nil
-}
-
-func min(a, b uint8) uint8 {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // genPartitionSizes generates all possible combinations of partition sizes
@@ -282,7 +274,7 @@ func genPartitionScenarios(twins, nodes []NodeID, k uint8, min uint8) (partition
 				twin := 0
 				for k := range twinAssignments[j] {
 					for _, t := range twinAssignments[j][k] {
-						partitions[t].Add(twins[twin].NetworkID)
+						partitions[t].Add(twins[twin])
 						twin++
 					}
 				}
@@ -291,7 +283,7 @@ func genPartitionScenarios(twins, nodes []NodeID, k uint8, min uint8) (partition
 			node := 0
 			for k := range partitions {
 				for sizes[i][k]-uint8(len(partitions[k])) > 0 {
-					partitions[k].Add(nodes[node].NetworkID)
+					partitions[k].Add(nodes[node])
 					node++
 				}
 			}
