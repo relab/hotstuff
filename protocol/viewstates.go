@@ -18,8 +18,7 @@ type ViewStates struct {
 	blockchain *blockchain.Blockchain
 	auth       *cert.Authority
 
-	mut sync.RWMutex // to protect the following
-
+	mut            sync.RWMutex // protects the following fields:
 	highTC         hotstuff.TimeoutCert
 	highQC         hotstuff.QuorumCert
 	view           hotstuff.View
@@ -106,7 +105,7 @@ func (s *ViewStates) View() hotstuff.View {
 func (s *ViewStates) SyncInfo() hotstuff.SyncInfo {
 	s.mut.RLock()
 	defer s.mut.RUnlock()
-	return hotstuff.NewSyncInfo().WithQC(s.HighQC()).WithTC(s.HighTC())
+	return hotstuff.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
 }
 
 // UpdateCommittedBlock updates the last committed block.
