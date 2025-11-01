@@ -179,10 +179,7 @@ func (bls *bls12Base) publicKey(id hotstuff.ID) (pubKey *BLS12PublicKey, err err
 	if id == bls.config.ID() {
 		return pubKey, nil
 	}
-	if err := bls.checkPop(replica); err != nil {
-		return nil, err
-	}
-	return pubKey, nil
+	return pubKey, bls.checkPop(replica)
 }
 
 func (bls *bls12Base) subgroupCheck(point *bls12.PointG2) error {
@@ -379,9 +376,7 @@ func (bls *bls12Base) Verify(signature hotstuff.QuorumSignature, message []byte)
 		if err != nil {
 			return err
 		}
-		if err := bls.coreVerify(pk, message, &s.sig, domain); err != nil {
-			return err
-		}
+		return bls.coreVerify(pk, message, &s.sig, domain)
 	}
 
 	// else if l > 1:
