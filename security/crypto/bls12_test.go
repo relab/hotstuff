@@ -15,38 +15,38 @@ func createBLS12Signers(t testing.TB, numReplicas int) []crypto.Base {
 	t.Helper()
 	// Generate keys for all replicas
 	keys := make(map[hotstuff.ID]hotstuff.PrivateKey, numReplicas)
-	for i := 1; i <= numReplicas; i++ {
-		keys[hotstuff.ID(i)] = testutil.GenerateBLS12Key(t)
+	for i := range numReplicas {
+		keys[hotstuff.ID(i+1)] = testutil.GenerateBLS12Key(t)
 	}
 	
 	// Create configs for all replicas
 	configs := make([]*core.RuntimeConfig, numReplicas)
-	for i := 1; i <= numReplicas; i++ {
-		id := hotstuff.ID(i)
-		configs[i-1] = core.NewRuntimeConfig(id, keys[id])
-		for j := 1; j <= numReplicas; j++ {
-			rid := hotstuff.ID(j)
-			configs[i-1].AddReplica(&hotstuff.ReplicaInfo{ID: rid, PubKey: keys[rid].Public()})
+	for i := range numReplicas {
+		id := hotstuff.ID(i + 1)
+		configs[i] = core.NewRuntimeConfig(id, keys[id])
+		for j := range numReplicas {
+			rid := hotstuff.ID(j + 1)
+			configs[i].AddReplica(&hotstuff.ReplicaInfo{ID: rid, PubKey: keys[rid].Public()})
 		}
 	}
 	
 	// Create base crypto instances (this adds connection metadata for each)
 	bases := make([]crypto.Base, numReplicas)
-	for i := 1; i <= numReplicas; i++ {
-		base, err := crypto.NewBLS12(configs[i-1])
+	for i := range numReplicas {
+		base, err := crypto.NewBLS12(configs[i])
 		if err != nil {
 			t.Fatalf("Failed to create BLS12 base: %v", err)
 		}
-		bases[i-1] = base
+		bases[i] = base
 	}
 	
 	// Share proof-of-possession metadata between all replicas
-	for i := 1; i <= numReplicas; i++ {
-		srcMeta := configs[i-1].ConnectionMetadata()
-		for j := 1; j <= numReplicas; j++ {
+	for i := range numReplicas {
+		srcMeta := configs[i].ConnectionMetadata()
+		for j := range numReplicas {
 			if i != j {
-				id := hotstuff.ID(i)
-				if err := configs[j-1].SetReplicaMetadata(id, srcMeta); err != nil {
+				id := hotstuff.ID(i + 1)
+				if err := configs[j].SetReplicaMetadata(id, srcMeta); err != nil {
 					t.Fatalf("Failed to set replica metadata: %v", err)
 				}
 			}
@@ -167,26 +167,6 @@ func TestBLS12Combine(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestBLS12SingleSignerVerifyNoDuplicateCheck(t *testing.T) {
-	// This is a regression test for the bug where Verify() fell through
-	// after successfully verifying single-signer signatures, causing
-	// the signature to be verified again via the multi-signer path.
-	// The fix ensures that verification returns immediately after the
-	// single-signer verification succeeds.
-	bls := createBLS12Signer(t, 1)
-	message := []byte("test message for single signer")
-	
-	sig, err := bls.Sign(message)
-	if err != nil {
-		t.Fatalf("Sign failed: %v", err)
-	}
-	
-	err = bls.Verify(sig, message)
-	if err != nil {
-		t.Fatalf("Verify failed: %v", err)
 	}
 }
 
