@@ -421,10 +421,7 @@ func (bls *bls12Base) BatchVerify(signature hotstuff.QuorumSignature, batch map[
 	}
 
 	if len(batch) == 1 {
-		if err := bls.coreVerify(pks[0], msgs[0], &s.sig, domain); err != nil {
-			return err
-		}
-		return nil
+		return bls.coreVerify(pks[0], msgs[0], &s.sig, domain)
 	}
 	return bls.aggregateVerify(pks, msgs, &s.sig)
 }

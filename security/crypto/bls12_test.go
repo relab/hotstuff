@@ -9,26 +9,57 @@ import (
 	"github.com/relab/hotstuff/security/crypto"
 )
 
-// createBLS12Signer creates a single BLS12-based signer for testing.
-func createBLS12Signer(t testing.TB, numReplicas int) crypto.Base {
+// createBLS12Signers creates BLS12-based signers for testing.
+// Returns a slice of signers, one for each replica.
+func createBLS12Signers(t testing.TB, numReplicas int) []crypto.Base {
 	t.Helper()
 	// Generate keys for all replicas
 	keys := make(map[hotstuff.ID]hotstuff.PrivateKey, numReplicas)
 	for i := 1; i <= numReplicas; i++ {
 		keys[hotstuff.ID(i)] = testutil.GenerateBLS12Key(t)
 	}
-	// Create config for the first replica
-	cfg := core.NewRuntimeConfig(hotstuff.ID(1), keys[hotstuff.ID(1)])
+	
+	// Create configs for all replicas
+	configs := make([]*core.RuntimeConfig, numReplicas)
 	for i := 1; i <= numReplicas; i++ {
-		rid := hotstuff.ID(i)
-		cfg.AddReplica(&hotstuff.ReplicaInfo{ID: rid, PubKey: keys[rid].Public()})
+		id := hotstuff.ID(i)
+		configs[i-1] = core.NewRuntimeConfig(id, keys[id])
+		for j := 1; j <= numReplicas; j++ {
+			rid := hotstuff.ID(j)
+			configs[i-1].AddReplica(&hotstuff.ReplicaInfo{ID: rid, PubKey: keys[rid].Public()})
+		}
 	}
-	// Create the base crypto for the first replica
-	base, err := crypto.NewBLS12(cfg)
-	if err != nil {
-		t.Fatalf("Failed to create BLS12 base: %v", err)
+	
+	// Create base crypto instances (this adds connection metadata for each)
+	bases := make([]crypto.Base, numReplicas)
+	for i := 1; i <= numReplicas; i++ {
+		base, err := crypto.NewBLS12(configs[i-1])
+		if err != nil {
+			t.Fatalf("Failed to create BLS12 base: %v", err)
+		}
+		bases[i-1] = base
 	}
-	return base
+	
+	// Share proof-of-possession metadata between all replicas
+	for i := 1; i <= numReplicas; i++ {
+		srcMeta := configs[i-1].ConnectionMetadata()
+		for j := 1; j <= numReplicas; j++ {
+			if i != j {
+				id := hotstuff.ID(i)
+				if err := configs[j-1].SetReplicaMetadata(id, srcMeta); err != nil {
+					t.Fatalf("Failed to set replica metadata: %v", err)
+				}
+			}
+		}
+	}
+	
+	return bases
+}
+
+// createBLS12Signer creates a single BLS12-based signer for testing.
+func createBLS12Signer(t testing.TB, numReplicas int) crypto.Base {
+	t.Helper()
+	return createBLS12Signers(t, numReplicas)[0]
 }
 
 func TestBLS12SignAndVerify(t *testing.T) {
@@ -92,40 +123,22 @@ func TestBLS12VerifyFailure(t *testing.T) {
 
 func TestBLS12Combine(t *testing.T) {
 	testCases := []struct {
-		name         string
-		numReplicas  int
-		numSigners   int
-		expectError  bool
-		errorMessage string
+		name       string
+		numSigners int
+		wantErr    string
 	}{
-		{name: "SingleSignature", numReplicas: 4, numSigners: 1, expectError: true, errorMessage: "must have at least two signatures"},
+		{name: "SingleSignature", numSigners: 1, wantErr: "must have at least two signatures"},
+		{name: "TwoSignatures", numSigners: 2, wantErr: ""},
+		{name: "FourSignatures", numSigners: 4, wantErr: ""},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Generate keys for all replicas
-			keys := make(map[hotstuff.ID]hotstuff.PrivateKey, tc.numReplicas)
-			for i := 1; i <= tc.numReplicas; i++ {
-				keys[hotstuff.ID(i)] = testutil.GenerateBLS12Key(t)
-			}
-			// Create signers for each replica
-			signers := make([]crypto.Base, tc.numReplicas)
-			for i := 0; i < tc.numReplicas; i++ {
-				id := hotstuff.ID(i + 1)
-				cfg := core.NewRuntimeConfig(id, keys[id])
-				for j := 1; j <= tc.numReplicas; j++ {
-					rid := hotstuff.ID(j)
-					cfg.AddReplica(&hotstuff.ReplicaInfo{ID: rid, PubKey: keys[rid].Public()})
-				}
-				base, err := crypto.NewBLS12(cfg)
-				if err != nil {
-					t.Fatalf("Failed to create BLS12 base: %v", err)
-				}
-				signers[i] = base
-			}
+			numReplicas := 4
+			signers := createBLS12Signers(t, numReplicas)
 
 			message := []byte("test message")
 			sigs := make([]hotstuff.QuorumSignature, tc.numSigners)
-			for i := 0; i < tc.numSigners; i++ {
+			for i := range tc.numSigners {
 				sig, err := signers[i].Sign(message)
 				if err != nil {
 					t.Fatalf("Sign failed: %v", err)
@@ -133,26 +146,36 @@ func TestBLS12Combine(t *testing.T) {
 				sigs[i] = sig
 			}
 
-			_, err := signers[0].Combine(sigs...)
-			if tc.expectError {
+			combined, err := signers[0].Combine(sigs...)
+			if tc.wantErr != "" {
 				if err == nil {
 					t.Fatal("Expected error, but got none")
 				}
-				if err.Error() != tc.errorMessage {
-					t.Fatalf("unexpected error: got %q, want %q", err.Error(), tc.errorMessage)
+				if err.Error() != tc.wantErr {
+					t.Fatalf("unexpected error: got %q, want %q", err.Error(), tc.wantErr)
 				}
 			} else {
-				t.Fatal("Should not reach here - all test cases expect errors")
+				if err != nil {
+					t.Fatalf("Combine failed: %v", err)
+				}
+				if combined == nil {
+					t.Fatal("combined signature is nil")
+				}
+				// Verify the combined signature
+				if err := signers[0].Verify(combined, message); err != nil {
+					t.Fatalf("Verify of combined signature failed: %v", err)
+				}
 			}
 		})
 	}
 }
 
 func TestBLS12SingleSignerVerifyNoDuplicateCheck(t *testing.T) {
-	// This test specifically checks that single-signer signatures
-	// are only verified once (not double-verified)
 	// This is a regression test for the bug where Verify() fell through
-	// after successfully verifying single-signer signatures
+	// after successfully verifying single-signer signatures, causing
+	// the signature to be verified again via the multi-signer path.
+	// The fix ensures that verification returns immediately after the
+	// single-signer verification succeeds.
 	bls := createBLS12Signer(t, 1)
 	message := []byte("test message for single signer")
 	
@@ -161,15 +184,10 @@ func TestBLS12SingleSignerVerifyNoDuplicateCheck(t *testing.T) {
 		t.Fatalf("Sign failed: %v", err)
 	}
 	
-	// Verify should succeed and not perform double verification
 	err = bls.Verify(sig, message)
 	if err != nil {
 		t.Fatalf("Verify failed: %v", err)
 	}
-	
-	// The test passes if we get here without errors
-	// The fix ensures that the verification returns immediately after
-	// the single-signer path, without falling through to the multi-signer path
 }
 
 func BenchmarkBLS12Sign(b *testing.B) {
