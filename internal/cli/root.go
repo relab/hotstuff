@@ -45,6 +45,7 @@ use 'hotstuff help run' to view all possible parameters for this command.`,
 				"--byzantine-strategy": {
 					byzantine.NameSilentProposer,
 					byzantine.NameFork,
+					byzantine.NameIncreaseView,
 				},
 				"--crypto": {
 					crypto.NameECDSA,

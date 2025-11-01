@@ -16,7 +16,7 @@ func TestExperimentsIteratorSingle(t *testing.T) {
 	treePositions := []uint32{10, 2, 3, 4, 5, 6, 7, 8, 9, 1}
 	byzantineStrategy := map[string][]uint32{
 		"silentproposer": {2, 5},
-		"slow":           {4},
+		"fork":           {4},
 	}
 	defaultModules := &config.ExperimentConfig{
 		Consensus:      "chainedhotstuff",
