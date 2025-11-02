@@ -25,8 +25,11 @@ func NewIncreaseView(
 	}
 }
 
-func (iv *IncreaseView) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
-	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
+func (iv *IncreaseView) ProposeRule(view hotstuff.View, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
+	qc, ok := cert.QC()
+	if !ok {
+		return proposal, false
+	}
 	const ByzViewExtraIncrease hotstuff.View = 1000
 	proposal = hotstuff.NewProposeMsg(iv.config.ID(), view+ByzViewExtraIncrease, qc, cmd)
 	return proposal, true

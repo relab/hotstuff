@@ -19,7 +19,7 @@ func NewSilentProposer(rules consensus.Ruleset) *SilentProposer {
 	return &SilentProposer{Ruleset: rules}
 }
 
-func (s *SilentProposer) ProposeRule(_ hotstuff.View, _ hotstuff.QuorumCert, _ hotstuff.SyncInfo, _ *clientpb.Batch) (hotstuff.ProposeMsg, bool) {
+func (s *SilentProposer) ProposeRule(_ hotstuff.View, _ hotstuff.SyncInfo, _ *clientpb.Batch) (hotstuff.ProposeMsg, bool) {
 	return hotstuff.ProposeMsg{}, false
 }
 

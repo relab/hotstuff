@@ -30,7 +30,11 @@ func NewFork(
 	}
 }
 
-func (f *Fork) ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
+func (f *Fork) ProposeRule(view hotstuff.View, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
+	highQC, ok := cert.QC()
+	if !ok {
+		return proposal, false
+	}
 	block, ok := f.blockchain.Get(highQC.BlockHash())
 	if !ok {
 		return proposal, false

@@ -113,7 +113,7 @@ func (p *Proposer) CreateProposal(syncInfo hotstuff.SyncInfo) (proposal hotstuff
 	}
 	// ensure that a proposal can be sent based on the protocol's rule.
 	// NOTE: the ruler will create the proposal too.
-	proposal, ok := p.ruler.ProposeRule(view, highQC, syncInfo, cmdBatch)
+	proposal, ok := p.ruler.ProposeRule(view, syncInfo, cmdBatch)
 	if !ok {
 		return proposal, fmt.Errorf("propose rule not satisfied")
 	}
