@@ -147,7 +147,6 @@ func NewSyncInfo() SyncInfo {
 //
 // Examples:
 //
-//	NewSyncInfoWith(qc)
 //	si := NewSyncInfoWith(tc); si.SetQC(qc)
 //	si := NewSyncInfoWith(tc); si.SetAggQC(aggQC)
 func NewSyncInfoWith[T QuorumCert | TimeoutCert | AggregateQC](value T) SyncInfo {
@@ -163,17 +162,17 @@ func NewSyncInfoWith[T QuorumCert | TimeoutCert | AggregateQC](value T) SyncInfo
 	return si
 }
 
-// SetQC sets the QC and returns the SyncInfo for chaining.
+// SetQC sets the QC.
 func (si *SyncInfo) SetQC(qc QuorumCert) {
 	si.qc = &qc
 }
 
-// SetTC sets the TC and returns the SyncInfo for chaining.
+// SetTC sets the TC.
 func (si *SyncInfo) SetTC(tc TimeoutCert) {
 	si.tc = &tc
 }
 
-// SetAggQC sets the AggregateQC and returns the SyncInfo for chaining.
+// SetAggQC sets the AggregateQC.
 func (si *SyncInfo) SetAggQC(aggQC AggregateQC) {
 	si.aggQC = &aggQC
 }
