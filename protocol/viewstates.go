@@ -105,9 +105,12 @@ func (s *ViewStates) View() hotstuff.View {
 
 // SyncInfo returns the highest known QC or TC.
 func (s *ViewStates) SyncInfo() hotstuff.SyncInfo {
+	si := hotstuff.NewSyncInfo()
 	s.mut.RLock()
-	defer s.mut.RUnlock()
-	return hotstuff.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
+	si.SetQC(s.highQC)
+	si.SetTC(s.highTC)
+	s.mut.RUnlock()
+	return si
 }
 
 // UpdateCommittedBlock updates the last committed block.

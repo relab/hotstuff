@@ -211,13 +211,13 @@ func AggregateQCToProto(aggQC hotstuff.AggregateQC) *AggQC {
 func SyncInfoFromProto(m *SyncInfo) hotstuff.SyncInfo {
 	si := hotstuff.NewSyncInfo()
 	if qc := m.GetQC(); qc != nil {
-		si = si.WithQC(QuorumCertFromProto(qc))
+		si.SetQC(QuorumCertFromProto(qc))
 	}
 	if tc := m.GetTC(); tc != nil {
-		si = si.WithTC(TimeoutCertFromProto(tc))
+		si.SetTC(TimeoutCertFromProto(tc))
 	}
 	if aggQC := m.GetAggQC(); aggQC != nil {
-		si = si.WithAggQC(AggregateQCFromProto(aggQC))
+		si.SetAggQC(AggregateQCFromProto(aggQC))
 	}
 	return si
 }

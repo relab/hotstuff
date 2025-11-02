@@ -56,7 +56,9 @@ func (s *Aggregate) RemoteTimeoutRule(currentView, timeoutView hotstuff.View, ti
 	if err != nil {
 		return hotstuff.SyncInfo{}, fmt.Errorf("failed to create aggregate quorum certificate: %w", err)
 	}
-	return hotstuff.NewSyncInfo().WithTC(tc).WithAggQC(aggQC), nil
+	si := hotstuff.NewSyncInfoWith(tc)
+	si.SetAggQC(aggQC)
+	return si, nil
 }
 
 func (s *Aggregate) VerifySyncInfo(syncInfo hotstuff.SyncInfo) (qc *hotstuff.QuorumCert, view hotstuff.View, timeout bool, err error) {

@@ -43,7 +43,7 @@ func (s *Simple) RemoteTimeoutRule(_, timeoutView hotstuff.View, timeouts []hots
 	if err != nil {
 		return hotstuff.SyncInfo{}, fmt.Errorf("failed to create timeout certificate: %w", err)
 	}
-	return hotstuff.NewSyncInfo().WithTC(tc), nil
+	return hotstuff.NewSyncInfoWith(tc), nil
 }
 
 func (s *Simple) VerifySyncInfo(syncInfo hotstuff.SyncInfo) (qc *hotstuff.QuorumCert, view hotstuff.View, timeout bool, err error) {

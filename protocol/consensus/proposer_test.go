@@ -99,7 +99,7 @@ func TestPropose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	proposal, err := proposer.CreateProposal(hotstuff.NewSyncInfo().WithQC(highQC))
+	proposal, err := proposer.CreateProposal(hotstuff.NewSyncInfoWith(highQC))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -181,7 +181,7 @@ func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) err
 	if combSignature.Participants().Len() >= k.config.QuorumSize() {
 		k.logger.Debug("Aggregated Complete QC and sending the event")
 		k.eventLoop.AddEvent(hotstuff.NewViewMsg{
-			SyncInfo: hotstuff.NewSyncInfo().WithQC(hotstuff.NewQuorumCert(
+			SyncInfo: hotstuff.NewSyncInfoWith(hotstuff.NewQuorumCert(
 				k.aggContrib,
 				k.currentView,
 				k.blockHash,
