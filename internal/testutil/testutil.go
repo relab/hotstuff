@@ -91,7 +91,7 @@ func CreateTimeouts[T crypto.Base](t testing.TB, view hotstuff.View, signers []T
 			ID:            signer(sig),
 			View:          view,
 			ViewSignature: sig,
-			SyncInfo:      hotstuff.NewSyncInfo().WithQC(qc),
+			SyncInfo:      hotstuff.NewSyncInfoWith(qc),
 		})
 	}
 	for i := range timeouts {

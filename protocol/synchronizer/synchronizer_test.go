@@ -114,7 +114,7 @@ func TestAdvanceViewQC(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	synchronizer.advanceView(hotstuff.NewSyncInfo().WithQC(qc))
+	synchronizer.advanceView(hotstuff.NewSyncInfoWith(qc))
 
 	if viewStates.View() != 2 {
 		t.Errorf("wrong view: expected: %d, got: %d", 2, viewStates.View())
@@ -153,7 +153,7 @@ func TestAdvanceViewTC(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	synchronizer.advanceView(hotstuff.NewSyncInfo().WithTC(tc))
+	synchronizer.advanceView(hotstuff.NewSyncInfoWith(tc))
 
 	if viewStates.View() != 2 {
 		t.Errorf("wrong view: expected: %d, got: %d", 2, viewStates.View())
@@ -234,15 +234,15 @@ func TestAdvanceView(t *testing.T) {
 			syncInfo := hotstuff.NewSyncInfo()
 			if tt.qc {
 				validQC := testutil.CreateQC(t, block, signers[tt.firstSignerIdx:]...)
-				syncInfo = syncInfo.WithQC(validQC)
+				syncInfo.SetQC(validQC)
 			}
 			if tt.tc {
 				validTC := testutil.CreateTC(t, 1, signers[tt.firstSignerIdx:])
-				syncInfo = syncInfo.WithTC(validTC)
+				syncInfo.SetTC(validTC)
 			}
 			if tt.ac {
 				validAC := testutil.CreateAC(t, 1, signers[tt.firstSignerIdx:])
-				syncInfo = syncInfo.WithAggQC(validAC)
+				syncInfo.SetAggQC(validAC)
 			}
 
 			// t.Logf("  %s: SyncInfo: %v", tt.name, syncInfo)

@@ -101,7 +101,7 @@ func New(
 		s.logger.Debugf("Received proposal: %v", proposal.Block)
 
 		// advance the view regardless of vote status
-		s.advanceView(hotstuff.NewSyncInfo().WithQC(proposal.Block.QuorumCert()))
+		s.advanceView(hotstuff.NewSyncInfoWith(proposal.Block.QuorumCert()))
 
 		proposalView := proposal.Block.View()
 		localView := s.state.View()
@@ -234,7 +234,7 @@ func (s *Synchronizer) OnRemoteTimeout(timeout hotstuff.TimeoutMsg) {
 		s.logger.Debugf("Failed to create sync info: %v", err)
 		return
 	}
-	si = si.WithQC(s.state.HighQC()) // ensure sync info also has the high QC
+	si.SetQC(s.state.HighQC()) // ensure sync info also has the high QC
 
 	s.logger.Debugf("OnRemoteTimeout (second advance)")
 	s.advanceView(si)
@@ -261,7 +261,7 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) {
 	}
 	if qc != nil {
 		// ensure that the true highQC is the one stored in the syncInfo
-		syncInfo = syncInfo.WithQC(*qc)
+		syncInfo.SetQC(*qc)
 		updated, err := s.state.UpdateHighQC(*qc)
 		if err != nil {
 			s.logger.Warnf("advanceView: Failed to update HighQC: %v", err)

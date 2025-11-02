@@ -127,5 +127,5 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
 	vm.logger.Debugf("CollectVote: dispatching event for new view (current : %d)", vm.state.View())
-	vm.eventLoop.AddEvent(hotstuff.NewViewMsg{ID: vm.config.ID(), SyncInfo: hotstuff.NewSyncInfo().WithQC(qc)})
+	vm.eventLoop.AddEvent(hotstuff.NewViewMsg{ID: vm.config.ID(), SyncInfo: hotstuff.NewSyncInfoWith(qc)})
 }

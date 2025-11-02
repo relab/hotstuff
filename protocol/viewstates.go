@@ -107,7 +107,9 @@ func (s *ViewStates) View() hotstuff.View {
 func (s *ViewStates) SyncInfo() hotstuff.SyncInfo {
 	s.mut.RLock()
 	defer s.mut.RUnlock()
-	return hotstuff.NewSyncInfo().WithQC(s.highQC).WithTC(s.highTC)
+	si := hotstuff.NewSyncInfoWith(s.highQC)
+	si.SetTC(s.highTC)
+	return si
 }
 
 // UpdateCommittedBlock updates the last committed block.

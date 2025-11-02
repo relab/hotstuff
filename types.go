@@ -141,25 +141,41 @@ func NewSyncInfo() SyncInfo {
 	return SyncInfo{}
 }
 
-// WithQC returns a copy of the SyncInfo struct with the given QC.
-func (si SyncInfo) WithQC(qc QuorumCert) SyncInfo {
-	si.qc = new(QuorumCert)
-	*si.qc = qc
+// NewSyncInfoWith returns a new SyncInfo with the provided value.
+// The value can be a QuorumCert, TimeoutCert, or AggregateQC.
+// For setting multiple values, use the Set* methods on the returned SyncInfo.
+//
+// Examples:
+//
+//	NewSyncInfoWith(qc)
+//	si := NewSyncInfoWith(tc); si.SetQC(qc)
+//	si := NewSyncInfoWith(tc); si.SetAggQC(aggQC)
+func NewSyncInfoWith[T QuorumCert | TimeoutCert | AggregateQC](value T) SyncInfo {
+	si := SyncInfo{}
+	switch v := any(value).(type) {
+	case QuorumCert:
+		si.qc = &v
+	case TimeoutCert:
+		si.tc = &v
+	case AggregateQC:
+		si.aggQC = &v
+	}
 	return si
 }
 
-// WithTC returns a copy of the SyncInfo struct with the given TC.
-func (si SyncInfo) WithTC(tc TimeoutCert) SyncInfo {
-	si.tc = new(TimeoutCert)
-	*si.tc = tc
-	return si
+// SetQC sets the QC and returns the SyncInfo for chaining.
+func (si *SyncInfo) SetQC(qc QuorumCert) {
+	si.qc = &qc
 }
 
-// WithAggQC returns a copy of the SyncInfo struct with the given AggregateQC.
-func (si SyncInfo) WithAggQC(aggQC AggregateQC) SyncInfo {
-	si.aggQC = new(AggregateQC)
-	*si.aggQC = aggQC
-	return si
+// SetTC sets the TC and returns the SyncInfo for chaining.
+func (si *SyncInfo) SetTC(tc TimeoutCert) {
+	si.tc = &tc
+}
+
+// SetAggQC sets the AggregateQC and returns the SyncInfo for chaining.
+func (si *SyncInfo) SetAggQC(aggQC AggregateQC) {
+	si.aggQC = &aggQC
 }
 
 // QC returns the quorum certificate, if present.

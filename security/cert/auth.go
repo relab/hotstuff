@@ -156,7 +156,7 @@ func (c *Authority) VerifyAggregateQC(aggQC hotstuff.AggregateQC) (highQC hotstu
 		messages[id] = hotstuff.TimeoutMsg{
 			ID:       id,
 			View:     aggQC.View(),
-			SyncInfo: hotstuff.NewSyncInfo().WithQC(qc),
+			SyncInfo: hotstuff.NewSyncInfoWith(qc),
 		}.ToBytes()
 	}
 	quorumSize := c.config.QuorumSize()
