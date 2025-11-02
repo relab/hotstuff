@@ -78,8 +78,11 @@ func (fhs *FastHotStuff) ChainLength() int {
 }
 
 // ProposeRule returns a new fast hotstuff proposal based on the current view, (aggregate) quorum certificate, and command batch.
-func (fhs *FastHotStuff) ProposeRule(view hotstuff.View, _ hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
-	qc, _ := cert.QC() // TODO: we should avoid cert does not contain a QC so we cannot fail here
+func (fhs *FastHotStuff) ProposeRule(view hotstuff.View, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (proposal hotstuff.ProposeMsg, ok bool) {
+	qc, ok := cert.QC()
+	if !ok {
+		return proposal, false
+	}
 	proposal = hotstuff.NewProposeMsg(fhs.config.ID(), view, qc, cmd)
 	if aggQC, ok := cert.AggQC(); ok {
 		proposal.AggregateQC = &aggQC

@@ -27,7 +27,7 @@ type CommitRuler interface {
 // This allows implementors to specify how new blocks are created.
 type ProposeRuler interface {
 	// ProposeRule creates a new proposal.
-	ProposeRule(view hotstuff.View, highQC hotstuff.QuorumCert, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (hotstuff.ProposeMsg, bool)
+	ProposeRule(view hotstuff.View, cert hotstuff.SyncInfo, cmd *clientpb.Batch) (hotstuff.ProposeMsg, bool)
 }
 
 // Ruleset is the interface that groups the VoteRule, CommitRule, ProposeRule, and ChainLength methods.
