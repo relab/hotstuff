@@ -105,10 +105,11 @@ func (s *ViewStates) View() hotstuff.View {
 
 // SyncInfo returns the highest known QC or TC.
 func (s *ViewStates) SyncInfo() hotstuff.SyncInfo {
+	si := hotstuff.NewSyncInfo()
 	s.mut.RLock()
-	defer s.mut.RUnlock()
-	si := hotstuff.NewSyncInfoWith(s.highQC)
+	si.SetQC(s.highQC)
 	si.SetTC(s.highTC)
+	s.mut.RUnlock()
 	return si
 }
 
