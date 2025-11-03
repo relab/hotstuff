@@ -47,22 +47,17 @@ func (s *Simple) RemoteTimeoutRule(_, timeoutView hotstuff.View, timeouts []hots
 }
 
 func (s *Simple) VerifySyncInfo(syncInfo hotstuff.SyncInfo) (qc *hotstuff.QuorumCert, view hotstuff.View, timeout bool, err error) {
+	// get the highest view of the sync info's QC and TC
+	view, timeout = syncInfo.HighestView()
+
 	if timeoutCert, haveTC := syncInfo.TC(); haveTC {
 		if err := s.auth.VerifyTimeoutCert(timeoutCert); err != nil {
 			return nil, 0, timeout, fmt.Errorf("failed to verify timeout certificate: %w", err)
 		}
-		view = timeoutCert.View()
-		timeout = true
 	}
-
 	if quorumCert, haveQC := syncInfo.QC(); haveQC {
 		if err := s.auth.VerifyQuorumCert(quorumCert); err != nil {
 			return nil, 0, timeout, fmt.Errorf("failed to verify quorum certificate: %w", err)
-		}
-		// if there is both a TC and a QC, we use the QC if its view is greater or equal to the TC.
-		if quorumCert.View() >= view {
-			view = quorumCert.View()
-			timeout = false
 		}
 		return &quorumCert, view, timeout, nil
 	}
