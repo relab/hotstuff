@@ -260,8 +260,6 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) {
 		return
 	}
 	if qc != nil {
-		// ensure that the true highQC is the one stored in the syncInfo
-		syncInfo.SetQC(*qc)
 		updated, err := s.state.UpdateHighQC(*qc)
 		if err != nil {
 			s.logger.Warnf("advanceView: Failed to update HighQC: %v", err)
@@ -270,6 +268,8 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) {
 		} else {
 			s.logger.Debugf("advanceView: HighQC not updated, current view: %d, new view: %d", s.state.View(), qc.View())
 		}
+		// ensure that the true highQC is the one stored in the syncInfo
+		syncInfo.SetQC(s.state.HighQC())
 	} else {
 		s.logger.Debug("advanceView: No QC found in sync info, using TC if available")
 	}
