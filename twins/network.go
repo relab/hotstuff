@@ -100,14 +100,14 @@ func (n *Network) createTwinsNodes(nodes []NodeID, consensusName string) error {
 	lastReplicaID := hotstuff.ID(1)
 	lastPrivKey, err := keygen.GenerateECDSAPrivateKey()
 	if err != nil {
-		return fmt.Errorf("failed to generate private key %w", err)
+		return fmt.Errorf("failed to generate private key: %w", err)
 	}
 	for _, nodeID := range nodes {
 		if nodeID.ReplicaID != lastReplicaID {
 			// not a twin, generate new key
 			lastPrivKey, err = keygen.GenerateECDSAPrivateKey()
 			if err != nil {
-				return fmt.Errorf("failed to generate private key %w", err)
+				return fmt.Errorf("failed to generate private key: %w", err)
 			}
 		}
 
