@@ -177,6 +177,42 @@ func (si *SyncInfo) SetAggQC(aggQC AggregateQC) {
 	si.aggQC = &aggQC
 }
 
+// HighestView returns the highest view among the QC and TC,
+// and whether it came from a timeout.
+func (si *SyncInfo) HighestView() (view View, timeout bool) {
+	switch {
+	case si.qc != nil && si.tc != nil:
+		if si.qc.View() >= si.tc.View() {
+			return si.qc.View(), false
+		}
+		return si.tc.View(), true
+	case si.qc != nil:
+		return si.qc.View(), false
+	case si.tc != nil:
+		return si.tc.View(), true
+	}
+	// no QC or TC present
+	return 0, false
+}
+
+// HighestViewAggQC returns the highest view among the AggQC and TC,
+// and whether it came from a timeout.
+func (si *SyncInfo) HighestViewAggQC() (view View, timeout bool) {
+	switch {
+	case si.aggQC != nil && si.tc != nil:
+		if si.aggQC.View() >= si.tc.View() {
+			return si.aggQC.View(), true // aggQC is always from timeouts
+		}
+		return si.tc.View(), true
+	case si.aggQC != nil:
+		return si.aggQC.View(), true
+	case si.tc != nil:
+		return si.tc.View(), true
+	}
+	// no AggQC or TC present
+	return 0, false
+}
+
 // QC returns the quorum certificate, if present.
 func (si SyncInfo) QC() (_ QuorumCert, _ bool) {
 	if si.qc != nil {
