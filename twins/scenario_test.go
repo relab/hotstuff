@@ -184,7 +184,7 @@ func TestTwinsScenarioRepNeeded(t *testing.T) {
 		}
 	}
 
-	if false {
+	if false { //set to true to print the log
 		t.Fail()
 		t.Logf("Network log:\n%s", result.NetworkLog)
 	}
@@ -229,9 +229,5 @@ func TestSafetyWithTwins(t *testing.T) {
 		}
 	}
 
-	if false {
-		t.Fail()
-		t.Logf("Network log:\n%s", result.NetworkLog)
-	}
 
 }
