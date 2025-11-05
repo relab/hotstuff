@@ -70,7 +70,11 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 		return nil
 	}
 
-	if block1.Parent() == block2.Hash() && block2.Parent() == block3.Hash() {
+	// since our implementation does not create dummy blocks every view, 
+	// we explicitly check that the parents are in the previous view
+	if block1.Parent() == block2.Hash() && 
+		block2.Parent() == block3.Hash() &&
+		block1.View() == block3.View()+2{
 		hs.logger.Debug("CommitRule - DECIDE: ", block3)
 		return block3
 	}
