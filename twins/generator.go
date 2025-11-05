@@ -30,21 +30,12 @@ func assignNodeIDs(numNodes, numTwins uint8) (nodes, twins []NodeID) {
 	for range numNodes {
 		if remainingTwins > 0 {
 			// twins get networkID 1 and 2
-			twins = append(twins, NodeID{
-				ReplicaID: replicaID,
-				NetworkID: 1,
-			})
-			twins = append(twins, NodeID{
-				ReplicaID: replicaID,
-				NetworkID: 2,
-			})
+			twins = append(twins, RepID(replicaID).Twin(1))
+			twins = append(twins, RepID(replicaID).Twin(2))
 			remainingTwins--
 		} else {
 			// non-twins get networkID 0
-			nodes = append(nodes, NodeID{
-				ReplicaID: replicaID,
-				NetworkID: 0,
-			})
+			nodes = append(nodes, RepID(replicaID))
 		}
 		replicaID++
 	}

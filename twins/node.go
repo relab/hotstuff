@@ -51,7 +51,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string, pk *ecdsa.PrivateK
 		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVerification()),
 		commandCache: clientpb.NewCommandCache(1),
 	}
-	node.logger = logging.NewWithDest(&n.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.NetworkID))
+	node.logger = logging.NewWithDest(&n.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.TwinID))
 	node.eventLoop = eventloop.New(node.logger, 100)
 	node.sender = newSender(n, node)
 	base, err := crypto.New(

@@ -19,22 +19,22 @@ import (
 // while the NetworkID is used to distinguish nodes on the network.
 type NodeID struct {
 	ReplicaID hotstuff.ID
-	NetworkID uint32
+	TwinID uint32
 }
 
 func (id NodeID) String() string {
-	return fmt.Sprintf("r%dn%d", id.ReplicaID, id.NetworkID)
+	return fmt.Sprintf("r%dn%d", id.ReplicaID, id.TwinID)
 }
 
-func (id *NodeID) TwinId(twinId uint32) NodeID {
-	id.NetworkID = twinId
-	return *id
+func (id NodeID) Twin(twinId uint32) NodeID {
+	id.TwinID = twinId
+	return id
 }
 
-func ReplicaID(replicaId hotstuff.ID) NodeID {
+func RepID(replicaId hotstuff.ID) NodeID {
 	return NodeID{
 		ReplicaID: replicaId,
-		NetworkID: uint32(0),
+		TwinID: uint32(0),
 	}
 }
 
@@ -78,7 +78,7 @@ type Network struct {
 func NewSimpleNetwork(numNodes int) *Network {
 	allNodesSet := make(NodeSet)
 	for i := 1; i <= numNodes; i++ {
-		allNodesSet.Add(NodeID{ReplicaID: hotstuff.ID(i), NetworkID: uint32(i)})
+		allNodesSet.Add(NodeID{ReplicaID: hotstuff.ID(i), TwinID: uint32(i)})
 	}
 	network := &Network{
 		nodes:      make(map[NodeID]*node),
@@ -254,7 +254,7 @@ func (s NodeSet) MarshalJSON() ([]byte, error) {
 		if a.ReplicaID != b.ReplicaID {
 			return int(a.ReplicaID) - int(b.ReplicaID)
 		}
-		return int(a.NetworkID) - int(b.NetworkID)
+		return int(a.TwinID) - int(b.TwinID)
 	})
 	return json.Marshal(ids)
 }

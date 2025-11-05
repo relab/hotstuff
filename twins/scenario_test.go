@@ -11,9 +11,9 @@ import (
 // when all nodes are honest and the leader is in a separate partition.
 func TestPartitionedScenario(t *testing.T) {
 	s := Scenario{}
-	allNodesSet := NewNodeSet(NodeID{1, 0}, NodeID{2, 0}, NodeID{3, 0}, NodeID{4, 0})
-	partitionedSet := NewNodeSet(NodeID{1, 0}, NodeID{3, 0}, NodeID{4, 0})
-	leaderSet := NewNodeSet(NodeID{2, 0})
+	allNodesSet := NewNodeSet(RepID(1), RepID(2), RepID(3), RepID(4))
+	partitionedSet := NewNodeSet(RepID(1), RepID(3), RepID(4))
+	leaderSet := NewNodeSet(RepID(2))
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 2, Partitions: []NodeSet{leaderSet, partitionedSet}})
 	s = append(s, View{Leader: 3, Partitions: []NodeSet{allNodesSet}})
@@ -35,9 +35,9 @@ func TestPartitionedScenario(t *testing.T) {
 
 func TestPartitionedScenario2(t *testing.T) {
 	s := Scenario{}
-	allNodesSet := NewNodeSet(NodeID{1, 0}, NodeID{2, 0}, NodeID{3, 0}, NodeID{4, 0})
-	partitionedSet := NewNodeSet(NodeID{1, 0}, NodeID{3, 0}, NodeID{4, 0})
-	leaderSet := NewNodeSet(NodeID{2, 0})
+	allNodesSet := NewNodeSet(RepID(1), RepID(2), RepID(3), RepID(4))
+	partitionedSet := NewNodeSet(RepID(1), RepID(3), RepID(4))
+	leaderSet := NewNodeSet(RepID(2))
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 2, Partitions: []NodeSet{leaderSet, partitionedSet}})
@@ -70,7 +70,7 @@ func TestPartitionedScenario2(t *testing.T) {
 // when all nodes are honest and the network is not partitioned.
 func TestBasicScenario(t *testing.T) {
 	s := Scenario{}
-	allNodesSet := NewNodeSet(NodeID{1, 0}, NodeID{2, 0}, NodeID{3, 0}, NodeID{4, 0})
+	allNodesSet := NewNodeSet(RepID(1), RepID(2), RepID(3), RepID(4))
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
@@ -93,7 +93,7 @@ func TestBasicScenario(t *testing.T) {
 func TestBasicTwinsScenario(t *testing.T) {
 	s := Scenario{}
 	// With 1 twin: nodes with NetworkID 1 and 2 will be twins of replica 1.
-	allNodesSet := NewNodeSet(NodeID{1, 1}, NodeID{1, 2}, NodeID{2, 0}, NodeID{3, 0}, NodeID{4, 0})
+	allNodesSet := NewNodeSet(RepID(1).Twin(1), RepID(1).Twin(2), RepID(2), RepID(3), RepID(4))
 	s = append(s, View{Leader: 3, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 3, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 3, Partitions: []NodeSet{allNodesSet}})
@@ -125,8 +125,8 @@ func TestBasicTwinsScenario(t *testing.T) {
 func TestTwinsScenarioNeeded(t *testing.T) {
 	s := Scenario{}
 	// With 1 twin: nodes with NetworkID 1 and 2 will be twins of replica 1.
-	allNodesSet := NewNodeSet(NodeID{1, 1}, NodeID{1, 2}, NodeID{2, 0}, NodeID{3, 0}, NodeID{4, 0})
-	BCD := NewNodeSet(NodeID{2, 0}, NodeID{1, 2}, NodeID{3, 0}) // node with NetworkID 2 is the twin of replica 1
+	allNodesSet := NewNodeSet(RepID(1).Twin(1), RepID(1).Twin(2), RepID(2), RepID(3), RepID(4))
+	BCD := NewNodeSet(RepID(2), RepID(1).Twin(2), RepID(3)) // node with NetworkID 2 is the twin of replica 1
 
 	s = append(s, View{Leader: 3, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 3, Partitions: []NodeSet{allNodesSet}})
@@ -159,8 +159,8 @@ func TestTwinsScenarioNeeded(t *testing.T) {
 func TestTwinsScenarioRepNeeded(t *testing.T) {
 	s := Scenario{}
 	// With 1 twin: nodes with NetworkID 1 and 2 will be twins of replica 1.
-	allNodesSet := NewNodeSet(NodeID{1, 1}, NodeID{1, 2}, NodeID{2, 0}, NodeID{3, 0}, NodeID{4, 0})
-	ACD := NewNodeSet(NodeID{2, 0}, NodeID{1, 1}, NodeID{3, 0}) // node with NetworkID 1 is the first twin of replica 1
+	allNodesSet := NewNodeSet(RepID(1).Twin(1), RepID(1).Twin(2), RepID(2), RepID(3), RepID(4))
+	ACD := NewNodeSet(RepID(2), RepID(1).Twin(1), RepID(3)) // node with NetworkID 1 is the first twin of replica 1
 
 	s = append(s, View{Leader: 3, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 3, Partitions: []NodeSet{allNodesSet}})
@@ -196,9 +196,9 @@ func TestSafetyWithTwins(t *testing.T) {
 	// With 1 twin: nodes with NetworkID 1 and 2 will be twins of replica 1.
 	// twinA := NewNodeSet(NodeID{1, 1})
 	// twinB := NewNodeSet(NodeID{1, 2})
-	allNodesSet := NewNodeSet(NodeID{1, 1}, NodeID{1, 2}, NodeID{2, 0}, NodeID{3, 0}, NodeID{4, 0})
-	noA := NewNodeSet(NodeID{1, 2}, NodeID{2, 0}, NodeID{3, 0})
-	noB := NewNodeSet(NodeID{1, 1}, NodeID{2, 0}, NodeID{3, 0}, NodeID{4, 0})
+	allNodesSet := NewNodeSet(RepID(1).Twin(1), RepID(1).Twin(2), RepID(2), RepID(3), RepID(4))
+	noA := NewNodeSet(RepID(1).Twin(2), RepID(2), RepID(3))
+	noB := NewNodeSet(RepID(1).Twin(1), RepID(2), RepID(3), RepID(4))
 
 	s = append(s, View{Leader: 2, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 2, Partitions: []NodeSet{noA}})
