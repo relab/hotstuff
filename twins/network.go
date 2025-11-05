@@ -26,6 +26,18 @@ func (id NodeID) String() string {
 	return fmt.Sprintf("r%dn%d", id.ReplicaID, id.NetworkID)
 }
 
+func (id *NodeID) TwinId(twinId uint32) NodeID {
+	id.NetworkID = twinId
+	return *id
+}
+
+func ReplicaID(replicaId hotstuff.ID) NodeID {
+	return NodeID{
+		ReplicaID: replicaId,
+		NetworkID: uint32(0),
+	}
+}
+
 type pendingMessage struct {
 	message  any
 	sender   NodeID
