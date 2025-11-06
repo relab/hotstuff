@@ -21,6 +21,7 @@ _If you use this project for research, please cite the [APpLIED workshop paper](
     - [Windows](#windows)
   - [Running Experiments](#running-experiments)
   - [Safety Testing with Twins](#safety-testing-with-twins)
+  - [Forks](#forks)
   - [Modules](#modules)
   - [Consensus Interfaces](#consensus-interfaces)
   - [Crypto Interfaces](#crypto-interfaces)
@@ -67,6 +68,16 @@ Run `./plot --help` for a list of options.
 
 We have implemented the Twins strategy [6] for testing the safety of the consensus implementations.
 See the [twins documentation](docs/twins.md) for details.
+
+## Forks
+
+To view a list of forks of this repository, see [FORKS.md](FORKS.md) or run the script:
+
+```bash
+./scripts/list_forks.sh
+```
+
+You can also view forks directly on GitHub at: https://github.com/relab/hotstuff/network/members
 
 ## Modules
 
