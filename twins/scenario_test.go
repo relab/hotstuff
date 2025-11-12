@@ -7,15 +7,18 @@ import (
 	"github.com/relab/hotstuff/protocol/rules"
 )
 
-// TestPartitionedScenario checks if chained HotStuff will commit one block
-// when all nodes are honest and the leader is in a separate partition.
+// TestPartitionedScenario checks that chained HotStuff will not commit a block
+// when there are gaps in the view sequence
+// all nodes are honest and the leader is in a separate partition.
 func TestPartitionedScenario(t *testing.T) {
 	s := Scenario{}
 	allNodesSet := NewNodeSet(RepID(1), RepID(2), RepID(3), RepID(4))
 	partitionedSet := NewNodeSet(RepID(1), RepID(3), RepID(4))
 	leaderSet := NewNodeSet(RepID(2))
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
+	// block in view 2 will be lost, because of partition
 	s = append(s, View{Leader: 2, Partitions: []NodeSet{leaderSet, partitionedSet}})
+	// block in view 3 will have parent and QC from view 1
 	s = append(s, View{Leader: 3, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
@@ -27,24 +30,29 @@ func TestPartitionedScenario(t *testing.T) {
 	if !result.Safe {
 		t.Errorf("Expected no safety violations")
 	}
-	if result.Commits != 1 {
-		t.Error("Expected one commit")
+	if result.Commits != 0 {
+		t.Error("Expected zero commits")
 	}
 	t.Logf("Network log:\n%s", result.NetworkLog)
 }
 
+// TestPartitionedScenario2 checks that chained HotStuff will commit a block 
+// in fourth view after a partition
+// all nodes are honest and the leader is in a separate partition.
 func TestPartitionedScenario2(t *testing.T) {
 	s := Scenario{}
 	allNodesSet := NewNodeSet(RepID(1), RepID(2), RepID(3), RepID(4))
 	partitionedSet := NewNodeSet(RepID(1), RepID(3), RepID(4))
 	leaderSet := NewNodeSet(RepID(2))
 	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
-	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
+	// block in view 2 will be lost, because of partition
 	s = append(s, View{Leader: 2, Partitions: []NodeSet{leaderSet, partitionedSet}})
-	s = append(s, View{Leader: 3, Partitions: []NodeSet{leaderSet, partitionedSet}})
-	s = append(s, View{Leader: 3, Partitions: []NodeSet{leaderSet, partitionedSet}})
-	s = append(s, View{Leader: 3, Partitions: []NodeSet{leaderSet, partitionedSet}})
-
+	// block in view 3 will have parent and QC from view 1
+	s = append(s, View{Leader: 3, Partitions: []NodeSet{allNodesSet}})
+	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
+	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
+	// in view 6, block from view 3, together with view 1 will be commited
+	s = append(s, View{Leader: 1, Partitions: []NodeSet{allNodesSet}})
 	logging.SetLogLevel("debug")
 	result, err := ExecuteScenario(s, 4, 0, 100, rules.NameChainedHotStuff)
 	if err != nil {
@@ -53,18 +61,13 @@ func TestPartitionedScenario2(t *testing.T) {
 	if !result.Safe {
 		t.Errorf("Expected no safety violations")
 	}
-	if result.Commits != 1 {
-		t.Error("Expected one commit")
-		for id, commits := range result.NodeCommits {
-			t.Logf("Node %v commits:", id)
-			for _, b := range commits {
-				t.Logf("  %v", b)
-			}
-		}
+	if result.Commits != 2 {
+		t.Error("Expected zero commits")
 	}
-
 	t.Logf("Network log:\n%s", result.NetworkLog)
 }
+
+
 
 // TestBasicScenario checks if chained HotStuff will commit one block
 // when all nodes are honest and the network is not partitioned.
