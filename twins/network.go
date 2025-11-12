@@ -81,7 +81,7 @@ type Network struct {
 func NewSimpleNetwork(numNodes int) *Network {
 	allNodesSet := make(NodeSet)
 	for i := 1; i <= numNodes; i++ {
-		allNodesSet.Add(NodeID{ReplicaID: hotstuff.ID(i), TwinID: uint32(i)})
+		allNodesSet.Add(Replica(hotstuff.ID(i)))
 	}
 	network := &Network{
 		nodes:      make(map[NodeID]*node),
@@ -94,8 +94,9 @@ func NewSimpleNetwork(numNodes int) *Network {
 	return network
 }
 
-// NewPartitionedNetwork creates a new Network with the specified partitions.
-// partitions specifies the network partitions for each view.
+// NewPartitionedNetwork creates a new Network with the specified list of views.  
+// Each view must specify a leader and a set of partitions, each with a set of nodes.  
+// One or more message types may be specified, which will be dropped at the sending node.  
 func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 	n := &Network{
 		nodes:      make(map[NodeID]*node),
@@ -111,7 +112,10 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 	return n
 }
 
-func (n *Network) createTwinsNodes(nodes []NodeID, consensusName string) error {
+// createNodesAndTwins creates nodes and their twins in the network.
+// Twins receive the same private key.
+// Assumes nodes are provided in order, twins with the same ReplicaID must be consecutive.
+func (n *Network) createNodesAndTwins(nodes []NodeID, consensusName string) error {
 	lastReplicaID := hotstuff.ID(1)
 	lastPrivKey, err := keygen.GenerateECDSAPrivateKey()
 	if err != nil {

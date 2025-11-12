@@ -161,6 +161,8 @@ func newNode(n *Network, nodeID NodeID, consensusName string, pk *ecdsa.PrivateK
 	return node, nil
 }
 
+// EffectiveView returns the effective view of the node, which is equal or larger to the nodes view.
+// The effective view reflects that a replica may have timed out but was not able to collect a timeout certificate.
 func (n *node) EffectiveView() hotstuff.View {
 	if n.effectiveView > n.viewStates.View() {
 		return n.effectiveView
