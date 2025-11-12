@@ -83,7 +83,7 @@ func (k *Kauri) Aggregate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert
 // begin starts dissemination of proposal and aggregation of votes.
 func (k *Kauri) begin(p *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	if !k.initDone {
-		k.eventLoop.DelayUntil(network.ConnectedEvent{}, func() {
+		eventloop.DelayUntil[network.ConnectedEvent](k.eventLoop, func() {
 			if err := k.begin(p, pc); err != nil {
 				k.logger.Error(err)
 			}
