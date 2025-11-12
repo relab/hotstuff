@@ -117,6 +117,17 @@ func Register[T any](el *EventLoop, callback EventHandler[T], opts ...HandlerOpt
 	}
 }
 
+// DelayUntil postpones handling the provided event until after another event of type T has occurred.
+func DelayUntil[T any](el *EventLoop, event any) {
+	if event == nil {
+		return
+	}
+	t := reflect.TypeFor[T]()
+	el.mut.Lock()
+	el.waitingEvents[t] = append(el.waitingEvents[t], event)
+	el.mut.Unlock()
+}
+
 // AddEvent adds an event to the event queue.
 func (el *EventLoop) AddEvent(event any) {
 	if event != nil {
@@ -255,21 +266,6 @@ func (el *EventLoop) dispatchDelayedEvents(t reflect.Type) {
 	for _, event := range events {
 		el.AddEvent(event)
 	}
-}
-
-// DelayUntil allows us to delay handling of an event until after another event has happened.
-// The eventType parameter decides the type of event to wait for, and it should be the zero value
-// of that event type. The event parameter is the event that will be delayed.
-func (el *EventLoop) DelayUntil(eventType, event any) {
-	if eventType == nil || event == nil {
-		return
-	}
-	el.mut.Lock()
-	t := reflect.TypeOf(eventType)
-	v := el.waitingEvents[t]
-	v = append(v, event)
-	el.waitingEvents[t] = v
-	el.mut.Unlock()
 }
 
 type ticker struct {

@@ -110,7 +110,7 @@ func New(
 		}
 		if proposalView > localView {
 			s.logger.Debugf("Delaying proposal until after next view change (proposal view %v > local view %v)", proposalView, localView)
-			s.eventLoop.DelayUntil(hotstuff.ViewChangeEvent{}, proposal)
+			eventloop.DelayUntil[hotstuff.ViewChangeEvent](s.eventLoop, proposal)
 			return
 		}
 

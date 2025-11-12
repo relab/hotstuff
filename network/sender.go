@@ -61,7 +61,7 @@ func NewGorumsSender(
 	// We delay processing `replicaConnected` events until after the configurations `connected` event has occurred.
 	eventloop.Register(el, func(event hotstuff.ReplicaConnectedEvent) {
 		if !s.connected {
-			el.DelayUntil(ConnectedEvent{}, event)
+			eventloop.DelayUntil[ConnectedEvent](el, event)
 			return
 		}
 		s.replicaConnected(event)
