@@ -19,7 +19,7 @@ type ConsensusLatency struct {
 
 // InitModule gives the module access to the other modules.
 func enableConsensusLatency(
-	eventLoop *eventloop.EventLoop,
+	el *eventloop.EventLoop,
 	metricsLogger Logger,
 	id hotstuff.ID,
 ) {
@@ -27,16 +27,12 @@ func enableConsensusLatency(
 		metricsLogger: metricsLogger,
 		id:            id,
 	}
-
-	eventLoop.RegisterHandler(hotstuff.ConsensusLatencyEvent{}, func(event any) {
-		latencyEvent := event.(hotstuff.ConsensusLatencyEvent)
-		lr.addLatency(latencyEvent.Latency)
+	eventloop.Register(el, func(event hotstuff.ConsensusLatencyEvent) {
+		lr.addLatency(event.Latency)
 	})
-
-	eventLoop.RegisterHandler(types.TickEvent{}, func(event any) {
-		lr.tick(event.(types.TickEvent))
+	eventloop.Register(el, func(tickEvent types.TickEvent) {
+		lr.tick(tickEvent)
 	}, eventloop.Prioritize())
-
 }
 
 // AddLatency adds a latency data point to the current measurement.

@@ -13,6 +13,7 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/network"
@@ -64,7 +65,7 @@ type sendFunc func(*cert.Authority, *network.GorumsSender)
 // testBase is a test helper that collects events for verification. The handle function is called
 // for each received event and signals receipt on the events channel which is used to ensure that
 // the expected number of events are received.
-func testBase(t *testing.T, typ any, n int, expectedEventsPerReplica int, send sendFunc, handle func(any)) {
+func testBase[T any](t *testing.T, n int, expectedEventsPerReplica int, send sendFunc, handle func(T)) {
 	run := func(t *testing.T, setup setupFunc) {
 		td := setup(t, n)
 		deps := createServers(t, td)
@@ -84,7 +85,7 @@ func testBase(t *testing.T, typ any, n int, expectedEventsPerReplica int, send s
 		// Start all replicas with event handling and event handled notification
 		ctx := t.Context()
 		for _, d := range deps {
-			d.EventLoop().RegisterHandler(typ, func(event any) {
+			eventloop.Register(d.EventLoop(), func(event T) {
 				handle(event)
 				eventsCh <- struct{}{} // event handled
 			})
@@ -109,7 +110,7 @@ func TestPropose(t *testing.T) {
 	const expectedEventsPerReplica = 1
 
 	var want hotstuff.ProposeMsg
-	testBase(t, want, defaultReplicaCount, expectedEventsPerReplica,
+	testBase(t, defaultReplicaCount, expectedEventsPerReplica,
 		func(auth *cert.Authority, sender *network.GorumsSender) {
 			// write the wanted test data to the variable in outer scope
 			want = hotstuff.ProposeMsg{
@@ -117,9 +118,8 @@ func TestPropose(t *testing.T) {
 				Block: testutil.CreateBlock(t, auth),
 			}
 			sender.Propose(&want)
-		}, func(event any) {
+		}, func(got hotstuff.ProposeMsg) {
 			// This should be invoked 3 times (1 per replica, 3 receiving replicas)
-			got := event.(hotstuff.ProposeMsg)
 			if got.ID != want.ID {
 				t.Errorf("wrong id in proposal: got: %d, want: %d", got.ID, want.ID)
 			}
@@ -141,8 +141,7 @@ func TestTimeout(t *testing.T) {
 		View:     view,
 		SyncInfo: hotstuff.NewSyncInfo(),
 	}
-
-	testBase(t, want, defaultReplicaCount, expectedEventsPerReplica,
+	testBase(t, defaultReplicaCount, expectedEventsPerReplica,
 		func(auth *cert.Authority, sender *network.GorumsSender) {
 			sig, err := auth.Sign(view.ToBytes())
 			if err != nil {
@@ -154,9 +153,8 @@ func TestTimeout(t *testing.T) {
 			// Start() -> startTimeoutTimer() -> TimeoutEvent -> OnLocalTimeout() -> sender.Timeout()
 			sender.Timeout(want)
 		},
-		func(event any) {
+		func(got hotstuff.TimeoutMsg) {
 			// This should be invoked 6 times (2 per replica, 3 receiving replicas)
-			got := event.(hotstuff.TimeoutMsg)
 			if got.ID != want.ID {
 				t.Errorf("wrong id: got: %d, want: %d", got.ID, want.ID)
 			}

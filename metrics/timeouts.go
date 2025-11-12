@@ -20,7 +20,7 @@ type viewTimeouts struct {
 }
 
 func enableViewTimeouts(
-	eventLoop *eventloop.EventLoop,
+	el *eventloop.EventLoop,
 	metricsLogger Logger,
 	id hotstuff.ID,
 ) {
@@ -28,13 +28,11 @@ func enableViewTimeouts(
 		metricsLogger: metricsLogger,
 		id:            id,
 	}
-
-	eventLoop.RegisterHandler(hotstuff.ViewChangeEvent{}, func(event any) {
-		vt.viewChange(event.(hotstuff.ViewChangeEvent))
+	eventloop.Register(el, func(event hotstuff.ViewChangeEvent) {
+		vt.viewChange(event)
 	})
-
-	eventLoop.RegisterHandler(types.TickEvent{}, func(event any) {
-		vt.tick(event.(types.TickEvent))
+	eventloop.Register(el, func(tickEvent types.TickEvent) {
+		vt.tick(tickEvent)
 	}, eventloop.Prioritize())
 }
 

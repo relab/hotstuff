@@ -13,8 +13,7 @@ import (
 )
 
 type KauriGorumsSender struct {
-	eventLoop *eventloop.EventLoop
-	config    *core.RuntimeConfig
+	config *core.RuntimeConfig
 	core.Sender
 
 	nodes map[hotstuff.ID]*kauripb.Node
@@ -22,19 +21,18 @@ type KauriGorumsSender struct {
 }
 
 func WrapGorumsSender(
-	eventLoop *eventloop.EventLoop,
+	el *eventloop.EventLoop,
 	config *core.RuntimeConfig,
 	base *network.GorumsSender,
 ) *KauriGorumsSender {
 	s := &KauriGorumsSender{
-		eventLoop: eventLoop,
-		config:    config,
-		Sender:    base, // important: extend the base
+		config: config,
+		Sender: base, // important: extend the base
 
 		nodes: make(map[hotstuff.ID]*kauripb.Node),
 		tree:  config.Tree(),
 	}
-	s.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(_ any) {
+	eventloop.Register(el, func(_ hotstuff.ReplicaConnectedEvent) {
 		kauriCfg := kauripb.ConfigurationFromRaw(base.GorumsConfig(), nil)
 		for _, n := range kauriCfg.Nodes() {
 			s.nodes[hotstuff.ID(n.ID())] = n

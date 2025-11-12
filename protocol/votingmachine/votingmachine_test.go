@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/protocol/votingmachine"
@@ -32,7 +33,7 @@ func TestCollectVote(t *testing.T) {
 	)
 
 	newViewTriggered := false
-	leader.EventLoop().RegisterHandler(hotstuff.NewViewMsg{}, func(_ any) {
+	eventloop.Register(leader.EventLoop(), func(_ hotstuff.NewViewMsg) {
 		newViewTriggered = true
 	})
 
@@ -77,7 +78,7 @@ func TestCollectVoteWithDuplicates(t *testing.T) {
 	)
 
 	newViewTriggered := false
-	leader.EventLoop().RegisterHandler(hotstuff.NewViewMsg{}, func(_ any) {
+	eventloop.Register(leader.EventLoop(), func(_ hotstuff.NewViewMsg) {
 		newViewTriggered = true
 	})
 

@@ -47,7 +47,7 @@ type Synchronizer struct {
 // New creates a new Synchronizer.
 func New(
 	// core dependencies
-	eventLoop *eventloop.EventLoop,
+	el *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 
@@ -73,7 +73,7 @@ func New(
 		proposer:  proposer,
 		auth:      auth,
 		sender:    sender,
-		eventLoop: eventLoop,
+		eventLoop: el,
 		logger:    logger,
 		config:    config,
 		voter:     voter,
@@ -82,22 +82,18 @@ func New(
 		timer:    oneShotTimer{time.AfterFunc(0, func() {})}, // dummy timer that will be replaced after start() is called
 		timeouts: newTimeoutCollector(config),
 	}
-	s.eventLoop.RegisterHandler(hotstuff.TimeoutEvent{}, func(event any) {
-		timeoutView := event.(hotstuff.TimeoutEvent).View
-		if s.state.View() == timeoutView {
+	eventloop.Register(el, func(timeout hotstuff.TimeoutEvent) {
+		if s.state.View() == timeout.View {
 			s.OnLocalTimeout()
 		}
 	})
-	s.eventLoop.RegisterHandler(hotstuff.NewViewMsg{}, func(event any) {
-		newViewMsg := event.(hotstuff.NewViewMsg)
+	eventloop.Register(el, func(newViewMsg hotstuff.NewViewMsg) {
 		s.OnNewView(newViewMsg)
 	})
-	s.eventLoop.RegisterHandler(hotstuff.TimeoutMsg{}, func(event any) {
-		timeoutMsg := event.(hotstuff.TimeoutMsg)
+	eventloop.Register(el, func(timeoutMsg hotstuff.TimeoutMsg) {
 		s.OnRemoteTimeout(timeoutMsg)
 	})
-	s.eventLoop.RegisterHandler(hotstuff.ProposeMsg{}, func(event any) {
-		proposal := event.(hotstuff.ProposeMsg)
+	eventloop.Register(el, func(proposal hotstuff.ProposeMsg) {
 		s.logger.Debugf("Received proposal: %v", proposal.Block)
 
 		// advance the view regardless of vote status

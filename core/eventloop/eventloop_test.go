@@ -16,7 +16,7 @@ func TestHandler(t *testing.T) {
 	logger := logging.New("test")
 	el := eventloop.New(logger, 10)
 	c := make(chan any)
-	el.RegisterHandler(testEvent(0), func(event any) {
+	eventloop.Register(el, func(event testEvent) {
 		c <- event
 	})
 
@@ -56,10 +56,10 @@ func TestPrioritize(t *testing.T) {
 	logger := logging.New("test")
 	el := eventloop.New(logger, 10)
 	c := make(chan eventData)
-	el.RegisterHandler(testEvent(0), func(event any) {
+	eventloop.Register(el, func(event testEvent) {
 		c <- eventData{event: event, handler: true}
 	})
-	el.RegisterHandler(testEvent(0), func(event any) {
+	eventloop.Register(el, func(event testEvent) {
 		c <- eventData{event: event, handler: false}
 	}, eventloop.Prioritize())
 
@@ -106,8 +106,8 @@ func TestTicker(t *testing.T) {
 	logger := logging.New("test")
 	el := eventloop.New(logger, 10)
 	count := 0
-	el.RegisterHandler(testEvent(0), func(event any) {
-		count += int(event.(testEvent))
+	eventloop.Register(el, func(event testEvent) {
+		count += int(event)
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -139,8 +139,8 @@ func TestDelayedEvent(t *testing.T) {
 	el := eventloop.New(logger, 10)
 	c := make(chan testEvent)
 
-	el.RegisterHandler(testEvent(0), func(event any) {
-		c <- event.(testEvent)
+	eventloop.Register(el, func(event testEvent) {
+		c <- event
 	})
 
 	// delay the "2" and "3" events until after the first instance of testEvent
@@ -170,8 +170,8 @@ func BenchmarkEventLoopWithPrioritize(b *testing.B) {
 	el := eventloop.New(logger, 100)
 
 	for range 100 {
-		el.RegisterHandler(testEvent(0), func(event any) {
-			if event.(testEvent) != 1 {
+		eventloop.Register(el, func(event testEvent) {
+			if event != 1 {
 				panic("unexpected value")
 			}
 		}, eventloop.Prioritize())
@@ -188,8 +188,8 @@ func BenchmarkEventLoopWithUnsafeRunInAddEventHandlers(b *testing.B) {
 	el := eventloop.New(logger, 100)
 
 	for range 100 {
-		el.RegisterHandler(testEvent(0), func(event any) {
-			if event.(testEvent) != 1 {
+		eventloop.Register(el, func(event testEvent) {
+			if event != 1 {
 				panic("Unexpected value observed")
 			}
 		}, eventloop.UnsafeRunInAddEvent())

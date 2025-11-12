@@ -39,7 +39,7 @@ type Kauri struct {
 // NewKauri creates a new Kauri instance for communicating proposals and votes.
 func NewKauri(
 	logger logging.Logger,
-	eventLoop *eventloop.EventLoop,
+	el *eventloop.EventLoop,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 	auth *cert.Authority,
@@ -50,7 +50,7 @@ func NewKauri(
 	}
 	k := &Kauri{
 		logger:     logger,
-		eventLoop:  eventLoop,
+		eventLoop:  el,
 		config:     config,
 		blockchain: blockchain,
 		auth:       auth,
@@ -58,14 +58,14 @@ func NewKauri(
 		senders:    make([]hotstuff.ID, 0),
 		tree:       config.Tree(),
 	}
-	k.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(_ any) {
+	eventloop.Register(el, func(_ hotstuff.ReplicaConnectedEvent) {
 		k.initDone = true // signal that we are connected
 	})
-	k.eventLoop.RegisterHandler(kauri.ContributionRecvEvent{}, func(event any) {
-		k.onContributionRecv(event.(kauri.ContributionRecvEvent))
+	eventloop.Register(el, func(event kauri.ContributionRecvEvent) {
+		k.onContributionRecv(event)
 	})
-	k.eventLoop.RegisterHandler(WaitTimerExpiredEvent{}, func(event any) {
-		k.onWaitTimerExpired(event.(WaitTimerExpiredEvent))
+	eventloop.Register(el, func(event WaitTimerExpiredEvent) {
+		k.onWaitTimerExpired(event)
 	})
 	return k
 }

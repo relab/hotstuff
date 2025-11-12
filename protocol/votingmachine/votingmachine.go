@@ -28,7 +28,7 @@ type VotingMachine struct {
 
 func New(
 	logger logging.Logger,
-	eventLoop *eventloop.EventLoop,
+	el *eventloop.EventLoop,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 	auth *cert.Authority,
@@ -37,14 +37,14 @@ func New(
 	vm := &VotingMachine{
 		blockchain:    blockchain,
 		auth:          auth,
-		eventLoop:     eventLoop,
+		eventLoop:     el,
 		logger:        logger,
 		config:        config,
 		state:         state,
 		verifiedVotes: make(map[hotstuff.Hash][]hotstuff.PartialCert),
 	}
-	vm.eventLoop.RegisterHandler(hotstuff.VoteMsg{}, func(event any) {
-		vm.CollectVote(event.(hotstuff.VoteMsg))
+	eventloop.Register(el, func(voteMsg hotstuff.VoteMsg) {
+		vm.CollectVote(voteMsg)
 	})
 	return vm
 }

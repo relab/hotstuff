@@ -31,7 +31,7 @@ type ClientIO struct {
 
 // NewClientIO returns a new client IO server.
 func NewClientIO(
-	eventLoop *eventloop.EventLoop,
+	el *eventloop.EventLoop,
 	logger logging.Logger,
 	cmdCache *clientpb.CommandCache,
 	srvOpts ...gorums.ServerOption,
@@ -46,13 +46,11 @@ func NewClientIO(
 		lastExecutedSeqNum: make(map[uint32]uint64),
 	}
 	clientpb.RegisterClientServer(srv.srv, srv)
-	eventLoop.RegisterHandler(clientpb.ExecuteEvent{}, func(event any) {
-		e := event.(clientpb.ExecuteEvent)
-		srv.Exec(e.Batch)
+	eventloop.Register(el, func(event clientpb.ExecuteEvent) {
+		srv.Exec(event.Batch)
 	})
-	eventLoop.RegisterHandler(clientpb.AbortEvent{}, func(event any) {
-		e := event.(clientpb.AbortEvent)
-		srv.Abort(e.Batch)
+	eventloop.Register(el, func(event clientpb.AbortEvent) {
+		srv.Abort(event.Batch)
 	})
 	return srv
 }

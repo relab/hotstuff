@@ -41,21 +41,21 @@ func (tm *timeoutManager) viewChange(event hotstuff.ViewChangeEvent) {
 func newTimeoutManager(
 	network *Network,
 	node *node,
-	eventLoop *eventloop.EventLoop,
+	el *eventloop.EventLoop,
 	viewStates *protocol.ViewStates,
 ) *timeoutManager {
 	tm := &timeoutManager{
 		node:       node,
 		network:    network,
-		eventLoop:  eventLoop,
+		eventLoop:  el,
 		viewStates: viewStates,
 		timeout:    5,
 	}
-	tm.eventLoop.RegisterHandler(tick{}, func(_ any) {
+	eventloop.Register(el, func(_ tick) {
 		tm.advance()
 	}, eventloop.Prioritize())
-	tm.eventLoop.RegisterHandler(hotstuff.ViewChangeEvent{}, func(event any) {
-		tm.viewChange(event.(hotstuff.ViewChangeEvent))
+	eventloop.Register(el, func(event hotstuff.ViewChangeEvent) {
+		tm.viewChange(event)
 	}, eventloop.Prioritize())
 	return tm
 }

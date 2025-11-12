@@ -34,7 +34,7 @@ type GorumsSender struct {
 }
 
 func NewGorumsSender(
-	eventLoop *eventloop.EventLoop,
+	el *eventloop.EventLoop,
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 
@@ -50,7 +50,7 @@ func NewGorumsSender(
 	mgrOpts = append(mgrOpts, gorums.WithGrpcDialOptions(grpcOpts...))
 
 	s := &GorumsSender{
-		eventLoop: eventLoop,
+		eventLoop: el,
 		logger:    logger,
 		config:    config,
 
@@ -59,12 +59,12 @@ func NewGorumsSender(
 	}
 
 	// We delay processing `replicaConnected` events until after the configurations `connected` event has occurred.
-	s.eventLoop.RegisterHandler(hotstuff.ReplicaConnectedEvent{}, func(event any) {
+	eventloop.Register(el, func(event hotstuff.ReplicaConnectedEvent) {
 		if !s.connected {
-			s.eventLoop.DelayUntil(ConnectedEvent{}, event)
+			el.DelayUntil(ConnectedEvent{}, event)
 			return
 		}
-		s.replicaConnected(event.(hotstuff.ReplicaConnectedEvent))
+		s.replicaConnected(event)
 	})
 	return s
 }
