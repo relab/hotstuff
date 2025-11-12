@@ -20,7 +20,7 @@ type clientLatency struct {
 }
 
 func enableClientLatency(
-	eventLoop *eventloop.EventLoop,
+	el *eventloop.EventLoop,
 	metricsLogger Logger,
 	id hotstuff.ID,
 ) {
@@ -28,14 +28,11 @@ func enableClientLatency(
 		id:            id,
 		metricsLogger: metricsLogger,
 	}
-
-	eventLoop.RegisterHandler(client.LatencyMeasurementEvent{}, func(event any) {
-		latencyEvent := event.(client.LatencyMeasurementEvent)
-		lr.addLatency(latencyEvent.Latency)
+	eventloop.Register(el, func(event client.LatencyMeasurementEvent) {
+		lr.addLatency(event.Latency)
 	})
-
-	eventLoop.RegisterHandler(types.TickEvent{}, func(event any) {
-		lr.tick(event.(types.TickEvent))
+	eventloop.Register(el, func(tickEvent types.TickEvent) {
+		lr.tick(tickEvent)
 	}, eventloop.Prioritize())
 }
 

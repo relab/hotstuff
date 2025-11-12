@@ -23,7 +23,7 @@ type throughput struct {
 }
 
 func enableThroughput(
-	eventLoop *eventloop.EventLoop,
+	el *eventloop.EventLoop,
 	metricsLogger Logger,
 	id hotstuff.ID,
 ) {
@@ -31,15 +31,12 @@ func enableThroughput(
 		metricsLogger: metricsLogger,
 		id:            id,
 	}
-	eventLoop.RegisterHandler(clientpb.ExecuteEvent{}, func(event any) {
-		commitEvent := event.(clientpb.ExecuteEvent)
+	eventloop.Register(el, func(commitEvent clientpb.ExecuteEvent) {
 		t.recordCommit(len(commitEvent.Batch.Commands))
 	})
-
-	eventLoop.RegisterHandler(types.TickEvent{}, func(event any) {
-		t.tick(event.(types.TickEvent))
+	eventloop.Register(el, func(tickEvent types.TickEvent) {
+		t.tick(tickEvent)
 	}, eventloop.Prioritize())
-
 }
 
 func (t *throughput) recordCommit(commands int) {

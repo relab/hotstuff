@@ -9,6 +9,7 @@ package eventloop
 import (
 	"context"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
@@ -41,11 +42,11 @@ func Prioritize() HandlerOption {
 	}
 }
 
-// EventHandler processes an event.
-type EventHandler func(event any)
+// EventHandler processes an event of type T.
+type EventHandler[T any] func(event T)
 
 type handler struct {
-	callback EventHandler
+	callback EventHandler[any]
 	opts     handlerOpts
 }
 
@@ -84,51 +85,36 @@ func New(
 	return el
 }
 
-// RegisterHandler registers the given event handler for the given event type with the given handler options, if any.
+// Register registers the given event handler for the event type T with the given handler options, if any.
 // If no handler options are provided, the default handler options will be used.
-func (el *EventLoop) RegisterHandler(eventType any, handler EventHandler, opts ...HandlerOption) int {
-	return el.registerHandler(eventType, opts, handler)
-}
-
-func (el *EventLoop) registerHandler(eventType any, opts []HandlerOption, callback EventHandler) int {
-	h := handler{callback: callback}
-
+// The returned function can be used to unregister the handler.
+func Register[T any](el *EventLoop, callback EventHandler[T], opts ...HandlerOption) func() {
+	// wrap the typed callback so we can store it as EventHandler[any]
+	wrapped := func(e any) { callback(e.(T)) }
+	h := handler{callback: wrapped}
 	for _, opt := range opts {
 		opt(&h.opts)
 	}
+	t := reflect.TypeFor[T]()
 
 	el.mut.Lock()
 	defer el.mut.Unlock()
-	t := reflect.TypeOf(eventType)
-
-	handlers := el.handlers[t]
 
 	// search for a free slot for the handler
-	i := 0
-	for ; i < len(handlers); i++ {
-		if handlers[i].callback == nil {
-			break
-		}
-	}
-
-	// no free slots; have to grow the list
-	if i == len(handlers) {
-		handlers = append(handlers, h)
+	i := slices.IndexFunc(el.handlers[t], func(h handler) bool { return h.callback == nil })
+	if i == -1 {
+		// no free slots; have to grow the list
+		i = len(el.handlers[t])
+		el.handlers[t] = append(el.handlers[t], h)
 	} else {
-		handlers[i] = h
+		el.handlers[t][i] = h
 	}
 
-	el.handlers[t] = handlers
-
-	return i
-}
-
-// UnregisterHandler unregisters the handler for the given event type with the given id.
-func (el *EventLoop) UnregisterHandler(eventType any, id int) {
-	el.mut.Lock()
-	defer el.mut.Unlock()
-	t := reflect.TypeOf(eventType)
-	el.handlers[t][id].callback = nil
+	return func() {
+		el.mut.Lock()
+		defer el.mut.Unlock()
+		el.handlers[t][i].callback = nil
+	}
 }
 
 // AddEvent adds an event to the event queue.
@@ -211,7 +197,7 @@ func (el *EventLoop) Tick(ctx context.Context) bool {
 	return true
 }
 
-var handlerListPool = newPool(func() []EventHandler { return make([]EventHandler, 0, 10) })
+var handlerListPool = newPool(func() []EventHandler[any] { return make([]EventHandler[any], 0, 10) })
 
 // processEvent dispatches the event to the correct handler.
 func (el *EventLoop) processEvent(event any, runningInAddEvent bool) {

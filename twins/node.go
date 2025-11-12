@@ -153,8 +153,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string) (*node, error) {
 	)
 	node.timeoutManager = newTimeoutManager(n, node, node.eventLoop, node.viewStates)
 	// necessary to count executed commands.
-	node.eventLoop.RegisterHandler(hotstuff.CommitEvent{}, func(event any) {
-		commit := event.(hotstuff.CommitEvent)
+	eventloop.Register(node.eventLoop, func(commit hotstuff.CommitEvent) {
 		node.executedBlocks = append(node.executedBlocks, commit.Block)
 	})
 	commandGenerator := &commandGenerator{}
