@@ -16,7 +16,8 @@ import (
 
 // NodeID is an ID that is unique to a node in the network.
 // The ReplicaID is the ID that the node uses when taking part in the consensus protocol,
-// while the NetworkID is used to distinguish nodes on the network.
+// The TwinID is used to distinguish twins of the same replica (TwinID 1 and 2).
+// Replicas without twin have TwinID 0.
 type NodeID struct {
 	ReplicaID hotstuff.ID
 	TwinID uint32
@@ -26,14 +27,16 @@ func (id NodeID) String() string {
 	return fmt.Sprintf("r%dn%d", id.ReplicaID, id.TwinID)
 }
 
-func (id NodeID) Twin(twinId uint32) NodeID {
-	id.TwinID = twinId
+// Twin returns a NodeID with the specified twinID.
+// TwinID should be 0 for non-twins, 1 or 2 for twins.
+func (id NodeID) Twin(twinID uint32) NodeID {
+	id.TwinID = twinID
 	return id
 }
 
-func RepID(replicaId hotstuff.ID) NodeID {
+func Replica(id hotstuff.ID) NodeID {
 	return NodeID{
-		ReplicaID: replicaId,
+		ReplicaID: id,
 		TwinID: uint32(0),
 	}
 }
