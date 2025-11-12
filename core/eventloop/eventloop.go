@@ -172,8 +172,7 @@ loop:
 	}
 
 	// HACK: when we get canceled, we will handle the events that were in the queue at that time before quitting.
-	l := el.eventQ.len()
-	for i := 0; i < l; i++ {
+	for range el.eventQ.len() {
 		event, _ := el.eventQ.pop()
 		el.processEvent(event, false)
 	}
