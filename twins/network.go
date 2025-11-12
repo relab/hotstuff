@@ -2,6 +2,7 @@ package twins
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -114,29 +115,28 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 
 // createNodesAndTwins creates nodes and their twins in the network.
 // Twins receive the same private key.
-// Assumes nodes are provided in order, twins with the same ReplicaID must be consecutive.
 func (n *Network) createNodesAndTwins(nodes []NodeID, consensusName string) error {
-	lastReplicaID := hotstuff.ID(1)
-	lastPrivKey, err := keygen.GenerateECDSAPrivateKey()
-	if err != nil {
-		return fmt.Errorf("failed to generate private key: %w", err)
-	}
 	for _, nodeID := range nodes {
-		if nodeID.ReplicaID != lastReplicaID {
-			// not a twin, generate new key
-			lastPrivKey, err = keygen.GenerateECDSAPrivateKey()
+		var privKey *ecdsa.PrivateKey; var err error
+		if twins := n.replicas[nodeID.ReplicaID]; len(twins) == 0 {
+			// generate new key since this is the first replica with this ReplicaID
+			privKey, err = keygen.GenerateECDSAPrivateKey()
 			if err != nil {
 				return fmt.Errorf("failed to generate private key: %w", err)
 			}
+		} else {
+			// reuse the private key of the first replica
+			privKey = twins[0].config.PrivateKey().(*ecdsa.PrivateKey)
 		}
-
-		node, err := newNode(n, nodeID, consensusName, lastPrivKey)
+		node, err := newNode(n, nodeID, consensusName, privKey)
 		if err != nil {
 			return fmt.Errorf("failed to create node %v: %w", nodeID, err)
 		}
 		n.nodes[nodeID] = node
 		n.replicas[nodeID.ReplicaID] = append(n.replicas[nodeID.ReplicaID], node)
 	}
+	
+	
 	// need to configure the replica info after all of them were set up
 	for _, node := range n.nodes {
 		config := node.config
