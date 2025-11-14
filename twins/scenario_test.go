@@ -36,7 +36,7 @@ func TestPartitionedScenario(t *testing.T) {
 	t.Logf("Network log:\n%s", result.NetworkLog)
 }
 
-// TestPartitionedScenario2 checks that chained HotStuff will commit a block 
+// TestPartitionedScenario2 checks that chained HotStuff will commit a block
 // in fourth view after a partition
 // all nodes are honest and the leader is in a separate partition.
 func TestPartitionedScenario2(t *testing.T) {
@@ -66,8 +66,6 @@ func TestPartitionedScenario2(t *testing.T) {
 	}
 	t.Logf("Network log:\n%s", result.NetworkLog)
 }
-
-
 
 // TestBasicScenario checks if chained HotStuff will commit one block
 // when all nodes are honest and the network is not partitioned.
@@ -231,6 +229,5 @@ func TestSafetyWithTwins(t *testing.T) {
 			}
 		}
 	}
-
 
 }

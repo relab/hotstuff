@@ -21,7 +21,7 @@ import (
 // Replicas without twin have TwinID 0.
 type NodeID struct {
 	ReplicaID hotstuff.ID
-	TwinID uint32
+	TwinID    uint32
 }
 
 func (id NodeID) String() string {
@@ -38,7 +38,7 @@ func (id NodeID) Twin(twinID uint32) NodeID {
 func Replica(id hotstuff.ID) NodeID {
 	return NodeID{
 		ReplicaID: id,
-		TwinID: uint32(0),
+		TwinID:    uint32(0),
 	}
 }
 
@@ -95,9 +95,9 @@ func NewSimpleNetwork(numNodes int) *Network {
 	return network
 }
 
-// NewPartitionedNetwork creates a new Network with the specified list of views.  
-// Each view must specify a leader and a set of partitions, each with a set of nodes.  
-// One or more message types may be specified, which will be dropped at the sending node.  
+// NewPartitionedNetwork creates a new Network with the specified list of views.
+// Each view must specify a leader and a set of partitions, each with a set of nodes.
+// One or more message types may be specified, which will be dropped at the sending node.
 func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 	n := &Network{
 		nodes:      make(map[NodeID]*node),
@@ -117,7 +117,8 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 // Twins receive the same private key.
 func (n *Network) createNodesAndTwins(nodes []NodeID, consensusName string) error {
 	for _, nodeID := range nodes {
-		var privKey *ecdsa.PrivateKey; var err error
+		var privKey *ecdsa.PrivateKey
+		var err error
 		if twins := n.replicas[nodeID.ReplicaID]; len(twins) == 0 {
 			// generate new key since this is the first replica with this ReplicaID
 			privKey, err = keygen.GenerateECDSAPrivateKey()
@@ -135,8 +136,7 @@ func (n *Network) createNodesAndTwins(nodes []NodeID, consensusName string) erro
 		n.nodes[nodeID] = node
 		n.replicas[nodeID.ReplicaID] = append(n.replicas[nodeID.ReplicaID], node)
 	}
-	
-	
+
 	// need to configure the replica info after all of them were set up
 	for _, node := range n.nodes {
 		config := node.config
