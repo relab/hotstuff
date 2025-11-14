@@ -76,6 +76,11 @@ func (s *Aggregate) VerifySyncInfo(syncInfo hotstuff.SyncInfo) (qc *hotstuff.Quo
 			return nil, 0, timeout, fmt.Errorf("failed to verify aggregate quorum certificate: %w", err)
 		}
 		return &highQC, view, timeout, nil
+	} else if qc, haveQC := syncInfo.QC(); haveQC {
+		if err := s.auth.VerifyQuorumCert(qc); err != nil {
+			return nil, 0, timeout, fmt.Errorf("failed to verify quorum certificate: %w", err)
+		}
+		return &qc, view, timeout, nil
 	}
 	return nil, view, timeout, nil // aggregate quorum certificate not present, so no high QC available
 }
