@@ -10,20 +10,20 @@ import (
 
 const NameConsensusLatency = "consensus-latency"
 
-// ConsensusLatency processes consensus latency measurements and writes them to the metrics logger.
-type ConsensusLatency struct {
+// consensusLatency measures the latency of consensus decisions.
+type consensusLatency struct {
 	metricsLogger Logger
 	id            hotstuff.ID
 	wf            Welford
 }
 
-// InitModule gives the module access to the other modules.
+// enableConsensusLatency enables consensus latency measurement.
 func enableConsensusLatency(
 	el *eventloop.EventLoop,
 	metricsLogger Logger,
 	id hotstuff.ID,
 ) {
-	lr := ConsensusLatency{
+	lr := consensusLatency{
 		metricsLogger: metricsLogger,
 		id:            id,
 	}
@@ -35,16 +35,17 @@ func enableConsensusLatency(
 	}, eventloop.Prioritize())
 }
 
-// AddLatency adds a latency data point to the current measurement.
-func (lr *ConsensusLatency) addLatency(latency time.Duration) {
+// addLatency adds a latency data point to the current measurement.
+func (lr *consensusLatency) addLatency(latency time.Duration) {
 	millis := float64(latency) / float64(time.Millisecond)
 	lr.wf.Update(millis)
 }
 
-func (lr *ConsensusLatency) tick(_ types.TickEvent) {
+// tick logs the current latency measurement to the metrics logger.
+func (lr *consensusLatency) tick(_ types.TickEvent) {
 	mean, variance, count := lr.wf.Get()
 	event := &types.LatencyMeasurement{
-		Event:    types.NewReplicaEvent(uint32(lr.id), time.Now()),
+		Event:    types.NewReplicaEvent(lr.id, time.Now()),
 		Latency:  mean,
 		Variance: variance,
 		Count:    count,
