@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
@@ -238,7 +239,7 @@ func (c *ExperimentConfig) lookupByzStrategy(replicaID hotstuff.ID) string {
 // AssignClients assigns clients to hosts.
 func (c *ExperimentConfig) AssignClients() ClientMap {
 	hostsToClients := make(ClientMap)
-	nextClientID := hotstuff.ID(1)
+	nextClientID := client.ID(1)
 
 	for hostIdx, host := range c.ClientHosts {
 		numClients := c.ClientsForHost(hostIdx)
@@ -320,7 +321,7 @@ func (r ReplicaMap) ReplicaIDs(host string) []uint32 {
 }
 
 // ClientMap maps from a host to a slice of client IDs.
-type ClientMap map[string][]hotstuff.ID
+type ClientMap map[string][]client.ID
 
 // ClientIDs returns the IDs of the clients running on the given host.
 func (c ClientMap) ClientIDs(host string) []uint32 {
