@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/test"
 	"github.com/relab/hotstuff/internal/testutil"
@@ -13,9 +14,9 @@ import (
 )
 
 func createDummies(t testing.TB, count uint, cryptoName string, cacheSize int) testutil.EssentialsSet {
-	opts := make([]cert.Option, 0)
+	opts := make([]core.RuntimeOption, 0)
 	if cacheSize > 0 {
-		opts = append(opts, cert.WithCache(cacheSize))
+		opts = append(opts, core.WithCache(cacheSize))
 	}
 	return testutil.NewEssentialsSet(t, count, cryptoName, opts...)
 }

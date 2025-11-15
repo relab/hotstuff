@@ -24,7 +24,6 @@ import (
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/replica"
-	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 	"github.com/relab/hotstuff/server"
@@ -144,7 +143,9 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		return nil, err
 	}
 	// setup core - used in replica and measurement framework
-	runtimeOpts := []core.RuntimeOption{}
+	runtimeOpts := []core.RuntimeOption{
+		core.WithCache(100), // TODO: consider making this configurable
+	}
 	if opts.KauriEnabled() {
 		runtimeOpts = append(runtimeOpts, core.WithKauriTree(newTree(opts)))
 	}
@@ -208,7 +209,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		depsCore.RuntimeCfg(),
 		sender,
 		base,
-		cert.WithCache(100), // TODO: consider making this configurable
 	)
 
 	var timeoutRules synchronizer.TimeoutRuler

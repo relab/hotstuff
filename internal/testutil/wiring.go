@@ -22,11 +22,12 @@ func WireUpEssentials(
 	t testing.TB,
 	id hotstuff.ID,
 	cryptoName string,
-	opts ...cert.Option,
+	opts ...core.RuntimeOption,
 ) *Essentials {
 	t.Helper()
 	// NOTE: using synchronous vote verification to keep tests simple.
-	depsCore := wiring.NewCore(id, "test", GenerateKey(t, cryptoName), core.WithSyncVerification())
+	allOpts := append([]core.RuntimeOption{core.WithSyncVerification()}, opts...)
+	depsCore := wiring.NewCore(id, "test", GenerateKey(t, cryptoName), allOpts...)
 	sender := NewMockSender(id)
 	base, err := crypto.New(
 		depsCore.RuntimeCfg(),
@@ -41,7 +42,6 @@ func WireUpEssentials(
 		depsCore.RuntimeCfg(),
 		sender,
 		base,
-		opts...,
 	)
 	return &Essentials{
 		Core:     *depsCore, // no problem dereferencing, since the deps just hold pointers
@@ -62,7 +62,7 @@ func NewEssentialsSet(
 	t testing.TB,
 	count uint,
 	cryptoName string,
-	opts ...cert.Option,
+	opts ...core.RuntimeOption,
 ) EssentialsSet {
 	t.Helper()
 	if count == 0 {

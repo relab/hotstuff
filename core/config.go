@@ -20,6 +20,8 @@ type RuntimeConfig struct {
 	sharedRandomSeed int64
 
 	tree *tree.Tree
+
+	cacheSize int
 }
 
 func NewRuntimeConfig(id hotstuff.ID, pk hotstuff.PrivateKey, opts ...RuntimeOption) *RuntimeConfig {
@@ -74,4 +76,10 @@ func (g *RuntimeConfig) HasKauriTree() bool {
 // Tree returns the tree configuration for the tree-based leader scheme.
 func (g *RuntimeConfig) Tree() *tree.Tree {
 	return g.tree
+}
+
+// CacheSize returns the cache size for crypto operations.
+// A value of 0 means no cache is used.
+func (g *RuntimeConfig) CacheSize() int {
+	return g.cacheSize
 }

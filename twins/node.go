@@ -19,7 +19,6 @@ import (
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto"
 	"github.com/relab/hotstuff/wiring"
 )
@@ -48,7 +47,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string, pk *ecdsa.PrivateK
 	cryptoName := crypto.NameECDSA
 	node := &node{
 		id:           nodeID,
-		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVerification()),
+		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVerification(), core.WithCache(100)),
 		commandCache: clientpb.NewCommandCache(1),
 	}
 	node.logger = logging.NewWithDest(&n.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.TwinID))
@@ -67,7 +66,6 @@ func newNode(n *Network, nodeID NodeID, consensusName string, pk *ecdsa.PrivateK
 		node.config,
 		node.sender,
 		base,
-		cert.WithCache(100),
 	)
 	node.blockchain = depsSecurity.Blockchain()
 	var consensusRules consensus.Ruleset
