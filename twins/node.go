@@ -42,11 +42,12 @@ type node struct {
 	log            strings.Builder
 }
 
-func newNode(n *Network, nodeID NodeID, consensusName string, pk *ecdsa.PrivateKey) (*node, error) {
+func newNode(n *Network, nodeID NodeID, consensusName string, pk *ecdsa.PrivateKey, opts ...core.RuntimeOption) (*node, error) {
 	cryptoName := crypto.NameECDSA
+	allOpts := append([]core.RuntimeOption{core.WithSyncVerification(), core.WithCache(100)}, opts...)
 	node := &node{
 		id:           nodeID,
-		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, core.WithSyncVerification(), core.WithCache(100)),
+		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, allOpts...),
 		commandCache: clientpb.NewCommandCache(1),
 	}
 	node.logger = logging.NewWithDest(&n.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.TwinID))
