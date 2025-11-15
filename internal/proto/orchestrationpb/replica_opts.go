@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/protocol/comm"
@@ -67,6 +68,14 @@ func (x *ReplicaOpts) SetByzantineStrategy(strategy string) {
 
 func (x *ReplicaOpts) HotstuffID() hotstuff.ID {
 	return hotstuff.ID(x.GetID())
+}
+
+// ReplicaIDs returns the list of hotstuff IDs.
+func (x *StartReplicaRequest) ReplicaIDs() []hotstuff.ID {
+	if x == nil || len(x.IDs) == 0 {
+		return nil
+	}
+	return unsafe.Slice((*hotstuff.ID)(unsafe.Pointer(unsafe.SliceData(x.IDs))), len(x.IDs))
 }
 
 func (x *ReplicaOpts) SetReplicaCertificates(host string, ca *x509.Certificate, caKey *ecdsa.PrivateKey) error {
