@@ -68,22 +68,14 @@ func newNode(n *Network, nodeID NodeID, consensusName string, pk *ecdsa.PrivateK
 		base,
 	)
 	node.blockchain = depsSecurity.Blockchain()
-	var consensusRules consensus.Ruleset
-	if consensusName == nameVulnerableFHS {
-		consensusRules = NewVulnFHS(
-			node.logger,
-			node.blockchain,
-			rules.NewFastHotStuff(
-				node.logger,
-				node.config,
-				node.blockchain,
-			),
-		)
-	} else {
-		consensusRules, err = rules.New(node.logger, node.config, node.blockchain, consensusName)
-		if err != nil {
-			return nil, err
-		}
+	consensusRules, err := newTwinsConsensusRules(
+		node.logger,
+		node.config,
+		node.blockchain,
+		consensusName,
+	)
+	if err != nil {
+		return nil, err
 	}
 	node.viewStates, err = protocol.NewViewStates(node.blockchain, depsSecurity.Authority())
 	if err != nil {
