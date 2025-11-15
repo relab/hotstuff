@@ -21,7 +21,6 @@ func NewSecurity(
 	config *core.RuntimeConfig,
 	sender core.Sender,
 	base crypto.Base,
-	opts ...cert.Option,
 ) *Security {
 	blockchain := blockchain.New(
 		eventLoop,
@@ -32,7 +31,6 @@ func NewSecurity(
 		config,
 		blockchain,
 		base,
-		opts...,
 	)
 	return &Security{
 		blockchain: blockchain,

@@ -2,6 +2,7 @@
 package cert
 
 import (
+	"container/list"
 	"fmt"
 	"slices"
 
@@ -23,15 +24,19 @@ func NewAuthority(
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 	base crypto.Base,
-	opts ...Option,
 ) *Authority {
+	// Apply cache wrapping if configured in RuntimeConfig
+	if cacheSize := config.CacheSize(); cacheSize > 0 {
+		base = &Cache{
+			impl:     base,
+			capacity: cacheSize,
+			entries:  make(map[string]*list.Element, cacheSize),
+		}
+	}
 	ca := &Authority{
 		Base:       base,
 		config:     config,
 		blockchain: blockchain,
-	}
-	for _, opt := range opts {
-		opt(ca)
 	}
 	return ca
 }
