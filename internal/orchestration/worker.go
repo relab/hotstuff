@@ -54,7 +54,7 @@ type Worker struct {
 	measurementInterval time.Duration
 
 	replicas map[hotstuff.ID]*replica.Replica
-	clients  map[hotstuff.ID]*client.Client
+	clients  map[client.ID]*client.Client
 }
 
 // Run runs the worker until it receives a command to quit.
@@ -102,7 +102,7 @@ func NewWorker(send *protostream.Writer, recv *protostream.Reader, dl metrics.Lo
 		metrics:             metrics,
 		measurementInterval: measurementInterval,
 		replicas:            make(map[hotstuff.ID]*replica.Replica),
-		clients:             make(map[hotstuff.ID]*client.Client),
+		clients:             make(map[client.ID]*client.Client),
 	}
 }
 
@@ -397,7 +397,6 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		runtimeCfg := core.NewRuntimeConfig(hotstuff.ID(opts.GetID()), nil)
 		logger := logging.New("cli" + strconv.Itoa(int(opts.GetID())))
 		eventLoop := eventloop.New(logger, 1000)
 
@@ -406,7 +405,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 				eventLoop,
 				logger,
 				w.metricsLogger,
-				runtimeCfg.ID(),
+				hotstuff.ID(opts.GetID()),
 				w.measurementInterval,
 				w.metrics...,
 			)
@@ -418,7 +417,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		cli := client.New(
 			eventLoop,
 			logger,
-			runtimeCfg,
+			opts.ClientID(),
 			c,
 		)
 		cfg, err := getConfiguration(req.GetConfiguration(), true)
@@ -431,14 +430,14 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		}
 		cli.Start()
 		w.metricsLogger.Log(&types.StartEvent{Event: types.NewClientEvent(opts.GetID(), time.Now())})
-		w.clients[hotstuff.ID(opts.GetID())] = cli
+		w.clients[opts.ClientID()] = cli
 	}
 	return &orchestrationpb.StartClientResponse{}, nil
 }
 
 func (w *Worker) stopClients(req *orchestrationpb.StopClientRequest) (*orchestrationpb.StopClientResponse, error) {
 	for _, id := range req.GetIDs() {
-		cli, ok := w.clients[hotstuff.ID(id)]
+		cli, ok := w.clients[client.ID(id)]
 		if !ok {
 			return nil, status.Errorf(codes.NotFound, "the client with ID %d was not found", id)
 		}
