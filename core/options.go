@@ -37,12 +37,11 @@ func WithAggregateQC() RuntimeOption {
 	}
 }
 
-// WithCache wraps the CryptoBase implementation with one that caches the results of crypto operations.
-func WithCache(cacheSize int) RuntimeOption {
-	if cacheSize <= 0 {
-		panic("cache size cannot be zero")
-	}
+// WithCache specifies the cache size for crypto operations. This option causes
+// the Crypto implementation to be wrapped in a caching layer that caches the
+// results of recent crypto operations, avoiding repeated computations.
+func WithCache(size uint) RuntimeOption {
 	return func(g *RuntimeConfig) {
-		g.cacheSize = cacheSize
+		g.cacheSize = size
 	}
 }

@@ -13,7 +13,7 @@ import (
 	"github.com/relab/hotstuff/security/crypto"
 )
 
-func createDummies(t testing.TB, count uint, cryptoName string, cacheSize int) testutil.EssentialsSet {
+func createDummies(t testing.TB, count uint, cryptoName string, cacheSize uint) testutil.EssentialsSet {
 	opts := make([]core.RuntimeOption, 0)
 	if cacheSize > 0 {
 		opts = append(opts, core.WithCache(cacheSize))
@@ -21,7 +21,7 @@ func createDummies(t testing.TB, count uint, cryptoName string, cacheSize int) t
 	return testutil.NewEssentialsSet(t, count, cryptoName, opts...)
 }
 
-func createSignersWithBlock(t testing.TB, cryptoName string, cacheSize int) ([]*cert.Authority, *hotstuff.Block) {
+func createSignersWithBlock(t testing.TB, cryptoName string, cacheSize uint) ([]*cert.Authority, *hotstuff.Block) {
 	const n = 4
 	dummies := createDummies(t, n, cryptoName, cacheSize)
 	signers := dummies.Signers()
@@ -34,7 +34,7 @@ func createSignersWithBlock(t testing.TB, cryptoName string, cacheSize int) ([]*
 
 var testData = []struct {
 	cryptoName string
-	cacheSize  int
+	cacheSize  uint
 }{
 	{cryptoName: crypto.NameECDSA},
 	{cryptoName: crypto.NameEDDSA},
@@ -406,7 +406,7 @@ func TestVerifyAggregateQCHighQCMismatch(t *testing.T) {
 func TestVerifyAggregateQC(t *testing.T) {
 	type testCase struct {
 		cryptoName string
-		cacheSize  int
+		cacheSize  uint
 		n          int
 		qcsPer     int
 	}
@@ -458,7 +458,7 @@ func TestVerifyAggregateQCReproduceBLS12FailVerify(t *testing.T) {
 
 	tests := []struct {
 		cryptoName string
-		cacheSize  int
+		cacheSize  uint
 		n          int
 		qcsPer     int
 	}{
@@ -508,7 +508,7 @@ func TestVerifyAnyQC(t *testing.T) {
 func BenchmarkVerifyAggregateQC(b *testing.B) {
 	type benchCase struct {
 		cryptoName string
-		cacheSize  int
+		cacheSize  uint
 		n          int
 		qcsPer     int
 	}
@@ -552,7 +552,7 @@ func BenchmarkVerifyAggregateQC(b *testing.B) {
 // - Only the lowest view (view 1) has a valid QC
 // - All higher views have invalid QCs (blocks not stored in blockchain)
 // - This forces findHighestValidQC to iterate through all invalid QCs before finding the valid one
-func buildAuthsAndAggregateQC(tb testing.TB, n int, cryptoName string, cacheSize, numQCs int) (*cert.Authority, hotstuff.AggregateQC) {
+func buildAuthsAndAggregateQC(tb testing.TB, n int, cryptoName string, cacheSize uint, numQCs int) (*cert.Authority, hotstuff.AggregateQC) {
 	tb.Helper()
 	if n <= 0 {
 		tb.Fatalf("participant count must be > 0")
