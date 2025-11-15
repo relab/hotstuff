@@ -64,8 +64,8 @@ tools: download ## Install development tools
 
 test: ## Run all tests with verbose output (logs to .log/test.log)
 	@mkdir -p .log
-	@echo "Running tests... (output in .log/test.log)"
-	@go test -v ./... > .log/test.log 2>&1 && echo "Tests passed! See .log/test.log for details" || (echo "Tests failed! See .log/test.log for details" && exit 1)
+	@echo "Running tests always (not cached)... (output in .log/test.log)"
+	@go test -count=1 -v ./... > .log/test.log 2>&1 && echo "Tests passed! See .log/test.log for details" || (echo "Tests failed! See .log/test.log for details" && exit 1)
 
 short: ## Run short tests only
 	@go test -short ./...
