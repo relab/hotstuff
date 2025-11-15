@@ -211,12 +211,6 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		base,
 	)
 
-	var timeoutRules synchronizer.TimeoutRuler
-	if depsCore.RuntimeCfg().HasAggregateQC() {
-		timeoutRules = synchronizer.NewAggregate(depsCore.RuntimeCfg(), depsSecure.Authority())
-	} else {
-		timeoutRules = synchronizer.NewSimple(depsCore.RuntimeCfg(), depsSecure.Authority())
-	}
 	consensusRules, viewStates, leaderRotation, comm, viewDuration, err := initConsensusModules(depsCore, depsSecure, sender, opts)
 	if err != nil {
 		return nil, err
@@ -230,7 +224,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		leaderRotation,
 		consensusRules,
 		viewDuration,
-		timeoutRules,
+		synchronizer.NewTimeoutRuler(depsCore.RuntimeCfg(), depsSecure.Authority()),
 		opts.GetBatchSize(),
 		replicaOpts...,
 	)
