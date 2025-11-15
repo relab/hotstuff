@@ -15,7 +15,6 @@ import (
 	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
-	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/protocol/synchronizer"
 	"github.com/relab/hotstuff/protocol/votingmachine"
 	"github.com/relab/hotstuff/security/blockchain"
@@ -116,14 +115,6 @@ func newNode(n *Network, nodeID NodeID, consensusName string, pk *ecdsa.PrivateK
 		node.commandCache,
 		committer,
 	)
-	var timeoutRules synchronizer.TimeoutRuler
-	if consensusName == rules.NameFastHotStuff || consensusName == nameVulnerableFHS {
-		// Use aggregated quorum certificates.
-		// This must be true for Fast-HotStuff: https://arxiv.org/abs/2010.11454
-		timeoutRules = synchronizer.NewAggregate(node.config, depsSecurity.Authority())
-	} else {
-		timeoutRules = synchronizer.NewSimple(node.config, depsSecurity.Authority())
-	}
 	node.synchronizer = synchronizer.New(
 		node.eventLoop,
 		node.logger,
@@ -131,7 +122,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string, pk *ecdsa.PrivateK
 		depsSecurity.Authority(),
 		node.leaderRotation,
 		synchronizer.NewFixedDuration(500*time.Millisecond),
-		timeoutRules,
+		synchronizer.NewTimeoutRuler(node.config, depsSecurity.Authority()),
 		node.proposer,
 		node.voter,
 		node.viewStates,
