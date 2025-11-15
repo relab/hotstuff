@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
-
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/metrics/types"
@@ -17,11 +16,11 @@ const NameThroughput = "throughput"
 type throughput struct {
 	metricsLogger Logger
 	id            hotstuff.ID
-
-	commitCount  uint64
-	commandCount uint64
+	commitCount   uint64
+	commandCount  uint64
 }
 
+// enableThroughput enables throughput measurement.
 func enableThroughput(
 	el *eventloop.EventLoop,
 	metricsLogger Logger,
@@ -39,15 +38,17 @@ func enableThroughput(
 	}, eventloop.Prioritize())
 }
 
+// recordCommit records a commit with the given number of commands.
 func (t *throughput) recordCommit(commands int) {
 	t.commitCount++
 	t.commandCount += uint64(commands)
 }
 
+// tick logs the current throughput measurement to the metrics logger.
 func (t *throughput) tick(tick types.TickEvent) {
 	now := time.Now()
 	event := &types.ThroughputMeasurement{
-		Event:    types.NewReplicaEvent(uint32(t.id), now),
+		Event:    types.NewReplicaEvent(t.id, now),
 		Commits:  t.commitCount,
 		Commands: t.commandCount,
 		Duration: durationpb.New(now.Sub(tick.LastTick)),

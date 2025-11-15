@@ -339,8 +339,8 @@ func newTree(opts *orchestrationpb.ReplicaOpts) *tree.Tree {
 }
 
 func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orchestrationpb.StartReplicaResponse, error) {
-	for _, id := range req.GetIDs() {
-		replica, ok := w.replicas[hotstuff.ID(id)]
+	for _, id := range req.ReplicaIDs() {
+		replica, ok := w.replicas[id]
 		if !ok {
 			return nil, status.Errorf(codes.NotFound, "The replica with ID %d was not found.", id)
 		}
@@ -353,7 +353,7 @@ func (w *Worker) startReplicas(req *orchestrationpb.StartReplicaRequest) (*orche
 			return nil, err
 		}
 
-		defer func(id uint32) {
+		defer func(id hotstuff.ID) {
 			w.metricsLogger.Log(&types.StartEvent{Event: types.NewReplicaEvent(id, time.Now())})
 			replica.Start()
 		}(id)
@@ -405,7 +405,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 				eventLoop,
 				logger,
 				w.metricsLogger,
-				hotstuff.ID(opts.GetID()),
+				opts.ClientID(),
 				w.measurementInterval,
 				w.metrics...,
 			)
@@ -429,7 +429,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			return nil, err
 		}
 		cli.Start()
-		w.metricsLogger.Log(&types.StartEvent{Event: types.NewClientEvent(opts.GetID(), time.Now())})
+		w.metricsLogger.Log(&types.StartEvent{Event: types.NewClientEvent(opts.ClientID(), time.Now())})
 		w.clients[opts.ClientID()] = cli
 	}
 	return &orchestrationpb.StartClientResponse{}, nil
