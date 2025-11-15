@@ -22,57 +22,57 @@ const fhsBugScenario = `
 		[
 			{
 				"leader": 1,
-				"partitions": [ [1, 2, 3, 4], [] ],
+				"partitions": [ [{"ReplicaID": 1}, {"ReplicaID": 2}, {"ReplicaID": 3}, {"ReplicaID": 4}], [] ],
 				"comment": "view 1"
 			},
 			{
 				"leader": 1,
-				"partitions": [ [1, 2, 3, 4], [] ],
+				"partitions": [ [{"ReplicaID": 1}, {"ReplicaID": 2}, {"ReplicaID": 3}, {"ReplicaID": 4}], [] ],
 				"comment": "view 2"
 			},
 			{
 				"leader": 1,
-				"partitions": [ [1, 2, 3, 4], [] ],
+				"partitions": [ [{"ReplicaID": 1}, {"ReplicaID": 2}, {"ReplicaID": 3}, {"ReplicaID": 4}], [] ],
 				"comment": "view 3"
 			},
 			{
 				"leader": 1,
-				"partitions": [ [1, 2, 3, 4], [] ],
+				"partitions": [ [{"ReplicaID": 1}, {"ReplicaID": 2}, {"ReplicaID": 3}, {"ReplicaID": 4}], [] ],
 				"comment": "view 4. replicas time out in this view"
 			},
 			{
 				"leader": 2,
-				"partitions": [ [1, 3, 4], [2] ],
+				"partitions": [ [{"ReplicaID": 1}, {"ReplicaID": 3}, {"ReplicaID": 4}], [{"ReplicaID": 2}] ],
 				"comment": "view 5."
 			},
 			{
 				"leader": 1,
-				"partitions": [ [1, 3, 4], [2] ],
+				"partitions": [ [{"ReplicaID": 1}, {"ReplicaID": 3}, {"ReplicaID": 4}], [{"ReplicaID": 2}] ],
 				"comment": "view 6"
 			},
 			{
 				"leader": 3,
-				"partitions": [ [1, 2, 4], [3] ],
+				"partitions": [ [{"ReplicaID": 1}, {"ReplicaID": 2}, {"ReplicaID": 4}], [{"ReplicaID": 3}] ],
 				"comment": "view 7"
 			},
 			{
 				"leader": 2,
-				"partitions": [ [1, 2, 4], [3] ],
+				"partitions": [ [{"ReplicaID": 1}, {"ReplicaID": 2}, {"ReplicaID": 4}], [{"ReplicaID": 3}] ],
 				"comment": "view 8"
 			},
 			{
 				"leader": 2,
-				"partitions": [ [1, 3, 4], [2] ],
+				"partitions": [ [{"ReplicaID": 1}, {"ReplicaID": 3}, {"ReplicaID": 4}], [{"ReplicaID": 2}] ],
 				"comment": "view 9"
 			},
 			{
 				"leader": 3,
-				"partitions": [ [1, 3, 4], [2] ],
+				"partitions": [ [{"ReplicaID": 1}, {"ReplicaID": 3}, {"ReplicaID": 4}], [{"ReplicaID": 2}] ],
 				"comment": "view 10"
 			},
 			{
 				"leader": 3,
-				"partitions": [ [1, 3, 4], [2] ],
+				"partitions": [ [{"ReplicaID": 1}, {"ReplicaID": 3}, {"ReplicaID": 4}], [{"ReplicaID": 2}] ],
 				"comment": "view 11"
 			}
 		]
