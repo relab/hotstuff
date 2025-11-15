@@ -29,7 +29,7 @@ func NewAuthority(
 	if cacheSize := config.CacheSize(); cacheSize > 0 {
 		base = &Cache{
 			impl:     base,
-			capacity: cacheSize,
+			capacity: int(cacheSize),
 			entries:  make(map[string]*list.Element, cacheSize),
 		}
 	}

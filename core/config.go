@@ -21,7 +21,8 @@ type RuntimeConfig struct {
 
 	tree *tree.Tree
 
-	cacheSize int
+	// Cache size for crypto operations.
+	cacheSize uint
 }
 
 func NewRuntimeConfig(id hotstuff.ID, pk hotstuff.PrivateKey, opts ...RuntimeOption) *RuntimeConfig {
@@ -80,6 +81,6 @@ func (g *RuntimeConfig) Tree() *tree.Tree {
 
 // CacheSize returns the cache size for crypto operations.
 // A value of 0 means no cache is used.
-func (g *RuntimeConfig) CacheSize() int {
+func (g *RuntimeConfig) CacheSize() uint {
 	return g.cacheSize
 }
