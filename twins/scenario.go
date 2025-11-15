@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/relab/hotstuff/core"
+
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/protocol/leaderrotation"
@@ -46,7 +48,7 @@ type ScenarioResult struct {
 }
 
 // ExecuteScenario executes a twins scenario.
-func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, consensusName string) (result ScenarioResult, err error) {
+func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, consensusName string, opts ...core.RuntimeOption) (result ScenarioResult, err error) {
 	// Network simulator that blocks proposals, votes, and fetch requests between nodes that are in different partitions.
 	// Timeout and NewView messages are permitted.
 	network := NewPartitionedNetwork(scenario,
@@ -60,7 +62,7 @@ func ExecuteScenario(scenario Scenario, numNodes, numTwins uint8, numTicks int, 
 	nodes, twins := assignNodeIDs(numNodes, numTwins)
 	nodes = append(nodes, twins...)
 
-	err = network.createNodesAndTwins(nodes, consensusName)
+	err = network.createNodesAndTwins(nodes, consensusName, opts...)
 	if err != nil {
 		return ScenarioResult{}, err
 	}

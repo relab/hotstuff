@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/twins"
 )
@@ -86,7 +87,7 @@ var (
 )
 
 func TestFHSBug(t *testing.T) {
-	t.Skip("This test is not working as expected; skipping until we have fixed the issue.")
+	// t.Skip("This test is not working as expected; skipping until we have fixed the issue.")
 	logging.SetLogLevel(*logLevel)
 
 	src, err := twins.FromJSON(strings.NewReader(fhsBugScenario))
@@ -101,7 +102,7 @@ func TestFHSBug(t *testing.T) {
 
 	settings := src.Settings()
 
-	res, err := twins.ExecuteScenario(scenario, settings.NumNodes, settings.NumTwins, 100, vulnerableModule)
+	res, err := twins.ExecuteScenario(scenario, settings.NumNodes, settings.NumTwins, 100, vulnerableModule, core.WithAggregateQC())
 	if err != nil {
 		t.Fatalf("failed to execute scenario: %v", err)
 	}

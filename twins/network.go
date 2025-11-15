@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/security/crypto/keygen"
 )
@@ -115,7 +116,7 @@ func NewPartitionedNetwork(views []View, dropTypes ...any) *Network {
 
 // createNodesAndTwins creates nodes and their twins in the network.
 // Twins receive the same private key.
-func (n *Network) createNodesAndTwins(nodes []NodeID, consensusName string) error {
+func (n *Network) createNodesAndTwins(nodes []NodeID, consensusName string, opts ...core.RuntimeOption) error {
 	for _, nodeID := range nodes {
 		var privKey *ecdsa.PrivateKey
 		var err error
@@ -129,7 +130,7 @@ func (n *Network) createNodesAndTwins(nodes []NodeID, consensusName string) erro
 			// reuse the private key of the first replica
 			privKey = twins[0].config.PrivateKey().(*ecdsa.PrivateKey)
 		}
-		node, err := newNode(n, nodeID, consensusName, privKey)
+		node, err := newNode(n, nodeID, consensusName, privKey, opts...)
 		if err != nil {
 			return fmt.Errorf("failed to create node %v: %w", nodeID, err)
 		}
@@ -200,13 +201,11 @@ func (n *Network) tick() {
 		for node.eventLoop.Tick(context.Background()) { //revive:disable-line:empty-block
 		}
 	}
-
 }
 
 // shouldDrop decides if the sender should drop the message, based on the current view of the sender and the
 // partitions configured for that view.
 func (n *Network) shouldDrop(sender, receiver NodeID, message any, view hotstuff.View) bool {
-
 	// Index into viewPartitions.
 	i := int(view) - 1
 
