@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff"
+	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/config"
 	"github.com/relab/hotstuff/internal/latency"
@@ -166,7 +167,7 @@ type assignmentsFileContents struct {
 	// the host associated with each replica.
 	HostsToReplicas map[string][]hotstuff.ID
 	// the host associated with each client.
-	HostsToClients map[string][]hotstuff.ID
+	HostsToClients map[string][]client.ID
 }
 
 func (e *Experiment) writeAssignmentsFile(replicaMap config.ReplicaMap, clientIDs config.ClientMap) (err error) {
@@ -257,7 +258,7 @@ func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration, src
 		req.Configuration = cfg.GetReplicas()
 		req.CertificateAuthority = keygen.CertToPEM(e.ca)
 		for _, id := range clientMap[host] {
-			clientOpts := proto.Clone(srcClientOpt).(*orchestrationpb.ClientOpts)
+			clientOpts := proto.CloneOf(srcClientOpt)
 			clientOpts.ID = uint32(id)
 			req.Clients[uint32(id)] = clientOpts
 			e.logger.Infof("client %d assigned to host %s", id, host)
@@ -272,8 +273,7 @@ func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration, src
 
 func (e *Experiment) stopClients(clientMap config.ClientMap) error {
 	for host, worker := range e.workers {
-		req := &orchestrationpb.StopClientRequest{}
-		req.IDs = clientMap.ClientIDs(host)
+		req := &orchestrationpb.StopClientRequest{IDs: clientMap.ClientIDs(host)}
 		_, err := worker.StopClient(req)
 		if err != nil {
 			return err
