@@ -33,7 +33,11 @@ func WrapGorumsSender(
 		tree:  config.Tree(),
 	}
 	eventloop.Register(el, func(_ hotstuff.ReplicaConnectedEvent) {
-		kauriCfg := kauripb.ConfigurationFromRaw(base.GorumsConfig(), nil)
+		// translate the base hotstuffpb.Configuration to kauripb.Configuration
+		kauriCfg, err := kauripb.ConfigurationFromRaw(base.GorumsConfig(), nil)
+		if err != nil {
+			panic(err) // should not happen
+		}
 		for _, n := range kauriCfg.Nodes() {
 			s.nodes[hotstuff.ID(n.ID())] = n
 		}

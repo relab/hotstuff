@@ -184,4 +184,4 @@ func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMs
 	impl.srv.eventLoop.AddEvent(timeoutMsg)
 }
 
-var _ hotstuffpb.Consensus = (*serviceImpl)(nil)
+var _ hotstuffpb.ConsensusServer = (*serviceImpl)(nil)
