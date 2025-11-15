@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/core"
@@ -393,9 +392,6 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			MaxConcurrent: opts.GetMaxConcurrent(),
 			PayloadSize:   opts.GetPayloadSize(),
 			Input:         io.NopCloser(rand.Reader),
-			ManagerOptions: []gorums.ManagerOption{
-				gorums.WithDialTimeout(opts.GetConnectTimeout().AsDuration()),
-			},
 			RateLimit:        opts.GetRateLimit(),
 			RateStep:         opts.GetRateStep(),
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),

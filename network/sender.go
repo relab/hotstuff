@@ -3,6 +3,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -172,9 +173,8 @@ func (s *GorumsSender) RequestBlock(ctx context.Context, hash hotstuff.Hash) (*h
 	cfg := s.pbCfg
 	protoBlock, err := cfg.RequestBlock(ctx, &hotstuffpb.BlockHash{Hash: hash[:]})
 	if err != nil {
-		qcErr, ok := err.(gorums.QuorumCallError)
 		// filter out context errors
-		if !ok || (qcErr.Reason != context.Canceled.Error() && qcErr.Reason != context.DeadlineExceeded.Error()) {
+		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 			s.logger.Infof("Failed to fetch block: %v", err)
 		}
 		return nil, false
