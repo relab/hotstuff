@@ -12,20 +12,21 @@ import (
 const NameFastHotStuff = "fasthotstuff"
 
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
+// See the paper for details: https://arxiv.org/abs/2010.11454
 type FastHotStuff struct {
 	logger     logging.Logger
 	config     *core.RuntimeConfig
 	blockchain *blockchain.Blockchain
 }
 
-// NewFastHotStuff returns a new instance of the Fast-HotStuff consensus ruleset.
+// NewFastHotStuff returns a new instance of the FastHotStuff consensus ruleset.
 func NewFastHotStuff(
 	logger logging.Logger,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 ) *FastHotStuff {
 	if !config.HasAggregateQC() {
-		panic("aggregate qc must be enabled for fasthotstuff")
+		panic(NameFastHotStuff + " requires aggregated quorum certificates")
 	}
 	return &FastHotStuff{
 		logger:     logger,
