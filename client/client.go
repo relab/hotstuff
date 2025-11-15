@@ -14,7 +14,6 @@ import (
 
 	"github.com/relab/gorums"
 	"github.com/relab/hotstuff"
-	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
@@ -24,6 +23,9 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
+
+// ID is the identifier for a client.
+type ID uint32
 
 type qspec struct {
 	faulty int
@@ -61,7 +63,7 @@ type Config struct {
 type Client struct {
 	eventLoop *eventloop.EventLoop
 	logger    logging.Logger
-	config    *core.RuntimeConfig
+	id        ID
 
 	mut              sync.Mutex
 	mgr              *clientpb.Manager
@@ -82,13 +84,13 @@ type Client struct {
 func New(
 	eventLoop *eventloop.EventLoop,
 	logger logging.Logger,
-	config *core.RuntimeConfig,
+	id ID,
 	conf Config,
 ) (client *Client) {
 	client = &Client{
 		eventLoop: eventLoop,
 		logger:    logger,
-		config:    config,
+		id:        id,
 
 		pendingCmds:      make(chan pendingCmd, conf.MaxConcurrent),
 		highestCommitted: 1,
@@ -230,7 +232,7 @@ loop:
 		}
 
 		cmd := &clientpb.Command{
-			ClientID:       uint32(c.config.ID()),
+			ClientID:       uint32(c.id),
 			SequenceNumber: num,
 			Data:           data[:n],
 		}
