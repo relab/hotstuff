@@ -387,17 +387,17 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 		w.metricsLogger.Log(opts)
 
 		c := client.Config{
-			TLS:           opts.GetUseTLS(),
-			RootCAs:       cp,
-			MaxConcurrent: opts.GetMaxConcurrent(),
-			PayloadSize:   opts.GetPayloadSize(),
-			Input:         io.NopCloser(rand.Reader),
+			TLS:              opts.GetUseTLS(),
+			RootCAs:          cp,
+			MaxConcurrent:    opts.GetMaxConcurrent(),
+			PayloadSize:      opts.GetPayloadSize(),
+			Input:            io.NopCloser(rand.Reader),
 			RateLimit:        opts.GetRateLimit(),
 			RateStep:         opts.GetRateStep(),
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		logger := logging.New("cli" + strconv.Itoa(int(opts.GetID())))
+		logger := logging.New("cli" + opts.ClientIDString())
 		eventLoop := eventloop.New(logger, 1000)
 
 		if w.measurementInterval > 0 {
@@ -436,8 +436,8 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 }
 
 func (w *Worker) stopClients(req *orchestrationpb.StopClientRequest) (*orchestrationpb.StopClientResponse, error) {
-	for _, id := range req.GetIDs() {
-		cli, ok := w.clients[client.ID(id)]
+	for _, id := range req.ClientIDs() {
+		cli, ok := w.clients[id]
 		if !ok {
 			return nil, status.Errorf(codes.NotFound, "the client with ID %d was not found", id)
 		}
