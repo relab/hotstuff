@@ -221,7 +221,7 @@ func (c *Authority) VerifySyncInfo(syncInfo hotstuff.SyncInfo) (highQC *hotstuff
 		timeout = true
 	}
 
-	if aggQC, haveQC := syncInfo.AggQC(); haveQC {
+	if aggQC, haveAggQC := syncInfo.AggQC(); haveAggQC {
 		qc, err := c.VerifyAggregateQC(aggQC)
 		if err != nil {
 			return nil, 0, timeout, fmt.Errorf("failed to verify aggregate quorum certificate: %w", err)
@@ -237,9 +237,12 @@ func (c *Authority) VerifySyncInfo(syncInfo hotstuff.SyncInfo) (highQC *hotstuff
 		}
 		view = max(view, qc.View())
 		if qc.View() == view {
-			// QC's view is highest or equal; it's not a timeout
+			// QC's view is higher or equal: not a timeout
 			highQC = &qc
 			timeout = false
+		} else if highQC == nil {
+			// QC's view is lower, but there was no AggQC
+			highQC = &qc
 		}
 	}
 
