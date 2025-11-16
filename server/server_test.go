@@ -310,10 +310,6 @@ func createServers(t *testing.T, td testData) []replicaDeps {
 				sender,
 			),
 		)
-		timeoutRuler := synchronizer.NewSimple(
-			depsCore.RuntimeCfg(),
-			depsSecurity.Authority(),
-		)
 		synchronizer := synchronizer.New(
 			depsCore.EventLoop(),
 			depsCore.Logger(),
@@ -321,7 +317,7 @@ func createServers(t *testing.T, td testData) []replicaDeps {
 			depsSecurity.Authority(),
 			leaderRotation,
 			synchronizer.NewFixedDuration(100*time.Millisecond),
-			timeoutRuler,
+			synchronizer.NewTimeoutRuler(depsCore.RuntimeCfg(), depsSecurity.Authority()),
 			depsConsensus.Proposer(),
 			depsConsensus.Voter(),
 			states,

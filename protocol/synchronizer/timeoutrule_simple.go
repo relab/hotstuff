@@ -14,8 +14,8 @@ type Simple struct {
 	auth   *cert.Authority
 }
 
-// NewSimple returns a simple timeout rule instance.
-func NewSimple(
+// newSimple returns a simple timeout rule instance.
+func newSimple(
 	config *core.RuntimeConfig,
 	auth *cert.Authority,
 ) *Simple {
