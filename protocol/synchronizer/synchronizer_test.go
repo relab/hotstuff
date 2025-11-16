@@ -176,33 +176,37 @@ func TestAdvanceView(t *testing.T) {
 	}{
 		// four signers; quorum reached, advance view
 		{name: "signers=4/Simple___/__/__/__", tr: S, qc: F, tc: F, ac: F, firstSignerIdx: 0, wantView: 1}, // empty syncInfo, should not advance view
-		{name: "signers=4/Simple___/__/__/AC", tr: S, qc: F, tc: F, ac: T, firstSignerIdx: 0, wantView: 1}, // simple timeout rule ignores aggregate timeout cert, will not advance view
+		{name: "signers=4/Simple___/__/__/AC", tr: S, qc: F, tc: F, ac: T, firstSignerIdx: 0, wantView: 2}, // advance view; simple timeout rule no longer ignores aggregate certs: cert.Authority.VerifySyncInfo()
 		{name: "signers=4/Simple___/__/TC/__", tr: S, qc: F, tc: T, ac: F, firstSignerIdx: 0, wantView: 2},
 		{name: "signers=4/Simple___/__/TC/AC", tr: S, qc: F, tc: T, ac: T, firstSignerIdx: 0, wantView: 2},
 		{name: "signers=4/Simple___/QC/__/__", tr: S, qc: T, tc: F, ac: F, firstSignerIdx: 0, wantView: 2},
 		{name: "signers=4/Simple___/QC/__/AC", tr: S, qc: T, tc: F, ac: T, firstSignerIdx: 0, wantView: 2},
+		{name: "signers=4/Simple___/QC/TC/__", tr: S, qc: T, tc: T, ac: F, firstSignerIdx: 0, wantView: 2},
 		{name: "signers=4/Simple___/QC/TC/AC", tr: S, qc: T, tc: T, ac: T, firstSignerIdx: 0, wantView: 2},
 		{name: "signers=4/Aggregate/__/__/__", tr: A, qc: F, tc: F, ac: F, firstSignerIdx: 0, wantView: 1}, // empty syncInfo, should not advance view
 		{name: "signers=4/Aggregate/__/__/AC", tr: A, qc: F, tc: F, ac: T, firstSignerIdx: 0, wantView: 2},
 		{name: "signers=4/Aggregate/__/TC/__", tr: A, qc: F, tc: T, ac: F, firstSignerIdx: 0, wantView: 2},
 		{name: "signers=4/Aggregate/__/TC/AC", tr: A, qc: F, tc: T, ac: T, firstSignerIdx: 0, wantView: 2},
-		{name: "signers=4/Aggregate/QC/__/__", tr: A, qc: T, tc: F, ac: F, firstSignerIdx: 0, wantView: 1}, // aggregate timeout rule ignores quorum cert, will not advance view
+		{name: "signers=4/Aggregate/QC/__/__", tr: A, qc: T, tc: F, ac: F, firstSignerIdx: 0, wantView: 2}, // advance view; aggregate timeout rule no longer ignores quorum certs: cert.Authority.VerifySyncInfo()
 		{name: "signers=4/Aggregate/QC/__/AC", tr: A, qc: T, tc: F, ac: T, firstSignerIdx: 0, wantView: 2},
+		{name: "signers=4/Aggregate/QC/TC/__", tr: A, qc: T, tc: T, ac: F, firstSignerIdx: 0, wantView: 2},
 		{name: "signers=4/Aggregate/QC/TC/AC", tr: A, qc: T, tc: T, ac: T, firstSignerIdx: 0, wantView: 2},
-		// three signers; quorum reacted, advance view
+		// three signers; quorum reached, advance view
 		{name: "signers=3/Simple___/__/__/__", tr: S, qc: F, tc: F, ac: F, firstSignerIdx: 1, wantView: 1}, // empty syncInfo, should not advance view
-		{name: "signers=3/Simple___/__/__/AC", tr: S, qc: F, tc: F, ac: T, firstSignerIdx: 1, wantView: 1}, // simple timeout rule ignores aggregate timeout cert, will not advance view
+		{name: "signers=3/Simple___/__/__/AC", tr: S, qc: F, tc: F, ac: T, firstSignerIdx: 1, wantView: 2}, // advance view; simple timeout rule no longer ignores aggregate certs: cert.Authority.VerifySyncInfo()
 		{name: "signers=3/Simple___/__/TC/__", tr: S, qc: F, tc: T, ac: F, firstSignerIdx: 1, wantView: 2},
 		{name: "signers=3/Simple___/__/TC/AC", tr: S, qc: F, tc: T, ac: T, firstSignerIdx: 1, wantView: 2},
 		{name: "signers=3/Simple___/QC/__/__", tr: S, qc: T, tc: F, ac: F, firstSignerIdx: 1, wantView: 2},
 		{name: "signers=3/Simple___/QC/__/AC", tr: S, qc: T, tc: F, ac: T, firstSignerIdx: 1, wantView: 2},
+		{name: "signers=3/Simple___/QC/TC/__", tr: S, qc: T, tc: T, ac: F, firstSignerIdx: 1, wantView: 2},
 		{name: "signers=3/Simple___/QC/TC/AC", tr: S, qc: T, tc: T, ac: T, firstSignerIdx: 1, wantView: 2},
 		{name: "signers=3/Aggregate/__/__/__", tr: A, qc: F, tc: F, ac: F, firstSignerIdx: 1, wantView: 1}, // empty syncInfo, should not advance view
 		{name: "signers=3/Aggregate/__/__/AC", tr: A, qc: F, tc: F, ac: T, firstSignerIdx: 1, wantView: 2},
 		{name: "signers=3/Aggregate/__/TC/__", tr: A, qc: F, tc: T, ac: F, firstSignerIdx: 1, wantView: 2},
 		{name: "signers=3/Aggregate/__/TC/AC", tr: A, qc: F, tc: T, ac: T, firstSignerIdx: 1, wantView: 2},
-		{name: "signers=3/Aggregate/QC/__/__", tr: A, qc: T, tc: F, ac: F, firstSignerIdx: 1, wantView: 1}, // aggregate timeout rule ignores quorum cert, will not advance view
+		{name: "signers=3/Aggregate/QC/__/__", tr: A, qc: T, tc: F, ac: F, firstSignerIdx: 1, wantView: 2}, // advance view; aggregate timeout rule no longer ignores quorum certs: cert.Authority.VerifySyncInfo()
 		{name: "signers=3/Aggregate/QC/__/AC", tr: A, qc: T, tc: F, ac: T, firstSignerIdx: 1, wantView: 2},
+		{name: "signers=3/Aggregate/QC/TC/__", tr: A, qc: T, tc: T, ac: F, firstSignerIdx: 1, wantView: 2},
 		{name: "signers=3/Aggregate/QC/TC/AC", tr: A, qc: T, tc: T, ac: T, firstSignerIdx: 1, wantView: 2},
 		// only two signers; no quorum reached, should not advance view
 		{name: "signers=2/Simple___/__/__/__", tr: S, qc: F, tc: F, ac: F, firstSignerIdx: 2, wantView: 1}, // empty syncInfo, should not advance view
@@ -211,6 +215,7 @@ func TestAdvanceView(t *testing.T) {
 		{name: "signers=2/Simple___/__/TC/AC", tr: S, qc: F, tc: T, ac: T, firstSignerIdx: 2, wantView: 1},
 		{name: "signers=2/Simple___/QC/__/__", tr: S, qc: T, tc: F, ac: F, firstSignerIdx: 2, wantView: 1},
 		{name: "signers=2/Simple___/QC/__/AC", tr: S, qc: T, tc: F, ac: T, firstSignerIdx: 2, wantView: 1},
+		{name: "signers=2/Simple___/QC/TC/__", tr: S, qc: T, tc: T, ac: F, firstSignerIdx: 2, wantView: 1},
 		{name: "signers=2/Simple___/QC/TC/AC", tr: S, qc: T, tc: T, ac: T, firstSignerIdx: 2, wantView: 1},
 		{name: "signers=2/Aggregate/__/__/__", tr: A, qc: F, tc: F, ac: F, firstSignerIdx: 2, wantView: 1}, // empty syncInfo, should not advance view
 		{name: "signers=2/Aggregate/__/__/AC", tr: A, qc: F, tc: F, ac: T, firstSignerIdx: 2, wantView: 1},
@@ -218,6 +223,7 @@ func TestAdvanceView(t *testing.T) {
 		{name: "signers=2/Aggregate/__/TC/AC", tr: A, qc: F, tc: T, ac: T, firstSignerIdx: 2, wantView: 1},
 		{name: "signers=2/Aggregate/QC/__/__", tr: A, qc: T, tc: F, ac: F, firstSignerIdx: 2, wantView: 1},
 		{name: "signers=2/Aggregate/QC/__/AC", tr: A, qc: T, tc: F, ac: T, firstSignerIdx: 2, wantView: 1},
+		{name: "signers=2/Aggregate/QC/TC/__", tr: A, qc: T, tc: T, ac: F, firstSignerIdx: 2, wantView: 1},
 		{name: "signers=2/Aggregate/QC/TC/AC", tr: A, qc: T, tc: T, ac: T, firstSignerIdx: 2, wantView: 1},
 	}
 	for _, tt := range tests {

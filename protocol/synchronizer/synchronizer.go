@@ -250,7 +250,7 @@ func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
 func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) {
 	s.logger.Debugf("advanceView: %v", syncInfo)
 
-	qc, view, timeout, err := s.timeoutRules.VerifySyncInfo(syncInfo)
+	qc, view, timeout, err := s.auth.VerifySyncInfo(syncInfo)
 	if err != nil {
 		s.logger.Infof("advanceView: Failed to verify sync info: %v", err)
 		return
