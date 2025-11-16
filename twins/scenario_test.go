@@ -31,7 +31,7 @@ func TestPartitionedScenario(t *testing.T) {
 		t.Errorf("Expected no safety violations")
 	}
 	if result.Commits != 0 {
-		t.Error("Expected zero commits")
+		t.Errorf("Expected zero commits, got %d", result.Commits)
 	}
 	t.Logf("Network log:\n%s", result.NetworkLog)
 }
@@ -62,7 +62,7 @@ func TestPartitionedScenario2(t *testing.T) {
 		t.Errorf("Expected no safety violations")
 	}
 	if result.Commits != 2 {
-		t.Error("Expected zero commits")
+		t.Errorf("Expected two commits, got %d", result.Commits)
 	}
 	t.Logf("Network log:\n%s", result.NetworkLog)
 }
@@ -85,7 +85,7 @@ func TestBasicScenario(t *testing.T) {
 		t.Errorf("Expected no safety violations")
 	}
 	if result.Commits != 1 {
-		t.Error("Expected one commit")
+		t.Errorf("Expected one commit, got %d", result.Commits)
 	}
 }
 
@@ -108,7 +108,7 @@ func TestBasicTwinsScenario(t *testing.T) {
 		t.Errorf("Expected no safety violations")
 	}
 	if result.Commits != 1 {
-		t.Error("Expected one commit")
+		t.Errorf("Expected one commit, got %d", result.Commits)
 		for id, commits := range result.NodeCommits {
 			t.Logf("Node %v commits:", id)
 			for _, b := range commits {
@@ -142,7 +142,7 @@ func TestTwinsScenarioNeeded(t *testing.T) {
 		t.Errorf("Expected no safety violations")
 	}
 	if result.Commits != 1 {
-		t.Error("Expected one commit")
+		t.Errorf("Expected one commit, got %d", result.Commits)
 		for id, commits := range result.NodeCommits {
 			t.Logf("Node %v commits:", id)
 			for _, b := range commits {
@@ -176,7 +176,7 @@ func TestTwinsScenarioRepNeeded(t *testing.T) {
 		t.Errorf("Expected no safety violations")
 	}
 	if result.Commits != 1 {
-		t.Error("Expected one commit")
+		t.Errorf("Expected one commit, got %d", result.Commits)
 		for id, commits := range result.NodeCommits {
 			t.Logf("Node %v commits:", id)
 			for _, b := range commits {
@@ -185,11 +185,10 @@ func TestTwinsScenarioRepNeeded(t *testing.T) {
 		}
 	}
 
-	if false { //set to true to print the log
+	if false { // set to true to print the log
 		t.Fail()
 		t.Logf("Network log:\n%s", result.NetworkLog)
 	}
-
 }
 
 func TestSafetyWithTwins(t *testing.T) {
@@ -221,7 +220,7 @@ func TestSafetyWithTwins(t *testing.T) {
 		t.Errorf("Expected no safety violations")
 	}
 	if result.Commits != 0 {
-		t.Error("Expected no commit")
+		t.Errorf("Expected no commits, got %d", result.Commits)
 		for id, commits := range result.NodeCommits {
 			t.Logf("Node %v commits:", id)
 			for _, b := range commits {
@@ -229,5 +228,4 @@ func TestSafetyWithTwins(t *testing.T) {
 			}
 		}
 	}
-
 }
