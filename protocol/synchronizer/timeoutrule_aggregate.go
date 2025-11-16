@@ -14,8 +14,8 @@ type Aggregate struct {
 	auth   *cert.Authority
 }
 
-// NewAggregate returns an aggregate timeout rule instance.
-func NewAggregate(
+// newAggregate returns an aggregate timeout rule instance.
+func newAggregate(
 	config *core.RuntimeConfig,
 	auth *cert.Authority,
 ) *Aggregate {

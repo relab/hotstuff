@@ -6,6 +6,7 @@ import (
 	"cuelang.org/go/pkg/time"
 	"github.com/relab/hotstuff"
 
+	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/protocol"
@@ -63,7 +64,7 @@ func wireUpSynchronizer(
 		essentials.Authority(),
 		leaderRotation,
 		NewFixedDuration(1000*time.Nanosecond),
-		NewSimple(essentials.RuntimeCfg(), essentials.Authority()),
+		NewTimeoutRuler(essentials.RuntimeCfg(), essentials.Authority()),
 		depsConsensus.Proposer(),
 		depsConsensus.Voter(),
 		viewStates,
@@ -221,15 +222,12 @@ func TestAdvanceView(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			set, viewStates, synchronizer, block := prepareSynchronizer(t)
-			signers := set.Signers()
-			essentials := set[0]
-			// this is a workaround since we want to test both timeout rules in the same test
+			var opts []core.RuntimeOption
 			if tt.tr == A {
-				synchronizer.timeoutRules = NewAggregate(essentials.RuntimeCfg(), essentials.Authority())
-			} else {
-				synchronizer.timeoutRules = NewSimple(essentials.RuntimeCfg(), essentials.Authority())
+				opts = append(opts, core.WithAggregateQC())
 			}
+			set, viewStates, synchronizer, block := prepareSynchronizer(t, opts...)
+			signers := set.Signers()
 
 			syncInfo := hotstuff.NewSyncInfo()
 			if tt.qc {
@@ -256,8 +254,8 @@ func TestAdvanceView(t *testing.T) {
 	}
 }
 
-func prepareSynchronizer(t *testing.T) (testutil.EssentialsSet, *protocol.ViewStates, *Synchronizer, *hotstuff.Block) {
-	set := testutil.NewEssentialsSet(t, 4, crypto.NameECDSA)
+func prepareSynchronizer(t *testing.T, opts ...core.RuntimeOption) (testutil.EssentialsSet, *protocol.ViewStates, *Synchronizer, *hotstuff.Block) {
+	set := testutil.NewEssentialsSet(t, 4, crypto.NameECDSA, opts...)
 	subject := set[0]
 	viewStates, err := protocol.NewViewStates(
 		subject.Blockchain(),

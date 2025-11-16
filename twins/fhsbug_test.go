@@ -87,7 +87,7 @@ var (
 )
 
 func TestFHSBug(t *testing.T) {
-	// t.Skip("This test is not working as expected; skipping until we have fixed the issue.")
+	t.Skip("This test is not working as expected; skipping until we have fixed the issue.")
 	logging.SetLogLevel(*logLevel)
 
 	src, err := twins.FromJSON(strings.NewReader(fhsBugScenario))

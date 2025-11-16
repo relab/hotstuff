@@ -9,9 +9,9 @@ import (
 // NewTimeoutRuler returns a TimeoutRuler based on the configuration.
 func NewTimeoutRuler(cfg *core.RuntimeConfig, auth *cert.Authority) TimeoutRuler {
 	if cfg.HasAggregateQC() {
-		return NewAggregate(cfg, auth)
+		return newAggregate(cfg, auth)
 	}
-	return NewSimple(cfg, auth)
+	return newSimple(cfg, auth)
 }
 
 type TimeoutRuler interface {
