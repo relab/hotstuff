@@ -67,6 +67,9 @@ func NewKauri(
 	eventloop.Register(el, func(event WaitTimerExpiredEvent) {
 		k.onWaitTimerExpired(event)
 	})
+	eventloop.Register(el, func(event WaitForConnectedEvent) {
+		k.onWaitForConnected(event)
+	})
 	return k
 }
 
@@ -83,11 +86,9 @@ func (k *Kauri) Aggregate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert
 // begin starts dissemination of proposal and aggregation of votes.
 func (k *Kauri) begin(p *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	if !k.initDone {
-		// TODO(meling): This is not correct use of DelayUntil, see issue #267
-		eventloop.DelayUntil[network.ConnectedEvent](k.eventLoop, func() {
-			if err := k.begin(p, pc); err != nil {
-				k.logger.Error(err)
-			}
+		eventloop.DelayUntil[network.ConnectedEvent](k.eventLoop, WaitForConnectedEvent{
+			pc: pc,
+			p:  p,
 		})
 		return nil
 	}
@@ -126,6 +127,19 @@ func (k *Kauri) waitToAggregate() {
 	view := k.currentView
 	time.Sleep(k.tree.WaitTime())
 	k.eventLoop.AddEvent(WaitTimerExpiredEvent{currentView: view})
+}
+
+// onWaitForConnected is invoked when begin is called before the replica is connected.
+func (k *Kauri) onWaitForConnected(event WaitForConnectedEvent) {
+	k.logger.Debugf("WaitForConnectedEvent: %v", event)
+	if k.currentView > hotstuff.View(event.p.Block.View()) {
+		k.logger.Debug("Current view is higher than event view, not starting kauri")
+		return
+	}
+	err := k.begin(event.p, event.pc)
+	if err != nil {
+		k.logger.Errorf("Failed to begin kauri after connection: %v", err)
+	}
 }
 
 // onContributionRecv is invoked upon receiving the vote for aggregation.
@@ -194,6 +208,11 @@ func (k *Kauri) mergeContribution(currentSignature hotstuff.QuorumSignature) err
 
 type WaitTimerExpiredEvent struct {
 	currentView hotstuff.View
+}
+
+type WaitForConnectedEvent struct {
+	pc hotstuff.PartialCert
+	p  *hotstuff.ProposeMsg
 }
 
 var _ Communication = (*Kauri)(nil)
