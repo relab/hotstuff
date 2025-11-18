@@ -86,7 +86,6 @@ func (k *Kauri) Aggregate(proposal *hotstuff.ProposeMsg, pc hotstuff.PartialCert
 // begin starts dissemination of proposal and aggregation of votes.
 func (k *Kauri) begin(p *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 	if !k.initDone {
-		// TODO(meling): This is not correct use of DelayUntil, see issue #267
 		eventloop.DelayUntil[network.ConnectedEvent](k.eventLoop, WaitForConnectedEvent{
 			pc: pc,
 			p:  p,
@@ -137,7 +136,10 @@ func (k *Kauri) onWaitForConnected(event WaitForConnectedEvent) {
 		k.logger.Debug("Current view is higher than event view, not starting kauri")
 		return
 	}
-	k.begin(event.p, event.pc)
+	err := k.begin(event.p, event.pc)
+	if err != nil {
+		k.logger.Errorf("Failed to begin kauri after connection: %v", err)
+	}
 }
 
 // onContributionRecv is invoked upon receiving the vote for aggregation.
