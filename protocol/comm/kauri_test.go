@@ -16,13 +16,12 @@ import (
 	kauripb "github.com/relab/hotstuff/internal/proto/kauripb"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/network"
-	pcomm "github.com/relab/hotstuff/protocol/comm/kauri"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
 	"github.com/relab/hotstuff/security/crypto"
 )
 
-// dummyQuorumSignature is a tiny QuorumSignature implementation for tests.
+// dummyQuorumSignature is a minimal QuorumSignature implementation for tests.
 type dummyQuorumSignature struct {
 	b  []byte
 	bf *crypto.Bitfield
@@ -31,27 +30,13 @@ type dummyQuorumSignature struct {
 func (d *dummyQuorumSignature) ToBytes() []byte              { return d.b }
 func (d *dummyQuorumSignature) Participants() hotstuff.IDSet { return d.bf }
 
-// mockAuthority allows configuring Verify and Combine behavior per-test.
-type mockAuthority struct {
-	VerifyFunc  func(sig hotstuff.QuorumSignature, msg []byte) error
-	CombineFunc func(a, b hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error)
-}
-
-func (m *mockAuthority) Verify(sig hotstuff.QuorumSignature, msg []byte) error {
-	if m.VerifyFunc != nil {
-		return m.VerifyFunc(sig, msg)
+// newDummyQuorumSignature creates a new dummyQuorumSignature with the given participants.
+func newDummyQuorumSignature(b []byte, participants ...hotstuff.ID) *dummyQuorumSignature {
+	bf := &crypto.Bitfield{}
+	for _, id := range participants {
+		bf.Add(id)
 	}
-	return nil
-}
-func (m *mockAuthority) Combine(a, b hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
-	if m.CombineFunc != nil {
-		return m.CombineFunc(a, b)
-	}
-	// default: merge participants into a new dummyQuorumSignature
-	nb := &crypto.Bitfield{}
-	a.Participants().ForEach(func(id hotstuff.ID) { nb.Add(id) })
-	b.Participants().ForEach(func(id hotstuff.ID) { nb.Add(id) })
-	return &dummyQuorumSignature{b: []byte("combined"), bf: nb}, nil
+	return &dummyQuorumSignature{b: b, bf: bf}
 }
 
 // fakeBase implements crypto.Base for injecting into cert.Authority in tests.
@@ -63,6 +48,7 @@ type fakeBase struct {
 func (f *fakeBase) Sign(message []byte) (hotstuff.QuorumSignature, error) {
 	return &dummyQuorumSignature{b: message, bf: &crypto.Bitfield{}}, nil
 }
+
 func (f *fakeBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
 	if f.CombineFunc != nil {
 		return f.CombineFunc(signatures...)
@@ -73,12 +59,14 @@ func (f *fakeBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.Quo
 	}
 	return &dummyQuorumSignature{b: []byte("combined"), bf: nb}, nil
 }
+
 func (f *fakeBase) Verify(signature hotstuff.QuorumSignature, message []byte) error {
 	if f.VerifyFunc != nil {
 		return f.VerifyFunc(signature, message)
 	}
 	return nil
 }
+
 func (f *fakeBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) error {
 	return nil
 }
@@ -154,9 +142,7 @@ func TestSendProposalToChildren_NoChildren_SendsToParent(t *testing.T) {
 	k.blockHash = block.Hash()
 	k.currentView = 1
 	// set some agg contribution
-	bf := &crypto.Bitfield{}
-	bf.Add(1)
-	k.aggContrib = &dummyQuorumSignature{b: []byte("s"), bf: bf}
+	k.aggContrib = newDummyQuorumSignature([]byte("s"), 1)
 
 	if err := k.sendProposalToChildren(&hotstuff.ProposeMsg{Block: block}); err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -195,9 +181,7 @@ func TestSendProposalToChildren_WithChildren_ProposesAndAggregates(t *testing.T)
 	k.initDone = true
 	k.blockHash = block.Hash()
 	k.currentView = 1
-	bf := &crypto.Bitfield{}
-	bf.Add(2)
-	k.aggContrib = &dummyQuorumSignature{b: []byte("s"), bf: bf}
+	k.aggContrib = newDummyQuorumSignature([]byte("s"), 2)
 
 	if err := k.sendProposalToChildren(&hotstuff.ProposeMsg{Block: block}); err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -228,7 +212,7 @@ func TestMergeContribution_Behaviors(t *testing.T) {
 	// block not present -> error
 	k := NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, bc, nil, sender)
 	k.blockHash = hotstuff.Hash{} // not stored except genesis
-	if err := k.mergeContribution(&dummyQuorumSignature{b: []byte("x"), bf: &crypto.Bitfield{}}); err == nil {
+	if err := k.mergeContribution(newDummyQuorumSignature([]byte("x"))); err == nil {
 		t.Fatalf("expected error when block missing")
 	}
 
@@ -239,15 +223,14 @@ func TestMergeContribution_Behaviors(t *testing.T) {
 	fbFail := &fakeBase{VerifyFunc: func(sig hotstuff.QuorumSignature, msg []byte) error { return fmt.Errorf("verify failed") }}
 	k.auth = cert.NewAuthority(cfg, bc, fbFail)
 	k.blockHash = block.Hash()
-	if err := k.mergeContribution(&dummyQuorumSignature{b: []byte("x"), bf: &crypto.Bitfield{}}); err == nil {
+	if err := k.mergeContribution(newDummyQuorumSignature([]byte("x"))); err == nil {
 		t.Fatalf("expected verify error")
 	}
 
 	// success: first contribution sets aggContrib
 	fbOK := &fakeBase{VerifyFunc: func(sig hotstuff.QuorumSignature, msg []byte) error { return nil }}
 	k.auth = cert.NewAuthority(cfg, bc, fbOK)
-	qs := &dummyQuorumSignature{b: []byte("s"), bf: &crypto.Bitfield{}}
-	qs.Participants().(*crypto.Bitfield).Add(1)
+	qs := newDummyQuorumSignature([]byte("s"), 1)
 	k.aggContrib = nil
 	k.currentView = 2
 	k.blockHash = block.Hash()
@@ -264,25 +247,22 @@ func TestMergeContribution_Behaviors(t *testing.T) {
 	cfg.AddReplica(&hotstuff.ReplicaInfo{ID: 1})
 	k.config = cfg
 	// make combined signature have participant count >= quorum
-	combined := &dummyQuorumSignature{b: []byte("c"), bf: &crypto.Bitfield{}}
-	combined.Participants().(*crypto.Bitfield).Add(1)
+	combined := newDummyQuorumSignature([]byte("c"), 1)
 	k.auth = cert.NewAuthority(cfg, bc, &fakeBase{CombineFunc: func(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) { return combined, nil }, VerifyFunc: func(sig hotstuff.QuorumSignature, msg []byte) error { return nil }})
 
 	// register handler to capture NewViewMsg event
 	got := make(chan struct{}, 1)
 	eventloop.Register(el, func(msg hotstuff.NewViewMsg) { got <- struct{}{} })
 	// current aggContrib set to something else
-	old := &dummyQuorumSignature{b: []byte("old"), bf: &crypto.Bitfield{}}
-	old.Participants().(*crypto.Bitfield).Add(2)
+	old := newDummyQuorumSignature([]byte("old"), 2)
 	k.aggContrib = old
 	// merge another signature
 	if err := k.mergeContribution(qs); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+
 	// process one queued event (the NewViewMsg) manually using Tick
-	if !el.Tick(context.Background()) {
-		t.Fatalf("expected event loop to have an event to process")
-	}
+	el.Tick(context.Background())
 	select {
 	case <-got:
 	case <-time.After(200 * time.Millisecond):
@@ -326,9 +306,8 @@ func TestOnContributionRecv_ViewMismatch(t *testing.T) {
 	bc := blockchain.New(el, logging.NewWithDest(new(bytes.Buffer), "test"), sender)
 	k := NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, bc, nil, sender)
 	k.currentView = 1
-	// create event with different view
-	ev := pcomm.ContributionRecvEvent{Contribution: &kauripb.Contribution{ID: 2, View: 2}}
-	k.onContributionRecv(ev)
+	// create contribution with different view
+	k.onContributionRecv(&kauripb.Contribution{ID: 2, View: 2})
 	if len(k.senders) != 0 {
 		t.Fatalf("expected no senders appended on view mismatch")
 	}
@@ -365,16 +344,13 @@ func TestWaitToAggregate_TriggersWaitExpiredAndResets(t *testing.T) {
 	k := NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, bc, nil, sender)
 	k.currentView = 7
 	k.aggSent = false
-	bf := &crypto.Bitfield{}
-	bf.Add(1)
-	k.aggContrib = &dummyQuorumSignature{b: []byte("s"), bf: bf}
+	k.aggContrib = newDummyQuorumSignature([]byte("s"), 1)
 
 	// call waitToAggregate directly (uses WaitTime==0)
 	k.waitToAggregate()
+
 	// process the added WaitTimerExpiredEvent
-	if !el.Tick(context.Background()) {
-		t.Fatalf("expected event loop to have an event to process")
-	}
+	el.Tick(context.Background())
 	select {
 	case <-contribCh:
 	case <-time.After(200 * time.Millisecond):
@@ -398,8 +374,7 @@ func TestDisseminate_DelayedUntilConnected(t *testing.T) {
 
 	k := NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, bc, nil, sender)
 	// initDone false by default
-	qs := &dummyQuorumSignature{b: []byte("s"), bf: &crypto.Bitfield{}}
-	qs.Participants().(*crypto.Bitfield).Add(1)
+	qs := newDummyQuorumSignature([]byte("s"), 1)
 	pc := hotstuff.NewPartialCert(qs, block.Hash())
 
 	if err := k.Disseminate(&hotstuff.ProposeMsg{Block: block}, pc); err != nil {
@@ -415,10 +390,10 @@ func TestDisseminate_DelayedUntilConnected(t *testing.T) {
 	el.AddEvent(network.ConnectedEvent{})
 	// simulate that the replica is connected (what the ReplicaConnectedEvent handler would have done)
 	k.initDone = true
+
 	// process connected and delayed WaitForConnectedEvent
-	if !el.Tick(context.Background()) || !el.Tick(context.Background()) {
-		t.Fatalf("expected two ticks to process connected and delayed event")
-	}
+	el.Tick(context.Background())
+	el.Tick(context.Background())
 	select {
 	case <-sender.contribCh:
 	case <-time.After(200 * time.Millisecond):
@@ -438,8 +413,7 @@ func TestAggregate_DelayedUntilConnected(t *testing.T) {
 	bc.Store(block)
 
 	k := NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, bc, nil, sender)
-	qs := &dummyQuorumSignature{b: []byte("s"), bf: &crypto.Bitfield{}}
-	qs.Participants().(*crypto.Bitfield).Add(1)
+	qs := newDummyQuorumSignature([]byte("s"), 1)
 	pc := hotstuff.NewPartialCert(qs, block.Hash())
 
 	if err := k.Aggregate(&hotstuff.ProposeMsg{Block: block}, pc); err != nil {
@@ -447,9 +421,10 @@ func TestAggregate_DelayedUntilConnected(t *testing.T) {
 	}
 	el.AddEvent(network.ConnectedEvent{})
 	k.initDone = true
-	if !el.Tick(context.Background()) || !el.Tick(context.Background()) {
-		t.Fatalf("expected two ticks to process connected and delayed event")
-	}
+
+	// process connected and delayed WaitForConnectedEvent
+	el.Tick(context.Background())
+	el.Tick(context.Background())
 	select {
 	case <-sender.contribCh:
 	case <-time.After(200 * time.Millisecond):
@@ -480,8 +455,7 @@ func TestOnContributionRecv_IsSubSetCallsParent(t *testing.T) {
 	ecd := &hotstuffpb.ECDSAMultiSignature{Sigs: []*hotstuffpb.ECDSASignature{{Signer: uint32(2), Sig: []byte("sig")}}}
 	protoSig.Sig = &hotstuffpb.QuorumSignature_ECDSASigs{ECDSASigs: ecd}
 
-	ev := pcomm.ContributionRecvEvent{Contribution: &kauripb.Contribution{ID: 2, View: uint64(k.currentView), Signature: protoSig}}
-	k.onContributionRecv(ev)
+	k.onContributionRecv(&kauripb.Contribution{ID: 2, View: uint64(k.currentView), Signature: protoSig})
 	select {
 	case <-contribCh:
 	case <-time.After(200 * time.Millisecond):
