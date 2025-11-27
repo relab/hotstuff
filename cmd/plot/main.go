@@ -9,6 +9,10 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/metrics/plotting"
+
+	// ensure proto messages are registered so that they can be decoded from measurement.json files
+	_ "github.com/relab/hotstuff/internal/proto/orchestrationpb"
+	_ "github.com/relab/hotstuff/metrics/types"
 )
 
 var (
