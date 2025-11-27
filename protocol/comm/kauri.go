@@ -9,6 +9,7 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
+	"github.com/relab/hotstuff/internal/proto/kauripb"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/network"
 	"github.com/relab/hotstuff/protocol/comm/kauri"
@@ -61,7 +62,7 @@ func NewKauri(
 	eventloop.Register(el, func(_ hotstuff.ReplicaConnectedEvent) {
 		k.initDone = true // signal that we are connected
 	})
-	eventloop.Register(el, func(event kauri.ContributionRecvEvent) {
+	eventloop.Register(el, func(event *kauripb.Contribution) {
 		k.onContributionRecv(event)
 	})
 	eventloop.Register(el, func(event WaitTimerExpiredEvent) {
@@ -143,11 +144,10 @@ func (k *Kauri) onWaitForConnected(event WaitForConnectedEvent) {
 }
 
 // onContributionRecv is invoked upon receiving the vote for aggregation.
-func (k *Kauri) onContributionRecv(event kauri.ContributionRecvEvent) {
-	if k.currentView != hotstuff.View(event.Contribution.View) {
+func (k *Kauri) onContributionRecv(contribution *kauripb.Contribution) {
+	if k.currentView != hotstuff.View(contribution.View) {
 		return
 	}
-	contribution := event.Contribution
 	k.logger.Debugf("Processing the contribution from %d", contribution.ID)
 	currentSignature := hotstuffpb.QuorumSignatureFromProto(contribution.Signature)
 	err := k.mergeContribution(currentSignature)
