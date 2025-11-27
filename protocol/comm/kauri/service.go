@@ -20,10 +20,5 @@ func RegisterService(
 }
 
 func (i kauriServiceImpl) SendContribution(_ gorums.ServerCtx, request *kauripb.Contribution) {
-	i.eventLoop.AddEvent(ContributionRecvEvent{Contribution: request})
-}
-
-// ContributionRecvEvent is raised when a contribution is received.
-type ContributionRecvEvent struct {
-	Contribution *kauripb.Contribution
+	i.eventLoop.AddEvent(request)
 }
