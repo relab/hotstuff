@@ -48,16 +48,44 @@ func NewViewStates(
 	return s, nil
 }
 
-// UpdateHighQC updates HighQC if quorum certificate's block is for a higher view.
-// It returns true if HighQC was updated. It returns an error if the
-// quorum certificate's block is not found in the local blockchain.
+// UpdateHighQC updates HighQC if quorum certificate's block is for a higher view
+// and the block extends the committed chain.
+// It returns true if HighQC was updated. It returns an error if:
+// - the quorum certificate's block is not found in the local blockchain
+// - the block does not extend the committed chain (safety check)
 func (s *ViewStates) UpdateHighQC(qc hotstuff.QuorumCert) (bool, error) {
 	newBlock, ok := s.blockchain.Get(qc.BlockHash())
 	if !ok {
 		return false, fmt.Errorf("block %x not found for QC@view %d", qc.BlockHash(), qc.View())
 	}
+
+	// Get committed block reference before acquiring lock
+	// to avoid potential deadlock with blockchain operations
+	s.mut.RLock()
+	committedBlock := s.committedBlock
+	currentHighQCView := s.highQC.View()
+	s.mut.RUnlock()
+
+	// Check if new block has higher view than current HighQC
+	if newBlock.View() <= currentHighQCView {
+		return false, nil
+	}
+
+	// Safety check: new QC must extend the committed chain
+	// This prevents HighQC from being updated to a fork that doesn't
+	// include the already committed blocks
+	if committedBlock != nil && committedBlock.View() > 0 {
+		if !s.blockchain.Extends(newBlock, committedBlock) {
+			return false, fmt.Errorf(
+				"QC block (view=%d, hash=%.8x) does not extend committed chain (view=%d, hash=%.8x)",
+				newBlock.View(), qc.BlockHash(), committedBlock.View(), committedBlock.Hash())
+		}
+	}
+
+	// All checks passed, update HighQC
 	s.mut.Lock()
 	defer s.mut.Unlock()
+	// Double-check view in case of concurrent updates
 	if newBlock.View() <= s.highQC.View() {
 		return false, nil
 	}
