@@ -11,7 +11,12 @@ import (
 // ViewContext returns a context that is canceled at the end of view.
 // If view is nil or less than or equal to the current view, the context will be canceled at the next view change.
 func (el *EventLoop) ViewContext(view *hotstuff.View) (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(el.Context())
+	parentCtx := el.Context()
+	if parentCtx == nil {
+		// Fallback to Background context to prevent panic from context.WithCancel(nil)
+		parentCtx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(parentCtx)
 
 	unregister := Register(el, func(event hotstuff.ViewChangeEvent) {
 		if view == nil || event.View >= *view {

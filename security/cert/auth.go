@@ -104,15 +104,23 @@ func (c *Authority) CreateAggregateQC(view hotstuff.View, timeouts []hotstuff.Ti
 }
 
 // VerifyPartialCert verifies a single partial certificate.
+// Note: Uses LocalGet to avoid blocking network fetch which could panic
+// if the event loop context is nil. If the block is not locally available,
+// verification fails immediately - this is expected behavior since we should
+// not accept certificates for blocks we haven't seen.
 func (c *Authority) VerifyPartialCert(cert hotstuff.PartialCert) error {
-	block, ok := c.blockchain.Get(cert.BlockHash())
+	block, ok := c.blockchain.LocalGet(cert.BlockHash())
 	if !ok {
-		return fmt.Errorf("block not found: %v", cert.BlockHash())
+		return fmt.Errorf("block not found locally: %v", cert.BlockHash())
 	}
 	return c.Verify(cert.Signature(), block.ToBytes())
 }
 
 // VerifyQuorumCert verifies a quorum certificate.
+// Note: Uses LocalGet to avoid blocking network fetch which could panic
+// if the event loop context is nil. This also prevents potential DoS attacks
+// where an attacker sends QCs pointing to non-existent blocks to trigger
+// expensive network operations or crashes.
 func (c *Authority) VerifyQuorumCert(qc hotstuff.QuorumCert) error {
 	// genesis QC is always valid.
 	if qc.BlockHash() == hotstuff.GetGenesis().Hash() {
@@ -130,9 +138,9 @@ func (c *Authority) VerifyQuorumCert(qc hotstuff.QuorumCert) error {
 	if participants.Len() < quorumSize {
 		return fmt.Errorf("%d participants cannot satisfy the quorum requirement: %d", participants.Len(), quorumSize)
 	}
-	block, ok := c.blockchain.Get(qc.BlockHash())
+	block, ok := c.blockchain.LocalGet(qc.BlockHash())
 	if !ok {
-		return fmt.Errorf("block not found: %v", qc.BlockHash())
+		return fmt.Errorf("block not found locally: %v (possible ghost QC attack)", qc.BlockHash())
 	}
 	return c.Verify(qc.Signature(), block.ToBytes())
 }
