@@ -134,6 +134,17 @@ func (c *Authority) VerifyQuorumCert(qc hotstuff.QuorumCert) error {
 	if !ok {
 		return fmt.Errorf("block not found: %v", qc.BlockHash())
 	}
+
+	// Prevent signature replay attacks: QC.View must match Block.View.
+	// Without this check, an attacker could take signatures from a legitimate QC
+	// (e.g., View 10) and create a fake QC claiming a much higher view (e.g., View 100).
+	// Since signatures only cover block.ToBytes() (which includes block.View),
+	// changing QC.View alone would not invalidate the signature.
+	// This allows "time-warp" attacks that can manipulate HighQC and disrupt consensus.
+	if qc.View() != block.View() {
+		return fmt.Errorf("QC view %d does not match block view %d (possible signature replay attack)", qc.View(), block.View())
+	}
+
 	return c.Verify(qc.Signature(), block.ToBytes())
 }
 
