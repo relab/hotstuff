@@ -154,3 +154,10 @@ func (s *ViewStates) CommittedBlock() *hotstuff.Block {
 	defer s.mut.RUnlock()
 	return s.committedBlock
 }
+
+// FetchBlock attempts to fetch a block by its hash.
+// If the block is not available locally, it will try to fetch it from the network.
+// This is used to ensure blocks referenced by QCs are available before verification.
+func (s *ViewStates) FetchBlock(hash hotstuff.Hash) {
+	s.blockchain.Get(hash)
+}

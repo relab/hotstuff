@@ -114,10 +114,22 @@ func (s *emulatedSender) NewView(id hotstuff.ID, si hotstuff.SyncInfo) error {
 }
 
 // RequestBlock requests a block from all the replicas in the network.
+// For lagging nodes (view significantly behind global view), uses global view
+// to check partition status, simulating real network behavior where block requests
+// succeed once connectivity is restored. For normal nodes, uses their effective view.
 func (s *emulatedSender) RequestBlock(_ context.Context, hash hotstuff.Hash) (block *hotstuff.Block, ok bool) {
+	nodeView := s.node.EffectiveView()
+	// Use global view for partition check if node is significantly behind (lagging).
+	// This allows lagging nodes to sync up once the partition is healed.
+	// The threshold of 5 views ensures normal operation isn't affected.
+	checkView := nodeView
+	if s.network.globalView > nodeView+5 {
+		checkView = s.network.globalView
+	}
+
 	for _, replica := range s.network.replicas {
 		for _, node := range replica {
-			if s.shouldDrop(node.id, hash, s.node.EffectiveView()) {
+			if s.shouldDrop(node.id, hash, checkView) {
 				continue
 			}
 			block, ok = node.blockchain.LocalGet(hash)

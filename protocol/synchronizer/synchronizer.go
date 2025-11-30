@@ -250,6 +250,20 @@ func (s *Synchronizer) OnNewView(newView hotstuff.NewViewMsg) {
 func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) {
 	s.logger.Debugf("advanceView: %v", syncInfo)
 
+	// Prefetch blocks referenced by the QC before verification.
+	// This ensures that lagging nodes can sync up by fetching missing blocks
+	// before the LocalGet check in VerifyQuorumCert fails.
+	// Note: This is safe because we only fetch blocks for QCs we receive through
+	// legitimate protocol messages (NewView, Timeout, Propose), not arbitrary requests.
+	if qc, ok := syncInfo.QC(); ok {
+		s.state.FetchBlock(qc.BlockHash())
+	}
+	if aggQC, ok := syncInfo.AggQC(); ok {
+		for _, qc := range aggQC.QCs() {
+			s.state.FetchBlock(qc.BlockHash())
+		}
+	}
+
 	qc, view, timeout, err := s.timeoutRules.VerifySyncInfo(syncInfo)
 	if err != nil {
 		s.logger.Infof("advanceView: Failed to verify sync info: %v", err)
