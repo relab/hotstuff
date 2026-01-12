@@ -7,10 +7,10 @@
 package clientpb
 
 import (
+	empty "github.com/golang/protobuf/ptypes/empty"
 	_ "github.com/relab/gorums"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -22,6 +22,113 @@ const (
 	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
+
+type CommandStatusResponse_Status int32
+
+const (
+	CommandStatusResponse_UNKNOWN   CommandStatusResponse_Status = 0
+	CommandStatusResponse_PENDING   CommandStatusResponse_Status = 1
+	CommandStatusResponse_COMMITTED CommandStatusResponse_Status = 2
+	CommandStatusResponse_EXECUTED  CommandStatusResponse_Status = 3
+	CommandStatusResponse_FAILED    CommandStatusResponse_Status = 4
+)
+
+// Enum value maps for CommandStatusResponse_Status.
+var (
+	CommandStatusResponse_Status_name = map[int32]string{
+		0: "UNKNOWN",
+		1: "PENDING",
+		2: "COMMITTED",
+		3: "EXECUTED",
+		4: "FAILED",
+	}
+	CommandStatusResponse_Status_value = map[string]int32{
+		"UNKNOWN":   0,
+		"PENDING":   1,
+		"COMMITTED": 2,
+		"EXECUTED":  3,
+		"FAILED":    4,
+	}
+)
+
+func (x CommandStatusResponse_Status) Enum() *CommandStatusResponse_Status {
+	p := new(CommandStatusResponse_Status)
+	*p = x
+	return p
+}
+
+func (x CommandStatusResponse_Status) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CommandStatusResponse_Status) Descriptor() protoreflect.EnumDescriptor {
+	return file_internal_proto_clientpb_client_proto_enumTypes[0].Descriptor()
+}
+
+func (CommandStatusResponse_Status) Type() protoreflect.EnumType {
+	return &file_internal_proto_clientpb_client_proto_enumTypes[0]
+}
+
+func (x CommandStatusResponse_Status) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CommandStatusResponse_Status.Descriptor instead.
+func (CommandStatusResponse_Status) EnumDescriptor() ([]byte, []int) {
+	return file_internal_proto_clientpb_client_proto_rawDescGZIP(), []int{0, 0}
+}
+
+type CommandStatusResponse struct {
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	Status        CommandStatusResponse_Status `protobuf:"varint,1,opt,name=status,proto3,enum=clientpb.CommandStatusResponse_Status" json:"status,omitempty"`
+	Command       *Command                     `protobuf:"bytes,2,opt,name=command,proto3" json:"command,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommandStatusResponse) Reset() {
+	*x = CommandStatusResponse{}
+	mi := &file_internal_proto_clientpb_client_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommandStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommandStatusResponse) ProtoMessage() {}
+
+func (x *CommandStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_clientpb_client_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommandStatusResponse.ProtoReflect.Descriptor instead.
+func (*CommandStatusResponse) Descriptor() ([]byte, []int) {
+	return file_internal_proto_clientpb_client_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *CommandStatusResponse) GetStatus() CommandStatusResponse_Status {
+	if x != nil {
+		return x.Status
+	}
+	return CommandStatusResponse_UNKNOWN
+}
+
+func (x *CommandStatusResponse) GetCommand() *Command {
+	if x != nil {
+		return x.Command
+	}
+	return nil
+}
 
 // Command is the request that is sent to the HotStuff replicas with the data to
 // be executed.
@@ -36,7 +143,7 @@ type Command struct {
 
 func (x *Command) Reset() {
 	*x = Command{}
-	mi := &file_internal_proto_clientpb_client_proto_msgTypes[0]
+	mi := &file_internal_proto_clientpb_client_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -48,7 +155,7 @@ func (x *Command) String() string {
 func (*Command) ProtoMessage() {}
 
 func (x *Command) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_clientpb_client_proto_msgTypes[0]
+	mi := &file_internal_proto_clientpb_client_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -61,7 +168,7 @@ func (x *Command) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Command.ProtoReflect.Descriptor instead.
 func (*Command) Descriptor() ([]byte, []int) {
-	return file_internal_proto_clientpb_client_proto_rawDescGZIP(), []int{0}
+	return file_internal_proto_clientpb_client_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Command) GetClientID() uint32 {
@@ -95,7 +202,7 @@ type Batch struct {
 
 func (x *Batch) Reset() {
 	*x = Batch{}
-	mi := &file_internal_proto_clientpb_client_proto_msgTypes[1]
+	mi := &file_internal_proto_clientpb_client_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -107,7 +214,7 @@ func (x *Batch) String() string {
 func (*Batch) ProtoMessage() {}
 
 func (x *Batch) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_clientpb_client_proto_msgTypes[1]
+	mi := &file_internal_proto_clientpb_client_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -120,7 +227,7 @@ func (x *Batch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Batch.ProtoReflect.Descriptor instead.
 func (*Batch) Descriptor() ([]byte, []int) {
-	return file_internal_proto_clientpb_client_proto_rawDescGZIP(), []int{1}
+	return file_internal_proto_clientpb_client_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Batch) GetCommands() []*Command {
@@ -134,15 +241,26 @@ var File_internal_proto_clientpb_client_proto protoreflect.FileDescriptor
 
 const file_internal_proto_clientpb_client_proto_rawDesc = "" +
 	"\n" +
-	"$internal/proto/clientpb/client.proto\x12\bclientpb\x1a\fgorums.proto\x1a\x1bgoogle/protobuf/empty.proto\"a\n" +
+	"$internal/proto/clientpb/client.proto\x12\bclientpb\x1a\fgorums.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xd1\x01\n" +
+	"\x15CommandStatusResponse\x12>\n" +
+	"\x06status\x18\x01 \x01(\x0e2&.clientpb.CommandStatusResponse.StatusR\x06status\x12+\n" +
+	"\acommand\x18\x02 \x01(\v2\x11.clientpb.CommandR\acommand\"K\n" +
+	"\x06Status\x12\v\n" +
+	"\aUNKNOWN\x10\x00\x12\v\n" +
+	"\aPENDING\x10\x01\x12\r\n" +
+	"\tCOMMITTED\x10\x02\x12\f\n" +
+	"\bEXECUTED\x10\x03\x12\n" +
+	"\n" +
+	"\x06FAILED\x10\x04\"a\n" +
 	"\aCommand\x12\x1a\n" +
 	"\bClientID\x18\x01 \x01(\rR\bClientID\x12&\n" +
 	"\x0eSequenceNumber\x18\x02 \x01(\x04R\x0eSequenceNumber\x12\x12\n" +
 	"\x04Data\x18\x03 \x01(\fR\x04Data\"6\n" +
 	"\x05Batch\x12-\n" +
-	"\bCommands\x18\x01 \x03(\v2\x11.clientpb.CommandR\bCommands2L\n" +
-	"\x06Client\x12B\n" +
-	"\vExecCommand\x12\x11.clientpb.Command\x1a\x16.google.protobuf.Empty\"\b\xa0\xb5\x18\x01е\x18\x01B3Z1github.com/relab/hotstuff/internal/proto/clientpbb\x06proto3"
+	"\bCommands\x18\x01 \x03(\v2\x11.clientpb.CommandR\bCommands2\x8f\x01\n" +
+	"\x06Client\x12>\n" +
+	"\vExecCommand\x12\x11.clientpb.Command\x1a\x16.google.protobuf.Empty\"\x04\x98\xb5\x18\x01\x12E\n" +
+	"\rCommandStatus\x12\x11.clientpb.Command\x1a\x1f.clientpb.CommandStatusResponse\"\x00B3Z1github.com/relab/hotstuff/internal/proto/clientpbb\x06proto3"
 
 var (
 	file_internal_proto_clientpb_client_proto_rawDescOnce sync.Once
@@ -156,21 +274,28 @@ func file_internal_proto_clientpb_client_proto_rawDescGZIP() []byte {
 	return file_internal_proto_clientpb_client_proto_rawDescData
 }
 
-var file_internal_proto_clientpb_client_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_internal_proto_clientpb_client_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_internal_proto_clientpb_client_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_internal_proto_clientpb_client_proto_goTypes = []any{
-	(*Command)(nil),       // 0: clientpb.Command
-	(*Batch)(nil),         // 1: clientpb.Batch
-	(*emptypb.Empty)(nil), // 2: google.protobuf.Empty
+	(CommandStatusResponse_Status)(0), // 0: clientpb.CommandStatusResponse.Status
+	(*CommandStatusResponse)(nil),     // 1: clientpb.CommandStatusResponse
+	(*Command)(nil),                   // 2: clientpb.Command
+	(*Batch)(nil),                     // 3: clientpb.Batch
+	(*empty.Empty)(nil),               // 4: google.protobuf.Empty
 }
 var file_internal_proto_clientpb_client_proto_depIdxs = []int32{
-	0, // 0: clientpb.Batch.Commands:type_name -> clientpb.Command
-	0, // 1: clientpb.Client.ExecCommand:input_type -> clientpb.Command
-	2, // 2: clientpb.Client.ExecCommand:output_type -> google.protobuf.Empty
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // 0: clientpb.CommandStatusResponse.status:type_name -> clientpb.CommandStatusResponse.Status
+	2, // 1: clientpb.CommandStatusResponse.command:type_name -> clientpb.Command
+	2, // 2: clientpb.Batch.Commands:type_name -> clientpb.Command
+	2, // 3: clientpb.Client.ExecCommand:input_type -> clientpb.Command
+	2, // 4: clientpb.Client.CommandStatus:input_type -> clientpb.Command
+	4, // 5: clientpb.Client.ExecCommand:output_type -> google.protobuf.Empty
+	1, // 6: clientpb.Client.CommandStatus:output_type -> clientpb.CommandStatusResponse
+	5, // [5:7] is the sub-list for method output_type
+	3, // [3:5] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_internal_proto_clientpb_client_proto_init() }
@@ -183,13 +308,14 @@ func file_internal_proto_clientpb_client_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_proto_clientpb_client_proto_rawDesc), len(file_internal_proto_clientpb_client_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   2,
+			NumEnums:      1,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_internal_proto_clientpb_client_proto_goTypes,
 		DependencyIndexes: file_internal_proto_clientpb_client_proto_depIdxs,
+		EnumInfos:         file_internal_proto_clientpb_client_proto_enumTypes,
 		MessageInfos:      file_internal_proto_clientpb_client_proto_msgTypes,
 	}.Build()
 	File_internal_proto_clientpb_client_proto = out.File

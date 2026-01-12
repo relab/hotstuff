@@ -12,10 +12,25 @@ service Client {
   // ExecCommand sends a command to all replicas and waits for valid signatures
   // from f+1 replicas
   rpc ExecCommand(Command) returns (google.protobuf.Empty) {
-    option (gorums.quorumcall) = true;
-    option (gorums.async) = true;
+        option (gorums.multicast) = true;
+  }
+
+  rpc CommandStatus(Command) returns (CommandStatusResponse) {
   }
 }
+
+message CommandStatusResponse {
+  enum Status {
+    UNKNOWN = 0;
+    PENDING = 1;
+    COMMITTED = 2;
+    EXECUTED = 3;
+    FAILED = 4;
+  }
+  Status status = 1;
+  Command command = 2;
+}
+
 
 // Command is the request that is sent to the HotStuff replicas with the data to
 // be executed.

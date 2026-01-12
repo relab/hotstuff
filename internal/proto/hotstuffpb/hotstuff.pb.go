@@ -7,12 +7,12 @@
 package hotstuffpb
 
 import (
+	empty "github.com/golang/protobuf/ptypes/empty"
+	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	_ "github.com/relab/gorums"
 	clientpb "github.com/relab/hotstuff/internal/proto/clientpb"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -128,7 +128,7 @@ type Block struct {
 	View          uint64                 `protobuf:"varint,3,opt,name=View,proto3" json:"View,omitempty"`
 	Commands      *clientpb.Batch        `protobuf:"bytes,4,opt,name=Commands,proto3" json:"Commands,omitempty"`
 	Proposer      uint32                 `protobuf:"varint,5,opt,name=Proposer,proto3" json:"Proposer,omitempty"`
-	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=Timestamp,proto3" json:"Timestamp,omitempty"`
+	Timestamp     *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=Timestamp,proto3" json:"Timestamp,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -198,7 +198,7 @@ func (x *Block) GetProposer() uint32 {
 	return 0
 }
 
-func (x *Block) GetTimestamp() *timestamppb.Timestamp {
+func (x *Block) GetTimestamp() *timestamp.Timestamp {
 	if x != nil {
 		return x.Timestamp
 	}
@@ -1152,8 +1152,8 @@ var file_internal_proto_hotstuffpb_hotstuff_proto_goTypes = []any{
 	(*AggQC)(nil),                   // 16: hotstuffpb.AggQC
 	nil,                             // 17: hotstuffpb.AggQC.QCsEntry
 	(*clientpb.Batch)(nil),          // 18: clientpb.Batch
-	(*timestamppb.Timestamp)(nil),   // 19: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),           // 20: google.protobuf.Empty
+	(*timestamp.Timestamp)(nil),     // 19: google.protobuf.Timestamp
+	(*empty.Empty)(nil),             // 20: google.protobuf.Empty
 }
 var file_internal_proto_hotstuffpb_hotstuff_proto_depIdxs = []int32{
 	2,  // 0: hotstuffpb.Proposal.Block:type_name -> hotstuffpb.Block

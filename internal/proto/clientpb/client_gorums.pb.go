@@ -9,10 +9,9 @@ package clientpb
 import (
 	context "context"
 	fmt "fmt"
+	empty "github.com/golang/protobuf/ptypes/empty"
 	gorums "github.com/relab/gorums"
 	encoding "google.golang.org/grpc/encoding"
-	proto "google.golang.org/protobuf/proto"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -150,75 +149,69 @@ type Node struct {
 	*gorums.RawNode
 }
 
-// ExecCommand sends a command to all replicas and waits for valid signatures
-// from f+1 replicas
-func (c *Configuration) ExecCommand(ctx context.Context, in *Command) *AsyncEmpty {
-	cd := gorums.QuorumCallData{
-		Message: in,
-		Method:  "clientpb.Client.ExecCommand",
-	}
-	cd.QuorumFunction = func(req proto.Message, replies map[uint32]proto.Message) (proto.Message, bool) {
-		r := make(map[uint32]*emptypb.Empty, len(replies))
-		for k, v := range replies {
-			r[k] = v.(*emptypb.Empty)
-		}
-		return c.qspec.ExecCommandQF(req.(*Command), r)
-	}
-
-	fut := c.RawConfiguration.AsyncCall(ctx, cd)
-	return &AsyncEmpty{fut}
-}
-
 // ClientClient is the client interface for the Client service.
 type ClientClient interface {
-	ExecCommand(ctx context.Context, in *Command) *AsyncEmpty
+	ExecCommand(ctx context.Context, in *Command, opts ...gorums.CallOption)
 }
 
 // enforce interface compliance
 var _ ClientClient = (*Configuration)(nil)
 
-// QuorumSpec is the interface of quorum functions for Client.
-type QuorumSpec interface {
-	gorums.ConfigOption
+// ClientNodeClient is the single node client interface for the Client service.
+type ClientNodeClient interface {
+	CommandStatus(ctx context.Context, in *Command) (resp *CommandStatusResponse, err error)
+}
 
-	// ExecCommandQF is the quorum function for the ExecCommand
-	// asynchronous quorum call method. The in parameter is the request object
-	// supplied to the ExecCommand method at call time, and may or may not
-	// be used by the quorum function. If the in parameter is not needed
-	// you should implement your quorum function with '_ *Command'.
-	ExecCommandQF(in *Command, replies map[uint32]*emptypb.Empty) (*emptypb.Empty, bool)
+// enforce interface compliance
+var _ ClientNodeClient = (*Node)(nil)
+
+// Reference imports to suppress errors if they are not otherwise used.
+var _ empty.Empty
+
+// ExecCommand sends a command to all replicas and waits for valid signatures
+// from f+1 replicas
+func (c *Configuration) ExecCommand(ctx context.Context, in *Command, opts ...gorums.CallOption) {
+	cd := gorums.QuorumCallData{
+		Message: in,
+		Method:  "clientpb.Client.ExecCommand",
+	}
+
+	c.RawConfiguration.Multicast(ctx, cd, opts...)
+}
+
+// There are no quorum calls.
+type QuorumSpec interface{}
+
+// CommandStatus is a quorum call invoked on all nodes in configuration c,
+// with the same argument in, and returns a combined result.
+func (n *Node) CommandStatus(ctx context.Context, in *Command) (resp *CommandStatusResponse, err error) {
+	cd := gorums.CallData{
+		Message: in,
+		Method:  "clientpb.Client.CommandStatus",
+	}
+
+	res, err := n.RawNode.RPCCall(ctx, cd)
+	if err != nil {
+		return nil, err
+	}
+	return res.(*CommandStatusResponse), err
 }
 
 // Client is the server-side API for the Client Service
 type ClientServer interface {
-	ExecCommand(ctx gorums.ServerCtx, request *Command) (response *emptypb.Empty, err error)
+	ExecCommand(ctx gorums.ServerCtx, request *Command)
+	CommandStatus(ctx gorums.ServerCtx, request *Command) (response *CommandStatusResponse, err error)
 }
 
 func RegisterClientServer(srv *gorums.Server, impl ClientServer) {
 	srv.RegisterHandler("clientpb.Client.ExecCommand", func(ctx gorums.ServerCtx, in *gorums.Message) (*gorums.Message, error) {
 		req := gorums.AsProto[*Command](in)
-		resp, err := impl.ExecCommand(ctx, req)
+		impl.ExecCommand(ctx, req)
+		return nil, nil
+	})
+	srv.RegisterHandler("clientpb.Client.CommandStatus", func(ctx gorums.ServerCtx, in *gorums.Message) (*gorums.Message, error) {
+		req := gorums.AsProto[*Command](in)
+		resp, err := impl.CommandStatus(ctx, req)
 		return gorums.NewResponseMessage(in.GetMetadata(), resp), err
 	})
-}
-
-type internalEmpty struct {
-	nid   uint32
-	reply *emptypb.Empty
-	err   error
-}
-
-// AsyncEmpty is a async object for processing replies.
-type AsyncEmpty struct {
-	*gorums.Async
-}
-
-// Get returns the reply and any error associated with the called method.
-// The method blocks until a reply or error is available.
-func (f *AsyncEmpty) Get() (*emptypb.Empty, error) {
-	resp, err := f.Async.Get()
-	if err != nil {
-		return nil, err
-	}
-	return resp.(*emptypb.Empty), err
 }

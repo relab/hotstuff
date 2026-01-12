@@ -9,10 +9,10 @@ package hotstuffpb
 import (
 	context "context"
 	fmt "fmt"
+	empty "github.com/golang/protobuf/ptypes/empty"
 	gorums "github.com/relab/gorums"
 	encoding "google.golang.org/grpc/encoding"
 	proto "google.golang.org/protobuf/proto"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -170,7 +170,7 @@ type ConsensusNodeClient interface {
 var _ ConsensusNodeClient = (*Node)(nil)
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
+var _ empty.Empty
 
 // Propose is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
@@ -184,7 +184,7 @@ func (c *Configuration) Propose(ctx context.Context, in *Proposal, opts ...gorum
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
+var _ empty.Empty
 
 // Timeout is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
@@ -275,7 +275,7 @@ type internalBlock struct {
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
+var _ empty.Empty
 
 // Vote is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
@@ -289,7 +289,7 @@ func (n *Node) Vote(ctx context.Context, in *PartialCert, opts ...gorums.CallOpt
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ emptypb.Empty
+var _ empty.Empty
 
 // NewView is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
