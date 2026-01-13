@@ -9,7 +9,6 @@ import (
 	"errors"
 	"io"
 	"math"
-	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -23,7 +22,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // ID is the identifier for a client.
@@ -33,11 +31,32 @@ type qspec struct {
 	faulty int
 }
 
-func (q *qspec) ExecCommandQF(_ *clientpb.Command, signatures map[uint32]*emptypb.Empty) (*emptypb.Empty, bool) {
-	if len(signatures) < q.faulty+1 {
+func (q *qspec) CommandStatusQF(command *clientpb.Command, replies map[uint32]*clientpb.CommandStatusResponse) (*clientpb.CommandStatusResponse, bool) {
+	if len(replies) < q.faulty+1 {
 		return nil, false
 	}
-	return &emptypb.Empty{}, true
+	responseCount := make([]int, 4) // assuming 4 possible statuses
+
+	for _, resp := range replies {
+		if resp != nil {
+			status := resp.Status
+			if int(status) >= 0 && int(status) < len(responseCount) {
+				responseCount[int(status)]++
+			}
+		}
+	}
+	for status, count := range responseCount {
+		if count >= q.faulty+1 {
+			return &clientpb.CommandStatusResponse{
+				Command: command,
+				Status:  clientpb.CommandStatusResponse_Status(status),
+			}, true
+		}
+	}
+	return &clientpb.CommandStatusResponse{
+		Command: command,
+		Status:  clientpb.CommandStatusResponse_PENDING,
+	}, false
 }
 
 type pendingCmd struct {
@@ -126,6 +145,7 @@ func (c *Client) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 	}
 	c.gorumsConfig, err = c.mgr.NewConfiguration(&qspec{faulty: hotstuff.NumFaulty(len(replicas))}, gorums.WithNodeMap(nodes))
 	if err != nil {
+		c.logger.Error("unable to create the configuration in client")
 		c.mgr.Close()
 		return err
 	}
@@ -273,14 +293,8 @@ func (c *Client) fetchCommandStatus(sequenceNumber uint64) hotstuff.CommandStatu
 				ClientID:       uint32(c.id),
 				SequenceNumber: sequenceNumber,
 			}
-			nodes := c.gorumsConfig.Nodes()
-			if len(nodes) == 0 {
-				c.logger.Error("No nodes available in gorums config")
-				cancel()
-				continue
-			}
-			node := nodes[rand.Intn(len(nodes))]
-			response, err := node.CommandStatus(ctx, cmd)
+
+			response, err := c.gorumsConfig.CommandStatus(ctx, cmd)
 			cancel()
 
 			if err != nil {

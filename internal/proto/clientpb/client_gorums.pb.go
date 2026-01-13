@@ -12,6 +12,7 @@ import (
 	empty "github.com/golang/protobuf/ptypes/empty"
 	gorums "github.com/relab/gorums"
 	encoding "google.golang.org/grpc/encoding"
+	proto "google.golang.org/protobuf/proto"
 )
 
 const (
@@ -152,18 +153,11 @@ type Node struct {
 // ClientClient is the client interface for the Client service.
 type ClientClient interface {
 	ExecCommand(ctx context.Context, in *Command, opts ...gorums.CallOption)
-}
-
-// enforce interface compliance
-var _ ClientClient = (*Configuration)(nil)
-
-// ClientNodeClient is the single node client interface for the Client service.
-type ClientNodeClient interface {
 	CommandStatus(ctx context.Context, in *Command) (resp *CommandStatusResponse, err error)
 }
 
 // enforce interface compliance
-var _ ClientNodeClient = (*Node)(nil)
+var _ ClientClient = (*Configuration)(nil)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ empty.Empty
@@ -179,18 +173,34 @@ func (c *Configuration) ExecCommand(ctx context.Context, in *Command, opts ...go
 	c.RawConfiguration.Multicast(ctx, cd, opts...)
 }
 
-// There are no quorum calls.
-type QuorumSpec interface{}
+// QuorumSpec is the interface of quorum functions for Client.
+type QuorumSpec interface {
+	gorums.ConfigOption
+
+	// CommandStatusQF is the quorum function for the CommandStatus
+	// quorum call method. The in parameter is the request object
+	// supplied to the CommandStatus method at call time, and may or may not
+	// be used by the quorum function. If the in parameter is not needed
+	// you should implement your quorum function with '_ *Command'.
+	CommandStatusQF(in *Command, replies map[uint32]*CommandStatusResponse) (*CommandStatusResponse, bool)
+}
 
 // CommandStatus is a quorum call invoked on all nodes in configuration c,
 // with the same argument in, and returns a combined result.
-func (n *Node) CommandStatus(ctx context.Context, in *Command) (resp *CommandStatusResponse, err error) {
-	cd := gorums.CallData{
+func (c *Configuration) CommandStatus(ctx context.Context, in *Command) (resp *CommandStatusResponse, err error) {
+	cd := gorums.QuorumCallData{
 		Message: in,
 		Method:  "clientpb.Client.CommandStatus",
 	}
+	cd.QuorumFunction = func(req proto.Message, replies map[uint32]proto.Message) (proto.Message, bool) {
+		r := make(map[uint32]*CommandStatusResponse, len(replies))
+		for k, v := range replies {
+			r[k] = v.(*CommandStatusResponse)
+		}
+		return c.qspec.CommandStatusQF(req.(*Command), r)
+	}
 
-	res, err := n.RawNode.RPCCall(ctx, cd)
+	res, err := c.RawConfiguration.QuorumCall(ctx, cd)
 	if err != nil {
 		return nil, err
 	}
@@ -214,4 +224,10 @@ func RegisterClientServer(srv *gorums.Server, impl ClientServer) {
 		resp, err := impl.CommandStatus(ctx, req)
 		return gorums.NewResponseMessage(in.GetMetadata(), resp), err
 	})
+}
+
+type internalCommandStatusResponse struct {
+	nid   uint32
+	reply *CommandStatusResponse
+	err   error
 }

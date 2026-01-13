@@ -257,10 +257,10 @@ const file_internal_proto_clientpb_client_proto_rawDesc = "" +
 	"\x0eSequenceNumber\x18\x02 \x01(\x04R\x0eSequenceNumber\x12\x12\n" +
 	"\x04Data\x18\x03 \x01(\fR\x04Data\"6\n" +
 	"\x05Batch\x12-\n" +
-	"\bCommands\x18\x01 \x03(\v2\x11.clientpb.CommandR\bCommands2\x8f\x01\n" +
+	"\bCommands\x18\x01 \x03(\v2\x11.clientpb.CommandR\bCommands2\x93\x01\n" +
 	"\x06Client\x12>\n" +
-	"\vExecCommand\x12\x11.clientpb.Command\x1a\x16.google.protobuf.Empty\"\x04\x98\xb5\x18\x01\x12E\n" +
-	"\rCommandStatus\x12\x11.clientpb.Command\x1a\x1f.clientpb.CommandStatusResponse\"\x00B3Z1github.com/relab/hotstuff/internal/proto/clientpbb\x06proto3"
+	"\vExecCommand\x12\x11.clientpb.Command\x1a\x16.google.protobuf.Empty\"\x04\x98\xb5\x18\x01\x12I\n" +
+	"\rCommandStatus\x12\x11.clientpb.Command\x1a\x1f.clientpb.CommandStatusResponse\"\x04\xa0\xb5\x18\x01B3Z1github.com/relab/hotstuff/internal/proto/clientpbb\x06proto3"
 
 var (
 	file_internal_proto_clientpb_client_proto_rawDescOnce sync.Once

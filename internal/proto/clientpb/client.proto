@@ -16,6 +16,7 @@ service Client {
   }
 
   rpc CommandStatus(Command) returns (CommandStatusResponse) {
+         option (gorums.quorumcall) = true; 
   }
 }
 
