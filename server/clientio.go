@@ -127,11 +127,10 @@ type ClientIO struct {
 	logger   logging.Logger
 	cmdCache *clientpb.CommandCache
 
-	mut          sync.Mutex
-	srv          *gorums.Server
-	awaitingCmds map[clientpb.MessageID]chan<- error
-	hash         hash.Hash
-	cmdCount     uint32
+	mut      sync.Mutex
+	srv      *gorums.Server
+	hash     hash.Hash
+	cmdCount uint32
 
 	lastExecutedSeqNum map[uint32]uint64     // highest executed sequence number per client ID
 	statusTracker      *CommandStatusTracker // tracks status of all commands (executed/aborted/failed)
@@ -234,7 +233,7 @@ func (srv *ClientIO) CleanupOldStatuses(clientID uint32, upToSeqNum uint64) {
 	srv.statusTracker.Cleanup(clientID, upToSeqNum)
 }
 
-func (srv *ClientIO) CommandStatus(ctx gorums.ServerCtx, in *clientpb.Command) (resp *clientpb.CommandStatusResponse, err error) {
+func (srv *ClientIO) CommandStatus(_ gorums.ServerCtx, in *clientpb.Command) (resp *clientpb.CommandStatusResponse, err error) {
 	srv.mut.Lock()
 	defer srv.mut.Unlock()
 	status := srv.statusTracker.GetStatus(in.ClientID, in.SequenceNumber)
