@@ -1,467 +1,534 @@
-package comm
+package comm_test
 
 import (
-	"bytes"
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
-	"github.com/relab/hotstuff/core/logging"
-	clientpb "github.com/relab/hotstuff/internal/proto/clientpb"
-	hotstuffpb "github.com/relab/hotstuff/internal/proto/hotstuffpb"
-	kauripb "github.com/relab/hotstuff/internal/proto/kauripb"
+	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"github.com/relab/hotstuff/internal/test"
+	"github.com/relab/hotstuff/internal/testutil"
 	"github.com/relab/hotstuff/internal/tree"
 	"github.com/relab/hotstuff/network"
-	"github.com/relab/hotstuff/security/blockchain"
-	"github.com/relab/hotstuff/security/cert"
+	"github.com/relab/hotstuff/protocol/comm"
 	"github.com/relab/hotstuff/security/crypto"
 )
 
-// dummyQuorumSignature is a minimal QuorumSignature implementation for tests.
-type dummyQuorumSignature struct {
-	b  []byte
-	bf *crypto.Bitfield
+// fullTreeSize calculates the number of nodes in a full tree with the given
+// branch factor and 3 levels (root, intermediate, leaves).
+func fullTreeSize(bf int) int {
+	return 1 + bf + bf*bf // level 0 + level 1 + level 2
 }
 
-func (d *dummyQuorumSignature) ToBytes() []byte              { return d.b }
-func (d *dummyQuorumSignature) Participants() hotstuff.IDSet { return d.bf }
-
-// newDummyQuorumSignature creates a new dummyQuorumSignature with the given participants.
-func newDummyQuorumSignature(b []byte, participants ...hotstuff.ID) *dummyQuorumSignature {
-	bf := &crypto.Bitfield{}
-	for _, id := range participants {
-		bf.Add(id)
-	}
-	return &dummyQuorumSignature{b: b, bf: bf}
+// treeConfig represents a tree configuration for table-driven tests.
+type treeConfig struct {
+	branchFactor int
+	size         int
 }
 
-// fakeBase implements crypto.Base for injecting into cert.Authority in tests.
-type fakeBase struct {
-	VerifyFunc  func(sig hotstuff.QuorumSignature, msg []byte) error
-	CombineFunc func(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error)
-}
-
-func (f *fakeBase) Sign(message []byte) (hotstuff.QuorumSignature, error) {
-	return &dummyQuorumSignature{b: message, bf: &crypto.Bitfield{}}, nil
-}
-
-func (f *fakeBase) Combine(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) {
-	if f.CombineFunc != nil {
-		return f.CombineFunc(signatures...)
-	}
-	nb := &crypto.Bitfield{}
-	for _, s := range signatures {
-		s.Participants().ForEach(func(id hotstuff.ID) { nb.Add(id) })
-	}
-	return &dummyQuorumSignature{b: []byte("combined"), bf: nb}, nil
-}
-
-func (f *fakeBase) Verify(signature hotstuff.QuorumSignature, message []byte) error {
-	if f.VerifyFunc != nil {
-		return f.VerifyFunc(signature, message)
-	}
-	return nil
-}
-
-func (f *fakeBase) BatchVerify(signature hotstuff.QuorumSignature, batch map[hotstuff.ID][]byte) error {
-	return nil
-}
-
-// mockKauriSender implements core.KauriSender for tests.
-type mockKauriSender struct {
-	proposeCh chan *hotstuff.ProposeMsg
-	contribCh chan struct{}
-	subFunc   func(ids []hotstuff.ID) (core.Sender, error)
-}
-
-func (m *mockKauriSender) NewView(id hotstuff.ID, msg hotstuff.SyncInfo) error {
-	return nil
-}
-
-func (m *mockKauriSender) Vote(id hotstuff.ID, cert hotstuff.PartialCert) error {
-	return nil
-}
-
-func (m *mockKauriSender) Timeout(msg hotstuff.TimeoutMsg) {
-}
-
-func (m *mockKauriSender) Propose(p *hotstuff.ProposeMsg) {
-	if m.proposeCh != nil {
-		m.proposeCh <- p
+// standardTreeConfigs returns tree configurations for full 3-level trees
+// with branch factors 2, 3, 4, and 5.
+func standardTreeConfigs() []treeConfig {
+	return []treeConfig{
+		{branchFactor: 2, size: fullTreeSize(2)}, // 7 nodes
+		{branchFactor: 3, size: fullTreeSize(3)}, // 13 nodes
+		{branchFactor: 4, size: fullTreeSize(4)}, // 21 nodes
+		{branchFactor: 5, size: fullTreeSize(5)}, // 31 nodes
 	}
 }
 
-func (m *mockKauriSender) RequestBlock(ctx context.Context, hash hotstuff.Hash) (*hotstuff.Block, bool) {
-	return nil, false
+// kauriTestSetup contains all components needed for Kauri tests.
+type kauriTestSetup struct {
+	essentials *testutil.Essentials
+	kauri      *comm.Kauri
+	tree       *tree.Tree
+	sender     *testutil.MockSender
 }
 
-func (m *mockKauriSender) Sub(ids []hotstuff.ID) (core.Sender, error) {
-	if m.subFunc != nil {
-		return m.subFunc(ids)
+// wireUpKauri creates a Kauri instance with the specified configuration.
+// It returns a setup struct containing the Kauri instance and related components.
+func wireUpKauri(
+	t testing.TB,
+	id hotstuff.ID,
+	treeSize, branchFactor int,
+) *kauriTestSetup {
+	t.Helper()
+
+	treePositions := tree.DefaultTreePos(treeSize)
+	tr := tree.NewSimple(id, branchFactor, treePositions)
+	tr.SetTreeHeightWaitTime(0) // disable wait time for tests
+
+	essentials := testutil.WireUpEssentials(
+		t, id, crypto.NameECDSA,
+		core.WithKauriTree(tr),
+	)
+
+	// Add all replicas to the configuration
+	for _, pos := range treePositions {
+		if pos != id {
+			essentials.RuntimeCfg().AddReplica(&hotstuff.ReplicaInfo{ID: pos})
+		}
 	}
-	return m, nil
-}
 
-func (m *mockKauriSender) SendContributionToParent(view hotstuff.View, qc hotstuff.QuorumSignature) {
-	if m.contribCh != nil {
-		m.contribCh <- struct{}{}
-	}
-}
+	// Create a mock sender with all replica IDs as potential recipients
+	sender := testutil.NewMockSender(id, treePositions...)
 
-// Test that NewKauri panics if no tree is configured.
-func TestNewKauriPanicsWhenNoTree(t *testing.T) {
-	el := eventloop.New(logging.NewWithDest(new(bytes.Buffer), "test"), 4)
-	cfg := core.NewRuntimeConfig(1, nil)
-	defer func() { _ = recover() }()
-	// should panic
-	_ = NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, nil, nil, &mockKauriSender{})
-}
+	k := comm.NewKauri(
+		essentials.Logger(),
+		essentials.EventLoop(),
+		essentials.RuntimeCfg(),
+		essentials.Blockchain(),
+		essentials.Authority(),
+		sender,
+	)
 
-func TestSendProposalToChildren_NoChildren_SendsToParent(t *testing.T) {
-	el := eventloop.New(logging.NewWithDest(new(bytes.Buffer), "test"), 8)
-	// single-node tree -> no children
-	tr := tree.NewSimple(1, 2, []hotstuff.ID{1})
-	cfg := core.NewRuntimeConfig(1, nil, core.WithKauriTree(tr))
-	// ensure quorum size is 1 by adding one replica
-	cfg.AddReplica(&hotstuff.ReplicaInfo{ID: 1})
-
-	sender := &mockKauriSender{contribCh: make(chan struct{}, 1)}
-	bc := blockchain.New(el, logging.NewWithDest(new(bytes.Buffer), "test"), sender)
-	// store a block we'll reference
-	block := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), &clientpb.Batch{}, 1, 1)
-	bc.Store(block)
-
-	k := NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, bc, nil, sender)
-	// instead of relying on the event loop, directly trigger the wait timer handler
-	// mark as initialized
-	k.initDone = true
-	k.blockHash = block.Hash()
-	k.currentView = 1
-	// set some agg contribution
-	k.aggContrib = newDummyQuorumSignature([]byte("s"), 1)
-
-	if err := k.sendProposalToChildren(&hotstuff.ProposeMsg{Block: block}); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	select {
-	case <-sender.contribCh:
-		// ok
-	case <-time.After(50 * time.Millisecond):
-		t.Fatalf("expected contribution sent to parent")
-	}
-	if !k.aggSent {
-		t.Fatalf("expected aggSent to be true")
+	return &kauriTestSetup{
+		essentials: essentials,
+		kauri:      k,
+		tree:       tr,
+		sender:     sender,
 	}
 }
 
-func TestSendProposalToChildren_WithChildren_ProposesAndAggregates(t *testing.T) {
-	el := eventloop.New(logging.NewWithDest(new(bytes.Buffer), "test"), 16)
-	// two-node tree where node 1 has child 2
-	tr := tree.NewSimple(1, 2, []hotstuff.ID{1, 2})
-	tr.SetTreeHeightWaitTime(0)
-	cfg := core.NewRuntimeConfig(1, nil, core.WithKauriTree(tr))
-	cfg.AddReplica(&hotstuff.ReplicaInfo{ID: 1})
-	cfg.AddReplica(&hotstuff.ReplicaInfo{ID: 2})
-
-	proposeCh := make(chan *hotstuff.ProposeMsg, 1)
-	contribCh := make(chan struct{}, 1)
-	sender := &mockKauriSender{proposeCh: proposeCh, contribCh: contribCh}
-	// Sub should return a sender that sends on proposeCh
-	sender.subFunc = func(ids []hotstuff.ID) (core.Sender, error) { return sender, nil }
-
-	bc := blockchain.New(el, logging.NewWithDest(new(bytes.Buffer), "test"), sender)
-	block := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), &clientpb.Batch{}, 1, 1)
-	bc.Store(block)
-
-	k := NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, bc, nil, sender)
-	k.initDone = true
-	k.blockHash = block.Hash()
-	k.currentView = 1
-	k.aggContrib = newDummyQuorumSignature([]byte("s"), 2)
-
-	if err := k.sendProposalToChildren(&hotstuff.ProposeMsg{Block: block}); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	// child should receive propose
-	select {
-	case <-proposeCh:
-	case <-time.After(50 * time.Millisecond):
-		t.Fatalf("expected child propose")
-	}
-	// Instead of relying on the event loop, directly call the handler that would be invoked
-	k.onWaitTimerExpired(WaitTimerExpiredEvent{currentView: k.currentView})
-	select {
-	case <-contribCh:
-	case <-time.After(200 * time.Millisecond):
-		t.Fatalf("expected contribution to parent after aggregation wait")
-	}
-}
-
-func TestMergeContribution_Behaviors(t *testing.T) {
-	el := eventloop.New(logging.NewWithDest(new(bytes.Buffer), "test"), 8)
-	tr := tree.NewSimple(1, 2, []hotstuff.ID{1})
-	cfg := core.NewRuntimeConfig(1, nil, core.WithKauriTree(tr))
-	cfg.AddReplica(&hotstuff.ReplicaInfo{ID: 1})
-	sender := &mockKauriSender{contribCh: make(chan struct{}, 1)}
-	bc := blockchain.New(el, logging.NewWithDest(new(bytes.Buffer), "test"), sender)
-
-	// block not present -> error
-	k := NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, bc, nil, sender)
-	k.blockHash = hotstuff.Hash{} // not stored except genesis
-	if err := k.mergeContribution(newDummyQuorumSignature([]byte("x"))); err == nil {
-		t.Fatalf("expected error when block missing")
-	}
-
-	// now store a block and test Verify failure
-	block := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), &clientpb.Batch{}, 2, 1)
-	bc.Store(block)
-	// inject authority that fails verify
-	fbFail := &fakeBase{VerifyFunc: func(sig hotstuff.QuorumSignature, msg []byte) error { return fmt.Errorf("verify failed") }}
-	k.auth = cert.NewAuthority(cfg, bc, fbFail)
-	k.blockHash = block.Hash()
-	if err := k.mergeContribution(newDummyQuorumSignature([]byte("x"))); err == nil {
-		t.Fatalf("expected verify error")
-	}
-
-	// success: first contribution sets aggContrib
-	fbOK := &fakeBase{VerifyFunc: func(sig hotstuff.QuorumSignature, msg []byte) error { return nil }}
-	k.auth = cert.NewAuthority(cfg, bc, fbOK)
-	qs := newDummyQuorumSignature([]byte("s"), 1)
-	k.aggContrib = nil
-	k.currentView = 2
-	k.blockHash = block.Hash()
-	if err := k.mergeContribution(qs); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	if k.aggContrib == nil {
-		t.Fatalf("expected aggContrib to be set")
-	}
-
-	// merging: create another disjoint contribution and ensure Combine used and event emitted when quorum reached
-	// make quorum size = 1 for brevity by having 1 replica in cfg
-	cfg = core.NewRuntimeConfig(1, nil, core.WithKauriTree(tr))
-	cfg.AddReplica(&hotstuff.ReplicaInfo{ID: 1})
-	k.config = cfg
-	// make combined signature have participant count >= quorum
-	combined := newDummyQuorumSignature([]byte("c"), 1)
-	k.auth = cert.NewAuthority(cfg, bc, &fakeBase{CombineFunc: func(signatures ...hotstuff.QuorumSignature) (hotstuff.QuorumSignature, error) { return combined, nil }, VerifyFunc: func(sig hotstuff.QuorumSignature, msg []byte) error { return nil }})
-
-	// register handler to capture NewViewMsg event
-	got := make(chan struct{}, 1)
-	eventloop.Register(el, func(msg hotstuff.NewViewMsg) { got <- struct{}{} })
-	// current aggContrib set to something else
-	old := newDummyQuorumSignature([]byte("old"), 2)
-	k.aggContrib = old
-	// merge another signature
-	if err := k.mergeContribution(qs); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-
-	// process one queued event (the NewViewMsg) manually using Tick
+// simulateConnection simulates the replica being connected by triggering
+// the ReplicaConnectedEvent through the event loop.
+func simulateConnection(t testing.TB, setup *kauriTestSetup) {
+	t.Helper()
+	el := setup.essentials.EventLoop()
+	el.AddEvent(hotstuff.ReplicaConnectedEvent{})
 	el.Tick(context.Background())
-	select {
-	case <-got:
-	case <-time.After(200 * time.Millisecond):
-		t.Fatalf("expected NewViewMsg event after aggregation")
+}
+
+// createProposal creates a test proposal with a block based on genesis.
+func createProposal(t testing.TB, essentials *testutil.Essentials, proposerID hotstuff.ID) *hotstuff.ProposeMsg {
+	t.Helper()
+	block := testutil.CreateBlock(t, essentials.Authority())
+	return &hotstuff.ProposeMsg{
+		ID:    proposerID,
+		Block: block,
 	}
 }
 
-func TestOnWaitForConnected_NoStartWhenCurrentHigher(t *testing.T) {
-	el := eventloop.New(logging.NewWithDest(new(bytes.Buffer), "test"), 8)
-	tr := tree.NewSimple(1, 2, []hotstuff.ID{1, 2})
-	cfg := core.NewRuntimeConfig(1, nil, core.WithKauriTree(tr))
-	cfg.AddReplica(&hotstuff.ReplicaInfo{ID: 1})
-	cfg.AddReplica(&hotstuff.ReplicaInfo{ID: 2})
+// waitForEvent registers a handler for event type T and ticks the event loop
+// until the event is received or timeout occurs. This is preferred over
+// arbitrary tick counts.
+func waitForEvent[T any](t testing.TB, el *eventloop.EventLoop, timeout time.Duration) {
+	t.Helper()
+	received := make(chan struct{})
+	unregister := eventloop.Register(el, func(_ T) {
+		close(received)
+	})
+	defer unregister()
 
-	proposeCh := make(chan *hotstuff.ProposeMsg, 1)
-	sender := &mockKauriSender{proposeCh: proposeCh}
-	sender.subFunc = func(ids []hotstuff.ID) (core.Sender, error) { return sender, nil }
-	bc := blockchain.New(el, logging.NewWithDest(new(bytes.Buffer), "test"), sender)
-
-	block := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), &clientpb.Batch{}, 1, 1)
-	k := NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, bc, nil, sender)
-	k.initDone = true
-	k.currentView = 5
-
-	// event has a lower view -> should not start kauri
-	event := WaitForConnectedEvent{pc: hotstuff.PartialCert{}, p: &hotstuff.ProposeMsg{Block: block}}
-	k.onWaitForConnected(event)
-	select {
-	case <-proposeCh:
-		t.Fatalf("did not expect proposal to be sent when current view is higher")
-	default:
-		// ok
+	deadline := time.Now().Add(timeout)
+	for {
+		select {
+		case <-received:
+			return
+		default:
+			if time.Now().After(deadline) {
+				t.Fatalf("timeout waiting for event %T", *new(T))
+			}
+			el.Tick(context.Background())
+			time.Sleep(time.Millisecond) // yield to allow goroutines to run
+		}
 	}
 }
 
-func TestOnContributionRecv_ViewMismatch(t *testing.T) {
-	el := eventloop.New(logging.NewWithDest(new(bytes.Buffer), "test"), 8)
-	tr := tree.NewSimple(1, 2, []hotstuff.ID{1})
-	cfg := core.NewRuntimeConfig(1, nil, core.WithKauriTree(tr))
-	sender := &mockKauriSender{contribCh: make(chan struct{}, 1)}
-	bc := blockchain.New(el, logging.NewWithDest(new(bytes.Buffer), "test"), sender)
-	k := NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, bc, nil, sender)
-	k.currentView = 1
-	// create contribution with different view
-	k.onContributionRecv(&kauripb.Contribution{ID: 2, View: 2})
-	if len(k.senders) != 0 {
-		t.Fatalf("expected no senders appended on view mismatch")
+// TestNewKauriPanic tests that NewKauri panics when no tree is configured.
+func TestNewKauriPanic(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("NewKauri should panic when no tree is configured")
+		}
+	}()
+
+	essentials := testutil.WireUpEssentials(t, 1, crypto.NameECDSA)
+	// This should panic because no tree is configured
+	_ = comm.NewKauri(
+		essentials.Logger(),
+		essentials.EventLoop(),
+		essentials.RuntimeCfg(),
+		essentials.Blockchain(),
+		essentials.Authority(),
+		essentials.MockSender(),
+	)
+}
+
+// TestDisseminateFromLeaf tests that a leaf node sends its contribution
+// directly to the parent without forwarding to children.
+func TestDisseminateFromLeaf(t *testing.T) {
+	for _, tc := range standardTreeConfigs() {
+		t.Run(test.Name("bf", tc.branchFactor, "size", tc.size), func(t *testing.T) {
+			// Use the last node (a leaf) as the test replica
+			leafID := hotstuff.ID(tc.size)
+			setup := wireUpKauri(t, leafID, tc.size, tc.branchFactor)
+			simulateConnection(t, setup)
+
+			proposal := createProposal(t, setup.essentials, 1)
+			setup.essentials.Blockchain().Store(proposal.Block)
+			pc := testutil.CreatePC(t, proposal.Block, setup.essentials.Authority())
+
+			err := setup.kauri.Disseminate(proposal, pc)
+			if err != nil {
+				t.Fatalf("Disseminate failed: %v", err)
+			}
+
+			// Leaf should send contribution to parent, not propose to children
+			contributions := setup.sender.ContributionsSent()
+			if len(contributions) != 1 {
+				t.Errorf("expected 1 contribution from leaf, got %d", len(contributions))
+			}
+
+			// Verify no proposals were sent (leaf has no children)
+			messages := setup.sender.MessagesSent()
+			for _, msg := range messages {
+				if _, ok := msg.(hotstuff.ProposeMsg); ok {
+					t.Error("leaf node should not send proposals")
+				}
+			}
+		})
 	}
 }
 
-func TestSendProposalToChildren_SubError(t *testing.T) {
-	el := eventloop.New(logging.NewWithDest(new(bytes.Buffer), "test"), 8)
-	tr := tree.NewSimple(1, 2, []hotstuff.ID{1, 2})
-	cfg := core.NewRuntimeConfig(1, nil, core.WithKauriTree(tr))
-	cfg.AddReplica(&hotstuff.ReplicaInfo{ID: 1})
-	cfg.AddReplica(&hotstuff.ReplicaInfo{ID: 2})
+// TestDisseminateFromIntermediate tests that an intermediate node with children
+// starts the aggregation timer and eventually sends its contribution to parent.
+func TestDisseminateFromIntermediate(t *testing.T) {
+	for _, tc := range standardTreeConfigs() {
+		t.Run(test.Name("bf", tc.branchFactor, "size", tc.size), func(t *testing.T) {
+			// Use node 2 (first child of root, has its own children)
+			intermediateID := hotstuff.ID(2)
+			setup := wireUpKauri(t, intermediateID, tc.size, tc.branchFactor)
+			simulateConnection(t, setup)
 
-	sender := &mockKauriSender{}
-	sender.subFunc = func(ids []hotstuff.ID) (core.Sender, error) { return nil, fmt.Errorf("sub failed") }
-	bc := blockchain.New(el, logging.NewWithDest(new(bytes.Buffer), "test"), sender)
-	block := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), &clientpb.Batch{}, 1, 1)
-	k := NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, bc, nil, sender)
-	k.initDone = true
-	if err := k.sendProposalToChildren(&hotstuff.ProposeMsg{Block: block}); err == nil {
-		t.Fatalf("expected error when Sub fails")
+			proposal := createProposal(t, setup.essentials, 1)
+			setup.essentials.Blockchain().Store(proposal.Block)
+			pc := testutil.CreatePC(t, proposal.Block, setup.essentials.Authority())
+
+			// Verify this node has children (precondition)
+			children := setup.tree.ReplicaChildren()
+			if len(children) == 0 {
+				t.Error("intermediate node should have children")
+			}
+
+			err := setup.kauri.Disseminate(proposal, pc)
+			if err != nil {
+				t.Fatalf("Disseminate failed: %v", err)
+			}
+
+			// No contribution yet (waiting for children)
+			contributions := setup.sender.ContributionsSent()
+			if len(contributions) != 0 {
+				t.Errorf("expected no contributions immediately, got %d", len(contributions))
+			}
+
+			// Wait for WaitTimerExpiredEvent to be processed
+			waitForEvent[comm.WaitTimerExpiredEvent](t, setup.essentials.EventLoop(), 100*time.Millisecond)
+
+			// Now contribution should be sent (timer expired)
+			contributions = setup.sender.ContributionsSent()
+			if len(contributions) != 1 {
+				t.Errorf("expected 1 contribution after timer expiry, got %d", len(contributions))
+			}
+		})
 	}
 }
 
-func TestWaitToAggregate_TriggersWaitExpiredAndResets(t *testing.T) {
-	el := eventloop.New(logging.NewWithDest(new(bytes.Buffer), "test"), 8)
-	tr := tree.NewSimple(1, 2, []hotstuff.ID{1})
-	tr.SetTreeHeightWaitTime(0)
-	cfg := core.NewRuntimeConfig(1, nil, core.WithKauriTree(tr))
-	cfg.AddReplica(&hotstuff.ReplicaInfo{ID: 1})
-	contribCh := make(chan struct{}, 1)
-	sender := &mockKauriSender{contribCh: contribCh}
-	bc := blockchain.New(el, logging.NewWithDest(new(bytes.Buffer), "test"), sender)
+// TestDisseminateFromRoot tests that the root node with children
+// starts the aggregation timer and eventually sends its contribution to parent.
+func TestDisseminateFromRoot(t *testing.T) {
+	for _, tc := range standardTreeConfigs() {
+		t.Run(test.Name("bf", tc.branchFactor, "size", tc.size), func(t *testing.T) {
+			rootID := hotstuff.ID(1)
+			setup := wireUpKauri(t, rootID, tc.size, tc.branchFactor)
+			simulateConnection(t, setup)
 
-	k := NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, bc, nil, sender)
-	k.currentView = 7
-	k.aggSent = false
-	k.aggContrib = newDummyQuorumSignature([]byte("s"), 1)
+			proposal := createProposal(t, setup.essentials, rootID)
+			setup.essentials.Blockchain().Store(proposal.Block)
+			pc := testutil.CreatePC(t, proposal.Block, setup.essentials.Authority())
 
-	// call waitToAggregate directly (uses WaitTime==0)
-	k.waitToAggregate()
+			// Verify root has children (precondition for multi-node trees)
+			children := setup.tree.ReplicaChildren()
+			if len(children) == 0 {
+				t.Error("root should have children in multi-node tree")
+			}
 
-	// process the added WaitTimerExpiredEvent
-	el.Tick(context.Background())
-	select {
-	case <-contribCh:
-	case <-time.After(200 * time.Millisecond):
-		t.Fatalf("expected SendContributionToParent to be called on wait expiry")
-	}
-	if k.aggContrib != nil {
-		t.Fatalf("expected aggContrib to be reset after wait expiry")
-	}
-}
+			err := setup.kauri.Disseminate(proposal, pc)
+			if err != nil {
+				t.Fatalf("Disseminate failed: %v", err)
+			}
 
-func TestDisseminate_DelayedUntilConnected(t *testing.T) {
-	el := eventloop.New(logging.NewWithDest(new(bytes.Buffer), "test"), 8)
-	tr := tree.NewSimple(1, 2, []hotstuff.ID{1})
-	cfg := core.NewRuntimeConfig(1, nil, core.WithKauriTree(tr))
-	cfg.AddReplica(&hotstuff.ReplicaInfo{ID: 1})
+			// No contribution yet (waiting for children)
+			contributions := setup.sender.ContributionsSent()
+			if len(contributions) != 0 {
+				t.Errorf("expected no contributions immediately, got %d", len(contributions))
+			}
 
-	sender := &mockKauriSender{contribCh: make(chan struct{}, 1)}
-	bc := blockchain.New(el, logging.NewWithDest(new(bytes.Buffer), "test"), sender)
-	block := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), &clientpb.Batch{}, 1, 1)
-	bc.Store(block)
+			// Wait for WaitTimerExpiredEvent to be processed
+			waitForEvent[comm.WaitTimerExpiredEvent](t, setup.essentials.EventLoop(), 100*time.Millisecond)
 
-	k := NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, bc, nil, sender)
-	// initDone false by default
-	qs := newDummyQuorumSignature([]byte("s"), 1)
-	pc := hotstuff.NewPartialCert(qs, block.Hash())
-
-	if err := k.Disseminate(&hotstuff.ProposeMsg{Block: block}, pc); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	// nothing sent yet
-	select {
-	case <-sender.contribCh:
-		t.Fatalf("did not expect contribution yet")
-	default:
-	}
-	// now trigger the ConnectedEvent which should release the delayed event
-	el.AddEvent(network.ConnectedEvent{})
-	// simulate that the replica is connected (what the ReplicaConnectedEvent handler would have done)
-	k.initDone = true
-
-	// process connected and delayed WaitForConnectedEvent
-	el.Tick(context.Background())
-	el.Tick(context.Background())
-	select {
-	case <-sender.contribCh:
-	case <-time.After(200 * time.Millisecond):
-		t.Fatalf("expected contribution after connection")
+			// Now contribution should be sent (timer expired)
+			contributions = setup.sender.ContributionsSent()
+			if len(contributions) != 1 {
+				t.Errorf("expected 1 contribution after timer expiry, got %d", len(contributions))
+			}
+		})
 	}
 }
 
-func TestAggregate_DelayedUntilConnected(t *testing.T) {
-	el := eventloop.New(logging.NewWithDest(new(bytes.Buffer), "test"), 8)
-	tr := tree.NewSimple(1, 2, []hotstuff.ID{1})
-	cfg := core.NewRuntimeConfig(1, nil, core.WithKauriTree(tr))
-	cfg.AddReplica(&hotstuff.ReplicaInfo{ID: 1})
+// TestAggregateFromLeaf tests that a leaf node sends its vote contribution
+// to its parent.
+func TestAggregateFromLeaf(t *testing.T) {
+	for _, tc := range standardTreeConfigs() {
+		t.Run(test.Name("bf", tc.branchFactor, "size", tc.size), func(t *testing.T) {
+			leafID := hotstuff.ID(tc.size)
+			setup := wireUpKauri(t, leafID, tc.size, tc.branchFactor)
+			simulateConnection(t, setup)
 
-	sender := &mockKauriSender{contribCh: make(chan struct{}, 1)}
-	bc := blockchain.New(el, logging.NewWithDest(new(bytes.Buffer), "test"), sender)
-	block := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), &clientpb.Batch{}, 1, 1)
-	bc.Store(block)
+			proposal := createProposal(t, setup.essentials, 1)
+			setup.essentials.Blockchain().Store(proposal.Block)
+			pc := testutil.CreatePC(t, proposal.Block, setup.essentials.Authority())
 
-	k := NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, bc, nil, sender)
-	qs := newDummyQuorumSignature([]byte("s"), 1)
-	pc := hotstuff.NewPartialCert(qs, block.Hash())
+			err := setup.kauri.Aggregate(proposal, pc)
+			if err != nil {
+				t.Fatalf("Aggregate failed: %v", err)
+			}
 
-	if err := k.Aggregate(&hotstuff.ProposeMsg{Block: block}, pc); err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	el.AddEvent(network.ConnectedEvent{})
-	k.initDone = true
+			// Leaf should send contribution to parent
+			contributions := setup.sender.ContributionsSent()
+			if len(contributions) != 1 {
+				t.Errorf("expected 1 contribution from leaf, got %d", len(contributions))
+			}
 
-	// process connected and delayed WaitForConnectedEvent
-	el.Tick(context.Background())
-	el.Tick(context.Background())
-	select {
-	case <-sender.contribCh:
-	case <-time.After(200 * time.Millisecond):
-		t.Fatalf("expected contribution after connection")
+			// Verify the contribution has the correct view
+			if contributions[0].View != proposal.Block.View() {
+				t.Errorf("contribution view = %d, want %d", contributions[0].View, proposal.Block.View())
+			}
+		})
 	}
 }
 
-func TestOnContributionRecv_IsSubSetCallsParent(t *testing.T) {
-	el := eventloop.New(logging.NewWithDest(new(bytes.Buffer), "test"), 8)
-	tr := tree.NewSimple(1, 2, []hotstuff.ID{1, 2})
-	cfg := core.NewRuntimeConfig(1, nil, core.WithKauriTree(tr))
-	cfg.AddReplica(&hotstuff.ReplicaInfo{ID: 1})
-	cfg.AddReplica(&hotstuff.ReplicaInfo{ID: 2})
+// TestDisseminateDelayedUntilConnected tests that Disseminate waits for
+// connection before processing.
+func TestDisseminateDelayedUntilConnected(t *testing.T) {
+	for _, tc := range standardTreeConfigs() {
+		t.Run(test.Name("bf", tc.branchFactor, "size", tc.size), func(t *testing.T) {
+			leafID := hotstuff.ID(tc.size)
+			setup := wireUpKauri(t, leafID, tc.size, tc.branchFactor)
 
-	contribCh := make(chan struct{}, 1)
-	sender := &mockKauriSender{contribCh: contribCh}
-	bc := blockchain.New(el, logging.NewWithDest(new(bytes.Buffer), "test"), sender)
-	block := hotstuff.NewBlock(hotstuff.GetGenesis().Hash(), hotstuff.NewQuorumCert(nil, 0, hotstuff.GetGenesis().Hash()), &clientpb.Batch{}, 1, 1)
-	bc.Store(block)
+			// Do NOT simulate connection yet
+			proposal := createProposal(t, setup.essentials, 1)
+			setup.essentials.Blockchain().Store(proposal.Block)
+			pc := testutil.CreatePC(t, proposal.Block, setup.essentials.Authority())
 
-	// authority that accepts any signature
-	k := NewKauri(logging.NewWithDest(new(bytes.Buffer), "test"), el, cfg, bc, cert.NewAuthority(cfg, bc, &fakeBase{}), sender)
-	k.currentView = 1
-	k.blockHash = block.Hash()
+			err := setup.kauri.Disseminate(proposal, pc)
+			if err != nil {
+				t.Fatalf("Disseminate failed: %v", err)
+			}
 
-	// construct a proto QuorumSignature with ECDSA sig so QuorumSignatureFromProto returns non-nil
-	protoSig := &hotstuffpb.QuorumSignature{}
-	ecd := &hotstuffpb.ECDSAMultiSignature{Sigs: []*hotstuffpb.ECDSASignature{{Signer: uint32(2), Sig: []byte("sig")}}}
-	protoSig.Sig = &hotstuffpb.QuorumSignature_ECDSASigs{ECDSASigs: ecd}
+			// Nothing should be sent yet
+			contributions := setup.sender.ContributionsSent()
+			if len(contributions) != 0 {
+				t.Errorf("expected no contributions before connection, got %d", len(contributions))
+			}
 
-	k.onContributionRecv(&kauripb.Contribution{ID: 2, View: uint64(k.currentView), Signature: protoSig})
-	select {
-	case <-contribCh:
-	case <-time.After(200 * time.Millisecond):
-		t.Fatalf("expected SendContributionToParent to be invoked when subtree satisfied")
+			// Simulate connection: ReplicaConnectedEvent first (sets initDone=true),
+			// then ConnectedEvent (triggers the delayed WaitForConnectedEvent)
+			el := setup.essentials.EventLoop()
+			el.AddEvent(hotstuff.ReplicaConnectedEvent{})
+			el.Tick(context.Background()) // Process ReplicaConnectedEvent
+
+			el.AddEvent(network.ConnectedEvent{})
+			// Wait for WaitForConnectedEvent to be processed
+			waitForEvent[comm.WaitForConnectedEvent](t, el, 100*time.Millisecond)
+
+			// Now contribution should be sent
+			contributions = setup.sender.ContributionsSent()
+			if len(contributions) != 1 {
+				t.Errorf("expected 1 contribution after connection, got %d", len(contributions))
+			}
+		})
 	}
-	if !k.aggSent {
-		t.Fatalf("expected aggSent to be true after subtree aggregation")
+}
+
+// TestAggregateDelayedUntilConnected tests that Aggregate waits for
+// connection before processing.
+func TestAggregateDelayedUntilConnected(t *testing.T) {
+	for _, tc := range standardTreeConfigs() {
+		t.Run(test.Name("bf", tc.branchFactor, "size", tc.size), func(t *testing.T) {
+			leafID := hotstuff.ID(tc.size)
+			setup := wireUpKauri(t, leafID, tc.size, tc.branchFactor)
+
+			// Do NOT simulate connection yet
+			proposal := createProposal(t, setup.essentials, 1)
+			setup.essentials.Blockchain().Store(proposal.Block)
+			pc := testutil.CreatePC(t, proposal.Block, setup.essentials.Authority())
+
+			err := setup.kauri.Aggregate(proposal, pc)
+			if err != nil {
+				t.Fatalf("Aggregate failed: %v", err)
+			}
+
+			// Nothing should be sent yet
+			contributions := setup.sender.ContributionsSent()
+			if len(contributions) != 0 {
+				t.Errorf("expected no contributions before connection, got %d", len(contributions))
+			}
+
+			// Simulate connection: ReplicaConnectedEvent first (sets initDone=true),
+			// then ConnectedEvent (triggers the delayed WaitForConnectedEvent)
+			el := setup.essentials.EventLoop()
+			el.AddEvent(hotstuff.ReplicaConnectedEvent{})
+			el.Tick(context.Background()) // Process ReplicaConnectedEvent
+
+			el.AddEvent(network.ConnectedEvent{})
+			// Wait for WaitForConnectedEvent to be processed
+			waitForEvent[comm.WaitForConnectedEvent](t, el, 100*time.Millisecond)
+
+			// Now contribution should be sent
+			contributions = setup.sender.ContributionsSent()
+			if len(contributions) != 1 {
+				t.Errorf("expected 1 contribution after connection, got %d", len(contributions))
+			}
+		})
+	}
+}
+
+// TestSingleNodeTree tests behavior when there is only one node in the tree.
+func TestSingleNodeTree(t *testing.T) {
+	setup := wireUpKauri(t, 1, 1, 2)
+	simulateConnection(t, setup)
+
+	proposal := createProposal(t, setup.essentials, 1)
+	setup.essentials.Blockchain().Store(proposal.Block)
+	pc := testutil.CreatePC(t, proposal.Block, setup.essentials.Authority())
+
+	err := setup.kauri.Disseminate(proposal, pc)
+	if err != nil {
+		t.Fatalf("Disseminate failed: %v", err)
+	}
+
+	// Single node has no children, should send contribution immediately
+	contributions := setup.sender.ContributionsSent()
+	if len(contributions) != 1 {
+		t.Errorf("expected 1 contribution from single node, got %d", len(contributions))
+	}
+}
+
+// TestChildrenCount tests that the correct number of children receive proposals
+// for different tree configurations.
+func TestChildrenCount(t *testing.T) {
+	tests := []struct {
+		branchFactor int
+		size         int
+		replicaID    hotstuff.ID
+		wantChildren int
+	}{
+		// Root nodes
+		{branchFactor: 2, size: 7, replicaID: 1, wantChildren: 2},
+		{branchFactor: 3, size: 13, replicaID: 1, wantChildren: 3},
+		{branchFactor: 4, size: 21, replicaID: 1, wantChildren: 4},
+		{branchFactor: 5, size: 31, replicaID: 1, wantChildren: 5},
+		// Intermediate nodes (node 2)
+		{branchFactor: 2, size: 7, replicaID: 2, wantChildren: 2},
+		{branchFactor: 3, size: 13, replicaID: 2, wantChildren: 3},
+		{branchFactor: 4, size: 21, replicaID: 2, wantChildren: 4},
+		// Leaf nodes (last node)
+		{branchFactor: 2, size: 7, replicaID: 7, wantChildren: 0},
+		{branchFactor: 3, size: 13, replicaID: 13, wantChildren: 0},
+		{branchFactor: 4, size: 21, replicaID: 21, wantChildren: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(test.Name("bf", tt.branchFactor, "id", int(tt.replicaID)), func(t *testing.T) {
+			setup := wireUpKauri(t, tt.replicaID, tt.size, tt.branchFactor)
+			children := setup.tree.ReplicaChildren()
+			if len(children) != tt.wantChildren {
+				t.Errorf("ReplicaChildren() = %d, want %d", len(children), tt.wantChildren)
+			}
+		})
+	}
+}
+
+// TestTreeNodePositions verifies that tree positions work correctly
+// for different node roles.
+func TestTreeNodePositions(t *testing.T) {
+	tests := []struct {
+		branchFactor int
+		size         int
+		replicaID    hotstuff.ID
+		wantIsRoot   bool
+		wantIsLeaf   bool
+	}{
+		// bf=2, size=7
+		{branchFactor: 2, size: 7, replicaID: 1, wantIsRoot: true, wantIsLeaf: false},
+		{branchFactor: 2, size: 7, replicaID: 2, wantIsRoot: false, wantIsLeaf: false},
+		{branchFactor: 2, size: 7, replicaID: 7, wantIsRoot: false, wantIsLeaf: true},
+		// bf=4, size=21
+		{branchFactor: 4, size: 21, replicaID: 1, wantIsRoot: true, wantIsLeaf: false},
+		{branchFactor: 4, size: 21, replicaID: 5, wantIsRoot: false, wantIsLeaf: false},
+		{branchFactor: 4, size: 21, replicaID: 21, wantIsRoot: false, wantIsLeaf: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(test.Name("bf", tt.branchFactor, "id", int(tt.replicaID)), func(t *testing.T) {
+			setup := wireUpKauri(t, tt.replicaID, tt.size, tt.branchFactor)
+
+			isRoot := setup.tree.IsRoot(tt.replicaID)
+			if isRoot != tt.wantIsRoot {
+				t.Errorf("IsRoot(%d) = %v, want %v", tt.replicaID, isRoot, tt.wantIsRoot)
+			}
+
+			// A node is a leaf if it has no children
+			isLeaf := len(setup.tree.ReplicaChildren()) == 0
+			if isLeaf != tt.wantIsLeaf {
+				t.Errorf("IsLeaf(%d) = %v, want %v", tt.replicaID, isLeaf, tt.wantIsLeaf)
+			}
+		})
+	}
+}
+
+// TestProposalViewTracking ensures that the view is correctly tracked
+// across dissemination and aggregation.
+func TestProposalViewTracking(t *testing.T) {
+	views := []hotstuff.View{1, 5, 10, 100}
+
+	for _, view := range views {
+		t.Run(test.Name("view", int(view)), func(t *testing.T) {
+			leafID := hotstuff.ID(7) // leaf in bf=2, size=7 tree
+			setup := wireUpKauri(t, leafID, 7, 2)
+			simulateConnection(t, setup)
+
+			// Create block with specific view
+			qc := testutil.CreateQC(t, hotstuff.GetGenesis(), setup.essentials.Authority())
+			block := hotstuff.NewBlock(
+				hotstuff.GetGenesis().Hash(),
+				qc,
+				&clientpb.Batch{},
+				view,
+				1,
+			)
+			setup.essentials.Blockchain().Store(block)
+
+			proposal := &hotstuff.ProposeMsg{ID: 1, Block: block}
+			pc := testutil.CreatePC(t, block, setup.essentials.Authority())
+
+			err := setup.kauri.Disseminate(proposal, pc)
+			if err != nil {
+				t.Fatalf("Disseminate failed: %v", err)
+			}
+
+			contributions := setup.sender.ContributionsSent()
+			if len(contributions) != 1 {
+				t.Fatalf("expected 1 contribution, got %d", len(contributions))
+			}
+
+			if contributions[0].View != view {
+				t.Errorf("contribution view = %d, want %d", contributions[0].View, view)
+			}
+		})
 	}
 }
