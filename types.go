@@ -373,3 +373,13 @@ type ReplicaInfo struct {
 	Location string
 	Metadata map[string]string
 }
+
+type CommandStatus uint8
+
+const (
+	UNKNOWN CommandStatus = iota
+	PENDING
+	COMMITTED
+	EXECUTED
+	FAILED
+)

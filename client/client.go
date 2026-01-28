@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,7 +22,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // ID is the identifier for a client.
@@ -31,17 +31,37 @@ type qspec struct {
 	faulty int
 }
 
-func (q *qspec) ExecCommandQF(_ *clientpb.Command, signatures map[uint32]*emptypb.Empty) (*emptypb.Empty, bool) {
-	if len(signatures) < q.faulty+1 {
+func (q *qspec) CommandStatusQF(command *clientpb.Command, replies map[uint32]*clientpb.CommandStatusResponse) (*clientpb.CommandStatusResponse, bool) {
+	if len(replies) < q.faulty+1 {
 		return nil, false
 	}
-	return &emptypb.Empty{}, true
+	responseCount := make([]int, 4) // assuming 4 possible statuses
+
+	for _, resp := range replies {
+		if resp != nil {
+			status := resp.Status
+			if int(status) >= 0 && int(status) < len(responseCount) {
+				responseCount[int(status)]++
+			}
+		}
+	}
+	for status, count := range responseCount {
+		if count >= q.faulty+1 {
+			return &clientpb.CommandStatusResponse{
+				Command: command,
+				Status:  clientpb.CommandStatusResponse_Status(status),
+			}, true
+		}
+	}
+	return &clientpb.CommandStatusResponse{
+		Command: command,
+		Status:  clientpb.CommandStatusResponse_PENDING,
+	}, false
 }
 
 type pendingCmd struct {
 	sequenceNumber uint64
 	sendTime       time.Time
-	promise        *clientpb.AsyncEmpty
 	cancelCtx      context.CancelFunc
 }
 
@@ -125,6 +145,7 @@ func (c *Client) Connect(replicas []hotstuff.ReplicaInfo) (err error) {
 	}
 	c.gorumsConfig, err = c.mgr.NewConfiguration(&qspec{faulty: hotstuff.NumFaulty(len(replicas))}, gorums.WithNodeMap(nodes))
 	if err != nil {
+		c.logger.Error("unable to create the configuration in client")
 		c.mgr.Close()
 		return err
 	}
@@ -182,6 +203,8 @@ func (c *Client) Stop() {
 }
 
 func (c *Client) close() {
+	// Signal the command handler to stop fetching statuses before closing the manager.
+	close(c.pendingCmds)
 	c.mgr.Close()
 	err := c.reader.Close()
 	if err != nil {
@@ -238,8 +261,8 @@ loop:
 		}
 
 		ctx, cancel := context.WithTimeout(ctx, c.timeout)
-		promise := c.gorumsConfig.ExecCommand(ctx, cmd)
-		pending := pendingCmd{sequenceNumber: num, sendTime: time.Now(), promise: promise, cancelCtx: cancel}
+		c.gorumsConfig.ExecCommand(ctx, cmd)
+		pending := pendingCmd{sequenceNumber: num, sendTime: time.Now(), cancelCtx: cancel}
 
 		num++
 		select {
@@ -255,6 +278,46 @@ loop:
 
 	}
 	return nil
+}
+
+func (c *Client) fetchCommandStatus(sequenceNumber uint64) hotstuff.CommandStatus {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	timeout := time.After(c.timeout)
+
+	for {
+		select {
+		case <-ticker.C:
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			cmd := &clientpb.Command{
+				ClientID:       uint32(c.id),
+				SequenceNumber: sequenceNumber,
+			}
+
+			response, err := c.gorumsConfig.CommandStatus(ctx, cmd)
+			cancel()
+
+			if err != nil {
+				c.logger.Errorf("Failed to fetch command status (client: %d, sequence: %d): %v", c.id, sequenceNumber, err)
+				// If the node/manager was closed, stop trying and return UNKNOWN.
+				if strings.Contains(err.Error(), "node closed") {
+					return hotstuff.UNKNOWN
+				}
+				continue
+			}
+			if response == nil || response.Command == nil {
+				c.logger.Errorf("Invalid response received when fetching command status (client: %d, sequence: %d)", c.id, sequenceNumber)
+				continue
+			}
+			c.logger.Infof("Fetched command status (client: %d, sequence: %d, status: %d)", c.id, sequenceNumber, response.Status)
+			status := hotstuff.CommandStatus(response.Status)
+			if status == hotstuff.COMMITTED || status == hotstuff.EXECUTED || status == hotstuff.FAILED {
+				return status
+			}
+		case <-timeout:
+			return hotstuff.UNKNOWN
+		}
+	}
 }
 
 // handleCommands will get pending commands from the pendingCmds channel and then
@@ -274,16 +337,17 @@ func (c *Client) handleCommands(ctx context.Context) (executed, failed, timeout 
 		case <-ctx.Done():
 			return
 		}
-		_, err := cmd.promise.Get()
-		if err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				c.logger.Debug("Command timed out.")
-				timeout++
-			} else if !errors.Is(err, context.Canceled) {
-				c.logger.Debugf("Did not get enough replies for command: %v\n", err)
-				failed++
-			}
-		} else {
+		response := c.fetchCommandStatus(cmd.sequenceNumber)
+
+		switch response {
+		case hotstuff.UNKNOWN:
+			c.logger.Infof("Command timed out (client: %d, sequence: %d)", c.id, cmd.sequenceNumber)
+			timeout++
+		case hotstuff.FAILED:
+			c.logger.Infof("Command failed (client: %d, sequence: %d)", c.id, cmd.sequenceNumber)
+			failed++
+		default:
+			c.logger.Infof("Command executed (client: %d, sequence: %d)", c.id, cmd.sequenceNumber)
 			executed++
 		}
 		c.mut.Lock()
@@ -291,7 +355,6 @@ func (c *Client) handleCommands(ctx context.Context) (executed, failed, timeout 
 			c.highestCommitted = cmd.sequenceNumber
 		}
 		c.mut.Unlock()
-
 		duration := time.Since(cmd.sendTime)
 		c.eventLoop.AddEvent(LatencyMeasurementEvent{Latency: duration})
 	}
