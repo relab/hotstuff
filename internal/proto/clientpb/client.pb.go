@@ -7,10 +7,10 @@
 package clientpb
 
 import (
-	empty "github.com/golang/protobuf/ptypes/empty"
 	_ "github.com/relab/gorums"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -281,7 +281,7 @@ var file_internal_proto_clientpb_client_proto_goTypes = []any{
 	(*CommandStatusResponse)(nil),     // 1: clientpb.CommandStatusResponse
 	(*Command)(nil),                   // 2: clientpb.Command
 	(*Batch)(nil),                     // 3: clientpb.Batch
-	(*empty.Empty)(nil),               // 4: google.protobuf.Empty
+	(*emptypb.Empty)(nil),             // 4: google.protobuf.Empty
 }
 var file_internal_proto_clientpb_client_proto_depIdxs = []int32{
 	0, // 0: clientpb.CommandStatusResponse.status:type_name -> clientpb.CommandStatusResponse.Status

@@ -9,10 +9,10 @@ package clientpb
 import (
 	context "context"
 	fmt "fmt"
-	empty "github.com/golang/protobuf/ptypes/empty"
 	gorums "github.com/relab/gorums"
 	encoding "google.golang.org/grpc/encoding"
 	proto "google.golang.org/protobuf/proto"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -160,7 +160,7 @@ type ClientClient interface {
 var _ ClientClient = (*Configuration)(nil)
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ empty.Empty
+var _ emptypb.Empty
 
 // ExecCommand sends a command to all replicas and waits for valid signatures
 // from f+1 replicas

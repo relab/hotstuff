@@ -5,7 +5,6 @@ go 1.25.6
 require (
 	cuelang.org/go v0.15.4
 	github.com/felixge/fgprof v0.9.5
-	github.com/golang/protobuf v1.5.4
 	github.com/google/go-cmp v0.7.0
 	github.com/kilic/bls12-381 v0.1.1-0.20210208205449-6045b0235e36
 	github.com/mroth/weightedrand v1.0.0
