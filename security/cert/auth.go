@@ -209,3 +209,42 @@ func (c *Authority) VerifyAnyQC(proposal *hotstuff.ProposeMsg) error {
 	}
 	return c.VerifyQuorumCert(qc)
 }
+
+// VerifySyncInfo verifies the sync info and returns the highest QC found (if any),
+// the highest view, whether it was a timeout, and an error if verification failed.
+func (c *Authority) VerifySyncInfo(syncInfo hotstuff.SyncInfo) (highQC *hotstuff.QuorumCert, view hotstuff.View, timeout bool, err error) {
+	if timeoutCert, haveTC := syncInfo.TC(); haveTC {
+		if err := c.VerifyTimeoutCert(timeoutCert); err != nil {
+			return nil, 0, timeout, fmt.Errorf("failed to verify timeout certificate: %w", err)
+		}
+		view = timeoutCert.View()
+		timeout = true
+	}
+
+	if aggQC, haveAggQC := syncInfo.AggQC(); haveAggQC {
+		qc, err := c.VerifyAggregateQC(aggQC)
+		if err != nil {
+			return nil, 0, timeout, fmt.Errorf("failed to verify aggregate quorum certificate: %w", err)
+		}
+		view = max(view, aggQC.View())
+		timeout = true // an aggregate QC represents a timeout
+		highQC = &qc
+	}
+
+	if qc, haveQC := syncInfo.QC(); haveQC {
+		if err := c.VerifyQuorumCert(qc); err != nil {
+			return nil, 0, timeout, fmt.Errorf("failed to verify quorum certificate: %w", err)
+		}
+		view = max(view, qc.View())
+		if qc.View() == view {
+			// QC's view is higher or equal: not a timeout
+			highQC = &qc
+			timeout = false
+		} else if highQC == nil {
+			// QC's view is lower, but there was no AggQC
+			highQC = &qc
+		}
+	}
+
+	return highQC, view, timeout, nil
+}
