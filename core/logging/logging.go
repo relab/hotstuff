@@ -73,8 +73,13 @@ type Logger interface {
 	Warnf(template string, args ...any)
 }
 
+type Logger2 interface {
+	Infox(msg string, fields ...zap.Field)
+}
+
 type wrapper struct {
 	inner Logger
+	zapLogger *zap.Logger
 	level zap.AtomicLevel
 	mut   sync.Mutex
 }
@@ -177,6 +182,13 @@ func (wr *wrapper) Infof(template string, args ...any) {
 	wr.inner.Infof(template, args...)
 }
 
+func (wr *wrapper) Infox(msg string, fields ...zap.Field) {
+	wr.mut.Lock()
+	defer wr.mut.Unlock()
+	wr.updateLevel()
+	wr.zapLogger.Info(msg, fields...)
+}
+
 func (wr *wrapper) Panic(args ...any) {
 	wr.mut.Lock()
 	defer wr.mut.Unlock()
@@ -224,6 +236,26 @@ func New(name string) Logger {
 		panic(err)
 	}
 	return &wrapper{inner: l.Sugar().Named(name), level: config.Level}
+}
+
+func New2(name string) Logger2 {
+	var config zap.Config
+	if strings.ToLower(os.Getenv("HOTSTUFF_LOG_TYPE")) == "json" {
+		config = zap.NewProductionConfig()
+	} else {
+		config = zap.NewDevelopmentConfig()
+		if term.IsTerminal(int(os.Stderr.Fd())) {
+			config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		}
+	}
+	mut.RLock()
+	config.Level.SetLevel(logLevel)
+	mut.RUnlock()
+	l, err := config.Build(zap.AddCallerSkip(1))
+	if err != nil {
+		panic(err)
+	}
+	return &wrapper{zapLogger: l.Named(name), level: config.Level}
 }
 
 // NewWithDest returns a new logger for the given destination with the given name.
