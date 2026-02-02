@@ -9,7 +9,7 @@ import (
 	"errors"
 	"io"
 	"math"
-	"strings"
+	"slices"
 	"sync"
 	"time"
 
@@ -31,32 +31,65 @@ type qspec struct {
 	faulty int
 }
 
+// leastOverlapSet returns the set of uint64 values that appear in all slices.
+func leastOverlapSet(slices [][]uint64) []uint64 {
+	if len(slices) == 0 {
+		return []uint64{}
+	}
+
+	// Count occurrences of each value across all slices
+	occurrences := make(map[uint64]int)
+	for _, slice := range slices {
+		seen := make(map[uint64]bool)
+		for _, val := range slice {
+			if !seen[val] {
+				occurrences[val]++
+				seen[val] = true
+			}
+		}
+	}
+
+	// Find values that appear in all slices
+	result := []uint64{}
+	numSlices := len(slices)
+	for val, count := range occurrences {
+		if count == numSlices {
+			result = append(result, val)
+		}
+	}
+
+	return result
+}
+
 func (q *qspec) CommandStatusQF(command *clientpb.Command, replies map[uint32]*clientpb.CommandStatusResponse) (*clientpb.CommandStatusResponse, bool) {
 	if len(replies) < q.faulty+1 {
 		return nil, false
 	}
-	responseCount := make([]int, 4) // assuming 4 possible statuses
-
-	for _, resp := range replies {
-		if resp != nil {
-			status := resp.Status
-			if int(status) >= 0 && int(status) < len(responseCount) {
-				responseCount[int(status)]++
-			}
+	successfulHighestCmds := make([]uint64, 0, len(replies))
+	commandCount := make(map[uint64]int)
+	failedCommandIdSets := make([][]uint64, 0, len(replies))
+	for _, reply := range replies {
+		successfulHighestCmds = append(successfulHighestCmds, reply.GetHighestSequenceNumber())
+		_, ok := commandCount[reply.GetHighestSequenceNumber()]
+		if !ok {
+			commandCount[reply.GetHighestSequenceNumber()] = 1
+			continue
 		}
+		commandCount[reply.GetHighestSequenceNumber()]++
+		failedCommandIdSets = append(failedCommandIdSets, reply.GetFailedSequenceNumbers())
 	}
-	for status, count := range responseCount {
-		if count >= q.faulty+1 {
+	leastOverlapFailedCmds := leastOverlapSet(failedCommandIdSets)
+	slices.Sort(successfulHighestCmds)
+	slices.Reverse(successfulHighestCmds)
+	for _, cmd := range successfulHighestCmds {
+		if commandCount[cmd] >= q.faulty+1 {
 			return &clientpb.CommandStatusResponse{
-				Command: command,
-				Status:  clientpb.CommandStatusResponse_Status(status),
+				HighestSequenceNumber: cmd,
+				FailedSequenceNumbers: leastOverlapFailedCmds,
 			}, true
 		}
 	}
-	return &clientpb.CommandStatusResponse{
-		Command: command,
-		Status:  clientpb.CommandStatusResponse_PENDING,
-	}, false
+	return nil, false
 }
 
 type pendingCmd struct {
@@ -85,19 +118,19 @@ type Client struct {
 	logger    logging.Logger
 	id        ID
 
-	mut              sync.Mutex
-	mgr              *clientpb.Manager
-	gorumsConfig     *clientpb.Configuration
-	payloadSize      uint32
-	highestCommitted uint64 // highest sequence number acknowledged by the replicas
-	pendingCmds      chan pendingCmd
-	cancel           context.CancelFunc
-	done             chan struct{}
-	reader           io.ReadCloser
-	limiter          *rate.Limiter
-	stepUp           float64
-	stepUpInterval   time.Duration
-	timeout          time.Duration
+	mut                sync.Mutex
+	mgr                *clientpb.Manager
+	gorumsConfig       *clientpb.Configuration
+	payloadSize        uint32
+	highestCommitted   uint64 // highest sequence number acknowledged by the replicas
+	cancel             context.CancelFunc
+	done               chan struct{}
+	reader             io.ReadCloser
+	limiter            *rate.Limiter
+	stepUp             float64
+	stepUpInterval     time.Duration
+	timeout            time.Duration
+	failedCommandIdSet *BitSet
 }
 
 // New returns a new Client.
@@ -112,17 +145,16 @@ func New(
 		logger:    logger,
 		id:        id,
 
-		pendingCmds:      make(chan pendingCmd, conf.MaxConcurrent),
-		highestCommitted: 1,
-		done:             make(chan struct{}),
-		reader:           conf.Input,
-		payloadSize:      conf.PayloadSize,
-		limiter:          rate.NewLimiter(rate.Limit(conf.RateLimit), 1),
-		stepUp:           conf.RateStep,
-		stepUpInterval:   conf.RateStepInterval,
-		timeout:          conf.Timeout,
+		highestCommitted:   1,
+		done:               make(chan struct{}),
+		reader:             conf.Input,
+		payloadSize:        conf.PayloadSize,
+		limiter:            rate.NewLimiter(rate.Limit(conf.RateLimit), 1),
+		stepUp:             conf.RateStep,
+		stepUpInterval:     conf.RateStepInterval,
+		timeout:            conf.Timeout,
+		failedCommandIdSet: NewBitSet(5000000), // assuming max 5 million commands for now
 	}
-
 	var creds credentials.TransportCredentials
 	if conf.TLS {
 		creds = credentials.NewClientTLSFromCert(conf.RootCAs, "")
@@ -204,7 +236,6 @@ func (c *Client) Stop() {
 
 func (c *Client) close() {
 	// Signal the command handler to stop fetching statuses before closing the manager.
-	close(c.pendingCmds)
 	c.mgr.Close()
 	err := c.reader.Close()
 	if err != nil {
@@ -220,7 +251,6 @@ func (c *Client) sendCommands(ctx context.Context) error {
 		nextLogTime        = time.Now().Add(time.Second)
 	)
 
-loop:
 	for ctx.Err() == nil {
 
 		// step up the rate limiter
@@ -259,65 +289,14 @@ loop:
 			SequenceNumber: num,
 			Data:           data[:n],
 		}
-
-		ctx, cancel := context.WithTimeout(ctx, c.timeout)
-		c.gorumsConfig.ExecCommand(ctx, cmd)
-		pending := pendingCmd{sequenceNumber: num, sendTime: time.Now(), cancelCtx: cancel}
-
+		c.gorumsConfig.ExecCommand(context.Background(), cmd)
 		num++
-		select {
-		case c.pendingCmds <- pending:
-		case <-ctx.Done():
-			break loop
-		}
-
 		if time.Now().After(nextLogTime) {
 			c.logger.Infof("%d commands sent so far", num)
 			nextLogTime = time.Now().Add(time.Second)
 		}
-
 	}
 	return nil
-}
-
-func (c *Client) fetchCommandStatus(sequenceNumber uint64) hotstuff.CommandStatus {
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-	timeout := time.After(c.timeout)
-
-	for {
-		select {
-		case <-ticker.C:
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			cmd := &clientpb.Command{
-				ClientID:       uint32(c.id),
-				SequenceNumber: sequenceNumber,
-			}
-
-			response, err := c.gorumsConfig.CommandStatus(ctx, cmd)
-			cancel()
-
-			if err != nil {
-				c.logger.Errorf("Failed to fetch command status (client: %d, sequence: %d): %v", c.id, sequenceNumber, err)
-				// If the node/manager was closed, stop trying and return UNKNOWN.
-				if strings.Contains(err.Error(), "node closed") {
-					return hotstuff.UNKNOWN
-				}
-				continue
-			}
-			if response == nil || response.Command == nil {
-				c.logger.Errorf("Invalid response received when fetching command status (client: %d, sequence: %d)", c.id, sequenceNumber)
-				continue
-			}
-			c.logger.Infof("Fetched command status (client: %d, sequence: %d, status: %d)", c.id, sequenceNumber, response.Status)
-			status := hotstuff.CommandStatus(response.Status)
-			if status == hotstuff.COMMITTED || status == hotstuff.EXECUTED || status == hotstuff.FAILED {
-				return status
-			}
-		case <-timeout:
-			return hotstuff.UNKNOWN
-		}
-	}
 }
 
 // handleCommands will get pending commands from the pendingCmds channel and then
@@ -325,42 +304,90 @@ func (c *Client) fetchCommandStatus(sequenceNumber uint64) hotstuff.CommandStatu
 // acknowledged in the order that they were sent.
 func (c *Client) handleCommands(ctx context.Context) (executed, failed, timeout int) {
 	for {
-		var (
-			cmd pendingCmd
-			ok  bool
-		)
+		statusRefresher := time.NewTicker(100 * time.Millisecond)
 		select {
-		case cmd, ok = <-c.pendingCmds:
-			if !ok {
-				return
+		case <-statusRefresher.C:
+			commandStatus, err := c.gorumsConfig.CommandStatus(ctx, &clientpb.Command{
+				ClientID: uint32(c.id),
+			})
+			if err != nil {
+				c.logger.Error("Failed to get command status: ", err)
+				continue
 			}
+			c.mut.Lock()
+			if c.highestCommitted < commandStatus.HighestSequenceNumber {
+				c.highestCommitted = commandStatus.HighestSequenceNumber
+			}
+			for _, failedSeqNum := range commandStatus.FailedSequenceNumbers {
+				c.failedCommandIdSet.Add(failedSeqNum)
+			}
+			failed = c.failedCommandIdSet.Count()
+			executed = int(c.highestCommitted) - failed
+			timeout = 0
+			c.mut.Unlock()
 		case <-ctx.Done():
 			return
 		}
-		response := c.fetchCommandStatus(cmd.sequenceNumber)
-
-		switch response {
-		case hotstuff.UNKNOWN:
-			c.logger.Infof("Command timed out (client: %d, sequence: %d)", c.id, cmd.sequenceNumber)
-			timeout++
-		case hotstuff.FAILED:
-			c.logger.Infof("Command failed (client: %d, sequence: %d)", c.id, cmd.sequenceNumber)
-			failed++
-		default:
-			c.logger.Infof("Command executed (client: %d, sequence: %d)", c.id, cmd.sequenceNumber)
-			executed++
-		}
-		c.mut.Lock()
-		if cmd.sequenceNumber > c.highestCommitted {
-			c.highestCommitted = cmd.sequenceNumber
-		}
-		c.mut.Unlock()
-		duration := time.Since(cmd.sendTime)
-		c.eventLoop.AddEvent(LatencyMeasurementEvent{Latency: duration})
 	}
 }
 
 // LatencyMeasurementEvent represents a single latency measurement.
 type LatencyMeasurementEvent struct {
 	Latency time.Duration
+}
+
+// BitSet is a space-efficient set for uint64 values
+type BitSet struct {
+	mut  sync.Mutex
+	bits []uint64
+}
+
+func NewBitSet(maxVal uint64) *BitSet {
+	size := (maxVal / 64) + 1
+	return &BitSet{
+		bits: make([]uint64, size),
+	}
+}
+
+func (bs *BitSet) Add(val uint64) {
+	bs.mut.Lock()
+	defer bs.mut.Unlock()
+
+	index := val / 64
+	offset := val % 64
+	if index < uint64(len(bs.bits)) {
+		bs.bits[index] |= (1 << offset)
+	}
+}
+
+func (bs *BitSet) Contains(val uint64) bool {
+	bs.mut.Lock()
+	defer bs.mut.Unlock()
+
+	index := val / 64
+	offset := val % 64
+	if index < uint64(len(bs.bits)) {
+		return (bs.bits[index] & (1 << offset)) != 0
+	}
+	return false
+}
+
+func (bs *BitSet) Count() int {
+	bs.mut.Lock()
+	defer bs.mut.Unlock()
+
+	count := 0
+	for _, word := range bs.bits {
+		count += popcount(word)
+	}
+	return count
+}
+
+func popcount(x uint64) int {
+	count := 0
+	for x != 0 {
+		x &= x - 1
+		count++
+	}
+	return count
 }

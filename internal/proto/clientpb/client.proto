@@ -21,15 +21,8 @@ service Client {
 }
 
 message CommandStatusResponse {
-  enum Status {
-    UNKNOWN = 0;
-    PENDING = 1;
-    COMMITTED = 2;
-    EXECUTED = 3;
-    FAILED = 4;
-  }
-  Status status = 1;
-  Command command = 2;
+  uint64 highestSequenceNumber = 1;
+  repeated uint64 failedSequenceNumbers = 2;
 }
 
 

@@ -7,122 +7,82 @@ import (
 	"sync"
 
 	"github.com/relab/gorums"
-	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 )
 
-// clientStatusWindow tracks command statuses for a single client using an array-based approach.
-// This is more memory-efficient than nested maps, especially for increasing sequence numbers.
+const (
+	// hotstuffFailedCommandLength is the maximum number of failed sequence numbers to track per client
+	hotstuffFailedCommandLength = 100
+)
+
+// clientStatusWindow tracks command statuses for a single client.
+// It stores the highest successfully executed sequence number and a list of failed sequence numbers.
 type clientStatusWindow struct {
-	baseSeqNum uint64                   // starting sequence number for the current window
-	statuses   []hotstuff.CommandStatus // array indexed by (seqNum - baseSeqNum)
+	// HighestSuccess is the highest successfully executed sequence number for this client
+	HighestSuccess uint64
+	// FailedCmds is the list of recent failed sequence numbers (up to maxFailed entries)
+	FailedCmds []uint64
 }
 
-// CommandStatusTracker efficiently tracks command status per client per sequence number.
-// Uses array-based storage per client to avoid the overhead of nested maps.
-// Supports sliding window cleanup to prevent unbounded memory growth.
+// CommandStatusTracker stores per-client command status information.
+// It tracks the highest successful sequence number and recent failed sequence numbers for each client.
 type CommandStatusTracker struct {
-	// clientWindows maps ClientID -> client status window
+	// clientWindows maps ClientID to its status window
 	clientWindows map[uint32]*clientStatusWindow
+	// maxFailed is the maximum number of failed sequence numbers to track per client
+	maxFailed int
 }
 
-// NewCommandStatusTracker creates a new status tracker
+// ensureWindow returns the status window for clientID, creating it if it doesn't exist.
+func (cst *CommandStatusTracker) ensureWindow(clientID uint32) *clientStatusWindow {
+	w, ok := cst.clientWindows[clientID]
+	if !ok {
+		w = &clientStatusWindow{
+			FailedCmds: make([]uint64, 0, cst.maxFailed),
+		}
+		cst.clientWindows[clientID] = w
+	}
+	return w
+}
+
+// addFailed records a failed sequence number in the window.
+// If the window is full (maxFailed entries), it removes the oldest entry before adding the new one.
+func (cst *CommandStatusTracker) addFailed(client uint32, seq uint64) {
+	w := cst.ensureWindow(client)
+	// If we have reached maxFailed, remove the oldest entry
+	if len(w.FailedCmds) >= cst.maxFailed {
+		w.FailedCmds = w.FailedCmds[1:]
+	}
+	w.FailedCmds = append(w.FailedCmds, seq)
+}
+
+// NewCommandStatusTracker creates a new CommandStatusTracker with default settings.
 func NewCommandStatusTracker() *CommandStatusTracker {
 	return &CommandStatusTracker{
 		clientWindows: make(map[uint32]*clientStatusWindow),
+		maxFailed:     hotstuffFailedCommandLength,
 	}
 }
 
-// SetStatus sets the status of a command
-func (cst *CommandStatusTracker) SetStatus(clientID uint32, seqNum uint64, status hotstuff.CommandStatus) {
-	window, exists := cst.clientWindows[clientID]
-	if !exists {
-		// Initialize new window for this client, starting at this sequence number
-		window = &clientStatusWindow{
-			baseSeqNum: seqNum,
-			statuses:   make([]hotstuff.CommandStatus, 5000),
-		}
-		cst.clientWindows[clientID] = window
-		window.statuses[0] = status
+// setSuccess updates the highest successfully executed sequence number for a client.
+// It only updates if the new sequence number is higher than the current highest.
+func (cst *CommandStatusTracker) setSuccess(clientID uint32, seqNum uint64) {
+	w := cst.ensureWindow(clientID)
+	if seqNum < w.HighestSuccess {
 		return
 	}
-
-	// Check if seqNum is within current window
-	if seqNum >= window.baseSeqNum {
-		index := seqNum - window.baseSeqNum
-		// Extend array if necessary
-		if index >= uint64(len(window.statuses)) {
-			// Grow array by 50% or enough to fit the new index, whichever is larger
-			newLen := len(window.statuses) + len(window.statuses)/2 + 1
-			if int(index) >= newLen {
-				newLen = int(index) + 1
-			}
-			newStatuses := make([]hotstuff.CommandStatus, newLen)
-			copy(newStatuses, window.statuses)
-			window.statuses = newStatuses
-		}
-		window.statuses[index] = status
-	}
-	// Ignore updates for seqNum < baseSeqNum (already cleaned up)
+	w.HighestSuccess = seqNum
 }
 
-// GetStatus retrieves the status of a command. Returns StatusExecuted if not found.
-func (cst *CommandStatusTracker) GetStatus(clientID uint32, seqNum uint64) hotstuff.CommandStatus {
-	window, exists := cst.clientWindows[clientID]
-	if !exists {
-		return hotstuff.EXECUTED
-	}
-
-	// Check if seqNum is within current window
-	if seqNum >= window.baseSeqNum && seqNum < window.baseSeqNum+uint64(len(window.statuses)) {
-		index := seqNum - window.baseSeqNum
-		return window.statuses[index]
-	}
-
-	// If outside window (cleaned up or not yet added), assume executed
-	return hotstuff.EXECUTED
+// GetClientStatuses returns the status window for a given client.
+// If the client doesn't exist, it creates and returns an empty window.
+func (cst *CommandStatusTracker) GetClientStatuses(clientID uint32) *clientStatusWindow {
+	return cst.ensureWindow(clientID)
 }
 
-// Cleanup removes entries for sequence numbers less than or equal to the given threshold per client.
-// This prevents unbounded memory growth by sliding the window forward.
-func (cst *CommandStatusTracker) Cleanup(clientID uint32, upToSeqNum uint64) {
-	window, exists := cst.clientWindows[clientID]
-	if !exists {
-		return
-	}
-
-	// Calculate how many entries to remove from the front
-	if upToSeqNum >= window.baseSeqNum {
-		entriesToRemove := int(upToSeqNum - window.baseSeqNum + 1)
-		if entriesToRemove >= len(window.statuses) {
-			// Remove entire window, clean up the client entry
-			delete(cst.clientWindows, clientID)
-			return
-		}
-
-		// Slide the window forward
-		window.statuses = window.statuses[entriesToRemove:]
-		window.baseSeqNum = upToSeqNum + 1
-	}
-}
-
-// GetClientStatuses returns a snapshot of all statuses for a given client (for testing/debugging)
-func (cst *CommandStatusTracker) GetClientStatuses(clientID uint32) map[uint64]hotstuff.CommandStatus {
-	window, exists := cst.clientWindows[clientID]
-	if !exists {
-		return make(map[uint64]hotstuff.CommandStatus)
-	}
-
-	snapshot := make(map[uint64]hotstuff.CommandStatus, len(window.statuses))
-	for i, status := range window.statuses {
-		snapshot[window.baseSeqNum+uint64(i)] = status
-	}
-	return snapshot
-}
-
-// ClientIO serves a client.
+// ClientIO serves client requests and manages command execution tracking.
 type ClientIO struct {
 	logger   logging.Logger
 	cmdCache *clientpb.CommandCache
@@ -132,12 +92,12 @@ type ClientIO struct {
 	hash     hash.Hash
 	cmdCount uint32
 
-	lastExecutedSeqNum map[uint32]uint64     // highest executed sequence number per client ID
-	statusTracker      *CommandStatusTracker // tracks status of all commands (executed/aborted/failed)
-
+	lastExecutedSeqNum map[uint32]uint64     // tracks the highest executed sequence number per client ID
+	statusTracker      *CommandStatusTracker // tracks command execution status (success/failure) per client
 }
 
-// NewClientIO returns a new client IO server.
+// NewClientIO creates and returns a new ClientIO server instance.
+// It registers the server with the event loop to handle Execute and Abort events.
 func NewClientIO(
 	el *eventloop.EventLoop,
 	logger logging.Logger,
@@ -163,6 +123,7 @@ func NewClientIO(
 	return srv
 }
 
+// StartOnListener starts the gRPC server on the provided listener.
 func (srv *ClientIO) StartOnListener(lis net.Listener) {
 	go func() {
 		err := srv.srv.Serve(lis)
@@ -172,24 +133,29 @@ func (srv *ClientIO) StartOnListener(lis net.Listener) {
 	}()
 }
 
+// Stop stops the gRPC server.
 func (srv *ClientIO) Stop() {
 	srv.srv.Stop()
 }
 
+// Hash returns the current hash of all executed commands.
 func (srv *ClientIO) Hash() hash.Hash {
 	return srv.hash
 }
 
+// CmdCount returns the total number of executed commands.
 func (srv *ClientIO) CmdCount() uint32 {
 	return srv.cmdCount
 }
 
+// ExecCommand receives a command from a client and adds it to the command cache.
 func (srv *ClientIO) ExecCommand(ctx gorums.ServerCtx, cmd *clientpb.Command) {
 	srv.cmdCache.Add(cmd)
-	srv.statusTracker.SetStatus(cmd.ClientID, cmd.SequenceNumber, hotstuff.UNKNOWN)
 	ctx.Release()
 }
 
+// Exec executes a batch of commands, updating the hash and command count.
+// It skips duplicate commands and marks successful executions in the status tracker.
 func (srv *ClientIO) Exec(batch *clientpb.Batch) {
 	for _, cmd := range batch.GetCommands() {
 
@@ -201,7 +167,7 @@ func (srv *ClientIO) Exec(batch *clientpb.Batch) {
 		}
 		srv.lastExecutedSeqNum[cmd.ClientID] = cmd.SequenceNumber
 		// Mark command as executed in status tracker
-		srv.statusTracker.SetStatus(cmd.ClientID, cmd.SequenceNumber, hotstuff.EXECUTED)
+		srv.statusTracker.setSuccess(cmd.ClientID, cmd.SequenceNumber)
 		_, _ = srv.hash.Write(cmd.Data)
 		srv.cmdCount++
 		srv.mut.Unlock()
@@ -209,37 +175,32 @@ func (srv *ClientIO) Exec(batch *clientpb.Batch) {
 	srv.logger.Debugf("Hash: %.8x", srv.hash.Sum(nil))
 }
 
+// Abort marks a batch of commands as failed in the status tracker.
 func (srv *ClientIO) Abort(batch *clientpb.Batch) {
 	for _, cmd := range batch.GetCommands() {
 		srv.mut.Lock()
 		// Mark command as aborted in status tracker
-		srv.statusTracker.SetStatus(cmd.ClientID, cmd.SequenceNumber, hotstuff.FAILED)
+		srv.statusTracker.addFailed(cmd.ClientID, cmd.SequenceNumber)
 		srv.mut.Unlock()
 	}
 }
 
-// isDuplicate return true if the command has already been executed.
+// isDuplicate returns true if the command has already been executed.
 // The caller must hold srv.mut.Lock().
 func (srv *ClientIO) isDuplicate(cmd *clientpb.Command) bool {
 	seqNum, ok := srv.lastExecutedSeqNum[cmd.ClientID]
 	return ok && seqNum >= cmd.SequenceNumber
 }
 
-// CleanupOldStatuses removes command status entries that are older than the given sequence number
-// for a specific client. This should be called periodically to prevent unbounded memory growth.
-func (srv *ClientIO) CleanupOldStatuses(clientID uint32, upToSeqNum uint64) {
-	srv.mut.Lock()
-	defer srv.mut.Unlock()
-	srv.statusTracker.Cleanup(clientID, upToSeqNum)
-}
-
+// CommandStatus returns the execution status for a given command.
+// It returns the highest executed sequence number and list of failed sequence numbers for the client.
 func (srv *ClientIO) CommandStatus(_ gorums.ServerCtx, in *clientpb.Command) (resp *clientpb.CommandStatusResponse, err error) {
 	srv.mut.Lock()
 	defer srv.mut.Unlock()
-	status := srv.statusTracker.GetStatus(in.ClientID, in.SequenceNumber)
-	srv.logger.Infof("Received CommandStatus request (client: %d, sequence: %d, status: %d)", in.ClientID, in.SequenceNumber, status)
+	CommandStatus := srv.statusTracker.GetClientStatuses(in.ClientID)
+
 	return &clientpb.CommandStatusResponse{
-		Status:  clientpb.CommandStatusResponse_Status(status),
-		Command: in,
+		HighestSequenceNumber: CommandStatus.HighestSuccess,
+		FailedSequenceNumbers: CommandStatus.FailedCmds,
 	}, nil
 }
