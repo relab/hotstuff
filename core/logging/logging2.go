@@ -132,8 +132,8 @@ func New2(name string) Logger2 {
 	}
 }
 
-// NewStructuredWithDest returns a new structured logger for the given destination with the given name.
-func NewStructuredWithDest(dest io.Writer, name string) Logger2 {
+// New2WithDest returns a new structured logger for the given destination with the given name.
+func New2WithDest(dest io.Writer, name string) Logger2 {
 	atom := zap.NewAtomicLevelAt(logLevel)
 	core := zapcore.NewCore(zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()), zapcore.AddSync(dest), atom)
 	l := zap.New(core, zap.AddCallerSkip(1))
