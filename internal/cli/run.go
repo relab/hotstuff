@@ -101,7 +101,7 @@ func runSingleExperiment(cfg *config.ExperimentConfig) {
 	experiment, err := orchestration.NewExperiment(
 		cfg,
 		remoteWorkers,
-		logging.New("ctrl"),
+		logging.New2("ctrl"),
 	)
 	checkf("config error: %v", err)
 
@@ -158,7 +158,7 @@ func localWorker(globalOutput string, enableMetrics []string, interval time.Dura
 			wr := bufio.NewWriter(f)
 			defer func() { checkf("failed to flush writer: %v", wr.Flush()) }()
 
-			logger, err = metrics.NewJSONLogger(wr, logging.New("json"))
+			logger, err = metrics.NewJSONLogger(wr, logging.New2("json"))
 			checkf("failed to create JSON logger: %v", err)
 			defer func() { checkf("failed to close logger: %v", logger.Close()) }()
 		} else {

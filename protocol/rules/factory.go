@@ -11,7 +11,7 @@ import (
 )
 
 func New(
-	logger logging.Logger,
+	logger logging.Logger2,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 	name string,

@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/relab/hotstuff/core/logging"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -18,7 +19,7 @@ type Logger interface {
 }
 
 type jsonLogger struct {
-	logger logging.Logger
+	logger logging.Logger2
 
 	mut   sync.Mutex
 	wr    io.Writer
@@ -26,7 +27,7 @@ type jsonLogger struct {
 }
 
 // NewJSONLogger returns a new metrics logger that logs to the specified writer.
-func NewJSONLogger(wr io.Writer, logger logging.Logger) (Logger, error) {
+func NewJSONLogger(wr io.Writer, logger logging.Logger2) (Logger, error) {
 	_, err := io.WriteString(wr, "[\n")
 	if err != nil {
 		return nil, fmt.Errorf("failed to write start of JSON array: %v", err)
@@ -43,13 +44,13 @@ func (dl *jsonLogger) Log(msg proto.Message) {
 	if anyMsg, ok = msg.(*anypb.Any); !ok {
 		anyMsg, err = anypb.New(msg)
 		if err != nil {
-			dl.logger.Errorf("failed to create Any message: %v", err)
+			dl.logger.Error("failed to create Any message", zap.Error(err))
 			return
 		}
 	}
 	err = dl.write(anyMsg)
 	if err != nil {
-		dl.logger.Errorf("failed to write message to log: %v", err)
+		dl.logger.Error("failed to write message to log", zap.Error(err))
 	}
 }
 

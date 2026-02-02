@@ -8,6 +8,7 @@ import (
 	"github.com/relab/hotstuff/client"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"go.uber.org/zap"
 )
 
 // Enable enables logging of the specified client and replica metrics.
@@ -17,7 +18,7 @@ import (
 // Valid metric names are defined as constants in their respective metric files.
 func Enable[T client.ID | hotstuff.ID](
 	eventLoop *eventloop.EventLoop,
-	logger logging.Logger,
+	logger logging.Logger2,
 	metricsLogger Logger,
 	id T,
 	measurementInterval time.Duration,
@@ -53,7 +54,7 @@ func Enable[T client.ID | hotstuff.ID](
 			return fmt.Errorf("invalid metric: %s", name)
 		}
 	}
-	logger.Infof("Metrics enabled: %v", enabledMetrics)
+	logger.Info("Metrics enabled", zap.Strings("metrics", enabledMetrics))
 	addTicker(eventLoop, measurementInterval)
 	return nil
 }

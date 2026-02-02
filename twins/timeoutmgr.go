@@ -4,6 +4,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/protocol"
+	"go.uber.org/zap"
 )
 
 type timeoutManager struct {
@@ -24,7 +25,7 @@ func (tm *timeoutManager) advance() {
 		tm.countdown = tm.timeout
 		if tm.node.effectiveView <= view {
 			tm.node.effectiveView = view + 1
-			tm.network.logger.Infof("node %v effective view is %d due to timeout", tm.node.id, tm.node.effectiveView)
+			tm.network.logger.Info("node effective view updated due to timeout", zap.Stringer("node", tm.node.id), zap.Uint64("view", uint64(tm.node.effectiveView)))
 		}
 	}
 }

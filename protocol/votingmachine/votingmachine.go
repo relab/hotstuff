@@ -11,11 +11,12 @@ import (
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
+	"go.uber.org/zap"
 )
 
 // VotingMachine collects and verifies votes.
 type VotingMachine struct {
-	logger     logging.Logger
+	logger     logging.Logger2
 	eventLoop  *eventloop.EventLoop
 	config     *core.RuntimeConfig
 	blockchain *blockchain.Blockchain
@@ -27,7 +28,7 @@ type VotingMachine struct {
 }
 
 func New(
-	logger logging.Logger,
+	logger logging.Logger2,
 	el *eventloop.EventLoop,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
@@ -52,7 +53,7 @@ func New(
 // CollectVote handles an incoming vote.
 func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 	cert := vote.PartialCert
-	vm.logger.Debugf("CollectVote(from %d): %s", vote.ID, cert.BlockHash().SmallString())
+	vm.logger.Debug("CollectVote", zap.Uint32("from", uint32(vote.ID)), zap.String("hash", cert.BlockHash().SmallString()))
 	var (
 		block *hotstuff.Block
 		ok    bool
@@ -63,7 +64,7 @@ func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 		if !ok {
 			// if that does not work, we will try to handle this event later.
 			// hopefully, the block has arrived by then.
-			vm.logger.Debugf("Local cache miss for block: %s", cert.BlockHash().SmallString())
+			vm.logger.Debug("Local cache miss for block", zap.String("hash", cert.BlockHash().SmallString()))
 			vote.Deferred = true
 			eventloop.DelayUntil[hotstuff.ProposeMsg](vm.eventLoop, vote)
 			return
@@ -72,7 +73,7 @@ func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 		// if the block has not arrived at this point we will try to fetch it.
 		block, ok = vm.blockchain.Get(cert.BlockHash())
 		if !ok {
-			vm.logger.Debugf("Could not find block for vote: %s.", cert.BlockHash().SmallString())
+			vm.logger.Debug("Could not find block for vote", zap.String("hash", cert.BlockHash().SmallString()))
 			return
 		}
 	}
@@ -89,7 +90,7 @@ func (vm *VotingMachine) CollectVote(vote hotstuff.VoteMsg) {
 
 func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.Block) {
 	if err := vm.auth.VerifyPartialCert(cert); err != nil {
-		vm.logger.Infof("vote could not be verified: %v", err)
+		vm.logger.Info("vote could not be verified", zap.Error(err))
 		return
 	}
 	vm.mut.Lock()
@@ -111,7 +112,7 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	// Check for duplicate votes from the same signer
 	for _, v := range votes {
 		if v.Signer() == cert.Signer() {
-			vm.logger.Debugf("Ignoring duplicate vote from signer %d", cert.Signer())
+			vm.logger.Debug("Ignoring duplicate vote from signer", zap.Uint32("signer", uint32(cert.Signer())))
 			return
 		}
 	}
@@ -122,10 +123,10 @@ func (vm *VotingMachine) verifyCert(cert hotstuff.PartialCert, block *hotstuff.B
 	}
 	qc, err := vm.auth.CreateQuorumCert(block, votes)
 	if err != nil {
-		vm.logger.Infof("CollectVote: could not create QC for block: %v", err)
+		vm.logger.Info("CollectVote: could not create QC for block", zap.Error(err))
 		return
 	}
 	delete(vm.verifiedVotes, cert.BlockHash())
-	vm.logger.Debugf("CollectVote: dispatching event for new view (current : %d)", vm.state.View())
+	vm.logger.Debug("CollectVote: dispatching event for new view", zap.Uint64("current", uint64(vm.state.View())))
 	vm.eventLoop.AddEvent(hotstuff.NewViewMsg{ID: vm.config.ID(), SyncInfo: hotstuff.NewSyncInfoWith(qc)})
 }

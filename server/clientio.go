@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -17,7 +18,7 @@ import (
 
 // ClientIO serves a client.
 type ClientIO struct {
-	logger   logging.Logger
+	logger   logging.Logger2
 	cmdCache *clientpb.CommandCache
 
 	mut          sync.Mutex
@@ -32,7 +33,7 @@ type ClientIO struct {
 // NewClientIO returns a new client IO server.
 func NewClientIO(
 	el *eventloop.EventLoop,
-	logger logging.Logger,
+	logger logging.Logger2,
 	cmdCache *clientpb.CommandCache,
 	srvOpts ...gorums.ServerOption,
 ) (srv *ClientIO) {
@@ -59,7 +60,7 @@ func (srv *ClientIO) StartOnListener(lis net.Listener) {
 	go func() {
 		err := srv.srv.Serve(lis)
 		if err != nil {
-			srv.logger.Error(err)
+			srv.logger.Error("Server error", zap.Error(err))
 		}
 	}()
 }
@@ -107,7 +108,7 @@ func (srv *ClientIO) Exec(batch *clientpb.Batch) {
 		srv.completeCommand(id, nil)
 		srv.mut.Unlock()
 	}
-	srv.logger.Debugf("Hash: %.8x", srv.hash.Sum(nil))
+	srv.logger.Debug("Hash", zap.Binary("hash", srv.hash.Sum(nil)))
 }
 
 func (srv *ClientIO) Abort(batch *clientpb.Batch) {

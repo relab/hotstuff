@@ -13,6 +13,7 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -22,7 +23,7 @@ import (
 
 type GorumsSender struct {
 	eventLoop *eventloop.EventLoop
-	logger    logging.Logger
+	logger    logging.Logger2
 	config    *core.RuntimeConfig
 
 	mgrOpts   []gorums.ManagerOption
@@ -36,7 +37,7 @@ type GorumsSender struct {
 
 func NewGorumsSender(
 	el *eventloop.EventLoop,
-	logger logging.Logger,
+	logger logging.Logger2,
 	config *core.RuntimeConfig,
 
 	creds credentials.TransportCredentials,
@@ -134,24 +135,24 @@ func (s *GorumsSender) replicaConnected(c hotstuff.ReplicaConnectedEvent) {
 
 	id, err := s.config.PeerIDFromContext(c.Ctx)
 	if err != nil {
-		s.logger.Warnf("Failed to get id for %v: %v", info.Addr, err)
+		s.logger.Warn("Failed to get id", zap.Stringer("addr", info.Addr), zap.Error(err))
 		return
 	}
 
 	_, ok := s.config.ReplicaInfo(id)
 	if !ok {
-		s.logger.Warnf("Replica with id %d was not found", id)
+		s.logger.Warn("Replica not found", zap.Uint32("id", uint32(id)))
 		return
 	}
 
 	replica := s.replicas[id]
 	replica.md = readMetadata(md)
 	if err := s.config.SetReplicaMetadata(replica.id, replica.md); err != nil {
-		s.logger.Errorf("failed to set replica metadata: %v", err)
+		s.logger.Error("failed to set replica metadata", zap.Error(err))
 		return
 	}
 
-	s.logger.Debugf("Replica %d connected from address %v", id, info.Addr)
+	s.logger.Debug("Replica connected", zap.Uint32("id", uint32(id)), zap.Stringer("addr", info.Addr))
 }
 
 // Timeout sends the timeout message to all replicas.
@@ -175,7 +176,7 @@ func (s *GorumsSender) RequestBlock(ctx context.Context, hash hotstuff.Hash) (*h
 	if err != nil {
 		// filter out context errors
 		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			s.logger.Infof("Failed to fetch block: %v", err)
+			s.logger.Info("Failed to fetch block", zap.Error(err))
 		}
 		return nil, false
 	}

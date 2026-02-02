@@ -6,19 +6,20 @@ import (
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/protocol/rules"
 	"github.com/relab/hotstuff/security/blockchain"
+	"go.uber.org/zap"
 )
 
 const nameVulnerableFHS = "vulnerableFHS"
 
 // A wrapper around the FHS rules that swaps the commit rule for a vulnerable version
 type vulnerableFHS struct {
-	logger     logging.Logger
+	logger     logging.Logger2
 	blockchain *blockchain.Blockchain
 	rules.FastHotStuff
 }
 
 func NewVulnFHS(
-	logger logging.Logger,
+	logger logging.Logger2,
 	blockchain *blockchain.Blockchain,
 	inner *rules.FastHotStuff,
 ) *vulnerableFHS {
@@ -42,7 +43,7 @@ func (fhs *vulnerableFHS) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	if !ok {
 		return nil
 	}
-	fhs.logger.Debug("PRECOMMIT: ", parent)
+	fhs.logger.Debug("PRECOMMIT", zap.Stringer("block", parent))
 	grandparent, ok := fhs.qcRef(parent.QuorumCert())
 	if !ok {
 		return nil
@@ -50,7 +51,7 @@ func (fhs *vulnerableFHS) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	// NOTE: this does check for a direct link between the block and the grandparent.
 	// This is what causes the safety violation.
 	if block.Parent() == parent.Hash() && parent.Parent() == grandparent.Hash() {
-		fhs.logger.Debug("COMMIT(vulnerable): ", grandparent)
+		fhs.logger.Debug("COMMIT(vulnerable)", zap.Stringer("block", grandparent))
 		return grandparent
 	}
 	return nil

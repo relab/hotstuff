@@ -15,7 +15,7 @@ func TestTwins(t *testing.T) {
 		numTwins = 1
 	)
 
-	g := twins.NewGenerator(logging.New(""), twins.Settings{
+	g := twins.NewGenerator(logging.New2(""), twins.Settings{
 		NumNodes:   numNodes,
 		NumTwins:   numTwins,
 		Partitions: 2,

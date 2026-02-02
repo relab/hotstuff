@@ -11,7 +11,7 @@ import (
 
 // TestTimeoutContext tests that a timeout context is canceled after receiving a timeout event.
 func TestTimeoutContext(t *testing.T) {
-	logger := logging.New("test")
+	logger := logging.New2("test")
 	eventloop := eventloop.New(logger, 10)
 	ctx, cancel := eventloop.TimeoutContext()
 	defer cancel()
@@ -25,7 +25,7 @@ func TestTimeoutContext(t *testing.T) {
 
 // TestTimeoutContextView tests that a timeout context is canceled after receiving a view change event.
 func TestTimeoutContextView(t *testing.T) {
-	logger := logging.New("test")
+	logger := logging.New2("test")
 	eventloop := eventloop.New(logger, 10)
 	ctx, cancel := eventloop.TimeoutContext()
 	defer cancel()
@@ -39,7 +39,7 @@ func TestTimeoutContextView(t *testing.T) {
 
 // TestViewContext tests that a view context is canceled after receiving a view change event.
 func TestViewContext(t *testing.T) {
-	logger := logging.New("test")
+	logger := logging.New2("test")
 	eventloop := eventloop.New(logger, 10)
 	ctx, cancel := eventloop.ViewContext(nil)
 	defer cancel()
@@ -53,7 +53,7 @@ func TestViewContext(t *testing.T) {
 
 // TestViewContextEarlierView tests that a view context is not canceled when receiving a view change event for an earlier view.
 func TestViewContextEarlierView(t *testing.T) {
-	logger := logging.New("test")
+	logger := logging.New2("test")
 	eventloop := eventloop.New(logger, 10)
 	v := hotstuff.View(1)
 	ctx, cancel := eventloop.ViewContext(&v)

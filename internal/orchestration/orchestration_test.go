@@ -80,7 +80,7 @@ func run(t *testing.T, cfg *config.ExperimentConfig) {
 	experiment, err := orchestration.NewExperiment(
 		cfg,
 		map[string]orchestration.RemoteWorker{"localhost": workerProxy},
-		logging.New("ctrl"),
+		logging.New2("ctrl"),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -223,7 +223,7 @@ func TestDeployment(t *testing.T) {
 	experiment, err := orchestration.NewExperiment(
 		cfg,
 		workers,
-		logging.New("ctrl"),
+		logging.New2("ctrl"),
 	)
 	if err != nil {
 		t.Fatal(err)

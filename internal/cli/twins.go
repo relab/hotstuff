@@ -86,7 +86,7 @@ func twinsRun() {
 		err    error
 	)
 	if twinsSrc == "" {
-		source = newGen(logging.New(""))
+		source = newGen(logging.New2(""))
 	} else {
 		f, err := os.Open(twinsSrc)
 		checkf("failed to open source file: %v", err)
@@ -131,7 +131,7 @@ func twinsRun() {
 }
 
 func twinsGenerate() {
-	t, err := newInstance(newGen(logging.New("")))
+	t, err := newInstance(newGen(logging.New2("")))
 	checkf("failed to create twins instance: %v", err)
 	defer func() { checkf("failed to close twins instance: %v", t.closeOutput()) }()
 
@@ -158,7 +158,7 @@ type twinsInstance struct {
 	closeOutput  func() error
 }
 
-func newGen(logger logging.Logger) *twins.Generator {
+func newGen(logger logging.Logger2) *twins.Generator {
 	gen := twins.NewGenerator(logger, twins.Settings{
 		NumNodes:   numReplicas,
 		NumTwins:   numTwins,

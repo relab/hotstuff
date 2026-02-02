@@ -72,7 +72,7 @@ func runWorker() {
 		f, err := os.OpenFile(dataPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 		checkf("failed to create data path: %v", err)
 		writer := bufio.NewWriter(f)
-		metricsLogger, err = metrics.NewJSONLogger(writer, logging.New("json"))
+		metricsLogger, err = metrics.NewJSONLogger(writer, logging.New2("json"))
 		defer func() {
 			err = metricsLogger.Close()
 			checkf("failed to close metrics logger: %v", err)

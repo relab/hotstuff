@@ -24,7 +24,7 @@ import (
 
 type node struct {
 	config         *core.RuntimeConfig
-	logger         logging.Logger
+	logger         logging.Logger2
 	sender         *emulatedSender
 	blockchain     *blockchain.Blockchain
 	commandCache   *clientpb.CommandCache
@@ -50,7 +50,7 @@ func newNode(n *Network, nodeID NodeID, consensusName string, pk *ecdsa.PrivateK
 		config:       core.NewRuntimeConfig(nodeID.ReplicaID, pk, allOpts...),
 		commandCache: clientpb.NewCommandCache(1),
 	}
-	node.logger = logging.NewWithDest(&n.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.TwinID))
+	node.logger = logging.New2WithDest(&n.log, fmt.Sprintf("r%dn%d", nodeID.ReplicaID, nodeID.TwinID))
 	node.eventLoop = eventloop.New(node.logger, 100)
 	node.sender = newSender(n, node)
 	base, err := crypto.New(

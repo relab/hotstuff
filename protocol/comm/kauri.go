@@ -14,13 +14,14 @@ import (
 	"github.com/relab/hotstuff/protocol/comm/kauri"
 	"github.com/relab/hotstuff/security/blockchain"
 	"github.com/relab/hotstuff/security/cert"
+	"go.uber.org/zap"
 )
 
 const NameKauri = "kauri"
 
 // Kauri implements tree-based dissemination and aggregation.
 type Kauri struct {
-	logger     logging.Logger
+	logger     logging.Logger2
 	eventLoop  *eventloop.EventLoop
 	config     *core.RuntimeConfig
 	blockchain *blockchain.Blockchain
@@ -38,7 +39,7 @@ type Kauri struct {
 
 // NewKauri creates a new Kauri instance for communicating proposals and votes.
 func NewKauri(
-	logger logging.Logger,
+	logger logging.Logger2,
 	el *eventloop.EventLoop,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
@@ -86,7 +87,7 @@ func (k *Kauri) begin(p *hotstuff.ProposeMsg, pc hotstuff.PartialCert) error {
 		// TODO(meling): This is not correct use of DelayUntil, see issue #267
 		eventloop.DelayUntil[network.ConnectedEvent](k.eventLoop, func() {
 			if err := k.begin(p, pc); err != nil {
-				k.logger.Error(err)
+				k.logger.Error("Failed to begin", zap.Error(err))
 			}
 		})
 		return nil
@@ -112,7 +113,7 @@ func (k *Kauri) sendProposalToChildren(p *hotstuff.ProposeMsg) error {
 		if err != nil {
 			return fmt.Errorf("unable to send the proposal to children: %w", err)
 		}
-		k.logger.Debug("Sending proposal to children ", children)
+		k.logger.Debug("Sending proposal to children", zap.Int("count", len(children)))
 		childSender.Propose(p)
 		go k.waitToAggregate()
 	} else {
@@ -134,11 +135,11 @@ func (k *Kauri) onContributionRecv(event kauri.ContributionRecvEvent) {
 		return
 	}
 	contribution := event.Contribution
-	k.logger.Debugf("Processing the contribution from %d", contribution.ID)
+	k.logger.Debug("Processing the contribution", zap.Uint32("from", contribution.ID))
 	currentSignature := hotstuffpb.QuorumSignatureFromProto(contribution.Signature)
 	err := k.mergeContribution(currentSignature)
 	if err != nil {
-		k.logger.Errorf("Failed to merge contribution from %d: %v", contribution.ID, err)
+		k.logger.Error("Failed to merge contribution", zap.Uint32("from", contribution.ID), zap.Error(err))
 		return
 	}
 	k.senders = append(k.senders, hotstuff.ID(contribution.ID))

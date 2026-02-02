@@ -13,7 +13,7 @@ import (
 type testEvent int
 
 func TestHandler(t *testing.T) {
-	logger := logging.New("test")
+	logger := logging.New2("test")
 	el := eventloop.New(logger, 10)
 	c := make(chan any)
 	eventloop.Register(el, func(event testEvent) {
@@ -53,7 +53,7 @@ func TestPrioritize(t *testing.T) {
 		handler bool
 	}
 
-	logger := logging.New("test")
+	logger := logging.New2("test")
 	el := eventloop.New(logger, 10)
 	c := make(chan eventData)
 	eventloop.Register(el, func(event testEvent) {
@@ -103,7 +103,7 @@ func TestTicker(t *testing.T) {
 		return
 	}
 
-	logger := logging.New("test")
+	logger := logging.New2("test")
 	el := eventloop.New(logger, 10)
 	count := 0
 	eventloop.Register(el, func(event testEvent) {
@@ -135,7 +135,7 @@ func TestTicker(t *testing.T) {
 }
 
 func TestDelayedEvent(t *testing.T) {
-	logger := logging.New("test")
+	logger := logging.New2("test")
 	el := eventloop.New(logger, 10)
 	c := make(chan testEvent)
 
@@ -166,7 +166,7 @@ func TestDelayedEvent(t *testing.T) {
 }
 
 func BenchmarkEventLoopWithPrioritize(b *testing.B) {
-	logger := logging.New("test")
+	logger := logging.New2("test")
 	el := eventloop.New(logger, 100)
 
 	for range 100 {
@@ -184,7 +184,7 @@ func BenchmarkEventLoopWithPrioritize(b *testing.B) {
 }
 
 func BenchmarkEventLoopWithUnsafeRunInAddEventHandlers(b *testing.B) {
-	logger := logging.New("test")
+	logger := logging.New2("test")
 	el := eventloop.New(logger, 100)
 
 	for range 100 {
@@ -210,7 +210,7 @@ func BenchmarkEventLoopWithUnsafeRunInAddEventHandlers(b *testing.B) {
 }
 
 func BenchmarkDelay(b *testing.B) {
-	logger := logging.New("test")
+	logger := logging.New2("test")
 	el := eventloop.New(logger, 100)
 
 	for b.Loop() {

@@ -19,13 +19,14 @@ import (
 	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/orchestrationpb"
 	"github.com/relab/hotstuff/security/crypto/keygen"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
 
 // Experiment coordinates replicas and clients, controls experiment flow and
 // handles measurement output.
 type Experiment struct {
-	logger  logging.Logger
+	logger  logging.Logger2
 	workers map[string]RemoteWorker
 	output  string // path to output folder
 
@@ -40,7 +41,7 @@ type Experiment struct {
 func NewExperiment(
 	cfg *config.ExperimentConfig,
 	workers map[string]RemoteWorker,
-	logger logging.Logger,
+	logger logging.Logger2,
 ) (*Experiment, error) {
 	totalHostCount := len(cfg.ReplicaHosts) + len(cfg.ClientHosts)
 	workerCount := len(workers)
@@ -113,7 +114,7 @@ func (e *Experiment) Run() (err error) {
 	}
 
 	wait := 5 * replicaOpts.GetInitialTimeout().AsDuration()
-	e.logger.Infof("Waiting %s for replicas to finish.", wait)
+	e.logger.Info("Waiting for replicas to finish", zap.Duration("wait", wait))
 	// give the replicas some time to commit the last batch
 	time.Sleep(wait)
 
@@ -143,7 +144,7 @@ func (e *Experiment) createReplicas(replicaMap config.ReplicaMap) (cfg *orchestr
 				return nil, err
 			}
 			req.Replicas[opt.ID] = opt
-			e.logger.Infof("replica %d assigned to host %s", opt.ID, host)
+			e.logger.Info("replica assigned to host", zap.Uint32("replica", uint32(opt.ID)), zap.String("host", host))
 		}
 
 		worker := e.workers[host]
@@ -154,8 +155,13 @@ func (e *Experiment) createReplicas(replicaMap config.ReplicaMap) (cfg *orchestr
 
 		for id, replicaCfg := range wcfg.GetReplicas() {
 			replicaCfg.Address = host
-			e.logger.Debugf("Replica %d: Address: %s, PublicKey: %t, ReplicaPort: %d, ClientPort: %d",
-				id, replicaCfg.Address, len(replicaCfg.PublicKey) > 0, replicaCfg.ReplicaPort, replicaCfg.ClientPort)
+			e.logger.Debug("Replica info",
+				zap.Uint32("id", uint32(id)),
+				zap.String("address", replicaCfg.Address),
+				zap.Bool("publicKey", len(replicaCfg.PublicKey) > 0),
+				zap.Uint32("replicaPort", uint32(replicaCfg.ReplicaPort)),
+				zap.Uint32("clientPort", uint32(replicaCfg.ClientPort)),
+			)
 			cfg.Replicas[id] = replicaCfg
 		}
 	}
@@ -261,7 +267,7 @@ func (e *Experiment) startClients(cfg *orchestrationpb.ReplicaConfiguration, src
 			clientOpts := proto.CloneOf(srcClientOpt)
 			clientOpts.ID = uint32(id)
 			req.Clients[uint32(id)] = clientOpts
-			e.logger.Infof("client %d assigned to host %s", id, host)
+			e.logger.Info("client assigned to host", zap.Uint32("client", uint32(id)), zap.String("host", host))
 		}
 		_, err := worker.StartClient(req)
 		if err != nil {

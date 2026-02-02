@@ -16,6 +16,7 @@ import (
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/internal/latency"
 	"github.com/relab/hotstuff/internal/proto/hotstuffpb"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -25,7 +26,7 @@ import (
 type Server struct {
 	blockchain *blockchain.Blockchain
 	eventLoop  *eventloop.EventLoop
-	logger     logging.Logger
+	logger     logging.Logger2
 	config     *core.RuntimeConfig
 
 	id        hotstuff.ID
@@ -36,7 +37,7 @@ type Server struct {
 // NewServer creates a new Server.
 func NewServer(
 	eventLoop *eventloop.EventLoop,
-	logger logging.Logger,
+	logger logging.Logger2,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 	srvOpts ...ServerOption,
@@ -73,7 +74,7 @@ func (srv *Server) addNetworkDelay(sender hotstuff.ID) {
 		return
 	}
 	delay := srv.lm.Latency(srv.id, sender)
-	srv.logger.Debugf("Delay between %s and %s: %v\n", srv.lm.Location(srv.id), srv.lm.Location(sender), delay)
+	srv.logger.Debug("Delay between locations", zap.String("local", srv.lm.Location(srv.id)), zap.String("remote", srv.lm.Location(sender)), zap.Duration("delay", delay))
 	srv.lm.Delay(srv.id, sender)
 }
 
@@ -97,7 +98,7 @@ func (srv *Server) StartOnListener(listener net.Listener) {
 	go func() {
 		err := srv.gorumsSrv.Serve(listener)
 		if err != nil {
-			srv.logger.Errorf("An error occurred while serving: %v", err)
+			srv.logger.Error("An error occurred while serving", zap.Error(err))
 		}
 	}()
 }
@@ -116,7 +117,7 @@ type serviceImpl struct {
 func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Proposal) {
 	id, err := impl.srv.config.PeerIDFromContext(ctx)
 	if err != nil {
-		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
+		impl.srv.logger.Warn("Could not get replica ID", zap.Error(err))
 		return
 	}
 	if impl.srv.config.HasKauriTree() {
@@ -133,7 +134,7 @@ func (impl *serviceImpl) Propose(ctx gorums.ServerCtx, proposal *hotstuffpb.Prop
 func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert) {
 	id, err := impl.srv.config.PeerIDFromContext(ctx)
 	if err != nil {
-		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
+		impl.srv.logger.Warn("Could not get replica ID", zap.Error(err))
 		return
 	}
 	impl.srv.addNetworkDelay(id)
@@ -147,7 +148,7 @@ func (impl *serviceImpl) Vote(ctx gorums.ServerCtx, cert *hotstuffpb.PartialCert
 func (impl *serviceImpl) NewView(ctx gorums.ServerCtx, msg *hotstuffpb.SyncInfo) {
 	id, err := impl.srv.config.PeerIDFromContext(ctx)
 	if err != nil {
-		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
+		impl.srv.logger.Warn("Could not get replica ID", zap.Error(err))
 		return
 	}
 	impl.srv.addNetworkDelay(id)
@@ -167,7 +168,7 @@ func (impl *serviceImpl) RequestBlock(_ gorums.ServerCtx, pb *hotstuffpb.BlockHa
 		return nil, status.Errorf(codes.NotFound, "requested block was not found")
 	}
 
-	impl.srv.logger.Debugf("On RequestBlock: %s", hash.SmallString())
+	impl.srv.logger.Debug("On RequestBlock", zap.String("hash", hash.SmallString()))
 
 	return hotstuffpb.BlockToProto(block), nil
 }
@@ -176,7 +177,7 @@ func (impl *serviceImpl) RequestBlock(_ gorums.ServerCtx, pb *hotstuffpb.BlockHa
 func (impl *serviceImpl) Timeout(ctx gorums.ServerCtx, msg *hotstuffpb.TimeoutMsg) {
 	id, err := impl.srv.config.PeerIDFromContext(ctx)
 	if err != nil {
-		impl.srv.logger.Warnf("Could not get replica ID: %v", err)
+		impl.srv.logger.Warn("Could not get replica ID", zap.Error(err))
 	}
 	timeoutMsg := hotstuffpb.TimeoutMsgFromProto(msg)
 	timeoutMsg.ID = id

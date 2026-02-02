@@ -7,11 +7,12 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"go.uber.org/zap"
 )
 
 type Core struct {
 	eventLoop *eventloop.EventLoop
-	logger    logging.Logger
+	logger    logging.Logger2
 	config    *core.RuntimeConfig
 }
 
@@ -21,7 +22,11 @@ func NewCore(
 	privKey hotstuff.PrivateKey,
 	opts ...core.RuntimeOption,
 ) *Core {
-	logger := logging.New(fmt.Sprintf("%s%d", logTag, id))
+	logger := logging.New2(fmt.Sprintf("%s%d", logTag, id))
+	logger.Info("Initializing core",
+		zap.Uint32("replica_id", uint32(id)),
+		zap.String("log_tag", logTag),
+	)
 	return &Core{
 		config:    core.NewRuntimeConfig(id, privKey, opts...),
 		eventLoop: eventloop.New(logger, 100),
@@ -35,7 +40,7 @@ func (c *Core) EventLoop() *eventloop.EventLoop {
 }
 
 // Logger returns the logger instance.
-func (c *Core) Logger() logging.Logger {
+func (c *Core) Logger() logging.Logger2 {
 	return c.logger
 }
 

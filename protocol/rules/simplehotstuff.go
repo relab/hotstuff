@@ -7,6 +7,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/security/blockchain"
+	"go.uber.org/zap"
 )
 
 const NameSimpleHotStuff = "simplehotstuff"
@@ -16,7 +17,7 @@ const NameSimpleHotStuff = "simplehotstuff"
 // Based on the simplified algorithm described in the paper
 // "Formal Verification of HotStuff" by Leander Jehl.
 type SimpleHotStuff struct {
-	logger     logging.Logger
+	logger     logging.Logger2
 	config     *core.RuntimeConfig
 	blockchain *blockchain.Blockchain
 
@@ -25,7 +26,7 @@ type SimpleHotStuff struct {
 
 // NewSimpleHotStuff creates a new instance of the simple HotStuff consensus ruleset.
 func NewSimpleHotStuff(
-	logger logging.Logger,
+	logger logging.Logger2,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 ) *SimpleHotStuff {
@@ -50,7 +51,7 @@ func (hs *SimpleHotStuff) VoteRule(view hotstuff.View, proposal hotstuff.Propose
 
 	parent, ok := hs.blockchain.Get(block.QuorumCert().BlockHash())
 	if !ok {
-		hs.logger.Info("VoteRule: missing parent block: ", block.QuorumCert().BlockHash())
+		hs.logger.Info("VoteRule: missing parent block", zap.String("hash", block.QuorumCert().BlockHash().String()))
 		return false
 	}
 
@@ -74,7 +75,7 @@ func (hs *SimpleHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	gp, ok := hs.blockchain.Get(p.QuorumCert().BlockHash())
 	if ok && gp.View() > hs.locked.View() {
 		hs.locked = gp
-		hs.logger.Debug("CommitRule: updated locked block: ", gp)
+		hs.logger.Debug("CommitRule: updated locked block", zap.Stringer("block", gp))
 	} else if !ok {
 		return nil
 	}

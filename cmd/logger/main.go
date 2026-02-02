@@ -72,3 +72,6 @@ func main() {
 		zap.Int("rows_affected", 42),
 	)
 }
+
+
+/*./hotstuff run --config scripts/local_config.cue --ssh-config scripts/ssh_config.local --log-level debug &> x.log*/

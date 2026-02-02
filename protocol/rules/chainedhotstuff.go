@@ -7,13 +7,14 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/security/blockchain"
+	"go.uber.org/zap"
 )
 
 const NameChainedHotStuff = "chainedhotstuff"
 
 // ChainedHotStuff implements the pipelined three-phase HotStuff protocol.
 type ChainedHotStuff struct {
-	logger     logging.Logger
+	logger     logging.Logger2
 	config     *core.RuntimeConfig
 	blockchain *blockchain.Blockchain
 
@@ -24,7 +25,7 @@ type ChainedHotStuff struct {
 
 // NewChainedHotStuff returns a new instance of the chained HotStuff consensus ruleset.
 func NewChainedHotStuff(
-	logger logging.Logger,
+	logger logging.Logger2,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 ) *ChainedHotStuff {
@@ -53,7 +54,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 
 	// Note that we do not call UpdateHighQC here.
 	// This is done through AdvanceView, which the Consensus implementation will call.
-	hs.logger.Debug("CommitRule - PRE_COMMIT: ", block1)
+	hs.logger.Debug("CommitRule - PRE_COMMIT", zap.Stringer("block", block1))
 
 	block2, ok := hs.qcRef(block1.QuorumCert())
 	if !ok {
@@ -61,7 +62,7 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	}
 
 	if block2.View() > hs.bLock.View() {
-		hs.logger.Debug("CommitRule - COMMIT: ", block2)
+		hs.logger.Debug("CommitRule - COMMIT", zap.Stringer("block", block2))
 		hs.bLock = block2
 	}
 
@@ -70,13 +71,13 @@ func (hs *ChainedHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 		return nil
 	}
 
-	// since our implementation does not create dummy blocks every view, 
+	// since our implementation does not create dummy blocks every view,
 	// we explicitly check that the parents are in the previous view
-	if block1.Parent() == block2.Hash() && 
+	if block1.Parent() == block2.Hash() &&
 		block1.View() == block2.View()+1 &&
 		block2.Parent() == block3.Hash() &&
 		block2.View() == block3.View()+1 {
-		hs.logger.Debug("CommitRule - DECIDE: ", block3)
+		hs.logger.Debug("CommitRule - DECIDE", zap.Stringer("block", block3))
 		return block3
 	}
 

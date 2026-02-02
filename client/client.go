@@ -17,6 +17,7 @@ import (
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/internal/proto/clientpb"
+	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -62,7 +63,7 @@ type Config struct {
 // Client is a hotstuff client.
 type Client struct {
 	eventLoop *eventloop.EventLoop
-	logger    logging.Logger
+	logger    logging.Logger2
 	id        ID
 
 	mut              sync.Mutex
@@ -83,7 +84,7 @@ type Client struct {
 // New returns a new Client.
 func New(
 	eventLoop *eventloop.EventLoop,
-	logger logging.Logger,
+	logger logging.Logger2,
 	id ID,
 	conf Config,
 ) (client *Client) {
@@ -155,14 +156,16 @@ func (c *Client) Run(ctx context.Context) {
 
 	err := c.sendCommands(ctx)
 	if err != nil && !errors.Is(err, io.EOF) {
-		c.logger.Panicf("Failed to send commands: %v", err)
+		c.logger.Error("Failed to send commands", zap.Error(err))
+		panic(err)
 	}
 	c.close()
 
 	commandStats := <-commandStatsChan
-	c.logger.Infof(
-		"Done sending commands (executed: %d, failed: %d, timeouts: %d)",
-		commandStats.executed, commandStats.failed, commandStats.timeout,
+	c.logger.Info("Done sending commands",
+		zap.Int("executed", commandStats.executed),
+		zap.Int("failed", commandStats.failed),
+		zap.Int("timeouts", commandStats.timeout),
 	)
 	<-eventLoopDone
 	close(c.done)
@@ -185,7 +188,7 @@ func (c *Client) close() {
 	c.mgr.Close()
 	err := c.reader.Close()
 	if err != nil {
-		c.logger.Warn("Failed to close reader: ", err)
+		c.logger.Warn("Failed to close reader", zap.Error(err))
 	}
 }
 
@@ -249,7 +252,7 @@ loop:
 		}
 
 		if time.Now().After(nextLogTime) {
-			c.logger.Infof("%d commands sent so far", num)
+			c.logger.Info("commands sent so far", zap.Uint64("count", num))
 			nextLogTime = time.Now().Add(time.Second)
 		}
 
@@ -280,7 +283,7 @@ func (c *Client) handleCommands(ctx context.Context) (executed, failed, timeout 
 				c.logger.Debug("Command timed out.")
 				timeout++
 			} else if !errors.Is(err, context.Canceled) {
-				c.logger.Debugf("Did not get enough replies for command: %v\n", err)
+				c.logger.Debug("Did not get enough replies for command", zap.Error(err))
 				failed++
 			}
 		} else {

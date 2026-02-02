@@ -7,6 +7,7 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/protocol/consensus"
 	"github.com/relab/hotstuff/security/blockchain"
+	"go.uber.org/zap"
 )
 
 const NameFastHotStuff = "fasthotstuff"
@@ -14,14 +15,14 @@ const NameFastHotStuff = "fasthotstuff"
 // FastHotStuff is an implementation of the Fast-HotStuff protocol.
 // See the paper for details: https://arxiv.org/abs/2010.11454
 type FastHotStuff struct {
-	logger     logging.Logger
+	logger     logging.Logger2
 	config     *core.RuntimeConfig
 	blockchain *blockchain.Blockchain
 }
 
 // NewFastHotStuff returns a new instance of the FastHotStuff consensus ruleset.
 func NewFastHotStuff(
-	logger logging.Logger,
+	logger logging.Logger2,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 ) *FastHotStuff {
@@ -48,14 +49,14 @@ func (fhs *FastHotStuff) CommitRule(block *hotstuff.Block) *hotstuff.Block {
 	if !ok {
 		return nil
 	}
-	fhs.logger.Debug("PRECOMMIT: ", parent)
+	fhs.logger.Debug("PRECOMMIT", zap.Stringer("block", parent))
 	grandparent, ok := fhs.qcRef(parent.QuorumCert())
 	if !ok {
 		return nil
 	}
 	if block.Parent() == parent.Hash() && block.View() == parent.View()+1 &&
 		parent.Parent() == grandparent.Hash() && parent.View() == grandparent.View()+1 {
-		fhs.logger.Debug("COMMIT: ", grandparent)
+		fhs.logger.Debug("COMMIT", zap.Stringer("block", grandparent))
 		return grandparent
 	}
 	return nil

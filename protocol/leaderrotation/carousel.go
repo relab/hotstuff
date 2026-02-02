@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/security/blockchain"
+	"go.uber.org/zap"
 )
 
 const NameCarousel = "carousel"
@@ -18,7 +19,7 @@ type Carousel struct {
 	blockchain *blockchain.Blockchain
 	viewStates *protocol.ViewStates
 	config     *core.RuntimeConfig
-	logger     logging.Logger
+	logger     logging.Logger2
 
 	chainLength int
 }
@@ -30,7 +31,7 @@ func NewCarousel(
 	blockchain *blockchain.Blockchain,
 	viewStates *protocol.ViewStates,
 	config *core.RuntimeConfig,
-	logger logging.Logger,
+	logger logging.Logger2,
 ) *Carousel {
 	return &Carousel{
 		blockchain:  blockchain,
@@ -50,7 +51,7 @@ func (c *Carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 	}
 
 	if commitHead.View() != round-hotstuff.View(c.chainLength) {
-		c.logger.Debugf("fallback to round-robin (view=%d, commitHead=%d)", round, commitHead.View())
+		c.logger.Debug("fallback to round-robin", zap.Uint64("view", uint64(round)), zap.Uint64("commitHead", uint64(commitHead.View())))
 		return ChooseRoundRobin(round, c.config.ReplicaCount())
 	}
 
@@ -81,7 +82,7 @@ func (c *Carousel) GetLeader(round hotstuff.View) hotstuff.ID {
 	rnd := rand.New(rand.NewSource(seed))
 
 	leader := candidates[rnd.Int()%len(candidates)]
-	c.logger.Debugf("chose id %d", leader)
+	c.logger.Debug("chose id", zap.Uint32("leader", uint32(leader)))
 
 	return leader
 }

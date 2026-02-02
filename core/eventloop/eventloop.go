@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/relab/hotstuff/core/logging"
+	"go.uber.org/zap"
 )
 
 type handlerOpts struct {
@@ -52,7 +53,7 @@ type handler struct {
 
 // EventLoop accepts events of any type and executes registered event handlers.
 type EventLoop struct {
-	logger logging.Logger
+	logger logging.Logger2
 
 	eventQ queue
 
@@ -70,7 +71,7 @@ type EventLoop struct {
 
 // New returns a new event loop with the requested buffer size.
 func New(
-	logger logging.Logger,
+	logger logging.Logger2,
 	bufferSize uint,
 ) *EventLoop {
 	el := &EventLoop{
@@ -82,6 +83,9 @@ func New(
 		handlers:      make(map[reflect.Type][]handler),
 		tickers:       make(map[int]*ticker),
 	}
+	logger.Debug("EventLoop created",
+		zap.Uint("buffer_size", bufferSize),
+	)
 	return el
 }
 
@@ -135,7 +139,10 @@ func (el *EventLoop) AddEvent(event any) {
 		el.processEvent(event, true)
 		droppedEvent := el.eventQ.push(event)
 		if droppedEvent != nil {
-			el.logger.Warnf("event queue is full, dropped event: %v", droppedEvent)
+			el.logger.Warn("Event queue is full, dropped event",
+				zap.String("dropped_event_type", reflect.TypeOf(droppedEvent).String()),
+				zap.Any("dropped_event", droppedEvent),
+			)
 		}
 	}
 }
@@ -301,7 +308,11 @@ func (el *EventLoop) AddTicker(interval time.Duration, callback func(tick time.T
 	// so we need to start the ticker from the run loop.
 	droppedEvent := el.eventQ.push(startTickerEvent{id})
 	if droppedEvent != nil {
-		el.logger.Warnf("event queue is full, dropped event: %v", droppedEvent)
+		el.logger.Warn("Event queue is full, dropped ticker start event",
+			zap.Int("ticker_id", id),
+			zap.Duration("interval", interval),
+			zap.String("dropped_event_type", reflect.TypeOf(droppedEvent).String()),
+		)
 	}
 
 	return id

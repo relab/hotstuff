@@ -21,7 +21,7 @@ type Consensus struct {
 
 func NewConsensus(
 	eventLoop *eventloop.EventLoop,
-	logger logging.Logger,
+	logger logging.Logger2,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 	auth *cert.Authority,

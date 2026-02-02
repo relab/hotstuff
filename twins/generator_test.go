@@ -16,7 +16,7 @@ func TestPartitionsGenerator(t *testing.T) {
 }
 
 func TestGenerator(t *testing.T) {
-	g := NewGenerator(logging.New(""), Settings{
+	g := NewGenerator(logging.New2(""), Settings{
 		NumNodes:   4,
 		NumTwins:   1,
 		Partitions: 3,
@@ -66,11 +66,11 @@ func TestAssignNodeIDs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotNodes, gotTwins := assignNodeIDs(tt.numNodes, tt.numTwins)
-			
+
 			if !reflect.DeepEqual(gotNodes, tt.wantNodes) {
 				t.Errorf("assignNodeIDs() gotNodes = %v, want %v", gotNodes, tt.wantNodes)
 			}
-			
+
 			if !reflect.DeepEqual(gotTwins, tt.wantTwins) {
 				t.Errorf("assignNodeIDs() gotTwins = %v, want %v", gotTwins, tt.wantTwins)
 			}

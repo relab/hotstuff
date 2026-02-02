@@ -16,7 +16,7 @@ type Client struct {
 // NewClient returns a set of dependencies for serving clients through
 func NewClient(
 	eventLoop *eventloop.EventLoop,
-	logger logging.Logger,
+	logger logging.Logger2,
 	commandBatchSize uint32,
 	clientSrvOpts ...gorums.ServerOption,
 ) *Client {

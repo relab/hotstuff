@@ -8,12 +8,13 @@ import (
 
 	"github.com/relab/hotstuff"
 	"github.com/relab/hotstuff/core/logging"
+	"go.uber.org/zap"
 )
 
 // Generator generates twins scenarios.
 type Generator struct {
 	mut               sync.Mutex
-	logger            logging.Logger
+	logger            logging.Logger2
 	remaining         int64
 	allNodes          []NodeID
 	indices           []int
@@ -44,7 +45,7 @@ func assignNodeIDs(numNodes, numTwins uint8) (nodes, twins []NodeID) {
 }
 
 // NewGenerator creates a new generator.
-func NewGenerator(logger logging.Logger, settings Settings) *Generator {
+func NewGenerator(logger logging.Logger2, settings Settings) *Generator {
 	g := &Generator{
 		logger:   logger,
 		allNodes: make([]NodeID, 0, settings.NumNodes+settings.NumTwins),
@@ -73,10 +74,7 @@ func NewGenerator(logger logging.Logger, settings Settings) *Generator {
 
 	g.remaining = int64(math.Pow(float64(len(g.leadersPartitions)), float64(g.settings.Views)))
 
-	g.logger.Infof(
-		"%d scenarios can be generated with current settings.",
-		g.remaining,
-	)
+	g.logger.Info("scenarios can be generated with current settings", zap.Int64("count", g.remaining))
 
 	return g
 }

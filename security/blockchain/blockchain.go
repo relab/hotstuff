@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/eventloop"
 	"github.com/relab/hotstuff/core/logging"
+	"go.uber.org/zap"
 )
 
 // Blockchain stores a limited amount of blocks in a map.
@@ -17,7 +18,7 @@ import (
 type Blockchain struct {
 	sender    core.Sender
 	eventLoop *eventloop.EventLoop
-	logger    logging.Logger
+	logger    logging.Logger2
 
 	mut         sync.Mutex
 	pruneHeight hotstuff.View
@@ -31,7 +32,7 @@ type Blockchain struct {
 // Blocks are dropped in least recently used order.
 func New(
 	eventLoop *eventloop.EventLoop,
-	logger logging.Logger,
+	logger logging.Logger2,
 	sender core.Sender,
 ) *Blockchain {
 	bc := &Blockchain{
@@ -54,7 +55,7 @@ func (chain *Blockchain) Store(block *hotstuff.Block) {
 
 	// do not store existing blocks, otherwise something is terribly wrong.
 	if _, ok := chain.blocks[block.Hash()]; ok {
-		chain.logger.Warnf("block already exists: %s", block.String())
+		chain.logger.Warn("block already exists", zap.String("block", block.String()))
 		return
 	}
 
@@ -113,7 +114,7 @@ func (chain *Blockchain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 	chain.pendingFetch[hash] = cancel
 
 	chain.mut.Unlock()
-	chain.logger.Debugf("Attempting to fetch block: %s", hash.SmallString())
+	chain.logger.Debug("Attempting to fetch block", zap.String("hash", hash.SmallString()))
 	block, ok = chain.sender.RequestBlock(ctx, hash)
 	chain.mut.Lock()
 
@@ -124,7 +125,7 @@ func (chain *Blockchain) Get(hash hotstuff.Hash) (block *hotstuff.Block, ok bool
 		goto done
 	}
 
-	chain.logger.Debugf("Successfully fetched block: %s", hash.SmallString())
+	chain.logger.Debug("Successfully fetched block", zap.String("hash", hash.SmallString()))
 
 	chain.blocks[hash] = block
 	chain.blockAtHeight[block.View()] = block
@@ -173,7 +174,7 @@ func (chain *Blockchain) PruneToHeight(committedHeight, height hotstuff.View) (f
 		if !committedViews[h] {
 			block, ok := chain.blockAtHeight[h]
 			if ok {
-				chain.logger.Debugf("PruneToHeight: found forked block: %v", block)
+				chain.logger.Debug("PruneToHeight: found forked block", zap.Stringer("block", block))
 				forkedBlocks = append(forkedBlocks, block)
 			}
 		}

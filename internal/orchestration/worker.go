@@ -28,6 +28,7 @@ import (
 	"github.com/relab/hotstuff/security/crypto/keygen"
 	"github.com/relab/hotstuff/server"
 	"github.com/relab/hotstuff/wiring"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -195,7 +196,7 @@ func (w *Worker) createReplica(opts *orchestrationpb.ReplicaOpts) (*replica.Repl
 		depsCore.RuntimeCfg(),
 		creds,
 	)
-	depsCore.Logger().Debugf("Initializing module (crypto): %s", opts.GetCrypto())
+	depsCore.Logger().Debug("Initializing module (crypto)", zap.String("module", opts.GetCrypto()))
 	base, err := crypto.New(
 		depsCore.RuntimeCfg(),
 		opts.GetCrypto(),
@@ -243,7 +244,7 @@ func initConsensusModules(
 	synchronizer.ViewDuration,
 	error,
 ) {
-	depsCore.Logger().Debugf("Initializing module (consensus rules): %s", opts.GetConsensus())
+	depsCore.Logger().Debug("Initializing module (consensus rules)", zap.String("module", opts.GetConsensus()))
 	consensusRules, err := rules.New(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
@@ -254,7 +255,7 @@ func initConsensusModules(
 		return nil, nil, nil, nil, nil, err
 	}
 	if byzStrategy := opts.GetByzantineStrategy(); byzStrategy != "" {
-		depsCore.Logger().Debugf("Initializing module (byzantine strategy): %s", byzStrategy)
+		depsCore.Logger().Debug("Initializing module (byzantine strategy)", zap.String("module", byzStrategy))
 		byz, err := byzantine.Wrap(
 			depsCore.RuntimeCfg(),
 			depsSecure.Blockchain(),
@@ -273,7 +274,7 @@ func initConsensusModules(
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
-	depsCore.Logger().Debugf("Initializing module (leader rotation): %s", opts.GetLeaderRotation())
+	depsCore.Logger().Debug("Initializing module (leader rotation)", zap.String("module", opts.GetLeaderRotation()))
 	leaderRotation, err := leaderrotation.New(
 		depsCore.Logger(),
 		depsCore.RuntimeCfg(),
@@ -285,7 +286,7 @@ func initConsensusModules(
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
-	depsCore.Logger().Debugf("Initializing module (communication): %s", opts.GetCommunication())
+	depsCore.Logger().Debug("Initializing module (communication)", zap.String("module", opts.GetCommunication()))
 	comm, err := comm.New(
 		depsCore.Logger(),
 		depsCore.EventLoop(),
@@ -391,7 +392,7 @@ func (w *Worker) startClients(req *orchestrationpb.StartClientRequest) (*orchest
 			RateStepInterval: opts.GetRateStepInterval().AsDuration(),
 			Timeout:          opts.GetTimeout().AsDuration(),
 		}
-		logger := logging.New("cli" + opts.ClientIDString())
+		logger := logging.New2("cli" + opts.ClientIDString())
 		eventLoop := eventloop.New(logger, 1000)
 
 		if w.measurementInterval > 0 {

@@ -9,7 +9,7 @@ import (
 )
 
 func newTwinsConsensusRules(
-	logger logging.Logger,
+	logger logging.Logger2,
 	config *core.RuntimeConfig,
 	blockchain *blockchain.Blockchain,
 	name string,

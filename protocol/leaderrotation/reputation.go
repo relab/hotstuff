@@ -10,6 +10,7 @@ import (
 	"github.com/relab/hotstuff/core"
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/protocol"
+	"go.uber.org/zap"
 )
 
 const NameReputation = "reputation"
@@ -19,7 +20,7 @@ type reputationsMap map[hotstuff.ID]float64
 type RepBased struct {
 	viewStates *protocol.ViewStates
 	config     *core.RuntimeConfig
-	logger     logging.Logger
+	logger     logging.Logger2
 
 	chainLength    int
 	prevCommitHead *hotstuff.Block
@@ -70,11 +71,11 @@ func (r *RepBased) GetLeader(view hotstuff.View) hotstuff.ID {
 		r.prevCommitHead = block
 	}
 
-	r.logger.Debug(weights)
+	r.logger.Debug("weighted choices calculated", zap.Int("count", len(weights)))
 
 	chooser, err := wr.NewChooser(weights...)
 	if err != nil {
-		r.logger.Error("weightedrand error: ", err)
+		r.logger.Error("weightedrand error", zap.Error(err))
 		return 0
 	}
 
@@ -82,7 +83,7 @@ func (r *RepBased) GetLeader(view hotstuff.View) hotstuff.ID {
 	rnd := rand.New(rand.NewSource(seed))
 
 	leader := chooser.PickSource(rnd).(hotstuff.ID)
-	r.logger.Debugf("picked leader %d for view %d using seed %d", leader, view, seed)
+	r.logger.Debug("picked leader", zap.Uint32("leader", uint32(leader)), zap.Uint64("view", uint64(view)), zap.Int64("seed", seed))
 
 	return leader
 }
@@ -93,7 +94,7 @@ func NewRepBased(
 
 	viewStates *protocol.ViewStates,
 	config *core.RuntimeConfig,
-	logger logging.Logger,
+	logger logging.Logger2,
 ) *RepBased {
 	return &RepBased{
 		viewStates: viewStates,

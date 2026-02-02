@@ -10,12 +10,13 @@ import (
 	"github.com/relab/hotstuff/internal/proto/clientpb"
 	"github.com/relab/hotstuff/protocol"
 	"github.com/relab/hotstuff/security/blockchain"
+	"go.uber.org/zap"
 )
 
 // Committer commits the correct block for a view.
 type Committer struct {
 	eventLoop  *eventloop.EventLoop
-	logger     logging.Logger
+	logger     logging.Logger2
 	blockchain *blockchain.Blockchain
 	viewStates *protocol.ViewStates
 	ruler      CommitRuler
@@ -23,7 +24,7 @@ type Committer struct {
 
 func NewCommitter(
 	eventLoop *eventloop.EventLoop,
-	logger logging.Logger,
+	logger logging.Logger2,
 	blockchain *blockchain.Blockchain,
 	viewStates *protocol.ViewStates,
 	ruler CommitRuler,
@@ -42,7 +43,7 @@ func NewCommitter(
 // This eligible block is then used as the starting point for recursively
 // committing its uncommitted ancestor blocks.
 func (cm *Committer) TryCommit(block *hotstuff.Block) error {
-	cm.logger.Debugf("TryCommit: %v", block)
+	cm.logger.Debug("TryCommit", zap.Stringer("block", block))
 	cm.blockchain.Store(block)
 	// check commit rule and get the next block to commit. If it was nil, do nothing.
 	if blockToCommit := cm.ruler.CommitRule(block); blockToCommit != nil {
@@ -86,7 +87,7 @@ func (cm *Committer) commitInner(block, committedBlock *hotstuff.Block) error {
 	} else {
 		return fmt.Errorf("failed to locate block: %s", block.Parent().SmallString())
 	}
-	cm.logger.Debug("EXEC: ", block)
+	cm.logger.Debug("EXEC", zap.Stringer("block", block))
 	batch := block.Commands()
 	// CommitEvent holds the entire block and is used in twins since it needs the hash.
 	cm.eventLoop.AddEvent(hotstuff.CommitEvent{Block: block})
