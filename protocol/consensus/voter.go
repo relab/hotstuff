@@ -99,6 +99,15 @@ func (v *Voter) Verify(proposal *hotstuff.ProposeMsg) (err error) {
 	if blockView <= v.lastVotedView {
 		return fmt.Errorf("block view %d too old, last voted view was %d", blockView, v.lastVotedView)
 	}
+	// Block.Parent must equal Block.QC.BlockHash to ensure chain consistency.
+	// Without this check, a Byzantine leader could create a malformed block where
+	// Parent points to an early block while QC points to the latest block,
+	// causing blockchain data structure inconsistency.
+	if proposal.Block.Parent() != proposal.Block.QuorumCert().BlockHash() {
+		return fmt.Errorf("block parent %s does not match QC block %s",
+			proposal.Block.Parent().SmallString(),
+			proposal.Block.QuorumCert().BlockHash().SmallString())
+	}
 	// vote rule must be valid
 	if !v.ruler.VoteRule(blockView, *proposal) {
 		return fmt.Errorf("vote rule not satisfied")
