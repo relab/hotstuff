@@ -1,0 +1,53 @@
+# Grafana Loki stack for HotStuff log aggregation.
+#
+# Usage:
+#   cd scripts/loki
+#   docker compose up -d
+#
+# Access:
+#   Grafana:  http://localhost:3000  (admin / admin)
+#   Loki API: http://localhost:3100
+#
+# Then run HotStuff with Loki enabled:
+#   ./hotstuff run --config scripts/local_config.cue \
+#     --ssh-config scripts/ssh_config.local \
+#     --log-level debug \
+#     --loki-url http://localhost:3100/loki/api/v1/push \
+#     --loki-labels node=controller,env=local
+
+services:
+  loki:
+    image: grafana/loki:3.4.2
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    volumes:
+      - ./provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  loki-data:
+  grafana-data:

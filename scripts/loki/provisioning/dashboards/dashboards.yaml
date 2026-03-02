@@ -1,0 +1,13 @@
+# Grafana dashboard provisioning: auto-load HotStuff dashboards.
+apiVersion: 1
+
+providers:
+  - name: HotStuff
+    orgId: 1
+    folder: HotStuff
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json
+      foldersFromFilesStructure: false

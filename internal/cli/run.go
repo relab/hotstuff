@@ -25,6 +25,8 @@ import (
 )
 
 func runController() {
+	defer logging.SyncLoki()
+
 	cfg, err := config.NewViper()
 	checkf("viper config error: %v", err)
 

@@ -60,6 +60,8 @@ func init() {
 }
 
 func runWorker() {
+	defer logging.SyncLoki()
+
 	stopProfilers, err := profiling.StartProfilers(cpuProfile, memProfile, trace, fgprofProfile)
 	checkf("failed to start profilers: %v", err)
 	defer func() {

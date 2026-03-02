@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/relab/hotstuff/core/logging"
 	"github.com/relab/hotstuff/protocol/comm"
@@ -100,6 +101,18 @@ func init() {
 	cobra.CheckErr(viper.BindPFlag("log-level", rootCmd.PersistentFlags().Lookup("log-level")))
 	rootCmd.PersistentFlags().StringSlice("log-pkgs", []string{}, "set the log level on a per-package basis.")
 	cobra.CheckErr(viper.BindPFlag("log-pkgs", rootCmd.PersistentFlags().Lookup("log-pkgs")))
+
+	// Loki log aggregation flags
+	rootCmd.PersistentFlags().String("loki-url", "", "Loki push API URL (e.g. http://localhost:3100/loki/api/v1/push). Enables Loki log shipping when set.")
+	cobra.CheckErr(viper.BindPFlag("loki-url", rootCmd.PersistentFlags().Lookup("loki-url")))
+	rootCmd.PersistentFlags().StringSlice("loki-labels", []string{}, "static labels for Loki streams as key=value pairs (e.g. node=replica-1,env=dev)")
+	cobra.CheckErr(viper.BindPFlag("loki-labels", rootCmd.PersistentFlags().Lookup("loki-labels")))
+	rootCmd.PersistentFlags().String("loki-tenant-id", "", "Loki tenant ID for multi-tenant setups (X-Scope-OrgID header)")
+	cobra.CheckErr(viper.BindPFlag("loki-tenant-id", rootCmd.PersistentFlags().Lookup("loki-tenant-id")))
+	rootCmd.PersistentFlags().Int("loki-batch-size", 100, "max log entries to buffer before pushing to Loki")
+	cobra.CheckErr(viper.BindPFlag("loki-batch-size", rootCmd.PersistentFlags().Lookup("loki-batch-size")))
+	rootCmd.PersistentFlags().Duration("loki-batch-wait", 1*time.Second, "max time to wait before flushing a partial batch to Loki")
+	cobra.CheckErr(viper.BindPFlag("loki-batch-wait", rootCmd.PersistentFlags().Lookup("loki-batch-wait")))
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -129,6 +142,25 @@ func initConfig() {
 	}
 
 	logging.SetLogLevel(viper.GetString("log-level"))
+
+	// Configure Loki if URL is provided (via --loki-url flag or HOTSTUFF_LOKI_URL env var)
+	lokiURL := viper.GetString("loki-url")
+	if lokiURL != "" {
+		labels := map[string]string{"app": "hotstuff"}
+		for _, lbl := range viper.GetStringSlice("loki-labels") {
+			parts := strings.SplitN(lbl, "=", 2)
+			if len(parts) == 2 {
+				labels[parts[0]] = parts[1]
+			}
+		}
+		logging.SetLokiConfig(&logging.LokiConfig{
+			URL:       lokiURL,
+			Labels:    labels,
+			TenantID:  viper.GetString("loki-tenant-id"),
+			BatchSize: viper.GetInt("loki-batch-size"),
+			BatchWait: viper.GetDuration("loki-batch-wait"),
+		})
+	}
 
 	packageLevels := viper.GetStringSlice("log-pkgs")
 

@@ -1,0 +1,239 @@
+{
+    "annotations": {
+        "list": []
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [],
+    "panels": [
+        {
+            "title": "Log Volume by Level",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            },
+            "datasource": {
+                "type": "loki",
+                "uid": ""
+            },
+            "targets": [
+                {
+                    "expr": "sum by (level) (count_over_time({app=\"hotstuff\"} | json | __error__=\"\" [1m]))",
+                    "legendFormat": "{{ level }}",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "bars",
+                        "stacking": {
+                            "mode": "normal"
+                        },
+                        "fillOpacity": 80
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "error"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "red",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "warn"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "orange",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "info"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "green",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "debug"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "blue",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "title": "All Logs",
+            "type": "logs",
+            "gridPos": {
+                "h": 16,
+                "w": 24,
+                "x": 0,
+                "y": 8
+            },
+            "datasource": {
+                "type": "loki",
+                "uid": ""
+            },
+            "targets": [
+                {
+                    "expr": "{app=\"hotstuff\"} | json",
+                    "refId": "A"
+                }
+            ],
+            "options": {
+                "showTime": true,
+                "showLabels": true,
+                "showCommonLabels": false,
+                "wrapLogMessage": true,
+                "prettifyLogMessage": true,
+                "enableLogDetails": true,
+                "sortOrder": "Descending",
+                "dedupStrategy": "none"
+            }
+        },
+        {
+            "title": "Error Logs",
+            "type": "logs",
+            "gridPos": {
+                "h": 12,
+                "w": 24,
+                "x": 0,
+                "y": 24
+            },
+            "datasource": {
+                "type": "loki",
+                "uid": ""
+            },
+            "targets": [
+                {
+                    "expr": "{app=\"hotstuff\"} | json | level=\"error\"",
+                    "refId": "A"
+                }
+            ],
+            "options": {
+                "showTime": true,
+                "showLabels": true,
+                "showCommonLabels": false,
+                "wrapLogMessage": true,
+                "prettifyLogMessage": true,
+                "enableLogDetails": true,
+                "sortOrder": "Descending",
+                "dedupStrategy": "none"
+            }
+        },
+        {
+            "title": "Logs by Logger Name",
+            "type": "logs",
+            "gridPos": {
+                "h": 12,
+                "w": 24,
+                "x": 0,
+                "y": 36
+            },
+            "datasource": {
+                "type": "loki",
+                "uid": ""
+            },
+            "targets": [
+                {
+                    "expr": "{app=\"hotstuff\"} | json | logger=~\"$logger\"",
+                    "refId": "A"
+                }
+            ],
+            "options": {
+                "showTime": true,
+                "showLabels": true,
+                "showCommonLabels": false,
+                "wrapLogMessage": true,
+                "prettifyLogMessage": true,
+                "enableLogDetails": true,
+                "sortOrder": "Descending",
+                "dedupStrategy": "none"
+            }
+        }
+    ],
+    "refresh": "5s",
+    "schemaVersion": 39,
+    "tags": [
+        "hotstuff",
+        "loki"
+    ],
+    "templating": {
+        "list": [
+            {
+                "current": {
+                    "selected": false,
+                    "text": ".*",
+                    "value": ".*"
+                },
+                "description": "Filter by logger name (e.g. ctrl, json, database)",
+                "label": "Logger",
+                "name": "logger",
+                "query": ".*",
+                "type": "textbox"
+            },
+            {
+                "current": {
+                    "selected": false,
+                    "text": "",
+                    "value": ""
+                },
+                "description": "Filter by node label",
+                "label": "Node",
+                "name": "node",
+                "query": "",
+                "type": "textbox"
+            }
+        ]
+    },
+    "time": {
+        "from": "now-15m",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "browser",
+    "title": "HotStuff Logs",
+    "uid": "hotstuff-logs",
+    "version": 1
+}
