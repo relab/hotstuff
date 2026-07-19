@@ -303,6 +303,9 @@ func (s *Synchronizer) advanceView(syncInfo hotstuff.SyncInfo) {
 		}
 		return
 	}
+	if !timeout {
+		return
+	}
 	if err := s.sender.NewView(leader, syncInfo); err != nil {
 		s.logger.Warnf("advanceView: error on sending new view: %v", err)
 	}
